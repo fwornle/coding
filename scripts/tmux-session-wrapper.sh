@@ -18,6 +18,44 @@
 #
 # Prerequisite: tmux must be installed (handled by install.sh)
 
+# Emit a diagnostic post-mortem when an agent session dies during startup.
+# Surfaces the tail of the captured launch output so the real error (a failed
+# MCP gate, missing config, proxy/auth hiccup) is visible instead of a silent
+# drop back to the shell prompt.
+_tmux_wrapper_report_fast_exit() {
+  local session_name="$1"
+  local log_file="$2"
+  local start_epoch="$3"
+  local lived=$(( $(date +%s) - start_epoch ))
+
+  {
+    echo ""
+    echo "[tmux-wrapper] ⚠️  Session '${session_name}' exited after ${lived}s — the agent failed to start."
+    echo "[tmux-wrapper]     The launch command died before the session became interactive."
+    if [ -n "$log_file" ] && [ -s "$log_file" ]; then
+      echo "[tmux-wrapper] ─── tail of the failed launch ──────────────────────────────"
+      tail -n 25 "$log_file" 2>/dev/null | tr -d '\r'
+      echo "[tmux-wrapper] ────────────────────────────────────────────────────────────"
+      echo "[tmux-wrapper]     Full log: ${log_file}"
+    else
+      echo "[tmux-wrapper]     (no output captured — the command exited too fast to log)"
+    fi
+    echo "[tmux-wrapper]     Likely causes: MCP services not ready (VKB :8080), missing MCP"
+    echo "[tmux-wrapper]     config, or a transient proxy/auth hiccup. Re-running 'coding'"
+    echo "[tmux-wrapper]     usually clears a startup timing race."
+  } >&2
+}
+
+# Heuristic: does the captured startup log show a launch-failure signature?
+# Anchored to launcher-specific markers so a healthy session's early output
+# does not trigger a false post-mortem.
+_looks_like_launch_failure() {
+  local log="$1"
+  [ -n "$log" ] && [ -s "$log" ] || return 1
+  tail -n 40 "$log" 2>/dev/null | tr -d '\r' | \
+    grep -qiE '❌|validation failed|config file not found|command not found|no such file|not reachable|exit code [1-9]'
+}
+
 tmux_session_wrapper() {
   local cmd="$1"
   shift
@@ -98,11 +136,46 @@ tmux_session_wrapper() {
     inner_cmd="${inner_cmd} '${arg}'"
   done
 
+  # Diagnostic capture: record the launch pane's early output so that if the
+  # inner command dies before the session becomes interactive (a failed
+  # pre-flight gate inside claude-mcp-launcher.sh, a transient proxy/auth
+  # hiccup, etc.) we can surface WHY instead of dropping the user back to a
+  # bare shell with no explanation.
+  local launch_log_dir="${coding_repo}/.logs/launch"
+  mkdir -p "$launch_log_dir" 2>/dev/null || true
+  find "$launch_log_dir" -type f -mtime +7 -delete 2>/dev/null || true
+  local launch_log="${launch_log_dir}/${session_name}-$(date +%s).log"
+  local session_start_epoch
+  session_start_epoch=$(date +%s)
+
   # Create detached session running the agent command
   tmux new-session -d -s "$session_name" "$inner_cmd"
 
-  # Configure status bar on the new session
-  _configure_tmux_status "$session_name"
+  # Fast-fail: the inner command may have exited before the session even
+  # settled (e.g. missing MCP config → immediate exit 1). If so there is
+  # nothing to attach to — report and bail instead of a silent return.
+  if ! tmux has-session -t "$session_name" 2>/dev/null; then
+    _tmux_wrapper_report_fast_exit "$session_name" "$launch_log" "$session_start_epoch"
+    return 1
+  fi
+
+  # Tap the pane's output into the diagnostic log during startup. We disarm the
+  # pipe after the pre-flight window (validate-mcp-startup.sh waits up to 30s)
+  # so a healthy interactive session is NOT logged in full. Skipped when the
+  # caller already owns pipe capture (AGENT_ENABLE_PIPE_CAPTURE), whose file we
+  # reuse for the post-mortem instead.
+  if [ "${AGENT_ENABLE_PIPE_CAPTURE}" != "true" ]; then
+    tmux pipe-pane -t "$session_name" "cat >> '${launch_log}'" 2>/dev/null || true
+    ( sleep 35
+      tmux has-session -t "$session_name" 2>/dev/null && \
+        tmux pipe-pane -t "$session_name" 2>/dev/null
+    ) >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+  fi
+
+  # Configure status bar on the new session (guarded — the session can still
+  # race-die between the check above and here).
+  _configure_tmux_status "$session_name" 2>/dev/null || true
 
   # --- Optional: pipe-pane capture for non-native agents ---
   local capture_monitor_pid=""
@@ -135,6 +208,18 @@ tmux_session_wrapper() {
   # Cleanup: stop capture monitor if running
   if [ -n "$capture_monitor_pid" ] && kill -0 "$capture_monitor_pid" 2>/dev/null; then
     kill "$capture_monitor_pid" 2>/dev/null || true
+  fi
+
+  # Post-mortem: if the session is gone now, distinguish a normal detach/quit
+  # from a startup crash. A crash either dies almost instantly (< 5s) or leaves
+  # a recognisable failure signature in the captured startup log. Must run
+  # BEFORE kill-session so has-session reflects the real state.
+  if ! tmux has-session -t "$session_name" 2>/dev/null; then
+    local lived=$(( $(date +%s) - session_start_epoch ))
+    local diag_log="${TMUX_CAPTURE_FILE:-$launch_log}"
+    if [ "$lived" -lt 5 ] || _looks_like_launch_failure "$diag_log"; then
+      _tmux_wrapper_report_fast_exit "$session_name" "$diag_log" "$session_start_epoch"
+    fi
   fi
 
   # After attach returns, clean up the session if it still exists
