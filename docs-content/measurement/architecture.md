@@ -28,6 +28,10 @@ A run's tokens are classified into three **role lanes** — **foreground develop
 
 **The Ambient activity panel.** Below each run's timeline, a collapsible **"Concurrent background activity"** panel honestly surfaces those in-window, unattributed processes (per process: role, calls, tokens, models). It is never a causation claim — just "this was happening at the same time" — and it makes the knowledge-capture + infrastructure spend that the task-exact stats deliberately exclude *visible* instead of hidden.
 
+**Per-turn rows for every role.** The role summary cards and the Ambient panel are *aggregates*; the timeline itself renders **individual per-turn rows for all three roles, interleaved chronologically** by timestamp. Foreground turns carry their full per-request context (tool calls, prompt preview, reasoning sub-bands); the in-window background/infrastructure calls render as lean, role-coloured rows (timestamp · process pill · model · tokens) with no fabricated drill-down, since that telemetry is foreground-only. Two backend readers feed this from the same proxy `token_usage` window: `readAmbientBackground` (`GROUP BY process`) powers the summary card counts + the Ambient panel, while `readAmbientTimeline` returns the same calls **individually** so they can be woven into the list. Three **role-filter checkboxes** above the list show/hide each lane — un-checking *Foreground development* isolates the background timeline; the per-row counts stay consistent with the cards (e.g. foreground + knowledge + infrastructure = the full row count, never double-counted).
+
+![Timeline — all three roles as per-turn rows, interleaved by time, with role-filter checkboxes](../images/measurement-timeline-roles.png)
+
 ---
 
 ## Always-on per-agent measurement

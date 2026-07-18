@@ -47,7 +47,9 @@ Do your normal coding. Then open **[http://localhost:3032](http://localhost:3032
 
 ![Performance → Runs table](../images/measurement-runs-table.png)
 
-Click a run to expand its **timeline** — each turn is coloured by role (foreground development · knowledge capture · infrastructure). A collapsible **Concurrent background activity** panel shows knowledge/infra token spend that happened in the same window but isn't charged to the run.
+Click a run to expand its **timeline** — every turn is a row, coloured by role (foreground development · knowledge capture · infrastructure) and **interleaved chronologically**, so you see foreground turns, background knowledge-capture calls, and infrastructure probes in the exact order they happened. Three **role-filter checkboxes** above the list toggle each lane — un-check *Foreground development* to isolate just the background timeline. A collapsible **Concurrent background activity** panel above the rows gives the same knowledge/infra spend as a per-process rollup.
+
+![Timeline — all three roles as per-turn rows, interleaved by time, with role-filter checkboxes](../images/measurement-timeline-roles.png)
 
 ### The payoff: what actually got sent to the model
 

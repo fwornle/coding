@@ -54,6 +54,24 @@ cat ~/.config/Claude/claude_desktop_config.json
 ls ~/.claude/logs/mcp*.log
 ```
 
+### Agent Drops Back to the Shell on Startup
+
+If `coding` prints `[tmux-wrapper] Creating tmux session: …` and then returns
+straight to the shell prompt (no interactive agent), the agent process exited
+during startup before the session became interactive — usually a transient timing
+race (e.g. an MCP pre-flight gate such as VKB on port 8080 not yet ready). The
+wrapper now surfaces *why* instead of failing silently: it prints a `⚠️ Session …
+exited` diagnostic with the tail of the captured launch output, and writes the
+full log to `.logs/launch/<session>.log`.
+
+```bash
+# Inspect the most recent failed launch
+ls -t .logs/launch/*.log | head -1 | xargs tail -40
+
+# Re-running usually clears a startup timing race
+coding --claude
+```
+
 ## LSL Issues
 
 ### LSL Files Not Generated
