@@ -26,6 +26,7 @@ import {
   type TimelineRow,
   type ContextTurnRow,
   type ContextTurnMessage,
+  type CategoryDetail,
 } from '@/store/slices/performanceSlice'
 import { normalizeModel } from './models'
 
@@ -113,7 +114,7 @@ interface RealBreakdown {
   knowledge_text?: string | null
   knowledge_occurrences?: number
   knowledge_cadence?: string
-  categories: { key: string; label: string; bytes: number }[]
+  categories: { key: string; label: string; bytes: number; detail?: CategoryDetail }[]
 }
 
 // Known per-model context-window ceilings — used only for the "% of window"
@@ -425,6 +426,133 @@ function KbDetailDialog({ open, onClose, real }: { open: boolean; onClose: () =>
   )
 }
 
+// Generic per-category descriptions — shown in the drill-down sub-modal when a run
+// has no captured wire buffer (illustrative runs), so a click is still informative.
+const CATEGORY_EXPLAIN: Record<string, string> = {
+  sys: 'System Instructions — the base system prompt / persona and operating rules prepended to every turn (AGENTS.md, tool-use policy, safety and formatting rules).',
+  tools: 'Tool Descriptions — the JSON tool definitions (name, description, input schema) the model may call, serialized into every request.',
+  know: 'Retrieved Knowledge — the ~1k-token KB block injected each prompt (Working Memory + semantic Insights/Digests/Entities/Observations via Qdrant RRF).',
+  hist: 'Conversation History — the accumulated prior user/assistant turns re-transmitted every request (the stateless API keeps nothing server-side).',
+  tout: 'Tool Outputs — results returned from tool calls (file reads, command output, search results) fed back into the context.',
+  user: 'User Input — the current turn’s user message.',
+}
+
+// Generic per-category drill-down sub-modal. Opened by clicking any context-window
+// band/legend entry (except `know`, which keeps its richer KbDetailDialog). Renders
+// the CONCRETE thing sent to the LLM for that category, sourced from the proxy's
+// buildCategoryDetails() (real wire buffer) — tool definitions for `tools`, the
+// memoized system-prompt summary for `sys`, and bounded content samples otherwise.
+function CategoryDetailModal({
+  segKey,
+  onClose,
+  detail,
+  bytes,
+}: {
+  segKey: string | null
+  onClose: () => void
+  detail: CategoryDetail | null
+  bytes: number | null
+}) {
+  const seg = SEGMENTS.find((s) => s.key === segKey) || null
+  const fmtB = (b?: number | null) => (typeof b === 'number' ? `${(b / 1024).toFixed(b < 1024 ? 2 : 1)} KB` : '—')
+  return (
+    <Dialog open={segKey != null} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto" data-testid="category-detail-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {seg && <span className="inline-block h-3 w-3 rounded-sm" style={{ background: seg.fill, border: `1px solid ${seg.stroke}` }} />}
+            {seg?.label || segKey} — what was sent
+          </DialogTitle>
+          <DialogDescription>
+            The concrete content the LLM received for this category, extracted from this run’s captured wire buffer
+            {typeof bytes === 'number' && <> (<span className="font-mono">{fmtB(bytes)}</span> on the wire)</>}.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!detail ? (
+          <div className="space-y-2" data-testid="cat-no-detail">
+            <p className="text-sm text-muted-foreground">{CATEGORY_EXPLAIN[segKey ?? ''] ?? 'A slice of the context window sent to the model.'}</p>
+            <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+              This run has no captured wire buffer for this category — it predates the drill-down capture tap,
+              or the agent has no proxy seam. Re-run the comparison to record the concrete content that was sent.
+            </div>
+          </div>
+        ) : detail._error ? (
+          <div className="rounded-md border border-dashed border-red-400/50 p-3 text-xs text-red-500">
+            Detail construction failed: <span className="font-mono">{detail._error}</span>
+          </div>
+        ) : segKey === 'tools' ? (
+          <div data-testid="cat-tools">
+            <p className="mb-2 text-sm">
+              <span className="font-semibold">{detail.count ?? detail.items?.length ?? 0}</span> tool definition
+              {(detail.count ?? 0) === 1 ? '' : 's'} sent to the model:
+            </p>
+            <div className="space-y-2">
+              {(detail.items || []).map((t, i) => (
+                <div key={`${t.name}-${i}`} className="rounded border p-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono text-sm font-semibold">{t.name}</p>
+                    <Badge variant="outline" className="font-mono text-[10px]">{fmtB(t.bytes)}</Badge>
+                  </div>
+                  {t.description && <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{t.description}</p>}
+                  {t.input_schema_keys && t.input_schema_keys.length > 0 && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      params: {t.input_schema_keys.map((k) => <span key={k} className="mr-1 font-mono">{k}</span>)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : segKey === 'sys' ? (
+          <div data-testid="cat-sys">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+              <Badge variant="outline" className="font-mono">{detail.block_count ?? 0} block{(detail.block_count ?? 0) === 1 ? '' : 's'}</Badge>
+              <Badge variant="outline" className="font-mono">{detail.total_chars?.toLocaleString() ?? '—'} chars</Badge>
+              {detail.hash && <Badge variant="outline" className="font-mono">#{detail.hash}</Badge>}
+              {detail.cached && <Badge className="bg-emerald-600 font-mono text-[10px]">cached summary</Badge>}
+            </div>
+            {detail.section_headers && detail.section_headers.length > 0 && (
+              <div className="mb-2 rounded border p-2">
+                <p className="mb-1 text-xs font-semibold">Sections ({detail.section_headers.length})</p>
+                <ul className="space-y-0.5">
+                  {detail.section_headers.map((h, i) => (
+                    <li key={i} className="truncate font-mono text-[11px] text-muted-foreground">{h}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {detail.preview && (
+              <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] leading-snug">{detail.preview}</pre>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              Summary is memoized by content hash — the system prompt is stable across turns, so it’s computed once per unique hash and reused.
+            </p>
+          </div>
+        ) : (
+          <div data-testid="cat-samples">
+            <p className="mb-2 text-sm">
+              <span className="font-semibold">{detail.count ?? detail.items?.length ?? 0}</span> block
+              {(detail.count ?? 0) === 1 ? '' : 's'} in this category:
+            </p>
+            <div className="space-y-2">
+              {(detail.items || []).map((m, i) => (
+                <div key={i} className="rounded border p-2">
+                  <div className="mb-1 flex items-center justify-between">
+                    {m.role && <span className="font-mono text-xs font-semibold">{m.role}</span>}
+                    <Badge variant="outline" className="font-mono text-[10px]">{fmtB(m.bytes)}</Badge>
+                  </div>
+                  {m.preview && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] leading-snug">{m.preview}</pre>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function ContextCacheExplainer() {
   const dispatch = useAppDispatch()
   const taskId = useAppSelector(selectExplainTaskId)
@@ -433,6 +561,7 @@ export function ContextCacheExplainer() {
   const contextTurns = useAppSelector(selectContextTurnsFor(taskId))
   const loading = useAppSelector(selectTimelineLoading)
   const [kbOpen, setKbOpen] = useState(false)
+  const [catOpen, setCatOpen] = useState<string | null>(null)
   const [real, setReal] = useState<RealBreakdown | null>(null)
 
   const open = taskId != null
@@ -485,7 +614,7 @@ export function ContextCacheExplainer() {
   //      measured run of any wire (anthropic OR openai).
   //   2. The older /api/context-breakdown per-run buffer capture (activeReal).
   //   3. Illustrative fixed widths, only when neither real source exists.
-  const { segView, prefixPct, realByKey, bandSource, bandTotalBytes, bandMsgCount } = useMemo(() => {
+  const { segView, prefixPct, realByKey, detailByKey, bandSource, bandTotalBytes, bandMsgCount } = useMemo(() => {
     // 1) Per-request context-turns — pick the turn with the largest total
     //    context (the representative "one full prompt sent to the backend").
     if (contextTurns.length > 0) {
@@ -498,13 +627,15 @@ export function ContextCacheExplainer() {
       }
       if (best && bestTotal > 0) {
         const byKey: Record<string, number> = {}
-        for (const c of best.categories) byKey[c.key] = num(c.bytes)
+        const detByKey: Record<string, CategoryDetail | undefined> = {}
+        for (const c of best.categories) { byKey[c.key] = num(c.bytes); detByKey[c.key] = c.detail }
         const band = scaledBand(byKey, bestTotal)
         if (band) {
           return {
             segView: band.view,
             prefixPct: band.prefixPct,
             realByKey: byKey,
+            detailByKey: detByKey,
             bandSource: 'turns' as const,
             bandTotalBytes: bestTotal,
             bandMsgCount: Array.isArray(best.messages) ? best.messages.length : 0,
@@ -515,7 +646,8 @@ export function ContextCacheExplainer() {
     // 2) /api/context-breakdown capture.
     const real = activeReal
     const byKey: Record<string, number> = {}
-    if (real) for (const c of real.categories) byKey[c.key] = c.bytes
+    const detByKey: Record<string, CategoryDetail | undefined> = {}
+    if (real) for (const c of real.categories) { byKey[c.key] = c.bytes; detByKey[c.key] = c.detail }
     if (real && real.total_bytes > 0) {
       const band = scaledBand(byKey, real.total_bytes)
       if (band) {
@@ -523,6 +655,7 @@ export function ContextCacheExplainer() {
           segView: band.view,
           prefixPct: band.prefixPct,
           realByKey: byKey,
+          detailByKey: detByKey,
           bandSource: 'real' as const,
           bandTotalBytes: real.total_bytes,
           bandMsgCount: real.message_count,
@@ -530,7 +663,7 @@ export function ContextCacheExplainer() {
       }
     }
     // 3) Illustrative.
-    return { segView: SEGMENTS, prefixPct: PREFIX_PCT, realByKey: byKey, bandSource: 'illustrative' as const, bandTotalBytes: 0, bandMsgCount: 0 }
+    return { segView: SEGMENTS, prefixPct: PREFIX_PCT, realByKey: byKey, detailByKey: detByKey, bandSource: 'illustrative' as const, bandTotalBytes: 0, bandMsgCount: 0 }
   }, [activeReal, contextTurns])
 
   // True whenever the band is drawn from a real size source (either context-turns
@@ -659,12 +792,20 @@ export function ContextCacheExplainer() {
                 {segView.map((seg, i) => {
                   const divider = i > 0 ? '1px solid rgba(0,0,0,0.28)' : undefined
                   if (seg.key !== 'know') {
+                    // Every category is ALWAYS clickable — opens a per-category
+                    // sub-modal. When this run has a captured wire buffer the modal
+                    // shows the concrete content; otherwise it explains the category
+                    // and notes the capture is absent (predates the tap / no proxy seam).
                     return (
-                      <div
+                      <button
                         key={seg.key}
-                        className="h-full"
-                        title={seg.label}
+                        type="button"
+                        onClick={() => setCatOpen(seg.key)}
+                        data-testid={`cat-segment-${seg.key}`}
+                        className="h-full cursor-pointer p-0 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        title={`${seg.label} — click for detail`}
                         style={{ width: `${seg.w}%`, background: seg.fill, borderLeft: divider }}
+                        aria-label={`${seg.label} — click for detail`}
                       />
                     )
                   }
@@ -722,15 +863,24 @@ export function ContextCacheExplainer() {
 
           {/* legend — real per-category bytes when a live capture exists */}
           <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
-            {SEGMENTS.map((seg) => (
-              <div key={seg.key} className="flex items-center gap-2 text-xs">
-                <span className="inline-block h-3 w-3 rounded-sm border" style={{ background: seg.fill, borderColor: seg.stroke }} />
-                <span>{seg.label}</span>
-                {bandMeasured
-                  ? <span className="font-mono text-muted-foreground">{kb(realByKey[seg.key] ?? 0)}</span>
-                  : seg.real && <span className="text-muted-foreground">(real ~1k tok · click)</span>}
-              </div>
-            ))}
+            {SEGMENTS.map((seg) => {
+              const clickable = seg.key !== 'know'
+              const onClick = seg.key === 'know' ? () => setKbOpen(true) : clickable ? () => setCatOpen(seg.key) : undefined
+              return (
+                <div
+                  key={seg.key}
+                  className={`flex items-center gap-2 text-xs ${onClick ? 'cursor-pointer hover:underline' : ''}`}
+                  onClick={onClick}
+                  data-testid={onClick ? `cat-legend-${seg.key}` : undefined}
+                >
+                  <span className="inline-block h-3 w-3 rounded-sm border" style={{ background: seg.fill, borderColor: seg.stroke }} />
+                  <span>{seg.label}</span>
+                  {bandMeasured
+                    ? <span className="font-mono text-muted-foreground">{kb(realByKey[seg.key] ?? 0)}</span>
+                    : seg.real && <span className="text-muted-foreground">(real ~1k tok · click)</span>}
+                </div>
+              )
+            })}
           </div>
 
           {/* Honesty note — accurate to whether we measured the buffer or not. */}
@@ -1002,6 +1152,12 @@ export function ContextCacheExplainer() {
         </div>
 
         <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} />
+        <CategoryDetailModal
+          segKey={catOpen}
+          onClose={() => setCatOpen(null)}
+          detail={catOpen ? (detailByKey[catOpen] ?? null) : null}
+          bytes={catOpen ? (realByKey[catOpen] ?? null) : null}
+        />
       </DialogContent>
     </Dialog>
   )

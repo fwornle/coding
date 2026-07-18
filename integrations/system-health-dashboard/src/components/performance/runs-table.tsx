@@ -59,6 +59,17 @@ function isCompletedExperimentRun(run: Run): boolean {
   return isExperiment && isComplete
 }
 
+// Newest-first sort key: prefer when the run ENDED, falling back to when it
+// started, then any generic timestamp. ISO-8601 strings sort lexicographically,
+// so a plain string compare is a valid chronological compare. Empty ('') sorts
+// last under a descending compare (undated legacy rows sink to the bottom).
+function runSortTs(run: Run): string {
+  return runStr(run, 'ended_at') ?? runStr(run, 'started_at') ?? runStr(run, 'timestamp') ?? ''
+}
+
+// How many runs to reveal per "Show more" step (and the initial page size).
+const RUNS_PAGE_SIZE = 15
+
 // Derive the spec FILE for a re-run (85-06): the Run row carries no `spec` field
 // (run-write never stamped one), so join the run to the server-listed spec whose
 // goal_sentence is IDENTICAL — the goal is the task_hash anchor (D-05: same goal
@@ -283,6 +294,11 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
   // prefill derives the spec file from them by exact goal_sentence match.
   const specList = useAppSelector(selectSpecList)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  // Pagination: reveal RUNS_PAGE_SIZE rows at a time (newest first). "Show more"
+  // grows the window by a page; "Show all" reveals the rest. Reset back to the
+  // first page whenever the filtered set changes size (a new facet selection
+  // shouldn't leave the operator scrolled deep into a stale window).
+  const [visibleCount, setVisibleCount] = useState(RUNS_PAGE_SIZE)
 
   // 85-06 DEFECT B: the re-run prefill derives the spec file from the server-listed specs by
   // exact goal_sentence match. The launcher normally fetches them on mount, but a defensive
@@ -293,6 +309,17 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
     if (specList.length === 0) dispatch(fetchSpecList())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Newest-first ordering (see runSortTs). Sort a COPY — the selector's array is
+  // frozen/shared state. Then slice to the current page window.
+  const sortedRuns = [...filtered].sort((a, b) => runSortTs(b).localeCompare(runSortTs(a)))
+  const visibleRuns = sortedRuns.slice(0, visibleCount)
+  const remaining = sortedRuns.length - visibleRuns.length
+
+  // Snap the window back to the first page when the filtered set size changes.
+  useEffect(() => {
+    setVisibleCount(RUNS_PAGE_SIZE)
+  }, [filtered.length])
 
   // Multi-select over the CURRENTLY-FILTERED set. "All" selects every visible
   // row; "None" clears. The header checkbox reflects all/some/none.
@@ -417,7 +444,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                 onChange={toggleAll}
               />
             </TableHead>
-            <TableHead>Task</TableHead>
+            <TableHead>Run</TableHead>
             <TableHead>Class</TableHead>
             <TableHead>Agent</TableHead>
             {/* ATTR-02 two-column model display: the canonical (foreground chat)
@@ -451,7 +478,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.map((run) => {
+          {visibleRuns.map((run) => {
             const isSelected = run.task_id === selectedTaskId
             return (
               <TableRow
@@ -471,8 +498,15 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                     onChange={() => dispatch(toggleRunSelected(run.task_id))}
                   />
                 </TableCell>
-                <TableCell className="max-w-[200px] truncate font-mono text-sm" title={run.task_id}>
-                  {run.task_id}
+                <TableCell className="max-w-[240px]" title={runStr(run, 'goal_sentence') || run.task_id}>
+                  {runStr(run, 'goal_sentence')
+                    ? (
+                      <div className="flex flex-col">
+                        <span className="truncate text-sm font-medium">{runStr(run, 'goal_sentence')}</span>
+                        <span className="truncate font-mono text-xs text-muted-foreground">{run.task_id}</span>
+                      </div>
+                    )
+                    : <span className="truncate font-mono text-sm">{run.task_id}</span>}
                 </TableCell>
                 <TableCell className="text-sm">
                   {run.task_class ?? <span className="text-muted-foreground">unclassified</span>}
@@ -607,6 +641,33 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
           })}
         </TableBody>
       </Table>
+      {remaining > 0 && (
+        <div
+          className="flex items-center justify-center gap-3 border-t px-3 py-2"
+          data-testid="runs-pagination"
+        >
+          <span className="text-sm text-muted-foreground">
+            Showing <span className="font-semibold">{visibleRuns.length}</span> of{' '}
+            <span className="font-semibold">{sortedRuns.length}</span> runs
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="runs-show-more"
+            onClick={() => setVisibleCount((n) => n + RUNS_PAGE_SIZE)}
+          >
+            Show {Math.min(RUNS_PAGE_SIZE, remaining)} more
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="runs-show-all"
+            onClick={() => setVisibleCount(sortedRuns.length)}
+          >
+            Show all ({sortedRuns.length})
+          </Button>
+        </div>
+      )}
       <p className="border-t px-3 py-2 text-sm text-muted-foreground">
         Scores are 0–1 rubric values. <span aria-hidden>↑</span> higher is better (Goal, Quality, Coverage);{' '}
         <span aria-hidden>↓</span> lower is better (Regress., Drift). Hover a column header for details. An
