@@ -161,6 +161,10 @@ integrations/mcp-server-browserbase/
 # scripts/experiments-compare.mjs or GET /api/experiments/comparison).
 .data/experiments/reports/
 
+# Auto-measure foreground title/summary cache (derived, self-refreshing — written
+# by lib/lsl/token/session-title-llm.mjs, regenerable by scripts/auto-measure-foreground.mjs).
+.data/auto-measure/
+
 # One-shot repair / backfill / soak session logs — timestamped, disposable run
 # artifacts written by scripts/{repair-*,backfill-*,poll-orphan-floor-soak}.mjs.
 # Kept on disk for the run, never needed in git.

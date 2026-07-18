@@ -119,16 +119,26 @@ test('STOP_ADAPTERS.copilot is a transcript adapter (copadt + build) — Copilot
   assert.equal(STOP_ADAPTERS.copilot.subagents, false, 'copilot has no Task sub-agents');
 });
 
-test('STOP_ADAPTERS opencode/mastra are stamp-only with NO build (double-count guard — they DO route through the proxy)', () => {
-  for (const agent of ['opencode', 'mastra']) {
-    assert.ok(STOP_ADAPTERS[agent], `${agent} adapter present`);
-    assert.equal(STOP_ADAPTERS[agent].mode, 'stamp-only', `${agent} is proxy-routed → stamp-only`);
-    assert.equal(
-      typeof STOP_ADAPTERS[agent].build,
-      'undefined',
-      `${agent} must NOT carry a transcript build (would double-count proxy rows)`,
-    );
-  }
+test('STOP_ADAPTERS mastra is stamp-only with NO build (double-count guard — it routes through the proxy)', () => {
+  assert.ok(STOP_ADAPTERS.mastra, 'mastra adapter present');
+  assert.equal(STOP_ADAPTERS.mastra.mode, 'stamp-only', 'mastra is proxy-routed → stamp-only');
+  assert.equal(
+    typeof STOP_ADAPTERS.mastra.build,
+    'undefined',
+    'mastra must NOT carry a transcript build (would double-count proxy rows)',
+  );
+});
+
+test('STOP_ADAPTERS opencode is transcript, PROVIDER-GATED (bypass providers only → no double-count)', () => {
+  // Phase 85: OpenCode on a bypass provider (github-copilot) never reaches the proxy, so its
+  // foreground tokens must be reconstructed from opencode.db. buildOpencodeTokenRows is
+  // provider-gated — it emits rows ONLY for bypass providers and skips proxy-routed ones
+  // (anthropic) whose wire rows already exist — so no double-count despite carrying a build.
+  assert.ok(STOP_ADAPTERS.opencode, 'opencode adapter present');
+  assert.equal(STOP_ADAPTERS.opencode.mode, 'transcript', 'opencode is transcript (provider-gated)');
+  assert.equal(typeof STOP_ADAPTERS.opencode.build, 'function', 'opencode carries a build function');
+  assert.equal(typeof STOP_ADAPTERS.opencode.locate, 'function', 'opencode carries a store locator');
+  assert.equal(STOP_ADAPTERS.opencode.subagents, false, 'opencode foreground has no Task sub-agents');
 });
 
 test('captureForegroundTokens(claude): inserts cladpt rows stamped with the active task_id', async () => {
@@ -303,9 +313,45 @@ test('captureForegroundTokens(copilot): builds copadt rows from events.jsonl sta
   }
 });
 
-test('captureForegroundTokens(opencode): stamp-only inserts NOTHING (no transcript build)', async () => {
+/** Build a throwaway opencode.db fixture with the (id, session_id, data) message schema. */
+function newOpencodeStore(dir, messages) {
+  const storePath = path.join(dir, 'opencode.db');
+  const db = new Database(storePath);
+  db.exec('CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, data TEXT)');
+  const ins = db.prepare('INSERT INTO message (id, session_id, data) VALUES (?, ?, ?)');
+  for (const m of messages) ins.run(m.id, m.session_id, JSON.stringify(m.data));
+  db.close();
+  return storePath;
+}
+
+test('captureForegroundTokens(opencode): reconstructs BYPASS-provider rows, skips proxy-routed, window-scopes + stamps', async () => {
   const { dir, dbPath } = newTempDb();
   try {
+    const inWin = Date.parse('2026-06-29T05:31:00.000Z');
+    const outWin = Date.parse('2026-06-29T09:00:00.000Z');
+    const storePath = newOpencodeStore(dir, [
+      // (1) bypass provider, in-window → CAPTURED
+      { id: 'msg_a', session_id: 'ses_x', data: {
+        role: 'assistant', providerID: 'github-copilot', modelID: 'claude-opus-4.8',
+        tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 40, write: 3 } },
+        time: { created: inWin } } },
+      // (2) proxy-routed provider (anthropic), in-window → SKIPPED (no double-count)
+      { id: 'msg_b', session_id: 'ses_x', data: {
+        role: 'assistant', providerID: 'anthropic', modelID: 'claude-sonnet',
+        tokens: { input: 999, output: 999, cache: { read: 0, write: 0 } },
+        time: { created: inWin } } },
+      // (3) bypass provider, OUT of window → clamped out
+      { id: 'msg_c', session_id: 'ses_x', data: {
+        role: 'assistant', providerID: 'github-copilot', modelID: 'claude-opus-4.8',
+        tokens: { input: 500, output: 50, cache: { read: 0, write: 0 } },
+        time: { created: outWin } } },
+      // (4) zero-token streaming placeholder → skipped
+      { id: 'msg_d', session_id: 'ses_x', data: {
+        role: 'assistant', providerID: 'github-copilot', modelID: 'claude-opus-4.8-fast',
+        tokens: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+        time: { created: inWin } } },
+    ]);
+
     const span = {
       task_id: 'm-stop-2',
       agent: 'opencode',
@@ -314,14 +360,21 @@ test('captureForegroundTokens(opencode): stamp-only inserts NOTHING (no transcri
     };
     await captureForegroundTokens(span, {
       dbPath,
-      mainSessionPath: MAIN_SESSION_FIXTURE,
+      mainSessionPath: storePath, // injected straight into buildOpencodeTokenRows
       resolveTaskId: async () => 'm-stop-2',
     });
 
     const db = new Database(dbPath, { readonly: true });
     try {
-      const { n } = db.prepare('SELECT COUNT(*) AS n FROM token_usage').get();
-      assert.equal(n, 0, 'a stamp-only agent must not build/insert transcript rows (no double-count)');
+      const rows = db
+        .prepare('SELECT user_hash, task_id, input_tokens, output_tokens, cache_read_tokens, provider FROM token_usage')
+        .all();
+      assert.equal(rows.length, 1, 'exactly ONE row: only the in-window bypass-provider turn');
+      assert.equal(rows[0].user_hash, 'opnadt', 'row carries the opencode adapter hash');
+      assert.equal(rows[0].task_id, 'm-stop-2', 'row stamped with the active task_id');
+      assert.equal(rows[0].provider, 'github-copilot', 'bypass provider preserved');
+      assert.equal(rows[0].input_tokens, 100, 'per-message input tokens reconstructed');
+      assert.equal(rows[0].cache_read_tokens, 40, 'cache read preserved');
     } finally {
       db.close();
     }
