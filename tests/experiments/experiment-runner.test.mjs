@@ -385,6 +385,19 @@ test('configureProxyRoutingEnv: opencode routes+keeps key; claude routes + x-tas
   const oc = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: up, route: '1' });
   assert.equal(oc.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435');
   assert.equal(oc.ANTHROPIC_API_KEY, 'k', 'opencode keeps its own credential');
+  assert.ok(!('OPENCODE_CONFIG_CONTENT' in oc), 'no taskId → no provider splice (byte-identical to prior)');
+
+  // Phase 84 (seams A+B): with a taskId, opencode gets per-request binding on BOTH wires via an
+  // OPENCODE_CONFIG_CONTENT provider splice — anthropic → /v1 + x-task-id/x-agent headers; openai/
+  // copilot → task-scoped path /v1/opencode/t/<taskId>. Kills the ambient-span capture leak.
+  const ocT = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: up, route: '1', taskId: 't-1' });
+  assert.equal(ocT.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435', 'opencode still proxy-routed');
+  const ocCfg = JSON.parse(ocT.OPENCODE_CONFIG_CONTENT);
+  assert.equal(ocCfg.provider.anthropic.options.baseURL, 'http://127.0.0.1:12435/v1', 'seam A: anthropic wire → /v1');
+  assert.equal(ocCfg.provider.anthropic.options.headers['x-task-id'], 't-1', 'seam A: per-request task binding header');
+  assert.equal(ocCfg.provider.anthropic.options.headers['x-agent'], 'opencode', 'seam A: agent binding header');
+  assert.equal(ocCfg.provider.openai.options.baseURL, 'http://127.0.0.1:12435/v1/opencode/t/t-1', 'seam B: openai wire → task-scoped path');
+  assert.equal(ocCfg.provider['github-copilot'].options.baseURL, 'http://127.0.0.1:12435/v1/opencode/t/t-1', 'seam B: copilot wire → task-scoped path');
 
   // Phase 82 re-routes claude through the proxy: the former unroute workaround existed only
   // because the tap dropped cache accounting (fixed Plan 02) and first-writer-wins dedup shadowed
