@@ -189,7 +189,7 @@ async function onePass(dbPath) {
       // score below the confidence threshold). Fall back to the zero-LLM keyword
       // scorer when the LLM is unavailable, then to the 'unclassified' sentinel so
       // the column always reflects reality, never a hardcoded label.
-      let taskClass = await llmSessionClass(dbPath, sid, log);
+      let taskClass = await llmSessionClass(dbPath, sid, log, { title, summary });
       if (!taskClass) {
         const derived = taxonomy
           ? deriveClassFromText(`${title} ${summary ?? ''}`, taxonomy)
@@ -238,14 +238,16 @@ async function reclassifyPass(dbPath) {
   try {
     // includePending so quarantined ('unclassified' pending) rows are reachable too.
     const runs = await readRuns(store, { includePending: true });
-    const weak = runs.filter((r) =>
-      /^ses_/.test(String(r.task_id || '')) &&
-      (r.task_class == null || r.task_class === 'unclassified' || !validClasses.has(r.task_class)),
-    );
-    log(`reclassify: ${weak.length} weak-class session run(s) to consider`);
+    // Re-derive EVERY session run: the classPromptV bump invalidates cached classes,
+    // so this applies the CURRENT (improved) prompt everywhere — fixing not just weak
+    // classes but valid-but-wrong ones (e.g. a fix-session mislabeled 'docs'). We
+    // update only when the class actually changes and never downgrade a valid class
+    // to 'unclassified' (see the skip), so re-running is safe/idempotent.
+    const targets = runs.filter((r) => /^ses_/.test(String(r.task_id || '')));
+    log(`reclassify: ${targets.length} session run(s) to (re)derive`);
 
-    for (const r of weak) {
-      const cls = await llmSessionClass(dbPath, r.task_id, log);
+    for (const r of targets) {
+      const cls = await llmSessionClass(dbPath, r.task_id, log, { title: r.goal_sentence, summary: r.session_summary });
       // Skip when the LLM is unavailable (null), genuinely can't classify
       // ('unclassified'), or the class is unchanged — never a no-op re-write.
       if (!cls || cls === 'unclassified' || cls === r.task_class) continue;
