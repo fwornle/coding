@@ -113,12 +113,15 @@ function createTokenUsageTable(db) {
     input_tokens     INTEGER NOT NULL DEFAULT 0,
     output_tokens    INTEGER NOT NULL DEFAULT 0,
     total_tokens     INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens INTEGER NOT NULL DEFAULT 0,
     tokens_estimated INTEGER NOT NULL DEFAULT 0,
     model            TEXT    NOT NULL DEFAULT '',
     task_id          TEXT    NOT NULL DEFAULT '',
     agent            TEXT    NOT NULL DEFAULT '',
     process          TEXT    NOT NULL DEFAULT '',
-    provider         TEXT    NOT NULL DEFAULT ''
+    provider         TEXT    NOT NULL DEFAULT '',
+    prompt_preview   TEXT    NOT NULL DEFAULT ''
   );`);
 }
 
@@ -141,15 +144,18 @@ export function seedTokenDb(rows = []) {
     const insert = db.prepare(`INSERT INTO token_usage
         (timestamp, granularity_tier, tool_call_id, parent_call_id,
          reasoning_tokens, input_tokens, output_tokens, total_tokens,
-         tokens_estimated, model, task_id, agent, process, provider)
+         cache_read_tokens, cache_write_tokens,
+         tokens_estimated, model, task_id, agent, process, provider, prompt_preview)
        VALUES (@timestamp, @granularity_tier, @tool_call_id, @parent_call_id,
          @reasoning_tokens, @input_tokens, @output_tokens, @total_tokens,
-         @tokens_estimated, @model, @task_id, @agent, @process, @provider)`);
+         @cache_read_tokens, @cache_write_tokens,
+         @tokens_estimated, @model, @task_id, @agent, @process, @provider, @prompt_preview)`);
     for (const row of rows) {
       insert.run({
         timestamp: '', granularity_tier: '', tool_call_id: '', parent_call_id: null,
         reasoning_tokens: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0,
-        tokens_estimated: 0, model: '', task_id: '', agent: '', process: '', provider: '',
+        cache_read_tokens: 0, cache_write_tokens: 0,
+        tokens_estimated: 0, model: '', task_id: '', agent: '', process: '', provider: '', prompt_preview: '',
         ...row,
       });
     }

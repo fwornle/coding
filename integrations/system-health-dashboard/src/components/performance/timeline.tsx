@@ -19,6 +19,7 @@ import {
   selectSelectedRun,
   selectTimelineFor,
   selectAmbientFor,
+  selectAmbientTimelineFor,
   selectContextTurnsFor,
   selectTimelineLoading,
   selectNarrativeFor,
@@ -124,12 +125,14 @@ function ProcessPill({ row, run }: { row: TimelineRow; run: Run | null }) {
   )
 }
 
-function TurnLabel({ index, row, run }: { index: number; row: TimelineRow; run: Run | null }) {
+function TurnLabel({ index, row, run, ambient = false }: { index: number; row: TimelineRow; run: Run | null; ambient?: boolean }) {
   const time = fmtTime(row.timestamp)
   const model = typeof row.model === 'string' && row.model.trim() !== '' ? normalizeModel(row.model) : null
   return (
     <>
-      <span className="text-sm font-medium">Turn {index + 1}</span>
+      {/* Ambient (background/infra) rows are NOT turns of the measured run, so they
+          omit the "Turn N" prefix — the process pill + time identify them. */}
+      {!ambient && <span className="text-sm font-medium">Turn {index + 1}</span>}
       {time && (
         <span className="font-mono text-sm text-muted-foreground" title={row.timestamp ?? undefined}>
           {time}
@@ -190,9 +193,9 @@ function TurnActivity({ row }: { row: TimelineRow }) {
 }
 
 function ParentRow({
-  row, index, run, observations, digestThemes,
+  row, index, run, observations, digestThemes, ambient = false,
 }: {
-  row: TimelineRow; index: number; run: Run | null; observations: NarrativeItem[]; digestThemes: string[]
+  row: TimelineRow; index: number; run: Run | null; observations: NarrativeItem[]; digestThemes: string[]; ambient?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const children = row.children ?? []
@@ -215,7 +218,7 @@ function ParentRow({
         <div className="flex items-center justify-between gap-3 px-3 py-2">
           <div className="flex items-center gap-2">
             <span className="inline-block w-4" />
-            <TurnLabel index={index} row={row} run={run} />
+            <TurnLabel index={index} row={row} run={run} ambient={ambient} />
             <TierBadge tier={String(row.granularity_tier)} />
             {isEstimated(row) && <span className="text-sm text-muted-foreground">estimated</span>}
           </div>
@@ -581,6 +584,13 @@ function TurnRowWithChildren({
   )
 }
 
+// A single entry in the interleaved render list: either a foreground turn (carrying
+// its original index into `rows` so contextTurns/turnLoopFlags stay aligned) or a
+// per-call background/infra row (no context-turn — that telemetry is foreground-only).
+type RenderItem =
+  | { kind: 'fg'; row: TimelineRow; originalIndex: number }
+  | { kind: 'ambient'; row: TimelineRow; ambientIndex: number }
+
 export function PerformanceTimeline() {
   const dispatch = useAppDispatch()
   const taskId = useAppSelector(selectSelectedTaskId)
@@ -596,6 +606,9 @@ export function PerformanceTimeline() {
   const contextTurns = useAppSelector(selectContextTurnsFor(taskId))
   // OPTION 2 — concurrent background (knowledge/infra) activity in the run window.
   const ambient = useAppSelector(selectAmbientFor(taskId))
+  // Per-CALL background/infra rows (same shape as foreground `rows`) to interleave
+  // chronologically into the rendered list, gated by the same role checkboxes.
+  const ambientTimeline = useAppSelector(selectAmbientTimelineFor(taskId))
 
   useEffect(() => {
     if (taskId) {
@@ -663,9 +676,25 @@ export function PerformanceTimeline() {
   // `turnLoopFlags` arrays stay aligned after a role filter hides some rows.
   // Indexing the unfiltered arrays by the filtered position desyncs every row's
   // band/chips/loop-badge and the drill-down modal (CR-01).
-  const visibleRows = rows
-    .map((row, originalIndex) => ({ row, originalIndex }))
-    .filter(({ row }) => !hiddenRoles.has(roleForProcess(row.process, run)))
+  // Unified render list: foreground turns (task_id-scoped `rows`) + per-call
+  // background/infra rows (`ambientTimeline`), interleaved CHRONOLOGICALLY so the
+  // timeline reads as one true time-ordered sequence. Foreground entries keep their
+  // ORIGINAL index into `rows` so the parallel contextTurns/turnLoopFlags arrays stay
+  // aligned (CR-01); ambient entries carry no context-turn (that data is
+  // foreground-only) and render as lean role-coloured ParentRows.
+  const tsOf = (r: TimelineRow): number => {
+    const t = r.timestamp ? Date.parse(r.timestamp) : NaN
+    return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t // undated rows sort last, stably
+  }
+  const fgItems: RenderItem[] = rows.map((row, originalIndex) => ({ kind: 'fg', row, originalIndex }))
+  const ambItems: RenderItem[] = ambientTimeline.map((row, ambientIndex) => ({ kind: 'ambient', row, ambientIndex }))
+  const visibleItems: RenderItem[] = [...fgItems, ...ambItems]
+    .filter((it) => !hiddenRoles.has(roleForProcess(it.row.process, run)))
+    .sort((a, b) => tsOf(a.row) - tsOf(b.row))
+  // Roles the user has left enabled (checkbox checked). Used to tell the two
+  // empty-states apart: "all roles hidden" vs "the enabled role(s) have no rows in
+  // this run's window".
+  const enabledRoles = ROLE_ORDER.filter((r) => !hiddenRoles.has(r))
 
   // v2 gate (D-01/D-06): render the compact v2 TurnRow only when this run has
   // captured per-request context-turns. The advisory loop badge is computed ONCE
@@ -823,48 +852,61 @@ export function PerformanceTimeline() {
               })}
             </div>
 
-            {visibleRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                All roles are hidden. Re-enable a role above to see its turns.
-              </p>
-            ) : hasContextTurns ? (
-              /* v2 (D-01): compact TurnRow per turn (chips + mini band + advisory
-                 loop badge, opens the drill-down modal). The DASH-02 TierBadge is
-                 passed as a slot; the collapsible reasoning sub-bands (children)
-                 are preserved BELOW each v2 row so the tier badge + per-reasoning
-                 -step sub-bands survive the evolution. */
-              <div className="space-y-2">
-                {visibleRows.map(({ row, originalIndex }) => (
-                  <TurnRowWithChildren
-                    key={row.tool_call_id ?? originalIndex}
-                    timelineRow={row}
-                    contextTurn={contextTurns[originalIndex]}
-                    taskId={taskId}
-                    index={originalIndex}
-                    loopFlag={turnLoopFlags[originalIndex] ?? false}
-                  />
-                ))}
-              </div>
-            ) : (
-              /* v1 fallback (D-06): no per-request context-turns for this run, so
-                 render today's v1 ParentRow (turn label + tokens + observation
-                 lines) with the v2 enrichments simply absent + the subtle note.
-                 This is the DESIGNED degradation path — never an error. */
-              <>
-                <p className="mb-2 text-xs text-muted-foreground" data-testid="timeline-no-context-note">
-                  no per-turn context captured
+            {visibleItems.length === 0 ? (
+              enabledRoles.length === 0 ? (
+                <p className="text-sm text-muted-foreground" data-testid="timeline-all-roles-hidden">
+                  All roles are hidden. Re-enable a role above to see its turns.
                 </p>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid="timeline-no-rows-for-roles">
+                  No {enabledRoles.map((r) => ROLE_META[r].label).join(' or ')} rows in this run’s window.
+                </p>
+              )
+            ) : (
+              /* One chronological list interleaving all enabled roles. Foreground
+                 turns render as the v2 TurnRow (context chips + mini band + loop
+                 badge + drill-down) when this run captured per-request context-turns,
+                 else the v1 ParentRow. Background/infra rows have no per-turn context
+                 telemetry (it is foreground-only), so they always render as lean,
+                 role-coloured ParentRows — no fabricated drill-down. */
+              <>
+                {!hasContextTurns && visibleItems.some((it) => it.kind === 'fg') && (
+                  <p className="mb-2 text-xs text-muted-foreground" data-testid="timeline-no-context-note">
+                    no per-turn context captured
+                  </p>
+                )}
                 <div className="space-y-2">
-                  {visibleRows.map(({ row, originalIndex }) => (
-                    <ParentRow
-                      key={row.tool_call_id ?? originalIndex}
-                      row={row}
-                      index={originalIndex}
-                      run={run}
-                      observations={obsByRow.get(row) ?? []}
-                      digestThemes={digestThemesForRow(row)}
-                    />
-                  ))}
+                  {visibleItems.map((it) =>
+                    it.kind === 'ambient' ? (
+                      <ParentRow
+                        key={`amb-${it.ambientIndex}`}
+                        row={it.row}
+                        index={it.ambientIndex}
+                        run={run}
+                        observations={[]}
+                        digestThemes={[]}
+                        ambient
+                      />
+                    ) : hasContextTurns ? (
+                      <TurnRowWithChildren
+                        key={`fg-${it.originalIndex}`}
+                        timelineRow={it.row}
+                        contextTurn={contextTurns[it.originalIndex]}
+                        taskId={taskId}
+                        index={it.originalIndex}
+                        loopFlag={turnLoopFlags[it.originalIndex] ?? false}
+                      />
+                    ) : (
+                      <ParentRow
+                        key={`fg-${it.originalIndex}`}
+                        row={it.row}
+                        index={it.originalIndex}
+                        run={run}
+                        observations={obsByRow.get(it.row) ?? []}
+                        digestThemes={digestThemesForRow(it.row)}
+                      />
+                    ),
+                  )}
                 </div>
               </>
             )}

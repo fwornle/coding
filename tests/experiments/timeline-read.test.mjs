@@ -116,3 +116,59 @@ test('DASH-02: task_id is bound as ? — a second task_id is excluded', async ()
     cleanup();
   }
 });
+
+/** Seed foreground rows for the run + concurrent background/infra rows (empty task_id). */
+function seedAmbientDb() {
+  return seedTokenDb([
+    // Foreground turns attributed to the run 'run1'.
+    { task_id: 'run1', tool_call_id: 'fg1', granularity_tier: 'turn', process: 'coding-agent-claude',
+      total_tokens: 12000, timestamp: '2026-06-28T08:01:00.000Z' },
+    // Concurrent background (knowledge) — two individual calls, NOT grouped, empty task_id.
+    { task_id: '', tool_call_id: '', granularity_tier: 'turn', process: 'consolidator-insight',
+      total_tokens: 3200, timestamp: '2026-06-28T08:01:30.000Z' },
+    { task_id: '', tool_call_id: '', granularity_tier: 'turn', process: 'observation-writer',
+      total_tokens: 1540, timestamp: '2026-06-28T08:03:00.000Z' },
+    // Concurrent infrastructure call.
+    { task_id: '', tool_call_id: '', granularity_tier: 'turn', process: 'health-coordinator',
+      total_tokens: 16, timestamp: '2026-06-28T08:02:00.000Z' },
+    // A non-background process in-window (must be EXCLUDED by AMBIENT_PROCESS_RE).
+    { task_id: '', tool_call_id: '', granularity_tier: 'turn', process: 'some-other-tool',
+      total_tokens: 999, timestamp: '2026-06-28T08:02:30.000Z' },
+    // A background call OUTSIDE the window (must be excluded by the timestamp bound).
+    { task_id: '', tool_call_id: '', granularity_tier: 'turn', process: 'consolidator-insight',
+      total_tokens: 7777, timestamp: '2026-06-28T09:30:00.000Z' },
+  ]);
+}
+
+test('AMBIENT-TL: per-call background rows returned individually (not grouped), in-window, non-attributed', async () => {
+  const { dbPath, cleanup } = seedAmbientDb();
+  try {
+    const { readAmbientTimeline } = await import('../../lib/experiments/timeline-read.mjs');
+    const win = ['2026-06-28T08:00:00.000Z', '2026-06-28T08:30:00.000Z'];
+    const amb = await readAmbientTimeline('run1', win[0], win[1], dbPath);
+    const procs = amb.map((r) => r.process).sort();
+    // 3 background rows (two knowledge + one infra), each individual — NOT one row per process group.
+    assert.deepEqual(procs, ['consolidator-insight', 'health-coordinator', 'observation-writer'],
+      'individual background rows for in-window background processes');
+    assert.ok(!procs.includes('coding-agent-claude'), 'the run\'s own foreground row is excluded');
+    assert.ok(!procs.includes('some-other-tool'), 'non-background processes are excluded by AMBIENT_PROCESS_RE');
+    // The 09:30 consolidator call is outside the window → only ONE consolidator row survives.
+    assert.equal(procs.filter((p) => p === 'consolidator-insight').length, 1, 'out-of-window background row excluded');
+  } finally {
+    cleanup();
+  }
+});
+
+test('AMBIENT-TL: missing window or DB returns graceful empty', async () => {
+  const { readAmbientTimeline } = await import('../../lib/experiments/timeline-read.mjs');
+  const { dbPath, cleanup } = seedAmbientDb();
+  try {
+    assert.deepEqual(await readAmbientTimeline('run1', null, null, dbPath), [], 'no window -> []');
+    const missing = path.join(os.tmpdir(), 'no-db-' + Date.now(), 'token-usage.db');
+    assert.deepEqual(
+      await readAmbientTimeline('run1', '2026-06-28T08:00:00.000Z', '2026-06-28T08:30:00.000Z', missing),
+      [], 'missing DB -> []');
+  } finally {
+    cleanup();
+  }
+});

@@ -379,6 +379,10 @@ interface PerformanceState {
   // OPTION 2: per-run concurrent background rollup, keyed by taskId, populated by
   // fetchTimeline alongside timelineByTaskId (same request).
   ambientByTaskId: Record<string, AmbientRow[]>
+  // Per-CALL background rows (same shape as the foreground timeline) so knowledge/infra
+  // turns can be interleaved chronologically into the rendered list. Populated by the
+  // same fetchTimeline request as timelineByTaskId/ambientByTaskId.
+  ambientTimelineByTaskId: Record<string, TimelineRow[]>
   timelineLoading: boolean
   timelineError: string | null
   // Per-request context-turns (Plan 84-08) keyed by taskId, mirroring the
@@ -662,6 +666,7 @@ const initialState: PerformanceState = {
   compareB: null,
   timelineByTaskId: {},
   ambientByTaskId: {},
+  ambientTimelineByTaskId: {},
   timelineLoading: false,
   timelineError: null,
   contextTurnsByTaskId: {},
@@ -806,7 +811,11 @@ export const fetchTimeline = createAsyncThunk(
           models: r.model ? [String(r.model)] : [],
         })
       )
-      return { taskId, timeline, ambient }
+      // Per-CALL background rows (same TimelineRow shape as `timeline`) so the Timeline
+      // can interleave knowledge/infra turns chronologically with foreground. Distinct
+      // from `ambient` (the per-process rollup that feeds the summary cards/disclosure).
+      const ambientTimeline: TimelineRow[] = (data?.ambientTimeline ?? []) as TimelineRow[]
+      return { taskId, timeline, ambient, ambientTimeline }
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
@@ -1619,6 +1628,7 @@ const performanceSlice = createSlice({
       .addCase(fetchTimeline.fulfilled, (state, action) => {
         state.timelineByTaskId[action.payload.taskId] = action.payload.timeline
         state.ambientByTaskId[action.payload.taskId] = action.payload.ambient
+        state.ambientTimelineByTaskId[action.payload.taskId] = action.payload.ambientTimeline
         state.timelineLoading = false
         state.timelineError = null
       })
@@ -1931,6 +1941,11 @@ export const selectTimelineFor = (taskId: string | null) => (state: RootState): 
 // concurrent knowledge/infra activity for the run's window, or [] when absent.
 export const selectAmbientFor = (taskId: string | null) => (state: RootState): AmbientRow[] =>
   taskId ? (state.performance.ambientByTaskId[taskId] ?? []) : []
+
+// Per-taskId per-CALL background rows (same TimelineRow shape as the foreground
+// timeline), for chronological interleaving into the rendered list. [] when absent.
+export const selectAmbientTimelineFor = (taskId: string | null) => (state: RootState): TimelineRow[] =>
+  taskId ? (state.performance.ambientTimelineByTaskId[taskId] ?? []) : []
 
 // Per-taskId context-turns selector factory (Plan 84-08). Returns the stored
 // per-request lines, or [] when absent/null so the explainer never crashes on a
