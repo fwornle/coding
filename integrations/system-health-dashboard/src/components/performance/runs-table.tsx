@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import type { ReactNode, PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pencil, Layers, Trash2, RotateCcw, GitCompare, GitBranch, Radio } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -355,6 +355,73 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
   )
 }
 
+// --- Resizable columns -----------------------------------------------------
+// The runs table is a plain (auto-layout) HTML table. To let the operator resize
+// columns we switch it to a FIXED layout driven by an explicit <colgroup>, whose
+// per-<col> widths live in component state (hydrated from localStorage). Each
+// header cell carries a drag handle at its right edge; dragging mutates that one
+// column's width. "Reset columns" restores defaults and drops the stored key.
+//
+// COLUMNS is the ORDERED registry — its order MUST match the header/body cell
+// order below (select, run, when, class, agent, chat model, background models,
+// the five score dimensions, tokens, reconciliation, actions). Widths are in px.
+const SCORE_COL_DEFAULT = 92
+const COLUMNS: { id: string; default: number }[] = [
+  { id: 'select', default: 40 },
+  { id: 'run', default: 240 },
+  { id: 'when', default: 120 },
+  { id: 'class', default: 96 },
+  { id: 'agent', default: 96 },
+  { id: 'chat_model', default: 150 },
+  { id: 'bg_models', default: 170 },
+  ...SCORE_DIMENSIONS.map((dim) => ({ id: `score_${dim}`, default: SCORE_COL_DEFAULT })),
+  { id: 'tokens', default: 96 },
+  { id: 'reconciliation', default: 140 },
+  { id: 'actions', default: 470 },
+]
+const COL_DEFAULTS: Record<string, number> = Object.fromEntries(COLUMNS.map((c) => [c.id, c.default]))
+const MIN_COL_WIDTH = 44
+const COLW_STORAGE_KEY = 'perf.runsTable.colWidths'
+
+// Hydrate saved widths over the defaults: a saved entry wins only when it's a
+// finite positive number, and unknown/legacy keys are ignored — so adding or
+// removing a column later can't corrupt the layout (new columns get defaults).
+function loadColWidths(): Record<string, number> {
+  const merged = { ...COL_DEFAULTS }
+  try {
+    const raw = window.localStorage.getItem(COLW_STORAGE_KEY)
+    if (!raw) return merged
+    const saved = JSON.parse(raw) as Record<string, unknown>
+    for (const id of Object.keys(COL_DEFAULTS)) {
+      const v = saved[id]
+      if (typeof v === 'number' && Number.isFinite(v) && v > 0) merged[id] = v
+    }
+  } catch {
+    // Corrupt/absent storage → defaults. Never throw from a render path.
+  }
+  return merged
+}
+
+// A thin drag strip pinned to the right edge of a header cell. Invisible until the
+// header (group) or the strip itself is hovered — the affordance the operator asked
+// for. Stops click propagation so a resize never triggers the row/header handlers.
+function ColResize({ colId, onStart }: {
+  colId: string
+  onStart: (colId: string, e: ReactPointerEvent) => void
+}): ReactNode {
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Resize ${colId} column`}
+      data-testid={`col-resize-${colId}`}
+      onPointerDown={(e) => onStart(colId, e)}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute -right-px top-0 z-20 h-full w-2 cursor-col-resize touch-none select-none opacity-0 transition-opacity after:absolute after:right-0 after:top-[15%] after:h-[70%] after:w-0.5 after:rounded-full after:bg-primary/70 group-hover:opacity-100 hover:bg-primary/10 hover:after:w-1 hover:after:bg-primary"
+    />
+  )
+}
+
 export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
   const dispatch = useAppDispatch()
   const filtered = useAppSelector(selectFilteredRuns)
@@ -390,6 +457,57 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
     const id = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(id)
   }, [])
+
+  // Resizable-column widths (see COLUMNS registry). Hydrated once from localStorage.
+  const [colWidths, setColWidths] = useState<Record<string, number>>(loadColWidths)
+  // A ref mirror so the drag handler reads the width AT DRAG START without being a
+  // stale-closure hazard (colWidths changes on every pointermove tick).
+  const colWidthsRef = useRef(colWidths)
+  colWidthsRef.current = colWidths
+  // Persist on change; when widths equal the defaults, drop the key entirely so a
+  // reset leaves no residue (and "Reset columns" below just restores defaults).
+  useEffect(() => {
+    try {
+      const isDefault = COLUMNS.every((c) => colWidths[c.id] === c.default)
+      if (isDefault) window.localStorage.removeItem(COLW_STORAGE_KEY)
+      else window.localStorage.setItem(COLW_STORAGE_KEY, JSON.stringify(colWidths))
+    } catch {
+      // Storage unavailable (private mode / quota) — resizing still works in-memory.
+    }
+  }, [colWidths])
+
+  const startResize = useCallback((colId: string, e: ReactPointerEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startW = colWidthsRef.current[colId] ?? COL_DEFAULTS[colId]
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.max(MIN_COL_WIDTH, startW + (ev.clientX - startX))
+      setColWidths((w) => ({ ...w, [colId]: next }))
+    }
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    }
+    // While dragging, suppress text selection and force the resize cursor globally
+    // so it doesn't flicker back to the arrow when the pointer leaves the 2px strip.
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }, [])
+
+  const resetColWidths = useCallback(() => setColWidths({ ...COL_DEFAULTS }), [])
+  const colsAreDefault = useMemo(
+    () => COLUMNS.every((c) => (colWidths[c.id] ?? c.default) === c.default),
+    [colWidths],
+  )
+  const totalWidth = useMemo(
+    () => COLUMNS.reduce((sum, c) => sum + (colWidths[c.id] ?? c.default), 0),
+    [colWidths],
+  )
 
   // Newest-first ordering (see runSortTs). Sort a COPY — the selector's array is
   // frozen/shared state. Then slice to the current page window.
@@ -444,6 +562,22 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
 
   return (
     <div className="rounded-md border" data-testid="runs-table">
+      {/* Column controls — a subtle hint (handles are near-invisible until hover)
+          plus a Reset that restores the default layout (disabled when already default). */}
+      <div className="flex items-center justify-end gap-2 border-b px-3 py-1.5">
+        <span className="text-xs text-muted-foreground">Drag a column edge to resize.</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="reset-columns"
+          disabled={colsAreDefault}
+          onClick={resetColWidths}
+          title="Reset column widths to the default layout"
+        >
+          <RotateCcw className="size-3.5" />
+          Reset columns
+        </Button>
+      </div>
       {/* Bulk-selection toolbar — visible whenever ≥1 run is selected. */}
       {selectedRunIds.length > 0 && (
         <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-3 py-2" data-testid="runs-bulk-toolbar">
@@ -511,10 +645,16 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
           </div>
         </div>
       )}
-      <Table>
+      <Table className="table-fixed" style={{ width: totalWidth }}>
+        {/* Explicit widths so table-fixed honors them; order MUST match COLUMNS. */}
+        <colgroup>
+          {COLUMNS.map((c) => (
+            <col key={c.id} style={{ width: colWidths[c.id] ?? c.default }} />
+          ))}
+        </colgroup>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-8">
+            <TableHead className="group relative w-8">
               <input
                 type="checkbox"
                 aria-label="Select all runs"
@@ -525,19 +665,19 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                 onChange={toggleAll}
               />
             </TableHead>
-            <TableHead>Run</TableHead>
-            <TableHead data-testid="runs-col-when">When</TableHead>
-            <TableHead>Class</TableHead>
-            <TableHead>Agent</TableHead>
+            <TableHead className="group relative">Run<ColResize colId="run" onStart={startResize} /></TableHead>
+            <TableHead className="group relative" data-testid="runs-col-when">When<ColResize colId="when" onStart={startResize} /></TableHead>
+            <TableHead className="group relative">Class<ColResize colId="class" onStart={startResize} /></TableHead>
+            <TableHead className="group relative">Agent<ColResize colId="agent" onStart={startResize} /></TableHead>
             {/* ATTR-02 two-column model display: the canonical (foreground chat)
                 model and the concurrent background-service models. Both READ the
                 persisted Run.metadata fields — no per-surface recompute (D-06). */}
-            <TableHead data-testid="runs-col-canonical-model">Chat model</TableHead>
-            <TableHead data-testid="runs-col-background-models">Background models</TableHead>
+            <TableHead className="group relative" data-testid="runs-col-canonical-model">Chat model<ColResize colId="chat_model" onStart={startResize} /></TableHead>
+            <TableHead className="group relative" data-testid="runs-col-background-models">Background models<ColResize colId="bg_models" onStart={startResize} /></TableHead>
             {SCORE_DIMENSIONS.map((dim) => {
               const m = DIM_META[dim]
               return (
-                <TableHead key={dim} className="text-right">
+                <TableHead key={dim} className="group relative text-right">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -551,12 +691,18 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                       <TooltipContent className="max-w-xs">{m.desc}</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                  <ColResize colId={`score_${dim}`} onStart={startResize} />
                 </TableHead>
               )
             })}
-            <TableHead className="text-right">Tokens</TableHead>
-            <TableHead>Reconciliation</TableHead>
-            <TableHead className="text-right sr-only">Edit</TableHead>
+            <TableHead className="group relative text-right">Tokens<ColResize colId="tokens" onStart={startResize} /></TableHead>
+            <TableHead className="group relative">Reconciliation<ColResize colId="reconciliation" onStart={startResize} /></TableHead>
+            {/* Actions header: label is sr-only (the buttons speak for themselves),
+                but the cell stays visible so its resize handle is reachable. */}
+            <TableHead className="group relative text-right">
+              <span className="sr-only">Actions</span>
+              <ColResize colId="actions" onStart={startResize} />
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -580,15 +726,17 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                     onChange={() => dispatch(toggleRunSelected(run.task_id))}
                   />
                 </TableCell>
-                <TableCell className="max-w-[240px]" title={runStr(run, 'goal_sentence') || run.task_id}>
+                {/* Width is governed by the resizable `run` column (table-fixed);
+                    overflow-hidden lets the inner `truncate` ellipsize at that width. */}
+                <TableCell className="overflow-hidden" title={runStr(run, 'goal_sentence') || run.task_id}>
                   {runStr(run, 'goal_sentence')
                     ? (
-                      <div className="flex flex-col">
+                      <div className="flex min-w-0 flex-col">
                         <span className="truncate text-sm font-medium">{runStr(run, 'goal_sentence')}</span>
                         <span className="truncate font-mono text-xs text-muted-foreground">{run.task_id}</span>
                       </div>
                     )
-                    : <span className="truncate font-mono text-sm">{run.task_id}</span>}
+                    : <span className="block truncate font-mono text-sm">{run.task_id}</span>}
                 </TableCell>
                 <TableCell data-testid="run-when">
                   <WhenCell run={run} now={now} />
