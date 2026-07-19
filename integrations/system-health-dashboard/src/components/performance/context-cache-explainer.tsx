@@ -355,9 +355,80 @@ const KB_SECTIONS = [
   { name: 'Observations', budget: '≤3 items', src: 'Qdrant · observations', detail: 'Individual past intents/approaches matching the query.' },
 ]
 
+// The 5 canonical KB sections. Item bodies can themselves contain `##` sub-headers
+// (e.g. an Insight's "## Purpose"), so we split the captured block ONLY on these
+// known top-level names — never on a bare `##`.
+interface KbSection { name: string; body: string; items: string[] }
+function parseKnowledgeSections(text?: string | null): Record<string, KbSection> {
+  const out: Record<string, KbSection> = {}
+  if (!text || !text.trim()) return out
+  const headerRe = /^##\s+(Working Memory|Insights|Digests|Entities|Observations)\s*$/
+  let cur: KbSection | null = null
+  for (const ln of text.split(/\r?\n/)) {
+    const m = ln.match(headerRe)
+    if (m) { cur = { name: m[1], body: '', items: [] }; out[m[1]] = cur; continue }
+    if (cur) cur.body += (cur.body ? '\n' : '') + ln
+  }
+  for (const k of Object.keys(out)) {
+    const body = out[k].body.trim()
+    out[k].body = body
+    // Working Memory is structured state, not a ranked list — keep it whole.
+    out[k].items = k === 'Working Memory'
+      ? (body ? [body] : [])
+      : body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean)
+  }
+  return out
+}
+
+// First non-empty line of a block, for the abbreviated preview in the KB modal.
+function kbFirstLine(s: string, max = 150): string {
+  const ln = (s.split(/\r?\n/).find((l) => l.trim()) ?? '').trim()
+  return ln.length > max ? ln.slice(0, max - 1) + '…' : ln
+}
+
+// 3rd-level sub-modal: the FULL captured content of one KB section, its items
+// rendered as cards. Stacks on top of KbDetailDialog (Radix supports nesting).
+// (Phase B enriches these cards with per-item relevance scores.)
+function KbCategoryDialog({ name, section, onClose }: { name: string | null; section: KbSection | null; onClose: () => void }) {
+  const meta = KB_SECTIONS.find((s) => s.name === name) || null
+  return (
+    <Dialog open={name != null} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto" data-testid="kb-category-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {name} — what was retrieved
+            {meta && <Badge variant="outline" className="font-mono text-[10px]">{meta.src}</Badge>}
+          </DialogTitle>
+          <DialogDescription>
+            {meta?.detail} The exact content injected for this run, verbatim from its captured buffer.
+          </DialogDescription>
+        </DialogHeader>
+        {section && section.items.length > 0 ? (
+          <div className="space-y-2" data-testid="kb-category-items">
+            {section.items.map((it, i) => (
+              <div key={i} className="rounded border p-2" data-testid="kb-item-card">
+                <pre className="whitespace-pre-wrap text-[11px] leading-snug">{it}</pre>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+            This section is empty in the captured block for this run.
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 /** Nested pop-up: the deep detail for the Retrieved-Knowledge injection. */
-function KbDetailDialog({ open, onClose, real }: { open: boolean; onClose: () => void; real: RealBreakdown | null }) {
+function KbDetailDialog({ open, onClose, real, agent }: { open: boolean; onClose: () => void; real: RealBreakdown | null; agent?: string | null }) {
   const injected = real?.knowledge_text?.trim() || null
+  const sections = useMemo(() => parseKnowledgeSections(injected), [injected])
+  const [openSection, setOpenSection] = useState<string | null>(null)
+  // Only Claude Code injects the KB block (a UserPromptSubmit hook). opencode/copilot
+  // runs legitimately carry no block, so their empty-state must say so — not "re-run".
+  const agentInjectsKb = !agent || /claude/i.test(agent)
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto" data-testid="kb-detail-dialog">
@@ -371,22 +442,27 @@ function KbDetailDialog({ open, onClose, real }: { open: boolean; onClose: () =>
           </DialogDescription>
         </DialogHeader>
 
-        {/* The ACTUAL injected block, extracted from this run's captured buffer. */}
+        {/* Header line: real content lights up the per-category rows below; the
+            two empty cases are distinguished honestly (agent-vs-capture). */}
         {injected ? (
-          <div className="rounded-md border p-3" data-testid="kb-real-content">
-            <div className="mb-1 flex items-center justify-between">
-              <p className="text-sm font-semibold">What actually got injected</p>
-              {typeof real?.knowledge_occurrences === 'number' && (
-                <span className="text-xs text-muted-foreground">{real.knowledge_occurrences} injection{real.knowledge_occurrences === 1 ? '' : 's'} in this buffer</span>
-              )}
-            </div>
-            <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] leading-snug">{injected}</pre>
-            <p className="mt-1 text-xs text-muted-foreground">Verbatim from this run’s captured request (most-recent injection, capped). This is the real retrieved content — not the schema.</p>
+          <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground" data-testid="kb-real-content">
+            <span className="font-semibold text-foreground">The real retrieved content</span> for this run is broken out per
+            category below — click any category for its full captured text.
+            {typeof real?.knowledge_occurrences === 'number' && (
+              <> This buffer carried <span className="font-medium text-foreground">{real.knowledge_occurrences} injection{real.knowledge_occurrences === 1 ? '' : 's'}</span> (most-recent shown).</>
+            )}
+          </div>
+        ) : !agentInjectsKb ? (
+          <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
+            The <span className="font-medium text-foreground">{agent}</span> agent doesn’t inject the ~1,000-token KB block — the
+            injection is a Claude Code <span className="font-mono">UserPromptSubmit</span> hook that doesn’t fire in this harness.
+            Open a <span className="font-medium text-foreground">Claude</span> run to see the retrieved knowledge. The schema below
+            shows what the block is composed of.
           </div>
         ) : (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
-            No captured buffer for this run, so the exact injected text isn’t available (it predates the capture tap, or the agent
-            has no proxy seam). Re-run the comparison to record it. The schema below shows what the block is composed of.
+            No captured buffer for this run, so the exact injected text isn’t available (it predates the capture tap). Re-run the
+            comparison to record it. The schema below shows what the block is composed of.
           </div>
         )}
 
@@ -403,16 +479,51 @@ function KbDetailDialog({ open, onClose, real }: { open: boolean; onClose: () =>
         </div>
 
         <div className="mt-3 space-y-1.5">
-          {KB_SECTIONS.map((s) => (
-            <div key={s.name} className="flex items-start justify-between gap-3 rounded border px-3 py-2">
-              <div>
-                <p className="text-sm font-medium">{s.name} <span className="ml-1 font-mono text-xs text-muted-foreground">{s.budget}</span></p>
-                <p className="text-xs text-muted-foreground">{s.detail}</p>
+          {KB_SECTIONS.map((s) => {
+            const sec = sections[s.name]
+            const hasContent = !!sec && sec.items.length > 0
+            const preview = hasContent ? kbFirstLine(sec.body) : s.detail
+            const inner = (
+              <>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {s.name} <span className="ml-1 font-mono text-xs text-muted-foreground">{s.budget}</span>
+                    {hasContent && s.name !== 'Working Memory' && (
+                      <span className="ml-2 text-xs text-muted-foreground">· {sec.items.length} item{sec.items.length === 1 ? '' : 's'}</span>
+                    )}
+                  </p>
+                  <p className={'truncate text-xs ' + (hasContent ? 'text-foreground/80' : 'text-muted-foreground')}>{preview}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge variant="outline" className="font-mono text-[10px]">{s.src}</Badge>
+                  {hasContent && <span className="text-muted-foreground" aria-hidden>›</span>}
+                </div>
+              </>
+            )
+            const testId = `kb-section-${s.name.toLowerCase().replace(/\s+/g, '-')}`
+            return hasContent ? (
+              <button
+                key={s.name}
+                type="button"
+                onClick={() => setOpenSection(s.name)}
+                data-testid={testId}
+                className="flex w-full cursor-pointer items-start justify-between gap-3 rounded border px-3 py-2 text-left transition-colors hover:bg-muted/50"
+              >
+                {inner}
+              </button>
+            ) : (
+              <div key={s.name} data-testid={testId} className="flex items-start justify-between gap-3 rounded border px-3 py-2">
+                {inner}
               </div>
-              <Badge variant="outline" className="shrink-0 font-mono text-[10px]">{s.src}</Badge>
-            </div>
-          ))}
+            )
+          })}
         </div>
+
+        <KbCategoryDialog
+          name={openSection}
+          section={openSection ? (sections[openSection] ?? null) : null}
+          onClose={() => setOpenSection(null)}
+        />
 
         <div className="mt-3 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">Pipeline:</span> the hook embeds your prompt → semantic search over
@@ -1191,7 +1302,7 @@ export function ContextCacheExplainer() {
           </p>
         </div>
 
-        <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} />
+        <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} agent={agent} />
         <CategoryDetailModal
           segKey={catOpen}
           onClose={() => setCatOpen(null)}
