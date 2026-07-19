@@ -494,9 +494,10 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
     const tier = nm ? SECTION_TIER[nm] : undefined
     return tier && kbItems ? kbItems.filter((i) => i.tier === tier) : []
   }
-  // Only Claude Code injects the KB block (a UserPromptSubmit hook). opencode/copilot
-  // runs legitimately carry no block, so their empty-state must say so — not "re-run".
-  const agentInjectsKb = !agent || /claude/i.test(agent)
+  // Claude (UserPromptSubmit hook) and OpenCode (chat.messages.transform plugin)
+  // inject the KB block per prompt. Copilot exposes no per-prompt hook API, so it
+  // genuinely can't — its empty-state must say so rather than a misleading "re-run".
+  const agentInjectsKb = !agent || /claude|opencode/i.test(agent)
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto" data-testid="kb-detail-dialog">
@@ -522,15 +523,17 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
           </div>
         ) : !agentInjectsKb ? (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
-            The <span className="font-medium text-foreground">{agent}</span> agent doesn’t inject the ~1,000-token KB block — the
-            injection is a Claude Code <span className="font-mono">UserPromptSubmit</span> hook that doesn’t fire in this harness.
-            Open a <span className="font-medium text-foreground">Claude</span> run to see the retrieved knowledge. The schema below
-            shows what the block is composed of.
+            <span className="font-medium text-foreground">{agent || 'This agent'}</span> doesn’t carry the ~1,000-token KB block:
+            the installed Copilot CLI fires filesystem hooks but doesn’t apply their injected context, so nothing is prepended.
+            Per-prompt injection works on <span className="font-medium text-foreground">Claude</span> and
+            <span className="font-medium text-foreground"> OpenCode</span> — open one of those runs to see the retrieved
+            knowledge. The schema below shows what the block is composed of.
           </div>
         ) : (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
-            No captured buffer for this run, so the exact injected text isn’t available (it predates the capture tap). Re-run the
-            comparison to record it. The schema below shows what the block is composed of.
+            No captured buffer for this run, so the exact injected text isn’t available (it predates the capture tap). Claude and
+            OpenCode inject the block per prompt — re-run it to record the content. The schema below shows what the block is
+            composed of.
           </div>
         )}
 

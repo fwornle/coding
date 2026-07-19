@@ -63,14 +63,29 @@ RESULT=$(echo "$UNIFIED_CONTEXT" | node "$SCRIPT_DIR/copilot-bridge-handler.js" 
 ALLOW=$(echo "$RESULT" | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).allow !== false' 2>/dev/null || echo "true")
 MESSAGE=$(echo "$RESULT" | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).messages?.join("\\n") || ""' 2>/dev/null || echo "")
 
-if [ "$ALLOW" = "true" ]; then
-  if [ -n "$MESSAGE" ]; then
-    echo "{\"continue\":true,\"message\":\"$MESSAGE\"}"
-  else
-    echo '{"continue":true}'
-  fi
-else
+if [ "$ALLOW" != "true" ]; then
   echo "{\"continue\":false,\"message\":\"$MESSAGE\"}"
+  exit 0
+fi
+
+# Per-prompt knowledge injection (parity with Claude's UserPromptSubmit hook).
+# Copilot rewrites the model-facing prompt from this hook's `modifiedPrompt` field,
+# so for userPromptSubmitted we retrieve the ~1000-token KB block and emit it. The
+# helper reads the raw Copilot payload ({prompt,...}) and prints single-line JSON —
+# {"modifiedPrompt":"<KB>\n\n<prompt>"} to inject, or {} to leave it unchanged.
+# NOTE: dormant no-op on Copilot CLI v1.0.71 — filesystem hooks fire but their output
+# is not processed for injection (verified). Activates on a build that honors
+# modifiedPrompt from a filesystem hook. See knowledge-injection-copilot-prompt.js.
+if [ "$NATIVE_EVENT" = "userPromptSubmitted" ]; then
+  KB=$(echo "$CONTEXT" | node "$CODING_REPO/src/hooks/knowledge-injection-copilot-prompt.js" 2>/dev/null || echo '{}')
+  [ -n "$KB" ] && echo "$KB" || echo '{"continue":true}'
+  exit 0
+fi
+
+if [ -n "$MESSAGE" ]; then
+  echo "{\"continue\":true,\"message\":\"$MESSAGE\"}"
+else
+  echo '{"continue":true}'
 fi
 
 exit 0
