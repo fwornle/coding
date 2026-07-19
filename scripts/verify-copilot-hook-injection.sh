@@ -92,7 +92,7 @@ fi
 echo ""
 
 # --- CHECK 2: INJECTION (probabilistic, N-run hit-rate) ----------------------
-pass=0; fail=0; posttool_ok=0
+pass=0; fail=0; perturn_ok=0
 test_channel() {  # <event> <field> <expect: yes|no>
   local event="$1" field="$2" expect="$3" hits=0 out
   cat > "$HOOK_SH" <<EOF
@@ -109,7 +109,13 @@ EOF
   local label; printf -v label "%-24s" "$event/$field"
   if [ "$hits" -gt 0 ]; then
     echo "  ${C_GREEN}✓ DELIVERS${C_OFF}  $label ${hits}/${REPEATS}"
-    pass=$((pass+1)); [ "$event/$field" = "postToolUse/additionalContext" ] && posttool_ok=1
+    pass=$((pass+1))
+    # A per-turn channel delivering is what the injector needs (postToolUse OR
+    # userPromptSubmitted → additionalContext). Whichever delivers, feed it back into
+    # copilot-channel-capabilities.js KNOWN_RANGES for this version.
+    case "$event/$field" in
+      postToolUse/additionalContext|userPromptSubmitted/additionalContext) perturn_ok=1 ;;
+    esac
   else
     local note=""; [ "$expect" = no ] && note=" ${C_YEL}(expected non-injecting)${C_OFF}"
     echo "  ${C_RED}✗ DROPPED${C_OFF}   $label 0/${REPEATS}$note"
@@ -117,10 +123,14 @@ EOF
   fi
 }
 echo "${C_CYAN}[2] Injection channels (neutral-token, ${REPEATS}x — read the rate, not one run)${C_OFF}"
-test_channel postToolUse        additionalContext yes
-test_channel sessionStart       additionalContext yes
+# Both per-turn channels are first-class now (the injector picks per version via
+# copilot-channel-capabilities.js). postToolUse delivers on v1.0.71; userPromptSubmitted
+# additionalContext became honored on v1.0.72+. sessionStart delivers too but is not
+# per-turn (fires once), so it can't carry task-relevant KB — shown for completeness.
+test_channel postToolUse         additionalContext yes
+test_channel userPromptSubmitted additionalContext yes
+test_channel sessionStart        additionalContext yes
 if [ "$TEST_ALL" = 1 ]; then
-  test_channel userPromptSubmitted additionalContext no
   test_channel userPromptSubmitted modifiedPrompt    no
 fi
 echo ""
@@ -129,10 +139,11 @@ echo ""
 echo "${C_CYAN}== Summary ==${C_OFF}  firing: $([ "$fired" = 1 ] && echo yes || echo NO)  |  channels delivering: $pass  dropped: $fail"
 echo "${C_YEL}Self-report is noisy (~1/3 even on a working channel); >0/N = the content reached the model."
 echo "In real use the agent uses relevant KB more reliably than it restates an abstract token.${C_OFF}"
-if [ "$fired" = 1 ] && [ "$posttool_ok" = 1 ]; then
-  echo "${C_GREEN}OK: hooks fire and postToolUse→additionalContext delivers — copilot KB injection is live.${C_OFF}"
+if [ "$fired" = 1 ] && [ "$perturn_ok" = 1 ]; then
+  echo "${C_GREEN}OK: hooks fire and at least one per-turn channel (postToolUse / userPromptSubmitted → additionalContext) delivers — copilot KB injection is live.${C_OFF}"
+  echo "${C_YEL}If the delivering channel differs from what copilot-channel-capabilities.js maps for $(copilot --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+[-0-9]*' | head -1), update KNOWN_RANGES.${C_OFF}"
   exit 0
 fi
 [ "$fired" = 0 ] && echo "${C_RED}Hooks are DORMANT — enable them (install.sh install_copilot_file_hooks) before injection can work.${C_OFF}"
-[ "$fired" = 1 ] && [ "$posttool_ok" = 0 ] && echo "${C_RED}postToolUse dropped on this build — re-run with --all; if another channel delivers, point the bridge at it.${C_OFF}"
+[ "$fired" = 1 ] && [ "$perturn_ok" = 0 ] && echo "${C_RED}No per-turn channel delivered on this build — re-run with --all; whichever channel delivers, add it to copilot-channel-capabilities.js KNOWN_RANGES for this version.${C_OFF}"
 exit 1

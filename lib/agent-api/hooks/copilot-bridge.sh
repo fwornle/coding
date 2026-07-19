@@ -69,20 +69,26 @@ if [ "$ALLOW" != "true" ]; then
 fi
 
 # Knowledge injection (parity with Claude's UserPromptSubmit hook, adapted to what
-# Copilot CLI actually honors). On Copilot, filesystem command hooks can only inject
-# context the model reads via postToolUse → additionalContext; userPromptSubmitted
-# output is ignored and modifiedPrompt is SDK-only. So we stash the prompt at
-# userPromptSubmitted, then inject task-relevant KB via additionalContext on the
-# first postToolUse of the turn (once-per-turn; see knowledge-injection-copilot-posttool.js).
+# Copilot CLI actually honors). Filesystem command hooks can only inject context the
+# model reads via an `additionalContext` field, and WHICH event's additionalContext is
+# honored churns across Copilot versions (postToolUse on v1.0.71; userPromptSubmitted
+# newly on v1.0.72+, where postToolUse went flaky). So the injector emits on the channel
+# SET resolved for the installed version (that set is the dedup — single channel on known
+# versions, both as a dup-tolerant fail-safe on unknown ones). See
+# knowledge-injection-copilot-posttool.js and copilot-channel-capabilities.js.
+#
+# The 'prompt' mode starts a fresh turn AND, when userPromptSubmitted is an honored
+# channel, emits its additionalContext directly (so we pass its JSON through, unlike the
+# old build which discarded it). The 'tool' mode injects on the first postToolUse when
+# postToolUse is honored. Either mode emits {} when its channel isn't in the plan.
 if [ "$NATIVE_EVENT" = "userPromptSubmitted" ]; then
-  # Persist the prompt for postToolUse; the emitted JSON is ignored by Copilot here.
-  echo "$CONTEXT" | node "$CODING_REPO/src/hooks/knowledge-injection-copilot-posttool.js" stash >/dev/null 2>&1 || true
-  echo '{"continue":true}'
+  KB=$(echo "$CONTEXT" | node "$CODING_REPO/src/hooks/knowledge-injection-copilot-posttool.js" prompt 2>/dev/null || echo '{}')
+  [ -n "$KB" ] && echo "$KB" || echo '{"continue":true}'
   exit 0
 fi
 
 if [ "$NATIVE_EVENT" = "postToolUse" ]; then
-  KB=$(echo "$CONTEXT" | node "$CODING_REPO/src/hooks/knowledge-injection-copilot-posttool.js" inject 2>/dev/null || echo '{}')
+  KB=$(echo "$CONTEXT" | node "$CODING_REPO/src/hooks/knowledge-injection-copilot-posttool.js" tool 2>/dev/null || echo '{}')
   [ -n "$KB" ] && echo "$KB" || echo '{"continue":true}'
   exit 0
 fi

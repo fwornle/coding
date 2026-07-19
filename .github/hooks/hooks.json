@@ -14,7 +14,7 @@
       {
         "type": "command",
         "bash": "./lib/agent-api/hooks/copilot-bridge.sh userPromptSubmitted",
-        "timeoutSec": 5
+        "timeoutSec": 8
       }
     ],
     "preToolUse": [
