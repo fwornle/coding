@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend,
@@ -355,6 +356,29 @@ const KB_SECTIONS = [
   { name: 'Observations', budget: '≤3 items', src: 'Qdrant · observations', detail: 'Individual past intents/approaches matching the query.' },
 ]
 
+// Phase B: one structured item from the retrieval capture (/api/retrieve-capture),
+// carrying the scores that never survive markdown flattening. `rrfScore` is the
+// final fused relevance-to-this-prompt; `score` the raw Qdrant cosine.
+interface KbCaptureItem {
+  id: string | number | null
+  tier: string // insights | digests | kg_entities | observations
+  rrfScore: number | null
+  score: number | null
+  payload: {
+    topic?: string; theme?: string; entityType?: string; agent?: string
+    project?: string; date?: string; hierarchyLevel?: string | number
+    confidence?: number; quality?: number; summary_preview?: string
+  }
+}
+// Map a KB section name → the capture's tier key. Working Memory has no structured
+// items (it's flattened state), so it's absent here and stays a markdown blob.
+const SECTION_TIER: Record<string, string> = {
+  Insights: 'insights',
+  Digests: 'digests',
+  Entities: 'kg_entities',
+  Observations: 'observations',
+}
+
 // The 5 canonical KB sections. Item bodies can themselves contain `##` sub-headers
 // (e.g. an Insight's "## Purpose"), so we split the captured block ONLY on these
 // known top-level names — never on a bare `##`.
@@ -386,11 +410,46 @@ function kbFirstLine(s: string, max = 150): string {
   return ln.length > max ? ln.slice(0, max - 1) + '…' : ln
 }
 
-// 3rd-level sub-modal: the FULL captured content of one KB section, its items
-// rendered as cards. Stacks on top of KbDetailDialog (Radix supports nesting).
-// (Phase B enriches these cards with per-item relevance scores.)
-function KbCategoryDialog({ name, section, onClose }: { name: string | null; section: KbSection | null; onClose: () => void }) {
+// One structured (scored) item card. `rrfScore` is the relevance-to-this-prompt;
+// confidence/quality are the item's own intrinsic score where the tier carries one.
+function KbScoredCard({ item }: { item: KbCaptureItem }): ReactNode {
+  const p = item.payload || {}
+  const title = p.topic || p.theme || p.entityType || (p.agent ? `${p.agent}${p.date ? ` · ${p.date}` : ''}` : 'item')
+  const intrinsic = typeof p.confidence === 'number'
+    ? `confidence ${p.confidence}`
+    : typeof p.quality === 'number' ? `quality ${p.quality}`
+    : (p.hierarchyLevel != null ? `level ${p.hierarchyLevel}` : (p.date || ''))
+  return (
+    <div className="rounded border p-2" data-testid="kb-item-card">
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <p className="min-w-0 flex-1 truncate text-sm font-medium">{title}</p>
+        <div className="flex shrink-0 items-center gap-1">
+          {intrinsic && <Badge variant="outline" className="text-[10px]">{intrinsic}</Badge>}
+          {typeof item.rrfScore === 'number' && (
+            <Badge variant="secondary" className="font-mono text-[10px]" title="RRF relevance to this prompt">
+              rel {item.rrfScore.toFixed(3)}
+            </Badge>
+          )}
+        </div>
+      </div>
+      {p.summary_preview && (
+        <p className="whitespace-pre-wrap text-[11px] leading-snug text-muted-foreground">{p.summary_preview}</p>
+      )}
+    </div>
+  )
+}
+
+// 3rd-level sub-modal: the FULL captured content of one KB section. Prefers the
+// structured (scored) capture when present, else falls back to the markdown blocks
+// parsed from the injected text. Stacks on top of KbDetailDialog (Radix nesting).
+function KbCategoryDialog({ name, section, structured, onClose }: {
+  name: string | null
+  section: KbSection | null
+  structured: KbCaptureItem[]
+  onClose: () => void
+}) {
   const meta = KB_SECTIONS.find((s) => s.name === name) || null
+  const hasScored = structured.length > 0
   return (
     <Dialog open={name != null} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto" data-testid="kb-category-dialog">
@@ -400,10 +459,15 @@ function KbCategoryDialog({ name, section, onClose }: { name: string | null; sec
             {meta && <Badge variant="outline" className="font-mono text-[10px]">{meta.src}</Badge>}
           </DialogTitle>
           <DialogDescription>
-            {meta?.detail} The exact content injected for this run, verbatim from its captured buffer.
+            {meta?.detail} The exact content injected for this run
+            {hasScored ? ', each with its relevance score to this prompt.' : ', verbatim from its captured buffer.'}
           </DialogDescription>
         </DialogHeader>
-        {section && section.items.length > 0 ? (
+        {hasScored ? (
+          <div className="space-y-2" data-testid="kb-category-items">
+            {structured.map((it, i) => <KbScoredCard key={it.id != null ? String(it.id) : i} item={it} />)}
+          </div>
+        ) : section && section.items.length > 0 ? (
           <div className="space-y-2" data-testid="kb-category-items">
             {section.items.map((it, i) => (
               <div key={i} className="rounded border p-2" data-testid="kb-item-card">
@@ -422,10 +486,14 @@ function KbCategoryDialog({ name, section, onClose }: { name: string | null; sec
 }
 
 /** Nested pop-up: the deep detail for the Retrieved-Knowledge injection. */
-function KbDetailDialog({ open, onClose, real, agent }: { open: boolean; onClose: () => void; real: RealBreakdown | null; agent?: string | null }) {
+function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean; onClose: () => void; real: RealBreakdown | null; agent?: string | null; kbItems?: KbCaptureItem[] | null }) {
   const injected = real?.knowledge_text?.trim() || null
   const sections = useMemo(() => parseKnowledgeSections(injected), [injected])
   const [openSection, setOpenSection] = useState<string | null>(null)
+  const structuredFor = (nm: string | null): KbCaptureItem[] => {
+    const tier = nm ? SECTION_TIER[nm] : undefined
+    return tier && kbItems ? kbItems.filter((i) => i.tier === tier) : []
+  }
   // Only Claude Code injects the KB block (a UserPromptSubmit hook). opencode/copilot
   // runs legitimately carry no block, so their empty-state must say so — not "re-run".
   const agentInjectsKb = !agent || /claude/i.test(agent)
@@ -522,6 +590,7 @@ function KbDetailDialog({ open, onClose, real, agent }: { open: boolean; onClose
         <KbCategoryDialog
           name={openSection}
           section={openSection ? (sections[openSection] ?? null) : null}
+          structured={structuredFor(openSection)}
           onClose={() => setOpenSection(null)}
         />
 
@@ -674,6 +743,11 @@ export function ContextCacheExplainer() {
   const [kbOpen, setKbOpen] = useState(false)
   const [catOpen, setCatOpen] = useState<string | null>(null)
   const [real, setReal] = useState<RealBreakdown | null>(null)
+  // Phase B: structured per-item KB capture for THIS run (scored cards in the KB
+  // drill-down). Forward-only — populated once the run went through the retrieval
+  // hook with its task_id after Phase B shipped; null/[] otherwise (Phase-A markdown
+  // fallback still renders the content).
+  const [kbItems, setKbItems] = useState<KbCaptureItem[] | null>(null)
 
   const open = taskId != null
   const close = () => dispatch(setExplainTaskId(null))
@@ -699,6 +773,18 @@ export function ContextCacheExplainer() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (!cancelled && d && Array.isArray(d.categories) && d.total_bytes > 0) setReal(d as RealBreakdown) })
       .catch(() => { /* no per-run capture — fall back to illustrative */ })
+    return () => { cancelled = true }
+  }, [open, taskId])
+
+  // Phase B: the structured per-item KB capture for this run (scored cards).
+  useEffect(() => {
+    if (!open || !taskId) { setKbItems(null); return }
+    let cancelled = false
+    setKbItems(null)
+    fetch(`/api/retrieve-capture?task_id=${encodeURIComponent(taskId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d && Array.isArray(d.items)) setKbItems(d.items as KbCaptureItem[]) })
+      .catch(() => { /* no structured capture — markdown parse still renders content */ })
     return () => { cancelled = true }
   }, [open, taskId])
 
@@ -1302,7 +1388,7 @@ export function ContextCacheExplainer() {
           </p>
         </div>
 
-        <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} agent={agent} />
+        <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} agent={agent} kbItems={kbItems} />
         <CategoryDetailModal
           segKey={catOpen}
           onClose={() => setCatOpen(null)}

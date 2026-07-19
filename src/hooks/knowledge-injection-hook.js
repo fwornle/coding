@@ -189,11 +189,18 @@ async function main() {
     // digest. The retrieval-service's topic-relevance pass (substring + exact-
     // token overlap) does the actual ranking; the threshold's job is just to
     // let the candidates in.
+    // Phase B: forward the run id so the retrieval server persists a structured
+    // per-item capture keyed by it. TASK_ID is set for experiment runs (the slug
+    // the runs table shows); interactive sessions fall back to the Claude Code
+    // hook's session_id (the UUID the auto-measure reconciler keys captures by).
+    const task_id = process.env.TASK_ID || input.session_id || null;
+
     const result = await callRetrieval({
       query,
       budget: 1000,
       threshold: 0.70,
       context,
+      task_id,
     });
     if (!result || !result.markdown || result.meta?.results_count === 0) return;
 

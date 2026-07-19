@@ -131,9 +131,32 @@ function contentSignature(item) {
   return `${item.tier}:${normalized}`;
 }
 
+/**
+ * Compact per-item record for structured capture (Phase B). Carries the scores
+ * that never survive markdown flattening — `rrfScore` is the final fused
+ * relevance-to-this-prompt, `score` the raw Qdrant cosine — plus the display
+ * payload (topic/theme/entityType/agent + summary_preview) so the dashboard can
+ * render each retrieved item as a card. Mirrors the item actually injected
+ * (truncated payload when truncated), not the pre-budget candidate.
+ * @param {object} item
+ * @returns {object}
+ */
+function pickItem(item) {
+  return {
+    id: item.id ?? null,
+    tier: item.tier,
+    rrfScore: typeof item.rrfScore === 'number' ? item.rrfScore : null,
+    score: typeof item.score === 'number' ? item.score : null,
+    payload: item.payload || {},
+  };
+}
+
 export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
   const buckets = Object.fromEntries(TIER_ORDER.map((t) => [t, []]));
   let tokensUsed = 0;
+  // Phase B: the item objects actually included, in injection order — returned
+  // alongside the markdown so callers can persist a structured capture.
+  const selected = [];
 
   const tierCounts = Object.fromEntries(TIER_ORDER.map((t) => [t, 0]));
   const seenSignatures = new Set();
@@ -159,6 +182,7 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
           if (buckets[result.tier]) {
             buckets[result.tier].push(tf);
             tierCounts[result.tier] = (tierCounts[result.tier] ?? 0) + 1;
+            selected.push(pickItem(truncated));
           }
           tokensUsed += countTokens(tf);
         }
@@ -170,6 +194,7 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
       buckets[result.tier].push(formatted);
       tierCounts[result.tier] = (tierCounts[result.tier] ?? 0) + 1;
       if (sig) seenSignatures.add(sig);
+      selected.push(pickItem(result));
     }
     tokensUsed += tokens;
   }
@@ -182,5 +207,5 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
     }
   }
 
-  return { markdown: sections.join('\n\n'), tokensUsed };
+  return { markdown: sections.join('\n\n'), tokensUsed, items: selected };
 }

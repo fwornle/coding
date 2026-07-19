@@ -295,11 +295,24 @@ class SystemHealthAPIServer {
              try {
                  const qs = new URLSearchParams(req.query).toString();
                  const url = `http://host.docker.internal:12435/api/context-breakdown${qs ? '?' + qs : ''}`;
-                 const resp = await fetch(url);
+                 const resp = await fetch(url, { signal: AbortSignal.timeout(4000) });
+                 // A 404 means "no per-category capture for this task" — the normal
+                 // case for copilot/opencode runs that bypass the proxy's wire tap.
+                 // The frontend already renders that as the illustrative band, so we
+                 // must NOT pass the 404 through: a 404 on this XHR is logged by the
+                 // browser as a red "API error". Degrade it to a graceful empty 200.
+                 if (resp.status === 404) {
+                     return res.status(200).json({ categories: [], total_bytes: 0, degraded: true, reason: 'no-capture' });
+                 }
                  const data = await resp.json();
                  res.status(resp.status).json(data);
              } catch (err) {
-                 res.status(502).json({ error: 'LLM proxy unreachable', details: err.message });
+                 // The proxy is a singleton that briefly restarts on a fresh session
+                 // (multi-second hydrate window). The frontend already treats an empty
+                 // capture as "no per-category wire data → illustrative band", so a
+                 // transient unreachable proxy must degrade to a graceful, frontend-
+                 // shaped empty 200 — never a scary 502 in the console.
+                 res.status(200).json({ categories: [], total_bytes: 0, degraded: true, reason: err.message });
              }
          });
 
@@ -311,11 +324,19 @@ class SystemHealthAPIServer {
              try {
                  const qs = new URLSearchParams(req.query).toString();
                  const url = `http://host.docker.internal:12435/api/context-turns${qs ? '?' + qs : ''}`;
-                 const resp = await fetch(url);
+                 const resp = await fetch(url, { signal: AbortSignal.timeout(4000) });
+                 // Same 404 contract as /api/context-breakdown: an unknown/uncaptured
+                 // task must not surface as a red browser "API error".
+                 if (resp.status === 404) {
+                     return res.status(200).json({ contextTurns: [], degraded: true, reason: 'no-capture' });
+                 }
                  const data = await resp.json();
                  res.status(resp.status).json(data);
              } catch (err) {
-                 res.status(502).json({ error: 'LLM proxy unreachable', details: err.message });
+                 // Same graceful-degrade contract as /api/context-breakdown above:
+                 // a transient proxy restart returns the empty shape the frontend
+                 // already handles, not a 502.
+                 res.status(200).json({ contextTurns: [], degraded: true, reason: err.message });
              }
          });
 
@@ -390,6 +411,9 @@ class SystemHealthAPIServer {
 
          // Retrieval API (Phase 29)
          this.app.post('/api/retrieve', this.handleRetrieve.bind(this));
+         // Structured per-item retrieval capture (Phase B) — read directly from the
+         // bind-mounted .data written by the obs-api /api/retrieve handler.
+         this.app.get('/api/retrieve-capture', this.handleRetrieveCapture.bind(this));
 
         // Error handling
         this.app.use(this.handleError.bind(this));
@@ -4713,6 +4737,27 @@ class SystemHealthAPIServer {
         } catch (err) {
             process.stderr.write(`[RetrievalAPI] forward error: ${err.message}\n`);
             res.status(502).json({ error: 'Observations API unreachable' });
+        }
+    }
+
+    /**
+     * GET /api/retrieve-capture?task_id=... — the structured per-item KB capture
+     * for a run (Phase B). Read straight from the bind-mounted .data written by the
+     * obs-api /api/retrieve handler; degrade to an empty set on miss (a run that
+     * predates the capture, or an agent that injects no KB block).
+     */
+    async handleRetrieveCapture(req, res) {
+        const taskId = String(req.query.task_id || '').trim();
+        if (!taskId) return res.status(400).json({ error: 'task_id is required' });
+        const safe = taskId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 200);
+        const file = join(codingRoot, '.data', 'retrieval-captures', `${safe}.json`);
+        try {
+            if (!existsSync(file)) return res.json({ task_id: taskId, items: [] });
+            const data = JSON.parse(readFileSync(file, 'utf8'));
+            res.json(data);
+        } catch (err) {
+            process.stderr.write(`[RetrievalAPI] capture read error: ${err.message}\n`);
+            res.json({ task_id: taskId, items: [] });
         }
     }
 }

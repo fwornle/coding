@@ -18,15 +18,22 @@ import http from 'node:http';
  * @param {number} [params.budget=1000] - Token budget
  * @param {number} [params.threshold=0.75] - Relevance threshold
  * @param {object|null} [params.context=null] - Optional context: { project, cwd, recent_files }
+ * @param {string|null} [params.task_id=null] - Optional run/session id. When set, the
+ *   retrieval server persists a structured per-item capture keyed by it (Phase B), so
+ *   the dashboard can show the exact injected Insights/Digests/Entities/Observations
+ *   as scored cards. Equals the runs-table task_id (experiment slug or session UUID).
  * @param {number} [params.timeout=2000] - HTTP timeout in ms
  * @param {number} [params.port=3033] - Retrieval service port
  * @returns {Promise<object|null>} Parsed response or null (fail-open)
  */
-export function callRetrieval({ query, budget = 1000, threshold = 0.75, context = null, timeout = 2000, port = 3033 }) {
+export function callRetrieval({ query, budget = 1000, threshold = 0.75, context = null, task_id = null, timeout = 2000, port = 3033 }) {
   return new Promise((resolve) => {
     const payload = { query, budget, threshold };
     if (context != null) {
       payload.context = context;
+    }
+    if (task_id) {
+      payload.task_id = task_id;
     }
 
     const body = JSON.stringify(payload);

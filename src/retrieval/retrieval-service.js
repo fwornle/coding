@@ -172,14 +172,17 @@ export class RetrievalService {
     fused.sort((a, b) => b.rrfScore - a.rrfScore);
 
     // Step 5: Token-budgeted markdown assembly (semantic budget after WM)
-    const { markdown, tokensUsed } = assembleBudgetedMarkdown(fused, effectiveSemanticBudget);
+    const { markdown, tokensUsed, items } = assembleBudgetedMarkdown(fused, effectiveSemanticBudget);
 
     // Combine: working memory prefix + semantic results
     const finalMarkdown = wm.markdown ? wm.markdown + '\n\n' + markdown : markdown;
 
-    // Return D-06 response shape (latency_ms set by caller)
+    // Return D-06 response shape (latency_ms set by caller). `items` (Phase B) is
+    // the structured subset actually injected — each with its rrfScore/score — so a
+    // caller can persist a per-item capture the dashboard renders as scored cards.
     return {
       markdown: finalMarkdown,
+      items,
       meta: {
         query,
         budget,

@@ -213,6 +213,10 @@ integrations/mcp-server-browserbase/
 # ignored above.)
 .data/llm-proxy/
 
+# Structured per-item KB retrieval captures (Phase B) — one JSON per run, written
+# by the obs-api /api/retrieve handler. Runtime data, regenerated per injection.
+.data/retrieval-captures/
+
 # Session scratch + Playwright/browser artifacts — local only, never committed.
 scratchpad/
 integrations/system-health-dashboard/test-results/

@@ -1418,14 +1418,45 @@ app.post('/api/insights/verify', async (req, res) => {
   }
 });
 
+// Phase B — structured per-item retrieval capture. When /api/retrieve is called
+// with a `task_id`, persist the exact injected Insights/Digests/Entities/
+// Observations (each with its rrfScore/score) to a per-run JSON the dashboard
+// reads directly from the shared .data bind mount, rendering them as scored cards.
+const RETRIEVAL_CAPTURES_DIR = path.join(
+  process.env.CODING_REPO || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
+  '.data',
+  'retrieval-captures',
+);
+const sanitizeCaptureId = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 200);
+
+function writeRetrievalCapture(taskId, result) {
+  try {
+    const items = Array.isArray(result?.items) ? result.items : [];
+    // Nothing structured to show (e.g. WM-only response) → skip; the client falls
+    // back to its markdown parse rather than showing an empty structured capture.
+    if (items.length === 0) return;
+    fs.mkdirSync(RETRIEVAL_CAPTURES_DIR, { recursive: true });
+    const file = path.join(RETRIEVAL_CAPTURES_DIR, `${sanitizeCaptureId(taskId)}.json`);
+    const payload = {
+      task_id: taskId,
+      capturedAt: new Date().toISOString(),
+      meta: result.meta || null,
+      items,
+    };
+    fs.writeFileSync(file, JSON.stringify(payload), 'utf8');
+  } catch (err) {
+    process.stderr.write(`[obs-api] retrieval-capture write failed (non-fatal): ${err.message}\n`);
+  }
+}
+
 /**
  * POST /api/retrieve — retrieve relevant knowledge for a query.
- * Body: { query: string, budget?: number, threshold?: number, context?: any }
- * Returns: { markdown: string, meta: { ... } }
+ * Body: { query: string, budget?: number, threshold?: number, context?: any, task_id?: string }
+ * Returns: { markdown: string, items?: [...], meta: { ... } }
  */
 app.post('/api/retrieve', async (req, res) => {
   const startMs = Date.now();
-  const { query, budget = 1000, threshold = 0.75, context = null } = req.body || {};
+  const { query, budget = 1000, threshold = 0.75, context = null, task_id = null } = req.body || {};
 
   if (!query || typeof query !== 'string' || query.trim().length === 0) {
     return res.status(400).json({ error: 'query (string) is required' });
@@ -1446,6 +1477,8 @@ app.post('/api/retrieve', async (req, res) => {
       context: context || null,
     });
     result.meta.latency_ms = Date.now() - startMs;
+    // Phase B: persist the structured capture keyed by the run id (best-effort).
+    if (task_id) writeRetrievalCapture(task_id, result);
     res.json(result);
   } catch (err) {
     process.stderr.write(`[obs-api] /retrieve error: ${err.message}\n`);
