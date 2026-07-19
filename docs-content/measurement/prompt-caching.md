@@ -104,7 +104,69 @@ Each turn **reads** the prefix it already stored and **writes** only the small n
 
 ---
 
-## 4. The three agents, side by side
+## 4. Under the hood: how cached and new content mix (and why it's exact)
+
+The last section said caching stores "the provider's computation." This section makes that concrete — because understanding it removes the last bit of mystery: *how can old content be reused and still combine correctly with new content?*
+
+### What the model actually computes
+
+A transformer reads the prompt one token at a time. For **every token, at every layer**, it computes two vectors — a **Key** and a **Value** (**K/V**). Intuitively:
+
+- the **Key** says *"here is what I'm about, so later tokens can find me,"*
+- the **Value** says *"here is the information I'll hand over when someone attends to me."*
+
+Producing the answer works by **attention**: each new token looks back over the K/V of *all earlier tokens*, decides which are relevant, and pulls in their Values. Computing K/V for a long prompt is the expensive part — it grows with the number of tokens. **That K/V computation is exactly what caching stores and skips.**
+
+!!! note "So 'the cache' is not text — it's the K/V tensors"
+    A cache hit means: *load the prefix's already-computed K/V from the provider's memory instead of recomputing them.* The bytes of your prompt still cross the wire every turn; what's saved is the **re-computation**, which is why cache-read is ~0.1× the price, not free.
+
+### How the new content is mixed in
+
+On a cache hit the provider **loads the prefix K/V**, computes K/V **only for the new tokens**, appends them, and runs attention over the whole sequence:
+
+```mermaid
+flowchart LR
+    subgraph Cached["Stable prefix — cache HIT"]
+        kv1["K/V for<br/>system + tools"]
+        kv2["K/V for<br/>older history"]
+    end
+    subgraph Now["New this turn — computed now"]
+        kvn["K/V for<br/>new input"]
+    end
+    kv1 --> Cat["one continuous K/V sequence"]
+    kv2 --> Cat
+    kvn --> Cat
+    Cat --> Attn["Attention:<br/>new tokens attend over ALL K/V<br/>(cached + fresh, indistinguishably)"]
+    Attn --> Out["next token"]
+```
+
+The model sees **one seamless sequence**. It cannot tell which K/V were loaded from cache and which were just computed — they are the *same numbers* either way. The generated output is **bit-for-bit identical** to running with no cache at all.
+
+### Why reuse is exact, not an approximation
+
+This is the key insight, and it's the reason caching is safe to do at all. Transformers use **causal (masked) attention**: a token may only attend to tokens **at or before its own position** — never to anything that comes later.
+
+```mermaid
+flowchart LR
+    t1["tok₁"]:::pfx --> t2["tok₂"]:::pfx --> t3["tok₃"]:::pfx --> t4["tok₄<br/>(new)"]:::new
+    t4 -. "attends back" .-> t3
+    t4 -. "attends back" .-> t2
+    t4 -. "attends back" .-> t1
+    classDef pfx fill:#1f6f3f,color:#fff
+    classDef new fill:#1f4f8f,color:#fff
+```
+
+Because attention only ever points **backward**, a prefix token's K/V depend **only on the tokens before it** — *never* on what gets appended later. Add a thousand new tokens at the end and the prefix's K/V are unchanged, down to the last digit. That independence is what makes reuse **exact**:
+
+- **Why a cached prefix is always valid** — appending new content can't alter earlier K/V, so the stored values stay correct.
+- **Why caching only works on a *prefix*** — change one token in the *middle* and every token after it now attends to something different, so all their K/V change and nothing past that point can be reused. (This is the same reason section 1 said the first differing token ends the reusable span.)
+
+!!! tip "One line to remember"
+    Cache = the prefix's K/V attention state. Causal masking makes those values independent of anything appended later — so they can be stored once and reused exactly, while new tokens are computed fresh and slotted in right after them.
+
+---
+
+## 5. The three agents, side by side
 
 Same idea, three different paths. This is where the dashboard differences come from.
 
@@ -136,7 +198,13 @@ flowchart TD
 
 ---
 
-## 5. Reading the "Per-turn tokens" chart
+## 6. Reading the "Per-turn tokens" chart
+
+Here is the actual modal (**Performance → context → Explain** on any run) that prompted this whole page:
+
+![Per-turn tokens chart from the context modal — a green cache-read floor at ~40k with fresh-input blue stacked above across ~900 turns, and summary cards reading cache read 44.4M, cache write 0, fresh input 44.2M, output 510k](../images/cache-per-turn-chart.png)
+
+*The green **cache read** band sits on a flat **~40k floor** (system + tools, reused every turn) and occasionally climbs higher where recent history is still warm; blue **fresh input** stacks on top. The cards below total it up: **44.4M cache read** reused, **44.2M fresh input**, and a **cache write of 0** — the exact pattern this page explains (this run rode a wire that reports no writes, so reuse shows up only as green).*
 
 Every bar is the tokens transmitted that turn, coloured by how the provider billed them:
 
@@ -170,7 +238,7 @@ That is the complete answer to *"why is there green (reuse) even though write is
 
 ---
 
-## 6. What the proxy now does (and doesn't)
+## 7. What the proxy now does (and doesn't)
 
 The `rapid-llm-proxy` was updated so that **any traffic it forwards on the Anthropic wire gets `cache_control` breakpoints injected automatically** — even when the agent didn't set them.
 
@@ -188,7 +256,7 @@ flowchart LR
 
 ---
 
-## 7. Quick answers
+## 8. Quick answers
 
 **Q: Why is cache write 0 for opencode but not Claude Code?**
 opencode rides the OpenAI wire (Copilot gateway), whose usage schema has no cache-creation field. Claude Code rides the Anthropic wire, which reports writes. Different wire → different reportable numbers.
