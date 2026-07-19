@@ -4787,7 +4787,15 @@ class SystemHealthAPIServer {
             return 'other';
         };
         const agentParam = String(query.agent || '').toLowerCase();
-        const wantClass = agentParam === 'opencode' || agentParam === 'claude' ? agentParam : idClass(taskId);
+        // Copilot (and any other agent) is excluded from window matching: its run
+        // ids are bare UUIDs — indistinguishable from claude capture ids — so a
+        // window match could put a claude buffer under a copilot run. Ambient
+        // copilot captures land under the SAME session uuid the run row uses
+        // (reconciler slot), so the exact-id path serves copilot; no fallback.
+        let wantClass;
+        if (agentParam === 'opencode' || agentParam === 'claude') wantClass = agentParam;
+        else if (agentParam) return null;
+        else wantClass = idClass(taskId);
 
         const dir = join(codingRoot, '.data', 'llm-proxy', 'context-breakdown');
         let best = null;

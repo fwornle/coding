@@ -533,11 +533,11 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
           </div>
         ) : !agentInjectsKb ? (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
-            <span className="font-medium text-foreground">{agent || 'This agent'}</span> does receive KB via its
-            <span className="font-mono"> postToolUse</span> hook (per-turn, when Copilot file-hooks are enabled), but Copilot runs
-            don’t route through the proxy tap this modal reads — so their injected context isn’t captured here. Open a
-            <span className="font-medium text-foreground"> Claude</span> or <span className="font-medium text-foreground">OpenCode</span>
-            run to see the captured retrieved knowledge. The schema below shows what the block is composed of.
+            <span className="font-medium text-foreground">{agent || 'This agent'}</span> receives KB via its
+            <span className="font-mono"> postToolUse</span> hook (per-turn, when Copilot file-hooks are enabled). This run has no
+            captured buffer — copilot sessions launched before ambient BYOK proxy routing shipped (2026-07-19) never hit the
+            capture tap. New copilot sessions launched via <span className="font-mono">coding --copilot</span> route through the
+            proxy and record their buffer. The schema below shows what the block is composed of.
           </div>
         ) : (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
@@ -1000,7 +1000,7 @@ export function ContextCacheExplainer() {
             <div className="mb-2 rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground" data-testid="no-real-capture-note">
               The band below is <span className="font-medium text-foreground">illustrative</span> — this run has no per-category
               wire capture under its own id, and no compatible capture was recorded during its time window
-              {run?.agent === 'copilot' ? ' (interactive copilot does not route through the proxy seam)' : ''};
+              {run?.agent === 'copilot' ? ' (copilot sessions capture only since ambient BYOK routing, 2026-07-19)' : ''};
               <span className="font-medium text-foreground"> re-run the comparison</span> to record each agent’s real buffer. This
               run’s measured cache split (read/write, per-turn) is still shown below.
             </div>

@@ -28,6 +28,7 @@
 // Output via process.stderr.write only (no-console-log rule).
 
 import { buildOpencodeTokenRows, DEFAULT_OPENCODE_DB } from '../lib/lsl/token/opencode-token-rows.mjs';
+import { buildCopilotTokenRows } from '../lib/lsl/token/copilot-token-rows.mjs';
 import { llmSessionTitle, llmSessionSummary, llmSessionClass } from '../lib/lsl/token/session-title-llm.mjs';
 import { openTokenDb, insertTokenRowDeduped } from '../lib/lsl/token/token-db.mjs';
 import { aggregateByTaskId, isForegroundGroup } from '../lib/experiments/token-aggregate.mjs';
@@ -37,6 +38,8 @@ import { readRuns } from '../lib/experiments/query.mjs';
 import { loadTaxonomy, deriveClassFromText } from '../lib/experiments/taxonomy.mjs';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -290,6 +293,147 @@ async function reclassifyPass(dbPath) {
   log(`reclassify complete — ${updated} run(s) updated`);
 }
 
+// ── Copilot ambient sessions (2026-07-19) ──────────────────────────────────
+// Same idea as the opencode pass, sourced from the Copilot CLI's per-session
+// state (~/.copilot/session-state/<uuid>/events.jsonl). One Run per session,
+// keyed task_id=<session uuid> — the SAME id the measurement-reconciler's
+// active-measurement.copilot.json slot binds, so a BYOK-routed session's wire
+// rows + context-breakdown capture land under this run automatically.
+//
+// Double-count safety (WR-02): a BYOK-routed session already has per-llm-call
+// wire rows in token_usage under this task_id; inserting the copadt
+// per-session-aggregate rows on top would double every token in
+// aggregateByTaskId. The wire-presence guard skips the transcript insert
+// whenever ANY copilot wire row exists for the session — copadt rows are only
+// the fallback for UNROUTED sessions (proxy down, COPILOT_AMBIENT_ROUTE=0,
+// or launches outside the coding launcher).
+
+const COPILOT_STATE_DIR = path.join(os.homedir(), '.copilot', 'session-state');
+
+/** Enumerate copilot sessions as { sid, eventsPath, mtimeMs }, newest first. */
+function copilotSessions() {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(COPILOT_STATE_DIR, { withFileTypes: true });
+  } catch {
+    return []; // no copilot CLI state on this machine — nothing to measure
+  }
+  const out = [];
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    const eventsPath = path.join(COPILOT_STATE_DIR, e.name, 'events.jsonl');
+    try {
+      const st = fs.statSync(eventsPath);
+      out.push({ sid: e.name, eventsPath, mtimeMs: st.mtimeMs });
+    } catch { /* dir without events.jsonl — skip */ }
+  }
+  return out.sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
+
+/**
+ * Session metadata from events.jsonl: start time (session.start.data.startTime)
+ * and the first user.message content for the heuristic title. Single bounded
+ * scan; malformed lines are skipped (same contract as buildCopilotTokenRows).
+ */
+function copilotSessionMeta(eventsPath) {
+  const meta = { startTime: null, firstUserText: '' };
+  let raw;
+  try {
+    raw = fs.readFileSync(eventsPath, 'utf8');
+  } catch {
+    return meta;
+  }
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    let evt;
+    try { evt = JSON.parse(line); } catch { continue; }
+    const t = evt?.type || evt?.event;
+    if (t === 'session.start' && !meta.startTime) {
+      const st = evt.data?.startTime;
+      if (typeof st === 'string') meta.startTime = st;
+    } else if (t === 'user.message' && !meta.firstUserText) {
+      const c = evt.data?.content;
+      if (typeof c === 'string') meta.firstUserText = c;
+    }
+    if (meta.startTime && meta.firstUserText) break;
+  }
+  return meta;
+}
+
+async function copilotPass() {
+  const now = Date.now();
+  const sessions = copilotSessions();
+  if (!sessions.length) { log('copilot: no session-state — skipping'); return; }
+
+  const tokenDb = openTokenDb(tokenDbPath());
+  const store = await openExperimentStore();
+  let taxonomy = null;
+  try { taxonomy = loadTaxonomy(); } catch (err) { log(`copilot: taxonomy load failed → unclassified: ${err.message}`); }
+  const wireCountStmt = tokenDb.prepare(
+    "SELECT COUNT(*) AS c FROM token_usage WHERE task_id = ? AND agent = 'copilot' AND granularity_tier = 'per-llm-call'",
+  );
+  let written = 0;
+  try {
+    for (const s of sessions) {
+      if (!HAS('--backfill') && now - s.mtimeMs > ACTIVE_WINDOW_MS) continue;
+
+      const taskId = s.sid;
+      const wireRows = wireCountStmt.get(taskId)?.c ?? 0;
+      if (wireRows === 0) {
+        // Unrouted session — fall back to the copadt per-session aggregate
+        // (present only after session.shutdown; a live unrouted session has
+        // nothing measurable yet).
+        const rows = buildCopilotTokenRows(s.eventsPath);
+        if (!rows.length) continue;
+        for (const r of rows) insertTokenRowDeduped(tokenDb, { ...r, task_id: taskId });
+      }
+
+      const agg = aggregateByTaskId(taskId);
+      const totals = agg.totals;
+      if (!totals || !(totals.total_tokens > 0)) continue;
+
+      const groups = agg.byAgentModel || [];
+      const fgGroups = groups.filter(isForegroundGroup);
+      const canonical = fgGroups[0] ?? null;
+      const bgModels = [...new Set(
+        groups.filter((g) => !isForegroundGroup(g)).map((g) => g.model).filter(Boolean),
+      )];
+
+      const meta = copilotSessionMeta(s.eventsPath);
+      const started = meta.startTime || new Date(s.mtimeMs).toISOString();
+      const ended = new Date(s.mtimeMs).toISOString();
+      const prose = meta.firstUserText ? firstProseLine(meta.firstUserText) : '';
+      const title = (prose && tidy(prose)) || `copilot session ${taskId.slice(0, 12)}`;
+      const model = canonical?.model || 'unknown';
+      const taskHash = createHash('sha256').update(title).digest('hex').slice(0, 16);
+      const derived = taxonomy
+        ? deriveClassFromText(title, taxonomy)
+        : { taskClass: null, confident: false };
+      const taskClass = derived.confident ? derived.taskClass : 'unclassified';
+
+      await writeRun(store, {
+        span: { task_id: taskId, started_at: started, ended_at: ended, goal_sentence: title },
+        taskClass,
+        pending: false,
+        tags: {
+          task_hash: taskHash, agent: 'copilot', model, framework: 'copilot', trace_id: taskId,
+          canonical_model: canonical?.model ?? null,
+          canonical_agent: canonical?.agent ?? 'copilot',
+          background_models: bgModels,
+          session_summary: null,
+        },
+        totals,
+      });
+      written += 1;
+      log(`copilot ${taskId.slice(0, 12)} · ${wireRows ? `${wireRows} wire rows` : 'copadt aggregate'} · ${totals.total_tokens} tok · "${title.slice(0, 48)}"`);
+    }
+  } finally {
+    try { tokenDb.close?.(); } catch { /* noop */ }
+    await store.close();
+  }
+  log(`copilot pass complete — ${written} active session(s) written`);
+}
+
 async function main() {
   const dbPath = arg('--db', DEFAULT_OPENCODE_DB);
   if (HAS('--reclassify')) {
@@ -301,10 +445,12 @@ async function main() {
     // eslint-disable-next-line no-constant-condition
     for (let tick = 0; tick < Number.MAX_SAFE_INTEGER; tick++) {
       try { await onePass(dbPath); } catch (e) { log(`pass error: ${e.message}`); }
+      try { await copilotPass(); } catch (e) { log(`copilot pass error: ${e.message}`); }
       await new Promise((res) => setTimeout(res, INTERVAL_S * 1000));
     }
   } else {
     await onePass(dbPath);
+    try { await copilotPass(); } catch (e) { log(`copilot pass error: ${e.message}`); }
   }
 }
 

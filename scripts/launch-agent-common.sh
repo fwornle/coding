@@ -459,12 +459,18 @@ configure_proxy_routing() {
       # against the localhost no-auth proxy (T-82-05-01, accepted). This is the SINGLE measured home
       # for launcher-driven copilot BYOK (copilot.sh agent_pre_launch delegates here, Plan 06 / D-03).
       #
-      # MEASURED-SPAN GATE (D-03 / WR-02): export BYOK ONLY when a measured span is active (TASK_ID set).
-      # An interactive copilot launch (no TASK_ID) — even through a HEALTHY proxy — must NOT route through
-      # the proxy, or it would double-write (proxy wire + copadt transcript, WR-02) and break fail-soft on
-      # a dead URL (WR-05). The former unconditional else-branch (unbound /v1/copilot for no-TASK_ID) was
-      # exactly that interactive double-writer; it is removed. The no-span branch UNSETS COPILOT_PROVIDER_*
-      # so nothing stale (inherited or otherwise) survives into an unmeasured copilot session.
+      # BYOK for BOTH launch modes (ambient routing shipped 2026-07-19; supersedes the WR-02 unset):
+      #   - Measured span (TASK_ID set): task-scoped path /v1/copilot/t/<taskId> — per-request binding.
+      #   - Interactive (no TASK_ID): unbound /v1/copilot — the shim stamps agent='copilot' from the
+      #     path and resolves the task_id from the reconciler's ambient slot
+      #     (active-measurement.copilot.json, kept in sync by measurement-reconciler.mjs), so ambient
+      #     copilot sessions get wire token rows AND per-run context-breakdown capture under the SAME
+      #     session uuid the auto-measure run row uses.
+      # WR-02 (double-write) is closed two ways: the stop-adapter reconcile matches copadt transcript
+      # rows against wire rows (request-id + fuzzy), and auto-measure-foreground's copilot pass only
+      # inserts copadt aggregate rows when NO wire rows exist for the session (wire-presence guard).
+      # WR-05 (dead URL) is covered by the /health gate above — same accepted risk as claude/opencode.
+      # Opt-out: COPILOT_AMBIENT_ROUTE=0 restores the copadt-only interactive launch.
       if [ -n "${TASK_ID:-}" ]; then
         export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot/t/${TASK_ID}"
         export COPILOT_PROVIDER_TYPE="openai"
@@ -474,9 +480,19 @@ configure_proxy_routing() {
         # COPILOT_PROVIDER_WIRE_MODEL is honoured if the caller pre-set it (wire name ≠ COPILOT_MODEL);
         # left inherited rather than forced, since the launcher has no wire-name mapping.
         _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; measured span; token_usage agent='copilot'; model=${COPILOT_MODEL})"
+      elif [ "${COPILOT_AMBIENT_ROUTE:-1}" != "0" ]; then
+        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot"
+        export COPILOT_PROVIDER_TYPE="openai"
+        export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
+        # The BYOK provider serves the proxy's copilot catalog, not GitHub's — default to the
+        # dotted opus id the proxy's copilot client verifiably serves (COPILOT_MODEL_MAP handles
+        # the -fast / dash aliases on the send path).
+        export COPILOT_MODEL="${COPILOT_MODEL:-claude-opus-4.8}"
+        export COPILOT_AUTO_UPDATE="false"
+        _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; AMBIENT — task_id from reconciler slot; model=${COPILOT_MODEL}; opt-out COPILOT_AMBIENT_ROUTE=0)"
       else
         unset COPILOT_PROVIDER_BASE_URL COPILOT_PROVIDER_TYPE COPILOT_PROVIDER_API_KEY
-        _agent_log "ℹ️  copilot: no measured span (TASK_ID unset) — interactive launch stays copadt-only; BYOK not applied (COPILOT_PROVIDER_* cleared)."
+        _agent_log "ℹ️  copilot: COPILOT_AMBIENT_ROUTE=0 — interactive launch stays copadt-only (unmeasured wire; no context capture)."
       fi
       ;;
     *)
