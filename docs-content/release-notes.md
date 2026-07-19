@@ -4,6 +4,24 @@ Highlights since the v6.0 Knowledge Context Injection milestone (commit `0fdb766
 
 ---
 
+## Knowledge Injection — Copilot per-turn injection is now version-adaptive multi-channel (2026-07-19)
+
+GitHub Copilot previously received only a session-start baseline; per-turn injection was blocked because Copilot filesystem hooks can only inject via an `additionalContext` field, and *which* event's `additionalContext` is honored changes between Copilot versions (`postToolUse` on ≤ 1.0.71; `userPromptSubmitted` newly on 1.0.72+, where `postToolUse` went flaky). A fixed channel was never upgrade-safe.
+
+`src/hooks/copilot-channel-capabilities.js` now maps the installed Copilot version to the set of channels to emit on, and that set *is* the deduplication:
+
+| Copilot version | Emit set | Result |
+|-----------------|----------|--------|
+| ≤ 1.0.71 | `postToolUse` only | injected once |
+| 1.0.72 – 1.0.x | `userPromptSubmitted` only | injected once, no duplicate |
+| unknown / ≥ 1.1.0 | both (fail-safe) | delivery guaranteed, tolerates one duplicate |
+
+Retrieval runs at most once per turn (block cached in the session stash; the fail-safe second channel reuses it). Overrides: `COPILOT_KB_CHANNELS` (force set / `none`), `COPILOT_VERSION` (test). `scripts/verify-copilot-hook-injection.sh` reports which channel delivers after an upgrade, to keep the map honest. Resolver + end-to-end tests under `tests/experiments/copilot-*.test.mjs`.
+
+See [Knowledge Context Injection](architecture/knowledge-injection.md#github-copilot-per-turn-version-adaptive-multi-channel).
+
+---
+
 ## Observational Memory — SQLite → km-core cutover complete (2026-06-05)
 
 Phase 44 Plans 12 → 18 finished cutting every production code path off the legacy `.observations/observations.db` SQLite file. The file was archived to `.observations/observations.db.archived.2026-06-05` after Plan 44-18 Tasks 1-4 landed (commits `cf6c8da45` → `c837dc421`).

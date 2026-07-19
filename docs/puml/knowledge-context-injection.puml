@@ -15,7 +15,8 @@ rectangle "Coding Agents" as AGENTS {
 rectangle "Agent Adapters" as ADAPTERS {
   component "Claude Hook\n(UserPromptSubmit)" <<core>> as CLAUDE_HOOK
   component "OpenCode Adapter\n(session-start)" <<core>> as OC_ADAPTER
-  component "Copilot Adapter\n(session-start)" <<core>> as CP_ADAPTER
+  component "Copilot Baseline\n(session-start file)" <<core>> as CP_ADAPTER
+  component "Copilot Per-Turn Hook\n(.github/hooks, multi-channel)" <<core>> as CP_HOOK
   component "Mastra Adapter\n(session-start)" <<core>> as MA_ADAPTER
 
   note right of CLAUDE_HOOK
@@ -23,6 +24,17 @@ rectangle "Agent Adapters" as ADAPTERS {
     additionalContext stdout.
     Registered in global
     ~/.claude/settings.json
+  end note
+
+  note bottom of CP_HOOK
+    Version-adaptive channel set
+    (copilot-channel-capabilities.js):
+    postToolUse on <=1.0.71,
+    userPromptSubmitted on 1.0.72+,
+    BOTH as dup-tolerant fail-safe on
+    unknown versions. Emits
+    additionalContext; the emit-set
+    per version IS the dedup.
   end note
 }
 
@@ -72,12 +84,14 @@ rectangle "Cross-Agent Continuity" as CONTINUITY {
 CLAUDE SYNC_LINE CLAUDE_HOOK : every prompt
 OPENCODE SYNC_LINE OC_ADAPTER : session start
 COPILOT SYNC_LINE CP_ADAPTER : session start
+COPILOT SYNC_LINE CP_HOOK : every prompt / tool
 MASTRA SYNC_LINE MA_ADAPTER : session start
 
 ' === Adapter to Shared Client ===
 CLAUDE_HOOK SYNC_LINE CLIENT : callRetrieval()
 OC_ADAPTER SYNC_LINE CLIENT : callRetrieval()
 CP_ADAPTER SYNC_LINE CLIENT : callRetrieval()
+CP_HOOK SYNC_LINE CLIENT : callRetrieval()
 MA_ADAPTER SYNC_LINE CLIENT : callRetrieval()
 
 ' === Client sends agent identity ===

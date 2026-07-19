@@ -6,7 +6,7 @@ Automatic surfacing of accumulated knowledge into coding agent conversations.
 
 The Knowledge Context Injection pipeline (v6.0) makes the coding project's accumulated knowledge actionable by injecting relevant context into every agent conversation. When you type a prompt in any coding agent, the system retrieves semantically relevant observations, digests, insights, and knowledge graph entities, then injects them as invisible context that shapes the agent's response.
 
-The pipeline is fully agent-agnostic: Claude, Copilot, OpenCode, and Mastra all receive knowledge injection through their native hook/plugin mechanisms.
+The pipeline is fully agent-agnostic: Claude, Copilot, OpenCode, and Mastra all receive knowledge injection through their native hook/plugin mechanisms. Claude and Copilot inject **per turn** (fresh, task-relevant knowledge on every prompt); OpenCode and Mastra inject a **session-start baseline**, which Copilot also gets on top of its per-turn injection.
 
 ## Architecture
 
@@ -21,7 +21,9 @@ The pipeline is fully agent-agnostic: Claude, Copilot, OpenCode, and Mastra all 
 | Retrieval Client | `src/hooks/retrieval-client.js` | Shared fail-open HTTP client for all adapters |
 | Claude Adapter | `src/hooks/knowledge-injection-hook.js` | UserPromptSubmit hook (per-prompt, global) |
 | OpenCode Adapter | `src/hooks/knowledge-injection-opencode.js` | Session-start context file writer |
-| Copilot Adapter | `src/hooks/knowledge-injection-copilot.js` | Workspace instructions file writer |
+| Copilot Baseline Adapter | `src/hooks/knowledge-injection-copilot.js` | Session-start workspace instructions writer |
+| Copilot Per-Turn Injector | `src/hooks/knowledge-injection-copilot-posttool.js` | Per-turn injection via `additionalContext` (multi-channel) |
+| Copilot Channel Resolver | `src/hooks/copilot-channel-capabilities.js` | Maps Copilot version → honored injection channel(s) |
 | Mastra Adapter | `src/hooks/knowledge-injection-mastra.js` | Session-start context file writer |
 | Working Memory | `src/retrieval/working-memory.js` | Live KG + STATE.md project summary |
 | Agent Profiles | `config/agent-profiles.json` | Per-agent tier weight multipliers |
@@ -83,7 +85,7 @@ The Claude adapter runs as a `UserPromptSubmit` hook registered in `~/.claude/se
 
 **Fail-open**: 2-second HTTP timeout, 5-second safety ceiling. Any error exits 0 with no output.
 
-### OpenCode, Copilot, Mastra (session-start injection)
+### OpenCode, Copilot, Mastra (session-start baseline)
 
 These adapters run once at session start via `launch-agent-common.sh`:
 
@@ -93,7 +95,44 @@ These adapters run once at session start via `launch-agent-common.sh`:
 | Copilot | `.github/copilot-instructions.md` | Workspace context (marker-based merge) |
 | Mastra | `.mastra/context.md` | Custom context file |
 
-The launch system calls `_inject_knowledge_context()` at step 12.5, which dispatches the appropriate adapter with a 10-second timeout.
+The launch system calls `_inject_knowledge_context()` at step 12.5, which dispatches the appropriate adapter with a 10-second timeout. For Copilot this is only the **baseline** — task-relevant per-turn injection is layered on top (see below).
+
+### GitHub Copilot (per-turn, version-adaptive multi-channel)
+
+On top of the session-start baseline, Copilot injects fresh knowledge **per turn** through its native filesystem hooks (`.github/hooks/hooks.json` → `lib/agent-api/hooks/copilot-bridge.sh` → `knowledge-injection-copilot-posttool.js`).
+
+**The churn problem.** A Copilot filesystem hook can only inject context the model reads via an `additionalContext` field, and *which* event's `additionalContext` is honored changes version to version:
+
+| Copilot version | Honored per-turn channel |
+|-----------------|--------------------------|
+| ≤ 1.0.71 | `postToolUse` only (`userPromptSubmitted` output is dropped) |
+| 1.0.72 – 1.0.x | `userPromptSubmitted` (honored & reliable; `postToolUse` went flaky) |
+| unknown / ≥ 1.1.0 | *undetermined* — treated as fail-safe |
+
+A single fixed channel is therefore never upgrade-safe.
+
+**The design — the emit set is the dedup.** `copilot-channel-capabilities.js` maps the installed version (via `copilot --version`, file-cached 6 h) to the set of channels to emit on, and that set is itself the deduplication:
+
+- **Known single-honored version** → emit on that one channel ⇒ injected exactly once, no duplication.
+- **Unknown / newer version** → fail-safe: emit on **both** `postToolUse` and `userPromptSubmitted` (tolerating one duplicate to *guarantee* delivery), and log a note to extend the map.
+
+This deliberately rejects "emit everywhere, then suppress after the first hit": on 1.0.71 the `userPromptSubmitted` hook process runs first and emits, but Copilot silently drops it — so suppression would kill the `postToolUse` channel that actually works. Keying the emit set to the version avoids that trap.
+
+**Mechanics.** The injector runs in two modes from the bridge:
+
+| Mode | Fires on | Behavior |
+|------|----------|----------|
+| `prompt` | `userPromptSubmitted` | Starts a fresh turn; stashes the prompt + resolved plan. If the plan includes `userPromptSubmitted`, retrieves and emits `additionalContext`. |
+| `tool` | `postToolUse` | If the plan includes `postToolUse` and it hasn't emitted this turn, injects (reusing the cached block if the prompt channel already retrieved). Once per turn. |
+
+Retrieval runs **at most once per turn** — the retrieved block is cached in a per-session stash (`$TMPDIR/coding-copilot-kb/<sid>.json`), so the fail-safe second channel reuses it rather than making a second HTTP call. Fail-open throughout: a disabled toggle, a short/slash prompt, no plan, or any error emits a no-op and never blocks a request.
+
+**Prerequisites.** Copilot gates all filesystem hooks behind two settings that are OFF by default; `install.sh install_copilot_file_hooks` sets both:
+
+- `enableFileHooks: true` in `~/.copilot/settings.json`
+- the repo folder present in `trustedFolders` in `~/.copilot/config.json`
+
+**Diagnostics & overrides.** `scripts/verify-copilot-hook-injection.sh` runs a deterministic firing check plus an N-run, neutral-token injection probe per channel — run it after any Copilot upgrade, and feed the delivering channel back into `KNOWN_RANGES`. `COPILOT_KB_CHANNELS` forces the channel set (or `none` to disable); `COPILOT_VERSION` overrides the version the resolver reasons about (for tests).
 
 ## Working Memory
 
@@ -143,3 +182,6 @@ When you switch agents mid-task (e.g., Claude → OpenCode), the new agent recei
 | Min words for injection | `knowledge-injection-hook.js` | 4 | Short prompt filter |
 | Agent profiles | `config/agent-profiles.json` | per-agent | Tier weight multipliers |
 | Session staleness | `working-memory.js` | 2 hours | Cross-agent window |
+| Copilot channel set | `COPILOT_KB_CHANNELS` env | version-resolved | Force Copilot injection channel(s), or `none` to disable |
+| Copilot version override | `COPILOT_VERSION` env | detected | Version the channel resolver reasons about (tests) |
+| Copilot file hooks | `~/.copilot/settings.json` + `config.json` | off | `enableFileHooks` + `trustedFolders` gate all Copilot hooks |
