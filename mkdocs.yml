@@ -92,6 +92,7 @@ nav:
     - Overview: measurement/overview.md
     - Tutorial: measurement/tutorial.md
     - Architecture: measurement/architecture.md
+    - Prompt Caching: measurement/prompt-caching.md
     - The /experiment Skill: measurement/experiment-skill.md
   - Integrations:
     - Overview: integrations/index.md

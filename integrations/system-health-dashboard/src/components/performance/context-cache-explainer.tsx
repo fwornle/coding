@@ -1177,6 +1177,18 @@ export function ContextCacheExplainer() {
             ever a real number on the Anthropic wire, and is honestly <span className="font-medium text-foreground">N/A</span> —
             not zero — on the OpenAI wire. Honest measurement over inference (D-12).
           </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Still fuzzy on <em>wire</em>, <em>breakpoint</em>, or why Claude, opencode and Copilot differ? See the full
+            illustrated walkthrough:{' '}
+            <a
+              href="https://fwornle.github.io/coding/measurement/prompt-caching/"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-foreground underline underline-offset-2"
+            >
+              Prompt Caching, End to End →
+            </a>
+          </p>
         </div>
 
         <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} />
