@@ -291,29 +291,37 @@ class SystemHealthAPIServer {
          // Context-window breakdown (Phase 78) — real per-category sizes of the
          // main session's latest /v1/messages, captured proxy-side. Same-origin
          // passthrough to the LLM proxy, mirroring the token-usage proxy below.
+         //
+         // Identity-mismatch fallback: the proxy keys per-run captures by ITS OWN
+         // measurement span id (a UUID / agent-* / ses_* id), which frequently is
+         // not the id the runs table carries for the same session. When the exact
+         // id misses AND the caller supplies the run's wall-clock window, we match
+         // a capture recorded DURING that window with a compatible model and the
+         // same agent-class (id prefix), and return it tagged matched_by:'window'
+         // so the UI can state its provenance honestly.
          this.app.get('/api/context-breakdown', async (req, res) => {
+             const taskId = String(req.query.task_id || '').trim();
              try {
-                 const qs = new URLSearchParams(req.query).toString();
-                 const url = `http://host.docker.internal:12435/api/context-breakdown${qs ? '?' + qs : ''}`;
+                 const qs = taskId ? `?task_id=${encodeURIComponent(taskId)}` : '';
+                 const url = `http://host.docker.internal:12435/api/context-breakdown${qs}`;
                  const resp = await fetch(url, { signal: AbortSignal.timeout(4000) });
-                 // A 404 means "no per-category capture for this task" — the normal
-                 // case for copilot/opencode runs that bypass the proxy's wire tap.
-                 // The frontend already renders that as the illustrative band, so we
-                 // must NOT pass the 404 through: a 404 on this XHR is logged by the
-                 // browser as a red "API error". Degrade it to a graceful empty 200.
-                 if (resp.status === 404) {
-                     return res.status(200).json({ categories: [], total_bytes: 0, degraded: true, reason: 'no-capture' });
+                 if (resp.ok) {
+                     const data = await resp.json();
+                     if ((data.total_bytes ?? 0) > 0) {
+                         return res.json({ ...data, matched_by: 'exact' });
+                     }
                  }
-                 const data = await resp.json();
-                 res.status(resp.status).json(data);
+                 // 404 / empty → "no per-category capture under this exact id" — the
+                 // normal case for runs whose table id differs from the proxy span id.
+                 // Must NOT pass a 404 through (red console "API error"): try the
+                 // window match, else degrade to the graceful empty 200 shape.
              } catch (err) {
-                 // The proxy is a singleton that briefly restarts on a fresh session
-                 // (multi-second hydrate window). The frontend already treats an empty
-                 // capture as "no per-category wire data → illustrative band", so a
-                 // transient unreachable proxy must degrade to a graceful, frontend-
-                 // shaped empty 200 — never a scary 502 in the console.
-                 res.status(200).json({ categories: [], total_bytes: 0, degraded: true, reason: err.message });
+                 // Proxy briefly restarting — fall through to the local window match,
+                 // which reads the bind-mounted capture files directly.
              }
+             const matched = this.windowMatchContextBreakdown(taskId, req.query);
+             if (matched) return res.json(matched);
+             res.status(200).json({ categories: [], total_bytes: 0, degraded: true, reason: 'no-capture' });
          });
 
          // Per-turn context-turns (Phase 84 / D-10) — same-origin passthrough to
@@ -4746,6 +4754,71 @@ class SystemHealthAPIServer {
      * obs-api /api/retrieve handler; degrade to an empty set on miss (a run that
      * predates the capture, or an agent that injects no KB block).
      */
+    /**
+     * Window-match fallback for /api/context-breakdown (see route comment).
+     * Scans the bind-mounted .data/llm-proxy/context-breakdown/ dir for the
+     * largest capture whose capturedAt lies inside the run's [window_start,
+     * window_end] (±5 min slack), whose model is compatible with the run's,
+     * and whose id belongs to the same agent-class as the run's id. Returns
+     * the capture tagged with matched_by:'window' provenance, or null.
+     */
+    windowMatchContextBreakdown(taskId, query) {
+        const startMs = Date.parse(String(query.window_start || ''));
+        const endMs = Date.parse(String(query.window_end || ''));
+        if (!Number.isFinite(startMs)) return null;
+        const SLACK = 5 * 60 * 1000;
+        const lo = startMs - SLACK;
+        const hi = (Number.isFinite(endMs) ? endMs : Date.now()) + SLACK;
+
+        // Model compatibility: dots/dashes vary per wire (claude-opus-4-8 vs
+        // claude-opus-4.8) and the proxy maps the "-fast" alias onto the base
+        // model on its send path — normalize both away before comparing.
+        const normModel = (m) => String(m || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/fast$/, '');
+        const wantModel = normModel(query.model);
+
+        // Agent-class from the id shape. Captures record no agent, but the span
+        // id prefix is deterministic per client: ses_* = opencode sessions,
+        // agent-* = claude subagents, bare UUID = claude foreground. Matching
+        // across classes would put another agent's buffer under this run.
+        const idClass = (id) => {
+            if (/^ses_/.test(id)) return 'opencode';
+            if (/^agent-/.test(id)) return 'claude';
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return 'claude';
+            return 'other';
+        };
+        const agentParam = String(query.agent || '').toLowerCase();
+        const wantClass = agentParam === 'opencode' || agentParam === 'claude' ? agentParam : idClass(taskId);
+
+        const dir = join(codingRoot, '.data', 'llm-proxy', 'context-breakdown');
+        let best = null;
+        try {
+            for (const f of readdirSync(dir)) {
+                if (!f.endsWith('.json')) continue;
+                const captureId = f.slice(0, -5);
+                if (captureId === taskId) continue; // exact id already missed at the proxy
+                if (wantClass !== 'other' && idClass(captureId) !== wantClass) continue;
+                let cap;
+                try {
+                    cap = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+                } catch { continue; }
+                const at = Date.parse(cap.capturedAt || '');
+                if (!Number.isFinite(at) || at < lo || at > hi) continue;
+                if ((cap.total_bytes ?? 0) <= 0) continue;
+                if (wantModel && normModel(cap.model) && normModel(cap.model) !== wantModel) continue;
+                if (!best || cap.total_bytes > best.total_bytes) best = { ...cap, matched_capture_id: captureId };
+            }
+        } catch {
+            return null;
+        }
+        if (!best) return null;
+        return {
+            ...best,
+            matched_by: 'window',
+            matched_captured_at: best.capturedAt,
+            matched_model: best.model,
+        };
+    }
+
     async handleRetrieveCapture(req, res) {
         const taskId = String(req.query.task_id || '').trim();
         if (!taskId) return res.status(400).json({ error: 'task_id is required' });

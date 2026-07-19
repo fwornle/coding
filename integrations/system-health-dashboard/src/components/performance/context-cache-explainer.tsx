@@ -116,6 +116,13 @@ interface RealBreakdown {
   knowledge_occurrences?: number
   knowledge_cadence?: string
   categories: { key: string; label: string; bytes: number; detail?: CategoryDetail }[]
+  // Provenance (identity-mismatch fallback): 'exact' = the proxy had a capture
+  // under this run's own id; 'window' = the dashboard server matched a capture
+  // recorded during this run's wall-clock window with a compatible model and
+  // agent-class, because the proxy's span id differs from the runs-table id.
+  matched_by?: 'exact' | 'window'
+  matched_capture_id?: string
+  matched_captured_at?: string
 }
 
 // Known per-model context-window ceilings — used only for the "% of window"
@@ -520,6 +527,9 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
             {typeof real?.knowledge_occurrences === 'number' && (
               <> This buffer carried <span className="font-medium text-foreground">{real.knowledge_occurrences} injection{real.knowledge_occurrences === 1 ? '' : 's'}</span> (most-recent shown).</>
             )}
+            {real?.matched_by === 'window' && (
+              <> Capture matched by time window (proxy span <span className="font-mono">{real.matched_capture_id}</span>).</>
+            )}
           </div>
         ) : !agentInjectsKb ? (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
@@ -763,21 +773,31 @@ export function ContextCacheExplainer() {
   }, [taskId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Real wire-buffer breakdown — PER RUN. We ask the proxy for THIS run's own
-  // captured buffer (keyed by its measurement task_id). A measured run of any
-  // proxy-routed agent (claude, opencode) persists its own snapshot, so the band
-  // shows that agent's real, scaled sizes — never another agent's. Runs captured
-  // before this tap existed (or copilot, which has no proxy seam) return 404 →
-  // the clearly-illustrative conceptual band, with a "re-run to capture" note.
+  // captured buffer (keyed by its measurement task_id). When the exact id has
+  // no capture (the proxy keys captures by its OWN span id, which often differs
+  // from the runs-table id), we also send the run's wall-clock window + model +
+  // agent so the server can match the capture recorded DURING this run — the
+  // response carries matched_by:'window' provenance in that case. Only when
+  // neither exists does the band fall back to the clearly-illustrative one.
   useEffect(() => {
     if (!open || !taskId) { setReal(null); return }
     let cancelled = false
     setReal(null)
-    fetch(`/api/context-breakdown?task_id=${encodeURIComponent(taskId)}`)
+    const params = new URLSearchParams({ task_id: taskId })
+    const winStart = run?.started_at
+    const winEnd = run?.ended_at
+    const runModel = run?.canonical_model ?? run?.model
+    const runAgent = run?.canonical_agent ?? run?.agent
+    if (winStart) params.set('window_start', winStart)
+    if (winEnd) params.set('window_end', winEnd)
+    if (runModel) params.set('model', runModel)
+    if (runAgent) params.set('agent', runAgent)
+    fetch(`/api/context-breakdown?${params.toString()}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (!cancelled && d && Array.isArray(d.categories) && d.total_bytes > 0) setReal(d as RealBreakdown) })
       .catch(() => { /* no per-run capture — fall back to illustrative */ })
     return () => { cancelled = true }
-  }, [open, taskId])
+  }, [open, taskId, run?.started_at, run?.ended_at]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Phase B: the structured per-item KB capture for this run (scored cards).
   useEffect(() => {
@@ -967,12 +987,20 @@ export function ContextCacheExplainer() {
               re-sent but recognised by the provider’s cache, so it is re-read instead of re-processed.{' '}
               {activeReal.cache_breakpoints} <span className="font-mono">cache_control</span>{' '}
               {activeReal.cache_breakpoints === 1 ? 'breakpoint' : 'breakpoints'}.
+              {activeReal.matched_by === 'window' && (
+                <span className="text-muted-foreground" data-testid="window-match-provenance">
+                  {' '}Capture matched by time window — the proxy recorded it during this run under span{' '}
+                  <span className="font-mono">{activeReal.matched_capture_id}</span>
+                  {activeReal.matched_captured_at ? <> at {new Date(activeReal.matched_captured_at).toLocaleTimeString()}</> : null}.
+                </span>
+              )}
             </div>
           )}
           {bandSource === 'illustrative' && (
             <div className="mb-2 rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground" data-testid="no-real-capture-note">
               The band below is <span className="font-medium text-foreground">illustrative</span> — this run has no per-category
-              wire capture. It predates the capture tap{run?.agent === 'copilot' ? ' (and copilot has no proxy seam to measure)' : ''};
+              wire capture under its own id, and no compatible capture was recorded during its time window
+              {run?.agent === 'copilot' ? ' (interactive copilot does not route through the proxy seam)' : ''};
               <span className="font-medium text-foreground"> re-run the comparison</span> to record each agent’s real buffer. This
               run’s measured cache split (read/write, per-turn) is still shown below.
             </div>
