@@ -214,6 +214,26 @@ if command -v jq &> /dev/null && [[ -f "$HOME/.config/opencode/opencode.json" ]]
     fi
 fi
 
+# Revert Copilot filesystem-hook enablement (symmetric with install_copilot_file_hooks).
+# Removes enableFileHooks and drops the coding repo from trustedFolders — leaves other
+# trusted folders intact. Uses node (config.json is JSONC; jq can't parse it).
+echo -e "\n${BLUE}🪝 Disabling Copilot filesystem hooks...${NC}"
+if command -v node &> /dev/null; then
+    CODING_SETTINGS="$HOME/.copilot/settings.json" node -e '
+      const fs=require("fs"); const p=process.env.CODING_SETTINGS; let d={};
+      try { d=JSON.parse(fs.readFileSync(p,"utf8")); } catch { return; }
+      delete d.enableFileHooks; fs.writeFileSync(p, JSON.stringify(d,null,2));
+    ' 2>/dev/null && echo "  Removed enableFileHooks from ~/.copilot/settings.json"
+    CODING_CONFIG="$HOME/.copilot/config.json" CODING_TRUST="$CODING_REPO" node -e '
+      const fs=require("fs"); const p=process.env.CODING_CONFIG;
+      let raw=""; try { raw=fs.readFileSync(p,"utf8"); } catch { return; }
+      const nc=raw.split("\n").filter(l=>!l.trim().startsWith("//")).join("\n");
+      let d={}; try { d=JSON.parse(nc); } catch { return; }
+      if(Array.isArray(d.trustedFolders)) d.trustedFolders=d.trustedFolders.filter(f=>f!==process.env.CODING_TRUST);
+      fs.writeFileSync(p, JSON.stringify(d,null,2));
+    ' 2>/dev/null && echo "  Untrusted $CODING_REPO in ~/.copilot/config.json"
+fi
+
 # Note: memory-visualizer and mcp-server-semantic-analysis are git submodules
 # and have already been cleaned above
 

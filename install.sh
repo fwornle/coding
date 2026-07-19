@@ -2812,6 +2812,7 @@ main() {
     install_mastra_opencode
     install_compaction_guard
     install_knowledge_injection
+    install_copilot_file_hooks
     install_skills
     create_project_local_settings
     install_okb_snapshot_guard
@@ -3144,6 +3145,55 @@ install_knowledge_injection() {
     fi
 
     success "Knowledge-injection installation complete"
+}
+
+# Enable Copilot CLI filesystem hooks so the repo's .github/hooks/hooks.json bridge
+# actually fires. Copilot gates these behind TWO settings that are OFF by default —
+# without both, the entire copilot integration (KB injection via postToolUse
+# additionalContext, constraint monitoring, observation capture) stays dormant and
+# no live test would catch it (the contract test only checks hooks.json schema):
+#   1. enableFileHooks: true   (user settings — ~/.copilot/settings.json)
+#   2. the repo folder in trustedFolders (~/.copilot/config.json)
+# Both edits are idempotent and fail-open (node — copilot ships node; jq can't parse
+# the JSONC config.json). Per-avenue KB injection still honors CODING_KNOWLEDGE_INJECTION=0.
+install_copilot_file_hooks() {
+    echo -e "\n${CYAN}🪝  Enabling Copilot CLI filesystem hooks...${NC}"
+    local SETTINGS="$HOME/.copilot/settings.json"
+    local CONFIG="$HOME/.copilot/config.json"
+
+    if ! command -v node &> /dev/null; then
+        warning "node not found — cannot enable copilot file hooks automatically"
+        info "Manually: set \"enableFileHooks\": true in $SETTINGS and add \"$CODING_REPO\" to trustedFolders in $CONFIG"
+        return 1
+    fi
+
+    # 1. enableFileHooks in the clean-JSON user settings file.
+    CODING_SETTINGS="$SETTINGS" node -e '
+      const fs=require("fs"); const p=process.env.CODING_SETTINGS; let d={};
+      try { d=JSON.parse(fs.readFileSync(p,"utf8")); } catch {}
+      d.enableFileHooks=true;
+      fs.mkdirSync(require("path").dirname(p),{recursive:true});
+      fs.writeFileSync(p, JSON.stringify(d,null,2));
+    ' 2>>"$INSTALL_LOG" && success "Set enableFileHooks: true in ~/.copilot/settings.json" \
+      || warning "Failed to update ~/.copilot/settings.json"
+
+    # 2. Trust the repo folder in the JSONC-format config.json (strip // comments to parse).
+    if [[ -f "$CONFIG" ]]; then
+        CODING_CONFIG="$CONFIG" CODING_TRUST="$CODING_REPO" node -e '
+          const fs=require("fs"); const p=process.env.CODING_CONFIG;
+          let raw=""; try { raw=fs.readFileSync(p,"utf8"); } catch {}
+          const nc=raw.split("\n").filter(l=>!l.trim().startsWith("//")).join("\n");
+          let d={}; try { d=JSON.parse(nc); } catch {}
+          d.trustedFolders=Array.isArray(d.trustedFolders)?d.trustedFolders:[];
+          if(!d.trustedFolders.includes(process.env.CODING_TRUST)) d.trustedFolders.push(process.env.CODING_TRUST);
+          fs.writeFileSync(p, JSON.stringify(d,null,2));
+        ' 2>>"$INSTALL_LOG" && success "Trusted $CODING_REPO in ~/.copilot/config.json" \
+          || warning "Failed to update ~/.copilot/config.json trustedFolders"
+    else
+        info "~/.copilot/config.json not found — copilot will create it + prompt for folder trust on first run"
+    fi
+
+    success "Copilot filesystem hooks enabled (KB injection via postToolUse is live)"
 }
 
 # Install skills to all supported agents (Claude global, Copilot, OpenCode)
