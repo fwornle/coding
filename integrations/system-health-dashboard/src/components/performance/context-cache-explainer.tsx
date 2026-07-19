@@ -970,16 +970,28 @@ export function ContextCacheExplainer() {
               <span className="font-medium text-foreground">at the provider</span> (Anthropic) — not in the agent or the proxy.
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              On each request the provider hashes the prefix marked by the <span className="font-mono">cache_control</span>{' '}
-              breakpoints. If that hash matches a warm entry (TTL ≈ 5 min / 1 h), it reuses the stored attention state for those
-              tokens instead of re-running the model over them — billing them as <span style={{ color: C_READ }}>cache_read</span>{' '}
-              (~0.1×). So the bytes still cross the wire; caching cuts <em>re-computation &amp; cost</em>, not transmission.
+              On each request the provider hashes the stable prefix and, if that hash matches a warm entry (TTL ≈ 5 min / 1 h),
+              reuses the stored attention state for those tokens instead of re-running the model over them — billing them as{' '}
+              <span style={{ color: C_READ }}>cache_read</span> (~0.1×). So the bytes still cross the wire; caching cuts{' '}
+              <em>re-computation &amp; cost</em>, not transmission.
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              That’s why a long claude run is dominated by <span style={{ color: C_READ }}>cache_read</span>, while an{' '}
-              <span className="font-medium text-foreground">opencode</span> run (whose provider path doesn’t set{' '}
-              <span className="font-mono">cache_control</span>) makes the provider re-process the whole prefix as fresh{' '}
-              <span style={{ color: C_INPUT }}>input</span> each turn.
+              <span className="font-medium text-foreground">Which prefix gets cached depends on the wire.</span> On the{' '}
+              <span className="font-medium" style={{ color: C_READ }}>Anthropic wire</span> (claude / claude-code / anthropic) it’s{' '}
+              <em>explicit</em>: a <span className="font-mono">cache_control</span> breakpoint marks the boundary — the proxy now
+              injects those breakpoints on its native paths, so those runs both <span style={{ color: C_WRITE }}>write</span> and{' '}
+              <span style={{ color: C_READ }}>read</span> the cache. On the{' '}
+              <span className="font-medium" style={{ color: C_INPUT }}>OpenAI wire</span> (copilot / opencode) it’s{' '}
+              <em>implicit</em>: the gateway auto-detects a repeated prefix and returns <span className="font-mono">cached_tokens</span>{' '}
+              on its own — no <span className="font-mono">cache_control</span>, and <span className="font-medium text-foreground">no
+              write counter exists at all</span> (so cache-write reads <span className="font-medium text-foreground">N/A</span>, never 0).
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              That implicit prefix is also why an opencode/copilot run still shows a green{' '}
+              <span style={{ color: C_READ }}>cache_read</span> floor with <em>zero</em> writes: the static head (system + tools +
+              knowledge) stays byte-identical every turn, so it keeps matching a warm entry. The floor rises above that baseline
+              when recent conversation history is <em>also</em> still warm within the TTL, and drops back after a gap longer than
+              the TTL expires the entry — leaving only the static head cached.
             </p>
           </div>
         </div>
@@ -1121,34 +1133,50 @@ export function ContextCacheExplainer() {
         {/* 5. How prompt caching ACTUALLY works — the Anthropic-wire vs OpenAI-wire
             asymmetry that makes cache-write N/A honest, not a bug (D-12). */}
         <div className="rounded-md border bg-muted/30 p-4" data-testid="caching-explainer-copy">
-          <p className="text-sm font-semibold">How prompt caching actually works — and why cache-write is sometimes “N/A”</p>
+          <p className="text-sm font-semibold">How prompt caching actually works — every wire, in one place</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Prompt caching is a <span className="font-medium text-foreground">provider-side</span> optimisation: the model host
             hashes the stable prefix of your prompt and, on a later request with the same prefix, reuses the already-computed
             attention state instead of re-running the model over those tokens. The bytes still cross the wire every turn — caching
-            cuts <em>re-computation &amp; cost</em>, not transmission.
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            The two provider wires report this differently, which is why the numbers above branch on <span className="font-mono">wire</span>:
+            cuts <em>re-computation &amp; cost</em>, not transmission. What differs is <span className="font-medium text-foreground">who
+            decides the prefix</span> and <span className="font-medium text-foreground">what the provider reports back</span>, and
+            that is entirely a function of the wire the request takes:
           </p>
           <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
             <li>
-              <span className="font-medium" style={{ color: C_READ }}>Anthropic wire</span> (claude, via{' '}
-              <span className="font-mono">/v1/messages</span>) exposes BOTH a <span className="font-mono">cache_read</span> and a
-              dedicated <span className="font-mono">cache-creation</span> (write) counter. When the agent marks a prefix with{' '}
-              <span className="font-mono">cache_control</span>, the first request that warms it is billed as{' '}
-              <span style={{ color: C_WRITE }}>cache write</span> (~1.25×); every subsequent hit is{' '}
-              <span style={{ color: C_READ }}>cache read</span> (~0.1×). Here we show the <span className="font-medium text-foreground">real</span> cache-write number.
+              <span className="font-medium" style={{ color: C_READ }}>Anthropic wire — explicit caching</span> (claude /
+              claude-code / anthropic, via <span className="font-mono">/v1/messages</span>). The client marks the reusable prefix
+              with a <span className="font-mono">cache_control</span> breakpoint; the response exposes BOTH a{' '}
+              <span className="font-mono">cache_read</span> and a dedicated <span className="font-mono">cache-creation</span> (write)
+              counter. The first request that warms a prefix is billed as <span style={{ color: C_WRITE }}>cache write</span>{' '}
+              (~1.25×); every subsequent hit is <span style={{ color: C_READ }}>cache read</span> (~0.1×). The proxy now injects
+              those breakpoints on its Anthropic-native paths (system + last message), so these runs actively write and re-read the
+              cache — here we show the <span className="font-medium text-foreground">real</span> read and write numbers.
             </li>
             <li>
-              <span className="font-medium" style={{ color: C_INPUT }}>OpenAI wire</span> (copilot / opencode, via{' '}
-              <span className="font-mono">/api/complete</span>) reports <span className="font-mono">cache_read</span> only —
-              there is <span className="font-medium text-foreground">no cache-creation counter on the wire at all</span>. So we
-              render cache-write as <span className="font-medium text-foreground">{CACHE_WRITE_NA}</span> rather than{' '}
-              <span className="font-mono">0</span>: a zero would falsely imply the run tried to cache and wrote nothing, when in
-              truth the provider simply never reports that figure. Honest measurement over inference (D-12).
+              <span className="font-medium" style={{ color: C_INPUT }}>OpenAI wire — implicit caching</span> (copilot / opencode,
+              via the Copilot gateway’s OpenAI-compatible endpoint). There is <span className="font-medium text-foreground">no{' '}
+              <span className="font-mono">cache_control</span></span> on this wire — the gateway auto-detects a repeated prefix and
+              returns <span className="font-mono">cached_tokens</span> (which we surface as{' '}
+              <span style={{ color: C_READ }}>cache read</span>) entirely on its own. But the OpenAI usage schema has{' '}
+              <span className="font-medium text-foreground">no cache-creation field at all</span>, so cache-write renders as{' '}
+              <span className="font-medium text-foreground">{CACHE_WRITE_NA}</span> rather than <span className="font-mono">0</span>:
+              a zero would falsely imply the run tried to cache and wrote nothing, when in truth the provider simply never reports
+              that figure. This is why a copilot/opencode run shows a green cache-read floor with no writes — that green is the
+              gateway’s implicit prefix reuse, not a write you can see or control.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">No proxy seam — no measurement</span> (e.g. a raw copilot run that
+              never traversed the metering proxy, or a run predating the capture tap). We record neither read nor write and fall
+              back to the illustrative band above. Re-run the comparison through the proxy to capture real numbers.
             </li>
           </ul>
+          <p className="mt-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">The one-line rule:</span> green (<span style={{ color: C_READ }}>cache
+            read</span>) can appear on <em>both</em> wires; amber (<span style={{ color: C_WRITE }}>cache write</span>) is only
+            ever a real number on the Anthropic wire, and is honestly <span className="font-medium text-foreground">N/A</span> —
+            not zero — on the OpenAI wire. Honest measurement over inference (D-12).
+          </p>
         </div>
 
         <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} />
