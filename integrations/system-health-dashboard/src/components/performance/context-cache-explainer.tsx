@@ -523,11 +523,11 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
           </div>
         ) : !agentInjectsKb ? (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
-            <span className="font-medium text-foreground">{agent || 'This agent'}</span> doesn’t carry the ~1,000-token KB block:
-            the installed Copilot CLI fires filesystem hooks but doesn’t apply their injected context, so nothing is prepended.
-            Per-prompt injection works on <span className="font-medium text-foreground">Claude</span> and
-            <span className="font-medium text-foreground"> OpenCode</span> — open one of those runs to see the retrieved
-            knowledge. The schema below shows what the block is composed of.
+            <span className="font-medium text-foreground">{agent || 'This agent'}</span> does receive KB via its
+            <span className="font-mono"> postToolUse</span> hook (per-turn, when Copilot file-hooks are enabled), but Copilot runs
+            don’t route through the proxy tap this modal reads — so their injected context isn’t captured here. Open a
+            <span className="font-medium text-foreground"> Claude</span> or <span className="font-medium text-foreground">OpenCode</span>
+            run to see the captured retrieved knowledge. The schema below shows what the block is composed of.
           </div>
         ) : (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">

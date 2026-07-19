@@ -68,16 +68,21 @@ if [ "$ALLOW" != "true" ]; then
   exit 0
 fi
 
-# Per-prompt knowledge injection (parity with Claude's UserPromptSubmit hook).
-# Copilot rewrites the model-facing prompt from this hook's `modifiedPrompt` field,
-# so for userPromptSubmitted we retrieve the ~1000-token KB block and emit it. The
-# helper reads the raw Copilot payload ({prompt,...}) and prints single-line JSON —
-# {"modifiedPrompt":"<KB>\n\n<prompt>"} to inject, or {} to leave it unchanged.
-# NOTE: dormant no-op on Copilot CLI v1.0.71 — filesystem hooks fire but their output
-# is not processed for injection (verified). Activates on a build that honors
-# modifiedPrompt from a filesystem hook. See knowledge-injection-copilot-prompt.js.
+# Knowledge injection (parity with Claude's UserPromptSubmit hook, adapted to what
+# Copilot CLI actually honors). On Copilot, filesystem command hooks can only inject
+# context the model reads via postToolUse → additionalContext; userPromptSubmitted
+# output is ignored and modifiedPrompt is SDK-only. So we stash the prompt at
+# userPromptSubmitted, then inject task-relevant KB via additionalContext on the
+# first postToolUse of the turn (once-per-turn; see knowledge-injection-copilot-posttool.js).
 if [ "$NATIVE_EVENT" = "userPromptSubmitted" ]; then
-  KB=$(echo "$CONTEXT" | node "$CODING_REPO/src/hooks/knowledge-injection-copilot-prompt.js" 2>/dev/null || echo '{}')
+  # Persist the prompt for postToolUse; the emitted JSON is ignored by Copilot here.
+  echo "$CONTEXT" | node "$CODING_REPO/src/hooks/knowledge-injection-copilot-posttool.js" stash >/dev/null 2>&1 || true
+  echo '{"continue":true}'
+  exit 0
+fi
+
+if [ "$NATIVE_EVENT" = "postToolUse" ]; then
+  KB=$(echo "$CONTEXT" | node "$CODING_REPO/src/hooks/knowledge-injection-copilot-posttool.js" inject 2>/dev/null || echo '{}')
   [ -n "$KB" ] && echo "$KB" || echo '{"continue":true}'
   exit 0
 fi
