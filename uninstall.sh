@@ -193,6 +193,27 @@ if command -v jq &> /dev/null && [[ -f "$HOME/.config/opencode/opencode.json" ]]
     fi
 fi
 
+# Clean up knowledge-injection plugin (per-prompt KB injection for OpenCode)
+echo -e "\n${BLUE}🧠 Removing knowledge-injection plugin...${NC}"
+if [[ -f "$HOME/.opencode/plugins/knowledge-injection.js" ]]; then
+    rm -f "$HOME/.opencode/plugins/knowledge-injection.js"
+    echo "  Removed ~/.opencode/plugins/knowledge-injection.js"
+    rmdir "$HOME/.opencode/plugins" 2>/dev/null || true
+else
+    echo "  knowledge-injection.js not found in ~/.opencode/plugins/ -- skipping"
+fi
+if command -v jq &> /dev/null && [[ -f "$HOME/.config/opencode/opencode.json" ]]; then
+    OPENCODE_JSON="$HOME/.config/opencode/opencode.json"
+    PLUGIN_PATH="$HOME/.opencode/plugins/knowledge-injection.js"
+    if jq -e '.plugin' "$OPENCODE_JSON" > /dev/null 2>&1; then
+        TMP_JSON=$(mktemp)
+        jq --arg p "$PLUGIN_PATH" '.plugin = [.plugin[] | select(. != $p)] | if .plugin == [] then del(.plugin) else . end' "$OPENCODE_JSON" > "$TMP_JSON" \
+            && mv "$TMP_JSON" "$OPENCODE_JSON" \
+            && echo "  Removed knowledge-injection from plugin array in opencode.json" \
+            || { echo "  Failed to update opencode.json plugin array"; rm -f "$TMP_JSON"; }
+    fi
+fi
+
 # Note: memory-visualizer and mcp-server-semantic-analysis are git submodules
 # and have already been cleaned above
 

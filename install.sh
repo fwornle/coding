@@ -2811,6 +2811,7 @@ main() {
     install_enhanced_lsl
     install_mastra_opencode
     install_compaction_guard
+    install_knowledge_injection
     install_skills
     create_project_local_settings
     install_okb_snapshot_guard
@@ -3093,6 +3094,56 @@ install_compaction_guard() {
     fi
 
     success "Compaction-guard installation complete"
+}
+
+# Install the knowledge-injection plugin — per-prompt KB injection for OpenCode,
+# mirroring the Claude Code UserPromptSubmit hook. Makes OpenCode runs carry the
+# ~1000-token retrieved-knowledge block (Working Memory + semantic Insights/Digests/
+# Entities/Observations), so the model uses it AND the Performance-tab "Retrieved
+# Knowledge" modal populates for OpenCode runs (previously always empty for them).
+install_knowledge_injection() {
+    echo -e "\n${CYAN}🧠 Installing OpenCode knowledge-injection plugin...${NC}"
+
+    local OPENCODE_HOME="$HOME/.opencode"
+    local OPENCODE_JSON="$HOME/.config/opencode/opencode.json"
+    local PLUGIN_SRC="$CODING_REPO/plugins/opencode/knowledge-injection.js"
+    local PLUGIN_DST="$OPENCODE_HOME/plugins/knowledge-injection.js"
+
+    if [[ ! -f "$PLUGIN_SRC" ]]; then
+        warning "knowledge-injection.js not found at $PLUGIN_SRC -- skipping plugin install"
+        INSTALLATION_WARNINGS+=("Knowledge injection: plugin source not found")
+        return 1
+    fi
+
+    mkdir -p "$OPENCODE_HOME/plugins"
+    cp "$PLUGIN_SRC" "$PLUGIN_DST"
+    success "Installed knowledge-injection plugin → $PLUGIN_DST"
+
+    # Register in the opencode.json plugin array (append — must not clobber the
+    # compaction-guard entry install_compaction_guard added just before us).
+    # OpenCode also auto-loads ~/.opencode/plugins/*.js, so this is belt-and-suspenders.
+    if [[ -f "$OPENCODE_JSON" ]] && command -v jq &> /dev/null; then
+        local TMP_JSON
+        if jq -e '.plugin' "$OPENCODE_JSON" > /dev/null 2>&1; then
+            if jq -e --arg p "$PLUGIN_DST" '.plugin | map(select(. == $p)) | length > 0' "$OPENCODE_JSON" > /dev/null 2>&1; then
+                info "knowledge-injection already registered in opencode.json plugin array"
+            else
+                TMP_JSON=$(mktemp)
+                jq --arg p "$PLUGIN_DST" '.plugin += [$p]' "$OPENCODE_JSON" > "$TMP_JSON" \
+                    && mv "$TMP_JSON" "$OPENCODE_JSON" \
+                    && success "Added knowledge-injection to plugin array in opencode.json" \
+                    || { warning "Failed to update opencode.json plugin array"; rm -f "$TMP_JSON"; }
+            fi
+        else
+            TMP_JSON=$(mktemp)
+            jq --arg p "$PLUGIN_DST" '. + {"plugin": [$p]}' "$OPENCODE_JSON" > "$TMP_JSON" \
+                && mv "$TMP_JSON" "$OPENCODE_JSON" \
+                && success "Registered knowledge-injection plugin in opencode.json" \
+                || { warning "Failed to add plugin array to opencode.json"; rm -f "$TMP_JSON"; }
+        fi
+    fi
+
+    success "Knowledge-injection installation complete"
 }
 
 # Install skills to all supported agents (Claude global, Copilot, OpenCode)
