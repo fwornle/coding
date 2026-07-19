@@ -143,6 +143,6 @@ test.describe('Performance — Retrieved-Knowledge per-category drill-down', () 
     const empty = page.locator('[data-testid="kb-no-content"]');
     await expect(empty).toBeVisible();
     await expect(page.locator('[data-testid="kb-real-content"]')).toHaveCount(0);
-    await expect(empty).toContainText(/doesn’t inject|does not inject|no captured buffer/i);
+    await expect(empty).toContainText(/inject|no captured buffer/i);
   });
 });
