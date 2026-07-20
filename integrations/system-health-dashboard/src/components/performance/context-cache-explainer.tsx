@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend,
 } from 'recharts'
@@ -356,11 +356,11 @@ function TopologyStrip({ agent }: { agent: string }) {
 
 // The real facts behind the Retrieved-Knowledge segment (Phase 78 dig).
 const KB_SECTIONS = [
-  { name: 'Working Memory', budget: '≤300 tok', src: 'STATE.md + VKB /api/entities', detail: 'Project, milestone, status, current phase, known issues.' },
+  { name: 'Working Memory', budget: '≤300 tok', src: 'STATE.md + VKB /api/entities', detail: 'Live project state (milestone, phase, known issues) — re-read from disk each prompt, NOT chat history.' },
   { name: 'Insights', budget: '≤4 items', src: 'Qdrant · insights', detail: 'Highest-confidence learned patterns, RRF-ranked to the prompt.' },
-  { name: 'Digests', budget: '≤3 items', src: 'Qdrant · digests', detail: 'Consolidated multi-observation summaries of past sessions.' },
+  { name: 'Digests', budget: '≤3 items', src: 'Qdrant · digests', detail: 'Daily consolidations of observations — cover material not yet promoted to an insight.' },
   { name: 'Entities', budget: '≤3 items', src: 'Qdrant · kg_entities', detail: 'Knowledge-graph components/subcomponents relevant to the prompt.' },
-  { name: 'Observations', budget: '≤3 items', src: 'Qdrant · observations', detail: 'Individual past intents/approaches matching the query.' },
+  { name: 'Observations', budget: '≤3 items', src: 'Qdrant · observations', detail: 'Raw per-session records — bridge the recency gap until consolidated into digests/insights.' },
 ]
 
 // Phase B: one structured item from the retrieval capture (/api/retrieve-capture),
@@ -377,6 +377,57 @@ interface KbCaptureItem {
     confidence?: number; quality?: number; summary_preview?: string
   }
 }
+// The retrieval capture's meta block — most importantly the EXACT query the hook
+// sent (user prompt + `[context: …]` conversation enrichment, truncated at 500
+// chars by the hook). Surfacing it is what lets the reader judge whether the
+// retrieved items actually relate to what was asked.
+interface KbCaptureMeta {
+  query?: string
+  budget?: number
+  results_count?: number
+  tokens_used?: number
+  working_memory_tokens?: number
+  latency_ms?: number
+}
+
+// Split the captured query back into the user-prompt part and the `[context: …]`
+// conversation-topic enrichment the hook appended (the closing bracket may be
+// missing when the 500-char truncation cut through it).
+function splitCaptureQuery(q?: string | null): { prompt: string; enrichment: string | null } {
+  const s = (q ?? '').trim()
+  const i = s.lastIndexOf('[context:')
+  if (i < 0) return { prompt: s, enrichment: null }
+  const enrichment = s.slice(i + '[context:'.length).replace(/\]\s*$/, '').trim()
+  return { prompt: s.slice(0, i).trim(), enrichment: enrichment || null }
+}
+
+// Mirror of retrieval-service._applyTopicRelevance word extraction: meaningful
+// query words (3+ chars, minus stop words) that the ranker matched against each
+// item's topic/theme/summary. Used to render "why this item" chips.
+const KB_STOP_WORDS = new Set([
+  'the', 'and', 'for', 'that', 'this', 'with', 'from', 'are', 'was', 'were', 'been',
+  'have', 'has', 'had', 'not', 'but', 'what', 'how', 'why', 'when', 'where', 'which',
+  'who', 'will', 'can', 'does', 'did', 'should', 'would', 'could', 'may', 'about',
+  'into', 'out', 'all', 'also', 'just', 'than', 'then', 'very', 'some', 'any', 'each',
+  'use', 'using', 'used', 'make', 'like', 'need', 'know', 'here', 'context', 'you',
+  'your', 'our', 'its', 'their', 'they', 'she', 'coding', 'project', 'file', 'files',
+  'system', 'service',
+])
+function kbQueryWords(query?: string | null): string[] {
+  if (!query) return []
+  return [...new Set(
+    query.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+      .filter((w) => w.length >= 3 && !KB_STOP_WORDS.has(w))
+  )]
+}
+function kbMatchedTerms(queryWords: string[], item: KbCaptureItem): string[] {
+  if (queryWords.length === 0) return []
+  const p = item.payload || {}
+  const text = [p.topic, p.theme, p.summary_preview].filter(Boolean).join(' ').toLowerCase()
+  if (!text) return []
+  return queryWords.filter((w) => text.includes(w))
+}
+
 // Map a KB section name → the capture's tier key. Working Memory has no structured
 // items (it's flattened state), so it's absent here and stays a markdown blob.
 const SECTION_TIER: Record<string, string> = {
@@ -419,26 +470,46 @@ function kbFirstLine(s: string, max = 150): string {
 
 // One structured (scored) item card. `rrfScore` is the relevance-to-this-prompt;
 // confidence/quality are the item's own intrinsic score where the tier carries one.
-function KbScoredCard({ item }: { item: KbCaptureItem }): ReactNode {
+// `queryWords` are the meaningful words of the retrieval query — the overlap chips
+// show WHY the ranker kept this item (same signal _applyTopicRelevance boosts on).
+function KbScoredCard({ item, queryWords }: { item: KbCaptureItem; queryWords?: string[] }): ReactNode {
   const p = item.payload || {}
   const title = p.topic || p.theme || p.entityType || (p.agent ? `${p.agent}${p.date ? ` · ${p.date}` : ''}` : 'item')
   const intrinsic = typeof p.confidence === 'number'
     ? `confidence ${p.confidence}`
     : typeof p.quality === 'number' ? `quality ${p.quality}`
     : (p.hierarchyLevel != null ? `level ${p.hierarchyLevel}` : (p.date || ''))
+  const matched = kbMatchedTerms(queryWords ?? [], item)
   return (
     <div className="rounded border p-2" data-testid="kb-item-card">
       <div className="mb-1 flex items-start justify-between gap-2">
         <p className="min-w-0 flex-1 truncate text-sm font-medium">{title}</p>
         <div className="flex shrink-0 items-center gap-1">
           {intrinsic && <Badge variant="outline" className="text-[10px]">{intrinsic}</Badge>}
+          {typeof item.score === 'number' && (
+            <Badge variant="outline" className="font-mono text-[10px]" title="Raw embedding similarity between the query and this item (Qdrant cosine)">
+              cos {item.score.toFixed(2)}
+            </Badge>
+          )}
           {typeof item.rrfScore === 'number' && (
-            <Badge variant="secondary" className="font-mono text-[10px]" title="RRF relevance to this prompt">
+            <Badge variant="secondary" className="font-mono text-[10px]" title="Final fused rank score: RRF over semantic + keyword + recency lists, × tier weight, × project/topic-overlap boosts">
               rel {item.rrfScore.toFixed(3)}
             </Badge>
           )}
         </div>
       </div>
+      {matched.length > 0 ? (
+        <p className="mb-1 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground" data-testid="kb-item-matched">
+          <span>matched:</span>
+          {matched.slice(0, 8).map((w) => (
+            <span key={w} className="rounded bg-muted px-1 font-mono">{w}</span>
+          ))}
+        </p>
+      ) : queryWords && queryWords.length > 0 ? (
+        <p className="mb-1 text-[10px] italic text-muted-foreground" data-testid="kb-item-matched">
+          no query-word overlap — kept on embedding similarity alone (weakest signal; topic-relevance demotes these 0.3×)
+        </p>
+      ) : null}
       {p.summary_preview && (
         <p className="whitespace-pre-wrap break-words text-[11px] leading-snug text-muted-foreground">{p.summary_preview}</p>
       )}
@@ -449,10 +520,11 @@ function KbScoredCard({ item }: { item: KbCaptureItem }): ReactNode {
 // 3rd-level sub-modal: the FULL captured content of one KB section. Prefers the
 // structured (scored) capture when present, else falls back to the markdown blocks
 // parsed from the injected text. Stacks on top of KbDetailDialog (Radix nesting).
-function KbCategoryDialog({ name, section, structured, onClose }: {
+function KbCategoryDialog({ name, section, structured, queryWords, onClose }: {
   name: string | null
   section: KbSection | null
   structured: KbCaptureItem[]
+  queryWords?: string[]
   onClose: () => void
 }) {
   const meta = KB_SECTIONS.find((s) => s.name === name) || null
@@ -470,9 +542,19 @@ function KbCategoryDialog({ name, section, structured, onClose }: {
             {hasScored ? ', each with its relevance score to this prompt.' : ', verbatim from its captured buffer.'}
           </DialogDescription>
         </DialogHeader>
+        {name === 'Working Memory' && (
+          <div className="rounded-md border bg-muted/20 p-3 text-[11px] leading-snug text-muted-foreground">
+            <span className="font-semibold text-foreground">Why this exists:</span> Working Memory is <em>not</em> chat
+            history — it is the current project state re-read from <span className="font-mono">STATE.md</span> + VKB at
+            every prompt. It is NOT semantically retrieved (no ranking): it is always prepended so the agent knows the
+            milestone/phase/known-issues even in a fresh session that never read STATE.md, and so mid-session state
+            changes (a phase completing) reach the model without waiting for it to re-read the file. Earlier copies do
+            ride along in history; the per-prompt refresh is what keeps the newest one authoritative.
+          </div>
+        )}
         {hasScored ? (
           <div className="space-y-2" data-testid="kb-category-items">
-            {structured.map((it, i) => <KbScoredCard key={it.id != null ? String(it.id) : i} item={it} />)}
+            {structured.map((it, i) => <KbScoredCard key={it.id != null ? String(it.id) : i} item={it} queryWords={queryWords} />)}
           </div>
         ) : section && section.items.length > 0 ? (
           <div className="space-y-2" data-testid="kb-category-items">
@@ -493,10 +575,12 @@ function KbCategoryDialog({ name, section, structured, onClose }: {
 }
 
 /** Nested pop-up: the deep detail for the Retrieved-Knowledge injection. */
-function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean; onClose: () => void; real: RealBreakdown | null; agent?: string | null; kbItems?: KbCaptureItem[] | null }) {
+function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open: boolean; onClose: () => void; real: RealBreakdown | null; agent?: string | null; kbItems?: KbCaptureItem[] | null; kbMeta?: KbCaptureMeta | null }) {
   const injected = real?.knowledge_text?.trim() || null
   const sections = useMemo(() => parseKnowledgeSections(injected), [injected])
   const [openSection, setOpenSection] = useState<string | null>(null)
+  const { prompt: capturedPrompt, enrichment } = useMemo(() => splitCaptureQuery(kbMeta?.query), [kbMeta?.query])
+  const queryWords = useMemo(() => kbQueryWords(kbMeta?.query), [kbMeta?.query])
   const structuredFor = (nm: string | null): KbCaptureItem[] => {
     const tier = nm ? SECTION_TIER[nm] : undefined
     return tier && kbItems ? kbItems.filter((i) => i.tier === tier) : []
@@ -544,6 +628,31 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
             No captured buffer for this run, so the exact injected text isn’t available (it predates the capture tap). Claude and
             OpenCode inject the block per prompt — re-run it to record the content. The schema below shows what the block is
             composed of.
+          </div>
+        )}
+
+        {capturedPrompt && (
+          <div className="mt-3 rounded-md border p-3" data-testid="kb-query-block">
+            <p className="text-sm font-semibold">The prompt that drove this retrieval</p>
+            <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[11px] leading-snug">
+              {capturedPrompt}
+            </p>
+            {enrichment && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-[11px] text-muted-foreground">
+                  + conversation-topic enrichment appended to the query (from the transcript tail)
+                </summary>
+                <p className="mt-1 whitespace-pre-wrap break-words rounded bg-muted/30 p-2 text-[11px] leading-snug text-muted-foreground">{enrichment}</p>
+              </details>
+            )}
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              This exact text was embedded and searched
+              {typeof kbMeta?.results_count === 'number' && <> — <span className="font-medium text-foreground">{kbMeta.results_count} candidates</span> were considered</>}
+              {typeof kbMeta?.tokens_used === 'number' && <>, <span className="font-medium text-foreground">{kbMeta.tokens_used} tokens</span> made the cut</>}
+              {typeof kbMeta?.latency_ms === 'number' && kbMeta.latency_ms > 0 && <> in {kbMeta.latency_ms} ms</>}.
+              Each item card shows its cosine similarity, fused rank score, and the query words it matched — that overlap is
+              the ranker’s main topical signal.
+            </p>
           </div>
         )}
 
@@ -604,6 +713,7 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
           name={openSection}
           section={openSection ? (sections[openSection] ?? null) : null}
           structured={structuredFor(openSection)}
+          queryWords={queryWords}
           onClose={() => setOpenSection(null)}
         />
 
@@ -613,6 +723,13 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
           markdown. Working Memory is always first; semantic tiers follow in order (Insights, Digests, Entities, Observations).
           Because it sits at the <em>front</em> of the prompt and rarely changes within a session, it becomes part of the
           <span style={{ color: C_READ }}> cacheable prefix</span>.
+          <span className="mt-1.5 block">
+            <span className="font-semibold text-foreground">Why three overlapping tiers?</span> Observations → Digests →
+            Insights are progressive consolidations of the same raw material — but consolidation <em>lags</em> (digests
+            run daily, insights on consolidation cycles). Retrieving all three bridges that lag: today’s work exists only
+            as an observation, last week’s as a digest, and only settled patterns as insights. Per-tier caps + RRF
+            de-emphasis keep the duplication cost to a few hundred tokens.
+          </span>
         </div>
       </DialogContent>
     </Dialog>
@@ -648,6 +765,18 @@ function CategoryDetailModal({
 }) {
   const seg = SEGMENTS.find((s) => s.key === segKey) || null
   const fmtB = (b?: number | null) => (typeof b === 'number' ? `${(b / 1024).toFixed(b < 1024 ? 2 : 1)} KB` : '—')
+  // Jump-to-section wiring for the `sys` drill-down: the scroll container plus a
+  // ref per rendered section, so clicking a header in the "Sections" list scrolls
+  // that section to the top of the content pane (rather than the section list
+  // being inert md-style anchors that point nowhere).
+  const sysScrollRef = useRef<HTMLDivElement | null>(null)
+  const sysSectionRefs = useRef<(HTMLDivElement | null)[]>([])
+  const scrollToSysSection = (i: number) => {
+    const el = sysSectionRefs.current[i]
+    const box = sysScrollRef.current
+    if (!el || !box) return
+    box.scrollTo({ top: el.offsetTop - box.offsetTop - 4, behavior: 'smooth' })
+  }
   return (
     <Dialog open={segKey != null} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-[900px] w-[90vw] max-h-[85vh] overflow-y-auto overflow-x-hidden" data-testid="category-detail-dialog">
@@ -705,18 +834,54 @@ function CategoryDetailModal({
               {detail.hash && <Badge variant="outline" className="font-mono">#{detail.hash}</Badge>}
               {detail.cached && <Badge className="bg-emerald-600 font-mono text-[10px]">cached summary</Badge>}
             </div>
-            {detail.section_headers && detail.section_headers.length > 0 && (
-              <div className="mb-2 rounded border p-2">
-                <p className="mb-1 text-xs font-semibold">Sections ({detail.section_headers.length})</p>
-                <ul className="space-y-0.5">
-                  {detail.section_headers.map((h, i) => (
-                    <li key={i} className="truncate font-mono text-[11px] text-muted-foreground">{h}</li>
+            {detail.sections && detail.sections.length > 0 ? (
+              <>
+                <div className="mb-2 rounded border p-2">
+                  <p className="mb-1 text-xs font-semibold">Sections ({detail.sections.length}) — click to jump</p>
+                  <ul className="space-y-0.5">
+                    {detail.sections.map((s, i) => (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => scrollToSysSection(i)}
+                          className="block w-full truncate rounded px-1 text-left font-mono text-[11px] text-sky-600 hover:bg-muted hover:underline dark:text-sky-400"
+                          title={s.header}
+                        >
+                          {s.header}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div
+                  ref={sysScrollRef}
+                  className="max-h-72 overflow-auto rounded bg-muted/40 p-2"
+                  data-testid="sys-sections-body"
+                >
+                  {detail.sections.map((s, i) => (
+                    <div key={i} ref={(el) => { sysSectionRefs.current[i] = el }} className="scroll-mt-2">
+                      <p className="sticky top-0 -mx-2 mb-1 bg-muted/80 px-2 py-0.5 font-mono text-[11px] font-semibold text-foreground backdrop-blur">{s.header}</p>
+                      <pre className="mb-3 whitespace-pre-wrap break-words text-[11px] leading-snug">{s.text}</pre>
+                    </div>
                   ))}
-                </ul>
-              </div>
-            )}
-            {detail.preview && (
-              <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[11px] leading-snug">{detail.preview}</pre>
+                </div>
+              </>
+            ) : (
+              <>
+                {detail.section_headers && detail.section_headers.length > 0 && (
+                  <div className="mb-2 rounded border p-2">
+                    <p className="mb-1 text-xs font-semibold">Sections ({detail.section_headers.length})</p>
+                    <ul className="space-y-0.5">
+                      {detail.section_headers.map((h, i) => (
+                        <li key={i} className="truncate font-mono text-[11px] text-muted-foreground">{h}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {detail.preview && (
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[11px] leading-snug">{detail.preview}</pre>
+                )}
+              </>
             )}
             <p className="mt-1 text-xs text-muted-foreground">
               Summary is memoized by content hash — the system prompt is stable across turns, so it’s computed once per unique hash and reused.
@@ -761,6 +926,7 @@ export function ContextCacheExplainer() {
   // hook with its task_id after Phase B shipped; null/[] otherwise (Phase-A markdown
   // fallback still renders the content).
   const [kbItems, setKbItems] = useState<KbCaptureItem[] | null>(null)
+  const [kbMeta, setKbMeta] = useState<KbCaptureMeta | null>(null)
 
   const open = taskId != null
   const close = () => dispatch(setExplainTaskId(null))
@@ -801,12 +967,17 @@ export function ContextCacheExplainer() {
 
   // Phase B: the structured per-item KB capture for this run (scored cards).
   useEffect(() => {
-    if (!open || !taskId) { setKbItems(null); return }
+    if (!open || !taskId) { setKbItems(null); setKbMeta(null); return }
     let cancelled = false
     setKbItems(null)
+    setKbMeta(null)
     fetch(`/api/retrieve-capture?task_id=${encodeURIComponent(taskId)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled && d && Array.isArray(d.items)) setKbItems(d.items as KbCaptureItem[]) })
+      .then((d) => {
+        if (cancelled || !d) return
+        if (Array.isArray(d.items)) setKbItems(d.items as KbCaptureItem[])
+        if (d.meta && typeof d.meta === 'object') setKbMeta(d.meta as KbCaptureMeta)
+      })
       .catch(() => { /* no structured capture — markdown parse still renders content */ })
     return () => { cancelled = true }
   }, [open, taskId])
@@ -1419,7 +1590,7 @@ export function ContextCacheExplainer() {
           </p>
         </div>
 
-        <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} agent={agent} kbItems={kbItems} />
+        <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} agent={agent} kbItems={kbItems} kbMeta={kbMeta} />
         <CategoryDetailModal
           segKey={catOpen}
           onClose={() => setCatOpen(null)}

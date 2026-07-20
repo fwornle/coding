@@ -162,6 +162,10 @@ export interface CategoryDetail {
   total_bytes?: number
   block_count?: number
   section_headers?: string[]
+  // Full per-section bodies ({ header, text }) so the UI can render each section
+  // as a jump-to-content anchor. Absent on captures taken before this shipped —
+  // the UI falls back to the truncated `preview` then.
+  sections?: { header: string; text: string }[]
   preview?: string
   blocks?: { chars: number; cached: boolean; preview: string }[]
   // Tools / history / tool-outputs / user samples.
