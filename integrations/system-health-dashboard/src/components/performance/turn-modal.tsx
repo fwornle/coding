@@ -15,7 +15,7 @@ import {
   type ContextTurnMessage,
 } from '@/store/slices/performanceSlice'
 import { scrubSecrets, CACHE_WRITE_NA } from './context-cache-explainer'
-import { ContextBand } from './context-band'
+import { ContextBand, ContextBandLegend } from './context-band'
 
 // ---------------------------------------------------------------------------
 // TurnModal (Phase 86 — Timeline v2, D-01/D-03)
@@ -164,8 +164,23 @@ export function TurnModal({ captureRawBodies = false }: TurnModalProps) {
               <Badge variant="outline" className="text-[10px] font-mono">{turn.wire}</Badge>
             </div>
 
-            {/* Cumulative context band for the whole run — the growth story. */}
-            <ContextBand variant="cumulative" turns={turns} />
+            {/* THIS turn's own context composition — the primary band, matching the
+                timeline row's mini band (bandForTurn on the clicked turn). Previously
+                this showed the whole-run cumulative band, which is identical for every
+                turn and so never reflected the clicked turn's real per-category sizes. */}
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground">This turn’s context composition</p>
+              <ContextBand variant="mini" turn={turn} />
+            </div>
+
+            {/* The whole-run cumulative growth story, kept as a clearly-labelled
+                secondary band (the original intent — how context accretes over the run). */}
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground">Whole-run growth (cumulative)</p>
+              <ContextBand variant="cumulative" turns={turns} />
+            </div>
+
+            <ContextBandLegend />
 
             {/* Full message list — every preview scrubbed, byte sizes shown. */}
             <div className="space-y-1.5" data-testid="turn-message-list">
