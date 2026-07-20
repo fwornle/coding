@@ -440,7 +440,7 @@ function KbScoredCard({ item }: { item: KbCaptureItem }): ReactNode {
         </div>
       </div>
       {p.summary_preview && (
-        <p className="whitespace-pre-wrap text-[11px] leading-snug text-muted-foreground">{p.summary_preview}</p>
+        <p className="whitespace-pre-wrap break-words text-[11px] leading-snug text-muted-foreground">{p.summary_preview}</p>
       )}
     </div>
   )
@@ -459,7 +459,7 @@ function KbCategoryDialog({ name, section, structured, onClose }: {
   const hasScored = structured.length > 0
   return (
     <Dialog open={name != null} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto" data-testid="kb-category-dialog">
+      <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto overflow-x-hidden" data-testid="kb-category-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {name} — what was retrieved
@@ -477,8 +477,8 @@ function KbCategoryDialog({ name, section, structured, onClose }: {
         ) : section && section.items.length > 0 ? (
           <div className="space-y-2" data-testid="kb-category-items">
             {section.items.map((it, i) => (
-              <div key={i} className="rounded border p-2" data-testid="kb-item-card">
-                <pre className="whitespace-pre-wrap text-[11px] leading-snug">{it}</pre>
+              <div key={i} className="min-w-0 rounded border p-2" data-testid="kb-item-card">
+                <pre className="whitespace-pre-wrap break-words text-[11px] leading-snug">{it}</pre>
               </div>
             ))}
           </div>
@@ -507,7 +507,7 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems }: { open: boolean
   const agentInjectsKb = !agent || /claude|opencode/i.test(agent)
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto" data-testid="kb-detail-dialog">
+      <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto overflow-x-hidden" data-testid="kb-detail-dialog">
         <DialogHeader>
           <DialogTitle>Retrieved Knowledge — the injected context block</DialogTitle>
           <DialogDescription>
@@ -650,8 +650,8 @@ function CategoryDetailModal({
   const fmtB = (b?: number | null) => (typeof b === 'number' ? `${(b / 1024).toFixed(b < 1024 ? 2 : 1)} KB` : '—')
   return (
     <Dialog open={segKey != null} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-[760px] w-[90vw] max-h-[85vh] overflow-y-auto" data-testid="category-detail-dialog">
-        <DialogHeader>
+      <DialogContent className="max-w-[900px] w-[90vw] max-h-[85vh] overflow-y-auto overflow-x-hidden" data-testid="category-detail-dialog">
+        <DialogHeader className="min-w-0">
           <DialogTitle className="flex items-center gap-2">
             {seg && <span className="inline-block h-3 w-3 rounded-sm" style={{ background: seg.fill, border: `1px solid ${seg.stroke}` }} />}
             {seg?.label || segKey} — what was sent
@@ -675,21 +675,21 @@ function CategoryDetailModal({
             Detail construction failed: <span className="font-mono">{detail._error}</span>
           </div>
         ) : segKey === 'tools' ? (
-          <div data-testid="cat-tools">
+          <div className="min-w-0" data-testid="cat-tools">
             <p className="mb-2 text-sm">
               <span className="font-semibold">{detail.count ?? detail.items?.length ?? 0}</span> tool definition
               {(detail.count ?? 0) === 1 ? '' : 's'} sent to the model:
             </p>
             <div className="space-y-2">
               {(detail.items || []).map((t, i) => (
-                <div key={`${t.name}-${i}`} className="rounded border p-2">
-                  <div className="flex items-center justify-between">
-                    <p className="font-mono text-sm font-semibold">{t.name}</p>
-                    <Badge variant="outline" className="font-mono text-[10px]">{fmtB(t.bytes)}</Badge>
+                <div key={`${t.name}-${i}`} className="min-w-0 rounded border p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="min-w-0 break-all font-mono text-sm font-semibold">{t.name}</p>
+                    <Badge variant="outline" className="shrink-0 font-mono text-[10px]">{fmtB(t.bytes)}</Badge>
                   </div>
-                  {t.description && <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{t.description}</p>}
+                  {t.description && <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">{t.description}</p>}
                   {t.input_schema_keys && t.input_schema_keys.length > 0 && (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
+                    <p className="mt-1 break-words text-[11px] text-muted-foreground">
                       params: {t.input_schema_keys.map((k) => <span key={k} className="mr-1 font-mono">{k}</span>)}
                     </p>
                   )}
@@ -698,7 +698,7 @@ function CategoryDetailModal({
             </div>
           </div>
         ) : segKey === 'sys' ? (
-          <div data-testid="cat-sys">
+          <div className="min-w-0" data-testid="cat-sys">
             <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="outline" className="font-mono">{detail.block_count ?? 0} block{(detail.block_count ?? 0) === 1 ? '' : 's'}</Badge>
               <Badge variant="outline" className="font-mono">{detail.total_chars?.toLocaleString() ?? '—'} chars</Badge>
@@ -716,26 +716,26 @@ function CategoryDetailModal({
               </div>
             )}
             {detail.preview && (
-              <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] leading-snug">{detail.preview}</pre>
+              <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[11px] leading-snug">{detail.preview}</pre>
             )}
             <p className="mt-1 text-xs text-muted-foreground">
               Summary is memoized by content hash — the system prompt is stable across turns, so it’s computed once per unique hash and reused.
             </p>
           </div>
         ) : (
-          <div data-testid="cat-samples">
+          <div className="min-w-0" data-testid="cat-samples">
             <p className="mb-2 text-sm">
               <span className="font-semibold">{detail.count ?? detail.items?.length ?? 0}</span> block
               {(detail.count ?? 0) === 1 ? '' : 's'} in this category:
             </p>
             <div className="space-y-2">
               {(detail.items || []).map((m, i) => (
-                <div key={i} className="rounded border p-2">
-                  <div className="mb-1 flex items-center justify-between">
+                <div key={i} className="min-w-0 rounded border p-2">
+                  <div className="mb-1 flex items-center justify-between gap-2">
                     {m.role && <span className="font-mono text-xs font-semibold">{m.role}</span>}
-                    <Badge variant="outline" className="font-mono text-[10px]">{fmtB(m.bytes)}</Badge>
+                    <Badge variant="outline" className="shrink-0 font-mono text-[10px]">{fmtB(m.bytes)}</Badge>
                   </div>
-                  {m.preview && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] leading-snug">{m.preview}</pre>}
+                  {m.preview && <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[11px] leading-snug">{m.preview}</pre>}
                 </div>
               ))}
             </div>
