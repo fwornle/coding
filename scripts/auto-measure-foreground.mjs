@@ -562,9 +562,15 @@ async function claudePass(dbPath) {
           AND process LIKE 'token-adapter-claude%'
           AND process NOT LIKE '%subagent%'
           AND task_id IS NOT NULL AND task_id != ''
-          AND task_id NOT LIKE 'agent-%'
-          AND task_id NOT LIKE 'exp-%'
-          AND task_id NOT LIKE 'compare-%'
+          -- AMBIENT sessions ONLY: a bare session UUID (8-4-4-4-12 hex). This
+          -- excludes sub-agents ('agent-*'), and — critically — DELIBERATE
+          -- measurement spans whose claude cell also emits cladpt rows under an
+          -- experiment-cell task_id ('<expId>--<variant>--rN'). Those runs are
+          -- written by the experiment runner; picking them up here would
+          -- double-write (and resurrect deleted) experiment runs. A UUID never
+          -- contains '--' and is exactly 36 chars, so the GLOB is a tight gate.
+          AND task_id GLOB '????????-????-????-????-????????????'
+          AND task_id NOT LIKE '%--%'
         GROUP BY task_id`,
     ).all();
   } catch (err) {
