@@ -65,6 +65,7 @@ const INTERVAL_S = parseInt(arg('--interval', '0'), 10);
 // surrounding prose intact ("...in the repo /Users/x" -> "...in the repo").
 function stripTitleNoise(s) {
   return String(s)
+    .replace(/^\s*[❯›»>#$%]+\s*/, '')                  // leading shell/prompt glyphs
     .replace(/\[Image[^\]]*\]/gi, ' ')                // [Image 1] attachment markers
     .replace(/\((?:project|repo)[^)]*\)/gi, ' ')       // (project coding) tails
     .replace(/https?:\/\/\S+/g, ' ')                   // inline URLs
@@ -434,6 +435,212 @@ async function copilotPass() {
   log(`copilot pass complete — ${written} active session(s) written`);
 }
 
+// ── Claude ambient foreground sessions (2026-07-20) ────────────────────────
+// The attribution gap for CLAUDE is different from opencode/copilot: a claude
+// foreground session's tokens are ALREADY in token_usage. The file-adapter
+// (process 'token-adapter-claude', user_hash 'cladpt') tails each session
+// transcript and stamps task_id=<session uuid> per turn, and the proxy Route-1
+// passthrough dedups its wire rows onto the same task_id by request-id. So —
+// unlike the opencode/copilot passes — there is NOTHING to insert here: the rows
+// exist, they were simply never promoted to a dashboard Run because no pass
+// enumerated ambient claude sessions (only deliberate exp-*/compare-* spans got
+// runs). This pass writes one idempotent Run per active claude session
+// (keyed task_id=<session uuid>, writeRun UPDATES on re-run), self-healing as the
+// session grows — the same contract as copilotPass, minus the row insert.
+//
+// Foreground ONLY: sub-agent rows (task_id 'agent-*', process '*-subagent') and
+// deliberate measurement spans (task_id 'exp-*'/'compare-*') are excluded — the
+// first roll into their parent's attribution, the second are written by the
+// experiment runner, not this ambient daemon.
+
+const CLAUDE_PROJECTS_DIR = process.env.CLAUDE_PROJECTS_DIR
+  || path.join(os.homedir(), '.claude', 'projects');
+
+/** Harness-injected wrapper lines that must never become a session title. */
+const CLAUDE_WRAPPER_RE =
+  /^<(?:local-command-(?:caveat|stdout)|command-(?:name|message|args))\b|Caveat: The messages below/i;
+
+/**
+ * Locate a claude session transcript `<sid>.jsonl` under ~/.claude/projects/*.
+ * One readdir of the projects root + one existsSync per project dir (the layout
+ * is exactly one level deep). Returns the path or null.
+ */
+function claudeTranscriptPath(sid) {
+  let roots = [];
+  try {
+    roots = fs.readdirSync(CLAUDE_PROJECTS_DIR, { withFileTypes: true });
+  } catch {
+    return null; // no claude CLI state on this machine
+  }
+  for (const e of roots) {
+    if (!e.isDirectory()) continue;
+    const p = path.join(CLAUDE_PROJECTS_DIR, e.name, `${sid}.jsonl`);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+/** Basename-ish target for a tool action, so `Edit(foo.mjs)` names the work. */
+function claudeActionTarget(name, input) {
+  if (!input || typeof input !== 'object') return '';
+  const raw = input.file_path || input.notebook_path || input.path
+    || input.command || input.pattern || input.query || input.url || '';
+  let s = String(raw).replace(/\s+/g, ' ').trim();
+  if (/^(Edit|Write|Read|NotebookEdit)$/.test(name) && s.includes('/')) s = s.split('/').pop();
+  return s.slice(0, 48);
+}
+
+/**
+ * Distil a claude session transcript into a classifier signal: the operator's
+ * real requests (title = the first, summary = a compact digest of the first few
+ * intents + the tool actions performed). The opencode pass reads all this from
+ * its SQLite store via gatherSignal; a claude session has no such store, so the
+ * transcript jsonl IS the store. Without the tool-action signal the classifier
+ * sees only a one-line title — and a session whose opening line is a QUESTION
+ * ("why isn't X captured?") reads as unclassified even though its actual work
+ * (the edits) is plainly a bugfix/feature. Bounded scan; malformed lines skipped.
+ *
+ * @returns {{ title: string, summary: string }}
+ */
+function claudeSessionSignal(jsonlPath) {
+  let raw;
+  try {
+    raw = fs.readFileSync(jsonlPath, 'utf8');
+  } catch {
+    return { title: '', summary: '' };
+  }
+  const intents = [];
+  const actions = [];
+  let scanned = 0;
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    if (scanned++ > 6000) break; // bounded — enough to name the dominant work
+    let evt;
+    try { evt = JSON.parse(line); } catch { continue; }
+    const c = evt?.message?.content;
+    if (evt?.type === 'user') {
+      const text = typeof c === 'string'
+        ? c
+        : Array.isArray(c)
+          ? c.filter((b) => b?.type === 'text').map((b) => b.text).join('\n')
+          : '';
+      if (!text || CLAUDE_WRAPPER_RE.test(text.trim())) continue;
+      const prose = firstProseLine(text);
+      if (prose && intents.length < 5) intents.push(prose.slice(0, 120));
+    } else if (evt?.type === 'assistant' && Array.isArray(c)) {
+      for (const b of c) {
+        if (b?.type !== 'tool_use' || !b?.name) continue;
+        if (actions.length >= 10) break;
+        const tgt = claudeActionTarget(b.name, b.input);
+        actions.push(tgt ? `${b.name}(${tgt})` : b.name);
+      }
+    }
+  }
+  const title = intents[0] || '';
+  const summaryParts = [];
+  if (intents.length) summaryParts.push(intents.join(' · '));
+  if (actions.length) summaryParts.push(`actions: ${[...new Set(actions)].join(', ')}`);
+  return { title, summary: summaryParts.join(' | ').slice(0, 600) };
+}
+
+async function claudePass(dbPath) {
+  const now = Date.now();
+  const tokenDb = openTokenDb(tokenDbPath());
+  const store = await openExperimentStore();
+  let taxonomy = null;
+  try { taxonomy = loadTaxonomy(); } catch (err) { log(`claude: taxonomy load failed → unclassified: ${err.message}`); }
+
+  // Enumerate ambient foreground claude sessions straight from the token DB —
+  // the rows are already attributed (file-adapter + proxy dedup), so the DB is
+  // the source of truth for "which sessions have measurable tokens".
+  let sessions = [];
+  try {
+    sessions = tokenDb.prepare(
+      `SELECT task_id AS sid, MIN(timestamp) AS first_ts, MAX(timestamp) AS last_ts
+         FROM token_usage
+        WHERE agent = 'claude'
+          AND process LIKE 'token-adapter-claude%'
+          AND process NOT LIKE '%subagent%'
+          AND task_id IS NOT NULL AND task_id != ''
+          AND task_id NOT LIKE 'agent-%'
+          AND task_id NOT LIKE 'exp-%'
+          AND task_id NOT LIKE 'compare-%'
+        GROUP BY task_id`,
+    ).all();
+  } catch (err) {
+    log(`claude: enumerate failed: ${err.message}`);
+  }
+  if (!sessions.length) {
+    log('claude: no ambient sessions — skipping');
+    try { tokenDb.close?.(); } catch { /* noop */ }
+    await store.close();
+    return;
+  }
+
+  let written = 0;
+  try {
+    for (const s of sessions) {
+      const lastMs = Date.parse(s.last_ts) || 0;
+      // --backfill (re)writes every session; normal passes only active ones.
+      if (!HAS('--backfill') && now - lastMs > ACTIVE_WINDOW_MS) continue;
+
+      const taskId = s.sid;
+      const agg = aggregateByTaskId(taskId);
+      const totals = agg.totals;
+      if (!totals || !(totals.total_tokens > 0)) continue;
+
+      const groups = agg.byAgentModel || [];
+      const fgGroups = groups.filter(isForegroundGroup);
+      const canonical = fgGroups[0] ?? null;
+      const bgModels = [...new Set(
+        groups.filter((g) => !isForegroundGroup(g)).map((g) => g.model).filter(Boolean),
+      )];
+
+      const jsonlPath = claudeTranscriptPath(taskId);
+      const signal = jsonlPath ? claudeSessionSignal(jsonlPath) : { title: '', summary: '' };
+      const title = (signal.title && tidy(signal.title)) || `claude session ${taskId.slice(0, 12)}`;
+      const started = new Date(Date.parse(s.first_ts) || now).toISOString();
+      const ended = new Date(lastMs).toISOString();
+      const model = canonical?.model || 'unknown';
+      const taskHash = createHash('sha256').update(title).digest('hex').slice(0, 16);
+      // Class: LLM classifier FIRST (Option A — same as the opencode pass). The
+      // zero-LLM keyword scorer quarantines most real titles ("Fix …"/"Investigate
+      // …") below its confidence threshold, so title-only keyword derivation lands
+      // almost everything in 'unclassified'. Pass the title as ctx so the classifier
+      // works despite there being no opencode-store signal for a claude session;
+      // fall back to the keyword scorer, then the 'unclassified' sentinel, whenever
+      // the proxy/LLM is unavailable.
+      let taskClass = await llmSessionClass(dbPath, taskId, log, { title, summary: signal.summary });
+      if (!taskClass) {
+        const derived = taxonomy
+          ? deriveClassFromText(`${title} ${signal.summary}`, taxonomy)
+          : { taskClass: null, confident: false };
+        taskClass = derived.confident ? derived.taskClass : 'unclassified';
+      }
+
+      await writeRun(store, {
+        span: { task_id: taskId, started_at: started, ended_at: ended, goal_sentence: title },
+        taskClass,
+        pending: false,
+        tags: {
+          task_hash: taskHash, agent: 'claude', model, framework: 'claude', trace_id: taskId,
+          canonical_model: canonical?.model ?? null,
+          canonical_agent: canonical?.agent ?? 'claude',
+          background_models: bgModels,
+          session_summary: signal.summary || null,
+        },
+        totals,
+      });
+      written += 1;
+      log(`claude ${taskId.slice(0, 12)} · ${totals.total_tokens} tok · "${title.slice(0, 48)}"`);
+    }
+  } finally {
+    try { tokenDb.close?.(); } catch { /* noop */ }
+    await store.close();
+  }
+  log(`claude pass complete — ${written} active session(s) written`);
+}
+
 async function main() {
   const dbPath = arg('--db', DEFAULT_OPENCODE_DB);
   if (HAS('--reclassify')) {
@@ -446,11 +653,13 @@ async function main() {
     for (let tick = 0; tick < Number.MAX_SAFE_INTEGER; tick++) {
       try { await onePass(dbPath); } catch (e) { log(`pass error: ${e.message}`); }
       try { await copilotPass(); } catch (e) { log(`copilot pass error: ${e.message}`); }
+      try { await claudePass(dbPath); } catch (e) { log(`claude pass error: ${e.message}`); }
       await new Promise((res) => setTimeout(res, INTERVAL_S * 1000));
     }
   } else {
     await onePass(dbPath);
     try { await copilotPass(); } catch (e) { log(`copilot pass error: ${e.message}`); }
+    try { await claudePass(); } catch (e) { log(`claude pass error: ${e.message}`); }
   }
 }
 
