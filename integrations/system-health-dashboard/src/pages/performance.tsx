@@ -202,7 +202,6 @@ export function PerformancePage() {
           <TabsTrigger value="avenues" data-testid="avenues-tab">Avenues</TabsTrigger>
           <TabsTrigger value="compare" data-testid="compare-tab">Compare</TabsTrigger>
           <TabsTrigger value="reports" data-testid="reports-tab">Reports</TabsTrigger>
-          <TabsTrigger value="comparison" data-testid="comparison-tab">Comparison</TabsTrigger>
         </TabsList>
         <TabsContent value="runs" className="mt-4">
           {/* min-w-0 on the content column: a grid 1fr track defaults to
@@ -227,21 +226,39 @@ export function PerformancePage() {
         <TabsContent value="avenues" className="mt-4">
           <AvenuePanel onCompare={() => setActiveTab('compare')} />
         </TabsContent>
-        <TabsContent value="compare" className="mt-4 space-y-6">
-          {/* Metric compare stays (UI-SPEC Q1); the Plan-04 divergence-point
-              difference viewer sits BESIDE it, self-reading the compare pair. */}
-          <RunCompare />
-          <DifferenceViewer />
+        {/* Consolidated Compare tab: the previously-separate "Compare" (manual 2-run
+            A/B) and "Comparison" (experiment variant matrix) tabs were confusingly
+            named and split. Merged into ONE tab, each a clearly-labelled section.
+            A/B stays first so the "Compare selected (2)" CTA (from Runs / Avenues,
+            which switches here) still lands on the difference viewer. */}
+        <TabsContent value="compare" className="mt-4 space-y-8">
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-base font-semibold">Two-run comparison</h2>
+              <p className="text-sm text-muted-foreground">
+                Pick any two runs (or use the "Compare selected (2)" button on Runs / Avenues)
+                to see their metric diff and divergence points side by side.
+              </p>
+            </div>
+            <RunCompare />
+            <DifferenceViewer />
+          </section>
+          {/* CMP-04 (Phase 80): the variant-comparison matrix — fed live by
+              GET /api/experiments/comparison via fetchComparison, keyed by the
+              selected experiment's task_hash (D-01/D-03). */}
+          <section className="space-y-4 border-t pt-8">
+            <div>
+              <h2 className="text-base font-semibold">Experiment variant comparison</h2>
+              <p className="text-sm text-muted-foreground">
+                The ranked variant matrix for one experiment (task_hash) — every variant's cost,
+                route quality, and outcome, grouped into ranked / failed / ungated.
+              </p>
+            </div>
+            <ComparisonMatrix />
+          </section>
         </TabsContent>
         <TabsContent value="reports" className="mt-4">
           <ReportsSubview />
-        </TabsContent>
-        {/* CMP-04 (Phase 80): the variant-comparison matrix — a DISTINCT 5th tab,
-            not the manual 2-run "Compare" (A/B) nor "Reports" (saved queries). Fed
-            live by GET /api/experiments/comparison via fetchComparison, keyed by
-            the selected experiment's task_hash (D-01/D-03). */}
-        <TabsContent value="comparison" className="mt-4">
-          <ComparisonMatrix />
         </TabsContent>
       </Tabs>
 
