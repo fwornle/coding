@@ -491,3 +491,15 @@ Plans:
 | 85. Experiment Control Center | v7.5 | 6/6 | Complete    | 2026-07-09 |
 | 86. Timeline v2 & Declutter | v7.5 | 5/5 | Complete    | 2026-07-11 |
 | 87. Interactive Spans & Branch Avenues | v7.5 | 8/8 | Complete    | 2026-07-13 |
+
+### Phase 88: Experiment Harness Agent-Invocation Alignment and Pre-flight Gate
+
+**Goal:** A multi-agent `/experiment` run produces a genuine N-way comparison — each cell invokes its agent through the SAME proxy-routing/env/model seam as `bin/coding --<agent>`, a per-agent pre-flight gate records a clean skip:<reason> up front instead of a mid-run abort, and the copilot drivability probe + ambient sessions do not pollute the Runs view.
+**Requirements**: ALIGN-01, PREFLIGHT-01, SUPPRESS-01, REVERIFY-01
+**Depends on:** Phase 87
+**Plans:** 3 plans
+
+Plans:
+- [ ] 88-01-PLAN.md — Agent-invocation alignment: one source of truth for per-agent routing env + model resolution (fixes opencode rapid-proxy model-not-found + copilot auto 500)
+- [ ] 88-02-PLAN.md — Per-agent pre-flight validation gate (bounded, fail-soft, non-measured) then clean recorded skip; probe/ambient suppression
+- [ ] 88-03-PLAN.md — Unattended real 3-agent re-run proving every cell executes (non-zero tokens) or clean-skips, confirmed e2e in the dashboard
