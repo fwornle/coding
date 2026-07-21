@@ -511,6 +511,7 @@ function claudeSessionSignal(jsonlPath) {
   }
   const intents = [];
   const actions = [];
+  let turns = 0;
   let scanned = 0;
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
@@ -518,6 +519,7 @@ function claudeSessionSignal(jsonlPath) {
     let evt;
     try { evt = JSON.parse(line); } catch { continue; }
     const c = evt?.message?.content;
+    if (evt?.type === 'user' || evt?.type === 'assistant') turns += 1; // growth signal for title refresh
     if (evt?.type === 'user') {
       const text = typeof c === 'string'
         ? c
@@ -526,21 +528,34 @@ function claudeSessionSignal(jsonlPath) {
           : '';
       if (!text || CLAUDE_WRAPPER_RE.test(text.trim())) continue;
       const prose = firstProseLine(text);
-      if (prose && intents.length < 5) intents.push(prose.slice(0, 120));
+      if (prose && intents.length < 80) intents.push(prose.slice(0, 120)); // bound; head+tail sampled below
     } else if (evt?.type === 'assistant' && Array.isArray(c)) {
       for (const b of c) {
         if (b?.type !== 'tool_use' || !b?.name) continue;
-        if (actions.length >= 10) break;
+        if (actions.length >= 120) break; // bound; head+tail sampled below
         const tgt = claudeActionTarget(b.name, b.input);
         actions.push(tgt ? `${b.name}(${tgt})` : b.name);
       }
     }
   }
-  const title = intents[0] || '';
+  // Head+tail sampling: keep the OPENING requests AND the most RECENT ones so a
+  // long multi-task session's title reflects both its original goal and its latest
+  // pivot (mirrors the opencode gatherSignal head/tail slice). Actions are deduped
+  // first (collapse repeated Edit(file) noise), preserving temporal order.
+  const headTail = (arr, h, t) => (arr.length <= h + t ? arr : [...arr.slice(0, h), ...arr.slice(-t)]);
+  const sampledIntents = headTail(intents, 3, 3);
+  const sampledActions = headTail([...new Set(actions)], 5, 5);
+  const title = sampledIntents[0] || '';
   const summaryParts = [];
-  if (intents.length) summaryParts.push(intents.join(' · '));
-  if (actions.length) summaryParts.push(`actions: ${[...new Set(actions)].join(', ')}`);
-  return { title, summary: summaryParts.join(' | ').slice(0, 600) };
+  if (sampledIntents.length) summaryParts.push(sampledIntents.join(' · '));
+  if (sampledActions.length) summaryParts.push(`actions: ${sampledActions.join(', ')}`);
+  return {
+    title,
+    summary: summaryParts.join(' | ').slice(0, 600),
+    intents: sampledIntents,
+    actions: sampledActions,
+    turns,
+  };
 }
 
 async function claudePass(dbPath) {
@@ -603,8 +618,18 @@ async function claudePass(dbPath) {
       )];
 
       const jsonlPath = claudeTranscriptPath(taskId);
-      const signal = jsonlPath ? claudeSessionSignal(jsonlPath) : { title: '', summary: '' };
-      const title = (signal.title && tidy(signal.title)) || `claude session ${taskId.slice(0, 12)}`;
+      const signal = jsonlPath
+        ? claudeSessionSignal(jsonlPath)
+        : { title: '', summary: '', intents: [], actions: [], turns: 0 };
+      // Prefer an LLM-generated title (summarizes the session's work from its
+      // requests + tool actions), cached + self-refreshing; fall back to the raw
+      // first-prose-line heuristic, then the session id, when the proxy/LLM is down.
+      const llmTitle = await llmSessionTitle(dbPath, taskId, log, {
+        userMsgs: signal.intents, actions: signal.actions, turns: signal.turns,
+      });
+      const title = llmTitle
+        || (signal.title && tidy(signal.title))
+        || `claude session ${taskId.slice(0, 12)}`;
       const started = new Date(Date.parse(s.first_ts) || now).toISOString();
       const ended = new Date(lastMs).toISOString();
       const model = canonical?.model || 'unknown';
