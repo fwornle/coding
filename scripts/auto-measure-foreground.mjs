@@ -688,9 +688,13 @@ async function main() {
       await new Promise((res) => setTimeout(res, INTERVAL_S * 1000));
     }
   } else {
-    await onePass(dbPath);
-    try { await copilotPass(); } catch (e) { log(`copilot pass error: ${e.message}`); }
-    try { await claudePass(); } catch (e) { log(`claude pass error: ${e.message}`); }
+    // --claude-only: run just the claude pass (e.g. `--backfill --claude-only` to
+    // re-title stale claude runs without re-processing every opencode/copilot session).
+    if (!HAS('--claude-only')) {
+      await onePass(dbPath);
+      try { await copilotPass(); } catch (e) { log(`copilot pass error: ${e.message}`); }
+    }
+    try { await claudePass(dbPath); } catch (e) { log(`claude pass error: ${e.message}`); }
   }
 }
 
