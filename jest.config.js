@@ -33,7 +33,12 @@ export default {
   },
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/integrations/'
+    '/integrations/',
+    // Leftover experiment sandbox worktrees carry a FULL repo snapshot (incl. tests
+    // + an old health-coordinator.js). Without this, jest matches N stale copies of
+    // every test and reports failures against frozen code we never edit.
+    '/\\.data/run-restores/',
+    '/\\.claude/worktrees/'
   ],
   extensionsToTreatAsEsm: ['.ts']
 };

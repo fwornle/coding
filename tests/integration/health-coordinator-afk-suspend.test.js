@@ -72,16 +72,23 @@ describe('health-coordinator — AFK full-suspend contract', () => {
     expect(flat).toMatch(/currentState\.user_active = _userActive/);
   });
 
-  test('presence is derived from transcript mtime, not the always-fresh ETM lastBeat (protects a40052b7a)', () => {
-    // userActiveNow() must read the transcript file's mtime as the activity
-    // clock. lastBeat tracks daemon liveness and made the gate always-true.
-    const fn = src.slice(src.indexOf('function userActiveNow()'));
+  test('presence is derived from real activity clocks, not the always-fresh ETM lastBeat (protects a40052b7a)', () => {
+    // The activity clock lives in codingSessionFresh() (called by userActiveNow()).
+    // It must read (a) the transcript file mtime and (b) the ETM content-activity ts
+    // — both genuine "work happened" signals. The always-fresh daemon heartbeat
+    // (entry.lastBeat) may appear ONLY as the narrow URI-transcript fallback (guarded
+    // by mt === 0), never as the primary clock — that was the always-true bug.
+    const fn = src.slice(src.indexOf('function codingSessionFresh()'));
     const body = fn.slice(0, fn.indexOf('\n}\n') + 2);
-    // Strip `//` line comments — the body intentionally NAMES lastBeat in a
-    // warning comment ("do NOT key idle-detection off entry.lastBeat"); we only
-    // care that no live code reads it.
+    // Strip `//` line comments — the body NAMES lastBeat in prose; only live code counts.
     const code = body.replace(/\/\/[^\n]*/g, '');
-    expect(code).toMatch(/statSync\([^)]*transcriptPath[^)]*\)\.mtimeMs/);
-    expect(code).not.toMatch(/entry\.lastBeat/);
+    // (a) transcript file mtime is still a governing activity clock (reads the
+    //     transcript path and stats its mtime)
+    expect(code).toMatch(/entry\.transcriptPath/);
+    expect(code).toMatch(/statSync\([^)]*\)\.mtimeMs/);
+    // (b) the non-flapping ETM content-activity ts is the primary signal (probe-cadence fix)
+    expect(code).toMatch(/lastContentActivityTs/);
+    // lastBeat only in the guarded mt===0 URI fallback — not the primary always-fresh clock
+    expect(code).toMatch(/mt === 0 && typeof entry\.lastBeat/);
   });
 });

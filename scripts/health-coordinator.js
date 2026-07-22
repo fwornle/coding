@@ -534,6 +534,17 @@ const PROXY_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000;
 // ETM-heartbeat promotion in combined-status-line.js (~line 1019).
 const USER_ACTIVE_HEARTBEAT_MAX_AGE_MS = 5 * 60_000;
 
+// Non-flapping presence window (2026-07-22): the sparse hourly-bucketed specstory
+// .md mtime ages past the 5-min transcript window MID-TURN during a long agent turn,
+// so codingSessionFresh() flapped false → user_active SUSPENDED → the synthetic proxy
+// probe fired in bursty clusters instead of the intended steady 60s cadence. The ETM's
+// lastContentActivityTs is set ONLY on OBSERVED transcript growth (message-count / file
+// size increase) — never on spawn, heartbeat, or laptop wake — so it is a genuine
+// "actively working right now" clock immune to the mtime lag, WITHOUT reintroducing the
+// always-fresh-heartbeat bug (a40052b7a). A slightly longer window than the mtime path,
+// bounded on darwin by the 10-min HID gate in userActiveNow() (no overnight burn).
+const USER_ACTIVE_CONTENT_MAX_AGE_MS = 15 * 60_000;
+
 // Physical-presence gate (2026-07-11): the transcript-mtime signal alone is not
 // sufficient proof a HUMAN is here. A scheduled task, a /loop, or any background
 // agent write keeps a session .jsonl fresh with nobody at the keyboard, so
@@ -602,7 +613,18 @@ function codingSessionFresh() {
   const now = Date.now();
   for (const entry of Object.values(currentState.lsl || {})) {
     if (!entry || entry.status === 'stopped') continue;
-    // Freshness timestamp: prefer the transcript file mtime (Claude Code writes real
+    // (1) Non-flapping primary signal: the ETM's real content-activity clock, set
+    // ONLY on observed transcript growth (NOT spawn/heartbeat/wake). A long agent
+    // turn keeps this fresh even while the sparse specstory .md mtime lags past the
+    // 5-min window — which is exactly what made user_active flap and the probe burst.
+    // Distinct from the always-fresh entry.lastBeat (a40052b7a), so no overnight-burn
+    // regression; darwin's 10-min HID gate still bounds the effective window.
+    if (typeof entry.lastContentActivityTs === 'number'
+      && entry.lastContentActivityTs > 0
+      && (now - entry.lastContentActivityTs) < USER_ACTIVE_CONTENT_MAX_AGE_MS) {
+      return true;
+    }
+    // (2) Fallback freshness timestamp: prefer the transcript file mtime (Claude Code writes real
     // .specstory/*.md files). Agents whose transcriptPath is a URI rather than a file
     // path (e.g. opencode's "opencode://ses_..." handle) cannot be statted — fs.statSync
     // throws → mt=0 → the session looked permanently stale, so user_active stayed false
