@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { ArrowDown, ArrowUp, GitCompare, X } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import {
+  AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp,
+  GitBranch, GitCompare, HelpCircle, X,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -372,6 +375,136 @@ function OriginGroupCard({
   )
 }
 
+// ── in-context help: what an avenue is, what each column means, how to prune ──
+// Collapsible so it stays out of the way once learned, but is always one click away
+// at the top of the tab (renders above both the empty state and the ranked groups).
+
+function HelpTerm({ children }: { children: ReactNode }) {
+  return <span className="font-medium text-foreground">{children}</span>
+}
+
+function AvenueHelp() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Card data-testid="avenue-help">
+      <CardHeader className="py-3">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 text-left"
+          aria-expanded={open}
+          aria-controls="avenue-help-body"
+          data-testid="avenue-help-toggle"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+            <HelpCircle className="size-4" />
+            What is an avenue? How do I read this table and prune avenues?
+          </CardTitle>
+          {open ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+        </button>
+      </CardHeader>
+
+      {open && (
+        <CardContent id="avenue-help-body" className="space-y-4 text-sm text-muted-foreground">
+          <p>
+            An <HelpTerm>avenue</HelpTerm> is one variant of the same starting prompt, run on its own
+            isolated git branch (<span className="font-mono">avenue/&lt;task-id&gt;</span>, backed by a git
+            worktree). Forking a span into avenues runs that prompt across different{' '}
+            <HelpTerm>agents, models, frameworks</HelpTerm>, or with knowledge injection on vs off — so you
+            can compare the results side by side without any variant touching <span className="font-mono">main</span>.
+            Every avenue of one origin span is grouped into a single ranked table below.
+          </p>
+
+          <div>
+            <p className="mb-1 font-medium text-foreground">Columns</p>
+            <dl className="space-y-1.5">
+              <div>
+                <dt className="inline font-medium text-foreground">Avenue — </dt>
+                <dd className="inline">the variant's task id and its <span className="font-mono">agent · model · framework</span>.</dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-foreground">Outcome — </dt>
+                <dd className="inline">
+                  goal-achievement score (0–1, higher is better), read verbatim from the run's measurement
+                  (an operator-corrected score wins over the auto-judged one). This is the default sort,
+                  best first.
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-foreground">Tokens — </dt>
+                <dd className="inline">total tokens the avenue consumed (K/M abbreviated). Lower is cheaper.</dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-foreground">Route — </dt>
+                <dd className="inline">
+                  route efficiency: the number of agent loop iterations taken to reach the result.
+                  Lower is better (fewer detours).
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-foreground">Wall-clock — </dt>
+                <dd className="inline">wall-clock seconds per step. Lower is faster.</dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-foreground">Merge — </dt>
+                <dd className="inline">
+                  the branch's git status versus <span className="font-mono">main</span> (computed host-side;
+                  hover the badge for <span className="font-mono">ahead / behind / conflicting files</span>):
+                </dd>
+              </div>
+            </dl>
+            <ul className="ml-4 mt-1.5 space-y-1">
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 inline-flex items-center gap-1 whitespace-nowrap text-status-success"><Check className="size-3.5" /> merged</span>
+                <span>— already merged into <span className="font-mono">main</span>.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 inline-flex items-center gap-1 whitespace-nowrap text-muted-foreground"><GitBranch className="size-3.5" /> unmerged</span>
+                <span>— ahead of <span className="font-mono">main</span> and not yet merged, but with no conflicts (safe to promote).</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 inline-flex items-center gap-1 whitespace-nowrap text-status-warning"><AlertTriangle className="size-3.5" /> conflicts</span>
+                <span>— overlapping edits with <span className="font-mono">main</span> block a clean merge; <HelpTerm>Promote is disabled</HelpTerm> until they are resolved on the branch.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 whitespace-nowrap italic">no badge</span>
+                <span>— the branch was pruned or never created; a merge state is never fabricated.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="mb-1 font-medium text-foreground">Working with avenues</p>
+            <ul className="ml-4 list-disc space-y-1">
+              <li>
+                <HelpTerm>Compare</HelpTerm> — tick two rows, then <span className="font-mono">Compare selected (2)</span> opens
+                them side by side in the Compare tab.
+              </li>
+              <li>
+                <HelpTerm>Promote to main</HelpTerm> — merges the winning avenue's code changes into{' '}
+                <span className="font-mono">main</span>. Blocked while the Merge column shows conflicts —
+                resolve them on the branch first, then promote.
+              </li>
+              <li>
+                <HelpTerm>Prune</HelpTerm> — deletes the avenue's git branch/worktree once you are done with it.
+                Your <HelpTerm>measurement data stays</HelpTerm> in <span className="font-mono">.data</span> (only the
+                branch is removed), but the deletion cannot be undone. After you pick and promote a winner,
+                prune the losing avenues to keep the workspace clean.
+              </li>
+            </ul>
+          </div>
+
+          <p className="text-xs">
+            A <span className="font-mono">—</span> in any cell means <HelpTerm>not measured</HelpTerm>, never
+            zero; unmeasured avenues always sort last so they never outrank a real low score.
+          </p>
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
 // ── the panel: one Card per origin group, or the empty state ──
 
 export function AvenuePanel({ onCompare }: { onCompare?: () => void }) {
@@ -379,22 +512,26 @@ export function AvenuePanel({ onCompare }: { onCompare?: () => void }) {
 
   if (groups.length === 0) {
     return (
-      <Card data-testid="avenue-panel-empty">
-        <CardHeader>
-          <CardTitle className="text-base">No avenues yet</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            This span hasn't been forked. Use "Fork into avenues" to run the same prompt across
-            agents, models, frameworks, or with knowledge injection on vs off.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6" data-testid="avenue-panel-empty">
+        <AvenueHelp />
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">No avenues yet</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              This span hasn't been forked. Use "Fork into avenues" to run the same prompt across
+              agents, models, frameworks, or with knowledge injection on vs off.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   return (
     <div className="space-y-6" data-testid="avenue-panel">
+      <AvenueHelp />
       {groups.map((g) => (
         <OriginGroupCard
           key={g.originSpanId}
