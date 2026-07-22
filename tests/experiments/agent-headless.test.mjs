@@ -22,6 +22,7 @@ import {
   argvForAgent,
   resolveAgentBinary,
   probeCopilotHeadless,
+  preflightAgent,
 } from '../../lib/experiments/agent-headless.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -154,4 +155,92 @@ test('probe argv is exactly [-p, <trivial prompt>, --allow-all-tools] — fixed 
   // bounded timeout so a hung probe cannot block the matrix (T-78-02-03)
   assert.equal(typeof seen.opts.timeout, 'number');
   assert.ok(seen.opts.timeout > 0);
+});
+
+// --- Task 1 (Phase 88-02): preflightAgent (PREFLIGHT-01 / SUPPRESS-01) --------------
+// A bounded, fail-soft POST /api/complete round-trip that validates the proxy is reachable
+// AND the RESOLVED model round-trips one token against the agent's target provider — with NO
+// agent CLI session (so it creates no experiment Run and no ambient pass; its token_usage row
+// lands process='experiment-preflight', task_id=''). The fetchImpl seam is injected so no live
+// proxy is contacted here (live-proven 2026-07-22: copilot/auto→HTTP 500; copilot/claude-haiku-4-5→200).
+
+// A 200 stub that CAPTURES the posted url/body for assertions.
+function okFetch(capture) {
+  return async (url, opts) => {
+    capture.url = url;
+    capture.opts = opts;
+    capture.body = JSON.parse(opts.body);
+    return { status: 200, ok: true, json: async () => ({ content: 'OK', tokens: { total: 18 } }) };
+  };
+}
+// A 500 stub — the exact original copilot `auto` failure (live-proven).
+const fetch500 = async () => ({ status: 500, ok: false, json: async () => ({ error: 'model not supported' }) });
+// A rejecting stub — the network-unreachable / abort shape.
+const fetchReject = async () => { throw new Error('ECONNREFUSED'); };
+
+test('preflightAgent(copilot, resolved model) → ok on HTTP 200 with provider:copilot', async () => {
+  const cap = {};
+  const res = await preflightAgent('copilot', { model: 'claude-haiku-4-5', fetchImpl: okFetch(cap) });
+  assert.deepEqual(res, { ok: true });
+  assert.equal(cap.body.provider, 'copilot');
+  assert.equal(cap.body.model, 'claude-haiku-4-5');
+  assert.match(cap.url, /\/api\/complete$/, 'the round-trip target is /api/complete (NOT an agent CLI spawn)');
+});
+
+test('preflightAgent(copilot, auto) → not-ok with a diagnosable HTTP-500 reason', async () => {
+  const res = await preflightAgent('copilot', { model: 'auto', fetchImpl: fetch500 });
+  assert.equal(res.ok, false);
+  assert.equal(res.reason, 'preflight:copilot-model-or-route (HTTP 500)');
+});
+
+test('preflightAgent(opencode) strips the rapid-proxy/ prefix and sends NO provider (auto-route)', async () => {
+  const cap = {};
+  const res = await preflightAgent('opencode', { model: 'rapid-proxy/claude-haiku-4.5', fetchImpl: okFetch(cap) });
+  assert.deepEqual(res, { ok: true });
+  assert.equal(cap.body.model, 'claude-haiku-4.5', 'prefix stripped to the bare catalog id');
+  assert.ok(!('provider' in cap.body), 'opencode sends NO provider → the proxy auto-routes');
+});
+
+test('preflightAgent(claude) sends provider claude-code with the resolved model', async () => {
+  const cap = {};
+  const res = await preflightAgent('claude', { model: 'sonnet', fetchImpl: okFetch(cap) });
+  assert.deepEqual(res, { ok: true });
+  assert.equal(cap.body.provider, 'claude-code');
+  assert.equal(cap.body.model, 'sonnet');
+});
+
+test('preflightAgent NEVER throws: a rejecting fetch → not-ok unreachable', async () => {
+  let res;
+  await assert.doesNotReject(async () => { res = await preflightAgent('copilot', { model: 'x', fetchImpl: fetchReject }); });
+  assert.equal(res.ok, false);
+  assert.equal(res.reason, 'preflight:copilot-unreachable');
+});
+
+test('preflightAgent posts process=experiment-preflight and NO task_id (neutral row → excluded from Runs)', async () => {
+  const cap = {};
+  await preflightAgent('claude', { model: 'sonnet', fetchImpl: okFetch(cap) });
+  assert.equal(cap.body.process, 'experiment-preflight');
+  assert.ok(!('task_id' in cap.body), 'no task_id → the row is neutral, excluded from Runs by construction');
+  assert.equal(cap.opts.method, 'POST');
+  assert.equal(cap.opts.headers['content-type'], 'application/json');
+});
+
+test('preflightAgent is bounded by an AbortController armed at timeoutMs (a hung round-trip skips, never hangs)', async () => {
+  // A fetch that respects the abort signal: never resolves on its own, rejects when aborted.
+  const abortableFetch = (_url, opts) => new Promise((_resolve, reject) => {
+    opts.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+  });
+  const res = await preflightAgent('copilot', { model: 'x', fetchImpl: abortableFetch, timeoutMs: 20 });
+  assert.equal(res.ok, false);
+  assert.match(res.reason, /unreachable/);
+});
+
+test('preflightAgent(mastracode) is out of the 3-agent scope → ok without any round-trip', async () => {
+  let called = false;
+  const res = await preflightAgent('mastracode', {
+    model: 'x',
+    fetchImpl: async () => { called = true; return { status: 200 }; },
+  });
+  assert.deepEqual(res, { ok: true });
+  assert.equal(called, false, 'no /api/complete call for an out-of-scope agent');
 });
