@@ -497,9 +497,9 @@ Plans:
 **Goal:** A multi-agent `/experiment` run produces a genuine N-way comparison — each cell invokes its agent through the SAME proxy-routing/env/model seam as `bin/coding --<agent>`, a per-agent pre-flight gate records a clean skip:<reason> up front instead of a mid-run abort, and the copilot drivability probe + ambient sessions do not pollute the Runs view.
 **Requirements**: ALIGN-01, PREFLIGHT-01, SUPPRESS-01, REVERIFY-01
 **Depends on:** Phase 87
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 88-01-PLAN.md — Agent-invocation alignment: one source of truth for per-agent routing env + model resolution (fixes opencode rapid-proxy model-not-found + copilot auto 500)
 - [x] 88-02-PLAN.md — Per-agent pre-flight validation gate (bounded, fail-soft, non-measured) then clean recorded skip; probe/ambient suppression
-- [ ] 88-03-PLAN.md — Unattended real 3-agent re-run proving every cell executes (non-zero tokens) or clean-skips, confirmed e2e in the dashboard
+- [x] 88-03-PLAN.md — Unattended real 3-agent re-run proving every cell executes (non-zero tokens) or clean-skips, confirmed e2e in the dashboard
