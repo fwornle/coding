@@ -158,9 +158,14 @@ async function main() {
     // orchestrator does — otherwise recompute would re-null Claude/Copilot runs
     // (the default locator is a stub awaiting a seam; build-trace.mjs).
     const normAgent = normalizeAgent({ agent: tags.agent, model: tags.model });
+    // Forward the cell's sandbox worktree (span.meta.cwd) as repoRoot so the Claude
+    // locator finds the headless transcript under the worktree-encoded projects dir,
+    // not the main repo (the transcript persists in ~/.claude/projects even after the
+    // worktree is removed). Absent → locator falls back to CODING_REPO/cwd.
+    const cellCwd = span?.meta?.cwd;
     const trace = await buildNormalizedTrace(span, {
       dominantAgent: normAgent,
-      __seam: buildTraceSeam(normAgent, span),
+      __seam: buildTraceSeam(normAgent, span, cellCwd ? { repoRoot: cellCwd } : {}),
     });
     const heuristics = trace ? computeHeuristics(trace) : ALL_NULL_HEURISTICS;
 

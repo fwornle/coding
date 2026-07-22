@@ -72,7 +72,7 @@ import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-r
 // writeScore materializes the Score + scored edge (73-02); filterConsequential/
 // isTrivialRun (73-01) drive the D-04 trivial-run short-circuit (no proxy paid).
 import { gatherEvidence, deriveNonGsdRubric, gateFromEvidence } from '../lib/experiments/evidence-harness.mjs';
-import { runJudge } from '../lib/experiments/judge.mjs';
+import { runJudge, nullJudgment } from '../lib/experiments/judge.mjs';
 import { writeScore } from '../lib/experiments/score-write.mjs';
 import { filterConsequential, isTrivialRun } from '../lib/experiments/consequential-events.mjs';
 // Phase 67-07 (REPRO-01/02): archive the span's fixtures into the RunSnapshot at
@@ -826,10 +826,16 @@ async function main() {
   //   trace already degrades to null inside the readers, so the close still completes.
   //   Claude/Copilot need the close orchestrator to resolve the per-run session file
   //   and inject it via the seam (build-trace.mjs's default locator is a stub by
-  //   design); buildTraceSeam supplies a time-window-based Claude locator.
+  //   design); buildTraceSeam supplies time-window-based Claude + Copilot locators.
+  //   For a cross-agent experiment cell the agent runs headless inside an isolated
+  //   sandbox worktree, so its transcript lives under span.meta.cwd (encoded), NOT the
+  //   main repo — forward that as repoRoot exactly as the token path already does
+  //   (stop-adapter-registry.mjs). When absent (ambient runs), the locator falls back
+  //   to CODING_REPO/cwd, preserving prior behavior.
+  const cellCwd = span?.meta?.cwd;
   const trace = await buildNormalizedTrace(span, {
     dominantAgent: canonicalAgent,
-    __seam: buildTraceSeam(canonicalAgent, span),
+    __seam: buildTraceSeam(canonicalAgent, span, cellCwd ? { repoRoot: cellCwd } : {}),
   });
   const heuristics = trace ? computeHeuristics(trace) : ALL_NULL_HEURISTICS;
 
@@ -846,11 +852,26 @@ async function main() {
     //   quarantines to { ...nulls, pending:true } and NEVER throws (73-04), and
     //   writeScore is a local store write — so the close can NOT hard-block on a
     //   slow/unreachable proxy (T-73-06-BLOCK / the "never hard-block" contract).
-    const evidence = gatherEvidence({ span, phaseArg, repoRoot: REPO_ROOT });
+    //   Evidence (diff/test) must come from the SAME tree the cell edited. A
+    //   cross-agent cell edits its sandbox worktree (span.meta.cwd), not the main
+    //   repo, so scoping gatherEvidence to REPO_ROOT would yield an empty diffStat.
+    //   Use the worktree when it still exists (present at inline stop-time; may be
+    //   gone at backfill → fall back to REPO_ROOT).
+    const evidenceRepoRoot = (cellCwd && fs.existsSync(cellCwd)) ? cellCwd : REPO_ROOT;
+    const evidence = gatherEvidence({ span, phaseArg, repoRoot: evidenceRepoRoot });
     const consequential = trace ? filterConsequential(trace) : [];
-    judgment = isTrivialRun(trace)
-      ? { not_scored: 'trivial' } // D-04 trivial-run guard — proxy NEVER called
-      : await runJudge({ span, trace: consequential, evidence });
+    //   Tri-state (build-trace.mjs D-02): trace===null means no trace FILE was located
+    //   (e.g. locator could not find the sandbox session) — this is NOT a genuine
+    //   trivial run and must NOT suppress the judge forever. Quarantine as pending so
+    //   experiments-recompute-score can re-judge once the trace becomes locatable. A
+    //   located-but-empty trace ([]) is a real trivial run (agent did <1 acting event).
+    if (trace === null) {
+      judgment = nullJudgment({ pending: true }); // locator miss → re-scorable, not trivial
+    } else if (isTrivialRun(trace)) {
+      judgment = { not_scored: 'trivial' }; // D-04 trivial-run guard — proxy NEVER called
+    } else {
+      judgment = await runJudge({ span, trace: consequential, evidence });
+    }
     // ── (4.6) VALID-03 (76-03, D-08): overlay the deterministic non-GSD dims onto
     //   the judgment — gap-fill ONLY. For code_quality/test_coverage/regressions,
     //   fill the judged value from the harness-derived signal WHEN the judged value

@@ -15,6 +15,7 @@ import path from 'node:path';
 import {
   normalizeAgent,
   locateClaudeSessionForSpan,
+  locateCopilotSessionForSpan,
   buildTraceSeam,
 } from '../../lib/experiments/route-trace-resolve.mjs';
 
@@ -103,12 +104,74 @@ describe('locateClaudeSessionForSpan', () => {
   });
 });
 
+describe('locateCopilotSessionForSpan', () => {
+  // Copilot writes ~/.copilot/session-state/<uuid>/events.jsonl — uuid-keyed dirs,
+  // NOT cwd-scoped, so selection is purely by the span time-window.
+  function seedState() {
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'cp-state-'));
+  }
+  function seedSession(stateDir, uuid, mtimeSec) {
+    const dir = path.join(stateDir, uuid);
+    fs.mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, 'events.jsonl');
+    fs.writeFileSync(p, '{}\n');
+    fs.utimesSync(p, mtimeSec, mtimeSec);
+    return p;
+  }
+
+  test('returns the most-recently-written session overlapping the window', () => {
+    const stateDir = seedState();
+    const base = Date.parse('2026-06-28T12:00:00.000Z') / 1000;
+    const older = seedSession(stateDir, 'aaaaaaaa-1111-2222-3333-444444444444', base);
+    const newer = seedSession(stateDir, 'bbbbbbbb-5555-6666-7777-888888888888', base + 60);
+    const span = { started_at: '2026-06-28T12:00:30.000Z', ended_at: '2026-06-28T12:01:30.000Z' };
+    assert.equal(locateCopilotSessionForSpan(span, { copilotStateDir: stateDir }), newer);
+  });
+
+  test('drops sessions written well before the run started → null', () => {
+    const stateDir = seedState();
+    const old = Date.parse('2026-06-28T10:00:00.000Z') / 1000;
+    seedSession(stateDir, 'cccccccc-9999-0000-1111-222222222222', old);
+    const span = { started_at: '2026-06-28T12:00:00.000Z', ended_at: '2026-06-28T12:05:00.000Z' };
+    assert.equal(locateCopilotSessionForSpan(span, { copilotStateDir: stateDir }), null);
+  });
+
+  test('drops sessions written well after the run ended → null', () => {
+    const stateDir = seedState();
+    const later = Date.parse('2026-06-28T14:00:00.000Z') / 1000;
+    seedSession(stateDir, 'dddddddd-3333-4444-5555-666666666666', later);
+    const span = { started_at: '2026-06-28T12:00:00.000Z', ended_at: '2026-06-28T12:05:00.000Z' };
+    assert.equal(locateCopilotSessionForSpan(span, { copilotStateDir: stateDir }), null);
+  });
+
+  test('absent session-state dir → null (honest no-trace)', () => {
+    assert.equal(
+      locateCopilotSessionForSpan(
+        { started_at: '2026-06-28T12:00:00Z', ended_at: '2026-06-28T12:01:00Z' },
+        { copilotStateDir: '/no/such/dir' },
+      ),
+      null,
+    );
+  });
+});
+
 describe('buildTraceSeam', () => {
-  test('claude → seam with a locate.claude function; others → undefined', () => {
+  test('claude → seam with a locate.claude function', () => {
     const span = { started_at: '2026-06-28T12:00:00Z', ended_at: '2026-06-28T12:01:00Z' };
     const seam = buildTraceSeam('claude', span, { projectsDir: '/no/such', repoRoot: '/x' });
     assert.equal(typeof seam.locate.claude, 'function');
     assert.equal(seam.locate.claude(), null); // resolves through the locator (no dir → null)
+  });
+
+  test('copilot → seam with a locate.copilot function', () => {
+    const span = { started_at: '2026-06-28T12:00:00Z', ended_at: '2026-06-28T12:01:00Z' };
+    const seam = buildTraceSeam('copilot', span, { copilotStateDir: '/no/such' });
+    assert.equal(typeof seam.locate.copilot, 'function');
+    assert.equal(seam.locate.copilot(), null); // resolves through the locator (no dir → null)
+  });
+
+  test('opencode / null → undefined (default DB locator / no seam)', () => {
+    const span = { started_at: '2026-06-28T12:00:00Z', ended_at: '2026-06-28T12:01:00Z' };
     assert.equal(buildTraceSeam('opencode', span), undefined);
     assert.equal(buildTraceSeam(null, span), undefined);
   });

@@ -47,7 +47,7 @@ import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-r
 //   writeScore materializes the Score + scored edge, preserving corrected_* (73-02);
 //   isTrivialRun (73-01) short-circuits trivial runs before the proxy is paid.
 import { gatherEvidence, deriveNonGsdRubric } from '../lib/experiments/evidence-harness.mjs';
-import { runJudge } from '../lib/experiments/judge.mjs';
+import { runJudge, nullJudgment } from '../lib/experiments/judge.mjs';
 import { writeScore } from '../lib/experiments/score-write.mjs';
 import { isTrivialRun, filterConsequential } from '../lib/experiments/consequential-events.mjs';
 
@@ -141,21 +141,33 @@ async function main() {
     // orchestrator does — otherwise recompute would re-null Claude/Copilot runs (the
     // default locator is a stub awaiting a seam; build-trace.mjs). MUST copy verbatim.
     const normAgent = normalizeAgent({ agent: m.agent ?? null, model: m.model ?? null });
+    // Forward the cell's sandbox worktree (span.meta.cwd) as repoRoot so the Claude/
+    // Copilot locators find the headless transcript (persists in ~/.claude/projects
+    // and ~/.copilot/session-state even after the worktree is removed). Absent →
+    // locator falls back to CODING_REPO/cwd.
+    const cellCwd = span?.meta?.cwd;
     const trace = await buildNormalizedTrace(span, {
       dominantAgent: normAgent,
-      __seam: buildTraceSeam(normAgent, span),
+      __seam: buildTraceSeam(normAgent, span, cellCwd ? { repoRoot: cellCwd } : {}),
     });
 
     // Gather deterministic on-disk evidence (73-03). phaseArg is best-effort from the
     // span/run metadata; null degrades each evidence slot to null (diffStat still read).
+    // Prefer the cell's worktree when it still exists (usually gone at backfill → fall
+    // back to REPO_ROOT); diff evidence is best-effort here, the trace judge is primary.
     const phaseArg = span.meta?.phase ?? m.phase ?? null;
-    const evidence = gatherEvidence({ span, phaseArg, repoRoot: REPO_ROOT });
+    const evidenceRepoRoot = (cellCwd && fs.existsSync(cellCwd)) ? cellCwd : REPO_ROOT;
+    const evidence = gatherEvidence({ span, phaseArg, repoRoot: evidenceRepoRoot });
 
-    // Judge the rebuilt trace — D-04 trivial-run guard short-circuits the proxy; else
-    // runJudge does the ONE Haiku call and internally quarantines to pending (D-03).
-    const judgment = isTrivialRun(trace)
-      ? { not_scored: 'trivial' }
-      : await runJudge({ span, trace: filterConsequential(trace), evidence });
+    // Judge the rebuilt trace. Tri-state (D-02): trace===null means no trace FILE was
+    // located → quarantine as pending (re-scorable next recompute), NOT trivial. A
+    // located-but-empty [] is a genuine trivial run. Else runJudge does the ONE Haiku
+    // call and internally quarantines to pending (D-03).
+    const judgment = trace === null
+      ? nullJudgment({ pending: true })
+      : (isTrivialRun(trace)
+        ? { not_scored: 'trivial' }
+        : await runJudge({ span, trace: filterConsequential(trace), evidence }));
 
     // VALID-03 (76-03, D-08): overlay the deterministic non-GSD dims onto the
     // judgment (gap-fill only — never clobber a judged dim, skip trivial runs), so
