@@ -4,13 +4,13 @@ milestone: v7.3
 milestone_name: Cross-Agent Comparison Experiment Runner
 status: executing
 stopped_at: Completed 88-01-PLAN.md
-last_updated: "2026-07-22T05:42:41.786Z"
+last_updated: "2026-07-22T05:53:34.384Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 58
   completed_phases: 51
   total_plans: 296
-  completed_plans: 296
+  completed_plans: 297
   percent: 88
 ---
 
@@ -54,7 +54,7 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 ## Current Position
 
 Phase: 88 (experiment-harness-agent-invocation-alignment-and-pre-flight) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-07-22
 
@@ -301,6 +301,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [86-02]: band primitives (scaledBand/SEGMENTS/scrubSecrets/CACHE_WRITE_NA + Segment) exported additively from context-cache-explainer.tsx (zero behavior change); context-band.tsx imports them (one taxonomy, D-05). Cache-read = hatched CSS repeating-linear-gradient overlay, no recharts/SVG; cache_write===null -> verbatim CACHE_WRITE_NA, never ??0.
 - [Phase ?]: [86-04]: DifferenceViewer consumes the pure Wave-1 seams (alignRuns/loopFlags) with zero re-implementation; per-aligned-pair cumulative token delta B-A accretes down the tail, decrease->text-status-success (Q5); canonical_model verbatim, null->unmeasured (ATTR-02, never recomputed); lightweight inline TurnCell avoids a Plan-03 file dependency.
 - [Phase 88-01]: agent-routing.mjs is the single source of truth for experiment-cell launch-model resolution + the per-agent proxy-routing env map. resolveCellModel fixes opencode dash->dot (rapid-proxy/claude-haiku-4-5 -> 4.5, prefix kept; real provider, not a swap) and copilot auto->COPILOT_MEASURED_DEFAULT_MODEL. configureProxyRoutingEnv delegates its env map to buildAgentRoutingEnv; runCell resolves the launch model once and passes it to both argvForAgent + configureRouting while task_id/variant/start --model stay on the ORIGINAL model (D-05). The shell copilot default is sourced from the JS helper fail-soft.
+- [Phase ?]: 88-02: Per-agent pre-flight is a session-free POST /api/complete round-trip (not an agent CLI spawn); its neutral token_usage row is excluded from Runs and ambient passes by construction. No EXPERIMENT_PREFLIGHT sentinel. Failure records a clean skip via the RUN-04 writeSkipRun path; leaky copilot -p probe gate removed.
 
 ### Blockers/Concerns
 
@@ -411,10 +412,11 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 86 P02 | 6 | 2 tasks | 3 files |
 | Phase 86 P04 | 2 | 2 tasks | 2 files |
 | Phase 88 P01 | 18 min | 3 tasks | 6 files |
+| Phase 88 P02 | 8 min | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-07-22T05:42:41.774Z
+Last session: 2026-07-22T05:53:04.379Z
 Stopped at: Completed 88-01-PLAN.md
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
