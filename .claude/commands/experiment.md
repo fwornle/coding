@@ -17,9 +17,11 @@ dashboard Comparison tab reads live).
   The skill synthesizes the spec, **shows you a preview + drafted test, and asks you to confirm** before spending tokens.
 - **Structured flags (power users):** `/experiment run --goal "…" --variants A,B --agents claude,opencode --repeats N`.
 
-**This skill is a THIN wrapper (D-09).** It shells to the two existing CLIs and
-reimplements NO runner or comparison logic:
+**This skill is a THIN wrapper (D-09).** It shells to three existing CLIs and
+reimplements NO runner, serialization, or comparison logic:
 
+- `scripts/experiment-write-spec.mjs` — builds, validates, and persists the spec YAML to
+  `config/experiments/gen-<id>.yaml` (so it lists in the dashboard Launch listbox + is re-launchable).
 - `scripts/experiment-run.mjs` — runs the matrix (spec-file driven; RUN-02/03/04, Phase 78).
 - `scripts/experiments-compare.mjs` — aggregates + ranks the Runs and writes the report JSON.
 
@@ -164,25 +166,34 @@ discipline.
 natural-language mode these were already operator-confirmed in the Step 0-NL gate, so write the spec
 without re-asking.
 
-Write a spec to `config/experiments/<derived-id>.yaml` (derive `<derived-id>` from a path-safe
-allowlist — `[A-Za-z0-9._-]` only — so no operator string can traverse out of `config/experiments/`;
-T-80-02-02). Mirror the fully-populated `config/experiments/compare-fizzbuzz.yaml` shape:
+**Persist the spec via the code serializer — do NOT hand-author the YAML.** Call
+`scripts/experiment-write-spec.mjs`, which BUILDS the spec, VALIDATES it through the SAME
+`resolveExperimentSpec` the dashboard listbox (`handleSpecList`) and launch gate
+(`handleExperimentRun`) use, and WRITES it to `config/experiments/gen-<experiment_id>.yaml`
+(path-safe via `sanitizeTaskId`, `gen-` prefix marks it auto-generated so it's distinguishable
+from curated specs in the listbox). This guarantees the experiment appears in the **Launch
+experiment** listbox and is one-click re-launchable — the prior prose-authored YAML had no such
+guarantee. Capture the printed path into `SPEC_FILE`:
 
-```yaml
-version: 1
-experiment_id: <derived, path-safe id>
-snapshot_id: smoke-spec            # RESOLVABLE baseline (from --snapshot-id; default smoke-spec).
-                                   # An absent/unresolvable snapshot → no restore baseline for the cells.
-goal_sentence: "<GOAL_SENTENCE>"   # ← the task_hash source (sha256 of THIS string)
-repeats: <N>
-task_class: new-feature            # MUST be a member of the closed-6 taxonomy (below)
-test_command: "node --test <yourtest>.test.mjs"   # score-time gate, fixed argv, NO shell meta.
-                                   # OMIT this line entirely when TEST_COMMAND is empty (ungated run).
-variants:
-  - { agent: claude,   model: sonnet,                        framework: straight, env: default }
-  - { agent: opencode, model: rapid-proxy/claude-haiku-4-5,  framework: straight, env: default }
-  # one entry per variant (flag pair, or Step 0-NL synthesized variant)
+```bash
+# EXPERIMENT_ID: path-safe [A-Za-z0-9._-] (e.g. "compare-fizzbuzz-v10"). VARIANTS_JSON: one
+# object per cell. --test-command optional (omit for an ungated run). Prints the spec path.
+SPEC_FILE=$(node scripts/experiment-write-spec.mjs \
+  --experiment-id "$EXPERIMENT_ID" \
+  --goal "$GOAL_SENTENCE" \
+  --snapshot-id "${SNAPSHOT_ID:-smoke-spec}" \
+  --task-class "${TASK_CLASS:-new-feature}" \
+  --repeats "${REPEATS:-1}" \
+  ${TEST_COMMAND:+--test-command "$TEST_COMMAND"} \
+  --variants "$VARIANTS_JSON")
+# VARIANTS_JSON example (one entry per variant — flag pair or Step 0-NL synthesized):
+#   [{"agent":"claude","model":"sonnet","framework":"straight","env":"default"},
+#    {"agent":"opencode","model":"rapid-proxy/claude-haiku-4-5","framework":"straight","env":"default"}]
 ```
+
+The serializer **rejects** (non-zero exit, nothing written) an unknown agent, an empty variant
+list, a missing goal, or a non-closed-6 `task_class` — so a broken spec never reaches the run.
+If it exits non-zero, surface the error and stop; do not fall back to hand-writing YAML.
 
 **task_class MUST be a member of the closed-6** (`lib/experiments/taxonomy.mjs` CLOSED_6):
 
@@ -230,7 +241,7 @@ one task_hash. Prefer the direct sha256 — no open store needed.
 ### Step 4: Run the matrix (UNATTENDED)
 
 ```bash
-node scripts/experiment-run.mjs --spec config/experiments/<derived-id>.yaml \
+node scripts/experiment-run.mjs --spec "$SPEC_FILE" \
   --repeats <N> --task-class <class>
 ```
 
