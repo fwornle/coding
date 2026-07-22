@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.5
+milestone: v7.3
 milestone_name: Cross-Agent Comparison Experiment Runner
-status: Awaiting next milestone
-stopped_at: "Phase 78 COMPLETE (RUN-02/03/04 live-verified via 78-05, operator-approved) — ALL v7.5 core reqs satisfied; next: milestone close-out (84 verification doc, sign-offs, complete-milestone)"
-last_updated: "2026-07-13T20:00:29.626Z"
-last_activity: 2026-07-13 — Milestone v7.5 completed and archived
+status: executing
+stopped_at: Completed 88-01-PLAN.md
+last_updated: "2026-07-22T05:42:41.786Z"
+last_activity: 2026-07-22
 progress:
-  total_phases: 21
-  completed_phases: 20
-  total_plans: 109
-  completed_plans: 109
-  percent: 95
+  total_phases: 58
+  completed_phases: 51
+  total_plans: 296
+  completed_plans: 296
+  percent: 88
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** A self-learning coding environment that captures every session, builds knowledge, prevents mistakes, and makes observations browsable -- across all AI coding agents.
-**Current focus:** Phase 80 — experiment-surface-dashboard-skill-packaging
+**Current focus:** Phase 88 — experiment-harness-agent-invocation-alignment-and-pre-flight
 
 **v7.1 milestone status (KM-Core unification — 10 of 10 phases done; one Phase 46 ONBOARDING.md operator UAT remains):**
 
@@ -53,10 +53,10 @@ Phase 50 ships the LSL primitives (`lib/lsl/window.mjs` + `lib/lsl/scan-and-conv
 
 ## Current Position
 
-Phase: Milestone v7.5 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-13 — Milestone v7.5 completed and archived
+Phase: 88 (experiment-harness-agent-invocation-alignment-and-pre-flight) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-07-22
 
 ## Deferred Items
 
@@ -96,6 +96,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 
 ### Roadmap Evolution
 
+- Phase 88 added 2026-07-21: **Experiment Harness — Agent-Invocation Alignment & Pre-flight Gate** (P0). Registered from a dogfood run of `/experiment` (compare-avenues-help-v1: claude/opus vs opencode/haiku vs copilot/auto) that degenerated to a one-horse race. Root causes (evidence in `.logs/experiment-avenues-help.log` + `.data/measurements/compare-avenues-help-v1--*.json`): (a) opencode aborted on `Model not found: rapid-proxy/claude-haiku-4-5` — the headless path (`lib/experiments/agent-headless.mjs` `argvForAgent` → `opencode run … -m <model>`) does NOT apply the OPENCODE_CONFIG splice / `rapid-proxy` provider that `scripts/launch-agent-common.sh` `configure_proxy_routing()` sets, so the model id doesn't resolve; (b) copilot returned `500 ×5` because the headless `-p … --model auto` invocation bypasses the working `COPILOT_PROVIDER_BASE_URL=${base}/v1/copilot/t/${TASK_ID}` BYOK seam + proxy copilot catalog model that `bin/coding --copilot` establishes (copilot proven working live). Fix spine: make each cell reuse the SAME proxy-routing/env/model setup as `bin/coding --<agent>`; add a per-agent pre-flight gate (proxy reachable + model resolves + 1-token round-trip → clean `skipped:<reason>`, not mid-run abort); suppress the copilot drivability probe (`agent-headless.mjs:161`) + ambient interactive rows from the experiment Runs view. P1/P2 follow-ups captured (distinct failed-run state vs quarantine, sandbox `node_modules` for UI build/verify, CLI-vs-UI launch-panel reconciliation, per-variant diff viewer). Run `/gsd-plan-phase 88`.
 - Phases 81–87 added 2026-07-05: **Uniform 4-Agent Measurement Program** extends v7.5 (now Phases 76–87). Deep research (dossier `.planning/research/uniform-measurement-dossier.md` + `.planning/research/proxy-infra-report.md`) established that ALL four agents can be wire-level measured at the proxy: Copilot CLI has a documented BYOK seam (`COPILOT_PROVIDER_BASE_URL` — overturns the 2026-06-04 spike's "no seam" verdict, pending live verification), and claude proxy-routing does NOT corrupt cache accounting (the real defect: `/v1/messages` tap never parses cache usage + first-writer-wins dedup shadows cladpt rows — why experiment cells were unrouted). Phase order: **81 Copilot BYOK spike [GATES 82 copilot scope]** → **82 Wire-Measurement Foundation [KEYSTONE]** (proxy cache columns, tap cache parse, x-task-id/x-agent header binding kills the ambient-span singleton, claude cells re-routed, dedup merge) → 83 Reconciliation (adapters verify/enrich, no double-count) → 84 Per-Turn Context Revelation (full per-request context-turns JSONL + usage pairing + read APIs) → 85 Experiment Control Center (dashboard-triggered runs; parallel with 84) → 86 Timeline v2 + declutter (needs 82+84) → 87 Interactive Spans & Branch Avenues (needs 82+85). User decisions locked: copilot BYOK yes (spike-gated), full per-turn payloads for measured runs (gzipped + retention), GSD execution.
 - v7.5 roadmap created 2026-07-03: **5 phases (76–80)** for the Cross-Agent Comparison Experiment Runner — an orchestration layer on the v7.4 measurement substrate (measurement-start/stop.mjs, task_hash, the experiment km-core KB + experiments-* CLIs, the Performance dashboard tab, proxy routing for all four agents commit 2a23a9a25, the Phase 67 reproducibility-replay rig). 14/14 v7.5 reqs mapped, no orphans. **VALID-before-RUN ordering enforced.** Dependency order: **Phase 76 [PREREQUISITE] Measurement Validity Fixes (VALID-01/02/03)** — corrects the shipped attribution/route/score code diagnosed as O1/O2/O3 in .planning/v7.4-attribution-findings.md (O1 model mis-attribution breaks 'Opus vs Fable'; O3 non-GSD rubric coverage breaks 'straight vs GSD'); extends the Phase-75 canonical-model/lineage work; MUST verify before the runner is trusted -> Phase 77 (Experiment Spec & Per-Variant Snapshot Foundation — SPEC-01/02 declarative validated variant matrix + fail-fast config resolution + RUN-01 per-variant×repeat snapshot restore off the Phase-67 rig) -> Phase 78 (Autonomous Cross-Agent Runner — RUN-02 measured-span agent launch + RUN-03 unattended-to-completion/timeout/abort + RUN-04 Copilot headless-drivability GATED SPIKE, skip-with-reason not silent) -> Phase 79 (Comparison, Aggregation & Report — CMP-01 objective success gate compares only gate-passers + CMP-02 N-repeat central-tendency+variance + CMP-03 ranked side-by-side report keyed by task_hash) -> Phase 80 (Experiment Surface — CMP-04 variant columns in the Performance dashboard tab + ORCH-01 single installed `experiment run` skill across the coding agents). Granularity=standard. Reslot: policy automation/auto-routing + currency conversion moved v7.5->v7.6 (consumes this runner's comparisons). Run `/gsd-plan-phase 76` to break down the prerequisite phase first.
 - Phase 75 added 2026-06-29: **Measurement Attribution Accuracy & Observation Linkage** (ATTR-01/02/03 + OBS-01/02). Registered (not yet planned) from the `exp-dash-start-control` dogfood measurement findings (`.planning/v7.4-attribution-findings.md`, findings A–D). Corrects TELEM-03's time-window attribution, which conflates concurrent background-daemon traffic with the measured task and misses the foreground agent's own tokens (the measured "Opus" session recorded 1.24M tokens of haiku/sonnet consolidator traffic). Also fixes finding D: ETM only captures a long agentic prompt-set's opening burst, stamped at the prompt-set start, so multi-hour GSD sessions yield no mid-session observations and mis-time them to the start. Argued **higher priority than Phase 67** (correct attribution must precede replay, else replay reproduces wrong numbers). Findings A + finding-1 (timeline shows event time + process per row) already fixed on main (commits a1ffe24e2, 47f28ad3b). Run `/gsd-plan-phase 75` to break down. Coverage now 26/26 reqs across 9 phases (67-75).
@@ -299,6 +300,7 @@ subsequently live-discharged (Phase 65 operator run + 66 gap-closure) — see th
 - [Phase ?]: [86-02]: reconciliation route serves reconciliation.json VERBATIM with a top-level summary object (ENOENT -> {reconciliation:null}); fetchReconciliation normalises both wire shapes to ReconciliationSummary|null so Waves 2/3 read one type.
 - [Phase ?]: [86-02]: band primitives (scaledBand/SEGMENTS/scrubSecrets/CACHE_WRITE_NA + Segment) exported additively from context-cache-explainer.tsx (zero behavior change); context-band.tsx imports them (one taxonomy, D-05). Cache-read = hatched CSS repeating-linear-gradient overlay, no recharts/SVG; cache_write===null -> verbatim CACHE_WRITE_NA, never ??0.
 - [Phase ?]: [86-04]: DifferenceViewer consumes the pure Wave-1 seams (alignRuns/loopFlags) with zero re-implementation; per-aligned-pair cumulative token delta B-A accretes down the tail, decrease->text-status-success (Q5); canonical_model verbatim, null->unmeasured (ATTR-02, never recomputed); lightweight inline TurnCell avoids a Plan-03 file dependency.
+- [Phase 88-01]: agent-routing.mjs is the single source of truth for experiment-cell launch-model resolution + the per-agent proxy-routing env map. resolveCellModel fixes opencode dash->dot (rapid-proxy/claude-haiku-4-5 -> 4.5, prefix kept; real provider, not a swap) and copilot auto->COPILOT_MEASURED_DEFAULT_MODEL. configureProxyRoutingEnv delegates its env map to buildAgentRoutingEnv; runCell resolves the launch model once and passes it to both argvForAgent + configureRouting while task_id/variant/start --model stay on the ORIGINAL model (D-05). The shell copilot default is sourced from the JS helper fail-soft.
 
 ### Blockers/Concerns
 
@@ -408,11 +410,12 @@ Items acknowledged and deferred at v6.0 milestone close on 2026-04-25:
 | Phase 86 P01 | 7 | 3 tasks | 9 files |
 | Phase 86 P02 | 6 | 2 tasks | 3 files |
 | Phase 86 P04 | 2 | 2 tasks | 2 files |
+| Phase 88 P01 | 18 min | 3 tasks | 6 files |
 
 ## Session Continuity
 
-Last session: 2026-07-13T19:54:22.854Z
-Stopped at: Phase 78 COMPLETE (RUN-02/03/04 live-verified via 78-05, operator-approved) — ALL v7.5 core reqs satisfied; next: milestone close-out (84 verification doc, sign-offs, complete-milestone)
+Last session: 2026-07-22T05:42:41.774Z
+Stopped at: Completed 88-01-PLAN.md
 Resume with: `/gsd:verify-phase 57` to drive Phase 57 closure verification. After verification, the chain continues with the remaining v7.2 phases (58-61). Two pieces of verification-debt are open against Phase 57 and discharge together at the next wave-analysis run: (1) 57-03 Task 4 — runtime jq check of `metadata.project='coding'` on new wave-analysis-emitted entities (per 57-03-SUMMARY.md § Verification Debt); (2) 57-04 Task 3 — runtime SC#3 gate `node scripts/check-l2-emission-rate.mjs --sample 20 --min 18` (per 57-04-SUMMARY.md § Verification Debt). Both discharge from the same wave-analysis run since the same wave produces both project-stamped and L2-classified entities. The 57-05 live backfill was operator-verified at 2026-06-14T20:13Z (100% coverage, SC#1 PASS); see 57-05-SUMMARY.md § Operator Runbook for the locked-in re-execution sequence (including the launchd bootout step missing from PLAN.md). Out-of-milestone backlog (47/48/49 not yet planned; 50-03 Task 4 awaits host-side `bash scripts/install-lsl-resolver-launchd.sh`). Plan 52-02 + 52-03 Task 6 (visual UAT in browser) are operator-owned per autonomous:false — see 52-02-SUMMARY.md and 52-03-SUMMARY.md for manual verification steps. Operator follow-up for 43-09: run `node scripts/reembed-okm-corpus.mjs --run-id=phase-43-reembed-<UTC>` inside the OKM submodule when ready (~5-10min wall-clock for 1665 entities) and verify via the inline node script in 43-09-SUMMARY § "Step 3 — verify 100% coverage".
 
 Documented follow-ups carried over from 42.2-06-SUMMARY (not yet phased):
