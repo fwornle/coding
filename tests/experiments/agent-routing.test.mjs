@@ -26,7 +26,6 @@ import { runCell, cellName, composeTaskId, configureProxyRoutingEnv } from '../.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AGENTS_DIR = path.resolve(__dirname, '..', '..', 'config', 'agents');
-void runCell; void cellName; void composeTaskId; void configureProxyRoutingEnv; // Task 2 wiring tests (added below)
 
 // ---------------------------------------------------------------------------
 // Task 1: resolveCellModel — the behavior table
@@ -111,5 +110,55 @@ test('buildAgentRoutingEnv: returns a COPY — never mutates baseEnv, never touc
   assert.equal(env.LLM_PROXY_DATA_DIR, '/wt/.data', 'sandbox data dir preserved verbatim');
 });
 
-// Task 2 runCell-wiring tests are appended by Plan 88-01 Task 2 (they require the runner to
-// resolve the launch model once and pass it to both argvForAgent and configureRouting).
+// ---------------------------------------------------------------------------
+// Task 2: runCell wiring — resolved launch model vs original identity
+// ---------------------------------------------------------------------------
+
+// Build a runCell invocation capturing the spawned argv/env + the measurement-start argv.
+function runCellCapturing(cell) {
+  const calls = [];
+  let spawnArgv;
+  let spawnEnv;
+  const restore = async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' });
+  const runMeasurement = async (phase, argv) => { calls.push({ phase, argv }); return 0; };
+  const spawnAgent = async ({ argv, env }) => { spawnArgv = argv; spawnEnv = env; return 'complete'; };
+  // Inject the REAL routing helper with a fake probe reporting the proxy up so COPILOT_MODEL
+  // reflects the resolved launch model that runCell passes through.
+  const configureRouting = (agent, env, opts) =>
+    configureProxyRoutingEnv(agent, env, { ...opts, probe: async () => ({ status: 'running' }), route: '1' });
+  const promise = runCell({
+    cell, rep: 0, expId: 'exp1', goal: 'do a thing', snapshotId: 'snap-1',
+    agentsDir: AGENTS_DIR, dataDir: '/main/.data',
+    restore, runMeasurement, spawnAgent, configureRouting,
+  });
+  return { promise, calls, get spawnArgv() { return spawnArgv; }, get spawnEnv() { return spawnEnv; } };
+}
+
+test('runCell: a copilot auto cell spawns with the RESOLVED model; task_id/variant keep the ORIGINAL', async () => {
+  const cell = { agent: 'copilot', model: 'auto', framework: 'straight', env: 'default' };
+  const h = runCellCapturing(cell);
+  const res = await h.promise;
+  // Spawned argv + COPILOT_MODEL use the resolved catalog default, NOT 'auto'.
+  assert.ok(h.spawnArgv.includes('claude-haiku-4-5'), 'argv carries the resolved model');
+  assert.ok(!h.spawnArgv.includes('auto'), 'argv does not carry the raw alias');
+  assert.equal(h.spawnEnv.COPILOT_MODEL, 'claude-haiku-4-5', 'COPILOT_MODEL is the resolved model');
+  // Identity fields (task_id + variant + measurement-start --model) keep the ORIGINAL alias.
+  assert.equal(res.variant, cellName(cell));
+  assert.ok(res.variant.includes('auto'), 'recorded variant keeps the original alias');
+  assert.equal(res.taskId, composeTaskId('exp1', cell, 0));
+  const start = h.calls.find((c) => c.phase === 'start');
+  assert.equal(start.argv[start.argv.indexOf('--model') + 1], 'auto', 'measurement-start --model is the ORIGINAL alias');
+});
+
+test('runCell: an opencode dash-typo cell spawns with -m rapid-proxy/claude-haiku-4.5', async () => {
+  const cell = { agent: 'opencode', model: 'rapid-proxy/claude-haiku-4-5', framework: 'straight', env: 'default' };
+  const h = runCellCapturing(cell);
+  const res = await h.promise;
+  const mIdx = h.spawnArgv.indexOf('-m');
+  assert.notEqual(mIdx, -1, 'opencode argv carries -m');
+  assert.equal(h.spawnArgv[mIdx + 1], 'rapid-proxy/claude-haiku-4.5', 'resolved dotted catalog id');
+  // task_id/variant keep the ORIGINAL dash string for comparability.
+  assert.ok(res.variant.includes('rapid-proxy/claude-haiku-4-5'), 'variant keeps original dash string');
+  const start = h.calls.find((c) => c.phase === 'start');
+  assert.equal(start.argv[start.argv.indexOf('--model') + 1], 'rapid-proxy/claude-haiku-4-5', 'start --model is original');
+});
