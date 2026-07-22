@@ -198,6 +198,15 @@ class EnhancedTranscriptMonitor {
     // This prevents orphaned monitors when Claude sessions are force-quit
     this.idleTimeout = config.idleTimeout || 1800000; // 30 minutes default
     this.lastActivityTime = Date.now(); // Track when we last saw transcript activity
+    // Phase 36: real-content-activity timestamp. Unlike lastActivityTime (seeded
+    // at construction), this stays null until we OBSERVE genuine transcript growth
+    // (OpenCode message-count increase or file-size growth). The status line uses
+    // it as the authoritative "session is actively working" signal so a long agent
+    // turn stays 🟢 even when the sparse, hourly-bucketed specstory .md mtime lags
+    // past the 45-min promotion cap — while a woke-but-idle session (no growth) is
+    // NOT falsely promoted. See combined-status-line.js promotion logic.
+    this.lastContentActivityTs = null;
+    this._contentBaselined = false;
 
     // In-progress observations: fire an extra observation each time the live
     // prompt-set accumulates this many model output tokens. 0 disables. Tuned to
@@ -4440,7 +4449,12 @@ ORDER BY m.time_created ASC;`;
         this.lastFileSize = msgCount;
         if (hasNew) {
           this.lastActivityTime = Date.now();
+          // Only record REAL activity after the baseline poll — the first poll
+          // always "changes" from the seeded baseline and must not read as active
+          // (otherwise a resumed-but-idle session would falsely promote to 🟢).
+          if (this._contentBaselined) this.lastContentActivityTs = Date.now();
         }
+        this._contentBaselined = true;
         return hasNew;
       } catch {
         return false;
@@ -4455,7 +4469,9 @@ ORDER BY m.time_created ASC;`;
       // Update activity time when we see new content
       if (hasNew) {
         this.lastActivityTime = Date.now();
+        if (this._contentBaselined) this.lastContentActivityTs = Date.now();
       }
+      this._contentBaselined = true;
 
       return hasNew;
     } catch (error) {
@@ -5047,6 +5063,11 @@ ORDER BY m.time_created ASC;`;
           transcriptPath: this.transcriptPath,
           exchangeCount: this.exchangeCount,
           tmux_pane: process.env.TMUX_PANE || null,
+          // Real-time activity timestamp: set only on observed transcript growth
+          // (OpenCode message-count / file-size increase), NOT on spawn or laptop
+          // wake. The statusline uses this — not the sparse specstory mtime — to
+          // decide 🟢 promotion, so a genuinely-active long turn stays green.
+          lastContentActivityTs: this.lastContentActivityTs,
           ...healthData
         },
         ts: Date.now()

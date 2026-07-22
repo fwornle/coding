@@ -1116,6 +1116,20 @@ class CombinedStatusLine {
         }
         return latestBeat > 0 ? Date.now() - latestBeat : null;
       };
+      // Age of the ETM's real-time content-activity signal — set only on
+      // observed transcript growth (message-count / file-size increase), NOT
+      // on spawn or laptop wake. This is the authoritative "the agent is
+      // genuinely working right now" clock, immune to the sparse hourly-
+      // bucketed specstory mtime that lags far behind a long OpenCode turn.
+      const contentActivityAgeMs = (projectName) => {
+        let latest = 0;
+        for (const e of lslEntries) {
+          if (e?.projectName !== projectName) continue;
+          if (e.status === 'stopped') continue;
+          if (e.lastContentActivityTs && e.lastContentActivityTs > latest) latest = e.lastContentActivityTs;
+        }
+        return latest > 0 ? Date.now() - latest : null;
+      };
       for (const [projectName, status] of Object.entries(rollup)) {
         let icon;
         let activityAgeMs = null;
@@ -1127,18 +1141,22 @@ class CombinedStatusLine {
           // override to 🟢. The transcript is updated only at prompt
           // boundaries, so a session in the middle of a long agent turn
           // looks idle by mtime but is actually in full swing. The
-          // heartbeat is the canonical "user/agent is here right now"
-          // signal — but ONLY when the transcript is moderately stale
-          // (< 45min, i.e. a long agent turn). When the transcript is
-          // hours old, the user is genuinely idle — the ETM heartbeat
-          // just means the monitor process is alive (e.g. after laptop
-          // wake from sleep), not that the user is active.
-          if (icon !== '🟢' && activityAgeMs !== null && activityAgeMs < 45 * 60_000) {
+          // heartbeat is the canonical "monitor is alive" signal, but on
+          // its own it also fires after laptop wake — so we gate promotion
+          // on genuine recent activity. Prefer the ETM's real-time
+          // content-activity clock (immune to sparse specstory writes);
+          // fall back to the transcript mtime only when it's unavailable.
+          if (icon !== '🟢') {
             const hbAge = heartbeatAgeMs(projectName);
-            if (hbAge !== null && hbAge < 5 * 60_000) {
+            const contentAge = contentActivityAgeMs(projectName);
+            const activeEnough = contentAge !== null
+              ? contentAge < 45 * 60_000
+              : (activityAgeMs !== null && activityAgeMs < 45 * 60_000);
+            if (hbAge !== null && hbAge < 5 * 60_000 && activeEnough) {
               icon = '🟢';
             }
           }
+
         } else if (status === 'degraded' || status === 'stale' || status === 'warning') {
           icon = '🟡';
         } else {
@@ -1173,10 +1191,17 @@ class CombinedStatusLine {
         // mirror the heartbeat-promotion logic without having to re-poll
         // the coordinator on every tmux tick.
         const freshestBeat = new Map();
+        // Freshest real content-activity ts per project (ETM-reported), so the
+        // fast-path can gate 🟢 promotion on genuine activity, not the sparse
+        // specstory mtime.
+        const freshestAct = new Map();
         for (const e of lslEntries) {
           if (!e?.projectName) continue;
           if (e.lastBeat && e.lastBeat > (freshestBeat.get(e.projectName) || 0)) {
             freshestBeat.set(e.projectName, e.lastBeat);
+          }
+          if (e.lastContentActivityTs && e.lastContentActivityTs > (freshestAct.get(e.projectName) || 0)) {
+            freshestAct.set(e.projectName, e.lastContentActivityTs);
           }
         }
         // When multiple sessions target the same project (e.g. Claude +
@@ -1199,6 +1224,7 @@ class CombinedStatusLine {
             mapping[entry.projectName] = {
               tp: entry.transcriptPath,
               hbTs: freshestBeat.get(entry.projectName) || 0,
+              caTs: freshestAct.get(entry.projectName) || 0,
               subMt,            // fast-path uses max(stat(tp).mtimeMs, subMt)
               _mt: mt,          // internal; stripped before write
             };
@@ -1250,6 +1276,7 @@ class CombinedStatusLine {
             mapping[projectName] = {
               tp: bestPath,
               hbTs: freshestBeat.get(projectName) || 0,
+              caTs: freshestAct.get(projectName) || 0,
             };
           }
         }

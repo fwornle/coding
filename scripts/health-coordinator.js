@@ -412,6 +412,10 @@ function ingestSignal(signal) {
         projectName,
         transcriptPath: signal.payload?.transcriptPath,
         tmuxPane: signal.payload?.tmux_pane || null,
+        // Real-time content-activity ts from the ETM (null until genuine growth
+        // observed). The statusline uses this for 🟢 promotion instead of the
+        // sparse specstory transcript mtime.
+        lastContentActivityTs: signal.payload?.lastContentActivityTs ?? null,
         agent: signal.payload?.agent,
         source: signal.source
       };

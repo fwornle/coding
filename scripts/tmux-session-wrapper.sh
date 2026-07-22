@@ -202,8 +202,45 @@ tmux_session_wrapper() {
     fi
   fi
 
-  # Attach — blocks until the agent exits or user detaches
+  # Attach — blocks until the agent exits or user detaches.
+  #
+  # Guard: tmux attach-session requires a real interactive terminal. When
+  # 'coding' is launched from a non-TTY context (a VS Code task, a pipe, a
+  # non-login/non-interactive shell, an SSH command without -t, etc.) attach
+  # fails instantly with "open terminal failed: not a terminal". The detached
+  # session is still alive at that instant, so the post-mortem check below sees
+  # has-session → true, skips the report, and kill-session silently drops the
+  # user back to the shell with no explanation. Detect that up front and report.
+  if [ ! -t 0 ] || [ ! -t 1 ]; then
+    {
+      echo ""
+      echo "[tmux-wrapper] ⚠️  Cannot attach to session '${session_name}' — not running in an interactive terminal."
+      echo "[tmux-wrapper]     tmux attach-session needs a real TTY on both stdin and stdout."
+      echo "[tmux-wrapper]     stdin tty:  $([ -t 0 ] && echo yes || echo NO)"
+      echo "[tmux-wrapper]     stdout tty: $([ -t 1 ] && echo yes || echo NO)"
+      echo "[tmux-wrapper]     Launch 'coding' directly from an interactive terminal, or attach"
+      echo "[tmux-wrapper]     manually:  tmux attach -t ${session_name}"
+    } >&2
+    # Leave the session running so the user can attach manually instead of
+    # killing work-in-progress. Skip the auto-cleanup at the end of the function.
+    return 1
+  fi
+
   tmux attach-session -t "$session_name"
+  local attach_rc=$?
+
+  # If attach itself failed (non-zero) but the session is still alive, the agent
+  # is running detached — surface the failure and preserve the session instead
+  # of silently killing it.
+  if [ "$attach_rc" -ne 0 ] && tmux has-session -t "$session_name" 2>/dev/null; then
+    {
+      echo ""
+      echo "[tmux-wrapper] ⚠️  tmux attach-session failed (exit ${attach_rc}) but session '${session_name}' is still alive."
+      echo "[tmux-wrapper]     The agent is running detached. Attach manually with:"
+      echo "[tmux-wrapper]        tmux attach -t ${session_name}"
+    } >&2
+    return "$attach_rc"
+  fi
 
   # Cleanup: stop capture monitor if running
   if [ -n "$capture_monitor_pid" ] && kill -0 "$capture_monitor_pid" 2>/dev/null; then

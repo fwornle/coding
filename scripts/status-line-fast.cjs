@@ -108,8 +108,8 @@ function readProjectMapping() {
 // actively confirming prompts inside a sub-agent and the parent transcript
 // file isn't being written. Phase 51 interim mitigation.
 function normalizeMappingEntry(v) {
-  if (typeof v === 'string') return { tp: v, hbTs: 0, subMt: 0 };
-  return { tp: v?.tp, hbTs: v?.hbTs || 0, subMt: v?.subMt || 0 };
+  if (typeof v === 'string') return { tp: v, hbTs: 0, subMt: 0, caTs: 0 };
+  return { tp: v?.tp, hbTs: v?.hbTs || 0, subMt: v?.subMt || 0, caTs: v?.caTs || 0 };
 }
 
 // Patch each project's lifecycle icon in `text` based on its current
@@ -130,7 +130,7 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     .sort((a, b) => b[2].length - a[2].length);
 
   const now = Date.now();
-  for (const [, { tp, hbTs, subMt }, abbrev] of entries) {
+  for (const [, { tp, hbTs, subMt, caTs }, abbrev] of entries) {
     let parentMt;
     try { parentMt = fs.statSync(tp).mtimeMs; } catch { continue; }
     // Effective mtime folds in the freshest sub-agent transcript so the
@@ -143,12 +143,13 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     let newIcon = ageToActivityIcon(now - mt);
     // Mirror combined-status-line.js's heartbeat promotion: a fresh ETM
     // heartbeat (<5min) overrides a non-Active transcript-derived icon,
-    // but ONLY when the transcript is moderately stale (<45min). When
-    // the transcript is hours old (e.g. after laptop wake from sleep),
-    // the ETM heartbeat just means the monitor is alive, not that the
-    // user is active — so we don't promote.
-    const transcriptAge = now - mt;
-    if (newIcon !== '🟢' && hbTs > 0 && (now - hbTs) < 5 * 60_000 && transcriptAge < 45 * 60_000) {
+    // but only when there's genuine recent activity — otherwise a heartbeat
+    // that resumed after laptop wake would falsely promote an idle session.
+    // Prefer the ETM's real-time content-activity clock (caTs), which is
+    // immune to the sparse hourly-bucketed specstory mtime that lags far
+    // behind a long OpenCode turn; fall back to transcript mtime when absent.
+    const activeAge = caTs > 0 ? (now - caTs) : (now - mt);
+    if (newIcon !== '🟢' && hbTs > 0 && (now - hbTs) < 5 * 60_000 && activeAge < 45 * 60_000) {
       newIcon = '🟢';
     }
     // anyNewer also fires if a sub-agent file is fresher than the cache —
