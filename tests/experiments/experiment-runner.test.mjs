@@ -489,13 +489,12 @@ function fakeStore() {
 // Base seams for a runMatrix invocation. `cells` is served through an injected resolveSpec
 // so tests fully control the matrix (incl. agents real validateCells would reject, e.g.
 // mastracode). Every side effect is recorded for assertions.
-function matrixHarness({ cells, repeats = 1, done = [], copilotOk = true, spawnImpl } = {}) {
-  const rec = { starts: [], stops: [], launched: [], opens: 0 };
+function matrixHarness({ cells, repeats = 1, done = [], preflight, spawnImpl } = {}) {
+  const rec = { starts: [], stops: [], launched: [], opens: 0, preflights: [] };
   const store = fakeStore();
   const resolveSpec = () => ({ goal_sentence: 'do a thing', repeats, cells });
   const openStore = async () => { rec.opens += 1; return store; };
   const readDone = async () => done;
-  const probeCopilot = () => copilotOk;
   const restore = async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' });
   const runMeasurement = async (phase, argv) => {
     if (phase === 'start') rec.starts.push(argv);
@@ -506,9 +505,13 @@ function matrixHarness({ cells, repeats = 1, done = [], copilotOk = true, spawnI
   const spawnAgent = spawnImpl || defaultSpawn;
   // Passthrough routing seam so runMatrix→runCell never probes a live proxy under test.
   const configureRouting = async (_agent, env) => env;
+  // Phase 88-02: the per-cell pre-flight seam. Default returns ok so happy-path cells launch
+  // normally (byte-identical); a test injects a failing preflight to prove the recorded-skip path.
+  const preflightSeam = preflight || (async (agent, opts) => { rec.preflights.push({ agent, opts }); return { ok: true }; });
   return { rec, store, opts: {
     expId: 'exp1', snapshotId: 'snap-1', agentsDir: AGENTS_DIR,
-    resolveSpec, openStore, readDone, probeCopilot, restore, runMeasurement, spawnAgent, configureRouting,
+    resolveSpec, openStore, readDone, restore, runMeasurement, spawnAgent, configureRouting,
+    preflight: preflightSeam,
   } };
 }
 
@@ -550,27 +553,63 @@ test('runMatrix: resume skips ONLY completed cells; timeout/abort cells are re-r
   assert.equal(rec.launched.length, 1, 'only the re-run cell launched an agent');
 });
 
-test('runMatrix: probe=false lands a recorded copilot skip-Run (no agent launched)', async () => {
-  const cells = [{ agent: 'copilot', model: 'm', framework: 'none', env: 'default' }];
-  const { rec, opts } = matrixHarness({ cells, repeats: 1, copilotOk: false });
+test('runMatrix: a failing pre-flight lands a recorded skip-Run via the RUN-04 path (no agent launched)', async () => {
+  // Phase 88-02: preflight !ok → writeSkipRun (start+stop with --skip-reason) + NO runCell launch.
+  const cells = [{ agent: 'copilot', model: 'auto', framework: 'none', env: 'default' }];
+  const preflight = async () => ({ ok: false, reason: 'preflight:copilot-model-or-route (HTTP 500)' });
+  const { rec, opts } = matrixHarness({ cells, repeats: 1, preflight });
   const summary = await runMatrix({}, opts);
-  assert.equal(rec.launched.length, 0, 'no agent launched for a probe-failed copilot cell');
-  // A skip-Run is recorded via start + stop with --skip-reason.
-  assert.equal(rec.starts.length, 1);
+  assert.equal(rec.launched.length, 0, 'no agent launched (spawnAgent seam) for a preflight-failed cell');
+  // A skip-Run is recorded via start + stop with --skip-reason carrying the diagnosable reason.
+  assert.equal(rec.starts.length, 1, 'exactly the skip-Run measurement-start (no cell span)');
   const stop = rec.stops[0];
   assert.ok(stop.includes('--skip-reason'));
-  assert.equal(stop[stop.indexOf('--skip-reason') + 1], 'copilot-headless-unsupported');
+  assert.equal(stop[stop.indexOf('--skip-reason') + 1], 'preflight:copilot-model-or-route (HTTP 500)');
   assert.equal(summary[0].status, 'skipped');
-  assert.equal(summary[0].reason, 'copilot-headless-unsupported');
+  assert.equal(summary[0].reason, 'preflight:copilot-model-or-route (HTTP 500)');
 });
 
-test('runMatrix: probe=true runs copilot cells through the normal launch path', async () => {
-  const cells = [{ agent: 'copilot', model: 'm', framework: 'none', env: 'default' }];
-  const { rec, opts } = matrixHarness({ cells, repeats: 1, copilotOk: true });
+test('runMatrix: an ok pre-flight runs the cell through the normal launch path', async () => {
+  const cells = [{ agent: 'copilot', model: 'claude-haiku-4-5', framework: 'none', env: 'default' }];
+  const { rec, opts } = matrixHarness({ cells, repeats: 1 }); // default preflight → ok
   const summary = await runMatrix({}, opts);
-  assert.equal(rec.launched.length, 1, 'copilot cell launched an agent when the probe passed');
+  assert.equal(rec.launched.length, 1, 'cell launched an agent when the pre-flight passed');
   assert.equal(summary[0].status, 'ran');
   assert.equal(summary[0].terminal_state, 'complete');
+});
+
+test('runMatrix: pre-flight is called per cell with the RESOLVED launch model and NO taskId (span-collision-free)', async () => {
+  // The gate calls preflight(cell.agent, { model: resolveCellModel(...), port }) — the resolved
+  // model (opencode dash→dot) and NEVER a composite taskId (avoids the measurement-start ordering
+  // collision that a taskId would create).
+  const seen = [];
+  const cells = [{ agent: 'opencode', model: 'rapid-proxy/claude-haiku-4-5', framework: 'straight', env: 'default' }];
+  const preflight = async (agent, opts) => { seen.push({ agent, opts }); return { ok: true }; };
+  const { opts } = matrixHarness({ cells, repeats: 1, preflight });
+  await runMatrix({}, opts);
+  assert.equal(seen.length, 1, 'preflight invoked once for the single cell');
+  assert.equal(seen[0].agent, 'opencode');
+  assert.equal(seen[0].opts.model, 'rapid-proxy/claude-haiku-4.5', 'preflight sees the RESOLVED launch model (dash→dot)');
+  assert.ok(!('taskId' in seen[0].opts), 'preflight is called WITHOUT a taskId (no span collision)');
+});
+
+test('runMatrix: a failed pre-flight on a REQUIRED agent is a recorded skip — NOT a required-agent failure', async () => {
+  // A skipped opencode cell must be status:'skipped' so scripts/experiment-run.mjs's REQUIRED_AGENTS
+  // filter (which only counts status==='ran' non-complete cells) does NOT fail the whole run.
+  const cells = [{ agent: 'opencode', model: 'rapid-proxy/claude-haiku-4-5', framework: 'straight', env: 'default' }];
+  const preflight = async () => ({ ok: false, reason: 'preflight:opencode-model-or-route (HTTP 500)' });
+  const { rec, opts } = matrixHarness({ cells, repeats: 1, preflight });
+  const summary = await runMatrix({}, opts);
+  assert.equal(rec.launched.length, 0, 'spawnAgent NOT invoked — the cell never launched');
+  assert.equal(summary[0].status, 'skipped');
+  // Mirror the REQUIRED_AGENTS gate from scripts/experiment-run.mjs and prove it does not fail.
+  const REQUIRED_AGENTS = new Set(['claude', 'opencode']);
+  const failed = summary.filter((s) => {
+    if (s.status !== 'ran') return false;
+    if (!s.terminal_state || s.terminal_state === 'complete') return false;
+    return REQUIRED_AGENTS.has(String(s.variant || '').split('-')[0]);
+  });
+  assert.equal(failed.length, 0, 'a skipped opencode cell does not trip the required-agent gate');
 });
 
 test('runMatrix: a cell whose launch throws is recorded best-effort — the matrix does not stall', async () => {
