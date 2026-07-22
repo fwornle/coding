@@ -50,12 +50,12 @@ variants:
     env: default
   # REQUIRED agent (D-12) — opencode via `run`, model routed through rapid-proxy (:12435).
   - agent: opencode
-    model: rapid-proxy/claude-haiku-4-5
+    model: rapid-proxy/claude-haiku-4.5   # dotted = the live `opencode models` catalog id (rapid-proxy provider kept)
     framework: straight
     env: default
   # Probe-gated (RUN-04) — env:default so validateCells passes; the runner's one-turn probe
   # decides run (copilot -p --allow-all-tools) vs. recorded skip (copilot-headless-unsupported).
   - agent: copilot
-    model: auto
+    model: auto   # `auto` resolves to the copilot measured default via resolveCellModel (agent-routing.mjs)
     framework: straight
     env: default

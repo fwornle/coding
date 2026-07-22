@@ -1,0 +1,37 @@
+# config/experiments/compare-avenues-help-v1.yaml — cross-agent comparison (claude/opencode/copilot)
+# Task: add in-context help/documentation to the Avenues tab of the Performance dashboard.
+#
+# UNGATED: this is a subjective UI-documentation task with no automatable pass/fail, so there is
+# NO test_command. Variants land in the `ungated` compare group — ranked on tokens/wallclock only;
+# the operator judges the actual help-text quality visually per avenue branch.
+#
+# RUN UNATTENDED (token-attribution caveat): one global active-measurement.json span slot + the
+# shared host proxy means any concurrent main-session LLM call in this repo during an open cell
+# would be mis-stamped with the cell's task_id. Kick this off standalone and let it run.
+version: 1
+
+experiment_id: compare-avenues-help-v1
+
+# Declare-time baseline snapshot each cell restores into an ISOLATED sandbox worktree.
+snapshot_id: smoke-spec
+
+goal_sentence: "Add in-context help documentation to the Avenues tab of the Performance dashboard explaining what an avenue branch is, what the Outcome, Tokens, Route, Wall-clock, and Merge columns and conflict states mean, and how a user should work with and prune avenues."
+
+repeats: 1
+
+# Closed-taxonomy class — adding a new UI help/documentation component = new-feature.
+task_class: new-feature
+
+variants:
+  - agent: claude
+    model: opus
+    framework: straight
+    env: default
+  - agent: opencode
+    model: rapid-proxy/claude-haiku-4.5   # dotted = the live `opencode models` catalog id (rapid-proxy provider kept)
+    framework: straight
+    env: default
+  - agent: copilot
+    model: auto   # `auto` resolves to the copilot measured default via resolveCellModel (agent-routing.mjs)
+    framework: straight
+    env: default

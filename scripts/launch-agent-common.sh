@@ -475,7 +475,12 @@ configure_proxy_routing() {
         export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot/t/${TASK_ID}"
         export COPILOT_PROVIDER_TYPE="openai"
         export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
-        export COPILOT_MODEL="${COPILOT_MODEL:-claude-haiku-4-5}"
+        # Phase 88-01 (ALIGN-01): the copilot measured-span default lives in ONE place —
+        # lib/experiments/agent-routing.mjs (COPILOT_MEASURED_DEFAULT_MODEL) — consulted by BOTH
+        # the experiment cell path and this shell launcher. Fail-soft: `2>/dev/null || echo <literal>`
+        # keeps the interactive launcher byte-identical on the happy path and unbroken if node/helper
+        # is unavailable (no regression to the working launcher).
+        export COPILOT_MODEL="${COPILOT_MODEL:-$(node "${CODING_REPO}/lib/experiments/agent-routing.mjs" default copilot 2>/dev/null || echo claude-haiku-4-5)}"
         export COPILOT_AUTO_UPDATE="false"
         # COPILOT_PROVIDER_WIRE_MODEL is honoured if the caller pre-set it (wire name ≠ COPILOT_MODEL);
         # left inherited rather than forced, since the launcher has no wire-name mapping.
