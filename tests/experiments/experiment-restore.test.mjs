@@ -22,6 +22,7 @@ import {
   restoreForCell,
   assertRepeatsIdentical,
   runVariantRepeats,
+  neutralizeSandboxRules,
 } from '../../lib/experiments/experiment-restore.mjs';
 import { buildWorktreeAddArgs } from '../../lib/repro/restore-snapshot.mjs';
 
@@ -43,6 +44,40 @@ function makeSandbox({ kbFiles = {}, settings = '{}' } = {}) {
   if (settings !== null) fs.writeFileSync(path.join(dataDir, 'llm-settings.json'), settings);
   return { root, dataDir, kbDir, settingsPath: path.join(dataDir, 'llm-settings.json') };
 }
+
+// ---------------------------------------------------------------------------
+// neutralizeSandboxRules — strip restored project-rules files (sandbox-escape fix, 2026-07-23)
+// ---------------------------------------------------------------------------
+
+test('neutralizeSandboxRules: removes CLAUDE.md / AGENTS.md / copilot-instructions and returns them', () => {
+  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'exp-rules-test-'));
+  fs.writeFileSync(path.join(wt, 'CLAUDE.md'), 'Primary working directory: /Users/x/coding');
+  fs.writeFileSync(path.join(wt, 'AGENTS.md'), 'rules');
+  fs.mkdirSync(path.join(wt, '.github'), { recursive: true });
+  fs.writeFileSync(path.join(wt, '.github', 'copilot-instructions.md'), 'copilot rules');
+  // A non-rules file must be left untouched.
+  fs.writeFileSync(path.join(wt, 'README.md'), 'keep me');
+
+  const removed = neutralizeSandboxRules(wt);
+
+  assert.ok(removed.includes('CLAUDE.md'));
+  assert.ok(removed.includes('AGENTS.md'));
+  assert.ok(removed.includes(path.join('.github', 'copilot-instructions.md')));
+  assert.equal(fs.existsSync(path.join(wt, 'CLAUDE.md')), false);
+  assert.equal(fs.existsSync(path.join(wt, 'AGENTS.md')), false);
+  assert.equal(fs.existsSync(path.join(wt, '.github', 'copilot-instructions.md')), false);
+  assert.equal(fs.existsSync(path.join(wt, 'README.md')), true, 'non-rules files are untouched');
+});
+
+test('neutralizeSandboxRules: fail-soft — no rules files present is a no-op returning []', () => {
+  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'exp-rules-empty-'));
+  assert.deepEqual(neutralizeSandboxRules(wt), []);
+});
+
+test('neutralizeSandboxRules: an empty/undefined worktree returns [] (never throws)', () => {
+  assert.deepEqual(neutralizeSandboxRules(''), []);
+  assert.deepEqual(neutralizeSandboxRules(undefined), []);
+});
 
 // ---------------------------------------------------------------------------
 // Task 1: digestRestoredState

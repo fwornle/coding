@@ -21,7 +21,9 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 
-import { launchCell, runCell, runMatrix, composeTaskId, cellName, configureProxyRoutingEnv } from '../../lib/experiments/experiment-runner.mjs';
+import { launchCell, runCell, runMatrix, composeTaskId, cellName, configureProxyRoutingEnv, detectSandboxEscape } from '../../lib/experiments/experiment-runner.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STUB = path.resolve(__dirname, '_fixtures', 'stub-agent.mjs');
@@ -132,10 +134,10 @@ const CELL = { agent: 'claude', model: 'sonnet', framework: 'none', env: 'defaul
 // `configureRouting` defaults to a passthrough so no live proxy is probed; a test may inject
 // the real helper (with a fake probe) to assert routing. The span uses an explicit MAIN
 // dataDir ('/main/.data') distinct from the sandbox ('/wt/.data') to prove the split.
-function runCellWith({ terminal = 'complete', cell = CELL, taskClass, configureRouting } = {}) {
+function runCellWith({ terminal = 'complete', cell = CELL, taskClass, configureRouting, restore, captureRepoState } = {}) {
   const calls = [];
   let agentSpawnEnv;
-  const restore = async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' });
+  const restoreFn = restore || (async () => ({ worktree: '/wt', sandboxDataDir: '/wt/.data' }));
   const runMeasurement = async (phase, argv, o) => {
     calls.push({ phase, argv, env: o?.env });
     return 0;
@@ -150,13 +152,61 @@ function runCellWith({ terminal = 'complete', cell = CELL, taskClass, configureR
     taskClass,
     agentsDir: AGENTS_DIR,
     dataDir: '/main/.data',
-    restore,
+    restore: restoreFn,
     runMeasurement,
     spawnAgent,
     configureRouting: configureRouting || (async (_a, env) => env),
+    // Hermetic default: no real `git status`. Escape-guard tests inject their own baseline/after seam.
+    captureRepoState: captureRepoState || (() => new Set()),
   });
   return { promise, calls, get agentSpawnEnv() { return agentSpawnEnv; } };
 }
+
+// ---------------------------------------------------------------------------
+// Sandbox-escape fix (2026-07-23): rules neutralization, PWD alignment, escape guard
+// ---------------------------------------------------------------------------
+
+test('runCell: neutralizes a restored CLAUDE.md in the sandbox worktree before launch', async () => {
+  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'exp-runcell-wt-'));
+  fs.writeFileSync(path.join(wt, 'CLAUDE.md'), 'Primary working directory: /Users/x/coding');
+  const restore = async () => ({ worktree: wt, sandboxDataDir: path.join(wt, '.data') });
+  const { promise } = runCellWith({ terminal: 'complete', restore });
+  await promise;
+  assert.equal(fs.existsSync(path.join(wt, 'CLAUDE.md')), false, 'restored CLAUDE.md removed before launch');
+});
+
+test('runCell: pins the agent env PWD to the sandbox worktree (and drops OLDPWD)', async () => {
+  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'exp-runcell-pwd-'));
+  const restore = async () => ({ worktree: wt, sandboxDataDir: path.join(wt, '.data') });
+  const h = runCellWith({ terminal: 'complete', restore });
+  await h.promise;
+  assert.equal(h.agentSpawnEnv.PWD, wt, 'PWD is the sandbox worktree');
+  assert.equal(h.agentSpawnEnv.OLDPWD, undefined, 'stale OLDPWD is dropped');
+});
+
+test('runCell: escape guard flags a NEW real-repo file the agent wrote outside .data/', async () => {
+  // captureRepoState is called twice: baseline (before launch) then after. Simulate the agent
+  // leaking `fizzbuzz.mjs` to the real root by returning it only in the second call.
+  let n = 0;
+  const captureRepoState = () => (n++ === 0 ? new Set([' M .data/exports/x.json']) : new Set([' M .data/exports/x.json', '?? fizzbuzz.mjs']));
+  const { promise } = runCellWith({ terminal: 'complete', captureRepoState });
+  const res = await promise;
+  assert.deepEqual(res.sandboxEscape, ['fizzbuzz.mjs'], 'the escaped file is surfaced on the summary');
+});
+
+test('runCell: escape guard stays silent when nothing escaped (no sandboxEscape field)', async () => {
+  const { promise } = runCellWith({ terminal: 'complete' }); // default captureRepoState → empty Sets
+  const res = await promise;
+  assert.equal(res.sandboxEscape, undefined);
+});
+
+test('detectSandboxEscape: new non-.data path is an escape; .data churn and null are ignored', () => {
+  const base = new Set([' M .data/exports/a.json']);
+  const after = new Set([' M .data/exports/a.json', ' M .data/exports/b.json', '?? leaked.txt']);
+  assert.deepEqual(detectSandboxEscape(base, after), ['leaked.txt']);
+  assert.deepEqual(detectSandboxEscape(null, after), []);
+  assert.deepEqual(detectSandboxEscape(base, null), []);
+});
 
 test('runCell: restores then measurement-start with composite task_id + variant/repeat/agent + span→MAIN dataDir', async () => {
   const { promise, calls } = runCellWith({ terminal: 'complete' });
