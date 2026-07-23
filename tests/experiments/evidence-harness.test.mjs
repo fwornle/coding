@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 import {
   gatherEvidence,
@@ -107,6 +108,51 @@ describe('gatherEvidence — Case C: diffStat never throws', () => {
       assert.equal(ev.planTasks, null);
     } finally {
       fs.rmSync(bare, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// diffStat includes UNTRACKED (new) files (2026-07-23). A "create a new file" task's
+// deliverable is untracked, and a plain `git diff` excludes untracked files — so the diffstat
+// used to be empty and code_quality was starved. readDiffStat now intent-to-adds via a scratch
+// index so new files appear, WITHOUT mutating the real index.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('gatherEvidence — diffStat captures untracked new files (scratch-index, no side effects)', () => {
+  function makeGitRepo() {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ev-git-'));
+    const g = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' });
+    g('init', '-q'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+    fs.writeFileSync(path.join(root, 'README.md'), 'hi\n');
+    g('add', '.'); g('commit', '-qm', 'init');
+    return { root, g };
+  }
+
+  test('a new untracked file shows in diffStat → non-null, high code_quality; real index untouched', () => {
+    const { root, g } = makeGitRepo();
+    try {
+      // Simulate the agent creating the deliverable — UNTRACKED.
+      fs.writeFileSync(path.join(root, 'fizzbuzz.mjs'), 'export function fizzbuzz(n){\n  return String(n);\n}\n');
+      const ev = gatherEvidence({ span: { meta: {} }, repoRoot: root });
+      assert.ok(typeof ev.diffStat === 'string' && /fizzbuzz\.mjs/.test(ev.diffStat), `diffStat should list the new file, got: ${ev.diffStat}`);
+      assert.match(ev.diffStat, /1 file changed/);
+      const rubric = deriveNonGsdRubric(ev);
+      assert.equal(typeof rubric.code_quality, 'number');
+      assert.ok(rubric.code_quality > 0.5, `a small clean new file should score high, got ${rubric.code_quality}`);
+      // Side-effect-free: the file is still UNTRACKED (?? ), never staged into the real index.
+      assert.match(g('status', '--porcelain').trim(), /^\?\? fizzbuzz\.mjs$/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('a clean repo (no changes) yields a null diffStat (no fabricated churn)', () => {
+    const { root } = makeGitRepo();
+    try {
+      const ev = gatherEvidence({ span: { meta: {} }, repoRoot: root });
+      assert.equal(ev.diffStat, null);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 });
