@@ -36,6 +36,23 @@ async function navigateToPerformance(page: Page) {
   await expect(page.locator('h1')).toHaveText('Performance', { timeout: 20000 })
   // Give the fetchRuns thunk a beat to populate the table / empty state.
   await page.waitForTimeout(800)
+  // Runs are grouped by experiment and COLLAPSED by default (one parent entry per
+  // experiment). The row-level flows below target per-agent child rows (run-row), so
+  // expand all groups first — otherwise those rows aren't in the DOM and data-gated
+  // tests would silently skip.
+  await expandAllGroups(page)
+}
+
+// Expand every experiment group so its per-agent child rows render. Idempotent: the
+// toggle button reads "Expand all" only when something is collapsed.
+async function expandAllGroups(page: Page) {
+  const toggle = page.locator('[data-testid="toggle-all-groups"]')
+  if ((await toggle.count()) === 0) return
+  const label = (await toggle.textContent())?.trim() ?? ''
+  if (label.includes('Expand all')) {
+    await toggle.click()
+    await page.waitForTimeout(200)
+  }
 }
 
 // The Fork button rides the SAME isCompletedExperimentRun guard as Re-run, so a
@@ -49,6 +66,41 @@ async function forkButtonCount(page: Page): Promise<number> {
 
 test('fork-launcher spec is collected by the runner', async () => {
   expect(true).toBe(true)
+})
+
+// ── Experiment grouping (Fix v7.3): one parent entry per experiment, collapsed by
+//    default, expanding to its per-agent cells; ambient/probe rows segregated. ──
+
+test('runs list groups experiments into collapsible parents (cells hidden until expanded)', async ({ page }) => {
+  // Navigate WITHOUT the auto-expand helper so we observe the collapsed default.
+  await page.goto('http://localhost:3032/performance', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('h1')).toHaveText('Performance', { timeout: 20000 })
+  await page.waitForTimeout(800)
+
+  const groupRows = page.locator('[data-testid="experiment-group-row"]')
+  const groupCount = await groupRows.count()
+  if (groupCount === 0) {
+    test.skip(true, 'No runs in the store — grouping needs at least one experiment or ambient row.')
+    return
+  }
+
+  // Default is COLLAPSED: parent group rows present, but no child run-rows rendered.
+  await expect(page.locator('[data-testid="run-row"]')).toHaveCount(0)
+  await expect(groupRows.first()).toHaveAttribute('data-expanded', 'false')
+
+  // Expanding a group reveals its per-agent child cells beneath that parent.
+  await groupRows.first().click()
+  await expect(groupRows.first()).toHaveAttribute('data-expanded', 'true')
+  await expect(page.locator('[data-testid="run-row"]').first()).toBeVisible()
+
+  // "Expand all" reveals every group's children at once.
+  const toggleAll = page.locator('[data-testid="toggle-all-groups"]')
+  await expect(toggleAll).toBeVisible()
+  await expandAllGroups(page)
+  const expandedGroups = await groupRows.evaluateAll(
+    (rows) => rows.filter((r) => r.getAttribute('data-expanded') === 'true').length,
+  )
+  expect(expandedGroups).toBe(groupCount)
 })
 
 // ── AVN-02: the Fork trigger ──

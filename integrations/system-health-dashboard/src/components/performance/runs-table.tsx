@@ -1,6 +1,6 @@
 import type { ReactNode, PointerEvent as ReactPointerEvent } from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pencil, Layers, Trash2, RotateCcw, GitCompare, GitBranch, Radio } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Pencil, Layers, Trash2, RotateCcw, GitCompare, GitBranch, Radio, ChevronRight, ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -422,6 +422,85 @@ function ColResize({ colId, onStart }: {
   )
 }
 
+// A group of Runs that belong to one experiment (shared task_hash), or the synthetic
+// '__other__' bucket for non-experiment rows (ambient auto-measured sessions + health
+// probes — anything with no task_hash). The user asked for one parent entry per
+// experiment that expands to a sub-list of its per-agent cells, instead of the flat
+// list that interleaved cells with unrelated ambient/probe rows.
+interface RunGroup { key: string; taskHash: string | null; runs: Run[] }
+const OTHER_GROUP_KEY = '__other__'
+
+/** Bucket the (already sorted, paginated) rows by experiment identity (task_hash),
+ *  preserving first-seen order; the '__other__' bucket is always appended last. */
+function groupRunsByExperiment(runs: Run[]): RunGroup[] {
+  const order: string[] = []
+  const map = new Map<string, Run[]>()
+  for (const run of runs) {
+    const th = runStr(run, 'task_hash')
+    const key = th && isExperimentRun(run) ? `exp:${th}` : OTHER_GROUP_KEY
+    if (!map.has(key)) { map.set(key, []); order.push(key) }
+    map.get(key)!.push(run)
+  }
+  const keys = order.filter((k) => k !== OTHER_GROUP_KEY)
+  if (map.has(OTHER_GROUP_KEY)) keys.push(OTHER_GROUP_KEY)
+  return keys.map((key) => ({
+    key,
+    taskHash: key === OTHER_GROUP_KEY ? null : key.slice('exp:'.length),
+    runs: map.get(key)!,
+  }))
+}
+
+/** Collapsible parent header row for one experiment group (or the "Other activity"
+ *  bucket). Clicking anywhere on the row toggles its child cells. Spans all columns. */
+function GroupHeaderRow({ group, expanded, onToggle }: {
+  group: RunGroup; expanded: boolean; onToggle: () => void
+}) {
+  const isOther = group.key === OTHER_GROUP_KEY
+  const goal = !isOther ? (group.runs.map((r) => runStr(r, 'goal_sentence')).find(Boolean) ?? null) : null
+  const agents = [...new Set(group.runs.map((r) => r.agent).filter(Boolean))] as string[]
+  const totalTokens = group.runs.reduce((sum, r) => sum + (r.outcome?.totalTokens ?? 0), 0)
+  const cellCount = group.runs.length
+  return (
+    <TableRow
+      data-testid="experiment-group-row"
+      data-group-key={group.key}
+      data-expanded={expanded ? 'true' : 'false'}
+      className="cursor-pointer bg-muted/40 hover:bg-muted/60"
+      onClick={onToggle}
+    >
+      <TableCell colSpan={30} className="py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {expanded
+            ? <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+            : <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
+          {isOther
+            ? (
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Radio className="size-3.5 text-muted-foreground" />
+                Other activity
+                <span className="font-normal text-muted-foreground">— ambient sessions &amp; health probes</span>
+              </span>
+            )
+            : (
+              <span className="truncate text-sm font-medium" title={goal ?? group.taskHash ?? ''}>
+                {goal ?? <span className="font-mono">{group.taskHash}</span>}
+              </span>
+            )}
+          <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+            {agents.length > 0 && (
+              <span className="flex items-center gap-1">
+                {agents.map((a) => <Badge key={a} variant="outline" className="px-1.5 py-0 text-[10px]">{a}</Badge>)}
+              </span>
+            )}
+            <span data-testid="group-cell-count">{cellCount} {cellCount === 1 ? 'cell' : 'cells'}</span>
+            {totalTokens > 0 && <span className="font-mono">{totalTokens.toLocaleString()} tok</span>}
+          </span>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
 export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
   const dispatch = useAppDispatch()
   const filtered = useAppSelector(selectFilteredRuns)
@@ -515,6 +594,27 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
   const visibleRuns = sortedRuns.slice(0, visibleCount)
   const remaining = sortedRuns.length - visibleRuns.length
 
+  // Group the visible rows by experiment (task_hash) so the list shows ONE parent
+  // entry per experiment that expands to its per-agent cells, with ambient sessions +
+  // health probes segregated into a collapsed "Other activity" bucket. Grouping the
+  // already-paginated slice keeps the existing row-based pagination untouched.
+  const runGroups = useMemo(() => groupRunsByExperiment(visibleRuns), [visibleRuns])
+  // Expanded-group set. Default COLLAPSED (empty set) — the operator asked for one
+  // entry per experiment, opened on demand. "Expand all / Collapse all" toggles all.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const toggleGroup = useCallback((key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+  const allExpanded = runGroups.length > 0 && runGroups.every((g) => expandedGroups.has(g.key))
+  const toggleAllGroups = useCallback(() => {
+    setExpandedGroups(allExpanded ? new Set() : new Set(runGroups.map((g) => g.key)))
+  }, [allExpanded, runGroups])
+
   // Snap the window back to the first page when the filtered set size changes.
   useEffect(() => {
     setVisibleCount(RUNS_PAGE_SIZE)
@@ -565,6 +665,20 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
       {/* Column controls — a subtle hint (handles are near-invisible until hover)
           plus a Reset that restores the default layout (disabled when already default). */}
       <div className="flex items-center justify-end gap-2 border-b px-3 py-1.5">
+        <span className="mr-auto text-xs text-muted-foreground">
+          Runs grouped by experiment — click a row to expand its per-agent cells.
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="toggle-all-groups"
+          disabled={runGroups.length === 0}
+          onClick={toggleAllGroups}
+          title={allExpanded ? 'Collapse every experiment group' : 'Expand every experiment group'}
+        >
+          {allExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+          {allExpanded ? 'Collapse all' : 'Expand all'}
+        </Button>
         <span className="text-xs text-muted-foreground">Drag a column edge to resize.</span>
         <Button
           variant="ghost"
@@ -706,7 +820,12 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {visibleRuns.map((run) => {
+          {runGroups.map((group) => {
+            const groupExpanded = expandedGroups.has(group.key)
+            return (
+              <Fragment key={group.key}>
+                <GroupHeaderRow group={group} expanded={groupExpanded} onToggle={() => toggleGroup(group.key)} />
+                {groupExpanded && group.runs.map((run) => {
             const isSelected = run.task_id === selectedTaskId
             return (
               <TableRow
@@ -928,6 +1047,9 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                   </TooltipProvider>
                 </TableCell>
               </TableRow>
+            )
+                })}
+              </Fragment>
             )
           })}
         </TableBody>
