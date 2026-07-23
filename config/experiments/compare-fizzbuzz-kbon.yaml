@@ -1,0 +1,17 @@
+# config/experiments/compare-fizzbuzz-kbon.yaml — single-cell kb-ON proof.
+# One claude cell with knowledge injection ENABLED (env: kb-on) to verify end-to-end that a
+# trivial fizzbuzz task injects NOTHING (the IDF floor + LLM relevance judge reject the irrelevant
+# coding-KB matches), while the agent still writes a passing fizzbuzz. Same goal/snapshot/test as
+# compare-fizzbuzz.yaml.
+version: 1
+experiment_id: compare-fizzbuzz-kbon4
+snapshot_id: smoke-spec
+goal_sentence: "Create a file named fizzbuzz.mjs at the repository root that exports a function fizzbuzz(n) returning the string 'Fizz' when n is divisible by 3, 'Buzz' when divisible by 5, 'FizzBuzz' when divisible by both 3 and 5, and the number itself as a string otherwise; and create fizzbuzz.test.mjs using node:test that asserts fizzbuzz(3)==='Fizz', fizzbuzz(5)==='Buzz', fizzbuzz(15)==='FizzBuzz', and fizzbuzz(2)==='2'."
+repeats: 1
+task_class: new-feature
+test_command: "node --test fizzbuzz.test.mjs"
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on
