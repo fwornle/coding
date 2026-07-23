@@ -1475,6 +1475,10 @@ app.post('/api/retrieve', async (req, res) => {
       budget: parsedBudget,
       threshold: Number(threshold) || 0.75,
       context: context || null,
+      // Thread the run id so retrieve() can detect an experiment cell ('<exp>--<variant>--rN')
+      // and suppress the task-agnostic Working Memory scaffold for it (already read for the
+      // Phase-B capture below).
+      taskId: task_id,
     });
     result.meta.latency_ms = Date.now() - startMs;
     // Phase B: persist the structured capture keyed by the run id (best-effort).

@@ -24,6 +24,24 @@ import { buildWorkingMemory } from './working-memory.js';
 const COLLECTIONS = ['insights', 'digests', 'kg_entities', 'observations'];
 
 /**
+ * Curated "specialist know-how" tiers injected into EXPERIMENT cells. Insights are
+ * consolidated, verified know-how; kg_entities are structural facts. The episodic tiers
+ * (digests = session summaries, observations = raw session intents) are deliberately
+ * excluded for experiments — they record *what happened in past sessions*, not know-how,
+ * and for a benchmark task they are merely the log of prior runs of the same cell.
+ */
+const EXPERIMENT_CURATED_TIERS = new Set(['insights', 'kg_entities']);
+
+/**
+ * Marks KB content that is ABOUT the experiment/benchmark harness itself. Such content is
+ * excluded from injection into experiment cells so a cell is never fed the KB's record of
+ * its own benchmark (measurement hygiene). Targeted at this repo's harness vocabulary — the
+ * per-spec slugs ('compare-fizzbuzz', 'compare-overuse-help', …) plus the artifact phrasing
+ * — to keep false positives on genuine domain insights near zero.
+ */
+const EXPERIMENT_META_RE = /(compare-[a-z0-9]+|benchmark artifact|cross-agent comparison|experiment (matrix|harness|runner|cell))/i;
+
+/**
  * Orchestrates hybrid retrieval: embed query, parallel semantic + keyword search,
  * RRF fusion, and token-budgeted markdown assembly.
  */
@@ -113,15 +131,22 @@ export class RetrievalService {
    * @returns {Promise<{ markdown: string, meta: { query: string, budget: number, results_count: number, latency_ms: number } }>}
    */
   async retrieve(query, options = {}) {
-    const { budget = this.defaultBudget, threshold = this.scoreThreshold, context = null } = options;
+    const { budget = this.defaultBudget, threshold = this.scoreThreshold, context = null, taskId = null } = options;
+
+    // An experiment cell's id is '<exp>--<variant>--rN' (a bare session UUID never contains
+    // '--'). For those, suppress the task-agnostic Working Memory scaffold entirely — in a
+    // sandbox it is the wrong project's context and is exactly what made heavy-harness agents
+    // narrate the scaffold instead of doing the task. Interactive sessions (UUID) keep WM.
+    const isExperiment = /--/.test(String(taskId || ''));
 
     // Ensure initialized
     if (!this._initialized) {
       await this.initialize();
     }
 
-    // Step 0: Build working memory (fail-open, per D-03)
-    const wm = await buildWorkingMemory(this.codingRoot);
+    // Step 0: Build working memory (fail-open, per D-03). Skipped for experiment cells — the
+    // scaffold is suppressed for them regardless, and this also avoids the VKB round-trip.
+    const wm = isExperiment ? { markdown: '', tokens: 0 } : await buildWorkingMemory(this.codingRoot);
     const semanticBudget = Math.min(budget - wm.tokens, 700);
     // Ensure at least 100 tokens for semantic results even if WM overshoots
     const effectiveSemanticBudget = Math.max(semanticBudget, 100);
@@ -157,6 +182,29 @@ export class RetrievalService {
     // cannot discriminate topics. This step uses keyword overlap as a proxy.
     this._applyTopicRelevance(fused, query);
 
+    // Step 4.65: Relevance floor (minimal — "high quality, or nothing"). Drop items sharing
+    // NO topical keyword with the query (the 0.30× band _applyTopicRelevance annotates as
+    // _topicalOverlap === 0) so off-topic insights can never fill the token budget. Items left
+    // unannotated (no rrfScore, or the query carried no meaningful keywords) are KEPT: fail-open,
+    // preserving current behavior for keyword-less queries.
+    let relevant = fused.filter((r) => r._topicalOverlap === undefined || r._topicalOverlap > 0);
+
+    // Step 4.66: Experiment-cell quality gate ("specialist know-how, or nothing"). ONLY for
+    // experiment cells (taskId '<exp>--<variant>--rN'): (a) keep curated know-how tiers only
+    // (insights + kg_entities), dropping episodic digests/observations — session activity, not
+    // know-how, and for a benchmark task merely records of prior runs; (b) exclude content about
+    // the experiment/benchmark harness itself. For a trivial task with no relevant know-how (e.g.
+    // fizzbuzz) this leaves zero survivors → results_count 0 → nothing injected. Interactive
+    // sessions keep all tiers (untouched by this gate).
+    if (isExperiment) {
+      relevant = relevant.filter((r) => {
+        if (!EXPERIMENT_CURATED_TIERS.has(r.tier)) return false;
+        const p = r.payload || {};
+        const title = `${p.topic || ''} ${p.theme || ''} ${p.entityType || ''}`.toLowerCase();
+        return !EXPERIMENT_META_RE.test(title);
+      });
+    }
+
     // Step 4.7: Freshness rerank — demote insights whose backticked code
     // claims no longer exist on disk. The verifier (ObservationConsolidator.
     // verifyInsights) writes metadata.codeVerification.verificationRatio for
@@ -167,28 +215,34 @@ export class RetrievalService {
     // tier; digests/kg_entities/observations don't have a verification field.
     // Plan 44-18: async because the metadata lookup now goes through
     // km-core `findByLegacyId` (was a single SQLite SELECT).
-    await this._applyFreshnessRerank(fused);
+    await this._applyFreshnessRerank(relevant);
 
-    fused.sort((a, b) => b.rrfScore - a.rrfScore);
+    relevant.sort((a, b) => b.rrfScore - a.rrfScore);
 
-    // Step 5: Token-budgeted markdown assembly (semantic budget after WM)
-    const { markdown, tokensUsed, items } = assembleBudgetedMarkdown(fused, effectiveSemanticBudget);
+    // Step 5: Token-budgeted markdown assembly (semantic budget after WM). Assembled over the
+    // FLOORED set so the Phase-B `items` capture also reflects only high-quality items.
+    const { markdown, tokensUsed, items } = assembleBudgetedMarkdown(relevant, effectiveSemanticBudget);
 
-    // Combine: working memory prefix + semantic results
-    const finalMarkdown = wm.markdown ? wm.markdown + '\n\n' + markdown : markdown;
+    // Combine: working-memory prefix + semantic results. WM is included ONLY when at least one
+    // relevant item survived the floor AND this is not an experiment cell. With zero survivors
+    // `markdown` is '' → finalMarkdown '' → the hooks' `results_count === 0` gate injects nothing.
+    const includeWM = relevant.length > 0 && !!wm.markdown && !isExperiment;
+    const finalMarkdown = includeWM ? wm.markdown + '\n\n' + markdown : markdown;
+    const wmTokens = includeWM ? wm.tokens : 0;
 
-    // Return D-06 response shape (latency_ms set by caller). `items` (Phase B) is
-    // the structured subset actually injected — each with its rrfScore/score — so a
-    // caller can persist a per-item capture the dashboard renders as scored cards.
+    // Return D-06 response shape (latency_ms set by caller). `results_count` is the SURVIVOR
+    // count (post-floor), NOT the raw candidate count — that is what the hooks gate injection on.
+    // `items` (Phase B) is the structured subset actually injected — each with its rrfScore/score
+    // — so a caller can persist a per-item capture the dashboard renders as scored cards.
     return {
       markdown: finalMarkdown,
       items,
       meta: {
         query,
         budget,
-        results_count: fused.length,
-        tokens_used: wm.tokens + tokensUsed,
-        working_memory_tokens: wm.tokens,
+        results_count: relevant.length,
+        tokens_used: wmTokens + tokensUsed,
+        working_memory_tokens: wmTokens,
         latency_ms: 0,
       },
     };
@@ -522,6 +576,12 @@ export class RetrievalService {
       else if (exactTokenOverlap >= 2) multiplier *= 2.2;
 
       result.rrfScore *= multiplier;
+
+      // Annotate topical overlap so the relevance floor (in retrieve()) can DROP
+      // zero-overlap items rather than merely demote them. 0 == no substring AND no
+      // exact-token match with any query keyword (the 0.30× "almost never relevant"
+      // band). Results skipped above (no rrfScore) stay unannotated → kept (fail-open).
+      result._topicalOverlap = substringOverlap + exactTokenOverlap;
     }
   }
 
