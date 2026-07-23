@@ -860,15 +860,21 @@ async function main() {
     const evidenceRepoRoot = (cellCwd && fs.existsSync(cellCwd)) ? cellCwd : REPO_ROOT;
     const evidence = gatherEvidence({ span, phaseArg, repoRoot: evidenceRepoRoot });
     const consequential = trace ? filterConsequential(trace) : [];
-    //   Tri-state (build-trace.mjs D-02): trace===null means no trace FILE was located
-    //   (e.g. locator could not find the sandbox session) — this is NOT a genuine
-    //   trivial run and must NOT suppress the judge forever. Quarantine as pending so
-    //   experiments-recompute-score can re-judge once the trace becomes locatable. A
-    //   located-but-empty trace ([]) is a real trivial run (agent did <1 acting event).
-    if (trace === null) {
-      judgment = nullJudgment({ pending: true }); // locator miss → re-scorable, not trivial
+    //   A spec-driven EXPERIMENT cell (span carries a variant) is ALWAYS judged — even an
+    //   empty/no-op run. Such a cell has a real goal + test_command, so producing no
+    //   consequential events is a FAILURE (the judge scores goal≈0 from evidence: no diff,
+    //   failing test), which is the cross-agent comparison signal — NOT something to hide as
+    //   "trivial" (that omission is exactly why a derailed opencode/copilot cell showed blank
+    //   while claude scored). The "trivial"/pending short-circuits apply only to AMBIENT runs.
+    const isExperimentCell = span?.meta?.variant != null;
+    if (isExperimentCell) {
+      judgment = await runJudge({ span, trace: consequential, evidence, forceScore: true });
+    } else if (trace === null) {
+      //   Ambient run, no trace FILE located (D-02) → pending (re-scorable), not trivial.
+      judgment = nullJudgment({ pending: true });
     } else if (isTrivialRun(trace)) {
-      judgment = { not_scored: 'trivial' }; // D-04 trivial-run guard — proxy NEVER called
+      //   Ambient run that genuinely did <1 consequential thing → trivial (no goal to score).
+      judgment = { not_scored: 'trivial' };
     } else {
       judgment = await runJudge({ span, trace: consequential, evidence });
     }

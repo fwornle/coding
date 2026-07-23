@@ -68,6 +68,24 @@ describe('runJudge — trivial guard (D-04)', () => {
       goal_achieved: null, code_quality: null, test_coverage: null, regressions: null, spec_drift: null,
     });
   });
+
+  test('forceScore bypasses the trivial guard — an empty experiment cell IS judged (failure, not hidden)', async () => {
+    // A spec-driven cell that produced no consequential events is a FAILURE to score
+    // from evidence, not a "trivial" run to omit. With forceScore the proxy IS called
+    // even on an empty trace, and the judged verdict (here goal_achieved 0) is returned.
+    const failVerdict = {
+      goal_aligned_ratio: 0, event_labels: [], ratio_rationale: 'no work done',
+      rubric: { goal_achieved: 0, code_quality: null, test_coverage: 0, regressions: null, spec_drift: null },
+      rubric_rationale: 'agent wrote nothing; test fails',
+    };
+    const fake = makeFakeProxy(() => ({ content: JSON.stringify(failVerdict) }));
+
+    const j = await runJudge({ span: SPAN, trace: [], evidence: EVIDENCE, callProxy: fake, forceScore: true });
+
+    assert.equal(fake.calls, 1, 'proxy MUST be called for a force-scored experiment cell');
+    assert.notEqual(j.not_scored, 'trivial');
+    assert.equal(j.rubric.goal_achieved, 0);
+  });
 });
 
 describe('runJudge — proxy-failure quarantine (D-03)', () => {

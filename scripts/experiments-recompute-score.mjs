@@ -159,15 +159,18 @@ async function main() {
     const evidenceRepoRoot = (cellCwd && fs.existsSync(cellCwd)) ? cellCwd : REPO_ROOT;
     const evidence = gatherEvidence({ span, phaseArg, repoRoot: evidenceRepoRoot });
 
-    // Judge the rebuilt trace. Tri-state (D-02): trace===null means no trace FILE was
-    // located → quarantine as pending (re-scorable next recompute), NOT trivial. A
-    // located-but-empty [] is a genuine trivial run. Else runJudge does the ONE Haiku
-    // call and internally quarantines to pending (D-03).
-    const judgment = trace === null
-      ? nullJudgment({ pending: true })
-      : (isTrivialRun(trace)
-        ? { not_scored: 'trivial' }
-        : await runJudge({ span, trace: filterConsequential(trace), evidence }));
+    // Judge the rebuilt trace. A spec-driven EXPERIMENT cell (span carries a variant) is
+    // ALWAYS judged — even an empty run is a FAILURE to score (goal≈0 from evidence), never
+    // hidden as trivial. For ambient runs: trace===null → pending (re-scorable); located-but-
+    // empty [] → genuine trivial; else the ONE Haiku call (internally quarantines to pending).
+    const isExperimentCell = span?.meta?.variant != null;
+    const judgment = isExperimentCell
+      ? await runJudge({ span, trace: filterConsequential(trace), evidence, forceScore: true })
+      : (trace === null
+        ? nullJudgment({ pending: true })
+        : (isTrivialRun(trace)
+          ? { not_scored: 'trivial' }
+          : await runJudge({ span, trace: filterConsequential(trace), evidence })));
 
     // VALID-03 (76-03, D-08): overlay the deterministic non-GSD dims onto the
     // judgment (gap-fill only — never clobber a judged dim, skip trivial runs), so
