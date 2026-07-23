@@ -43,9 +43,15 @@ task_class: new-feature
 test_command: "node --test fizzbuzz.test.mjs"
 
 variants:
-  # REQUIRED agent (D-12) — claude via -p, alias model, --permission-mode acceptEdits.
+  # REQUIRED agent (D-12) — claude via -p, --permission-mode acceptEdits.
+  # PINNED to claude-sonnet-4-6 (not the `sonnet` alias) for cross-cell version PARITY:
+  # the alias resolves to the LATEST Sonnet in the CLI's tier, now Sonnet 5 — so it would
+  # run a different model than the opencode/copilot cells (both Sonnet 4.6), breaking the
+  # apples-to-apples comparison. The claude CLI's --model takes the full Anthropic ID in
+  # HYPHENATED form (claude-sonnet-4-6); the dotted `claude-sonnet-4.6` is a 404 typo here
+  # (it's only valid as the rapid-proxy / copilot CATALOG id used by the two cells below).
   - agent: claude
-    model: sonnet
+    model: claude-sonnet-4-6
     framework: straight
     env: default
   # REQUIRED agent (D-12) — opencode via `run`, model routed through rapid-proxy (:12435).

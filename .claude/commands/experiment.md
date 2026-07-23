@@ -67,7 +67,7 @@ Apply these deterministic rules so every agent behaves identically. This is **sp
 
    | Agent | model string to emit | notes |
    |-------|----------------------|-------|
-   | `claude` | alias: `opus` \| `sonnet` \| `haiku` | pick from the prose ("Sonnet" → `sonnet`); default `sonnet` |
+   | `claude` | pinned Anthropic id, HYPHENATED: `claude-opus-4-8` \| `claude-sonnet-4-6` \| `claude-haiku-4-5` | pick from the prose ("Sonnet" → `claude-sonnet-4-6`); default `claude-sonnet-4-6`. Pin the exact id — the `sonnet`/`opus` ALIASES resolve to the latest in-tier model (e.g. `sonnet`→Sonnet 5), which silently breaks version parity with the opencode/copilot cells. Dotted `claude-sonnet-4.6` 404s on the claude CLI path (that form is only the rapid-proxy/copilot catalog id). |
    | `opencode` | `rapid-proxy/claude-haiku-4-5` | proxy-routed BYOK model string |
    | `copilot` | `auto` | copilot picks; free-form, not blocked |
    | `mastracode` | as named, else `default` | best-effort |
@@ -187,9 +187,16 @@ SPEC_FILE=$(node scripts/experiment-write-spec.mjs \
   ${TEST_COMMAND:+--test-command "$TEST_COMMAND"} \
   --variants "$VARIANTS_JSON")
 # VARIANTS_JSON example (one entry per variant — flag pair or Step 0-NL synthesized):
-#   [{"agent":"claude","model":"sonnet","framework":"straight","env":"default"},
+#   [{"agent":"claude","model":"claude-sonnet-4-6","framework":"straight","env":"default"},
 #    {"agent":"opencode","model":"rapid-proxy/claude-sonnet-4.6","framework":"straight","env":"default"},
 #    {"agent":"copilot","model":"claude-sonnet-4.6","framework":"straight","env":"default"}]
+# MODEL STRING DIALECT (per-agent): the SAME Sonnet 4.6 is spelled three ways because each CLI has
+# its own resolver. claude → the HYPHENATED Anthropic id `claude-sonnet-4-6` (the CLI's --model takes
+# a full model name; the DOTTED `claude-sonnet-4.6` is a 404 typo on this path). opencode → the
+# rapid-proxy CATALOG id `rapid-proxy/claude-sonnet-4.6` (dotted). copilot → the copilot catalog id
+# `claude-sonnet-4.6` (dotted). PIN the claude cell to `claude-sonnet-4-6`, NOT the `sonnet` alias —
+# the alias resolves to the latest Sonnet in the tier (now Sonnet 5), which would silently run a
+# DIFFERENT model than the other cells and break cross-agent version parity.
 # MODEL TIER for agentic tasks: prefer sonnet+ for opencode/copilot cells. Verified (2/2 each)
 # that claude-haiku-4.5, under opencode's heavy agentic context (full system prompt + many tools),
 # NARRATES its plan instead of emitting tool_use — opencode's single-turn `run` then ends with no
