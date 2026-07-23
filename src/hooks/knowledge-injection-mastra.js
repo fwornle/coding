@@ -24,7 +24,10 @@ async function main() {
     } catch { /* no git or no commits -- skip */ }
 
     const result = await callRetrieval({
-      query: `project context for ${project}`,
+      // In an experiment cell the runner sets CODING_EXPERIMENT_GOAL to the task; retrieve on that
+      // real task (so the IDF pass + LLM judge have a task to judge against) instead of the generic
+      // project-context query used for interactive session-start injection.
+      query: process.env.CODING_EXPERIMENT_GOAL || `project context for ${project}`,
       budget: 1000,
       threshold: 0.65,
       context: { project, cwd, recent_files: recentFiles, agent: 'mastra' },

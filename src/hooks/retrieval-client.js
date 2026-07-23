@@ -22,11 +22,14 @@ import http from 'node:http';
  *   retrieval server persists a structured per-item capture keyed by it (Phase B), so
  *   the dashboard can show the exact injected Insights/Digests/Entities/Observations
  *   as scored cards. Equals the runs-table task_id (experiment slug or session UUID).
- * @param {number} [params.timeout=2000] - HTTP timeout in ms
+ * @param {number} [params.timeout=4500] - HTTP timeout in ms. 4500 (was 2000) so the server-side
+ *   LLM relevance judge (~2.5s, 3500ms cap) plus retrieval fit within a single retrieve; still <
+ *   the hooks' 5000ms SAFETY_TIMEOUT. The judge itself fails open, so a slow proxy never stalls the
+ *   hook (the request aborts and the hook injects nothing that turn).
  * @param {number} [params.port=3033] - Retrieval service port
  * @returns {Promise<object|null>} Parsed response or null (fail-open)
  */
-export function callRetrieval({ query, budget = 1000, threshold = 0.75, context = null, task_id = null, timeout = 2000, port = 3033 }) {
+export function callRetrieval({ query, budget = 1000, threshold = 0.75, context = null, task_id = null, timeout = 4500, port = 3033 }) {
   return new Promise((resolve) => {
     const payload = { query, budget, threshold };
     if (context != null) {

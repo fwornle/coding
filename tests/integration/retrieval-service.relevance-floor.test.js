@@ -68,8 +68,10 @@ describe('RetrievalService relevance floor + WM suppression (high-quality-or-not
   // semantic search returns; keyword search returns []. Freshness rerank is a no-op
   // (no km-core). codingRoot points at a temp dir holding a STATE.md so working
   // memory has deterministic content for the non-experiment path.
-  function makeService(candidates) {
-    const svc = new RetrievalService({ codingRoot });
+  // `judge` defaults to a deterministic pass-through so the floor / WM / tier tests are isolated
+  // from the LLM judge (which is unit-tested separately). Pass a custom judge to test integration.
+  function makeService(candidates, judge = async (_q, cands) => cands) {
+    const svc = new RetrievalService({ codingRoot, judge });
     svc._initialized = true; // skip fastembed/Qdrant warm-up
     svc.embeddingService = { embedOne: async () => new Array(384).fill(0.01) };
     svc._semanticSearch = async () => candidates.map((c) => ({ ...c, payload: { ...c.payload } }));
@@ -103,8 +105,8 @@ describe('RetrievalService relevance floor + WM suppression (high-quality-or-not
     process.stderr.write = origStderrWrite;
   });
 
-  // ── 1. Pure annotation: _topicalOverlap reflects keyword overlap ──────────────
-  test('_applyTopicRelevance annotates _topicalOverlap (0 for off-topic, >0 on-topic)', () => {
+  // ── 1. Pure annotation: _relevanceWeight reflects idf-weighted overlap ─────────
+  test('_applyTopicRelevance annotates _relevanceWeight (0 for off-topic, >0 on-topic)', () => {
     const results = [
       { id: 'on', tier: 'insights', rrfScore: 1, payload: { topic: 'Knowledge Injection Quality', summary_preview: '' } },
       { id: 'off', tier: 'insights', rrfScore: 1, payload: { topic: 'ETM Singleton Stall Reclaim', summary_preview: 'unrelated daemon watchdog' } },
@@ -113,9 +115,25 @@ describe('RetrievalService relevance floor + WM suppression (high-quality-or-not
     _applyTopicRelevanceDirect(results, 'knowledge injection quality relevance floor');
 
     const byId = Object.fromEntries(results.map((r) => [r.id, r]));
-    expect(byId.on._topicalOverlap).toBeGreaterThan(0);
-    expect(byId.off._topicalOverlap).toBe(0);
-    expect(byId.noscore._topicalOverlap).toBeUndefined(); // skipped (no rrfScore) → kept by floor
+    expect(byId.on._relevanceWeight).toBeGreaterThan(0);
+    expect(byId.off._relevanceWeight).toBe(0);
+    expect(byId.noscore._relevanceWeight).toBeUndefined(); // skipped (no rrfScore) → kept by floor
+  });
+
+  // ── 1b. IDF ranking: a rare-term match outranks a generic-word-only match ──────
+  test('IDF weighting ranks a rare-term match above a generic-word coincidence', () => {
+    // Pool where "root" is common (in 3/3) and "fizzbuzz" is rare (1/3). A query with both should
+    // give the fizzbuzz-matching item a far higher weight than the ones matching only "root".
+    const results = [
+      { id: 'rare', tier: 'insights', rrfScore: 1, payload: { topic: 'FizzBuzz Module Layout', summary_preview: 'root' } },
+      { id: 'gen1', tier: 'insights', rrfScore: 1, payload: { topic: 'Repo Root Cause Analysis', summary_preview: 'root' } },
+      { id: 'gen2', tier: 'insights', rrfScore: 1, payload: { topic: 'Root Path Resolver', summary_preview: 'root' } },
+    ];
+    _applyTopicRelevanceDirect(results, 'create fizzbuzz at the root');
+    const byId = Object.fromEntries(results.map((r) => [r.id, r]));
+    // "root" is in all 3 candidates → idf≈0 (floored to 0.05); "fizzbuzz" is in 1 → high idf.
+    expect(byId.rare._relevanceWeight).toBeGreaterThan(byId.gen1._relevanceWeight);
+    expect(byId.rare._relevanceWeight).toBeGreaterThan(byId.gen2._relevanceWeight);
   });
 
   // ── 2. Off-topic query → nothing injected (results_count 0, empty markdown) ───
@@ -192,16 +210,39 @@ describe('RetrievalService relevance floor + WM suppression (high-quality-or-not
     expect(res.markdown).toContain('## Working Memory');
   }, 30000);
 
-  // ── 4d. Experiment-meta insight is excluded (measurement hygiene) ──────────────
-  test('experiment cell excludes benchmark/harness self-reference → nothing for a benchmark task', async () => {
-    const svc = makeService([
-      insight('meta', 'compare-fizzbuzz Experiment — FizzBuzz Benchmark Artifact', 'controlled benchmark for cross-agent comparison'),
-    ]);
+  // ── 4d. LLM judge rejects self-reference → nothing (replaces the fixed meta-regex) ─
+  test('judge rejecting benchmark/self-reference yields nothing injected', async () => {
+    // Topically the insight matches (shares "fizzbuzz"); the JUDGE decides it is not useful
+    // know-how (it documents the benchmark, not how to do it) and returns [].
+    const rejectAll = async () => [];
+    const svc = makeService(
+      [insight('meta', 'FizzBuzz Benchmark Artifact', 'controlled fizzbuzz benchmark for cross-agent comparison')],
+      rejectAll,
+    );
     const res = await svc.retrieve('write a fizzbuzz function that returns Fizz Buzz FizzBuzz for multiples', {
       taskId: 'compare-fizzbuzz-v9--claude--r0',
     });
-    expect(res.meta.results_count).toBe(0); // the only topical insight is experiment-meta → excluded
+    expect(res.meta.results_count).toBe(0);
     expect(res.markdown).toBe('');
+  }, 30000);
+
+  // ── 4e. Judge keeps only the useful subset of topical survivors ────────────────
+  test('judge filters topical survivors to the useful subset', async () => {
+    // Both insights are topical to the query; the judge keeps only "a".
+    const keepA = async (_q, cands) => cands.filter((c) => c.id === 'a');
+    const svc = makeService(
+      [
+        insight('a', 'Knowledge Injection Quality', 'topic relevance floor for injected knowledge'),
+        insight('b', 'Knowledge Injection Dedup', 'near-duplicate knowledge injection collapsing'),
+      ],
+      keepA,
+    );
+    const res = await svc.retrieve('improve knowledge injection quality and relevance', {
+      taskId: '550e8400-e29b-41d4-a716-446655440000',
+    });
+    expect(res.meta.results_count).toBe(1);
+    expect(res.markdown).toContain('Knowledge Injection Quality');
+    expect(res.markdown).not.toContain('Knowledge Injection Dedup');
   }, 30000);
 
   // ── 5. Fizzbuzz experiment cell → truly nothing (the reported bug, end to end) ─
@@ -216,4 +257,56 @@ describe('RetrievalService relevance floor + WM suppression (high-quality-or-not
     expect(res.meta.results_count).toBe(0);
     expect(res.markdown).toBe('');
   }, 30000);
+});
+
+describe('relevance-judge (LLM precision gate — fail-open, parse, cache)', () => {
+  let judgeRelevance;
+  let _clearJudgeCache;
+
+  const cand = (id) => ({ id, tier: 'insights', payload: { topic: `Topic ${id}`, summary_preview: `about ${id}` } });
+  const fakeResp = (content) => ({ ok: true, json: async () => ({ content }) });
+
+  beforeAll(async () => {
+    const mod = await import('../../src/retrieval/relevance-judge.js');
+    judgeRelevance = mod.judgeRelevance;
+    _clearJudgeCache = mod._clearJudgeCache;
+  });
+  beforeEach(() => _clearJudgeCache());
+
+  test('keeps only the ids the model returns as useful', async () => {
+    const fetchImpl = async () => fakeResp('{"useful":["a"]}');
+    const kept = await judgeRelevance('task alpha', [cand('a'), cand('b'), cand('c')], { fetchImpl });
+    expect(kept.map((c) => c.id)).toEqual(['a']);
+  });
+
+  test('FAIL-OPEN: proxy error returns all candidates unchanged', async () => {
+    const fetchImpl = async () => { throw new Error('proxy down'); };
+    const input = [cand('a'), cand('b')];
+    const kept = await judgeRelevance('task beta', input, { fetchImpl });
+    expect(kept).toBe(input); // same array, nothing dropped
+  });
+
+  test('FAIL-OPEN: unparseable response returns all candidates', async () => {
+    const fetchImpl = async () => fakeResp('sorry, I cannot help with that');
+    const input = [cand('a'), cand('b')];
+    const kept = await judgeRelevance('task gamma', input, { fetchImpl });
+    expect(kept).toBe(input);
+  });
+
+  test('caches by (query, candidate-ids): second call does not hit the proxy', async () => {
+    let calls = 0;
+    const fetchImpl = async () => { calls += 1; return fakeResp('{"useful":["a"]}'); };
+    const input = [cand('a'), cand('b')];
+    const first = await judgeRelevance('task delta', input, { fetchImpl });
+    const second = await judgeRelevance('task delta', input, { fetchImpl });
+    expect(calls).toBe(1);
+    expect(first.map((c) => c.id)).toEqual(['a']);
+    expect(second.map((c) => c.id)).toEqual(['a']);
+  });
+
+  test('ignores ids the model invents that were not candidates', async () => {
+    const fetchImpl = async () => fakeResp('{"useful":["a","ghost"]}');
+    const kept = await judgeRelevance('task epsilon', [cand('a'), cand('b')], { fetchImpl });
+    expect(kept.map((c) => c.id)).toEqual(['a']);
+  });
 });

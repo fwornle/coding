@@ -97,6 +97,11 @@ WAVE_OVERRIDES = {
     # wave-analysis-* tags above, not the generic observation-writer route.
     'health-coordinator':                      CHEAP,
     'observation-writer':                      CHEAP,
+    # kb-relevance-judge (2026-07-23): the knowledge-injection precision gate runs on EVERY
+    # substantive prompt and must be fast — the default claude-code (CLI subprocess) route is
+    # ~2.8s and blows the retrieval timeout into fail-open (keeping noise). Pin to CHEAP (copilot/
+    # haiku, HTTP) so it returns in ~0.7s. Small prompt (≤12 candidate titles) → haiku is the tier.
+    'kb-relevance-judge':                      CHEAP,
     # LSL observation resolver (src/live-logging/LslObservationResolver.js —
     # the 30-min in-process obs-api sweep). Small prompt (a vague summary + a
     # 3-prompt LSL window) and small response (4-line template + a confidence

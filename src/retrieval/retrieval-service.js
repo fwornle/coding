@@ -19,6 +19,7 @@ import { KeywordSearch } from './keyword-search.js';
 import { rrfFuse, buildRecencyList, TIER_WEIGHTS, loadAgentProfiles } from './rrf-fusion.js';
 import { assembleBudgetedMarkdown } from './token-budget.js';
 import { buildWorkingMemory } from './working-memory.js';
+import { judgeRelevance } from './relevance-judge.js';
 
 /** Qdrant collection names matching embedding-config.json. */
 const COLLECTIONS = ['insights', 'digests', 'kg_entities', 'observations'];
@@ -32,14 +33,8 @@ const COLLECTIONS = ['insights', 'digests', 'kg_entities', 'observations'];
  */
 const EXPERIMENT_CURATED_TIERS = new Set(['insights', 'kg_entities']);
 
-/**
- * Marks KB content that is ABOUT the experiment/benchmark harness itself. Such content is
- * excluded from injection into experiment cells so a cell is never fed the KB's record of
- * its own benchmark (measurement hygiene). Targeted at this repo's harness vocabulary — the
- * per-spec slugs ('compare-fizzbuzz', 'compare-overuse-help', …) plus the artifact phrasing
- * — to keep false positives on genuine domain insights near zero.
- */
-const EXPERIMENT_META_RE = /(compare-[a-z0-9]+|benchmark artifact|cross-agent comparison|experiment (matrix|harness|runner|cell))/i;
+/** Judge at most this many top-ranked candidates in one batched LLM call. */
+const JUDGE_TOP_K = 12;
 
 /**
  * Orchestrates hybrid retrieval: embed query, parallel semantic + keyword search,
@@ -83,6 +78,10 @@ export class RetrievalService {
       || new URL('../../', import.meta.url).pathname.replace(/\/$/, '');
     this._initialized = false;
     this._initPromise = null;
+    // LLM relevance judge (precision gate). Instance property so tests can inject a deterministic
+    // stub (mirrors the _semanticSearch / _applyFreshnessRerank override pattern). Fail-open lives
+    // inside judgeRelevance itself.
+    this._judge = options.judge ?? judgeRelevance;
   }
 
   /**
@@ -182,27 +181,21 @@ export class RetrievalService {
     // cannot discriminate topics. This step uses keyword overlap as a proxy.
     this._applyTopicRelevance(fused, query);
 
-    // Step 4.65: Relevance floor (minimal — "high quality, or nothing"). Drop items sharing
-    // NO topical keyword with the query (the 0.30× band _applyTopicRelevance annotates as
-    // _topicalOverlap === 0) so off-topic insights can never fill the token budget. Items left
-    // unannotated (no rrfScore, or the query carried no meaningful keywords) are KEPT: fail-open,
-    // preserving current behavior for keyword-less queries.
-    let relevant = fused.filter((r) => r._topicalOverlap === undefined || r._topicalOverlap > 0);
+    // Step 4.65: IDF relevance floor. Drop items sharing NO discriminating keyword with the query
+    // (_relevanceWeight === 0: no overlap, or only terms present in EVERY candidate). IDF governs
+    // RANK (rare-term matches rise); this floor is intentionally lenient because the LLM judge
+    // below — not this heuristic — is the precision gate. Unannotated items (no rrfScore, or a
+    // keyword-less query) are KEPT (fail-open).
+    let relevant = fused.filter((r) => r._relevanceWeight === undefined || r._relevanceWeight > 0);
 
-    // Step 4.66: Experiment-cell quality gate ("specialist know-how, or nothing"). ONLY for
-    // experiment cells (taskId '<exp>--<variant>--rN'): (a) keep curated know-how tiers only
-    // (insights + kg_entities), dropping episodic digests/observations — session activity, not
-    // know-how, and for a benchmark task merely records of prior runs; (b) exclude content about
-    // the experiment/benchmark harness itself. For a trivial task with no relevant know-how (e.g.
-    // fizzbuzz) this leaves zero survivors → results_count 0 → nothing injected. Interactive
-    // sessions keep all tiers (untouched by this gate).
+    // Step 4.66: Experiment-cell structural gate. ONLY for experiment cells (taskId
+    // '<exp>--<variant>--rN'): keep curated know-how tiers (insights + kg_entities), dropping
+    // episodic digests/observations — session activity, not know-how, and for a benchmark task
+    // merely records of prior runs. (Self-reference / benchmark-meta exclusion is now handled
+    // semantically by the LLM judge below, so the old fixed EXPERIMENT_META_RE regex is gone.)
+    // Interactive sessions keep all tiers.
     if (isExperiment) {
-      relevant = relevant.filter((r) => {
-        if (!EXPERIMENT_CURATED_TIERS.has(r.tier)) return false;
-        const p = r.payload || {};
-        const title = `${p.topic || ''} ${p.theme || ''} ${p.entityType || ''}`.toLowerCase();
-        return !EXPERIMENT_META_RE.test(title);
-      });
+      relevant = relevant.filter((r) => EXPERIMENT_CURATED_TIERS.has(r.tier));
     }
 
     // Step 4.7: Freshness rerank — demote insights whose backticked code
@@ -219,8 +212,20 @@ export class RetrievalService {
 
     relevant.sort((a, b) => b.rrfScore - a.rrfScore);
 
+    // Step 4.8: LLM relevance judge (precision gate, applied everywhere). The cheap hybrid + IDF
+    // pass has good recall but can't tell "shares a generic word" from "genuinely useful for THIS
+    // task" — so a batched LLM call over the top-K survivors keeps only the items that actually
+    // help accomplish `query`. This replaces the brittle fixed-keyword exclusion and generalizes
+    // to any task/benchmark. FAIL-OPEN: judgeRelevance returns its input unchanged on any proxy
+    // error/timeout/unparseable response, so a proxy outage degrades to the IDF-floored set —
+    // never to empty, never blocking. Cached per (query, candidate-ids). Only the top-K are judged
+    // (that is all the token budget can hold); the tail is dropped, which is the IDF trim.
+    relevant = await this._judge(query, relevant.slice(0, JUDGE_TOP_K), {
+      log: (m) => process.stderr.write(m),
+    });
+
     // Step 5: Token-budgeted markdown assembly (semantic budget after WM). Assembled over the
-    // FLOORED set so the Phase-B `items` capture also reflects only high-quality items.
+    // judged set so the Phase-B `items` capture also reflects only genuinely-useful items.
     const { markdown, tokensUsed, items } = assembleBudgetedMarkdown(relevant, effectiveSemanticBudget);
 
     // Combine: working-memory prefix + semantic results. WM is included ONLY when at least one
@@ -521,67 +526,52 @@ export class RetrievalService {
 
     if (queryWords.size === 0) return;
 
-    for (const result of results) {
-      if (!result.rrfScore) continue;
+    // Text extractors shared by the IDF pre-pass and the scoring loop.
+    const topicTextOf = (p) => [p.topic || '', p.theme || '', p.summary_preview || ''].join(' ').toLowerCase();
+    const topicTokensOf = (p) => new Set(
+      ((p.topic || '') + ' ' + (p.theme || '')).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean),
+    );
 
+    // IDF over the CANDIDATE POOL (no external corpus needed): df = how many candidates a query
+    // term appears in; idf = log((N+1)/(df+1)). A generic word present in most candidates
+    // ("root", "function", "create") → idf≈0 and stops driving relevance; a rare, discriminating
+    // word ("fizzbuzz", "statusline", "ETM") → high idf and dominates. This is what fixes the
+    // keyword-overlap leak WITHOUT any fixed word list. Only results with an rrfScore participate.
+    const scored = results.filter((r) => r.rrfScore);
+    const N = scored.length;
+    const df = new Map();
+    for (const w of queryWords) df.set(w, 0);
+    for (const result of scored) {
+      const hay = topicTextOf(result.payload || {});
+      for (const w of queryWords) if (hay.includes(w)) df.set(w, df.get(w) + 1);
+    }
+    // Floor each term's idf at a small epsilon so ANY genuine overlap keeps the item alive for the
+    // LLM judge (the judge, not this heuristic, is the precision gate) while idf still governs RANK.
+    const idf = (w) => Math.max(Math.log((N + 1) / ((df.get(w) || 0) + 1)), 0.05);
+
+    for (const result of scored) {
       const p = result.payload || {};
+      const topicText = topicTextOf(p);
+      const topicTokens = topicTokensOf(p);
 
-      // Substring-overlap target: topic + theme + summary_preview
-      const topicText = [
-        p.topic || '',
-        p.theme || '',
-        p.summary_preview || '',
-      ].join(' ').toLowerCase();
-
-      // Exact-token target: ONLY topic/theme (the named field — title-like).
-      // Tokenize on non-alphanumerics so "Tmux Statusline Renderer" yields
-      // ['tmux','statusline','renderer'] — a query word "statusline" matches
-      // the whole token, not just any substring.
-      const topicTokens = new Set(
-        ((p.topic || '') + ' ' + (p.theme || ''))
-          .toLowerCase()
-          .split(/[^a-z0-9]+/)
-          .filter(Boolean)
-      );
-
-      // Count overlaps in both modes
-      let substringOverlap = 0;
-      let exactTokenOverlap = 0;
+      // IDF-weighted relevance: sum idf of substring-overlapping terms, plus a half-idf bonus for
+      // exact topic-TOKEN matches (a title-word hit is the strongest signal short of the LLM).
+      let weight = 0;
       for (const word of queryWords) {
-        if (topicText.includes(word)) substringOverlap++;
-        if (topicTokens.has(word)) exactTokenOverlap++;
+        if (topicText.includes(word)) weight += idf(word);
+        if (topicTokens.has(word)) weight += idf(word) * 0.5;
       }
 
-      // Substring band — broad signal, governs the base multiplier.
-      // 0   → 0.30× (hard demote, was 0.40×): an item with no topical overlap
-      //      at all is almost never what the user is asking about, even if
-      //      the embedding model thinks it's similar.
-      // 1   → 1.00× (neutral): one accidental substring hit is too weak.
-      // 2   → 1.50× (boost, was 1.00× neutral): two overlapping words is a
-      //      meaningful topical signal.
-      // 3+  → 1.90× (strong boost, was 1.30×): high topical overlap.
-      let multiplier = 1.0;
-      if (substringOverlap === 0) multiplier = 0.30;
-      else if (substringOverlap === 1) multiplier = 1.00;
-      else if (substringOverlap === 2) multiplier = 1.50;
-      else multiplier = 1.90;
-
-      // Exact-token band — narrow signal, compounds with substring band.
-      // Matching a whole token of the topic with a query word is the
-      // strongest topical signal we have without an LLM in the loop.
-      // 1   → ×1.6 compound (e.g. query "statusline drift" matches topic
-      //      "Tmux Statusline Renderer" on "statusline").
-      // 2+  → ×2.2 compound (query saturates the topic).
-      if (exactTokenOverlap === 1) multiplier *= 1.6;
-      else if (exactTokenOverlap >= 2) multiplier *= 2.2;
-
+      // Rank multiplier: no overlap → 0.30× hard demote (floored out below); otherwise scale with
+      // the idf weight (capped) so rare-term matches outrank generic-word coincidences and land in
+      // the top-K handed to the judge.
+      const multiplier = weight <= 0 ? 0.30 : Math.min(0.5 + weight, 6);
       result.rrfScore *= multiplier;
 
-      // Annotate topical overlap so the relevance floor (in retrieve()) can DROP
-      // zero-overlap items rather than merely demote them. 0 == no substring AND no
-      // exact-token match with any query keyword (the 0.30× "almost never relevant"
-      // band). Results skipped above (no rrfScore) stay unannotated → kept (fail-open).
-      result._topicalOverlap = substringOverlap + exactTokenOverlap;
+      // Annotate for the relevance floor in retrieve(). weight === 0 ⇒ no query term overlaps at
+      // all (or only terms present in EVERY candidate) ⇒ drop. Unscored results (no rrfScore) stay
+      // unannotated ⇒ kept (fail-open).
+      result._relevanceWeight = weight;
     }
   }
 
