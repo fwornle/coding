@@ -197,11 +197,11 @@ function buildRerunPrefill(run: Run, specs: SpecSummary[]): {
 // plain-language description (surfaced as a header tooltip + a ↑/↓ direction glyph)
 // so a bare "1.00" is self-explanatory and the mixed direction is visible.
 const DIM_META: Record<string, { label: string; better: 'higher' | 'lower'; desc: string }> = {
-  goal_achieved: { label: 'Goal', better: 'higher', desc: 'Goal achieved — did the run accomplish its stated goal? Scale 0–1; higher is better (1 = fully achieved).' },
-  code_quality: { label: 'Quality', better: 'higher', desc: 'Code quality of the result. Scale 0–1; higher is better.' },
-  test_coverage: { label: 'Coverage', better: 'higher', desc: 'Test coverage of the change. Scale 0–1; higher is better.' },
-  regressions: { label: 'Regress.', better: 'lower', desc: 'Regressions introduced. 0 or 1; lower is better (0 = none).' },
-  spec_drift: { label: 'Drift', better: 'lower', desc: 'Drift from the spec/intent. Scale 0–1; lower is better (0 = on-spec).' },
+  goal_achieved: { label: 'Goal', better: 'higher', desc: 'Goal achieved — did the run accomplish its stated goal? LLM-judged (Opus) from the VERIFICATION verdict + test summary + goal-vs-diff. Scale 0–1; higher is better (1 = fully achieved). "—" = no evidence to judge (never treated as 0).' },
+  code_quality: { label: 'Quality', better: 'higher', desc: 'Code quality of the result — LLM-judged from diff size + code-review findings. Scale 0–1; higher is better. "—" = no code evidence available (e.g. the diffstat did not capture the change). NOTE: the judge never sees file contents, so this is a coarse signal.' },
+  test_coverage: { label: 'Coverage', better: 'higher', desc: 'Test coverage of the change — judged from test pass-rate + new-tests-for-new-code ratio. Scale 0–1; higher is better. <1 is usually an evidence-completeness discount (judge could not fully confirm), not a specific missing test. "—" = no test evidence.' },
+  regressions: { label: 'Regress.', better: 'lower', desc: 'Regressions introduced — tests that broke and were NOT introduced by this run. Binary 0 or 1; lower is better (0 = none). "—" = no evidence.' },
+  spec_drift: { label: 'Drift', better: 'lower', desc: 'Drift from the spec/intent (divergence from the PLAN.md task list, else the goal sentence). Scale 0–1; lower is better (0 = on-spec). "—" = null (no plan to diverge from — the common case for freeform goals).' },
 }
 
 // Render a single number (or em-dash for null). NEVER coerce null to 0.
@@ -239,6 +239,12 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
   const eff = effective(dim, run.score)
   const edited = isEdited(dim, run.score)
   const judgedVal = judged(dim, run.score)
+  const meta = DIM_META[dim]
+  // The judge's own explanation of the score, persisted per run (judge.mjs → score-write.mjs).
+  // rubric_rationale covers the 5 dims; ratio_rationale explains goal_aligned_ratio (best for Goal).
+  const rubricRat = typeof run.score?.rubric_rationale === 'string' ? run.score.rubric_rationale.trim() : ''
+  const ratioRat = typeof run.score?.ratio_rationale === 'string' ? run.score.ratio_rationale.trim() : ''
+  const why = dim === 'goal_achieved' ? (ratioRat || rubricRat) : rubricRat
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -336,18 +342,25 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
     </span>
   )
 
+  // Always-on hover tooltip: what the dimension measures (desc), this run's value, the judge's own
+  // rationale for the score ("why not 1.0"), and — when overridden — the pre-edit judged value.
   return (
     <span onClick={(e) => e.stopPropagation()}>
-      {edited ? (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>{view}</TooltipTrigger>
-            <TooltipContent>
-              Judged: {judgedVal == null ? '—' : judgedVal.toFixed(2)}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      ) : view}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{view}</TooltipTrigger>
+          <TooltipContent className="max-w-sm space-y-1 text-left">
+            <p className="font-medium">{meta?.label ?? dim}: {eff == null ? '—' : eff.toFixed(2)}</p>
+            {meta?.desc && <p className="text-xs opacity-80">{meta.desc}</p>}
+            {edited && (
+              <p className="text-xs">Judged (before your edit): {judgedVal == null ? '—' : judgedVal.toFixed(2)}</p>
+            )}
+            {why
+              ? <p className="text-xs"><span className="opacity-70">Why this run scored this: </span>{why}</p>
+              : <p className="text-xs opacity-70">No judge rationale recorded for this run.</p>}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       {inlineError && !editing && (
         <p className="mt-1 text-xs text-status-error" role="alert">{inlineError}</p>
       )}
@@ -843,7 +856,19 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                 </TableHead>
               )
             })}
-            <TableHead className="group relative text-right">Tokens<ColResize colId="tokens" onStart={startResize} /></TableHead>
+            <TableHead className="group relative text-right">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex cursor-help items-center">Tokens</span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm text-left">
+                    Total tokens for the run (input + output + cache). Dominated by the agent HARNESS, not the model — heavyweight harnesses (opencode, copilot) load a large system prompt + full tool schemas + repo context (~100k), while a lean <code>claude -p</code> single-shot is a few thousand. Capture also varies by agent (claude foreground tokens arrive via a file-adapter and can under-report). Compare WITHIN an agent, not across.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <ColResize colId="tokens" onStart={startResize} />
+            </TableHead>
             <TableHead className="group relative">Reconciliation<ColResize colId="reconciliation" onStart={startResize} /></TableHead>
             {/* Actions header: label is sr-only (the buttons speak for themselves),
                 but the cell stays visible so its resize handle is reachable. */}
@@ -925,7 +950,19 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                 <TableCell className="text-right font-mono text-sm">
                   {run.outcome?.totalTokens == null
                     ? <span className="text-muted-foreground">—</span>
-                    : run.outcome.totalTokens.toLocaleString()}
+                    : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">{run.outcome.totalTokens.toLocaleString()}</span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-sm text-left">
+                            <p className="font-medium">{run.outcome.totalTokens.toLocaleString()} tokens{typeof run.agent === 'string' ? ` · ${run.agent}` : ''}</p>
+                            <p className="text-xs opacity-80">Input + output + cache for this run. Mostly agent-harness overhead (system prompt + tool schemas + repo context), not model efficiency — comparable only to other runs of the SAME agent. A suspiciously small claude number can be a foreground-capture gap, not a real efficiency win.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                 </TableCell>
                 {/* D-12 per-run reconciliation badge — renders one of the three
                     pinned states from VERBATIM Plan-02 summary data; absent (no

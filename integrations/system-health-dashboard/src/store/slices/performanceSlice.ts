@@ -27,6 +27,11 @@ export interface RunScore {
   corrected_spec_drift?: number | null
   overridden_by?: string | null
   overridden_at?: string | null
+  // Judge rationale (persisted by judge.mjs → score-write.mjs). rubric_rationale explains the 5-dim
+  // scores; ratio_rationale explains goal_aligned_ratio. Surfaced as per-value hover tooltips so a
+  // bare "0.70" is explainable ("why not 1.0"). Already present in the API payload; typed here.
+  rubric_rationale?: string | null
+  ratio_rationale?: string | null
   pending?: boolean | null
   // WR-02: the writer (lib/experiments/score-write.mjs / judge.mjs) persists
   // this as the string literal 'trivial' (D-04) or null — NOT a boolean. The
