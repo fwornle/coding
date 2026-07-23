@@ -15,7 +15,7 @@ import {
 } from '@/store/slices/performanceSlice'
 import { normalizeModel } from './models'
 import { ROLE_META, ROLE_ORDER, summarizeByRole, type Role, type RoleStat } from './roles'
-import { effective, SCORE_DIMENSIONS } from './corrected-wins'
+import { effective, isExperimentCell, EXPERIMENT_DRIFT_NOTE, SCORE_DIMENSIONS } from './corrected-wins'
 
 // C: side-by-side run comparison. Picks two runs (e.g. the same task with a
 // different foreground model) and contrasts them by ROLE — foreground vs
@@ -66,6 +66,9 @@ interface MetricRow {
   better: Better
   digits?: number
   group?: boolean
+  // Redundant for this pairing (Drift when BOTH runs are experiment cells) — the
+  // row renders muted with an explanatory title so it does not read as signal.
+  muted?: boolean
 }
 
 function RunPicker({ value, onChange, runs, label, exclude }: {
@@ -134,6 +137,9 @@ export function RunCompare() {
   const statsB = summarizeByRole(bRows, runB)
 
   const scoreVal = (run: Run | null, dim: string) => (run ? effective(dim, run.score) : null)
+  // Drift is redundant with Goal only when BOTH sides are experiment cells (freeform
+  // goals). If either run is a GSD/interactive run with a real PLAN.md, keep it lit.
+  const driftRedundant = isExperimentCell(runA) && isExperimentCell(runB)
 
   const rows: MetricRow[] = [
     ...ROLE_ORDER.flatMap((role): MetricRow[] => [
@@ -153,6 +159,7 @@ export function RunCompare() {
       better: (dim === 'regressions' || dim === 'spec_drift') ? 'lower' : 'higher',
       digits: 2,
       group: dim === 'goal_achieved',
+      muted: dim === 'spec_drift' && driftRedundant,
     })),
   ]
 
@@ -192,8 +199,12 @@ export function RunCompare() {
               </thead>
               <tbody>
                 {rows.map((row, i) => (
-                  <tr key={i} className={`border-b last:border-0 ${row.group ? 'border-t-2 border-t-muted' : ''}`}>
-                    <td className="px-3 py-1.5 text-muted-foreground">{row.label}</td>
+                  <tr
+                    key={i}
+                    className={`border-b last:border-0 ${row.group ? 'border-t-2 border-t-muted' : ''} ${row.muted ? 'opacity-60' : ''}`}
+                    title={row.muted ? EXPERIMENT_DRIFT_NOTE : undefined}
+                  >
+                    <td className="px-3 py-1.5 text-muted-foreground">{row.muted ? <span className="italic">{row.label} <span className="text-xs">(redundant)</span></span> : row.label}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtNum(row.a, row.digits)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtNum(row.b, row.digits)}</td>
                     <td className="px-3 py-1.5 text-right"><Delta a={row.a} b={row.b} better={row.better} digits={row.digits} /></td>

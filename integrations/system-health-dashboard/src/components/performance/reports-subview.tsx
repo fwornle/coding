@@ -21,7 +21,7 @@ import {
   type Report,
   type Run,
 } from '@/store/slices/performanceSlice'
-import { effective, SCORE_DIMENSIONS } from './corrected-wins'
+import { effective, isExperimentCell, EXPERIMENT_DRIFT_NOTE, SCORE_DIMENSIONS } from './corrected-wins'
 
 // D-04 / D-05 / DASH-03 Saved Reports sub-view. Lives as a "Reports" TabsContent
 // INSIDE the Performance tab (NOT a top-level nav tab). ALL state comes from the
@@ -84,11 +84,20 @@ function SnapshotTable({ rows }: { rows: Run[] }) {
               <TableCell className="text-sm">
                 {run.task_class ?? <span className="text-muted-foreground">unclassified</span>}
               </TableCell>
-              {SCORE_DIMENSIONS.map((dim) => (
-                <TableCell key={dim} className="text-right font-mono text-sm">
-                  {num(effective(dim, run.score))}
-                </TableCell>
-              ))}
+              {SCORE_DIMENSIONS.map((dim) => {
+                // Drift is redundant with Goal for experiment cells (freeform goal,
+                // no PLAN.md) — mute it so it reads as a demoted, non-independent value.
+                const redundant = dim === 'spec_drift' && isExperimentCell(run)
+                return (
+                  <TableCell
+                    key={dim}
+                    className={`text-right font-mono text-sm ${redundant ? 'italic text-muted-foreground/60' : ''}`}
+                    title={redundant ? EXPERIMENT_DRIFT_NOTE : undefined}
+                  >
+                    {num(effective(dim, run.score))}
+                  </TableCell>
+                )
+              })}
             </TableRow>
           ))}
         </TableBody>

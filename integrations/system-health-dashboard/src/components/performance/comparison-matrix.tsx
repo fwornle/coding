@@ -16,6 +16,7 @@ import {
   type VariantEntry,
   type MetricStat,
 } from '@/store/slices/performanceSlice'
+import { EXPERIMENT_DRIFT_NOTE } from './corrected-wins'
 
 // CMP-04 (Phase 80): the variant-comparison matrix. Variants render as COLUMNS,
 // metrics/variance/gate as ROWS (transposed vs runs-table), ranked best-first
@@ -140,16 +141,33 @@ function VariantsMatrix({ entries, ranked }: { entries: VariantEntry[]; ranked: 
             </TableRow>
           )}
           {/* metric rows */}
-          {METRIC_ROWS.map((m) => (
-            <TableRow key={m.key}>
-              <TableCell className="text-muted-foreground">{m.label}</TableCell>
-              {entries.map((e) => (
-                <TableCell key={e.variant} className="text-right">
-                  <MetricCell stat={e.metrics[m.key]} digits={m.digits} />
+          {METRIC_ROWS.map((m) => {
+            // This matrix ONLY ever shows experiment variants (keyed by task_hash),
+            // so Spec drift is always redundant with Goal achieved here — mute the
+            // whole row and explain why on the label.
+            const redundant = m.key === 'spec_drift'
+            return (
+              <TableRow key={m.key} className={redundant ? 'opacity-60' : ''}>
+                <TableCell className="text-muted-foreground">
+                  {redundant ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help italic">{m.label} <span className="text-xs">(redundant)</span></span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">{EXPERIMENT_DRIFT_NOTE}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : m.label}
                 </TableCell>
-              ))}
-            </TableRow>
-          ))}
+                {entries.map((e) => (
+                  <TableCell key={e.variant} className="text-right">
+                    <MetricCell stat={e.metrics[m.key]} digits={m.digits} />
+                  </TableCell>
+                ))}
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
     </div>

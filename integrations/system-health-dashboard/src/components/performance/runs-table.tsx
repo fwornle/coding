@@ -38,7 +38,7 @@ import {
   type VariantOverride,
   type SpecSummary,
 } from '@/store/slices/performanceSlice'
-import { effective, isEdited, judged, SCORE_DIMENSIONS } from './corrected-wins'
+import { effective, isEdited, judged, isExperimentCell, EXPERIMENT_DRIFT_NOTE, SCORE_DIMENSIONS } from './corrected-wins'
 import { distinctModels, normalizeModel } from './models'
 import { ReconciliationBadge } from './reconciliation-badge'
 
@@ -201,7 +201,7 @@ const DIM_META: Record<string, { label: string; better: 'higher' | 'lower'; desc
   code_quality: { label: 'Quality', better: 'higher', desc: 'Code quality of the result — LLM-judged from diff size + code-review findings. Scale 0–1; higher is better. "—" = no code evidence available (e.g. the diffstat did not capture the change). NOTE: the judge never sees file contents, so this is a coarse signal.' },
   test_coverage: { label: 'Coverage', better: 'higher', desc: 'Test coverage of the change — judged from test pass-rate + new-tests-for-new-code ratio. Scale 0–1; higher is better. <1 is usually an evidence-completeness discount (judge could not fully confirm), not a specific missing test. "—" = no test evidence.' },
   regressions: { label: 'Regress.', better: 'lower', desc: 'Regressions introduced — tests that broke and were NOT introduced by this run. Binary 0 or 1; lower is better (0 = none). "—" = no evidence.' },
-  spec_drift: { label: 'Drift', better: 'lower', desc: 'Drift from the spec/intent (divergence from the PLAN.md task list, else the goal sentence). Scale 0–1; lower is better (0 = on-spec). "—" = null (no plan to diverge from — the common case for freeform goals).' },
+  spec_drift: { label: 'Drift', better: 'lower', desc: 'Drift from the spec/intent (divergence from the PLAN.md task list, else the goal sentence). Scale 0–1; lower is better (0 = on-spec). "—" = null (no plan to diverge from — the common case for freeform goals). ' + EXPERIMENT_DRIFT_NOTE },
 }
 
 // Render a single number (or em-dash for null). NEVER coerce null to 0.
@@ -245,6 +245,10 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
   const rubricRat = typeof run.score?.rubric_rationale === 'string' ? run.score.rubric_rationale.trim() : ''
   const ratioRat = typeof run.score?.ratio_rationale === 'string' ? run.score.ratio_rationale.trim() : ''
   const why = dim === 'goal_achieved' ? (ratioRat || rubricRat) : rubricRat
+  // For experiment cells the Drift value is redundant with Goal (freeform goal, no
+  // PLAN.md to diverge from) — render it muted so it does not read as independent
+  // signal. Still editable/overridable; only the resting display is demoted.
+  const redundant = dim === 'spec_drift' && isExperimentCell(run)
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -329,7 +333,7 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
       onClick={(e) => { e.stopPropagation(); beginEdit() }}
       onFocus={beginEdit}
     >
-      <span className="font-mono">{num(eff)}</span>
+      <span className={`font-mono ${redundant ? 'italic text-muted-foreground/60' : ''}`}>{num(eff)}</span>
       {edited && (
         <Badge
           variant="outline"
@@ -351,6 +355,7 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
           <TooltipTrigger asChild>{view}</TooltipTrigger>
           <TooltipContent className="max-w-sm space-y-1 text-left">
             <p className="font-medium">{meta?.label ?? dim}: {eff == null ? '—' : eff.toFixed(2)}</p>
+            {redundant && <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{EXPERIMENT_DRIFT_NOTE}</p>}
             {meta?.desc && <p className="text-xs opacity-80">{meta.desc}</p>}
             {edited && (
               <p className="text-xs">Judged (before your edit): {judgedVal == null ? '—' : judgedVal.toFixed(2)}</p>
