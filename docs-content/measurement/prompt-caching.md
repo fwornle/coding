@@ -275,8 +275,13 @@ Point it at a `rapid-proxy/<claude-model>` model so it uses the Anthropic wire; 
 
 ---
 
+Everything on this page is visible per-run in the dashboard's **Context & caching** explainer — the billed-by-cache breakdown, the explicit-vs-implicit wire explanation, and the per-turn stacked bar chart:
+
+![Caching detail in the Context & caching explainer — billed-by-cache bar, wire explanation, per-turn chart, wire table](../images/measurement-context-caching.png)
+
 ## See also
 
+- [Dashboard Reference → Context & Caching explainer](dashboard-reference.md#context-caching-explainer) — every field and tooltip in that modal
 - [Measurement Architecture](architecture.md) — how a run's tokens are captured and split
 - [Token Usage](../architecture/token-usage.md) — the token accounting model
 - [LLM CLI Proxy](../integrations/llm-cli-proxy.md) — the proxy that forwards every request

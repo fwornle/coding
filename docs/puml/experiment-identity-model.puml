@@ -1,0 +1,47 @@
+@startuml experiment-identity-model
+!include _standard-style.puml
+
+title Experiment Identity — composite task_id vs task_hash vs experiment-RUN id
+top to bottom direction
+
+component "Goal sentence\n(what the agent must achieve)" as goal <<util>>
+
+package "Per-cell identity" as cell_pkg {
+  component "composite task_id\n<exp-id>[-<salt>]--<agent>-<model>-<framework>-<env>--rN" as tid <<core>>
+  note right of tid
+    The "--" delimiter marks an experiment cell.
+    Both the dashboard AND the KB-injection gate
+    detect a cell via /--/.test(task_id).
+    A bare session UUID never contains "--".
+  end note
+}
+
+package "Cross-cell identity" as hash_pkg {
+  component "task_hash = sha256(goal_sentence)\n(shared by ALL cells & re-runs of one goal)" as hash <<core>>
+  note right of hash
+    The experiment identity — Compare-tab key.
+    Re-derive: printf '%s' "$GOAL" | shasum -a 256.
+    Do NOT scrape runner stdout (prints task_id).
+  end note
+}
+
+package "Grouping identity" as group_pkg {
+  component "experiment-RUN id\n= task_id prefix before first '--'\n(experimentRunId())" as runid <<core>>
+  note right of runid
+    The Runs-table grouping key — one collapsible
+    parent per experiment-run, so v9 / v10 / re-runs
+    do NOT collapse into one giant parent.
+  end note
+}
+
+goal --> hash : sha256
+goal --> tid : + variant + repeat
+tid --> runid : prefix before "--"
+
+component "Runs table\n(grouped parents)" as runs <<api>>
+component "Compare tab\n(variant matrix)" as cmp <<api>>
+
+runid --> runs : group by
+hash --> cmp : key by
+
+@enduml

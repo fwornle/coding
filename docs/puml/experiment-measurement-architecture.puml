@@ -8,60 +8,80 @@ actor "Operator" as op
 
 package "Skill / CLI Layer" as cli_layer {
   component "/experiment skill\n(plain-English or flags)" as skill <<cli>>
-  component "experiment-run.mjs\n(matrix runner)" as runner <<cli>>
+  component "experiment-write-spec.mjs\n(validated spec YAML)" as writer <<cli>>
+  component "experiment-run.mjs\n(runMatrix)" as runner <<cli>>
   component "experiments-compare.mjs\n(aggregate + rank)" as compare_cli <<cli>>
 }
 
-package "Measurement Span" as span_layer {
-  component "measurement-start.mjs\n(open span)" as mstart <<core>>
-  component "measurement-stop.mjs\n(close + score)" as mstop <<core>>
-  component "evidence harness\n(run test gate)" as evidence <<core>>
-  component "Haiku judge\n(5-dim rubric)" as judge <<agent>>
+package "Per-cell lifecycle (runCell)" as cell_layer {
+  component "preflightAgent\n(/api/complete gate)" as preflight <<core>>
+  component "restoreForCell\n(isolated worktree + sandbox .data)" as restore <<core>>
+  component "neutralizeSandboxRules\n(strip CLAUDE.md / AGENTS.md ...)" as strip <<core>>
+  component "cell-injection.mjs\n(kb-on: inject per agent channel)" as inject <<core>>
+  component "sandbox-escape guard\n(dirty-set diff + PWD pin)" as escape <<core>>
+}
+
+package "Scoring" as score_layer {
+  component "evidence harness\n(scratch-index diffstat + gate)" as evidence <<core>>
+  component "Opus 4.8 judge\n(5-dim rubric, forceScore)" as judge <<agent>>
+}
+
+package "Retrieval gate (obs-api :12436)" as retr_layer {
+  component "retrieve()\n(IDF floor + RRF)" as retrieve <<core>>
+  component "relevance-judge.js\n(LLM keep/drop, fail-CLOSED)" as rjudge <<agent>>
+  database "Qdrant + SQLite FTS5\n(insights/digests/entities/obs)" as vecdb <<storage>>
 }
 
 package "Token Attribution" as token_layer {
   component "rapid-llm-proxy\n:12435 /api/complete" as proxy <<infra>>
-  database "token-usage.db\n(per task_id)" as tokendb <<storage>>
+  database "token-usage.db\n(per task_id, fg/bg)" as tokendb <<storage>>
 }
 
 package "Experiment Store" as store_layer {
-  database ".data/experiments/leveldb\nRun · Score · Outcome" as store <<storage>>
+  database ".data/experiments/leveldb\nRun · Score · Outcome · Route" as store <<storage>>
   component "compare.mjs\n(honesty spine, composite)" as compare_lib <<core>>
   artifact "reports/<task_hash>.json" as report <<storage>>
 }
 
 package "Dashboard (:3032 / :8080)" as ui_layer {
-  component "GET /api/experiments/comparison" as api <<api>>
-  component "Comparison matrix\n(ranked/failed/ungated/unscored)" as matrix <<core>>
-  component "Runs timeline\n(per-turn rows, all 3 roles\ninterleaved + Ambient panel)" as timeline <<core>>
+  component "GET /api/experiments/*\n(runs · comparison · specs)" as api <<api>>
+  component "Runs (grouped) · Compare\nAvenues · Reports · Timeline" as views <<core>>
 }
 
 op --> skill : describe / declare
-skill --> runner : --spec <derived>.yaml
-runner --> mstart : per cell
-mstart --> proxy : open ambient span (fallback)
+skill --> writer : synthesize spec
+writer --> runner : --spec <id>.yaml
+runner --> preflight : per cell
+preflight --> proxy : one-token round-trip
+runner --> restore : snapshot -> worktree
+restore --> strip : always
+strip --> inject : kb-on only
+inject --> retrieve : composite task_id
+retrieve --> vecdb : hybrid search
+retrieve --> rjudge : keep genuinely-useful
+runner --> escape : post-cell diff
+runner --> proxy : agent LLM calls (task-bound)
 proxy --> tokendb : record tokens
-runner --> mstop : cell done
-mstop --> evidence : gate (test_command)
-mstop --> judge : rubric
-judge --> proxy : POST /api/complete
-mstop --> tokendb : aggregate by task_id
-mstop --> store : writeRun + writeScore
+runner --> evidence : gate (test_command)
+evidence --> judge : rubric
+judge --> proxy : POST /api/complete (Opus)
+runner --> store : writeRun + writeScore + writeOutcome
 skill --> compare_cli : --task-hash <sha256(goal)>
 compare_cli --> compare_lib : buildComparison
 compare_lib --> store : readRuns join
 compare_cli --> report : writeReportJson
 api --> compare_lib : same buildComparison
-matrix --> api : fetchComparison
-report ..> matrix : live source
-store ..> timeline : per-turn rows (all roles) + ambient rollup
+views --> api : fetch
+report ..> views : live source
+store ..> views : grouped rows + avenues + timeline
 
-note bottom of proxy
-  **Per-request task binding** (primary)
-  claude: x-task-id header
-  opencode: config splice (both wires)
-  mastra / copilot: base-URL seam
-  ambient span = fallback for unbound calls
+note right of inject
+  **kb-on axis (native channels)**
+  claude   --append-system-prompt
+  opencode .opencode/knowledge-context.md
+  copilot  .github/copilot-instructions.md
+  mastra   .mastra/context.md
+  kb-off/default -> CODING_KNOWLEDGE_INJECTION=0
 end note
 
 note right of compare_lib
@@ -69,8 +89,8 @@ note right of compare_lib
   ranked  = gate passed + complete + scored
   failed  = gate false / timeout / abort
   ungated = no test_command
-  unscored = trivial or judge failed
-  composite = totalTokens / goal_aligned_ratio
+  unscored = trivial / judge null
+  composite ranks best-first
 end note
 
 @enduml

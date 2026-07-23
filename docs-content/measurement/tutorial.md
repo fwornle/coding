@@ -9,7 +9,11 @@ Every time you use a coding agent (claude, opencode, copilot), the measurement s
 | **Always-on measurement** | Zero — it just runs | Per-session tokens, cost, timeline, and the exact **context-window breakdown** of every turn | You want to understand *where your tokens go* in normal work |
 | **Experiments** (`/experiment`) | One command | A **ranked A/B table** across models / agents / methods, gated by an objective test | You want a *defensible decision*: "which is cheapest for this job?" |
 
-You don't choose one — always-on is passive and always there; you reach for experiments when you need a comparison. Everything shows up in the same place: the dashboard at **[http://localhost:3032](http://localhost:3032) → Performance**.
+You don't choose one — always-on is passive and always there; you reach for experiments when you need a comparison. Everything shows up in the same place: **[http://localhost:3032](http://localhost:3032) → Performance**.
+
+![The Performance page — stat tiles, Measurement + Launch panels, and the Runs / Avenues / Compare / Reports sub-tabs](../images/measurement-perf-landing.png)
+
+The four stat tiles (Total runs, Scored runs, Total tokens, Median wallclock/step) headline the page; the **Show quarantined (N)** toggle reveals runs hidden for an invalid `task_class`.
 
 ---
 
@@ -22,12 +26,12 @@ In `~/.config/opencode/opencode.json`, point your model at the **`rapid-proxy`**
 
 ```jsonc
 {
-  "model": "rapid-proxy/claude-opus-4.6",        // ✅ captured   (not github-copilot/…)
+  "model": "rapid-proxy/claude-sonnet-4.6",       // ✅ captured   (not github-copilot/…)
   "provider": {
     "rapid-proxy": {
       "options": { "baseURL": "http://localhost:12435/v1" },
       "models": {
-        "claude-opus-4.6": {}, "claude-sonnet-4.6": {}, "claude-haiku-4.5": {},
+        "claude-opus-4.8": {}, "claude-sonnet-4.6": {}, "claude-haiku-4.5": {},
         "gpt-4o": {}, "gpt-4o-mini": {}
       }
     }
@@ -37,42 +41,57 @@ In `~/.config/opencode/opencode.json`, point your model at the **`rapid-proxy`**
 
 Config is read **at launch**, so start a fresh agent session after editing. Claude Code (via `/v1/messages`) is captured automatically — no change needed.
 
-**How to tell it's working:** open a run in the dashboard (below). A *measured* run shows exact KB per category; an *illustrative* one says "this run has no per-category wire capture" — that means the traffic bypassed the proxy.
-
 ---
 
 ## Path A — Just look at your work (zero effort)
 
-Do your normal coding. Then open **[http://localhost:3032](http://localhost:3032) → Performance → Runs**. Every session is a row with its tokens, wall-clock, model, and (if it ran through an experiment) score.
+Do your normal coding. Then open **Performance → Runs**. Runs are **grouped by experiment** — one collapsible parent per experiment-run, plus a pinned **"Other activity — ambient (auto-measured) sessions"** bucket for your normal interactive work.
 
-![Performance → Runs table](../images/measurement-runs-table.png)
+![Runs table, groups collapsed — experiment parents, ambient bucket, pagination, and the score legend](../images/measurement-runs-grouped-collapsed.png)
 
-Click a run to expand its **timeline** — every turn is a row, coloured by role (foreground development · knowledge capture · infrastructure) and **interleaved chronologically**, so you see foreground turns, background knowledge-capture calls, and infrastructure probes in the exact order they happened. Three **role-filter checkboxes** above the list toggle each lane — un-check *Foreground development* to isolate just the background timeline. A collapsible **Concurrent background activity** panel above the rows gives the same knowledge/infra spend as a per-process rollup.
+**Expand all** opens each parent into its per-agent cells, with the 5-dim rubric scores side by side — this is where a cross-agent spread jumps out (here claude scores 1.00 on Goal where opencode lands 0.00 on the same task):
 
-![Timeline — all three roles as per-turn rows, interleaved by time, with role-filter checkboxes](../images/measurement-timeline-roles.png)
+![Runs table expanded — per-agent cells, composite task_ids, and the cross-agent score spread](../images/measurement-runs-grouped-expanded.png)
+
+!!! tip "Hover the score columns — the definitions are hidden there"
+    Every score header carries its full definition on hover. **Goal**: *"did the run accomplish its stated goal? LLM-judged (Opus) from the VERIFICATION verdict + test summary + goal-vs-diff… '—' = no evidence to judge (never treated as 0)."* Hover a **value** and you also get **"Why this run scored this: &lt;rationale&gt;."** The full set is in the [Dashboard Reference](dashboard-reference.md#score-dimension-glossary).
+
+![Hovering the Goal score header surfaces its full LLM-judged definition](../images/measurement-score-tooltip-goal.png)
 
 ### The payoff: what actually got sent to the model
 
 Click **Explain** on any run to open **"Context & caching — what actually gets sent to the LLM."** This is the centrepiece — the exact anatomy of your context window, measured from the real wire bytes:
 
-![Context-window anatomy — scaled band with per-category byte legend](../images/measurement-context-window.png)
+![Context & caching explainer — topology strip, cached-% verdict, and the measured per-category anatomy band](../images/measurement-context-explainer.png)
 
 Read it like this:
 
-- **The band** is one turn's full context window, scaled to real UTF-8 bytes. The legend gives exact sizes per category — **System Instructions**, **Tool Descriptions**, **Retrieved Knowledge**, **Conversation History**, **Tool Outputs**, **User Input**.
-- **The dashed line** is the cacheable-prefix boundary: everything to its left can be re-read from the provider cache; only the **User Input** tail is fresh each turn.
-- **"X% served from cache"** tells you how much of the prompt was re-used (cheap `cache_read`) vs re-sent. A long claude run is dominated by cache reads; an opencode run whose provider doesn't set `cache_control` re-processes the whole prefix as fresh input each turn.
-- **Per-turn tokens** (bottom chart) splits every turn's billing: green = cache read, amber = cache write, blue = fresh input, purple = output.
+- **The topology strip** shows the path: your agent → the `rapid-llm-proxy` (the single metering seam at :12435) → the backend LLM (where the cache lives).
+- **The band** is one turn's full context window, scaled to real UTF-8 bytes: **System Instructions**, **Tool Descriptions**, **Retrieved Knowledge**, **Conversation History**, **Tool Outputs**, **User Input**. The dashed line is the **cacheable-prefix** boundary — everything to its left is re-read from cache; only the User Input tail is fresh each turn.
+- **"X% served from cache"** tells you how much of the prompt was re-used (cheap `cache_read`) vs re-sent.
 
-This is where "why is this session so expensive?" gets a concrete answer — usually a fat **Tool Descriptions** or **Conversation History** block, or a run that isn't hitting cache.
+Scroll down in the same modal for the **caching detail** — how the biggest turn was billed, the explicit-vs-implicit wire explanation, and the per-turn stacked bar chart (green = cache read, amber = cache write, blue = fresh input, purple = output):
+
+![Caching detail — billed-by-cache bar, the wire explanation, the per-turn chart, and the wire table](../images/measurement-context-caching.png)
+
+!!! tip "A 0-byte Retrieved-Knowledge block is the quality gate working"
+    Click the **Retrieved Knowledge** segment for the injected-context breakdown — the ~1,000-token block (300 Working Memory + 700 semantic via Qdrant RRF). For a *trivial* task on a `kb-on` cell it shows **0 B**: the relevance judge rejected the topical-but-useless matches. That empty block is the gate, not a bug.
+
+![Retrieved Knowledge detail — the injected KB block, its 300+700 budget, tiers, and the RRF pipeline](../images/measurement-retrieved-knowledge.png)
+
+### The timeline
+
+Click a run to load its **per-turn timeline** below the table — turns are chronological, coloured by **role** (foreground development · knowledge capture · infrastructure), with role-filter chips to isolate a lane and cache-read hatching per turn:
+
+![Inline timeline — role chips, per-turn rows, cache-read hatching, process pills](../images/measurement-timeline-roles.png)
+
+The **fullscreen** timeline adds the token-reconciliation summary and a cumulative context-growth band:
+
+![Fullscreen timeline — reconciliation summary + cumulative context band](../images/measurement-timeline-fullscreen.png)
 
 ### Always-on controls
 
-The **Always-on auto measurement** checkbox (top of the Performance panel) is on by default — a background reconciler binds each live claude / opencode / copilot session so its traffic is captured with zero setup. **Reset** clears the current binding and re-detects on the next tick (useful if a session id goes stale).
-
-![Always-on auto measurement — checkbox and Reset control](../images/measurement-auto-control.png)
-
-Leave it on. Turn it off only if you want purely manual measurement spans.
+The **Always-on auto measurement** checkbox is on by default — a reconciler binds each live claude / opencode / copilot session so its traffic is captured with zero setup. **Reset** clears the current per-agent slots and rebinds on the next tick. Leave it on.
 
 ---
 
@@ -85,36 +104,34 @@ When you need a *decision* instead of an observation, compare setups head-to-hea
 In any coding agent, type `/experiment`:
 
 ```
-/experiment compare Claude Sonnet against OpenCode Haiku on writing a fizzbuzz
+/experiment compare Claude Sonnet against OpenCode on writing a fizzbuzz
 function, run each twice
 ```
 
-### Step 2 — Confirm the synthesized plan
+The skill turns your prose into a concrete matrix and drafts an **objective test** — the gate that makes results rankable — then writes `config/experiments/<id>.yaml`. Choose **Run it** (or **Run ungated** to skip the test, or **Edit** a field). The matrix runs **unattended**.
 
-The skill turns your prose into a concrete matrix and drafts an **objective test** — the gate that makes results rankable:
+!!! warning "Run experiments unattended"
+    There is a single measurement span slot. A concurrent in-repo agent call gets mis-stamped with the open cell's `task_id`. Don't drive a matrix from an interactive agent working the same repo.
 
-```
-Experiment (from your description)
-  goal:      Create fizzbuzz.mjs exporting fizzbuzz(n)…
-  variants:  claude / sonnet
-             opencode / rapid-proxy/claude-haiku-4.5
-  repeats:   2     task_class: new-feature     test gate: node --test fizzbuzz.test.mjs
-  rank by:   composite
-```
+You can also launch from the dashboard: pick a spec in **Launch experiment**, then watch the **Run monitor** cell grid move through `restoring → running → scoring`:
 
-Choose **Run it**. (**Run ungated** skips the test — you still get token/latency numbers, just no quality ranking. **Edit** fixes any field.) The matrix runs unattended.
+![Launch panel matrix preview + the live Run monitor cell grid](../images/measurement-run-monitor.png)
 
-### Step 3 — Read the ranked comparison
+### Step 2 — Read the ranked comparison
 
-Dashboard → **Performance → Comparison**. Variants are columns; metrics are rows. The **ranked** group is ordered cheapest-per-quality first, with `mean ± stddev` (hover for median/min/max/n). Failed, ungated, and unscored variants are shown separately — never crowned as winners.
+Dashboard → **Performance → Compare**. Two sections. **Two-run comparison** contrasts any two runs by role — tick two rows on Runs, hit **Compare selected (2)**, and read the Δ(B−A) column. This is the clearest way to *see* the harness-overhead story (here claude sends 644 tokens where opencode sends 106,694 for the same fizzbuzz):
 
-![Comparison tab — ranked variant columns](../images/measurement-comparison-matrix.png)
+![Two-run comparison — role-delta table with Δ(B−A), claude vs opencode](../images/measurement-compare-two-run.png)
 
-### Step 4 — Make the call
+**Experiment variant comparison** is the ranked matrix — variants as columns, metrics ± variance as rows, grouped into the **honesty spine**: RANKED (best composite first), FAILED, UNGATED, UNSCORED — so a variant that never passed the gate is never crowned a winner:
+
+![Variant matrix — RANKED #1/#2/#3 with metrics ± variance, FAILED section below](../images/measurement-comparison-matrix.png)
+
+### Step 3 — Make the call
 
 ```mermaid
 graph TD
-    A[Open the Comparison tab] --> B{Is the ranked group empty?}
+    A[Open the Compare tab] --> B{Is the RANKED group empty?}
     B -->|Yes| B1[Nothing passed the gate.<br/>Fix the goal/test or run ungated;<br/>compare tokens & wall-clock only]
     B -->|No| C{Enough repeats?<br/>n >= 3 for trust}
     C -->|n = 1-2| C1[Treat as directional.<br/>Re-run with more repeats<br/>before committing]
@@ -129,7 +146,15 @@ graph TD
     I -->|No| K[Keep the higher-quality variant;<br/>the cost premium is justified]
 ```
 
-**A worked read:** if `claude/sonnet` scores 15k tokens @ 0.92 quality (composite ≈ 16.3) and `opencode/haiku` scores 8k @ 0.78 (composite ≈ 10.3), Haiku wins on cost-per-quality — switch to it *unless* the 0.14 quality gap lands somewhere you can't afford (e.g. `test_coverage` on a critical path).
+---
+
+## Path C — Fork the same span into avenues
+
+When you've got a run you like and want to try the *same prompt* several ways at once, **Fork into avenues** seeds a sweep across the agent / model / framework / knowledge-injection axes — each avenue on its own isolated git branch and worktree. The **Avenues** tab groups every sibling of one origin span into a single ranked table with a built-in help card:
+
+![Avenues tab — the help card explaining columns, merge states, and Compare/Promote/Prune](../images/measurement-avenues-help.png)
+
+Rank by **Outcome**, then **Promote to main** the winner (blocked while its Merge badge shows conflicts) and **Prune** the losers — the branch goes, but the measurement data stays in `.data`.
 
 ---
 
@@ -139,32 +164,31 @@ graph TD
 |------------|-------|
 | See what a session cost / its timeline | Performance → **Runs** → click a row |
 | See the real context-window breakdown & cache reuse | Runs → **Explain** on a row |
-| Confirm capture is working (measured vs illustrative) | The banner at the top of the Explain view |
-| Compare models / agents / methods | Performance → **Comparison** (after `/experiment`) |
-| Turn always-on capture on/off, or reset a binding | Performance panel → **Always-on** checkbox / **Reset** |
-| Understand the token totals | Dashboard → **Token Usage** tab |
+| Compare two runs or a variant matrix | Performance → **Compare** |
+| Sweep the same prompt many ways | Runs → **Fork into avenues** → **Avenues** tab |
+| Override a wrong auto-score | Runs → **Edit scores** |
+| Every column / badge / tooltip defined | The [Dashboard Reference](dashboard-reference.md) |
 
 ## What the numbers mean
 
 | Metric | Prefer | Reads as |
 |--------|--------|----------|
 | `composite` | lower | cost per unit quality — **the headline** |
-| `totalTokens` | lower | raw cost |
-| `goal_aligned_ratio` | higher | quality (0–1) |
+| `totalTokens` | lower | raw cost (compare **within** an agent, not across) |
+| `goal_achieved` | higher | quality (0–1) |
 | `wallclock` | lower | latency |
 | `loop_count`, `edit_revert_count`, `total_step_count` | lower | solution efficiency / stability |
 | `n` | higher | how much to trust the result |
 
-## Optimizing across the three levers
+## Optimizing across the levers
 
-- **Models** — sweep `opus`/`sonnet`/`haiku` for one agent to find the cheapest tier that clears your quality bar for a given `task_class`.
+- **Models** — sweep `opus`/`sonnet`/`haiku` for one agent to find the cheapest tier that clears your quality bar.
 - **Agents** — same goal across `claude` / `opencode` / `copilot`; the composite normalizes their different token economics.
-- **Methodologies** — vary `framework` (straight vs TDD) or `env` (KB-injection on/off) to measure whether a heavier method actually pays for itself.
+- **Methods** — vary `framework` (straight vs TDD) or the `env` **kb-on / kb-off** axis to measure whether a heavier method actually pays for itself.
 
-Re-run whenever your goals or model options change — the comparison is only as current as its last run.
+!!! note "Execution-style goals score better for opencode/copilot"
+    opencode's headless `run` ends its loop on the first assistant message with no tool call, so an *analysis-shaped* goal ("explain how…") gets narrated instead of executed. Phrase deliverables as **execution** ("create file X, write it, done only once it exists") to get a real artifact. See [Operational notes](experiment-skill.md#operational-notes).
 
 ---
 
-See the [`/experiment` skill reference](experiment-skill.md) for all options, the [Overview](overview.md) for the three-layer model, or the [Architecture](architecture.md) for how capture works under the hood.
-</content>
-</invoke>
+See the [Dashboard Reference](dashboard-reference.md) for every facet, the [`/experiment` skill reference](experiment-skill.md) for all options, the [Overview](overview.md) for the three-layer model, or the [Architecture](architecture.md) for how capture works under the hood.

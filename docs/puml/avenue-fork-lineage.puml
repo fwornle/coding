@@ -1,0 +1,54 @@
+@startuml avenue-fork-lineage
+!include _standard-style.puml
+
+title Avenues — fork lineage, isolated worktrees, promote / prune
+top to bottom direction
+
+component "Origin run (span)\ntask_id" as origin <<core>>
+
+package "Fork into avenues (four axes)" as fork_pkg {
+  component "agent" as ax_agent <<util>>
+  component "model" as ax_model <<util>>
+  component "framework" as ax_fw <<util>>
+  component "knowledge (kb-on/off)" as ax_kb <<util>>
+}
+
+package "Sibling avenues (origin_span_id groups them)" as av_pkg {
+  component "avenue/<task_id> #1\nown git branch + worktree" as av1 <<agent>>
+  component "avenue/<task_id> #2\nown git branch + worktree" as av2 <<agent>>
+  component "avenue/<task_id> #N\nown git branch + worktree" as avN <<agent>>
+}
+
+component "rankAvenues()\n(avenueOutcomeScore, best-first)" as rank <<core>>
+component "Merge status\n(merged | unmerged | conflicts | none)" as merge <<core>>
+
+origin --> ax_agent : forkAxes / sweep
+origin --> ax_model
+origin --> ax_fw
+origin --> ax_kb
+ax_agent --> av1
+ax_model --> av2
+ax_kb --> avN
+av1 --> rank
+av2 --> rank
+avN --> rank
+rank --> merge : per-branch vs main
+
+package "Actions (Avenues tab)" as act_pkg {
+  component "Compare\n(tick 2 -> Compare tab)" as compare <<api>>
+  component "Promote to main\n(blocked while conflicts)" as promote <<api>>
+  component "Prune\n(delete branch; .data stays)" as prune <<api>>
+}
+
+merge --> compare
+merge --> promote : safe when unmerged/merged
+merge --> prune : after a winner is chosen
+
+note bottom of av_pkg
+  Every avenue shares one origin_span_id.
+  Normal /experiment cells have NO origin_span_id,
+  so they appear in neither the Avenues cards
+  nor a grouped Runs list — only forked spans do.
+end note
+
+@enduml

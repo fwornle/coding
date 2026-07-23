@@ -1,0 +1,64 @@
+@startuml scoring-rubric-pipeline
+!include _standard-style.puml
+
+title Scoring Pipeline — evidence harness → Opus judge → rubric → override
+top to bottom direction
+
+component "measurement-stop\n(runJudge, forceScore for cells)" as stop <<core>>
+
+package "Evidence harness" as ev_pkg {
+  component "readDiffStat\n(scratch GIT_INDEX_FILE + git add -N)" as diff <<core>>
+  component "baseline commit\n(post-restore, --allow-empty)" as base <<core>>
+  component "test_command gate\n(fixed-argv; pass/fail = gate_passed)" as gate <<core>>
+  component "trace locator\n(claude / opencode / copilot)" as trace <<core>>
+}
+
+component "Opus 4.8 judge\nJUDGE_PROVIDER=copilot\nJUDGE_MODEL=claude-opus-4.8" as judge <<agent>>
+
+package "5-dim rubric (0..1, null != 0)" as rub_pkg {
+  component "goal_achieved (up)" as d_goal <<util>>
+  component "code_quality (up)" as d_qual <<util>>
+  component "test_coverage (up)" as d_cov <<util>>
+  component "regressions (down)" as d_reg <<util>>
+  component "spec_drift (down; redundant for cells)" as d_drift <<util>>
+}
+
+package "Persistence & override" as store_pkg {
+  database "Score entity\n(judged + corrected_* twin)" as score <<storage>>
+  component "operator override\n(Edit scores drawer; effective())" as override <<core>>
+}
+
+stop --> diff
+stop --> base
+stop --> gate
+stop --> trace
+diff --> judge : diff + review findings
+gate --> judge : pass-rate
+trace --> judge : consequential events
+judge --> d_goal
+judge --> d_qual
+judge --> d_cov
+judge --> d_reg
+judge --> d_drift
+d_goal --> score
+d_qual --> score
+d_cov --> score
+d_reg --> score
+d_drift --> score
+score --> override : corrected wins over judged
+
+note right of trace
+  **Score states**
+  scored             — >=1 consequential event, judged
+  not_scored:trivial — <1 consequential event
+  pending            — locator miss / trace unresolved (re-scorable)
+  forceScore makes an empty spec cell score a FAILURE (goal~0),
+  not hide as "trivial".
+end note
+
+note bottom of store_pkg
+  null renders as em-dash, never coerced to 0.
+  effective() = corrected_* -> judged -> null.
+end note
+
+@enduml

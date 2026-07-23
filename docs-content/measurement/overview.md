@@ -25,8 +25,8 @@ A variant that is 3× cheaper but only 10% lower quality usually wins on composi
 ## The mental model: Run → Score → Comparison
 
 1. **Run** — one execution of the goal by one variant `(agent × model × framework × env)`, repeated *N* times. Each run records its tokens, wall-clock, and route heuristics.
-2. **Score** — after the run, an objective **test gate** decides pass/fail, and a 5-dimension rubric judge (Haiku) produces the quality signal.
-3. **Comparison** — runs sharing a `task_hash` (the sha256 of the goal sentence) are aggregated per variant (`mean ± stddev`, median, min/max, *n*) and ranked.
+2. **Score** — after the run, an objective **test gate** decides pass/fail, and a 5-dimension rubric judge (**Opus 4.8**) produces the quality signal. Evidence for the judge comes from a scratch-index diffstat (so untracked new-file deliverables count) over a post-restore baseline commit (so only the agent's edits are diffed).
+3. **Compare** — runs sharing a `task_hash` (the sha256 of the goal sentence) are aggregated per variant (`mean ± stddev`, median, min/max, *n*) and ranked.
 
 ### The honesty spine
 
@@ -51,9 +51,9 @@ Measurement happens at three levels, and only the top two ask anything of you:
 - **Measurement** — a **named span** with a `task_id` + one-sentence goal, so a specific task's tokens attribute to a stable `task_hash` (`sha256(goal)`) and its **Stop** triggers the heavy close (token-aggregate + judge + score) that ambient skips. This span can open two ways:
     - **Always-on (default).** The **measurement reconciler** keeps a span bound to each live **claude / opencode / copilot** foreground session automatically, so interactive sessions get a *real* context-window breakdown with no clicks — **provided the session routes through the proxy** (a `rapid-proxy/<model>` model, not a direct `github-copilot/<model>` one, which bypasses the wire-tap and yields only the illustrative band). A single **Always-on auto measurement** checkbox on the Performance tab toggles it; when on, the manual form becomes a **Reset** button (clear-and-rebind). See [Architecture → Always-on per-agent measurement](architecture.md#always-on-per-agent-measurement).
     - **Manual.** With always-on off, the **Start measurement** button opens the span with a `task_id` + goal you choose — reach for it when you want *one* hand-run task to be a scored, re-runnable, comparable unit (effectively a single manual experiment cell).
-- **Experiment** — the **Launch experiment** button, or the [`/experiment` skill](experiment-skill.md). Runs a whole matrix (`variants × repeats` cells, each measured, gated, judged), ranks them, and writes the report the **Comparison** tab reads.
+- **Experiment** — the **Launch experiment** button, or the [`/experiment` skill](experiment-skill.md). Runs a whole matrix (`variants × repeats` cells, each measured, gated, judged), ranks them, and writes the report the **Compare** tab reads. A completed run can also be **forked into avenues** — the same prompt swept across agent/model/framework/knowledge axes, each on its own isolated branch (see the [Dashboard Reference → Avenues](dashboard-reference.md#avenues-tab)).
 
-The **Performance** tab surfaces all three: the **Runs** table (every measured/ambient Run), each run's role-lane **timeline** with its **Ambient activity panel**, and the **Comparison** tab.
+The **Performance** tab surfaces all of it: a grouped **Runs** table (every measured/ambient Run), each run's role-lane **timeline**, the **Compare** and **Avenues** tabs, and the **Context & Caching** explainer. Every tab, column, badge, and hover tooltip is catalogued in the [Dashboard Reference](dashboard-reference.md).
 
 ## When to reach for it
 
@@ -65,7 +65,8 @@ The **Performance** tab surfaces all three: the **Runs** table (every measured/a
 ## Where to look
 
 - **Run it:** the [`/experiment` skill](experiment-skill.md) — describe an experiment in plain English (or with flags) and it drives the whole pipeline.
-- **How it works:** [Architecture](architecture.md) — the end-to-end measurement sequence and data model.
+- **How it works:** [Architecture](architecture.md) — the end-to-end measurement sequence, the knowledge-injection axis, and the data model.
 - **Do it now:** the [Tutorial](tutorial.md) — a 5-minute walkthrough from a plain-English description to a cost decision.
+- **Every knob:** the [Dashboard Reference](dashboard-reference.md) — exhaustive tab/column/badge/tooltip catalogue.
 
 **Dashboard:** [http://localhost:3032](http://localhost:3032) → **Performance** tab.

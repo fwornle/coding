@@ -1,0 +1,52 @@
+@startuml kb-injection-axis
+!include _standard-style.puml
+
+title Knowledge-Injection Axis — kb-on / kb-off (gated, per-agent channels)
+top to bottom direction
+
+component "runCell\n(env axis: kb-on | kb-off | default)" as cell <<core>>
+
+package "kb-off / default" as off_pkg {
+  component "CODING_KNOWLEDGE_INJECTION=0\n(inject nothing)" as off <<util>>
+}
+
+package "kb-on — gated retrieval (obs-api :12436)" as on_pkg {
+  component "retrieveCellKnowledge()\nPOST /api/retrieve (composite task_id)" as retr <<core>>
+  component "IDF-weighted floor\n(drop 0-overlap; rare terms win)" as idf <<core>>
+  component "relevance-judge.js\n(one batched LLM keep/drop)" as judge <<agent>>
+  database "Qdrant + SQLite FTS5\ninsights · digests · entities · obs" as vec <<storage>>
+}
+
+package "Per-agent native channel" as chan_pkg {
+  component "claude\n--append-system-prompt" as claude <<agent>>
+  component "opencode\n.opencode/knowledge-context.md" as opencode <<agent>>
+  component "copilot\n.github/copilot-instructions.md" as copilot <<agent>>
+  component "mastra\n.mastra/context.md" as mastra <<agent>>
+}
+
+cell --> off : env != kb-on
+cell --> retr : env == kb-on
+retr --> vec : hybrid search + RRF
+retr --> idf : query-term overlap
+idf --> judge : top-K candidates
+judge --> claude : survivors -> markdown
+judge --> opencode
+judge --> copilot
+judge --> mastra
+
+note right of judge
+  **fail-CLOSED for experiment cells**
+  (task_id contains "--"):
+  judge/timeout error -> inject NOTHING.
+  Interactive sessions fail-OPEN (keep IDF set).
+  Working-Memory scaffold suppressed for cells;
+  curated tiers only (insights + kg_entities).
+end note
+
+note bottom of off_pkg
+  Trivial task (fizzbuzz) on kb-on also yields
+  nothing — the judge rejects topical-but-useless
+  matches. "Useful know-how, or nothing."
+end note
+
+@enduml

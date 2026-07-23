@@ -17,8 +17,9 @@ Each run is wrapped in a **measurement span** keyed by a `task_id`:
     - **opencode** splices an `OPENCODE_CONFIG_CONTENT` provider config that binds *both* of its wires — the anthropic provider via `/v1` + `x-task-id`, the openai/copilot providers via a task-scoped `/v1/opencode/t/<taskId>` base-URL path;
     - **mastra** routes via `ANTHROPIC_BASE_URL`; **copilot** uses the BYOK task-scoped seam.
   The shared `rapid-llm-proxy` (port **12435**) stamps every `token_usage` row with that `task_id`; the ambient `active-measurement.json` span is the *fallback* for any call that doesn't carry its own binding. Wire rows are the **primary** token source for all agents — the `cladpt`/`copadt` transcript adapters no longer capture here; at close they run in **reconcile** mode (verify wire rows, fill gaps: reasoning tokens, cache split).
-- The agent then drives the goal inside a restored **sandbox** snapshot (`snapshot_id`, default `smoke-spec`) so runs are reproducible and isolated.
-- **`measurement-stop.mjs`** closes the span: it aggregates tokens from `token-usage.db WHERE task_id = ?`, runs the **evidence harness** (the objective `test_command` gate), invokes the **Haiku judge** for the 5-dimension rubric, and persists the results.
+- Before launch, **`preflightAgent`** runs one bounded `/api/complete` round-trip to confirm the proxy is reachable and the cell's resolved model round-trips a token — a failed preflight records a clean `skipped:<reason>` Run instead of a mid-matrix abort.
+- The agent then drives the goal inside a restored **sandbox** snapshot (`snapshot_id`, default `smoke-spec`) so runs are reproducible and isolated. `restoreForCell` builds an isolated git **worktree** + sandbox `.data` under `.data/run-restores/<snapshot>-<ts>/`; the live checkout and KB are never touched. Two guards keep the agent inside that sandbox: **`neutralizeSandboxRules()`** strips restored rules files (`CLAUDE.md` / `AGENTS.md` / `.github/copilot-instructions.md` / …) — a restored `CLAUDE.md` hardcodes the *live* repo path, and opencode would otherwise ingest it and write there — and a **post-cell sandbox-escape guard** diffs the real repo's dirty-set (plus a `PWD`-pin so a `$PWD`-reading agent can't find the real root), surfacing any leak loudly.
+- **`measurement-stop.mjs`** closes the span: it aggregates tokens from `token-usage.db WHERE task_id = ?`, runs the **evidence harness** (the objective `test_command` gate, over a scratch-index diffstat — see [Scoring pipeline](#scoring-pipeline)), invokes the **Opus 4.8 judge** for the 5-dimension rubric, and persists the results. The terminal state is the agent's exit code (`complete` / `timeout` / `abort`), **never** the test result.
 
 ### Roles, foreground/background, and the ambient panel
 
@@ -31,6 +32,50 @@ A run's tokens are classified into three **role lanes** — **foreground develop
 **Per-turn rows for every role.** The role summary cards and the Ambient panel are *aggregates*; the timeline itself renders **individual per-turn rows for all three roles, interleaved chronologically** by timestamp. Foreground turns carry their full per-request context (tool calls, prompt preview, reasoning sub-bands); the in-window background/infrastructure calls render as lean, role-coloured rows (timestamp · process pill · model · tokens) with no fabricated drill-down, since that telemetry is foreground-only. Two backend readers feed this from the same proxy `token_usage` window: `readAmbientBackground` (`GROUP BY process`) powers the summary card counts + the Ambient panel, while `readAmbientTimeline` returns the same calls **individually** so they can be woven into the list. Three **role-filter checkboxes** above the list show/hide each lane — un-checking *Foreground development* isolates the background timeline; the per-row counts stay consistent with the cards (e.g. foreground + knowledge + infrastructure = the full row count, never double-counted).
 
 ![Timeline — all three roles as per-turn rows, interleaved by time, with role-filter checkboxes](../images/measurement-timeline-roles.png)
+
+---
+
+## Knowledge-injection axis (kb-on / kb-off)
+
+The `env` axis carries a **with-vs-without knowledge** comparison. Default is injection **off** for every cell; only `env: kb-on` turns it on. This is a genuine axis because the runner launches raw agent binaries (bypassing the interactive `_inject_knowledge_context` seam) and `claude -p` never fires the `UserPromptSubmit` hook — so without the cell-injection path, a cell gets *no* injection at all.
+
+![Knowledge-injection axis — gated retrieval and per-agent native channels](../images/kb-injection-axis.png)
+
+For a `kb-on` cell, `runCell` calls `cell-injection.mjs`, which fetches **gated** knowledge from obs-api `POST /api/retrieve` (keyed by the composite `task_id`) and injects it via each agent's native channel:
+
+| Agent | Channel |
+|-------|---------|
+| claude | `--append-system-prompt "<knowledge>"` (launch argv) |
+| opencode | `<worktree>/.opencode/knowledge-context.md` |
+| copilot | `<worktree>/.github/copilot-instructions.md` |
+| mastra | `<worktree>/.mastra/context.md` |
+
+The gate (`src/retrieval/retrieval-service.js` + `relevance-judge.js`) applies an **IDF-weighted floor** (generic query terms score ≈ 0; rare terms like `fizzbuzz`/`ETM` dominate) and a **batched LLM relevance judge** that keeps only genuinely-useful items. For an experiment cell (`task_id` contains `--`) it **fails CLOSED** — a judge/timeout error injects *nothing* ("useful know-how, or nothing"); interactive sessions fail *open*. The task-agnostic Working-Memory scaffold is suppressed for cells; only curated `insights` + `kg_entities` are eligible. A trivial task therefore injects **0 bytes** — visible as `Retrieved Knowledge 0 B` in the Explain modal.
+
+---
+
+## Scoring pipeline
+
+![Scoring pipeline — evidence harness → Opus judge → rubric → override](../images/scoring-rubric-pipeline.png)
+
+The evidence harness makes new-file deliverables scoreable and keeps the diff honest:
+
+- **Scratch-index diffstat** — `readDiffStat` runs `git add -N` through a scratch `GIT_INDEX_FILE`, so **untracked** new files appear in `git diff --stat` without touching the real index. Without this, a "write fizzbuzz.mjs" task showed an empty diffstat → a starved `code_quality`.
+- **Post-restore baseline commit** — the restore reconstruction is folded into the sandbox HEAD before the agent runs, so the score-time diff reflects **only the agent's edits**, not tens of thousands of restored lines.
+- **`runJudge({forceScore})`** — a spec-driven cell that produced no events is judged a **failure** (goal ≈ 0), not hidden as `not_scored:"trivial"`.
+- **Judge model** — pinned to `JUDGE_PROVIDER='copilot'`, `JUDGE_MODEL='claude-opus-4.8'` (env-overridable). Haiku previously fabricated wrong-direction scores (e.g. `quality 0.12` for a clean 4/4 run).
+
+**Score states:** `scored` (≥ 1 consequential event, judged) · `not_scored:"trivial"` (< 1 consequential event) · `pending` (trace locator miss / unresolved — re-scorable). Trace locators are agent-specific and sandbox-fragile; the claude transcript survives at `~/.claude/projects/<encoded-cwd>/*.jsonl` even after the worktree is deleted (which is why the cwd dot-encoding fix matters at backfill).
+
+---
+
+## Experiment identity
+
+![Experiment identity — composite task_id vs task_hash vs experiment-RUN id](../images/experiment-identity-model.png)
+
+Three ids do three jobs: the **composite `task_id`** (`…--<agent>-<model>-<framework>-<env>--rN`) identifies one cell and — via its `--` delimiter — is how both the dashboard and the injection gate detect an experiment cell; **`task_hash` = sha256(goal)** is the cross-cell identity keying the Compare tab; the **experiment-RUN id** (prefix before the first `--`) is the Runs-table grouping key so re-runs don't collapse together.
+
+Per-agent **model dialects** matter here: the same model needs three spellings — claude CLI `--model claude-sonnet-4-6` (hyphenated; the dotted form 404s), the rapid-proxy catalog `rapid-proxy/claude-sonnet-4.6` (dotted), and the copilot catalog `claude-sonnet-4.6` (dotted). `resolveCellModel` normalizes each at launch while keeping the recorded variant identity byte-stable.
 
 ---
 
@@ -89,6 +134,14 @@ The runner derives `task_hash = sha256(goal_sentence)` at close. The `/experimen
 4. **rank** by `--rank-by` (`composite` default, or `tokens` / `wallclock` / `score`),
 5. **write** `.data/experiments/reports/<task_hash>.json`.
 
-That exact JSON is what the dashboard's **Comparison** tab reads via `GET /api/experiments/comparison` — and the endpoint calls the *same* `buildComparison`, guarded by a deep-equality test, so the CLI table and the dashboard can never disagree.
+That exact JSON is what the dashboard's **Compare** tab reads via `GET /api/experiments/comparison` — and the endpoint calls the *same* `buildComparison`, guarded by a deep-equality test, so the CLI table and the dashboard can never disagree.
 
-**Service ports involved:** dashboard `:3032` · dashboard API `:3033` · vkb `:8080` · llm-proxy `:12435`. The proxy, obs-api, and ETM run as auto-respawning launchd daemons (`com.coding.*`).
+## Avenues — forking a span
+
+A completed run can be **forked into avenues**: the same prompt swept across the agent / model / framework / knowledge axes, each avenue restored onto its own named `avenue/<task_id>` branch (a real worktree that accumulates the avenue's edits as commits). Sibling avenues share one `origin_span_id`, which is how the **Avenues** tab groups and ranks them; a winner can be **promoted** to `main` (blocked while its git status shows conflicts) and the losers **pruned**.
+
+![Avenues — fork lineage, isolated worktrees, promote / prune](../images/avenue-fork-lineage.png)
+
+**Service ports involved:** dashboard `:3032` · dashboard API `:3033` · vkb / experiments API `:8080` · llm-proxy `:12435` · obs-api / retrieval `:12436`. The proxy, obs-api, and ETM run as auto-respawning launchd daemons (`com.coding.*`).
+
+See the [Dashboard Reference](dashboard-reference.md) for every tab, column, badge, and tooltip.

@@ -8,22 +8,22 @@ box "Operator" #E8F4F8
     participant "/experiment skill" as skill
 end box
 
-box "Runner" #F0E6FF
+box "Runner (runCell per cell)" #F0E6FF
     participant "experiment-run.mjs" as runner
-    participant "measurement-start" as mstart
-    participant "agent (sandbox)" as agent
-    participant "measurement-stop" as mstop
+    participant "preflight + restore\n+ rules-strip + inject" as prep
+    participant "agent (sandbox worktree)" as agent
+    participant "measurement-stop\n(+ escape guard)" as mstop
 end box
 
 box "Scoring & Store" #E6F7E6
-    participant "evidence + Haiku judge" as judge
+    participant "evidence + Opus judge" as judge
     participant "rapid-llm-proxy\n:12435 + token-usage.db" as proxy
     database "experiments store\n(Run · Score · Outcome)" as store
 end box
 
 box "Compare & Dashboard" #FFE6E6
     participant "experiments-compare.mjs" as compare
-    participant "Comparison tab (:3032)" as dash
+    participant "Performance tab (:3032)" as dash
 end box
 
 == Describe & confirm (natural-language mode) ==
@@ -33,19 +33,21 @@ skill -> op: preview + drafted gate
 op -> skill: confirm (Run it / ungated / edit)
 skill -> skill: write config/experiments/<id>.yaml\ncompute task_hash = sha256(goal_sentence)
 
-== Run the matrix (unattended) ==
+== Run the matrix (UNATTENDED — single span slot) ==
 skill -> runner: --spec <id>.yaml
 loop each variant × repeat cell
-    runner -> mstart: open span (task_id)
-    mstart -> proxy: open ambient span (fallback)
+    runner -> proxy: preflight — one-token /api/complete
+    runner -> prep: restore snapshot -> worktree,\nstrip rules files, (kb-on) inject knowledge
+    prep -> proxy: (kb-on) /api/retrieve — gated, fail-CLOSED
     runner -> agent: drive goal in sandbox\n(per-request binding: x-task-id / config splice)
     agent -> proxy: LLM calls (task-bound)
-    proxy -> proxy: record token_usage(task_id)
-    runner -> mstop: cell complete
-    mstop -> judge: gate (test_command) + 5-dim rubric
-    judge -> proxy: POST /api/complete
+    proxy -> proxy: record token_usage(task_id, fg/bg)
+    runner -> mstop: cell complete (exit code = terminal state)
+    mstop -> mstop: escape guard — diff real repo dirty-set
+    mstop -> judge: gate (test_command) + 5-dim rubric (forceScore)
+    judge -> proxy: POST /api/complete (Opus 4.8)
     mstop -> proxy: aggregate tokens by task_id
-    mstop -> store: writeRun + writeScore (gate_passed)
+    mstop -> store: writeRun + writeScore + writeOutcome
 end
 
 == Compare & surface ==

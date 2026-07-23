@@ -4,6 +4,19 @@ Highlights since the v6.0 Knowledge Context Injection milestone (commit `0fdb766
 
 ---
 
+## Measurement & Experiments — cross-agent runner, live KB axis, grouped dashboard (2026-07-23)
+
+The v7.3 cross-agent experiment harness became a genuine measurement instrument:
+
+- **Live knowledge-injection axis.** `env: kb-on` now injects **gated** knowledge into each cell via the agent's native channel (`lib/experiments/cell-injection.mjs`); previously the axis was inert. The gate (`src/retrieval/retrieval-service.js` + `relevance-judge.js`) applies an IDF floor + an LLM relevance judge and **fails CLOSED** for experiment cells — "useful know-how, or nothing." Injection now defaults **off** unless `kb-on`.
+- **Sandbox hardening.** Every cell restores into an isolated worktree; `neutralizeSandboxRules()` strips restored rules files and a post-cell escape guard + `PWD`-pin keep the agent inside its sandbox (a restored `CLAUDE.md`'s hardcoded path had leaked opencode writes to the real repo).
+- **Honest scoring.** The judge is pinned to **Opus 4.8**; `runJudge({forceScore})` scores empty spec cells as failures; a scratch-index diffstat + post-restore baseline commit make new-file deliverables scoreable without restore noise.
+- **Dashboard.** The Runs table now **groups by experiment-run** (collapsible parents + an ambient bucket); the Compare tab merged two-run and variant-matrix views; a new **Avenues** tab ranks forked spans (promote / prune); and per-value **score tooltips** surface the judge's rationale.
+
+See the [Measurement Tutorial](measurement/tutorial.md) and the new [Dashboard Reference](measurement/dashboard-reference.md).
+
+---
+
 ## Knowledge Injection — Copilot per-turn injection is now version-adaptive multi-channel (2026-07-19)
 
 GitHub Copilot previously received only a session-start baseline; per-turn injection was blocked because Copilot filesystem hooks can only inject via an `additionalContext` field, and *which* event's `additionalContext` is honored changes between Copilot versions (`postToolUse` on ≤ 1.0.71; `userPromptSubmitted` newly on 1.0.72+, where `postToolUse` went flaky). A fixed channel was never upgrade-safe.
