@@ -49,13 +49,19 @@ variants:
     framework: straight
     env: default
   # REQUIRED agent (D-12) — opencode via `run`, model routed through rapid-proxy (:12435).
+  # SONNET, not haiku: verified that claude-haiku-4.5 (via the copilot backend, in opencode's
+  # single-turn `run`) NARRATES intent ("I'll create both files") and emits NO tool_use, so it
+  # writes nothing and scores 0 — while claude-sonnet-4.6 emits tool calls and passes the test.
+  # A cross-agent comparison must give each agent a tool-capable model to exercise the task.
   - agent: opencode
-    model: rapid-proxy/claude-haiku-4.5   # dotted = the live `opencode models` catalog id (rapid-proxy provider kept)
+    model: rapid-proxy/claude-sonnet-4.6   # dotted catalog id; rapid-proxy provider → copilot backend
     framework: straight
     env: default
   # Probe-gated (RUN-04) — env:default so validateCells passes; the runner's one-turn probe
   # decides run (copilot -p --allow-all-tools) vs. recorded skip (copilot-headless-unsupported).
+  # SONNET, not `auto` (which resolves to the haiku measured-default): same tool-use reason as
+  # opencode above — the copilot CLI accepts `claude-sonnet-4.6`.
   - agent: copilot
-    model: auto   # `auto` resolves to the copilot measured default via resolveCellModel (agent-routing.mjs)
+    model: claude-sonnet-4.6
     framework: straight
     env: default

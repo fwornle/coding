@@ -188,7 +188,13 @@ SPEC_FILE=$(node scripts/experiment-write-spec.mjs \
   --variants "$VARIANTS_JSON")
 # VARIANTS_JSON example (one entry per variant — flag pair or Step 0-NL synthesized):
 #   [{"agent":"claude","model":"sonnet","framework":"straight","env":"default"},
-#    {"agent":"opencode","model":"rapid-proxy/claude-haiku-4-5","framework":"straight","env":"default"}]
+#    {"agent":"opencode","model":"rapid-proxy/claude-sonnet-4.6","framework":"straight","env":"default"},
+#    {"agent":"copilot","model":"claude-sonnet-4.6","framework":"straight","env":"default"}]
+# MODEL TIER for agentic tasks: prefer sonnet+ for opencode/copilot cells. Verified (2/2 each)
+# that claude-haiku-4.5, under opencode's heavy agentic context (full system prompt + many tools),
+# NARRATES its plan instead of emitting tool_use — opencode's single-turn `run` then ends with no
+# files (gate_passed=False). haiku tool-calls fine with a trivial single tool, so it's an
+# agentic-robustness-under-load gap, not raw capability. sonnet-4.6 tool-calls reliably.
 ```
 
 The serializer **rejects** (non-zero exit, nothing written) an unknown agent, an empty variant
