@@ -109,8 +109,12 @@ function parseUseful(content, validIds) {
  * @returns {Promise<Array>} the kept subset (or all, fail-open)
  */
 export async function judgeRelevance(query, candidates, opts = {}) {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, log, fetchImpl = fetch } = opts;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, log, fetchImpl = fetch, failClosed = false } = opts;
   if (!query || !Array.isArray(candidates) || candidates.length === 0) return candidates;
+  // On failure the caller chooses the safe direction: interactive fails OPEN (keep the IDF-ranked
+  // set — useful degradation), experiment cells fail CLOSED (inject nothing — "judge-confirmed or
+  // nothing", never fall open to noise when the proxy is slow/down).
+  const onFailure = () => (failClosed ? [] : candidates);
 
   const pool = candidates.slice(0, MAX_CANDIDATES);
   const validIds = new Set(pool.map((c) => String(c.id)));
@@ -140,8 +144,9 @@ export async function judgeRelevance(query, candidates, opts = {}) {
     keptIds = parseUseful(data && data.content, validIds);
     if (!keptIds) throw new Error('unparseable judge response');
   } catch (err) {
-    log?.(`[relevance-judge] fail-open (${candidates.length} kept): ${err.message}\n`);
-    return candidates; // FAIL-OPEN — degrade to the heuristic set, never block or drop-all
+    const fb = onFailure();
+    log?.(`[relevance-judge] ${failClosed ? 'fail-closed (0 kept)' : `fail-open (${fb.length} kept)`}: ${err.message}\n`);
+    return fb; // interactive: degrade to heuristic set; experiment: inject nothing
   }
 
   // Bounded cache (drop oldest on overflow).

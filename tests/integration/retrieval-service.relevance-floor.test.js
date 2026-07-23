@@ -279,11 +279,17 @@ describe('relevance-judge (LLM precision gate — fail-open, parse, cache)', () 
     expect(kept.map((c) => c.id)).toEqual(['a']);
   });
 
-  test('FAIL-OPEN: proxy error returns all candidates unchanged', async () => {
+  test('FAIL-OPEN: proxy error returns all candidates unchanged (interactive default)', async () => {
     const fetchImpl = async () => { throw new Error('proxy down'); };
     const input = [cand('a'), cand('b')];
     const kept = await judgeRelevance('task beta', input, { fetchImpl });
     expect(kept).toBe(input); // same array, nothing dropped
+  });
+
+  test('FAIL-CLOSED: proxy error injects NOTHING when failClosed (experiment cells)', async () => {
+    const fetchImpl = async () => { throw new Error('proxy down'); };
+    const kept = await judgeRelevance('task beta2', [cand('a'), cand('b')], { fetchImpl, failClosed: true });
+    expect(kept).toEqual([]); // judge-confirmed or nothing — never fall open to noise
   });
 
   test('FAIL-OPEN: unparseable response returns all candidates', async () => {

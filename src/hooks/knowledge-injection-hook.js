@@ -39,8 +39,16 @@ function isInjectionEnabled() {
   return !(v === '0' || v === 'false' || v === 'off');
 }
 
-// Absolute safety ceiling -- never let the hook hang Claude Code
-const SAFETY_TIMEOUT_MS = 5000;
+// Experiment cells (CODING_EXPERIMENT_TASK_ID contains '--') are BATCH measurements, not live
+// keystrokes: precision matters and latency does not, so give the server-side LLM relevance judge
+// a generous budget (the copilot/haiku route can spike to several seconds when cold/contended by
+// the cell's own agent traffic — a tight cap there fails open and injects noise). Interactive
+// sessions keep the tight ceiling so the operator's prompt is never delayed.
+const IS_EXPERIMENT_CELL = /--/.test(process.env.CODING_EXPERIMENT_TASK_ID || '');
+
+// Absolute safety ceiling -- never let the hook hang Claude Code.
+const SAFETY_TIMEOUT_MS = IS_EXPERIMENT_CELL ? 15000 : 5000;
+const RETRIEVE_TIMEOUT_MS = IS_EXPERIMENT_CELL ? 12000 : 4500;
 const safetyTimer = setTimeout(() => process.exit(0), SAFETY_TIMEOUT_MS);
 safetyTimer.unref();
 
@@ -206,6 +214,7 @@ async function main() {
       threshold: 0.70,
       context,
       task_id,
+      timeout: RETRIEVE_TIMEOUT_MS,
     });
     if (!result || !result.markdown || result.meta?.results_count === 0) return;
 

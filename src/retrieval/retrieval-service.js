@@ -221,6 +221,12 @@ export class RetrievalService {
     // never to empty, never blocking. Cached per (query, candidate-ids). Only the top-K are judged
     // (that is all the token budget can hold); the tail is dropped, which is the IDF trim.
     relevant = await this._judge(query, relevant.slice(0, JUDGE_TOP_K), {
+      // Experiment cells are batch measurements: give the judge a generous cap so a cold/contended
+      // proxy usually completes, AND fail CLOSED (inject nothing) if it still can't — "judge-
+      // confirmed know-how, or nothing". Interactive stays tight and fails OPEN to the IDF set so
+      // the operator is neither delayed nor left with nothing useful.
+      timeoutMs: isExperiment ? 10000 : 2500,
+      failClosed: isExperiment,
       log: (m) => process.stderr.write(m),
     });
 
