@@ -107,7 +107,7 @@ async function retrieve(prompt, sessionId, cwd) {
     budget: 1000,
     threshold: 0.70,
     context: { agent: 'copilot', cwd: cwd || process.cwd() },
-    task_id: process.env.TASK_ID || sessionId,
+    task_id: process.env.CODING_EXPERIMENT_TASK_ID || process.env.TASK_ID || sessionId,
     timeout: RETRIEVAL_TIMEOUT_MS,
     // Defaults to 3033 (the retrieval service). Overridable for tests / non-standard ports.
     ...(process.env.CODING_RETRIEVAL_PORT ? { port: Number(process.env.CODING_RETRIEVAL_PORT) } : {}),

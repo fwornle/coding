@@ -28,6 +28,10 @@ async function main() {
       budget: 1000,
       threshold: 0.65,
       context: { project, cwd, recent_files: recentFiles, agent: 'mastra' },
+      // Experiment cells signal themselves via CODING_EXPERIMENT_TASK_ID (composite id, contains
+      // '--') so the retrieval service suppresses the Working Memory scaffold + restricts to
+      // curated tiers. Null for interactive sessions (no experiment gate).
+      task_id: process.env.CODING_EXPERIMENT_TASK_ID || process.env.TASK_ID || null,
       timeout: 3000,
     });
 

@@ -193,7 +193,12 @@ async function main() {
     // per-item capture keyed by it. TASK_ID is set for experiment runs (the slug
     // the runs table shows); interactive sessions fall back to the Claude Code
     // hook's session_id (the UUID the auto-measure reconciler keys captures by).
-    const task_id = process.env.TASK_ID || input.session_id || null;
+    // CODING_EXPERIMENT_TASK_ID (set by the experiment runner, composite '<exp>--<variant>--rN')
+    // takes precedence: it is the ONLY channel that tells this hook it is inside an experiment
+    // cell (TASK_ID is threaded to the proxy via header, not this env), so the retrieval service
+    // can apply the experiment gate (suppress Working Memory, curated tiers only). Falls back to
+    // TASK_ID, then the interactive Claude Code session UUID.
+    const task_id = process.env.CODING_EXPERIMENT_TASK_ID || process.env.TASK_ID || input.session_id || null;
 
     const result = await callRetrieval({
       query,
