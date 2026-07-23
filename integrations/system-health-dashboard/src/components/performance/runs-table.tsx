@@ -427,17 +427,29 @@ function ColResize({ colId, onStart }: {
 // probes — anything with no task_hash). The user asked for one parent entry per
 // experiment that expands to a sub-list of its per-agent cells, instead of the flat
 // list that interleaved cells with unrelated ambient/probe rows.
-interface RunGroup { key: string; taskHash: string | null; runs: Run[] }
+interface RunGroup { key: string; expId: string | null; runs: Run[] }
 const OTHER_GROUP_KEY = '__other__'
 
-/** Bucket the (already sorted, paginated) rows by experiment identity (task_hash),
- *  preserving first-seen order; the '__other__' bucket is always appended last. */
+/** The experiment-RUN identity: the task_id prefix before the first `--`
+ *  (`<experiment_id>[-<runsalt>]--<variant>--rN`). NOT task_hash — task_hash is
+ *  sha256(goal_sentence), so every re-run of the SAME task (e.g. all fizzbuzz runs)
+ *  shares it and would wrongly collapse into one giant group. The prefix keeps each
+ *  distinct run (v10, v9-rv88a, exp-…) as its own group of per-agent cells. */
+function experimentRunId(run: Run): string | null {
+  const tid = run.task_id
+  if (!tid) return null
+  const prefix = tid.split('--')[0]
+  return prefix && prefix.length ? prefix : null
+}
+
+/** Bucket rows by experiment-RUN id, preserving first-seen order; the '__other__'
+ *  bucket (ambient auto-measured sessions, no variant) is always appended last. */
 function groupRunsByExperiment(runs: Run[]): RunGroup[] {
   const order: string[] = []
   const map = new Map<string, Run[]>()
   for (const run of runs) {
-    const th = runStr(run, 'task_hash')
-    const key = th && isExperimentRun(run) ? `exp:${th}` : OTHER_GROUP_KEY
+    const rid = experimentRunId(run)
+    const key = rid && isExperimentRun(run) ? `exp:${rid}` : OTHER_GROUP_KEY
     if (!map.has(key)) { map.set(key, []); order.push(key) }
     map.get(key)!.push(run)
   }
@@ -445,7 +457,7 @@ function groupRunsByExperiment(runs: Run[]): RunGroup[] {
   if (map.has(OTHER_GROUP_KEY)) keys.push(OTHER_GROUP_KEY)
   return keys.map((key) => ({
     key,
-    taskHash: key === OTHER_GROUP_KEY ? null : key.slice('exp:'.length),
+    expId: key === OTHER_GROUP_KEY ? null : key.slice('exp:'.length),
     runs: map.get(key)!,
   }))
 }
@@ -457,6 +469,17 @@ function GroupHeaderRow({ group, expanded, onToggle }: {
 }) {
   const isOther = group.key === OTHER_GROUP_KEY
   const goal = !isOther ? (group.runs.map((r) => runStr(r, 'goal_sentence')).find(Boolean) ?? null) : null
+  // Short experiment label = the experiment-run id (task_id prefix), which is also
+  // this group's key, falling back to the run's experiment_id metadata.
+  const expLabel = !isOther
+    ? (group.expId
+      ?? runStr(group.runs[0], 'experiment_id')
+      ?? group.runs[0]?.task_id?.split('--')[0]
+      ?? '')
+    : ''
+  // The goal is a full paragraph — show a one-line SUMMARY as the title (full text on
+  // hover), not the whole description bleeding across the row.
+  const goalSummary = goal && goal.length > 96 ? `${goal.slice(0, 96).trimEnd()}…` : goal
   const agents = [...new Set(group.runs.map((r) => r.agent).filter(Boolean))] as string[]
   const totalTokens = group.runs.reduce((sum, r) => sum + (r.outcome?.totalTokens ?? 0), 0)
   const cellCount = group.runs.length
@@ -478,12 +501,18 @@ function GroupHeaderRow({ group, expanded, onToggle }: {
               <span className="flex items-center gap-2 text-sm font-medium">
                 <Radio className="size-3.5 text-muted-foreground" />
                 Other activity
-                <span className="font-normal text-muted-foreground">— ambient sessions &amp; health probes</span>
+                <span className="font-normal text-muted-foreground">— ambient (auto-measured) sessions</span>
               </span>
             )
             : (
-              <span className="truncate text-sm font-medium" title={goal ?? group.taskHash ?? ''}>
-                {goal ?? <span className="font-mono">{group.taskHash}</span>}
+              // Title = short experiment id (bold) + a one-line goal SUMMARY (muted);
+              // the full goal paragraph is on hover. Keeps the row from bleeding the
+              // entire description across the table.
+              <span className="flex min-w-0 items-baseline gap-2" title={goal ?? group.expId ?? ''}>
+                <span className="shrink-0 font-mono text-sm font-medium">{expLabel}</span>
+                {goalSummary && (
+                  <span className="truncate text-xs font-normal text-muted-foreground">{goalSummary}</span>
+                )}
               </span>
             )}
           <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
@@ -589,16 +618,21 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
   )
 
   // Newest-first ordering (see runSortTs). Sort a COPY — the selector's array is
-  // frozen/shared state. Then slice to the current page window.
+  // frozen/shared state.
   const sortedRuns = [...filtered].sort((a, b) => runSortTs(b).localeCompare(runSortTs(a)))
-  const visibleRuns = sortedRuns.slice(0, visibleCount)
-  const remaining = sortedRuns.length - visibleRuns.length
 
-  // Group the visible rows by experiment (task_hash) so the list shows ONE parent
-  // entry per experiment that expands to its per-agent cells, with ambient sessions +
-  // health probes segregated into a collapsed "Other activity" bucket. Grouping the
-  // already-paginated slice keeps the existing row-based pagination untouched.
-  const runGroups = useMemo(() => groupRunsByExperiment(visibleRuns), [visibleRuns])
+  // Group the FULL filtered set by experiment so EVERY experiment surfaces as a compact
+  // parent row regardless of how many ambient rows exist — the 77 opencode / 35 claude
+  // auto-measured sessions must NOT crowd experiments off the first page (the reason the
+  // older experiments vanished when grouping only the paginated slice). Experiment groups
+  // paginate; the "Other activity" bucket (ambient sessions) is ALWAYS pinned last so it
+  // never displaces an experiment.
+  const allGroups = useMemo(() => groupRunsByExperiment(sortedRuns), [sortedRuns])
+  const expGroups = useMemo(() => allGroups.filter((g) => g.key !== OTHER_GROUP_KEY), [allGroups])
+  const otherGroup = useMemo(() => allGroups.find((g) => g.key === OTHER_GROUP_KEY) ?? null, [allGroups])
+  const visibleExpGroups = expGroups.slice(0, visibleCount)
+  const remaining = expGroups.length - visibleExpGroups.length
+  const runGroups = otherGroup ? [...visibleExpGroups, otherGroup] : visibleExpGroups
   // Expanded-group set. Default COLLAPSED (empty set) — the operator asked for one
   // entry per experiment, opened on demand. "Expand all / Collapse all" toggles all.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -1060,8 +1094,8 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
           data-testid="runs-pagination"
         >
           <span className="text-sm text-muted-foreground">
-            Showing <span className="font-semibold">{visibleRuns.length}</span> of{' '}
-            <span className="font-semibold">{sortedRuns.length}</span> runs
+            Showing <span className="font-semibold">{visibleExpGroups.length}</span> of{' '}
+            <span className="font-semibold">{expGroups.length}</span> experiments
           </span>
           <Button
             variant="outline"
@@ -1075,9 +1109,9 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
             variant="ghost"
             size="sm"
             data-testid="runs-show-all"
-            onClick={() => setVisibleCount(sortedRuns.length)}
+            onClick={() => setVisibleCount(expGroups.length)}
           >
-            Show all ({sortedRuns.length})
+            Show all ({expGroups.length})
           </Button>
         </div>
       )}

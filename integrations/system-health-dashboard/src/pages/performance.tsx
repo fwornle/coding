@@ -130,15 +130,21 @@ export function PerformancePage() {
   const loading = useAppSelector(selectRunsLoading)
   const error = useAppSelector(selectRunsError)
   const filtered = useAppSelector(selectFilteredRuns)
+  const includePending = useAppSelector(selectIncludePending)
 
   // D-08: the body Tabs are CONTROLLED so the runs-table "Compare selected (2)"
   // CTA can switch to the Compare tab (which mounts the DifferenceViewer).
   const [activeTab, setActiveTab] = useState('runs')
 
+  // Fetch on mount AND poll every 30s. Mount-only left runs completed by ANY source
+  // OTHER than the in-UI launcher (a CLI `experiment-run.mjs`, the coordinator, or a
+  // run finished while this tab sat open) invisible until a manual reload — the exact
+  // "my experiment doesn't appear" gap. Re-fetch honors the current quarantine toggle.
   useEffect(() => {
-    dispatch(fetchRuns())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    dispatch(fetchRuns(includePending))
+    const id = setInterval(() => dispatch(fetchRuns(includePending)), 30_000)
+    return () => clearInterval(id)
+  }, [dispatch, includePending])
 
   if (loading && runs.length === 0) {
     return (
