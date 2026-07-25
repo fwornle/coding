@@ -15,6 +15,9 @@ import {
   selectLaunchError,
   selectLaunchPending,
   selectLauncherPrefill,
+  selectActiveRunId,
+  selectRunStatus,
+  switchRunToParallel,
   type SpecSummary,
   type ExperimentOverrides,
   type VariantOverride,
@@ -67,6 +70,13 @@ export function ExperimentLauncher() {
   const launchError = useAppSelector(selectLaunchError)
   const launchPending = useAppSelector(selectLaunchPending)
   const prefill = useAppSelector(selectLauncherPrefill)
+  // Live-run control: the "run in parallel" box doubles as a switch for a running SERIAL matrix.
+  const activeRunId = useAppSelector(selectActiveRunId)
+  const runStatus = useAppSelector(selectRunStatus)
+  const TERMINAL_OVERALL = new Set(['complete', 'cancelled', 'timeout', 'abort', 'unknown'])
+  const runInProgress = !!activeRunId && !TERMINAL_OVERALL.has(String(runStatus?.overall ?? 'unknown'))
+  const liveSerial = runInProgress && runStatus?.execution_mode !== 'parallel'
+  const liveParallel = runInProgress && runStatus?.execution_mode === 'parallel'
 
   const [specFile, setSpecFile] = useState('')
   const [rerunOf, setRerunOf] = useState<string | null>(null)
@@ -624,18 +634,31 @@ export function ExperimentLauncher() {
             </span>
           </label>
 
-          {/* Parallel execution checkbox, default OFF (= sequential, unchanged behavior). */}
+          {/* Parallel execution checkbox. With no live run it configures the NEXT launch. During a
+              live SERIAL run, ticking it SWITCHES that run to parallel (releases queued cells). While
+              a run is already parallel it is greyed until the run completes. */}
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
-              checked={parallel}
+              checked={liveParallel ? true : liveSerial ? false : parallel}
+              disabled={liveParallel}
               onCheckedChange={(v) => {
+                if (liveParallel) return
+                if (liveSerial) {
+                  // Live switch: release the running serial matrix's queued cells to the pool.
+                  if (v === true && activeRunId) dispatch(switchRunToParallel(activeRunId))
+                  return
+                }
                 setParallel(v === true)
                 if (v === true) setCaptureRawBodies(false)
               }}
               id="parallel-cells"
             />
-            <span data-testid="parallel-cells">
-              Run cells in parallel (faster; background activity becomes shared across cells)
+            <span data-testid="parallel-cells" className={liveParallel ? 'text-muted-foreground' : ''}>
+              {liveParallel
+                ? 'Running in parallel — cells are executing concurrently (wait for completion)'
+                : liveSerial
+                  ? 'Switch the running experiment to parallel (start all queued cells now)'
+                  : 'Run cells in parallel (faster; background activity becomes shared across cells)'}
             </span>
           </label>
 

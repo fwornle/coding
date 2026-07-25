@@ -105,6 +105,24 @@ test('parallel: maxParallel bounds in-flight agents', async () => {
   assert.equal(trackers.spawn.calls, 3);
 });
 
+test('live switch: control.json {parallel:true} releases a serial run to the pool', async () => {
+  // Long agents vs. near-instant restores so overlap is deterministic once the pool releases them
+  // (restores serialize on the setup mutex; agents run outside it and clearly co-exist).
+  const { trackers, opts } = makeSeams({ agentDelayMs: 250, restoreDelayMs: 3 });
+  const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-switch-dir-'));
+  // Signal present BEFORE the run: the serial loop's first wantsParallelNow() check flips it, so
+  // all cells dispatch through the worker pool — deterministic proof of the switch mechanism.
+  fs.writeFileSync(path.join(runDir, 'control.json'), JSON.stringify({ parallel: true }));
+  const summary = await runMatrix(SPEC, {
+    ...opts, resolveSpec: () => SPEC, expId: 'swtest', parallel: false, maxParallel: 3, runDir,
+  });
+  assert.equal(summary.length, 3);
+  assert.ok(trackers.spawn.maxInFlight > 1, `switched run should overlap agents (max=${trackers.spawn.maxInFlight})`);
+  assert.equal(trackers.restore.maxInFlight, 1, 'restores still serialized after switch');
+  const progress = await readProgress(runDir);
+  assert.equal(progress.execution_mode, 'parallel', 'execution_mode flips to parallel on switch');
+});
+
 test('serial (default): nothing overlaps — legacy behavior preserved', async () => {
   const { trackers, opts } = makeSeams({ agentDelayMs: 20 });
   const summary = await runMatrix(SPEC, { ...opts, resolveSpec: () => SPEC, expId: 'stest' });

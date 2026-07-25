@@ -1360,6 +1360,30 @@ export const fetchActiveRun = createAsyncThunk<
   }
 )
 
+// switchRunToParallel: tick "run in parallel" on a live SERIAL run → the runner releases its
+// remaining queued cells into the worker pool. POSTs the control signal; the 5s progress poll
+// then reflects execution_mode:'parallel'.
+export const switchRunToParallel = createAsyncThunk<
+  { runId: string },
+  string,
+  { rejectValue: string }
+>(
+  'performance/switchRunToParallel',
+  async (runId, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/experiments/run-control/${encodeURIComponent(runId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parallel: true }),
+      })
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      return { runId }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
 // ── Per-cell live log tail (mini-terminal view) ──────────────────────────────
 // Offset-based incremental polling of GET /api/experiments/run-log/:runId/:taskId.
 // Each poll appends only the new chunk; the reducer caps the kept text and records

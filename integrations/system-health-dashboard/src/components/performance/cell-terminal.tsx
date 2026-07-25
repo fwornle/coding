@@ -50,11 +50,13 @@ const ERROR_RE = /error|fatal|FAIL|Traceback|SANDBOX ESCAPE/i
 const TOOL_RE = /^(\$|⏺)|(\[experiment)|tool_use|Running |Write\(|Edit\(|Bash\(/
 const INFRA_RE = /^\[(measurement|experiment-runner|experiment-run)\]|^(started|stopped|archived|captured) /
 
-export function lineClass(line: string): string {
-  if (ERROR_RE.test(line)) return 'text-red-400'
-  if (INFRA_RE.test(line)) return 'text-zinc-500'
-  if (TOOL_RE.test(line)) return 'text-cyan-300'
-  return 'text-zinc-300'
+// `bright` raises contrast for the zoomed/expanded view (the tiny grid tiles read fine dimmer,
+// but the near-fullscreen log needs to be comfortably readable).
+export function lineClass(line: string, bright = false): string {
+  if (ERROR_RE.test(line)) return bright ? 'text-red-300' : 'text-red-400'
+  if (INFRA_RE.test(line)) return bright ? 'text-zinc-400' : 'text-zinc-500'
+  if (TOOL_RE.test(line)) return bright ? 'text-cyan-200' : 'text-cyan-300'
+  return bright ? 'text-zinc-100' : 'text-zinc-300'
 }
 
 // ── Small pieces ──────────────────────────────────────────────────────────────
@@ -214,8 +216,8 @@ export function CellTerminal({ cell, log, expanded = false, onClick }: CellTermi
                 }
               : undefined
           }
-          className={`h-full overflow-y-auto px-2 py-1 font-mono leading-tight ${
-            expanded ? 'text-xs' : 'pointer-events-none text-[9px]'
+          className={`h-full overflow-y-auto px-2 py-1 font-mono ${
+            expanded ? 'text-[13px] leading-relaxed' : 'pointer-events-none text-[9px] leading-tight'
           } ${dimmed ? 'opacity-50 saturate-50' : ''} ${state === 'restoring' ? 'animate-pulse' : ''}`}
           data-testid="cell-terminal-body"
         >
@@ -223,20 +225,22 @@ export function CellTerminal({ cell, log, expanded = false, onClick }: CellTermi
             <div className="italic text-zinc-600">{state === 'pending' ? 'waiting for slot…' : 'no output yet…'}</div>
           ) : (
             lines.map((l, i) => (
-              <div key={i} className={`whitespace-pre-wrap break-all ${lineClass(l)}`}>
+              <div key={i} className={`whitespace-pre-wrap break-all ${lineClass(l, expanded)}`}>
                 {l}
               </div>
             ))
           )}
           {live && <span className="inline-block h-3 w-[6px] animate-cursor-blink bg-zinc-300 align-text-bottom" />}
         </div>
-        {/* CRT vignette + scanlines (decorative, never intercept clicks) */}
+        {/* CRT vignette + scanlines (decorative, never intercept clicks). Softened in the expanded
+            view so it doesn't fight the log's readability — full effect only on the tiny grid tiles. */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
           style={{
-            background:
-              'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.35) 100%), repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px)',
+            background: expanded
+              ? 'radial-gradient(ellipse at center, transparent 75%, rgba(0,0,0,0.18) 100%)'
+              : 'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.35) 100%), repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px)',
           }}
         />
       </div>
