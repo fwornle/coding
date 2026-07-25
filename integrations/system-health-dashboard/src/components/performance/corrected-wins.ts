@@ -42,12 +42,27 @@ export const EXPERIMENT_REDUNDANT_DIM: ScoreDimension = 'spec_drift'
 export const EXPERIMENT_DRIFT_NOTE =
   'For experiment cells (freeform goals, no PLAN.md task list) Drift mirrors Goal — it is not an independent signal, so it is shown muted here.'
 
+// Goal fallback: `goal_achieved` is the LLM's OUTCOME reading and is null unless the
+// harness captured verification/test evidence — which it often can't for an agent that
+// ran its tests in its own sandbox. `goal_aligned_ratio` is the PROCESS reading (fraction
+// of consequential tool-events that moved toward the goal), it IS populated, and it is
+// already what the Goal cell's tooltip rationale (ratio_rationale) explains. So the Goal
+// column shows goal_achieved, then falls back to goal_aligned_ratio — otherwise a run the
+// judge describes as "investigated the flicker, edited the script, added a test" shows a
+// bare "—", contradicting its own rationale. Both null → still "—" (never 0).
+function goalFallback(score: RunScore | null): number | null {
+  const ratio = score?.['goal_aligned_ratio']
+  return ratio != null && typeof ratio === 'number' ? ratio : null
+}
+
 export function effective(dim: string, score: RunScore | null): number | null {
   if (!score) return null
   const corrected = score[`corrected_${dim}`]
   if (corrected != null && typeof corrected === 'number') return corrected
   const judged = score[dim]
-  return judged != null && typeof judged === 'number' ? judged : null
+  if (judged != null && typeof judged === 'number') return judged
+  if (dim === 'goal_achieved') return goalFallback(score)
+  return null
 }
 
 export function isEdited(dim: string, score: RunScore | null): boolean {
@@ -58,5 +73,18 @@ export function isEdited(dim: string, score: RunScore | null): boolean {
 export function judged(dim: string, score: RunScore | null): number | null {
   if (!score) return null
   const v = score[dim]
-  return v != null && typeof v === 'number' ? v : null
+  if (v != null && typeof v === 'number') return v
+  if (dim === 'goal_achieved') return goalFallback(score)
+  return null
+}
+
+// Whether the Goal cell is showing the goal_aligned_ratio FALLBACK (goal_achieved was
+// null). Surfaces let the tooltip say which metric the number represents so the value and
+// its rationale always agree.
+export function isGoalRatioFallback(score: RunScore | null): boolean {
+  if (!score) return false
+  const ga = score['goal_achieved']
+  const corrected = score['corrected_goal_achieved']
+  const hasDirect = (ga != null && typeof ga === 'number') || (corrected != null && typeof corrected === 'number')
+  return !hasDirect && goalFallback(score) != null
 }

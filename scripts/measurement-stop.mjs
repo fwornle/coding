@@ -908,7 +908,14 @@ async function main() {
     //   "trivial" (that omission is exactly why a derailed opencode/copilot cell showed blank
     //   while claude scored). The "trivial"/pending short-circuits apply only to AMBIENT runs.
     const isExperimentCell = span?.meta?.variant != null;
-    if (isExperimentCell) {
+    if (skipReason) {
+      //   A SKIPPED cell (preflight failure, unsupported combo — writeSkipRun) never launched an
+      //   agent, so the sandbox holds only the untouched baseline. Judging it fabricates rubric
+      //   numbers from the baseline's OWN state (a pre-existing failing test read as a "regression",
+      //   the baseline's coverage read as this cell's) — the misleading 0.22/0.95/1.00 on a cell
+      //   that did nothing. Record it as not-scored; never judge, never overlay.
+      judgment = { not_scored: `skipped:${skipReason}` };
+    } else if (isExperimentCell) {
       judgment = await runJudge({ span, trace: consequential, evidence, forceScore: true });
     } else if (trace === null) {
       //   Ambient run, no trace FILE located (D-02) → pending (re-scorable), not trivial.
@@ -927,14 +934,15 @@ async function main() {
     //   dims are computed by the harness (diff + fail-soft test run), NOT the LLM
     //   (D-08 security note), so a non-GSD run persists them even when the judge
     //   returned null/pending. A pending judgment IS gap-filled (its rubric is null).
-    overlayNonGsdRubric(judgment, evidence);
+    //   Skipped cells never launched an agent — no rubric to gap-fill from baseline evidence.
+    if (!skipReason) overlayNonGsdRubric(judgment, evidence);
     // ── CMP-01 / Phase 79 (D-04a): stamp the OBJECTIVE per-cell test-gate outcome onto
     //   the judgment so writeScore persists it as a discrete queryable field, DISTINCT
     //   from the subjective rubric above (D-04). Compute-once from the ALREADY-computed
     //   evidence.testRun (no second test execution, D-04) and attach-to-judgment —
     //   mirrors overlayNonGsdRubric's mutate-in-place idiom; single writeScore below.
     //   null = no test_command (ungated, D-02); true = exit 0; false = non-zero exit. ──
-    judgment.gate_passed = gateFromEvidence(evidence);
+    if (!skipReason) judgment.gate_passed = gateFromEvidence(evidence);
     await writeScore(store, { span, judgment });
 
     pendingCount = await countPending(store);
@@ -945,9 +953,11 @@ async function main() {
   // ── (5) Close summary ──
   //   Resolve a single scored/pending/trivial marker + the goal_aligned_ratio so the
   //   operator sees how the run was judged without querying the store.
-  const scoreMarker = judgment?.not_scored === 'trivial'
-    ? 'trivial'
-    : (judgment?.pending === true ? 'pending' : 'scored');
+  const scoreMarker = typeof judgment?.not_scored === 'string' && judgment.not_scored.startsWith('skipped')
+    ? 'skipped'
+    : judgment?.not_scored === 'trivial'
+      ? 'trivial'
+      : (judgment?.pending === true ? 'pending' : 'scored');
   const ratioStr = judgment?.goal_aligned_ratio == null
     ? 'null'
     : judgment.goal_aligned_ratio.toFixed(3);

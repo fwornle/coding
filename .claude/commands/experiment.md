@@ -29,6 +29,22 @@ The ONLY skill-side computation is re-deriving the `task_hash` (the sha256 the r
 computes at close) so the run→compare handoff is mechanically closed — no manual lookup, no
 scraping of runner stdout.
 
+> **DO NOT pre-solve the task. The analysis IS the experiment.** The whole point is to compare
+> how each agent *independently* investigates and solves the task, in its own isolated sandbox.
+> The orchestrator's job is to turn the user's description into a `GOAL_SENTENCE` and run the
+> matrix — **never** to read the codebase, locate the bug, design the fix, or otherwise do the
+> work before running. Doing so contaminates the comparison (you'd be feeding one agent's answer
+> to all cells) and defeats the purpose. Write the goal from **symptoms + the observable
+> deliverable** the user described (e.g. "the REC indicator wrongly toggles between black and
+> green — make it stable"), optionally with a one-line orienting pointer the user themselves gave,
+> and let each cell do its own analysis. If you catch yourself grepping the target code to "craft a
+> better goal," stop — that is the cells' job.
+
+> **Parallel is the default execution mode.** Run cells concurrently (Step 4) unless the user
+> explicitly asks for serial/sequential execution, or the matrix includes an agent whose tokens
+> must be measured and that agent is ambient-slot-bound (opencode / mastracode — see Step 4). Only
+> then fall back to serial.
+
 ## Instructions
 
 **Goal**: From either a plain-English description or `run --goal "<sentence>" --variants A,B
@@ -63,17 +79,31 @@ Apply these deterministic rules so every agent behaves identically. This is **sp
 
 2. **Variants (agent × model)** — map every agent named in the prose to a member of the known set
    `claude | copilot | opencode | mastracode` (`lib/experiments/experiment-spec.mjs` `KNOWN_AGENTS`).
-   Use the per-agent model-string convention (from `config/experiments/compare-fizzbuzz.yaml`):
 
-   | Agent | model string to emit | notes |
-   |-------|----------------------|-------|
-   | `claude` | pinned Anthropic id, HYPHENATED: `claude-opus-4-8` \| `claude-sonnet-4-6` \| `claude-haiku-4-5` | pick from the prose ("Sonnet" → `claude-sonnet-4-6`); default `claude-sonnet-4-6`. Pin the exact id — the `sonnet`/`opus` ALIASES resolve to the latest in-tier model (e.g. `sonnet`→Sonnet 5), which silently breaks version parity with the opencode/copilot cells. Dotted `claude-sonnet-4.6` 404s on the claude CLI path (that form is only the rapid-proxy/copilot catalog id). |
-   | `opencode` | `rapid-proxy/claude-haiku-4-5` | proxy-routed BYOK model string |
-   | `copilot` | `auto` | copilot picks; free-form, not blocked |
-   | `mastracode` | as named, else `default` | best-effort |
+   **Resolve the model ONCE, per agent, with the shared resolver — never hand-formulate the three
+   spellings.** The user names a model ONE way ("opus 4.8", "Sonnet 4.6", "claude-opus-4.8", …); the
+   same model is spelled differently by each agent's CLI/catalog (hyphenated for claude, dotted for
+   copilot, `rapid-proxy/…` dotted for opencode). `lib/experiments/model-resolve.mjs` does the mapping:
 
-   - **If no agent is named, default to two variants: `claude` (sonnet) + `opencode`
-     (`rapid-proxy/claude-haiku-4-5`)** — the two RUN-verified drivable agents.
+   ```bash
+   # Emit the per-agent model string for whatever the user said. Prints e.g.
+   #   claude-opus-4-8   (claude) | claude-opus-4.8 (copilot) | rapid-proxy/claude-opus-4.8 (opencode)
+   node -e 'import("./lib/experiments/model-resolve.mjs").then(m =>
+     process.stdout.write(m.resolveModelForAgent(process.argv[1], process.argv[2]) || ""))' <agent> "<user model ref>"
+   ```
+
+   Call it for each agent when building `VARIANTS_JSON` (Step 2). It accepts `opus 4.8`, `opus-4.8`,
+   `claude-opus-4.8`, `claude-opus-4-8` — all equivalent — and returns `null` for a non-Claude ref
+   (e.g. `gpt-4o`), in which case keep the user's raw string. This is why the dotted/hyphenated model
+   chaos no longer needs to be spelled out per agent: **say the model once, resolve per agent.**
+
+   Notes: pin the concrete version, not a bare `sonnet`/`opus` alias — the alias floats to the latest
+   in-tier model and silently breaks version parity across the cells (the resolver always pins a
+   concrete `<major>-<minor>`/`<major>.<minor>`). Default model when the prose names none:
+   `claude-sonnet-4-6` (claude) / `rapid-proxy/claude-sonnet-4.6` (opencode).
+
+   - **If no agent is named, default to two variants: `claude` + `opencode`**, both on `sonnet 4.6`
+     (resolved per agent) — the two RUN-verified drivable agents.
    - Each variant is `{ agent, model, framework: straight, env: default }` unless the prose asks for
      a different framework/env. **Drop any `UNSUPPORTED_COMBINATIONS`** (e.g. `copilot`+`headless`,
      "Copilot headless drivability is unproven") and note the drop in the preview.
@@ -186,18 +216,16 @@ SPEC_FILE=$(node scripts/experiment-write-spec.mjs \
   --repeats "${REPEATS:-1}" \
   ${TEST_COMMAND:+--test-command "$TEST_COMMAND"} \
   --variants "$VARIANTS_JSON")
-# VARIANTS_JSON example (one entry per variant — flag pair or Step 0-NL synthesized):
+# VARIANTS_JSON — build each `model` with resolveModelForAgent(agent, ref) (point 2 above). Example
+# for the ref "sonnet 4.6" across three agents (the resolver emits these; do NOT hand-type them):
 #   [{"agent":"claude","model":"claude-sonnet-4-6","framework":"straight","env":"default"},
 #    {"agent":"opencode","model":"rapid-proxy/claude-sonnet-4.6","framework":"straight","env":"default"},
 #    {"agent":"copilot","model":"claude-sonnet-4.6","framework":"straight","env":"default"}]
-# MODEL STRING DIALECT (per-agent): the SAME Sonnet 4.6 is spelled three ways because each CLI has
-# its own resolver. claude → the HYPHENATED Anthropic id `claude-sonnet-4-6` (the CLI's --model takes
-# a full model name; the DOTTED `claude-sonnet-4.6` is a 404 typo on this path). opencode → the
-# rapid-proxy CATALOG id `rapid-proxy/claude-sonnet-4.6` (dotted). copilot → the copilot catalog id
-# `claude-sonnet-4.6` (dotted). PIN the claude cell to `claude-sonnet-4-6`, NOT the `sonnet` alias —
-# the alias resolves to the latest Sonnet in the tier (now Sonnet 5), which would silently run a
-# DIFFERENT model than the other cells and break cross-agent version parity.
-# MODEL TIER for agentic tasks: prefer sonnet+ for opencode/copilot cells. Verified (2/2 each)
+# The resolver handles the per-agent spelling (hyphenated claude id / dotted copilot id / dotted
+# rapid-proxy opencode id) so you never formulate "with hyphen / without / with prefix" by hand.
+# It always PINS a concrete version (never the floating `sonnet`/`opus` alias, which would run a
+# DIFFERENT model per cell and break cross-agent parity).
+# MODEL TIER for agentic tasks: prefer sonnet+ for the opencode/copilot cells. Verified (2/2 each)
 # that claude-haiku-4.5, under opencode's heavy agentic context (full system prompt + many tools),
 # NARRATES its plan instead of emitting tool_use — opencode's single-turn `run` then ends with no
 # files (gate_passed=False). haiku tool-calls fine with a trivial single tool, so it's an
@@ -251,22 +279,59 @@ TASK_HASH=$(node -e "process.stdout.write(require('crypto').createHash('sha256')
 Run's persisted `metadata.task_hash` via `readRuns` (`lib/experiments/query.mjs`); all cells share
 one task_hash. Prefer the direct sha256 — no open store needed.
 
-### Step 4: Run the matrix (UNATTENDED)
+### Step 4: Run the matrix (UNATTENDED — parallel by default)
+
+**Watch it in the dashboard.** Run through the **Performance tab of the running health dashboard** so
+the live mini-terminal grid is visible. Ensure the dashboard is up (spin it up if not), open it
+**visibly** on Performance, then launch with a `--run-dir` so `progress.json` + per-cell logs exist —
+the Run monitor **auto-attaches** to the active run and streams the mini-terminals (no Launch click
+needed; auto-attach is `GET /api/experiments/active-run`, added Phase 90):
 
 ```bash
+# 1) Dashboard up + visible on the Performance tab.
+if ! curl -sf -m 3 http://localhost:3032 >/dev/null 2>&1; then
+  (cd docker && docker compose up -d coding-services) >/dev/null 2>&1 || true
+  for i in $(seq 1 30); do curl -sf -m 2 http://localhost:3032 >/dev/null 2>&1 && break; sleep 2; done
+fi
+open "http://localhost:3032/performance" >/dev/null 2>&1 || true   # visible in the operator's browser
+
+# 2) Launch parallel (default) with a run-dir so the monitor auto-attaches.
+RUN_ID="r$(date +%s | tail -c 9)"   # ≤12-char id (vkb-server _validRunId)
 node scripts/experiment-run.mjs --spec "$SPEC_FILE" \
-  --repeats <N> --task-class <class>
+  --repeats <N> --task-class <class> --parallel \
+  --run-id "$RUN_ID" --run-dir ".data/experiments/runs/$RUN_ID"
 ```
 
 Pass `--task-class` through so the runner classifies the Runs (belt-and-braces with the spec field).
+`--max-parallel N` (1–8, default 4) caps concurrency if needed. Do NOT launch via a hidden/automation
+browser (e.g. gsd-browser) when the operator wants to watch — the Run monitor renders in whatever tab
+sees the active run, and auto-attach makes the operator's own dashboard show it.
 
-**RUN UNATTENDED** (ambient-span caveat): each cell binds its OWN tokens per-request (claude via an
-`x-task-id` header, opencode via an `OPENCODE_CONFIG_CONTENT` provider splice on both wires — Phase
-84), so the cell captures reliably even under concurrency. But it still opens the ambient
-`active-measurement.json` span as the fallback the shared host proxy reads to stamp any *unbound*
-`token_usage.task_id`. A concurrent main-session LLM call in THIS repo that carries no binding of its
-own would be mis-stamped with the cell's task_id. Kick this off standalone — do not drive it from an
-interactive agent working the same repo.
+**All agents route their LLM calls through the shared rapid-proxy** (`:12435`) — that is how every
+cell's tokens are captured at all; it is NOT special to any one agent, so don't single one out for
+"goes through the proxy." What differs per agent is only *how each proxy row is bound to the cell's
+`task_id`*, and that binding is what parallel mode stresses:
+
+| Agent | token→cell binding | measured in parallel? |
+|-------|--------------------|-----------------------|
+| claude | per-request `x-task-id` header | ✅ yes |
+| copilot | per-request task-scoped adapter path | ✅ yes |
+| opencode | rows carry opencode's own session id | ❌ needs the serial slot |
+| mastracode | rows land `task_id=''` | ❌ needs the serial slot |
+
+**When to run SERIAL instead** (drop `--parallel`): only when the matrix includes **opencode** or
+**mastracode** *and* you need their **token** numbers. Their rows aren't per-request bound, so only
+the serial global `active-measurement.json` slot re-stamps them with the cell's `task_id`. In
+**parallel** mode there is no global slot, so those cells still run and are **rubric-scored on their
+diff** (goal/quality/coverage) but report **0 tokens (unmeasured)** on the cost axis. If the
+comparison is about the *fix* (not cost), parallel is fine; if you need opencode/mastracode **cost**,
+run serially. State which you chose and why in the preview.
+
+**RUN UNATTENDED.** In **parallel** mode spans are slotless (per-cell), so there is no global slot for
+a stray call to be mis-stamped into — but still kick this off standalone. In **serial** mode a cell
+opens the ambient `active-measurement.json` span the shared host proxy reads to stamp any *unbound*
+`token_usage.task_id`, so a concurrent main-session LLM call in THIS repo could be mis-stamped with
+the cell's task_id. Either way: do not drive the matrix from an interactive agent working the same repo.
 
 Env knobs the runner honours (surface if the operator needs them): `CODING_REPO`,
 `LLM_PROXY_DATA_DIR`, `LLM_PROXY_PORT`, `CODING_PROXY_ROUTE`.

@@ -7,6 +7,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
   fetchRuns,
+  fetchActiveRun,
+  setActiveRunId,
+  selectActiveRunId,
   setIncludePending,
   selectIncludePending,
   selectRuns,
@@ -145,6 +148,27 @@ export function PerformancePage() {
     const id = setInterval(() => dispatch(fetchRuns(includePending)), 30_000)
     return () => clearInterval(id)
   }, [dispatch, includePending])
+
+  // AUTO-ATTACH: poll for the newest in-progress run and adopt it as the active run
+  // when this tab isn't already watching one — so a matrix launched from the CLI or the
+  // /experiment skill (not this tab's Launch button) still surfaces the live mini-terminal
+  // grid here. Only adopts when activeRunId is null, so it never yanks a run the operator
+  // deliberately dismissed away from them mid-view (Dismiss sets activeRunId null AND the
+  // run reaches a terminal overall shortly after, so it won't be re-adopted).
+  const activeRunId = useAppSelector(selectActiveRunId)
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled || activeRunId) return
+      const res = await dispatch(fetchActiveRun())
+      if (!cancelled && fetchActiveRun.fulfilled.match(res) && res.payload.runId) {
+        dispatch(setActiveRunId(res.payload.runId))
+      }
+    }
+    tick()
+    const id = setInterval(tick, 5_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [dispatch, activeRunId])
 
   if (loading && runs.length === 0) {
     return (

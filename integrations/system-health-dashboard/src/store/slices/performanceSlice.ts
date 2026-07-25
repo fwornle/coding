@@ -1338,6 +1338,28 @@ export const fetchRunStatus = createAsyncThunk<RunProgress, string, { rejectValu
   }
 )
 
+// fetchActiveRun: the newest in-progress run, so ANY tab can auto-attach its Run
+// monitor to a run launched elsewhere (CLI, the /experiment skill, another tab).
+// Returns { runId: null } when nothing is running. Never rejects loudly — a failed
+// poll just yields null so the page keeps working.
+export const fetchActiveRun = createAsyncThunk<
+  { runId: string | null; overall?: string | null; execution_mode?: string | null },
+  void,
+  { rejectValue: string }
+>(
+  'performance/fetchActiveRun',
+  async (_arg, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/experiments/active-run')
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      return { runId: data?.runId ?? null, overall: data?.overall ?? null, execution_mode: data?.execution_mode ?? null }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
 // ── Per-cell live log tail (mini-terminal view) ──────────────────────────────
 // Offset-based incremental polling of GET /api/experiments/run-log/:runId/:taskId.
 // Each poll appends only the new chunk; the reducer caps the kept text and records

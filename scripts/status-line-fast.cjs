@@ -59,8 +59,10 @@ function getAbbrev(name) {
 function reunderline(text, targetAbbrev) {
   // Strip any existing underline
   let s = text.replace(/#\[underscore\]/g, '').replace(/#\[nounderscore\]/g, '');
-  // Apply underline to this project's abbreviation
-  s = s.replace(new RegExp(`(${targetAbbrev})([^A-Z#])`), `#[underscore]$1#[nounderscore]$2`);
+  // Apply underline to this project's abbreviation. The leading (?<![A-Z]) guard stops a short
+  // abbrev from matching as the TAIL of a longer one — e.g. targetAbbrev "C" (coding) must not
+  // underline the "C" inside "REC". The trailing [^A-Z#] already guards the prefix side.
+  s = s.replace(new RegExp(`(?<![A-Z])(${targetAbbrev})([^A-Z#])`), `#[underscore]$1#[nounderscore]$2`);
   return s;
 }
 
@@ -155,12 +157,15 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     // anyNewer also fires if a sub-agent file is fresher than the cache —
     // so the next tick triggers a CSL refresh that re-walks subagents/
     // and re-publishes subMt.
-    // Match: <ABBREV>(?![A-Z]) optionally followed by a #[nounderscore]
-    // closing tag (when the abbrev is the underlined "current project"),
-    // immediately followed by exactly one lifecycle icon. The (?![A-Z])
-    // guard prevents abbrev "C" from matching the "C" in "CA🟢".
+    // Match: <ABBREV> optionally followed by a #[nounderscore] closing tag (when the abbrev is
+    // the underlined "current project"), immediately followed by exactly one lifecycle icon.
+    // BOTH boundary guards are required so an abbrev only matches as a WHOLE token:
+    //   • trailing (?![A-Z]) — abbrev "C" must not match the PREFIX "C" in "CA🟢";
+    //   • leading  (?<![A-Z]) — abbrev "C" must not match the SUFFIX "C" in "REC🟢" (the "C" is
+    //     preceded by "E" ∈ [A-Z]). Without this, the global replace for the live "coding" project
+    //     rewrote REC's dot with coding's icon, so REC flickered green↔black in lock-step with it.
     const re = new RegExp(
-      `(${abbrev}(?![A-Z])(?:#\\[nounderscore\\])?)(?:${lifecycleAlt})`,
+      `(?<![A-Z])(${abbrev}(?![A-Z])(?:#\\[nounderscore\\])?)(?:${lifecycleAlt})`,
       'gu'
     );
     out = out.replace(re, `$1${newIcon}`);

@@ -288,7 +288,11 @@ async function main() {
   // D-03/D-04: when a --run-dir is set, initialize progress.json as a `pending` grid BEFORE the
   // loop so the dashboard poller (Plan 05) has a header + one cell per variant×repeat immediately.
   // writeProgress is atomic + never-throw, so a progress-init failure never blocks the run.
+  // Create the run-dir FIRST — the dashboard launch path (run-launch.mjs) pre-creates it, but a
+  // direct CLI launch (the /experiment skill's Step 4) does not, and without the dir the init
+  // write ENOENTs, dropping the header (overall/execution_mode) so auto-attach can't see the run.
   if (runDir) {
+    try { fs.mkdirSync(runDir, { recursive: true }); } catch { /* best-effort; writeProgress is never-throw */ }
     const pendingCells = [];
     for (const c of cells) {
       const v = cellName(c);

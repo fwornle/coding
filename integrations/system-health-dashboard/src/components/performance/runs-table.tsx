@@ -38,7 +38,7 @@ import {
   type VariantOverride,
   type SpecSummary,
 } from '@/store/slices/performanceSlice'
-import { effective, isEdited, judged, isExperimentCell, EXPERIMENT_DRIFT_NOTE, SCORE_DIMENSIONS } from './corrected-wins'
+import { effective, isEdited, judged, isExperimentCell, isGoalRatioFallback, EXPERIMENT_DRIFT_NOTE, SCORE_DIMENSIONS } from './corrected-wins'
 import { distinctModels, normalizeModel } from './models'
 import { ReconciliationBadge } from './reconciliation-badge'
 
@@ -244,7 +244,11 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
   // rubric_rationale covers the 5 dims; ratio_rationale explains goal_aligned_ratio (best for Goal).
   const rubricRat = typeof run.score?.rubric_rationale === 'string' ? run.score.rubric_rationale.trim() : ''
   const ratioRat = typeof run.score?.ratio_rationale === 'string' ? run.score.ratio_rationale.trim() : ''
-  const why = dim === 'goal_achieved' ? (ratioRat || rubricRat) : rubricRat
+  // The Goal cell may be showing the goal_aligned_ratio fallback (goal_achieved was null
+  // for lack of verification evidence). When it is, pair the value with the ratio rationale
+  // so the number and its explanation always describe the same thing.
+  const goalRatioFallback = dim === 'goal_achieved' && isGoalRatioFallback(run.score)
+  const why = dim === 'goal_achieved' ? (goalRatioFallback ? (ratioRat || rubricRat) : (rubricRat || ratioRat)) : rubricRat
   // For experiment cells the Drift value is redundant with Goal (freeform goal, no
   // PLAN.md to diverge from) — render it muted so it does not read as independent
   // signal. Still editable/overridable; only the resting display is demoted.
@@ -356,6 +360,12 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
           <TooltipContent className="max-w-sm space-y-1 text-left">
             <p className="font-medium">{meta?.label ?? dim}: {eff == null ? '—' : eff.toFixed(2)}</p>
             {redundant && <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{EXPERIMENT_DRIFT_NOTE}</p>}
+            {goalRatioFallback && (
+              <p className="text-xs font-medium text-sky-600 dark:text-sky-400">
+                Showing goal-alignment (fraction of tool-events that moved toward the goal). The judge captured
+                no verification/test evidence, so goal-achieved could not be scored directly.
+              </p>
+            )}
             {meta?.desc && <p className="text-xs opacity-80">{meta.desc}</p>}
             {edited && (
               <p className="text-xs">Judged (before your edit): {judgedVal == null ? '—' : judgedVal.toFixed(2)}</p>
