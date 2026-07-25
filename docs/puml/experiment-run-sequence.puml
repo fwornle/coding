@@ -33,22 +33,47 @@ skill -> op: preview + drafted gate
 op -> skill: confirm (Run it / ungated / edit)
 skill -> skill: write config/experiments/<id>.yaml\ncompute task_hash = sha256(goal_sentence)
 
-== Run the matrix (UNATTENDED — single span slot) ==
-skill -> runner: --spec <id>.yaml
-loop each variant × repeat cell
+== Run the matrix (UNATTENDED) ==
+skill -> runner: --spec <id>.yaml  [--parallel --max-parallel N]
+
+alt serial (default)
+    note over runner
+      Cells run one at a time (await each).
+      One global span slot; execution_mode = serial.
+    end note
+else parallel (opt-in — bounded worker pool)
+    note over runner
+      Cells overlap. SLOTLESS per-cell spans (no global slot).
+      Setup mutex serializes restore; store mutex serializes
+      measurement-stop. execution_mode = parallel.
+    end note
+end
+
+loop each (variant × repeat) cell  —  serial: awaited · parallel: pooled
     runner -> proxy: preflight — one-token /api/complete
-    runner -> prep: restore snapshot -> worktree,\nstrip rules files, (kb-on) inject knowledge
-    prep -> proxy: (kb-on) /api/retrieve — gated, fail-CLOSED
-    runner -> agent: drive goal in sandbox\n(per-request binding: x-task-id / config splice)
+    group setup lock  (parallel: serialized — git worktree not concurrency-safe)
+        runner -> prep: restore snapshot -> worktree,\nstrip rules, (kb-on) inject; open cells/<taskId>.log
+        prep -> proxy: (kb-on) /api/retrieve — gated, fail-CLOSED
+    end
+    runner -> agent: drive goal in sandbox\n(per-request binding: x-task-id / config splice)\nstdout+stderr -> cells/<taskId>.log
     agent -> proxy: LLM calls (task-bound)
     proxy -> proxy: record token_usage(task_id, fg/bg)
     runner -> mstop: cell complete (exit code = terminal state)
     mstop -> mstop: escape guard — diff real repo dirty-set
-    mstop -> judge: gate (test_command) + 5-dim rubric (forceScore)
-    judge -> proxy: POST /api/complete (Opus 4.8)
-    mstop -> proxy: aggregate tokens by task_id
-    mstop -> store: writeRun + writeScore + writeOutcome
+    group store lock  (parallel: serialized — single-owner LevelDB)
+        mstop -> judge: gate (test_command) + 5-dim rubric (forceScore)
+        judge -> proxy: POST /api/complete (Opus 4.8)
+        mstop -> proxy: aggregate tokens by task_id
+        mstop -> store: writeRun + writeScore + writeOutcome (execution_mode)
+    end
 end
+
+note over runner, proxy
+  Parallel caveat: opencode (rapid-proxy provider → its own session id)
+  and mastracode (task_id='') are ambient-slot-bound — with no global
+  slot they measure ~0 tokens. claude (x-task-id) and copilot
+  (task-scoped adapter) stay per-request bound. Run serially to measure them.
+end note
 
 == Compare & surface ==
 skill -> compare: --task-hash <hash> --rank-by composite

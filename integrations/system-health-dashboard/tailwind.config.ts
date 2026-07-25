@@ -24,11 +24,23 @@ const config: Config = {
           '50%': { transform: 'scale(1.05)' },
           '100%': { transform: 'scale(1)' },
         },
+        // Mini-terminal (cell-terminal.tsx): blinking block cursor + one-shot success glow.
+        'cursor-blink': {
+          '0%, 49%': { opacity: '1' },
+          '50%, 100%': { opacity: '0' },
+        },
+        'term-glow-green': {
+          '0%': { boxShadow: '0 0 0px 0px rgba(34,197,94,0)' },
+          '30%': { boxShadow: '0 0 14px 3px rgba(34,197,94,0.55)' },
+          '100%': { boxShadow: '0 0 6px 1px rgba(34,197,94,0.18)' },
+        },
       },
       animation: {
         wiggle: 'wiggle 0.3s ease-in-out 2',
         'completion-glow': 'completion-glow 0.8s ease-out',
         'step-pop': 'step-pop 0.4s ease-out',
+        'cursor-blink': 'cursor-blink 1.1s steps(1) infinite',
+        'term-glow-green': 'term-glow-green 1.2s ease-out forwards',
       },
       borderRadius: {
         lg: 'var(--radius)',

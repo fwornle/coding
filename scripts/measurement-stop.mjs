@@ -178,6 +178,9 @@ export function buildRunTags({
     // ── AVN-01 (Phase 87-03): the forked origin span's task_id, folded from span.meta the
     //    same null-preserved way rerun_of/base_variant do (never coerced; `?? null` keeps null). ──
     origin_span_id: span.meta?.origin_span_id ?? null,
+    // ── Parallel experiments: how this cell was executed ('serial' | 'parallel'), folded
+    //    from span.meta the same null-preserved way (absent on pre-feature spans → null). ──
+    execution_mode: span.meta?.execution_mode ?? null,
   };
 }
 
@@ -490,9 +493,45 @@ async function main() {
   const { stopMeasurement, resolveMeasurementPaths } = await import(modUrl);
 
   const { archiveDir } = resolveMeasurementPaths();
-  let archived = stopMeasurement();
+
+  // ── Slotless close (parallel mode): --no-slot --task-id <id> promotes the pending
+  //   per-cell span file (written by measurement-start --no-slot) to the archive path,
+  //   never touching the global active-measurement.json — another cell may own it.
+  //   Everything downstream (adapters, aggregateByTaskId, judge, writeRun) is keyed off
+  //   the archived span JSON + task_id, so the close path below is IDENTICAL.
+  const noSlot = args.includes('--no-slot');
+  const noSlotTaskId = parseStrArg(args, '--task-id');
+  if (noSlot && !noSlotTaskId) {
+    process.stderr.write('error: --no-slot requires --task-id <id>\n');
+    process.exit(1);
+  }
+
+  let archived;
   let closeMarker = null;
   let closeMarkerPath = null;
+  if (noSlot) {
+    const safeId = sanitizeTaskId(noSlotTaskId);
+    const pendingPath = path.join(archiveDir, `${safeId}.pending.json`);
+    let span;
+    try {
+      span = JSON.parse(fs.readFileSync(pendingPath, 'utf8'));
+    } catch {
+      process.stdout.write(`no pending slotless span for task_id=${noSlotTaskId}\n`);
+      process.exit(0); // idempotent, mirrors the no-active-span path
+    }
+    span.ended_at = new Date().toISOString();
+    const finalPath = path.join(archiveDir, `${safeId}.json`);
+    const tempPath = `${finalPath}.tmp-${process.pid}`;
+    fs.writeFileSync(tempPath, JSON.stringify(span, null, 2));
+    fs.renameSync(tempPath, finalPath);
+    fs.rmSync(pendingPath, { force: true });
+    archived = { task_id: span.task_id, ended_at: span.ended_at };
+    process.stdout.write(
+      `stopped slotless measurement span task_id=${archived.task_id} ended_at=${archived.ended_at}\n`,
+    );
+  } else {
+    archived = stopMeasurement();
+  }
   if (!archived) {
     // No active span. A dashboard-initiated stop (vkb-server measurement/stop) may have
     // already archived the span + left a *.close-requested.json marker — finish the
@@ -510,7 +549,9 @@ async function main() {
     // Adopt a close-request marker for THIS task if the dashboard wrote one (task_class).
     const mp = path.join(archiveDir, `${archived.task_id}.close-requested.json`);
     try { closeMarker = JSON.parse(fs.readFileSync(mp, 'utf8')); closeMarkerPath = mp; } catch { /* none */ }
-    process.stdout.write(`stopped measurement span task_id=${archived.task_id} ended_at=${archived.ended_at}\n`);
+    if (!noSlot) {
+      process.stdout.write(`stopped measurement span task_id=${archived.task_id} ended_at=${archived.ended_at}\n`);
+    }
   }
 
   const archivePath = path.join(archiveDir, `${archived.task_id}.json`);

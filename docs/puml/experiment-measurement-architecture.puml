@@ -9,7 +9,7 @@ actor "Operator" as op
 package "Skill / CLI Layer" as cli_layer {
   component "/experiment skill\n(plain-English or flags)" as skill <<cli>>
   component "experiment-write-spec.mjs\n(validated spec YAML)" as writer <<cli>>
-  component "experiment-run.mjs\n(runMatrix)" as runner <<cli>>
+  component "experiment-run.mjs\n(runMatrix — serial | --parallel pool)" as runner <<cli>>
   component "experiments-compare.mjs\n(aggregate + rank)" as compare_cli <<cli>>
 }
 
@@ -19,6 +19,7 @@ package "Per-cell lifecycle (runCell)" as cell_layer {
   component "neutralizeSandboxRules\n(strip CLAUDE.md / AGENTS.md ...)" as strip <<core>>
   component "cell-injection.mjs\n(kb-on: inject per agent channel)" as inject <<core>>
   component "sandbox-escape guard\n(dirty-set diff + PWD pin)" as escape <<core>>
+  artifact "cells/<taskId>.log\n(per-cell live log)" as celllog <<storage>>
 }
 
 package "Scoring" as score_layer {
@@ -45,7 +46,9 @@ package "Experiment Store" as store_layer {
 
 package "Dashboard (:3032 / :8080)" as ui_layer {
   component "GET /api/experiments/*\n(runs · comparison · specs)" as api <<api>>
+  component "GET /run-log/:runId/:taskId\n(offset-based tail + tokens)" as logapi <<api>>
   component "Runs (grouped) · Compare\nAvenues · Reports · Timeline" as views <<core>>
+  component "Run monitor —\nmini-terminal grid + click-to-zoom" as monitor <<core>>
 }
 
 op --> skill : describe / declare
@@ -65,7 +68,11 @@ proxy --> tokendb : record tokens
 runner --> evidence : gate (test_command)
 evidence --> judge : rubric
 judge --> proxy : POST /api/complete (Opus)
-runner --> store : writeRun + writeScore + writeOutcome
+runner --> store : writeRun + writeScore + writeOutcome (execution_mode)
+runner --> celllog : stream stdout+stderr per cell
+logapi --> celllog : read tail
+monitor --> logapi : poll ~1.5s (live cells)
+monitor --> api : progress.json (5s)
 skill --> compare_cli : --task-hash <sha256(goal)>
 compare_cli --> compare_lib : buildComparison
 compare_lib --> store : readRuns join

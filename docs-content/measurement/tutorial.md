@@ -111,11 +111,13 @@ function, run each twice
 The skill turns your prose into a concrete matrix and drafts an **objective test** — the gate that makes results rankable — then writes `config/experiments/<id>.yaml`. Choose **Run it** (or **Run ungated** to skip the test, or **Edit** a field). The matrix runs **unattended**.
 
 !!! warning "Run experiments unattended"
-    There is a single measurement span slot. A concurrent in-repo agent call gets mis-stamped with the open cell's `task_id`. Don't drive a matrix from an interactive agent working the same repo.
+    There is a single measurement span slot (in serial mode). A concurrent in-repo agent call gets mis-stamped with the open cell's `task_id`. Don't drive a matrix from an interactive agent working the same repo.
 
-You can also launch from the dashboard: pick a spec in **Launch experiment**, then watch the **Run monitor** cell grid move through `restoring → running → scoring`:
+You can also launch from the dashboard: pick a spec in **Launch experiment**, tick **Run cells in parallel** for a faster run if you like, then watch the **Run monitor** — a grid of live **mini-terminals**, one per cell, each streaming the agent's own output and moving through `restoring → running → scoring`. Cells are colored per agent, dim with a green glow on success (red on failure), and **click any terminal to zoom in** for a readable log:
 
-![Launch panel matrix preview + the live Run monitor cell grid](../images/measurement-run-monitor.png)
+![Launch panel with "Run cells in parallel" checked and the live mini-terminal grid](../images/measurement-parallel-launch.png)
+
+Parallel mode runs the cells through a bounded worker pool instead of one at a time. It's faster, but **opencode and mastracode cells will show as *unmeasured*** (they attribute tokens only via the serial span slot) — run serially when you need their token numbers. See [Serial vs parallel execution](experiment-skill.md#serial-vs-parallel-execution) for the details.
 
 ### Step 2 — Read the ranked comparison
 

@@ -91,6 +91,10 @@ export interface Run {
   abandoned_tool_count?: number | null
   total_step_count?: number | null
   wallclock_per_step?: number | null
+  // How the cell was executed: 'parallel' (worker pool — background activity is SHARED
+  // across concurrently running cells) | 'serial' | null (pre-feature runs). The timeline
+  // gates the ambient-overlay disclaimer on 'parallel'.
+  execution_mode?: 'serial' | 'parallel' | string | null
   score: RunScore | null
   outcome: RunOutcome | null
   [key: string]: unknown
@@ -441,6 +445,9 @@ interface PerformanceState {
   activeRunId: string | null
   runStatus: RunProgress | null
   runStatusError: string | null
+  // Per-cell live log tails (mini-terminal view), keyed by composite task_id. Appended
+  // incrementally by fetchCellLog (offset polling); text capped at ~32 KiB.
+  cellLogs: Record<string, CellLogState>
   // The 409-holder / validation message surfaced after a rejected launch (never
   // a silent failure — D-09).
   launchError: string | null
@@ -527,6 +534,10 @@ export interface ExperimentOverrides {
   capture_raw_bodies?: boolean
   // D-06 per-variant model/agent override map, keyed by ORIGINAL variant name.
   variantOverrides?: Record<string, VariantOverride>
+  // Parallel cell execution (worker pool). Default absent/false = sequential. Mutually
+  // exclusive with capture_raw_bodies (raw capture is armed via the sequential slot).
+  parallel?: boolean
+  max_parallel?: number
 }
 
 // The verbatim progress.json served by GET /api/experiments/run-status/:runId
@@ -560,6 +571,9 @@ export interface RunProgress {
   done?: number | null
   total?: number | null
   overall?: string | null
+  // 'parallel' | 'serial' — stamped by experiment-run.mjs into the progress header so the
+  // live monitor knows the mode before any Run is written.
+  execution_mode?: string | null
   cells: RunProgressCell[]
   [key: string]: unknown
 }
@@ -706,6 +720,7 @@ const initialState: PerformanceState = {
   activeRunId: null,
   runStatus: null,
   runStatusError: null,
+  cellLogs: {},
   launchError: null,
   launchPending: false,
   launcherPrefill: null,
@@ -1323,6 +1338,54 @@ export const fetchRunStatus = createAsyncThunk<RunProgress, string, { rejectValu
   }
 )
 
+// ── Per-cell live log tail (mini-terminal view) ──────────────────────────────
+// Offset-based incremental polling of GET /api/experiments/run-log/:runId/:taskId.
+// Each poll appends only the new chunk; the reducer caps the kept text and records
+// arrival timestamps for the lines/min sparkline + heartbeat dot.
+export interface CellLogTokens {
+  input_tokens?: number
+  output_tokens?: number
+  total_tokens?: number
+  calls?: number
+  [key: string]: unknown
+}
+
+export interface CellLogState {
+  text: string
+  offset: number
+  size: number
+  // Arrival times (ms epoch) of recently appended lines — feeds the activity sparkline.
+  lineTimestamps: number[]
+  tokens?: CellLogTokens | null
+}
+
+export const fetchCellLog = createAsyncThunk<
+  { taskId: string; offset: number; size: number; chunk: string; tokens?: CellLogTokens | null },
+  { runId: string; taskId: string; offset: number; withTokens?: boolean },
+  { rejectValue: string }
+>(
+  'performance/fetchCellLog',
+  async ({ runId, taskId, offset, withTokens }, { rejectWithValue }) => {
+    try {
+      const q = `offset=${offset}${withTokens ? '&tokens=1' : ''}`
+      const response = await fetch(
+        `/api/experiments/run-log/${encodeURIComponent(runId)}/${encodeURIComponent(taskId)}?${q}`
+      )
+      if (!response.ok) throw new Error(`API returned ${response.status}`)
+      const data = await response.json()
+      return {
+        taskId,
+        offset: typeof data?.offset === 'number' ? data.offset : 0,
+        size: typeof data?.size === 'number' ? data.size : 0,
+        chunk: typeof data?.chunk === 'string' ? data.chunk : '',
+        ...(data?.tokens !== undefined ? { tokens: data.tokens } : {}),
+      }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+)
+
 // cancelRun (D-08): POST a run cancel. The server delegates a negated-pid group
 // kill to the host coordinator — it acts immediately (no graceful-after-cell
 // latency). Body carries run_id + run_dir (Plan 04 handleRunCancel reads run.json
@@ -1884,6 +1947,26 @@ const performanceSlice = createSlice({
       })
       .addCase(fetchRunStatus.rejected, (state, action) => {
         state.runStatusError = action.payload ?? 'Failed to load run status'
+      })
+      .addCase(fetchCellLog.fulfilled, (state, action) => {
+        const { taskId, offset, size, chunk, tokens } = action.payload
+        const prev = state.cellLogs[taskId] ?? { text: '', offset: 0, size: 0, lineTimestamps: [] }
+        const CAP = 32 * 1024
+        // A server offset RESET (truncation/restart) replaces the buffer; otherwise append.
+        let text = offset < prev.offset ? chunk : prev.text + chunk
+        if (text.length > CAP) text = text.slice(text.length - CAP)
+        const newLines = chunk ? (chunk.match(/\n/g) ?? []).length : 0
+        const now = Date.now()
+        const lineTimestamps = newLines > 0
+          ? [...prev.lineTimestamps, ...new Array(Math.min(newLines, 200)).fill(now)].slice(-400)
+          : prev.lineTimestamps
+        state.cellLogs[taskId] = {
+          text,
+          offset,
+          size,
+          lineTimestamps,
+          tokens: tokens !== undefined ? tokens : prev.tokens,
+        }
       })
       .addCase(cancelRun.fulfilled, (state) => {
         // The host group-kill was requested; the next 5s poll reflects the

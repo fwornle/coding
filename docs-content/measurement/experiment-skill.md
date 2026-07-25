@@ -5,7 +5,7 @@
 `/experiment` is the single command that drives the whole measurement pipeline: it synthesizes a spec, runs the matrix across your chosen agents/models, auto-compares the variants, and writes the report the dashboard reads live. It is a **thin wrapper** over three CLIs and reimplements no runner or comparison logic:
 
 1. **`scripts/experiment-write-spec.mjs`** — `buildExperimentSpec()` + `writeExperimentSpec()` emit a validated `config/experiments/<id>.yaml` (this is what makes a `/experiment`-authored spec appear in the dashboard's **Launch experiment** listbox, via `GET /api/experiments/specs`). It rejects unknown agents, empty variants, a missing goal, or a non-closed-6 `task_class`.
-2. **`scripts/experiment-run.mjs --spec <yaml>`** — `runMatrix`: the sequential, idempotent, resumable per-cell loop.
+2. **`scripts/experiment-run.mjs --spec <yaml>`** — `runMatrix`: the idempotent, resumable per-cell loop. Serial by default; opt into a bounded parallel worker pool with `--parallel` (see [Serial vs parallel execution](#serial-vs-parallel-execution)).
 3. **`scripts/experiments-compare.mjs`** — aggregates + ranks the runs and writes the report JSON.
 
 The only skill-side computation is re-deriving the `task_hash` so the run→compare handoff is mechanically closed.
@@ -73,6 +73,30 @@ Flags override everything; there is no synthesis step. The skill detects this mo
 
 ---
 
+## Serial vs parallel execution
+
+By default the matrix runs **serially** — one cell at a time — because the shared host proxy attributes any otherwise-unbound LLM call to the single global measurement span slot (`active-measurement.json`), and that slot can only belong to one cell at a time. Serial is safe, deterministic, and the historical default; nothing changes unless you opt in.
+
+For a faster run, tick **Run cells in parallel** in the dashboard launcher, or pass `--parallel` (optionally `--max-parallel N`, 1–8, default 4) on the CLI. Cells then run through a **bounded worker pool**:
+
+```
+node scripts/experiment-run.mjs --spec config/experiments/<id>.yaml --parallel --max-parallel 4
+```
+
+What changes under `--parallel`:
+
+- **Slotless spans.** Each cell writes its own `<taskId>.pending.json` span instead of claiming the global slot, so concurrent cells never cross-archive each other. Attribution rides the per-request binding (`x-task-id` header for claude, provider-config splice for opencode) that already exists.
+- **Two mutexes keep the unsafe parts serialized.** A *setup* lock serializes sandbox restores (`git worktree add` + submodule updates against the shared repo are not concurrency-safe); a *store* lock serializes the per-cell `measurement-stop` writes into the single-owner LevelDB. The long part — the agents actually working — fully overlaps.
+- **Per-cell logs.** Every cell's stdout/stderr streams to `<runDir>/cells/<taskId>.log` (in serial mode too), which is what the dashboard's live [mini-terminal grid](dashboard-reference.md#run-monitor-the-mini-terminal-grid) tails.
+- **Shared background activity.** The background service traffic during the run overlaps all cells, so it is recorded once and overlaid on **every** cell's timeline with a disclaimer that it cannot be attributed to any single cell. Each run is stamped `execution_mode: parallel | serial`.
+
+!!! warning "Ambient-bound agents measure ~0 tokens in parallel"
+    **opencode** and **mastracode** are *ambient-slot-bound*: opencode's `rapid-proxy` provider traffic carries opencode's own session id (not the cell's `task_id`), and mastracode lands `task_id=''`. In serial mode the global span slot re-stamps those rows with the cell's `task_id`; parallel mode removes the slot, so these cells run fine but **record 0 tokens** and show as *unmeasured* in the Runs table. **claude** (`x-task-id` header) and **copilot** (task-scoped adapter) are per-request bound and measure correctly either way. Run the matrix **serially** when you need opencode/mastracode token numbers; the runner also prints a loud stderr warning when it detects this combination.
+
+`--parallel` and **capture raw bodies** are mutually exclusive — raw-body capture is armed off the global span slot, which parallel mode never writes, so the launcher disables that checkbox while parallel is on.
+
+---
+
 ## The task classes (CLOSED_6)
 
 `task_class` must be one of the closed taxonomy (`config/task-taxonomy.yaml`). A run with an invalid class is quarantined and won't appear in the dashboard, so the skill always emits a valid one:
@@ -97,7 +121,7 @@ Flags override everything; there is no synthesis step. The skill detects this mo
 
 ## Operational notes
 
-- **Run unattended.** Each cell binds its own tokens **per-request** (claude via an `x-task-id` header, opencode via a provider-config splice on both wires), so a cell captures reliably even under concurrency. But a cell still opens the ambient `active-measurement.json` span as a fallback, so a *concurrent* interactive call in the same repo that carries no binding of its own can be swept into the open cell — keep the matrix unattended.
+- **Run unattended.** claude and copilot bind their tokens **per-request** (an `x-task-id` header / a task-scoped adapter path), so those cells capture reliably. In **serial** mode a cell also opens the ambient `active-measurement.json` span, which is what attributes opencode/mastracode traffic (and is also how a *concurrent* interactive call in the same repo can be swept into the open cell — keep the matrix unattended). In **[parallel](#serial-vs-parallel-execution)** mode there is no global slot, so opencode/mastracode go unmeasured (see the warning above) but there is nothing for a stray interactive call to be mis-swept into.
 - **`test_command` must be fixed-argv.** The spec validator rejects shell metacharacters (`&&`, `|`, `;`, `$()`, newline). Use a single command — e.g. `grep -qi stall notes.md`, not `test -s notes.md && grep …` — or the whole matrix aborts before run 0.
 - **Phrase deliverables as execution, not analysis.** opencode's headless `run` ends its agentic loop on the first assistant message with *no* tool call; an analysis-shaped goal ("explain how…") gets narrated and never written. Say "create file X, write it directly, done only once it exists" to get a real artifact (this affects sonnet too, not just haiku).
 - **A free-form model WARN is expected.** `WARN: unrecognized model 'rapid-proxy/claude-sonnet-4.6' — free-form, not blocked (D-05)` is informational, not an error.

@@ -77,6 +77,9 @@ export function ExperimentLauncher() {
   // Per-variant model/agent overrides, keyed by the ORIGINAL variant name (D-06).
   const [variantOverrides, setVariantOverrides] = useState<Record<string, VariantOverride>>({})
   const [captureRawBodies, setCaptureRawBodies] = useState(false)
+  // Parallel cell execution (worker pool), default OFF = sequential. Mutually exclusive with
+  // capture_raw_bodies (raw-body capture needs the sequential measurement slot).
+  const [parallel, setParallel] = useState(false)
   // 85-06 DEFECT B: a transient highlight + confirmation shown when a Re-run pre-fills the
   // launcher, so the operator sees the click landed (the runs-table Re-run button also scrolls
   // this card into view). Cleared after a few seconds so it doesn't linger.
@@ -115,6 +118,7 @@ export function ExperimentLauncher() {
     setVariantSubset(Array.isArray(o.variants) ? o.variants : [])
     setVariantOverrides(o.variantOverrides ?? {})
     setCaptureRawBodies(o.capture_raw_bodies === true)
+    setParallel(o.parallel === true)
     // AVN-03: consume the D-03 fork fields (present only for a Fork pre-fill). A
     // plain Re-run leaves origin_span_id null → the axis picker stays hidden.
     setOriginSpanId(prefill.origin_span_id ?? null)
@@ -250,7 +254,8 @@ export function ExperimentLauncher() {
     if (timeout.trim() !== '' && Number.isFinite(Number(timeout))) o.timeout = Number(timeout)
     const subset = parseVariantSubset(variantSubset)
     if (subset) o.variants = subset
-    if (captureRawBodies) o.capture_raw_bodies = true
+    if (captureRawBodies && !parallel) o.capture_raw_bodies = true
+    if (parallel) o.parallel = true
     if (Object.keys(variantOverrides).length > 0) o.variantOverrides = variantOverrides
     return o
   }
@@ -603,14 +608,35 @@ export function ExperimentLauncher() {
             </div>
           )}
 
-          {/* D-12: capture_raw_bodies checkbox, default OFF. */}
+          {/* D-12: capture_raw_bodies checkbox, default OFF. Disabled under parallel —
+              raw-body capture is armed via the ACTIVE measurement slot, which parallel
+              (slotless) mode never writes. */}
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={captureRawBodies}
               onCheckedChange={(v) => setCaptureRawBodies(v)}
+              disabled={parallel}
               id="capture-raw-bodies"
             />
-            <span data-testid="capture-raw-bodies">Capture raw request/response bodies (heavier; default off)</span>
+            <span data-testid="capture-raw-bodies" className={parallel ? 'text-muted-foreground' : ''}>
+              Capture raw request/response bodies (heavier; default off)
+              {parallel ? ' — unavailable in parallel mode (requires the sequential measurement slot)' : ''}
+            </span>
+          </label>
+
+          {/* Parallel execution checkbox, default OFF (= sequential, unchanged behavior). */}
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={parallel}
+              onCheckedChange={(v) => {
+                setParallel(v === true)
+                if (v === true) setCaptureRawBodies(false)
+              }}
+              id="parallel-cells"
+            />
+            <span data-testid="parallel-cells">
+              Run cells in parallel (faster; background activity becomes shared across cells)
+            </span>
           </label>
 
           <div className="flex items-center gap-2">

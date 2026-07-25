@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAppSelector, useAppDispatch } from '@/store'
+import { CellTerminalGrid } from './cell-terminal-grid'
 import {
   fetchRuns,
   fetchRunStatus,
@@ -123,36 +124,24 @@ export function RunMonitor() {
 
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
-          {/* variant×repeat cell grid — a straight render of progress.json.cells. */}
+          {/* Live mini-terminal grid — each cell is a scaled-down terminal streaming its own
+              per-cell log (<runDir>/cells/<taskId>.log); click zooms with a FLIP animation.
+              Replaces the former badge grid; all content still renders as React text
+              (auto-escaped) — never dangerouslySetInnerHTML (T-85-05-03). */}
+          {status?.execution_mode === 'parallel' && (
+            <p className="text-xs text-muted-foreground" data-testid="parallel-mode-note">
+              Parallel run: cells execute concurrently — background service activity is recorded
+              once, overlaid on every cell's timeline, and cannot be attributed to any single cell.
+            </p>
+          )}
           {cells.length === 0 ? (
             <p className="text-sm text-muted-foreground">No cells reported yet…</p>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {cells.map((cell) => {
-                const cellId = `cell-${cell.variant}-${cell.rep}`
-                const clickable = cell.state === 'complete' && cell.task_id
-                return (
-                  <div
-                    key={cellId}
-                    data-testid={cellId}
-                    className={`rounded-md border p-2 text-sm ${clickable ? 'cursor-pointer hover:bg-muted' : ''}`}
-                    onClick={() => {
-                      if (clickable && cell.task_id) dispatch(setSelectedTaskId(cell.task_id))
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono">{cell.variant} · r{cell.rep}</span>
-                      <Badge variant={badgeVariant(cell.state)}>{cell.state}</Badge>
-                    </div>
-                    {/* Reason rendered as React text content (auto-escaped) — never
-                        dangerouslySetInnerHTML (T-85-05-03). */}
-                    {cell.reason && (
-                      <p className="mt-1 text-xs text-muted-foreground">{cell.reason}</p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            <CellTerminalGrid
+              runId={activeRunId}
+              cells={cells}
+              parallelMode={status?.execution_mode === 'parallel'}
+            />
           )}
         </div>
       </CardContent>

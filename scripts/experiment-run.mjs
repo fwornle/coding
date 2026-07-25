@@ -119,6 +119,8 @@ function usage() {
     '  --model V=M       per-variant model override keyed by ORIGINAL variant name V (D-06; repeatable)\n' +
     '  --agent V=A       per-variant agent override keyed by ORIGINAL variant name V (D-06; repeatable)\n' +
     '  --capture-raw-bodies  arm raw request/response body capture per cell (D-12; presence flag, off by default)\n' +
+    '  --parallel        run cells through a bounded worker pool (slotless spans; background activity shared)\n' +
+    '  --max-parallel N  worker-pool size for --parallel (1-8, default 4)\n' +
     '  --avenue          run the matrix as an AVENUE fork (restore onto avenue/<task_id>, commit on close; presence flag, off by default)\n' +
     '  --origin-span-id <id>  the forked origin span task_id linked onto each avenue Run (AVN-01; run-write stamps origin_span_id)\n',
   );
@@ -170,6 +172,19 @@ async function main() {
   // every cell's measurement-start (via runMatrix→runCell) so the proxy writes raw-bodies.jsonl.
   // OFF by default; when absent the per-cell measurement-start argv is byte-identical to before.
   const captureRawBodies = args.includes('--capture-raw-bodies');
+  // Parallel mode (opt-in): run cells through a bounded worker pool (default 4, cap 8). In this
+  // mode spans are SLOTLESS (per-cell pending files; token attribution is per-request) and the
+  // dashboard overlays the shared background activity on every cell timeline with a disclaimer.
+  const parallel = args.includes('--parallel');
+  const maxParallelArg = parseStrArg(args, '--max-parallel');
+  let maxParallel;
+  if (maxParallelArg != null) {
+    maxParallel = Number.parseInt(maxParallelArg, 10);
+    if (!Number.isInteger(maxParallel) || maxParallel < 1 || maxParallel > 8) {
+      process.stderr.write(`error: --max-parallel must be an integer 1-8 (got '${maxParallelArg}')\n`);
+      process.exit(2);
+    }
+  }
   // Phase 87-07 (CR-01, D-01 scriptable-CLI path): --avenue is a PRESENCE flag that turns
   // the matrix into an AVENUE run (runCell restores onto avenue/<task_id>, commits on close);
   // --origin-span-id <id> links each avenue Run back to the forked origin span so run-write
@@ -289,6 +304,7 @@ async function main() {
       done: 0,
       total: pendingCells.length,
       overall: 'running',
+      execution_mode: parallel ? 'parallel' : 'serial',
       cells: pendingCells,
     });
   }
@@ -313,7 +329,10 @@ async function main() {
     // avenue defaults false (non-avenue matrices unchanged); originSpanId only threads when set.
     avenue,
     originSpanId,
+    // Parallel worker-pool mode (default OFF → serial path byte-identical).
+    parallel,
   };
+  if (maxParallel != null) opts.maxParallel = maxParallel;
   if (timeoutMs != null) opts.timeoutMs = timeoutMs;
   // Phase 85-06: thread the validated task_class → runCell --task-class → the
   // measurement-stop judge, so spec-launched Runs land CLASSIFIED (visible in the

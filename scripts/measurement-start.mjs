@@ -30,6 +30,7 @@
  */
 
 import process from 'node:process';
+import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
@@ -280,10 +281,25 @@ async function main() {
   // the stop-process cwd (main repo) and MISSES the sandbox session → claude falls back to the
   // cache-excluded proxy passthrough (a ~530× undercount). Absent → locator uses process.cwd().
   const agentCwd = parseStrArg(args, '--cwd');
+  // Parallel-mode provenance (execution_mode) + slotless spans (--no-slot):
+  //   --execution-mode <serial|parallel> → span.meta.execution_mode (buildRunTags folds it
+  //   into Run.metadata, mirroring rerun_of). --no-slot skips the GLOBAL
+  //   active-measurement.json slot entirely — concurrent cells would cross-archive each
+  //   other's spans (startMeasurement OVERWRITES the slot). Instead the identical span
+  //   record is written to <dataDir>/measurements/<sanitizeTaskId>.pending.json; token
+  //   attribution relies purely on per-request binding (x-task-id / config splice), and
+  //   measurement-stop --no-slot --task-id promotes the pending file to the archive.
+  const executionMode = parseStrArg(args, '--execution-mode');
+  if (executionMode && executionMode !== 'serial' && executionMode !== 'parallel') {
+    process.stderr.write(`error: --execution-mode '${executionMode}' must be 'serial' or 'parallel'\n`);
+    process.exit(1);
+  }
+  const noSlot = args.includes('--no-slot');
   const meta = {
     record: true,
     ...(replayFixturesDir ? { replay_from: replayFixturesDir } : {}),
     ...(agentCwd ? { cwd: agentCwd } : {}),
+    ...(executionMode ? { execution_mode: executionMode } : {}),
     ...variantMeta,
   };
 
@@ -292,11 +308,28 @@ async function main() {
 
   let span;
   try {
-    span = startMeasurement({
-      task_id: taskId,
-      ...(goalSentence ? { goal_sentence: goalSentence } : {}),
-      meta,
-    });
+    if (noSlot) {
+      // Slotless: compose the span record startMeasurement would have written, but land it
+      // as a per-task pending file so N concurrent cells never contend on the global slot.
+      span = {
+        task_id: taskId,
+        started_at: new Date().toISOString(),
+        ...(goalSentence ? { goal_sentence: goalSentence } : {}),
+        meta,
+      };
+      const pendingDir = path.join(dataDir, 'measurements');
+      fs.mkdirSync(pendingDir, { recursive: true });
+      const pendingPath = path.join(pendingDir, `${sanitizeTaskId(taskId)}.pending.json`);
+      const tmpPath = `${pendingPath}.tmp-${process.pid}`;
+      fs.writeFileSync(tmpPath, JSON.stringify(span, null, 2));
+      fs.renameSync(tmpPath, pendingPath);
+    } else {
+      span = startMeasurement({
+        task_id: taskId,
+        ...(goalSentence ? { goal_sentence: goalSentence } : {}),
+        meta,
+      });
+    }
   } catch (err) {
     process.stderr.write(`error: ${err.message}\n`);
     process.exit(1);
@@ -332,9 +365,15 @@ async function main() {
     );
   }
 
-  const { activePath } = resolveMeasurementPaths();
   process.stdout.write(`started measurement span task_id=${span.task_id} started_at=${span.started_at}\n`);
-  process.stdout.write(`active span: ${activePath}\n`);
+  if (noSlot) {
+    process.stdout.write(
+      `slotless span (parallel-safe): ${path.join(dataDir, 'measurements', `${sanitizeTaskId(taskId)}.pending.json`)}\n`,
+    );
+  } else {
+    const { activePath } = resolveMeasurementPaths();
+    process.stdout.write(`active span: ${activePath}\n`);
+  }
 }
 
 // Run main() only when executed directly as a CLI — NOT when imported (the variant test

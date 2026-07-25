@@ -35,16 +35,51 @@ A background reconciler binds each live agent session automatically, so a manual
 Pick a **Spec** from the dropdown (populated from `config/experiments/*.yaml` via
 `GET /api/experiments/specs`; malformed specs appear disabled with their parse error). Optional
 **repeats** / **timeout** overrides, a **variant subset** with per-variant model/agent overrides, a
-**Sweep** expander (every combination of the selected fork axes), and **Capture raw request/response
-bodies (heavier; default off)**. **Launch experiment** posts to `/api/experiments/run` and wires up the
-**Run monitor** (a variant×repeat cell grid with live state + Cancel/Dismiss).
+**Sweep** expander (every combination of the selected fork axes), **Capture raw request/response
+bodies (heavier; default off)**, and **Run cells in parallel**. **Launch experiment** posts to
+`/api/experiments/run` and wires up the **Run monitor**.
 
-![Run monitor — live cell grid with restoring/running/scoring state, and the launcher's matrix preview](../images/measurement-run-monitor.png)
+![Launch panel with "Run cells in parallel" checked and the live mini-terminal grid below](../images/measurement-parallel-launch.png)
+
+### Run cells in parallel
+
+Ticking **Run cells in parallel** runs the matrix through a bounded worker pool instead of one cell
+at a time. It threads `--parallel` to the runner (default pool size 4). Because parallel cells cannot
+share the single global span slot, spans go **slotless** (per-cell) and attribution relies on
+per-request binding — see [The `/experiment` skill → Serial vs parallel execution](experiment-skill.md#serial-vs-parallel-execution)
+for the full mechanism. Two consequences are visible in the UI:
+
+- **Capture raw bodies is disabled** while parallel is on (raw capture is armed off the global slot,
+  which parallel mode never writes) — the checkbox greys out with a hint.
+- **opencode / mastracode cells show as *unmeasured*** (0 tokens) in parallel mode — they are
+  ambient-slot-bound and only attribute via the global slot. Run serially to measure them. claude
+  and copilot are per-request bound and measure either way.
+
+### Run monitor — the mini-terminal grid
+
+The Run monitor renders each cell as a scaled-down **live terminal** that tails the cell's own log
+(`<runDir>/cells/<taskId>.log`, polled every ~1.5 s via `GET /api/experiments/run-log/:runId/:taskId`).
+Each terminal card shows: a header with the agent (in a stable per-agent accent — claude amber,
+opencode teal, copilot blue, mastracode magenta), model + `kb-on` chips, a state badge, and a ticking
+elapsed timer; a colorized auto-scrolling log body (errors red, tool calls cyan, infra dimmed) with a
+blinking cursor while running; and a footer with live tokens in/out, tool-call count, and a
+lines-per-minute activity sparkline. Completed cells dim with a green edge-glow; a timeout/abort gets
+a red glow and the failure reason pinned. A parallel run also shows a note that background activity is
+shared across cells.
+
+![Run monitor mini-terminal grid — claude scoring, opencode running, copilot aborted with red glow and reason](../images/measurement-run-monitor.png)
+
+**Click any terminal to zoom in.** The tile FLIP-animates into a near-fullscreen terminal with a
+readable, scrollable log, the full `task_id`, a **Show in timeline** jump, and (for a parallel run)
+the shared-background disclaimer. **Esc** or a backdrop click shrinks it back.
+
+![Zoomed-in cell terminal — readable log, footer meters, Show-in-timeline, parallel disclaimer](../images/measurement-cell-terminal-zoom.png)
 
 !!! warning "Run experiments UNATTENDED"
-    There is a **single** global measurement span slot and a shared host proxy. A concurrent
-    in-repo agent LLM call gets mis-stamped with the open cell's `task_id`. Never drive a matrix
-    from an interactive agent working the same repo.
+    In **serial** mode there is a single global measurement span slot and a shared host proxy: a
+    concurrent in-repo agent LLM call gets mis-stamped with the open cell's `task_id`. In
+    **parallel** mode there is no global slot to mis-stamp, but opencode/mastracode go unmeasured
+    (above). Either way, never drive a matrix from an interactive agent working the same repo.
 
 ---
 

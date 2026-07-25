@@ -323,7 +323,7 @@ function linkDigestsToRun(
 // knowledge-capture + infrastructure token spend that the task_id-exact role stats
 // (summarizeByRole) deliberately exclude. Never a claim of causation — just "this
 // was happening at the same time".
-function AmbientActivity({ rows }: { rows: AmbientRow[] }) {
+function AmbientActivity({ rows, note }: { rows: AmbientRow[]; note?: string }) {
   if (!rows.length) return null
   const total = rows.reduce((a, r) => a + (r.total_tokens ?? 0), 0)
   return (
@@ -333,6 +333,11 @@ function AmbientActivity({ rows }: { rows: AmbientRow[] }) {
         <span className="font-mono">{total.toLocaleString()}</span> tok
         <span className="ml-1 text-xs">(in-window, not attributed to this run)</span>
       </summary>
+      {note && (
+        <p className="mt-2 text-xs text-muted-foreground" data-testid="timeline-ambient-note">
+          {note}
+        </p>
+      )}
       <table className="mt-2 w-full text-xs" data-testid="timeline-ambient-table">
         <thead className="text-muted-foreground">
           <tr className="text-left">
@@ -632,6 +637,12 @@ export function PerformanceTimeline() {
   const isExperimentCell = !!(
     runUnknown && (typeof runUnknown.variant === 'string' || typeof runUnknown.base_variant === 'string')
   )
+  // A PARALLEL-mode experiment cell overlaps other cells in time, so the shared background
+  // activity is deliberately overlaid on EVERY cell's timeline (recorded once) — with a
+  // disclaimer that it cannot be attributed to any single cell. Serial cells keep the
+  // suppressed-ambient behavior (their window is exclusive, but the sandbox rationale above
+  // still applies to narrative/digests).
+  const isParallelCell = isExperimentCell && runUnknown?.execution_mode === 'parallel'
 
   // Once the timeline is loaded, derive the run window and fetch the narrative
   // (SKIPPED for experiment cells — cross-session bleed, see above).
@@ -805,7 +816,14 @@ export function PerformanceTimeline() {
         ) : (
           <>
             <StorySummary stats={mergedStats} />
-            {!isExperimentCell && ambient.length > 0 && <AmbientActivity rows={ambient} />}
+            {(!isExperimentCell || isParallelCell) && ambient.length > 0 && (
+              <AmbientActivity
+                rows={ambient}
+                note={isParallelCell
+                  ? 'This experiment ran its cells in PARALLEL: the background activity above was recorded once and is overlaid on every concurrently running cell’s timeline. It is shared between the cells and cannot be attributed to any single cell.'
+                  : undefined}
+              />
+            )}
 
             {isExperimentCell ? (
               /* 85-06: a sandboxed cell has no session observations of its own — show
