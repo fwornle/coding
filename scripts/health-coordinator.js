@@ -1855,7 +1855,12 @@ async function pollNetworkStatus() {
     let proxyFunctional = false;
     let functionalFailConfirmed = false;  // debounced outage flag (see hysteresis block)
 
-    if (proxyEnabledByUser) {
+    // 2026-07-25: agent sessions are pinned to the local adaptive proxy
+    // (127.0.0.1:3128 with --direct-fallback; see detect-network.sh
+    // configure_proxy_if_needed) — so the daemon must be probed and healed
+    // ALWAYS, independent of the user's px env toggle. proxyEnabledByUser is
+    // still reported (proxy_enabled_by_user) but no longer gates health.
+    {
       // Functional probe: actually try to proxy a request (not just TCP connect)
       if (portListening) {
         try {
@@ -1906,7 +1911,10 @@ async function pollNetworkStatus() {
         const reason = !portListening ? 'port 3128 dead (stale socket)' : 'port alive but proxy not functional (network change?)';
         log(`network: proxy intent=ON but ${reason} — kickstarting proxydetox`, 'WARN');
         try {
-          await execFileAsync('bash', ['-c', 'launchctl kickstart -k gui/$(id -u)/cc.colorto.proxydetox 2>/dev/null || launchctl start cc.colorto.proxydetox 2>/dev/null'], { timeout: 5000 });
+          // kickstart only works if the job is loaded; when the job was
+          // unloaded (old px-off behavior did launchctl unload) fall back to
+          // bootstrap so the socket-activated daemon comes back regardless.
+          await execFileAsync('bash', ['-c', 'launchctl kickstart -k gui/$(id -u)/cc.colorto.proxydetox 2>/dev/null || launchctl bootstrap gui/$(id -u) /Library/LaunchAgents/cc.colorto.proxydetox.plist 2>/dev/null || launchctl load /Library/LaunchAgents/cc.colorto.proxydetox.plist 2>/dev/null'], { timeout: 5000 });
           // Re-check after kickstart (give it 2s to bind + initialize)
           await new Promise(r => setTimeout(r, 2000));
           // Re-probe: port check
@@ -1955,14 +1963,13 @@ async function pollNetworkStatus() {
       }
     }
 
-    // proxy_running = user enabled it AND proxydetox is actually listening AND functional
-    netState.proxy_running = proxyEnabledByUser && effectivePortListening;
+    // proxy_running = the daemon actually owns :3128 (truth, not intent).
+    // The px env toggle is reported separately as proxy_enabled_by_user.
+    netState.proxy_running = effectivePortListening;
     // Debounced functional badge: a live probe pass reports true immediately;
     // a raw miss holds the previous value until FUNCTIONAL_FAIL_THRESHOLD
     // consecutive misses confirm the outage. Prevents single-blip P:OFF flaps.
-    if (!proxyEnabledByUser) {
-      netState.proxy_functional = false;
-    } else if (proxyFunctional) {
+    if (proxyFunctional) {
       netState.proxy_functional = true;
     } else if (functionalFailConfirmed || !effectivePortListening) {
       netState.proxy_functional = false;
@@ -2035,19 +2042,22 @@ async function pollNetworkStatus() {
    // - User enabled proxy (px) + port listening → set env vars so our probes use proxy
    // - User disabled proxy → clear env vars so our probes go direct
    const onCorporateNet = netState.location === 'corporate' || netState.location === 'vpn';
-    if (proxyEnabledByUser && effectivePortListening && !proxyEnvSet) {
+    // 2026-07-25: follow the DAEMON, not the px env toggle — the local
+    // adaptive proxy is correct in every network state (--direct-fallback),
+    // so the coordinator's own probes route through it whenever it's alive.
+    if (effectivePortListening && netState.proxy_functional && !proxyEnvSet) {
      const proxyUrl = 'http://127.0.0.1:3128';
      process.env.http_proxy = proxyUrl;
      process.env.https_proxy = proxyUrl;
      process.env.HTTP_PROXY = proxyUrl;
      process.env.HTTPS_PROXY = proxyUrl;
-     log(`network: auto-enabled proxy env vars (user enabled proxy, port 3128 listening)`, 'INFO');
-   } else if (!proxyEnabledByUser && proxyEnvSet) {
+     log(`network: auto-enabled proxy env vars (local adaptive proxy alive on :3128)`, 'INFO');
+   } else if (!effectivePortListening && proxyEnvSet) {
      delete process.env.http_proxy;
      delete process.env.https_proxy;
      delete process.env.HTTP_PROXY;
      delete process.env.HTTPS_PROXY;
-     log(`network: auto-disabled proxy env vars (user disabled proxy via px)`, 'INFO');
+     log(`network: auto-disabled proxy env vars (local proxy :3128 not listening)`, 'INFO');
    }
 
    // 5. Proxy functional status is ALREADY computed above with hysteresis /
@@ -2073,7 +2083,7 @@ async function pollNetworkStatus() {
       req.on('timeout', () => { req.destroy(); resolve(false); });
     };
 
-    if (netState.proxy_functional && proxyEnabledByUser) {
+    if (netState.proxy_functional) {
       // Try via proxy first, fall back to direct
       const proxyReq = http.request({
         host: '127.0.0.1', port: 3128,

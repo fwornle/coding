@@ -144,112 +144,57 @@ test_proxy_connectivity() {
 }
 
 # ============================================
-# Bash Profile Proxy Toggle
+# Auto-Configure Proxy (2026-07-25 redesign)
 # ============================================
-# Ensures ~/.bash_profile proxy lines match the current network state,
-# so child processes (Claude Code, etc.) inherit the correct environment.
-_sync_bash_profile_proxy() {
-  local desired_state="$1"  # "enabled" or "disabled"
-  local profile="$HOME/.bash_profile"
+# Agent sessions freeze their env at launch, but the user roams CN/VPN/home
+# WHILE sessions run. Pinning the network-of-the-moment into the session
+# (corporate proxy at the office, nothing at home) breaks the session the
+# moment the network changes — /login dials a dead proxy, or CN blocks direct.
+#
+# The fix: pin every session to the ALWAYS-ON local adaptive proxy
+# (proxydetox on 127.0.0.1:3128). proxydetox re-decides PER REQUEST:
+#   - on CN/VPN: PAC → corporate upstream proxy
+#   - off CN (PAC unreachable / upstream dead): DIRECT (--direct-fallback)
+# So a session env pinned to 127.0.0.1:3128 is correct in EVERY network state,
+# including transitions mid-session. NO_PROXY keeps local services
+# (rapid-llm-proxy :12435, obs-api, dashboard) and BMW-internal hosts direct.
+#
+# We deliberately do NOT touch ~/.bash_profile anymore — the old enable/
+# disable sync fought the user's `px` toggle and left stale pins behind.
+configure_proxy_if_needed() {
+  local px_url="http://127.0.0.1:3128"
+  local no_proxy_val="localhost,127.0.0.1,::1,.bmwgroup.net"
 
-  [ -f "$profile" ] || return 0
-
-  if [ "$desired_state" = "disabled" ]; then
-    # Comment out active http_proxy= line (if not already commented)
-    if grep -qF -- 'http_proxy=' "$profile" && grep -q '^http_proxy=' "$profile" 2>/dev/null; then
-      sed -i.bak 's/^http_proxy=/#http_proxy=/' "$profile"
-      log "Disabled proxy in ~/.bash_profile"
-    fi
-  elif [ "$desired_state" = "enabled" ]; then
-    # Uncomment http_proxy= line (if currently commented)
-    if grep -q '^#http_proxy=' "$profile" 2>/dev/null; then
-      sed -i.bak 's/^#http_proxy=/http_proxy=/' "$profile"
-      log "Enabled proxy in ~/.bash_profile"
+  if [ "$PLATFORM" = "macos" ]; then
+    # Ensure the proxydetox launchd job is loaded (socket-activated: once
+    # loaded, launchd owns :3128 and spawns proxydetox on demand — "always on").
+    if ! launchctl list 2>/dev/null | grep -q cc.colorto.proxydetox; then
+      log "proxydetox not loaded — bootstrapping launchd job"
+      launchctl bootstrap "gui/$(id -u)" /Library/LaunchAgents/cc.colorto.proxydetox.plist 2>/dev/null || \
+        launchctl load /Library/LaunchAgents/cc.colorto.proxydetox.plist 2>/dev/null || true
+      sleep 1
     fi
   fi
-}
 
-# ============================================
-# Auto-Configure Proxy
-# ============================================
-# Mirrors the user's proven toggle script:
-#   Inside CN  → uncomment proxy in ~/.bash_profile, source it, restart proxydetox
-#   Outside CN → comment out proxy in ~/.bash_profile, unset env vars
-#
-# The key insight: editing ~/.bash_profile alone does NOTHING for the current shell.
-# We must also source it (enable) or unset vars (disable), AND restart proxydetox
-# so it picks up the new state.
-configure_proxy_if_needed() {
-  local profile="$HOME/.bash_profile"
-
-  # Outside CN: try to disable proxy, but ONLY if direct internet works.
-  # On a hotspot, Proxydetox may still provide a working route (DIRECT fallback)
-  # even without corporate DNS. Don't unset proxy until we confirm direct works.
-  if [ "$INSIDE_CN" = "false" ]; then
-    _sync_bash_profile_proxy disabled
-
-    # Test if direct internet works WITHOUT proxy
-    if timeout 5 curl -s --connect-timeout 3 --noproxy '*' "https://${REACHABILITY_HOST}" >/dev/null 2>&1; then
-      # Direct works — safe to remove proxy vars
-      if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
-        log "Outside CN — disabling proxy (direct works; was: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"
-      fi
-      unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy no_proxy NO_PROXY
-    else
-      # Direct doesn't work — keep proxy vars if set (Proxydetox DIRECT fallback may help)
-      if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ] || [ -n "$http_proxy" ] || [ -n "$https_proxy" ]; then
-        log "Outside CN — keeping proxy (direct failed; proxy: ${HTTP_PROXY:-${http_proxy:-'(unknown)'}})"
-      elif pgrep -q proxydetox 2>/dev/null; then
-        # Proxydetox running but no env vars — set them to known default
-        log "Outside CN — direct failed but proxydetox running; setting proxy to 127.0.0.1:3128"
-        export HTTP_PROXY="http://127.0.0.1:3128"
-        export HTTPS_PROXY="http://127.0.0.1:3128"
-        export http_proxy="http://127.0.0.1:3128"
-        export https_proxy="http://127.0.0.1:3128"
-        export NO_PROXY="localhost,127.0.0.1"
-        export no_proxy="localhost,127.0.0.1"
-      fi
-    fi
-
-    # Restart proxydetox so it doesn't hold stale state (macOS only)
-    if [ "$PLATFORM" = "macos" ]; then
-      launchctl stop cc.colorto.proxydetox 2>/dev/null || true
-      launchctl start cc.colorto.proxydetox 2>/dev/null || true
-    fi
+  # Functional probe THROUGH the local proxy (not just a port check).
+  if timeout 8 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${REACHABILITY_HOST}" 2>/dev/null; then
+    export HTTP_PROXY="$px_url" HTTPS_PROXY="$px_url"
+    export http_proxy="$px_url" https_proxy="$px_url"
+    export NO_PROXY="$no_proxy_val" no_proxy="$no_proxy_val"
+    log "✅ Session pinned to local adaptive proxy $px_url (survives CN/VPN/home transitions)"
     return 0
   fi
 
-  # Inside CN: enable proxy
-  _sync_bash_profile_proxy enabled
-
-  # Source the profile to load proxy vars into THIS shell process
-  if [ -f "$profile" ]; then
-    # shellcheck disable=SC1090
-    source "$profile"
-    log "Sourced ~/.bash_profile (proxy vars loaded into current shell)"
+  # Local adaptive proxy not usable — fall back to direct (correct off-CN;
+  # on CN this will fail loudly in validate_agent_connectivity, which is the
+  # honest outcome: nothing we pin here would work either).
+  unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+  export NO_PROXY="$no_proxy_val" no_proxy="$no_proxy_val"
+  if [ "$INSIDE_CN" = "true" ]; then
+    log "⚠️  proxydetox on $px_url not functional and we are INSIDE CN — external APIs will fail until it is restored (try: px)"
+  else
+    log "proxydetox on $px_url not functional — using direct connection (outside CN)"
   fi
-
-  # Restart proxydetox to ensure it's running with current config (macOS only)
-  if [ "$PLATFORM" = "macos" ]; then
-    log "Restarting proxydetox..."
-    launchctl stop cc.colorto.proxydetox 2>/dev/null || true
-    launchctl start cc.colorto.proxydetox 2>/dev/null || true
-    sleep 1
-  fi
-
-  # Verify we have proxy vars set
-  if [ -z "$http_proxy" ] && [ -z "$HTTP_PROXY" ]; then
-    # Profile didn't set them — fall back to known default
-    log "Proxy vars not set after sourcing profile — using default 127.0.0.1:3128"
-    export HTTP_PROXY="http://127.0.0.1:3128"
-    export HTTPS_PROXY="http://127.0.0.1:3128"
-    export http_proxy="http://127.0.0.1:3128"
-    export https_proxy="http://127.0.0.1:3128"
-    export NO_PROXY="localhost,127.0.0.1,.bmwgroup.net"
-    export no_proxy="localhost,127.0.0.1,.bmwgroup.net"
-  fi
-
-  log "Proxy active: ${HTTP_PROXY:-${http_proxy}}"
 }
 
 # ============================================

@@ -2161,11 +2161,14 @@ class CombinedStatusLine {
     // Proxy status badge: [P:ON] / [P:OFF]
     // Reflects whether the local proxy (px/proxydetox) is running and functional.
     {
+      // 2026-07-25: proxy_running now = daemon actually owns :3128 (truth,
+      // independent of the px env toggle) — sessions are pinned to the local
+      // adaptive proxy, so this badge is the one that must never lie.
       const pxOn = network?.proxy_running && network?.proxy_functional;
-      const pxLabel = (network?.proxy_running && network?.proxy_functional) ? 'ON' : 'OFF';
+      const pxLabel = pxOn ? 'ON' : 'OFF';
       parts.push(`[P:${pxLabel}]`);
-      if (network?.location === 'corporate' && !pxOn) {
-        // On CN without working proxy — problem
+      if ((network?.location === 'corporate' || network?.location === 'vpn') && !pxOn) {
+        // On CN/VPN without a working local proxy — external APIs unreachable
         if (overallColor === 'green') overallColor = 'yellow';
       }
     }
