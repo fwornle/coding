@@ -14,6 +14,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, Treemap, AreaChart, Area, Brush
 } from 'recharts'
+import { normalizeModel } from '@/components/performance/models'
 
 const PROXY_PORT = '12435'
 const PROXY_BASE = `http://localhost:${PROXY_PORT}`
@@ -89,6 +90,22 @@ const PROVIDER_COLORS: Record<string, string> = {
   'copilot': '#2563eb',
   'claude-code': '#7c3aed',
   'anthropic': '#d97706',
+}
+
+// The proxy emits several route/product aliases for the same underlying
+// provider (`github-copilot` is the same seller as `copilot`; the Anthropic
+// wire is tagged `claude-code` on the CLI-adapter path and `anthropic` on the
+// direct `/v1/messages` path). Collapse each alias set to one canonical label
+// so the By Provider pie, its legend, and the per-provider call breakdown never
+// split a single provider into two slices. Matching is case-insensitive.
+const PROVIDER_ALIASES: Record<string, string> = {
+  'github-copilot': 'copilot',
+  'claude-code': 'anthropic',
+}
+function normalizeProvider(provider: string | null | undefined): string {
+  if (!provider) return provider ?? ''
+  const key = provider.trim().toLowerCase()
+  return PROVIDER_ALIASES[key] ?? key
 }
 
 const SUBSCRIPTION_LABELS: Record<string, string> = {
@@ -227,6 +244,49 @@ function getProviderColor(provider: string): string {
   return PROVIDER_COLORS[provider] || '#6b7280'
 }
 
+// Merge by_provider rows that resolve to the same canonical provider (copilot +
+// github-copilot, anthropic + claude-code), summing their token/call totals so
+// each provider appears exactly once. Sorted by total tokens descending to keep
+// the pie/legend ordering stable after the merge.
+function mergeByProvider(rows: TokenSummary['by_provider']): TokenSummary['by_provider'] {
+  const acc = new Map<string, TokenSummary['by_provider'][number]>()
+  for (const r of rows) {
+    const provider = normalizeProvider(r.provider)
+    const cur = acc.get(provider)
+    if (cur) {
+      cur.calls += r.calls
+      cur.input_tokens += r.input_tokens
+      cur.output_tokens += r.output_tokens
+      cur.total_tokens += r.total_tokens
+    } else {
+      acc.set(provider, { ...r, provider })
+    }
+  }
+  return Array.from(acc.values()).sort((a, b) => b.total_tokens - a.total_tokens)
+}
+
+// Merge by_model rows whose names differ only in the version separator
+// (claude-opus-4-8 vs claude-opus-4.8 — see normalizeModel) into one canonical
+// model, summing token and call totals. Latency percentiles are dropped: the
+// By Model list shows totals only, and re-weighting medians across the merged
+// rows would be misleading here.
+function mergeByModel(
+  rows: TokenSummary['by_model']
+): Array<{ model: string; calls: number; total_tokens: number }> {
+  const acc = new Map<string, { model: string; calls: number; total_tokens: number }>()
+  for (const r of rows) {
+    const model = normalizeModel(r.model) || r.model
+    const cur = acc.get(model)
+    if (cur) {
+      cur.calls += r.calls
+      cur.total_tokens += r.total_tokens
+    } else {
+      acc.set(model, { model, calls: r.calls, total_tokens: r.total_tokens })
+    }
+  }
+  return Array.from(acc.values()).sort((a, b) => b.total_tokens - a.total_tokens)
+}
+
 // Custom treemap content for process breakdown
 function TreemapContent(props: {
   x: number; y: number; width: number; height: number;
@@ -344,6 +404,12 @@ export function TokenUsagePage() {
   }
 
   if (!summary) return null
+
+  // Canonicalized provider/model breakdowns: alias-merged providers and
+  // punctuation-merged models, so the By Provider pie and By Model list count
+  // each provider/model exactly once (see mergeByProvider / mergeByModel).
+  const byProvider = mergeByProvider(summary.by_provider)
+  const byModel = mergeByModel(summary.by_model)
 
   // Prepare treemap data for process breakdown
   const treemapData = summary.by_process
@@ -489,7 +555,7 @@ export function TokenUsagePage() {
           </CardHeader>
           <CardContent>
             <div className="text-xs text-muted-foreground">
-              {summary.by_provider.map(p => (
+              {byProvider.map(p => (
                 <span key={p.provider} className="mr-3">
                   <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: getProviderColor(p.provider) }} />
                   {p.provider}: {p.calls}
@@ -570,7 +636,7 @@ export function TokenUsagePage() {
                 <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
                     <Pie
-                      data={summary.by_provider.map(p => ({
+                      data={byProvider.map(p => ({
                         name: p.provider,
                         value: p.total_tokens,
                         fill: getProviderColor(p.provider)
@@ -582,7 +648,7 @@ export function TokenUsagePage() {
                       outerRadius={55}
                       label={false}
                     >
-                      {summary.by_provider.map(p => (
+                      {byProvider.map(p => (
                         <Cell key={p.provider} fill={getProviderColor(p.provider)} />
                       ))}
                     </Pie>
@@ -591,8 +657,8 @@ export function TokenUsagePage() {
                       verticalAlign="bottom"
                       wrapperStyle={{ paddingTop: '12px' }}
                       formatter={(value, entry: any) => {
-                        const item = summary.by_provider.find(p => p.provider === value);
-                        const total = summary.by_provider.reduce((s, p) => s + p.total_tokens, 0);
+                        const item = byProvider.find(p => p.provider === value);
+                        const total = byProvider.reduce((s, p) => s + p.total_tokens, 0);
                         const pct = item ? ((item.total_tokens / total) * 100).toFixed(0) : '0';
                         return `${value} ${pct}%`;
                       }}
@@ -602,7 +668,7 @@ export function TokenUsagePage() {
 
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">By Model</h4>
-                  {summary.by_model
+                  {byModel
                     .filter(m => (m.total_tokens / (summary.total_tokens || 1)) >= MAIN_CONSUMER_THRESHOLD)
                     .map(m => (
                       <div key={m.model} className="flex justify-between items-center text-sm py-1">
