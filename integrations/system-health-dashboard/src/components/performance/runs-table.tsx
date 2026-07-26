@@ -359,14 +359,23 @@ function ScoreCell({ dim, run }: { dim: string; run: Run }) {
           <TooltipTrigger asChild>{view}</TooltipTrigger>
           <TooltipContent className="max-w-sm space-y-1 text-left">
             <p className="font-medium">{meta?.label ?? dim}: {eff == null ? '—' : eff.toFixed(2)}</p>
-            {redundant && <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{EXPERIMENT_DRIFT_NOTE}</p>}
+            {/* GENERIC (blue) — what this metric measures; identical for every run. */}
+            {meta?.desc && (
+              <p className="text-xs font-medium text-sky-600 dark:text-sky-400">{meta.desc}</p>
+            )}
             {goalRatioFallback && (
               <p className="text-xs font-medium text-sky-600 dark:text-sky-400">
-                Showing goal-alignment (fraction of tool-events that moved toward the goal). The judge captured
-                no verification/test evidence, so goal-achieved could not be scored directly.
+                Goal-alignment = the fraction of a run’s tool-events that moved toward the goal.
               </p>
             )}
-            {meta?.desc && <p className="text-xs opacity-80">{meta.desc}</p>}
+            {/* THIS RUN (default/black) — what actually happened in this specific run. */}
+            {redundant && <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{EXPERIMENT_DRIFT_NOTE}</p>}
+            {goalRatioFallback && (
+              <p className="text-xs">
+                This run: no verification/test evidence was captured, so goal-achieved could not be
+                scored directly — the value shown is goal-alignment instead.
+              </p>
+            )}
             {edited && (
               <p className="text-xs">Judged (before your edit): {judgedVal == null ? '—' : judgedVal.toFixed(2)}</p>
             )}

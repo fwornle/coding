@@ -68,6 +68,41 @@ const PROCESS_COLORS: Record<string, string> = {
   'reproject-online':     '#06b6d4',   // cyan
 }
 
+// Human-readable label + one-line "what is this" for each token `process` id (the
+// cognitive-pipeline stage / agent / adapter that issued the LLM call). The raw ids
+// (`consolidator-mentions`, `opencode`, `token-adapter-copilot`…) are opaque; this
+// makes the Token-Consumption treemap self-explanatory. Unmapped ids fall back to a
+// title-cased id + generic note (processMeta below), and `token-adapter-*` is handled
+// by rule so new agents need no map edit.
+const PROCESS_META: Record<string, { label: string; desc: string }> = {
+  'consolidator-mentions':  { label: 'Consolidator · @mentions', desc: 'Background knowledge consolidation triggered by @mentions in sessions — typically the heaviest consumer.' },
+  'consolidator-insight':   { label: 'Consolidator · insights',  desc: 'Synthesizes recurring patterns from observations into KB insight entities.' },
+  'consolidator-digest':    { label: 'Consolidator · digests',   desc: 'Rolls session activity up into per-day digests.' },
+  'observation-writer':     { label: 'Observation writer',       desc: 'ETM: turns live session transcripts into structured observations.' },
+  'observation-resolution': { label: 'Observation resolution',   desc: 'Backfills pronoun/reference antecedents in stored observations (LSL sweep).' },
+  'auto-measure-class':     { label: 'Auto-measure · classify',  desc: 'Classifies each measured run into a task class (bugfix / refactor / …).' },
+  'auto-measure-title':     { label: 'Auto-measure · title',     desc: 'Generates a short human title for a measured run.' },
+  'kb-relevance-judge':     { label: 'KB relevance judge',       desc: 'Injection gate — scores whether KB snippets are relevant before injecting them.' },
+  'route-judge':            { label: 'Route judge',              desc: 'Scores agent routing / outcome for the Performance dashboard.' },
+  'experiment-preflight':   { label: 'Experiment preflight',     desc: 'Validates model/agent availability before an experiment cell runs.' },
+  'health-coordinator':     { label: 'Health coordinator',       desc: 'Periodic system-health probe LLM calls.' },
+  // The two the user flagged as opaque: these are FOREGROUND AGENT sessions, not a
+  // pipeline stage — and yes, they include /experiment cells run under that agent.
+  'opencode':               { label: 'OpenCode agent (fg)',      desc: 'Foreground OpenCode coding sessions — includes experiment cells run under OpenCode.' },
+  'copilot':                { label: 'Copilot agent (fg)',       desc: 'Foreground GitHub Copilot coding sessions — includes experiment cells run under Copilot.' },
+  'claude':                 { label: 'Claude agent (fg)',        desc: 'Foreground Claude Code sessions — includes experiment cells run under Claude.' },
+}
+function processMeta(id: string): { label: string; desc: string } {
+  if (PROCESS_META[id]) return PROCESS_META[id]
+  // token-adapter-<agent>[-variant]: the per-agent foreground token-capture path.
+  const adapter = /^token-adapter-(.+)$/.exec(id)
+  if (adapter) {
+    const who = adapter[1].replace(/-/g, ' ')
+    return { label: `Token adapter · ${who}`, desc: `Captures the foreground token usage of ${who} agent calls (file-adapter / BYOK capture path).` }
+  }
+  return { label: id.replace(/-/g, ' '), desc: 'Cognitive-pipeline process.' }
+}
+
 // Palette slots that don't collide with any canonical PROCESS_COLORS value.
 // evoColorFor() prefers this subset when hashing non-canonical keys so an
 // unknown process can never accidentally render in the same color as a
@@ -86,20 +121,25 @@ function hashKey(s: string): number {
   return Math.abs(h)
 }
 
+// Keyed by CANONICAL provider (the company, not the product) — see
+// PROVIDER_ALIASES. getProviderColor() normalizes its argument first, so raw
+// labels (`copilot`, `github-copilot`, `claude-code`) resolve here too.
 const PROVIDER_COLORS: Record<string, string> = {
-  'copilot': '#2563eb',
-  'claude-code': '#7c3aed',
+  'github': '#2563eb',
   'anthropic': '#d97706',
 }
 
 // The proxy emits several route/product aliases for the same underlying
-// provider (`github-copilot` is the same seller as `copilot`; the Anthropic
-// wire is tagged `claude-code` on the CLI-adapter path and `anthropic` on the
-// direct `/v1/messages` path). Collapse each alias set to one canonical label
-// so the By Provider pie, its legend, and the per-provider call breakdown never
-// split a single provider into two slices. Matching is case-insensitive.
+// provider. We canonicalize to the COMPANY name for consistency: `github` owns
+// the Copilot product (tagged `copilot` / `github-copilot` on the wire), just as
+// `anthropic` owns Claude Code (tagged `claude-code` on the CLI-adapter path and
+// `anthropic` on the direct `/v1/messages` path). Collapse each alias set to one
+// canonical company label so the By Provider pie, its legend, the per-provider
+// call breakdown, and the Evolution stacks never split one provider into two.
+// Matching is case-insensitive.
 const PROVIDER_ALIASES: Record<string, string> = {
-  'github-copilot': 'copilot',
+  'github-copilot': 'github',
+  'copilot': 'github',
   'claude-code': 'anthropic',
 }
 function normalizeProvider(provider: string | null | undefined): string {
@@ -241,7 +281,7 @@ function getProcessColor(process: string): string {
 }
 
 function getProviderColor(provider: string): string {
-  return PROVIDER_COLORS[provider] || '#6b7280'
+  return PROVIDER_COLORS[normalizeProvider(provider)] || '#6b7280'
 }
 
 // Merge by_provider rows that resolve to the same canonical provider (copilot +
@@ -300,7 +340,7 @@ function TreemapContent(props: {
       {width > 60 && height > 40 && (
         <>
           <text x={x + 8} y={y + 18} fill="#fff" fontSize={12} fontWeight={600}>
-            {name.replace(/-/g, ' ')}
+            {processMeta(name).label}
           </text>
           <text x={x + 8} y={y + 34} fill="rgba(255,255,255,0.7)" fontSize={11}>
             {formatTokens(value)} tokens
@@ -317,9 +357,11 @@ function TreemapTooltip({ active, payload }: { active?: boolean; payload?: Array
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
-    <div className="bg-background border rounded-md shadow-md px-3 py-2 text-sm space-y-0.5">
-      <div className="font-semibold">{d.name}</div>
-      <div className="text-muted-foreground text-xs">
+    <div className="bg-background border rounded-md shadow-md px-3 py-2 text-sm space-y-0.5 max-w-xs">
+      <div className="font-semibold">{processMeta(d.name).label}</div>
+      <div className="text-[11px] text-muted-foreground leading-snug">{processMeta(d.name).desc}</div>
+      <div className="text-[10px] text-muted-foreground/70 font-mono">id: {d.name}</div>
+      <div className="text-muted-foreground text-xs pt-0.5">
         {formatTokens(d.value)} tokens total
       </div>
       <div className="text-xs">
@@ -431,16 +473,35 @@ export function TokenUsagePage() {
   // in the window (incl. test/reap-* / fake-* outliers); restrict to the
   // "main consumers" — series contributing at least 0.5% of the window's
   // total tokens — so the legend and stacked area stay focused.
-  const evoKeysRaw: string[] =
+  const evoKeysSrc: string[] =
     evoGroupBy === 'process' ? (summary.process_keys || [])
     : evoGroupBy === 'model' ? (summary.model_keys || [])
     : evoGroupBy === 'provider' ? (summary.provider_keys || [])
     : ['input', 'output']
-  const evoSeriesRaw: Array<Record<string, any>> =
+  const evoSeriesSrc: Array<Record<string, any>> =
     evoGroupBy === 'process' ? (summary.by_process_hour || [])
     : evoGroupBy === 'model' ? (summary.by_model_hour || [])
     : evoGroupBy === 'provider' ? (summary.by_provider_hour || [])
     : (summary.by_hour || []).map(h => ({ hour: h.hour, input: h.input_tokens, output: h.output_tokens }))
+  // Canonicalize the Evolution series exactly like the Overview By Provider/By
+  // Model breakdowns: provider aliases (copilot/github-copilot → github) and
+  // model punctuation variants (claude-opus-4-8 → claude-opus-4.8) collapse into
+  // ONE stacked series, summing each bucket's tokens. process/tokens grouping is
+  // untouched (evoCanon is identity there).
+  const evoCanon = (key: string): string =>
+    evoGroupBy === 'provider' ? normalizeProvider(key)
+    : evoGroupBy === 'model' ? (normalizeModel(key) || key)
+    : key
+  const evoKeysRaw: string[] = Array.from(new Set(evoKeysSrc.map(evoCanon)))
+  const evoSeriesRaw: Array<Record<string, any>> = evoSeriesSrc.map(row => {
+    const out: Record<string, any> = {}
+    for (const [k, v] of Object.entries(row)) {
+      if (typeof v !== 'number') { out[k] = v; continue }  // 'hour' + any stray metadata
+      const ck = evoCanon(k)
+      out[ck] = Number(out[ck] || 0) + v
+    }
+    return out
+  })
   const evoGrandTotal = summary.total_tokens || 1
   const evoKeyTotals = new Map<string, number>()
   for (const k of evoKeysRaw) {
@@ -480,6 +541,9 @@ export function TokenUsagePage() {
       const canonical = PROCESS_COLORS[key]
       if (canonical) return canonical
     }
+    // Provider series share the Overview pie's palette so `github`/`anthropic`
+    // read the same color in both places.
+    if (evoGroupBy === 'provider') return getProviderColor(key)
     const palette = SAFE_EVOLUTION_PALETTE.length > 0 ? SAFE_EVOLUTION_PALETTE : EVOLUTION_PALETTE
     return palette[hashKey(key) % palette.length]
   }
@@ -809,9 +873,20 @@ export function TokenUsagePage() {
                     }
                   } else if (evoGroupBy === 'model') {
                     for (const m of (summary.by_model || [])) {
+                      // Key by CANONICAL model so punctuation variants (claude-opus-4-8
+                      // vs -4.8) share one row, matching the canonicalized evoKeys. Calls
+                      // sum across merged variants; latency fields keep the first seen (the
+                      // variants are the same model, so latency is effectively identical).
                       // Phase 66-01 piggyback: median (p50) rides on the by_model row.
                       // Phase 66-04: p50_overhead_ms (pool spawn overhead) rides alongside.
-                      meta.set(m.model, { calls: m.calls, avg_latency: m.avg_latency, p50_latency_ms: m.p50_latency_ms, p50_overhead_ms: m.p50_overhead_ms })
+                      const mk = normalizeModel(m.model) || m.model
+                      const prev = meta.get(mk)
+                      meta.set(mk, {
+                        calls: (prev?.calls ?? 0) + (m.calls ?? 0),
+                        avg_latency: prev?.avg_latency ?? m.avg_latency,
+                        p50_latency_ms: prev?.p50_latency_ms ?? m.p50_latency_ms,
+                        p50_overhead_ms: prev?.p50_overhead_ms ?? m.p50_overhead_ms,
+                      })
                     }
                   }
                   return (
