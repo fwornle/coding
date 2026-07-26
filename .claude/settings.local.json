@@ -591,7 +591,11 @@
       "Bash(gsd-browser switch-page *)",
       "Bash(gsd-browser reload *)",
       "Bash(cd *)",
-      "Skill(gsd-ui-phase)"
+      "Skill(gsd-ui-phase)",
+      "Bash(/usr/bin/stat *)",
+      "Bash(launchctl getenv *)",
+      "Bash(/bin/ps -o pid,ppid,lstart,command -p 56548)",
+      "mcp__code-graph-rag__write_file"
     ],
     "deny": [],
     "ask": []
