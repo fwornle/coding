@@ -264,7 +264,16 @@ const currentState = {
     // restart can fix (e.g. stale HTTPS_PROXY from a launchd KeepAlive
     // restart — the 2026-05-21 9-hr observation silence root cause).
     // Resets on success or non-recoverable reason (timeout/4xx/empty/oksub).
-    consecutive_strong_network_failures: 0
+    consecutive_strong_network_failures: 0,
+    // Passthrough self-heal (2026-07-26): tracks the /v1/messages passthrough
+    // path that `bin/coding` foreground claude uses (ANTHROPIC_BASE_URL=:12435)
+    // — a path NEITHER probe above exercises. Counts consecutive frozen-dead-
+    // proxy signatures (passthrough 502 while direct egress to Anthropic works).
+    // Resets on any other outcome. See pollProxyPassthrough().
+    passthrough_ok: null,                // null until first probe; true|false after
+    passthrough_reason: null,            // 'frozen_proxy_502'|'http_<code>'|'network'|'genuine_outage'|null
+    passthrough_last_probe_end: null,
+    consecutive_passthrough_frozen: 0
   },
   // Network environment detection — single source of truth for CN/VPN/home
   // and local proxy (px/proxydetox) status. Polled every 30s.
@@ -520,6 +529,26 @@ const PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000; // real obs withi
 // read below hits the proxy itself and fails fast when it is down, falling
 // through to the synthetic probe.
 const PROXY_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000;
+// ----- Passthrough self-heal (2026-07-26) -----
+// The cheap AND strong probes above both hit /api/complete (the native
+// completion path). NEITHER exercises POST /v1/messages — the passthrough path
+// that `bin/coding` foreground claude routes through (ANTHROPIC_BASE_URL set to
+// :12435, keys unset → Max-OAuth forwarded to the proxy's /v1/messages
+// passthrough). A frozen-dead-proxy env (HTTPS_PROXY=proxy.muc:8080 baked in at
+// a VPN-on startup, then VPN dropped) breaks THAT path specifically → every
+// foreground claude call returns `API Error: 502`, while /api/complete can
+// still pass. This probe closes the blind spot with an unambiguous signature:
+// passthrough returns 502 AND direct egress to Anthropic works (so the break is
+// the proxy's stale routing, not a real network outage). ONLY that exact
+// signature dispatches a kickstart — a no-auth passthrough that reaches
+// Anthropic returns 401 (the HEALTHY signal here), quota/rate-limit return
+// 4xx, and a genuine network outage fails the direct-egress check too, so none
+// of those can trigger a useless restart. The kickstart re-runs
+// start-llm-proxy.sh which re-probes the network and clears the stale env.
+const PROXY_PASSTHROUGH_PROBE_INTERVAL_MS = 90_000;        // every 90s while active
+const PROXY_PASSTHROUGH_PROBE_TIMEOUT_MS = 12_000;
+const PROXY_PASSTHROUGH_ESCALATION_THRESHOLD = 2;          // 2 consecutive frozen sigs (~3min) before kickstart
+const DIRECT_EGRESS_PROBE_HOST = 'https://api.anthropic.com/v1/messages';
 
 // AFK full-suspend (restored 2026-07-10): when no session transcript is fresh
 // across any project/pane, the user is AFK and no one is watching the dashboard
@@ -1278,6 +1307,130 @@ function evaluateStrongProbeEscalation() {
   getRemediationDispatcher()
     .then(d => d.executeAction('restart_llm_cli_proxy', { reason: `strong-probe ${reason}` }))
     .catch(err => log(`proxy strong-probe escalation kickstart failed: ${err.message}`, 'ERROR'));
+}
+
+/**
+ * Direct-egress reachability from the coordinator itself. A plain fetch from
+ * this process goes DIRECT — undici does not honour *_PROXY env by default — so
+ * this tests raw internet reachability, independent of the proxy's (possibly
+ * stale) routing. Any HTTP response (401/405) proves reachability; only a
+ * connect/DNS/TLS failure or timeout throws → false.
+ */
+async function directEgressReachable() {
+  try {
+    await fetch(DIRECT_EGRESS_PROBE_HOST, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(6000),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Passthrough self-heal probe (2026-07-26). POSTs an UNAUTHENTICATED request to
+ * the proxy's /v1/messages passthrough — the exact path `bin/coding` foreground
+ * claude uses — and detects the frozen-dead-proxy signature: HTTP 502 from the
+ * passthrough WHILE direct egress to Anthropic works. That signature ONLY arises
+ * when the running proxy has a stale HTTPS_PROXY baked into its env (started on
+ * VPN, then VPN dropped) — a break NO /api/complete probe catches. On
+ * PROXY_PASSTHROUGH_ESCALATION_THRESHOLD consecutive signatures it dispatches
+ * restart_llm_cli_proxy (kickstart re-runs start-llm-proxy.sh → re-probes the
+ * network → clears the stale env). EVERY other outcome resets the counter:
+ *   - 401 (healthy no-auth reject) / any 2xx / other 4xx  → passthrough forwards
+ *   - network error (proxy port down)  → cheap-probe FSM's domain, defer
+ *   - 502 while direct egress ALSO down → genuine outage a restart can't fix
+ * Shares the kickstart cooldown window with the other proxy-restart paths.
+ */
+async function pollProxyPassthrough() {
+  const probeEndedAt = () => new Date().toISOString();
+  currentState.proxy.passthrough_last_probe_end = probeEndedAt();
+  const prev = currentState.proxy.passthrough_ok;
+  let status = null;
+  try {
+    const r = await fetch(`${PROXY_URL}/v1/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      // No Authorization header on purpose: a healthy proxy that reaches
+      // Anthropic returns 401 (auth rejected AT the upstream); a frozen-dead-
+      // proxy returns 502 (its own fetch to the upstream fails before auth is
+      // ever evaluated). That is the whole discriminator.
+      body: JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }),
+      signal: AbortSignal.timeout(PROXY_PASSTHROUGH_PROBE_TIMEOUT_MS),
+    });
+    status = r.status;
+  } catch (err) {
+    // Proxy not listening / connection refused — the cheap-probe FSM restarts a
+    // dead port; this is not our signature. Reset and defer.
+    currentState.proxy.passthrough_ok = false;
+    currentState.proxy.passthrough_reason = 'network';
+    currentState.proxy.passthrough_last_probe_end = probeEndedAt();
+    if (currentState.proxy.consecutive_passthrough_frozen > 0) {
+      log(`proxy passthrough counter reset (proxy unreachable: ${err.message}) — deferring to cheap-probe FSM`, 'INFO');
+    }
+    currentState.proxy.consecutive_passthrough_frozen = 0;
+    return;
+  }
+  currentState.proxy.passthrough_last_probe_end = probeEndedAt();
+
+  if (status !== 502) {
+    currentState.proxy.passthrough_ok = true;
+    currentState.proxy.passthrough_reason = null;
+    if (currentState.proxy.consecutive_passthrough_frozen > 0) {
+      log(`proxy passthrough recovered (status=${status}) — frozen counter reset`, 'INFO');
+    }
+    currentState.proxy.consecutive_passthrough_frozen = 0;
+    if (prev !== true) log(`proxy passthrough_ok flip -> true (status=${status})`, 'DEBUG');
+    return;
+  }
+
+  // 502 from the passthrough — disambiguate stale-env vs genuine outage.
+  const directOk = await directEgressReachable();
+  currentState.proxy.passthrough_ok = false;
+  if (!directOk) {
+    currentState.proxy.passthrough_reason = 'genuine_outage';
+    if (currentState.proxy.consecutive_passthrough_frozen > 0) {
+      log(`proxy passthrough 502 but direct egress ALSO down — genuine outage, not stale env; counter reset`, 'INFO');
+    }
+    currentState.proxy.consecutive_passthrough_frozen = 0;
+    return;
+  }
+
+  // 502 passthrough + direct egress OK = frozen-dead-proxy signature.
+  currentState.proxy.passthrough_reason = 'frozen_proxy_502';
+  currentState.proxy.consecutive_passthrough_frozen += 1;
+  const count = currentState.proxy.consecutive_passthrough_frozen;
+  if (prev !== false) log(`proxy passthrough_ok flip -> false (frozen_proxy_502: 502 while direct egress works)`, 'WARN');
+  evaluatePassthroughEscalation(count);
+}
+
+// Escalation for the passthrough self-heal — mirrors evaluateStrongProbeEscalation
+// but keyed on the frozen-dead-proxy signature. Shares the kickstart cooldown
+// window + counter so ALL proxy-restart paths obey the same 3-in-5-min cap.
+function evaluatePassthroughEscalation(count) {
+  const rule = RULES?.rules?.services?.llm_cli_proxy;
+  if (!rule || rule.auto_heal !== true) return;
+  if (count < PROXY_PASSTHROUGH_ESCALATION_THRESHOLD) {
+    log(`proxy passthrough frozen-signature ${count}/${PROXY_PASSTHROUGH_ESCALATION_THRESHOLD} — not yet escalating`, 'INFO');
+    return;
+  }
+  const now = Date.now();
+  currentState.proxy.kickstart_timestamps = currentState.proxy.kickstart_timestamps
+    .filter(ts => (now - ts) < PROXY_KICKSTART_WINDOW_MS);
+  if (currentState.proxy.kickstart_timestamps.length >= PROXY_KICKSTART_MAX) {
+    log(`proxy passthrough escalation suppressed — ${currentState.proxy.kickstart_timestamps.length} kickstarts in last ${PROXY_KICKSTART_WINDOW_MS/1000}s (cooldown)`, 'WARN');
+    return;
+  }
+  currentState.proxy.kickstart_timestamps.push(now);
+  currentState.proxy.kickstart_count += 1;
+  currentState.proxy.consecutive_passthrough_frozen = 0;
+  log(`proxy passthrough escalation: dispatching restart_llm_cli_proxy (frozen-dead-proxy signature x${count}, kickstart_count=${currentState.proxy.kickstart_count})`, 'INFO');
+  getRemediationDispatcher()
+    .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'passthrough frozen_proxy_502' }))
+    .catch(err => log(`proxy passthrough escalation kickstart failed: ${err.message}`, 'ERROR'));
 }
 
 /**
@@ -2387,6 +2540,20 @@ async function runAllChecks() {
         currentState.proxy.semantic_strong_reason = `exception_${probeErr.message || 'unknown'}`;
         currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
       });
+    });
+  }
+
+  // ----- Passthrough self-heal (2026-07-26): guard the /v1/messages path that
+  // `bin/coding` foreground claude uses; auto-kickstart on the frozen-dead-proxy
+  // signature (502 passthrough while direct egress works). Cheap (~1 request,
+  // no LLM tokens — it 401s or 502s before any completion), so it runs on a
+  // tight 90s cadence. Fire-and-forget so it never serializes the tick loop. -----
+  const _passthroughAge = currentState.proxy.passthrough_last_probe_end
+    ? Date.now() - new Date(currentState.proxy.passthrough_last_probe_end).getTime()
+    : Infinity;
+  if (_userActive && _passthroughAge >= PROXY_PASSTHROUGH_PROBE_INTERVAL_MS) {
+    pollProxyPassthrough().catch(err => {
+      log(`proxy passthrough probe threw: ${err.message}`, 'ERROR');
     });
   }
 
