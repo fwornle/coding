@@ -12,6 +12,7 @@
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --coverage",
     "lint": "eslint lib/",
+    "lint:egress": "node scripts/lint-egress.mjs",
     "install-deps": "npm install",
     "setup": "./install.sh",
     "db:init": "node scripts/init-databases.js",

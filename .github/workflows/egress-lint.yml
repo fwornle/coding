@@ -1,0 +1,48 @@
+name: Egress Lint
+
+# T4 of the egress lockdown: fail CI when new code constructs a direct
+# provider-cloud client (`new OpenAI(` / `new Anthropic(` / ... without a
+# baseURL) or a new in-process `LLMService` outside the ratcheted allowlist.
+# The scanner is scripts/lint-egress.mjs; sanctioned exceptions live in
+# config/egress-lint-allowlist.json and are reviewed via the diff.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  egress-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Submodules are pinned via SSH URLs; rewrite to HTTPS so public repos
+      # clone with the default token. Init is best-effort per submodule: a pin
+      # that isn't reachable (e.g. a local-only commit) downgrades to a warning
+      # instead of failing the whole lint — the scanner reports which roots it
+      # actually covered.
+      - name: Initialize submodules (best effort)
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule sync
+          git config --file .gitmodules --get-regexp '^submodule\..*\.path$' | while read -r _ sub; do
+            if git submodule update --init "$sub"; then
+              echo "initialized: $sub"
+            else
+              echo "::warning::submodule $sub could not be initialized; its sources are not covered by this run"
+            fi
+          done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Zero npm-installed dependencies — runs straight from checkout.
+      - name: Run egress lint
+        run: node scripts/lint-egress.mjs

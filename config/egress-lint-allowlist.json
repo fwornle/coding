@@ -1,0 +1,57 @@
+{
+  "$comment": "Allowlist for scripts/lint-egress.mjs (T4 egress lockdown lint). Every entry documents a sanctioned exception to the ':12435 proxy is the chokepoint' rule. providerClients entries absorb up to maxUnguarded `new <Provider>(` constructions WITHOUT a baseURL in that file; llmService entries absorb up to maxCount `new LLMService(` constructions. Additions must carry a reason and are reviewed in the diff.",
+  "providerClients": [
+    {
+      "file": "integrations/mcp-server-semantic-analysis/src/agents/deduplication.ts",
+      "maxUnguarded": 1,
+      "reason": "Host-side fallback branch for embeddings when LLM_CLI_PROXY_URL is unset; container path is keyless (T2) and takes the proxy branch."
+    },
+    {
+      "file": "integrations/mcp-server-semantic-analysis/src/agents/git-staleness-detector.ts",
+      "maxUnguarded": 1,
+      "reason": "Host-side fallback branch for embeddings when LLM_CLI_PROXY_URL is unset; container path is keyless (T2) and takes the proxy branch."
+    },
+    {
+      "file": "integrations/mcp-constraint-monitor/src/engines/groq-engine.js",
+      "maxUnguarded": 1,
+      "reason": "Pre-existing host-side Grok/Groq semantic engine; hard-requires GROQ_API_KEY and is inert in the keyless container (T2). Ratcheted here until refactored onto the proxy."
+    }
+  ],
+  "llmService": [
+    {
+      "file": "integrations/mcp-server-semantic-analysis/src/agents/semantic-analyzer.ts",
+      "maxCount": 1,
+      "reason": "Legacy in-process LLMService site predating T2; keyless container makes key-based providers unavailable so SDK routes via LLM_CLI_PROXY_URL CLI providers."
+    },
+    {
+      "file": "integrations/mcp-server-semantic-analysis/src/agents/git-staleness-detector.ts",
+      "maxCount": 1,
+      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
+    },
+    {
+      "file": "integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts",
+      "maxCount": 1,
+      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
+    },
+    {
+      "file": "integrations/mcp-server-semantic-analysis/src/agents/wave1-project-agent.ts",
+      "maxCount": 1,
+      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
+    },
+    {
+      "file": "integrations/mcp-server-semantic-analysis/src/agents/wave2-component-agent.ts",
+      "maxCount": 1,
+      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
+    },
+    {
+      "file": "integrations/mcp-server-semantic-analysis/src/agents/wave3-detail-agent.ts",
+      "maxCount": 1,
+      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
+    },
+    {
+      "file": "integrations/mcp-constraint-monitor/src/engines/semantic-validator.js",
+      "maxCount": 1,
+      "reason": "Legacy in-process LLMService site in constraint monitor; host-side, ratcheted until refactored onto the proxy."
+    }
+  ]
+}
