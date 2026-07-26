@@ -1,0 +1,26 @@
+version: 1
+experiment_id: normalize-token-view-labels
+snapshot_id: smoke-spec
+goal_sentence: >-
+  On the Token Usage dashboard page at localhost:3032/token-usage, normalize
+  provider and model labels so the copilot and github-copilot providers merge
+  into a single provider, the anthropic and claude-code provider labels are
+  reconciled into one canonical label, and model names differing only by
+  punctuation such as claude-opus-4-8 and claude-opus-4.8 combine into one
+  canonical model, applied consistently across the By Provider pie and the By
+  Model list.
+repeats: 1
+task_class: bugfix
+variants:
+  - agent: claude
+    model: claude-opus-4-8
+    framework: straight
+    env: default
+  - agent: copilot
+    model: claude-opus-4.8
+    framework: straight
+    env: default
+  - agent: opencode
+    model: rapid-proxy/claude-opus-4.8
+    framework: straight
+    env: default

@@ -1,0 +1,24 @@
+version: 1
+experiment_id: fix-statusbar-rec-toggle
+snapshot_id: smoke-spec
+goal_sentence: >-
+  In the tmux status bar's per-project display, the REC indicator's status dot
+  incorrectly toggles between black and green across successive status-line
+  renders; investigate why the REC indicator flickers between black and green
+  and fix it so it renders a single stable, correct color, without breaking the
+  neighboring VA and C indicators.
+repeats: 1
+task_class: bugfix
+variants:
+  - agent: claude
+    model: claude-opus-4-8
+    framework: straight
+    env: default
+  - agent: copilot
+    model: claude-opus-4.8
+    framework: straight
+    env: default
+  - agent: opencode
+    model: rapid-proxy/claude-opus-4.8
+    framework: straight
+    env: default
