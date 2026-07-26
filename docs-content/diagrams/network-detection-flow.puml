@@ -84,9 +84,9 @@ note across
   location=corporate → **N:CN**
   location=corporate+vpn → **N:VPN**
   location=open → **N:OPEN**
-  proxy_running=true → **P:ON**
-  proxy_running=false → **P:OFF**
-  (No P:ERR state — binary only)
+  daemon ok + px on → **P:ON**
+  daemon ok, px off → **P:AUTO**
+  daemon down/broken → **P:OFF**
 end note
 
 @enduml

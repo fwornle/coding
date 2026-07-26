@@ -12,7 +12,7 @@ continuously monitors services, network connectivity, and proxy health.
 ```
 ┌─────────────────────────────────────────────────┐
 │                 tmux Status Line                │
-│  N:OPEN/CN  P:ON/OFF  C:●  LLM:●  SEM:●       │
+│  N:OPEN/CN  P:ON/AUTO/OFF  C:●  LLM:●  SEM:●       │
 └──────────────────────┬──────────────────────────┘
                        │ polls every 5s
                        ▼
@@ -40,7 +40,7 @@ continuously monitors services, network connectivity, and proxy health.
 | System | Check | Indicator |
 |--------|-------|-----------|
 | Docker services | Container health via Docker API | C:● |
-| Proxy (Proxydetox) | Functional probe via `api.github.com` | P:ON/OFF |
+| Proxy (Proxydetox) | Functional probe via `api.github.com` + `proxy_enabled_by_user` intent | P:ON/AUTO/OFF |
 | LLM CLI Proxy | Provider availability check | LLM:● |
 | Semantic Analysis | SSE endpoint liveness | SEM:● |
 | Network | DNS probe for CN detection | N:OPEN/CN |

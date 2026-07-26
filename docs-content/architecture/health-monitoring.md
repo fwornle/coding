@@ -136,13 +136,13 @@ The strong probe runs **fire-and-forget** with a 30s timeout — the CLI-fallbac
 
 ### Proxy detection (user-intent model)
 
-Proxy state (`proxy.state`) is determined by **user intent**, not process state. The toggle is the `px` alias in `~/.bash_profile` which sets/unsets `http_proxy`/`https_proxy` env vars. The proxydetox process state is irrelevant — only user intent matters.
+Proxy state combines **daemon truth** with **user intent** (since 2026-07-26). The `px` toggle sets/unsets `http_proxy`/`https_proxy` shell env vars and is reported as `proxy_enabled_by_user`; the proxydetox daemon itself stays loaded on :3128 regardless (always-on redesign, 2026-07-25) and is reported as `proxy_running`/`proxy_functional`.
 
 | State | Meaning |
 |-------|---------|
-| `P:ON` | User enabled proxy (`px on`) AND `CONNECT` probe succeeds |
-| `P:ERR` | User enabled proxy (`px on`) AND `CONNECT` probe fails |
-| `P:OFF` | User disabled proxy (`px off`) |
+| `P:ON` | Daemon running + functional AND user enabled proxy (`px on`) |
+| `P:AUTO` | Daemon running + functional, user toggle off — adaptive `--direct-fallback` routing |
+| `P:OFF` | Daemon down or not functional (only genuinely broken state) |
 
 ### Violations
 

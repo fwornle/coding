@@ -38,8 +38,8 @@ note right: Cache deleted → miss
 tmux -> tmux: Spawn combined-status-line.js\n(slow path, ~300ms)
 tmux -> coordinator: GET /health/state
 coordinator --> tmux: { proxy_running: false,\n  location: "corporate" }
-tmux -> cache: Write new cache\n[P:OFF] [N:CN]
-tmux --> user: **[P:OFF]** rendered\n(≤5s total latency)
+tmux -> cache: Write new cache\n[P:AUTO] [N:CN]
+tmux --> user: **[P:AUTO]** rendered\n(daemon stays loaded; ≤5s total latency)
 
 ... Next LLM call ...
 

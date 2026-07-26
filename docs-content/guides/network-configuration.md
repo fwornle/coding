@@ -189,7 +189,7 @@ CODING_FORCE_CN=true coding --opencode --dry-run
 | Symptom | Cause | Fix |
 |---|---|---|
 | `N:OPEN` when on office LAN | Coordinator started on hotspot; stale DNS servers (pre-`dig` fix) or process running old code | Restart coordinator: `launchctl stop com.coding.health-coordinator && launchctl start com.coding.health-coordinator` |
-| `P:ON` after `px off` | Old `px` used `launchctl stop` which launchd respawns via socket activation | Update `proxy.sh` to use `launchctl unload`/`load` instead |
+| `P:ON` after `px off` | Pre-2026-07-26 badge showed daemon truth only | Fixed: badge is now three-state — `px off` with the daemon loaded renders `P:AUTO` (expected; the always-on daemon auto-DIRECTs off-CN). `P:OFF` now only means the daemon is down |
 | Status line takes >10s to show P: change | Cache files not invalidated; coordinator not notified | Ensure `px` does `rm .logs/combined-status-line-cache-*.txt` AND `curl -s -X POST http://localhost:3034/health/refresh` |
 | LLM proxy 500s after `px off` | Proxy dead but LLM proxy still routing through `ProxyAgent` | LLM proxy now has `smartFetch()` with 5s proxy-alive cache — recovers automatically |
 | 502 Bad Gateway in OpenCode | Proxy interfering with streaming API | Check proxydetox is running: `lsof -i :3128` |

@@ -50,8 +50,8 @@ deactivate PX
 TM -> SLC: read cache
 note right: Cache miss\n(files deleted)
 SLC -> HC: GET /health/state
-HC --> SLC: proxy_running: false
-SLC --> TM: P:OFF rendered
+HC --> SLC: proxy_enabled_by_user: false\n(daemon stays loaded)
+SLC --> TM: P:AUTO rendered
 
 ... next LLM request ...
 

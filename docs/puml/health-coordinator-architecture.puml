@@ -66,9 +66,9 @@ note right of COORD
 
   Proxy detection (user intent):
   ~/.bash_profile toggle (px alias)
-  P:ON  = enabled + CONNECT ok
-  P:ERR = enabled + CONNECT fails
-  P:OFF = disabled by user
+  P:ON   = daemon ok + px on
+  P:AUTO = daemon ok, px off
+  P:OFF  = daemon down/broken
 
   Stale PID check: probes for
   orphaned consolidation

@@ -84,7 +84,7 @@ rectangle "**Health Monitoring** (coding/bin/coding)" as HEALTH #E1BEE7 {
     **Proxy**: Port 3128 may still listen (DIRECT mode) or be stopped
     **Auto-heal**: If proxy was ON, detect-network.sh may toggle it OFF
     or leave Proxydetox in DIRECT fallback mode
-    **Status line**: N:OPEN P:OFF LLM:● (Claude available!)
+    **Status line**: N:OPEN P:AUTO LLM:● (Claude available!)
     **Important**: Claude/Anthropic API is now reachable (no firewall)
   end note
 }

@@ -23,7 +23,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | Constraint | `[🔒77%]` | Code quality % (with optional `🟡N` violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
 | Network Location | `[N:VPN]` | Network environment: VPN / CN / OPEN / ?? |
-| Proxy Status | `[P:ON]` | Local proxy daemon (proxydetox): ON / OFF |
+| Proxy Status | `[P:AUTO]` | Local proxy daemon (proxydetox): ON / AUTO / OFF |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
 
@@ -86,11 +86,12 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[P:ON]` | Proxydetox daemon is running (port 3128 listening) | Normal on VPN/CN |
-| `[P:OFF]` | Proxydetox daemon is stopped (port 3128 closed) | Expected on OPEN; problem on VPN |
+| `[P:ON]` | Daemon running + functional AND user toggled `px` on | Normal on VPN/CN |
+| `[P:AUTO]` | Daemon running + functional, `px` toggle off — adaptive `--direct-fallback` mode; pinned sessions still routed | Normal off-CN state |
+| `[P:OFF]` | Daemon down or not functional | Problem on VPN/CN (bar turns yellow); investigate proxydetox |
 
-!!! note "P: is binary — no ERR state"
-    Previous versions had a `P:ERR` state (proxy port listening but CONNECT tunnel fails). This was removed — the proxy is either ON (port up) or OFF (port down). If the proxy is up but non-functional, `internet_reachable` in the coordinator state will be `false`, and the system health badge `[🏥]` reflects the issue.
+!!! note "P: is three-state since 2026-07-26"
+    Since the always-on proxy redesign (2026-07-25), the proxydetox daemon stays loaded on :3128 regardless of the `px` toggle — agent sessions are pinned to it and its `--direct-fallback` adapts routing per request. A daemon-truth-only badge would therefore read `ON` nearly always. The badge now combines daemon truth with user intent (`proxy_enabled_by_user` from the coordinator): `ON` (daemon healthy + `px` on), `AUTO` (daemon healthy, `px` off), `OFF` (daemon down/not functional — the only broken state). The former `P:ERR` state remains removed.
 
 !!! note "Proxy toggle via `px`"
     The `px` alias toggles proxydetox via `launchctl unload`/`launchctl load` (not `stop`/`start`, which was ineffective due to launchd socket activation). After toggling, `px` invalidates all status line caches and triggers an immediate coordinator re-probe via `POST /health/refresh`. The P: badge updates within **≤5 seconds** (one tmux refresh cycle). See [Network Configuration → Proxy Management](network-configuration.md#proxy-management) for details.

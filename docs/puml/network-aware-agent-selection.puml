@@ -19,9 +19,10 @@ rectangle "Proxy Detection" as pdetect #FFF0F0 {
   component [~/.bash_profile\nhttp_proxy toggle\n(px alias)] <<infra>> as pxtoggle
   component [CONNECT test\nvia 127.0.0.1:3128] <<infra>> as pxtest
   note bottom of pxtoggle
-    P:ON  = enabled + works
-    P:ERR = enabled + broken
-    P:OFF = disabled by user
+    P:ON   = daemon up + px on
+    P:AUTO = daemon up, px off
+             (adaptive direct-fallback)
+    P:OFF  = daemon down/broken
   end note
 }
 

@@ -78,7 +78,7 @@ rectangle "**Health Monitoring** (coding/bin/coding)" as HEALTH #E1BEE7 {
     **Fix**: Script preserves proxy env vars, retests via proxy as fallback
     **Cellular handover**: Brief connection drops during cell tower switch
     → health-coordinator detects via failed probe, waits for recovery
-    **Status line**: N:OPEN P:OFF LLM:●
+    **Status line**: N:OPEN P:AUTO LLM:●
     **Auto-heal**: Accelerated probing (5s interval) after connectivity loss
   end note
 }
