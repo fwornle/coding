@@ -2158,16 +2158,22 @@ class CombinedStatusLine {
       parts.push(`[N:${locLabel}]`);
     }
 
-    // Proxy status badge: [P:ON] / [P:OFF]
-    // Reflects whether the local proxy (px/proxydetox) is running and functional.
+    // Proxy status badge: [P:ON] / [P:AUTO] / [P:OFF]
+    // Since the 2026-07-25 always-on redesign the proxydetox daemon on :3128
+    // stays loaded regardless of the `px` toggle (sessions are pinned to it;
+    // --direct-fallback makes it adaptive), so daemon-up alone would render a
+    // near-constant ON. Three states keep the badge informative:
+    //   ON   — daemon up+functional AND user toggled px on (env vars exported)
+    //   AUTO — daemon up+functional, px toggle off (adaptive/direct-fallback;
+    //          pinned sessions still routed — today's normal off-CN state)
+    //   OFF  — daemon down or not functional (the only genuinely broken state)
     {
-      // 2026-07-25: proxy_running now = daemon actually owns :3128 (truth,
-      // independent of the px env toggle) — sessions are pinned to the local
-      // adaptive proxy, so this badge is the one that must never lie.
-      const pxOn = network?.proxy_running && network?.proxy_functional;
-      const pxLabel = pxOn ? 'ON' : 'OFF';
+      const daemonUp = network?.proxy_running && network?.proxy_functional;
+      const pxLabel = !daemonUp ? 'OFF'
+        : network?.proxy_enabled_by_user ? 'ON'
+        : 'AUTO';
       parts.push(`[P:${pxLabel}]`);
-      if ((network?.location === 'corporate' || network?.location === 'vpn') && !pxOn) {
+      if ((network?.location === 'corporate' || network?.location === 'vpn') && !daemonUp) {
         // On CN/VPN without a working local proxy — external APIs unreachable
         if (overallColor === 'green') overallColor = 'yellow';
       }
