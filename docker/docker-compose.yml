@@ -42,11 +42,12 @@ services:
       # CODING_REPO is what config-manager.js uses to find .constraint-monitor.yaml.
       # Inside the container this is /coding (bind-mounted from the host repo).
       - CODING_REPO=/coding
-      # API keys (passed through from host)
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      # T2 egress lockdown (2026-07-26): raw provider API keys are NO LONGER
+      # injected into the container. All in-container LLM/embedding callers
+      # route through the host llm-cli-proxy (:12435): LLMService falls back to
+      # its claude-code/copilot CLI providers (LLM_CLI_PROXY_URL), embeddings
+      # use the proxy's /v1/embeddings passthrough, code-graph-rag points at
+      # /v1/codegraph/chat/completions via its .env. Keys live host-side only.
       # Local LLM - Docker Model Runner (DMR) on host
       # DMR uses llama.cpp under the hood for local inference
       - DMR_HOST=host.docker.internal

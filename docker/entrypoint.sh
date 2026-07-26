@@ -65,6 +65,13 @@ if [ -f /coding/.env ]; then
         [[ "$key" =~ ^[[:space:]]*# ]] && continue
         [[ -z "$key" ]] && continue
         key=$(echo "$key" | xargs)  # trim whitespace
+        # T2 egress lockdown: never import raw provider keys/tokens from the
+        # bind-mounted host .env — all LLM/embedding egress routes via the
+        # host llm-cli-proxy (:12435). Importing them here would silently
+        # re-enable direct provider calls from in-container SDK clients.
+        case "$key" in
+            *_API_KEY|*_TOKEN|*_MANAGEMENT_KEY) continue ;;
+        esac
         if [ -z "${!key}" ]; then
             export "$key=$value"
         fi

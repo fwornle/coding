@@ -798,51 +798,30 @@ install_code_graph_rag() {
 
     # Create .env if not exists
     if [[ ! -f "$CODE_GRAPH_RAG_DIR/.env" ]]; then
-        # Source main .env to get API keys
-        if [[ -f "$CODING_REPO/.env" ]]; then
-            source "$CODING_REPO/.env"
-        fi
-
-        # Use Groq as default (OpenAI quota issues are common)
-        # Fall back to OpenAI if no Groq key available
-        if [[ -n "$GROQ_API_KEY" ]]; then
-            cat > "$CODE_GRAPH_RAG_DIR/.env" << ENVEOF
+        # T2 egress lockdown: route LLM calls via the host llm-cli-proxy (:12435)
+        # OpenAI-compat shim (/v1/codegraph stamps agent='codegraph') instead of
+        # handing code-graph-rag a raw provider key.
+        cat > "$CODE_GRAPH_RAG_DIR/.env" << 'ENVEOF'
 # code-graph-rag configuration
 MEMGRAPH_HOST=localhost
 MEMGRAPH_PORT=7687
 MEMGRAPH_BATCH_SIZE=1000
 
-# Using Groq via OpenAI-compatible API (faster, no quota issues)
+# LLM calls route via the host llm-cli-proxy OpenAI-compat shim (no raw key)
 CYPHER_PROVIDER=openai
-CYPHER_MODEL=llama-3.3-70b-versatile
-CYPHER_ENDPOINT=https://api.groq.com/openai/v1
-CYPHER_API_KEY=$GROQ_API_KEY
+CYPHER_MODEL=claude-haiku-4-5
+CYPHER_ENDPOINT=http://host.docker.internal:12435/v1/codegraph
+CYPHER_API_KEY=proxy-routed
+ORCHESTRATOR_PROVIDER=openai
+ORCHESTRATOR_MODEL=claude-haiku-4-5
+ORCHESTRATOR_ENDPOINT=http://host.docker.internal:12435/v1/codegraph
+ORCHESTRATOR_API_KEY=proxy-routed
 ENVEOF
-            info "Created .env with Groq configuration"
-        else
-            cat > "$CODE_GRAPH_RAG_DIR/.env" << 'ENVEOF'
-# code-graph-rag configuration
-MEMGRAPH_HOST=localhost
-MEMGRAPH_PORT=7687
-MEMGRAPH_BATCH_SIZE=1000
-
-# Using OpenAI (set CYPHER_API_KEY or OPENAI_API_KEY)
-CYPHER_PROVIDER=openai
-CYPHER_MODEL=gpt-4o-mini
-ENVEOF
-            info "Created .env with OpenAI configuration (set GROQ_API_KEY in main .env for better performance)"
-        fi
+        info "Created .env with proxy-routed LLM configuration"
     else
-        # Update existing .env if GROQ_API_KEY is available but not configured
-        if [[ -f "$CODING_REPO/.env" ]]; then
-            source "$CODING_REPO/.env"
-        fi
-        if [[ -n "$GROQ_API_KEY" ]] && ! grep -q "CYPHER_API_KEY" "$CODE_GRAPH_RAG_DIR/.env"; then
-            info "Adding Groq API key to existing code-graph-rag .env..."
-            echo "" >> "$CODE_GRAPH_RAG_DIR/.env"
-            echo "# Groq API key added by installer" >> "$CODE_GRAPH_RAG_DIR/.env"
-            echo "CYPHER_ENDPOINT=https://api.groq.com/openai/v1" >> "$CODE_GRAPH_RAG_DIR/.env"
-            echo "CYPHER_API_KEY=$GROQ_API_KEY" >> "$CODE_GRAPH_RAG_DIR/.env"
+        # Migrate legacy direct-Groq .env entries to the proxy route
+        if grep -q "api.groq.com" "$CODE_GRAPH_RAG_DIR/.env"; then
+            warn "code-graph-rag .env still points at api.groq.com — re-run with the file removed to regenerate proxy-routed config"
         fi
     fi
 
