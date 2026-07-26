@@ -392,9 +392,13 @@ _inject_knowledge_context() {
 #   copilot   no base-URL override on the Copilot CLI (GitHub-enterprise OAuth) —
 #                                    not yet proxy-routable; flagged honestly
 #
-# HEALTH-GATED: if the proxy is unreachable we log a loud warning and launch the
-# agent UNROUTED (direct, unmeasured) rather than brick it. Runs AFTER
-# agent_pre_launch + _set_agent_env_vars so it has the final say on the routing env.
+# HEALTH-GATED, FAIL-CLOSED (T1): agents launched via bin/coding MUST route
+# through the proxy. If the daemon is unreachable after a short retry window the
+# launch ABORTS with remediation hints — no silent direct (unmeasured) fallback.
+# A bare `claude`/`opencode` started outside bin/coding is untouched by this
+# policy; CODING_PROXY_ROUTE=0 remains the explicit direct-launch escape hatch.
+# Runs AFTER agent_pre_launch + _set_agent_env_vars so it has the final say on
+# the routing env.
 configure_proxy_routing() {
   # Opt-out safety valve: CODING_PROXY_ROUTE=0 launches the agent direct (unmeasured)
   # without touching its env — use if the proxy is misbehaving in the hot path.
@@ -408,10 +412,21 @@ configure_proxy_routing() {
   local port="${LLM_PROXY_PORT:-12435}"
   local base="http://127.0.0.1:${port}"
 
-  if ! curl -sf -o /dev/null --max-time 2 "${base}/health" 2>/dev/null; then
-    _agent_log "⚠️  LLM proxy unreachable at ${base} — launching ${AGENT_NAME:-$AGENT} UNROUTED; its traffic will NOT be measured."
-    _agent_log "    Start it:  launchctl kickstart -k gui/\$(id -u)/com.coding.llm-cli-proxy  then relaunch."
-    return 0
+  # Retry briefly: the daemon is launchd-managed and may be mid-(re)start.
+  local _px_ok=""
+  local _px_try
+  for _px_try in 1 2 3 4 5; do
+    if curl -sf -o /dev/null --max-time 2 "${base}/health" 2>/dev/null; then
+      _px_ok=1
+      break
+    fi
+    sleep 2
+  done
+  if [ -z "$_px_ok" ]; then
+    _agent_log "🚫 LLM proxy unreachable at ${base} — ABORTING ${AGENT_NAME:-$AGENT} launch (fail-closed: no unmeasured direct fallback)."
+    _agent_log "    Fix:      launchctl kickstart -k gui/\$(id -u)/com.coding.llm-cli-proxy   then relaunch."
+    _agent_log "    Override: CODING_PROXY_ROUTE=0 launches direct (unmeasured) — explicit opt-out only."
+    exit 1
   fi
 
   case "${AGENT_NAME:-$AGENT}" in
