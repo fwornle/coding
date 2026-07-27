@@ -5,6 +5,7 @@
 - ✅ **v7.3 LLM Proxy Performance — Claude CLI Worker Pool** — Phases 62–66 (shipped 2026-06-21)
 - ✅ **v7.4 Performance Measurement System — Cross-agent Token + Route + Outcome Attribution** — Phases 67–75 (100% of phases; complete pending formal `/gsd-complete-milestone` close)
 - ✅ **v7.5 Cross-Agent Comparison Experiment Runner** — Phases 76–87 (shipped 2026-07-13)
+- 🟡 **v7.6 Experiment Harness** — Phase 88+ (in flight)
 
 ## Phases
 
@@ -63,6 +64,12 @@ Turn the v7.4 measurement rig into an experiment tool: a user states a goal plus
 - [x] **Phase 85: Experiment Control Center** — Launch / re-run (same snapshot, param overrides) / monitor / cancel experiments from the performance dashboard (completed 2026-07-09)
 - [x] **Phase 86: Timeline v2 & Performance Page Declutter** — Per-turn story (prompt, tool calls, cache split, context band) + IA cleanup (completed 2026-07-11)
 - [x] **Phase 87: Interactive Spans & Branch Avenues** — Span snapshot from the main agent; forked avenue branches re-running the initial prompt with modified params; compare & merge (gaps_found 2026-07-11 — fork-launch chain not wired end-to-end; see 87-VERIFICATION.md) (completed 2026-07-13)
+
+### 🟡 v7.6 Experiment Harness (Phase 88+) — IN FLIGHT
+
+Harden the cross-agent experiment harness so every agent (claude, copilot, opencode, mastra) launches and is measured under symmetric initial conditions, with a pre-flight gate that catches invocation/model-format mismatches and suppresses probe-text leakage before a cell runs.
+
+- [x] **Phase 88: Experiment Harness — Agent-Invocation Alignment & Pre-flight Gate** — Model-id format alignment + proxy routing per agent, pre-flight probe suppression, and unattended cross-agent re-verify (3 plans)
 
 ## Phase Details
 
