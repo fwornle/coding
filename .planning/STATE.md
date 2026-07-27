@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v7.6
 milestone_name: Experiment Harness
-status: executing
-stopped_at: context exhaustion at 75% (2026-07-26)
+status: completed
+stopped_at: v7.6 Experiment Harness milestone shipped (2026-07-27)
 last_updated: "2026-07-27T05:45:06.000Z"
 last_activity: 2026-07-27
 progress:
