@@ -77,13 +77,28 @@ NC='\033[0m' # No Color
 # Portable `timeout` shim (cross-platform robustness): the many `timeout Ns <cmd>`
 # call sites below assume GNU coreutils `timeout`, which is ABSENT on stock macOS
 # (and on minimal Windows/Git-Bash). Prefer a real `timeout`; else `gtimeout`
-# (coreutils on macOS); else run the command WITHOUT a watchdog so the check still
-# executes (best-effort — we lose only the timeout guard, not the test itself).
+# (coreutils on macOS); else a pure-bash bounded fallback.
 if ! command -v timeout >/dev/null 2>&1; then
     if command -v gtimeout >/dev/null 2>&1; then
         timeout() { gtimeout "$@"; }
     else
-        timeout() { shift; "$@"; }
+        # Pure-bash bounded fallback for boxes with NEITHER `timeout` nor
+        # `gtimeout` (stock macOS, minimal Windows). A background watcher
+        # SIGTERM/SIGKILLs the command once its budget elapses, so a hanging
+        # probe can never stall the whole suite. (An earlier "run unbounded"
+        # fallback caused the macOS CI job to hang on a wedged probe — never
+        # drop the watchdog.)
+        timeout() {
+            local __dur="${1%s}"; shift
+            "$@" &
+            local __pid=$!
+            ( sleep "$__dur" 2>/dev/null; kill -TERM "$__pid" 2>/dev/null
+              sleep 2; kill -KILL "$__pid" 2>/dev/null ) >/dev/null 2>&1 &
+            local __watcher=$!
+            wait "$__pid" 2>/dev/null; local __rc=$?
+            kill -TERM "$__watcher" 2>/dev/null; wait "$__watcher" 2>/dev/null
+            return $__rc
+        }
     fi
 fi
 
