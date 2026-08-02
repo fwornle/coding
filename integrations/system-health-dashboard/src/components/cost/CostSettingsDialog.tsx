@@ -90,7 +90,7 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
             <section>
               <h3 className="text-sm font-semibold mb-2">Model prices — USD / 1M tokens</h3>
               <div className="text-xs text-muted-foreground mb-2">
-                Opus 4.8 seeded at $15 / $75 — confirm against your actual model tier.
+                Opus 4.8 seeded at $5 / $25 — confirm against your actual model tier.
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

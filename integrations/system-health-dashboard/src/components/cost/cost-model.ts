@@ -38,7 +38,7 @@ export const DEFAULT_COST_CONFIG: CostConfig = {
   modelPrices: {
     'claude-haiku-4.5':  { in: 1,   out: 5,   cacheRead: 0.10,  cacheWrite: 1.25 },
     'claude-sonnet-4.6': { in: 3,   out: 15,  cacheRead: 0.30,  cacheWrite: 3.75 },
-    'claude-opus-4.8':   { in: 15,  out: 75,  cacheRead: 1.50,  cacheWrite: 18.75 },
+    'claude-opus-4.8':   { in: 5,   out: 25,  cacheRead: 0.50,  cacheWrite: 6.25 },
     'claude-fable-5':    { in: 10,  out: 50,  cacheRead: 1.00,  cacheWrite: 12.50 },
     'gpt-4o':            { in: 2.5, out: 10,  cacheRead: 1.25,  cacheWrite: 0 },
     'gpt-4o-mini':       { in: 0.15, out: 0.6, cacheRead: 0.075, cacheWrite: 0 },
