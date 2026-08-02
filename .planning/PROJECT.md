@@ -216,4 +216,10 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-13 — v7.5 Cross-Agent Comparison Experiment Runner SHIPPED (all 23 requirements verified; Phases 76–87). The comparison/aggregation/report core (CMP-01/02/03) and the dashboard + installed skill surface (CMP-04/ORCH-01) closed the milestone-audit gaps; the runner was live-verified via the 78-05 cross-agent smoke; 2 code-verified residuals (83 WR-06 copilot-BYOK UAT, 87 AVN-07 numeric-render) accepted-with-documented-limitation. 28 pre-v7.5 artifacts deferred (STATE.md). v7.6 candidate: policy automation / auto-routing consuming this runner's comparisons. v7.4 (Performance Measurement) reached 100% of phases, still pending its own formal close. v7.3 (Worker Pool) shipped 2026-06-21; v7.2/v7.1 previously shipped.*
+*Last updated: 2026-07-27 — v7.6 Experiment Harness SHIPPED (Phase 88; 4/4 requirements — ALIGN-01/PREFLIGHT-01/SUPPRESS-01/REVERIFY-01 — verified, operator sign-off; hardened cross-agent `/experiment` invocation to a single routing seam + fail-soft pre-flight gate + probe/ambient suppression). Next candidate: policy automation / auto-routing consuming the runner's comparisons (reslotted from the original v7.6 earmark). v7.4 (Performance Measurement) still pending its own formal close.*
+
+<details><summary>Previous: 2026-07-13 — v7.5</summary>
+
+*2026-07-13 — v7.5 Cross-Agent Comparison Experiment Runner SHIPPED (all 23 requirements verified; Phases 76–87). The comparison/aggregation/report core (CMP-01/02/03) and the dashboard + installed skill surface (CMP-04/ORCH-01) closed the milestone-audit gaps; the runner was live-verified via the 78-05 cross-agent smoke; 2 code-verified residuals (83 WR-06 copilot-BYOK UAT, 87 AVN-07 numeric-render) accepted-with-documented-limitation. 28 pre-v7.5 artifacts deferred (STATE.md). v7.6 candidate: policy automation / auto-routing consuming this runner's comparisons. v7.4 (Performance Measurement) reached 100% of phases, still pending its own formal close. v7.3 (Worker Pool) shipped 2026-06-21; v7.2/v7.1 previously shipped.*
+
+</details>

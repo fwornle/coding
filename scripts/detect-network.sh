@@ -144,6 +144,85 @@ test_proxy_connectivity() {
 }
 
 # ============================================
+# proxydetox Liveness Guarantee (2026-08-02)
+# ============================================
+# The 2026-07-25 redesign pins every session to the ALWAYS-ON local adaptive
+# proxy on 127.0.0.1:3128. That invariant only holds if proxydetox is actually
+# alive — otherwise the pin points a session at a dead proxy and /login OAuth
+# fails with `ECONNREFUSED 127.0.0.1:3128` (observed 2026-08-02).
+#
+# proxydetox is a *socket-activated* launchd job (cc.colorto.proxydetox):
+# launchd owns the :3128 listening socket and spawns proxydetox on demand; the
+# process exits when idle. So a high `runs` count and `job state = exited` are
+# NORMAL, not a fault.
+#
+# The failure mode this heals: the launchd job is LOADED but the :3128 socket is
+# no longer bound (nothing listens → every request ECONNREFUSED). Empirically a
+# plain `launchctl kickstart` does NOT rebind the socket — only a full
+# `bootout` + `bootstrap` re-registers it (the bootstrap may print a benign
+# "Input/output error" (rc 5) mid-re-registration; ignored on purpose). The OLD
+# guard ("bootstrap only if the job is absent from `launchctl list`") never
+# fired in this loaded-but-dead state, so a crashed proxydetox stayed dead.
+# Requires no sudo: a user can bootstrap the root-owned /Library/LaunchAgents
+# plist into their own gui/<uid> domain (verified live).
+#
+# Returns 0 iff a real request THROUGH :3128 succeeds (ground truth, not a mere
+# port check — a bound-but-broken proxy must count as down); 1 otherwise.
+ensure_proxydetox_up() {
+  local px_url="http://127.0.0.1:3128"
+  local plist="/Library/LaunchAgents/cc.colorto.proxydetox.plist"
+  local label="cc.colorto.proxydetox"
+  local uid_gui="gui/$(id -u)"
+
+  # Fast path: already functional — no launchd surgery on the happy path.
+  if timeout 8 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${REACHABILITY_HOST}" 2>/dev/null; then
+    return 0
+  fi
+
+  # Only macOS ships the launchd job; elsewhere we cannot heal it.
+  if [ "$(uname -s)" != "Darwin" ]; then
+    return 1
+  fi
+  if [ ! -f "$plist" ]; then
+    log "proxydetox plist missing ($plist) — cannot heal; will fall back to direct"
+    return 1
+  fi
+
+  log "proxydetox on :3128 not functional — healing (launchd socket re-register)"
+
+  local attempt
+  for attempt in 1 2 3; do
+    if ! launchctl print "$uid_gui/$label" >/dev/null 2>&1; then
+      # Not loaded at all → plain bootstrap.
+      log "  proxydetox[$attempt]: not loaded — bootstrapping launchd job"
+      launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null \
+        || launchctl load "$plist" 2>/dev/null || true
+    else
+      # Loaded but socket dead → tear down and re-register so launchd rebinds
+      # :3128. bootout is async, so give it a beat before bootstrap.
+      log "  proxydetox[$attempt]: loaded but :3128 dead — bootout + bootstrap"
+      launchctl bootout "$uid_gui/$label" 2>/dev/null || true
+      sleep 1
+      launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null || true
+    fi
+
+    # Force-spawn the socket-activated job, then a triggering request activates
+    # the launchd socket → proxydetox binds :3128 and serves the probe.
+    launchctl kickstart "$uid_gui/$label" 2>/dev/null || true
+    sleep 1
+
+    if timeout 10 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${REACHABILITY_HOST}" 2>/dev/null; then
+      log "✅ proxydetox healed — :3128 functional (attempt $attempt)"
+      return 0
+    fi
+    sleep 1
+  done
+
+  log "⚠️  proxydetox could not be brought up on :3128 after 3 heal attempts"
+  return 1
+}
+
+# ============================================
 # Auto-Configure Proxy (2026-07-25 redesign)
 # ============================================
 # Agent sessions freeze their env at launch, but the user roams CN/VPN/home
@@ -165,19 +244,13 @@ configure_proxy_if_needed() {
   local px_url="http://127.0.0.1:3128"
   local no_proxy_val="localhost,127.0.0.1,::1,.bmwgroup.net"
 
-  if [ "$PLATFORM" = "macos" ]; then
-    # Ensure the proxydetox launchd job is loaded (socket-activated: once
-    # loaded, launchd owns :3128 and spawns proxydetox on demand — "always on").
-    if ! launchctl list 2>/dev/null | grep -q cc.colorto.proxydetox; then
-      log "proxydetox not loaded — bootstrapping launchd job"
-      launchctl bootstrap "gui/$(id -u)" /Library/LaunchAgents/cc.colorto.proxydetox.plist 2>/dev/null || \
-        launchctl load /Library/LaunchAgents/cc.colorto.proxydetox.plist 2>/dev/null || true
-      sleep 1
-    fi
-  fi
-
-  # Functional probe THROUGH the local proxy (not just a port check).
-  if timeout 8 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${REACHABILITY_HOST}" 2>/dev/null; then
+  # Guarantee the always-on local adaptive proxy is actually alive — heals a
+  # crashed / socket-unbound proxydetox rather than merely probing it. Runs
+  # regardless of px on/off intent and regardless of CN: the whole point of the
+  # redesign is that a session pinned to :3128 is correct in EVERY network
+  # state, so :3128 must be up for the pin to be valid (this is what the user's
+  # `px` toggle being OFF must NOT undermine — the daemon stays live either way).
+  if ensure_proxydetox_up; then
     export HTTP_PROXY="$px_url" HTTPS_PROXY="$px_url"
     export http_proxy="$px_url" https_proxy="$px_url"
     export NO_PROXY="$no_proxy_val" no_proxy="$no_proxy_val"
@@ -185,9 +258,11 @@ configure_proxy_if_needed() {
     return 0
   fi
 
-  # Local adaptive proxy not usable — fall back to direct (correct off-CN;
-  # on CN this will fail loudly in validate_agent_connectivity, which is the
-  # honest outcome: nothing we pin here would work either).
+  # proxydetox is genuinely unreachable even after healing — DO NOT pin a dead
+  # proxy (pinning one is exactly what made /login fail with
+  # ECONNREFUSED 127.0.0.1:3128). Fall back to direct: correct off-CN; on CN it
+  # fails loudly in validate_agent_connectivity, which is the honest outcome —
+  # nothing we could pin here would work either.
   unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
   export NO_PROXY="$no_proxy_val" no_proxy="$no_proxy_val"
   if [ "$INSIDE_CN" = "true" ]; then

@@ -45,6 +45,16 @@ SANDBOX_MODE=false
 SKIP_ALL_SYSTEM_CHANGES=false
 SKIPPED_SYSTEM_DEPS=()
 
+# Unattended / CI controls (set by parse_args / env in main).
+#   NON_INTERACTIVE  — never block on a prompt; take documented defaults.
+#   ASSUME_YES       — auto-approve confirm_system_change prompts (--yes).
+#   CI_LITE          — downgrade missing-infra HARD gates (Docker, agent CLI,
+#                      core deps) to warnings so a portability run completes and
+#                      reports a summary instead of aborting at the first gap.
+NON_INTERACTIVE=false
+ASSUME_YES=false
+CI_LITE=false
+
 # Safety: Confirm before any system-level modification
 # Usage: confirm_system_change "action description" "risk warning"
 # Returns: 0 if approved, 1 if declined
@@ -54,6 +64,16 @@ confirm_system_change() {
 
     # Skip if user already chose to skip all
     if [[ "$SKIP_ALL_SYSTEM_CHANGES" == "true" ]]; then
+        return 1
+    fi
+
+    # Unattended paths: --yes approves, --ci/--non-interactive declines (safe).
+    if [[ "$ASSUME_YES" == "true" ]]; then
+        info "[--yes] auto-approving system change: $action"
+        return 0
+    fi
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        info "[non-interactive] declining optional system change: $action"
         return 1
     fi
 
@@ -198,7 +218,15 @@ detect_sandbox_mode() {
             echo -e "  ${BLUE}source $current_install/.activate${NC}"
             echo ""
 
-            read -p "$(echo -e ${YELLOW}Continue with sandbox installation? [y/N]: ${NC})" response
+            # Unattended: proceed with the sandbox install (it is non-mutating
+            # by design). Interactive behaviour is unchanged (empty = cancel).
+            local response
+            if [[ "$NON_INTERACTIVE" == "true" ]]; then
+                response="y"
+                info "[non-interactive] proceeding with sandbox installation"
+            else
+                read -p "$(echo -e ${YELLOW}Continue with sandbox installation? [y/N]: ${NC})" response || response="n"
+            fi
             case "$response" in
                 [yY][eE][sS]|[yY])
                     info "Proceeding with sandbox installation..."
@@ -553,12 +581,21 @@ handle_non_mirrored_repo_cn() {
                 echo "  - Install Node.js: https://nodejs.org/"
                 echo "  - Install Python: https://www.python.org/downloads/"
                 echo "  - Install jq: https://stedolan.github.io/jq/download/"
+                echo "  - Install tmux: use WSL, or 'pacman -S tmux' under MSYS2"
+                echo "  - Install PlantUML: https://plantuml.com/download (needs Java)"
                 ;;
         esac
-        exit 1
+        if [[ "$CI_LITE" == "true" ]]; then
+            warning "Missing core dependencies (${missing_deps[*]}) — continuing (CI-lite portability run)"
+            INSTALLATION_FAILURES+=("Core dependencies missing: ${missing_deps[*]}")
+        else
+            exit 1
+        fi
     fi
-    
-    success "All required dependencies are installed"
+
+    if [[ ${#missing_deps[@]} -eq 0 ]]; then
+        success "All required dependencies are installed"
+    fi
 }
 
 # Install memory-visualizer (git submodule)
@@ -821,7 +858,7 @@ ENVEOF
     else
         # Migrate legacy direct-Groq .env entries to the proxy route
         if grep -q "api.groq.com" "$CODE_GRAPH_RAG_DIR/.env"; then
-            warn "code-graph-rag .env still points at api.groq.com — re-run with the file removed to regenerate proxy-routed config"
+            warning "code-graph-rag .env still points at api.groq.com — re-run with the file removed to regenerate proxy-routed config"
         fi
     fi
 
@@ -1452,11 +1489,11 @@ initialize_shared_memory() {
             if timeout 60 node bin/graph-sync import 2>&1 | grep -E "^✓|entities|relations" | head -10; then
                 success "Knowledge imported from JSON exports to GraphDB"
             else
-                warn "Knowledge import encountered issues (non-fatal)"
+                warning "Knowledge import encountered issues (non-fatal)"
             fi
             cd - > /dev/null
         else
-            warn "Node.js not available - skipping knowledge import"
+            warning "Node.js not available - skipping knowledge import"
         fi
     elif [[ "$json_exports_exist" == "true" ]]; then
         info "GraphDB already has data, skipping JSON import"
@@ -1670,6 +1707,11 @@ detect_agents() {
     fi
     
     if [ ${#agents_found[@]} -eq 0 ]; then
+        if [[ "$CI_LITE" == "true" ]]; then
+            warning "No coding agent CLI (Claude Code / GitHub Copilot) found — continuing (CI-lite portability run)"
+            INSTALLATION_FAILURES+=("No coding agent CLI found")
+            return 0
+        fi
         error_exit "No supported coding agents found. Please install Claude Code or GitHub CoPilot."
         return 1
     fi
@@ -1734,10 +1776,20 @@ configure_docker_mode() {
     echo "monitor, the LLM proxy on :12435, and bin/init-history.sh."
 
     if ! command -v docker &>/dev/null; then
+        if [[ "$CI_LITE" == "true" ]]; then
+            warning "Docker not installed — skipping Docker setup (CI-lite portability run)"
+            INSTALLATION_FAILURES+=("Docker not installed (image build skipped)")
+            return 0
+        fi
         error_exit "Docker is required but not installed. Install Docker Desktop first: https://www.docker.com/products/docker-desktop"
     fi
 
     if ! docker info &>/dev/null; then
+        if [[ "$CI_LITE" == "true" ]]; then
+            warning "Docker daemon not running — skipping Docker setup (CI-lite portability run)"
+            INSTALLATION_FAILURES+=("Docker daemon not running (image build skipped)")
+            return 0
+        fi
         error_exit "Docker daemon is not running. Start Docker Desktop, then re-run install.sh."
     fi
 
@@ -1781,7 +1833,7 @@ install_plantuml() {
     echo -e "  ${GREEN}2${NC} = System package manager (brew/apt-get)"
     echo -e "  ${GREEN}3${NC} = Skip PlantUML (diagram generation won't work)"
     echo ""
-    read -p "$(echo -e ${CYAN}Your choice [1/2/3]: ${NC})" plantuml_choice
+    read_or_default plantuml_choice "" "$(echo -e ${CYAN}Your choice [1/2/3]: ${NC})"
 
     case "$plantuml_choice" in
         1)
@@ -2056,7 +2108,7 @@ setup_local_llm() {
         echo -e "  ${GREEN}y${NC} = Enable DMR on port ${dmr_port}"
         echo -e "  ${GREEN}n${NC} = Skip (coding tools will use cloud APIs only)"
         echo ""
-        read -p "$(echo -e ${CYAN}Enable Docker Model Runner? [y/N]: ${NC})" enable_dmr_choice
+        read_or_default enable_dmr_choice "n" "$(echo -e ${CYAN}Enable Docker Model Runner? [y/N]: ${NC})"
 
         case "$enable_dmr_choice" in
             [yY]|[yY][eE][sS])
@@ -2330,7 +2382,7 @@ install_ollama() {
     echo -e "  ${GREEN}y${NC} = Install Ollama"
     echo -e "  ${GREEN}n${NC} = Skip"
     echo ""
-    read -p "$(echo -e ${CYAN}Install Ollama? [y/N]: ${NC})" install_ollama_choice
+    read_or_default install_ollama_choice "n" "$(echo -e ${CYAN}Install Ollama? [y/N]: ${NC})"
 
     case "$install_ollama_choice" in
         [yY]|[yY][eE][sS])
@@ -2674,14 +2726,14 @@ EOF
     local repo_url=""
     if [[ -n "$existing" ]]; then
         echo "  Currently configured: $existing"
-        read -r -p "  Keep this URL? [Y/n]: " keep
+        read_or_default keep "Y" "  Keep this URL? [Y/n]: "
         if [[ -z "${keep:-}" || "${keep}" =~ ^[Yy]$ ]]; then
             repo_url="$existing"
         else
-            read -r -p "  New private history repo URL [blank to skip]: " repo_url
+            read_or_default repo_url "" "  New private history repo URL [blank to skip]: "
         fi
     else
-        read -r -p "  Private history repo URL [blank to skip]: " repo_url
+        read_or_default repo_url "" "  Private history repo URL [blank to skip]: "
     fi
 
     if [[ -z "$repo_url" ]]; then
@@ -2741,7 +2793,78 @@ EOF
     fi
 }
 
+show_usage() {
+    cat <<EOF
+Agent-Agnostic Coding Tools — Universal Installer
+
+USAGE:
+  ./install.sh [OPTIONS]
+
+OPTIONS:
+  -y, --yes                 Unattended: auto-approve system changes, never prompt.
+      --ci, --non-interactive
+                            Unattended: never prompt (take safe defaults, DECLINE
+                            optional system changes) AND downgrade missing-infra
+                            gates (Docker / agent CLI / core deps) from fatal to
+                            warnings, so a portability run completes with a summary.
+  -h, --help                Show this help and exit.
+
+ENVIRONMENT:
+  CI=true                   Same as --ci (auto-detected on CI runners).
+  CODING_INSTALL_YES=1      Same as --yes.
+  CODING_INSTALL_CI=1       Same as --ci.
+
+Default (no flags) is the interactive install: prompts work as before and
+missing Docker / agent CLI / core dependencies abort with guidance.
+EOF
+}
+
+# parse_args — populate the unattended-mode globals from flags + environment.
+# Unknown flags are warned-and-ignored (preserves the historically lenient
+# behaviour; e.g. a stray --skip-hooks must never abort the root installer).
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--yes)                    ASSUME_YES=true; NON_INTERACTIVE=true ;;
+            --ci|--non-interactive)      NON_INTERACTIVE=true; CI_LITE=true ;;
+            -h|--help)                   show_usage; exit 0 ;;
+            --skip-hooks)                : ;;  # accepted, no-op at root level
+            *)                           warning "Unknown option: $1 (ignored)" ;;
+        esac
+        shift
+    done
+
+    # Environment overrides (CI systems set CI=true).
+    [[ "${CI:-}" == "true" ]] && { NON_INTERACTIVE=true; CI_LITE=true; }
+    [[ -n "${CODING_INSTALL_YES:-}" ]] && { ASSUME_YES=true; NON_INTERACTIVE=true; }
+    [[ -n "${CODING_INSTALL_CI:-}" ]] && { NON_INTERACTIVE=true; CI_LITE=true; }
+
+    # No controlling TTY on stdin → force non-interactive so `read` under
+    # `set -e` can never abort on EOF (the failure mode of piped/CI runs).
+    [[ -t 0 ]] || NON_INTERACTIVE=true
+
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        info "Running non-interactively (assume_yes=$ASSUME_YES, ci_lite=$CI_LITE)"
+    fi
+}
+
+# read_or_default VAR DEFAULT PROMPT...
+# Interactive behaviour is byte-identical to a bare `read -r -p` (the user's
+# input, including empty, is preserved). Only NON_INTERACTIVE or an EOF on stdin
+# substitutes DEFAULT — so no prompt can abort an unattended run under `set -e`.
+read_or_default() {
+    local __var="$1" __def="$2"; shift 2
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        printf -v "$__var" '%s' "$__def"
+        return 0
+    fi
+    local __reply
+    read -r -p "$*" __reply || __reply="$__def"
+    printf -v "$__var" '%s' "$__reply"
+}
+
 main() {
+    parse_args "$@"
     echo -e "${PURPLE}🚀 Agent-Agnostic Coding Tools - Universal Installer${NC}"
     echo -e "${PURPLE}=====================================================${NC}"
     echo ""
@@ -3184,7 +3307,7 @@ install_skills() {
         "$CODING_REPO/scripts/generate-agent-instructions.sh" "$CODING_REPO" "$CODING_REPO"
         success "Skills synced to Claude (global), Copilot, and OpenCode"
     else
-        warn "scripts/generate-agent-instructions.sh not found or not executable"
+        warning "scripts/generate-agent-instructions.sh not found or not executable"
     fi
 }
 
@@ -3548,5 +3671,8 @@ EOF
     fi
 }
 
-# Run main function
-main "$@"
+# Run main function — only when executed directly, so the script can be sourced
+# (e.g. by tests / CI) to exercise individual functions without installing.
+if [[ "$SCRIPT_EXECUTED" == "true" ]]; then
+    main "$@"
+fi
