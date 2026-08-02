@@ -63,7 +63,7 @@ The system implements a robust 6-layer monitoring protection with 9 core classes
 
 #### Layer 3: HealthVerifier (`scripts/health-verifier.js`)
 - Core verification engine with 15-second periodic checks
-- Checks databases (LevelDB, Qdrant, SQLite, Memgraph, CGR Cache), services, processes
+- Checks databases (LevelDB, Qdrant, SQLite), graphify graph freshness, services, processes
 - Generates health scores (0-100) per service
 - Triggers auto-healing via HealthRemediationActions
 - **Daemon Robustness**: Heartbeat mechanism, error handlers, and external watchdog
@@ -273,11 +273,11 @@ The system includes a real-time web-based health dashboard accessible at `http:/
 
 **Monitoring Cards:**
 
-1. **Databases** (LevelDB, Qdrant, CGR Cache)
+1. **Databases** (LevelDB, Qdrant, Graphify graph freshness)
    - Real-time connection status
    - Lock detection and ownership tracking
    - Availability monitoring
-   - CGR Cache staleness tracking (commits behind, threshold-based alerts)
+   - Graphify graph freshness tracking (`built_at_commit` vs `HEAD`, threshold-based alerts)
 
 2. **Services** (VKB Server, Constraint Monitor, Dashboard)
    - Port connectivity checks

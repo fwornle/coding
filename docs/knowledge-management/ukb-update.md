@@ -98,7 +98,7 @@ When triggered, the MCP semantic-analysis server executes a coordinated workflow
 **Data Extraction Agents:**
 1. **GitHistoryAgent** - LLM-powered commit pattern analysis and evolution extraction
 2. **VibeHistoryAgent** - Analyzes session logs with LLM context extraction
-3. **CodeGraphAgent** - AST-based indexing via Memgraph (requires Docker)
+3. **CodeGraphAgent** - AST-based indexing via graphify's static `graph.json`
 
 **Analysis & Enrichment Agents:**
 4. **SemanticAnalysisAgent** - Deep semantic analysis with LLM fallback chain

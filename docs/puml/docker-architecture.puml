@@ -13,7 +13,6 @@ rectangle "HOST (Native)" as host #F5F5F5 {
     package "Stdio Proxies" <<util>> {
         component "semantic-analysis\nproxy" as sa_proxy <<util>>
         component "constraint-monitor\nproxy" as cm_proxy <<util>>
-        component "code-graph-rag\nproxy" as cgr_proxy <<util>>
     }
 
     component "LLM CLI Proxy\n:12435" <<api>> as llm_proxy
@@ -39,7 +38,7 @@ rectangle "DOCKER CONTAINERS" as docker #E3F2FD {
         package "MCP Servers (HTTP/SSE)" {
             component "semantic-analysis\n:3848" as sa_sse <<api>>
             component "constraint-monitor\n:3849" as cm_sse <<api>>
-            component "code-graph-rag\n:3850" as cgr_sse <<api>>
+            component "graphify\n:3851 (/mcp)" as graphify <<api>>
         }
 
         package "Web Services" {
@@ -52,7 +51,6 @@ rectangle "DOCKER CONTAINERS" as docker #E3F2FD {
     package "Databases" <<storage>> {
         database "Qdrant\n:6333/:6334" as qdrant
         database "Redis\n:6379" as redis
-        database "Memgraph\n:7687/:3100" as memgraph
     }
 }
 
@@ -61,6 +59,7 @@ rectangle "DOCKER CONTAINERS" as docker #E3F2FD {
 ' ============================================
 rectangle "Volume Mounts" as volumes #FFF9C4 {
     storage "/coding/.data" as data_vol
+    storage ".data/graphify/graph.json\n(static, bind-mounted)" as graphjson
     storage "/coding/.specstory" as specstory_vol
     storage "/workspace (ro)" as workspace_vol
 }
@@ -72,18 +71,22 @@ rectangle "Volume Mounts" as volumes #FFF9C4 {
 ' Claude to Proxies (stdio)
 claude SYNC_LINE sa_proxy : stdio
 claude SYNC_LINE cm_proxy : stdio
-claude SYNC_LINE cgr_proxy : stdio
+
+' Claude to graphify (HTTP MCP directly, no stdio proxy)
+claude ASYNC_LINE graphify : "HTTP MCP /mcp"
 
 ' Proxies to SSE Servers (HTTP)
 sa_proxy ASYNC_LINE sa_sse : HTTP/SSE
 cm_proxy ASYNC_LINE cm_sse : HTTP/SSE
-cgr_proxy ASYNC_LINE cgr_sse : HTTP/SSE
 
-' MCP Servers to Databases
+' MCP Servers to Databases / graph
 sa_sse DATA_LINE qdrant
 cm_sse DATA_LINE qdrant
 cm_sse DATA_LINE redis
-cgr_sse DATA_LINE memgraph
+
+' graphify + semantic-analysis read the static graph.json
+graphify DATA_LINE graphjson : "reads (static)"
+sa_sse DATA_LINE graphjson : "analyze_code_graph"
 
 ' Web Services to Databases
 vkb DATA_LINE qdrant

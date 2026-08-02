@@ -1057,6 +1057,27 @@ else
     print_fixed "Semantic analysis submodule initialized and built"
 fi
 
+print_check "Graphify code-graph engine (git submodule, runs in coding-services)"
+if dir_exists "$CODING_ROOT/integrations/graphify"; then
+    print_pass "Graphify submodule found"
+
+    print_check "Graphify graph.json"
+    if [ -f "$CODING_ROOT/.data/graphify/graphify-out/graph.json" ]; then
+        print_pass "Graphify graph.json present"
+    else
+        print_info "Graphify graph.json not built yet (built on first coding-services start or via the dashboard Re-index button)"
+    fi
+
+    print_check "Graphify HTTP MCP (port 3851)"
+    if lsof -i :3851 -sTCP:LISTEN >/dev/null 2>&1 || curl -s -o /dev/null --max-time 3 http://localhost:3851/mcp 2>/dev/null; then
+        print_pass "Graphify MCP endpoint reachable (http://localhost:3851/mcp)"
+    else
+        print_info "Graphify MCP not running (starts with the coding-services container)"
+    fi
+else
+    print_info "Graphify submodule not found (run: git submodule update --init integrations/graphify)"
+fi
+
 print_check "MCP Constraint Monitor with Professional Dashboard"
 CONSTRAINT_MONITOR_DIR="$CODING_ROOT/integrations/mcp-constraint-monitor"
 if dir_exists "$CONSTRAINT_MONITOR_DIR"; then

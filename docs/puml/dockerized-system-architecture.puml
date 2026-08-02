@@ -21,6 +21,7 @@ rectangle "Host Machine (macOS)" as host {
 
   rectangle "Bind Mounts" as mounts {
     folder ".data/" as data_mount
+    folder ".data/graphify/\ngraph.json (static)" as graph_mount
     folder ".specstory/" as spec_mount
     folder ".env" as env_mount
     folder "~/Agentic/" as workspace_mount
@@ -37,7 +38,7 @@ rectangle "Docker Network: coding-network (bridge)" as network {
     rectangle "MCP Servers (SSE)" as mcp_group {
       component "Semantic Analysis\n:3848" <<api>> as sem
       component "Constraint Monitor\n:3849" <<api>> as constraint
-      component "Code-Graph-RAG\n:3850" <<api>> as cgr
+      component "graphify\n:3851 (/mcp)" <<api>> as graphify
     }
 
     rectangle "Web Services" as web_group {
@@ -56,14 +57,12 @@ rectangle "Docker Network: coding-network (bridge)" as network {
   ' Database containers
   database "Qdrant\n:6333/:6334\n(Vector DB)" <<storage>> as qdrant
   database "Redis\n:6379\n(Cache)" <<storage>> as redis
-  database "Memgraph\n:7687\n(Graph DB)" <<storage>> as memgraph
 }
 
 ' Docker managed volumes
 rectangle "Docker Volumes" as volumes {
   storage "qdrant-data" as qvol
   storage "redis-data" as rvol
-  storage "memgraph-data" as mvol
 }
 
 ' Connections
@@ -73,7 +72,7 @@ agentapi --> claude
 agentapi --> copilot
 claude ASYNC_LINE sem : "SSE/HTTP"
 claude ASYNC_LINE constraint : "SSE/HTTP"
-claude ASYNC_LINE cgr : "SSE/HTTP"
+claude ASYNC_LINE graphify : "HTTP MCP /mcp"
 copilot ASYNC_LINE sem : "HTTP fallback"
 
 dev --> health_ui : "http://localhost:3032"
@@ -86,7 +85,8 @@ supervisor --> mon_group : manages
 
 sem --> qdrant : "vectors"
 sem --> redis : "cache"
-cgr --> memgraph : "code graph"
+graphify --> graph_mount : "reads graph.json (static)"
+sem --> graph_mount : "analyze_code_graph"
 vkb --> qdrant : "search"
 constraint --> qdrant : "embeddings"
 constraint --> redis : "state"
@@ -96,7 +96,6 @@ verifier DATA_LINE health_api : "status files"
 
 qdrant --> qvol
 redis --> rvol
-memgraph --> mvol
 
 data_mount ..> cs_container : "/coding/.data"
 spec_mount ..> cs_container : "/coding/.specstory"

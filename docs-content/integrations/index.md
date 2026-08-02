@@ -42,19 +42,19 @@ MCP servers and tools that extend the coding infrastructure.
 
     [:octicons-arrow-right-24: Details](constraint-monitor.md)
 
--   :material-graph:{ .lg .middle } **Code Graph RAG**
+-   :material-graph:{ .lg .middle } **Graphify**
 
     ---
 
-    AST-based code search with Memgraph graph database.
+    tree-sitter static code graph (file-based `graph.json`, no database).
 
     - Call graph analysis
-    - Natural language queries
-    - Similar code finding
+    - Structural / natural language queries
+    - Shortest-path finding
 
-    **Port**: 3850 (Docker)
+    **Port**: 3851 (HTTP MCP, in `coding-services`)
 
-    [:octicons-arrow-right-24: Details](code-graph-rag.md)
+    [:octicons-arrow-right-24: Details](graphify.md)
 
 -   :material-view-dashboard:{ .lg .middle } **Dashboard**
 
@@ -124,12 +124,10 @@ MCP servers and tools that extend the coding infrastructure.
 |---------|------|----------|--------------|
 | Semantic Analysis | 3848 | HTTP/SSE | `/health` |
 | Constraint Monitor | 3030/3031/3849 | HTTP | `/health` |
-| Code Graph RAG | 3850 | HTTP/SSE | `/health` |
+| Graphify | 3851 | HTTP MCP | N/A |
 | VKB Server | 8080 | HTTP | `/health` |
 | Health Dashboard | 3032 | HTTP | `/health` |
 | Health API | 3033 | HTTP | `/health` |
-| Memgraph | 7687 | Bolt | N/A |
-| Memgraph Lab | 3100 | HTTP | N/A |
 | Qdrant | 6333/6334 | HTTP/gRPC | `/health` |
 | LLM Proxy Bridge | 12435 | HTTP | `/health` |
 | Observations API (mounts km-core `/api/km/`) | 12436 | HTTP | `/health` |
@@ -145,11 +143,11 @@ flowchart TB
     CC[Claude Code] --> MCP{MCP Protocol}
     MCP --> SA[Semantic Analysis]
     MCP --> CM[Constraint Monitor]
-    MCP --> CGR[Code Graph RAG]
+    MCP --> CGR[Graphify]
 
     SA --> GDB[(GraphDB)]
     SA --> QD[(Qdrant)]
-    CGR --> MG[(Memgraph)]
+    CGR --> GJ[graph.json]
     CM --> CMDB[(Violations DB)]
 
     GDB --> VKB[VKB Dashboard]
@@ -200,14 +198,16 @@ Each MCP server provides tools accessible within Claude sessions:
 | `get_constraint_status` | Current compliance metrics |
 | `update_constraints` | Modify constraint rules |
 
-### Code Graph RAG Tools
+### Graphify Tools
 
 | Tool | Purpose |
 |------|---------|
-| `query_code_graph` | Natural language queries |
-| `index_repository` | Build code graph |
-| `get_code_snippet` | Retrieve source code |
-| `comprehensive_analysis` | Deep code analysis |
+| `query_graph` | Structural / natural language queries |
+| `get_node` | Retrieve a single node by id |
+| `get_neighbors` | List a node's neighbours |
+| `shortest_path` | Shortest path between two nodes |
+| `graph_stats` | Graph size and shape statistics |
+| `god_nodes` | Most-connected hub nodes |
 
 ---
 
@@ -215,7 +215,7 @@ Each MCP server provides tools accessible within Claude sessions:
 
 ```bash
 # Check all health endpoints
-for port in 3848 3849 3850 8080 3032; do
+for port in 3848 3849 8080 3032; do
   echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status // "N/A"')"
 done
 

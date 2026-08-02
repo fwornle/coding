@@ -60,7 +60,7 @@ package "Phase 4: Classification & Linking" <<frame>> {
     [LLM Doc-Code Matching] <<core>>
   }
   rectangle "CodeGraphAgent" <<agent>> as codegraph {
-    [AST + External LLM] <<external>>
+    [graph.json + LLM] <<external>>
   }
 }
 
@@ -89,7 +89,7 @@ package "Phase 6: Storage & Dedup" <<frame>> {
 package "External Services" {
   cloud "LLM Chain\n(Groq→Anthropic→OpenAI)" <<external>> as llm
   cloud "OpenAI Embeddings" <<external>> as embeddings
-  database "Memgraph" <<storage>> as memgraph
+  database "graphify graph.json\n(static)" <<storage>> as graphjson
   database "GraphDB" <<storage>> as graphdb
 }
 
@@ -130,7 +130,7 @@ codegraph ..> llm
 ' Storage connections
 persist --> graphdb
 dedup ..> embeddings
-codegraph ..> memgraph
+codegraph ..> graphjson : "reads (static)"
 
 note right of coordinator
   **Workflow Engine**

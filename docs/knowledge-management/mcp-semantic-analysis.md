@@ -57,10 +57,10 @@ When triggered, the MCP semantic-analysis server executes a coordinated workflow
 - Identifies problem-solution pairs
 
 #### 3. **CodeGraphAgent**
-- AST-based code analysis via Memgraph
+- AST-based code analysis over graphify's static `graph.json`
 - Function call graphs and dependencies
 - Natural language queries about code structure
-- Requires Docker (Memgraph)
+- Reads the file-based graph (no database required)
 
 ### Analysis & Enrichment Agents
 

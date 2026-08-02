@@ -18,7 +18,7 @@ rectangle "MCP Protocol (SSE/HTTP)" as mcp_layer {
   interface ":3848" as p3848
   interface ":3847" as p3847
   interface ":3849" as p3849
-  interface ":3850" as p3850
+  interface ":3851" as p3851
 }
 
 ' ============================================
@@ -26,7 +26,7 @@ rectangle "MCP Protocol (SSE/HTTP)" as mcp_layer {
 ' ============================================
 rectangle "AI & Analysis Services" as ai_services {
   component "Semantic\nAnalysis" <<agent>> as sem
-  component "Code-Graph\nRAG" <<agent>> as cgr
+  component "graphify" <<agent>> as graphify
   component "Constraint\nMonitor" <<core>> as cm
   component "Browser\nAccess" <<api>> as ba
 }
@@ -46,7 +46,7 @@ rectangle "Knowledge Management Pipeline" as km_pipe {
 rectangle "Storage Layer" as storage {
   database "Qdrant\n(Vectors)" <<storage>> as qdrant
   database "Redis\n(Cache/State)" <<storage>> as redis
-  database "Memgraph\n(Code Graph)" <<storage>> as memgraph
+  database "graph.json\n(static, .data/graphify)" <<storage>> as graphjson
   database "LevelDB\n(Knowledge Graph)" <<storage>> as leveldb
 }
 
@@ -56,7 +56,6 @@ rectangle "Storage Layer" as storage {
 rectangle "UI & Monitoring" as ui_layer {
   component "VKB Viewer\n:8080" <<core>> as vkb
   component "Health Dashboard\n:3032" <<api>> as health
-  component "Memgraph Lab\n:3100" <<external>> as mglab
 }
 
 ' ============================================
@@ -65,19 +64,20 @@ rectangle "UI & Monitoring" as ui_layer {
 claude --> p3848
 claude --> p3847
 claude --> p3849
-claude --> p3850
+claude --> p3851
 
 p3848 --> sem
 p3847 --> ba
 p3849 --> cm
-p3850 --> cgr
+p3851 --> graphify
 
 ' ============================================
 ' Connections - Service to Storage
 ' ============================================
 sem DATA_LINE qdrant : "embeddings\n& search"
 sem DATA_LINE redis : "response\ncache"
-cgr DATA_LINE memgraph : "AST nodes\n& relations"
+graphify DATA_LINE graphjson : "code-graph\nqueries (static)"
+sem DATA_LINE graphjson : "analyze_code_graph"
 cm DATA_LINE qdrant : "constraint\nembeddings"
 cm DATA_LINE redis : "enforcement\nstate"
 
@@ -96,7 +96,6 @@ onto DATA_LINE qdrant : "similarity"
 ' ============================================
 dev --> vkb : "browse\nknowledge"
 dev --> health : "monitor\nsystem"
-dev --> mglab : "explore\ncode graph"
 
 vkb DATA_LINE leveldb : "graph data"
 vkb DATA_LINE qdrant : "search"

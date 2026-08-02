@@ -24,7 +24,7 @@ Each integration component:
 **What it provides:**
 - 14 specialized AI agents for code analysis (including code graph and ontology classification)
 - Repository scanning and pattern extraction
-- AST-based code indexing via Memgraph
+- Code graph analysis backed by graphify's static `graph.json`
 - Ontology classification for knowledge entities
 - PlantUML diagram generation
 - Knowledge base synchronization
@@ -46,19 +46,19 @@ Each integration component:
 
 ### Code Analysis
 
-#### Code Graph RAG
-**Location**: `integrations/code-graph-rag/`
+#### Graphify
+**Location**: `integrations/graphify/`
 
 **What it provides:**
-- Graph-based code analysis using Memgraph
-- Semantic code search and relationship mapping
+- File-based code graph — tree-sitter parses source into a static `graph.json` (NetworkX node-link), no database
+- Structural code search and relationship mapping
 - Call graph analysis and dependency tracing
-- MCP tools for querying code structure
-- Visual graph exploration via Memgraph Lab
+- HTTP MCP tools for querying code structure (`query_graph`, `get_node`, `get_neighbors`, `shortest_path`, `graph_stats`, `god_nodes`)
+- Runs inside `coding-services`; host access via the `bin/graphify` shim
 
-**Ports**: Memgraph (7687), Lab UI (3100) - configured in `.env.ports`
+**Port**: Graphify MCP (3851, HTTP) - configured in `.env.ports`
 
-**Documentation**: [code-graph-rag.md](code-graph-rag.md) | [GitHub](https://github.com/anthropics/code-graph-rag)
+**Documentation**: [graphify.md](graphify.md)
 
 ### Editor Integration
 
@@ -162,9 +162,9 @@ MCP servers are configured in Claude Code's config:
       "command": "node",
       "args": ["/path/to/coding/integrations/mcp-constraint-monitor/src/mcp-server.js"]
     },
-    "code-graph-rag": {
-      "command": "node",
-      "args": ["/path/to/coding/integrations/code-graph-rag/build/index.js"]
+    "graphify": {
+      "type": "http",
+      "url": "http://localhost:3851/mcp"
     }
   }
 }

@@ -90,9 +90,9 @@ echo $PATH | grep -q "Agentic/coding/bin" && echo "OK" || echo "Missing from PAT
 docker compose -f ~/Agentic/coding/docker/docker-compose.yml ps
 
 # Expected output shows these services running:
-# - coding-services (main MCP servers)
-# - memgraph (graph database)
+# - coding-services (main MCP servers; graphify runs file-based inside this container)
 # - qdrant (vector database)
+# - redis (cache / queues)
 ```
 
 ### 4. Test Health Endpoints

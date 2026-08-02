@@ -188,8 +188,8 @@ MCP servers run as HTTP/SSE services in Docker containers:
 
 **Architecture:**
 - **Host**: Claude CLI + lightweight stdio proxies
-- **Container**: MCP SSE servers (semantic-analysis:3848, constraint-monitor:3849, code-graph-rag:3850)
-- **Databases**: Qdrant:6333, Redis:6379, Memgraph:7687
+- **Container**: MCP servers (semantic-analysis:3848 SSE, constraint-monitor:3849 SSE, graphify:3851 HTTP MCP)
+- **Databases**: Qdrant:6333, Redis:6379
 
 **Pros**:
 - Persistent services across sessions

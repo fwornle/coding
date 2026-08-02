@@ -32,15 +32,18 @@ MCP tools and REST API endpoints.
 | `get_violation_history` | Past violations |
 | `update_constraints` | Modify constraint rules |
 
-### Code Graph RAG
+### Graphify
+
+HTTP MCP endpoint at `http://localhost:3851/mcp` (served from inside `coding-services`), backed by the static `graph.json`.
 
 | Tool | Description |
 |------|-------------|
-| `index_repository` | Build code graph |
-| `query_code_graph` | Natural language queries |
-| `get_code_snippet` | Retrieve source code |
-| `surgical_replace_code` | Targeted code replacement |
-| `comprehensive_analysis` | LLM-powered analysis |
+| `query_graph` | Structural / natural-language query over the graph |
+| `get_node` | Retrieve a single node by id |
+| `get_neighbors` | List a node's neighbours |
+| `shortest_path` | Shortest path between two nodes |
+| `graph_stats` | Graph size and shape statistics |
+| `god_nodes` | Most-connected hub nodes |
 
 ## REST APIs
 

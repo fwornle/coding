@@ -68,7 +68,7 @@ This processes entire git history and all session logs instead of just changes s
 
 1. **GitHistoryAgent** - LLM-powered commit pattern analysis and evolution extraction
 2. **VibeHistoryAgent** - Analyzes session logs with LLM context extraction
-3. **CodeGraphAgent** - AST-based indexing via Memgraph (requires Docker)
+3. **CodeGraphAgent** - AST-based indexing via graphify `graph.json` (requires Docker)
 
 ### Analysis & Enrichment Agents
 

@@ -11,7 +11,7 @@
  *                               schema, with every referenced script resolvable
  *                               and (for copilot) actually executable
  *   3. MCP servers            — exactly the 3 expected (semantic-analysis,
- *                               constraint-monitor, code-graph-rag)
+ *                               constraint-monitor, graphify)
  *   4. Constraints            — .constraint-monitor.yaml parses, non-empty
  *   5. Online learning        — observations → digests → insights pipeline has
  *                               data (export files; obs-api as a live soft-check)
@@ -39,7 +39,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..', '..');
 
 const AGENTS = ['claude', 'copilot', 'opencode', 'mastra'];
-const EXPECTED_MCP_SERVERS = ['semantic-analysis', 'constraint-monitor', 'code-graph-rag'];
+const EXPECTED_MCP_SERVERS = ['semantic-analysis', 'constraint-monitor', 'graphify'];
 
 const readText = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
 const readJson = (rel) => JSON.parse(readText(rel));
@@ -260,18 +260,25 @@ describe('MCP servers — expected set of 3', () => {
     expect(Object.keys(servers).sort()).toEqual([...EXPECTED_MCP_SERVERS].sort());
   });
 
-  it('each MCP server has a runnable command and a present integration dir', () => {
+  it('each MCP server is well-formed (command+dir for local, url for http)', () => {
     const servers = readJson('claude-code-mcp.json').mcpServers;
+    // graphify is served over HTTP MCP from the coding-services container, so it
+    // has {type:"http", url} rather than a command + integration dir.
     const dirs = {
       'semantic-analysis': 'integrations/mcp-server-semantic-analysis',
       'constraint-monitor': 'integrations/mcp-constraint-monitor',
-      'code-graph-rag': 'integrations/code-graph-rag',
     };
     for (const name of EXPECTED_MCP_SERVERS) {
-      expect(typeof servers[name].command).toBe('string');
-      expect(servers[name].command.length).toBeGreaterThan(0);
-      expect(Array.isArray(servers[name].args)).toBe(true);
-      expect(existsSync(path.join(REPO, dirs[name]))).toBe(true);
+      const s = servers[name];
+      if (s.type === 'http') {
+        expect(typeof s.url).toBe('string');
+        expect(s.url.length).toBeGreaterThan(0);
+      } else {
+        expect(typeof s.command).toBe('string');
+        expect(s.command.length).toBeGreaterThan(0);
+        expect(Array.isArray(s.args)).toBe(true);
+        expect(existsSync(path.join(REPO, dirs[name]))).toBe(true);
+      }
     }
   });
 });

@@ -32,7 +32,7 @@ The MCP Semantic Analysis Server is a standalone Node.js application that provid
 
 **Embedding/External LLM Agents (2 agents):**
 12. **DeduplicationAgent** - Semantic duplicate detection using OpenAI embeddings (text-embedding-3-small)
-13. **CodeGraphAgent** - AST-based code indexing via Memgraph with LLM queries (requires code-graph-rag)
+13. **CodeGraphAgent** - Reads graphify's static `graph.json` (tree-sitter AST) for code-graph queries with LLM synthesis
 
 **Non-LLM Agent (1 agent):**
 14. **PersistenceAgent** - Persists entities to Graphology+LevelDB (no LLM needed - pure data storage)
@@ -56,7 +56,7 @@ The MCP Semantic Analysis Server is a standalone Node.js application that provid
 - `generate_plantuml_diagrams` - Architecture diagram generation
 - `reset_analysis_checkpoint` - Reset analysis checkpoints
 - `refresh_entity` - Refresh specific knowledge entity
-- `analyze_code_graph` - AST-based code analysis via Memgraph
+- `analyze_code_graph` - AST-based code analysis over graphify's static `graph.json`
 
 ---
 

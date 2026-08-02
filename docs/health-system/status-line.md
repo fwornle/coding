@@ -37,7 +37,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] 📋17-18
+[🐳] [🐳MCP:SA✅CM✅GF✅] [🏥✅] [C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Reading the Status Line
@@ -46,7 +46,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Components**:
 - `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
-- `[🐳MCP:SA✅CM✅CGR✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
+- `[🐳MCP:SA✅CM✅GF✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
 - `[C🟢 UT🟤]` - **Active Sessions**: Project abbreviations with activity icons
 - `🔒67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `🟡N` violations sub-segment when non-zero)
@@ -67,7 +67,7 @@ The statusline-health-monitor writes detailed health to `.logs/statusline-health
 | `GCM` | - | Global Process Supervisor | Session coordinator and auto-restart |
 | `Sessions` | - | Transcript Monitors | Per-project Claude session health |
 | `Guards` | 3030/3031 | Constraint Monitor | Dashboard and API for code quality |
-| `DB` | - | Databases | LevelDB, SQLite, Qdrant, Memgraph |
+| `DB` | - | Databases | LevelDB, SQLite, Qdrant (+ graphify graph freshness) |
 | `VKB` | 8080 | Knowledge Visualization | Graph visualization server |
 | `Dash` | 3032/3033 | System Health Dashboard | UI and API for health monitoring |
 
@@ -88,7 +88,7 @@ Docker mode is detected when:
 |--------------|---------|------|--------------|
 | `SA` | Semantic Analysis | 3848 | `http://localhost:3848/health` |
 | `CM` | Constraint Monitor | 3849 | `http://localhost:3849/health` |
-| `CGR` | Code Graph RAG | 3850 | `http://localhost:3850/health` |
+| `GF` | Graphify | 3851 | `http://localhost:3851/mcp` |
 
 **Status Icons:**
 - `✅` - Service healthy and responding
@@ -96,9 +96,9 @@ Docker mode is detected when:
 - `⚠️` - Service responding but with issues
 
 **Examples:**
-- `[🐳MCP:SA✅CM✅CGR✅]` - All Docker MCP services healthy
-- `[🐳MCP:SA✅CM❌CGR✅]` - Constraint Monitor is down
-- `[🐳MCP:SA⚠️CM✅CGR✅]` - Semantic Analysis has issues
+- `[🐳MCP:SA✅CM✅GF✅]` - All Docker MCP services healthy
+- `[🐳MCP:SA✅CM❌GF✅]` - Constraint Monitor is down
+- `[🐳MCP:SA⚠️CM✅GF✅]` - Semantic Analysis has issues
 
 ### Unified Health Status Indicator
 
@@ -537,7 +537,7 @@ docker compose -f docker/docker-compose.yml ps
 # Test individual health endpoints
 curl http://localhost:3848/health  # Semantic Analysis
 curl http://localhost:3849/health  # Constraint Monitor
-curl http://localhost:3850/health  # Code Graph RAG
+curl http://localhost:3851/mcp     # Graphify
 
 # Check container logs for errors
 docker compose -f docker/docker-compose.yml logs coding-services

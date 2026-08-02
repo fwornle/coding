@@ -25,7 +25,7 @@ package "Data Layer" {
   database "Progress File\n(.data/)" as progress <<storage>>
   database "Knowledge Graph\n(LevelDB)" as kg <<storage>>
   database "Qdrant\n(Vectors)" as qdrant <<storage>>
-  database "Memgraph\n(Code Graph)" as memgraph <<storage>>
+  database "graph.json\n(static, .data/graphify)" as graphjson <<storage>>
 }
 
 package "External" {
@@ -52,7 +52,7 @@ coord DATA_LINE progress : "write progress"
 ' Coordinator to storage
 coord DATA_LINE kg : "persist entities"
 coord DATA_LINE qdrant : "store embeddings"
-coord DATA_LINE memgraph : "update code graph"
+coord DATA_LINE graphjson : "graphify update\n(rebuild graph)"
 
 ' LLM calls
 coord ASYNC_LINE llm : "semantic analysis"

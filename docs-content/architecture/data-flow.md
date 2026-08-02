@@ -21,13 +21,13 @@ flowchart TB
 
     subgraph "Analysis Layer"
         MCP --> SA[Semantic Analysis]
-        MCP --> CGR[Code Graph RAG]
+        MCP --> CGR[Graphify]
     end
 
     subgraph "Storage Layer"
         LSL --> FS[.specstory/history/]
         SA --> KMC[("@fwornle/km-core<br/>GraphKMStore<br/>shared by A/B/C")]
-        CGR --> MG[Memgraph]
+        CGR --> MG[graph.json]
         SA --> QD[Qdrant]
     end
 

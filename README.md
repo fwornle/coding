@@ -41,7 +41,7 @@ coding --copilot
 
 **MCP Configuration**: `claude-mcp-launcher.sh` wires the stdio-proxy → SSE bridge so the agent talks to the containerized MCP servers.
 
-**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, OpenCode, and Mastracode. The shared orchestrator (`scripts/launch-agent-common.sh`) handles service startup, monitoring, session management, and **auto-installation of missing agent CLIs** — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) treats Redis, Qdrant, and Memgraph as built-ins of the coding-services container, so it never spawns duplicates.
+**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, OpenCode, and Mastracode. The shared orchestrator (`scripts/launch-agent-common.sh`) handles service startup, monitoring, session management, and **auto-installation of missing agent CLIs** — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) treats Redis and Qdrant as stack containers and graphify (the file-based code knowledge graph) as a built-in of the coding-services container, so it never spawns duplicates.
 
 ![Coding Environment — Tmux Status Bar](docs/images/status-line.png)
 
@@ -66,7 +66,7 @@ See [Agent Integration Guide](docs/agent-integration-guide.md) for adding new ag
 
 **Health System**: The health verifier reads cached commit info from `cache-metadata.json` (no `.git` inside the container) and uses supervisorctl for service restarts.
 
-The Docker stack runs 4 containers (coding-services, Qdrant, Memgraph, Redis) with 10 internal services managed by supervisord, using ~1.75 GB memory total. The only host-side service is the LLM CLI Proxy (port 12435), which bridges to host-local CLI tools like Claude Code and GitHub Copilot.
+The Docker stack runs 3 containers (coding-services, Qdrant, Redis) with 10 internal services managed by supervisord, using ~1.75 GB memory total. Code-graph analysis is provided by graphify, which runs inside `coding-services` and serves a static, file-based `graph.json` (no separate database container). The only host-side service is the LLM CLI Proxy (port 12435), which bridges to host-local CLI tools like Claude Code and GitHub Copilot.
 
 ![Docker Container Architecture](docs/images/dockerized-system-architecture.png)
 
@@ -113,7 +113,7 @@ The `coding` system does NOT own per-agent prompts (that's `mcp-server-semantic-
 
 ![Coding system architecture](docs/images/coding-system-architecture.png)
 
-The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`, `com.coding.etm`) plus a four-container Docker stack (`coding-services`, Qdrant, Memgraph, Redis) supervised by supervisord. Live conversations land in `.specstory/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `mcp-server-semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
+The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`, `com.coding.etm`) plus a three-container Docker stack (`coding-services`, Qdrant, Redis) supervised by supervisord — code-graph analysis is served by graphify, a file-based `graph.json` inside `coding-services`. Live conversations land in `.specstory/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `mcp-server-semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
 
 ## Where to Edit
 

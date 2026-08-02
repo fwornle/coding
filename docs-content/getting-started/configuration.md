@@ -38,12 +38,10 @@ All ports are centralized in `.env.ports`:
 | 3033 | System Health API | Docker |
 | 3848 | Semantic Analysis SSE | Docker |
 | 3849 | Constraint Monitor SSE | Docker |
-| 3850 | Code Graph RAG SSE | Docker |
+| 3851 | Graphify (HTTP MCP, in `coding-services`) | Docker |
 | 8080 | VKB Server (Knowledge visualization) | Docker |
 | 6333 | Qdrant HTTP | Docker |
 | 6379 | Redis | Docker |
-| 7687 | Memgraph (Bolt protocol) | Docker |
-| 3100 | Memgraph Lab UI | Docker |
 | 12435 | LLM CLI Proxy | Host |
 | 12434 | Docker Model Runner | Host |
 

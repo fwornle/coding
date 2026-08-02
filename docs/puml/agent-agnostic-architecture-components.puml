@@ -40,7 +40,7 @@ package "Shared Services Layer" {
         [Semantic Analysis]
         [Constraint Monitor]
         [Live Logging System]
-        [Redis + Qdrant + Memgraph]
+        [Redis + Qdrant + graphify]
     }
 }
 
@@ -122,7 +122,7 @@ end note
 note bottom of services_docker
   **Containerized stack:**
   All services in coding-services
-  container (Redis, Qdrant, Memgraph
+  container (Redis, Qdrant, graphify
   included - no duplicate containers)
 end note
 

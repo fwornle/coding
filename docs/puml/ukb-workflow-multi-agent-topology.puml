@@ -23,7 +23,7 @@ package "KG Operations Agents" {
 }
 
 package "Finalization Agents" {
-  component "Code\n(CGR index)" as code <<agent>>
+  component "Code\n(graphify index)" as code <<agent>>
   component "Docs\n(link docs)" as docs <<agent>>
   component "Insights\n(synthesize)" as insights <<agent>>
   component "Persist\n(final save)" as persist <<agent>>

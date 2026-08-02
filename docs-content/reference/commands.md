@@ -54,7 +54,7 @@ Performs a full cleanup before startup — use when ports are stuck or orphaned 
 
 1. Stops all Docker coding containers (`docker compose down`)
 2. Kills process supervisors and health monitors (prevents respawning)
-3. Kills all processes on coding ports (3030-3033, 3847-3850, 8080, 9090, 12435)
+3. Kills all processes on coding ports (3030-3033, 3847-3851, 8080, 9090, 12435)
 4. Kills remaining coding-repo node processes
 5. Verifies all ports are free
 6. Proceeds with normal startup
@@ -149,10 +149,12 @@ docker compose -f docker/docker-compose.yml down -v
 ## Health Checks
 
 ```bash
-# All MCP health endpoints
-for port in 3848 3849 3850; do
+# All MCP health endpoints (semantic-analysis, constraint-monitor)
+for port in 3848 3849; do
   echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status')"
 done
+# Graphify serves an HTTP MCP endpoint (not /health):
+curl -s http://localhost:3851/mcp >/dev/null && echo "Port 3851: graphify ok"
 
 # LSL monitor health (Phase 33+: read from coordinator, not .health/*.json)
 curl -fs http://localhost:3034/health/state \

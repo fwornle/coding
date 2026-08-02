@@ -6,13 +6,13 @@ A comprehensive overview of the "coding" infrastructure system - a containerized
 
 ## System Overview
 
-The coding system runs as a Docker Compose stack with 4 containers and 10 internal services, designed to augment Claude Code (CLI agent) with specialized AI-powered tools. The only host-side service is the LLM CLI Proxy (port 12435), which bridges to host-local CLI tools.
+The coding system runs as a Docker Compose stack with 3 containers and 10 internal services, designed to augment Claude Code (CLI agent) with specialized AI-powered tools. The only host-side service is the LLM CLI Proxy (port 12435), which bridges to host-local CLI tools.
 
 | Metric | Value |
 |--------|-------|
-| Total Containers | 4 |
+| Total Containers | 3 |
 | Internal Services | 10 (managed by supervisord) |
-| Exposed Ports | 12 |
+| Exposed Ports | 9 |
 | Total Memory Usage | ~1.13 GB |
 | Total CPU Usage | ~3.15% |
 | Network | Bridge (coding-network) |
@@ -27,9 +27,8 @@ The coding system runs as a Docker Compose stack with 4 containers and 10 intern
 
 | Container | Image | Role | Ports | Memory |
 |-----------|-------|------|-------|--------|
-| `coding-services` | docker-coding-services | Main application (10 services) | 3030-3031, 3032-3033, 3847-3850, 8080 | ~17.9% |
+| `coding-services` | docker-coding-services | Main application (10 services) | 3030-3031, 3032-3033, 3847-3849, 3851, 8080 | ~17.9% |
 | `coding-qdrant` | qdrant/qdrant:latest | Vector database | 6333, 6334 | ~2.7% |
-| `coding-memgraph` | memgraph-platform:latest | Graph database (code) | 7687, 3100 | ~2.6% |
 | `coding-redis` | redis:7-alpine | Cache & state | 6379 | ~0.1% |
 
 ### Container Dependencies
@@ -37,11 +36,10 @@ The coding system runs as a Docker Compose stack with 4 containers and 10 intern
 ```
 coding-services
   ├── depends_on: qdrant (healthy)
-  ├── depends_on: redis (healthy)
-  └── depends_on: memgraph (healthy)
+  └── depends_on: redis (healthy)
 ```
 
-All containers communicate over the `coding-network` bridge network using container hostnames (`qdrant`, `redis`, `memgraph`).
+All containers communicate over the `coding-network` bridge network using container hostnames (`qdrant`, `redis`).
 
 ---
 
@@ -59,7 +57,7 @@ MCP (Model Context Protocol) servers exposed via SSE (Server-Sent Events), consu
 |---------|------|----------|---------|
 | **semantic-analysis** | 3848 | TypeScript | LLM-powered code analysis, UKB workflow engine, ontology classification, pattern extraction |
 | **constraint-monitor** | 3849 | TypeScript | Code quality rules enforcement, real-time violation tracking |
-| **code-graph-rag** | 3850 | Python 3.12 | AST-based code indexing via Tree-sitter, call graph analysis, natural language code queries |
+| **graphify** | 3851 | Python 3.12 | tree-sitter AST parsing into a static `graph.json`, structural code queries via HTTP MCP (no database) |
 
 ### Group: web-services (priority: 50)
 
@@ -95,13 +93,13 @@ Background monitoring services.
 
 ### Storage Layer Interactions
 
-| Service | Qdrant | Redis | Memgraph | LevelDB |
-|---------|--------|-------|----------|---------|
-| semantic-analysis | Embeddings & search | Response cache | - | - |
-| code-graph-rag | - | - | AST nodes & relations | - |
-| constraint-monitor | Constraint embeddings | Enforcement state | - | - |
-| vkb-server | Semantic search | - | - | Knowledge graph (Graphology) |
-| UKB workflow | Entity vectors | - | - | Persist entities |
+| Service | Qdrant | Redis | LevelDB |
+|---------|--------|-------|---------|
+| semantic-analysis | Embeddings & search | Response cache | - |
+| graphify | - | - | - (static `graph.json` file) |
+| constraint-monitor | Constraint embeddings | Enforcement state | - |
+| vkb-server | Semantic search | - | Knowledge graph (Graphology) |
+| UKB workflow | Entity vectors | - | Persist entities |
 
 ### Knowledge Management Pipeline
 
@@ -140,12 +138,10 @@ Git History / Session Logs
 | 3033 | Health Dashboard API | HTTP/WS | http://localhost:3033 |
 | 3848 | Semantic Analysis MCP | SSE | http://localhost:3848 |
 | 3849 | Constraint Monitor MCP | SSE | http://localhost:3849 |
-| 3850 | Code-Graph-RAG MCP | SSE | http://localhost:3850 |
+| 3851 | Graphify MCP | HTTP | http://localhost:3851/mcp |
 | 6333 | Qdrant HTTP API | HTTP | http://localhost:6333 |
 | 6334 | Qdrant gRPC | gRPC | localhost:6334 |
 | 6379 | Redis | Redis protocol | localhost:6379 |
-| 7687 | Memgraph Bolt | Bolt | localhost:7687 |
-| 3100 | Memgraph Lab | HTTP | http://localhost:3100 |
 
 ### Internal Network (container → container)
 
@@ -153,7 +149,6 @@ Git History / Session Logs
 |------|----|---------|---------|
 | coding-services | qdrant | http://qdrant:6333 | Vector operations |
 | coding-services | redis | redis://redis:6379 | Caching |
-| coding-services | memgraph | bolt://memgraph:7687 | Code graph queries |
 
 ---
 
@@ -165,7 +160,6 @@ Git History / Session Logs
 |--------|-----------|-------------|---------|
 | qdrant-data | coding-qdrant | /qdrant/storage | Vector data persistence |
 | redis-data | coding-redis | /data | Cache persistence (AOF) |
-| memgraph-data | coding-memgraph | /var/lib/memgraph | Graph data persistence |
 
 ### Bind Mounts (host → coding-services)
 
@@ -219,7 +213,7 @@ start_qdrant             → SKIPPED (external container)
 | Frontend | React 18 + Redux Toolkit + Vite |
 | Graph Storage | Graphology + LevelDB (classic-level) |
 | Vector DB | Qdrant |
-| Graph DB (Code) | Memgraph |
+| Code Graph | Graphify (tree-sitter → static `graph.json`) |
 | Cache | Redis 7 |
 | Code Parsing | Tree-sitter (multi-language) |
 | MCP Transport | SSE (Server-Sent Events) |
@@ -234,9 +228,8 @@ start_qdrant             → SKIPPED (external container)
 |-----------|-----|--------|-------|
 | coding-services | 2.35% | 17.89% (~1.34 GB) | 8 Node.js + 1 Python process |
 | coding-qdrant | 1.11% | 2.71% (~202 MB) | Vector index in memory |
-| coding-memgraph | 0.03% | 2.64% (~197 MB) | Idle (awaiting queries) |
 | coding-redis | 0.53% | 0.11% (~8 MB) | Minimal cache usage |
-| **Total** | **~4%** | **~23%** (~1.75 GB) | Well within 4G limit |
+| **Total** | **~4%** | **~21%** (~1.55 GB) | Well within 4G limit |
 
 ---
 
