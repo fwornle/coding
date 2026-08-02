@@ -1,0 +1,5 @@
+# Shell scripts MUST use LF line endings so they run under bash on Windows CI
+# runners (windows-latest defaults to core.autocrlf=true, which would otherwise
+# check them out with CRLF and break the shebang / `bash -n`).
+*.sh   text eol=lf
+*.bash text eol=lf
