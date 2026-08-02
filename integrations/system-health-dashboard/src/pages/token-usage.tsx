@@ -15,6 +15,7 @@ import {
   PieChart, Pie, Cell, Legend, Treemap, AreaChart, Area, Brush
 } from 'recharts'
 import { normalizeModel } from '@/components/performance/models'
+import { CostTab } from '@/components/cost/CostTab'
 
 const PROXY_PORT = '12435'
 const PROXY_BASE = `http://localhost:${PROXY_PORT}`
@@ -660,6 +661,7 @@ export function TokenUsagePage() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="evolution">Evolution</TabsTrigger>
+          <TabsTrigger value="cost">Cost</TabsTrigger>
           <TabsTrigger value="recent">Recent Calls</TabsTrigger>
         </TabsList>
 
@@ -987,6 +989,11 @@ export function TokenUsagePage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Cost Tab - €/$ cost, budgets, burn-rate, optimization controls */}
+        <TabsContent value="cost">
+          <CostTab proxyBase={PROXY_BASE} />
         </TabsContent>
 
         {/* Recent Calls Tab */}

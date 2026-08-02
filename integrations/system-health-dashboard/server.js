@@ -4157,27 +4157,61 @@ class SystemHealthAPIServer {
         });
     }
 
+    // Runtime-tunable cadence for the auto-consolidation daemon. Read from the
+    // proxy's llm-settings.json (consolidationCadence block) each time the
+    // interval gate is evaluated, so the dashboard Cost tab can change how often
+    // consolidation runs — or pause it — with no restart. Falls back to the
+    // historical hardcoded defaults if the proxy is unreachable.
+    async _fetchConsolidationCadence() {
+        const base = process.env.LLM_CLI_PROXY_URL || 'http://host.docker.internal:12435';
+        const fallback = { enabled: true, checkIntervalMinutes: 30, undigestedThreshold: 10 };
+        try {
+            const r = await fetch(`${base}/api/llm/settings`);
+            if (!r.ok) return fallback;
+            const j = await r.json();
+            const c = j?.settings?.consolidationCadence;
+            if (!c || typeof c !== 'object') return fallback;
+            return {
+                enabled: c.enabled !== false,
+                checkIntervalMinutes: Number(c.checkIntervalMinutes) > 0 ? Number(c.checkIntervalMinutes) : 30,
+                undigestedThreshold: Number(c.undigestedThreshold) >= 0 ? Number(c.undigestedThreshold) : 10,
+            };
+        } catch {
+            return fallback;
+        }
+    }
+
     /**
-     * Auto-consolidation daemon — checks every 30 min for undigested observations
-     * from completed days (not today). Triggers consolidation when threshold is met.
+     * Auto-consolidation daemon — a short base tick (60s) that reads the
+     * runtime cadence (enabled / checkIntervalMinutes / undigestedThreshold)
+     * from the proxy settings and gates the actual consolidation on it. The
+     * interval and threshold are therefore runtime-tunable from the Cost tab
+     * without re-arming the timer or restarting the service.
      */
     startAutoConsolidation() {
-        const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
-        const UNDIGESTED_THRESHOLD = 10; // Minimum undigested obs to trigger
+        const BASE_TICK_MS = 60 * 1000; // evaluate the cadence gate once a minute
+        this._lastConsolidationCheckAt = 0;
 
         const check = async () => {
             if (this.consolidationRunning) return;
             // Skip new runs once shutdown begins so SIGTERM can drain.
             if (this._shuttingDown) return;
             try {
+                const cadence = await this._fetchConsolidationCadence();
+                if (!cadence.enabled) return;
+                // Interval gate: only look for undigested work every N minutes.
+                const now = Date.now();
+                if (now - this._lastConsolidationCheckAt < cadence.checkIntervalMinutes * 60 * 1000) return;
+                this._lastConsolidationCheckAt = now;
+
                 // Pull undigested-past-days count from the host Observations API
                 // rather than opening the SQLite file across the bind-mount.
                 const status = await this._fetchObsApi('/api/consolidation/status');
                 if (!status) return;
                 const pastUndigested = Number(status.pendingPast) || 0;
 
-                if (pastUndigested >= UNDIGESTED_THRESHOLD) {
-                    process.stderr.write(`[AutoConsolidate] ${pastUndigested} undigested observations from past days — triggering consolidation via host API\n`);
+                if (pastUndigested >= cadence.undigestedThreshold) {
+                    process.stderr.write(`[AutoConsolidate] ${pastUndigested} undigested observations from past days (threshold ${cadence.undigestedThreshold}, interval ${cadence.checkIntervalMinutes}min) — triggering consolidation via host API\n`);
                     this.consolidationRunning = true;
                     const base = process.env.OBS_API_URL || 'http://host.docker.internal:12436';
                     this._activeConsolidation = (async () => {
@@ -4207,10 +4241,12 @@ class SystemHealthAPIServer {
             }
         };
 
-        // Initial check after 2 minutes (let services settle)
-        setTimeout(check, 2 * 60 * 1000);
-        this.autoConsolidationInterval = setInterval(check, CHECK_INTERVAL_MS);
-        process.stderr.write(`[AutoConsolidate] Daemon started — checking every 30 min (threshold: ${UNDIGESTED_THRESHOLD} obs)\n`);
+        // Let services settle before the first cadence evaluation, then tick
+        // once a minute; the interval gate inside check() enforces the
+        // runtime-configured checkIntervalMinutes.
+        this._lastConsolidationCheckAt = Date.now() - (28 * 60 * 1000); // first real check ~2min in at default 30min cadence
+        this.autoConsolidationInterval = setInterval(check, BASE_TICK_MS);
+        process.stderr.write(`[AutoConsolidate] Daemon started — cadence read live from proxy consolidationCadence (default 30min / threshold 10)\n`);
     }
 
     async stop({ deadlineMs = 25000 } = {}) {
