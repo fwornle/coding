@@ -16,13 +16,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      memgraph:
-        condition: service_healthy
     environment:
       # Service ports
       - SEMANTIC_ANALYSIS_PORT=3848
       - CONSTRAINT_MONITOR_PORT=3849
-      - CODE_GRAPH_RAG_PORT=3850
       - GRAPHIFY_MCP_PORT=3851
       - GRAPHIFY_OUT=/coding/.data/graphify/graphify-out
       # Graphify full (docs/PDF) extraction routes through the host llm-cli-proxy's
@@ -37,11 +34,9 @@ services:
       # Database connections (container networking)
       - QDRANT_URL=http://qdrant:6333
       - REDIS_URL=redis://redis:6379
-      - MEMGRAPH_HOST=memgraph
-      - MEMGRAPH_PORT=7687
       # Bypass corporate proxy for internal Docker networking
-      - no_proxy=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph,host.docker.internal
-      - NO_PROXY=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph,host.docker.internal
+      - no_proxy=qdrant,redis,localhost,127.0.0.1,coding-qdrant,coding-redis,host.docker.internal
+      - NO_PROXY=qdrant,redis,localhost,127.0.0.1,coding-qdrant,coding-redis,host.docker.internal
       # PlantUML include path (resolves !include _standard-style.puml in diagrams)
       - JAVA_TOOL_OPTIONS=-Dplantuml.include.path=/coding/docs/puml
       # Project paths (mapped via volumes)
@@ -54,8 +49,8 @@ services:
       # injected into the container. All in-container LLM/embedding callers
       # route through the host llm-cli-proxy (:12435): LLMService falls back to
       # its claude-code/copilot CLI providers (LLM_CLI_PROXY_URL), embeddings
-      # use the proxy's /v1/embeddings passthrough, code-graph-rag points at
-      # /v1/codegraph/chat/completions via its .env. Keys live host-side only.
+      # use the proxy's /v1/embeddings passthrough, graphify's docs pass points at
+      # the /v1/codegraph OpenAI-compat shim. Keys live host-side only.
       # Local LLM - Docker Model Runner (DMR) on host
       # DMR uses llama.cpp under the hood for local inference
       - DMR_HOST=host.docker.internal
@@ -76,7 +71,6 @@ services:
       - "8080:8080"     # VKB Server
       - "3848:3848"     # Semantic Analysis SSE
       - "3849:3849"     # Constraint Monitor SSE
-      - "3850:3850"     # Code-Graph-RAG SSE
       - "3851:3851"     # Graphify HTTP MCP (/mcp)
       - "3030:3030"     # Constraint Dashboard (Next.js)
       - "3031:3031"     # Constraint Dashboard API
@@ -240,27 +234,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Memgraph Graph Database
-  memgraph:
-    image: memgraph/memgraph-platform:latest
-    container_name: coding-memgraph
-    restart: unless-stopped
-    ports:
-      - "7687:7687"     # Bolt protocol
-      - "3100:3000"     # Memgraph Lab (changed to 3100 to avoid conflicts)
-    volumes:
-      - memgraph-data:/var/lib/memgraph
-    environment:
-      - MEMGRAPH="--log-level=WARNING"
-    networks:
-      - coding-network
-    healthcheck:
-      test: ["CMD-SHELL", "echo 'RETURN 1;' | mgconsole || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
 # ===========================================
 # Networks
 # ===========================================
@@ -274,4 +247,3 @@ networks:
 volumes:
   qdrant-data:
   redis-data:
-  memgraph-data:

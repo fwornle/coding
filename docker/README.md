@@ -12,14 +12,13 @@ This directory contains Docker configuration for containerized deployment of the
 
 **Docker Containers (10 supervisord-managed services):**
 - **coding-services**:
-  - MCP Servers: semantic-analysis (3848), constraint-monitor (3849), code-graph-rag (3850)
+  - MCP Servers: semantic-analysis (3848), constraint-monitor (3849), graphify (3851, endpoint /mcp)
   - Web Services: VKB Server (8080), Health Dashboard (3032/3033), Constraint Dashboard (3030/3031)
   - Monitoring: health-verifier (background daemon)
 
 - **Databases:**
   - Qdrant: Ports 6333/6334
   - Redis: Port 6379
-  - Memgraph: Ports 7687/3100
 
 ## Quick Start
 
@@ -52,7 +51,7 @@ docker compose -f docker/docker-compose.yml ps
 # Check MCP server health endpoints
 curl http://localhost:3848/health  # semantic-analysis
 curl http://localhost:3849/health  # constraint-monitor
-curl http://localhost:3850/health  # code-graph-rag
+curl http://localhost:3851/mcp     # graphify
 ```
 
 ## Files
@@ -92,13 +91,11 @@ See `.env.ports` in the main repository for all port configurations:
 | Health Dashboard API | 3033 | HTTP/WS |
 | Semantic Analysis SSE | 3848 | HTTP/SSE |
 | Constraint Monitor SSE | 3849 | HTTP/SSE |
-| Code Graph RAG SSE | 3850 | HTTP/SSE |
+| Graphify MCP (endpoint /mcp) | 3851 | HTTP/MCP |
 | VKB Server | 8080 | HTTP |
 | Qdrant HTTP | 6333 | HTTP |
 | Qdrant gRPC | 6334 | gRPC |
 | Redis | 6379 | TCP |
-| Memgraph Bolt | 7687 | Bolt |
-| Memgraph Lab | 3100 | HTTP |
 
 ### Volume Mounts
 

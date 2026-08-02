@@ -103,12 +103,6 @@ SEMANTIC_ANALYSIS_CN_HTTPS="https://cc-github.bmwgroup.net/frankwoernle/mcp-serv
 SEMANTIC_ANALYSIS_PUBLIC_SSH="git@github.com:fwornle/mcp-server-semantic-analysis.git"
 SEMANTIC_ANALYSIS_PUBLIC_HTTPS="https://github.com/fwornle/mcp-server-semantic-analysis.git"
 
-# Code Graph RAG (forked with semantic enhancements)
-CODE_GRAPH_RAG_SSH="git@github.com:fwornle/code-graph-rag.git"
-CODE_GRAPH_RAG_HTTPS="https://github.com/fwornle/code-graph-rag.git"
-CODE_GRAPH_RAG_BRANCH="semantic-enhancements"
-CODE_GRAPH_RAG_DIR="$CODING_REPO/integrations/code-graph-rag"
-
 # Platform detection
 PLATFORM=""
 SHELL_RC=""
@@ -380,34 +374,6 @@ check_dependencies() {
         missing_deps+=("tmux")
     fi
 
-    # Install uv if missing (required for code-graph-rag Python venv)
-    if ! command -v uv >/dev/null 2>&1; then
-        if confirm_system_change \
-            "Install uv (Python package installer) via curl | sh" \
-            "This downloads and executes an installer script from astral.sh. Required for code-graph-rag."; then
-            info "Installing uv (Python package installer, required for code-graph-rag)..."
-            if curl -LsSf https://astral.sh/uv/install.sh | sh; then
-                # Source shell config to update PATH
-                export PATH="$HOME/.local/bin:$PATH"
-                if command -v uv >/dev/null 2>&1; then
-                    success "uv installed successfully"
-                else
-                    warning "uv installed but not in PATH. You may need to restart your shell."
-                    info "Add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\""
-                fi
-            else
-                warning "Failed to install uv. code-graph-rag may not be available."
-                SKIPPED_SYSTEM_DEPS+=("uv")
-            fi
-        else
-            warning "Skipped uv installation. code-graph-rag may not be available."
-            SKIPPED_SYSTEM_DEPS+=("uv")
-            info "To install manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
-        fi
-    else
-        success "uv is already installed"
-    fi
-    
     # Platform-specific checks
     if [[ "$PLATFORM" == "macos" ]]; then
         if ! command -v brew >/dev/null 2>&1; then
@@ -751,225 +717,58 @@ install_system_health_dashboard() {
     cd "$CODING_REPO"
 }
 
-# Install code-graph-rag MCP server (AST-based code knowledge graph)
-install_code_graph_rag() {
-    echo -e "\n${CYAN}🔗 Installing code-graph-rag MCP server...${NC}"
+# Install graphify (code knowledge graph; replaces the former code-graph-rag + Memgraph stack).
+# Graphify builds a static graph.json and serves it over MCP from the coding-graphify
+# container — no host Python/uv venv and no Memgraph database are required.
+install_graphify() {
+    echo -e "\n${CYAN}🔗 Installing graphify code knowledge graph...${NC}"
 
     cd "$CODING_REPO"
 
-    # Check for uv package manager
-    if ! command -v uv >/dev/null 2>&1; then
-        warning "uv not found - code-graph-rag requires uv package manager"
-        info "Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
-        INSTALLATION_WARNINGS+=("code-graph-rag: uv not installed")
-        return 1
-    fi
-
-    # Clone or update repository (check for both .git directory and .git file for submodules)
-    if [[ -d "$CODE_GRAPH_RAG_DIR/.git" ]] || [[ -f "$CODE_GRAPH_RAG_DIR/.git" ]]; then
-        info "code-graph-rag exists (submodule), updating..."
-        cd "$CODE_GRAPH_RAG_DIR"
-        timeout 30s git pull origin "$CODE_GRAPH_RAG_BRANCH" 2>/dev/null || info "Could not update code-graph-rag (may be on specific commit)"
+    # Ensure the graphify submodule is initialized (best-effort)
+    info "Initializing graphify submodule..."
+    if git submodule update --init integrations/graphify 2>/dev/null; then
+        success "graphify submodule initialized"
     else
-        info "Cloning code-graph-rag (branch: $CODE_GRAPH_RAG_BRANCH)..."
-        if git clone -b "$CODE_GRAPH_RAG_BRANCH" "$CODE_GRAPH_RAG_HTTPS" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
-            success "Cloned code-graph-rag"
-        elif git clone -b "$CODE_GRAPH_RAG_BRANCH" "$CODE_GRAPH_RAG_SSH" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
-            success "Cloned code-graph-rag via SSH"
-        else
-            warning "Failed to clone code-graph-rag"
-            INSTALLATION_WARNINGS+=("code-graph-rag: Failed to clone")
-            return 1
-        fi
+        warning "Could not initialize graphify submodule (integrations/graphify)"
+        INSTALLATION_WARNINGS+=("graphify: submodule init failed")
     fi
 
-    cd "$CODE_GRAPH_RAG_DIR"
+    # Idempotently register the graphify MCP server in OpenCode's config.
+    local opencode_config="$HOME/.config/opencode/opencode.json"
+    if [[ -f "$opencode_config" ]] && command -v python3 >/dev/null 2>&1; then
+        if python3 - "$opencode_config" << 'PYEOF'
+import json, sys
 
-    # Install dependencies with uv
-    info "Installing dependencies with uv..."
-    if uv sync --extra treesitter-full 2>/dev/null; then
-        success "code-graph-rag dependencies installed"
+path = sys.argv[1]
+with open(path) as f:
+    cfg = json.load(f)
+
+mcp = cfg.setdefault("mcp", {})
+if "graphify" in mcp:
+    print("already-present")
+    sys.exit(0)
+
+mcp["graphify"] = {
+    "type": "remote",
+    "url": "http://localhost:3851/mcp",
+    "enabled": True,
+}
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2)
+print("registered")
+PYEOF
+        then
+            success "graphify MCP server registered in OpenCode config"
+        else
+            warning "Failed to register graphify MCP server in OpenCode config"
+        fi
     else
-        warning "Failed to install code-graph-rag dependencies"
-        INSTALLATION_WARNINGS+=("code-graph-rag: uv sync failed")
-        cd "$CODING_REPO"
-        return 1
+        info "OpenCode config or python3 not found - skipping graphify MCP registration"
     fi
 
-    # Create .env if not exists
-    if [[ ! -f "$CODE_GRAPH_RAG_DIR/.env" ]]; then
-        # T2 egress lockdown: route LLM calls via the host llm-cli-proxy (:12435)
-        # OpenAI-compat shim (/v1/codegraph stamps agent='codegraph') instead of
-        # handing code-graph-rag a raw provider key.
-        cat > "$CODE_GRAPH_RAG_DIR/.env" << 'ENVEOF'
-# code-graph-rag configuration
-MEMGRAPH_HOST=localhost
-MEMGRAPH_PORT=7687
-MEMGRAPH_BATCH_SIZE=1000
-
-# LLM calls route via the host llm-cli-proxy OpenAI-compat shim (no raw key)
-CYPHER_PROVIDER=openai
-CYPHER_MODEL=claude-haiku-4-5
-CYPHER_ENDPOINT=http://host.docker.internal:12435/v1/codegraph
-CYPHER_API_KEY=proxy-routed
-ORCHESTRATOR_PROVIDER=openai
-ORCHESTRATOR_MODEL=claude-haiku-4-5
-ORCHESTRATOR_ENDPOINT=http://host.docker.internal:12435/v1/codegraph
-ORCHESTRATOR_API_KEY=proxy-routed
-ENVEOF
-        info "Created .env with proxy-routed LLM configuration"
-    else
-        # Migrate legacy direct-Groq .env entries to the proxy route
-        if grep -q "api.groq.com" "$CODE_GRAPH_RAG_DIR/.env"; then
-            warn "code-graph-rag .env still points at api.groq.com — re-run with the file removed to regenerate proxy-routed config"
-        fi
-    fi
-
-    # Create docker-compose.yaml for Memgraph if not exists
-    if [[ ! -f "$CODE_GRAPH_RAG_DIR/docker-compose.yaml" ]]; then
-        cat > "$CODE_GRAPH_RAG_DIR/docker-compose.yaml" << 'DCEOF'
-# Memgraph database for code-graph-rag
-version: '3.8'
-services:
-  memgraph:
-    image: memgraph/memgraph-platform
-    container_name: code-graph-memgraph
-    ports:
-      - "7687:7687"   # Bolt protocol
-      - "7444:7444"   # HTTPS
-      - "3100:3000"   # Memgraph Lab (UI)
-    volumes:
-      - memgraph_data:/var/lib/memgraph
-    restart: unless-stopped
-    environment:
-      - MEMGRAPH_TELEMETRY_ENABLED=false
-
-volumes:
-  memgraph_data:
-DCEOF
-        info "Created docker-compose.yaml for Memgraph"
-    fi
-
-    # Download pre-built cache from GitHub Release (if available)
-    download_cgr_cache() {
-        local cache_url="https://github.com/fwornle/code-graph-rag/releases/download/v1.0.0-cache-coding/cgr-cache-coding.tar.gz"
-        local cache_dir="$CODE_GRAPH_RAG_DIR/shared-data"
-
-        info "Checking for pre-built code-graph-rag cache..."
-
-        # Skip if cache already exists with metadata
-        if [[ -f "$cache_dir/cache-metadata.json" ]]; then
-            info "Cache already exists, skipping download"
-            return 0
-        fi
-
-        # Try to download cache
-        if curl -fsSL --head "$cache_url" >/dev/null 2>&1; then
-            info "Downloading pre-built cache (saves ~20 min indexing)..."
-            local tmp_file="/tmp/cgr-cache-$$.tar.gz"
-            if curl -fsSL "$cache_url" -o "$tmp_file" 2>/dev/null; then
-                mkdir -p "$cache_dir"
-                tar -xzf "$tmp_file" -C "$CODE_GRAPH_RAG_DIR" 2>/dev/null && \
-                    success "Pre-built cache downloaded and extracted" || \
-                    warning "Failed to extract cache - will need to index on first run"
-                rm -f "$tmp_file"
-            else
-                warning "Cache download failed - will need to index on first run"
-            fi
-        else
-            info "No pre-built cache available yet - will need to index on first run"
-            info "  Run: cd integrations/code-graph-rag && uv run graph-code load-index /path/to/repo"
-        fi
-    }
-
-    download_cgr_cache
-
-    # Reindex CGR cache if stale (requires Docker for Memgraph)
-    reindex_cgr_if_needed() {
-        local staleness_script="$CODE_GRAPH_RAG_DIR/scripts/check-cache-staleness.sh"
-        local reindex_script="$CODE_GRAPH_RAG_DIR/scripts/reindex-with-metadata.sh"
-
-        # Check if staleness script exists
-        if [[ ! -x "$staleness_script" ]]; then
-            info "CGR staleness check script not found, skipping reindex"
-            return 0
-        fi
-
-        # Check cache staleness
-        info "Checking CGR cache freshness..."
-        local staleness_json
-        staleness_json=$("$staleness_script" "$CODING_REPO" 2>/dev/null) || true
-
-        local is_stale=$(echo "$staleness_json" | jq -r '.is_stale // true' 2>/dev/null)
-        local commits_behind=$(echo "$staleness_json" | jq -r '.commits_behind // "unknown"' 2>/dev/null)
-
-        if [[ "$is_stale" != "true" ]]; then
-            success "CGR cache is fresh"
-            return 0
-        fi
-
-        info "CGR cache is stale ($commits_behind commits behind)"
-
-        # Check if Docker is available
-        if ! command -v docker &>/dev/null; then
-            warning "Docker not available - CGR reindex skipped"
-            info "  Run manually: cd integrations/code-graph-rag && docker-compose up -d && ./scripts/reindex-with-metadata.sh"
-            return 0
-        fi
-
-        # Check if Docker daemon is running
-        if ! docker info &>/dev/null; then
-            warning "Docker daemon not running - CGR reindex skipped"
-            info "  Start Docker and run: cd integrations/code-graph-rag && docker-compose up -d && ./scripts/reindex-with-metadata.sh"
-            return 0
-        fi
-
-        info "Starting Memgraph for CGR reindex..."
-        cd "$CODE_GRAPH_RAG_DIR"
-
-        # Start Memgraph container
-        if ! docker-compose up -d 2>/dev/null; then
-            warning "Failed to start Memgraph - CGR reindex skipped"
-            cd "$CODING_REPO"
-            return 0
-        fi
-
-        # Wait for Memgraph to be ready (max 30 seconds)
-        info "Waiting for Memgraph to be ready..."
-        local max_wait=30
-        local waited=0
-        while ! docker-compose exec -T memgraph mgconsole -c "RETURN 1" &>/dev/null; do
-            sleep 1
-            ((waited++))
-            if [[ $waited -ge $max_wait ]]; then
-                warning "Memgraph not ready after ${max_wait}s - CGR reindex skipped"
-                cd "$CODING_REPO"
-                return 0
-            fi
-        done
-
-        success "Memgraph ready"
-
-        # Run reindex
-        info "Reindexing CGR cache (this may take a few minutes)..."
-        if [[ -x "$reindex_script" ]]; then
-            if "$reindex_script" "$CODING_REPO" "coding" 2>&1 | tail -5; then
-                success "CGR cache reindexed successfully"
-            else
-                warning "CGR reindex had issues - check logs in integrations/code-graph-rag/shared-data/reindex.log"
-            fi
-        else
-            warning "Reindex script not executable"
-        fi
-
-        cd "$CODING_REPO"
-    }
-
-    reindex_cgr_if_needed
-
-    success "code-graph-rag installed"
-    info "  - Memgraph Lab: http://localhost:3100"
-    info "  - MCP server: uv run graph-code mcp-server"
+    success "graphify installed"
+    info "  - MCP server: http://localhost:3851/mcp (served by coding-graphify container)"
 
     cd "$CODING_REPO"
 }
@@ -2778,7 +2577,7 @@ main() {
     install_semantic_analysis
     install_constraint_monitor
     install_system_health_dashboard
-    install_code_graph_rag
+    install_graphify
     configure_docker_mode
     create_command_wrappers
     setup_unified_launcher
