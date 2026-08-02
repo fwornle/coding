@@ -11,11 +11,11 @@
 # MCP server and by code-graph-agent (which reads the file directly).
 set -euo pipefail
 
-CONTAINER="${GRAPHIFY_CONTAINER:-coding-graphify}"
+CONTAINER="${GRAPHIFY_CONTAINER:-coding-services}"
 
 if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "${CONTAINER}"; then
     echo "graphify: container '${CONTAINER}' is not running." >&2
-    echo "  Start it with:  cd docker && docker-compose up -d graphify" >&2
+    echo "  Start it with:  cd docker && docker-compose up -d coding-services" >&2
     exit 1
 fi
 

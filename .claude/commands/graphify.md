@@ -6,7 +6,7 @@ description: Query and rebuild the project's code knowledge graph (graphify). Us
 # /graphify
 
 Graphify turns this repo into a navigable code knowledge graph (tree-sitter AST → static
-`graph.json`), served over an HTTP MCP endpoint. All Python runs **inside the `coding-graphify`
+`graph.json`), served over an HTTP MCP endpoint. All Python runs **inside the `coding-services`
 container** — the host `graphify` command (`bin/graphify`) forwards to it via `docker exec`.
 
 - **Graph output:** `.data/graphify/graphify-out/graph.json` (bind-mounted; `built_at_commit` stamps the indexed commit)
@@ -48,7 +48,7 @@ output is written to the bind-mounted `.data/graphify`.
 
 ## Notes
 
-- If `graphify: container 'coding-graphify' is not running` appears, start it:
-  `cd docker && docker-compose up -d graphify`.
+- If `graphify: container 'coding-services' is not running` appears, start it:
+  `cd docker && docker-compose up -d coding-services`.
 - The graph is file-based — no database. It persists across sessions in `.data/graphify`.
 - This replaces the former code-graph-rag / Memgraph stack.
