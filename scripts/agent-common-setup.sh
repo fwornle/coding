@@ -838,6 +838,7 @@ export -f ensure_statusline_config
 export -f initialize_unified_hooks
 export -f detect_corporate_network
 export -f test_proxy_connectivity
+export -f ensure_proxydetox_up
 export -f configure_proxy_if_needed
 export -f detect_network_and_configure_proxy
 export -f agent_common_init
