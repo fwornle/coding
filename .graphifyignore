@@ -1,0 +1,38 @@
+# graphify ignore file (.gitignore syntax) — scopes the code-graph extraction to
+# project SOURCE, excluding vendored deps, build outputs, data, and logs. This is
+# read directly by graphify (independent of git) and "can only ever exclude MORE",
+# so it is the authoritative guard against walking node_modules etc.
+
+# Vendored / installed dependencies
+node_modules/
+**/node_modules/
+.venv/
+**/.venv/
+venv/
+**/__pycache__/
+*.egg-info/
+
+# Build / compiled outputs
+dist/
+**/dist/
+build/
+**/build/
+*.min.js
+*.map
+
+# Runtime data, caches, exports, logs (not source)
+.data/
+.observations/
+.cache/
+**/.cache/
+logs/
+.logs/
+coverage/
+**/coverage/
+
+# Session logs / planning history (large, non-code)
+.specstory/
+
+# VCS
+.git/
+**/.git/

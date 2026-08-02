@@ -17,3 +17,6 @@
 [submodule "lib/km-core"]
 	path = lib/km-core
 	url = git@github.com:fwornle/km-core.git
+[submodule "integrations/graphify"]
+	path = integrations/graphify
+	url = https://github.com/Graphify-Labs/graphify.git

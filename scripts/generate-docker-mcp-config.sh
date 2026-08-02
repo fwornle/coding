@@ -26,6 +26,7 @@ fi
 SEMANTIC_ANALYSIS_PORT="${SEMANTIC_ANALYSIS_PORT:-3848}"
 CONSTRAINT_MONITOR_PORT="${CONSTRAINT_MONITOR_PORT:-3849}"
 CODE_GRAPH_RAG_PORT="${CODE_GRAPH_RAG_PORT:-3850}"
+GRAPHIFY_MCP_PORT="${GRAPHIFY_MCP_PORT:-3851}"
 
 # Generate the Docker MCP configuration
 cat > "$OUTPUT_FILE" << EOF
@@ -53,6 +54,10 @@ cat > "$OUTPUT_FILE" << EOF
       "env": {
         "CODE_GRAPH_RAG_SSE_URL": "http://localhost:$CODE_GRAPH_RAG_PORT"
       }
+    },
+    "graphify": {
+      "type": "http",
+      "url": "http://localhost:$GRAPHIFY_MCP_PORT/mcp"
     }
   }
 }
@@ -63,3 +68,4 @@ log "Services configured:"
 log "  - semantic-analysis -> http://localhost:$SEMANTIC_ANALYSIS_PORT"
 log "  - constraint-monitor -> http://localhost:$CONSTRAINT_MONITOR_PORT"
 log "  - code-graph-rag -> http://localhost:$CODE_GRAPH_RAG_PORT"
+log "  - graphify -> http://localhost:$GRAPHIFY_MCP_PORT/mcp"

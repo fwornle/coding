@@ -36,6 +36,10 @@
         "MEMGRAPH_HOST": "localhost",
         "MEMGRAPH_PORT": "7687"
       }
+    },
+    "graphify": {
+      "type": "http",
+      "url": "http://localhost:3851/mcp"
     }
   }
 }

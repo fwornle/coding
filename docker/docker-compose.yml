@@ -252,6 +252,55 @@ services:
       retries: 5
       start_period: 30s
 
+  # ===========================================
+  # Graphify — code-knowledge-graph engine
+  # ===========================================
+  # Replaces code-graph-rag + Memgraph. Builds from the vendored submodule
+  # (integrations/graphify); parses code with tree-sitter into a static
+  # graph.json under the bind-mounted .data/graphify, then serves it over the
+  # HTTP MCP transport. The host talks to it only via `docker exec` (bin/graphify)
+  # or the /mcp endpoint. (Phase 1: coexists with code-graph-rag; CGR + Memgraph
+  # are removed in Phase 4.)
+  graphify:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.graphify
+    container_name: coding-graphify
+    restart: unless-stopped
+    ports:
+      - "3851:3851"     # Graphify HTTP MCP (path /mcp)
+    environment:
+      - GRAPHIFY_OUT=/coding/.data/graphify/graphify-out
+      - GRAPHIFY_TARGET=/workspace/coding
+      - GRAPHIFY_MCP_PORT=3851
+      # Full (docs/PDF) extraction routes through the host llm-cli-proxy's
+      # OpenAI-compatible shim. T2 egress lockdown: no raw provider keys here —
+      # only the local proxy endpoint. Code extraction (--code-only/update) needs
+      # no LLM at all. Model mirrors CGR's known-good /v1/codegraph value.
+      - OPENAI_BASE_URL=http://host.docker.internal:12435/v1/codegraph
+      - OPENAI_API_KEY=proxy-local
+      - OPENAI_MODEL=gpt-4o-mini
+      - no_proxy=localhost,127.0.0.1,host.docker.internal
+      - NO_PROXY=localhost,127.0.0.1,host.docker.internal
+    volumes:
+      # graph.json output (rw) — shared with coding-services so code-graph-agent
+      # can read it directly (Phase 3).
+      - ${CODING_REPO:-.}/.data:/coding/.data:rw
+      # Repos to graph (ro) — coding lives at /workspace/coding, incl. its .git
+      # so graphify can stamp built_at_commit.
+      - ${HOME}/Agentic:/workspace:ro
+    networks:
+      - coding-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      # MCP streamable-http may not 200 on a bare GET, so probe the TCP port.
+      test: ["CMD-SHELL", "python -c \"import socket; socket.create_connection(('localhost',3851),2)\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
 # ===========================================
 # Networks
 # ===========================================
