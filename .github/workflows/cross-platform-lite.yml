@@ -1,0 +1,61 @@
+# Cross-platform "lite" CI for the coding tools installer + test suite.
+#
+# Runs on GitHub's hosted ubuntu / macOS / Windows runners. It proves the shell
+# scripts are PORTABLE and degrade gracefully — it does NOT prove a full working
+# stack (that needs Docker, an authenticated agent CLI, and the private
+# submodules; use self-hosted runners for that). See docs/ci/README.md.
+
+name: cross-platform-lite
+
+on:
+  pull_request: {}
+  workflow_dispatch: {}
+  # push:
+  #   branches: [ main ]   # ← uncomment to also run on every push to main
+
+jobs:
+  portability:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash          # Windows runs these under Git-Bash — scripts are bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false  # lite: private submodules aren't reachable here
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Syntax gate — bash -n on every tracked shell script
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            if ! bash -n "$f"; then echo "SYNTAX ERROR: $f"; fail=1; fi
+          done < <(git ls-files '*.sh')
+          exit $fail
+
+      - name: install.sh — help, OS detection, and unattended gate behaviour
+        run: |
+          set -e
+          bash install.sh --help >/dev/null
+          # Source the installer (main() is guarded, so it does NOT install) and
+          # exercise the CI-lite gates: they must warn + continue, never exit,
+          # when core deps / agent CLI are missing.
+          source ./install.sh
+          detect_platform
+          echo "Detected PLATFORM=$PLATFORM"
+          [ -n "$PLATFORM" ] || { echo "OS detection failed"; exit 1; }
+          ( CI_LITE=true; NON_INTERACTIVE=true; check_dependencies ) \
+            || { echo "check_dependencies exited under CI_LITE"; exit 1; }
+          ( CI_LITE=true; NON_INTERACTIVE=true; detect_agents ) \
+            || { echo "detect_agents exited under CI_LITE"; exit 1; }
+          echo "unattended gates warn-and-continue on $PLATFORM"
+
+      - name: test-coding.sh --ci — full suite, unsatisfied checks are non-fatal
+        run: bash scripts/test-coding.sh --ci
