@@ -127,6 +127,9 @@ services:
       # added /api/* reverse-proxy and we need host edits to take effect without
       # a Docker image rebuild — same pattern as server.js above).
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/static-server.js:/coding/integrations/system-health-dashboard/static-server.js:ro
+      # Graphify re-index script (spawned by the dashboard Re-index button);
+      # live-mounted so host edits take effect without an image rebuild.
+      - ${CODING_REPO:-.}/scripts/graphify-reindex.sh:/coding/scripts/graphify-reindex.sh:ro
       # Constraint monitor source (live-mounted so dashboard-server changes
       # don't require an image rebuild).
       - ${CODING_REPO:-.}/integrations/mcp-constraint-monitor/src:/coding/integrations/mcp-constraint-monitor/src:ro
