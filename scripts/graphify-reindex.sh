@@ -44,21 +44,72 @@ write_progress running "Extracting code graph (${MODE})"
         # when there is no usable git baseline or the change set is large (>500).
         # Viz is skipped either way (GRAPHIFY_VIZ_NODE_LIMIT=0); clustering/communities
         # are kept intact.
-        # Read the graph's built_at_commit. Retry once — right after a container
-        # (re)start the 61MB graph.json read can transiently fail over the bind
-        # mount, and an empty baseline needlessly falls back to a slow full scan.
+        # Baseline = the last commit we successfully indexed to, recorded in OUR
+        # own metadata sidecar (re-stamped to HEAD after every run below). We do
+        # NOT use graph.json's built_at_commit as the baseline: graphify freezes
+        # it on the "no topology change -> outputs left untouched" path, so it
+        # would pin every incremental diff to an ever-older commit and re-extract
+        # the same files on every run forever (never reaching the 0-change no-op).
+        # The sidecar advances each run, so a clean tree at HEAD => 0 changed =>
+        # near-instant. Fall back to graph.json only when the sidecar is absent
+        # (e.g. immediately after a fresh full build). Retry the read: right after
+        # a container (re)start the bind-mount read can transiently fail.
         BUILT=""
         for _try in 1 2 3; do
-            BUILT=$("$PYBIN" -c "import json;print(json.load(open('$OUT/graph.json')).get('built_at_commit') or '')" 2>>"$LOG" || true)
+            BUILT=$("$PYBIN" -c "import json,os;p='$META';print((json.load(open(p)).get('commit_hash') or '') if os.path.exists(p) else '')" 2>>"$LOG" || true)
             [ -n "$BUILT" ] && break
             sleep 1
         done
+        if [ -z "$BUILT" ]; then
+            BUILT=$("$PYBIN" -c "import json;print(json.load(open('$OUT/graph.json')).get('built_at_commit') or '')" 2>>"$LOG" || true)
+        fi
         CHANGED=""
+        BUILT_OK=0
         if [ -n "$BUILT" ] && git cat-file -e "${BUILT}^{commit}" 2>/dev/null; then
+            BUILT_OK=1
             CHANGED=$( { git diff --name-only "$BUILT" HEAD; git diff --name-only HEAD; git ls-files --others --exclude-standard; } 2>/dev/null | sort -u | sed '/^$/d' )
         fi
+        # Drop paths graphify never graphs (.graphifyignore/.gitignore: .data/,
+        # dist/, logs/, .specstory/, node_modules/, …). `git diff` lists them, but
+        # counting them would force a full whole-graph rebuild for pure noise —
+        # e.g. this repo's .data/ export churn keeps NCHANGED>0 forever, so the
+        # 0-change no-op path could never engage and every re-index paid ~30s+.
+        # Uses the SAME matcher graphify's detect() uses. Fail-safe: on any error
+        # the python exits non-zero and we keep the unfiltered set (worst case a
+        # needless rebuild, never a skipped one).
+        if [ -n "$CHANGED" ]; then
+            FILTERED=$(GRAPHIFY_CHANGED_RAW="$CHANGED" "$PYBIN" - <<'PY' 2>>"$LOG"
+import os
+from pathlib import Path
+from graphify.detect import _load_graphifyignore, _is_ignored, CODE_EXTENSIONS
+root = Path('.').resolve()
+raw = [l.strip() for l in os.environ.get('GRAPHIFY_CHANGED_RAW', '').splitlines() if l.strip()]
+pats = _load_graphifyignore(root)   # raises on failure -> non-zero exit -> keep raw
+cache = {}
+kept = []
+for f in raw:
+    try:
+        p = root / f
+        # update mode builds the CODE graph only: a changed doc/image/config
+        # can't alter code topology, so it must not trigger a whole-graph rebuild.
+        if p.suffix not in CODE_EXTENSIONS:
+            continue
+        if not _is_ignored(p, root, pats, _cache=cache):
+            kept.append(f)
+    except Exception:
+        kept.append(f)              # keep on per-file uncertainty
+print('\n'.join(kept))
+PY
+) && CHANGED="$FILTERED"
+        fi
         NCHANGED=$(printf '%s' "$CHANGED" | grep -c . || true)
-        if [ -n "$BUILT" ] && [ "${NCHANGED:-0}" -gt 0 ] && [ "${NCHANGED:-0}" -le 500 ]; then
+        if [ "$BUILT_OK" = 1 ] && [ "${NCHANGED:-0}" -eq 0 ]; then
+            # Already current: nothing changed since the graph's baseline. Do NOT
+            # fall through to a full re-extract (~90s for zero benefit) — the graph
+            # already reflects this tree; the metadata step below re-stamps the
+            # freshness marker to HEAD so the dashboard clears "N commits behind".
+            echo "Up to date: 0 file(s) changed since ${BUILT} — skipping extraction."
+        elif [ "$BUILT_OK" = 1 ] && [ "${NCHANGED:-0}" -gt 0 ] && [ "${NCHANGED:-0}" -le 500 ]; then
             echo "Incremental (changed-files): ${NCHANGED} file(s) changed since ${BUILT} — re-extracting only those."
             GRAPHIFY_VIZ_NODE_LIMIT=0 GRAPHIFY_OUT="$OUT" GRAPHIFY_CHANGED="$CHANGED" "$PYBIN" - <<'PY'
 import os
@@ -93,12 +144,16 @@ write_progress running "Writing metadata"
 import json, sys, subprocess, datetime
 graph, meta, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 d = json.load(open(graph))
-commit = d.get("built_at_commit")
-if not commit:
-    try:
-        commit = subprocess.check_output(["git", "-C", repo, "rev-parse", "HEAD"], text=True).strip()
-    except Exception:
-        commit = None
+# Freshness marker = the commit the graph now reflects. A successful reindex
+# always brings the graph up to the current working tree (incremental re-extracts
+# diff(baseline..HEAD) + worktree + untracked; full rebuilds from scratch), so
+# HEAD is authoritative. graph.json's own built_at_commit is NOT trustworthy here:
+# graphify's watch.py leaves it stale on the "no topology change -> outputs left
+# untouched" path, which otherwise pins the dashboard at "N commits behind" forever.
+try:
+    commit = subprocess.check_output(["git", "-C", repo, "rev-parse", "HEAD"], text=True).strip()
+except Exception:
+    commit = d.get("built_at_commit")
 nodes = len(d.get("nodes", []))
 edges = len(d.get("links", d.get("edges", [])))
 json.dump({

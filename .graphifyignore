@@ -36,3 +36,6 @@ coverage/
 # VCS
 .git/
 **/.git/
+
+# Agent local machine-state — tracked but constantly rewritten; never source.
+.claude/settings.local.json
