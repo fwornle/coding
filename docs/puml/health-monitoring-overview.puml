@@ -52,7 +52,7 @@ package "Probed services" {
   component "Semantic Analysis SSE\n:3848" as SA <<infra>>
   component "LLM CLI Proxy\n:12435" as PROXY <<infra>>
   component "obs_api\n:3035" as OBS <<infra>>
-  component "Memgraph / LevelDB\nQdrant" as DBS <<storage>>
+  component "graphify graph.json\nLevelDB / Qdrant" as DBS <<storage>>
   component "Container healthcheck" as CONTAINER <<infra>>
   component "Network (PAC URL\n+ proxy :3128)" as NET <<infra>>
   note bottom of NET
@@ -65,7 +65,7 @@ package "Probed services" {
     **Sub-check probes**
     leveldb_lock_check: LevelDB lock file
     qdrant_availability: Qdrant REST :6333
-    graph_integrity: Memgraph TCP :7687
+    graph_integrity: graphify graph.json + :3851
     stale_pids: orphan heartbeat files
     All probed every coordinator tick
     and mapped to passed/failed.

@@ -85,16 +85,15 @@ RUN cd integrations/system-health-dashboard && npm install --ignore-scripts 2>/d
 # ============================================================
 FROM base AS python-deps
 
-WORKDIR /coding/integrations/code-graph-rag
-
-# Copy all Python project files (needed for editable install)
-COPY integrations/code-graph-rag/ ./
-
-# Create virtual environment with Python 3.12 and install dependencies
+# Graphify — code knowledge graph engine (the code-graph engine; replaced
+# code-graph-rag + Memgraph). Own venv so its deps stay isolated.
+# [mcp]=HTTP MCP transport, [pdf,office]=docs extraction, [openai]=OpenAI-compatible
+# backend routed through the host llm-cli-proxy.
+WORKDIR /coding/integrations/graphify
+COPY integrations/graphify/ ./
 RUN uv venv --python 3.12 .venv && \
     . .venv/bin/activate && \
-    uv pip install -e "." && \
-    uv pip install -e ".[treesitter-full]" || true
+    uv pip install ".[mcp,pdf,office,openai]"
 
 # Embedding model for KG operators
 WORKDIR /coding/integrations/mcp-server-semantic-analysis
@@ -224,9 +223,15 @@ COPY --from=builder /coding/knowledge-management ./knowledge-management
 COPY --from=builder /coding/local_cache ./local_cache
 
 # Copy Python virtual environments
-COPY --from=python-deps /coding/integrations/code-graph-rag/.venv ./integrations/code-graph-rag/.venv
 COPY --from=python-deps /coding/integrations/mcp-server-semantic-analysis/.embedding-venv ./integrations/mcp-server-semantic-analysis/.embedding-venv
-COPY integrations/code-graph-rag/ ./integrations/code-graph-rag/
+
+# Graphify venv + source + CLI wrapper on PATH (the code-graph engine).
+COPY --from=python-deps /coding/integrations/graphify/.venv ./integrations/graphify/.venv
+COPY integrations/graphify/ ./integrations/graphify/
+COPY docker/graphify-serve.sh /usr/local/bin/graphify-serve.sh
+RUN chmod +x /usr/local/bin/graphify-serve.sh && \
+    printf '#!/bin/sh\nexec /coding/integrations/graphify/.venv/bin/graphify "$@"\n' > /usr/local/bin/graphify && \
+    chmod +x /usr/local/bin/graphify
 
 # Copy configuration files
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -243,13 +248,14 @@ RUN mkdir -p /coding/.data /coding/.specstory /coding/.health
 ENV SEMANTIC_ANALYSIS_PORT=3848 \
     BROWSER_ACCESS_PORT=3847 \
     CONSTRAINT_MONITOR_PORT=3849 \
-    CODE_GRAPH_RAG_PORT=3850 \
+    GRAPHIFY_MCP_PORT=3851 \
+    GRAPHIFY_OUT=/coding/.data/graphify/graphify-out \
     VKB_PORT=8080 \
     HEALTH_DASHBOARD_PORT=3032 \
     HEALTH_DASHBOARD_WS_PORT=3033
 
 # Expose all service ports
-EXPOSE 3030 3031 3032 3033 3847 3848 3849 3850 8080
+EXPOSE 3030 3031 3032 3033 3847 3848 3849 3851 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

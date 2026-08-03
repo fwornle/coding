@@ -193,7 +193,7 @@ const counts = await queryEngine.aggregateByEntityClass('coding');
 
 1. **Six facets** -- Prevents the ontology from becoming a flat grab-bag. Each facet answers a clear question.
 2. **Node vs property** -- Nodes have relationships to other things. Properties are scalar attributes of one thing. This prevents bloat.
-3. **File granularity** -- File is the atomic level. Functions/classes are delegated to code-graph-rag. Features are the coarsest level.
+3. **File granularity** -- File is the atomic level. Functions/classes are delegated to graphify. Features are the coarsest level.
 4. **Contract as a node** -- Contracts are reusable (multiple services fulfill one contract) and testable independently.
 5. **Limitation as a node** -- Limitations are shared across services, linked to planned revisions, and can chain causally.
 6. **Quality as properties** -- Complexity, maturity, and test coverage are scalar measurements. Promote to nodes only if relationships are needed.

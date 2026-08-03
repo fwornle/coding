@@ -60,7 +60,7 @@ Forgetting step 1 is a recurring issue — committed source looks correct but `d
 **Submodules requiring both steps:**
 - `integrations/mcp-server-semantic-analysis`
 - `integrations/mcp-constraint-monitor`
-- `integrations/code-graph-rag`
+- `integrations/graphify` (git submodule built into the `coding-services` image; Python — no `npm run build`, but a Docker rebuild is needed to pick up source changes)
 
 **After ANY code change to a submodule:**
 ```bash
@@ -97,7 +97,7 @@ Symptom of the stale-cache bug: the dashboard backend exits with `SyntaxError: I
 
 ## Code Graph Analysis
 
-`mcp__semantic-analysis__analyze_code_graph` with actions: `nl_query`, `query`, `call_graph`, `similar`. Requires Memgraph running.
+`mcp__semantic-analysis__analyze_code_graph` with actions: `nl_query`, `query`, `call_graph`, `similar`. Reads graphify's static `graph.json` (`.data/graphify/graphify-out/graph.json`) — no Memgraph, no database. Rebuild the graph with `graphify update` (host `bin/graphify` shim → `coding-services`) when it drifts behind HEAD. Graphify also serves its own HTTP MCP endpoint at `http://localhost:3851/mcp` (tools: `query_graph`/`get_node`/`get_neighbors`/`shortest_path`/`graph_stats`/`god_nodes`); the `/graphify` skill is the preferred entry point.
 
 ## Available Skills (Auto-Generated)
 
@@ -106,6 +106,7 @@ Read the full skill file when a task matches its description.
 
 - **/documentation-style** (`.claude/commands/documentation-style.md`): Enforce consistent styling for documentation artifacts (PlantUML, Mermaid, markdown, PNG diagrams).
 - **/experiment** (`.claude/commands/experiment.md`): Describe a cross-agent experiment in plain English (or with flags), then auto-run the matrix, compare, and render the ranked variant table
+- **/graphify** (`.claude/commands/graphify.md`): Query and rebuild the project's code knowledge graph (graphify). Use for any question about the codebase — architecture, "what calls X", "where is Y", file/function relationships, data-flow tracing — instead of blind greps. The graph is a static graph.json served over MCP by the coding-graphify container; rebuild it with `graphify update` when it's stale.
 - **/playwright-cli** (`.claude/commands/playwright-cli.md`): Use this skill whenever the user wants to automate a browser, scrape web content, take screenshots or PDFs of pages, fill out forms, click through UI flows, or run end-to-end tests — without using an MCP server. This skill drives Playwright directly from the bash_tool via Node.js scripts. Trigger whenever the user says things like "open this URL", "screenshot this page", "scrape this site", "automate this form", "test this UI", "extract data from", "click through", "check if this page works", or any task that requires real browser interaction. Prefer this skill over web_fetch when JavaScript rendering, authentication, interaction, or visual output is needed.
 - **/sl** (`.claude/commands/sl.md`): Load session logs (LSL) from current and coding projects for continuity
 

@@ -197,9 +197,6 @@ const PORTS = {
   CONSTRAINT_API: parseInt(process.env.CONSTRAINT_API_PORT || '3031', 10),
   SYSTEM_HEALTH_DASHBOARD: parseInt(process.env.SYSTEM_HEALTH_DASHBOARD_PORT || '3032', 10),
   SYSTEM_HEALTH_API: parseInt(process.env.SYSTEM_HEALTH_API_PORT || '3033', 10),
-  MEMGRAPH_BOLT: parseInt(process.env.MEMGRAPH_BOLT_PORT || '7687', 10),
-  MEMGRAPH_HTTPS: parseInt(process.env.MEMGRAPH_HTTPS_PORT || '7444', 10),
-  MEMGRAPH_LAB: parseInt(process.env.MEMGRAPH_LAB_PORT || '3100', 10),
   LLM_CLI_PROXY: parseInt(process.env.LLM_CLI_PROXY_PORT || '12435', 10),
   OBSERVATIONS_API: parseInt(process.env.OBSERVATIONS_API_PORT || '12436', 10),
 };
@@ -623,36 +620,6 @@ const SERVICE_CONFIGS = {
   // (and the invocation that spawned it from main()) was removed along
   // with the deleted script.
 
-  memgraph: {
-    name: 'Memgraph (Code Graph RAG)',
-    required: false, // OPTIONAL - for code-graph-rag AST analysis
-    maxRetries: 2,
-    timeout: 45000, // Memgraph can take time to start
-    startFn: async () => {
-      // Memgraph is provided by the coding-services container.
-      process.stderr.write('[Memgraph] Memgraph provided by coding-services - skipping standalone container\n');
-      return {
-        service: 'memgraph-docker',
-        mode: 'coding-services-builtin',
-        ports: { bolt: PORTS.MEMGRAPH_BOLT, https: PORTS.MEMGRAPH_HTTPS, lab: PORTS.MEMGRAPH_LAB }
-      };
-    },
-    healthCheckFn: async (result) => {
-      try {
-        const isListening = await isTcpPortListening(PORTS.MEMGRAPH_BOLT);
-        if (isListening) {
-          process.stderr.write(`[Memgraph] Bolt port ${PORTS.MEMGRAPH_BOLT} listening (coding-services builtin)\n`);
-          return true;
-        }
-        process.stderr.write(`[Memgraph] Bolt port ${PORTS.MEMGRAPH_BOLT} not yet listening\n`);
-        return false;
-      } catch (error) {
-        process.stderr.write(`[Memgraph] health check error: ${error.message}\n`);
-        return false;
-      }
-    }
-  },
-
   systemHealthDashboardAPI: {
     name: 'System Health Dashboard API',
     required: false, // OPTIONAL - system health dashboard
@@ -1016,17 +983,6 @@ async function createServicesStatusFile(results) {
       health: results.successful.some(r => r.serviceName === 'System Health Dashboard API')
         ? 'healthy'
         : 'degraded'
-    },
-    memgraph: {
-      status: results.successful.some(r => r.serviceName === 'Memgraph (Code Graph RAG)')
-        ? '✅ OPERATIONAL'
-        : '⚠️ DEGRADED',
-      bolt_port: PORTS.MEMGRAPH_BOLT,
-      lab_port: PORTS.MEMGRAPH_LAB,
-      health: results.successful.some(r => r.serviceName === 'Memgraph (Code Graph RAG)')
-        ? 'healthy'
-        : 'degraded',
-      purpose: 'AST-based code knowledge graph (code-graph-rag)'
     }
   };
 
@@ -1297,25 +1253,6 @@ async function startAllServices() {
   }
 
   console.log('');
-
-  // 8. OPTIONAL: Memgraph (Code Graph RAG)
-  const memgraphResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.memgraph.name,
-    SERVICE_CONFIGS.memgraph.startFn,
-    SERVICE_CONFIGS.memgraph.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.memgraph.required,
-      maxRetries: SERVICE_CONFIGS.memgraph.maxRetries,
-      timeout: SERVICE_CONFIGS.memgraph.timeout
-    }
-  );
-
-  if (memgraphResult.status === 'success') {
-    results.successful.push(memgraphResult);
-    // No PSM registration for Docker-based service
-  } else {
-    results.degraded.push(memgraphResult);
-  }
 
   console.log('');
 

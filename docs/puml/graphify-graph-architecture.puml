@@ -1,0 +1,99 @@
+@startuml graphify-graph-architecture
+!include _standard-style.puml
+
+title Graphify Graph Architecture (build / serve / staleness)
+
+' Layout: top-down vertical flow
+top to bottom direction
+
+' ============================================
+' Source layer
+' ============================================
+package "Source Code" as src {
+  folder "Repository" as repo {
+    file "*.py, *.ts, *.js" as srcfiles
+  }
+  file "Git HEAD\n(current commit)" as githead
+}
+
+' ============================================
+' Build layer (graphify update)
+' ============================================
+package "Build (graphify update)" as build {
+  component "Extractor / Parser\n(graphify update)" as extractor <<core>>
+  component "Graph Builder\n(functions, classes, calls)" as builder <<core>>
+}
+
+' ============================================
+' Static graph store (bind-mounted)
+' ============================================
+package "Graph Store (.data/graphify, bind mount)" as store {
+  file "graph.json\n(static)\nbuilt_at_commit: <sha>" as graphjson <<storage>>
+}
+
+' ============================================
+' Serve layer (inside coding-services container)
+' ============================================
+package "coding-services container" as container {
+  component "graphify\nHTTP MCP :3851 (/mcp)\n(supervisord: mcp-servers:graphify)" as graphify <<agent>>
+  component "semantic-analysis\nanalyze_code_graph" as sem <<api>>
+}
+
+' ============================================
+' Consumers
+' ============================================
+package "Consumers" as consumers {
+  component "Claude / Agents\n(MCP client)" as agents <<cli>>
+  component "Health Dashboard\n:3032 (Re-index button)" as dash <<api>>
+}
+
+' ============================================
+' Health / staleness
+' ============================================
+package "Health Monitoring" as health {
+  component "Health Verifier" as verifier <<util>>
+}
+
+' ============================================
+' Build flow
+' ============================================
+srcfiles --> extractor : "reads source"
+extractor --> builder : "parsed symbols"
+builder DATA_LINE graphjson : "writes graph.json\n+ built_at_commit"
+githead --> builder : "stamps commit"
+
+' ============================================
+' Serve flow (read-only, static)
+' ============================================
+graphjson DATA_LINE graphify : "reads (static)"
+graphjson DATA_LINE sem : "reads (static)"
+agents ASYNC_LINE graphify : "HTTP MCP /mcp\ncode-graph queries"
+
+' ============================================
+' Re-index (dashboard button triggers rebuild)
+' ============================================
+dash CONTROL_LINE extractor : "Re-index\ngraphify update"
+
+' ============================================
+' Staleness check
+' ============================================
+verifier --> graphjson : "reads\nbuilt_at_commit"
+verifier --> githead : "compares\ncurrent commit"
+
+' ============================================
+' Notes
+' ============================================
+note right of graphjson
+  Static artifact - no graph database,
+  no Cypher, no separate DB container.
+  Rebuilt only by `graphify update`.
+end note
+
+note bottom of verifier
+  Staleness:
+  - fresh  (built_at_commit == HEAD)
+  - stale  (HEAD advanced)
+  Re-index rebuilds graph.json.
+end note
+
+@enduml

@@ -32,13 +32,14 @@ rectangle "coding-services container" as container {
       Violation tracking
     end note
 
-    component "Code-Graph-RAG\nPort 3850 (SSE)\n[Python 3.12]" <<agent>> as cgr {
+    component "graphify\nPort 3851 (HTTP MCP /mcp)" <<agent>> as graphify {
     }
-    note right of cgr
-      AST-based code indexing
-      Tree-sitter parsing
-      Call graph analysis
-      Natural language queries
+    note right of graphify
+      Serves a STATIC graph.json
+      Code-graph queries
+      (functions, classes, calls)
+      No graph DB, no Cypher
+      Rebuilt via `graphify update`
     end note
   }
 
@@ -115,6 +116,7 @@ rectangle "coding-services container" as container {
   ' ============================================
   package "Shared Resources" as shared {
     folder ".data/knowledge-graph/" as kgdata
+    folder ".data/graphify/graph.json\n(static, bind-mounted)" as graphjson
     folder ".health/" as healthdata
     folder ".services-running.json" as svcfile
     folder "config/" as config
@@ -124,7 +126,7 @@ rectangle "coding-services container" as container {
 ' Process management
 supervisor --> sem : "autostart\nautorestart"
 supervisor --> constraint : "autostart\nautorestart"
-supervisor --> cgr : "autostart\nautorestart"
+supervisor --> graphify : "autostart\nautorestart"
 supervisor --> vkb : "autostart\nautorestart"
 supervisor --> health_api : "autostart\nautorestart"
 supervisor --> health_ui : "autostart\nautorestart"
@@ -134,6 +136,8 @@ supervisor --> verifier : "autostart\nautorestart"
 
 ' Internal data flows
 vkb --> kgdata : "read/write"
+graphify --> graphjson : "read (static)"
+sem --> graphjson : "analyze_code_graph"
 verifier --> healthdata : "reports"
 verifier --> svcfile : "regenerate"
 verifier --> config : "rules"

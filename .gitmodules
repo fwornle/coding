@@ -10,10 +10,9 @@
 [submodule "integrations/serena"]
 	path = integrations/serena
 	url = https://github.com/oraios/serena.git
-[submodule "integrations/code-graph-rag"]
-	path = integrations/code-graph-rag
-	url = https://github.com/fwornle/code-graph-rag.git
-	branch = semantic-enhancements
 [submodule "lib/km-core"]
 	path = lib/km-core
 	url = git@github.com:fwornle/km-core.git
+[submodule "integrations/graphify"]
+	path = integrations/graphify
+	url = https://github.com/fwornle/graphify.git

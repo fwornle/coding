@@ -684,17 +684,20 @@ class SystemHealthAPIServer {
                 }
             }
 
-            // CGR Cache: bundled frontend's Databases panel adds a "CGR Cache" tile
-            // when it finds a check named `cgr_cache` with details {commits_behind,
-            // cached_commit, repo_name}. The original staleness script depends on
-            // `jq`, which isn't installed in this container; read cache-metadata.json
-            // with Node natively and compute commits_behind via git, both available.
+            // Code-graph cache: the frontend's Databases panel renders a tile when
+            // it finds a check named `cgr_cache` with details {commits_behind,
+            // cached_commit, repo_name}. Now backed by graphify: read the tiny
+            // metadata sidecar (.data/graphify/metadata.json, written by the serve
+            // wrapper / reindex script — commit_hash + counts) and compute
+            // commits_behind via git. Check name kept as `cgr_cache` so the tile
+            // renders unchanged.
             try {
-                const metaFile = join(codingRoot, 'integrations', 'code-graph-rag', 'shared-data', 'cache-metadata.json');
+                const graphifyOut = process.env.GRAPHIFY_OUT || join(codingRoot, '.data', 'graphify', 'graphify-out');
+                const metaFile = join(graphifyOut, '..', 'metadata.json');
                 if (existsSync(metaFile)) {
                     const meta = JSON.parse(readFileSync(metaFile, 'utf-8'));
                     const cachedCommit = meta.commit_hash || '';
-                    const cachedShort = meta.commit_short || (cachedCommit ? cachedCommit.slice(0, 7) : '');
+                    const cachedShort = cachedCommit ? cachedCommit.slice(0, 7) : '';
                     let currentCommit = '';
                     let commitsBehind = null;
                     let cgrRawStatus = 'unknown';
@@ -737,12 +740,12 @@ class SystemHealthAPIServer {
                         status: cgrStatus,
                         raw_status: cgrRawStatus,
                         timestamp: stamp,
-                        message: cgrRawStatus === 'fresh' && commitsBehind === 0 ? 'CGR cache up to date' :
-                                 cgrRawStatus === 'fresh' && commitsBehind > 0 ? `CGR cache ${commitsBehind} commits behind (within threshold)` :
-                                 cgrRawStatus === 'fresh' ? 'CGR cache fresh (commits-behind unavailable)' :
-                                 cgrRawStatus === 'stale' && commitsBehind === -1 ? 'CGR cache reference no longer in repo history — re-index recommended' :
-                                 cgrRawStatus === 'stale' ? `CGR cache ${commitsBehind} commits behind — consider re-index` :
-                                 'CGR cache status unknown (no git/cached commit)',
+                        message: cgrRawStatus === 'fresh' && commitsBehind === 0 ? 'Code graph up to date' :
+                                 cgrRawStatus === 'fresh' && commitsBehind > 0 ? `Code graph ${commitsBehind} commits behind (within threshold)` :
+                                 cgrRawStatus === 'fresh' ? 'Code graph fresh (commits-behind unavailable)' :
+                                 cgrRawStatus === 'stale' && commitsBehind === -1 ? 'Code graph reference no longer in repo history — re-index recommended' :
+                                 cgrRawStatus === 'stale' ? `Code graph ${commitsBehind} commits behind — consider re-index` :
+                                 'Code graph status unknown (no git/cached commit)',
                         details: {
                             commits_behind: commitsBehind,
                             cached_commit: cachedShort,
@@ -3212,64 +3215,37 @@ class SystemHealthAPIServer {
      */
     async handleGetCGRFreshness(req, res) {
         try {
-            const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
-            const metadataFile = join(cgrDir, 'shared-data', 'cache-metadata.json');
-            const lastIndexedFile = join(codingRoot, '.data', 'cgr-last-indexed');
+            // Graphify-backed: no database to probe. Freshness comes from the
+            // graph.json presence + the metadata sidecar. `memgraphRunning` is
+            // kept in the response shape (frontend gates on it) and now means
+            // "a code graph exists". graphify supports real incremental updates,
+            // so incrementalRefreshAvailable is always true when a graph exists.
+            const graphifyOut = process.env.GRAPHIFY_OUT || join(codingRoot, '.data', 'graphify', 'graphify-out');
+            const graphJson = join(graphifyOut, 'graph.json');
+            const metaFile = join(graphifyOut, '..', 'metadata.json');
+            const graphExists = existsSync(graphJson);
 
-            // Check Memgraph availability via bolt port. Probe `memgraph:7687`
-            // (docker-compose service hostname — dashboard backend runs in the
-            // same compose network) and fall back to localhost. `nc` is not
-            // installed in the container, so use Node's net module directly.
-            const probeTcp = (host, port, timeoutMs = 1500) => new Promise((resolve) => {
-                const sock = new net.Socket();
-                let done = false;
-                const finish = (ok) => { if (done) return; done = true; try { sock.destroy(); } catch {} resolve(ok); };
-                sock.setTimeout(timeoutMs);
-                sock.once('connect', () => finish(true));
-                sock.once('error', () => finish(false));
-                sock.once('timeout', () => finish(false));
-                try { sock.connect(port, host); } catch { finish(false); }
-            });
-            let memgraphRunning = await probeTcp('memgraph', 7687);
-            if (!memgraphRunning) memgraphRunning = await probeTcp('localhost', 7687);
-            if (!memgraphRunning) memgraphRunning = await probeTcp('host.docker.internal', 7687);
-
-            if (!memgraphRunning) {
+            if (!graphExists) {
                 return res.json({
                     status: 'success',
                     data: { memgraphRunning: false }
                 });
             }
 
-            // Read last indexed timestamp
             let lastIndexedAt = null;
-            if (existsSync(lastIndexedFile)) {
+            let entityCount = 0;
+            if (existsSync(metaFile)) {
                 try {
-                    lastIndexedAt = readFileSync(lastIndexedFile, 'utf-8').trim();
-                } catch {
-                    // ignore read error
-                }
-            }
-
-            // Fall back to cache-metadata.json indexed_at
-            if (!lastIndexedAt && existsSync(metadataFile)) {
-                try {
-                    const metadata = JSON.parse(readFileSync(metadataFile, 'utf-8'));
-                    lastIndexedAt = metadata.indexed_at || null;
+                    const meta = JSON.parse(readFileSync(metaFile, 'utf-8'));
+                    lastIndexedAt = meta.indexed_at || null;
+                    entityCount = (meta.nodes || 0) + (meta.edges || 0);
                 } catch {
                     // ignore parse error
                 }
             }
-
-            // Get entity count from cache-metadata stats
-            let entityCount = 0;
-            if (existsSync(metadataFile)) {
-                try {
-                    const metadata = JSON.parse(readFileSync(metadataFile, 'utf-8'));
-                    entityCount = (metadata.stats?.functions || 0) + (metadata.stats?.relationships || 0);
-                } catch {
-                    // ignore
-                }
+            // Fall back to graph.json mtime if the sidecar is missing.
+            if (!lastIndexedAt) {
+                try { lastIndexedAt = new Date(statSync(graphJson).mtimeMs).toISOString(); } catch {}
             }
 
             res.json({
@@ -3277,7 +3253,7 @@ class SystemHealthAPIServer {
                 data: {
                     lastIndexedAt,
                     entityCount,
-                    incrementalRefreshAvailable: !!lastIndexedAt,
+                    incrementalRefreshAvailable: true,
                     memgraphRunning: true
                 }
             });
@@ -3427,8 +3403,8 @@ class SystemHealthAPIServer {
      */
     async handleGetCGRProgress(req, res) {
         try {
-            const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
-            const progressPath = join(cgrDir, 'shared-data', 'reindex-progress.json');
+            const graphifyOut = process.env.GRAPHIFY_OUT || join(codingRoot, '.data', 'graphify', 'graphify-out');
+            const progressPath = join(graphifyOut, '..', 'progress.json');
 
             if (!existsSync(progressPath)) {
                 return res.json({
@@ -3479,30 +3455,43 @@ class SystemHealthAPIServer {
      */
     async handleCGRReindex(req, res) {
         try {
-            const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
-            const reindexScript = join(cgrDir, 'scripts', 'reindex-with-metadata.sh');
-
-            if (!existsSync(cgrDir)) {
-                return res.status(404).json({
-                    status: 'error',
-                    message: 'Code Graph RAG directory not found'
-                });
-            }
+            // Graphify-backed re-index. graphify lives in this same container, so
+            // we spawn the reindex script directly (no cross-container hop). Mode
+            // "update" = incremental AST (fast); "full" = code + docs via proxy.
+            const reindexScript = join(codingRoot, 'scripts', 'graphify-reindex.sh');
+            const targetRepo = '/workspace/coding';
+            const mode = (req.body && req.body.mode === 'full') ? 'full' : 'update';
 
             if (!existsSync(reindexScript)) {
                 return res.status(404).json({
                     status: 'error',
-                    message: 'CGR reindex script not found',
+                    message: 'graphify reindex script not found',
                     path: reindexScript
                 });
             }
 
-            console.log('🔄 Starting CGR reindex with metadata update...');
+            // Concurrent-run guard: a reindex already running would otherwise
+            // stack (two server passes, 2x wall-clock — the double-click bug).
+            // Reject if progress.json says "running" and is fresh (<15 min).
+            const progressPath = join(codingRoot, '.data', 'graphify', 'progress.json');
+            if (existsSync(progressPath)) {
+                try {
+                    const prog = JSON.parse(readFileSync(progressPath, 'utf8'));
+                    const ageMs = Date.now() - new Date(prog.updatedAt).getTime();
+                    if (prog.status === 'running' && Number.isFinite(ageMs) && ageMs < 15 * 60 * 1000) {
+                        return res.status(409).json({
+                            status: 'error',
+                            message: 'A graphify re-index is already running',
+                            data: { phase: prog.phase, since: prog.updatedAt }
+                        });
+                    }
+                } catch { /* unreadable progress → allow */ }
+            }
 
-            // Run the reindex script that handles both indexing AND metadata update
-            // This ensures the cache-metadata.json gets updated after indexing completes
-            const indexProcess = spawn('/bin/bash', [reindexScript, codingRoot, 'coding'], {
-                cwd: cgrDir,
+            // Detached background run; writes .data/graphify/progress.json and
+            // metadata.json. graphify's MCP server hot-reloads graph.json on change.
+            const indexProcess = spawn('/bin/bash', [reindexScript, targetRepo, mode], {
+                cwd: codingRoot,
                 detached: true,
                 stdio: 'ignore'
             });
@@ -3510,18 +3499,21 @@ class SystemHealthAPIServer {
 
             res.json({
                 status: 'success',
-                message: 'CGR reindexing started in background',
+                message: 'Graphify re-index started in background',
                 data: {
                     startedAt: new Date().toISOString(),
-                    targetRepo: codingRoot,
-                    note: 'Indexing may take 20-30 minutes. Cache metadata will be updated automatically after completion. Check /api/cgr/status for updates.'
+                    targetRepo,
+                    mode,
+                    note: mode === 'update'
+                        ? 'Incremental AST update — usually under a minute. Poll /api/cgr/progress.'
+                        : 'Full re-extract incl. docs — may take several minutes. Poll /api/cgr/progress.'
                 }
             });
         } catch (error) {
-            console.error('Failed to start CGR reindex:', error);
+            console.error('Failed to start graphify re-index:', error);
             res.status(500).json({
                 status: 'error',
-                message: 'Failed to start CGR reindexing',
+                message: 'Failed to start graphify re-index',
                 error: error.message
             });
         }

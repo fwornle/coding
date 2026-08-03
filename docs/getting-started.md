@@ -52,7 +52,7 @@ cd ~/Agentic/coding
 source ~/.bashrc  # or ~/.zshrc on macOS
 ```
 
-**Note**: The repository uses git submodules for integration components (memory-visualizer, semantic-analysis, constraint-monitor, code-graph-rag). The `--recurse-submodules` flag ensures all submodules are initialized during clone.
+**Note**: The repository uses git submodules for integration components (memory-visualizer, semantic-analysis, constraint-monitor, graphify). The `--recurse-submodules` flag ensures all submodules are initialized during clone.
 
 ### Installation Safety
 
@@ -188,7 +188,7 @@ For teams or users who prefer containerized deployments, the coding system suppo
 ### Benefits of Docker Mode
 
 - **Persistent Services**: MCP servers run continuously, surviving session restarts
-- **Isolated Databases**: Qdrant, Redis, and Memgraph run in containers
+- **Isolated Databases**: Qdrant and Redis run in containers
 - **Consistent Environment**: Same behavior across different machines
 
 ### Docker Prerequisites
@@ -229,11 +229,10 @@ curl http://localhost:3849/health  # constraint-monitor
 |---------|------|----------|
 | Semantic Analysis SSE | 3848 | HTTP/SSE |
 | Constraint Monitor SSE | 3849 | HTTP/SSE |
-| Code Graph RAG SSE | 3850 | HTTP/SSE |
+| Graphify MCP | 3851 | HTTP |
 | VKB Server | 8080 | HTTP |
 | Qdrant | 6333/6334 | HTTP/gRPC |
 | Redis | 6379 | TCP |
-| Memgraph | 7687/3100 | Bolt/HTTP |
 
 See [Docker Deployment Guide](../docker/README.md) for detailed configuration.
 
@@ -295,8 +294,7 @@ CONSTRAINT_DASHBOARD_PORT=3030   # Constraint monitor UI
 CONSTRAINT_API_PORT=3031         # Constraint monitor API
 SYSTEM_HEALTH_DASHBOARD_PORT=3032  # Health dashboard UI
 SYSTEM_HEALTH_API_PORT=3033      # Health dashboard API
-MEMGRAPH_BOLT_PORT=7687          # Memgraph database (Bolt protocol)
-MEMGRAPH_LAB_PORT=3100           # Memgraph Lab UI
+GRAPHIFY_MCP_PORT=3851           # Graphify code-graph MCP (HTTP)
 DMR_PORT=12434                   # Docker Model Runner (local LLM)
 ```
 
@@ -305,7 +303,7 @@ The startup scripts (`bin/coding`, `scripts/start-services-robust.js`) automatic
 1. Edit `.env.ports` with your preferred ports
 2. Restart services with `bin/coding`
 
-**Note:** Docker services (Memgraph, Constraint Monitor) receive port configuration via environment variables at startup time, ensuring the submodule docker-compose files don't need modification.
+**Note:** Docker services (Graphify, Constraint Monitor) receive port configuration via environment variables at startup time, ensuring the submodule docker-compose files don't need modification.
 
 **Note:** The system works with ANY coding agent (Claude Code, GitHub CoPilot, Cursor, etc.) and ANY LLM provider. Provider SDKs are installed as optional dependencies - only install what you need:
 
@@ -637,7 +635,7 @@ docker compose -f docker/docker-compose.yml logs -f coding-services
 # Check MCP SSE server health
 curl http://localhost:3848/health  # semantic-analysis
 curl http://localhost:3849/health  # constraint-monitor
-curl http://localhost:3850/health  # code-graph-rag
+curl http://localhost:3851/mcp     # graphify
 
 # Restart containers
 docker compose -f docker/docker-compose.yml restart
@@ -647,7 +645,7 @@ docker compose -f docker/docker-compose.yml build --no-cache
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-**Port Conflicts**: If ports 3847-3850 are already in use:
+**Port Conflicts**: If ports 3847-3851 are already in use:
 ```bash
 # Find process using port
 lsof -i :3848

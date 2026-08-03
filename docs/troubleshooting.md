@@ -957,7 +957,7 @@ docker compose -f docker/docker-compose.yml logs coding-services
 # Test health endpoints
 curl http://localhost:3848/health  # Semantic Analysis
 curl http://localhost:3849/health  # Constraint Monitor
-curl http://localhost:3850/health  # Code Graph RAG
+curl http://localhost:3851/mcp     # Graphify MCP
 ```
 
 **Solutions:**
@@ -1000,7 +1000,7 @@ docker compose -f docker/docker-compose.yml up -d
 # Check if ports are listening
 lsof -i :3848  # Semantic Analysis
 lsof -i :3849  # Constraint Monitor
-lsof -i :3850  # Code Graph RAG
+lsof -i :3851  # Graphify MCP
 
 # Test SSE endpoints
 curl -v http://localhost:3848/health
@@ -1049,10 +1049,9 @@ SEMANTIC_ANALYSIS_SSE_URL=http://localhost:3848 node integrations/mcp-server-sem
 **Diagnosis:**
 ```bash
 # Check port usage
-lsof -i :3847-3850 | grep LISTEN
+lsof -i :3847-3851 | grep LISTEN
 lsof -i :6333  # Qdrant
 lsof -i :6379  # Redis
-lsof -i :7687  # Memgraph
 
 # Check Docker port mappings
 docker compose -f docker/docker-compose.yml ps --format "table {{.Name}}\t{{.Ports}}"
@@ -1063,7 +1062,7 @@ docker compose -f docker/docker-compose.yml ps --format "table {{.Name}}\t{{.Por
 **A. Stop Conflicting Services:**
 ```bash
 # Kill processes using required ports
-for port in 3847 3848 3849 3850; do
+for port in 3847 3848 3849 3851; do
   pid=$(lsof -ti :$port)
   [ -n "$pid" ] && kill $pid
 done
@@ -1078,7 +1077,7 @@ docker compose -f docker/docker-compose.yml up -d
 cat >> .env.ports << EOF
 SEMANTIC_ANALYSIS_SSE_PORT=4848
 CONSTRAINT_MONITOR_SSE_PORT=4849
-CODE_GRAPH_RAG_SSE_PORT=4850
+GRAPHIFY_MCP_PORT=4851
 EOF
 
 # Restart with new ports
@@ -1130,19 +1129,22 @@ volumes:
 ### 5. Database Container Issues
 
 **Symptoms:**
-- Qdrant, Redis, or Memgraph not connecting
+- Qdrant or Redis not connecting
 - Database initialization failures
 - Slow queries or timeouts
 
 **Diagnosis:**
 ```bash
 # Check database containers
-docker compose -f docker/docker-compose.yml ps | grep -E "(qdrant|redis|memgraph)"
+docker compose -f docker/docker-compose.yml ps | grep -E "(qdrant|redis)"
 
 # Test database connectivity
 curl http://localhost:6333/collections  # Qdrant
 redis-cli -p 6379 ping              # Redis (if redis-cli installed)
-docker exec memgraph cypher-shell -u memgraph -p memgraph "MATCH (n) RETURN count(n);"
+
+# Check graphify code graph exists and is fresh (file-based, no DB)
+ls -la .data/graphify/graphify-out/graph.json
+docker exec coding-services graphify god-nodes --top 5
 ```
 
 **Solutions:**
@@ -1152,13 +1154,12 @@ docker exec memgraph cypher-shell -u memgraph -p memgraph "MATCH (n) RETURN coun
 # Restart specific database
 docker compose -f docker/docker-compose.yml restart qdrant
 docker compose -f docker/docker-compose.yml restart redis
-docker compose -f docker/docker-compose.yml restart memgraph
 ```
 
 **B. Check Database Logs:**
 ```bash
 docker compose -f docker/docker-compose.yml logs qdrant
-docker compose -f docker/docker-compose.yml logs memgraph
+docker compose -f docker/docker-compose.yml logs redis
 ```
 
 **C. Reset Database Data:**
@@ -1235,9 +1236,11 @@ docker compose -f docker/docker-compose.yml down
 docker compose -f docker/docker-compose.yml logs -f
 
 # Check health of all services
-for port in 3847 3848 3849 3850; do
+for port in 3847 3848 3849; do
   echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status // "failed"')"
 done
+# Graphify serves an HTTP MCP endpoint (no /health route)
+curl -s http://localhost:3851/mcp >/dev/null && echo "Port 3851: graphify ok"
 
 # Full restart
 docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml up -d
@@ -1248,10 +1251,9 @@ docker compose -f docker/docker-compose.yml down && docker compose -f docker/doc
 |------|---------|--------------|
 | 3848 | Semantic Analysis SSE | `curl http://localhost:3848/health` |
 | 3849 | Constraint Monitor SSE | `curl http://localhost:3849/health` |
-| 3850 | Code Graph RAG SSE | `curl http://localhost:3850/health` |
+| 3851 | Graphify MCP | `curl http://localhost:3851/mcp` |
 | 6333 | Qdrant | `curl http://localhost:6333/collections` |
 | 6379 | Redis | `redis-cli ping` |
-| 7687 | Memgraph | Bolt protocol |
 
 ---
 

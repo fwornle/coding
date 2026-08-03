@@ -42,7 +42,7 @@
 | Agent | Function |
 |-------|----------|
 | DeduplicationAgent | Duplicate detection using embeddings |
-| CodeGraphAgent | AST indexing via Memgraph |
+| CodeGraphAgent | reads graphify `graph.json` |
 
 ### Non-LLM (1)
 

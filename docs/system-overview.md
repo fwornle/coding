@@ -326,8 +326,8 @@ coding --claude
 
 **Architecture:**
 - **Host**: Claude CLI + lightweight stdio proxies + LLM CLI Proxy (12435) + DMR (12434)
-- **Containers**: MCP SSE servers on ports 3847-3850
-- **Databases**: Qdrant (6333), Redis (6379), Memgraph (7687)
+- **Containers**: MCP servers on ports 3847-3849 (SSE) + graphify (3851, HTTP MCP)
+- **Databases**: Qdrant (6333), Redis (6379)
 
 **Characteristics:**
 - Persistent services across sessions

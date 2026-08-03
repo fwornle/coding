@@ -9,7 +9,6 @@ Web-based visualization and monitoring interfaces.
 | VKB | http://localhost:8080 | Knowledge graph visualization |
 | Constraint Monitor | http://localhost:3030 | Compliance monitoring |
 | System Health | http://localhost:3032 | Service health monitoring |
-| Memgraph Lab | http://localhost:3100 | Graph database UI |
 
 ## VKB (Knowledge Visualization)
 
@@ -73,7 +72,7 @@ PORT=3030 npm run dashboard
 | `/api/health` | Dashboard's own self-healthcheck |
 | `/api/health-verifier/status` | Pass-through to coordinator `/health/state` (includes `network`, `databases` sub-checks) |
 | `/api/health-verifier/report` | Full health report with all checks (databases, services, processes, CGR cache) |
-| `/api/cgr/freshness` | CGR cache freshness; probes Memgraph reachability |
+| `/api/cgr/freshness` | Graph freshness; compares `graph.json` `built_at_commit` vs `HEAD` |
 | `/api/services` | Individual service status |
 | `/api/metrics` | Health metrics history |
 | `/api/alerts` | Recent alerts |
@@ -83,33 +82,28 @@ PORT=3030 npm run dashboard
 
     - **Database sub-checks** (`leveldb_lock_check`, `qdrant_availability`, `graph_integrity`): mapped via `toUiStatus()` — values `passed`, `healthy`, `running`, `ok`, `present` all map to `passed`; other values map to `warning`, `failed`, `error`, or `unknown`.
     - **Network state** (`network.internet_reachable`, `network.proxy_running`, `network.location`): passed through directly to the LLM Proxy Health card.
-    - **CGR cache**: synthesized from `.cgr/cache-metadata.json` + `git rev-list` for commits-behind count.
+    - **Code graph cache**: synthesized from `.data/graphify/metadata.json` + `git rev-list` for commits-behind count.
 
-## Memgraph Lab
+## Graphify Graph Inspection
 
-**URL**: http://localhost:3100
-
-Graph database visualization and query interface.
+Graphify is file-based — there is no Lab UI and no Cypher. The code graph is a static `graph.json` at `.data/graphify/graphify-out/graph.json`, inspected via the `graphify` CLI or by reading the JSON directly.
 
 ### Features
 
-- **Cypher Console** - Run graph queries
-- **Visual Query** - Point-and-click query building
-- **Graph Visualization** - Interactive node/edge display
-- **Schema Browser** - Explore graph structure
+- **Structural Search** - Query the graph for callers, dependencies, and paths
+- **Call Graph** - Function dependency analysis
+- **Path Finding** - Shortest path between two nodes
+- **Hub Detection** - `god-nodes` lists the most-connected nodes
 
 ### Example Queries
 
-```cypher
-// Count all nodes
-MATCH (n) RETURN count(n);
+```bash
+graphify query "what calls captureForegroundTokens"     # structural query
+graphify path "ObservationWriter" "obs-api"             # shortest path
+graphify god-nodes --top 20                             # most-connected hubs
 
-// Find all functions
-MATCH (f:Function) RETURN f.name, f.file LIMIT 10;
-
-// Show call graph
-MATCH (a:Function)-[:CALLS]->(b:Function)
-RETURN a.name, b.name LIMIT 20;
+# Inspect the graph file and its built_at_commit stamp
+ls -la .data/graphify/graphify-out/graph.json
 ```
 
 ## Port Configuration
@@ -122,7 +116,6 @@ CONSTRAINT_DASHBOARD_PORT=3030
 CONSTRAINT_API_PORT=3031
 SYSTEM_HEALTH_DASHBOARD_PORT=3032
 SYSTEM_HEALTH_API_PORT=3033
-MEMGRAPH_LAB_PORT=3100
 ```
 
 ## Rebuilding Dashboards
@@ -166,12 +159,12 @@ curl http://localhost:8080/api/health
 docker compose -f docker/docker-compose.yml restart coding-services
 ```
 
-### Memgraph Lab connection failed
+### Graph out of date or missing
 
 ```bash
-# Check Memgraph container
-docker compose -f docker/docker-compose.yml ps memgraph
+# Check the graph file and its built_at_commit stamp
+ls -la .data/graphify/graphify-out/graph.json
 
-# View logs
-docker compose -f docker/docker-compose.yml logs memgraph
+# Rebuild incrementally (AST only)
+graphify update /workspace/coding
 ```

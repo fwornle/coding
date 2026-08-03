@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
   closeConfirmModal,
@@ -52,6 +52,11 @@ export default function CGRReindexModal() {
   const [elapsedTime, setElapsedTime] = useState(0)
   const [progress, setProgress] = useState<ReindexProgress | null>(null)
   const [freshness, setFreshness] = useState<CGRFreshness | null>(null)
+  const [chosenMode, setChosenMode] = useState<'update' | 'full'>('update')
+  // Always-current mirror of the run start time, for the stale-progress guard
+  // in pollProgress (kept in a ref so the memoized callback needn't re-create).
+  const startTimeRef = useRef<string | null>(cgr.reindexStartTime)
+  startTimeRef.current = cgr.reindexStartTime
 
   // Fetch freshness on mount
   useEffect(() => {
@@ -74,6 +79,13 @@ export default function CGRReindexModal() {
       const data = await res.json()
 
       if (data.status === 'success' && data.data) {
+        // Ignore a terminal status left by a PRIOR run (stale progress.json)
+        // so a freshly-started re-index doesn't flip to "Complete" instantly.
+        const startMs = startTimeRef.current ? new Date(startTimeRef.current).getTime() : 0
+        const updatedMs = data.data.updatedAt ? new Date(data.data.updatedAt).getTime() : 0
+        if (data.data.status !== 'running' && updatedMs + 1000 < startMs) {
+          return false
+        }
         setProgress(data.data)
 
         // Check if completed or failed
@@ -140,15 +152,25 @@ export default function CGRReindexModal() {
     return mins + ':' + String(secs).padStart(2, '0')
   }
 
-  const handleConfirm = async () => {
-    Logger.info(LogCategories.API, 'Starting CGR re-index')
+  const handleConfirm = async (mode: 'update' | 'full') => {
+    setChosenMode(mode)
+    Logger.info(LogCategories.API, `Starting CGR re-index (${mode})`)
     dispatch(reindexStart())
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/cgr/reindex`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
       })
+
+      if (response.status === 409) {
+        // A re-index is already running (e.g. a stray double-click, or another
+        // tab). Not a failure — stay in the running view and let progress
+        // polling report completion.
+        Logger.info(LogCategories.API, 'CGR re-index already running — attaching to it')
+        return
+      }
 
       if (!response.ok) {
         const error = await response.json()
@@ -176,7 +198,7 @@ export default function CGRReindexModal() {
   // Calculate progress percentage
   const progressPercent = progress?.totalSteps && progress.totalSteps > 0
     ? Math.round((progress.step / progress.totalSteps) * 100)
-    : Math.min((elapsedTime / 1800) * 100, 95) // Fallback to time-based
+    : Math.min((elapsedTime / (chosenMode === 'full' ? 600 : 60)) * 100, 95) // Fallback to time-based (mode-aware)
 
   // Modal is only open when explicitly requested - user can close it even during running
   const isOpen = cgr.showConfirmModal
@@ -233,14 +255,17 @@ export default function CGRReindexModal() {
               <Alert>
                 <Clock className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Warning:</strong> This operation typically takes <strong>20-30 minutes</strong> to complete.
-                  The process runs asynchronously and you can continue using the dashboard.
+                  <strong>Incremental</strong> re-parses only changed files (AST cache), then re-clusters —
+                  usually well under a minute. <strong>Full re-extract</strong> rebuilds from scratch
+                  including the docs/semantic pass — several minutes. Both run in the background.
                 </AlertDescription>
               </Alert>
               <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                <strong>Scope:</strong> Re-indexes the <code className="bg-background px-1 rounded">coding</code> repository
-                including all integrations (code-graph-rag, semantic-analysis, etc.). This covers ~33k functions across
-                the entire monorepo. Other repositories indexed via UKB remain in Memgraph but aren&apos;t cache-tracked.
+                <strong>Scope:</strong> Rebuilds the graphify code graph
+                (<code className="bg-background px-1 rounded">graph.json</code>) for the
+                <code className="bg-background px-1 rounded">coding</code> monorepo including all
+                integrations (~57k nodes). Served over MCP on :3851 and read by
+                <code className="bg-background px-1 rounded">analyze_code_graph</code>.
               </div>
               {/* Index freshness indicator (Phase 13) */}
               {freshness && (
@@ -315,7 +340,9 @@ export default function CGRReindexModal() {
 
               {!progress && (
                 <div className="text-sm text-center text-muted-foreground">
-                  Typical duration: 20-30 minutes
+                  {chosenMode === 'full'
+                    ? 'Full re-extract — several minutes'
+                    : 'Incremental update — usually under a minute'}
                 </div>
               )}
             </div>
@@ -345,8 +372,18 @@ export default function CGRReindexModal() {
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button onClick={handleConfirm}>
-                Start Re-index
+              <Button
+                variant="outline"
+                disabled={cgr.reindexStatus === 'running'}
+                onClick={() => handleConfirm('full')}
+              >
+                Full re-extract
+              </Button>
+              <Button
+                disabled={cgr.reindexStatus === 'running'}
+                onClick={() => handleConfirm('update')}
+              >
+                Incremental update
               </Button>
             </>
           )}

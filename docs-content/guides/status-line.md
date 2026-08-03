@@ -142,7 +142,7 @@ curl -fs http://localhost:3034/health/state | jq .
 |--------------|---------|
 | `container.healthcheck` | Docker `coding-services` container probe result |
 | `services` | List of probed services with `status`, `last_seen`, `latency_ms`, `probe_error` |
-| `databases` | LevelDB / Qdrant / Memgraph availability + lock state (sub-checks: `leveldb_lock_check`, `qdrant_availability`, `graph_integrity` — probed every tick and mapped to `passed`/`failed`) |
+| `databases` | LevelDB / Qdrant availability + lock state and graphify graph freshness (sub-checks: `leveldb_lock_check`, `qdrant_availability`, `graph_integrity` — `graph_integrity` now checks `graph.json` freshness; probed every tick and mapped to `passed`/`failed`) |
 | `network` | Network environment: `internet_reachable`, `proxy_running`, `location` (`vpn` / `corporate` / `home` / `unknown`) |
 | `lsl` | Per-session ETM heartbeats (sessionId, projectName, transcriptPath, lastBeat) |
 | `lsl_by_project` | 3-state rollup per project: `healthy` / `degraded` / `stopped` |

@@ -145,7 +145,8 @@ export default function SystemHealthDashboard() {
       })
     }
 
-    // CGR Cache check - tracks code-graph-rag index for 'coding' repository
+    // Code-graph cache check - tracks the graphify graph.json for 'coding'
+    // (check id stays `cgr_cache` for backend/response-shape compatibility)
     const cgrCheck = checks.find((c: any) => c.check === 'cgr_cache')
     if (cgrCheck) {
       const commitsBehind = cgrCheck.details?.commits_behind
@@ -166,11 +167,11 @@ export default function SystemHealthDashboard() {
       }
 
       // Tooltip explains scope
-      const scopeNote = 'CGR Cache tracks the code-graph-rag index for coding (including all integrations). Re-indexing rebuilds the AST-based code graph (~33k functions).'
+      const scopeNote = 'Tracks the graphify code graph (graph.json) for coding, including all integrations. Re-indexing runs an incremental graphify update of the tree-sitter graph.'
       const statusNote = cgrCheck.message + (cgrCheck.recommendation ? ` - ${cgrCheck.recommendation}` : '')
 
       items.push({
-        name: 'CGR Cache',
+        name: 'Code Graph',
         status: mapCheckStatus(cgrCheck),
         description,
         tooltip: `${statusNote}\n\n${scopeNote}`,

@@ -46,11 +46,6 @@ if [ -n "$REDIS_URL" ]; then
     wait_for_service "Redis" "$REDIS_HOST" 6379
 fi
 
-# Wait for Memgraph
-if [ -n "$MEMGRAPH_HOST" ]; then
-    wait_for_service "Memgraph" "$MEMGRAPH_HOST" "${MEMGRAPH_PORT:-7687}"
-fi
-
 echo "=== All databases ready ==="
 
 # ===========================================
@@ -78,10 +73,6 @@ if [ -f /coding/.env ]; then
     done < /coding/.env
 fi
 
-# Activate Python virtual environment for code-graph-rag
-export VIRTUAL_ENV=/coding/integrations/code-graph-rag/.venv
-export PATH="$VIRTUAL_ENV/bin:$PATH"
-
 # ===========================================
 # Create necessary directories
 # ===========================================
@@ -102,7 +93,7 @@ echo "  VKB Server:          http://localhost:${VKB_PORT:-8080}"
 echo "  Browser Access SSE:  http://localhost:${BROWSER_ACCESS_PORT:-3847}"
 echo "  Semantic Analysis:   http://localhost:${SEMANTIC_ANALYSIS_PORT:-3848}"
 echo "  Constraint Monitor:  http://localhost:${CONSTRAINT_MONITOR_PORT:-3849}"
-echo "  Code-Graph-RAG:      http://localhost:${CODE_GRAPH_RAG_PORT:-3850}"
+echo "  Graphify MCP:        http://localhost:${GRAPHIFY_MCP_PORT:-3851}/mcp"
 echo "  Health Dashboard:    http://localhost:${HEALTH_DASHBOARD_PORT:-3032}"
 echo ""
 echo "=== Starting supervisord ==="

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Host entry point to the containerized graphify CLI.
+#
+# All graphify Python lives inside the coding-graphify container — after
+# `docker build` you never install or run Python on the host. This shim just
+# forwards every argument into the container, so `graphify query "..."`,
+# `graphify extract .`, `graphify update .`, etc. all work from the host.
+#
+# graph.json and the manifest live under the bind-mounted .data/graphify, so
+# extracts/updates run here persist to the host and are picked up by the HTTP
+# MCP server and by code-graph-agent (which reads the file directly).
+set -euo pipefail
+
+CONTAINER="${GRAPHIFY_CONTAINER:-coding-services}"
+
+if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "${CONTAINER}"; then
+    echo "graphify: container '${CONTAINER}' is not running." >&2
+    echo "  Start it with:  cd docker && docker-compose up -d coding-services" >&2
+    exit 1
+fi
+
+# -i keeps stdin open (needed for `serve --transport stdio` and interactive use);
+# harmless for one-shot subcommands.
+exec docker exec -i "${CONTAINER}" graphify "$@"

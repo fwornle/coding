@@ -16,11 +16,13 @@ import {
   syncStepPauseFromServer,
   syncLLMStateFromServer,
 } from '../slices/ukbSlice'
+import { reindexSuccess, reindexFailure } from '../slices/cgrSlice'
 import { Logger, LogCategories } from '../../utils/logging'
 
 const API_PORT = process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}/api/health-verifier`
 const UKB_API_URL = `http://localhost:${API_PORT}/api/ukb`
+const CGR_API_URL = `http://localhost:${API_PORT}/api/cgr`
 
 // Polling cadence:
 //   ACTIVE_INTERVAL_MS — fast polling while a workflow is running/paused so the
@@ -341,6 +343,41 @@ class HealthRefreshManager {
     await this.fetchHealthReport()
     // Fetch UKB process status
     await this.fetchUKBStatus()
+    // Reconcile a running re-index even when the modal is closed
+    await this.fetchCGRProgress()
+  }
+
+  // App-level re-index progress reconciliation. The modal polls while open, but
+  // when it is closed nothing advanced cgr.reindexStatus, leaving the Code Graph
+  // tile stuck on "Running..." forever. Poll here whenever a run is in flight so
+  // the tile resets regardless of modal state.
+  private async fetchCGRProgress() {
+    if (!this.store) return
+    const state: any = this.store.getState()
+    if (state?.cgr?.reindexStatus !== 'running') return
+
+    try {
+      const response = await fetch(`${CGR_API_URL}/progress`)
+      if (!response.ok) return
+      const result = await response.json()
+      const data = result?.data
+      if (!data) return
+      // Ignore a terminal status that predates this run's start — otherwise a
+      // stale "completed" left in progress.json by a PRIOR run makes a freshly
+      // started re-index flip to done instantly.
+      const startMs = state?.cgr?.reindexStartTime ? new Date(state.cgr.reindexStartTime).getTime() : 0
+      const updatedMs = data.updatedAt ? new Date(data.updatedAt).getTime() : 0
+      if (updatedMs + 1000 < startMs) return
+      if (data.status === 'completed') {
+        Logger.info(LogCategories.API, 'CGR re-index completed (reconciled by middleware)')
+        this.store.dispatch(reindexSuccess())
+      } else if (data.status === 'failed') {
+        Logger.error(LogCategories.API, 'CGR re-index failed (reconciled by middleware)', { message: data.message })
+        this.store.dispatch(reindexFailure(data.message || 'Reindex failed'))
+      }
+    } catch (error: any) {
+      Logger.warn(LogCategories.API, 'Failed to poll CGR progress', error)
+    }
   }
 
   private async fetchHealthStatus() {

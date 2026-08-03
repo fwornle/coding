@@ -162,7 +162,7 @@ The `/health/state` report endpoint includes `proxy` and `semantic_readiness` vi
 - Backend (`server.js`) at port 3033 reads coordinator state and exposes per-card APIs.
 - Frontend at port 3032 polls the API.
 - Supervisord process panel reads supervisorctl directly inside the container (the coordinator does not surface raw supervisord state).
-- The `cgr_cache` tile reads `.cgr/cache-metadata.json` via Node fs (no `jq` dependency) and computes commits-behind via `git rev-list`.
+- The `cgr_cache` tile reads `.data/graphify/metadata.json` (graphify's commit sidecar) via Node fs and computes commits-behind via `git rev-list` against the graph's `built_at_commit`.
 
 ### Health prompt hook (`scripts/health-prompt-hook.js`)
 
@@ -221,7 +221,7 @@ When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Reme
 | Endpoint | Description |
 |----------|-------------|
 | `/api/health` | Dashboard's own self-healthcheck (not the coordinator rollup) |
-| `/api/cgr/freshness` | CGR cache freshness; probes Memgraph reachability |
+| `/api/cgr/freshness` | Graph freshness; compares `graph.json` `built_at_commit` vs `HEAD` |
 | `/api/health-verifier/status` | Pass-through to coordinator `/health/state` |
 | `/api/health-verifier/report` | Same, verbose |
 | `/api/ukb/*` | UKB workflow control + history |

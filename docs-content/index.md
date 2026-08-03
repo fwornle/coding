@@ -186,7 +186,7 @@ Coding provides several MCP (Model Context Protocol) servers:
 |-------------|---------|
 | [Semantic Analysis](integrations/semantic-analysis.md) | 14-agent AI-powered code analysis |
 | [Constraint Monitor](integrations/constraint-monitor.md) | Real-time violation detection |
-| [Code Graph RAG](integrations/code-graph-rag.md) | AST-based code search via Memgraph |
+| [Graphify](integrations/graphify.md) | tree-sitter static code graph (file-based, no database) |
 
 ---
 

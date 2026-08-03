@@ -43,11 +43,9 @@ vkb
 | 3033 | Health API |
 | 3848 | Semantic Analysis SSE |
 | 3849 | Constraint Monitor SSE |
-| 3850 | Code Graph RAG SSE |
+| 3851 | Graphify (HTTP MCP) |
 | 6333 | Qdrant |
 | 6379 | Redis |
-| 7687 | Memgraph |
-| 3100 | Memgraph Lab |
 
 ## Key Directories
 

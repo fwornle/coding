@@ -25,17 +25,9 @@
         "CODING_TOOLS_PATH": "{{CODING_TOOLS_PATH}}"
       }
     },
-    "code-graph-rag": {
-      "command": "uv",
-      "args": ["run", "--directory", "{{CODING_TOOLS_PATH}}/integrations/code-graph-rag", "graph-code", "mcp-server"],
-      "env": {
-        "TARGET_REPO_PATH": "{{CODING_TOOLS_PATH}}",
-        "CYPHER_PROVIDER": "openai",
-        "CYPHER_MODEL": "gpt-4o-mini",
-        "CYPHER_API_KEY": "{{OPENAI_API_KEY}}",
-        "MEMGRAPH_HOST": "localhost",
-        "MEMGRAPH_PORT": "7687"
-      }
+    "graphify": {
+      "type": "http",
+      "url": "http://localhost:3851/mcp"
     }
   }
 }

@@ -86,7 +86,7 @@ If these fail after all retries → **Claude startup blocked with clear error**
 1. **VKB Server** - Knowledge visualization (port 8080)
 2. **Constraint Monitor** - Live guardrails system (Docker mode aware)
 3. **Semantic Analysis** - MCP semantic analysis server
-4. **Memgraph** - Code Graph RAG AST analysis (Docker mode aware)
+4. **Graphify** - Code graph AST analysis (built into `coding-services`, no separate container)
 
 If these fail after all retries → **Continue in DEGRADED mode with warning**
 
@@ -95,7 +95,7 @@ If these fail after all retries → **Continue in DEGRADED mode with warning**
 When `CODING_DOCKER_MODE=true` (set by both `launch-claude.sh` and `launch-copilot.sh`), `start-services-robust.js` automatically skips launching standalone containers that are already provided by the `coding-services` Docker container:
 
 - **Constraint Monitor**: Skips `docker-compose up -d` for standalone Redis + Qdrant containers (they run inside `coding-services` as `coding-redis` and `coding-qdrant`)
-- **Memgraph**: Skips `docker-compose up -d` for standalone Memgraph container (runs inside `coding-services`)
+- **Graphify**: No standalone container — graphify runs inside `coding-services` as the `mcp-servers:graphify` supervisord program
 
 This prevents duplicate containers, port conflicts (both bind 6379, 6333), and ~540MB wasted RAM. Health checks in Docker mode verify the `coding-services` health endpoint or TCP port instead of counting standalone containers.
 

@@ -9,10 +9,6 @@
 			"path": ".specstory/history"
 		},
 		{
-			"name": "code-graph-rag",
-			"path": "integrations/code-graph-rag"
-		},
-		{
 			"name": "mcp-constraint-monitor",
 			"path": "integrations/mcp-constraint-monitor"
 		},
@@ -23,6 +19,10 @@
 		{
 			"name": "memory-visualizer",
 			"path": "integrations/memory-visualizer"
+		},
+		{
+			"name": "graphify",
+			"path": "integrations/graphify"
 		}
 	],
 	"settings": {

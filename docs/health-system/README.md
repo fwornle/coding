@@ -110,7 +110,7 @@ The supervision architecture includes multiple guards to prevent runaway process
 ### HealthVerifier (`scripts/health-verifier.js`) - Verification Layer
 - Core verification engine with 60-second periodic checks
 - **Dynamic discovery of ALL projects** (enabled via `dynamic_discovery: true` in config)
-- Checks databases (LevelDB, Qdrant, SQLite, Memgraph), services, processes
+- Checks databases (LevelDB, Qdrant, SQLite), graphify graph freshness, services, processes
 - Generates health scores (0-100) per service
 - Triggers auto-healing via HealthRemediationActions
 
@@ -197,8 +197,7 @@ The supervision architecture includes multiple guards to prevent runaway process
 - **LevelDB** - Knowledge graph storage
 - **Qdrant** - Vector database (port 6333)
 - **SQLite** - Analytics database
-- **Memgraph** - Code graph database (port 7687 Bolt protocol, port 3100 Lab UI)
-- **CGR Cache** - Code graph index staleness (commit tracking)
+- **Graphify Graph** - Code graph freshness (file-based `graph.json`; `built_at_commit` vs `HEAD`, no DB)
 
 ### Services
 - **VKB Server** - Knowledge visualization (port 8080)
@@ -211,7 +210,7 @@ The supervision architecture includes multiple guards to prevent runaway process
 When running in Docker mode, the health system also monitors MCP SSE servers:
 - **Semantic Analysis SSE** - AI analysis server (port 3848)
 - **Constraint Monitor SSE** - Constraint enforcement MCP (port 3849)
-- **Code Graph RAG SSE** - Code graph analysis MCP (port 3850)
+- **Graphify MCP** - Code graph analysis MCP over HTTP (port 3851)
 
 ### Processes
 - Stale PID detection
@@ -237,9 +236,9 @@ When running in Docker mode, the health system also monitors MCP SSE servers:
 
 **Detailed Flow**: See [Enhanced Health Monitoring](./enhanced-health-monitoring.md)
 
-## CGR Cache Staleness
+## Graphify Graph Freshness
 
-The `.git` directory is not mounted into the coding-services container (for performance), so the CGR cache staleness check cannot count commits behind. The verifier reads `cache-metadata.json` directly and the dashboard displays the cached commit, e.g. `coding @ abc123` (staleness unknown).
+Graph freshness is file-based: the verifier reads the `built_at_commit` stamp inside `.data/graphify/graphify-out/graph.json` and compares it against `HEAD` to report how many commits behind the graph is. The dashboard shows the built commit, e.g. `coding @ abc123`, and offers a **Re-index** button that runs `graphify update`.
 
 ### Service Supervision Hierarchy
 
@@ -298,7 +297,7 @@ The status line appears automatically in Claude Code:
 
 **Components:**
 - `[🐳]` - Docker mode indicator (only shown when running in Docker mode)
-- `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, CGR=Code Graph RAG
+- `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, GF=Graphify
 - `[C🟢 UT🟤]` - Active sessions with activity icons (all sessions shown, 💤 for sleeping)
 - `[🔒67%]` - Constraint compliance percentage (with optional `🟡N` violations sub-segment when non-zero)
 - `[📚✅]` - Knowledge system status (icons only, no counts)

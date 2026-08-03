@@ -2614,21 +2614,6 @@ async function runAllChecks() {
         leveldb_accessibility: dbStatus?.levelDB?.available !== false ? 'passed' : 'failed',
         qdrant_availability: qdrantOk ? 'passed' : 'failed',
       };
-
-      // Probe Memgraph for graph_integrity (TCP port check on bolt 7687)
-      try {
-        const net = await import('net');
-        await new Promise((resolve, reject) => {
-          const sock = net.default.createConnection(7687, 'localhost');
-          sock.setTimeout(2000);
-          sock.on('connect', () => { sock.destroy(); resolve(); });
-          sock.on('timeout', () => { sock.destroy(); reject(new Error('timeout')); });
-          sock.on('error', reject);
-        });
-        currentState.databases.graph_integrity = 'passed';
-      } catch {
-        currentState.databases.graph_integrity = 'failed';
-      }
     }
   } catch (err) {
     log(`db_health check threw: ${err.message}`, 'ERROR');

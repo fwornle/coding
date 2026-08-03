@@ -52,7 +52,7 @@ The workflow uses a **hub-and-spoke topology** with the Coordinator at the cente
 | KG-Ops | Batch | Tree-KG operators (6 substeps) |
 | QA | Batch | Quality assurance with retry |
 | Checkpoint | Batch | Saves resumable state |
-| Code (CGR) | Finalization | Indexes current codebase |
+| Code (Graphify) | Finalization | Indexes current codebase |
 | Docs | Finalization | Links documentation |
 | Insights | Finalization | Synthesizes insights |
 | Persist | Finalization | Final persistence |
@@ -80,7 +80,7 @@ The batch-analysis workflow processes git history in chronological batches:
    - Save checkpoint
 
 3. **Finalization Phase** (runs once after all batches)
-   - Code Graph RAG indexing
+   - Graphify code graph indexing
    - Documentation linking
    - Insight synthesis
    - Final persistence and validation
@@ -255,7 +255,7 @@ These enable more accurate ETA predictions on subsequent runs.
 
 ### Parallelization
 
-- Code Graph RAG: 5 concurrent LLM calls
+- Graphify code graph: 5 concurrent LLM calls
 - Persistence: 10 concurrent entity writes
 - Content Validation: 3+ concurrent calls
 
