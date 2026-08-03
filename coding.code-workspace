@@ -19,6 +19,10 @@
 		{
 			"name": "memory-visualizer",
 			"path": "integrations/memory-visualizer"
+		},
+		{
+			"name": "graphify",
+			"path": "integrations/graphify"
 		}
 	],
 	"settings": {
