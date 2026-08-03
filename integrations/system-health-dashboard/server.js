@@ -3470,8 +3470,26 @@ class SystemHealthAPIServer {
                 });
             }
 
+            // Concurrent-run guard: a reindex already running would otherwise
+            // stack (two server passes, 2x wall-clock — the double-click bug).
+            // Reject if progress.json says "running" and is fresh (<15 min).
+            const progressPath = join(codingRoot, '.data', 'graphify', 'progress.json');
+            if (existsSync(progressPath)) {
+                try {
+                    const prog = JSON.parse(readFileSync(progressPath, 'utf8'));
+                    const ageMs = Date.now() - new Date(prog.updatedAt).getTime();
+                    if (prog.status === 'running' && Number.isFinite(ageMs) && ageMs < 15 * 60 * 1000) {
+                        return res.status(409).json({
+                            status: 'error',
+                            message: 'A graphify re-index is already running',
+                            data: { phase: prog.phase, since: prog.updatedAt }
+                        });
+                    }
+                } catch { /* unreadable progress → allow */ }
+            }
+
             // Detached background run; writes .data/graphify/progress.json and
-            // metadata.json, then reloads the graphify MCP server via supervisorctl.
+            // metadata.json. graphify's MCP server hot-reloads graph.json on change.
             const indexProcess = spawn('/bin/bash', [reindexScript, targetRepo, mode], {
                 cwd: codingRoot,
                 detached: true,

@@ -53,7 +53,9 @@ const cgrSlice = createSlice({
       state.reindexStatus = 'running'
       state.reindexStartTime = new Date().toISOString()
       state.reindexError = null
-      state.showConfirmModal = false
+      // Keep the modal OPEN so the user sees the live progress view (timer,
+      // phase, progress bar) instead of it vanishing on click with no feedback.
+      // Closing it here was half the "did it even work? *click again*" bug.
     },
     reindexSuccess(state) {
       state.reindexStatus = 'completed'
