@@ -9,7 +9,7 @@
 import express from 'express';
 import { createServer, get as httpGet } from 'http';
 import { WebSocketServer } from 'ws';
-import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch, statSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch, statSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
@@ -28,6 +28,99 @@ const require_cjs = createRequire(import.meta.url);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_REPO || join(__dirname, '../..');
+
+// ---------------------------------------------------------------------------
+// Code Graph VIEWER — in-memory graphify index (see /api/cgr/graph* handlers).
+//
+// graph.json is NetworkX node-link JSON (~62 MB, 57k nodes / 81k edges). We
+// parse it ONCE, build compact indexes, and let the raw parse be GC'd. The
+// cache is keyed on graph.json mtime, so a graphify re-index (which rewrites
+// the file) transparently invalidates it. All of this runs in Node inside the
+// coding-services container — no host Python, no submodule changes.
+// ---------------------------------------------------------------------------
+let GRAPH_INDEX_CACHE = null; // { mtimeMs, index } | null
+
+// Code-graph HTML generation jobs, keyed by scope slug:
+// { status: 'running'|'done'|'error', phase, error, scope, updatedAt }
+const CODE_HTML_JOBS = new Map();
+// Vendored vis-network UMD (Vite copies public/vendor/ → dist/vendor/), inlined
+// into graphify's graph.html so the output is self-contained (no unpkg/CDN/SRI).
+const VIS_NETWORK_VENDOR_REL = 'dist/vendor/vis-network-9.1.6.min.js';
+
+function buildGraphifyIndex(graphJsonPath, labelsPath) {
+    const raw = JSON.parse(readFileSync(graphJsonPath, 'utf-8'));
+    const rawNodes = raw.nodes || [];
+    const rawLinks = raw.links || [];
+
+    // Compact node table: id -> { label, norm, ft (file_type), sf (source_file), c (community) }
+    const nodesById = new Map();
+    const members = new Map();     // cid -> [id, ...]
+    for (const n of rawNodes) {
+        const cid = typeof n.community === 'number' ? n.community : parseInt(n.community, 10);
+        nodesById.set(n.id, {
+            label: n.label || n.id,
+            norm: n.norm_label || (n.label || n.id).toLowerCase(),
+            ft: n.file_type || 'code',
+            sf: n.source_file || '',
+            c: cid,
+            cn: n.community_name || ''
+        });
+        if (!Number.isNaN(cid)) {
+            let bucket = members.get(cid);
+            if (!bucket) { bucket = []; members.set(cid, bucket); }
+            bucket.push(n.id);
+        }
+    }
+
+    // Adjacency: id -> [{ t (neighbor id), r (relation), cf (confidence), w (weight), dir }].
+    // Both directions stored so a member's full connectivity is available when
+    // its community is expanded. Physical edges are deduped at emit time.
+    const adj = new Map();
+    const pushAdj = (id, entry) => {
+        let a = adj.get(id);
+        if (!a) { a = []; adj.set(id, a); }
+        a.push(entry);
+    };
+    // Community meta-graph: cross-community edge counts, canonicalized (min:max).
+    const meta = new Map(); // "cu:cv" -> count
+    for (const l of rawLinks) {
+        const s = l.source, t = l.target;
+        const rel = l.relation || '', cf = l.confidence || '', w = typeof l.weight === 'number' ? l.weight : 1;
+        pushAdj(s, { t, r: rel, cf, w, dir: 'out' });
+        pushAdj(t, { t: s, r: rel, cf, w, dir: 'in' });
+        const ns = nodesById.get(s), nt = nodesById.get(t);
+        if (ns && nt && !Number.isNaN(ns.c) && !Number.isNaN(nt.c) && ns.c !== nt.c) {
+            const cu = Math.min(ns.c, nt.c), cv = Math.max(ns.c, nt.c);
+            const key = cu + ':' + cv;
+            meta.set(key, (meta.get(key) || 0) + 1);
+        }
+    }
+
+    // Community labels sidecar: { "<cid>": "<label>" } (canonical over community_name).
+    const labels = new Map();
+    try {
+        if (existsSync(labelsPath)) {
+            const lj = JSON.parse(readFileSync(labelsPath, 'utf-8'));
+            for (const [k, v] of Object.entries(lj)) labels.set(parseInt(k, 10), v);
+        }
+    } catch { /* fall back to community_name below */ }
+
+    return {
+        nodesById,
+        members,
+        adj,
+        meta,
+        labels,
+        totalNodes: rawNodes.length,
+        totalEdges: rawLinks.length,
+        builtAtCommit: raw.built_at_commit || null,
+        // Build diagnostics surfaced in /api/cgr/graph stats (observable via curl)
+        // — the 62 MB parse is a flagged memory risk, so we report heap + timing
+        // as data rather than a log line.
+        indexMs: 0,
+        heapMb: 0
+    };
+}
 
 // Service → remediation mapping. Keys MUST match the `name` field emitted by
 // the coordinator at /health/state; `action` MUST match a case handled in
@@ -287,6 +380,16 @@ class SystemHealthAPIServer {
         this.app.get('/api/cgr/freshness', this.handleGetCGRFreshness.bind(this));
         this.app.get('/api/cgr/progress', this.handleGetCGRProgress.bind(this));
         this.app.post('/api/cgr/reindex', this.handleCGRReindex.bind(this));
+
+        // Code Graph VIEWER endpoints — generate + serve graphify's OWN native
+        // graph.html for a CODE-ONLY, scoped subgraph (the authentic graphify.com
+        // viewer: communities sidebar, filter, god node, visible edges). All work
+        // runs here inside coding-services; graph.json is bind-mounted; the
+        // graphify Python CLI is invoked in-container. No host Python.
+        this.app.get('/api/cgr/code-scopes', this.handleGetCodeScopes.bind(this));
+        this.app.post('/api/cgr/code-graph-html', this.handleGenerateCodeGraphHtml.bind(this));
+        this.app.get('/api/cgr/code-graph-html/progress', this.handleGetCodeGraphHtmlProgress.bind(this));
+        this.app.get('/api/cgr/code-graph-html/view', this.handleViewCodeGraphHtml.bind(this));
 
          // Context-window breakdown (Phase 78) — real per-category sizes of the
          // main session's latest /v1/messages, captured proxy-side. Same-origin
@@ -3264,6 +3367,253 @@ class SystemHealthAPIServer {
                 message: 'Failed to retrieve CGR freshness',
                 error: error.message
             });
+        }
+    }
+
+    /**
+     * Lazily build + mtime-cache the graphify graph index. Returns null when no
+     * graph.json exists yet. The parse is the expensive part (~62 MB); we only
+     * redo it when the file's mtime changes (i.e. after a re-index).
+     */
+    _getGraphIndex() {
+        const graphifyOut = process.env.GRAPHIFY_OUT || join(codingRoot, '.data', 'graphify', 'graphify-out');
+        const graphJson = join(graphifyOut, 'graph.json');
+        if (!existsSync(graphJson)) return null;
+        const mtimeMs = statSync(graphJson).mtimeMs;
+        if (GRAPH_INDEX_CACHE && GRAPH_INDEX_CACHE.mtimeMs === mtimeMs) {
+            return GRAPH_INDEX_CACHE.index;
+        }
+        const t0 = Date.now();
+        const labelsPath = join(graphifyOut, '.graphify_labels.json');
+        const index = buildGraphifyIndex(graphJson, labelsPath);
+        index.indexMs = Date.now() - t0;
+        index.heapMb = Math.round(process.memoryUsage().heapUsed / 1048576);
+        GRAPH_INDEX_CACHE = { mtimeMs, index };
+        return index;
+    }
+
+    /** Sanitize a scope like `integrations/km-core` into a filesystem slug. */
+    _scopeSlug(scope) {
+        return String(scope).replace(/[^A-Za-z0-9._-]+/g, '__').replace(/^_+|_+$/g, '');
+    }
+
+    _graphifyOut() {
+        return process.env.GRAPHIFY_OUT || join(codingRoot, '.data', 'graphify', 'graphify-out');
+    }
+
+    /**
+     * Derive the scope for a code node's source_file: first path segment, but
+     * `integrations/<component>` (two segments) so the huge integrations tree
+     * splits into per-component scopes. Root-level files (no `/`) are skipped.
+     */
+    _scopeForSourceFile(sf) {
+        if (!sf || !sf.includes('/')) return null;
+        const segs = sf.split('/');
+        if (segs[0] === 'integrations' && segs.length >= 3) return 'integrations/' + segs[1];
+        return segs[0];
+    }
+
+    /**
+     * GET /api/cgr/code-scopes — the code areas the user can view, each with its
+     * code-symbol count. Only `file_type === 'code'` nodes count (documents are
+     * excluded — this is a CODE graph). Scopes under graphify's ~5k node-level
+     * cap render as a full node-level graph.
+     */
+    async handleGetCodeScopes(req, res) {
+        try {
+            const index = this._getGraphIndex();
+            if (!index) {
+                return res.json({ status: 'success', data: [] });
+            }
+            const counts = new Map();
+            for (const n of index.nodesById.values()) {
+                if (n.ft !== 'code') continue;
+                const scope = this._scopeForSourceFile(n.sf);
+                if (!scope) continue;
+                counts.set(scope, (counts.get(scope) || 0) + 1);
+            }
+            const VIZ_CAP = 5000;
+            const scopes = [...counts.entries()]
+                .filter(([, c]) => c >= 25) // drop root-file / trivial noise
+                .sort((a, b) => b[1] - a[1])
+                .map(([scope, codeNodes]) => ({
+                    scope,
+                    slug: this._scopeSlug(scope),
+                    codeNodes,
+                    nodeLevel: codeNodes <= VIZ_CAP,
+                }));
+            res.json({ status: 'success', data: scopes });
+        } catch (error) {
+            console.error('Failed to list code scopes:', error);
+            res.status(500).json({ status: 'error', message: 'Failed to list code scopes', error: error.message });
+        }
+    }
+
+    /**
+     * POST /api/cgr/code-graph-html { scope } — generate graphify's OWN native
+     * graph.html for a CODE-ONLY subgraph scoped to `scope`. Async: returns
+     * immediately; poll /api/cgr/code-graph-html/progress. Cached per scope and
+     * invalidated when graph.json is re-indexed (mtime).
+     */
+    async handleGenerateCodeGraphHtml(req, res) {
+        try {
+            const scope = ((req.body && req.body.scope) || '').trim();
+            if (!scope) return res.status(400).json({ status: 'error', message: 'scope required' });
+            const slug = this._scopeSlug(scope);
+            const graphifyOut = this._graphifyOut();
+            const graphJson = join(graphifyOut, 'graph.json');
+            if (!existsSync(graphJson)) {
+                return res.status(404).json({ status: 'error', message: 'no code graph — run a re-index first' });
+            }
+            const viewDir = join(graphifyOut, 'code-views', slug);
+            const htmlPath = join(viewDir, 'graph.html');
+
+            // Serve cached HTML when it's newer than the source graph.
+            try {
+                if (existsSync(htmlPath) && statSync(htmlPath).mtimeMs >= statSync(graphJson).mtimeMs) {
+                    CODE_HTML_JOBS.set(slug, { status: 'done', phase: 'cached', scope, updatedAt: new Date().toISOString() });
+                    return res.json({ status: 'success', data: { slug, state: 'ready', cached: true } });
+                }
+            } catch { /* fall through to regenerate */ }
+
+            const existing = CODE_HTML_JOBS.get(slug);
+            if (existing && existing.status === 'running') {
+                return res.json({ status: 'success', data: { slug, state: 'running' } });
+            }
+
+            CODE_HTML_JOBS.set(slug, { status: 'running', phase: 'filtering', scope, updatedAt: new Date().toISOString() });
+            res.json({ status: 'success', data: { slug, state: 'running' } });
+
+            // Run the pipeline off the response path.
+            this._buildScopedCodeHtml({ scope, slug, graphifyOut, graphJson, viewDir, htmlPath })
+                .catch((err) => {
+                    console.error('code-graph-html generation failed:', err);
+                    CODE_HTML_JOBS.set(slug, { status: 'error', phase: 'failed', error: String((err && err.message) || err), scope, updatedAt: new Date().toISOString() });
+                });
+        } catch (error) {
+            console.error('Failed to start code-graph-html generation:', error);
+            res.status(500).json({ status: 'error', message: 'Failed to start generation', error: error.message });
+        }
+    }
+
+    /**
+     * Pipeline: filter graph.json → code-only nodes in `scope` (+ induced edges),
+     * write a scoped labels file, run graphify's native `export html` on it
+     * (node-level), then inline vis-network so the output is self-contained.
+     */
+    async _buildScopedCodeHtml({ scope, slug, graphifyOut, graphJson, viewDir, htmlPath }) {
+        const setPhase = (phase) => CODE_HTML_JOBS.set(slug, { status: 'running', phase, scope, updatedAt: new Date().toISOString() });
+
+        mkdirSync(viewDir, { recursive: true });
+
+        // 1. Filter to code-only nodes within the scope; induce edges among them.
+        setPhase('filtering');
+        const raw = JSON.parse(readFileSync(graphJson, 'utf-8'));
+        const prefix = scope.endsWith('/') ? scope : scope + '/';
+        const keep = new Set();
+        const nodes = [];
+        for (const n of raw.nodes || []) {
+            if (n.file_type !== 'code') continue;
+            const sf = n.source_file || '';
+            if (sf === scope || sf.startsWith(prefix)) { keep.add(n.id); nodes.push(n); }
+        }
+        if (nodes.length === 0) throw new Error('no code nodes for scope ' + scope);
+        const links = (raw.links || []).filter((l) => keep.has(l.source) && keep.has(l.target));
+        const filtered = {
+            directed: raw.directed ?? false,
+            multigraph: raw.multigraph ?? false,
+            graph: raw.graph ?? {},
+            nodes,
+            links,
+            built_at_commit: raw.built_at_commit,
+        };
+        writeFileSync(join(viewDir, 'graph.json'), JSON.stringify(filtered));
+
+        // 2. Scoped labels: only the communities actually present in the subgraph
+        //    (so graphify's sidebar lists ~this scope's communities, not all 4067).
+        const globalLabelsPath = join(graphifyOut, '.graphify_labels.json');
+        const scopedLabels = {};
+        if (existsSync(globalLabelsPath)) {
+            const globalLabels = JSON.parse(readFileSync(globalLabelsPath, 'utf-8'));
+            const present = new Set(nodes.map((n) => String(n.community)));
+            for (const cid of present) if (globalLabels[cid] !== undefined) scopedLabels[cid] = globalLabels[cid];
+        }
+        const scopedLabelsPath = join(viewDir, '.graphify_labels.json');
+        writeFileSync(scopedLabelsPath, JSON.stringify(scopedLabels));
+
+        // 3. graphify's OWN html exporter, node-level. GRAPHIFY_OUT points at the
+        //    scoped dir so it reconstructs communities from THIS subgraph (its
+        //    global .graphify_analysis.json isn't picked up), giving accurate
+        //    per-scope community counts.
+        setPhase('rendering');
+        const graphifyBin = '/coding/integrations/graphify/.venv/bin/graphify';
+        await new Promise((resolve, reject) => {
+            const child = spawn(graphifyBin, [
+                'export', 'html',
+                '--graph', join(viewDir, 'graph.json'),
+                '--labels', scopedLabelsPath,
+                '--node-limit', '100000',
+            ], { cwd: codingRoot, env: { ...process.env, GRAPHIFY_OUT: viewDir }, stdio: 'ignore' });
+            child.on('error', reject);
+            child.on('close', (code) => (code === 0 ? resolve() : reject(new Error('graphify export html exited ' + code))));
+        });
+        if (!existsSync(htmlPath)) throw new Error('graphify did not produce graph.html');
+
+        // 4. Inline the vendored vis-network so graph.html is fully self-contained
+        //    (graphify links it from unpkg with an SRI hash — fragile behind a
+        //    corporate proxy / offline). Replace the <script src=unpkg…> tag.
+        setPhase('inlining');
+        const visPath = join(__dirname, VIS_NETWORK_VENDOR_REL);
+        if (existsSync(visPath)) {
+            const vis = readFileSync(visPath, 'utf-8');
+            let html = readFileSync(htmlPath, 'utf-8');
+            html = html.replace(
+                /<script\s+src="https:\/\/unpkg\.com\/vis-network@[^"]*"[\s\S]*?<\/script>/i,
+                () => '<script>\n' + vis + '\n</script>'
+            );
+            writeFileSync(htmlPath, html);
+        }
+
+        CODE_HTML_JOBS.set(slug, { status: 'done', phase: 'ready', scope, updatedAt: new Date().toISOString() });
+    }
+
+    /** GET /api/cgr/code-graph-html/progress?scope= — poll generation state. */
+    async handleGetCodeGraphHtmlProgress(req, res) {
+        try {
+            const scope = (req.query.scope || '').trim();
+            if (!scope) return res.status(400).json({ status: 'error', message: 'scope required' });
+            const slug = this._scopeSlug(scope);
+            const job = CODE_HTML_JOBS.get(slug);
+            if (job) return res.json({ status: 'success', data: { slug, ...job } });
+            // No in-memory job (e.g. after a restart): report ready if a fresh
+            // HTML exists on disk.
+            const graphifyOut = this._graphifyOut();
+            const htmlPath = join(graphifyOut, 'code-views', slug, 'graph.html');
+            const graphJson = join(graphifyOut, 'graph.json');
+            try {
+                if (existsSync(htmlPath) && existsSync(graphJson) && statSync(htmlPath).mtimeMs >= statSync(graphJson).mtimeMs) {
+                    return res.json({ status: 'success', data: { slug, status: 'done', phase: 'cached' } });
+                }
+            } catch { /* ignore */ }
+            res.json({ status: 'success', data: { slug, status: 'idle' } });
+        } catch (error) {
+            res.status(500).json({ status: 'error', message: 'Failed to read progress', error: error.message });
+        }
+    }
+
+    /** GET /api/cgr/code-graph-html/view?scope= — serve the generated graph.html. */
+    async handleViewCodeGraphHtml(req, res) {
+        try {
+            const scope = (req.query.scope || '').trim();
+            if (!scope) return res.status(400).send('scope required');
+            const slug = this._scopeSlug(scope);
+            const htmlPath = join(this._graphifyOut(), 'code-views', slug, 'graph.html');
+            if (!existsSync(htmlPath)) return res.status(404).send('not generated — POST /api/cgr/code-graph-html first');
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+            res.sendFile(htmlPath);
+        } catch (error) {
+            res.status(500).send('Failed to serve graph: ' + error.message);
         }
     }
 
