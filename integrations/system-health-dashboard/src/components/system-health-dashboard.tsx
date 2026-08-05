@@ -21,6 +21,7 @@ import {
   ExternalLink,
   Brain,
   RotateCcw,
+  Network,
   Terminal
 } from 'lucide-react'
 import HealthStatusCard from './health-status-card'
@@ -29,6 +30,7 @@ import ViolationsTable from './violations-table'
 import SystemChecksTable from './system-checks-table'
 import UKBWorkflowModal from './ukb-workflow-modal'
 import CGRReindexModal from './cgr-reindex-modal'
+import CodeGraphViewerModal from './code-graph-viewer-modal'
 import LoggingControl from './logging-control'
 import { openConfirmModal } from '@/store/slices/cgrSlice'
 import { Logger, LogCategories } from '@/utils/logging'
@@ -37,6 +39,7 @@ export default function SystemHealthDashboard() {
   const dispatch = useAppDispatch()
   const healthStatus = useAppSelector((state) => state.healthStatus)
   const [ukbModalOpen, setUkbModalOpen] = useState(false)
+  const [graphViewerOpen, setGraphViewerOpen] = useState(false)
   const [loggingControlOpen, setLoggingControlOpen] = useState(false)
   const [serviceDetailOpen, setServiceDetailOpen] = useState(false)
   const healthReport = useAppSelector((state) => state.healthReport)
@@ -145,6 +148,16 @@ export default function SystemHealthDashboard() {
       })
     }
 
+    return items
+  }
+
+  // Code Graph is its own clickable tile (click the tile → open the interactive
+  // graphify viewer; the Re-index action button opens the reindex modal and
+  // stops propagation so it doesn't also open the viewer).
+  const getCodeGraphItems = () => {
+    const checks = getChecksByCategory('databases')
+    const items = []
+
     // Code-graph cache check - tracks the graphify graph.json for 'coding'
     // (check id stays `cgr_cache` for backend/response-shape compatibility)
     const cgrCheck = checks.find((c: any) => c.check === 'cgr_cache')
@@ -166,8 +179,8 @@ export default function SystemHealthDashboard() {
         description = `${repoName} @ ${cachedCommit.substring(0, 7)}`
       }
 
-      // Tooltip explains scope
-      const scopeNote = 'Tracks the graphify code graph (graph.json) for coding, including all integrations. Re-indexing runs an incremental graphify update of the tree-sitter graph.'
+      // Tooltip explains scope + the click affordance
+      const scopeNote = 'Tracks the graphify code graph (graph.json) for coding, including all integrations. Click this tile to open the interactive graph viewer; the Re-index button runs an incremental graphify update.'
       const statusNote = cgrCheck.message + (cgrCheck.recommendation ? ` - ${cgrCheck.recommendation}` : '')
 
       items.push({
@@ -182,6 +195,14 @@ export default function SystemHealthDashboard() {
           disabled: isReindexing,
           variant: 'outline' as const,
         }
+      })
+    } else {
+      // No check yet — still surface a clickable tile so the viewer is reachable.
+      items.push({
+        name: 'Code Graph',
+        status: 'unknown' as const,
+        description: 'graphify code graph',
+        tooltip: 'Click to open the interactive graphify code-graph viewer.',
       })
     }
 
@@ -538,14 +559,23 @@ export default function SystemHealthDashboard() {
       )}
 
       {/* Health Status Cards Grid */}
-      {/* Phase 66-02: 6-up at xl so the LLM Latency tile flows inline with the
-          other 5 health tiles instead of wrapping to its own row (lg keeps 3-up). */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+      {/* Phase 66-02: was 6-up at xl so the LLM Latency tile flows inline; now
+          7-up to keep the new dedicated Code Graph tile inline too (lg keeps 3-up). */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6">
         <HealthStatusCard
           title="Databases"
           icon={<Database className="h-5 w-5" />}
           items={getDatabaseItems()}
         />
+        <div data-testid="code-graph-tile">
+          <HealthStatusCard
+            title="Code Graph"
+            icon={<Network className="h-5 w-5" />}
+            items={getCodeGraphItems()}
+            clickable={true}
+            onClick={() => setGraphViewerOpen(true)}
+          />
+        </div>
         <HealthStatusCard
           title="Services"
           icon={<Server className="h-5 w-5" />}
@@ -696,6 +726,9 @@ export default function SystemHealthDashboard() {
 
       {/* CGR Re-index Modal */}
       <CGRReindexModal />
+
+      {/* Code Graph interactive viewer (opened by clicking the Code Graph tile) */}
+      <CodeGraphViewerModal open={graphViewerOpen} onOpenChange={setGraphViewerOpen} />
 
       {/* Logger Configuration Modal */}
       <LoggingControl
