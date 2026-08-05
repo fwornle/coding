@@ -1179,6 +1179,22 @@ else
     print_info "kgbench question verifier not found"
 fi
 
+# kgbench graders and containment. Pure functions, no model calls, ~2s — and they are
+# what decides whether a published number means anything. The coding-v1 pilot scored a
+# correct abstention as a hallucination and scored a leaked answer key as a win; both
+# are pinned here against the real answers that produced them.
+print_check "kgbench graders and containment"
+if [ -d "$CODING_ROOT/node_modules/jest" ] && command -v node >/dev/null 2>&1; then
+    if (cd "$CODING_ROOT" && NODE_OPTIONS='--experimental-vm-modules --no-warnings' \
+        npx jest tests/integration/kgbench --silent >/dev/null 2>&1); then
+        print_pass "kgbench grader + sandbox contracts hold"
+    else
+        print_fail "kgbench grader/sandbox tests fail (run: npx jest tests/integration/kgbench)"
+    fi
+else
+    print_info "jest not installed; skipping kgbench grader tests"
+fi
+
 print_check "MCP config converters (OpenCode/Copilot)"
 if [ -f "$CODING_ROOT/tests/integration/mcp-converters.test.sh" ]; then
     if bash "$CODING_ROOT/tests/integration/mcp-converters.test.sh" >/dev/null 2>&1; then

@@ -57,6 +57,10 @@ const report = {
     model: meta.arms[0]?.model ?? 'unknown',
     baselines: meta.baselines,
     schemaTax: meta.schemaTax,
+    // Containment state travels with the report: a reader must be able to tell a
+    // sandboxed run from one where the arms could read the answer key.
+    sandbox: meta.sandbox ?? null,
+    contaminatedRows: rows.filter((r) => r.contaminated).length,
     generatedAt: new Date().toISOString(),
   },
   ...agg,

@@ -95,6 +95,7 @@ nav:
     - Architecture: measurement/architecture.md
     - Prompt Caching: measurement/prompt-caching.md
     - The /experiment Skill: measurement/experiment-skill.md
+    - Retrieval Benchmark (kgbench): measurement/kgbench.md
   - Integrations:
     - Overview: integrations/index.md
     - Semantic Analysis: integrations/semantic-analysis.md
