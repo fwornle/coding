@@ -1131,6 +1131,21 @@ else
     print_info "Graphify submodule not found (run: git submodule update --init integrations/graphify)"
 fi
 
+# Agent MCP config converters. These write the OpenCode and Copilot configs, and
+# have shipped defects that only show up in generated output — a wholesale map
+# replace that stranded retired servers, and a missing HTTP branch that emitted
+# unusable stdio entries. Fixture-driven, so it needs no running services.
+print_check "MCP config converters (OpenCode/Copilot)"
+if [ -f "$CODING_ROOT/tests/integration/mcp-converters.test.sh" ]; then
+    if bash "$CODING_ROOT/tests/integration/mcp-converters.test.sh" >/dev/null 2>&1; then
+        print_pass "MCP config converters produce correct OpenCode/Copilot output"
+    else
+        print_fail "MCP config converter contract broken (run: bash tests/integration/mcp-converters.test.sh)"
+    fi
+else
+    print_info "MCP converter test not found"
+fi
+
 print_check "MCP Constraint Monitor with Professional Dashboard"
 CONSTRAINT_MONITOR_DIR="$CODING_ROOT/integrations/mcp-constraint-monitor"
 if dir_exists "$CONSTRAINT_MONITOR_DIR"; then

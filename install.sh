@@ -771,38 +771,10 @@ install_graphify() {
         INSTALLATION_WARNINGS+=("graphify: submodule init failed")
     fi
 
-    # Idempotently register the graphify MCP server in OpenCode's config.
-    local opencode_config="$HOME/.config/opencode/opencode.json"
-    if [[ -f "$opencode_config" ]] && command -v python3 >/dev/null 2>&1; then
-        if python3 - "$opencode_config" << 'PYEOF'
-import json, sys
-
-path = sys.argv[1]
-with open(path) as f:
-    cfg = json.load(f)
-
-mcp = cfg.setdefault("mcp", {})
-if "graphify" in mcp:
-    print("already-present")
-    sys.exit(0)
-
-mcp["graphify"] = {
-    "type": "remote",
-    "url": "http://localhost:3851/mcp",
-    "enabled": True,
-}
-with open(path, "w") as f:
-    json.dump(cfg, f, indent=2)
-print("registered")
-PYEOF
-        then
-            success "graphify MCP server registered in OpenCode config"
-        else
-            warning "Failed to register graphify MCP server in OpenCode config"
-        fi
-    else
-        info "OpenCode config or python3 not found - skipping graphify MCP registration"
-    fi
+    # Agent MCP registration is deliberately NOT done here. setup_mcp_config() runs
+    # after this function and is the single registration path for every agent; a
+    # second path here was silently overwritten by it, which is how OpenCode and
+    # Copilot drifted onto a retired backend.
 
     success "graphify installed"
     info "  - MCP server: http://localhost:3851/mcp (served by coding-graphify container)"
@@ -991,6 +963,10 @@ setup_mcp_config() {
     sed -i.bak "s|{{ANTHROPIC_API_KEY}}|${ANTHROPIC_API_KEY:-}|g" "$temp_file"
     sed -i.bak "s|{{OPENAI_API_KEY}}|${OPENAI_API_KEY:-}|g" "$temp_file"
     sed -i.bak "s|{{XAI_API_KEY}}|${XAI_API_KEY:-}|g" "$temp_file"
+    # Present in claude-code-mcp.json but previously unsubstituted, so every
+    # generated agent config carried the literal placeholder text as its value.
+    sed -i.bak "s|{{GROQ_API_KEY}}|${GROQ_API_KEY:-}|g" "$temp_file"
+    sed -i.bak "s|{{GROK_API_KEY}}|${GROK_API_KEY:-${XAI_API_KEY:-}}|g" "$temp_file"
     sed -i.bak "s|{{OPENAI_BASE_URL}}|${OPENAI_BASE_URL:-}|g" "$temp_file"
     sed -i.bak "s|{{KNOWLEDGE_BASE_PATH}}|${KNOWLEDGE_BASE_PATH:-$CODING_REPO}|g" "$temp_file"
     sed -i.bak "s|{{CODING_DOCS_PATH}}|${CODING_DOCS_PATH:-$CODING_REPO/docs}|g" "$temp_file"
@@ -1112,9 +1088,20 @@ setup_project_level_mcp_config() {
 
 # Setup OpenCode MCP configuration
 # OpenCode format: { "mcp": { "name": { "type": "local", "command": ["cmd", ...args], "enabled": true, "environment": {...} } } }
+# MCP server names this installer owns in the non-Claude agent configs.
+#
+# Both converters below MERGE rather than replace, so anything a user adds by hand
+# survives. That merge needs a prune list: without one, a server we stop shipping
+# (e.g. code-graph-rag, retired with the Memgraph stack) would linger forever in
+# every agent config, pointing at a backend that no longer exists.
+#
+# Only names on this list are ever removed. Retired names stay listed so existing
+# installs get cleaned up.
+MANAGED_MCP_KEYS="semantic-analysis constraint-monitor graphify code-graph-rag"
+
 setup_opencode_mcp_config() {
     local temp_file="$1"
-    
+
     echo -e "\n${CYAN}📋 Setting up OpenCode MCP configuration...${NC}"
     
     if [[ "$SANDBOX_MODE" == "true" ]]; then
@@ -1151,26 +1138,37 @@ with open('$opencode_config', 'r') as f:
 
 # Convert Claude mcpServers to OpenCode mcp format
 mcp_servers = claude_config.get('mcpServers', {})
+managed = set('$MANAGED_MCP_KEYS'.split())
 oc_mcp = {}
 
 for name, server in mcp_servers.items():
-    cmd = server.get('command', '')
-    args = server.get('args', [])
     env = server.get('env', {})
-    
-    # OpenCode format: command is array of [command, ...args]
-    command_list = [cmd] + args
-    
-    oc_mcp[name] = {
-        'type': 'local',
-        'command': command_list,
-        'enabled': True,
-    }
+
+    # Transport-aware. An HTTP server has no command to run, so emitting the
+    # local shape for it produces command:[''] — a silently broken entry.
+    if server.get('type') in ('http', 'sse') or server.get('url'):
+        oc_mcp[name] = {
+            'type': 'remote',
+            'url': server.get('url', ''),
+            'enabled': True,
+        }
+    else:
+        oc_mcp[name] = {
+            'type': 'local',
+            'command': [server.get('command', '')] + server.get('args', []),
+            'enabled': True,
+        }
     if env:
         oc_mcp[name]['environment'] = env
 
-# Merge into existing config (preserve all existing settings)
-oc_config['mcp'] = oc_mcp
+# Merge, do not replace: drop only the managed names we are no longer shipping,
+# keep every hand-added server, then apply the current set.
+existing = oc_config.get('mcp', {})
+for name in list(existing):
+    if name in managed and name not in oc_mcp:
+        del existing[name]
+existing.update(oc_mcp)
+oc_config['mcp'] = existing
 
 with open('$opencode_config', 'w') as f:
     json.dump(oc_config, f, indent=2)
@@ -1213,20 +1211,45 @@ with open('$temp_file', 'r') as f:
     claude_config = json.load(f)
 
 # Convert Claude mcpServers to Copilot servers format
+import os
 mcp_servers = claude_config.get('mcpServers', {})
+managed = set('$MANAGED_MCP_KEYS'.split())
 copilot_servers = {}
 
 for name, server in mcp_servers.items():
-    copilot_servers[name] = {
-        'type': 'stdio',
-        'command': server.get('command', ''),
-        'args': server.get('args', []),
-    }
+    # Transport-aware, same reasoning as the OpenCode converter above. Without
+    # the http branch every HTTP server landed as stdio with an empty command,
+    # which is why Copilot had no working code-graph server at all.
+    if server.get('type') in ('http', 'sse') or server.get('url'):
+        copilot_servers[name] = {
+            'type': 'http',
+            'url': server.get('url', ''),
+        }
+    else:
+        copilot_servers[name] = {
+            'type': 'stdio',
+            'command': server.get('command', ''),
+            'args': server.get('args', []),
+        }
     env = server.get('env', {})
     if env:
         copilot_servers[name]['env'] = env
 
-copilot_config = {'servers': copilot_servers}
+# Merge into any existing file rather than overwriting it wholesale.
+copilot_config = {'servers': {}}
+if os.path.exists('$copilot_mcp'):
+    try:
+        with open('$copilot_mcp', 'r') as f:
+            copilot_config = json.load(f)
+        copilot_config.setdefault('servers', {})
+    except (ValueError, OSError):
+        copilot_config = {'servers': {}}
+
+existing = copilot_config['servers']
+for name in list(existing):
+    if name in managed and name not in copilot_servers:
+        del existing[name]
+existing.update(copilot_servers)
 
 with open('$copilot_mcp', 'w') as f:
     json.dump(copilot_config, f, indent=2)
