@@ -43,6 +43,11 @@ constraints:
   suggestion: 'Replace with: Logger.log(''info'', ''category'', message)'
   whitelist:
   - '**/.claude/plans/*.md'
+  # Script CLIs under scripts/ are invoked as `$(node scripts/foo.mjs ...)`, so their
+  # stdout is the program's return value, not logging — routing it through Logger would
+  # break every bash caller. The existing scripts/experiments-*.mjs CLIs already work
+  # this way. The rule keeps full force everywhere else (lib/, integrations/, services).
+  - '**/scripts/*.mjs'
 - id: no-var-declarations
   group: code_quality
   pattern: \bvar\s+

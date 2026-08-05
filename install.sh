@@ -971,6 +971,33 @@ setup_mcp_config() {
     sed -i.bak "s|{{KNOWLEDGE_BASE_PATH}}|${KNOWLEDGE_BASE_PATH:-$CODING_REPO}|g" "$temp_file"
     sed -i.bak "s|{{CODING_DOCS_PATH}}|${CODING_DOCS_PATH:-$CODING_REPO/docs}|g" "$temp_file"
     
+    # Replace the code-graph server entry with whatever config/code-graph.json says is
+    # active. The template still carries a literal entry so the file stands alone and so
+    # this step is a no-op when nothing has been switched; without the splice, changing
+    # backends would update the Docker config but leave native mode on the old one.
+    # Any non-active backend's serverName is dropped so two never register at once.
+    if command -v node >/dev/null 2>&1 && [[ -f "$CODING_REPO/config/code-graph.json" ]]; then
+        if node -e '
+            const fs = require("fs");
+            const { execFileSync } = require("child_process");
+            const [file, repo] = process.argv.slice(1);
+            const run = (args) => execFileSync("node", [repo + "/scripts/code-graph-config.mjs", ...args], { encoding: "utf8" }).trim();
+            const entry = JSON.parse(run(["mcp-entry", "--agent", "claude", "--flavor", "claude", "--named"]));
+            const reg = JSON.parse(fs.readFileSync(repo + "/config/code-graph.json", "utf8"));
+            const allNames = Object.values(reg.backends).map((b) => b.mcp.serverName);
+            const active = Object.keys(entry)[0];
+            const cfg = JSON.parse(fs.readFileSync(file, "utf8"));
+            for (const n of allNames) if (n !== active) delete cfg.mcpServers[n];
+            Object.assign(cfg.mcpServers, entry);
+            fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+            process.stderr.write("code-graph backend: " + active + "\n");
+        ' "$temp_file" "$CODING_REPO" 2>&1; then
+            :
+        else
+            warning "Could not resolve code-graph backend from registry; using the template's literal entry"
+        fi
+    fi
+
     # Save the processed version locally
     cp "$temp_file" "$CODING_REPO/claude-code-mcp-processed.json"
     

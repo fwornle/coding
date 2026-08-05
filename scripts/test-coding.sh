@@ -1131,6 +1131,37 @@ else
     print_info "Graphify submodule not found (run: git submodule update --init integrations/graphify)"
 fi
 
+# Code-graph backend registry. Static/pure, so it is meaningful even with no
+# services running: it catches an active-but-disabled backend, duplicate MCP
+# server names, and port collisions before they reach an agent config.
+print_check "Code-graph backend registry"
+if [ -f "$CODING_ROOT/config/code-graph.json" ]; then
+    if command -v node >/dev/null 2>&1; then
+        if node "$CODING_ROOT/scripts/code-graph-config.mjs" validate >/dev/null 2>&1; then
+            CG_ACTIVE=$(node "$CODING_ROOT/scripts/code-graph-config.mjs" active 2>/dev/null || echo unknown)
+            print_pass "Code-graph registry valid (active backend: $CG_ACTIVE)"
+
+            print_check "Active code-graph backend registered for Claude"
+            if [ -f "$CODING_ROOT/claude-code-mcp-docker.json" ]; then
+                CG_SERVER=$(node "$CODING_ROOT/scripts/code-graph-config.mjs" get --field mcp.serverName 2>/dev/null || echo '')
+                if [ -n "$CG_SERVER" ] && grep -q "\"$CG_SERVER\"" "$CODING_ROOT/claude-code-mcp-docker.json"; then
+                    print_pass "MCP config registers '$CG_SERVER'"
+                else
+                    print_fail "claude-code-mcp-docker.json does not register '$CG_SERVER' (run: scripts/generate-docker-mcp-config.sh)"
+                fi
+            else
+                print_info "claude-code-mcp-docker.json not generated yet"
+            fi
+        else
+            print_fail "Code-graph registry invalid (run: node scripts/code-graph-config.mjs validate)"
+        fi
+    else
+        print_info "node not found - skipping code-graph registry validation"
+    fi
+else
+    print_info "config/code-graph.json not found"
+fi
+
 # Agent MCP config converters. These write the OpenCode and Copilot configs, and
 # have shipped defects that only show up in generated output — a wholesale map
 # replace that stranded retired servers, and a missing HTTP branch that emitted
