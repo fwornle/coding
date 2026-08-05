@@ -401,3 +401,6 @@ local_cache/
 .codegraph/*
 !.codegraph/.gitkeep
 .data/codegraph/
+
+# kgbench raw run output (results.jsonl with full answers; reports are committed, runs are not)
+.data/kgbench/

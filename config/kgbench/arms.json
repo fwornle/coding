@@ -1,0 +1,76 @@
+{
+  "version": 1,
+
+  "_comment": [
+    "Retrieval arms for kgbench.",
+    "",
+    "An arm is one way of answering a question. `kind: agent` spawns a headless claude",
+    "with a fixed tool surface; that surface is what distinguishes the arms, so the",
+    "comparison measures retrieval strategy rather than model.",
+    "",
+    "`allowedTools` may contain the token $backendTools, which expands to the tool list",
+    "declared for that backend in config/code-graph.json. Arms must NOT hand-write MCP",
+    "tool names: deriving them is what guarantees the benchmark exercises the same tool",
+    "surface production exposes, instead of drifting from it silently.",
+    "",
+    "Every arm keeps the same model and the same base prompt. Only tools differ."
+  ],
+
+  "defaults": {
+    "model": "claude-sonnet-5",
+    "timeoutMs": 300000,
+    "maxAttempts": 2
+  },
+
+  "arms": {
+    "grep": {
+      "kind": "agent",
+      "enabled": true,
+      "label": "Agentic grep (baseline)",
+      "note": "No index, no infrastructure. The pattern shipping coding agents already use, and the baseline any retrieval layer has to beat.",
+      "allowedTools": ["Glob", "Grep", "Read"],
+      "mcp": { "mcpServers": {} },
+      "preflight": []
+    },
+
+    "graphify": {
+      "kind": "agent",
+      "enabled": true,
+      "label": "Graphify code graph",
+      "backend": "graphify",
+      "allowedTools": ["Read", "$backendTools"],
+      "preflight": [
+        { "type": "http", "url": "http://localhost:${GRAPHIFY_MCP_PORT:-3851}/mcp" },
+        { "type": "artifact", "backend": "graphify" }
+      ]
+    },
+
+    "codegraph": {
+      "kind": "agent",
+      "enabled": false,
+      "label": "CodeGraph (SQLite)",
+      "backend": "codegraph",
+      "allowedTools": ["Read", "$backendTools"],
+      "preflight": [{ "type": "artifact", "backend": "codegraph" }]
+    },
+
+    "hybrid": {
+      "kind": "agent",
+      "enabled": false,
+      "label": "All tools, agent chooses",
+      "note": "The only production-shaped arm. Every other arm is FORCED onto one strategy, which is not how an agent actually works — so this is the number the others should be read against.",
+      "allowedTools": ["Glob", "Grep", "Read", "$allBackendTools"],
+      "mcpFrom": ["graphify"]
+    },
+
+    "docs": {
+      "kind": "agent",
+      "enabled": false,
+      "label": "Curated docs only (OKF)",
+      "note": "The OKF pattern: markdown + an index, no source access. Expected to win narrative/architecture questions and to be the only arm that can honestly answer 'that is not documented'.",
+      "allowedTools": ["Read", "Glob"],
+      "mcp": { "mcpServers": {} },
+      "promptPrefix": "You may consult ONLY files under docs/, docs-content/, and CLAUDE.md. Do not read source files. If the answer is not present in those documents, say so explicitly rather than inferring it."
+    }
+  }
+}
