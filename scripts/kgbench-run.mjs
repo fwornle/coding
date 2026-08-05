@@ -18,8 +18,9 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadArms, loadQuestions, resolveArms, enabledArmIds, preflightArm, REPO_ROOT } from '../lib/kgbench/arms.mjs';
-import { runCell, measureBaseline } from '../lib/kgbench/runner.mjs';
+import { runCell, measureBaseline, assertProxyReachable, PROXY_BASE } from '../lib/kgbench/runner.mjs';
 import { grade } from '../lib/kgbench/graders.mjs';
+import { judgeAnswer, reconcile, JUDGE_MODEL, JUDGE_PROVIDER } from '../lib/kgbench/judge.mjs';
 
 const argv = process.argv.slice(2);
 const out = (s) => console.log(s);
@@ -50,6 +51,14 @@ if (!questions.length) die(`no questions selected from set "${setName}"`);
 // ---- preflight -------------------------------------------------------------
 // Runs before anything executes. A down MCP server is indistinguishable from a
 // backend that answers badly, and a whole matrix run under that condition is worthless.
+// Fail-closed on the LLM proxy, matching the launcher. Every cognitive call in this
+// run — the arms AND the judge — goes through :12435 so the subscription provider for
+// the current network is used and the work is measured. Running direct would benchmark
+// a path nobody uses.
+const proxy = await assertProxyReachable();
+if (!proxy.ok) die(proxy.detail);
+out(`kgbench: LLM proxy ok at ${PROXY_BASE} (network=${proxy.detail?.networkMode ?? '?'}, providers=${Object.entries(proxy.detail?.providers ?? {}).filter(([, p]) => p.available).map(([n]) => n).join(',') || 'none'})`);
+
 out(`kgbench: preflighting ${arms.length} arm(s)...`);
 const pre = await Promise.all(arms.map((a) => preflightArm(a, { repoRoot })));
 let blocked = false;
@@ -107,6 +116,7 @@ writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({
   arms: arms.map((a) => ({ id: a.id, label: a.label, model: a.model, allowedTools: a.allowedTools, backend: a.backend })),
   questions: questions.map((q) => q.id),
   baselines, schemaTax,
+  judge: { provider: JUDGE_PROVIDER, model: JUDGE_MODEL, enabled: !flag("no-judge") },
   startedAt: new Date().toISOString(),
 }, null, 2) + '\n');
 
@@ -131,14 +141,33 @@ for (const arm of arms) {
       // Deterministic grading inline. `llm`-type questions are left ungraded here
       // and picked up by kgbench-judge, so a judge outage cannot lose a run.
       let scored = { score: null, grade_detail: null, hallucinated: false };
+      let judged = {};
       if (res.outcome === 'ok') {
         const g = grade(res.answer, q.grader);
         scored = { score: g.score, grade_detail: g.detail, hallucinated: !!g.hallucinated, grade_missing: g.missing ?? null };
+
+        // The judge runs when the question is judge-only (llm grader) or when a
+        // checklist exists to cross-check. It never overrides the deterministic
+        // score; disagreements are recorded and surfaced in the report.
+        const wantsJudge = !flag('no-judge') && (g.judgeOnly || q.checklist?.length);
+        if (wantsJudge) {
+          const j = await judgeAnswer({
+            question: q.prompt, answer: res.answer,
+            checklist: q.checklist, rubric: q.grader?.rubric,
+          });
+          judged = {
+            judge_score: j.score, judge_why: j.why ?? null, judge_pending: !!j.pending,
+            judge_reason: j.reason ?? null, judge_provider: j.provider ?? null,
+            ...(g.judgeOnly ? {} : { judge_agreement: reconcile(g.score, j.score) }),
+          };
+          // For an llm-only question the judge IS the score.
+          if (g.judgeOnly && j.score != null) scored.score = j.score;
+        }
       }
 
       const base = baselines[arm.id];
       const row = {
-        ...res, ...scored,
+        ...res, ...scored, ...judged,
         content_tokens: res.total_tokens != null && base != null ? Math.max(0, res.in_tokens - base) + (res.out_tokens ?? 0) : null,
         baseline_in_tokens: base ?? null,
         set: setName, commit, at: new Date().toISOString(),
