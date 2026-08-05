@@ -186,6 +186,8 @@
     },
     {
       "id": "T3", "cls": "abstain",
+      "_leak_terms_note": "Decisive must-not-appear terms. An abstain probe's subject should not exist anywhere in the searchable tree; if it does, either something leaked or the question's premise is false (see retired T2). Any occurrence aborts the run.",
+      "leak_terms": ["payment reconciliation"],
       "prompt": "Which module implements the payment reconciliation service in this repository? Reply with the repo-relative path, or state clearly that it does not exist.",
       "grader": { "type": "abstain" },
       "forbidden": [

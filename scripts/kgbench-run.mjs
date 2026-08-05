@@ -86,7 +86,7 @@ const resultsFile = path.join(runDir, 'results.jsonl');
 // ---- sandboxed run tree ----------------------------------------------------
 // The arms must not be able to read the answer key that grades them. See
 // lib/kgbench/sandbox.mjs — in the coding-v1 pilot the grep arm scored 1.00 on an
-// abstain probe by quoting that probe's own provenance note out of the question file.
+// abstain question by quoting that question's own provenance note out of the answer key.
 // Containment is verified, not assumed; createRunTree throws rather than hand back a
 // tree it could not clear.
 let tree = null;
