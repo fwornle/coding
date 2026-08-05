@@ -1,0 +1,251 @@
+{
+  "meta": {
+    "set": "replication",
+    "runId": "replication-full",
+    "questionCount": 9,
+    "reps": 3,
+    "commit": "3fd7d40de",
+    "dirty": true,
+    "model": "claude-sonnet-5",
+    "baselines": {
+      "grep": 71393,
+      "graphify": 72693
+    },
+    "schemaTax": {
+      "grep": 0,
+      "graphify": 1300
+    },
+    "generatedAt": "2026-08-05T18:29:38.114Z"
+  },
+  "byArm": {
+    "grep": {
+      "arm": "grep",
+      "runs": 27,
+      "ranked": 27,
+      "ungraded": 0,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "retry_rate": 0,
+      "hallucination_rate": 0,
+      "metrics": {
+        "score": {
+          "mean": 0.9259259259259259,
+          "median": 1,
+          "min": 0.33333333333333337,
+          "max": 1,
+          "p95": 1,
+          "n": 27
+        },
+        "total_tokens": {
+          "mean": 245701.14814814815,
+          "median": 217042,
+          "min": 143881,
+          "max": 447390,
+          "p95": 441572,
+          "n": 27
+        },
+        "content_tokens": {
+          "mean": 174308.14814814815,
+          "median": 145649,
+          "min": 72488,
+          "max": 375997,
+          "p95": 370179,
+          "n": 27
+        },
+        "tool_calls": {
+          "mean": 2.3703703703703702,
+          "median": 2,
+          "min": 1,
+          "max": 5,
+          "p95": 5,
+          "n": 27
+        },
+        "wall_s": {
+          "mean": 14.6,
+          "median": 11.6,
+          "min": 6.5,
+          "max": 32.1,
+          "p95": 30.5,
+          "n": 27
+        },
+        "cost_usd": {
+          "mean": 0.14124779999999998,
+          "median": 0.1262238,
+          "min": 0.0459378,
+          "max": 0.295734,
+          "p95": 0.29492999999999997,
+          "n": 27
+        }
+      }
+    },
+    "graphify": {
+      "arm": "graphify",
+      "runs": 27,
+      "ranked": 27,
+      "ungraded": 0,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "retry_rate": 0.07407407407407407,
+      "hallucination_rate": 0,
+      "metrics": {
+        "score": {
+          "mean": 0.9169040835707502,
+          "median": 1,
+          "min": 0.33333333333333337,
+          "max": 1,
+          "p95": 1,
+          "n": 27
+        },
+        "total_tokens": {
+          "mean": 249965.11111111112,
+          "median": 220992,
+          "min": 73248,
+          "max": 449796,
+          "p95": 374248,
+          "n": 27
+        },
+        "content_tokens": {
+          "mean": 177272.11111111112,
+          "median": 148299,
+          "min": 555,
+          "max": 377103,
+          "p95": 301555,
+          "n": 27
+        },
+        "tool_calls": {
+          "mean": 2.3703703703703702,
+          "median": 2,
+          "min": 0,
+          "max": 5,
+          "p95": 4,
+          "n": 27
+        },
+        "wall_s": {
+          "mean": 17.781481481481485,
+          "median": 17,
+          "min": 3.5,
+          "max": 38.1,
+          "p95": 34.4,
+          "n": 27
+        },
+        "cost_usd": {
+          "mean": 0.15177741111111112,
+          "median": 0.1505463,
+          "min": 0.0222738,
+          "max": 0.31720529999999997,
+          "p95": 0.2801094,
+          "n": 27
+        }
+      }
+    }
+  },
+  "byClass": {
+    "arch": {
+      "scores": {
+        "grep": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 3
+        },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 3
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "blast": {
+      "scores": {
+        "grep": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 6
+        },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 6
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "lookup": {
+      "scores": {
+        "grep": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "graphify": {
+          "mean": 0.9444444444444444,
+          "median": 1,
+          "min": 0.5,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "structural": {
+      "scores": {
+        "grep": {
+          "mean": 0.7777777777777778,
+          "median": 1,
+          "min": 0.33333333333333337,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "graphify": {
+          "mean": 0.8062678062678063,
+          "median": 1,
+          "min": 0.33333333333333337,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    }
+  },
+  "classes": [
+    "arch",
+    "blast",
+    "lookup",
+    "structural"
+  ],
+  "disagreements": []
+}
