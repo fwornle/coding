@@ -19,7 +19,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadArms, loadQuestions, resolveArms, enabledArmIds, preflightArm, REPO_ROOT } from '../lib/kgbench/arms.mjs';
 import { runCell, measureBaseline, assertProxyReachable, PROXY_BASE } from '../lib/kgbench/runner.mjs';
-import { grade } from '../lib/kgbench/graders.mjs';
+import { gradeQuestion } from '../lib/kgbench/graders.mjs';
+import { createRunTree } from '../lib/kgbench/sandbox.mjs';
 import { judgeAnswer, reconcile, JUDGE_MODEL, JUDGE_PROVIDER } from '../lib/kgbench/judge.mjs';
 
 const argv = process.argv.slice(2);
@@ -82,6 +83,41 @@ const runDir = path.join(repoRoot, '.data/kgbench/runs', runId);
 mkdirSync(runDir, { recursive: true });
 const resultsFile = path.join(runDir, 'results.jsonl');
 
+// ---- sandboxed run tree ----------------------------------------------------
+// The arms must not be able to read the answer key that grades them. See
+// lib/kgbench/sandbox.mjs — in the coding-v1 pilot the grep arm scored 1.00 on an
+// abstain probe by quoting that probe's own provenance note out of the question file.
+// Containment is verified, not assumed; createRunTree throws rather than hand back a
+// tree it could not clear.
+let tree = null;
+let armCwd = repoRoot;
+if (flag('no-sandbox')) {
+  out('kgbench: WARNING — --no-sandbox: arms can read config/kgbench/questions.');
+  out('kgbench:           Scores from this run are NOT comparable and must not be published.');
+} else {
+  out('kgbench: building sandboxed run tree (this takes ~1 min on a large repo)...');
+  try {
+    tree = createRunTree({ repoRoot, questions });
+    armCwd = tree.dir;
+    out(`  tree     ${tree.dir}`);
+    out(`  commit   ${tree.commit.slice(0, 9)}`);
+    out(`  excluded ${tree.removed.join(', ')}`);
+    out('  verified no question prompt or provenance note survives in the tree');
+  } catch (err) { die(err.message); }
+}
+// A worktree is built from the COMMIT, so uncommitted work is not what gets searched.
+if (dirty && tree) {
+  out(`kgbench: NOTE — working tree is dirty; arms search ${tree.commit.slice(0, 9)}, not your edits.`);
+}
+
+// Always give the worktree back, including on Ctrl-C — a leaked worktree wedges the
+// next run's `git worktree add` and leaves a stale copy of the repo in /tmp.
+const releaseTree = () => { if (tree) { tree.cleanup(); tree = null; } };
+process.on('exit', releaseTree);
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => { releaseTree(); process.exit(130); });
+}
+
 // Resume: skip cells already recorded.
 const done = new Set();
 if (existsSync(resultsFile)) {
@@ -99,7 +135,7 @@ const baselines = {};
 if (!flag('no-baseline')) {
   out('kgbench: measuring per-arm token baselines...');
   for (const arm of arms) {
-    const b = await measureBaseline({ arm, cwd: repoRoot, env: process.env, reps: 3 });
+    const b = await measureBaseline({ arm, cwd: armCwd, env: process.env, reps: 3 });
     baselines[arm.id] = b.baseline_in_tokens;
     out(`  ${arm.id.padEnd(12)} baseline_in_tokens=${b.baseline_in_tokens ?? 'n/a'} (${b.samples} samples)`);
   }
@@ -115,6 +151,9 @@ writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({
   runId, set: setName, reps, commit, dirty,
   arms: arms.map((a) => ({ id: a.id, label: a.label, model: a.model, allowedTools: a.allowedTools, backend: a.backend })),
   questions: questions.map((q) => q.id),
+  sandbox: tree
+    ? { mode: 'worktree', tree_commit: tree.commit, excluded: tree.removed, verified: true }
+    : { mode: 'none', verified: false, warning: 'arms could read the answer key; scores not comparable' },
   baselines, schemaTax,
   judge: { provider: JUDGE_PROVIDER, model: JUDGE_MODEL, enabled: !flag("no-judge") },
   startedAt: new Date().toISOString(),
@@ -129,6 +168,9 @@ let n = 0;
 // a result. Bail early and loudly instead.
 let consecutiveApiErrors = 0;
 const API_ERROR_ABORT = 3;
+// Rows whose answer cited the benchmark's own ground truth. With the sandbox in place
+// this should stay empty; if it does not, containment has regressed and the run is void.
+const contaminatedRows = [];
 for (const arm of arms) {
   for (const q of questions) {
     for (let rep = 1; rep <= reps; rep++) {
@@ -136,15 +178,26 @@ for (const arm of arms) {
       const key = `${arm.id}|${q.id}|${rep}`;
       if (done.has(key)) continue;
 
-      const res = await runCell({ arm, question: q, rep, cwd: repoRoot, env: process.env });
+      const res = await runCell({ arm, question: q, rep, cwd: armCwd, env: process.env });
 
       // Deterministic grading inline. `llm`-type questions are left ungraded here
       // and picked up by kgbench-judge, so a judge outage cannot lose a run.
       let scored = { score: null, grade_detail: null, hallucinated: false };
       let judged = {};
       if (res.outcome === 'ok') {
-        const g = grade(res.answer, q.grader);
-        scored = { score: g.score, grade_detail: g.detail, hallucinated: !!g.hallucinated, grade_missing: g.missing ?? null };
+        // gradeQuestion, not grade(answer, q.grader): questions author `checklist` and
+        // `forbidden` at the top level, and passing only q.grader left 13 of 17
+        // questions scoring null and the abstain class's fabrication check switched off.
+        const g = gradeQuestion(q, res.answer);
+        scored = {
+          score: g.score, grade_detail: g.detail, hallucinated: !!g.hallucinated,
+          grade_missing: g.missing ?? null,
+          ...(g.contaminated ? {
+            contaminated: true,
+            contamination_signals: g.contamination_signals,
+            score_if_clean: g.score_if_clean,
+          } : {}),
+        };
 
         // The judge runs when the question is judge-only (llm grader) or when a
         // checklist exists to cross-check. It never overrides the deterministic
@@ -174,7 +227,11 @@ for (const arm of arms) {
       };
       appendFileSync(resultsFile, JSON.stringify(row) + '\n');
 
-      const mark = res.outcome === 'ok' ? (scored.score == null ? 'judge' : scored.score.toFixed(2)) : res.outcome.toUpperCase();
+      if (scored.contaminated) contaminatedRows.push(`${arm.id}/${q.id}`);
+      const mark = res.outcome !== 'ok' ? res.outcome.toUpperCase()
+        : scored.contaminated ? 'CONTAM'
+        : scored.score == null ? 'judge'
+        : scored.score.toFixed(2);
       out(`  [${String(n).padStart(3)}/${total}] ${arm.id.padEnd(12)} ${q.id.padEnd(4)} rep${rep}  ${String(mark).padEnd(8)} ${res.wall_s}s`
         + (res.outcome === 'api_error' ? `  ${res.error}` : ''));
 
@@ -193,5 +250,10 @@ for (const arm of arms) {
 }
 
 out('');
+if (contaminatedRows.length) {
+  out(`kgbench: ${contaminatedRows.length} CONTAMINATED row(s): ${contaminatedRows.join(', ')}`);
+  out('kgbench: those answers cited the benchmark ground truth and are excluded from ranking.');
+  out('kgbench: containment has regressed — treat this run as void and fix lib/kgbench/sandbox.mjs.');
+}
 out(`kgbench: done. results -> ${resultsFile}`);
 out(`kgbench: render with  node scripts/kgbench-report.mjs --run ${runId}`);

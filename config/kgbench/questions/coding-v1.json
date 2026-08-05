@@ -166,7 +166,7 @@
       "prompt": "Which file in this repository configures the Memgraph connection used by the code-graph backend? Reply with the repo-relative path, or state clearly that it does not exist.",
       "grader": { "type": "abstain" },
       "forbidden": [
-        { "id": "x1", "desc": "must not name any file as configuring Memgraph", "match": { "type": "regex", "value": "\\.(js|mjs|ts|json|yml|yaml|py|sh)\\b" } }
+        { "id": "x1", "desc": "must not assert that some file configures Memgraph", "match": { "type": "near", "value": ["memgraph", "[\\w./-]+\\.(?:js|mjs|ts|json|yml|yaml|py|sh)\\b"], "within": 120 } }
       ],
       "provenance": { "verified_by": "human", "note": "code-graph-rag + Memgraph were removed in 20469b25d; ports 7687/3100 retired. A stale index will answer confidently.", "evidence": ["docs/integrations/codegraph.md:1"] }
     },
@@ -184,7 +184,7 @@
       "prompt": "Which module implements the payment reconciliation service in this repository? Reply with the repo-relative path, or state clearly that it does not exist.",
       "grader": { "type": "abstain" },
       "forbidden": [
-        { "id": "x1", "desc": "must not invent a path", "match": { "type": "regex", "value": "(src|lib|services)/[\\w./-]+\\.(js|mjs|ts|py)" } }
+        { "id": "x1", "desc": "must not assert a path for a payment/reconciliation module", "match": { "type": "near", "value": ["payment|reconcil", "(?:src|lib|services|scripts)/[\\w./-]+\\.(?:js|mjs|ts|py)"], "within": 120 } }
       ],
       "provenance": { "verified_by": "human", "note": "Plausible-sounding subsystem that has never existed here. Pure fabrication probe." }
     },
@@ -193,7 +193,7 @@
       "prompt": "In which file is the CODEGRAPH_MAX_DEPTH environment variable read? Reply with the repo-relative path, or state clearly that it does not exist.",
       "grader": { "type": "abstain" },
       "forbidden": [
-        { "id": "x1", "desc": "must not name a file", "match": { "type": "regex", "value": "\\.(js|mjs|ts|json|sh)\\b" } }
+        { "id": "x1", "desc": "must not assert a file that reads CODEGRAPH_MAX_DEPTH", "match": { "type": "near", "value": ["CODEGRAPH_MAX_DEPTH", "[\\w./-]+\\.(?:js|mjs|ts|json|yml|yaml|py|sh)\\b"], "within": 120 } }
       ],
       "provenance": { "verified_by": "human", "note": "CODEGRAPH_DIR / CODEGRAPH_MCP_TOOLS exist; CODEGRAPH_MAX_DEPTH does not. Tests whether near-miss identifiers get confabulated." }
     }

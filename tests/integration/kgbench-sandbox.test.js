@@ -1,0 +1,124 @@
+/**
+ * Containment contract for kgbench.
+ *
+ * The pilot's grep arm scored 1.00 on an abstain probe by reading that probe's entry
+ * in config/kgbench/questions/coding-v1.json. A leaked answer key yields CORRECT
+ * answers, so contamination cannot be spotted in the scores — it has to be prevented
+ * structurally and then verified. These tests pin the verification, not the worktree
+ * mechanics: building a real worktree takes ~50s and does not belong in lite CI.
+ */
+
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { leakNeedles, scanTreeForLeaks, classifyLeaks, DEFAULT_EXCLUDES } from '../../lib/kgbench/sandbox.mjs';
+
+const QUESTIONS = [
+  {
+    id: 'T3',
+    prompt: 'Which module implements the payment reconciliation service in this repository? '
+      + 'Reply with the repo-relative path, or state clearly that it does not exist.',
+    provenance: { note: 'Plausible-sounding subsystem that has never existed here. Pure fabrication probe.' },
+  },
+  { id: 'L1', prompt: 'Which file defines the shell variable MANAGED_MCP_KEYS, and what is its purpose?' },
+];
+
+describe('leakNeedles', () => {
+  it('drops the shared "Reply with..." boilerplate so questions do not match each other', () => {
+    const texts = leakNeedles(QUESTIONS).filter((x) => x.id === 'prompt:T3').map((x) => x.text);
+    expect(texts.join(' | ')).toContain('payment reconciliation');
+    for (const t of texts) expect(t.toLowerCase()).not.toContain('reply with');
+  });
+
+  it('emits overlapping windows, not one prefix — a paraphrase shares the middle, not the opening', () => {
+    const texts = leakNeedles(QUESTIONS).filter((x) => x.id === 'prompt:T3').map((x) => x.text);
+    expect(texts.length).toBeGreaterThan(1);
+    // Verified against the real leak: .data/knowledge-graph/exports/general.json and
+    // observations.json contain this window, but not the prompt's opening words.
+    expect(texts).toContain('the payment reconciliation service in');
+  });
+
+  it('probes provenance notes too — the pilot leak quoted a note, not a prompt', () => {
+    expect(leakNeedles(QUESTIONS).map((n) => n.id)).toContain('note:T3');
+  });
+
+  it('does not probe for the question-set PATH, which harness source legitimately names', () => {
+    // lib/kgbench/arms.mjs builds 'config/kgbench/questions/...' and is itself ground
+    // truth for one question. A path reference is not a content leak.
+    expect(leakNeedles(QUESTIONS).map((n) => n.text)).not.toContain('kgbench/questions');
+  });
+});
+
+describe('scanTreeForLeaks', () => {
+  let dir;
+  beforeEach(() => { dir = mkdtempSync(path.join(os.tmpdir(), 'kgb-scan-')); });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('passes a tree that contains the ANSWER but not the QUESTION', () => {
+    // install.sh genuinely defines MANAGED_MCP_KEYS — containment must not remove the
+    // thing the arms are supposed to find.
+    writeFileSync(path.join(dir, 'install.sh'), 'MANAGED_MCP_KEYS=(a b c)\n');
+    expect(scanTreeForLeaks(dir, QUESTIONS)).toEqual([]);
+  });
+
+  it('catches the answer key itself', () => {
+    mkdirSync(path.join(dir, 'config'), { recursive: true });
+    writeFileSync(path.join(dir, 'config/coding-v1.json'), JSON.stringify(QUESTIONS));
+    const hits = scanTreeForLeaks(dir, QUESTIONS);
+    expect(hits.map((h) => h.needle)).toContain('prompt:T3');
+  });
+
+  it('catches a prompt echoed by telemetry, which is how this actually leaked', () => {
+    // .data/observation-export/observations.json recorded the session in which these
+    // questions were written. A project that observes itself re-contaminates itself.
+    mkdirSync(path.join(dir, '.data'), { recursive: true });
+    writeFileSync(
+      path.join(dir, '.data/observations.json'),
+      JSON.stringify([{ text: 'discussed the payment reconciliation service in this repository probe' }]),
+    );
+    expect(scanTreeForLeaks(dir, QUESTIONS).length).toBeGreaterThan(0);
+  });
+});
+
+describe('classifyLeaks — an echo of the question vs the codebase\'s own vocabulary', () => {
+  const windows = leakNeedles(QUESTIONS).filter((n) => n.id === 'prompt:T3').length;
+
+  it('treats one or two adjacent windows as vocabulary overlap, not a leak', () => {
+    // Real case: B2 asks about "the LLM proxy on port 12435", and CostTab.tsx says the
+    // same thing because that is what this project calls it. Blocking on that would
+    // make the benchmark unrunnable for any question phrased in the codebase's terms.
+    const hits = [{ needle: 'prompt:T3', text: 'a', files: ['src/CostTab.tsx'] }];
+    const { leaks, weak } = classifyLeaks(hits, QUESTIONS);
+    expect(leaks).toHaveLength(0);
+    expect(weak).toHaveLength(1);
+  });
+
+  it('flags a file that echoes most of the prompt', () => {
+    // How the real leak looked: general.json matched every window of A3, T1 and T3.
+    const hits = Array.from({ length: windows }, (_, i) => (
+      { needle: 'prompt:T3', text: `w${i}`, files: ['.data/exports/general.json'] }
+    ));
+    const { leaks } = classifyLeaks(hits, QUESTIONS);
+    expect(leaks).toHaveLength(1);
+    expect(leaks[0].ratio).toBe(1);
+  });
+});
+
+describe('DEFAULT_EXCLUDES', () => {
+  it('removes the answer key and the telemetry exports', () => {
+    expect(DEFAULT_EXCLUDES).toContain('config/kgbench/questions');
+    expect(DEFAULT_EXCLUDES).toContain('.data');
+  });
+
+  it('does NOT remove config/kgbench wholesale — arms.json is a question\'s ground truth', () => {
+    expect(DEFAULT_EXCLUDES).not.toContain('config/kgbench');
+    expect(DEFAULT_EXCLUDES).not.toContain('lib/kgbench');
+  });
+
+  it('removes agent rule files — abspath escape hatch and per-arm tool bias', () => {
+    // CLAUDE.md tells agents to prefer the graphify skill over greps, which is a thumb
+    // on the scale for one arm, and carries absolute paths back out of the sandbox.
+    expect(DEFAULT_EXCLUDES).toContain('CLAUDE.md');
+    expect(DEFAULT_EXCLUDES).toContain('.claude');
+  });
+});
