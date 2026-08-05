@@ -70,7 +70,7 @@ Forgetting step 1 is a recurring issue — committed source looks correct but `d
 **Submodules requiring both steps:**
 - `integrations/mcp-server-semantic-analysis`
 - `integrations/mcp-constraint-monitor`
-- `integrations/code-graph-rag`
+- `integrations/graphify` (git submodule built into the `coding-services` image; Python — no `npm run build`, but a Docker rebuild is needed to pick up source changes)
 
 **After ANY code change to a submodule:**
 ```bash
@@ -107,7 +107,7 @@ Symptom of the stale-cache bug: the dashboard backend exits with `SyntaxError: I
 
 ## Code Graph Analysis
 
-`mcp__semantic-analysis__analyze_code_graph` with actions: `nl_query`, `query`, `call_graph`, `similar`. Requires Memgraph running.
+`mcp__semantic-analysis__analyze_code_graph` with actions: `nl_query`, `query`, `call_graph`, `similar`. Reads graphify's static `graph.json` (`.data/graphify/graphify-out/graph.json`) — no Memgraph, no database. Rebuild the graph with `graphify update` (host `bin/graphify` shim → `coding-services`) when it drifts behind HEAD. Graphify also serves its own HTTP MCP endpoint at `http://localhost:3851/mcp` (tools: `query_graph`/`get_node`/`get_neighbors`/`shortest_path`/`graph_stats`/`god_nodes`); the `/graphify` skill is the preferred entry point.
 
 
 ## Available Skills

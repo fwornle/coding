@@ -595,7 +595,11 @@
       "Bash(/usr/bin/stat *)",
       "Bash(launchctl getenv *)",
       "Bash(/bin/ps -o pid,ppid,lstart,command -p 56548)",
-      "mcp__code-graph-rag__write_file"
+      "mcp__code-graph-rag__write_file",
+      "Read(//Library/LaunchAgents/**)",
+      "Bash(/bin/ps aux *)",
+      "Bash(/usr/bin/grep -nE \"consolidation/run|consolidation/status|new ObservationConsolidator|setInterval|_INTERVAL|_THRESHOLD|schedule|cron|app\\\\.\\(get|post\\)\" scripts/observations-api-server.mjs)",
+      "Bash(gh pr *)"
     ],
     "deny": [],
     "ask": []
