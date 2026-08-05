@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "set": "coding-v1",
+  "_comment": [
+    "Evaluation set for the code-retrieval benchmark. Replaces the replication set,",
+    "which could not tell the arms apart: both scored 1.00 on every class.",
+    "",
+    "Three deliberate differences:",
+    "",
+    "1. FIRST-PARTY EVIDENCE ONLY. No question cites integrations/graphify or any other",
+    "   submodule. CI runs with submodules:false, so submodule evidence is unverifiable,",
+    "   and questions about graphify's internals would become meaningless if graphify were",
+    "   ever swapped out — which is the decision this benchmark exists to inform.",
+    "",
+    "2. MULTI-HOP AND SYNTHESIS. The replication questions mostly resolved with one",
+    "   well-chosen grep, which is why grep tied everywhere. These require joining facts",
+    "   across files, or narrative that is not in any single location.",
+    "",
+    "3. AN ABSTAIN CLASS. Questions whose answer is NOT in this repo, including two about",
+    "   code that was genuinely REMOVED (code-graph-rag / Memgraph). A stale index will",
+    "   answer those confidently and wrongly; grep will come up empty. That asymmetry is",
+    "   the most decision-relevant thing a benchmark can surface, and no correctness-only",
+    "   scoring reveals it.",
+    "",
+    "Scoring: facts_found/facts_required. Any `forbidden` match forces 0 and flags",
+    "hallucinated — a confidently wrong answer is worse than an incomplete one.",
+    "",
+    "Every provenance.evidence entry is machine-checked by",
+    "scripts/kgbench-verify-questions.mjs, so the ground truth cannot rot silently."
+  ],
+
+  "questions": [
+    {
+      "id": "L1", "cls": "lookup",
+      "prompt": "Which file defines the shell variable MANAGED_MCP_KEYS, and what is its purpose? Reply with the repo-relative path and one sentence.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "names install.sh", "match": { "type": "path", "value": "install.sh" } },
+        { "id": "f2", "must": true, "desc": "explains it is the prune list for installer-owned MCP servers", "match": { "type": "any-of", "value": ["prune", "remove", "retired", "no longer ship", "owned by"] } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["install.sh:1180"] }
+    },
+    {
+      "id": "L2", "cls": "lookup",
+      "prompt": "Which file implements the function summaryStats, and which module imports it for the retrieval benchmark? Reply with both repo-relative paths.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "lib/experiments/compare.mjs", "match": { "type": "path", "value": "lib/experiments/compare.mjs" } },
+        { "id": "f2", "must": false, "desc": "notes kgbench has its own copy", "match": { "type": "any-of", "value": ["lib/kgbench/report.mjs", "kgbench"] } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["lib/experiments/compare.mjs:145", "lib/kgbench/report.mjs:1"] }
+    },
+    {
+      "id": "L3", "cls": "lookup",
+      "prompt": "Which HTTP route does the system-health dashboard expose to trigger a code-graph re-index, and in which file is it registered? Reply with the route and the repo-relative path.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "POST /api/cgr/reindex", "match": { "type": "regex", "value": "/api/cgr/reindex" } },
+        { "id": "f2", "must": true, "desc": "server.js", "match": { "type": "path", "value": "integrations/system-health-dashboard/server.js" } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["integrations/system-health-dashboard/server.js:382"] }
+    },
+
+    {
+      "id": "S1", "cls": "structural",
+      "prompt": "In config/code-graph.json the active backend is resolved with a precedence order. List the three inputs in priority order, highest first.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "CODE_GRAPH_BACKEND env var first", "match": { "type": "symbol", "value": "CODE_GRAPH_BACKEND" } },
+        { "id": "f2", "must": true, "desc": "per-agent backend second", "match": { "type": "any-of", "value": ["agents.", "per-agent", "agent override", "agents["] } },
+        { "id": "f3", "must": true, "desc": "active third", "match": { "type": "regex", "value": "\\bactive\\b" } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["lib/code-graph/registry.mjs:13", "config/code-graph.json:6"] }
+    },
+    {
+      "id": "S2", "cls": "structural",
+      "prompt": "Under supervisord, which program serves the graphify MCP endpoint, what script does it run, and on which port? Reply with the program name, script path and port.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "program graphify", "match": { "type": "regex", "value": "program:graphify|\\bgraphify\\b" } },
+        { "id": "f2", "must": true, "desc": "graphify-serve.sh", "match": { "type": "regex", "value": "graphify-serve\\.sh" } },
+        { "id": "f3", "must": true, "desc": "port 3851", "match": { "type": "symbol", "value": "3851" } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["docker/supervisord.conf:113", "docker/graphify-serve.sh:51"] }
+    },
+    {
+      "id": "S3", "cls": "structural",
+      "prompt": "Which backends does the code-graph registry currently define, and which transport does each use? Reply as a list of name and transport.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "graphify over http", "match": { "type": "regex", "value": "graphify[^\\n]{0,40}http" } },
+        { "id": "f2", "must": true, "desc": "codegraph over stdio", "match": { "type": "regex", "value": "codegraph[^\\n]{0,40}stdio" } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["config/code-graph.json:50", "config/code-graph.json:108"] }
+    },
+
+    {
+      "id": "B1", "cls": "blast",
+      "prompt": "If the `mcp.tools` list for a backend in config/code-graph.json were changed, which parts of the system would be affected? Name the consumers.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "MCP config generation / agent registration", "match": { "type": "any-of", "value": ["generate-docker-mcp-config", "claude-code-mcp", "mcp config", "agent config", "install.sh"] } },
+        { "id": "f2", "must": true, "desc": "kgbench allowedTools derivation", "match": { "type": "any-of", "value": ["kgbench", "allowedTools", "allowed-tools", "benchmark arm"] } },
+        { "id": "f3", "must": false, "desc": "the registry helper itself", "match": { "type": "any-of", "value": ["allowedToolsFor", "registry.mjs"] } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["lib/code-graph/registry.mjs:1", "lib/kgbench/arms.mjs:1", "config/kgbench/arms.json:1"] }
+    },
+    {
+      "id": "B2", "cls": "blast",
+      "prompt": "A change makes the LLM proxy on port 12435 unreachable. Trace what happens to (a) launching a coding agent and (b) running the kgbench benchmark. Answer in 2-4 sentences.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "agent launch aborts fail-closed", "match": { "type": "any-of", "value": ["fail-closed", "fail closed", "abort", "exits", "refuses"] } },
+        { "id": "f2", "must": true, "desc": "kgbench also refuses to start", "match": { "type": "any-of", "value": ["kgbench", "benchmark"] } },
+        { "id": "f3", "must": false, "desc": "no unmeasured direct fallback", "match": { "type": "any-of", "value": ["unmeasured", "no fallback", "direct fallback"] } }
+      ],
+      "forbidden": [
+        { "id": "x1", "desc": "must not claim it silently falls back to direct provider calls", "match": { "type": "regex", "value": "falls back to (the )?(direct|provider|anthropic)" } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["scripts/launch-agent-common.sh:426", "lib/kgbench/runner.mjs:1", "scripts/kgbench-run.mjs:1"] }
+    },
+    {
+      "id": "B3", "cls": "blast",
+      "prompt": "The repo contains a tracked but empty directory `.codegraph/`. What breaks if it is deleted, and why can Docker not recreate it? Answer in 2-3 sentences.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "the container fails to start / the bind mount cannot attach", "match": { "type": "any-of", "value": ["fails to start", "cannot mount", "mount fails", "bind", "mountpoint"] } },
+        { "id": "f2", "must": true, "desc": "the parent is mounted read-only", "match": { "type": "any-of", "value": ["read-only", "readonly", ":ro"] } },
+        { "id": "f3", "must": false, "desc": "CODEGRAPH_DIR cannot take an absolute path", "match": { "type": "any-of", "value": ["CODEGRAPH_DIR", "absolute path"] } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["docker/docker-compose.yml:92", "docs/integrations/codegraph.md:1"] }
+    },
+
+    {
+      "id": "A1", "cls": "arch",
+      "prompt": "Why is the `.observations` directory deliberately NOT bind-mounted into the coding-services container, and what replaced it? Answer in 2-4 sentences.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "SQLite WAL/SHM corruption from concurrent openers across the bind mount", "match": { "type": "any-of", "value": ["wal", "corruption", "concurrent"] } },
+        { "id": "f2", "must": true, "desc": "the host obs-api is the single owner", "match": { "type": "any-of", "value": ["obs-api", "single owner", "observations-api"] } },
+        { "id": "f3", "must": false, "desc": "container reaches it over HTTP", "match": { "type": "any-of", "value": ["http", "OBS_API_URL", "12436"] } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["docker/docker-compose.yml:83"] }
+    },
+    {
+      "id": "A2", "cls": "arch",
+      "prompt": "The kgbench benchmark measures 'content tokens' rather than total tokens. What problem does that solve, and how is the value derived? Answer in 2-4 sentences.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "a large fixed floor (system prompt + tool schemas) dominates totals", "match": { "type": "any-of", "value": ["fixed", "floor", "baseline", "system prompt", "tool schema", "overhead"] } },
+        { "id": "f2", "must": true, "desc": "derived by subtracting a measured empty-run baseline", "match": { "type": "any-of", "value": ["subtract", "minus", "empty", "baseline"] } },
+        { "id": "f3", "must": false, "desc": "it is what makes arms comparable / compressed ratios", "match": { "type": "any-of", "value": ["parity", "compress", "ratio", "distinguish", "separate"] } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["lib/kgbench/runner.mjs:1", "docs/benchmarks/kgbench-replication/README.md:1"] }
+    },
+    {
+      "id": "A3", "cls": "arch",
+      "prompt": "Why does the benchmark harness strip ANTHROPIC_API_KEY from the environment of the agents it spawns? Answer in 2-3 sentences.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "a key takes precedence over the Max/subscription OAuth login", "match": { "type": "any-of", "value": ["precedence", "takes priority", "prefers", "overrides", "instead of"] } },
+        { "id": "f2", "must": true, "desc": "it would bypass the proxy / the measured path", "match": { "type": "any-of", "value": ["bypass", "unmeasured", "measured path", "proxy"] } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["scripts/launch-agent-common.sh:433", "lib/kgbench/runner.mjs:1"] }
+    },
+    {
+      "id": "A4", "cls": "arch",
+      "prompt": "What is the difference in failure behaviour between a code-graph backend served over HTTP and one served over stdio, and why does it matter operationally? Answer in 2-4 sentences.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "stdio crash takes down the whole MCP server list for the session", "match": { "type": "any-of", "value": ["whole", "all mcp", "entire", "server list", "every tool"] } },
+        { "id": "f2", "must": true, "desc": "http fails per call / degrades gracefully", "match": { "type": "any-of", "value": ["per call", "per-call", "individual", "gracefully", "only that"] } }
+      ],
+      "provenance": { "verified_by": "human", "evidence": ["docs/integrations/codegraph.md:1", "scripts/backend-smoke.sh:89"] }
+    },
+
+    {
+      "id": "T1", "cls": "abstain",
+      "prompt": "Which file in this repository configures the Memgraph connection used by the code-graph backend? Reply with the repo-relative path, or state clearly that it does not exist.",
+      "grader": { "type": "abstain" },
+      "forbidden": [
+        { "id": "x1", "desc": "must not name any file as configuring Memgraph", "match": { "type": "regex", "value": "\\.(js|mjs|ts|json|yml|yaml|py|sh)\\b" } }
+      ],
+      "provenance": { "verified_by": "human", "note": "code-graph-rag + Memgraph were removed in 20469b25d; ports 7687/3100 retired. A stale index will answer confidently.", "evidence": ["docs/integrations/codegraph.md:1"] }
+    },
+    {
+      "id": "T2", "cls": "abstain",
+      "prompt": "What Cypher query does runCypherQuery execute to find callers of a symbol? Reply with the query, or state clearly that this no longer exists.",
+      "grader": { "type": "abstain" },
+      "forbidden": [
+        { "id": "x1", "desc": "must not produce a Cypher query", "match": { "type": "regex", "value": "MATCH\\s*\\(|RETURN\\s+\\w" } }
+      ],
+      "provenance": { "verified_by": "human", "note": "runCypherQuery was rewritten against graph.json during the graphify migration; the Cypher path is gone.", "evidence": ["docs/integrations/graphify.md:1"] }
+    },
+    {
+      "id": "T3", "cls": "abstain",
+      "prompt": "Which module implements the payment reconciliation service in this repository? Reply with the repo-relative path, or state clearly that it does not exist.",
+      "grader": { "type": "abstain" },
+      "forbidden": [
+        { "id": "x1", "desc": "must not invent a path", "match": { "type": "regex", "value": "(src|lib|services)/[\\w./-]+\\.(js|mjs|ts|py)" } }
+      ],
+      "provenance": { "verified_by": "human", "note": "Plausible-sounding subsystem that has never existed here. Pure fabrication probe." }
+    },
+    {
+      "id": "T4", "cls": "abstain",
+      "prompt": "In which file is the CODEGRAPH_MAX_DEPTH environment variable read? Reply with the repo-relative path, or state clearly that it does not exist.",
+      "grader": { "type": "abstain" },
+      "forbidden": [
+        { "id": "x1", "desc": "must not name a file", "match": { "type": "regex", "value": "\\.(js|mjs|ts|json|sh)\\b" } }
+      ],
+      "provenance": { "verified_by": "human", "note": "CODEGRAPH_DIR / CODEGRAPH_MCP_TOOLS exist; CODEGRAPH_MAX_DEPTH does not. Tests whether near-miss identifiers get confabulated." }
+    }
+  ]
+}

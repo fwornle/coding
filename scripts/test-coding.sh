@@ -1166,6 +1166,19 @@ fi
 # have shipped defects that only show up in generated output — a wholesale map
 # replace that stranded retired servers, and a missing HTTP branch that emitted
 # unusable stdio entries. Fixture-driven, so it needs no running services.
+# kgbench ground truth. Questions cite file:line evidence; a rename or refactor
+# silently turns every arm's answer wrong and the benchmark reports that as a finding.
+print_check "kgbench question-set provenance"
+if [ -f "$CODING_ROOT/scripts/kgbench-verify-questions.mjs" ] && command -v node >/dev/null 2>&1; then
+    if node "$CODING_ROOT/scripts/kgbench-verify-questions.mjs" >/dev/null 2>&1; then
+        print_pass "kgbench question evidence still resolves"
+    else
+        print_fail "kgbench question evidence is stale (run: node scripts/kgbench-verify-questions.mjs)"
+    fi
+else
+    print_info "kgbench question verifier not found"
+fi
+
 print_check "MCP config converters (OpenCode/Copilot)"
 if [ -f "$CODING_ROOT/tests/integration/mcp-converters.test.sh" ]; then
     if bash "$CODING_ROOT/tests/integration/mcp-converters.test.sh" >/dev/null 2>&1; then
