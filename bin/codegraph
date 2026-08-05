@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Host shim for the CodeGraph CLI, which runs inside coding-services.
+#
+# Mirrors bin/graphify. Nothing about codegraph is installed on the host: the binary,
+# its Node runtime and its SQLite index all live in the container, and this is the
+# only host-side artifact.
+#
+#   codegraph status                 # index stats
+#   codegraph explore "<query>"      # same output as the codegraph_explore MCP tool
+#   codegraph-index.sh full|update   # rebuild (run inside the container)
+set -euo pipefail
+
+CONTAINER="${CODEGRAPH_CONTAINER:-coding-services}"
+
+if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "${CONTAINER}"; then
+    echo "codegraph: container '${CONTAINER}' is not running." >&2
+    echo "  Start it with:  cd docker && docker-compose up -d coding-services" >&2
+    exit 1
+fi
+
+# -i so `serve --mcp` works over stdio when an agent drives this shim directly.
+exec docker exec -i "${CONTAINER}" codegraph "$@"

@@ -89,6 +89,15 @@ services:
       - ${CODING_REPO:-.}/.git:/coding/.git:rw
       # Workspace access (host repos)
       - ${HOME}/Agentic:/workspace:ro
+      # CodeGraph index, mounted OVER the read-only workspace.
+      #
+      # CODEGRAPH_DIR accepts only a plain directory name — absolute paths are
+      # rejected — so the index cannot simply be pointed at /coding/.data. Docker
+      # also cannot create a mountpoint under a :ro parent, which is why the repo
+      # ships a tracked, empty .codegraph/ for this bind to attach to. The parent
+      # stays read-only; only this subpath is writable, and every byte lands in
+      # .data/codegraph on the host. Verified end-to-end before adopting.
+      - ${CODING_REPO:-.}/.data/codegraph:/workspace/coding/.codegraph
       # km-core peer package — Phase 42 strangler adapter (Plan 01).
       # Mounted at /coding/node_modules/@fwornle/km-core so that
       # `import('@fwornle/km-core')` from the bind-mounted semantic-analysis

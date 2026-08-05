@@ -1,6 +1,5 @@
 {
   "version": 1,
-
   "_comment": [
     "Registry of code-graph / code-retrieval backends.",
     "",
@@ -19,22 +18,33 @@
     "JSON Schema file — a second declaration of the same shape would only drift.",
     "Run `node scripts/code-graph-config.mjs validate` to check this file."
   ],
-
   "active": "graphify",
-
   "agents": {
-    "claude": { "backend": "inherit" },
-    "opencode": { "backend": "inherit" },
-    "copilot": { "backend": "inherit" },
-    "mastra": { "backend": "inherit" }
+    "claude": {
+      "backend": "inherit"
+    },
+    "opencode": {
+      "backend": "inherit"
+    },
+    "copilot": {
+      "backend": "inherit"
+    },
+    "mastra": {
+      "backend": "inherit"
+    }
   },
-
   "backends": {
     "graphify": {
       "enabled": true,
       "displayName": "Graphify",
       "summary": "tree-sitter AST + semantic pass into a static graph.json, served over HTTP MCP",
-      "capabilities": ["graph", "html-export", "communities", "incremental", "file-artifact"],
+      "capabilities": [
+        "graph",
+        "html-export",
+        "communities",
+        "incremental",
+        "file-artifact"
+      ],
       "mcp": {
         "serverName": "graphify",
         "transport": "http",
@@ -67,27 +77,48 @@
       },
       "index": {
         "script": "scripts/graphify-reindex.sh",
-        "modes": { "full": "full", "incremental": "update" },
+        "modes": {
+          "full": "full",
+          "incremental": "update"
+        },
         "target": "/workspace/coding"
       },
-      "install": { "kind": "submodule", "path": "integrations/graphify", "image": "prod" },
+      "install": {
+        "kind": "submodule",
+        "path": "integrations/graphify",
+        "image": "prod"
+      },
       "hostCli": "bin/graphify",
       "skill": ".claude/commands/graphify.md",
       "docs": "docs/integrations/graphify.md"
     },
-
     "codegraph": {
-      "enabled": false,
+      "enabled": true,
       "displayName": "CodeGraph",
       "summary": "tree-sitter into SQLite/FTS5, served over stdio MCP",
-      "capabilities": ["search", "context", "blast-radius", "incremental", "sqlite-artifact"],
+      "capabilities": [
+        "search",
+        "context",
+        "blast-radius",
+        "incremental",
+        "sqlite-artifact"
+      ],
       "mcp": {
         "serverName": "codegraph",
         "transport": "stdio",
         "command": "docker",
-        "args": ["exec", "-i", "coding-services", "codegraph", "serve", "--mcp"],
+        "args": [
+          "exec",
+          "-i",
+          "coding-services",
+          "codegraph",
+          "serve",
+          "--mcp"
+        ],
         "toolPrefix": "mcp__codegraph__",
-        "tools": ["codegraph_explore"],
+        "tools": [
+          "codegraph_explore"
+        ],
         "_toolsNote": [
           "codegraph_explore is the only tool exposed by default. The other seven",
           "(node, search, callers, callees, impact, files, status) exist but are unlisted",
@@ -130,8 +161,12 @@
         ]
       },
       "index": {
-        "script": "scripts/code-graph-index-codegraph.sh",
-        "modes": { "full": "index", "incremental": "sync" },
+        "script": "codegraph-index.sh",
+        "scriptLocation": "container",
+        "modes": {
+          "full": "full",
+          "incremental": "update"
+        },
         "target": "/workspace/coding",
         "_indexNote": "`codegraph init` ends with an interactive freshness prompt; run it with stdin closed or it hangs under supervisord."
       },
