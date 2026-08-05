@@ -520,12 +520,22 @@ function GroupHeaderRow({ group, expanded, onToggle }: {
   const agents = [...new Set(group.runs.map((r) => r.agent).filter(Boolean))] as string[]
   const totalTokens = group.runs.reduce((sum, r) => sum + (r.outcome?.totalTokens ?? 0), 0)
   const cellCount = group.runs.length
+  // Quarantined (Run.pending) runs only appear at all when "Show quarantined" is on.
+  // Once shown they must be unmistakable — they are excluded from every headline
+  // number, so an operator reading them as normal rows would draw wrong conclusions.
+  // Faint red wash on the row + an explicit badge; `allQuarantined` distinguishes a
+  // wholly-quarantined experiment from one with a few bad cells.
+  const quarantinedCount = group.runs.filter((r) => r.pending === true).length
+  const allQuarantined = quarantinedCount > 0 && quarantinedCount === cellCount
   return (
     <TableRow
       data-testid="experiment-group-row"
       data-group-key={group.key}
       data-expanded={expanded ? 'true' : 'false'}
-      className="cursor-pointer bg-muted/40 hover:bg-muted/60"
+      data-quarantined={allQuarantined ? 'true' : quarantinedCount > 0 ? 'partial' : 'false'}
+      className={`cursor-pointer ${quarantinedCount > 0
+        ? 'bg-destructive/10 hover:bg-destructive/15'
+        : 'bg-muted/40 hover:bg-muted/60'}`}
       onClick={onToggle}
     >
       <TableCell colSpan={30} className="py-2">
@@ -533,6 +543,18 @@ function GroupHeaderRow({ group, expanded, onToggle }: {
           {expanded
             ? <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
             : <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
+          {/* Leading, NOT ml-auto: the group header spans 30 columns, so anything
+              right-aligned lands past the viewport on this table and is never seen. */}
+          {quarantinedCount > 0 && (
+            <Badge
+              variant="outline"
+              data-testid="group-quarantined-badge"
+              className="shrink-0 border-destructive/40 bg-destructive/10 px-1.5 py-0 text-[10px] font-medium text-destructive"
+              title="Quarantined runs are excluded from the summary cards, facet counts and comparisons."
+            >
+              {allQuarantined ? 'Quarantined' : `${quarantinedCount} quarantined`}
+            </Badge>
+          )}
           {isOther
             ? (
               <span className="flex items-center gap-2 text-sm font-medium">
@@ -910,13 +932,19 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                 <GroupHeaderRow group={group} expanded={groupExpanded} onToggle={() => toggleGroup(group.key)} />
                 {groupExpanded && group.runs.map((run) => {
             const isSelected = run.task_id === selectedTaskId
+            const isQuarantined = run.pending === true
             return (
               <TableRow
                 key={run.task_id}
                 data-testid="run-row"
                 data-task-id={run.task_id}
+                data-quarantined={isQuarantined ? 'true' : 'false'}
                 onClick={() => dispatch(setSelectedTaskId(run.task_id))}
-                className={`cursor-pointer ${isSelected ? 'bg-muted' : ''}`}
+                // Selection still wins visually, but a quarantined row keeps the red
+                // wash so it can never be mistaken for a run that counts.
+                className={`cursor-pointer ${isQuarantined
+                  ? (isSelected ? 'bg-destructive/20' : 'bg-destructive/[0.07] hover:bg-destructive/15')
+                  : (isSelected ? 'bg-muted' : '')}`}
               >
                 <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
                   <input
@@ -931,14 +959,29 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
                 {/* Width is governed by the resizable `run` column (table-fixed);
                     overflow-hidden lets the inner `truncate` ellipsize at that width. */}
                 <TableCell className="overflow-hidden" title={runStr(run, 'goal_sentence') || run.task_id}>
-                  {runStr(run, 'goal_sentence')
-                    ? (
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate text-sm font-medium">{runStr(run, 'goal_sentence')}</span>
-                        <span className="truncate font-mono text-xs text-muted-foreground">{run.task_id}</span>
-                      </div>
-                    )
-                    : <span className="block truncate font-mono text-sm">{run.task_id}</span>}
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {/* Per-row marker as well as the group badge: in the "Other
+                        activity" bucket a lone quarantined run would otherwise sit
+                        among hundreds of counted ones with only the wash to go on. */}
+                    {isQuarantined && (
+                      <Badge
+                        variant="outline"
+                        data-testid="run-quarantined-badge"
+                        className="shrink-0 border-destructive/40 bg-destructive/10 px-1 py-0 text-[10px] font-medium text-destructive"
+                        title="Quarantined: excluded from the summary cards, facet counts and comparisons."
+                      >
+                        Q
+                      </Badge>
+                    )}
+                    {runStr(run, 'goal_sentence')
+                      ? (
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-sm font-medium">{runStr(run, 'goal_sentence')}</span>
+                          <span className="truncate font-mono text-xs text-muted-foreground">{run.task_id}</span>
+                        </div>
+                      )
+                      : <span className="block truncate font-mono text-sm">{run.task_id}</span>}
+                  </div>
                 </TableCell>
                 <TableCell data-testid="run-when">
                   <WhenCell run={run} now={now} />

@@ -12,7 +12,8 @@ import {
   selectActiveRunId,
   setIncludePending,
   selectIncludePending,
-  selectRuns,
+  selectVisibleRuns,
+  selectQuarantinedCount,
   selectRunsLoading,
   selectRunsError,
   selectFilteredRuns,
@@ -95,41 +96,49 @@ function SummaryCards({ runs }: { runs: Run[] }) {
 }
 
 // D-10: the quarantine control re-homed from the faceted sidebar to the page
-// header, now WITH a live count — "Show quarantined (N)" where N is the number
-// of quarantined (pending) runs among the already-fetched rows. Toggling it
-// re-fetches with ?includePending=<next> (the fetch param is UNCHANGED from the
-// old sidebar home). The count is a client-side filter over fetched rows — a
-// low-value internal metric, never authoritative (T-86-05-03). There is no
+// header, WITH a live count — "Show quarantined (N)". There is no
 // `run.quarantined` field; `pending` is the quarantine flag (Run.pending).
-function QuarantineHeaderToggle({ runs }: { runs: Run[] }) {
+//
+// The count previously read over the already-fetched rows while the fetch itself
+// asked the server to EXCLUDE pending runs — so N was structurally always 0 (the
+// fetched set contained none), even with 21 quarantined runs on the server, and
+// the checkbox looked inert. fetchRuns now always pulls them and the toggle
+// filters client-side (selectVisibleRuns), so the count is real and toggling is
+// instant — no refetch.
+function QuarantineHeaderToggle() {
   const dispatch = useAppDispatch()
   const includePending = useAppSelector(selectIncludePending)
-  const quarantinedCount = runs.filter((r) => r.pending === true).length
+  const quarantinedCount = useAppSelector(selectQuarantinedCount)
 
+  // The Checkbox sits BESIDE the <label>, not inside it. Wrapping a Radix checkbox
+  // in `<label htmlFor>` pointing at itself makes it impossible to UNCHECK by
+  // clicking the tick: once checked, the indicator <svg> is the topmost element at
+  // the control's centre, so the click targets a descendant rather than the labeled
+  // control — the label's activation behaviour then forwards a second click and the
+  // two toggles cancel. Checking worked only because an unchecked box renders no
+  // indicator. Side by side, the control handles its own clicks and the label
+  // forwards exactly once from the text.
   return (
-    <label
-      htmlFor="include-pending"
-      className="flex cursor-pointer items-center gap-2 text-sm"
-      data-testid="include-pending-row"
-    >
+    <div className="flex items-center gap-2 text-sm" data-testid="include-pending-row">
       <Checkbox
         id="include-pending"
         data-testid="include-pending-toggle"
         checked={includePending}
-        onCheckedChange={(checked) => {
-          const next = checked === true
-          dispatch(setIncludePending(next))
-          dispatch(fetchRuns(next))
-        }}
+        disabled={quarantinedCount === 0}
+        onCheckedChange={(checked) => dispatch(setIncludePending(checked === true))}
       />
-      <span className="truncate">Show quarantined ({quarantinedCount})</span>
-    </label>
+      <label htmlFor="include-pending" className="cursor-pointer truncate">
+        Show quarantined ({quarantinedCount})
+      </label>
+    </div>
   )
 }
 
 export function PerformancePage() {
   const dispatch = useAppDispatch()
-  const runs = useAppSelector(selectRuns)
+  // Visible = fetched minus quarantined unless the operator opted in. Quarantined
+  // runs must not silently inflate the summary cards.
+  const runs = useAppSelector(selectVisibleRuns)
   const loading = useAppSelector(selectRunsLoading)
   const error = useAppSelector(selectRunsError)
   const filtered = useAppSelector(selectFilteredRuns)
@@ -144,10 +153,10 @@ export function PerformancePage() {
   // run finished while this tab sat open) invisible until a manual reload — the exact
   // "my experiment doesn't appear" gap. Re-fetch honors the current quarantine toggle.
   useEffect(() => {
-    dispatch(fetchRuns(includePending))
-    const id = setInterval(() => dispatch(fetchRuns(includePending)), 30_000)
+    dispatch(fetchRuns())
+    const id = setInterval(() => dispatch(fetchRuns()), 30_000)
     return () => clearInterval(id)
-  }, [dispatch, includePending])
+  }, [dispatch])
 
   // AUTO-ATTACH: poll for the newest in-progress run and adopt it as the active run
   // when this tab isn't already watching one — so a matrix launched from the CLI or the
@@ -207,7 +216,7 @@ export function PerformancePage() {
           <SummaryCards runs={runs} />
         </div>
         <div className="pt-2">
-          <QuarantineHeaderToggle runs={runs} />
+          <QuarantineHeaderToggle />
         </div>
       </div>
 
