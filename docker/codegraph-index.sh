@@ -16,10 +16,10 @@ MODE="${1:-update}"
 TARGET="${CODEGRAPH_TARGET:-/workspace/coding}"
 DATA_DIR="${CODEGRAPH_DATA_DIR:-/coding/.data/codegraph}"
 DB="${DATA_DIR}/codegraph.db"
-META="${DATA_DIR}/metadata.json"
+META="${CODEGRAPH_META_DIR:-/coding/.data/code-graph-meta/codegraph}/metadata.json"
 PROGRESS="${DATA_DIR}/progress.json"
 
-mkdir -p "${DATA_DIR}"
+mkdir -p "${DATA_DIR}" "$(dirname "${META}")"
 
 write_progress() {
     printf '{"status":"%s","phase":"%s","mode":"%s","updatedAt":"%s"}\n' \

@@ -21,7 +21,7 @@ MODE="${2:-}"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTAINER="${CODING_CONTAINER:-coding-services}"
-OUT_DIR="$REPO/.data/$BACKEND"
+OUT_DIR="$REPO/.data/code-graph-meta/$BACKEND"
 OUT="$OUT_DIR/smoke.json"
 mkdir -p "$OUT_DIR"
 
