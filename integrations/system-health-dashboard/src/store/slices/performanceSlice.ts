@@ -748,11 +748,16 @@ export const fetchRuns = createAsyncThunk(
   // state so every refetch respects the operator's "Show quarantined" choice.
   async (includePending: boolean | void | undefined, { getState, rejectWithValue }) => {
     try {
-      const inc = typeof includePending === 'boolean'
-        ? includePending
-        : (getState() as RootState).performance.includePending
-      const url = inc ? '/api/experiments/runs?includePending=true' : '/api/experiments/runs'
-      const response = await fetch(url)
+      // ALWAYS fetch quarantined runs; the toggle filters CLIENT-side via
+      // selectVisibleRuns. Fetching the excluded set is what makes
+      // "Show quarantined (N)" able to report a real N — when the server did the
+      // excluding, the count was computed over rows that by definition contained
+      // zero pending runs, so it always read (0) while 21 sat on the server.
+      // Toggling is now instant (no refetch) as a side benefit. The arg is kept
+      // for call-site compatibility but no longer selects the URL.
+      void includePending
+      void getState
+      const response = await fetch('/api/experiments/runs?includePending=true')
       if (!response.ok) {
         throw new Error(`API returned ${response.status}`)
       }
@@ -2256,8 +2261,28 @@ function runPassesFacets(run: Run, f: FacetState): boolean {
 
 // Derived: the filtered run set. Memoized so component re-renders are cheap
 // and we never hold a page-local filtered array.
+// The run set the page should DISPLAY: everything fetched, minus D-06-quarantined
+// (pending) runs unless the operator asked to see them. fetchRuns always pulls the
+// quarantined ones so the count next to the toggle is real; this is where they get
+// hidden again. Every consumer that renders or aggregates runs must go through here
+// (or selectFilteredRuns below) rather than selectRuns — selectRuns is the raw
+// fetched set and includes quarantined rows at all times.
+export const selectVisibleRuns = createSelector(
+  [selectRuns, selectIncludePending],
+  (runs, includePending): Run[] =>
+    includePending ? runs : runs.filter((r) => r.pending !== true)
+)
+
+// How many quarantined runs exist in the fetched set, shown as "Show quarantined
+// (N)". Counted over selectRuns (the unfiltered set) on purpose — counting over the
+// visible set is what produced the permanent (0).
+export const selectQuarantinedCount = createSelector(
+  [selectRuns],
+  (runs): number => runs.filter((r) => r.pending === true).length
+)
+
 export const selectFilteredRuns = createSelector(
-  [selectRuns, selectFacetState],
+  [selectVisibleRuns, selectFacetState],
   (runs, facetState): Run[] => runs.filter((r) => runPassesFacets(r, facetState))
 )
 
@@ -2298,7 +2323,7 @@ export const selectFacetCounts = createSelector(
 // All distinct facet values present in the UNFILTERED run set — used to render
 // the facet rows themselves (so a value with a current count of 0 still shows).
 export const selectFacetOptions = createSelector(
-  [selectRuns],
+  [selectVisibleRuns],
   (runs) => {
     const uniqSorted = (vals: string[]) => Array.from(new Set(vals)).sort()
     return {
