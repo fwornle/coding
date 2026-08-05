@@ -64,7 +64,7 @@
 | `report.py` | Aggregates `results.jsonl` into the tables above. |
 | `queries.json` | The 9 queries with their ground truth and grader spec. |
 | `results.jsonl` | Raw output of the run — 54 records (tokens, tool calls, cost, latency, score). |
-| `full_run.log` | Harness stdout for that run. |
+| `full_run.log.txt` | Harness stdout for that run. |
 
 `mcp_graphify_only.json` is written by `bench.py` at startup, so it is not checked in.
 
