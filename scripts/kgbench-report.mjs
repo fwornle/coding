@@ -28,13 +28,21 @@ const resultsFile = path.join(runDir, 'results.jsonl');
 if (!existsSync(resultsFile)) die(`no results at ${resultsFile}`);
 
 const meta = JSON.parse(readFileSync(path.join(runDir, 'run.json'), 'utf8'));
-const rows = readFileSync(resultsFile, 'utf8').split('\n')
+const allRows = readFileSync(resultsFile, 'utf8').split('\n')
   .filter((l) => l.trim())
   .map((l) => JSON.parse(l));
 
 const { questions } = loadQuestions(meta.set, repoRoot);
 const selected = questions.filter((q) => meta.questions.includes(q.id));
 const armIds = meta.arms.map((a) => a.id);
+
+// Rows are filtered to the questions the set STILL defines, not the ones the run
+// happened to execute. A question retired mid-flight (T2: its premise was false, so no
+// answer to it could be graded) leaves rows behind, and aggregating them would fold a
+// known-broken question into the medians.
+const selectedIds = new Set(selected.map((q) => q.id));
+const rows = allRows.filter((r) => selectedIds.has(r.id));
+const retiredIds = [...new Set(allRows.filter((r) => !selectedIds.has(r.id)).map((r) => r.id))];
 
 const agg = aggregate(rows, { arms: armIds, questions: selected });
 
@@ -61,6 +69,8 @@ const report = {
     // sandboxed run from one where the arms could read the answer key.
     sandbox: meta.sandbox ?? null,
     contaminatedRows: rows.filter((r) => r.contaminated).length,
+    toolEscapeRows: rows.filter((r) => r.outcome === 'tool_escape').length,
+    retiredQuestions: retiredIds,
     generatedAt: new Date().toISOString(),
   },
   ...agg,
