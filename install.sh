@@ -754,6 +754,58 @@ install_system_health_dashboard() {
     cd "$CODING_REPO"
 }
 
+# Host-side prerequisites for the CodeGraph backend.
+#
+# CodeGraph itself is installed in the coding-services image, NOT on the host — the
+# binary, its Node runtime and its SQLite index all live in the container. What has to
+# exist on the host is only what Docker and the agents cannot create themselves:
+#
+#   1. .codegraph/  — the bind MOUNTPOINT. CODEGRAPH_DIR takes a plain directory name
+#      and rejects absolute paths, so the index cannot be redirected to .data by env
+#      alone; compose binds .data/codegraph over this path instead. Docker cannot
+#      mkdir a mountpoint under a read-only parent, so the directory must pre-exist or
+#      the container fails to start.
+#   2. .data/codegraph/ — the writable target of that bind.
+#
+# Non-fatal throughout, like install_graphify: a fresh clone without Docker should
+# still complete an install.
+_install_codegraph_support() {
+    info "Preparing CodeGraph backend (container-side; host gets a mountpoint + shim)..."
+
+    if ! mkdir -p "$CODING_REPO/.codegraph" "$CODING_REPO/.data/codegraph" 2>/dev/null; then
+        warning "Could not create CodeGraph directories"
+        INSTALLATION_WARNINGS+=("codegraph: could not create .codegraph / .data/codegraph")
+        return 0
+    fi
+    touch "$CODING_REPO/.codegraph/.gitkeep" 2>/dev/null || true
+
+    if [[ -f "$CODING_REPO/bin/codegraph" ]]; then
+        chmod +x "$CODING_REPO/bin/codegraph" 2>/dev/null || true
+        success "CodeGraph host shim ready (bin/codegraph → docker exec)"
+    else
+        warning "bin/codegraph shim missing"
+        INSTALLATION_WARNINGS+=("codegraph: bin/codegraph shim missing")
+    fi
+
+    # A host-global install shadows the container one and can serve a different
+    # version against a host-side index. Warn rather than uninstall — it may not be ours.
+    # Identify by content, not path: any shim that delegates to `docker exec` is fine
+    # wherever it lives, while a real binary on PATH is the problem regardless of name.
+    local on_path
+    on_path="$(command -v codegraph 2>/dev/null || true)"
+    if [[ -n "$on_path" ]] && ! grep -q "docker exec" "$on_path" 2>/dev/null; then
+        warning "A host-global 'codegraph' is on PATH at ${on_path}"
+        warning "  It shadows the container backend and may be a different version."
+        warning "  Remove with: npm -g uninstall @colbymchenry/codegraph"
+        INSTALLATION_WARNINGS+=("codegraph: host-global install shadows the container backend")
+    fi
+
+    local active
+    active="$(node "$CODING_REPO/scripts/code-graph-config.mjs" active 2>/dev/null || echo unknown)"
+    info "  Active code-graph backend: ${active} (switch in config/code-graph.json)"
+    info "  Build the index: docker exec coding-services codegraph-index.sh full"
+}
+
 # Install graphify (code knowledge graph; replaces the former code-graph-rag + Memgraph stack).
 # Graphify builds a static graph.json and serves it over MCP from the coding-graphify
 # container — no host Python/uv venv and no Memgraph database are required.
@@ -777,6 +829,7 @@ install_graphify() {
     # Copilot drifted onto a retired backend.
 
     success "graphify installed"
+    _install_codegraph_support
     info "  - MCP server: http://localhost:3851/mcp (served by coding-graphify container)"
 
     cd "$CODING_REPO"
