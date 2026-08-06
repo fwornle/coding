@@ -65,6 +65,7 @@ const regraded = rows.map((r) => {
     grade_detail: g.detail,
     hallucinated: !!g.hallucinated,
     grade_missing: g.missing ?? null,
+    contamination_weak: g.contamination_weak ?? undefined,
     ...(g.contaminated
       ? { contaminated: true, contamination_signals: g.contamination_signals, score_if_clean: g.score_if_clean }
       : { contaminated: undefined, contamination_signals: undefined, score_if_clean: undefined }),

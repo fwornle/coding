@@ -286,9 +286,13 @@ describe('detectContamination', () => {
   // single quote character, the rest because nothing looked for an answer citing the
   // machinery that marks it.
 
-  it('tolerates punctuation between the class name and "probe"', () => {
+  it('detects self-identification through punctuation, as a soft signal', () => {
+    // The quote character alone used to defeat this. It is now a SOFT signal, so what
+    // must survive is DETECTION — the row is flagged and counted, not voided.
     for (const t of ['a benchmark "abstain" probe', "an 'abstain' probe", 'a `trap` probe']) {
-      expect(detectContamination(`This is ${t} — nothing here implements it.`).contaminated).toBe(true);
+      const d = detectContamination(`This is ${t} — nothing here implements it.`);
+      expect(d.weak).toContain('self-identifies-as-probe');
+      expect(d.contaminated).toBe(false);
     }
   });
 
@@ -307,6 +311,32 @@ describe('detectContamination', () => {
     // signal; the answer reporting what the BENCHMARK does with it is.
     expect(detectContamination('see lib/kgbench/sandbox.mjs').contaminated).toBe(false);
     expect(detectContamination('modified lib/kgbench/graders.mjs').contaminated).toBe(false);
+  });
+
+  it('treats self-identification as SOFT — recorded, not score-voiding', () => {
+    // Real r6 answer, scored 1.00 and voided by the hard version of this signal. The arm
+    // queried the graph, found only false positives, and concluded the question looked
+    // like a probe. That is the inference the abstain class rewards, reached without
+    // reading anything — and voiding it loses a correct answer, which biases the result
+    // exactly as much as scoring a wrong one.
+    const inferred = 'No such module exists. The only hits are false positives — a parser '
+      + 'test fixture and dashboard data reconciliation, unrelated. This matches prior '
+      + 'findings in memory (this looks like a repeated fabrication probe).';
+    const d = detectContamination(inferred);
+    expect(d.contaminated).toBe(false);
+    expect(d.weak).toContain('self-identifies-as-probe');
+
+    const q = { id: 'T3', cls: 'abstain', prompt: 'x', grader: { type: 'abstain' } };
+    const g = gradeQuestion(q, inferred);
+    expect(g.score).toBe(1);
+    expect(g.contaminated).toBeFalsy();
+    expect(g.contamination_weak).toContain('self-identifies-as-probe');
+  });
+
+  it('still voids an answer that cites a source, even while calling it a probe', () => {
+    const cited = 'This is a benchmark "abstain" probe — the only hits are in '
+      + '`lib/kgbench/graders.mjs`, a comment describing it as a fabrication test case.';
+    expect(detectContamination(cited).contaminated).toBe(true);
   });
 
   it('does not flag a correct abstention that merely lists the file among grep hits', () => {
