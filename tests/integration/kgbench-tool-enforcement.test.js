@@ -74,3 +74,29 @@ describe('toolViolations', () => {
     expect(toolViolations(grepArm, undefined)).toEqual([]);
   });
 });
+
+describe('MCP scope — server, not per-tool', () => {
+  // graphify's server advertises ten tools; config/code-graph.json names six. Flagging
+  // per-tool would void a cell for calling get_community, which is a graph query — the
+  // exact strategy the arm exists to exercise. What must never happen is crossing to a
+  // different strategy, and that is what --strict-mcp-config already bounds.
+  const armWithServer = {
+    id: 'graphify',
+    allowedTools: ['Read', 'mcp__graphify__query_graph'],
+    mcpConfig: { mcpServers: { graphify: { type: 'http', url: 'http://localhost:3851/mcp' } } },
+  };
+
+  it('accepts any tool from a server the arm is configured with', () => {
+    expect(toolViolations(armWithServer, ['mcp__graphify__get_community', 'Read'])).toEqual([]);
+  });
+
+  it('still rejects a built-in outside the grant', () => {
+    expect(toolViolations(armWithServer, ['Grep'])).toEqual(['Grep']);
+    expect(toolViolations(armWithServer, ['Skill'])).toEqual(['Skill']);
+  });
+
+  it('rejects an MCP tool from a server the arm was never given', () => {
+    expect(toolViolations(armWithServer, ['mcp__codegraph__codegraph_explore']))
+      .toEqual(['mcp__codegraph__codegraph_explore']);
+  });
+});

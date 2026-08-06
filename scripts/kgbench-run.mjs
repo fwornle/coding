@@ -18,7 +18,10 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadArms, loadQuestions, resolveArms, enabledArmIds, preflightArm, REPO_ROOT } from '../lib/kgbench/arms.mjs';
-import { runCell, measureBaseline, assertProxyReachable, PROXY_BASE } from '../lib/kgbench/runner.mjs';
+import {
+  runCell, measureBaseline, assertProxyReachable, PROXY_BASE,
+  discoverBuiltinTools, denyListFor,
+} from '../lib/kgbench/runner.mjs';
 import { gradeQuestion } from '../lib/kgbench/graders.mjs';
 import { createRunTree } from '../lib/kgbench/sandbox.mjs';
 import { judgeAnswer, reconcile, JUDGE_MODEL, JUDGE_PROVIDER } from '../lib/kgbench/judge.mjs';
@@ -128,16 +131,43 @@ if (existsSync(resultsFile)) {
   if (done.size) out(`kgbench: resuming, ${done.size} cell(s) already recorded`);
 }
 
+// ---- tool surface discovery ------------------------------------------------
+// Ask the CLI what tools exist rather than maintaining a list by hand. The hand-written
+// list missed `Skill`, and the graphify arm used it to invoke this project's /graphify
+// skill — the second escape found this way. A tool added upstream is now denied
+// automatically instead of quietly becoming a hole in the comparison.
+out('kgbench: discovering CLI tool surface...');
+const builtins = await discoverBuiltinTools({ model: arms[0].model, cwd: armCwd, env: process.env });
+if (!builtins?.length) {
+  die('could not read the CLI tool surface from the session init event.\n'
+    + '  Refusing to run: without it the deny list is a guess, and an un-isolated arm\n'
+    + '  produces a comparison between things that are not what their labels say.');
+}
+out(`  ${builtins.length} built-in tools; each arm denies all but its own grant`);
+
 // ---- per-arm token baseline ------------------------------------------------
 // content_tokens = total - baseline. Without this the fixed ~140k floor of system
 // prompt + tool schemas dominates and every arm looks the same.
 const baselines = {};
 if (!flag('no-baseline')) {
   out('kgbench: measuring per-arm token baselines...');
+  const leaks = [];
   for (const arm of arms) {
-    const b = await measureBaseline({ arm, cwd: armCwd, env: process.env, reps: 3 });
+    const b = await measureBaseline({ arm, cwd: armCwd, env: process.env, reps: 3, builtins });
     baselines[arm.id] = b.baseline_in_tokens;
-    out(`  ${arm.id.padEnd(12)} baseline_in_tokens=${b.baseline_in_tokens ?? 'n/a'} (${b.samples} samples)`);
+    // The baseline probe is a real session with this arm's real flags, so what it
+    // reports as available is evidence that isolation applied — checked BEFORE the
+    // matrix runs, rather than discovering 48 voided cells afterwards.
+    const denied = new Set(denyListFor(arm, builtins));
+    const leaked = (b.available_tools ?? []).filter((t) => denied.has(t));
+    if (leaked.length) leaks.push(`  ${arm.id}: ${leaked.join(', ')}`);
+    out(`  ${arm.id.padEnd(12)} baseline_in_tokens=${b.baseline_in_tokens ?? 'n/a'} (${b.samples} samples)`
+      + `, tools=${(b.available_tools ?? []).length}`);
+  }
+  if (leaks.length) {
+    die('arms are not isolated — these tools were denied but are still available:\n'
+      + leaks.join('\n')
+      + '\n  Every number from such a run compares arms that are not what their labels say.');
   }
 }
 // The always-on cost of merely having a backend registered, relative to bare grep.
