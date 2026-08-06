@@ -82,18 +82,85 @@ reach into the container. Grading happens back on the host after the answer is w
 
 ### The five question classes
 
-| Class | n | What it asks |
-|---|--:|---|
-| `lookup` | 3 | Single-fact retrieval — *which file defines `MANAGED_MCP_KEYS`?* |
-| `structural` | 3 | Relationships — *which backends exist and what transport does each use?* |
-| `blast` | 3 | Consequences — *if this config field changed, what breaks?* |
-| `arch` | 4 | Narrative — *why does the harness strip `ANTHROPIC_API_KEY`?* |
-| `abstain` | 3 | **The answer is not here.** Saying so is the only correct response. |
+Questions are grouped by *what kind of work answering them takes*. Every chart in this
+report is broken down by these five groups, so it is worth knowing what they are:
 
-The `abstain` class is the interesting one. Two of its questions ask about code that was
-genuinely **removed** from this repo. A stale index will answer them confidently and
-wrongly; grep comes up empty. That asymmetry is the most decision-relevant thing a
-retrieval benchmark can surface, and no correctness-only scoring reveals it.
+| Class | n | The job |
+|---|--:|---|
+| `lookup` | 3 | Find one fact in one place |
+| `structural` | 3 | Describe how pieces relate to each other |
+| `blast` | 3 | Work out the consequences of a change |
+| `arch` | 4 | Explain *why* the system is built a certain way — narrative that lives in no single file |
+| `abstain` | 3 | **The answer is not here.** Saying so is the only correct response |
+
+The `abstain` class is the interesting one, and the reason this set exists. Its questions
+ask about things that were genuinely **removed** from this repo, or never existed. A stale
+index answers them confidently and wrongly; grep comes up empty. That asymmetry is the most
+decision-relevant thing a retrieval benchmark can surface, and correctness-only scoring
+hides it completely.
+
+### The questions
+
+All sixteen, verbatim — this is the whole test. Every arm was asked every question, and
+"correct" means the listed facts appear in the answer, checked mechanically rather than
+by impression.
+
+#### `lookup` — one fact, one place
+
+| | Question | Correct requires |
+|---|---|---|
+| **L1** | Which file defines the shell variable `MANAGED_MCP_KEYS`, and what is its purpose? | names `install.sh`; explains it is the prune list for installer-owned MCP servers |
+| **L2** | Which file implements the function `summaryStats`, and which module imports it for the retrieval benchmark? | `lib/experiments/compare.mjs` · *(bonus: notes kgbench has its own copy)* |
+| **L3** | Which HTTP route does the system-health dashboard expose to trigger a code-graph re-index, and in which file is it registered? | `POST /api/cgr/reindex`; `server.js` |
+
+#### `structural` — how pieces relate
+
+| | Question | Correct requires |
+|---|---|---|
+| **S1** | In `config/code-graph.json` the active backend is resolved with a precedence order. List the three inputs in priority order, highest first. | `CODE_GRAPH_BACKEND` env var first; per-agent backend second; `active` third |
+| **S2** | Under supervisord, which program serves the graphify MCP endpoint, what script does it run, and on which port? | program `graphify`; `graphify-serve.sh`; port `3851` |
+| **S3** | Which backends does the code-graph registry currently define, and which transport does each use? | graphify over http; codegraph over stdio |
+
+#### `blast` — consequences of a change
+
+| | Question | Correct requires |
+|---|---|---|
+| **B1** | If the `mcp.tools` list for a backend in `config/code-graph.json` were changed, which parts of the system would be affected? Name the consumers. | MCP config generation / agent registration; kgbench `allowedTools` derivation |
+| **B2** | A change makes the LLM proxy on port 12435 unreachable. Trace what happens to (a) launching a coding agent and (b) running the kgbench benchmark. | agent launch aborts fail-closed; kgbench also refuses to start · **must not** claim it silently falls back to direct provider calls |
+| **B3** | The repo contains a tracked but empty directory `.codegraph/`. What breaks if it is deleted, and why can Docker not recreate it? | the container fails to start / the bind mount cannot attach; the parent is mounted read-only |
+
+#### `arch` — narrative, not location *(run at 10 reps)*
+
+| | Question | Correct requires |
+|---|---|---|
+| **A1** | Why is the `.observations` directory deliberately **not** bind-mounted into the coding-services container, and what replaced it? | SQLite WAL/SHM corruption from concurrent openers across the bind mount; the host obs-api is the single owner |
+| **A2** | The kgbench benchmark measures "content tokens" rather than total tokens. What problem does that solve, and how is the value derived? | a large fixed floor (system prompt + tool schemas) dominates totals; derived by subtracting a measured empty-run baseline |
+| **A3** | Why does the benchmark harness strip `ANTHROPIC_API_KEY` from the environment of the agents it spawns? | a key takes precedence over the Max/subscription OAuth login; it would bypass the proxy / the measured path |
+| **A4** | What is the difference in failure behaviour between a code-graph backend served over HTTP and one served over stdio, and why does it matter operationally? | a stdio crash takes down the whole MCP server list for the session; http fails per call / degrades gracefully |
+
+#### `abstain` — the answer is not in this repository
+
+The trap class. Each asks for something that does not exist; the **only** correct
+response is to say so. A stale index answers confidently and wrongly.
+
+| | Question | Correct requires |
+|---|---|---|
+| **T1** | Which file in this repository configures the Memgraph connection used by the code-graph backend? | say it does not exist · **must not** assert that some file configures Memgraph *(Memgraph was removed when graphify replaced code-graph-rag — stale references still litter the repo, which is the trap)* |
+| **T3** | Which module implements the payment reconciliation service in this repository? | say it does not exist · **must not** assert a path for such a module *(a plausible-sounding subsystem that has never existed here)* |
+| **T4** | In which file is the `CODEGRAPH_MAX_DEPTH` environment variable read? | say it does not exist · **must not** assert a file that reads it *(a plausible-sounding env var for a backend that does exist)* |
+
+#### Retired: T2
+
+> *What Cypher query does `runCypherQuery` execute to find callers of a symbol?*
+
+Written as an abstain probe on the assumption the Cypher path was gone. **It is not.**
+`runCypherQuery` still exists and still builds literal Cypher at
+`integrations/mcp-server-semantic-analysis/src/services/cgr-query-cache.ts:233`. Arms that
+produced the query were *right* and scored 0; the arm that abstained scored 1.
+
+Retired for a **false premise**, not for scoring badly — dropping questions because
+results look wrong is selection, and the distinction is recorded in the question file
+itself. Its rows are excluded from every number in this report.
 
 ### How answers are scored
 
@@ -128,13 +195,16 @@ The run aborts if anything survives. Details in
   <img alt="Correctness by question class — all three arms at 1.00 median on lookup, structural, blast and abstain; codegraph at 0.65 on arch" src="../../images/kgbench-correctness-light.svg">
 </picture>
 
-| Class | grep | graphify | codegraph | verdict |
-|---|--:|--:|--:|---|
-| lookup | 1.00 | 1.00 | 1.00 | tie |
-| structural | 1.00 | 1.00 | 1.00 | tie |
-| blast | 1.00 | 1.00 | 1.00 | tie |
-| arch | 1.00 | 1.00 | 0.65 | tie (spreads overlap) |
-| abstain | 1.00 | 1.00 | 1.00 | tie |
+Each group of three bars is one **question class**; the three bars within it are the
+three **arms**, always in the same order.
+
+| Class | Questions | n per arm | grep | graphify | codegraph | verdict |
+|---|---|--:|--:|--:|--:|---|
+| lookup | L1 L2 L3 | 9 | 1.00 | 1.00 | 1.00 | tie |
+| structural | S1 S2 S3 | 9 | 1.00 | 1.00 | 1.00 | tie |
+| blast | B1 B2 B3 | 9 | 1.00 | 1.00 | 1.00 | tie |
+| arch | A1 A2 A3 A4 | 40 | 1.00 | 1.00 | 0.65 | tie (spreads overlap) |
+| abstain | T1 T3 T4 | 9 | 1.00 | 1.00 | 1.00 | tie |
 
 A winner is declared only at a **≥1.25× median gap with non-overlapping interquartile
 range**. Anything weaker prints "tie", because at these sample sizes a 1.3× gap is not a

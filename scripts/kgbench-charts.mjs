@@ -84,13 +84,16 @@ const wrap = (w, h, body) =>
 /* ---- Figure 1: correctness by question class ------------------------------ */
 function figCorrectness(mode) {
   const t = THEME[mode];
-  const W = 760, H = 330, L = 46, R = 16, T = 54, B = 52;
+  const W = 760, H = 360, L = 52, R = 16, T = 60, B = 76;
   const pw = W - L - R, ph = H - T - B;
   const gw = pw / CLASSES.length, bw = Math.min(26, (gw - 18) / 3);
 
   let s = `<text x="0" y="16" font-size="13" font-weight="600" fill="${t.text}">Correctness by question class</text>`;
-  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">median score across reps — 1.00 = every required fact recovered</text>`;
-  s += legend(t, W - R, 22);
+  // Say what a GROUP is and what a BAR is. Without it a reader sees five clusters of
+  // three columns and has to guess which dimension is which.
+  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one group per question class · one bar per arm · median score across reps</text>`;
+  s += `<text x="0" y="47" font-size="10.5" fill="${t.muted}">1.00 = every required fact recovered</text>`;
+  s += legend(t, W - R, 26);
 
   for (let i = 0; i <= 4; i++) {
     const v = i / 4, y = T + ph - v * ph;
@@ -112,10 +115,14 @@ function figCorrectness(mode) {
     });
     const n = rows.filter((r) => r.cls === cls && r.arm === 'grep' && r.score != null).length;
     s += `<text x="${gx + gw / 2}" y="${T + ph + 16}" font-size="11" fill="${t.text}" text-anchor="middle">${esc(cls)}</text>`;
-    s += `<text x="${gx + gw / 2}" y="${T + ph + 30}" font-size="9.5" fill="${t.muted}" text-anchor="middle">n=${n}/arm</text>`;
+    const ids = [...new Set(rows.filter((r) => r.cls === cls).map((r) => r.id))].sort().join(' ');
+    s += `<text x="${gx + gw / 2}" y="${T + ph + 30}" font-size="9" fill="${t.muted}" text-anchor="middle">${esc(ids)}</text>`;
+    s += `<text x="${gx + gw / 2}" y="${T + ph + 43}" font-size="9" fill="${t.muted}" text-anchor="middle">n=${n} per arm</text>`;
   });
 
   s += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="${t.grid}" stroke-width="1"/>`;
+  s += `<text x="${L + (W - L - R) / 2}" y="${H - 6}" font-size="10.5" fill="${t.muted}" text-anchor="middle">question class</text>`;
+  s += `<text transform="translate(12,${T + ph / 2}) rotate(-90)" font-size="10.5" fill="${t.muted}" text-anchor="middle">score</text>`;
   return wrap(W, H, s);
 }
 
@@ -134,7 +141,7 @@ function figCost(mode) {
   const pw = (W - 40) / 2, ph = H - T - B;
 
   let s = `<text x="0" y="16" font-size="13" font-weight="600" fill="${t.text}">What one query costs</text>`;
-  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">lower is better — correctness was a tie, so this is where the arms differ</text>`;
+  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one bar per arm · lower is better — correctness was a tie, so this is where the arms differ</text>`;
   // No legend: every bar is named directly beneath it, so a legend would repeat itself.
 
   panels.forEach((p, pi) => {
@@ -171,7 +178,7 @@ function figArchSpread(mode) {
   const laneH = ph / ARMS.length;
 
   let s = `<text x="0" y="16" font-size="13" font-weight="600" fill="${t.text}">Architecture class: every individual run</text>`;
-  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">each dot is one answer — overlap between arms is why a median gap is not yet a finding</text>`;
+  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one lane per arm · each dot is one answer (A1-A4, 10 reps each) — the arms' spreads overlap completely</text>`;
 
   for (let i = 0; i <= 4; i++) {
     const v = i / 4, x = L + v * pw;
