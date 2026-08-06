@@ -8,7 +8,7 @@ answer whether they buy anything a plain `grep` agent doesn't, using measurement
 than intuition.
 
 **Run:** `coding-v1-r5` · repo at `199bf1f3f` · model `claude-sonnet-5` ·
-16 questions × 3 arms × 3–10 reps = **264 runs**, 0 failures.
+16 questions × 3 arms × 3–10 reps = **228 runs**, 0 failures.
 
 ---
 
@@ -52,8 +52,8 @@ variable.
 ### A "cell" is one complete agent session
 
 One cell = one headless `claude -p` run: the agent reasons, calls tools, reads results,
-and writes a final answer. 16 questions × 3 arms × 3 reps = 144 cells, plus 7 extra reps
-on the 4 architecture questions = **264 cells total**.
+and writes a final answer. Twelve questions ran at 3 reps (12 × 3 arms × 3 = 108) and the
+four architecture questions at 10 (4 × 3 arms × 10 = 120), for **228 cells total**.
 
 Cells run **strictly sequentially**. Running them in parallel would be ~4× faster but
 would corrupt the latency and token measurements through CPU contention — and that is
