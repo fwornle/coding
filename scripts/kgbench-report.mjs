@@ -68,6 +68,7 @@ const report = {
     // Containment state travels with the report: a reader must be able to tell a
     // sandboxed run from one where the arms could read the answer key.
     sandbox: meta.sandbox ?? null,
+    history: meta.history ?? null,
     contaminatedRows: rows.filter((r) => r.contaminated).length,
     toolEscapeRows: rows.filter((r) => r.outcome === 'tool_escape').length,
     retiredQuestions: retiredIds,

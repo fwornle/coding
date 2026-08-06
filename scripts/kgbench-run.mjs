@@ -177,8 +177,26 @@ for (const [id, b] of Object.entries(baselines)) {
   schemaTax[id] = b != null && grepBase != null ? b - grepBase : null;
 }
 
-writeFileSync(path.join(runDir, 'run.json'), JSON.stringify({
+// Resuming must not erase what the earlier cells actually ran against. run.json was
+// rewritten wholesale, so adding reps at a later commit would have relabelled every
+// existing row with the new commit — the report would then claim a provenance that was
+// true for none of them. Prior manifests are kept.
+const runJsonPath = path.join(runDir, 'run.json');
+let priorRuns = [];
+if (existsSync(runJsonPath)) {
+  try {
+    const prev = JSON.parse(readFileSync(runJsonPath, 'utf8'));
+    priorRuns = [...(prev.history ?? []), {
+      commit: prev.commit, reps: prev.reps, startedAt: prev.startedAt,
+      sandbox_commit: prev.sandbox?.tree_commit ?? null,
+      questions: prev.questions,
+    }];
+  } catch { /* unreadable manifest: start a fresh history */ }
+}
+
+writeFileSync(runJsonPath, JSON.stringify({
   runId, set: setName, reps, commit, dirty,
+  ...(priorRuns.length ? { history: priorRuns } : {}),
   arms: arms.map((a) => ({ id: a.id, label: a.label, model: a.model, allowedTools: a.allowedTools, backend: a.backend })),
   questions: questions.map((q) => q.id),
   sandbox: tree
