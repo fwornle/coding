@@ -33,7 +33,15 @@ const allRows = readFileSync(resultsFile, 'utf8').split('\n')
   .map((l) => JSON.parse(l));
 
 const { questions } = loadQuestions(meta.set, repoRoot);
-const selected = questions.filter((q) => meta.questions.includes(q.id));
+// A run's question set is the UNION over every pass, not just the last one. Adding reps
+// with `--only A1,A2,A3,A4` rewrote run.json's list to those four, so the other twelve
+// questions' rows were misfiled as "retired" and silently dropped from every table —
+// the report showed a 4-question benchmark and named the rest as excluded.
+const runQuestionIds = new Set([
+  ...(meta.questions ?? []),
+  ...(meta.history ?? []).flatMap((h) => h.questions ?? []),
+]);
+const selected = questions.filter((q) => runQuestionIds.has(q.id));
 const armIds = meta.arms.map((a) => a.id);
 
 // Rows are filtered to the questions the set STILL defines, not the ones the run
@@ -59,7 +67,15 @@ const report = {
     set: meta.set,
     runId,
     questionCount: selected.length,
-    reps: meta.reps,
+    // Reps vary per question once a later pass deepens a subset, so report the real
+    // per-question range instead of the last pass's --reps value.
+    reps: (() => {
+      const per = new Map();
+      for (const r of rows) per.set(`${r.arm}|${r.id}`, (per.get(`${r.arm}|${r.id}`) ?? 0) + 1);
+      const v = [...per.values()];
+      const lo = Math.min(...v), hi = Math.max(...v);
+      return lo === hi ? String(lo) : `${lo}-${hi}`;
+    })(),
     commit: meta.commit,
     dirty: meta.dirty,
     model: meta.arms[0]?.model ?? 'unknown',

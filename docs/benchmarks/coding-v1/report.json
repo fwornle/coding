@@ -1,0 +1,734 @@
+{
+  "meta": {
+    "set": "coding-v1",
+    "runId": "coding-v1-r5",
+    "questionCount": 16,
+    "reps": "3-10",
+    "commit": "199bf1f3f",
+    "dirty": true,
+    "model": "claude-sonnet-5",
+    "baselines": {},
+    "schemaTax": {},
+    "sandbox": {
+      "mode": "worktree",
+      "tree_commit": "199bf1f3f37b0b442fc9d45636aff006227ba47d",
+      "excluded": [
+        "config/kgbench/questions",
+        "tests/integration/kgbench-graders.test.js",
+        "tests/integration/kgbench-sandbox.test.js",
+        "tests/integration/kgbench-tool-enforcement.test.js",
+        "docs/measurement/kgbench.md",
+        "docs-content/measurement/kgbench.md",
+        ".data",
+        ".specstory",
+        "CLAUDE.md",
+        ".claude",
+        ".github/copilot-instructions.md"
+      ],
+      "verified": true
+    },
+    "history": [
+      {
+        "commit": "172b2df21",
+        "reps": 3,
+        "startedAt": "2026-08-06T05:59:12.523Z",
+        "sandbox_commit": "172b2df21b02649d256174042bd0b3728b60ea00",
+        "questions": [
+          "L1",
+          "L2",
+          "L3",
+          "S1",
+          "S2",
+          "S3",
+          "B1",
+          "B2",
+          "B3",
+          "A1",
+          "A2",
+          "A3",
+          "A4",
+          "T1",
+          "T3",
+          "T4"
+        ]
+      }
+    ],
+    "contaminatedRows": 0,
+    "toolEscapeRows": 0,
+    "retiredQuestions": [],
+    "generatedAt": "2026-08-06T09:24:33.454Z"
+  },
+  "byArm": {
+    "grep": {
+      "arm": "grep",
+      "runs": 76,
+      "ranked": 76,
+      "ungraded": 0,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "retry_rate": 0,
+      "hallucination_rate": 0,
+      "metrics": {
+        "score": {
+          "mean": 0.8572368421052632,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 76
+        },
+        "total_tokens": {
+          "mean": 112229.28947368421,
+          "median": 86363,
+          "min": 22850,
+          "max": 783680,
+          "p95": 264491,
+          "n": 76
+        },
+        "content_tokens": {
+          "mean": 99059.1875,
+          "median": 57426.5,
+          "min": 760,
+          "max": 761590,
+          "p95": 257746,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 4.315789473684211,
+          "median": 4,
+          "min": 0,
+          "max": 22,
+          "p95": 14,
+          "n": 76
+        },
+        "wall_s": {
+          "mean": 23.009210526315783,
+          "median": 18.299999999999997,
+          "min": 4.6,
+          "max": 103.5,
+          "p95": 55,
+          "n": 76
+        },
+        "cost_usd": {
+          "mean": 0.09122852368421054,
+          "median": 0.0752712,
+          "min": 0.0092112,
+          "max": 0.42101340000000004,
+          "p95": 0.2315454,
+          "n": 76
+        }
+      }
+    },
+    "graphify": {
+      "arm": "graphify",
+      "runs": 76,
+      "ranked": 76,
+      "ungraded": 0,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "retry_rate": 0,
+      "hallucination_rate": 0,
+      "metrics": {
+        "score": {
+          "mean": 0.8125,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 76
+        },
+        "total_tokens": {
+          "mean": 175889.11842105264,
+          "median": 117488.5,
+          "min": 23283,
+          "max": 714114,
+          "p95": 624256,
+          "n": 76
+        },
+        "content_tokens": {
+          "mean": 196910.5625,
+          "median": 161681,
+          "min": 755,
+          "max": 691586,
+          "p95": 624612,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 5.447368421052632,
+          "median": 4,
+          "min": 0,
+          "max": 25,
+          "p95": 20,
+          "n": 76
+        },
+        "wall_s": {
+          "mean": 32.72894736842105,
+          "median": 28.45,
+          "min": 5.1,
+          "max": 109.5,
+          "p95": 98.7,
+          "n": 76
+        },
+        "cost_usd": {
+          "mean": 0.1674797052631579,
+          "median": 0.12645435,
+          "min": 0.0091626,
+          "max": 0.9580010999999999,
+          "p95": 0.45031409999999994,
+          "n": 76
+        }
+      }
+    },
+    "codegraph": {
+      "arm": "codegraph",
+      "runs": 76,
+      "ranked": 76,
+      "ungraded": 0,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "retry_rate": 0.013157894736842105,
+      "hallucination_rate": 0,
+      "metrics": {
+        "score": {
+          "mean": 0.756578947368421,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 76
+        },
+        "total_tokens": {
+          "mean": 322160.55263157893,
+          "median": 119893,
+          "min": 22022,
+          "max": 2041565,
+          "p95": 1252559,
+          "n": 76
+        },
+        "content_tokens": {
+          "mean": 320995.6875,
+          "median": 99746.5,
+          "min": 692,
+          "max": 1764539,
+          "p95": 1231229,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 10.618421052631579,
+          "median": 3.5,
+          "min": 0,
+          "max": 65,
+          "p95": 50,
+          "n": 76
+        },
+        "wall_s": {
+          "mean": 64.10263157894738,
+          "median": 28.15,
+          "min": 5.3,
+          "max": 283.8,
+          "p95": 206.5,
+          "n": 76
+        },
+        "cost_usd": {
+          "mean": 0.2603112947368421,
+          "median": 0.1308645,
+          "min": 0.0086682,
+          "max": 1.3206054000000003,
+          "p95": 0.8258667,
+          "n": 76
+        }
+      }
+    }
+  },
+  "byClass": {
+    "abstain": {
+      "scores": {
+        "grep": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "codegraph": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "arch": {
+      "scores": {
+        "grep": {
+          "mean": 0.7625,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 40
+        },
+        "graphify": {
+          "mean": 0.68625,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 40
+        },
+        "codegraph": {
+          "mean": 0.6137500000000001,
+          "median": 0.65,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 40
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "blast": {
+      "scores": {
+        "grep": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "codegraph": {
+          "mean": 0.9444444444444444,
+          "median": 1,
+          "min": 0.5,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "lookup": {
+      "scores": {
+        "grep": {
+          "mean": 0.8500000000000001,
+          "median": 1,
+          "min": 0.15,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "graphify": {
+          "mean": 0.8111111111111111,
+          "median": 1,
+          "min": 0.15,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "codegraph": {
+          "mean": 0.7166666666666667,
+          "median": 1,
+          "min": 0.15,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "structural": {
+      "scores": {
+        "grep": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "codegraph": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    }
+  },
+  "classes": [
+    "abstain",
+    "arch",
+    "blast",
+    "lookup",
+    "structural"
+  ],
+  "disagreements": [
+    {
+      "id": "L1",
+      "arm": "grep",
+      "checklist": 0.5,
+      "judge": 1,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "B1",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B1",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A3",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A3",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B1",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B1",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "graphify",
+      "checklist": 0.5,
+      "judge": 0.1,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B1",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B1",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B2",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "codegraph",
+      "checklist": 0.5,
+      "judge": 0,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A1",
+      "arm": "codegraph",
+      "checklist": 0.65,
+      "judge": 0.33,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A1",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0,
+      "judge": 1,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A3",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "grep",
+      "checklist": 0,
+      "judge": 0.4,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "grep",
+      "checklist": 0.5,
+      "judge": 0.1,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A3",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A3",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "graphify",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "graphify",
+      "checklist": 0,
+      "judge": 1,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "graphify",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "graphify",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "graphify",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A2",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A2",
+      "arm": "codegraph",
+      "checklist": 0.65,
+      "judge": 0.33,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A2",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.67,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A3",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A3",
+      "arm": "codegraph",
+      "checklist": 0.5,
+      "judge": 1,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A3",
+      "arm": "codegraph",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0.5,
+      "judge": 1,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0,
+      "judge": 0.5,
+      "kind": "judge_higher"
+    }
+  ]
+}
