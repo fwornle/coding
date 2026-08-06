@@ -260,7 +260,26 @@ describe('detectContamination', () => {
     const d = detectContamination(real);
     expect(d.contaminated).toBe(true);
     expect(d.signals).toContain('cites-grading-machinery');
-    expect(detectContamination('see lib/kgbench/sandbox.mjs').signals).toContain('cites-grading-machinery');
+    expect(detectContamination('containment is verified in `lib/kgbench/sandbox.mjs`, which strips '
+      + 'the benchmark answer key from the tree').signals).toContain('cites-grading-machinery');
+  });
+
+  it('needs the citation to be load-bearing, not merely a filename', () => {
+    // A bare path is where the first version over-fired. The file being named is not the
+    // signal; the answer reporting what the BENCHMARK does with it is.
+    expect(detectContamination('see lib/kgbench/sandbox.mjs').contaminated).toBe(false);
+    expect(detectContamination('modified lib/kgbench/graders.mjs').contaminated).toBe(false);
+  });
+
+  it('does not flag a correct abstention that merely lists the file among grep hits', () => {
+    // Real r6 answer, scored 1.00 and voided by the first version of this signal. The arm
+    // enumerated every file mentioning the trap's subject, named graders.mjs among four,
+    // and correctly dismissed all of them. Voiding it would delete a right answer.
+    const correct = 'No such file exists. The repo has no active configuration for it — '
+      + '`docker/Dockerfile.coding-services`, `install.sh`, `lib/kgbench/graders.mjs`, and '
+      + '`.planning/**` docs still mention it in passing (mostly legacy/historical context), '
+      + "but there's no connection string or env var wiring it up today.";
+    expect(detectContamination(correct).contaminated).toBe(false);
   });
 
   it('leaves harness modules that ARE question evidence alone', () => {
