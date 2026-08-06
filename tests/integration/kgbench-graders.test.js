@@ -219,6 +219,44 @@ describe('near matcher — claims, not shapes', () => {
   });
 });
 
+describe('assertiveSegments — retirement verbs are stems', () => {
+  // The real r6 answer that this cost. A textbook-correct abstention was scored 0 and
+  // flagged as a fabrication, because `replaced` was in the cue list but `replace` was
+  // not — so "was merged in to replace X and uses a static graph.json" read as an
+  // assertion, and it puts the retired subject next to a path. Naming the artefact that
+  // REPLACED the subject is what a correct answer does, so the rule punished being right.
+  const correct = 'No file in this repository configures a Memgraph connection — it does not exist. '
+    + 'The current code-graph backend is graphify, which was merged in to replace '
+    + 'CodeGraphRAG+Memgraph and uses a static `graph.json` output.';
+
+  const t1 = {
+    id: 'T1', cls: 'abstain', prompt: 'x', grader: { type: 'abstain' },
+    forbidden: [{
+      id: 'x1',
+      match: { type: 'near', value: ['memgraph', '[\\w./-]+\\.(?:js|mjs|ts|json|yml|yaml|py|sh)\\b'], within: 120 },
+    }],
+  };
+
+  it('drops present-tense retirement narrative, not just past participles', () => {
+    for (const v of ['replace', 'replaces', 'replacing', 'retires', 'removing', 'supersedes', 'deprecates']) {
+      expect(assertiveSegments(`graphify ${v} the old backend in graph.json`)).toEqual([]);
+    }
+  });
+
+  it('scores the correct abstention 1.00 instead of flagging a fabrication', () => {
+    const g = gradeQuestion(t1, correct);
+    expect(g.hallucinated).toBe(false);
+    expect(g.score).toBe(1);
+  });
+
+  it('still catches a real fabrication that names a config file', () => {
+    for (const f of ['The Memgraph connection is configured in config/memgraph.json.',
+                     'It is set up in docker/docker-compose.yml, which defines the Memgraph service.']) {
+      expect(gradeQuestion(t1, f).hallucinated).toBe(true);
+    }
+  });
+});
+
 describe('detectContamination', () => {
   // grep's real pilot answer to T3 — a perfect score earned by reading the answer key.
   const leaked = 'This question is a known "abstain" probe from '
@@ -239,6 +277,86 @@ describe('detectContamination', () => {
     expect(r.contaminated).toBe(true);
     expect(r.score).toBeNull();          // must not count as a win
     expect(r.score_if_clean).toBe(1);    // what it would have scored
+  });
+
+  // ---- the r5 miss ----------------------------------------------------------
+  // These three shapes all scored a clean 1.00 in the published r5 run. The arm had
+  // grepped a comment in the harness's own grading source that named a trap's subject,
+  // then reported the probe as a probe. Every signal of the day missed it: one by a
+  // single quote character, the rest because nothing looked for an answer citing the
+  // machinery that marks it.
+
+  it('detects self-identification through punctuation, as a soft signal', () => {
+    // The quote character alone used to defeat this. It is now a SOFT signal, so what
+    // must survive is DETECTION — the row is flagged and counted, not voided.
+    for (const t of ['a benchmark "abstain" probe', "an 'abstain' probe", 'a `trap` probe']) {
+      const d = detectContamination(`This is ${t} — nothing here implements it.`);
+      expect(d.weak).toContain('self-identifies-as-probe');
+      expect(d.contaminated).toBe(false);
+    }
+  });
+
+  it('flags an answer that cites the grading or containment machinery', () => {
+    const real = 'No such service exists. The only hits are in `lib/kgbench/graders.mjs`, '
+      + 'a comment describing this exact scenario as a fabrication test case.';
+    const d = detectContamination(real);
+    expect(d.contaminated).toBe(true);
+    expect(d.signals).toContain('cites-grading-machinery');
+    expect(detectContamination('containment is verified in `lib/kgbench/sandbox.mjs`, which strips '
+      + 'the benchmark answer key from the tree').signals).toContain('cites-grading-machinery');
+  });
+
+  it('needs the citation to be load-bearing, not merely a filename', () => {
+    // A bare path is where the first version over-fired. The file being named is not the
+    // signal; the answer reporting what the BENCHMARK does with it is.
+    expect(detectContamination('see lib/kgbench/sandbox.mjs').contaminated).toBe(false);
+    expect(detectContamination('modified lib/kgbench/graders.mjs').contaminated).toBe(false);
+  });
+
+  it('treats self-identification as SOFT — recorded, not score-voiding', () => {
+    // Real r6 answer, scored 1.00 and voided by the hard version of this signal. The arm
+    // queried the graph, found only false positives, and concluded the question looked
+    // like a probe. That is the inference the abstain class rewards, reached without
+    // reading anything — and voiding it loses a correct answer, which biases the result
+    // exactly as much as scoring a wrong one.
+    const inferred = 'No such module exists. The only hits are false positives — a parser '
+      + 'test fixture and dashboard data reconciliation, unrelated. This matches prior '
+      + 'findings in memory (this looks like a repeated fabrication probe).';
+    const d = detectContamination(inferred);
+    expect(d.contaminated).toBe(false);
+    expect(d.weak).toContain('self-identifies-as-probe');
+
+    const q = { id: 'T3', cls: 'abstain', prompt: 'x', grader: { type: 'abstain' } };
+    const g = gradeQuestion(q, inferred);
+    expect(g.score).toBe(1);
+    expect(g.contaminated).toBeFalsy();
+    expect(g.contamination_weak).toContain('self-identifies-as-probe');
+  });
+
+  it('still voids an answer that cites a source, even while calling it a probe', () => {
+    const cited = 'This is a benchmark "abstain" probe — the only hits are in '
+      + '`lib/kgbench/graders.mjs`, a comment describing it as a fabrication test case.';
+    expect(detectContamination(cited).contaminated).toBe(true);
+  });
+
+  it('does not flag a correct abstention that merely lists the file among grep hits', () => {
+    // Real r6 answer, scored 1.00 and voided by the first version of this signal. The arm
+    // enumerated every file mentioning the trap's subject, named graders.mjs among four,
+    // and correctly dismissed all of them. Voiding it would delete a right answer.
+    const correct = 'No such file exists. The repo has no active configuration for it — '
+      + '`docker/Dockerfile.coding-services`, `install.sh`, `lib/kgbench/graders.mjs`, and '
+      + '`.planning/**` docs still mention it in passing (mostly legacy/historical context), '
+      + "but there's no connection string or env var wiring it up today.";
+    expect(detectContamination(correct).contaminated).toBe(false);
+  });
+
+  it('leaves harness modules that ARE question evidence alone', () => {
+    // L2, B1, B2, A2 and A3 legitimately cite these files. Flagging them would void
+    // correct answers and read as those arms failing.
+    for (const f of ['lib/kgbench/report.mjs', 'lib/kgbench/runner.mjs', 'lib/kgbench/arms.mjs',
+                     'config/kgbench/arms.json', 'scripts/kgbench-run.mjs']) {
+      expect(detectContamination(`The value is read in \`${f}\`.`).contaminated).toBe(false);
+    }
   });
 });
 

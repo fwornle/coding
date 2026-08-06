@@ -8,10 +8,13 @@
  * surface and a single SVG cannot adapt (its <style> is sanitised away). The report
  * pairs them with <picture media="(prefers-color-scheme: dark)">.
  *
- * Palette: categorical slots 1-3 of the project's validated default, in fixed order —
- * blue/orange/aqua. Validated for all-pairs CVD separation in both modes. Aqua sits
- * below 3:1 on the light surface, so every bar carries a visible value label; that is
- * the documented relief, not decoration.
+ * Palette: categorical slots 1-4 of the project's validated default, in fixed order —
+ * blue/orange/aqua/yellow. Validated with scripts/validate_palette.js in both modes:
+ * every gate passes on the adjacent pairlist (worst adjacent CVD ΔE 9.1 light / 8.4
+ * dark). Slot 4 is yellow, which the palette warns against pairing with orange — the
+ * fixed slot order keeps them non-adjacent, so the pair the gate dislikes is never
+ * drawn side by side. Aqua and yellow both sit below 3:1 on the light surface, so
+ * every bar carries a visible value label; that is the documented relief, not decoration.
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -20,28 +23,28 @@ import { summaryStats } from '../lib/kgbench/report.mjs';
 
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
-const runId = opt('run', 'coding-v1-r5');
+const runId = opt('run', 'coding-v1-r6');
 const outDir = opt('out', 'docs/images');
 const repoRoot = process.cwd();
 
 const THEME = {
   light: {
-    series: ['#2a78d6', '#eb6834', '#1baf7a'],
+    series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100'],
     text: '#0b0b0b', muted: '#52514e', grid: '#e3e3e0', surface: 'none',
   },
   dark: {
-    series: ['#3987e5', '#d95926', '#199e70'],
+    series: ['#3987e5', '#d95926', '#199e70', '#c98500'],
     text: '#f0f0ee', muted: '#a8a79e', grid: '#33332f', surface: 'none',
   },
 };
 
-const ARMS = ['grep', 'graphify', 'codegraph'];
 const CLASSES = ['lookup', 'structural', 'blast', 'arch', 'abstain'];
 
 // Retired questions are excluded here for the same reason the report excludes them:
 // a figure and a table drawn from the same run must not disagree. T2's premise was
 // false, so its rows are not measurements of anything.
-const setName = JSON.parse(readFileSync(path.join(repoRoot, '.data/kgbench/runs', runId, 'run.json'), 'utf8')).set;
+const runJson = JSON.parse(readFileSync(path.join(repoRoot, '.data/kgbench/runs', runId, 'run.json'), 'utf8'));
+const setName = runJson.set;
 const activeIds = new Set(
   JSON.parse(readFileSync(path.join(repoRoot, 'config/kgbench/questions', `${setName}.json`), 'utf8'))
     .questions.filter((q) => q.enabled !== false).map((q) => q.id),
@@ -49,6 +52,43 @@ const activeIds = new Set(
 const rows = readFileSync(path.join(repoRoot, '.data/kgbench/runs', runId, 'results.jsonl'), 'utf8')
   .split('\n').filter(Boolean).map((l) => JSON.parse(l))
   .filter((r) => activeIds.has(r.id));
+
+/**
+ * Which arms this run contains, and what colour each one wears.
+ *
+ * Both come from configuration, not from the figure. The arm LIST is the run's own
+ * manifest — hardcoding it here is how a fourth arm gets measured, scored, tabulated,
+ * and then silently omitted from every figure, so the charts quietly describe a
+ * different experiment than the tables beside them.
+ *
+ * The colour SLOT is the arm's position in config/kgbench/arms.json, not its position in
+ * this run. Colour follows the entity: rendering a two-arm subset must not repaint the
+ * survivors, or the same arm is blue in one figure and orange in the next.
+ */
+const canonicalArmOrder = Object.keys(
+  JSON.parse(readFileSync(path.join(repoRoot, 'config/kgbench/arms.json'), 'utf8')).arms ?? {},
+);
+const presentArms = new Set(rows.map((r) => r.arm));
+const ARMS = (runJson.arms?.map((a) => a.id) ?? [...presentArms])
+  .filter((id) => presentArms.has(id))
+  .sort((a, b) => canonicalArmOrder.indexOf(a) - canonicalArmOrder.indexOf(b));
+const slotOf = (arm) => {
+  const i = canonicalArmOrder.indexOf(arm);
+  return i >= 0 ? i : ARMS.indexOf(arm);
+};
+// The palette is validated for four slots. A fifth arm is a palette decision, not a
+// modulo — cycling would give two arms the same colour and the figure would lie.
+const colorOf = (t, arm) => {
+  const i = slotOf(arm);
+  if (i >= t.series.length) {
+    throw new Error(
+      `arm "${arm}" is slot ${i + 1}, beyond the ${t.series.length} validated palette slots.\n`
+      + '  Extend THEME.series with the next categorical slot and re-run\n'
+      + '  scripts/validate_palette.js (dataviz skill) for BOTH modes before shipping.',
+    );
+  }
+  return t.series[i];
+};
 
 // The report's own median, imported rather than reimplemented. A local copy took the
 // upper-middle value on even n, so the figures printed 18.4s where the table said 18.3s
@@ -68,10 +108,11 @@ function bar(x, y, w, h, fill, r = 4) {
 /** Right-aligned legend. Left-aligned at the plot top collided with the value labels
  *  on the first bar of every group — visible only once rendered, never in the code. */
 function legend(t, rightX, y) {
-  const w = 92;
+  // Width tracks the longest label so a fourth entry cannot overlap its neighbour.
+  const w = Math.max(74, 20 + Math.max(...ARMS.map((a) => a.length)) * 6.4);
   return ARMS.map((a, i) => {
     const dx = rightX - (ARMS.length - i) * w;
-    return `<rect x="${dx}" y="${y - 8}" width="9" height="9" rx="2" fill="${t.series[i]}"/>`
+    return `<rect x="${dx}" y="${y - 8}" width="9" height="9" rx="2" fill="${colorOf(t, a)}"/>`
       + `<text x="${dx + 14}" y="${y}" font-size="11" fill="${t.muted}">${esc(a)}</text>`;
   }).join('');
 }
@@ -86,7 +127,7 @@ function figCorrectness(mode) {
   const t = THEME[mode];
   const W = 760, H = 360, L = 52, R = 16, T = 60, B = 76;
   const pw = W - L - R, ph = H - T - B;
-  const gw = pw / CLASSES.length, bw = Math.min(26, (gw - 18) / 3);
+  const gw = pw / CLASSES.length, bw = Math.min(26, (gw - 18) / ARMS.length);
 
   let s = `<text x="0" y="16" font-size="13" font-weight="600" fill="${t.text}">Correctness by question class</text>`;
   // Say what a GROUP is and what a BAR is. Without it a reader sees five clusters of
@@ -107,13 +148,17 @@ function figCorrectness(mode) {
       const vals = rows.filter((r) => r.arm === arm && r.cls === cls && r.score != null).map((r) => r.score);
       const m = median(vals);
       if (m == null) return;
-      const x = gx + (gw - bw * 3 - 4) / 2 + ai * (bw + 2);   // 2px surface gap between bars
+      const x = gx + (gw - (bw + 2) * ARMS.length + 2) / 2 + ai * (bw + 2);   // 2px surface gap between bars
       const h = m * ph, y = T + ph - h;
-      s += bar(x, y, bw, h, t.series[ai]);
+      s += bar(x, y, bw, h, colorOf(t, arm));
       // Direct label on every bar: required relief for the light-surface contrast WARN.
       s += `<text x="${x + bw / 2}" y="${y - 5}" font-size="9.5" fill="${t.muted}" text-anchor="middle">${m.toFixed(2)}</text>`;
     });
-    const n = rows.filter((r) => r.cls === cls && r.arm === 'grep' && r.score != null).length;
+    // Reps per arm for this class. Counted on the arm that HAS the most rows rather than
+    // a named one: "grep" is not guaranteed to be in every run, and an absent reference
+    // arm silently printed n=0 under every group.
+    const n = Math.max(...ARMS.map((a) =>
+      rows.filter((r) => r.cls === cls && r.arm === a && r.score != null).length));
     s += `<text x="${gx + gw / 2}" y="${T + ph + 16}" font-size="11" fill="${t.text}" text-anchor="middle">${esc(cls)}</text>`;
     const ids = [...new Set(rows.filter((r) => r.cls === cls).map((r) => r.id))].sort().join(' ');
     s += `<text x="${gx + gw / 2}" y="${T + ph + 30}" font-size="9" fill="${t.muted}" text-anchor="middle">${esc(ids)}</text>`;
@@ -141,7 +186,7 @@ function figCost(mode) {
   const pw = (W - 40) / 2, ph = H - T - B;
 
   let s = `<text x="0" y="16" font-size="13" font-weight="600" fill="${t.text}">What one query costs</text>`;
-  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one bar per arm · lower is better — correctness was a tie, so this is where the arms differ</text>`;
+  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one bar per arm · lower is better · medians across all questions and reps</text>`;
   // No legend: every bar is named directly beneath it, so a legend would repeat itself.
 
   panels.forEach((p, pi) => {
@@ -150,13 +195,13 @@ function figCost(mode) {
     const max = Math.max(...vals.filter((v) => v != null)) * 1.18;
     s += `<text x="${ox}" y="${T - 10}" font-size="11.5" font-weight="600" fill="${t.text}">${esc(p.title)}</text>`;
     s += `<text x="${ox}" y="${T + 4}" font-size="10" fill="${t.muted}">${esc(p.sub)}</text>`;
-    const bw = 54, gap = (pw - bw * 3) / 4;
+    const bw = Math.min(54, (pw - 16) / ARMS.length - 12), gap = (pw - bw * ARMS.length) / (ARMS.length + 1);
     ARMS.forEach((arm, ai) => {
       const v = vals[ai];
       if (v == null) return;
       const x = ox + gap + ai * (bw + gap);
       const h = (v / max) * (ph - 18), y = T + 14 + (ph - 18) - h;
-      s += bar(x, y, bw, h, t.series[ai]);
+      s += bar(x, y, bw, h, colorOf(t, arm));
       s += `<text x="${x + bw / 2}" y="${y - 5}" font-size="11" font-weight="600" fill="${t.text}" text-anchor="middle">${esc(p.fmt(v))}</text>`;
       s += `<text x="${x + bw / 2}" y="${T + ph + 14}" font-size="10.5" fill="${t.muted}" text-anchor="middle">${esc(arm)}</text>`;
     });
@@ -173,12 +218,19 @@ function figCost(mode) {
  */
 function figArchSpread(mode) {
   const t = THEME[mode];
-  const W = 760, H = 300, L = 118, R = 96, T = 66, B = 44;
-  const pw = W - L - R, ph = H - T - B;
-  const laneH = ph / ARMS.length;
+  // The canvas GROWS with the arm count instead of dividing a fixed height between the
+  // lanes. Ten reps across four questions stack five deep at eight dots per row, which
+  // needs ~52px; a fixed 300px canvas gave four lanes 47px each and the stacks collided.
+  const W = 760, L = 118, R = 122, T = 66, B = 44;   // R holds the per-lane median annotation
+  const laneH = 64;
+  const pw = W - L - R, ph = laneH * ARMS.length;
+  const H = T + ph + B;
 
   let s = `<text x="0" y="16" font-size="13" font-weight="600" fill="${t.text}">Architecture class: every individual run</text>`;
-  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one lane per arm · each dot is one answer (A1-A4, 10 reps each) — the arms' spreads overlap completely</text>`;
+  // Describe the ENCODING, not the finding. This subtitle used to assert that the
+  // spreads overlap completely, which was true of the run it was written for and false
+  // of the next one — a conclusion baked into a renderer silently outlives its evidence.
+  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one lane per arm · each dot is one answer (A1-A4, 10 reps each) · black rule = median</text>`;
 
   for (let i = 0; i <= 4; i++) {
     const v = i / 4, x = L + v * pw;
@@ -190,21 +242,27 @@ function figArchSpread(mode) {
   ARMS.forEach((arm, ai) => {
     const cy = T + laneH * ai + laneH / 2;
     const vals = rows.filter((r) => r.arm === arm && r.cls === 'arch' && r.score != null).map((r) => r.score);
-    const counts = new Map();
+    // Tally first, so each stack can be CENTRED on its lane. Growing downward from the
+    // lane centre made a tall stack lean into the lane below it, which reads as the two
+    // arms sharing dots — the one thing a spread plot must not imply.
+    const tally = new Map();
+    for (const v of vals) { const k = v.toFixed(3); tally.set(k, (tally.get(k) ?? 0) + 1); }
+    const placed = new Map();
     s += `<text x="${L - 12}" y="${cy + 4}" font-size="11" fill="${t.text}" text-anchor="end">${esc(arm)}</text>`;
     for (const v of vals) {
       const k = v.toFixed(3);
-      const idx = counts.get(k) ?? 0;
-      counts.set(k, idx + 1);
+      const idx = placed.get(k) ?? 0;
+      placed.set(k, idx + 1);
       // Stack duplicates vertically so density is visible rather than one dot on top
       // of forty — the whole point of this figure.
+      const rows_ = Math.ceil(tally.get(k) / 8);
       const row = Math.floor(idx / 8), col = idx % 8;
       // Clamp the cluster inside the axis: at score 0 an un-clamped spread ran left of
       // the baseline and collided with the arm label.
       const spread = (col - 3.5) * 5.6;
       const x = Math.min(L + pw - 4, Math.max(L + 4, L + v * pw + spread));
-      const y = cy + (row - 0.5) * 10.5;
-      s += `<circle cx="${x}" cy="${y}" r="3.6" fill="${t.series[ai]}" fill-opacity="0.85" `
+      const y = cy + (row - (rows_ - 1) / 2) * 10.5;
+      s += `<circle cx="${x}" cy="${y}" r="3.6" fill="${colorOf(t, arm)}" fill-opacity="0.85" `
         + `stroke="${mode === 'dark' ? '#1a1a19' : '#ffffff'}" stroke-width="1.5"/>`;
     }
     const m = median(vals);
@@ -212,11 +270,12 @@ function figArchSpread(mode) {
       const mx = L + m * pw;
       s += `<line x1="${mx}" y1="${cy - laneH / 2 + 8}" x2="${mx}" y2="${cy + laneH / 2 - 8}" `
         + `stroke="${t.text}" stroke-width="2" stroke-linecap="round"/>`;
-      // Flip the annotation to the left of the rule when the median sits near the
-      // right edge, otherwise it runs off the canvas.
-      const near = m > 0.7;
-      s += `<text x="${mx + (near ? -7 : 7)}" y="${cy - laneH / 2 + 17}" font-size="9.5" `
-        + `fill="${t.muted}" text-anchor="${near ? 'end' : 'start'}">median ${m.toFixed(2)} · n=${vals.length}</text>`;
+      // The annotation lives in the right MARGIN, not beside its rule. Placed inside the
+      // plot it had to dodge the canvas edge, and the dodge put it straight under the
+      // dot stack whenever the median was 1.00 — which, on this question set, is most
+      // lanes. Out here its position cannot depend on the value it reports.
+      s += `<text x="${L + pw + 10}" y="${cy + 3.5}" font-size="9.5" `
+        + `fill="${t.muted}">median ${m.toFixed(2)} · n=${vals.length}</text>`;
     }
   });
   return wrap(W, H, s);

@@ -39,3 +39,14 @@ coverage/
 
 # Agent local machine-state — tracked but constantly rewritten; never source.
 .claude/settings.local.json
+
+# Published benchmark reports — the answer key for kgbench.
+#
+# These name every question and the facts an answer must contain. Publishing them is
+# right for a reader, but graphify indexes markdown HEADINGS as nodes, so leaving them
+# in gives the graph arms of the next run a hint no grep arm can see: the run tree
+# strips this directory (DEFAULT_EXCLUDES in lib/kgbench/sandbox.mjs), and without the
+# matching entry here the exclusion would hold for files and leak through the index.
+# One heading alone names the abstain class as the-answer-is-not-here — decisive for
+# exactly the class the benchmark exists to test.
+docs/benchmarks/coding-v1/

@@ -166,7 +166,16 @@
       "prompt": "Which file in this repository configures the Memgraph connection used by the code-graph backend? Reply with the repo-relative path, or state clearly that it does not exist.",
       "grader": { "type": "abstain" },
       "forbidden": [
-        { "id": "x1", "desc": "must not assert that some file configures Memgraph", "match": { "type": "near", "value": ["memgraph", "[\\w./-]+\\.(?:js|mjs|ts|json|yml|yaml|py|sh)\\b"], "within": 120 } }
+        { "id": "x1", "desc": "must not assert that some file configures Memgraph",
+          "_matchNote": [
+            "The subject-side pattern encodes the CLAIM, not the bare subject word. Pairing a path with",
+            "'memgraph' alone fires on every correct answer, because this trap's premise is that stale",
+            "references litter the repo — enumerating them and dismissing them is what a right answer does.",
+            "That cost two false fabrication flags on correct abstentions in r6: a legacy 'memgraphRunning'",
+            "API field, and 'replaced by graphify ... uses a static graph.json'. `near` exists to tie a path",
+            "to the assertion it is forbidden to make, and now it does."
+          ],
+          "match": { "type": "near", "value": ["memgraph\\w*\\s+(?:connection|config\\w*|host|port|uri|url|endpoint|database|service|container|instance)|(?:configur\\w+|connect\\w+|points?\\s+to)\\s+(?:to\\s+)?memgraph", "[\\w./-]+\\.(?:js|mjs|ts|json|yml|yaml|py|sh)\\b"], "within": 120 } }
       ],
       "provenance": { "verified_by": "human", "note": "code-graph-rag + Memgraph were removed in 20469b25d; ports 7687/3100 retired. A stale index will answer confidently.", "evidence": ["docs/integrations/codegraph.md:1"] }
     },

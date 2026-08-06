@@ -73,7 +73,7 @@
     },
     "hybrid": {
       "kind": "agent",
-      "enabled": false,
+      "enabled": true,
       "label": "All tools, agent chooses",
       "note": "The only production-shaped arm. Every other arm is FORCED onto one strategy, which is not how an agent actually works — so this is the number the others should be read against.",
       "allowedTools": [
@@ -82,8 +82,26 @@
         "Read",
         "$allBackendTools"
       ],
-      "mcpFrom": [
-        "graphify"
+      "_mcpFromNote": [
+        "Deliberately absent: with $allBackendTools the server list is DERIVED from the",
+        "same expansion that produced the tool names (resolveArm in lib/kgbench/arms.mjs).",
+        "Naming one backend here while granting every backend's tools is the defect that",
+        "shape invites — the unconfigured server's tools are absent rather than refused,",
+        "so the arm loses a strategy silently and still fills the table with numbers."
+      ],
+      "preflight": [
+        {
+          "type": "http",
+          "url": "http://localhost:${GRAPHIFY_MCP_PORT:-3851}/mcp"
+        },
+        {
+          "type": "artifact",
+          "backend": "graphify"
+        },
+        {
+          "type": "artifact",
+          "backend": "codegraph"
+        }
       ]
     },
     "docs": {
