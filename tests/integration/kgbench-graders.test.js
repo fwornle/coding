@@ -219,6 +219,44 @@ describe('near matcher — claims, not shapes', () => {
   });
 });
 
+describe('assertiveSegments — retirement verbs are stems', () => {
+  // The real r6 answer that this cost. A textbook-correct abstention was scored 0 and
+  // flagged as a fabrication, because `replaced` was in the cue list but `replace` was
+  // not — so "was merged in to replace X and uses a static graph.json" read as an
+  // assertion, and it puts the retired subject next to a path. Naming the artefact that
+  // REPLACED the subject is what a correct answer does, so the rule punished being right.
+  const correct = 'No file in this repository configures a Memgraph connection — it does not exist. '
+    + 'The current code-graph backend is graphify, which was merged in to replace '
+    + 'CodeGraphRAG+Memgraph and uses a static `graph.json` output.';
+
+  const t1 = {
+    id: 'T1', cls: 'abstain', prompt: 'x', grader: { type: 'abstain' },
+    forbidden: [{
+      id: 'x1',
+      match: { type: 'near', value: ['memgraph', '[\\w./-]+\\.(?:js|mjs|ts|json|yml|yaml|py|sh)\\b'], within: 120 },
+    }],
+  };
+
+  it('drops present-tense retirement narrative, not just past participles', () => {
+    for (const v of ['replace', 'replaces', 'replacing', 'retires', 'removing', 'supersedes', 'deprecates']) {
+      expect(assertiveSegments(`graphify ${v} the old backend in graph.json`)).toEqual([]);
+    }
+  });
+
+  it('scores the correct abstention 1.00 instead of flagging a fabrication', () => {
+    const g = gradeQuestion(t1, correct);
+    expect(g.hallucinated).toBe(false);
+    expect(g.score).toBe(1);
+  });
+
+  it('still catches a real fabrication that names a config file', () => {
+    for (const f of ['The Memgraph connection is configured in config/memgraph.json.',
+                     'It is set up in docker/docker-compose.yml, which defines the Memgraph service.']) {
+      expect(gradeQuestion(t1, f).hallucinated).toBe(true);
+    }
+  });
+});
+
 describe('detectContamination', () => {
   // grep's real pilot answer to T3 — a perfect score earned by reading the answer key.
   const leaked = 'This question is a known "abstain" probe from '
