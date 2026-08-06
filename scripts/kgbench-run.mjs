@@ -168,6 +168,12 @@ let n = 0;
 // a result. Bail early and loudly instead.
 let consecutiveApiErrors = 0;
 const API_ERROR_ABORT = 3;
+// A starved host produces cells that cost a full timeout each and measure nothing. Three
+// in a row means the machine cannot currently run this benchmark, and continuing would
+// burn hours to produce voids — the first clean run spent ~47 minutes that way before
+// anyone looked.
+let consecutiveHostStalls = 0;
+const HOST_STALL_ABORT = 3;
 // Rows whose answer cited the benchmark's own ground truth. With the sandbox in place
 // this should stay empty; if it does not, containment has regressed and the run is void.
 const contaminatedRows = [];
@@ -234,6 +240,19 @@ for (const arm of arms) {
         : scored.score.toFixed(2);
       out(`  [${String(n).padStart(3)}/${total}] ${arm.id.padEnd(12)} ${q.id.padEnd(4)} rep${rep}  ${String(mark).padEnd(8)} ${res.wall_s}s`
         + (res.outcome === 'api_error' ? `  ${res.error}` : ''));
+
+      if (res.outcome === 'host_stalled') {
+        if (++consecutiveHostStalls >= HOST_STALL_ABORT) {
+          out('');
+          die(`aborting: ${HOST_STALL_ABORT} consecutive host stalls.\n`
+            + `  Last: ${res.error}\n`
+            + '  The machine is too loaded to measure anything. Check for background load\n'
+            + '  (AV scanning this harness\'s /tmp worktrees is a known cause on managed macOS),\n'
+            + `  then resume with --run-id ${runId} — completed cells are kept.`);
+        }
+      } else {
+        consecutiveHostStalls = 0;
+      }
 
       if (res.outcome === 'api_error') {
         if (++consecutiveApiErrors >= API_ERROR_ABORT) {

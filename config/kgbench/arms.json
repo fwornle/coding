@@ -16,7 +16,7 @@
   ],
   "defaults": {
     "model": "claude-sonnet-5",
-    "timeoutMs": 300000,
+    "timeoutMs": 600000,
     "maxAttempts": 2
   },
   "arms": {
