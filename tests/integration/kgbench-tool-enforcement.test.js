@@ -17,6 +17,7 @@
  */
 
 import { denyListFor, toolViolations, DENYABLE_BUILTINS } from '../../lib/kgbench/runner.mjs';
+import { loadArms, resolveArm, REPO_ROOT } from '../../lib/kgbench/arms.mjs';
 
 const grepArm = { id: 'grep', allowedTools: ['Glob', 'Grep', 'Read'] };
 const graphArm = {
@@ -98,5 +99,51 @@ describe('MCP scope — server, not per-tool', () => {
   it('rejects an MCP tool from a server the arm was never given', () => {
     expect(toolViolations(armWithServer, ['mcp__codegraph__codegraph_explore']))
       .toEqual(['mcp__codegraph__codegraph_explore']);
+  });
+});
+
+describe('granted MCP tools must have a configured server', () => {
+  // The failure this guards is silent in a way the deny list is not. --strict-mcp-config
+  // means an unconfigured server's tools are ABSENT, not refused: the arm never errors,
+  // never trips toolViolations, and simply answers using whatever it does have. The
+  // hybrid arm shipped in exactly that shape — $allBackendTools granted every backend's
+  // tools while mcpFrom named one — so it would have run as grep+graphify under a label
+  // saying grep+graphify+codegraph, and produced a full column of publishable numbers.
+  const armsDoc = () => loadArms(REPO_ROOT);
+
+  it('derives the server list from the tool expansion when mcpFrom is absent', () => {
+    const hybrid = resolveArm(armsDoc(), 'hybrid', { repoRoot: REPO_ROOT });
+    const servers = Object.keys(hybrid.mcpConfig.mcpServers).sort();
+    expect(servers).toEqual(['codegraph', 'graphify']);
+    // Every granted MCP tool is reachable through one of them.
+    for (const t of hybrid.allowedTools.filter((x) => x.startsWith('mcp__'))) {
+      expect(servers).toContain(t.split('__')[1]);
+    }
+  });
+
+  it('grants the hybrid arm both text search and every backend', () => {
+    const hybrid = resolveArm(armsDoc(), 'hybrid', { repoRoot: REPO_ROOT });
+    expect(hybrid.allowedTools).toEqual(expect.arrayContaining(['Glob', 'Grep', 'Read']));
+    expect(hybrid.allowedTools).toEqual(expect.arrayContaining([
+      'mcp__graphify__query_graph', 'mcp__codegraph__codegraph_explore',
+    ]));
+  });
+
+  it('throws when mcpFrom omits a backend whose tools were granted', () => {
+    const doc = armsDoc();
+    doc.arms.__broken = {
+      kind: 'agent',
+      allowedTools: ['Read', '$allBackendTools'],
+      mcpFrom: ['graphify'],          // the original defect, pinned
+    };
+    expect(() => resolveArm(doc, '__broken', { repoRoot: REPO_ROOT }))
+      .toThrow(/server is not configured.*codegraph|codegraph.*server is not configured/s);
+  });
+
+  it('leaves a correctly scoped single-backend arm alone', () => {
+    for (const id of ['graphify', 'codegraph']) {
+      const arm = resolveArm(armsDoc(), id, { repoRoot: REPO_ROOT });
+      expect(Object.keys(arm.mcpConfig.mcpServers)).toEqual([id]);
+    }
   });
 });
