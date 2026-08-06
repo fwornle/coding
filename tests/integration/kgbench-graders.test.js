@@ -240,6 +240,37 @@ describe('detectContamination', () => {
     expect(r.score).toBeNull();          // must not count as a win
     expect(r.score_if_clean).toBe(1);    // what it would have scored
   });
+
+  // ---- the r5 miss ----------------------------------------------------------
+  // These three shapes all scored a clean 1.00 in the published r5 run. The arm had
+  // grepped a comment in the harness's own grading source that named a trap's subject,
+  // then reported the probe as a probe. Every signal of the day missed it: one by a
+  // single quote character, the rest because nothing looked for an answer citing the
+  // machinery that marks it.
+
+  it('tolerates punctuation between the class name and "probe"', () => {
+    for (const t of ['a benchmark "abstain" probe', "an 'abstain' probe", 'a `trap` probe']) {
+      expect(detectContamination(`This is ${t} — nothing here implements it.`).contaminated).toBe(true);
+    }
+  });
+
+  it('flags an answer that cites the grading or containment machinery', () => {
+    const real = 'No such service exists. The only hits are in `lib/kgbench/graders.mjs`, '
+      + 'a comment describing this exact scenario as a fabrication test case.';
+    const d = detectContamination(real);
+    expect(d.contaminated).toBe(true);
+    expect(d.signals).toContain('cites-grading-machinery');
+    expect(detectContamination('see lib/kgbench/sandbox.mjs').signals).toContain('cites-grading-machinery');
+  });
+
+  it('leaves harness modules that ARE question evidence alone', () => {
+    // L2, B1, B2, A2 and A3 legitimately cite these files. Flagging them would void
+    // correct answers and read as those arms failing.
+    for (const f of ['lib/kgbench/report.mjs', 'lib/kgbench/runner.mjs', 'lib/kgbench/arms.mjs',
+                     'config/kgbench/arms.json', 'scripts/kgbench-run.mjs']) {
+      expect(detectContamination(`The value is read in \`${f}\`.`).contaminated).toBe(false);
+    }
+  });
 });
 
 describe('summaryStats — null-not-zero', () => {
