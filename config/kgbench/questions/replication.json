@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "set": "replication",
+  "_comment": [
+    "VERBATIM copy of docs/benchmarks/graphify-vs-grep/queries.json.",
+    "",
+    "This set exists for one purpose: re-running it through kgbench must reproduce the",
+    "numbers in that report. That is the harness's own correctness test \u2014 without it we",
+    "cannot tell a real backend difference from a kgbench bug.",
+    "",
+    "FROZEN. Do not edit, extend, or 'improve' these questions. Note that 6 of the 9 cite",
+    "integrations/graphify internals, which makes them unverifiable in CI (submodules are",
+    "not checked out) and non-portable if graphify is ever swapped out. That is precisely",
+    "why the real evaluation set is authored separately against first-party code."
+  ],
+  "questions": [
+    {
+      "id": "L1",
+      "cls": "lookup",
+      "prompt": "Which source file in this repository defines the Python function `_corpus_signature`? Reply with ONLY the repo-relative file path.",
+      "grader": {
+        "type": "path",
+        "gt": "integrations/graphify/graphify/detect.py"
+      }
+    },
+    {
+      "id": "L2",
+      "cls": "lookup",
+      "prompt": "Which source file in this repository defines the Python function `_reconcile_existing_graph`? Reply with ONLY the repo-relative file path.",
+      "grader": {
+        "type": "path",
+        "gt": "integrations/graphify/graphify/watch.py"
+      }
+    },
+    {
+      "id": "L3",
+      "cls": "lookup",
+      "prompt": "Which source file implements the HTTP handler for the route `POST /api/cgr/reindex`? Reply with ONLY the repo-relative file path.",
+      "grader": {
+        "type": "path",
+        "gt": "integrations/system-health-dashboard/server.js"
+      }
+    },
+    {
+      "id": "S1",
+      "cls": "structural",
+      "prompt": "List every source file in this repository that references the function `_load_graphifyignore`. Reply with ONLY the repo-relative file paths, one per line.",
+      "grader": {
+        "type": "set",
+        "gt": [
+          "integrations/graphify/graphify/detect.py",
+          "integrations/graphify/graphify/extract.py",
+          "integrations/graphify/graphify/watch.py"
+        ]
+      }
+    },
+    {
+      "id": "S2",
+      "cls": "structural",
+      "prompt": "In the graphify code, which function contains the call to `_reconcile_existing_graph`? Reply with ONLY the calling function's name.",
+      "grader": {
+        "type": "contains",
+        "gt": [
+          "_rebuild_code"
+        ]
+      }
+    },
+    {
+      "id": "S3",
+      "cls": "structural",
+      "prompt": "Which shell script does the system-health-dashboard backend spawn to re-index the code graph? Reply with ONLY the script filename.",
+      "grader": {
+        "type": "contains",
+        "gt": [
+          "graphify-reindex.sh"
+        ]
+      }
+    },
+    {
+      "id": "B1",
+      "cls": "blast",
+      "prompt": "If I change the signature of the function `_corpus_signature`, which function(s) call it and would need to be updated? Reply with ONLY the calling function name(s).",
+      "grader": {
+        "type": "regex",
+        "gt": [
+          "\\bdetect\\b"
+        ]
+      }
+    },
+    {
+      "id": "B2",
+      "cls": "blast",
+      "prompt": "Which function in `watch.py` calls `detect()` during an incremental rebuild? Reply with ONLY the calling function's name.",
+      "grader": {
+        "type": "contains",
+        "gt": [
+          "_rebuild_code"
+        ]
+      }
+    },
+    {
+      "id": "A1",
+      "cls": "arch",
+      "prompt": "In the graphify engine, what does the file `.detect_corpus_cache.json` cache, and what causes a cache miss (invalidation)? Answer in 2-4 sentences.",
+      "grader": {
+        "type": "llm",
+        "rubric": "Correct answer must state: (1) it caches detect()'s per-file CLASSIFICATION result (the file-type buckets / detect output), so the expensive per-file pass can be skipped; (2) a miss/invalidation occurs when the corpus SIGNATURE changes \u2014 i.e. the file SET changes (add/remove/rename), the ignore rules change, the follow_symlinks/google_workspace params change, OR a CONTENT-classified file's stat (mtime/size) changes. Bonus-correct: code/paper/image files are keyed on PATH ALONE so a code body-edit still HITS the cache. Score 1.0 if it captures both what-it-caches and the main invalidation triggers; 0.5 if partially correct; 0.0 if it gets the purpose wrong or hallucinates."
+      }
+    }
+  ]
+}

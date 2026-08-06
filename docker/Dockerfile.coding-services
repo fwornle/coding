@@ -233,6 +233,22 @@ RUN chmod +x /usr/local/bin/graphify-serve.sh && \
     printf '#!/bin/sh\nexec /coding/integrations/graphify/.venv/bin/graphify "$@"\n' > /usr/local/bin/graphify && \
     chmod +x /usr/local/bin/graphify
 
+# CodeGraph — alternative code-graph backend (Node + SQLite/FTS5, stdio MCP).
+# Pinned: the registry in config/code-graph.json records the same version, and an
+# index built by one version must not be served by another.
+#
+# It stays OFF by default (config/code-graph.json has enabled:false) until its smoke
+# gate passes; installing it here only makes it available.
+#
+# CODEGRAPH_DIR takes a plain directory NAME and rejects absolute paths, so the index
+# cannot be pointed at /coding/.data directly. The repo is mounted read-only, so
+# docker-compose binds .data/codegraph over /workspace/coding/.codegraph instead —
+# which is why the repo ships a tracked, empty .codegraph/ for the mount to attach to.
+RUN npm install -g @colbymchenry/codegraph@1.5.0 && \
+    codegraph --version
+COPY docker/codegraph-index.sh /usr/local/bin/codegraph-index.sh
+RUN chmod +x /usr/local/bin/codegraph-index.sh
+
 # Copy configuration files
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /entrypoint.sh
@@ -250,6 +266,11 @@ ENV SEMANTIC_ANALYSIS_PORT=3848 \
     CONSTRAINT_MONITOR_PORT=3849 \
     GRAPHIFY_MCP_PORT=3851 \
     GRAPHIFY_OUT=/coding/.data/graphify/graphify-out \
+    CODEGRAPH_NO_DAEMON=1 \
+    CODEGRAPH_NO_WATCH=1 \
+    CODEGRAPH_NO_UPDATE_CHECK=1 \
+    CODEGRAPH_TELEMETRY=0 \
+    DO_NOT_TRACK=1 \
     VKB_PORT=8080 \
     HEALTH_DASHBOARD_PORT=3032 \
     HEALTH_DASHBOARD_WS_PORT=3033

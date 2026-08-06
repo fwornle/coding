@@ -1,0 +1,60 @@
+{
+  "runId": "replication-full",
+  "set": "replication",
+  "reps": 3,
+  "commit": "3fd7d40de",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    },
+    {
+      "id": "graphify",
+      "label": "Graphify code graph",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes"
+      ],
+      "backend": "graphify"
+    }
+  ],
+  "questions": [
+    "L1",
+    "L2",
+    "L3",
+    "S1",
+    "S2",
+    "S3",
+    "B1",
+    "B2",
+    "A1"
+  ],
+  "baselines": {
+    "grep": 71393,
+    "graphify": 72693
+  },
+  "schemaTax": {
+    "grep": 0,
+    "graphify": 1300
+  },
+  "judge": {
+    "provider": "claude-code",
+    "model": "claude-opus-4.8",
+    "enabled": true
+  },
+  "startedAt": "2026-08-05T18:03:13.018Z"
+}

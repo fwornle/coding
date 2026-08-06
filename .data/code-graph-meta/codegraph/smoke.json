@@ -1,0 +1,10 @@
+{
+  "backend": "codegraph",
+  "status": "pass",
+  "measured_at": "2026-08-05T19:30:43Z",
+  "cold_index_s": null,
+  "incremental_s": 1,
+  "artifact_bytes": 113890177,
+  "mcp_cold_start_ms": 168,
+  "failures": ""
+}

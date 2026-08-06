@@ -1131,6 +1131,81 @@ else
     print_info "Graphify submodule not found (run: git submodule update --init integrations/graphify)"
 fi
 
+# Code-graph backend registry. Static/pure, so it is meaningful even with no
+# services running: it catches an active-but-disabled backend, duplicate MCP
+# server names, and port collisions before they reach an agent config.
+print_check "Code-graph backend registry"
+if [ -f "$CODING_ROOT/config/code-graph.json" ]; then
+    if command -v node >/dev/null 2>&1; then
+        if node "$CODING_ROOT/scripts/code-graph-config.mjs" validate >/dev/null 2>&1; then
+            CG_ACTIVE=$(node "$CODING_ROOT/scripts/code-graph-config.mjs" active 2>/dev/null || echo unknown)
+            print_pass "Code-graph registry valid (active backend: $CG_ACTIVE)"
+
+            print_check "Active code-graph backend registered for Claude"
+            if [ -f "$CODING_ROOT/claude-code-mcp-docker.json" ]; then
+                CG_SERVER=$(node "$CODING_ROOT/scripts/code-graph-config.mjs" get --field mcp.serverName 2>/dev/null || echo '')
+                if [ -n "$CG_SERVER" ] && grep -q "\"$CG_SERVER\"" "$CODING_ROOT/claude-code-mcp-docker.json"; then
+                    print_pass "MCP config registers '$CG_SERVER'"
+                else
+                    print_fail "claude-code-mcp-docker.json does not register '$CG_SERVER' (run: scripts/generate-docker-mcp-config.sh)"
+                fi
+            else
+                print_info "claude-code-mcp-docker.json not generated yet"
+            fi
+        else
+            print_fail "Code-graph registry invalid (run: node scripts/code-graph-config.mjs validate)"
+        fi
+    else
+        print_info "node not found - skipping code-graph registry validation"
+    fi
+else
+    print_info "config/code-graph.json not found"
+fi
+
+# Agent MCP config converters. These write the OpenCode and Copilot configs, and
+# have shipped defects that only show up in generated output — a wholesale map
+# replace that stranded retired servers, and a missing HTTP branch that emitted
+# unusable stdio entries. Fixture-driven, so it needs no running services.
+# kgbench ground truth. Questions cite file:line evidence; a rename or refactor
+# silently turns every arm's answer wrong and the benchmark reports that as a finding.
+print_check "kgbench question-set provenance"
+if [ -f "$CODING_ROOT/scripts/kgbench-verify-questions.mjs" ] && command -v node >/dev/null 2>&1; then
+    if node "$CODING_ROOT/scripts/kgbench-verify-questions.mjs" >/dev/null 2>&1; then
+        print_pass "kgbench question evidence still resolves"
+    else
+        print_fail "kgbench question evidence is stale (run: node scripts/kgbench-verify-questions.mjs)"
+    fi
+else
+    print_info "kgbench question verifier not found"
+fi
+
+# kgbench graders and containment. Pure functions, no model calls, ~2s — and they are
+# what decides whether a published number means anything. The coding-v1 pilot scored a
+# correct abstention as a hallucination and scored a leaked answer key as a win; both
+# are pinned here against the real answers that produced them.
+print_check "kgbench graders and containment"
+if [ -d "$CODING_ROOT/node_modules/jest" ] && command -v node >/dev/null 2>&1; then
+    if (cd "$CODING_ROOT" && NODE_OPTIONS='--experimental-vm-modules --no-warnings' \
+        npx jest tests/integration/kgbench --silent >/dev/null 2>&1); then
+        print_pass "kgbench grader + sandbox contracts hold"
+    else
+        print_fail "kgbench grader/sandbox tests fail (run: npx jest tests/integration/kgbench)"
+    fi
+else
+    print_info "jest not installed; skipping kgbench grader tests"
+fi
+
+print_check "MCP config converters (OpenCode/Copilot)"
+if [ -f "$CODING_ROOT/tests/integration/mcp-converters.test.sh" ]; then
+    if bash "$CODING_ROOT/tests/integration/mcp-converters.test.sh" >/dev/null 2>&1; then
+        print_pass "MCP config converters produce correct OpenCode/Copilot output"
+    else
+        print_fail "MCP config converter contract broken (run: bash tests/integration/mcp-converters.test.sh)"
+    fi
+else
+    print_info "MCP converter test not found"
+fi
+
 print_check "MCP Constraint Monitor with Professional Dashboard"
 CONSTRAINT_MONITOR_DIR="$CODING_ROOT/integrations/mcp-constraint-monitor"
 if dir_exists "$CONSTRAINT_MONITOR_DIR"; then

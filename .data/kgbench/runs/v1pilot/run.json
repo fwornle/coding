@@ -1,0 +1,58 @@
+{
+  "runId": "v1pilot",
+  "set": "coding-v1",
+  "reps": 1,
+  "commit": "88c875d3a",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    },
+    {
+      "id": "graphify",
+      "label": "Graphify code graph",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes"
+      ],
+      "backend": "graphify"
+    },
+    {
+      "id": "codegraph",
+      "label": "CodeGraph (SQLite)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": "codegraph"
+    }
+  ],
+  "questions": [
+    "A3",
+    "T1",
+    "T3"
+  ],
+  "baselines": {},
+  "schemaTax": {},
+  "judge": {
+    "provider": "claude-code",
+    "model": "claude-opus-4.8",
+    "enabled": true
+  },
+  "startedAt": "2026-08-05T19:33:47.816Z"
+}

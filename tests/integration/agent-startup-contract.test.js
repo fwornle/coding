@@ -39,7 +39,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..', '..');
 
 const AGENTS = ['claude', 'copilot', 'opencode', 'mastra'];
-const EXPECTED_MCP_SERVERS = ['semantic-analysis', 'constraint-monitor', 'graphify'];
+
+// The two always-present stdio servers, plus whichever code-graph backend the
+// registry says is active. Derived rather than frozen: pinning the literal set
+// meant every backend switch broke this test for the wrong reason.
+const STATIC_MCP_SERVERS = ['semantic-analysis', 'constraint-monitor'];
+const CODE_GRAPH_SERVER = (() => {
+  try {
+    const reg = JSON.parse(readFileSync(path.join(REPO, 'config/code-graph.json'), 'utf8'));
+    return reg.backends[reg.active].mcp.serverName;
+  } catch {
+    return 'graphify'; // registry unreadable — assert the shipped default
+  }
+})();
+const EXPECTED_MCP_SERVERS = [...STATIC_MCP_SERVERS, CODE_GRAPH_SERVER];
+
+// Integration dir to assert on disk, for stdio servers we ship ourselves. Servers
+// launched through `docker exec` have no such dir, which is why this is a lookup
+// with an explicit "no dir expected" case rather than an unconditional deref.
+const SERVER_INTEGRATION_DIRS = {
+  'semantic-analysis': 'integrations/mcp-server-semantic-analysis',
+  'constraint-monitor': 'integrations/mcp-constraint-monitor',
+};
 
 const readText = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
 const readJson = (rel) => JSON.parse(readText(rel));
@@ -262,24 +283,32 @@ describe('MCP servers — expected set of 3', () => {
 
   it('each MCP server is well-formed (command+dir for local, url for http)', () => {
     const servers = readJson('claude-code-mcp.json').mcpServers;
-    // graphify is served over HTTP MCP from the coding-services container, so it
-    // has {type:"http", url} rather than a command + integration dir.
-    const dirs = {
-      'semantic-analysis': 'integrations/mcp-server-semantic-analysis',
-      'constraint-monitor': 'integrations/mcp-constraint-monitor',
-    };
     for (const name of EXPECTED_MCP_SERVERS) {
       const s = servers[name];
       if (s.type === 'http') {
+        // Served over HTTP from the coding-services container: url, no command.
         expect(typeof s.url).toBe('string');
         expect(s.url.length).toBeGreaterThan(0);
       } else {
         expect(typeof s.command).toBe('string');
         expect(s.command.length).toBeGreaterThan(0);
         expect(Array.isArray(s.args)).toBe(true);
-        expect(existsSync(path.join(REPO, dirs[name]))).toBe(true);
+        // Only assert an integration dir for servers we ship in-tree. A stdio
+        // backend reached via `docker exec` lives in the image, not the repo.
+        const dir = SERVER_INTEGRATION_DIRS[name];
+        if (dir) expect(existsSync(path.join(REPO, dir))).toBe(true);
       }
     }
+  });
+
+  it('the active code-graph backend is registered and enabled', () => {
+    const servers = readJson('claude-code-mcp.json').mcpServers;
+    expect(Object.keys(servers)).toContain(CODE_GRAPH_SERVER);
+
+    const reg = JSON.parse(readFileSync(path.join(REPO, 'config/code-graph.json'), 'utf8'));
+    // An active-but-disabled backend would leave agents pointed at a server
+    // nothing starts, which is the exact failure the registry exists to prevent.
+    expect(reg.backends[reg.active].enabled).toBe(true);
   });
 });
 

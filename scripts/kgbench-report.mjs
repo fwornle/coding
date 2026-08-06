@@ -1,0 +1,108 @@
+#!/usr/bin/env node
+/**
+ * Render a kgbench run into markdown + report.json.
+ *
+ *   kgbench-report.mjs --run <runId> [--out docs/benchmarks/<name>/README.md]
+ *
+ * Arms are rows, so N arms costs nothing. Raw results are NOT copied into docs/:
+ * 8 arms x 30 questions x 3 reps with full answers is megabytes, and the report plus
+ * report.json is what is worth committing.
+ */
+
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
+import { aggregate, renderMarkdown } from '../lib/kgbench/report.mjs';
+import { loadQuestions, REPO_ROOT } from '../lib/kgbench/arms.mjs';
+
+const argv = process.argv.slice(2);
+const out = (s) => console.log(s);
+const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
+const die = (m) => { console.error(`kgbench-report: ${m}`); process.exit(2); };
+
+const runId = opt('run', null);
+if (!runId) die('--run <runId> is required');
+
+const repoRoot = opt('repo', REPO_ROOT);
+const runDir = path.join(repoRoot, '.data/kgbench/runs', runId);
+const resultsFile = path.join(runDir, 'results.jsonl');
+if (!existsSync(resultsFile)) die(`no results at ${resultsFile}`);
+
+const meta = JSON.parse(readFileSync(path.join(runDir, 'run.json'), 'utf8'));
+const allRows = readFileSync(resultsFile, 'utf8').split('\n')
+  .filter((l) => l.trim())
+  .map((l) => JSON.parse(l));
+
+const { questions } = loadQuestions(meta.set, repoRoot);
+// A run's question set is the UNION over every pass, not just the last one. Adding reps
+// with `--only A1,A2,A3,A4` rewrote run.json's list to those four, so the other twelve
+// questions' rows were misfiled as "retired" and silently dropped from every table —
+// the report showed a 4-question benchmark and named the rest as excluded.
+const runQuestionIds = new Set([
+  ...(meta.questions ?? []),
+  ...(meta.history ?? []).flatMap((h) => h.questions ?? []),
+]);
+const selected = questions.filter((q) => runQuestionIds.has(q.id));
+const armIds = meta.arms.map((a) => a.id);
+
+// Rows are filtered to the questions the set STILL defines, not the ones the run
+// happened to execute. A question retired mid-flight (T2: its premise was false, so no
+// answer to it could be graded) leaves rows behind, and aggregating them would fold a
+// known-broken question into the medians.
+const selectedIds = new Set(selected.map((q) => q.id));
+const rows = allRows.filter((r) => selectedIds.has(r.id));
+const retiredIds = [...new Set(allRows.filter((r) => !selectedIds.has(r.id)).map((r) => r.id))];
+
+const agg = aggregate(rows, { arms: armIds, questions: selected });
+
+// Checklist vs judge disagreement, when both graded the same answer.
+const disagreements = rows
+  .filter((r) => r.score != null && r.judge_score != null && Math.abs(r.score - r.judge_score) > 0.25)
+  .map((r) => ({
+    id: r.id, arm: r.arm, checklist: r.score, judge: r.judge_score,
+    kind: r.judge_score > r.score ? 'judge_higher' : 'checklist_higher',
+  }));
+
+const report = {
+  meta: {
+    set: meta.set,
+    runId,
+    questionCount: selected.length,
+    // Reps vary per question once a later pass deepens a subset, so report the real
+    // per-question range instead of the last pass's --reps value.
+    reps: (() => {
+      const per = new Map();
+      for (const r of rows) per.set(`${r.arm}|${r.id}`, (per.get(`${r.arm}|${r.id}`) ?? 0) + 1);
+      const v = [...per.values()];
+      const lo = Math.min(...v), hi = Math.max(...v);
+      return lo === hi ? String(lo) : `${lo}-${hi}`;
+    })(),
+    commit: meta.commit,
+    dirty: meta.dirty,
+    model: meta.arms[0]?.model ?? 'unknown',
+    baselines: meta.baselines,
+    schemaTax: meta.schemaTax,
+    // Containment state travels with the report: a reader must be able to tell a
+    // sandboxed run from one where the arms could read the answer key.
+    sandbox: meta.sandbox ?? null,
+    history: meta.history ?? null,
+    contaminatedRows: rows.filter((r) => r.contaminated).length,
+    toolEscapeRows: rows.filter((r) => r.outcome === 'tool_escape').length,
+    retiredQuestions: retiredIds,
+    generatedAt: new Date().toISOString(),
+  },
+  ...agg,
+  disagreements,
+};
+
+const md = renderMarkdown(report);
+const outPath = opt('out', null);
+if (outPath) {
+  const abs = path.isAbsolute(outPath) ? outPath : path.join(repoRoot, outPath);
+  mkdirSync(path.dirname(abs), { recursive: true });
+  writeFileSync(abs, md);
+  writeFileSync(path.join(path.dirname(abs), 'report.json'), JSON.stringify(report, null, 2) + '\n');
+  out(`wrote ${abs}`);
+  out(`wrote ${path.join(path.dirname(abs), 'report.json')}`);
+} else {
+  out(md);
+}
