@@ -86,6 +86,12 @@ const report = {
     sandbox: meta.sandbox ?? null,
     history: meta.history ?? null,
     contaminatedRows: rows.filter((r) => r.contaminated).length,
+    // Answers that GUESSED they were being probed without citing anything. Not
+    // contamination — an arm that searches, finds nothing, and concludes the question is
+    // a trap is doing the job the abstain class asks for. Counted because a set whose
+    // traps are guessable from their phrasing is measuring something narrower than
+    // retrieval, and that is a fact about the QUESTIONS, not about the arms.
+    selfIdentifiedProbeRows: rows.filter((r) => r.contamination_weak?.length).length,
     toolEscapeRows: rows.filter((r) => r.outcome === 'tool_escape').length,
     retiredQuestions: retiredIds,
     generatedAt: new Date().toISOString(),
