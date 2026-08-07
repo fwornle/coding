@@ -7,10 +7,12 @@ which costs an index, a container service, and a rebuild step. This benchmark ex
 answer whether they buy anything a plain `grep` agent doesn't, using measurements rather
 than intuition.
 
-**Run:** `coding-v1-r6` · repo at `a54b1af78` · model `claude-sonnet-5` ·
+**Run:** `coding-v1-r6` · repo at `c31d07b02` · model `claude-sonnet-5` ·
 16 questions × 4 arms × 3–10 reps = **304 runs**, 0 failures.
 Supersedes `coding-v1-r5`, which had three contaminated rows — see
 [What changed since r5](#what-changed-since-r5).
+A3 and A4 were **rewritten and re-run** after the first pass showed they did not test
+retrieval; see [Provenance](#provenance-of-these-numbers).
 
 ---
 
@@ -19,19 +21,20 @@ Supersedes `coding-v1-r5`, which had three contaminated rows — see
 | | grep | graphify | codegraph | **hybrid** |
 |---|--:|--:|--:|--:|
 | **Correctness** (median) | **1.00** | **1.00** | **1.00** | **1.00** |
-| Content tokens per query | 55,656 | 86,971 | 122,414 | **56,965** |
-| Latency per query | 16.2s | 20.1s | 32.4s | **14.1s** |
-| Cost per query | **$0.066** | $0.111 | $0.158 | $0.072 |
+| Content tokens per query | **73,536** | 106,420 | 177,217 | 81,216 |
+| Latency per query | **17.1s** | 26.1s | 51.5s | 17.9s |
+| Latency p90 | 33.9s | 63.8s | **143.9s** | **30.0s** |
+| Cost per query | **$0.074** | $0.141 | $0.227 | $0.085 |
 | Hard failures | 0 / 76 | 0 / 76 | 0 / 76 | 0 / 76 |
 | Hallucinations | 0 | 0 | 0 | 0 |
 
 **On this question set, neither graph backend buys measurable correctness, and both cost
-1.6–2.2× the tokens, 1.2–2.0× the latency, and 1.7–2.4× the money.**
+1.4–2.4× the tokens, 1.5–3.0× the latency, and 1.9–3.1× the money.**
 
 The `hybrid` arm is the one to read the others against, because it is the only one shaped
 like production: it has *every* tool and chooses freely. It lands on grep's cost and
-grep's correctness — because **it chooses grep**. Across 76 cells it made 273 tool calls,
-of which **3 were graph queries** and **none were Graphify**. Given the index, the agent
+grep's correctness — because **it chooses grep**. Across 76 cells it made 348 tool calls,
+of which **4 were graph queries** and **none were Graphify**. Given the index, the agent
 declines to use it.
 
 The hypothesis this set was designed to test — that a graph index answers *"that isn't
@@ -39,8 +42,9 @@ here"* better than grep — **did not reproduce**. All four arms abstained corre
 every trap question.
 
 Read this as a **null result on 16 questions**, not as proof that code graphs are
-worthless. Two of the four architecture questions turned out not to test retrieval at
-all — see [What this does not show](#what-this-does-not-show).
+worthless. There is one real per-question difference: **CodeGraph scores 0.00 on A4**,
+where every other arm scores 1.00, because that answer lives in configuration prose its
+index does not carry. See [the architecture class](#the-architecture-class-where-corpus-scope-shows-up).
 
 ---
 
@@ -150,8 +154,14 @@ by impression.
 |---|---|---|
 | **A1** | Why is the `.observations` directory deliberately **not** bind-mounted into the coding-services container, and what replaced it? | SQLite WAL/SHM corruption from concurrent openers across the bind mount; the host obs-api is the single owner |
 | **A2** | The kgbench benchmark measures "content tokens" rather than total tokens. What problem does that solve, and how is the value derived? | a large fixed floor (system prompt + tool schemas) dominates totals; derived by subtracting a measured empty-run baseline |
-| **A3** | Why does the benchmark harness strip `ANTHROPIC_API_KEY` from the environment of the agents it spawns? | a key takes precedence over the Max/subscription OAuth login; it would bypass the proxy / the measured path |
-| **A4** | What is the difference in failure behaviour between a code-graph backend served over HTTP and one served over stdio, and why does it matter operationally? | a stdio crash takes down the whole MCP server list for the session; http fails per call / degrades gracefully |
+| **A3** | The code-graph registry deliberately leaves out two capabilities such a registry might be expected to have. Name both omissions, give the reason recorded for each, and say which component does the first one's job instead. | no way to select every backend at once; kgbench composes its own per-arm MCP configs instead; no query-type routing; because which backend suits which question is what the benchmark exists to measure |
+| **A4** | CodeGraph's runtime and index configuration carries several deliberate constraints, each recorded with a reason. Identify them, explain what each prevents, and say what owns index freshness instead of CodeGraph itself. | daemon/watcher off for deterministic indexing; the reindex dispatcher owns freshness; `codegraph init` needs stdin closed or it hangs under supervisord *(bonus: telemetry off — the container is keyless)* |
+
+> **A3 and A4 are replacements.** The originals asked why an API key is stripped and how
+> stdio differs from HTTP on crash. Both were answerable from general knowledge, and in
+> the first pass **70 of 160 architecture cells answered them with no tool call at all**.
+> They measured the model, not the repository. The originals and the reasons for retiring
+> them are kept in the question file's `_rewriteNote`.
 
 #### `abstain` — the answer is not in this repository
 
@@ -294,53 +304,50 @@ rather than querying, which is the next section.
 
 ---
 
-## The architecture class: two of these questions don't test retrieval
+## The architecture class: where corpus scope shows up
+
+Rewriting A3 and A4 to require repository-specific facts changed this class from the
+weakest part of the benchmark to the only place an arm actually separates.
+
+**Zero-tool answers went from 70 of 160 cells to 0 of 160.** Every architecture cell now
+does retrieval. Checklist-vs-judge disagreement across the whole run fell from 85 to 37,
+almost all of that from A4 alone (35 → 3): the old question was not just non-retrieval,
+it was badly specified.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../images/kgbench-arch-spread-dark.svg">
-  <img alt="Dot plot of every architecture-class run — all four arms spread across 0.00 to 1.00 with heavy overlap" src="../../images/kgbench-arch-spread-light.svg">
+  <img alt="Dot plot of every architecture-class run — grep, graphify and hybrid cluster at 1.00; codegraph spreads lower" src="../../images/kgbench-arch-spread-light.svg">
 </picture>
 
-| Arm | n | mean | median |
-|---|--:|--:|--:|
-| grep | 40 | 0.74 | 1.00 |
-| graphify | 40 | 0.65 | 0.65 |
-| codegraph | 40 | 0.63 | 0.82 |
-| hybrid | 40 | 0.74 | 1.00 |
+| Question | grep | graphify | codegraph | hybrid |
+|---|--:|--:|--:|--:|
+| A1 — why `.observations` is not bind-mounted | 1.00 | 0.65 | 1.00 | 1.00 |
+| A2 — why "content tokens" rather than total | 1.00 | 1.00 | 1.00 | 1.00 |
+| A3 — the registry's two deliberate omissions | 1.00 | 1.00 | 1.00 | 1.00 |
+| A4 — why CodeGraph's runtime is constrained | 1.00 | 1.00 | **0.00** | 1.00 |
 
-Every arm produces answers across the whole range. **A bar chart of medians would have
-hidden that entirely** — which is why the dot plot is here.
+**CodeGraph scores 0.00 on A4, ten times out of ten** — and it is not a grading artifact.
+The deterministic checklist and the independent LLM judge agree exactly: 0 from both, on
+all ten reps. It also made *more* tool calls than any other arm on that question (median
+12), so it is not a case of not trying.
 
-But the more important finding is one this run surfaced by instrumenting tool calls:
+The reason is corpus scope, and it is the most useful finding in this run. A4's answer
+lives in prose inside a JSON config — the `_envNote` and `_indexNote` keys of
+`config/code-graph.json`. CodeGraph indexes **code entities** into SQLite/FTS5; comment
+strings in a config file are not code entities, so its index cannot reach them. Rather
+than find nothing and say so, the arm answered from the one source it did have — its own
+MCP tool description — and produced a fluent, confident, wrong account of constraints
+that are not this repository's.
 
-| Question | cells answered with **zero tool calls** | median |
-|---|--:|--:|
-| A1 — why `.observations` is not bind-mounted | 0 / 40 | 1.00 |
-| A2 — why "content tokens" rather than total | 0 / 40 | 1.00 |
-| A3 — why `ANTHROPIC_API_KEY` is stripped | **36 / 40** | 0.50 |
-| A4 — HTTP vs stdio failure behaviour | **34 / 40** | 0.00 |
+That is worth stating plainly: **the failure mode of a too-narrow index is not an empty
+result, it is a confident answer from whatever else is in context.** Graphify, which
+indexes documents as well as code, scores 1.00 here. Grep, which has no index at all and
+just reads the file, also scores 1.00.
 
-**A3 and A4 are answered from the model's prior knowledge, not from this repository.**
-Seventy of 160 architecture cells made no tool call at all — single-turn, no denied
-attempts, just an answer. Both questions are general: why an API key beats an OAuth login,
-and how stdio differs from HTTP on crash. Neither needs *this* codebase, so no retrieval
-strategy can distinguish itself on them.
-
-That reframes the arch tie. Restricted to the two questions that do require this
-repository, every arm scores a median of **1.00**; restricted to the two that don't,
-every arm scores **0.50**. The class was not measuring four architecture questions — it
-was measuring two, plus two prior-knowledge questions that dilute every arm equally.
-
-A4 is worse than merely non-retrieval: its median is 0.00 and the checklist disagrees
-with the LLM judge on **35 of 40** cells. By this report's own rule — a question over 10%
-disagreement is the question's problem — A4 is broken, and B1 and B3 (10 of 12 each) are
-close behind.
-
-**These questions are not retired here.** Dropping questions after seeing scores is
-selection, and it is the same error the benchmark's own T2 note warns about. They are
-reported as defective and left in every number above, so the medians on this page are the
-pessimistic ones. Rewriting A3 and A4 to require repository-specific facts is the single
-highest-value change to this set, and it should happen *before* the next run, not after.
+Note the reverse case in the same class: graphify scores 0.65 on A1, where CodeGraph
+scores 1.00. Neither backend dominates. The class median stays 1.00 for all four arms, so
+the automatic winner check still prints "tie" — correctly, because these are single
+questions, not a class-level effect.
 
 ---
 
@@ -357,9 +364,9 @@ No stalls, no timeouts, no tool escapes, no contamination. In the earlier
 [graphify-vs-grep](../graphify-vs-grep/) run the graph arm had a 7% hard-fail rate from
 MCP stalls; that did not recur here.
 
-Latency tails differ even though medians are close: p90 is 29s for grep and hybrid, 62s
-for graphify, and **118s for codegraph**, with a single 268s worst case. Medians
-understate what the stdio backend costs when it is slow.
+Latency tails differ even more than medians: p90 is 34s for grep, **30s for hybrid**, 64s
+for graphify, and **144s for codegraph**. Medians understate what the stdio backend costs
+when it is slow, and the arm with every tool available has the *tightest* tail of all.
 
 ---
 
@@ -376,12 +383,14 @@ understate what the stdio backend costs when it is slow.
   here — so the graph backends look *better* than their true total cost.
 - **16 questions is small**, and `arch` is only 4. A null result at this size means "no
   effect detected", not "no effect exists".
-- **A3 and A4 do not test retrieval** — 70 of 160 arch cells answered them with no tool
-  call at all. A4 additionally has a 35/40 checklist-vs-judge disagreement. Both are left
-  in every number here rather than dropped after the fact, which makes the arch medians
-  pessimistic for all four arms equally.
-- **L2 scores 0.15 for every arm** and is masked by its class median. Also a question
-  defect, also left in.
+- **B1 and B3 disagree with the judge on 10 of 12 cells each.** By this report's own rule
+  — a question over 10% disagreement is the question's problem — they are the next two to
+  rewrite, for the same reason A4 was.
+- **L2 scores 0.15 for every arm** and is masked by its class median: every arm names
+  kgbench's own `summaryStats` rather than the implementation the checklist wants. A
+  question defect, left in rather than dropped after the fact.
+- **The A4 result is one question.** "CodeGraph cannot reach prose in a config file" is a
+  real mechanism, but it is demonstrated by a single question at 10 reps, not by a class.
 - **The abstain class may be guessable.** One answer concluded the question was a probe
   purely from finding nothing. Correct, and honestly reached — but a trap inferable from
   its phrasing measures something narrower than retrieval.
@@ -396,6 +405,35 @@ understate what the stdio backend costs when it is slow.
 
 ---
 
+## Provenance of these numbers
+
+Not every cell in this run comes from one pass, and the report should say so rather than
+imply a single sitting.
+
+| Cells | Questions | Tree commit | When |
+|---|---|---|---|
+| 224 | the 14 unchanged questions | `a54b1af78` | first pass |
+| 80 | A3, A4 (rewritten) | `c31d07b02` | re-run after the rewrite |
+
+The 80 replaced cells were re-run because the questions changed, not because their
+results were unwelcome — the originals scored *well* on the arms; they simply were not
+measuring retrieval. Splicing is legitimate here only if the two tree states are
+equivalent for the questions involved, so that was checked rather than assumed:
+
+- Nine tree-visible files differ between the two commits: six figure SVGs and three
+  report/chart renderers.
+- **None is A3 or A4 evidence.** Their ground truth — `config/code-graph.json`,
+  `config/kgbench/arms.json`, `docker/supervisord.conf` — is byte-identical across both.
+- The one changed file any question depends on is `lib/kgbench/report.mjs` (L2's
+  evidence), and the change is a rendering line; `summaryStats` and its imports are
+  untouched, and L2 was not re-run.
+
+The question set itself is excluded from the run tree, so rewriting questions does not
+change what the arms can search. Full per-pass provenance is in the run manifest's
+`history` block, and every score that a grader fix moved is in `regrade.json`.
+
+---
+
 ## What changed since r5
 
 r5 measured three arms and reported a clean sweep: every arm 1.00 on every class,
@@ -406,9 +444,11 @@ r5 measured three arms and reported a clean sweep: every arm 1.00 on every class
 | Arms | 3 | 4 (adds `hybrid`) |
 | Cells | 228 | 304 |
 | Contaminated rows | reported 0 | **3 in r5**, found later; 0 in r6 |
-| grep content tokens | 57,427 | 55,656 |
-| graphify content tokens | 161,681 | **86,971** |
-| codegraph content tokens | 99,747 | **122,414** |
+| grep content tokens | 57,427 | 73,536 |
+| graphify content tokens | 161,681 | 106,420 |
+| codegraph content tokens | 99,747 | 177,217 |
+| Arch cells answered with no tool call | not measured | **0 / 160** |
+| Checklist-vs-judge disagreements | not reported | 37 (was 85 before the A3/A4 rewrite) |
 
 **r5's abstain result was contaminated for grep on T3.** All three of its T3 reps cite
 `lib/kgbench/graders.mjs`, where a comment of mine named the trap's subject; one reports
@@ -420,11 +460,13 @@ With the cribs removed, grep still abstains correctly on all three traps. **Remo
 contamination did not change the abstain conclusion** — it changed how much that
 conclusion is worth, since one arm had been getting there partly by reading.
 
-The token numbers moved substantially for both graph backends in opposite directions.
-Between the runs the indexes were rebuilt and the tree changed, so r5-vs-r6 token deltas
-should be read as *"this measurement is not stable across index rebuilds"* rather than as
-either backend improving. That instability is itself worth knowing: a per-query token cost
-that swings 1.9× on a reindex is not a fixed property of a backend.
+The token numbers moved substantially, and in both directions, so r5-vs-r6 deltas should
+not be read as either backend improving. Three things changed at once: the indexes were
+rebuilt, the tree changed, and — the largest effect — A3 and A4 stopped being answerable
+without tools. Two questions that previously cost almost nothing now cost a real search
+for every arm, which lifts every arm's median. **A per-query token cost is a property of
+the question set at least as much as of the backend**, which is worth remembering before
+quoting any single number from this page out of context.
 
 r5's raw results remain in `.data/kgbench/runs/coding-v1-r5/` for comparison.
 
@@ -447,12 +489,16 @@ failure modes generalise to any agent benchmark.
 | 7 | **Comments in the grader were cribs.** Two illustrative examples in `graders.mjs` quoted real trap subjects. In r5 the grep arm grepped one and scored a perfect abstention off it — three rows, undetected. | Four leaks now, three of them comments explaining the previous leak. Fixed structurally: the grading and containment modules are stripped from the run tree, since no question cites them. |
 | 8 | **Publishing the questions contaminated the next run.** The r5 report lists every prompt, and Graphify indexes markdown *headings* as graph nodes — including one naming the abstain class as the-answer-is-not-here. | A file-level exclusion would have held for grep and leaked for the graph arms. `.graphifyignore` now excludes the report too. |
 | 9 | **My own contamination signals voided two correct answers.** A signal added to catch defect 7 fired on an answer that merely listed the file among grep hits, and a probe-detector fired on an arm that *inferred* a trap from finding nothing. | A voided correct answer biases the result exactly as much as a scored wrong one, and hides better — a missing row reads as caution. Signals are now split: citing a source voids, suspecting does not. |
+| 10 | **Two questions measured the model, not the repository.** A3 and A4 were answerable from general knowledge; 70 of 160 architecture cells answered them with no tool call at all, and A4 additionally disagreed with the judge on 35 of 40. | A benchmark class that requires no retrieval cannot distinguish retrieval strategies, and it dilutes every arm equally — which *looks* like a tie. Rewritten to need facts recorded only in this repo; zero-tool cells went to 0/160 and disagreements 85 → 37. |
+| 11 | **Long runs were being killed silently.** Two attempts were terminated part-way with no error and nothing in any project log. | Diagnosed, not guessed: the runner cleans up its worktree on SIGINT/SIGTERM but would *leak* it on SIGKILL, and no worktree leaked — so it caught a signal and exited through its own handler. The health coordinator logged only network polling; no project sweeper matches the runner's command line; memory was 48% free with no jetsam. Both deaths were runs tracked by a task manager, while the same workload detached ran on untouched. `scripts/kgbench-supervise.sh` now detaches and resumes on signal deaths only. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising
 grep. Defects 7 and 9 point the other way: 7 handed the *baseline* a free abstention, and
-9 deleted correct answers from whichever arm produced them. The lesson is not "the graph
-arms were flattered", it is that **every measurement defect found here was invisible in
-the output it produced.** Each one yielded a clean-looking table.
+9 deleted correct answers from whichever arm produced them. Defect 10 flattered nobody and
+hid everybody, by making a quarter of the matrix measure something other than retrieval.
+The lesson is not "the graph arms were flattered", it is that **every measurement defect
+found here was invisible in the output it produced.** Each one yielded a clean-looking
+table.
 
 Six of these were found by instrumentation rather than by reading results: the tool-surface
 check, the containment scan, the orphaned-MCP-server guard, and the grader's own
@@ -486,11 +532,13 @@ arm cannot answer a class of question, caused entirely by an antivirus scan.
 # check every arm is available (fails loudly if an index or the proxy is missing)
 node scripts/kgbench-run.mjs --set coding-v1 --preflight-only
 
-# the full matrix
-node scripts/kgbench-run.mjs --set coding-v1 --reps 3 --run-id my-run
+# the full matrix, detached and self-resuming — USE THIS for anything long
+scripts/kgbench-supervise.sh --run-id my-run --set coding-v1 --reps 3 \
+                             --deepen A1,A2,A3,A4 --deepen-reps 10
 
-# deepen a single class
-node scripts/kgbench-run.mjs --set coding-v1 --reps 10 --only A1,A2,A3,A4 --run-id my-run
+# progress / outcome
+cat .data/kgbench/runs/my-run/supervise.status
+wc -l .data/kgbench/runs/my-run/results.jsonl
 
 # re-apply a fixed grader to stored answers, without re-running the matrix
 node scripts/kgbench-regrade.mjs --run my-run --dry-run
@@ -518,6 +566,7 @@ without spending another model call.
 | `lib/kgbench/graders.mjs` | Deterministic scoring; pure, so answers can be re-graded offline |
 | `lib/kgbench/runner.mjs` | Cell execution, tool-surface enforcement, host-stall detection |
 | `scripts/kgbench-charts.mjs` | Regenerates the figures on this page from `results.jsonl` |
+| `scripts/kgbench-supervise.sh` | Detached, self-resuming runner — survives a signalled process group |
 | `scripts/kgbench-regrade.mjs` | Re-applies fixed graders to stored answers, without re-running cells |
 | `.data/kgbench/runs/coding-v1-r6/` | Raw results, run manifest, and `regrade.json` (every score that moved) |
 | [`docs/measurement/kgbench.md`](../../measurement/kgbench.md) | Operator guide — prerequisites, containment, scoring |

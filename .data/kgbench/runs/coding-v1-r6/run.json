@@ -2,7 +2,7 @@
   "runId": "coding-v1-r6",
   "set": "coding-v1",
   "reps": 10,
-  "commit": "a54b1af78",
+  "commit": "c31d07b02",
   "dirty": true,
   "history": [
     {
@@ -51,6 +51,18 @@
         "T1",
         "T3",
         "T4"
+      ]
+    },
+    {
+      "commit": "a54b1af78",
+      "reps": 10,
+      "startedAt": "2026-08-06T18:31:49.890Z",
+      "sandbox_commit": "a54b1af78696aa5e69c98148959e4ab698996072",
+      "questions": [
+        "A1",
+        "A2",
+        "A3",
+        "A4"
       ]
     }
   ],
@@ -111,19 +123,18 @@
     }
   ],
   "questions": [
-    "A1",
-    "A2",
     "A3",
     "A4"
   ],
   "sandbox": {
     "mode": "worktree",
-    "tree_commit": "a54b1af78696aa5e69c98148959e4ab698996072",
+    "tree_commit": "c31d07b02c651341e614f472b98d87627d4c0c41",
     "excluded": [
       "config/kgbench/questions",
       "lib/kgbench/graders.mjs",
       "lib/kgbench/sandbox.mjs",
       "scripts/kgbench-regrade.mjs",
+      "scripts/kgbench-supervise.sh",
       "tests/integration/kgbench-graders.test.js",
       "tests/integration/kgbench-sandbox.test.js",
       "tests/integration/kgbench-tool-enforcement.test.js",
@@ -139,10 +150,10 @@
     "verified": true
   },
   "baselines": {
-    "grep": 22082,
-    "graphify": 22520,
-    "codegraph": 21322,
-    "hybrid": 25344
+    "grep": 22103,
+    "graphify": 22541,
+    "codegraph": 21343,
+    "hybrid": 25365
   },
   "schemaTax": {
     "grep": 0,
@@ -155,5 +166,5 @@
     "model": "claude-opus-4.8",
     "enabled": true
   },
-  "startedAt": "2026-08-06T18:31:49.890Z"
+  "startedAt": "2026-08-07T05:15:38.954Z"
 }
