@@ -10,7 +10,7 @@
 
 import {
   gradePath, gradeContains, gradeRegex, gradeSet, gradeChecklist, gradeAbstain, grade,
-  gradeQuestion, resolveGrader, detectContamination, assertiveSegments,
+  gradeQuestion, resolveGrader, detectContamination, assertiveSegments, stripEmphasis,
 } from '../../lib/kgbench/graders.mjs';
 import { summaryStats, classifyRow, declareWinner, aggregate } from '../../lib/kgbench/report.mjs';
 
@@ -254,6 +254,40 @@ describe('assertiveSegments — retirement verbs are stems', () => {
                      'It is set up in docker/docker-compose.yml, which defines the Memgraph service.']) {
       expect(gradeQuestion(t1, f).hallucinated).toBe(true);
     }
+  });
+});
+
+describe('markdown emphasis is stripped before matching', () => {
+  // Models answer in markdown. A `near` matcher written in plain prose could not see
+  // through it: a heading reading "MCP server registration is **not** affected" failed
+  // a pattern for "is not affected" on the two asterisk pairs alone — and that heading
+  // was a verbatim statement of the required fact. Widening the regex would have fixed
+  // that phrasing and left the next one.
+  const spec = (m) => ({ id: 'X', cls: 'blast', prompt: 'x', checklist: [{ id: 'f1', must: true, match: m }] });
+
+  it('sees through bold, italic and code spans', () => {
+    expect(stripEmphasis('is **not** affected')).toBe('is not affected');
+    expect(stripEmphasis('`lib/a/b.mjs`')).toBe('lib/a/b.mjs');
+    expect(stripEmphasis('*emphasis*')).toBe('emphasis');
+  });
+
+  it('leaves underscores alone — they are load-bearing in the symbols under test', () => {
+    expect(stripEmphasis('CODEGRAPH_MAX_DEPTH')).toBe('CODEGRAPH_MAX_DEPTH');
+    expect(gradeQuestion(spec({ type: 'symbol', value: 'ANTHROPIC_BASE_URL' }),
+      'set `ANTHROPIC_BASE_URL` to the proxy').score).toBe(1);
+  });
+
+  it('applies to near matchers, which is where it was found', () => {
+    const m = { type: 'near', value: ['is n(?:o|\')t affected|unaffected', 'registration'], within: 80 };
+    expect(gradeQuestion(spec(m), 'MCP server registration is **not** affected.').score).toBe(1);
+    expect(gradeQuestion(spec(m), 'MCP server registration is rebuilt from the tools list.').score).toBe(0);
+  });
+
+  it('applies to any-of and path matchers too, so matchers cannot disagree on decoration', () => {
+    expect(gradeQuestion(spec({ type: 'any-of', value: ['allowedtoolsfor'] }),
+      'derived by `allowedToolsFor()`').score).toBe(1);
+    expect(gradeQuestion(spec({ type: 'path', value: 'install.sh' }),
+      'defined in **`install.sh`**').score).toBe(1);
   });
 });
 

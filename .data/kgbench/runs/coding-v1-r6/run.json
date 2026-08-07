@@ -1,8 +1,8 @@
 {
   "runId": "coding-v1-r6",
   "set": "coding-v1",
-  "reps": 10,
-  "commit": "c31d07b02",
+  "reps": 3,
+  "commit": "fcfedffaa",
   "dirty": true,
   "history": [
     {
@@ -61,6 +61,16 @@
       "questions": [
         "A1",
         "A2",
+        "A3",
+        "A4"
+      ]
+    },
+    {
+      "commit": "c31d07b02",
+      "reps": 10,
+      "startedAt": "2026-08-07T05:15:38.954Z",
+      "sandbox_commit": "c31d07b02c651341e614f472b98d87627d4c0c41",
+      "questions": [
         "A3",
         "A4"
       ]
@@ -123,12 +133,11 @@
     }
   ],
   "questions": [
-    "A3",
-    "A4"
+    "B1"
   ],
   "sandbox": {
     "mode": "worktree",
-    "tree_commit": "c31d07b02c651341e614f472b98d87627d4c0c41",
+    "tree_commit": "fcfedffaafc4c43680fffa431faf215c11940a16",
     "excluded": [
       "config/kgbench/questions",
       "lib/kgbench/graders.mjs",
@@ -150,10 +159,10 @@
     "verified": true
   },
   "baselines": {
-    "grep": 22103,
-    "graphify": 22541,
-    "codegraph": 21343,
-    "hybrid": 25365
+    "grep": 22109,
+    "graphify": 22547,
+    "codegraph": 21349,
+    "hybrid": 25371
   },
   "schemaTax": {
     "grep": 0,
@@ -166,5 +175,5 @@
     "model": "claude-opus-4.8",
     "enabled": true
   },
-  "startedAt": "2026-08-07T05:15:38.954Z"
+  "startedAt": "2026-08-07T06:25:46.071Z"
 }
