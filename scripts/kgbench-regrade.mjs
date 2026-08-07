@@ -17,12 +17,20 @@
  * re-run. This has been needed twice now (four false hallucination flags in r5, and a
  * fifth in r6), which is why it is a script rather than an ad-hoc snippet each time.
  *
- * WHAT IT WILL NOT DO
+ * WHAT IT WILL NOT DO BY DEFAULT
  *
  * It never touches the judge fields and never re-invokes the judge — those are separate
  * evidence, and silently regenerating them would destroy the checklist-vs-judge
  * disagreement signal the report depends on. It only recomputes what gradeQuestion
  * derives from the stored answer.
+ *
+ * `--rejudge` is the deliberate exception, and it is opt-in for that reason. It re-runs
+ * the JUDGE over the stored answers without re-running any cell. That is worth having
+ * because a judge defect is a grading defect: the judge prompt used to present optional
+ * (`must: false`) checklist facts under a "REQUIRED FACTS" heading, so it marked answers
+ * down for omitting a bonus and manufactured a steady disagreement on all seven
+ * questions that carry one. Re-running 168 agent cells to fix a prompt bug would change
+ * the measurement in order to repair the scoring of it.
  *
  * The pre-regrade file is kept beside the results, because "the scores changed after the
  * fact" is exactly the claim a reader is entitled to audit.
@@ -32,6 +40,7 @@ import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import path from 'node:path';
 import { gradeQuestion } from '../lib/kgbench/graders.mjs';
 import { loadQuestions, REPO_ROOT } from '../lib/kgbench/arms.mjs';
+import { judgeAnswer, reconcile } from '../lib/kgbench/judge.mjs';
 
 const argv = process.argv.slice(2);
 const out = (s) => console.log(s);
@@ -50,13 +59,15 @@ const meta = JSON.parse(readFileSync(path.join(runDir, 'run.json'), 'utf8'));
 const { questions } = loadQuestions(meta.set, repoRoot);
 const byId = Object.fromEntries(questions.map((q) => [q.id, q]));
 
+const only = opt('only', null)?.split(',').map((x) => x.trim());
 const rows = readFileSync(resultsFile, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
+const inScope = (r) => !only || only.includes(r.id);
 
 const changes = [];
 const regraded = rows.map((r) => {
   // Only `ok` rows carry an answer worth grading. A timeout has no answer, and inventing
   // a score for it would convert a failure into a measurement.
-  if (r.outcome !== 'ok' || !byId[r.id]) return r;
+  if (r.outcome !== 'ok' || !byId[r.id] || !inScope(r)) return r;
 
   const g = gradeQuestion(byId[r.id], r.answer);
   const next = {
@@ -92,14 +103,40 @@ for (const c of changes) {
 }
 out(`kgbench-regrade: ${changes.length} of ${rows.length} row(s) change`);
 
+// ---- optional judge pass ---------------------------------------------------
+const judgeChanges = [];
+if (flag('rejudge')) {
+  const targets = regraded.filter((r) => r.outcome === 'ok' && byId[r.id] && inScope(r)
+    && (byId[r.id].checklist?.length || byId[r.id].grader?.type === 'llm'));
+  out(`kgbench-regrade: re-judging ${targets.length} row(s) — answers are NOT re-run, only re-scored`);
+  let n = 0;
+  for (const r of targets) {
+    const q = byId[r.id];
+    const j = await judgeAnswer({ question: q.prompt, answer: r.answer, checklist: q.checklist, rubric: q.grader?.rubric });
+    n++;
+    if (j.pending) { out(`  [${n}/${targets.length}] ${r.arm}/${r.id} rep${r.rep}: judge unavailable (${j.reason}) — leaving prior score`); continue; }
+    const before = r.judge_score ?? null;
+    r.judge_score = j.score;
+    r.judge_why = j.why ?? null;
+    r.judge_pending = false;
+    r.judge_provider = j.provider ?? null;
+    if (r.score != null) r.judge_agreement = reconcile(r.score, j.score);
+    if (before !== j.score) judgeChanges.push({ arm: r.arm, id: r.id, rep: r.rep, judge: [before, j.score] });
+    if (n % 20 === 0) out(`  [${n}/${targets.length}] ...`);
+  }
+  out(`kgbench-regrade: ${judgeChanges.length} judge score(s) changed`);
+}
+
 if (flag('dry-run')) { out('kgbench-regrade: --dry-run, nothing written'); process.exit(0); }
-if (!changes.length) { out('kgbench-regrade: nothing to write'); process.exit(0); }
+if (!changes.length && !judgeChanges.length) { out('kgbench-regrade: nothing to write'); process.exit(0); }
 
 const backup = path.join(runDir, 'results.pre-regrade.jsonl');
 if (!existsSync(backup)) copyFileSync(resultsFile, backup);
 writeFileSync(resultsFile, regraded.map((r) => JSON.stringify(r)).join('\n') + '\n');
 writeFileSync(path.join(runDir, 'regrade.json'), JSON.stringify({
-  runId, at: new Date().toISOString(), rows: rows.length, changed: changes.length, changes,
+  runId, at: new Date().toISOString(), rows: rows.length,
+  changed: changes.length, changes,
+  judgeChanged: judgeChanges.length, judgeChanges,
 }, null, 2) + '\n');
 out(`kgbench-regrade: wrote ${resultsFile}`);
 out(`kgbench-regrade: original preserved at ${backup}, change log at ${path.join(runDir, 'regrade.json')}`);
