@@ -144,23 +144,42 @@
     },
     {
       "id": "A3", "cls": "arch",
-      "prompt": "Why does the benchmark harness strip ANTHROPIC_API_KEY from the environment of the agents it spawns? Answer in 2-3 sentences.",
-      "checklist": [
-        { "id": "f1", "must": true, "desc": "a key takes precedence over the Max/subscription OAuth login", "match": { "type": "any-of", "value": ["precedence", "takes priority", "prefers", "overrides", "instead of"] } },
-        { "id": "f2", "must": true, "desc": "it would bypass the proxy / the measured path", "match": { "type": "any-of", "value": ["bypass", "unmeasured", "measured path", "proxy"] } }
+      "_rewriteNote": [
+        "Rewritten 2026-08-07. The previous A3 asked why the harness strips ANTHROPIC_API_KEY.",
+        "In run r6, 36 of 40 cells answered it with ZERO tool calls — every arm knew that an",
+        "API key outranks an OAuth login without reading anything, so no retrieval strategy",
+        "could distinguish itself and the question measured the model, not the repository.",
+        "The replacement asks for two design OMISSIONS and their stated reasons, which exist",
+        "nowhere but this repo's own registry comment and cannot be inferred from priors."
       ],
-      "provenance": { "verified_by": "human", "evidence": ["scripts/launch-agent-common.sh:433", "lib/kgbench/runner.mjs:1"] }
+      "prompt": "The code-graph registry in config/code-graph.json deliberately leaves out two capabilities such a registry might be expected to have. Name both omissions, give the reason recorded for each, and say which component does the first one's job instead. Answer in 3-5 sentences.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "no way to select every backend at once (no active:\"all\")", "match": { "type": "any-of", "value": ["all\" ", "\"all\"", "all backends at once", "every backend at once", "all at once", "multiple backends simultaneously", "active: all", "active all"] } },
+        { "id": "f2", "must": true, "desc": "because running every backend at once is a benchmarking concern; kgbench composes its own per-arm MCP configs instead", "match": { "type": "any-of", "value": ["kgbench", "per-arm", "per arm", "benchmark arm", "arms.json"] } },
+        { "id": "f3", "must": true, "desc": "no query-type routing", "match": { "type": "any-of", "value": ["query-type routing", "query type routing", "routing by query", "route queries", "query routing", "per-query routing", "routing rules"] } },
+        { "id": "f4", "must": true, "desc": "because which backend suits which question is what the benchmark exists to measure — encoding a guess would bias it", "match": { "type": "any-of", "value": ["bias", "what the benchmark exists to measure", "benchmark exists to measure", "prejudge", "encoding a guess", "presuppose", "assume the answer"] } }
+      ],
+      "provenance": { "verified_by": "human", "note": "Both omissions and both reasons are stated in the registry's own _comment block; the 'instead' half is only visible by reading how kgbench builds arm MCP configs.", "evidence": ["config/code-graph.json:8", "config/code-graph.json:11", "config/kgbench/arms.json:1"] }
     },
     {
       "id": "A4", "cls": "arch",
-      "prompt": "What is the difference in failure behaviour between a code-graph backend served over HTTP and one served over stdio, and why does it matter operationally? Answer in 2-4 sentences.",
-      "checklist": [
-        { "id": "f1", "must": true, "desc": "stdio crash takes down the whole MCP server list for the session", "match": { "type": "any-of", "value": ["whole", "all mcp", "entire", "server list", "every tool"] } },
-        { "id": "f2", "must": true, "desc": "http fails per call / degrades gracefully", "match": { "type": "any-of", "value": ["per call", "per-call", "individual", "gracefully", "only that"] } }
+      "_rewriteNote": [
+        "Rewritten 2026-08-07. The previous A4 asked how HTTP and stdio backends differ on",
+        "failure. In run r6, 34 of 40 cells answered with ZERO tool calls (general transport",
+        "knowledge), its median was 0.00, and the checklist disagreed with the judge on 35 of",
+        "40 — a question failing on every axis at once. It also overlapped S3, which already",
+        "asks which transport each backend uses. The replacement asks why CodeGraph's runtime",
+        "is constrained the way it is: three choices, each with a reason recorded in-repo."
       ],
-      "provenance": { "verified_by": "human", "evidence": ["docs/integrations/codegraph.md:1", "scripts/backend-smoke.sh:89"] }
+      "prompt": "CodeGraph's runtime and index configuration carries several deliberate constraints, each recorded with a reason. Identify them, explain what each one prevents, and say what owns index freshness instead of CodeGraph itself. Answer in 3-5 sentences.",
+      "checklist": [
+        { "id": "f1", "must": true, "desc": "daemon/watcher disabled so indexing is deterministic", "match": { "type": "any-of", "value": ["deterministic", "determinism", "no_daemon", "no-daemon", "no_watch", "no-watch"] } },
+        { "id": "f2", "must": true, "desc": "freshness is owned by the reindex dispatcher, not codegraph's own watcher or git hooks", "match": { "type": "any-of", "value": ["reindex dispatcher", "dispatcher", "reindex script", "codegraph-index.sh", "git hooks"] } },
+        { "id": "f3", "must": true, "desc": "index must run with stdin closed: `codegraph init` ends with an interactive prompt and would hang under supervisord", "match": { "type": "any-of", "value": ["stdin", "interactive", "prompt", "hang"] } },
+        { "id": "f4", "must": false, "desc": "telemetry off because the container is keyless and must not phone home", "match": { "type": "any-of", "value": ["telemetry", "phone home", "do_not_track", "keyless"] } }
+      ],
+      "provenance": { "verified_by": "human", "note": "The reasons are recorded in the backend's _envNote and _indexNote; none of it is inferable from general knowledge of the tool.", "evidence": ["config/code-graph.json:142", "config/code-graph.json:171"] }
     },
-
     {
       "id": "T1", "cls": "abstain",
       "prompt": "Which file in this repository configures the Memgraph connection used by the code-graph backend? Reply with the repo-relative path, or state clearly that it does not exist.",
