@@ -41,12 +41,36 @@
     },
     {
       "id": "L2", "cls": "lookup",
+      "_rewriteNote": [
+        "Key corrected 2026-08-07 (run r7). The question was right; the key named the wrong",
+        "file. It required lib/experiments/compare.mjs as the sole must-have. summaryStats is",
+        "defined TWICE and independently — compare.mjs:145 and lib/kgbench/report.mjs:23,",
+        "neither importing the other. compare.mjs belongs to the /experiment cross-agent",
+        "harness, not the retrieval benchmark, and NOTHING imports its copy; it is used only",
+        "internally at compare.mjs:266. The only cross-module import of summaryStats anywhere",
+        "in the repo is scripts/kgbench-charts.mjs:22, from lib/kgbench/report.mjs.",
+        "",
+        "All 12 r7 cells named lib/kgbench/report.mjs as the implementer — every arm, no",
+        "exceptions. Score correlated perfectly with whether the answer merely MENTIONED",
+        "compare.mjs: 1.00 if it did, 0.15 if it did not. The path matcher falls back to a",
+        "plain substring test (graders.mjs:183), so a footnote reading 'unrelated, not part of",
+        "the kgbench retrieval benchmark chain' SATISFIED the required fact. Same defect as",
+        "B1: a matcher accepting a path inside a sentence that denies it.",
+        "",
+        "The judge agreed with the checklist on all 12 cells, because its prompt is built from",
+        "the same key — so L2 produced ZERO disagreements and the detector stayed silent. A",
+        "disagreement detector cannot see a wrong key; both graders fail in the same direction.",
+        "",
+        "Also fixed: the question asks for TWO paths and the old checklist graded neither the",
+        "importer nor anything else — half the question was ungraded."
+      ],
       "prompt": "Which file implements the function summaryStats, and which module imports it for the retrieval benchmark? Reply with both repo-relative paths.",
       "checklist": [
-        { "id": "f1", "must": true, "desc": "lib/experiments/compare.mjs", "match": { "type": "path", "value": "lib/experiments/compare.mjs" } },
-        { "id": "f2", "must": false, "desc": "notes kgbench has its own copy", "match": { "type": "any-of", "value": ["lib/kgbench/report.mjs", "kgbench"] } }
+        { "id": "f1", "must": true, "desc": "lib/kgbench/report.mjs implements summaryStats for the retrieval benchmark", "match": { "type": "path", "value": "lib/kgbench/report.mjs" } },
+        { "id": "f2", "must": true, "desc": "scripts/kgbench-charts.mjs is the only module importing it", "match": { "type": "path", "value": "scripts/kgbench-charts.mjs" } },
+        { "id": "f3", "must": false, "desc": "notices the unrelated second copy in lib/experiments/compare.mjs", "match": { "type": "any-of", "value": ["lib/experiments/compare.mjs", "compare.mjs"] } }
       ],
-      "provenance": { "verified_by": "human", "evidence": ["lib/experiments/compare.mjs:145", "lib/kgbench/report.mjs:1"] }
+      "provenance": { "verified_by": "human", "note": "summaryStats is defined twice; only lib/kgbench/report.mjs serves the retrieval benchmark, and only scripts/kgbench-charts.mjs imports it. compare.mjs's copy has no importers.", "evidence": ["lib/kgbench/report.mjs:23", "scripts/kgbench-charts.mjs:22", "lib/experiments/compare.mjs:145"] }
     },
     {
       "id": "L3", "cls": "lookup",
