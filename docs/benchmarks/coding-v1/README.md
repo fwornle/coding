@@ -458,8 +458,9 @@ imply a single sitting.
 
 | Cells | Questions | Tree commit | When |
 |---|---|---|---|
-| 224 | the 14 unchanged questions | `a54b1af78` | first pass |
+| 212 | the 13 unchanged questions | `a54b1af78` | first pass |
 | 80 | A3, A4 (rewritten) | `c31d07b02` | re-run after the rewrite |
+| 12 | B1 (rewritten) | `fcfedffaa` | re-run after its key was corrected |
 
 The 80 replaced cells were re-run because the questions changed, not because their
 results were unwelcome — the originals scored *well* on the arms; they simply were not
