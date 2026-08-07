@@ -144,7 +144,11 @@ by impression.
 
 | | Question | Correct requires |
 |---|---|---|
-| **B1** | If the `mcp.tools` list for a backend in `config/code-graph.json` were changed, which parts of the system would be affected? Name the consumers. | MCP config generation / agent registration; kgbench `allowedTools` derivation |
+| **B1** | If the `mcp.tools` list for a backend in `config/code-graph.json` were changed, which parts of the system would be affected? Name the consumers. Also state explicitly whether MCP server registration is affected, and why. | kgbench's `allowedTools` derivation, via `allowedToolsFor()`; and that registration is **not** affected — the generated config carries servers, not tool lists *(bonus: the `allowed-tools` CLI, `validate()`)* |
+
+> **B1 is a replacement.** Its predecessor required naming MCP config generation as an
+> affected consumer. It is not one, and every arm said so. Retired for a false premise,
+> like T2 — see [where the disagreements went](#where-the-disagreements-went).
 | **B2** | A change makes the LLM proxy on port 12435 unreachable. Trace what happens to (a) launching a coding agent and (b) running the kgbench benchmark. | agent launch aborts fail-closed; kgbench also refuses to start · **must not** claim it silently falls back to direct provider calls |
 | **B3** | The repo contains a tracked but empty directory `.codegraph/`. What breaks if it is deleted, and why can Docker not recreate it? | the container fails to start / the bind mount cannot attach; the parent is mounted read-only |
 
@@ -312,7 +316,8 @@ weakest part of the benchmark to the only place an arm actually separates.
 **Zero-tool answers went from 70 of 160 cells to 0 of 160.** Every architecture cell now
 does retrieval. Checklist-vs-judge disagreement across the whole run fell from 85 to 37,
 almost all of that from A4 alone (35 → 3): the old question was not just non-retrieval,
-it was badly specified.
+it was badly specified. Fixing the judge's rubric and two matchers then took it to
+**17** — see [where the disagreements went](#where-the-disagreements-went).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../images/kgbench-arch-spread-dark.svg">
@@ -383,9 +388,9 @@ when it is slow, and the arm with every tool available has the *tightest* tail o
   here — so the graph backends look *better* than their true total cost.
 - **16 questions is small**, and `arch` is only 4. A null result at this size means "no
   effect detected", not "no effect exists".
-- **B1 and B3 disagree with the judge on 10 of 12 cells each.** By this report's own rule
-  — a question over 10% disagreement is the question's problem — they are the next two to
-  rewrite, for the same reason A4 was.
+- **17 disagreements remain**, concentrated in A1 (6), B2 (3) and A4 (3). By this
+  report's own rule they are the next candidates to examine, though at 3–6 cells each
+  they may be ordinary judge variance rather than defects.
 - **L2 scores 0.15 for every arm** and is masked by its class median: every arm names
   kgbench's own `summaryStats` rather than the implementation the checklist wants. A
   question defect, left in rather than dropped after the fact.
@@ -402,6 +407,47 @@ when it is slow, and the arm with every tool available has the *tightest* tail o
   benchmark-meta files, but the graph index is built from the working repository, so the
   two corpora are not identical. `.graphifyignore` now excludes the published report for
   this reason; the residual difference is untested.
+
+---
+
+## Where the disagreements went
+
+The checklist and the LLM judge disagreed on 85 of 304 cells in the first pass. That is
+the report's own alarm for "the question is the problem" — and chasing it found three
+defects, none of which was a bad question.
+
+| | disagreements | what changed |
+|---|--:|---|
+| first pass | 85 | — |
+| after rewriting A3/A4 | 37 | two questions that tested priors, not retrieval |
+| after fixing the judge | **17** | the judge was grading optional facts as required |
+
+**The judge was shown a different rubric from the grader.** Its prompt listed every
+checklist item under one "REQUIRED FACTS" heading regardless of the item's `must` flag,
+so it marked answers down for omitting a *bonus*. B3 produced this on 10 of 12 cells,
+each time naming the one fact the deterministic grader treats as optional. Seven of the
+sixteen questions carry an optional fact, and six of those seven were in the disagreement
+list. The prompt now separates required from optional and states the same scoring rule
+`gradeChecklist` implements.
+
+**B1's answer key was wrong, and every arm had been telling us so.** Its required fact
+claimed that changing `mcp.tools` affects MCP config generation. It does not:
+`generate-docker-mcp-config.sh` never reads the tools list, and `mcpServerMapFor` returns
+a server entry — a command or url, no tools. The only consumers are `allowedToolsFor()`
+and its two callers. The arms worked this out, said so, and were penalised by the judge
+for "contradicting f1" while the checklist handed them the point anyway, because its
+matcher accepted the substring `mcp config` *inside a sentence denying it*. Same
+false-premise category as retired T2; rewritten so the distinction is the point.
+
+**Two matcher-precision bugs, both of which cost correct answers.** The replacement fact
+missed `## Is MCP server registration affected? No.` — the most direct phrasing available
+— and separately missed `registration is **not** affected`, where markdown bold split the
+phrase. Matchers now strip `*` and backticks before comparing, on every branch, so
+`any-of` and `near` cannot disagree about the same answer over decoration. Underscores are
+left alone: they are load-bearing in `CODEGRAPH_MAX_DEPTH` and `ANTHROPIC_BASE_URL`.
+
+B1 and B3 now sit at 0 disagreements out of 12 each, both at a 1.00 median for all four
+arms. One B1 cell still scores 0.82 — it genuinely never addresses registration.
 
 ---
 
@@ -428,9 +474,15 @@ equivalent for the questions involved, so that was checked rather than assumed:
   evidence), and the change is a rendering line; `summaryStats` and its imports are
   untouched, and L2 was not re-run.
 
+B3 was **not** re-run: its question is unchanged, and only the judge's view of it was
+wrong. Six questions were re-*judged* against the corrected rubric — the stored answers
+were re-scored, not regenerated — which is why `regrade.json` records 43 judge scores
+moving with no cell re-executed.
+
 The question set itself is excluded from the run tree, so rewriting questions does not
 change what the arms can search. Full per-pass provenance is in the run manifest's
-`history` block, and every score that a grader fix moved is in `regrade.json`.
+`history` block, and every score that a grader or judge fix moved is in `regrade.json`,
+with the prior scores in `results.pre-regrade.jsonl`.
 
 ---
 
@@ -448,7 +500,7 @@ r5 measured three arms and reported a clean sweep: every arm 1.00 on every class
 | graphify content tokens | 161,681 | 106,420 |
 | codegraph content tokens | 99,747 | 177,217 |
 | Arch cells answered with no tool call | not measured | **0 / 160** |
-| Checklist-vs-judge disagreements | not reported | 37 (was 85 before the A3/A4 rewrite) |
+| Checklist-vs-judge disagreements | not reported | **17** (85 → 37 after the A3/A4 rewrite → 17 after the judge fix) |
 
 **r5's abstain result was contaminated for grep on T3.** All three of its T3 reps cite
 `lib/kgbench/graders.mjs`, where a comment of mine named the trap's subject; one reports
@@ -474,7 +526,7 @@ r5's raw results remain in `.data/kgbench/runs/coding-v1-r5/` for comparison.
 
 ## What went wrong building this
 
-Seven runs were started and five discarded. Every discard came from a defect that would
+Seven runs were started and five discarded, and fourteen defects were found. Every discard came from a defect that would
 have produced a **plausible, publishable, wrong** result. They are documented because the
 failure modes generalise to any agent benchmark.
 
@@ -490,7 +542,10 @@ failure modes generalise to any agent benchmark.
 | 8 | **Publishing the questions contaminated the next run.** The r5 report lists every prompt, and Graphify indexes markdown *headings* as graph nodes — including one naming the abstain class as the-answer-is-not-here. | A file-level exclusion would have held for grep and leaked for the graph arms. `.graphifyignore` now excludes the report too. |
 | 9 | **My own contamination signals voided two correct answers.** A signal added to catch defect 7 fired on an answer that merely listed the file among grep hits, and a probe-detector fired on an arm that *inferred* a trap from finding nothing. | A voided correct answer biases the result exactly as much as a scored wrong one, and hides better — a missing row reads as caution. Signals are now split: citing a source voids, suspecting does not. |
 | 10 | **Two questions measured the model, not the repository.** A3 and A4 were answerable from general knowledge; 70 of 160 architecture cells answered them with no tool call at all, and A4 additionally disagreed with the judge on 35 of 40. | A benchmark class that requires no retrieval cannot distinguish retrieval strategies, and it dilutes every arm equally — which *looks* like a tie. Rewritten to need facts recorded only in this repo; zero-tool cells went to 0/160 and disagreements 85 → 37. |
-| 11 | **Long runs were being killed silently.** Two attempts were terminated part-way with no error and nothing in any project log. | Diagnosed, not guessed: the runner cleans up its worktree on SIGINT/SIGTERM but would *leak* it on SIGKILL, and no worktree leaked — so it caught a signal and exited through its own handler. The health coordinator logged only network polling; no project sweeper matches the runner's command line; memory was 48% free with no jetsam. Both deaths were runs tracked by a task manager, while the same workload detached ran on untouched. `scripts/kgbench-supervise.sh` now detaches and resumes on signal deaths only. |
+| 11 | **The judge graded optional facts as required.** Its prompt listed every checklist item under one "REQUIRED FACTS" heading regardless of the `must` flag. | It marked answers down for omitting a *bonus*, on all seven questions carrying one — manufacturing 10-of-12 disagreements on B3 and sending me looking for a bad question that did not exist. The two graders must be shown the same rubric or their disagreement measures the rubric, not the answer. |
+| 12 | **A question's answer key asserted a consumer that does not exist.** B1 required naming MCP config generation as affected by `mcp.tools`; it is not. | Every arm got it right, was penalised by the judge for "contradicting" the key, and was handed the point anyway by a matcher that accepted the phrase inside a sentence denying it. Two graders cancelling out a wrong key is the worst case: the error is invisible in the score. |
+| 13 | **Matchers could not read markdown.** `registration is **not** affected` failed a pattern for `is not affected` on the asterisks alone. | The fourth matcher-precision defect here, and like the other three it destroyed a *correct* answer. Fixed once for every matcher by stripping emphasis before comparing, rather than widening one regex per phrasing. |
+| 14 | **Long runs were being killed silently.** Two attempts were terminated part-way with no error and nothing in any project log. | Diagnosed, not guessed: the runner cleans up its worktree on SIGINT/SIGTERM but would *leak* it on SIGKILL, and no worktree leaked — so it caught a signal and exited through its own handler. The health coordinator logged only network polling; no project sweeper matches the runner's command line; memory was 48% free with no jetsam. Both deaths were runs tracked by a task manager, while the same workload detached ran on untouched. `scripts/kgbench-supervise.sh` now detaches and resumes on signal deaths only. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising
 grep. Defects 7 and 9 point the other way: 7 handed the *baseline* a free abstention, and
@@ -500,10 +555,13 @@ The lesson is not "the graph arms were flattered", it is that **every measuremen
 found here was invisible in the output it produced.** Each one yielded a clean-looking
 table.
 
-Six of these were found by instrumentation rather than by reading results: the tool-surface
-check, the containment scan, the orphaned-MCP-server guard, and the grader's own
-disagreement counter. The two that were not — defects 7 and 9 — were caught only because a
-row was flagged mid-run and got read by hand.
+Most were found by instrumentation rather than by reading results: the tool-surface check,
+the containment scan, the orphaned-MCP-server guard, and above all the grader's own
+disagreement counter, which is what exposed defects 11, 12 and 13. That counter earns its
+keep — but note what it took to use it. It said "B1 and B3 are bad questions". Both were
+fine; the alarm was pointing at the rubric, the key, and a regex. **A disagreement
+detector tells you two graders differ, not which one is wrong**, and every time here the
+answer was neither the obvious one nor the same one twice.
 
 ### A note on tuning the grader after seeing results
 
@@ -567,6 +625,7 @@ without spending another model call.
 | `lib/kgbench/runner.mjs` | Cell execution, tool-surface enforcement, host-stall detection |
 | `scripts/kgbench-charts.mjs` | Regenerates the figures on this page from `results.jsonl` |
 | `scripts/kgbench-supervise.sh` | Detached, self-resuming runner — survives a signalled process group |
+| `lib/kgbench/judge.mjs` | The second scorer. Excluded from the run tree: its prompt states what a right answer contains |
 | `scripts/kgbench-regrade.mjs` | Re-applies fixed graders to stored answers, without re-running cells |
 | `.data/kgbench/runs/coding-v1-r6/` | Raw results, run manifest, and `regrade.json` (every score that moved) |
 | [`docs/measurement/kgbench.md`](../../measurement/kgbench.md) | Operator guide — prerequisites, containment, scoring |
