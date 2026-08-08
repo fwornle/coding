@@ -17,7 +17,7 @@
 import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { resolveAgent, armIsFaithful, KNOWN_AGENTS, ANSWER_FILE, _ADAPTERS } from '../../lib/kgbench/agents.mjs';
+import { resolveAgent, armIsFaithful, cellKey, KNOWN_AGENTS, ANSWER_FILE, _ADAPTERS } from '../../lib/kgbench/agents.mjs';
 import { toCopilotMcp, toOpencodeMcp, prepareAgentMcp } from '../../lib/kgbench/agent-sandbox.mjs';
 import { runAgent } from '../../lib/kgbench/runner.mjs';
 import { resolveModelForAgent, parseModelRef } from '../../lib/experiments/model-resolve.mjs';
@@ -119,6 +119,29 @@ describe('enforcement is described, not asserted', () => {
     // A `tool_enforced: true|false` would have to lie about one of the two halves.
     expect(Object.keys(e)).toEqual(expect.arrayContaining(['mcp_servers', 'builtins', 'verified_by']));
     expect(e.tool_enforced).toBeUndefined();
+  });
+});
+
+describe('the resume key, once cells have an agent and a model', () => {
+  // Getting this wrong fails SILENTLY in both directions — too coarse and a resume skips
+  // cells that never ran, too fine and it re-runs cells that did.
+  it('separates the same question run by different agents', () => {
+    const base = { arm: 'grep', model: 'claude-sonnet-5', question: 'L1', rep: 1 };
+    const keys = ['claude', 'copilot', 'opencode'].map((agent) => cellKey({ ...base, agent }));
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it('separates the same cell run on different models', () => {
+    const base = { arm: 'grep', agent: 'claude', question: 'L1', rep: 1 };
+    expect(cellKey({ ...base, model: 'claude-sonnet-5' })).not.toBe(cellKey({ ...base, model: 'claude-opus-5' }));
+  });
+
+  it('matches a pre-axis row against its claude equivalent, so a resume does not re-run r6/r7', () => {
+    // Rows written before the agent axis carry neither field. Treating them as unmatched
+    // would have re-run every completed cell in the existing runs from scratch.
+    const legacy = cellKey({ arm: 'grep', question: 'L1', rep: 1, armModel: 'claude-sonnet-5' });
+    const current = cellKey({ arm: 'grep', agent: 'claude', model: 'claude-sonnet-5', question: 'L1', rep: 1 });
+    expect(legacy).toBe(current);
   });
 });
 
