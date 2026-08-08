@@ -14,7 +14,7 @@
  *     elicitation exists to avoid must stay visible when it still happens
  */
 
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { resolveAgent, armIsFaithful, cellKey, KNOWN_AGENTS, ANSWER_FILE, _ADAPTERS } from '../../lib/kgbench/agents.mjs';
@@ -294,6 +294,50 @@ describe('answer-file elicitation', () => {
     });
     expect(res.outcome).toBe('ok');
     expect(res.answer).toBe('the answer is lib/foo.mjs');
+  });
+
+  it('never reads a previous cell\'s answer — cells share one worktree and one filename', async () => {
+    // THE DEFECT THIS PINS. Cells reuse the worktree and the answer file has a fixed name, so
+    // an agent that exits without writing left the PREVIOUS cell's answer in place — and the
+    // reader, which only asked "is it non-empty?", reported it as this cell's answer. The cell
+    // recorded `ok` and was graded against the wrong question.
+    //
+    // It inverted the elicitation's whole purpose: the answer file exists so an early exit
+    // surfaces as `no_result` rather than a false success. Staleness turned every early exit
+    // back into a false success WITH A PLAUSIBLE ANSWER ATTACHED. In run coding-v1-x2 a single
+    // opencode answer was scored against eleven different questions and the agent's median
+    // read 0.00 — indistinguishable from a capability finding.
+    const first = await runAgent({
+      prompt: 'q1', arm: ARM, cwd: dir,
+      agent: stub(`printf 'answer to the FIRST question' > ${ANSWER_FILE}`),
+    });
+    expect(first.answer).toBe('answer to the FIRST question');
+
+    const second = await runAgent({ prompt: 'q2', arm: ARM, cwd: dir, agent: stub('exit 0') });
+    expect(second.outcome).toBe('no_result');
+    expect(second.answer).toBeUndefined();
+  });
+
+  it('rejects an answer file older than the spawn, even if the pre-delete failed', async () => {
+    // Second line of defence: the delete can fail on a locked or read-only path, and a crashed
+    // prior process can leave a file behind. A file that predates the spawn was not written by
+    // this cell, whatever else is true.
+    const stale = path.join(dir, ANSWER_FILE);
+    writeFileSync(stale, 'an answer from some earlier run');
+    const old = Date.now() / 1000 - 3600;
+    utimesSync(stale, old, old);
+    const res = await runAgent({
+      prompt: 'q', arm: ARM, cwd: dir,
+      // A stub that neither writes nor deletes: it recreates the stale file post-delete.
+      agent: {
+        id: 'copilot', binary: '/bin/sh', model: 'm',
+        elicitation: 'answer-file', answerFile: ANSWER_FILE,
+        argv: () => ['-c', `printf 'an answer from some earlier run' > ${ANSWER_FILE}; touch -t 202001010000 ${ANSWER_FILE}`],
+      },
+    });
+    expect(res.outcome).toBe('no_result');
+    expect(res.stale_answer_file).toBe(true);
+    expect(res.error).toMatch(/stale/i);
   });
 
   it('reports no_result when the agent exits without writing — the failure mode this avoids', async () => {
