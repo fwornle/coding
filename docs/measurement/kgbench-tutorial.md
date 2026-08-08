@@ -158,7 +158,7 @@ kgbench: 8 (arm, agent, model) combination(s):
 
 **The refusals are the framework working, not a limitation to route around.** An arm whose
 identity is a restriction can only exist where that restriction is enforceable — see
-[the asymmetry](kgbench-experimental-design.md#part-3--the-asymmetry-that-cannot-be-fixed).
+[the asymmetry](kgbench-experimental-design.md#part-3-the-asymmetry-that-cannot-be-fixed).
 
 Afterwards, fill in tokens that arrived late:
 
