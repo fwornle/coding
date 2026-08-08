@@ -4,8 +4,9 @@ This is a guide to measuring systems that do **cognitive work with LLMs** — co
 retrieval layers, knowledge graphs, RAG pipelines — in a way whose numbers survive scrutiny.
 
 It documents `kgbench`, the benchmark harness in this repository. But the harness is the
-example, not the point. Nearly everything here was learned by getting it wrong first: five
-separate leaks of the answer key, a comparison that turned out to be one configuration
+example, not the point. Nearly everything here was learned by getting it wrong first: six
+distinct channels by which the answers leaked — one of them structurally invisible to the
+sandbox built to prevent exactly that — a comparison that turned out to be one configuration
 measured against itself, a token column that silently double-counted, and a report that
 published a grading model which had never graded anything. Each of those produced a
 plausible-looking table. That is the hazard this guide is about.
@@ -181,6 +182,11 @@ one is the answer key. The non-obvious ones found here, all real:
 - session logs from the sessions in which the questions were written
 - source-code comments *explaining a previous leak*, which quoted the thing they were explaining
 - the project's own agent instructions, which told agents to prefer one arm's tool over another
+- **a prompt-injection hook that never touches the tree at all** — a user-level hook that
+  retrieved this project's knowledge base against the question and prepended the answer. A
+  sandbox is structurally incapable of catching this one, and it was feeding the agent digests
+  of *previous benchmark runs answering the same question*. See
+  [Experimental Design](kgbench-experimental-design.md#the-channel-a-sandbox-cannot-see)
 
 **Leak term** — a string a question declares must appear nowhere in the tree. One occurrence
 aborts the run. This exists because the general leak scan matches five-word windows from the
@@ -446,23 +452,28 @@ parts are these, in rough order of how much grief they save:
    contain your answers — programmatically, every run, and fail the run rather than warn. Assume
    you will leak; the question is only whether you find out.
 
-2. **Audit what actually happened, do not trust the configuration.** Record what your system
+2. **Enumerate what is injected into the prompt, not just what is in the corpus.** Hooks,
+   memory systems, retrieval augmentation, system prompts and prior-session state all add
+   content your data inspection cannot see. The worst leak found here arrived this way, and it
+   was self-reinforcing: the benchmark's own past answers were fed back into later runs.
+
+3. **Audit what actually happened, do not trust the configuration.** Record what your system
    actually did and compare it to what it was allowed to do. Every silent-configuration failure
    in this project was caught by that check and by nothing else.
 
-3. **Make "not measured" distinguishable from "zero".** In the data, in the aggregation, and in
+4. **Make "not measured" distinguishable from "zero".** In the data, in the aggregation, and in
    the rendered output. A zero that means "unknown" will find its way into a median.
 
-4. **Record the provenance of every number next to the number.** Not in a methodology section.
+5. **Record the provenance of every number next to the number.** Not in a methodology section.
    A reader forms a conclusion at the moment they see the figure.
 
-5. **Close the outcome set.** Every execution ends in exactly one recorded state, including the
+6. **Close the outcome set.** Every execution ends in exactly one recorded state, including the
    failures, including the ones that are your machine's fault rather than the system's.
 
-6. **Store enough to re-derive offline.** Full outputs, timestamps, identifiers. Re-running a
+7. **Store enough to re-derive offline.** Full outputs, timestamps, identifiers. Re-running a
    trial to fix a scoring bug changes what you are measuring; re-scoring stored outputs does not.
 
-7. **Refuse rather than approximate.** When a combination cannot be measured honestly, decline
+8. **Refuse rather than approximate.** When a combination cannot be measured honestly, decline
    it loudly and record the refusal. A matrix that quietly shrinks is worse than one that says
    what it will not do.
 

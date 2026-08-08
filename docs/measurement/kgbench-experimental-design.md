@@ -48,7 +48,7 @@ not look like cheating in the data; it looks like retrieval working extremely we
 statistical signature to catch it after the fact. It has to be prevented, and the prevention has
 to be verified.
 
-### Five channels, only one of them obvious
+### Six channels, only one of them obvious
 
 Removing the answer key was necessary and nowhere near sufficient. The leaks actually found:
 
@@ -59,10 +59,66 @@ Removing the answer key was necessary and nowhere near sufficient. The leaks act
 | 3 | Session logs of the sessions in which the questions were authored | The act of writing the benchmark created a searchable record of it |
 | 4 | The published report of a previous run | Publishing the questions was the right call for readers — a benchmark whose questions are secret cannot be judged — but it puts every prompt into the tree |
 | 5 | **Source comments explaining a previous leak** | Four separate times. Each was a comment written to explain the *previous* leak, and it quoted the thing it was explaining — including, once, the warning comment that said not to do this |
+| 6 | **A knowledge-injection hook, outside the tree entirely** | See below. The sandbox is structurally incapable of seeing this one |
 
-Channel 5 deserves emphasis because it is the one that generalises. The instinct on finding a
-leak is to document it thoroughly so it does not recur. If your documentation lives inside the
-measured surface, thorough documentation *is* the recurrence.
+Channel 5 generalises. The instinct on finding a leak is to document it thoroughly so it does
+not recur; if your documentation lives inside the measured surface, thorough documentation *is*
+the recurrence.
+
+Channel 6 generalises further, and is the most important entry in this table.
+
+### The channel a sandbox cannot see
+
+Everything above is about *what is in the tree*. That framing has a blind spot, and it took a
+contaminated cell in a live run to expose it.
+
+This project registers a knowledge-injection hook at **user level**, so it fires for every agent
+session in every working directory — including a throwaway worktree with no project context. It
+semantically retrieves the project's knowledge base **against the prompt** and prepends what it
+finds. Reproduced from an empty temporary directory:
+
+```
+prompt      "Which file defines the shell variable MANAGED_MCP_KEYS?"
+
+injected    ## Digests
+            Smoke Test Execution: MANAGED_MCP_KEYS Answer File Written  (2026-08-08)
+              Located definition via grep in install.sh at line 1180
+            Locate definition of MANAGED_MCP_KEYS constant             (2026-08-05)
+              Found it is defined in install.sh
+```
+
+That is the answer, handed to the agent before it retrieves anything. Note what those digests
+*are*: records of **previous benchmark runs answering that same question**. The leak is
+self-reinforcing — running the benchmark generates observations about the answers, and the next
+run is handed them. Each run makes the next one easier while looking like a retrieval
+improvement.
+
+Three properties make this worse than any tree-based leak:
+
+- **Containment is structurally blind to it.** The sandbox governs the tree. This never touches
+  the tree, so verifying the tree proves nothing about it.
+- **It is prompt-targeted.** A file in the tree still has to be *found*. This retrieves against
+  the question itself, so it delivers precisely the most relevant knowledge — the answer.
+- **It is asymmetric across agents.** The hook belongs to one agent's hook system, so a
+  cross-agent comparison silently advantages that agent.
+
+There was already an off switch, `CODING_KNOWLEDGE_INJECTION=0`. The sibling experiment harness
+sets it; this benchmark was written later and did not inherit the lesson. It is now set in the
+one function every spawn path goes through, so cells, baseline probes and tool discovery are all
+covered — and a test asserts it, including that an operator's inherited `=1` does not win.
+
+A footnote that is its own small lesson: the injected answer said line 1180. Real retrieval,
+with injection off, returned line 1292 — the code had moved. The leaked knowledge was not only
+unearned, it was **stale**, and would have produced a subtly wrong answer that still scored,
+because the checklist matches the filename. A cache of past answers is a liability twice over.
+
+### The general form
+
+Enumerate every channel by which information reaches your system, not just the corpus you
+intended it to search. Ask specifically: *what is injected into the prompt that I did not put
+there?* Hooks, middleware, memory systems, system prompts, retrieval augmentation, tool
+descriptions, and the agent's own prior-session state are all channels, and none of them are
+visible to a check that inspects your data.
 
 ### The controls
 
@@ -257,6 +313,12 @@ that was reaching cells verbatim, carrying a model override and a disabled provi
 whichever session happened to start the benchmark. Part of each cell's configuration was
 therefore inherited from the operator's shell. It is now dropped, so the pinned configuration
 file is the only configuration a cell sees.
+
+**Prompt-injection hooks.** Covered in full under
+[the channel a sandbox cannot see](#the-channel-a-sandbox-cannot-see). Restated here because it
+belongs to this category as much as to containment: a user-level hook is part of what a
+subprocess inherits, and it can add content to the prompt that no inspection of your data will
+reveal. `CODING_KNOWLEDGE_INJECTION=0` is set for every spawned agent.
 
 **Global instruction layers.** Agent rule files (`CLAUDE.md` and equivalents) are removed from
 the tree for two reasons: they carry absolute paths that let a sandboxed agent walk back to the

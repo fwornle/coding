@@ -37,7 +37,7 @@
         { "id": "f1", "must": true, "desc": "names install.sh", "match": { "type": "path", "value": "install.sh" } },
         { "id": "f2", "must": true, "desc": "explains it is the prune list for installer-owned MCP servers", "match": { "type": "any-of", "value": ["prune", "remove", "retired", "no longer ship", "owned by"] } }
       ],
-      "provenance": { "verified_by": "human", "evidence": ["install.sh:1180"] }
+      "provenance": { "verified_by": "human", "evidence": ["install.sh:1292"] }
     },
     {
       "id": "L2", "cls": "lookup",

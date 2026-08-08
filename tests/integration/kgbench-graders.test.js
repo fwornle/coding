@@ -340,6 +340,20 @@ describe('detectContamination', () => {
       + 'the benchmark answer key from the tree').signals).toContain('cites-grading-machinery');
   });
 
+  it('does not fire on agent-sandbox.mjs, which merely CONTAINS the string sandbox.mjs', () => {
+    // A real cell, voided at score_if_clean 1.00. agent-sandbox.mjs is ordinary source —
+    // not grading machinery, not excluded from the tree — and several questions can
+    // legitimately reach it. The substring match plus the word "benchmark" 60 characters
+    // later was enough to delete a right answer, silently, in a way that reads as the arm
+    // failing rather than as the detector misfiring.
+    const legitimate = '**(b) kgbench:** `lib/kgbench/agent-sandbox.mjs:68-83` implements the '
+      + 'identical fail-closed gate — it probes `${PROXY_BASE}/health` and, if unreachable, '
+      + 'fails the benchmark cell/run with the same remediation message.';
+    const d = detectContamination(legitimate);
+    expect(d.signals).not.toContain('cites-grading-machinery');
+    expect(d.contaminated).toBe(false);
+  });
+
   it('needs the citation to be load-bearing, not merely a filename', () => {
     // A bare path is where the first version over-fired. The file being named is not the
     // signal; the answer reporting what the BENCHMARK does with it is.
