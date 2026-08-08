@@ -6,26 +6,56 @@ Complete guide to installing, configuring, and using the unified semantic analys
 
 ## Prerequisites
 
-- **Git** - Version control
-- **Node.js 18+** - JavaScript runtime
-- **npm** - Package manager
-- **jq** - JSON processor
-- **tmux** - Terminal multiplexer (required for status bar rendering)
-- **macOS, Linux, or Windows** (via WSL/Git Bash)
-- **Docker** (optional) - For containerized deployment
+`./install.sh` distinguishes what it genuinely needs from what merely improves
+things. Only the first group can stop an install.
+
+### Required — the install aborts without these
+
+| Tool | Why |
+|---|---|
+| **git** | clones submodules |
+| **node** (18+) | runs everything |
+| **npm** | installs dependencies |
+| **python3** | knowledge-graph tooling |
+| **curl** | network preflight and downloads |
+| **Docker** (20+), running | all services run as containers — see below |
+
+### Optional — reported, never fatal
+
+| Tool | Consequence if absent |
+|---|---|
+| **jq** | none: every use has a non-jq fallback |
+| **plantuml** | installed later in the run, and skippable — a repo-local JAR is used as a fallback |
+| **tmux** | install completes fine. Needed **at launch time** for status-bar rendering, and enforced there (`config/agents/copilot.sh`), not by the installer. Not available natively on Windows |
+
+> **On Docker being required:** this page previously called Docker "optional".
+> It is not. `install.sh` exits with guidance if Docker is missing or its daemon
+> is not running, because all MCP servers, databases and dashboards run as
+> containers — only the agent CLI runs natively on the host. The one exception
+> is `install.sh --ci`, which downgrades the Docker gate (and the agent-CLI and
+> core-dependency gates) to warnings so a portability run can complete.
+
+The installer runs a network preflight **before** `npm install`, separating DNS
+from TCP from TLS, and configures a proxy for the install if it detects one. If
+you are behind a corporate proxy, that is handled; see
+[Host impact and install scope](./install-scope-and-host-impact.md).
 
 ### Install Prerequisites
 
 **macOS:**
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install git node jq tmux
+brew install git node python3 curl        # required
+brew install jq plantuml tmux             # optional, but recommended
+brew install --cask docker                # required, and must be running
 ```
 
 **Linux (Ubuntu/Debian):**
 ```bash
 sudo apt update
-sudo apt install git nodejs npm jq tmux
+sudo apt install git nodejs npm python3 curl   # required
+sudo apt install jq plantuml tmux              # optional, but recommended
+# Docker: https://docs.docker.com/engine/install/ubuntu/
 ```
 
 **Windows:**

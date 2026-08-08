@@ -2244,6 +2244,134 @@ fi
 
 
 # =============================================================================
+# REQUIREMENT 7 — a default install must not change how bare agents behave
+# =============================================================================
+#
+# This is the test that actually proves the claim. P2 relocated seven global
+# writes behind `require_global_scope`, and verified byte-identity by hand,
+# once. A hand-check does not survive the next edit: any of these functions can
+# regain a global write and nothing would notice, because the symptom appears in
+# the user's OTHER projects rather than in this repo's test output.
+#
+# Method: hash every shared config a bare agent reads, run the seven functions
+# that used to write to them at default (wrapper) scope, hash again, compare.
+#
+# TWO DELIBERATE CHOICES:
+#
+# 1. This runs the FUNCTIONS, not a full `./install.sh --ci` as the plan wrote.
+#    A whole install inside the test suite would take minutes and rebuild
+#    node_modules on a developer's machine every time they ran tests, so in
+#    practice it would get skipped and rot. The full-install form of this check
+#    belongs in CI, where a throwaway runner makes it cheap — and it is there,
+#    in .github/workflows/cross-platform-lite.yml.
+#
+# 2. It runs against the REAL $HOME, not a temp one. A temp HOME would be safer
+#    but weaker: it could not catch a hardcoded absolute path, which is exactly
+#    the class of bug P2 removed from this installer. If a function has
+#    regressed, this test writes to the real home — which is precisely what a
+#    real install would have done, reported instead of hidden.
+print_section "REQUIREMENT 7: bare agents unchanged by a default install"
+
+# sha256 of a file, or of a directory's sorted name+content listing. Absent
+# paths hash to a fixed sentinel, so "created" and "deleted" both register as
+# changes rather than as equal-and-missing.
+r7_sha() {
+    local p="$1" hasher
+    if command_exists sha256sum; then hasher="sha256sum"
+    elif command_exists shasum;   then hasher="shasum -a 256"
+    else echo "NO-HASHER"; return 0; fi
+
+    if [[ -f "$p" ]]; then
+        $hasher < "$p" | awk '{print $1}'
+    elif [[ -d "$p" ]]; then
+        # Names AND contents: a changed file and an added file must both show.
+        (cd "$p" && find . -type f -print0 2>/dev/null | sort -z \
+            | xargs -0 $hasher 2>/dev/null | $hasher | awk '{print $1}')
+    else
+        echo "ABSENT"
+    fi
+    return 0
+}
+
+R7_PATHS=(
+    "$HOME/.claude/settings.json"
+    "$HOME/.claude.json"
+    "$HOME/.claude/commands"
+    "$HOME/.copilot/settings.json"
+    "$HOME/.copilot/config.json"
+    "$HOME/.config/opencode/opencode.json"
+    "$HOME/.opencode/plugins"
+)
+
+if [[ ! -f "$CODING_ROOT/install.sh" ]]; then
+    print_fail "install.sh not found — cannot check requirement 7"
+elif [[ "$(r7_sha "$HOME/.claude/settings.json")" == "NO-HASHER" ]]; then
+    print_warning "No sha256sum/shasum available — requirement-7 check skipped"
+else
+    declare -a R7_BEFORE=()
+    for p in "${R7_PATHS[@]}"; do R7_BEFORE+=("$(r7_sha "$p")"); done
+
+    r7_log="$(mktemp)"
+    r7_tmp_repo="$(mktemp -d)"
+    # A subshell: these functions set globals and we must not inherit them.
+    (
+        unset CODING_INSTALL_GLOBAL_AGENTS
+        unset CODING_INSTALL_COPILOT_HOOKS
+        unset CODING_INSTALL_SYSTEM_SERVICES
+        # shellcheck disable=SC1091
+        source "$CODING_ROOT/install.sh"          # this sets CODING_REPO itself (install.sh:29)
+        # AFTER the source, not before: install.sh:29 and :67 unconditionally
+        # assign CODING_REPO and CODING_AGENT_SCOPE at load time, so anything
+        # exported beforehand is silently overwritten. Setting scope before the
+        # source made this test assert nothing — it ran at whatever default
+        # install.sh happened to carry. A negative control caught it.
+        CODING_AGENT_SCOPE="${R7_SCOPE:-wrapper}" # the default; override to test the test
+        INSTALL_LOG="$r7_log"                     # never the repo's install.log
+        NON_INTERACTIVE=true
+        INSTALLATION_WARNINGS=()
+        INSTALLATION_FAILURES=()
+
+        # The seven that used to write into $HOME unconditionally.
+        setup_user_level_mcp_config      || true
+        setup_opencode_mcp_config        || true
+        install_compaction_guard         || true
+        install_knowledge_injection      || true
+        install_constraint_monitor_hooks || true
+        install_copilot_file_hooks       || true
+        # install_skills writes repo-local files too; point it at a throwaway
+        # repo so the check stays about $HOME and the working tree stays clean.
+        CODING_AGENT_SCOPE="wrapper" "$CODING_ROOT/scripts/generate-agent-instructions.sh" \
+            "$r7_tmp_repo" "$r7_tmp_repo" || true
+    ) >>"$r7_log" 2>&1 || true
+
+    r7_changed=()
+    for i in "${!R7_PATHS[@]}"; do
+        after="$(r7_sha "${R7_PATHS[$i]}")"
+        if [[ "$after" != "${R7_BEFORE[$i]}" ]]; then
+            r7_changed+=("${R7_PATHS[$i]}")
+        fi
+    done
+
+    if [[ ${#r7_changed[@]} -eq 0 ]]; then
+        print_pass "Requirement 7: ${#R7_PATHS[@]} shared agent configs byte-identical after wrapper-scoped install"
+    else
+        # NOT print_fail: that downgrades to a non-fatal [CI-SKIP] in --ci mode,
+        # which would make this test silent in the one place it matters most. A
+        # global write is a real regression on every platform, never an
+        # unsatisfied environment precondition.
+        echo -e "  ${RED}[FAIL]${NC} Requirement 7 VIOLATED — a ${R7_SCOPE:-wrapper}-scoped install wrote to shared config:"
+        for p in "${r7_changed[@]}"; do echo -e "      ${RED}modified:${NC} $p"; done
+        echo -e "      This changes how bare claude/copilot/opencode behave in the user's"
+        echo -e "      other projects. Gate the offending write with require_global_scope."
+        echo -e "      Function output: $r7_log"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+    fi
+    rm -rf "$r7_tmp_repo"
+    [[ ${#r7_changed[@]} -eq 0 ]] && rm -f "$r7_log" || true
+fi
+
+
+# =============================================================================
 # SUMMARY REPORT
 # =============================================================================
 

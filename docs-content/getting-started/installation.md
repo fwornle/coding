@@ -40,13 +40,24 @@ Before installing, ensure you have these tools:
 
 ### Version Requirements
 
+Required — the install aborts without these:
+
 | Tool | Minimum Version | Check Command |
 |------|----------------|---------------|
-| Node.js | 18+ | `node --version` |
 | Git | 2.0+ | `git --version` |
-| tmux | 3.0+ | `tmux -V` |
-| Docker | 20+ | `docker --version` |
-| jq | 1.6+ | `jq --version` |
+| Node.js | 18+ | `node --version` |
+| npm | any | `npm --version` |
+| Python | 3.x | `python3 --version` |
+| curl | any | `curl --version` |
+| Docker | 20+, running | `docker info` |
+
+Optional — reported, never fatal:
+
+| Tool | Minimum Version | Consequence if absent |
+|------|----------------|-----------------------|
+| jq | 1.6+ | none — every use has a fallback |
+| plantuml | any | installed later in the run, and skippable (a repo-local JAR is used instead) |
+| tmux | 3.0+ | install completes fine; needed at **launch** time for status-bar rendering, not by the installer |
 
 ---
 
@@ -77,15 +88,45 @@ cd ~/Agentic/coding
 
 The installer will:
 
-1. Verify Docker is installed and running
-2. Build Docker containers
-3. Configure Claude MCP servers for SSE/HTTP communication
-4. Set up Claude hooks (LSL, constraints)
-5. Initialize knowledge store
+1. Check network reachability (DNS, TCP, TLS) and configure a proxy for the install if it finds one
+2. Verify Docker is installed and running
+3. Build Docker containers
+4. Configure MCP servers, hooks and slash commands **for `bin/coding` launches**
+5. Initialize the knowledge store
 6. Add `coding` and `vkb` commands to your PATH
+7. Offer to set up the private session-history repository
 
-!!! info "Non-Intrusive Installation"
-    The installer prompts before any system changes and creates timestamped backups of your shell configuration. Use `--skip-all` to decline all system-level changes.
+### Step 2a: See what it will change first
+
+```bash
+./install.sh --dry-run
+```
+
+This prints every path the installer may touch, grouped by scope, then exits
+without changing anything at all. It is the authoritative list — this page
+deliberately does not reproduce it, so it cannot go stale.
+
+!!! info "Bare agents are not affected by default"
+    Installing this project does **not** change how bare `claude`, `copilot` or
+    `opencode` behave. Hooks, MCP servers and slash commands are supplied per
+    launch by `bin/coding`; your shared config files are read, never written.
+
+    The installer asks once whether you want them configured globally too — the
+    default is **no**, recorded in `.env` as `CODING_AGENT_SCOPE=wrapper`. Opt in
+    with `--global-agents`.
+
+!!! warning "`--yes` does not mean 'yes to everything'"
+    `--yes` auto-approves system changes but deliberately does **not** select
+    global agent scope, and does not install the login-persistent LLM proxy
+    service. Those need `CODING_INSTALL_GLOBAL_AGENTS=1` and
+    `CODING_INSTALL_SYSTEM_SERVICES=1`. An unattended run must never silently
+    reconfigure agents outside this project.
+
+!!! note "Backups"
+    Files the installer modifies are backed up **once**, as `<file>.coding-orig`,
+    from before the installer first touched them. `./uninstall.sh` reports these
+    rather than deleting them. Run `./install.sh --help` for the full flag and
+    environment-variable list.
 
 ### Step 3: Reload Shell
 

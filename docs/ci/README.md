@@ -1,46 +1,52 @@
-# Cross-platform CI (ready-to-enable, not yet active)
+# Cross-platform CI
 
-This directory holds a **ready-to-enable** GitHub Actions workflow for validating
-that the coding tools install/test scripts are portable across macOS, Linux, and
-Windows. It is intentionally **not** under `.github/workflows/` yet, so nothing
-runs until you opt in.
+The cross-platform workflow is **live**. It runs on every pull request and can be
+triggered manually from the **Actions** tab.
 
-## Files
+- Workflow: [`.github/workflows/cross-platform-lite.yml`](../../.github/workflows/cross-platform-lite.yml)
 
-- [`cross-platform-lite.yml`](./cross-platform-lite.yml) — a 3-OS matrix
-  (`ubuntu-latest`, `macos-latest`, `windows-latest`) that runs a **lite**
-  portability check.
+> This directory used to hold a second copy of the workflow, plus instructions to
+> "copy it into `.github/workflows/` to enable it". It had been active since
+> `6b464a8a1`, and the copy here had already drifted from the live file —
+> different triggers, different echo text. The duplicate is gone: there is now
+> one workflow file, and it is the one that runs.
 
-## Enable it
+## Jobs
 
-Copy the workflow into the active workflows directory on the **public** remote
-(`github.com/fwornle/coding`), whose hosted runners include real Windows/Linux/mac:
+| Job | Runs on | What it proves |
+|---|---|---|
+| `portability` | ubuntu, macOS, windows (Git Bash) | every tracked `*.sh` is valid bash; `install.sh` detects the OS; `--ci` gates warn-and-continue instead of aborting; `test-coding.sh --ci` exits 0 |
+| `dry-run-is-inert` | ubuntu | `install.sh --ci --dry-run` exits 0 and mutates **nothing** — neither the working tree nor `$HOME` |
+| `real-install` | ubuntu | an actual `./install.sh --ci` completes, then `bin/coding --help` works, and shared agent configs are byte-identical afterwards |
 
-```bash
-cp docs/ci/cross-platform-lite.yml .github/workflows/cross-platform-lite.yml
-git add .github/workflows/cross-platform-lite.yml
-git commit -m "ci: enable cross-platform lite matrix"
-git push origin main
-```
+`real-install` is the job that would have caught the original corporate-Ubuntu
+failure. Before it existed, CI only *sourced* `install.sh` and called
+`detect_platform` / `check_dependencies` / `detect_agents` — so
+`install_node_dependencies` was unreachable on every OS, and the npm and proxy
+paths were never executed anywhere. Sourcing also leaves `set -euo pipefail`
+inactive, so it tested different shell semantics than a real run.
 
-Then run it manually from the **Actions** tab (it ships with `workflow_dispatch`
-only). Once you're happy, uncomment the `push:` / `pull_request:` triggers in the
-workflow to run it automatically.
+## What "lite" still means
 
-## What "lite" means
-
-| Proven by lite CI | NOT proven by lite CI |
+| Proven here | NOT proven here |
 |---|---|
-| Every tracked `*.sh` is valid bash on all 3 OSes | A full working service stack |
-| `install.sh` detects the OS correctly | Docker image builds |
-| `install.sh --ci` gates warn-and-continue (no abort) when infra is absent | Agent CLI auth (claude / gh copilot) |
-| `test-coding.sh --ci` runs end-to-end and exits 0 | Private submodules (`cc-github.bmwgroup.net`) |
+| Shell portability across 3 OSes | A full working service stack |
+| OS detection | Docker image builds |
+| Unattended gates warn-and-continue | Agent CLI auth (claude / gh copilot) |
+| A real install completes on Linux | Private submodules (`cc-github.bmwgroup.net`) |
+| A default install leaves `$HOME` untouched | Behaviour behind a corporate proxy |
 
-The lite path deliberately skips Docker, the agent CLI, and private submodules —
-none of which exist on public hosted runners. For **full-stack** CI (real
-install + full `test-coding.sh`), register **self-hosted runners** that have
-Docker, an authenticated agent CLI, and submodule access, then run
-`install.sh --yes` followed by `scripts/test-coding.sh`.
+Docker, the agent CLIs and the private submodules do not exist on public hosted
+runners. Two gaps are covered elsewhere rather than here:
+
+- **Corporate-proxy behaviour** — `scripts/test-install-linux.sh` runs a real
+  `./install.sh` in an Ubuntu 24.04 container across three network shapes
+  (direct, proxy-only via a squid sidecar with egress blocked, and no-egress).
+  It runs from a developer machine, including macOS, and is the laptop-reproducible
+  analogue of the box that originally failed.
+- **Full stack** — register self-hosted runners with Docker, an authenticated
+  agent CLI and submodule access, then run `install.sh --yes` followed by
+  `scripts/test-coding.sh`.
 
 ## Unattended flags (used by CI, usable by any automation)
 
@@ -49,6 +55,13 @@ Docker, an authenticated agent CLI, and submodule access, then run
   warnings so a portability run completes with a summary.
 - `install.sh --yes` (or `CODING_INSTALL_YES=1`) — non-interactive; auto-approves
   system changes; keeps hard requirements hard (for a fully-provisioned box).
+  Note this does **not** extend to agent scope or background services: those
+  need `CODING_INSTALL_GLOBAL_AGENTS=1` / `CODING_INSTALL_SYSTEM_SERVICES=1`.
+  See [Host impact and install scope](../install-scope-and-host-impact.md).
+- `install.sh --dry-run` — prints the mutation manifest and exits 0, touching
+  nothing at all (not even the install log).
 - `test-coding.sh --ci` (or `CI=true`) — runs every check but records
   unsatisfied ones as non-fatal `[CI-SKIP]`, so a healthy headless runner isn't
-  marked failed.
+  marked failed. The requirement-7 check is deliberately exempt: a global write
+  is a real regression, not an unsatisfied precondition, so it fails hard even
+  under `--ci`.
