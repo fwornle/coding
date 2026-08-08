@@ -14,7 +14,7 @@ things. Only the first group can stop an install.
 | Tool | Why |
 |---|---|
 | **git** | clones submodules |
-| **node** (18+) | runs everything |
+| **node** (22 LTS or newer) | runs everything — see the note below |
 | **npm** | installs dependencies |
 | **python3** | knowledge-graph tooling |
 | **curl** | network preflight and downloads |
@@ -27,6 +27,15 @@ things. Only the first group can stop an install.
 | **jq** | none: every use has a non-jq fallback |
 | **plantuml** | installed later in the run, and skippable — a repo-local JAR is used as a fallback |
 | **tmux** | install completes fine. Needed **at launch time** for status-bar rendering, and enforced there (`config/agents/copilot.sh`), not by the installer. Not available natively on Windows |
+
+> **On the Node version:** the floor is **22 LTS**. Services run on
+> `node:22-bookworm` in Docker, `install_mastra_opencode` requires >= 22.13.0
+> outright, and per the [Node release schedule](https://github.com/nodejs/Release)
+> both 18 (EOL 2025-04-30) and 20 (EOL 2026-04-30) are past end-of-life. This
+> page used to say "Node.js 18+" while `package.json` said `>=16` — both were
+> claiming support for majors nobody supports. `install.sh` warns rather than
+> aborts below 22, because it cannot know which parts of the system you need;
+> `engines` states the same floor to npm.
 
 > **On Docker being required:** this page previously called Docker "optional".
 > It is not. `install.sh` exits with guidance if Docker is missing or its daemon
@@ -45,7 +54,7 @@ you are behind a corporate proxy, that is handled; see
 **macOS:**
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install git node python3 curl        # required
+brew install git node@22 python3 curl     # required (node 22 LTS or newer)
 brew install jq plantuml tmux             # optional, but recommended
 brew install --cask docker                # required, and must be running
 ```
@@ -53,13 +62,15 @@ brew install --cask docker                # required, and must be running
 **Linux (Ubuntu/Debian):**
 ```bash
 sudo apt update
-sudo apt install git nodejs npm python3 curl   # required
+sudo apt install git python3 curl               # required
+# Node 22 LTS — Ubuntu's own 'nodejs' package is 18, which is EOL:
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
 sudo apt install jq plantuml tmux              # optional, but recommended
 # Docker: https://docs.docker.com/engine/install/ubuntu/
 ```
 
 **Windows:**
-- Install Node.js from [nodejs.org](https://nodejs.org)
+- Install Node.js **22 LTS or newer** from [nodejs.org](https://nodejs.org)
 - Install Git Bash from [git-scm.com](https://git-scm.com)
 - Install jq from [stedolan.github.io/jq](https://stedolan.github.io/jq/)
 - Install tmux (available via WSL or MSYS2)

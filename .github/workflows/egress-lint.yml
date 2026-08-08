@@ -41,7 +41,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22   # 20 is EOL (2026-04-30); match the container and cross-platform-lite
 
       # Zero npm-installed dependencies — runs straight from checkout.
       - name: Run egress lint

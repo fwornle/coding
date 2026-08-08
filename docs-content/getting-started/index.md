@@ -28,7 +28,7 @@ Coding runs in Docker. All services (MCP servers, databases, dashboards) run as 
 | Tool | Required | Purpose |
 |------|----------|---------|
 | **Docker** | Yes | Container runtime (Docker Desktop or Docker Engine) |
-| **Node.js 18+** | Yes | Runtime for the host-side launcher |
+| **Node.js 22 LTS+** | Yes | Runtime for the host-side launcher (18/20 are EOL) |
 | **Git** | Yes | Clone repository, submodules |
 | **jq** | Yes | JSON processing in scripts |
 | **tmux** | Yes | Unified agent session wrapping and status bar |

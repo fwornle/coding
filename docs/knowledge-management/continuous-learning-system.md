@@ -163,7 +163,7 @@ groq (remote, fast) → openrouter (remote, accurate) → local (free, private)
 
 ### Prerequisites
 
-- Node.js 18+ or Bun
+- Node.js 22 LTS+ or Bun
 - Qdrant server (optional - for vector search features)
 - SQLite (built-in with better-sqlite3)
 

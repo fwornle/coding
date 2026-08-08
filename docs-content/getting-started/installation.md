@@ -45,7 +45,7 @@ Required — the install aborts without these:
 | Tool | Minimum Version | Check Command |
 |------|----------------|---------------|
 | Git | 2.0+ | `git --version` |
-| Node.js | 18+ | `node --version` |
+| Node.js | 22 LTS+ | `node --version` |
 | npm | any | `npm --version` |
 | Python | 3.x | `python3 --version` |
 | curl | any | `curl --version` |
