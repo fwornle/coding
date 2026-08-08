@@ -203,7 +203,11 @@ writeFileSync(runJsonPath, JSON.stringify({
     ? { mode: 'worktree', tree_commit: tree.commit, excluded: tree.removed, verified: true }
     : { mode: 'none', verified: false, warning: 'arms could read the answer key; scores not comparable' },
   baselines, schemaTax,
-  judge: { provider: JUDGE_PROVIDER, model: JUDGE_MODEL, enabled: !flag("no-judge") },
+  // `requested` is what this process asks the proxy for. `served` is filled in at the end
+  // of the run from the judge's own responses, because it is the only evidence of what
+  // actually graded the cells — and the two are not the same thing. r6 and r7 both
+  // published `claude-opus-4.8` here while haiku answered every call.
+  judge: { requested: { provider: JUDGE_PROVIDER, model: JUDGE_MODEL }, served: null, enabled: !flag("no-judge") },
   startedAt: new Date().toISOString(),
 }, null, 2) + '\n');
 
@@ -212,6 +216,11 @@ if (dirty) out('kgbench: WARNING — working tree is dirty; the indexes and the 
 // ---- matrix ----------------------------------------------------------------
 const total = arms.length * questions.length * reps;
 let n = 0;
+// The judge identity the proxy actually served, learned from the first response, plus the
+// substitution notice if it differs from what was requested. Both land in run.json so a
+// reader never has to trust the requested name.
+let judgeObserved = null;
+let judgeSubstitution = null;
 // A run that cannot reach the model produces a full table of zeros that looks like
 // a result. Bail early and loudly instead.
 let consecutiveApiErrors = 0;
@@ -264,9 +273,22 @@ for (const arm of arms) {
           });
           judged = {
             judge_score: j.score, judge_why: j.why ?? null, judge_pending: !!j.pending,
-            judge_reason: j.reason ?? null, judge_provider: j.provider ?? null,
+            judge_reason: j.reason ?? null, judge_provider: j.served_provider ?? null,
+            judge_model_served: j.served_model ?? null,
+            judge_model_requested: j.requested_model ?? JUDGE_MODEL,
+            judge_served_as_requested: j.served_as_requested ?? null,
             ...(g.judgeOnly ? {} : { judge_agreement: reconcile(g.score, j.score) }),
           };
+          // Announce a substitution ONCE, the first time it is seen. Per-cell would bury
+          // it; never would publish a false provenance, which is what happened in r6/r7.
+          if (j.served_model && j.served_as_requested === false && !judgeSubstitution) {
+            judgeSubstitution = { requested: j.requested_model, served: j.served_model, provider: j.served_provider };
+            out(`kgbench: WARNING — judge requested ${j.requested_model} but the proxy served `
+              + `${j.served_model} (${j.served_provider}). Scores are graded by what was SERVED; `
+              + 'run.json records that. Pin it with a processOverride for `kgbench-judge` '
+              + '(scripts/configure-wave-analysis-routing.sh) — /api/complete ignores the request `model`.');
+          }
+          if (j.served_model && !judgeObserved) judgeObserved = { model: j.served_model, provider: j.served_provider };
           // For an llm-only question the judge IS the score.
           if (g.judgeOnly && j.score != null) scored.score = j.score;
         }
@@ -316,7 +338,21 @@ for (const arm of arms) {
   }
 }
 
+// Record the judge identity that actually graded this run. Patched rather than rewritten
+// so a resumed run keeps the history/sandbox facts the earlier pass established.
+if (judgeObserved) {
+  try {
+    const meta = JSON.parse(readFileSync(runJsonPath, 'utf8'));
+    meta.judge = { ...(meta.judge ?? {}), served: judgeObserved, ...(judgeSubstitution ? { substitution: judgeSubstitution } : {}) };
+    writeFileSync(runJsonPath, JSON.stringify(meta, null, 2) + '\n');
+  } catch { /* a run.json we cannot parse is not worth failing a completed matrix over */ }
+}
+
 out('');
+if (judgeSubstitution) {
+  out(`kgbench: judge was ${judgeSubstitution.served} (${judgeSubstitution.provider}), NOT the requested `
+    + `${judgeSubstitution.requested}. run.json records the served identity.`);
+}
 if (contaminatedRows.length) {
   out(`kgbench: ${contaminatedRows.length} CONTAMINATED row(s): ${contaminatedRows.join(', ')}`);
   out('kgbench: those answers cited the benchmark ground truth and are excluded from ranking.');

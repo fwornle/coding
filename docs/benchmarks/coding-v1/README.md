@@ -1,7 +1,9 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3-10 reps/arm) against 4 arms.
-Repo at `7e08b6a60`, model `claude-sonnet-5`, generated 2026-08-08T05:52:09.523Z.
+Repo at `7e08b6a60`, model `claude-sonnet-5`, generated 2026-08-08T07:03:21.264Z.
+
+Secondary scorer: `claude-opus-4.8` was *requested*; this run predates served-model recording, so what actually graded it is unverified. See [Measurement and judging lessons](../measurement-lessons.md).
 
 Arms searched a sandboxed worktree of `7e08b6a60` with 17 path(s) removed (answer key, telemetry exports, agent rule files), verified to contain no question prompt or provenance note.
 
@@ -61,7 +63,9 @@ Failed runs are counted, never dropped. An arm that stalls is not cheap — it i
 | A2 | codegraph | 1.00 | 0.65 | checklist_higher |
 | A2 | codegraph | 0.50 | 0.15 | checklist_higher |
 
-`judge_higher` usually means the checklist matcher is too strict (the answer paraphrased a path) — fix the matcher and re-grade offline. `checklist_higher` usually means correct strings were padded into a wrong narrative, which is a real quality signal. A question exceeding 10% disagreement across arms is the question's problem, not the arms'.
+`judge_higher` usually means the checklist matcher is too strict (the answer paraphrased a path) — fix the matcher and re-grade offline. `checklist_higher` usually means correct strings were padded into a wrong narrative, which is a real quality signal.
+
+**This table is an alarm, not a diagnosis.** It says two graders differ; it does not say which is wrong, and the answer has not once been the obvious one. Across every investigation on this set the causes were a judge rubric, a false answer key, a regex, a shared match token, and a matcher that was too loose and too narrow at the same time — *never* a badly written question. Twice the arms were right and the key was wrong. And the detector is blind to the most common defect of all: because the judge's prompt is built from the same checklist, a WRONG KEY makes both graders agree and produces zero disagreements. See [Measurement and judging lessons](../measurement-lessons.md) before concluding a question is at fault.
 
 ## Limitations
 

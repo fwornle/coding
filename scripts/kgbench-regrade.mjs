@@ -105,6 +105,7 @@ out(`kgbench-regrade: ${changes.length} of ${rows.length} row(s) change`);
 
 // ---- optional judge pass ---------------------------------------------------
 const judgeChanges = [];
+let judgeServed = null;
 if (flag('rejudge')) {
   const targets = regraded.filter((r) => r.outcome === 'ok' && byId[r.id] && inScope(r)
     && (byId[r.id].checklist?.length || byId[r.id].grader?.type === 'llm'));
@@ -116,12 +117,24 @@ if (flag('rejudge')) {
     n++;
     if (j.pending) { out(`  [${n}/${targets.length}] ${r.arm}/${r.id} rep${r.rep}: judge unavailable (${j.reason}) — leaving prior score`); continue; }
     const before = r.judge_score ?? null;
+    const beforeModel = r.judge_model_served ?? null;
     r.judge_score = j.score;
     r.judge_why = j.why ?? null;
     r.judge_pending = false;
-    r.judge_provider = j.provider ?? null;
+    r.judge_provider = j.served_provider ?? null;
+    r.judge_model_served = j.served_model ?? null;
+    r.judge_model_requested = j.requested_model ?? null;
+    r.judge_served_as_requested = j.served_as_requested ?? null;
     if (r.score != null) r.judge_agreement = reconcile(r.score, j.score);
     if (before !== j.score) judgeChanges.push({ arm: r.arm, id: r.id, rep: r.rep, judge: [before, j.score] });
+    // A re-judge that silently swaps the model changes what the scores MEAN, not just
+    // their values. Surface it the first time, and again if it changes mid-pass.
+    if (j.served_model && j.served_model !== judgeServed?.model) {
+      judgeServed = { model: j.served_model, provider: j.served_provider };
+      out(`  judge served by ${j.served_model} (${j.served_provider})`
+        + (j.served_as_requested === false ? ` — NOT the requested ${j.requested_model}` : '')
+        + (beforeModel && beforeModel !== j.served_model ? `; prior scores came from ${beforeModel}` : ''));
+    }
     if (n % 20 === 0) out(`  [${n}/${targets.length}] ...`);
   }
   out(`kgbench-regrade: ${judgeChanges.length} judge score(s) changed`);
