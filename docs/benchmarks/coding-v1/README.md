@@ -1,7 +1,7 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3-10 reps/arm) against 4 arms.
-Repo at `7e08b6a60`, model `claude-sonnet-5`, generated 2026-08-07T19:37:14.077Z.
+Repo at `7e08b6a60`, model `claude-sonnet-5`, generated 2026-08-08T05:52:09.523Z.
 
 Arms searched a sandboxed worktree of `7e08b6a60` with 17 path(s) removed (answer key, telemetry exports, agent rule files), verified to contain no question prompt or provenance note.
 
@@ -48,22 +48,17 @@ Failed runs are counted, never dropped. An arm that stalls is not cheap — it i
 | Question | Arm | checklist | judge | note |
 |---|---|--:|--:|---|
 | B2 | graphify | 1.00 | 0.50 | checklist_higher |
-| A1 | graphify | 0.65 | 1.00 | judge_higher |
-| A1 | graphify | 0.65 | 1.00 | judge_higher |
+| A1 | graphify | 1.00 | 0.65 | checklist_higher |
 | B2 | codegraph | 0.50 | 1.00 | judge_higher |
 | B2 | codegraph | 1.00 | 0.65 | checklist_higher |
 | A2 | codegraph | 0.50 | 0.15 | checklist_higher |
 | A2 | codegraph | 0.50 | 0.15 | checklist_higher |
 | L1 | hybrid | 0.50 | 1.00 | judge_higher |
 | B2 | hybrid | 0.50 | 1.00 | judge_higher |
-| A1 | codegraph | 1.00 | 0.65 | checklist_higher |
-| A1 | codegraph | 1.00 | 0.65 | checklist_higher |
-| A1 | codegraph | 1.00 | 0.65 | checklist_higher |
-| A1 | codegraph | 1.00 | 0.65 | checklist_higher |
-| A1 | codegraph | 1.00 | 0.65 | checklist_higher |
+| A1 | hybrid | 1.00 | 0.65 | checklist_higher |
+| A1 | graphify | 1.00 | 0.65 | checklist_higher |
 | A2 | codegraph | 1.00 | 0.50 | checklist_higher |
 | A2 | codegraph | 1.00 | 0.65 | checklist_higher |
-| A1 | hybrid | 0.65 | 1.00 | judge_higher |
 | A2 | codegraph | 0.50 | 0.15 | checklist_higher |
 
 `judge_higher` usually means the checklist matcher is too strict (the answer paraphrased a path) — fix the matcher and re-grade offline. `checklist_higher` usually means correct strings were padded into a wrong narrative, which is a real quality signal. A question exceeding 10% disagreement across arms is the question's problem, not the arms'.

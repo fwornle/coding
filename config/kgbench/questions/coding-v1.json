@@ -164,7 +164,7 @@
       "id": "A1", "cls": "arch",
       "prompt": "Why is the `.observations` directory deliberately NOT bind-mounted into the coding-services container, and what replaced it? Answer in 2-4 sentences.",
       "checklist": [
-        { "id": "f1", "must": true, "desc": "SQLite WAL/SHM corruption from concurrent openers across the bind mount", "match": { "type": "any-of", "value": ["wal", "corruption", "concurrent"] } },
+        { "id": "f1", "must": true, "desc": "SQLite WAL/SHM corruption from concurrent openers across the bind mount", "match": { "type": "near", "value": ["sqlite|wal\\b|shm", "corrupt|concurren|race|contention|two[-\\s]+writers|multiple[-\\s]+(openers|writers)"], "within": 160 } },
         { "id": "f2", "must": true, "desc": "the host obs-api is the single owner", "match": { "type": "any-of", "value": ["obs-api", "single owner", "observations-api"] } },
         { "id": "f3", "must": false, "desc": "container reaches it over HTTP", "match": { "type": "any-of", "value": ["http", "OBS_API_URL", "12436"] } }
       ],

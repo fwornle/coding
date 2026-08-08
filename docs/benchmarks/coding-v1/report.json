@@ -94,7 +94,7 @@
     "selfIdentifiedProbeRows": 2,
     "toolEscapeRows": 0,
     "retiredQuestions": [],
-    "generatedAt": "2026-08-07T19:37:14.077Z"
+    "generatedAt": "2026-08-08T05:52:09.523Z"
   },
   "byArm": {
     "grep": {
@@ -168,7 +168,7 @@
       "hallucination_rate": 0,
       "metrics": {
         "score": {
-          "mean": 0.9576754385964912,
+          "mean": 0.9622807017543858,
           "median": 1,
           "min": 0.65,
           "max": 1,
@@ -228,7 +228,7 @@
       "hallucination_rate": 0,
       "metrics": {
         "score": {
-          "mean": 0.9214912280701754,
+          "mean": 0.8984649122807017,
           "median": 1,
           "min": 0.3333333333333333,
           "max": 1,
@@ -288,7 +288,7 @@
       "hallucination_rate": 0,
       "metrics": {
         "score": {
-          "mean": 0.9677631578947368,
+          "mean": 0.9723684210526317,
           "median": 1,
           "min": 0.5,
           "max": 1,
@@ -391,7 +391,7 @@
           "n": 40
         },
         "graphify": {
-          "mean": 0.9195833333333333,
+          "mean": 0.9283333333333333,
           "median": 1,
           "min": 0.65,
           "max": 1,
@@ -399,7 +399,7 @@
           "n": 40
         },
         "codegraph": {
-          "mean": 0.9008333333333333,
+          "mean": 0.8570833333333333,
           "median": 1,
           "min": 0.3333333333333333,
           "max": 1,
@@ -407,9 +407,9 @@
           "n": 40
         },
         "hybrid": {
-          "mean": 0.9637499999999999,
+          "mean": 0.9724999999999999,
           "median": 1,
-          "min": 0.65,
+          "min": 0.8166666666666667,
           "max": 1,
           "p95": 1,
           "n": 40
@@ -563,16 +563,9 @@
     {
       "id": "A1",
       "arm": "graphify",
-      "checklist": 0.65,
-      "judge": 1,
-      "kind": "judge_higher"
-    },
-    {
-      "id": "A1",
-      "arm": "graphify",
-      "checklist": 0.65,
-      "judge": 1,
-      "kind": "judge_higher"
+      "checklist": 1,
+      "judge": 0.65,
+      "kind": "checklist_higher"
     },
     {
       "id": "B2",
@@ -618,35 +611,14 @@
     },
     {
       "id": "A1",
-      "arm": "codegraph",
+      "arm": "hybrid",
       "checklist": 1,
       "judge": 0.65,
       "kind": "checklist_higher"
     },
     {
       "id": "A1",
-      "arm": "codegraph",
-      "checklist": 1,
-      "judge": 0.65,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A1",
-      "arm": "codegraph",
-      "checklist": 1,
-      "judge": 0.65,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A1",
-      "arm": "codegraph",
-      "checklist": 1,
-      "judge": 0.65,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A1",
-      "arm": "codegraph",
+      "arm": "graphify",
       "checklist": 1,
       "judge": 0.65,
       "kind": "checklist_higher"
@@ -664,13 +636,6 @@
       "checklist": 1,
       "judge": 0.65,
       "kind": "checklist_higher"
-    },
-    {
-      "id": "A1",
-      "arm": "hybrid",
-      "checklist": 0.65,
-      "judge": 1,
-      "kind": "judge_higher"
     },
     {
       "id": "A2",
