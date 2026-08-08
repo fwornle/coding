@@ -211,7 +211,9 @@ jobs:
               fail=1
             fi
           done < /tmp/r7-before.txt
-          [ $fail -eq 0 ] && echo "all 7 shared agent configs unchanged by a real install"
+          if [ $fail -eq 0 ]; then
+            echo "all 7 shared agent configs unchanged by a real install"
+          fi
           exit $fail
 
       - name: Installer summary (always shown, for diagnosis)
