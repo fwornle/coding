@@ -82,13 +82,13 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Snapshot the working tree and $HOME
+      - name: Snapshot the working tree and the paths the installer can touch
         run: |
           set -e
           git status --porcelain > /tmp/tree-before.txt
-          # Timestamp floor for the $HOME sweep. Sleep 1s so that files written
-          # during the run are strictly newer than the marker, rather than
-          # sharing its second and being missed.
+          # Timestamp floor for the sweep. Sleep 1s so files written during the
+          # run are strictly newer than the marker rather than sharing its
+          # second and being missed.
           sleep 1
           touch /tmp/home-marker
           sleep 1
@@ -116,14 +116,26 @@ jobs:
             fail=1
           fi
 
-          # Anything under $HOME newer than the marker, minus the caches that
-          # node/npm/gh touch merely by being invoked — those are not installer
-          # mutations and would make this assertion permanently red.
-          find "$HOME" -type f -newer /tmp/home-marker -print 2>/dev/null \
-            | grep -vE "^$HOME/(\.npm|\.cache|\.local/state|\.config/gh)/|/\.(bash_history|zsh_history)$" \
-            > /tmp/home-touched.txt || true
+          # Only the paths install.sh can actually touch, per its own mutation
+          # manifest, plus the shell rc files.
+          #
+          # NOT a blanket `find $HOME`: on a GitHub runner $HOME is /home/runner,
+          # and the runner's own bookkeeping lives underneath it — work/_temp/*.sh
+          # (the very script running this step), _runner_file_commands/*,
+          # actions-runner/*/_diag/*. A whole-$HOME sweep is therefore non-empty
+          # on every run no matter what the installer does, so it reported a
+          # violation that was pure runner noise. Enumerating the real targets
+          # states the intent instead of trying to out-guess runner internals.
+          : > /tmp/home-touched.txt
+          for p in "$HOME/.claude" "$HOME/.claude.json" "$HOME/.copilot" \
+                   "$HOME/.config/opencode" "$HOME/.opencode" "$HOME/bin" \
+                   "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" \
+                   "$HOME/.zprofile" "$HOME/.config/systemd/user" "$HOME/.npmrc"; do
+            [ -e "$p" ] || continue
+            find "$p" -newer /tmp/home-marker -print 2>/dev/null >> /tmp/home-touched.txt || true
+          done
           if [ -s /tmp/home-touched.txt ]; then
-            echo "::error::--dry-run wrote to \$HOME:"
+            echo "::error::--dry-run wrote to a path in the mutation manifest:"
             cat /tmp/home-touched.txt
             fail=1
           fi
