@@ -1392,20 +1392,36 @@ setup_user_level_mcp_config() {
     local user_config_backup=""
     
     if [[ -f "$user_config" ]]; then
-        # Create backup
-        user_config_backup="$user_config.backup.$(date +%Y%m%d_%H%M%S)"
-        cp "$user_config" "$user_config_backup"
-        info "Backed up existing configuration to: $user_config_backup"
-        
+        # ONE-TIME original, not a new copy per run. ~/.claude.json is often
+        # large, and the old `.backup.<timestamp>` pattern grew without bound.
+        user_config_backup="$user_config.coding-orig"
+        if [[ ! -f "$user_config_backup" ]]; then
+            cp "$user_config" "$user_config_backup"
+            info "Saved a one-time original: $user_config_backup"
+        fi
+
         # Merge with existing configuration
         local merged_config=$(mktemp)
-        
-        # Use jq to merge configurations, giving priority to new MCP servers
+
+        # NOTE: jq's `*` is a RECURSIVE merge, so the previous
+        # `jq -s '.[0] * .[1]'` already preserved the user's own mcpServers
+        # entries — it was not the data-loss bug it looks like at a glance, and an
+        # earlier note in this project claiming otherwise was wrong. Verified:
+        # a user server survives that expression untouched.
+        #
+        # The mcpServers line below is therefore explicit rather than corrective.
+        # It pins the intent — union the two maps, ours winning only on a genuine
+        # name collision — so a future reader does not "fix" it into a shallow
+        # assignment, which WOULD lose the user's servers.
         if command -v jq >/dev/null 2>&1; then
-            jq -s '.[0] * .[1]' "$user_config" "$temp_file" > "$merged_config"
+            jq -s '
+                .[0] as $user | .[1] as $ours
+                | ($user * $ours)
+                | .mcpServers = (($user.mcpServers // {}) + ($ours.mcpServers // {}))
+            ' "$user_config" "$temp_file" > "$merged_config"
             cp "$merged_config" "$user_config"
             rm -f "$merged_config"
-            success "Merged MCP configuration with existing user config"
+            success "Merged MCP configuration (your own servers preserved)"
         else
             # Fallback: overwrite mcpServers section only
             warning "jq not found, using simple merge (may overwrite existing MCP servers)"
@@ -1491,8 +1507,12 @@ setup_opencode_mcp_config() {
         return 0
     fi
     
-    # Backup existing config
-    cp "$opencode_config" "$opencode_config.backup.$(date +%Y%m%d_%H%M%S)"
+    # ONE-TIME original instead of a new timestamped copy per run — those
+    # accumulated indefinitely and were never pruned.
+    if [[ ! -f "$opencode_config.coding-orig" ]]; then
+        cp "$opencode_config" "$opencode_config.coding-orig"
+        info "Saved a one-time original: $opencode_config.coding-orig"
+    fi
     
     # Convert Claude MCP format to OpenCode MCP format and merge into existing config
     python3 -c "
@@ -3942,21 +3962,45 @@ install_okb_snapshot_guard() {
     # Install in coding repo itself
     local coding_hook="$CODING_REPO/.git/hooks/pre-commit"
     if [[ -d "$CODING_REPO/.git/hooks" ]]; then
+        # Preserve an existing hook once before overwriting it. This used to be a
+        # bare `cp`, so anyone with their own pre-commit hook lost it silently on
+        # every install — and had no way to get it back.
+        if [[ -f "$coding_hook" ]] && ! cmp -s "$coding_hook" "$hook_template"; then
+            if [[ ! -f "$coding_hook.coding-orig" ]]; then
+                cp "$coding_hook" "$coding_hook.coding-orig"
+                info "Existing pre-commit hook preserved as pre-commit.coding-orig"
+            fi
+        fi
         cp "$hook_template" "$coding_hook"
         chmod +x "$coding_hook"
         success "OKB snapshot guard installed in coding repo"
     fi
 
-    # Install in consumer repos that have OKB as a submodule
-    local consumer_repos=(
-        "$HOME/Agentic/_work/rapid-automations"
-    )
-    for repo in "${consumer_repos[@]}"; do
+    # Install in consumer repos that have OKB as a submodule.
+    #
+    # This list used to be hardcoded to "$HOME/Agentic/_work/rapid-automations" —
+    # one developer's machine baked into an installer everyone runs, writing a
+    # git hook into an unrelated repository. It is now opt-in and empty by
+    # default: set CODING_OKB_CONSUMER_REPOS to a colon-separated list of repo
+    # paths if you actually want this.
+    local consumer_repos=()
+    if [[ -n "${CODING_OKB_CONSUMER_REPOS:-}" ]]; then
+        IFS=':' read -r -a consumer_repos <<< "$CODING_OKB_CONSUMER_REPOS"
+    fi
+    local repo
+    for repo in "${consumer_repos[@]:-}"; do
+        [[ -n "$repo" ]] || continue
         local submodule_hooks_dir="$repo/.git/modules/integrations/operational-knowledge-management/hooks"
         if [[ -d "$submodule_hooks_dir" ]]; then
+            # Preserve whatever was there before we overwrite it.
+            if [[ -f "$submodule_hooks_dir/pre-commit" && ! -f "$submodule_hooks_dir/pre-commit.coding-orig" ]]; then
+                cp "$submodule_hooks_dir/pre-commit" "$submodule_hooks_dir/pre-commit.coding-orig"
+            fi
             cp "$hook_template" "$submodule_hooks_dir/pre-commit"
             chmod +x "$submodule_hooks_dir/pre-commit"
             success "OKB snapshot guard installed in $(basename "$repo") OKB submodule"
+        else
+            warning "CODING_OKB_CONSUMER_REPOS: no OKB submodule hooks dir in $repo — skipped"
         fi
     done
 }
@@ -4077,11 +4121,13 @@ EOF
         fi
     fi
 
-    # Backup existing settings
+    # Backup existing settings — ONE-TIME original, not one per run.
     if [[ -f "$settings_file" ]]; then
-        local backup_file="${settings_file}.backup.$(date +%Y%m%d_%H%M%S)"
-        cp "$settings_file" "$backup_file"
-        info "Backed up existing settings to: $backup_file"
+        local backup_file="${settings_file}.coding-orig"
+        if [[ ! -f "$backup_file" ]]; then
+            cp "$settings_file" "$backup_file"
+            info "Saved a one-time original: $backup_file"
+        fi
     else
         # Create new settings file
         echo '{"$schema": "https://json.schemastore.org/claude-code-settings.json"}' > "$settings_file"
