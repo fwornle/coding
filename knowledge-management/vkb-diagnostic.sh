@@ -96,7 +96,11 @@ echo
 # Repository Checks
 echo "6. Repository Checks:"
 echo -n "   CODING_REPO environment: "
-if [[ -n "$CODING_REPO" ]]; then
+# ${CODING_REPO:-} not $CODING_REPO: this line exists to REPORT whether the
+# variable is set, so dereferencing it bare means that under `set -u` the check
+# aborts the script instead of answering its own question. The script does not
+# set -u today; this keeps it honest if it ever does.
+if [[ -n "${CODING_REPO:-}" ]]; then
     echo "✓ $CODING_REPO"
 
     echo -n "   GraphDB (.data/knowledge-graph/): "
@@ -211,7 +215,7 @@ if ! command -v lsof >/dev/null 2>&1 && ! command -v ss >/dev/null 2>&1 && ! com
     ISSUES=$((ISSUES + 1))
 fi
 
-if [[ -z "$CODING_REPO" ]]; then
+if [[ -z "${CODING_REPO:-}" ]]; then
     echo "❌ CODING_REPO environment variable not set"
     ISSUES=$((ISSUES + 1))
 elif [[ ! -d "$CODING_REPO/memory-visualizer" ]]; then
@@ -237,7 +241,7 @@ else
         echo "  Ubuntu/Debian: sudo apt-get install lsof"
         echo "  Fedora/RHEL:  sudo dnf install lsof"
     fi
-    if [[ -z "$CODING_REPO" ]]; then
+    if [[ -z "${CODING_REPO:-}" ]]; then
         echo "  Set CODING_REPO: export CODING_REPO=/path/to/your/coding/repo"
     fi
 fi
