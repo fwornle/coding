@@ -356,8 +356,10 @@ _direct_verifies() {
 _proxy_candidates() {
     local c
 
-    # 1. Whatever the user already exported (captured before we touch anything)
-    [[ -n "${USER_PROXY:-}" ]] && echo "$USER_PROXY"
+    # 1. Whatever the user already exported (captured before we touch anything).
+    #    if/fi, not `[[ ]] && echo`: under `set -e` the failing AND-list would
+    #    abort this function and silently truncate the candidate list.
+    if [[ -n "${USER_PROXY:-}" ]]; then echo "$USER_PROXY"; fi
 
     # 2. An existing npm proxy config (honours a hand-written ~/.npmrc)
     if command -v npm >/dev/null 2>&1; then
@@ -2465,16 +2467,44 @@ install_node_dependencies() {
 
     # Because scripts were skipped, native modules must be built explicitly.
     # Each is rebuilt individually so one failure does not mask the others.
-    local native_mod
+    #
+    # These packages ship as `prebuild-install || node-gyp rebuild`: they try to
+    # download a prebuilt binary for the exact node/OS/arch, and fall back to
+    # compiling from source. When no prebuilt matches AND no toolchain is
+    # present, the fallback fails — so the actionable remedy is almost always
+    # "install build tools". (Note this is not caused by --ignore-scripts: a
+    # plain `npm install` runs the same script with the same outcome.)
+    local native_mod rebuild_log native_failed=0
     for native_mod in better-sqlite3 classic-level; do
+        # One log per module, kept only on failure so the path we print is real.
+        rebuild_log="${TMPDIR:-/tmp}/coding-rebuild-${native_mod}.log"
         info "Building native bindings for $native_mod..."
-        if npm rebuild "$native_mod" >/dev/null 2>&1; then
+        if npm rebuild "$native_mod" >"$rebuild_log" 2>&1; then
             success "✓ $native_mod native bindings built"
+            rm -f "$rebuild_log" 2>/dev/null || true
         else
-            warning "$native_mod native build failed — features depending on it may not work"
-            INSTALLATION_WARNINGS+=("Native build failed: $native_mod")
+            native_failed=1
+            warning "$native_mod native build failed"
+            # Surface the actual cause instead of swallowing it.
+            local reason
+            reason="$(grep -m1 -iE "gyp ERR! stack Error|not ok|command not found|No such file" "$rebuild_log" 2>/dev/null | head -c 200 || true)"
+            # NOTE: if/fi, not `[[ ]] && info`. Under `set -e` a bare AND-list
+            # whose test fails returns non-zero and aborts the installer.
+            if [[ -n "$reason" ]]; then info "  cause: $reason"; fi
+            if ! command -v cc >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1; then
+                info "  No C compiler found — that is the likely cause. Install build tools:"
+                case "$PLATFORM" in
+                    macos)        info "    xcode-select --install" ;;
+                    linux|wsl)    info "    sudo apt-get install -y build-essential   (or: dnf groupinstall 'Development Tools')" ;;
+                    windows)      info "    npm install --global windows-build-tools   (or install Visual Studio Build Tools)" ;;
+                esac
+            fi
+            info "  Impact: $([[ "$native_mod" == "better-sqlite3" ]] && echo "local knowledge databases" || echo "LevelDB-backed graph storage") will not work until this is fixed."
+            info "  Full log: $rebuild_log"
+            INSTALLATION_WARNINGS+=("Native build failed: $native_mod (see $rebuild_log)")
         fi
     done
+    [[ "$native_failed" == "0" ]] || log "One or more native builds failed; logs retained under ${TMPDIR:-/tmp}"
 
     ensure_km_core_link
     install_fastembed_native

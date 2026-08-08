@@ -17,6 +17,25 @@
 #   scripts/test-install-linux.sh --arm64          # exercise the missing
 #                                                  # tokenizers-linux-arm64-gnu path
 #
+# SCOPE — what this harness does and does NOT prove.
+#
+# It verifies the phases the reported corporate-Ubuntu failure lived in: the
+# dependency gate, proxy configuration, network preflight, and the npm
+# dependency install (including native builds and the arch-specific fastembed
+# tokenizer). Those are asserted directly.
+#
+# It does NOT verify a complete installation. The container has no Docker and no
+# credentials for the private submodule remotes, and the build context is a
+# pruned file copy rather than a git checkout — so `git submodule update --init`
+# cannot succeed and install.sh exits non-zero at install_memory_visualizer.
+# That is expected here and is NOT a regression. Full-install completion has to
+# be verified on a real machine (see docs; the corporate box and Windows/WSL).
+#
+# The image deliberately has no C compiler, so better-sqlite3's source-build
+# fallback fails — this is the hostile case a user without build tools hits, and
+# the harness asserts the failure is reported with a cause and a remedy rather
+# than swallowed.
+#
 # Exit 0 only if every selected shape behaves as specified.
 
 set -uo pipefail
@@ -176,6 +195,25 @@ shape_direct() {
         fail "direct: still downloads a browser onto the host"
     else
         pass "direct: no chromium download"
+    fi
+    # The npm phase is the thing under test — assert it actually SUCCEEDED,
+    # not merely that it was reached.
+    if grep -q "Node.js dependencies installed" <<<"$out"; then
+        pass "direct: npm dependency install succeeded"
+    else
+        fail "direct: npm dependency install did not succeed"
+    fi
+    # Degradation must be actionable, not a bare warning. This image has no
+    # compiler on purpose, so better-sqlite3's source-build fallback fails —
+    # exactly the hostile case a user without build tools hits.
+    if grep -q "native build failed" <<<"$out"; then
+        if grep -q "No C compiler found" <<<"$out" && grep -q "build-essential" <<<"$out"; then
+            pass "direct: native build failure names the cause and the remedy"
+        else
+            fail "direct: native build failed without actionable guidance"
+        fi
+    else
+        pass "direct: all native builds succeeded"
     fi
 }
 
