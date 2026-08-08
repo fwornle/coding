@@ -1,0 +1,173 @@
+{
+  "runId": "coding-v1-r7",
+  "at": "2026-08-08T05:49:18.964Z",
+  "rows": 304,
+  "changed": 7,
+  "changes": [
+    {
+      "arm": "graphify",
+      "id": "A1",
+      "rep": 1,
+      "score": [
+        0.65,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "2/2 required, 1/1 optional"
+    },
+    {
+      "arm": "codegraph",
+      "id": "A1",
+      "rep": 5,
+      "score": [
+        1,
+        0.65
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "1/2 required, 1/1 optional"
+    },
+    {
+      "arm": "codegraph",
+      "id": "A1",
+      "rep": 6,
+      "score": [
+        1,
+        0.65
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "1/2 required, 1/1 optional"
+    },
+    {
+      "arm": "codegraph",
+      "id": "A1",
+      "rep": 7,
+      "score": [
+        1,
+        0.65
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "1/2 required, 1/1 optional"
+    },
+    {
+      "arm": "codegraph",
+      "id": "A1",
+      "rep": 8,
+      "score": [
+        1,
+        0.65
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "1/2 required, 1/1 optional"
+    },
+    {
+      "arm": "codegraph",
+      "id": "A1",
+      "rep": 10,
+      "score": [
+        1,
+        0.65
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "1/2 required, 1/1 optional"
+    },
+    {
+      "arm": "hybrid",
+      "id": "A1",
+      "rep": 8,
+      "score": [
+        0.65,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "2/2 required, 1/1 optional"
+    }
+  ],
+  "judgeChanged": 4,
+  "judgeChanges": [
+    {
+      "arm": "graphify",
+      "id": "A1",
+      "rep": 1,
+      "judge": [
+        1,
+        0.65
+      ]
+    },
+    {
+      "arm": "graphify",
+      "id": "A1",
+      "rep": 2,
+      "judge": [
+        1,
+        0.65
+      ]
+    },
+    {
+      "arm": "hybrid",
+      "id": "A1",
+      "rep": 1,
+      "judge": [
+        1,
+        0.65
+      ]
+    },
+    {
+      "arm": "graphify",
+      "id": "A1",
+      "rep": 9,
+      "judge": [
+        1,
+        0.65
+      ]
+    }
+  ]
+}

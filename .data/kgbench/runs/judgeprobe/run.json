@@ -1,0 +1,31 @@
+{
+  "runId": "judgeprobe",
+  "set": "replication",
+  "reps": 1,
+  "commit": "3fd7d40de",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    }
+  ],
+  "questions": [
+    "A1"
+  ],
+  "baselines": {},
+  "schemaTax": {},
+  "judge": {
+    "provider": "claude-code",
+    "model": "claude-opus-4.8",
+    "enabled": true
+  },
+  "startedAt": "2026-08-05T18:00:41.960Z"
+}

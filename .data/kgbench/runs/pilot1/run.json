@@ -1,0 +1,49 @@
+{
+  "runId": "pilot1",
+  "set": "replication",
+  "reps": 1,
+  "commit": "20041a787",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    },
+    {
+      "id": "graphify",
+      "label": "Graphify code graph",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes"
+      ],
+      "backend": "graphify"
+    }
+  ],
+  "questions": [
+    "L1",
+    "S1",
+    "A1"
+  ],
+  "baselines": {
+    "grep": 71428,
+    "graphify": 72728
+  },
+  "schemaTax": {
+    "grep": 0,
+    "graphify": 1300
+  },
+  "startedAt": "2026-08-05T17:41:21.558Z"
+}

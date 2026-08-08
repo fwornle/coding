@@ -1,0 +1,136 @@
+{
+  "runId": "coding-v1-r6",
+  "at": "2026-08-07T06:57:26.311Z",
+  "rows": 304,
+  "changed": 7,
+  "changes": [
+    {
+      "arm": "grep",
+      "id": "B1",
+      "rep": 1,
+      "score": [
+        0.8166666666666667,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "3/3 required, 1/1 optional"
+    },
+    {
+      "arm": "grep",
+      "id": "B1",
+      "rep": 2,
+      "score": [
+        0.8166666666666667,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "3/3 required, 1/1 optional"
+    },
+    {
+      "arm": "graphify",
+      "id": "B1",
+      "rep": 1,
+      "score": [
+        0.8166666666666667,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "3/3 required, 1/1 optional"
+    },
+    {
+      "arm": "codegraph",
+      "id": "B1",
+      "rep": 1,
+      "score": [
+        0.8166666666666667,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "3/3 required, 1/1 optional"
+    },
+    {
+      "arm": "codegraph",
+      "id": "B1",
+      "rep": 2,
+      "score": [
+        0.8166666666666667,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "3/3 required, 1/1 optional"
+    },
+    {
+      "arm": "codegraph",
+      "id": "B1",
+      "rep": 3,
+      "score": [
+        0.8166666666666667,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "3/3 required, 1/1 optional"
+    },
+    {
+      "arm": "hybrid",
+      "id": "B1",
+      "rep": 3,
+      "score": [
+        0.8166666666666667,
+        1
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "3/3 required, 1/1 optional"
+    }
+  ],
+  "judgeChanged": 0,
+  "judgeChanges": []
+}
