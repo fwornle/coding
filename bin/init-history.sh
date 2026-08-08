@@ -15,6 +15,17 @@
 #     working with an empty local dir.
 #   - Always: mkdir -p the dirs LSL services write to. Most writers already
 #     auto-create on first write, but pre-empting startup races is cheap.
+#
+# DELIBERATELY CLONE-ONLY. This runs on every `bin/coding` launch, so it must
+# never push: publishing verbatim transcripts is a decision, not a side effect
+# of starting an agent. Creating the remote and seeding it from a local snapshot
+# is install.sh's job (`history_repo_seed`), where it is confirmed explicitly and
+# gated behind CODING_HISTORY_PUSH=1 for unattended runs.
+#
+# A consequence worth knowing: if the configured repo is EMPTY (freshly created)
+# this script does nothing visible — it neither clones anything useful nor
+# publishes what is on disk. If you got here expecting your history to be backed
+# up and it isn't, re-run ./install.sh, which detects that case by name.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
