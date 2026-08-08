@@ -1,7 +1,7 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3-10 reps/arm) against 4 arms.
-Repo at `7e08b6a60`, model `claude-sonnet-5`, generated 2026-08-08T07:03:21.264Z.
+Repo at `7e08b6a60`, model `claude-sonnet-5`, generated 2026-08-08T08:16:16.533Z.
 
 Secondary scorer: `claude-opus-4.8` was *requested*; this run predates served-model recording, so what actually graded it is unverified. See [Measurement and judging lessons](../measurement-lessons.md).
 

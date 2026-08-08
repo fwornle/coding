@@ -55,12 +55,18 @@ if ! curl -sf -o /dev/null "$SETTINGS_URL"; then
 fi
 
 python3 - "$MODE" "$SETTINGS_URL" <<'PY'
-import json, sys, urllib.request
+import json, os, sys, urllib.request
 
 mode, url = sys.argv[1], sys.argv[2]
 
 HEAVY = {'provider': 'copilot', 'model': 'claude-sonnet-4.6'}
 CHEAP = {'provider': 'copilot', 'model': 'claude-haiku-4.5'}
+# Grading tier. Opus lives on the PERSONAL Max subscription (claude-code) and is absent
+# from Copilot entirely, so the best available judge is network-dependent. `JUDGE=work`
+# selects the corporate-network answer.
+JUDGE = ({'provider': 'copilot', 'model': 'claude-sonnet-4.6'}
+         if os.environ.get('JUDGE') == 'work'
+         else {'provider': 'claude-code', 'model': 'claude-opus-5'})
 
 # Phase 52 D-05/D-11 — per-sub-step PROCESS_TAGS entries. Mirrors the 9 keys
 # in integrations/mcp-server-semantic-analysis/src/agents/process-tags.ts.
@@ -119,22 +125,26 @@ WAVE_OVERRIDES = {
     'consolidator-compaction':                 CHEAP,
     'consolidator-resynthesize':               CHEAP,
     # kgbench's secondary scorer (lib/kgbench/judge.mjs). This override is not an
-    # optimisation — it is the ONLY way to choose the judge's model at all.
-    # /api/complete ignores the request-body `model`, and the claude-code path ignores
-    # model selection even when an override names one, so without an entry here the judge
-    # is served claude-haiku-4-5 whatever it asks for. That is what graded runs r6 and r7
-    # while run.json published `claude-opus-4.8`.
+    # optimisation — it is the ONLY way to choose the judge's model at all, because
+    # /api/complete ignores the request-body `model`. Without an entry here the judge gets
+    # whatever the proxy defaults to, which is how runs r6 and r7 were graded by
+    # claude-haiku-4-5 while run.json published `claude-opus-4.8` (a version that does not
+    # exist, so the substitution was silent and total).
     #
-    # HEAVY (copilot/sonnet-4.6) rather than a stronger tier because it is the strongest
-    # model verified end-to-end: copilot rejects claude-opus-4.6 outright with
-    # `400 The requested model is not supported`, despite advertising it in providerModels.
-    # Pinned to copilot deliberately — it is the only provider that honours the model
-    # field, and it is ~3x faster (1.5s vs 4.3s), which matters across ~300 judge calls.
+    # JUDGE, not HEAVY: the grader is the yardstick every arm is measured against, so it
+    # gets the strongest model the personal subscription offers. claude-code serves
+    # claude-opus-5 — verified stable over 3 repeats at ~1.7s, and NOT listed in the
+    # proxy's providerModels catalog, which omits it.
     #
-    # An A/B over 18 cells with independently established ground truth scored haiku-4.5
-    # and sonnet-4.6 both 18/18, so this is not a correctness rescue; it is provenance
-    # (asking for what we get) plus sharper score separation.
-    'kgbench-judge':                           HEAVY,
+    # INSIDE THE CORPORATE NETWORK this is wrong and must be switched: Copilot has no Opus
+    # at any version (`400 The requested model is not supported`), so the best available
+    # judge there is copilot/claude-sonnet-4.6 — run this script with JUDGE=work:
+    #     JUDGE=work scripts/configure-wave-analysis-routing.sh
+    #
+    # An A/B over 18 cells with independently established ground truth scored haiku-4.5 and
+    # sonnet-4.6 both 18/18, so a stronger judge is not a correctness rescue — it is
+    # provenance (asking for what we actually get) plus sharper score separation.
+    'kgbench-judge':                           JUDGE,
 }
 
 def get_settings():
