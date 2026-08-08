@@ -89,10 +89,6 @@ CODING_AGENT_SCOPE="wrapper"
 # ─────────────────────────────────────────────────────────────────────────────
 run_step() {
     local fn="$1"
-    if [[ "$CI_LITE" != "true" ]]; then
-        "$fn"
-        return $?
-    fi
     # `local rc=0` then `|| rc=$?`, NOT `if ! "$fn"; then local rc=$?`: after a
     # negated test `$?` is the NEGATION's status, so the latter always reports 0
     # and the diagnostic would state the opposite of what happened. The `||`
@@ -100,8 +96,31 @@ run_step() {
     local rc=0
     "$fn" || rc=$?
     if [[ $rc -ne 0 ]]; then
-        warning "Step ${fn}() returned ${rc} — continuing (CI-lite portability run)"
+        warning "Step ${fn}() returned ${rc} — continuing to the summary"
         INSTALLATION_FAILURES+=("${fn} did not complete (returned ${rc})")
+    fi
+    return 0
+}
+
+# Exit status for the whole install.
+#
+# This is the other half of run_step, and it is NOT optional. Recording a failed
+# step and carrying on is only an improvement if the run still SAYS it failed;
+# without this, extending run_step to interactive installs would trade "aborts
+# early with a non-zero status" for "runs to the end and exits 0", which is worse
+# for anything doing `./install.sh && …`. show_installation_status() only ever
+# printed — it never affected the exit code.
+#
+# --ci is exempt on purpose. There, failures are expected environment gaps (no
+# Docker daemon, no agent CLI, no credentials for the private submodules) and the
+# documented contract is that a portability run "completes with a summary". CI
+# asserts exit 0 for precisely that reason.
+install_exit_status() {
+    if [[ "$CI_LITE" == "true" ]]; then
+        return 0
+    fi
+    if [[ ${#INSTALLATION_FAILURES[@]} -gt 0 ]]; then
+        return 1
     fi
     return 0
 }
@@ -3864,8 +3883,11 @@ EOF
     
     # Installation status report
     show_installation_status
-    
+
     log "Installation completed"
+
+    # Reflect real failures in the exit status. See install_exit_status().
+    install_exit_status
 }
 
 # Show comprehensive installation status
