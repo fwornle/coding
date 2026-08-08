@@ -1,0 +1,95 @@
+@startuml kgbench-architecture
+!include _standard-style.puml
+
+title kgbench — framework architecture
+
+top to bottom direction
+
+package "1. Declaration (what to measure)" {
+  component "arms.json\nretrieval strategies" <<util>> as ARMS
+  component "questions/<set>.json\nprompts + answer key" <<util>> as QS
+  component "code-graph.json\nbackend registry" <<util>> as REG
+}
+
+package "2. Orchestration" {
+  component "kgbench-run.mjs\nmatrix: arm x agent x model\nx question x rep" <<cli>> as RUN
+  component "kgbench-supervise.sh\ndetached, self-resuming" <<cli>> as SUP
+  component "arms.mjs\nresolve arm + expand\n$backendTools" <<core>> as ARMRES
+}
+
+package "3. Isolation (bias control)" {
+  component "sandbox.mjs\nthrowaway git worktree\n+ leak verification" <<core>> as SAND
+  component "agent-sandbox.mjs\nper-agent MCP restriction" <<core>> as ASAND
+  component "runner.mjs\ndeny list + PWD pin\n+ post-hoc tool audit" <<core>> as RUNNER
+}
+
+package "4. Execution" {
+  component "agents.mjs\nper-agent adapters\n(argv + elicitation)" <<core>> as ADAPT
+  component "claude / copilot /\nopencode CLI" <<agent>> as CLI
+  component "rapid-llm-proxy\n:12435" <<infra>> as PROXY
+  cloud "model providers" <<external>> as PROV
+}
+
+package "5. Measurement" {
+  database "token-usage.db\nproxy-owned, read-only" <<storage>> as TDB
+  component "tokens.mjs\nsource-ranked attribution" <<core>> as TOK
+  component "kgbench-backfill-\ntokens.mjs\noffline re-resolve" <<cli>> as BF
+}
+
+package "6. Scoring" {
+  component "graders.mjs\ndeterministic checklist" <<core>> as GRAD
+  component "judge.mjs\nLLM cross-check" <<core>> as JUDGE
+}
+
+package "7. Reporting" {
+  component "results.jsonl\nrun.json" <<storage>> as RES
+  component "report.mjs\naggregate + provenance" <<core>> as REP
+  component "kgbench-charts.mjs\nSVG figures" <<cli>> as CHART
+  component "report.md" <<util>> as MD
+}
+
+SUP CONTROL_LINE RUN
+ARMS DATA_LINE ARMRES
+REG DATA_LINE ARMRES
+ARMRES DATA_LINE RUN
+QS DATA_LINE RUN
+
+RUN CONTROL_LINE SAND
+RUN CONTROL_LINE ASAND
+RUN CONTROL_LINE RUNNER
+RUNNER CONTROL_LINE ADAPT
+ADAPT CONTROL_LINE CLI
+SAND DATA_LINE CLI : read-only\nsandbox tree
+ASAND DATA_LINE CLI : allowed MCP\nservers only
+
+CLI SYNC_LINE PROXY
+PROXY SYNC_LINE PROV
+PROXY DATA_LINE TDB : stamps task_id\n+ agent
+
+RUNNER CONTROL_LINE TOK
+TOK DATA_LINE TDB : read-only join
+BF DATA_LINE TDB : late rows
+BF DATA_LINE RES
+
+RUN CONTROL_LINE GRAD
+RUN CONTROL_LINE JUDGE
+JUDGE SYNC_LINE PROXY
+
+RUN DATA_LINE RES
+RES DATA_LINE REP
+RES DATA_LINE CHART
+REP DATA_LINE MD
+CHART DATA_LINE MD
+
+note right of SAND
+  Refuses to hand back a tree
+  it could not verify clean.
+end note
+
+note right of TOK
+  stream-json > proxy-db-taskid
+  > proxy-db-window > unmeasured.
+  Never 0 for "not measured".
+end note
+
+@enduml

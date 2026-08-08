@@ -1,0 +1,65 @@
+@startuml kgbench-token-attribution
+!include _standard-style.puml
+
+title kgbench — how a cell's token count is established
+
+top to bottom direction
+
+component "claude cell" <<agent>> as CLAUDE
+component "copilot cell" <<agent>> as COPILOT
+component "opencode cell" <<agent>> as OPENCODE
+
+component "stream-json\nresult event" <<core>> as SJ
+component "x-task-id header\nper request" <<core>> as HDR
+component "stop-adapter\ncopadt / opcadt" <<core>> as ADAPT
+
+component "rapid-llm-proxy\n:12435" <<infra>> as PROXY
+database "token_usage\nrows" <<storage>> as DB
+
+component "resolveCellTokens()" <<core>> as RES
+component "aggregateByTaskId()\nexact: tagged as this cell" <<core>> as BYID
+component "aggregateByWindow()\ninferred: ran while it ran" <<core>> as BYWIN
+
+component "row.token_source" <<util>> as SRC
+
+CLAUDE DATA_LINE SJ : first-party,\nexact
+CLAUDE SYNC_LINE HDR
+HDR SYNC_LINE PROXY
+
+COPILOT SYNC_LINE PROXY
+OPENCODE SYNC_LINE PROXY
+COPILOT DATA_LINE ADAPT : session id\nthe harness\nnever learns
+OPENCODE DATA_LINE ADAPT
+ADAPT DATA_LINE DB
+PROXY DATA_LINE DB
+
+SJ DATA_LINE RES
+RES CONTROL_LINE BYID
+BYID OPTIONAL_LINE BYWIN : no rows\nfor this task_id
+BYID DATA_LINE DB
+BYWIN DATA_LINE DB
+RES DATA_LINE SRC
+
+note right of SRC
+  stream-json      first-party, exact
+  proxy-db-taskid  tagged, exact
+  proxy-db-window  time join, weaker
+  unmeasured       null, never 0
+end note
+
+note right of BYWIN
+  Sound only because cells run
+  serially and the window is
+  scoped to one agent. More than
+  one session inside the window
+  sets token_ambiguous.
+end note
+
+note bottom of ADAPT
+  Rows can land a MINUTE after the
+  cell ends, so resolution must be
+  re-runnable offline
+  (kgbench-backfill-tokens.mjs).
+end note
+
+@enduml

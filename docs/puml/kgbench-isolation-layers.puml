@@ -1,0 +1,73 @@
+@startuml kgbench-isolation-layers
+!include _standard-style.puml
+
+title kgbench — the six layers that keep a cell honest
+
+top to bottom direction
+
+rectangle "A CELL\none arm x one agent x one model x one question x one repetition" <<agent>> as CELL
+
+package "L1 — What the agent can READ" {
+  component "throwaway git worktree\nbuilt from the benchmark commit" <<core>> as L1A
+  component "exclusion set\nanswer key, telemetry exports,\nagent rule files, grading machinery" <<core>> as L1B
+  component "evidence cross-check\nrefuses to delete a question's\nown ground truth" <<core>> as L1C
+}
+
+package "L2 — Proof the read surface is clean" {
+  component "leak scan\n5-word prompt windows" <<core>> as L2A
+  component "leak_terms\none occurrence is decisive" <<core>> as L2B
+  component "abort, never warn\nno tree = no run" <<core>> as L2C
+}
+
+package "L3 — What the agent can DO" {
+  component "tool surface discovered\nfrom the CLI init event" <<core>> as L3A
+  component "--disallowedTools\n= builtins minus the grant" <<core>> as L3B
+  component "post-hoc audit\nexecuted vs granted\n-> outcome tool_escape" <<core>> as L3C
+}
+
+package "L4 — Which retrieval backend it can reach" {
+  component "--strict-mcp-config\n(claude)" <<core>> as L4A
+  component ".vscode/mcp.json\n(copilot)" <<core>> as L4B
+  component "XDG_CONFIG_HOME pin\n(opencode)" <<core>> as L4C
+}
+
+package "L5 — The environment it inherits" {
+  component "PWD pinned to the sandbox\nOLDPWD dropped" <<core>> as L5A
+  component "API keys stripped\nproxy base URL pinned" <<core>> as L5B
+  component "inherited agent config\ndropped" <<core>> as L5C
+}
+
+package "L6 — Backstop at scoring time" {
+  component "contamination detector\nanswer cites the ground truth" <<core>> as L6A
+  component "score_if_clean kept,\nscore nulled" <<core>> as L6B
+}
+
+CELL CONTROL_LINE L1A
+L1A CONTROL_LINE L2A
+L2A CONTROL_LINE L3A
+L3A CONTROL_LINE L4A
+L4A CONTROL_LINE L5A
+L5A CONTROL_LINE L6A
+
+note right of L3C
+  The flag is the mechanism.
+  The audit is the guarantee:
+  a flag can be wrong, a tool can
+  be renamed, a new builtin can
+  appear — each silently.
+end note
+
+note right of L4C
+  Only claude can be held to L3.
+  On the others an arm defined by
+  WITHHOLDING search is refused,
+  not run under a false label.
+end note
+
+note right of L6B
+  A leaked answer key produces
+  CORRECT answers, so it is
+  invisible in the scores.
+end note
+
+@enduml
