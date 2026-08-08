@@ -81,7 +81,7 @@ while [ $(($(date +%s) - start_time)) -lt $TIMEOUT ]; do
     vkb_port_ok=false
     if check_port 8080 "VKB Server"; then
         vkb_port_ok=true
-        ((services_ok++))
+        services_ok=$((services_ok + 1))
     fi
 
     # Check VKB Health Endpoint (but don't fail if health check has issues)

@@ -198,25 +198,25 @@ ISSUES=0
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "❌ Python3 is not installed"
-    ((ISSUES++))
+    ISSUES=$((ISSUES + 1))
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
     echo "❌ jq is not installed"
-    ((ISSUES++))
+    ISSUES=$((ISSUES + 1))
 fi
 
 if ! command -v lsof >/dev/null 2>&1 && ! command -v ss >/dev/null 2>&1 && ! command -v netstat >/dev/null 2>&1; then
     echo "❌ No port checking tool installed"
-    ((ISSUES++))
+    ISSUES=$((ISSUES + 1))
 fi
 
 if [[ -z "$CODING_REPO" ]]; then
     echo "❌ CODING_REPO environment variable not set"
-    ((ISSUES++))
+    ISSUES=$((ISSUES + 1))
 elif [[ ! -d "$CODING_REPO/memory-visualizer" ]]; then
     echo "❌ memory-visualizer directory not found"
-    ((ISSUES++))
+    ISSUES=$((ISSUES + 1))
 fi
 
 if [[ $ISSUES -eq 0 ]]; then
