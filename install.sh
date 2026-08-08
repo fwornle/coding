@@ -3163,6 +3163,143 @@ ask_agent_scope() {
     set_env_var CODING_AGENT_SCOPE "$CODING_AGENT_SCOPE"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Migration: global → wrapper.
+#
+# Choosing wrapper scope stops us WRITING global config, but it does not undo
+# what an earlier global-mode install already wrote. Those artifacts are still
+# live, so bare agents would remain affected and the user's choice would be
+# quietly untrue. Detect the leftovers and offer to remove them.
+#
+# Everything here is surgical: only entries naming THIS repo or our own known
+# filenames are touched. The user's own hooks, plugins and commands are left
+# exactly as they are.
+# ─────────────────────────────────────────────────────────────────────────────
+cleanup_stale_global_artifacts() {
+    [[ "$CODING_AGENT_SCOPE" == "wrapper" ]] || return 0
+
+    local found=()
+
+    # 1. Slash commands previously copied into the global dir.
+    local cmd_leftovers=()
+    if [[ -d "$HOME/.claude/commands" && -d "$CODING_REPO/.claude/commands" ]]; then
+        local f base
+        for f in "$CODING_REPO/.claude/commands"/*.md; do
+            [[ -f "$f" ]] || continue
+            base="$(basename "$f")"
+            [[ -f "$HOME/.claude/commands/$base" ]] && cmd_leftovers+=("$base")
+        done
+        [[ ${#cmd_leftovers[@]} -gt 0 ]] && found+=("~/.claude/commands: ${#cmd_leftovers[@]} command(s) from this repo")
+    fi
+
+    # 2. Our hooks inside the user's global Claude settings.
+    local hooks_present=false
+    if [[ -f "$HOME/.claude/settings.json" ]] && grep -q "$CODING_REPO" "$HOME/.claude/settings.json" 2>/dev/null; then
+        hooks_present=true
+        found+=("~/.claude/settings.json: hooks pointing at this repo")
+    fi
+
+    # 3. OpenCode plugins copied under $HOME.
+    local oc_leftovers=()
+    local p
+    for p in compaction-guard knowledge-injection; do
+        [[ -f "$HOME/.opencode/plugins/$p.js" ]] && oc_leftovers+=("$p.js")
+    done
+    [[ ${#oc_leftovers[@]} -gt 0 ]] && found+=("~/.opencode/plugins: ${#oc_leftovers[@]} plugin(s)")
+
+    if [[ ${#found[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    echo ""
+    warning "This machine still carries GLOBAL agent configuration from an earlier install:"
+    local item
+    for item in "${found[@]}"; do echo "    • $item"; done
+    echo ""
+    info "You chose wrapper-scoped, so these are the reason bare agents would still"
+    info "be affected. Removing them completes the switch. Your own hooks, plugins"
+    info "and commands are not touched."
+    echo ""
+
+    local reply
+    read_or_default reply "y" "$(echo -e "${CYAN}Remove this project's global leftovers? [Y/n]: ${NC}")"
+    case "$reply" in
+        [Nn]*)
+            warning "Left in place — bare agents will still load this project's config"
+            INSTALLATION_WARNINGS+=("Stale global agent config left in place (wrapper scope chosen)")
+            return 0
+            ;;
+    esac
+
+    # Remove only the command files that came from this repo.
+    local base
+    for base in "${cmd_leftovers[@]:-}"; do
+        [[ -n "$base" ]] || continue
+        rm -f "$HOME/.claude/commands/$base" && info "  removed ~/.claude/commands/$base"
+    done
+    rmdir "$HOME/.claude/commands" 2>/dev/null || true
+
+    # Strip only hook entries whose command names this repo.
+    if [[ "$hooks_present" == "true" ]]; then
+        local settings="$HOME/.claude/settings.json"
+        if [[ ! -f "$settings.coding-orig" ]]; then
+            cp "$settings" "$settings.coding-orig"
+            info "  saved a one-time original: $settings.coding-orig"
+        fi
+        if node -e '
+            const fs = require("fs");
+            const [file, repo] = process.argv.slice(1);
+            const s = JSON.parse(fs.readFileSync(file, "utf8"));
+            let removed = 0;
+            for (const ev of Object.keys(s.hooks || {})) {
+                const before = s.hooks[ev].length;
+                s.hooks[ev] = s.hooks[ev].filter(
+                    (e) => !(e.hooks || []).some((h) => (h.command || "").includes(repo)),
+                );
+                removed += before - s.hooks[ev].length;
+                if (s.hooks[ev].length === 0) delete s.hooks[ev];
+            }
+            if (s.hooks && Object.keys(s.hooks).length === 0) delete s.hooks;
+            fs.writeFileSync(file, JSON.stringify(s, null, 2) + "\n");
+            process.stderr.write(`removed ${removed} hook entr${removed === 1 ? "y" : "ies"}\n`);
+        ' "$settings" "$CODING_REPO" 2>&1 | while read -r l; do info "  $l"; done; then
+            :
+        else
+            warning "  could not edit $settings — remove the hooks naming $CODING_REPO by hand"
+        fi
+    fi
+
+    # OpenCode plugins: delete the files and drop their entries from the config.
+    for p in "${oc_leftovers[@]:-}"; do
+        [[ -n "$p" ]] || continue
+        rm -f "$HOME/.opencode/plugins/$p" && info "  removed ~/.opencode/plugins/$p"
+    done
+    rmdir "$HOME/.opencode/plugins" 2>/dev/null || true
+    local oc_json="$HOME/.config/opencode/opencode.json"
+    if [[ -f "$oc_json" ]] && grep -q "$CODING_REPO\|compaction-guard\|knowledge-injection" "$oc_json" 2>/dev/null; then
+        node -e '
+            const fs = require("fs");
+            const [file, repo] = process.argv.slice(1);
+            const c = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (Array.isArray(c.plugin)) {
+                const before = c.plugin.length;
+                c.plugin = c.plugin.filter(
+                    (p) => !String(p).includes(repo)
+                        && !String(p).includes("compaction-guard")
+                        && !String(p).includes("knowledge-injection"),
+                );
+                if (c.plugin.length === 0) delete c.plugin;
+                if (before !== (c.plugin || []).length) {
+                    fs.writeFileSync(file, JSON.stringify(c, null, 2) + "\n");
+                    process.stderr.write("dropped plugin entries from opencode.json\n");
+                }
+            }
+        ' "$oc_json" "$CODING_REPO" 2>&1 | while read -r l; do info "  $l"; done || true
+    fi
+
+    success "Global leftovers removed — bare agents now behave as they did before this project"
+}
+
 main() {
     parse_args "$@"
     echo -e "${PURPLE}🚀 Agent-Agnostic Coding Tools - Universal Installer${NC}"
@@ -3199,6 +3336,10 @@ main() {
 
     # The single question that decides host impact (default: wrapper-scoped).
     ask_agent_scope
+
+    # Choosing wrapper does not undo what an earlier global install wrote, so
+    # offer to remove those leftovers — otherwise the choice is quietly untrue.
+    cleanup_stale_global_artifacts
 
     # Network FIRST. Everything below this line may hit the network, and the
     # heaviest step (install_node_dependencies -> native postinstalls fetching
