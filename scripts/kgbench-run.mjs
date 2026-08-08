@@ -235,6 +235,18 @@ const comboKey = (c) => `${c.arm.id}|${c.agentId}|${c.agent.model}`;
 // Non-claude probes cost a session each and their tokens can arrive late, so one sample is
 // the default there; claude's are cheap and immediate, so it keeps three.
 const baselineReps = (agentId) => parseInt(opt('baseline-reps', agentId === 'claude' ? '3' : '1'), 10);
+// How long a non-claude baseline waits for its stop-adapter to write the row.
+//
+// 40s was not enough and the failure is expensive in a way a cell's is not: a cell whose
+// tokens arrive late is repaired by kgbench-backfill-tokens.mjs, but a BASELINE has no window
+// stored anywhere to re-resolve from, so a floor that misses its wait is gone for the whole
+// run — and every cell in that combination loses `content_tokens`, the headline metric. Two
+// copilot floors timed out at 40s on one attempt, costing 96 of 384 cells their column; the
+// rows themselves landed about two minutes later.
+//
+// Patience is nearly free because the poll returns the moment it finds rows: a prompt adapter
+// pays nothing, and only a genuinely missing floor pays the full budget, once per combination.
+const baselineWaitS = parseInt(opt('baseline-token-wait-s', '150'), 10);
 if (!flag('no-baseline')) {
   out('kgbench: measuring token baselines...');
   const leaks = [];
@@ -246,7 +258,9 @@ if (!flag('no-baseline')) {
       runId,
       // Baselines happen once per combination rather than once per cell, so they can afford
       // to wait out a slow stop-adapter that a cell cannot.
-      tokenOpts: c.agentId === 'claude' ? {} : { attempts: 8, settleMs: 5000 },
+      tokenOpts: c.agentId === 'claude'
+        ? {}
+        : { attempts: Math.max(1, Math.ceil(baselineWaitS / 5)), settleMs: 5000 },
     });
     baselines[comboKey(c)] = b.baseline_in_tokens;
     baselineSource[comboKey(c)] = b.source ?? null;
@@ -268,6 +282,21 @@ if (!flag('no-baseline')) {
     die('arms are not isolated — these tools were denied but are still available:\n'
       + leaks.join('\n')
       + '\n  Every number from such a run compares arms that are not what their labels say.');
+  }
+  // A missing floor is NOT recoverable after the fact — unlike a cell, a baseline stores no
+  // window to re-resolve from — so every cell in that combination will carry a null
+  // content_tokens for the life of the run. Said loudly here rather than discovered in the
+  // report, because the fix (a longer wait, or an idle machine) is only cheap before the
+  // matrix starts.
+  const missing = combos.filter((c) => baselines[comboKey(c)] == null);
+  if (missing.length) {
+    out('');
+    out(`kgbench: WARNING — ${missing.length} of ${combos.length} combination(s) have NO token floor:`);
+    for (const c of missing) out(`  ${c.arm.id} / ${c.agentId}`);
+    out(`kgbench: those cells will have content_tokens = null (${missing.length * questions.length * reps} of `
+      + `${combos.length * questions.length * reps} cells). A baseline cannot be backfilled.`);
+    out(`kgbench: raise --baseline-token-wait-s (currently ${baselineWaitS}s) and restart if you need that column.`);
+    out('');
   }
 }
 // The always-on cost of merely having a backend registered, relative to bare grep — compared
