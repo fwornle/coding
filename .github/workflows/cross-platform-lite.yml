@@ -1,9 +1,10 @@
-# Cross-platform "lite" CI for the coding tools installer + test suite.
+# Cross-platform CI for the coding tools installer + test suite.
 #
 # Runs on GitHub's hosted ubuntu / macOS / Windows runners. It proves the shell
-# scripts are PORTABLE and degrade gracefully — it does NOT prove a full working
-# stack (that needs Docker, an authenticated agent CLI, and the private
-# submodules; use self-hosted runners for that). See docs/ci/README.md.
+# scripts are PORTABLE and degrade gracefully, that --dry-run is inert, and that
+# a real install completes on Linux. It does NOT prove a full working stack
+# (that needs Docker, an authenticated agent CLI, and the private submodules;
+# use self-hosted runners for that). See docs/ci/README.md.
 
 name: cross-platform-lite
 
@@ -30,7 +31,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22 to match docker/Dockerfile.coding-services (node:22-bookworm).
+          # Testing on 20 while shipping on 22 is testing a different runtime.
+          node-version: '22'
 
       - name: Syntax gate — bash -n on every tracked shell script
         run: |
@@ -59,3 +62,158 @@ jobs:
 
       - name: test-coding.sh --ci — full suite, unsatisfied checks are non-fatal
         run: bash scripts/test-coding.sh --ci
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # --dry-run must be exactly as inert as it claims.
+  #
+  # This is cheap and catches a specific, plausible regression: someone adds a
+  # mutation ABOVE the dry-run exit, or writes the install log before it, and
+  # the flag quietly stops being a safe way to inspect the installer. Asserting
+  # "exit 0" alone would not notice either.
+  # ───────────────────────────────────────────────────────────────────────────
+  dry-run-is-inert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Snapshot the working tree and $HOME
+        run: |
+          set -e
+          git status --porcelain > /tmp/tree-before.txt
+          # Timestamp floor for the $HOME sweep. Sleep 1s so that files written
+          # during the run are strictly newer than the marker, rather than
+          # sharing its second and being missed.
+          sleep 1
+          touch /tmp/home-marker
+          sleep 1
+
+      - name: ./install.sh --ci --dry-run
+        run: |
+          set -e
+          ./install.sh --ci --dry-run | tee /tmp/dry-run.txt
+          echo "exit=0 as required"
+
+      - name: Assert nothing was mutated
+        run: |
+          set -e
+          fail=0
+
+          git status --porcelain > /tmp/tree-after.txt
+          if ! diff -u /tmp/tree-before.txt /tmp/tree-after.txt; then
+            echo "::error::--dry-run modified the working tree"
+            fail=1
+          fi
+
+          # install.log in particular: writing it would contradict the promise.
+          if [ -f install.log ]; then
+            echo "::error::--dry-run created install.log"
+            fail=1
+          fi
+
+          # Anything under $HOME newer than the marker, minus the caches that
+          # node/npm/gh touch merely by being invoked — those are not installer
+          # mutations and would make this assertion permanently red.
+          find "$HOME" -type f -newer /tmp/home-marker -print 2>/dev/null \
+            | grep -vE "^$HOME/(\.npm|\.cache|\.local/state|\.config/gh)/|/\.(bash_history|zsh_history)$" \
+            > /tmp/home-touched.txt || true
+          if [ -s /tmp/home-touched.txt ]; then
+            echo "::error::--dry-run wrote to \$HOME:"
+            cat /tmp/home-touched.txt
+            fail=1
+          fi
+
+          # And it must actually have PRINTED the manifest, otherwise a
+          # do-nothing stub would pass every assertion above.
+          grep -q "WHAT THIS INSTALLER WILL CHANGE" /tmp/dry-run.txt \
+            || { echo "::error::--dry-run did not print the mutation manifest"; fail=1; }
+
+          exit $fail
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # A real install. This is the job whose absence hid the original failure.
+  #
+  # The old CI only SOURCED install.sh and called detect_platform /
+  # check_dependencies / detect_agents, so install_node_dependencies was
+  # unreachable on every OS and the npm and proxy paths were never executed
+  # anywhere. Sourcing also leaves `set -euo pipefail` inactive, so it tested
+  # different shell semantics than a real run.
+  #
+  # ubuntu-latest only: this needs a throwaway machine. It is allowed to end
+  # with warnings (no Docker daemon, no agent CLI, no private submodules) —
+  # --ci downgrades those to warnings by design. What it must not do is abort,
+  # leave `coding` unusable, or touch shared agent config.
+  # ───────────────────────────────────────────────────────────────────────────
+  real-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Hash shared agent configs before the install
+        run: |
+          set -e
+          # The requirement-7 invariant, asserted around a REAL install rather
+          # than around the seven functions in isolation (test-coding.sh does
+          # the function-level form; this is the end-to-end one).
+          hash_one() {
+            if [ -f "$1" ]; then sha256sum < "$1" | awk '{print $1}'
+            elif [ -d "$1" ]; then (cd "$1" && find . -type f -print0 | sort -z | xargs -0 sha256sum 2>/dev/null | sha256sum | awk '{print $1}')
+            else echo ABSENT; fi
+          }
+          : > /tmp/r7-before.txt
+          for p in "$HOME/.claude/settings.json" "$HOME/.claude.json" \
+                   "$HOME/.claude/commands" "$HOME/.copilot/settings.json" \
+                   "$HOME/.copilot/config.json" \
+                   "$HOME/.config/opencode/opencode.json" "$HOME/.opencode/plugins"; do
+            echo "$p $(hash_one "$p")" >> /tmp/r7-before.txt
+          done
+          cat /tmp/r7-before.txt
+
+      - name: ./install.sh --ci
+        timeout-minutes: 25
+        run: |
+          set -e
+          ./install.sh --ci
+          echo "installer exit=$?"
+
+      - name: bin/coding --help must work afterwards
+        run: |
+          set -e
+          test -x bin/coding || { echo "::error::bin/coding is not executable"; exit 1; }
+          bash bin/coding --help >/dev/null \
+            || { echo "::error::bin/coding --help failed after a real install"; exit 1; }
+          echo "bin/coding --help OK"
+
+      - name: Requirement 7 — shared agent configs still byte-identical
+        run: |
+          set -e
+          hash_one() {
+            if [ -f "$1" ]; then sha256sum < "$1" | awk '{print $1}'
+            elif [ -d "$1" ]; then (cd "$1" && find . -type f -print0 | sort -z | xargs -0 sha256sum 2>/dev/null | sha256sum | awk '{print $1}')
+            else echo ABSENT; fi
+          }
+          fail=0
+          while read -r p before; do
+            after="$(hash_one "$p")"
+            if [ "$before" != "$after" ]; then
+              echo "::error::a default install changed $p ($before -> $after)"
+              fail=1
+            fi
+          done < /tmp/r7-before.txt
+          [ $fail -eq 0 ] && echo "all 7 shared agent configs unchanged by a real install"
+          exit $fail
+
+      - name: Installer summary (always shown, for diagnosis)
+        if: always()
+        run: tail -60 install.log 2>/dev/null || echo "(no install.log)"
