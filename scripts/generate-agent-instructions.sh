@@ -107,6 +107,23 @@ emit_skill_list() {
 # 1. Claude: install slash commands globally
 # ──────────────────────────────────────────────────────────────────────────────
 install_claude_global() {
+    # ~/.claude/commands/ is global: anything copied there becomes a slash
+    # command for EVERY claude session in every project. A wrapper-scoped
+    # install must not touch it — bin/coding passes the repo's commands via
+    # --plugin-dir per launch instead, which also keeps them live rather than
+    # letting stale copies accumulate in $HOME.
+    #
+    # Read the scope from .env so this script behaves correctly whether it is
+    # invoked by install.sh or standalone at agent-launch time.
+    local scope="${CODING_AGENT_SCOPE:-}"
+    if [[ -z "$scope" && -f "$CODING_REPO/.env" ]]; then
+        scope="$(grep -m1 '^CODING_AGENT_SCOPE=' "$CODING_REPO/.env" 2>/dev/null | cut -d= -f2- || true)"
+    fi
+    if [[ "${scope:-wrapper}" != "global" ]]; then
+        log "Claude: skipping global ~/.claude/commands (wrapper-scoped install)"
+        return 0
+    fi
+
     local target="$HOME/.claude/commands"
     mkdir -p "$target"
 
@@ -119,6 +136,7 @@ install_claude_global() {
         ((count++))
     done
 
+    _CLAUDE_GLOBAL_INSTALLED=true
     log "Claude: installed $count skill(s) → $target"
 }
 
@@ -233,7 +251,14 @@ main() {
     generate_copilot_instructions "$PROJECT_DIR"
     ensure_skill_references_in_claude_md "$CLAUDE_MD"
 
-    log "Done — skills active in Claude, Copilot, and OpenCode"
+    # Be accurate about what actually happened: in wrapper-scoped installs the
+    # global Claude command dir was deliberately skipped, and claiming otherwise
+    # would send someone hunting for files that were never written.
+    if [[ "${_CLAUDE_GLOBAL_INSTALLED:-false}" == "true" ]]; then
+        log "Done — skills active in Claude (global), Copilot, and OpenCode"
+    else
+        log "Done — skills active for Copilot and OpenCode; Claude gets them per-launch via 'coding' (wrapper-scoped)"
+    fi
 }
 
 main "$@"

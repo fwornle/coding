@@ -51,9 +51,121 @@ SKIPPED_SYSTEM_DEPS=()
 #   CI_LITE          — downgrade missing-infra HARD gates (Docker, agent CLI,
 #                      core deps) to warnings so a portability run completes and
 #                      reports a summary instead of aborting at the first gap.
+#   DRY_RUN          — print the mutation manifest and exit 0 without touching
+#                      anything (--dry-run).
 NON_INTERACTIVE=false
 ASSUME_YES=false
 CI_LITE=false
+DRY_RUN=false
+
+# Which agent configuration scope the user chose. See ask_agent_scope().
+#   wrapper — nothing outside this repo is configured; bin/coding injects
+#             everything per-launch. Bare `claude`/`copilot`/`opencode` are
+#             byte-for-byte unaffected. THIS IS THE DEFAULT.
+#   global  — hooks/MCP are written into the user's global agent configs, so
+#             bare sessions are observed too. Opt-in only.
+CODING_AGENT_SCOPE="wrapper"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MUTATION MANIFEST
+#
+# Every change this installer can make OUTSIDE the repo is declared here, in one
+# place, and printed before anything happens. It is declarative on purpose: a
+# prose list drifts from reality within a release or two, and the user's whole
+# basis for consent is that this list is complete.
+#
+# Format:  scope|path|action|reversible|why
+#
+# scope:  repo   — inside $CODING_REPO. Safe: deleting the repo removes it.
+#         home   — under $HOME, ours alone. Reversible by uninstall.sh.
+#         global — a config file SHARED with the user's own tools. Changing these
+#                  affects how bare agents behave. Requires explicit opt-in.
+#         system — background services that persist across logins.
+#
+# uninstall.sh consumes the same table, so the two cannot drift apart.
+# ─────────────────────────────────────────────────────────────────────────────
+mutation_manifest() {
+    cat <<'MANIFEST'
+repo|$CODING_REPO/node_modules|create|yes|Node dependencies
+repo|$CODING_REPO/.env|append|yes|local settings (history repo URL, feature flags)
+repo|$CODING_REPO/.npmrc|create|yes|proxy for npm, only if env vars are not honoured
+repo|$CODING_REPO/.git/hooks/pre-commit|replace|yes|knowledge-snapshot guard (original saved as pre-commit.coding-orig)
+repo|$CODING_REPO/lib/km-core|checkout|yes|git submodule required for session logging
+home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
+home|$SHELL_RC|one marker block|yes|exports CODING_REPO and adds bin/ to PATH
+global|~/.claude/settings.json|merge hooks|yes|OPT-IN: adds hooks that run for EVERY claude session, in every project
+global|~/.claude.json|merge mcpServers|yes|OPT-IN: MCP servers visible to bare `claude` everywhere
+global|~/.claude/commands/|copy skills|yes|OPT-IN: slash commands available to bare `claude` everywhere
+global|~/.config/opencode/opencode.json|merge plugins|yes|OPT-IN: plugins load in every opencode session
+global|~/.copilot/settings.json|enableFileHooks|yes|OPT-IN (separate): lets repo hooks fire in ANY of your repos
+system|~/Library/LaunchAgents/com.coding.llm-cli-proxy.plist|create+load|yes|OPT-IN: starts the LLM proxy at login (macOS)
+system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux)
+MANIFEST
+}
+
+# Print the manifest grouped by scope, with a hard visual break between what is
+# safe and what needs consent.
+print_impact_manifest() {
+    echo ""
+    echo -e "${PURPLE}════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${PURPLE}  WHAT THIS INSTALLER WILL CHANGE ON YOUR MACHINE${NC}"
+    echo -e "${PURPLE}════════════════════════════════════════════════════════════════════${NC}"
+
+    local scope path action reversible why line
+    local shown_header=""
+
+    for scope in repo home global system; do
+        local any=false
+        while IFS='|' read -r s path action reversible why; do
+            [[ "$s" == "$scope" ]] || continue
+            # Only show rows that can actually apply here. Listing a systemd unit
+            # on macOS (or a LaunchAgent on Linux) makes the manifest look
+            # careless and undermines its purpose as a consent document.
+            case "$path" in
+                *LaunchAgents*) [[ "$PLATFORM" == "macos" ]] || continue ;;
+                *systemd*)      [[ "$PLATFORM" == "linux" || "$PLATFORM" == "wsl" ]] || continue ;;
+            esac
+            if [[ "$any" == "false" ]]; then
+                any=true
+                case "$scope" in
+                    repo)
+                        echo ""
+                        echo -e "${GREEN}▸ Inside the repo — removed entirely if you delete it${NC}"
+                        ;;
+                    home)
+                        echo ""
+                        echo -e "${CYAN}▸ In your home directory — ours alone, reverted by ./uninstall.sh${NC}"
+                        ;;
+                    global)
+                        echo ""
+                        echo -e "${YELLOW}────────────────────────────────────────────────────────────────────${NC}"
+                        echo -e "${YELLOW}▸ SHARED with your own tools — changes how BARE agents behave${NC}"
+                        echo -e "${YELLOW}  Skipped unless you opt in. Default is NO.${NC}"
+                        ;;
+                    system)
+                        echo ""
+                        echo -e "${YELLOW}▸ Background services that survive logout${NC}"
+                        echo -e "${YELLOW}  Skipped unless you opt in. Default is NO.${NC}"
+                        ;;
+                esac
+            fi
+            # Expand $CODING_REPO / $SHELL_RC / ~ for display.
+            local shown="${path/\$CODING_REPO/$CODING_REPO}"
+            shown="${shown/\$SHELL_RC/$SHELL_RC}"
+            shown="${shown/#\~/$HOME}"
+            printf "    %-58s %s\n" "$shown" "[$action]"
+            printf "      └─ %s\n" "$why"
+        done < <(mutation_manifest)
+    done
+
+    echo ""
+    echo -e "${PURPLE}────────────────────────────────────────────────────────────────────${NC}"
+    echo "  Everything above is reversible with ./uninstall.sh."
+    echo "  Nothing else on your machine is touched. Bare 'claude', 'copilot' and"
+    echo "  'opencode' keep working exactly as they do now unless you opt in."
+    echo -e "${PURPLE}════════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+}
 
 # Safety: Confirm before any system-level modification
 # Usage: confirm_system_change "action description" "risk warning"
@@ -291,6 +403,29 @@ info() {
 warning() {
     echo -e "${YELLOW}⚠️  $1${NC}"
     log "WARNING: $1"
+}
+
+# Gate for anything that writes a config file SHARED with the user's own tools
+# (~/.claude, ~/.claude.json, ~/.config/opencode, ~/.opencode, ~/.copilot).
+#
+# Requirement: installing this project MUST NOT change how bare `claude`,
+# `copilot` or `opencode` behave. Those configs are global, so writing them
+# changes every project on the machine — therefore they are opt-in only, and
+# CODING_AGENT_SCOPE defaults to "wrapper".
+#
+# Usage, as the first line of any such function:
+#     require_global_scope "what this would configure" || return 0
+#
+# In wrapper mode the equivalent capability is injected per-launch by bin/coding
+# instead, so the feature is not lost for agents started through the wrapper.
+require_global_scope() {
+    local what="$1"
+    if [[ "$CODING_AGENT_SCOPE" == "global" ]]; then
+        return 0
+    fi
+    info "Skipping $what (wrapper-scoped install — your global agent config is untouched)"
+    log "SKIP (wrapper scope): $what"
+    return 1
 }
 
 # Set KEY=VALUE in the repo-local .env, replacing any existing line for KEY.
@@ -1011,40 +1146,29 @@ configure_shell_environment() {
     local claude_path_export="export PATH=\"$CODING_REPO/bin:\$PATH\""
     local claude_repo_export="export CODING_REPO=\"$CODING_REPO\""
     
-    # Clean up old aliases from all shell config files
-    local config_files=("$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.zprofile")
-    
-    for config_file in "${config_files[@]}"; do
-        if [[ -f "$config_file" ]]; then
-            info "Cleaning up old configurations in $config_file..."
-            # Remove old alias blocks and exports
-            sed -i.bak '/# ===============================================/,/💡 Master commands/d' "$config_file" 2>/dev/null || true
-            sed -i.bak '/Enhanced Knowledge Management Aliases/,/💡 Master commands/d' "$config_file" 2>/dev/null || true
-            sed -i.bak '/alias vkb=/d' "$config_file" 2>/dev/null || true
-            sed -i.bak '/alias claude-mcp=/d' "$config_file" 2>/dev/null || true
-            sed -i.bak '/unalias vkb/d' "$config_file" 2>/dev/null || true
-            # Remove old CODING_REPO/CLAUDE_REPO exports
-            sed -i.bak '/CLAUDE_REPO.*Claude/d' "$config_file" 2>/dev/null || true
-            sed -i.bak '/CODING_REPO.*coding/d' "$config_file" 2>/dev/null || true
-        fi
-    done
-    
-    # Clean up old wrapper scripts in ~/bin that point to wrong paths
-    local wrapper_scripts=("$HOME/bin/vkb" "$HOME/bin/claude-mcp")
-    for wrapper in "${wrapper_scripts[@]}"; do
-        if [[ -f "$wrapper" ]] && grep -q "/Users/q284340/Claude/" "$wrapper" 2>/dev/null; then
-            info "Updating old wrapper script: $wrapper"
-            # Update wrapper to point to new location
-            local script_name=$(basename "$wrapper")
-            cat > "$wrapper" << EOF
-#!/bin/bash
-# Updated wrapper for $script_name command
-exec $CODING_REPO/knowledge-management/$script_name "\$@"
-EOF
-            chmod +x "$wrapper"
-        fi
-    done
-    
+    # ── REMOVED: the four-file "clean up old aliases" scrub ─────────────────
+    #
+    # This used to run SEVEN sequential `sed -i.bak` passes over ALL FOUR of
+    # ~/.bashrc, ~/.bash_profile, ~/.zshrc and ~/.zprofile, on every single run,
+    # with no confirmation and before the sandbox guard below (so even sandbox
+    # mode mutated them). It was unsafe in three separate ways:
+    #
+    #   1. Not recoverable. Each pass overwrote the same `.bak`, so after pass 7
+    #      the "backup" held the state after pass 6 — the user's original file
+    #      was gone for good.
+    #   2. Over-broad. `/CODING_REPO.*coding/d` deletes ANY line mentioning both,
+    #      including a user's own unrelated exports, comments or aliases.
+    #   3. Unnecessary. Everything this installer adds now lives inside one
+    #      marker-delimited block in ONE file ($SHELL_RC), which is removed and
+    #      re-appended below. That is inherently idempotent and needs no scrub.
+    #
+    # Legacy leftovers from the pre-2025 layout (vkb/claude-mcp aliases, a
+    # CLAUDE_REPO export, ~/bin wrapper scripts hardcoding a path that no longer
+    # exists on any machine) are NOT rewritten either — silently editing four of
+    # the user's shell files to clean up after an old version is exactly the kind
+    # of impact this installer must not have. uninstall.sh removes what we added;
+    # anything older is the user's to keep or delete.
+
     # SANDBOX MODE: Only create local .activate file
     if [[ "$SANDBOX_MODE" == "true" ]]; then
         cat > "$CODING_REPO/.activate" << EOF
@@ -1077,17 +1201,29 @@ EOF
             info "  $claude_path_export"
             SKIPPED_SYSTEM_DEPS+=("shell-config")
         else
-            # Create timestamped backup before modification
-            local backup_file="${SHELL_RC}.coding-backup.$(date +%Y%m%d%H%M%S)"
-            cp "$SHELL_RC" "$backup_file"
-            info "Created backup: $backup_file"
-
-            # Remove any existing Claude configurations to prevent duplicates
-            if [[ -f "$SHELL_RC.bak" ]]; then
-                rm -f "$SHELL_RC.bak"
+            # ONE-TIME pristine backup. The previous version wrote a new
+            # ${SHELL_RC}.coding-backup.<timestamp> on EVERY run, so these
+            # accumulated forever and were never pruned. Keep exactly one copy
+            # of the file as it was before this installer first touched it.
+            local backup_file="${SHELL_RC}.coding-orig"
+            if [[ ! -f "$backup_file" ]]; then
+                cp "$SHELL_RC" "$backup_file"
+                info "Saved a one-time original: $backup_file"
+            else
+                info "Original already preserved at: $backup_file"
             fi
-            # Remove existing Claude sections
-            sed -i.bak '/# Claude Knowledge Management System/,/^$/d' "$SHELL_RC" 2>/dev/null || true
+
+            # Remove OUR marker block if a previous run added one, then append a
+            # fresh copy. Remove-then-append on a delimited block is what makes
+            # this idempotent, with no .bak litter and no broad patterns that
+            # could catch the user's own lines.
+            local tmp_rc
+            tmp_rc="$(mktemp)"
+            awk '
+                /^# === CODING TOOLS START/ { skip=1 }
+                skip != 1 { print }
+                /^# === CODING TOOLS END/   { skip=0 }
+            ' "$SHELL_RC" > "$tmp_rc" && mv "$tmp_rc" "$SHELL_RC"
 
             # Add configuration to SINGLE shell config file with markers
             {
@@ -1096,17 +1232,17 @@ EOF
                 echo "$claude_repo_export"
                 echo "$claude_path_export"
                 echo "# === CODING TOOLS END ==="
-                echo ""
             } >> "$SHELL_RC"
 
             # Verify the modification didn't break the shell config
             if bash -n "$SHELL_RC" 2>/dev/null || zsh -n "$SHELL_RC" 2>/dev/null; then
-                success "Configuration added to $SHELL_RC"
-                info "Backup saved: $backup_file"
+                success "Configuration added to $SHELL_RC (one marker block)"
+                info "Revert at any time with ./uninstall.sh, or delete the block between"
+                info "  '# === CODING TOOLS START' and '# === CODING TOOLS END'"
             else
-                warning "Shell config may have issues - restoring backup"
+                warning "Shell config may have issues - restoring original"
                 cp "$backup_file" "$SHELL_RC"
-                INSTALLATION_WARNINGS+=("Shell config: Restored from backup due to syntax issues")
+                INSTALLATION_WARNINGS+=("Shell config: Restored from original due to syntax issues")
             fi
         fi
     fi
@@ -1236,6 +1372,12 @@ except Exception as e:
 setup_user_level_mcp_config() {
     local temp_file="$1"
 
+    # ~/.claude.json is read by EVERY claude invocation in every project. In
+    # wrapper mode bin/coding passes --mcp-config per launch instead (the seam
+    # already exists in scripts/claude-mcp-launcher.sh), so bare `claude` sees
+    # exactly the MCP servers it saw before this project was installed.
+    require_global_scope "user-level MCP configuration (~/.claude.json)" || return 0
+
     # SANDBOX MODE: Skip global config modifications
     if [[ "$SANDBOX_MODE" == "true" ]]; then
         warning "SANDBOX MODE: Skipping user-level MCP configuration (~/.claude.json)"
@@ -1250,20 +1392,36 @@ setup_user_level_mcp_config() {
     local user_config_backup=""
     
     if [[ -f "$user_config" ]]; then
-        # Create backup
-        user_config_backup="$user_config.backup.$(date +%Y%m%d_%H%M%S)"
-        cp "$user_config" "$user_config_backup"
-        info "Backed up existing configuration to: $user_config_backup"
-        
+        # ONE-TIME original, not a new copy per run. ~/.claude.json is often
+        # large, and the old `.backup.<timestamp>` pattern grew without bound.
+        user_config_backup="$user_config.coding-orig"
+        if [[ ! -f "$user_config_backup" ]]; then
+            cp "$user_config" "$user_config_backup"
+            info "Saved a one-time original: $user_config_backup"
+        fi
+
         # Merge with existing configuration
         local merged_config=$(mktemp)
-        
-        # Use jq to merge configurations, giving priority to new MCP servers
+
+        # NOTE: jq's `*` is a RECURSIVE merge, so the previous
+        # `jq -s '.[0] * .[1]'` already preserved the user's own mcpServers
+        # entries — it was not the data-loss bug it looks like at a glance, and an
+        # earlier note in this project claiming otherwise was wrong. Verified:
+        # a user server survives that expression untouched.
+        #
+        # The mcpServers line below is therefore explicit rather than corrective.
+        # It pins the intent — union the two maps, ours winning only on a genuine
+        # name collision — so a future reader does not "fix" it into a shallow
+        # assignment, which WOULD lose the user's servers.
         if command -v jq >/dev/null 2>&1; then
-            jq -s '.[0] * .[1]' "$user_config" "$temp_file" > "$merged_config"
+            jq -s '
+                .[0] as $user | .[1] as $ours
+                | ($user * $ours)
+                | .mcpServers = (($user.mcpServers // {}) + ($ours.mcpServers // {}))
+            ' "$user_config" "$temp_file" > "$merged_config"
             cp "$merged_config" "$user_config"
             rm -f "$merged_config"
-            success "Merged MCP configuration with existing user config"
+            success "Merged MCP configuration (your own servers preserved)"
         else
             # Fallback: overwrite mcpServers section only
             warning "jq not found, using simple merge (may overwrite existing MCP servers)"
@@ -1326,6 +1484,10 @@ MANAGED_MCP_KEYS="semantic-analysis constraint-monitor graphify code-graph-rag"
 setup_opencode_mcp_config() {
     local temp_file="$1"
 
+    # Rewrites ~/.config/opencode/opencode.json. In wrapper mode the launcher
+    # supplies MCP servers via OPENCODE_CONFIG_CONTENT instead.
+    require_global_scope "OpenCode MCP configuration (~/.config/opencode/opencode.json)" || return 0
+
     echo -e "\n${CYAN}📋 Setting up OpenCode MCP configuration...${NC}"
     
     if [[ "$SANDBOX_MODE" == "true" ]]; then
@@ -1345,8 +1507,12 @@ setup_opencode_mcp_config() {
         return 0
     fi
     
-    # Backup existing config
-    cp "$opencode_config" "$opencode_config.backup.$(date +%Y%m%d_%H%M%S)"
+    # ONE-TIME original instead of a new timestamped copy per run — those
+    # accumulated indefinitely and were never pruned.
+    if [[ ! -f "$opencode_config.coding-orig" ]]; then
+        cp "$opencode_config" "$opencode_config.coding-orig"
+        info "Saved a one-time original: $opencode_config.coding-orig"
+    fi
     
     # Convert Claude MCP format to OpenCode MCP format and merge into existing config
     python3 -c "
@@ -2285,6 +2451,19 @@ setup_llm_cli_proxy() {
         return 0
     fi
 
+    # A login-persistent background service is a bigger commitment than any
+    # config edit: it keeps running after the install, after logout, and after
+    # the user has forgotten about it. `--yes` used to auto-approve it via
+    # confirm_system_change, which is the wrong default for "unattended".
+    # Require explicit consent, exactly like the global agent configs.
+    if [[ "${CODING_INSTALL_SYSTEM_SERVICES:-0}" != "1" ]]; then
+        info "Not installing an autostart service for the LLM proxy"
+        info "  It runs on demand when you use 'coding'. For a login-persistent"
+        info "  service, re-run with CODING_INSTALL_SYSTEM_SERVICES=1."
+        log "SKIP: LLM proxy autostart service (not opted in)"
+        return 0
+    fi
+
     # Offer to install as persistent service.
     # Dispatch on $PLATFORM, not `uname -s`: WSL reports "Linux" but frequently
     # has no user systemd instance (WSL1, and WSL2 without systemd enabled), so
@@ -2908,6 +3087,12 @@ parse_args() {
         case "$1" in
             -y|--yes)                    ASSUME_YES=true; NON_INTERACTIVE=true ;;
             --ci|--non-interactive)      NON_INTERACTIVE=true; CI_LITE=true ;;
+            # --dry-run must be truly side-effect free, including the install
+            # log: writing $CODING_REPO/install.log would contradict "nothing
+            # was changed". Redirect it to a temp file for the duration.
+            --dry-run)                   DRY_RUN=true; NON_INTERACTIVE=true
+                                         INSTALL_LOG="${TMPDIR:-/tmp}/coding-install-dryrun.log" ;;
+            --global-agents)             CODING_INSTALL_GLOBAL_AGENTS=1 ;;
             -h|--help)                   show_usage; exit 0 ;;
             --skip-hooks)                : ;;  # accepted, no-op at root level
             *)                           warning "Unknown option: $1 (ignored)" ;;
@@ -2944,6 +3129,197 @@ read_or_default() {
     printf -v "$__var" '%s' "$__reply"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# The one question that decides host impact.
+#
+# DEFAULT IS "wrapper" (no). Note this deliberately INVERTS the semantics of
+# confirm_system_change(), where --yes auto-approves: an unattended run must
+# never silently reconfigure the user's global agent setup. Choosing global
+# non-interactively requires the explicit CODING_INSTALL_GLOBAL_AGENTS=1 or
+# --global-agents.
+# ─────────────────────────────────────────────────────────────────────────────
+ask_agent_scope() {
+    # Explicit opt-in wins, interactive or not.
+    if [[ "${CODING_INSTALL_GLOBAL_AGENTS:-0}" == "1" ]]; then
+        CODING_AGENT_SCOPE="global"
+        info "Agent scope: GLOBAL (explicitly requested)"
+        set_env_var CODING_AGENT_SCOPE global
+        return 0
+    fi
+
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        CODING_AGENT_SCOPE="wrapper"
+        info "Agent scope: WRAPPER-SCOPED (default for unattended runs)"
+        info "  Global agent configs are NOT modified. Re-run with --global-agents to opt in."
+        set_env_var CODING_AGENT_SCOPE wrapper
+        return 0
+    fi
+
+    echo ""
+    echo -e "${CYAN}Observe agents launched WITHOUT the 'coding' wrapper?${NC}"
+    echo ""
+    echo "  Session logging and knowledge injection always work for agents you"
+    echo "  start via 'coding'. Extending that to bare 'claude' / 'copilot' /"
+    echo "  'opencode' requires editing their GLOBAL config files, which changes"
+    echo "  their behaviour in every project on this machine."
+    echo ""
+    echo -e "  ${GREEN}n${NC} (default) — wrapper-scoped. Nothing outside this repo is configured."
+    echo "                 Bare agents behave exactly as they do today."
+    echo -e "  ${YELLOW}y${NC}           — also write hooks/MCP into ~/.claude, ~/.config/opencode."
+    echo "                 Reversible with ./uninstall.sh."
+    echo ""
+    local reply
+    read_or_default reply "n" "$(echo -e "${CYAN}Observe bare agent sessions too? [y/N]: ${NC}")"
+    case "$reply" in
+        [Yy]*)
+            CODING_AGENT_SCOPE="global"
+            info "Agent scope: GLOBAL — bare agent sessions will be observed"
+            ;;
+        *)
+            CODING_AGENT_SCOPE="wrapper"
+            success "Agent scope: WRAPPER-SCOPED — your global agent configs stay untouched"
+            ;;
+    esac
+    set_env_var CODING_AGENT_SCOPE "$CODING_AGENT_SCOPE"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Migration: global → wrapper.
+#
+# Choosing wrapper scope stops us WRITING global config, but it does not undo
+# what an earlier global-mode install already wrote. Those artifacts are still
+# live, so bare agents would remain affected and the user's choice would be
+# quietly untrue. Detect the leftovers and offer to remove them.
+#
+# Everything here is surgical: only entries naming THIS repo or our own known
+# filenames are touched. The user's own hooks, plugins and commands are left
+# exactly as they are.
+# ─────────────────────────────────────────────────────────────────────────────
+cleanup_stale_global_artifacts() {
+    [[ "$CODING_AGENT_SCOPE" == "wrapper" ]] || return 0
+
+    local found=()
+
+    # 1. Slash commands previously copied into the global dir.
+    local cmd_leftovers=()
+    if [[ -d "$HOME/.claude/commands" && -d "$CODING_REPO/.claude/commands" ]]; then
+        local f base
+        for f in "$CODING_REPO/.claude/commands"/*.md; do
+            [[ -f "$f" ]] || continue
+            base="$(basename "$f")"
+            [[ -f "$HOME/.claude/commands/$base" ]] && cmd_leftovers+=("$base")
+        done
+        [[ ${#cmd_leftovers[@]} -gt 0 ]] && found+=("~/.claude/commands: ${#cmd_leftovers[@]} command(s) from this repo")
+    fi
+
+    # 2. Our hooks inside the user's global Claude settings.
+    local hooks_present=false
+    if [[ -f "$HOME/.claude/settings.json" ]] && grep -q "$CODING_REPO" "$HOME/.claude/settings.json" 2>/dev/null; then
+        hooks_present=true
+        found+=("~/.claude/settings.json: hooks pointing at this repo")
+    fi
+
+    # 3. OpenCode plugins copied under $HOME.
+    local oc_leftovers=()
+    local p
+    for p in compaction-guard knowledge-injection; do
+        [[ -f "$HOME/.opencode/plugins/$p.js" ]] && oc_leftovers+=("$p.js")
+    done
+    [[ ${#oc_leftovers[@]} -gt 0 ]] && found+=("~/.opencode/plugins: ${#oc_leftovers[@]} plugin(s)")
+
+    if [[ ${#found[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    echo ""
+    warning "This machine still carries GLOBAL agent configuration from an earlier install:"
+    local item
+    for item in "${found[@]}"; do echo "    • $item"; done
+    echo ""
+    info "You chose wrapper-scoped, so these are the reason bare agents would still"
+    info "be affected. Removing them completes the switch. Your own hooks, plugins"
+    info "and commands are not touched."
+    echo ""
+
+    local reply
+    read_or_default reply "y" "$(echo -e "${CYAN}Remove this project's global leftovers? [Y/n]: ${NC}")"
+    case "$reply" in
+        [Nn]*)
+            warning "Left in place — bare agents will still load this project's config"
+            INSTALLATION_WARNINGS+=("Stale global agent config left in place (wrapper scope chosen)")
+            return 0
+            ;;
+    esac
+
+    # Remove only the command files that came from this repo.
+    local base
+    for base in "${cmd_leftovers[@]:-}"; do
+        [[ -n "$base" ]] || continue
+        rm -f "$HOME/.claude/commands/$base" && info "  removed ~/.claude/commands/$base"
+    done
+    rmdir "$HOME/.claude/commands" 2>/dev/null || true
+
+    # Strip only hook entries whose command names this repo.
+    if [[ "$hooks_present" == "true" ]]; then
+        local settings="$HOME/.claude/settings.json"
+        if [[ ! -f "$settings.coding-orig" ]]; then
+            cp "$settings" "$settings.coding-orig"
+            info "  saved a one-time original: $settings.coding-orig"
+        fi
+        if node -e '
+            const fs = require("fs");
+            const [file, repo] = process.argv.slice(1);
+            const s = JSON.parse(fs.readFileSync(file, "utf8"));
+            let removed = 0;
+            for (const ev of Object.keys(s.hooks || {})) {
+                const before = s.hooks[ev].length;
+                s.hooks[ev] = s.hooks[ev].filter(
+                    (e) => !(e.hooks || []).some((h) => (h.command || "").includes(repo)),
+                );
+                removed += before - s.hooks[ev].length;
+                if (s.hooks[ev].length === 0) delete s.hooks[ev];
+            }
+            if (s.hooks && Object.keys(s.hooks).length === 0) delete s.hooks;
+            fs.writeFileSync(file, JSON.stringify(s, null, 2) + "\n");
+            process.stderr.write(`removed ${removed} hook entr${removed === 1 ? "y" : "ies"}\n`);
+        ' "$settings" "$CODING_REPO" 2>&1 | while read -r l; do info "  $l"; done; then
+            :
+        else
+            warning "  could not edit $settings — remove the hooks naming $CODING_REPO by hand"
+        fi
+    fi
+
+    # OpenCode plugins: delete the files and drop their entries from the config.
+    for p in "${oc_leftovers[@]:-}"; do
+        [[ -n "$p" ]] || continue
+        rm -f "$HOME/.opencode/plugins/$p" && info "  removed ~/.opencode/plugins/$p"
+    done
+    rmdir "$HOME/.opencode/plugins" 2>/dev/null || true
+    local oc_json="$HOME/.config/opencode/opencode.json"
+    if [[ -f "$oc_json" ]] && grep -q "$CODING_REPO\|compaction-guard\|knowledge-injection" "$oc_json" 2>/dev/null; then
+        node -e '
+            const fs = require("fs");
+            const [file, repo] = process.argv.slice(1);
+            const c = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (Array.isArray(c.plugin)) {
+                const before = c.plugin.length;
+                c.plugin = c.plugin.filter(
+                    (p) => !String(p).includes(repo)
+                        && !String(p).includes("compaction-guard")
+                        && !String(p).includes("knowledge-injection"),
+                );
+                if (c.plugin.length === 0) delete c.plugin;
+                if (before !== (c.plugin || []).length) {
+                    fs.writeFileSync(file, JSON.stringify(c, null, 2) + "\n");
+                    process.stderr.write("dropped plugin entries from opencode.json\n");
+                }
+            }
+        ' "$oc_json" "$CODING_REPO" 2>&1 | while read -r l; do info "  $l"; done || true
+    fi
+
+    success "Global leftovers removed — bare agents now behave as they did before this project"
+}
+
 main() {
     parse_args "$@"
     echo -e "${PURPLE}🚀 Agent-Agnostic Coding Tools - Universal Installer${NC}"
@@ -2968,6 +3344,22 @@ main() {
     if [[ "$SANDBOX_MODE" == "true" ]]; then
         log "Running in SANDBOX MODE"
     fi
+
+    # Disclose everything BEFORE the first mutation. --dry-run stops here, so
+    # the manifest is also a way to inspect the installer without running it.
+    print_impact_manifest
+    if [[ "$DRY_RUN" == "true" ]]; then
+        success "Dry run — nothing was changed."
+        info "Re-run without --dry-run to install."
+        exit 0
+    fi
+
+    # The single question that decides host impact (default: wrapper-scoped).
+    ask_agent_scope
+
+    # Choosing wrapper does not undo what an earlier global install wrote, so
+    # offer to remove those leftovers — otherwise the choice is quietly untrue.
+    cleanup_stale_global_artifacts
 
     # Network FIRST. Everything below this line may hit the network, and the
     # heaviest step (install_node_dependencies -> native postinstalls fetching
@@ -3204,6 +3596,11 @@ MASTRACONFIG
 # old tool outputs and enriches compaction prompts to keep payloads manageable.
 # Also configures compaction.reserved=40000 in opencode.json to trigger compaction earlier.
 install_compaction_guard() {
+    # Writes ~/.opencode/plugins/ and ~/.config/opencode/opencode.json, so it
+    # would load in EVERY opencode session. In wrapper mode bin/coding supplies
+    # the plugin through OPENCODE_CONFIG_CONTENT instead (config/agents/opencode.sh).
+    require_global_scope "OpenCode compaction-guard plugin (global ~/.opencode)" || return 0
+
     echo -e "\n${CYAN}🛡️  Installing OpenCode compaction-guard plugin...${NC}"
 
     local OPENCODE_HOME="$HOME/.opencode"
@@ -3293,6 +3690,10 @@ install_compaction_guard() {
 # Entities/Observations), so the model uses it AND the Performance-tab "Retrieved
 # Knowledge" modal populates for OpenCode runs (previously always empty for them).
 install_knowledge_injection() {
+    # Same reasoning as install_compaction_guard: global ~/.opencode write,
+    # replaced per-launch by OPENCODE_CONFIG_CONTENT in wrapper mode.
+    require_global_scope "OpenCode knowledge-injection plugin (global ~/.opencode)" || return 0
+
     echo -e "\n${CYAN}🧠 Installing OpenCode knowledge-injection plugin...${NC}"
 
     local OPENCODE_HOME="$HOME/.opencode"
@@ -3347,6 +3748,25 @@ install_knowledge_injection() {
 # Both edits are idempotent and fail-open (node — copilot ships node; jq can't parse
 # the JSONC config.json). Per-avenue KB injection still honors CODING_KNOWLEDGE_INJECTION=0.
 install_copilot_file_hooks() {
+    # THIS ONE IS A SEPARATE OPT-IN, off even in global scope.
+    #
+    # `copilot` has no per-launch equivalent for enableFileHooks: there is no
+    # flag and no config-dir env var (only --additional-mcp-config is
+    # session-scoped). So unlike claude and opencode, this capability CANNOT be
+    # made wrapper-scoped — it is inherently global, and switching it on lets a
+    # repo's own .github/hooks/hooks.json fire in ANY of the user's repositories.
+    #
+    # It therefore needs its own explicit consent, not merely "global scope".
+    # With it off, copilot under `coding` still gets MCP and transcript capture;
+    # only the postToolUse knowledge-injection path is dormant.
+    if [[ "${CODING_INSTALL_COPILOT_HOOKS:-0}" != "1" ]]; then
+        info "Skipping Copilot filesystem hooks (opt in with CODING_INSTALL_COPILOT_HOOKS=1)"
+        info "  Why separate: copilot has no per-launch hook switch, so this is"
+        info "  unavoidably global — it would let repo hooks fire in all your repos."
+        log "SKIP: copilot file hooks (not opted in)"
+        return 0
+    fi
+
     echo -e "\n${CYAN}🪝  Enabling Copilot CLI filesystem hooks...${NC}"
     local SETTINGS="$HOME/.copilot/settings.json"
     local CONFIG="$HOME/.copilot/config.json"
@@ -3542,27 +3962,58 @@ install_okb_snapshot_guard() {
     # Install in coding repo itself
     local coding_hook="$CODING_REPO/.git/hooks/pre-commit"
     if [[ -d "$CODING_REPO/.git/hooks" ]]; then
+        # Preserve an existing hook once before overwriting it. This used to be a
+        # bare `cp`, so anyone with their own pre-commit hook lost it silently on
+        # every install — and had no way to get it back.
+        if [[ -f "$coding_hook" ]] && ! cmp -s "$coding_hook" "$hook_template"; then
+            if [[ ! -f "$coding_hook.coding-orig" ]]; then
+                cp "$coding_hook" "$coding_hook.coding-orig"
+                info "Existing pre-commit hook preserved as pre-commit.coding-orig"
+            fi
+        fi
         cp "$hook_template" "$coding_hook"
         chmod +x "$coding_hook"
         success "OKB snapshot guard installed in coding repo"
     fi
 
-    # Install in consumer repos that have OKB as a submodule
-    local consumer_repos=(
-        "$HOME/Agentic/_work/rapid-automations"
-    )
-    for repo in "${consumer_repos[@]}"; do
+    # Install in consumer repos that have OKB as a submodule.
+    #
+    # This list used to be hardcoded to "$HOME/Agentic/_work/rapid-automations" —
+    # one developer's machine baked into an installer everyone runs, writing a
+    # git hook into an unrelated repository. It is now opt-in and empty by
+    # default: set CODING_OKB_CONSUMER_REPOS to a colon-separated list of repo
+    # paths if you actually want this.
+    local consumer_repos=()
+    if [[ -n "${CODING_OKB_CONSUMER_REPOS:-}" ]]; then
+        IFS=':' read -r -a consumer_repos <<< "$CODING_OKB_CONSUMER_REPOS"
+    fi
+    local repo
+    for repo in "${consumer_repos[@]:-}"; do
+        [[ -n "$repo" ]] || continue
         local submodule_hooks_dir="$repo/.git/modules/integrations/operational-knowledge-management/hooks"
         if [[ -d "$submodule_hooks_dir" ]]; then
+            # Preserve whatever was there before we overwrite it.
+            if [[ -f "$submodule_hooks_dir/pre-commit" && ! -f "$submodule_hooks_dir/pre-commit.coding-orig" ]]; then
+                cp "$submodule_hooks_dir/pre-commit" "$submodule_hooks_dir/pre-commit.coding-orig"
+            fi
             cp "$hook_template" "$submodule_hooks_dir/pre-commit"
             chmod +x "$submodule_hooks_dir/pre-commit"
             success "OKB snapshot guard installed in $(basename "$repo") OKB submodule"
+        else
+            warning "CODING_OKB_CONSUMER_REPOS: no OKB submodule hooks dir in $repo — skipped"
         fi
     done
 }
 
 # Install constraint monitor hooks and LSL logging hooks
 install_constraint_monitor_hooks() {
+    # ~/.claude/settings.json hooks fire for EVERY claude session in every
+    # project — this is the single biggest "did installing this change my setup?"
+    # surface. In wrapper mode bin/coding derives a settings file containing
+    # these hooks and passes it with --settings per launch, so the user's own
+    # ~/.claude/settings.json is never read-modify-written.
+    require_global_scope "global Claude hooks (~/.claude/settings.json)" || return 0
+
     echo -e "\n${CYAN}🔗 Installing Hooks (Constraints + LSL)...${NC}"
 
     # SANDBOX MODE: Skip global hooks installation
@@ -3670,11 +4121,13 @@ EOF
         fi
     fi
 
-    # Backup existing settings
+    # Backup existing settings — ONE-TIME original, not one per run.
     if [[ -f "$settings_file" ]]; then
-        local backup_file="${settings_file}.backup.$(date +%Y%m%d_%H%M%S)"
-        cp "$settings_file" "$backup_file"
-        info "Backed up existing settings to: $backup_file"
+        local backup_file="${settings_file}.coding-orig"
+        if [[ ! -f "$backup_file" ]]; then
+            cp "$settings_file" "$backup_file"
+            info "Saved a one-time original: $backup_file"
+        fi
     else
         # Create new settings file
         echo '{"$schema": "https://json.schemastore.org/claude-code-settings.json"}' > "$settings_file"

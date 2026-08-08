@@ -64,6 +64,38 @@ agent_pre_launch() {
     _agent_log "🧪 opencode ANTHROPIC-NATIVE (opt-in) → proxy http://127.0.0.1:${_oc_proxy_port}/v1/messages (x-agent=opencode; x-task-id=${TASK_ID:-<ambient>})"
   fi
 
+  # ───────────────────────────────────────────────────────────────────────────
+  # Wrapper-scoped plugins (default since P2).
+  #
+  # A wrapper-scoped install does NOT copy plugins into ~/.opencode/plugins or
+  # edit ~/.config/opencode/opencode.json, so a bare `opencode` behaves exactly
+  # as it did before this project was installed. The plugins are instead spliced
+  # into OPENCODE_CONFIG_CONTENT here — the same seam already used above for the
+  # provider — so they load only for sessions started through `coding`.
+  #
+  # opencode accepts absolute plugin paths, so these are referenced in place from
+  # the repo and stay live rather than going stale as copies under $HOME.
+  local _oc_scope="${CODING_AGENT_SCOPE:-}"
+  if [ -z "$_oc_scope" ] && [ -f "${CODING_REPO:-}/.env" ]; then
+    _oc_scope="$(grep -m1 '^CODING_AGENT_SCOPE=' "${CODING_REPO}/.env" 2>/dev/null | cut -d= -f2- || true)"
+  fi
+  if [ "${_oc_scope:-wrapper}" != "global" ] && [ -n "${CODING_REPO:-}" ]; then
+    local _oc_plugins=""
+    for _p in compaction-guard knowledge-injection; do
+      if [ -f "${CODING_REPO}/plugins/opencode/${_p}.js" ]; then
+        _oc_plugins="${_oc_plugins:+${_oc_plugins},}\"${CODING_REPO}/plugins/opencode/${_p}.js\""
+      fi
+    done
+    if [ -n "$_oc_plugins" ]; then
+      # compaction.reserved mirrors what the global installer wrote, so behaviour
+      # through the wrapper is unchanged by the scope switch.
+      local _oc_extra="\"plugin\":[${_oc_plugins}],\"compaction\":{\"reserved\":40000}"
+      OPENCODE_CONFIG_CONTENT="{${_oc_extra},${OPENCODE_CONFIG_CONTENT#\{}"
+      export OPENCODE_CONFIG_CONTENT
+      _agent_log "🔒 Wrapper-scoped: opencode plugins injected for this session only"
+    fi
+  fi
+
   # Validate connectivity for the chosen provider (warn only, don't abort)
   validate_agent_connectivity "$AGENT_NAME" || true
 }

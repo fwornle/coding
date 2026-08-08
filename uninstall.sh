@@ -371,6 +371,80 @@ if [[ -d "$CODING_REPO/.data/knowledge-export" ]]; then
     fi
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Items the mutation manifest in install.sh declares but this script used to
+# miss entirely: the ~/bin/coding symlink, global slash commands, the git
+# pre-commit hook, and the one-time .coding-orig originals.
+#
+# install.sh's mutation_manifest() is the shared source of truth for what may
+# have been changed; keep the two in step when adding a new mutation.
+# ─────────────────────────────────────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}🧹 Removing remaining installed artifacts...${NC}"
+
+# 1. The `coding` command symlink.
+if [[ -L "$HOME/bin/coding" ]]; then
+    rm -f "$HOME/bin/coding"
+    echo "  Removed ~/bin/coding symlink"
+    rmdir "$HOME/bin" 2>/dev/null || true
+elif [[ -e "$HOME/bin/coding" ]]; then
+    echo "  ~/bin/coding exists but is not our symlink — left alone"
+fi
+
+# 2. Global slash commands, but ONLY the files that came from this repo.
+if [[ -d "$HOME/.claude/commands" && -d "$CODING_REPO/.claude/commands" ]]; then
+    _removed=0
+    for _f in "$CODING_REPO/.claude/commands"/*.md; do
+        [[ -f "$_f" ]] || continue
+        _base="$(basename "$_f")"
+        if [[ -f "$HOME/.claude/commands/$_base" ]]; then
+            rm -f "$HOME/.claude/commands/$_base"
+            _removed=$((_removed + 1))
+        fi
+    done
+    if [[ $_removed -gt 0 ]]; then
+        echo "  Removed $_removed slash command(s) from ~/.claude/commands (yours kept)"
+    fi
+    rmdir "$HOME/.claude/commands" 2>/dev/null || true
+fi
+
+# 3. The git pre-commit hook — restore the user's original if we saved one.
+_hook="$CODING_REPO/.git/hooks/pre-commit"
+if [[ -f "$_hook.coding-orig" ]]; then
+    mv "$_hook.coding-orig" "$_hook"
+    echo "  Restored your original pre-commit hook"
+elif [[ -f "$_hook" ]] && grep -q "okb\|OKB" "$_hook" 2>/dev/null; then
+    rm -f "$_hook"
+    echo "  Removed the OKB snapshot-guard pre-commit hook"
+fi
+
+# 4. Repo-local per-launch runtime config (regenerated on demand, safe to drop).
+if [[ -d "$CODING_REPO/.coding" ]]; then
+    rm -rf "$CODING_REPO/.coding/runtime" "$CODING_REPO/.coding/claude-plugin"
+    rmdir "$CODING_REPO/.coding" 2>/dev/null || true
+    echo "  Removed repo-local per-launch agent config (.coding/)"
+fi
+
+# 5. Report the one-time originals rather than deleting them: they are the user's
+#    safety net, and the earlier per-run `.backup.<timestamp>` files may still be
+#    littering their home directory from older installs.
+_origs=$(ls -1 "$HOME"/.zshrc.coding-orig "$HOME"/.bashrc.coding-orig \
+              "$HOME"/.bash_profile.coding-orig "$HOME"/.claude.json.coding-orig \
+              "$HOME"/.claude/settings.json.coding-orig \
+              "$HOME"/.config/opencode/opencode.json.coding-orig 2>/dev/null || true)
+if [[ -n "$_origs" ]]; then
+    echo ""
+    echo -e "${GREEN}💾 Pre-install originals kept (delete when you are satisfied):${NC}"
+    echo "$_origs" | while read -r _o; do [[ -n "$_o" ]] && echo "   $_o"; done
+fi
+_stale=$(ls -1 "$HOME"/*.coding-backup.* 2>/dev/null | head -5 || true)
+if [[ -n "$_stale" ]]; then
+    echo ""
+    echo -e "${YELLOW}⚠️  Older installs left timestamped backups you may want to prune:${NC}"
+    echo "$_stale" | while read -r _o; do [[ -n "$_o" ]] && echo "   $_o"; done
+    echo "   (newer installs keep a single .coding-orig instead)"
+fi
+
 if [[ -d "$CODING_REPO/.data" ]]; then
     echo -e "${GREEN}📊 Knowledge database preserved:${NC}"
     echo "   $CODING_REPO/.data/knowledge.db (SQLite database with learning history)"
