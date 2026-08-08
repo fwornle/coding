@@ -40,6 +40,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 2
 
 RUN_ID=""; SET_NAME="coding-v1"; REPS="3"; ONLY=""; DEEPEN=""; DEEPEN_REPS="10"; ARMS=""
+AGENTS=""; MODELS=""
 MAX_RESTARTS="8"
 
 while [ $# -gt 0 ]; do
@@ -49,6 +50,8 @@ while [ $# -gt 0 ]; do
     --reps)        REPS="$2"; shift 2 ;;
     --only)        ONLY="$2"; shift 2 ;;
     --arms)        ARMS="$2"; shift 2 ;;
+    --agents)      AGENTS="$2"; shift 2 ;;
+    --models)      MODELS="$2"; shift 2 ;;
     --deepen)      DEEPEN="$2"; shift 2 ;;
     --deepen-reps) DEEPEN_REPS="$2"; shift 2 ;;
     --max-restarts) MAX_RESTARTS="$2"; shift 2 ;;
@@ -75,7 +78,8 @@ if [ -z "${KGBENCH_SUPERVISED:-}" ]; then
   fi
   KGBENCH_SUPERVISED=1 nohup "$0" \
     --run-id "$RUN_ID" --set "$SET_NAME" --reps "$REPS" \
-    ${ONLY:+--only "$ONLY"} ${ARMS:+--arms "$ARMS"} ${DEEPEN:+--deepen "$DEEPEN"} --deepen-reps "$DEEPEN_REPS" \
+    ${ONLY:+--only "$ONLY"} ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} \
+    ${DEEPEN:+--deepen "$DEEPEN"} --deepen-reps "$DEEPEN_REPS" \
     --max-restarts "$MAX_RESTARTS" >>"$LOG" 2>&1 &
   disown
   echo "kgbench-supervise: detached (pid $!)"
@@ -123,15 +127,17 @@ run_pass() {
   done
 }
 
-say "supervising run '$RUN_ID' (set=$SET_NAME reps=$REPS arms='${ARMS:-all enabled}' only='${ONLY:-all}' deepen='${DEEPEN:-none}')"
+say "supervising run '$RUN_ID' (set=$SET_NAME reps=$REPS arms='${ARMS:-all enabled}' agents='${AGENTS:-claude}' models='${MODELS:-per-arm}' only='${ONLY:-all}' deepen='${DEEPEN:-none}')"
 set_status "running"
 
 if [ -n "$ONLY" ]; then
-  run_pass "only:$ONLY" --set "$SET_NAME" --reps "$REPS" --only "$ONLY" ${ARMS:+--arms "$ARMS"} --run-id "$RUN_ID" || exit $?
+  run_pass "only:$ONLY" --set "$SET_NAME" --reps "$REPS" --only "$ONLY" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} --run-id "$RUN_ID" || exit $?
 else
-  run_pass "matrix" --set "$SET_NAME" --reps "$REPS" ${ARMS:+--arms "$ARMS"} --run-id "$RUN_ID" || exit $?
+  run_pass "matrix" --set "$SET_NAME" --reps "$REPS" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} --run-id "$RUN_ID" || exit $?
   if [ -n "$DEEPEN" ]; then
-    run_pass "deepen:$DEEPEN" --set "$SET_NAME" --reps "$DEEPEN_REPS" --only "$DEEPEN" ${ARMS:+--arms "$ARMS"} --run-id "$RUN_ID" || exit $?
+    # The axes travel to the deepen pass too: adding reps under a different agent set would
+    # deepen a different experiment than the one the matrix measured.
+    run_pass "deepen:$DEEPEN" --set "$SET_NAME" --reps "$DEEPEN_REPS" --only "$DEEPEN" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} --run-id "$RUN_ID" || exit $?
   fi
 fi
 
