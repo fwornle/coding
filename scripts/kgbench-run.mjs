@@ -229,6 +229,26 @@ out(`  ${builtins.length} built-in tools; each arm denies all but its own grant`
 // SOURCE it was measured through, so a DB-derived cell total is never reduced by a
 // stream-json floor — those two account for prompt caching differently, and the difference
 // would not be a difference of anything.
+// A RESUME MUST REUSE THE FLOORS IT ALREADY MEASURED.
+//
+// Resume rightly skips completed cells; re-measuring the baselines undoes that discipline for
+// the derived metric. `content_tokens` is `total - floor`, so a fresh floor means cells 184+
+// are normalised against a different number than cells 1-183 — inside one run, in one column,
+// silently. That is not hypothetical drift: two launches an hour apart on this machine
+// measured the opencode floor at 33,200 and 64,935, a factor of two, because a
+// proxy-db-window floor depends on what the stop-adapter had written by the time it was asked.
+//
+// So the prior manifest's baselines are authoritative for a resume, exactly as results.jsonl is
+// authoritative for completed cells. --remeasure-baselines forces a fresh set when that is
+// what you actually want, and it applies to ALL of them so the run stays internally consistent.
+const priorManifest = (() => {
+  try { return JSON.parse(readFileSync(path.join(runDir, 'run.json'), 'utf8')); } catch { return null; }
+})();
+const reuseBaselines = !flag('remeasure-baselines') && priorManifest?.baselines
+  ? priorManifest.baselines
+  : {};
+const reuseBaselineSource = priorManifest?.baselineSource ?? {};
+
 const baselines = {};      // "arm|agent|model" -> in_tokens
 const baselineSource = {}; // "arm|agent|model" -> 'stream-json' | 'proxy-db-*' | null
 const comboKey = (c) => `${c.arm.id}|${c.agentId}|${c.agent.model}`;
@@ -251,6 +271,18 @@ if (!flag('no-baseline')) {
   out('kgbench: measuring token baselines...');
   const leaks = [];
   for (const c of combos) {
+    // Reused floors skip the probe entirely, which also means a resume does not re-run the
+    // isolation assertion for that combination. That is acceptable: the assertion already
+    // passed for this run tree at the same commit, and the alternative — re-measuring — is
+    // the inconsistency this reuse exists to prevent.
+    const priorFloor = reuseBaselines[comboKey(c)];
+    if (priorFloor != null) {
+      baselines[comboKey(c)] = priorFloor;
+      baselineSource[comboKey(c)] = reuseBaselineSource[comboKey(c)] ?? null;
+      out(`  ${c.arm.id.padEnd(12)} ${c.agentId.padEnd(10)} baseline_in_tokens=${priorFloor}`
+        + ` (reused from this run's manifest${baselineSource[comboKey(c)] ? `, ${baselineSource[comboKey(c)]}` : ''})`);
+      continue;
+    }
     const b = await measureBaseline({
       arm: c.arm, cwd: armCwd, env: process.env, builtins,
       reps: baselineReps(c.agentId),
