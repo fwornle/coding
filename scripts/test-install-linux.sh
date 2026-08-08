@@ -1,7 +1,8 @@
 #!/bin/bash
 # Linux end-to-end verification for ./install.sh, runnable from macOS.
 #
-# Drives the installer through three network shapes on a clean Ubuntu container:
+# Drives the installer through three network shapes and one platform shape on a
+# clean Ubuntu container:
 #
 #   direct     — normal egress. The installer must complete and must NOT pin a proxy.
 #   proxy-only — direct egress blocked, a squid proxy reachable via https_proxy.
@@ -112,6 +113,7 @@ docker info >/dev/null 2>&1 || { echo "docker daemon is not running"; exit 2; }
 cleanup() {
     docker rm -f coding-install-runner squid-proxy >/dev/null 2>&1 || true
     docker network rm "$NET" >/dev/null 2>&1 || true
+    [[ -n "${CACHE_DIR:-}" && -d "$CACHE_DIR" ]] && rm -rf "$CACHE_DIR"
     cleanup_ctx
 }
 trap cleanup EXIT
@@ -180,10 +182,42 @@ run_installer() {
     docker rm -f "$name" >/dev/null 2>&1 || true
 }
 
+# Memoised wrapper. `direct` and `arch` assert different things about the SAME
+# installer invocation, so running it twice doubles the slowest phase of the
+# harness for no extra coverage — which matters most under emulation, where one
+# run is minutes.
+#
+# Keyed to a FILE per argument string rather than a single last-result slot: with
+# the default shape order (direct, proxy-only, no-egress, arch) the intervening
+# shapes use different flags, so a last-only cache is evicted before `arch` asks
+# for it and the saving silently never happens. A file cache is order-independent.
+# An associative array would be the obvious structure, but macOS ships bash 3.2,
+# which does not have them.
+#
+# Shapes with different flags (proxy-only, no-egress) get their own runs, and each
+# shape stays independently runnable. The cache lives and dies with one
+# invocation, so it can never serve a stale result across runs.
+CACHE_DIR="$(mktemp -d)"
+run_installer_cached() {
+    local key f
+    key="$(printf '%s' "$1" | cksum | tr -d ' /')"
+    f="$CACHE_DIR/run-$key.log"
+    if [[ -s "$f" ]]; then
+        # stderr, not stdout: this function's stdout IS the installer log the
+        # caller captures, so an `info` on stdout both hides itself from the
+        # terminal and contaminates the saved /tmp/coding-install-*.log.
+        info "(reusing the identical installer run from this invocation)" >&2
+        cat "$f"
+        return 0
+    fi
+    run_installer "$1" > "$f"
+    cat "$f"
+}
+
 # ── shape: direct ────────────────────────────────────────────────────────────
 shape_direct() {
     echo; info "── shape: direct (normal egress) ──"
-    local out; out="$(run_installer "-e INSTALL_ARGS=--ci")"
+    local out; out="$(run_installer_cached "-e INSTALL_ARGS=--ci")"
     echo "$out" > /tmp/coding-install-direct.log
 
     if grep -q "reachable directly — no proxy needed" <<<"$out"; then
@@ -321,7 +355,7 @@ shape_no_egress() {
 # would be silent at install time and only surface later as an obs-api crash.
 shape_arch() {
     echo; info "── shape: arch (fastembed tokenizer per platform) ──"
-    local out; out="$(run_installer "-e INSTALL_ARGS=--ci")"
+    local out; out="$(run_installer_cached "-e INSTALL_ARGS=--ci")"
     echo "$out" > /tmp/coding-install-arch.log
 
     local carch expected_pkg embed_host

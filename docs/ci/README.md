@@ -36,13 +36,24 @@ inactive, so it tested different shell semantics than a real run.
 | A real install completes on Linux | Private submodules (`cc-github.bmwgroup.net`) |
 | A default install leaves `$HOME` untouched | Behaviour behind a corporate proxy |
 
+### Architecture coverage is split, deliberately
+
+GitHub's hosted runners are **amd64**, so `real-install` exercises the
+`tokenizers-linux-x64-gnu` path natively. `scripts/test-install-linux.sh` builds
+for the **host** architecture, so on an Apple Silicon developer machine it
+exercises `tokenizers-linux-arm64-gnu` instead. Between them both Linux
+architectures are covered — but neither covers both on its own, and a green local
+run is not evidence about amd64. Pass `--amd64` / `--arm64` to the harness to pin
+one explicitly.
+
 Docker, the agent CLIs and the private submodules do not exist on public hosted
 runners. Two gaps are covered elsewhere rather than here:
 
 - **Corporate-proxy behaviour** — `scripts/test-install-linux.sh` runs a real
   `./install.sh` in an Ubuntu 24.04 container across three network shapes
-  (direct, proxy-only via a squid sidecar with egress blocked, and no-egress).
-  It runs from a developer machine, including macOS, and is the laptop-reproducible
+  (direct, proxy-only via a squid sidecar with egress blocked, and no-egress),
+  plus an `arch` shape for the platform-specific fastembed tokenizer. It runs
+  from a developer machine, including macOS, and is the laptop-reproducible
   analogue of the box that originally failed.
 - **Full stack** — register self-hosted runners with Docker, an authenticated
   agent CLI and submodule access, then run `install.sh --yes` followed by
