@@ -246,8 +246,30 @@ detect_sandbox_mode() {
 }
 
 # Logging functions
+#
+# Never let logging abort the install. If $INSTALL_LOG is not writable — a
+# root-owned checkout, a read-only mount, a directory owned by another user —
+# every log() call would fail, and under `set -e` the very first one killed the
+# script with a bare "Permission denied" before any of our own diagnostics could
+# explain why. Fall back to a temp file once, tell the user where it went, and
+# carry on.
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$INSTALL_LOG"
+    if [[ "${INSTALL_LOG_WRITABLE:-unknown}" == "unknown" ]]; then
+        if ( : >> "$INSTALL_LOG" ) 2>/dev/null; then
+            INSTALL_LOG_WRITABLE=yes
+        else
+            local fallback="${TMPDIR:-/tmp}/coding-install-$$.log"
+            echo -e "${YELLOW}⚠️  Cannot write $INSTALL_LOG — logging to $fallback instead${NC}" >&2
+            INSTALL_LOG="$fallback"
+            if ( : >> "$INSTALL_LOG" ) 2>/dev/null; then
+                INSTALL_LOG_WRITABLE=yes
+            else
+                INSTALL_LOG_WRITABLE=no
+            fi
+        fi
+    fi
+    [[ "$INSTALL_LOG_WRITABLE" == "yes" ]] || return 0
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$INSTALL_LOG" 2>/dev/null || true
 }
 
 error_exit() {
@@ -314,6 +336,8 @@ set_env_var() {
 
 PROXY_SOURCE=""          # human-readable origin of the proxy we selected
 NETWORK_DIRECT_OK=false  # true when github.com is reachable with no proxy
+NETWORK_OK=true          # false once preflight proves the network is unusable;
+                         # network-dependent steps then skip instead of failing
 
 # Verify a proxy candidate by actually fetching through it. A listening port is
 # not evidence; a 200/301 from github.com is.
@@ -507,7 +531,13 @@ preflight_network() {
     echo ""
 
     if [[ "$CI_LITE" == "true" ]]; then
+        # CI-lite exists to exercise the script's portability without a network.
+        # Record the failure and let the run continue — but mark the network as
+        # down so the steps that REQUIRE it skip cleanly instead of failing deep
+        # inside npm with a misleading "Failed to install Node.js dependencies".
         warning "Network unreachable — continuing (CI-lite portability run)"
+        info "  Network-dependent steps will be skipped, not attempted."
+        NETWORK_OK=false
         INSTALLATION_FAILURES+=("Network preflight failed: ${failed[*]}")
         return 0
     fi
@@ -2398,6 +2428,15 @@ install_node_dependencies() {
         return 1
     fi
 
+    # Preflight already proved the network is unusable. Attempting npm here would
+    # fail several minutes later with a misleading error; skip explicitly instead.
+    # (Only reachable under --ci, which downgrades preflight to a warning.)
+    if [[ "$NETWORK_OK" != "true" ]]; then
+        warning "Skipping Node.js dependencies — no usable network (see preflight above)"
+        INSTALLATION_FAILURES+=("Node.js dependencies skipped: no network")
+        return 0
+    fi
+
     cd "$CODING_REPO"
 
     # Never let any sub-install download a browser. gsd-browser is the mandated
@@ -2882,7 +2921,10 @@ main() {
     echo ""
 
     # Initialize log
-    echo "Installation started at $(date)" > "$INSTALL_LOG"
+    # `|| true`: this is the FIRST write to the log, and on a root-owned or
+    # read-only checkout it failed under `set -e` and killed the install with a
+    # bare "Permission denied". log() below handles the fallback properly.
+    echo "Installation started at $(date)" > "$INSTALL_LOG" 2>/dev/null || true
     log "Platform: $(uname -s)"
     log "Coding repo: $CODING_REPO"
 

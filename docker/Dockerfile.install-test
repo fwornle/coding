@@ -2,12 +2,22 @@
 #
 # WHY: the reported corporate-Ubuntu failure was invisible to CI because
 # .github/workflows/cross-platform-lite.yml only *sources* install.sh and calls
-# three functions; it never runs install_node_dependencies, so the npm/proxy
-# path was unreachable on every OS. This image actually executes the installer
-# on a clean Debian-family box.
+# three functions; it never runs install_node_dependencies, so the npm and proxy
+# paths were unreachable on every OS. Sourcing also leaves `set -euo pipefail`
+# inactive, so it tested different shell semantics than a real run. This image
+# actually executes the installer on a clean Debian-family box.
 #
-# Build only — the assertions live in scripts/test-install-linux.sh, which drives
-# three network shapes (direct / proxy-only / no-egress) against this image.
+# BUILD CONTEXT: this Dockerfile expects a PRUNED context, not the repo root.
+# scripts/test-install-linux.sh prepares it (tracked files only, minus docs/,
+# .data/, .planning/, tests/) into a temp dir and builds from there.
+#
+# Do not bind-mount the repo instead: reading the working tree over macOS
+# VirtioFS took minutes and dominated the runtime, and an earlier attempt that
+# tar'd from a bind mount pulled in ~10.5G because `git ls-files` emits
+# submodule gitlinks as paths that tar then recursed into. Copying a 44MB
+# prepared context is ~9s on native FS and cached by Docker across runs.
+#
+# Assertions live on the host side in scripts/test-install-linux.sh.
 #
 # Deliberately installs ONLY the hard dependencies (git node npm python3 curl).
 # plantuml, tmux and jq are omitted on purpose: their absence must NOT stop the
@@ -27,29 +37,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         npm \
     && rm -rf /var/lib/apt/lists/*
 
-# Non-root: the installer writes to $HOME and must never need sudo for its
-# core path. Running as root would hide permission problems real users hit.
+# Non-root: the installer writes to $HOME and must never need sudo for its core
+# path. Running as root would hide permission problems real users hit.
 RUN useradd -m -s /bin/bash tester
-USER tester
-WORKDIR /home/tester
 
-# The repo is bind-mounted read-only at /src and copied in, so a failed test run
-# can never mutate the developer's working tree.
-#
-# Obtain the tree with a shallow git clone, NOT a filesystem copy.
-#
-# A copy is not viable: the live working tree carries ~17G of .data, 5.6G of
-# .git, 3.8G of .specstory history, 2.4G of submodule node_modules and 2G of
-# logs. An earlier `cp -a` / tar version spent longer copying than the install
-# under test took, and looked like a hang.
-#
-# A shallow clone gives exactly the tracked files at HEAD — which is also a
-# more faithful test subject, since it is precisely what a new user gets. Note
-# this therefore tests COMMITTED state; commit before running the harness.
-# node_modules is necessarily absent, so the npm path is genuinely exercised.
-CMD ["/bin/bash", "-lc", "\
-    set -e; \
-    git clone --depth 1 --quiet file:///src /home/tester/coding; \
-    cd /home/tester/coding; \
-    exec bash scripts/test-install-linux.sh --in-container \
-"]
+# Create AND chown the directory before COPY. WORKDIR alone creates it as root,
+# and --chown on COPY only affects the copied entries, not the parent — so the
+# installer could not create its own install.log inside it and died with a bare
+# "Permission denied".
+RUN mkdir -p /home/tester/coding && chown tester:tester /home/tester/coding
+WORKDIR /home/tester/coding
+COPY --chown=tester:tester . /home/tester/coding/
+
+USER tester
+
+# node_modules is necessarily absent from the context (it is gitignored), so the
+# npm path is genuinely exercised on a clean tree.
+CMD ["bash", "scripts/test-install-linux.sh", "--in-container"]

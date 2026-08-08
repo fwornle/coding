@@ -42,10 +42,18 @@ if [[ "${1:-}" == "--in-container" ]]; then
     echo "=== node $(node --version 2>/dev/null) npm $(npm --version 2>/dev/null) ==="
     echo "=== deliberately absent: $(for t in plantuml tmux jq; do command -v $t >/dev/null 2>&1 || printf '%s ' "$t"; done) ==="
     echo "=== proxy env: https_proxy=${https_proxy:-unset} ==="
+    echo "=== installer args: ${INSTALL_ARGS:-<none>} ==="
     echo "--------------------------------------------------------------------"
-    bash ./install.sh --ci
+    # INSTALL_ARGS is set per shape by the host side. It matters which flags are
+    # used: --ci deliberately downgrades the network preflight to a warning, so
+    # the fail-fast behaviour can only be observed WITHOUT it. stdin is not a
+    # tty here, so install.sh forces NON_INTERACTIVE on its own and no prompt
+    # can block even with no flags at all.
+    # shellcheck disable=SC2086
+    bash ./install.sh ${INSTALL_ARGS:-}
+    rc=$?
     echo "--------------------------------------------------------------------"
-    echo "INSTALLER_EXIT=$?"
+    echo "INSTALLER_EXIT=$rc"
     exit 0
 fi
 
@@ -67,29 +75,78 @@ docker info >/dev/null 2>&1 || { echo "docker daemon is not running"; exit 2; }
 cleanup() {
     docker rm -f coding-install-runner squid-proxy >/dev/null 2>&1 || true
     docker network rm "$NET" >/dev/null 2>&1 || true
+    cleanup_ctx
 }
 trap cleanup EXIT
+
+# ── prepare a pruned build context ───────────────────────────────────────────
+# Tracked files only, minus the heavy paths the installer never touches
+# (docs/ + docs-content/ are ~139MB of images, .data/ ~62MB of exports). That
+# takes 275MB -> 44MB, and running it on the native filesystem takes ~9s versus
+# minutes for the container reading the same tree over a macOS bind mount.
+#
+# --no-recursion is REQUIRED, not an optimisation: `git ls-files` emits submodule
+# gitlinks as bare paths, and without it tar recurses into them and pulls in
+# ~10.5G of submodule node_modules.
+CTX="$(mktemp -d)"
+prepare_context() {
+    info "Preparing build context (tracked files, minus docs/.data/.planning/tests)..."
+    ( cd "$CODING_REPO" && git ls-files -z -- . \
+        ':!:docs/**' ':!:docs-content/**' ':!:.data/**' ':!:.planning/**' ':!:tests/**' \
+      | tar --null -T - --no-recursion -cf - 2>/dev/null ) | tar -C "$CTX" -xf -
+    cp "$CODING_REPO/docker/Dockerfile.install-test" "$CTX/Dockerfile.install-test"
+    info "  context: $(du -sh "$CTX" | cut -f1), $(find "$CTX" -type f | wc -l | tr -d ' ') files"
+}
+cleanup_ctx() { [[ -n "${CTX:-}" && -d "$CTX" ]] && rm -rf "$CTX"; }
+
+prepare_context
 
 # ── build ────────────────────────────────────────────────────────────────────
 info "Building $IMAGE ${PLATFORM_FLAG:+($PLATFORM_FLAG)}..."
 # shellcheck disable=SC2086
-docker build $PLATFORM_FLAG -f "$CODING_REPO/docker/Dockerfile.install-test" \
-    -t "$IMAGE" "$CODING_REPO" >/tmp/coding-install-build.log 2>&1 \
+docker build $PLATFORM_FLAG -f "$CTX/Dockerfile.install-test" \
+    -t "$IMAGE" "$CTX" >/tmp/coding-install-build.log 2>&1 \
     || { echo "${RED}build failed${NC} — see /tmp/coding-install-build.log"; tail -20 /tmp/coding-install-build.log; exit 1; }
 pass "image built"
 
+# Runs the installer in a NAMED, DETACHED container and returns its full log.
+#
+# Detached on purpose: an earlier version used `docker run --rm` from a
+# backgrounded subshell, and when the calling shell went away the container was
+# orphaned with its stdout going nowhere — producing an empty log while the
+# container was still running. Polling a named container and reading `docker
+# logs` is immune to that.
 run_installer() {
-    # $1 = extra docker args (as a string), rest ignored. Emits combined output.
     local extra="$1"; shift
+    local name="coding-install-runner"
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    # Docker Desktop injects the HOST's proxy settings into every container by
+    # default (Settings > Resources > Proxies), so containers arrive with
+    # https_proxy=http://host.docker.internal:3128 already set — even under
+    # --network none. That silently contaminated every shape: "no-egress" was not
+    # proxy-free and "direct" was pointed at an unreachable proxy. Blank them
+    # explicitly; each shape then sets only what it means to test.
+    local clear_proxy="-e https_proxy= -e http_proxy= -e HTTPS_PROXY= -e HTTP_PROXY= -e no_proxy= -e NO_PROXY="
     # shellcheck disable=SC2086
-    docker run --rm --name coding-install-runner $PLATFORM_FLAG $extra \
-        -v "$CODING_REPO:/src:ro" "$IMAGE" 2>&1
+    docker run -d --name "$name" $PLATFORM_FLAG $clear_proxy $extra "$IMAGE" >/dev/null 2>&1
+    local waited=0
+    while [[ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" == "true" ]]; do
+        sleep 3; waited=$((waited+3))
+        if [[ $waited -gt 900 ]]; then
+            docker kill "$name" >/dev/null 2>&1 || true
+            echo "HARNESS_TIMEOUT after ${waited}s"
+            break
+        fi
+    done
+    docker logs "$name" 2>&1
+    echo "CONTAINER_EXIT=$(docker inspect -f '{{.State.ExitCode}}' "$name" 2>/dev/null)"
+    docker rm -f "$name" >/dev/null 2>&1 || true
 }
 
 # ── shape: direct ────────────────────────────────────────────────────────────
 shape_direct() {
     echo; info "── shape: direct (normal egress) ──"
-    local out; out="$(run_installer "")"
+    local out; out="$(run_installer "-e INSTALL_ARGS=--ci")"
     echo "$out" > /tmp/coding-install-direct.log
 
     if grep -q "reachable directly — no proxy needed" <<<"$out"; then
@@ -137,7 +194,7 @@ shape_proxy_only() {
     sleep 8
 
     local out
-    out="$(run_installer "--network $NET --dns 127.0.0.1 \
+    out="$(run_installer "--network $NET --dns 127.0.0.1 -e INSTALL_ARGS=--ci \
         -e https_proxy=http://squid-proxy:3128 -e http_proxy=http://squid-proxy:3128")"
     echo "$out" > /tmp/coding-install-proxy.log
 
@@ -161,7 +218,9 @@ shape_proxy_only() {
 # ── shape: no-egress ─────────────────────────────────────────────────────────
 shape_no_egress() {
     echo; info "── shape: no-egress (must fail fast, with guidance) ──"
-    local out; out="$(run_installer "--network none")"
+    # No --ci here on purpose: --ci downgrades preflight to a warning, so
+    # fail-fast is only observable in a real (non-CI-lite) install.
+    local out; out="$(run_installer "--network none -e INSTALL_ARGS=")"
     echo "$out" > /tmp/coding-install-noegress.log
 
     if grep -q "Network preflight failed" <<<"$out"; then
@@ -169,11 +228,16 @@ shape_no_egress() {
     else
         fail "no-egress: did not fail at preflight"
     fi
-    # Must fail BEFORE the expensive npm step, not inside it.
+    # Must abort BEFORE the expensive npm step, not inside it.
     if grep -q "Installing Node.js dependencies" <<<"$out"; then
         fail "no-egress: reached npm install — preflight ran too late"
     else
         pass "no-egress: aborted before npm install"
+    fi
+    if grep -q "INSTALLER_EXIT=1" <<<"$out"; then
+        pass "no-egress: exited non-zero"
+    else
+        fail "no-egress: did not exit 1 ($(grep -o 'INSTALLER_EXIT=[0-9]*' <<<"$out"))"
     fi
     if grep -q "export https_proxy=" <<<"$out"; then
         pass "no-egress: printed actionable remediation"
