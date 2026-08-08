@@ -1,0 +1,273 @@
+{
+  "runId": "coding-v1-x1",
+  "set": "coding-v1",
+  "reps": 3,
+  "commit": "29bb31678",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    },
+    {
+      "id": "graphify",
+      "label": "Graphify code graph",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes"
+      ],
+      "backend": "graphify"
+    },
+    {
+      "id": "codegraph",
+      "label": "CodeGraph (SQLite)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": "codegraph"
+    },
+    {
+      "id": "hybrid",
+      "label": "All tools, agent chooses",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": null
+    }
+  ],
+  "agents": [
+    "claude",
+    "copilot",
+    "opencode"
+  ],
+  "models": [
+    null
+  ],
+  "combinations": [
+    {
+      "arm": "grep",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "grep",
+      "agent": "copilot",
+      "model": "claude-sonnet-5",
+      "elicitation": "answer-file",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "not_enforced",
+        "gateable": true,
+        "verified_by": "nothing — the CLI emits no tool trace, so no audit is possible",
+        "note": "copilot supports --available-tools/--deny-tool; this harness does not yet map arm tool names onto copilot's naming, so built-ins are left open rather than restricted with unverified names."
+      }
+    },
+    {
+      "arm": "grep",
+      "agent": "opencode",
+      "model": "rapid-proxy/claude-sonnet-5",
+      "elicitation": "answer-file",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "ungated",
+        "gateable": false,
+        "verified_by": "nothing — no tool allowlist to enforce with, and no tool trace to audit"
+      }
+    },
+    {
+      "arm": "graphify",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "codegraph",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "hybrid",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "hybrid",
+      "agent": "copilot",
+      "model": "claude-sonnet-5",
+      "elicitation": "answer-file",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "not_enforced",
+        "gateable": true,
+        "verified_by": "nothing — the CLI emits no tool trace, so no audit is possible",
+        "note": "copilot supports --available-tools/--deny-tool; this harness does not yet map arm tool names onto copilot's naming, so built-ins are left open rather than restricted with unverified names."
+      }
+    },
+    {
+      "arm": "hybrid",
+      "agent": "opencode",
+      "model": "rapid-proxy/claude-sonnet-5",
+      "elicitation": "answer-file",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "ungated",
+        "gateable": false,
+        "verified_by": "nothing — no tool allowlist to enforce with, and no tool trace to audit"
+      }
+    }
+  ],
+  "refused": [
+    {
+      "arm": "graphify",
+      "agent": "copilot",
+      "reason": "arm \"graphify\" is defined by WITHHOLDING built-in search (it grants Read without Glob/Grep), and copilot CAN gate tools (--available-tools), but this harness has no verified mapping from arm tool names to copilot's naming, so the restriction is not applied. The cell would run with more capability than its label claims."
+    },
+    {
+      "arm": "graphify",
+      "agent": "opencode",
+      "reason": "arm \"graphify\" is defined by WITHHOLDING built-in search (it grants Read without Glob/Grep), and opencode exposes no tool allowlist, so built-ins cannot be withheld. The cell would run with more capability than its label claims."
+    },
+    {
+      "arm": "codegraph",
+      "agent": "copilot",
+      "reason": "arm \"codegraph\" is defined by WITHHOLDING built-in search (it grants Read without Glob/Grep), and copilot CAN gate tools (--available-tools), but this harness has no verified mapping from arm tool names to copilot's naming, so the restriction is not applied. The cell would run with more capability than its label claims."
+    },
+    {
+      "arm": "codegraph",
+      "agent": "opencode",
+      "reason": "arm \"codegraph\" is defined by WITHHOLDING built-in search (it grants Read without Glob/Grep), and opencode exposes no tool allowlist, so built-ins cannot be withheld. The cell would run with more capability than its label claims."
+    }
+  ],
+  "questions": [
+    "L1",
+    "L2",
+    "L3",
+    "S1",
+    "S2",
+    "S3",
+    "B1",
+    "B2",
+    "B3",
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "T1",
+    "T3",
+    "T4"
+  ],
+  "sandbox": {
+    "mode": "worktree",
+    "tree_commit": "29bb316787e5c3a4cd9c148c835c1b65ecc25991",
+    "excluded": [
+      "config/kgbench/questions",
+      "lib/kgbench/graders.mjs",
+      "lib/kgbench/sandbox.mjs",
+      "lib/kgbench/judge.mjs",
+      "scripts/kgbench-regrade.mjs",
+      "scripts/kgbench-supervise.sh",
+      "tests/integration/kgbench-agents.test.js",
+      "tests/integration/kgbench-graders.test.js",
+      "tests/integration/kgbench-report-provenance.test.js",
+      "tests/integration/kgbench-sandbox.test.js",
+      "tests/integration/kgbench-tokens.test.js",
+      "tests/integration/kgbench-tool-enforcement.test.js",
+      "docs/measurement/kgbench.md",
+      "docs-content/measurement/kgbench.md",
+      "docs/benchmarks/coding-v1",
+      ".data",
+      ".specstory",
+      "CLAUDE.md",
+      ".claude",
+      ".github/copilot-instructions.md"
+    ],
+    "verified": true
+  },
+  "baselines": {
+    "grep|claude|claude-sonnet-5": 22437,
+    "grep|copilot|claude-sonnet-5": 63609,
+    "grep|opencode|rapid-proxy/claude-sonnet-5": 66558,
+    "graphify|claude|claude-sonnet-5": 22875,
+    "codegraph|claude|claude-sonnet-5": 21677,
+    "hybrid|claude|claude-sonnet-5": 25699,
+    "hybrid|copilot|claude-sonnet-5": null,
+    "hybrid|opencode|rapid-proxy/claude-sonnet-5": 32870
+  },
+  "baselineSource": {
+    "grep|claude|claude-sonnet-5": "stream-json",
+    "grep|copilot|claude-sonnet-5": "proxy-db-window",
+    "grep|opencode|rapid-proxy/claude-sonnet-5": "proxy-db-window",
+    "graphify|claude|claude-sonnet-5": "stream-json",
+    "codegraph|claude|claude-sonnet-5": "stream-json",
+    "hybrid|claude|claude-sonnet-5": "stream-json",
+    "hybrid|copilot|claude-sonnet-5": null,
+    "hybrid|opencode|rapid-proxy/claude-sonnet-5": "proxy-db-window"
+  },
+  "schemaTax": {
+    "grep|claude|claude-sonnet-5": 0,
+    "grep|copilot|claude-sonnet-5": 0,
+    "grep|opencode|rapid-proxy/claude-sonnet-5": 0,
+    "graphify|claude|claude-sonnet-5": 438,
+    "codegraph|claude|claude-sonnet-5": -760,
+    "hybrid|claude|claude-sonnet-5": 3262,
+    "hybrid|copilot|claude-sonnet-5": null,
+    "hybrid|opencode|rapid-proxy/claude-sonnet-5": -33688
+  },
+  "judge": {
+    "requested": {
+      "provider": "claude-code",
+      "model": "claude-opus-5"
+    },
+    "served": null,
+    "enabled": true
+  },
+  "startedAt": "2026-08-08T10:37:16.993Z"
+}

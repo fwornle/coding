@@ -405,8 +405,16 @@ local_cache/
 
 # kgbench: raw runs stay out (results.jsonl carries full answers, megabytes per run);
 # the per-run summary is small, non-regenerable provenance and is kept.
+#
+# results.pre-*.jsonl are the same thing under a different name: snapshots of the
+# full answer set taken before a regrade or a rescope (results.pre-regrade.jsonl,
+# results.pre-A34-rewrite.jsonl, ...). The original rule matched only the literal
+# filename, so those slipped through — ~550-590K each, five of them across r6/r7.
+# regrade.json keeps the part that matters (what changed and why); the pre-images
+# are reproducible by re-running the grader against results.jsonl.
 !.data/kgbench/
 .data/kgbench/runs/*/results.jsonl
+.data/kgbench/runs/*/results.pre-*.jsonl
 
 # Code-graph gate results and freshness sidecars. Small, non-regenerable provenance
 # (what was measured, at which commit) kept deliberately in the repo. The indexes

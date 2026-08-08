@@ -1,0 +1,155 @@
+{
+  "runId": "coding-v1-r7",
+  "set": "coding-v1",
+  "reps": 10,
+  "commit": "7e08b6a60",
+  "dirty": true,
+  "history": [
+    {
+      "commit": "47928068f",
+      "reps": 3,
+      "startedAt": "2026-08-07T10:54:32.012Z",
+      "sandbox_commit": "47928068f799c51785923e9dc2d87e1f577566a9",
+      "questions": [
+        "L1",
+        "L2",
+        "L3",
+        "S1",
+        "S2",
+        "S3",
+        "B1",
+        "B2",
+        "B3",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "T1",
+        "T3",
+        "T4"
+      ]
+    },
+    {
+      "commit": "47928068f",
+      "reps": 10,
+      "startedAt": "2026-08-07T13:14:32.009Z",
+      "sandbox_commit": "47928068f799c51785923e9dc2d87e1f577566a9",
+      "questions": [
+        "A1",
+        "A2",
+        "A3",
+        "A4"
+      ]
+    },
+    {
+      "commit": "47928068f",
+      "reps": 10,
+      "startedAt": "2026-08-07T15:27:23.056Z",
+      "sandbox_commit": "47928068f799c51785923e9dc2d87e1f577566a9",
+      "questions": [
+        "A2"
+      ]
+    }
+  ],
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    },
+    {
+      "id": "graphify",
+      "label": "Graphify code graph",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes"
+      ],
+      "backend": "graphify"
+    },
+    {
+      "id": "codegraph",
+      "label": "CodeGraph (SQLite)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": "codegraph"
+    },
+    {
+      "id": "hybrid",
+      "label": "All tools, agent chooses",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": null
+    }
+  ],
+  "questions": [
+    "A4"
+  ],
+  "sandbox": {
+    "mode": "worktree",
+    "tree_commit": "7e08b6a606fa1ae18c0cde071b20a9341e1af1b6",
+    "excluded": [
+      "config/kgbench/questions",
+      "lib/kgbench/graders.mjs",
+      "lib/kgbench/sandbox.mjs",
+      "lib/kgbench/judge.mjs",
+      "scripts/kgbench-regrade.mjs",
+      "scripts/kgbench-supervise.sh",
+      "tests/integration/kgbench-graders.test.js",
+      "tests/integration/kgbench-sandbox.test.js",
+      "tests/integration/kgbench-tool-enforcement.test.js",
+      "docs/measurement/kgbench.md",
+      "docs-content/measurement/kgbench.md",
+      "docs/benchmarks/coding-v1",
+      ".data",
+      ".specstory",
+      "CLAUDE.md",
+      ".claude",
+      ".github/copilot-instructions.md"
+    ],
+    "verified": true
+  },
+  "baselines": {
+    "grep": 22118,
+    "graphify": 22556,
+    "codegraph": 21358,
+    "hybrid": 25380
+  },
+  "schemaTax": {
+    "grep": 0,
+    "graphify": 438,
+    "codegraph": -760,
+    "hybrid": 3262
+  },
+  "judge": {
+    "provider": "claude-code",
+    "model": "claude-opus-4.8",
+    "enabled": true
+  },
+  "startedAt": "2026-08-07T18:24:03.750Z"
+}
