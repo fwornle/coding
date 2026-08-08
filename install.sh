@@ -765,6 +765,29 @@ check_dependencies() {
             echo ""
             error_exit "Node.js is broken. Please fix it before running this installer."
         fi
+
+        # Supported floor is Node 22. That is not a preference: the container
+        # this project runs its services in is node:22-bookworm
+        # (docker/Dockerfile.coding-services), install_mastra_opencode requires
+        # >= 22.13.0 outright, and per the Node release schedule both 18 (EOL
+        # 2025-04-30) and 20 (EOL 2026-04-30) are past end-of-life as of this
+        # writing. Claiming "18+" — as this installer and the docs did — was
+        # claiming support for two unsupported majors.
+        #
+        # WARNS rather than aborts, deliberately. The installer cannot know
+        # which parts of the system a given user actually needs, and hard-gating
+        # a machine that works today is precisely the mistake P1 removed when it
+        # stopped hard-requiring plantuml and tmux. `engines` in package.json
+        # states the floor to npm; this states it to the human.
+        local node_major
+        node_major="$(node -v 2>/dev/null | sed 's/^v//' | cut -d. -f1)"
+        if [[ -n "$node_major" ]] && [[ "$node_major" -lt 22 ]]; then
+            warning "Node.js $node_major is below the supported floor (22 LTS)"
+            info "  → services run on node:22 in Docker; mastra-opencode needs >= 22.13.0"
+            info "  → Node 18 and 20 are both past end-of-life (2025-04-30 / 2026-04-30)"
+            info "  → upgrade with: nvm install 22 && nvm use 22   (or your platform's package manager)"
+            INSTALLATION_WARNINGS+=("Node.js $node_major is below the supported floor (22 LTS)")
+        fi
     fi
 
     if ! command -v npm >/dev/null 2>&1; then
@@ -1004,7 +1027,7 @@ install_semantic_analysis() {
 
         # Check for Node.js
         if ! command -v node &> /dev/null; then
-            warning "Node.js not found. Please install Node.js 18+ to use semantic analysis."
+            warning "Node.js not found. Please install Node.js 22+ (LTS) to use semantic analysis."
             return 1
         fi
 
@@ -2888,6 +2911,51 @@ install_fastembed_native() {
     fi
 }
 
+# Re-check host embeddings AFTER every npm install has run, and repair if needed.
+#
+# WHY A SECOND, LATER CHECK. install_fastembed_native() runs inside
+# install_node_dependencies, long before install_mastra_opencode does
+# `npm install @mastra/opencode@latest`. That later install reconciles the tree
+# against package-lock.json and PRUNES anything installed with --no-save —
+# which is exactly how the platform tokenizer gets there on linux/arm64.
+# Reproduced directly: a --no-save package is present after its own install and
+# GONE after any subsequent `npm install` in the same directory.
+#
+# Only arm64 Linux is affected. @anush008/tokenizers@0.0.0 — the version pinned
+# in package-lock.json — declares just three platform builds
+# (darwin-universal, linux-x64-gnu, win32-x64-msvc), so on those three the
+# tokenizer comes from `npm ci` and pruning cannot touch it. arm64 has no
+# upstream build at that version, so it depends entirely on the --no-save
+# workaround, and therefore on nothing pruning it afterwards.
+#
+# AND THE CHECK ITSELF WAS TOO WEAK: `require('fastembed')` succeeds without a
+# working tokenizer, so the earlier verification passed while the install was
+# being quietly undone behind it. `require('@anush008/tokenizers')` is the
+# decisive one — it loads the native binding and fails with
+# "Cannot find module '@anush008/tokenizers-<platform>'" when the build is absent.
+verify_host_embeddings() {
+    cd "$CODING_REPO"
+
+    if node -e "require('@anush008/tokenizers')" >/dev/null 2>&1; then
+        success "✓ host embeddings: platform tokenizer loads"
+        return 0
+    fi
+
+    info "Platform tokenizer missing after later npm installs — repairing..."
+    install_fastembed_native
+
+    if node -e "require('@anush008/tokenizers')" >/dev/null 2>&1; then
+        success "✓ host embeddings: platform tokenizer restored"
+    else
+        warning "Host embeddings unavailable: no working platform tokenizer"
+        info "  → host-side semantic retrieval is disabled; the container's"
+        info "    embedding listener is unaffected, so knowledge features still work."
+        INSTALLATION_WARNINGS+=("Host embeddings disabled (no platform tokenizer)")
+        set_env_var CODING_EMBEDDINGS_HOST off
+    fi
+    return 0
+}
+
 install_vkb_server_deps() {
     info "Installing vkb-server dependencies..."
     if [ -d "$CODING_REPO/lib/vkb-server" ]; then
@@ -3770,6 +3838,9 @@ main() {
     run_step install_copilot_file_hooks
     install_skills
     create_project_local_settings
+    # AFTER every npm install: the last one prunes --no-save packages, so the
+    # host-embeddings verdict is only true once nothing else will run npm.
+    run_step verify_host_embeddings
     run_step install_okb_snapshot_guard
     run_step install_constraint_monitor_hooks
     verify_installation

@@ -33,9 +33,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
         python3 \
-        nodejs \
-        npm \
+        gnupg \
     && rm -rf /var/lib/apt/lists/*
+
+# Node 22 from NodeSource, NOT Ubuntu's `nodejs` package.
+#
+# Ubuntu 24.04 ships Node 18, which is past end-of-life (2025-04-30) and below
+# this project's floor: services run on node:22-bookworm and mastra-opencode
+# requires >= 22.13.0. Testing the installer on 18 meant the harness was
+# certifying a runtime the product does not support — and it showed up as a
+# "Node.js version too old" warning that read like a finding about the user's
+# machine rather than about this image.
+#
+# The base stays ubuntu:24.04 rather than node:22: the failure this harness was
+# built to reproduce was on a corporate *Ubuntu* box, and swapping the base for
+# a Node image would change the distro, the apt layout and the CA bundle along
+# with the Node version.
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && node --version && npm --version
 
 # Non-root: the installer writes to $HOME and must never need sudo for its core
 # path. Running as root would hide permission problems real users hit.

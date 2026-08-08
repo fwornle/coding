@@ -51,7 +51,7 @@ The test script verifies all components:
 ### 1. Check Prerequisites
 
 ```bash
-# Node.js 18+
+# Node.js 22 LTS or newer
 node --version
 
 # Git
