@@ -3318,21 +3318,50 @@ USAGE:
   ./install.sh [OPTIONS]
 
 OPTIONS:
+      --dry-run             Print everything this installer would change, then
+                            exit 0 having touched NOTHING (not even the log).
+                            Start here if you want to know the blast radius.
   -y, --yes                 Unattended: auto-approve system changes, never prompt.
+                            Does NOT imply global agent scope or background
+                            services — see the note below.
       --ci, --non-interactive
                             Unattended: never prompt (take safe defaults, DECLINE
                             optional system changes) AND downgrade missing-infra
                             gates (Docker / agent CLI / core deps) from fatal to
                             warnings, so a portability run completes with a summary.
+      --global-agents       Configure your USER-LEVEL agent config, so the hooks,
+                            MCP servers and slash commands also apply to bare
+                            claude/copilot/opencode sessions in every project.
+                            Default is wrapper scope: bare agents are untouched.
   -h, --help                Show this help and exit.
 
 ENVIRONMENT:
-  CI=true                   Same as --ci (auto-detected on CI runners).
-  CODING_INSTALL_YES=1      Same as --yes.
-  CODING_INSTALL_CI=1       Same as --ci.
+  CI=true                          Same as --ci (auto-detected on CI runners).
+  CODING_INSTALL_YES=1             Same as --yes.
+  CODING_INSTALL_CI=1              Same as --ci.
+  CODING_INSTALL_GLOBAL_AGENTS=1   Same as --global-agents.
+  CODING_INSTALL_SYSTEM_SERVICES=1 Install the login-persistent LLM proxy service
+                                   (launchd / systemd). Off by default.
+  CODING_INSTALL_COPILOT_HOOKS=1   Enable copilot filesystem hooks. This CANNOT be
+                                   scoped per launch, so it stays off even under
+                                   --global-agents and must be asked for by name.
+  CODING_HISTORY_HOST=<host>       Git host to suggest for the private
+                                   session-history repo. Default is derived from
+                                   this machine, not hardcoded.
+  CODING_HISTORY_PUSH=1            Allow an UNATTENDED run to push session
+                                   transcripts to the history repo. Off by
+                                   default: pushing publishes verbatim prompts
+                                   and responses, so it is normally confirmed.
+  CODING_OKB_CONSUMER_REPOS=a:b    Extra repos to receive the OKB pre-commit hook.
+                                   Empty by default.
 
 Default (no flags) is the interactive install: prompts work as before and
 missing Docker / agent CLI / core dependencies abort with guidance.
+
+WHY --yes DOES NOT IMPLY GLOBAL SCOPE: an unattended run must never silently
+reconfigure how your agents behave outside this project, so agent scope and
+background services invert the usual --yes semantics and require explicit
+opt-in. See docs/install-scope-and-host-impact.md.
 EOF
 }
 
