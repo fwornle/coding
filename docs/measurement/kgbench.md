@@ -154,3 +154,67 @@ reporting that as a finding. The grader and containment contracts run there too.
   unavailable, and averaging only its successes reports the opposite.
 - Arms other than `hybrid` are *forced* onto one strategy, which is not how an agent
   actually works. Read them against `hybrid`, not against each other.
+- A **†** on an arm means its tool surface was not enforced on every cell. Only claude can
+  be confined to an arm's tools; see below.
+
+## Cross-agent cells
+
+A cell can be run by claude, copilot or opencode. The axes are not equally measurable, and
+the report says so wherever the numbers appear rather than once at the bottom.
+
+**Only claude is tool-enforced.** `--allowedTools`, `--disallowedTools` and
+`--strict-mcp-config` are claude flags. For the others an arm's MCP servers are restricted
+by writing the config file each CLI reads, but their built-in file and search tools cannot
+be withheld — so on those agents an arm name describes the strategy the cell was *asked* to
+use, not one it was *confined* to. Arms whose identity depends on withholding built-in
+search (`graphify`, `codegraph`) are refused outright on them rather than run under a label
+they would not honour. There is also no post-hoc check available: those CLIs emit no tool
+trace, so `tools_executed` is null and the cell records `tool_audit: "unavailable"` — which
+is a weaker statement than an empty violation list, and deliberately so.
+
+**Answers are elicited differently.** claude streams structured JSON; the others are told
+to write the answer to a file, because an analysis-shaped prompt makes copilot exit in
+seconds and opencode yield on its first toolless step, both "succeeding" having answered
+nothing. That is a confound in every cross-agent comparison, and it is not removable — it
+is what makes those cells answer at all.
+
+**Where token numbers come from.** Every row records a `token_source`:
+
+| source | meaning |
+|---|---|
+| `stream-json` | the agent reported its own usage — first-party and exact (claude) |
+| `proxy-db-taskid` | the wire carried the cell's task id — exact, reconstructed from the proxy |
+| `proxy-db-window` | proxy rows that ran while the cell ran — a time join, weaker than a tag |
+| `unmeasured` | no rows found; the field stays null, never 0 |
+
+copilot's and opencode's tokens reach `token-usage.db` through their stop-adapters, stamped
+with the agent's OWN session identity (`ses_01f5…`, a UUID) that the harness never learns —
+so a task-id join finds nothing and the window join is what recovers them. It is only sound
+because cells run serially and the window is scoped to one agent; when more than one session
+of that agent falls inside a cell's window the row is marked `token_ambiguous` and the
+report warns, rather than quietly averaging it in.
+
+**Tokens can arrive after the cell.** The stop-adapters write on their own schedule. One
+measured copilot cell ran `09:57:01.869 → 09:57:35.267` and its row carries an in-window
+timestamp of `09:57:34.810`, but was not written to the DB until roughly a minute later —
+long after the runner's short poll gave up and recorded `unmeasured`. Waiting a minute per
+cell would put a 200-cell matrix to sleep for three hours, so the runner records what it can
+see and the rest is filled in offline:
+
+```bash
+node scripts/kgbench-backfill-tokens.mjs --run <runId>            # fill unmeasured cells
+node scripts/kgbench-backfill-tokens.mjs --run <runId> --dry-run  # show what it would do
+node scripts/kgbench-backfill-tokens.mjs --run <runId> --all      # re-resolve DB-sourced cells too
+```
+
+It is idempotent, never overwrites a first-party `stream-json` figure, and keeps the
+previous file as `results.jsonl.bak`. This is the same discipline the grader already
+follows: store enough to re-derive offline, because re-running a cell to learn its cost
+changes the cost.
+
+**A caveat that survives all of the above.** A DB-derived `in_tokens` may account for prompt
+caching differently from a stream-json one — the cache columns are a breakdown of input for
+some writers and an addition for others, and only `total_tokens = input + output` holds
+across all of them. `content_tokens`, which subtracts a baseline measured on claude, is
+therefore strictly comparable only *within* a token source. The report prints the source
+next to every figure for exactly this reason.
