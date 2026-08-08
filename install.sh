@@ -405,6 +405,29 @@ warning() {
     log "WARNING: $1"
 }
 
+# Gate for anything that writes a config file SHARED with the user's own tools
+# (~/.claude, ~/.claude.json, ~/.config/opencode, ~/.opencode, ~/.copilot).
+#
+# Requirement: installing this project MUST NOT change how bare `claude`,
+# `copilot` or `opencode` behave. Those configs are global, so writing them
+# changes every project on the machine — therefore they are opt-in only, and
+# CODING_AGENT_SCOPE defaults to "wrapper".
+#
+# Usage, as the first line of any such function:
+#     require_global_scope "what this would configure" || return 0
+#
+# In wrapper mode the equivalent capability is injected per-launch by bin/coding
+# instead, so the feature is not lost for agents started through the wrapper.
+require_global_scope() {
+    local what="$1"
+    if [[ "$CODING_AGENT_SCOPE" == "global" ]]; then
+        return 0
+    fi
+    info "Skipping $what (wrapper-scoped install — your global agent config is untouched)"
+    log "SKIP (wrapper scope): $what"
+    return 1
+}
+
 # Set KEY=VALUE in the repo-local .env, replacing any existing line for KEY.
 # Idempotent: re-running never appends a duplicate. Repo-local only — this
 # never touches the user's shell environment or any file outside $CODING_REPO.
@@ -1349,6 +1372,12 @@ except Exception as e:
 setup_user_level_mcp_config() {
     local temp_file="$1"
 
+    # ~/.claude.json is read by EVERY claude invocation in every project. In
+    # wrapper mode bin/coding passes --mcp-config per launch instead (the seam
+    # already exists in scripts/claude-mcp-launcher.sh), so bare `claude` sees
+    # exactly the MCP servers it saw before this project was installed.
+    require_global_scope "user-level MCP configuration (~/.claude.json)" || return 0
+
     # SANDBOX MODE: Skip global config modifications
     if [[ "$SANDBOX_MODE" == "true" ]]; then
         warning "SANDBOX MODE: Skipping user-level MCP configuration (~/.claude.json)"
@@ -1438,6 +1467,10 @@ MANAGED_MCP_KEYS="semantic-analysis constraint-monitor graphify code-graph-rag"
 
 setup_opencode_mcp_config() {
     local temp_file="$1"
+
+    # Rewrites ~/.config/opencode/opencode.json. In wrapper mode the launcher
+    # supplies MCP servers via OPENCODE_CONFIG_CONTENT instead.
+    require_global_scope "OpenCode MCP configuration (~/.config/opencode/opencode.json)" || return 0
 
     echo -e "\n${CYAN}📋 Setting up OpenCode MCP configuration...${NC}"
     
@@ -2395,6 +2428,19 @@ setup_llm_cli_proxy() {
     # Check if already running
     if lsof -i :"$proxy_port" -sTCP:LISTEN >/dev/null 2>&1; then
         success "  LLM CLI Proxy already running on port $proxy_port"
+        return 0
+    fi
+
+    # A login-persistent background service is a bigger commitment than any
+    # config edit: it keeps running after the install, after logout, and after
+    # the user has forgotten about it. `--yes` used to auto-approve it via
+    # confirm_system_change, which is the wrong default for "unattended".
+    # Require explicit consent, exactly like the global agent configs.
+    if [[ "${CODING_INSTALL_SYSTEM_SERVICES:-0}" != "1" ]]; then
+        info "Not installing an autostart service for the LLM proxy"
+        info "  It runs on demand when you use 'coding'. For a login-persistent"
+        info "  service, re-run with CODING_INSTALL_SYSTEM_SERVICES=1."
+        log "SKIP: LLM proxy autostart service (not opted in)"
         return 0
     fi
 
@@ -3389,6 +3435,11 @@ MASTRACONFIG
 # old tool outputs and enriches compaction prompts to keep payloads manageable.
 # Also configures compaction.reserved=40000 in opencode.json to trigger compaction earlier.
 install_compaction_guard() {
+    # Writes ~/.opencode/plugins/ and ~/.config/opencode/opencode.json, so it
+    # would load in EVERY opencode session. In wrapper mode bin/coding supplies
+    # the plugin through OPENCODE_CONFIG_CONTENT instead (config/agents/opencode.sh).
+    require_global_scope "OpenCode compaction-guard plugin (global ~/.opencode)" || return 0
+
     echo -e "\n${CYAN}🛡️  Installing OpenCode compaction-guard plugin...${NC}"
 
     local OPENCODE_HOME="$HOME/.opencode"
@@ -3478,6 +3529,10 @@ install_compaction_guard() {
 # Entities/Observations), so the model uses it AND the Performance-tab "Retrieved
 # Knowledge" modal populates for OpenCode runs (previously always empty for them).
 install_knowledge_injection() {
+    # Same reasoning as install_compaction_guard: global ~/.opencode write,
+    # replaced per-launch by OPENCODE_CONFIG_CONTENT in wrapper mode.
+    require_global_scope "OpenCode knowledge-injection plugin (global ~/.opencode)" || return 0
+
     echo -e "\n${CYAN}🧠 Installing OpenCode knowledge-injection plugin...${NC}"
 
     local OPENCODE_HOME="$HOME/.opencode"
@@ -3532,6 +3587,25 @@ install_knowledge_injection() {
 # Both edits are idempotent and fail-open (node — copilot ships node; jq can't parse
 # the JSONC config.json). Per-avenue KB injection still honors CODING_KNOWLEDGE_INJECTION=0.
 install_copilot_file_hooks() {
+    # THIS ONE IS A SEPARATE OPT-IN, off even in global scope.
+    #
+    # `copilot` has no per-launch equivalent for enableFileHooks: there is no
+    # flag and no config-dir env var (only --additional-mcp-config is
+    # session-scoped). So unlike claude and opencode, this capability CANNOT be
+    # made wrapper-scoped — it is inherently global, and switching it on lets a
+    # repo's own .github/hooks/hooks.json fire in ANY of the user's repositories.
+    #
+    # It therefore needs its own explicit consent, not merely "global scope".
+    # With it off, copilot under `coding` still gets MCP and transcript capture;
+    # only the postToolUse knowledge-injection path is dormant.
+    if [[ "${CODING_INSTALL_COPILOT_HOOKS:-0}" != "1" ]]; then
+        info "Skipping Copilot filesystem hooks (opt in with CODING_INSTALL_COPILOT_HOOKS=1)"
+        info "  Why separate: copilot has no per-launch hook switch, so this is"
+        info "  unavoidably global — it would let repo hooks fire in all your repos."
+        log "SKIP: copilot file hooks (not opted in)"
+        return 0
+    fi
+
     echo -e "\n${CYAN}🪝  Enabling Copilot CLI filesystem hooks...${NC}"
     local SETTINGS="$HOME/.copilot/settings.json"
     local CONFIG="$HOME/.copilot/config.json"
@@ -3748,6 +3822,13 @@ install_okb_snapshot_guard() {
 
 # Install constraint monitor hooks and LSL logging hooks
 install_constraint_monitor_hooks() {
+    # ~/.claude/settings.json hooks fire for EVERY claude session in every
+    # project — this is the single biggest "did installing this change my setup?"
+    # surface. In wrapper mode bin/coding derives a settings file containing
+    # these hooks and passes it with --settings per launch, so the user's own
+    # ~/.claude/settings.json is never read-modify-written.
+    require_global_scope "global Claude hooks (~/.claude/settings.json)" || return 0
+
     echo -e "\n${CYAN}🔗 Installing Hooks (Constraints + LSL)...${NC}"
 
     # SANDBOX MODE: Skip global hooks installation

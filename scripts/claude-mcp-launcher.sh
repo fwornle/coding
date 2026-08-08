@@ -39,6 +39,42 @@ if [[ ! -f "$MCP_CONFIG" ]]; then
     exit 1
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Wrapper-scoped configuration (the default since P2).
+#
+# A wrapper-scoped install writes NOTHING into ~/.claude, so the hooks and slash
+# commands this project provides have to be supplied per launch instead. Both
+# are session-scoped flags, so a bare `claude` in another terminal is completely
+# unaffected — which is the entire point.
+#
+#   --settings    a DERIVED copy of the user's own settings.json with our hooks
+#                 merged in (their hooks are preserved; see the generator).
+#   --plugin-dir  this repo's .claude/commands as a session-only plugin, so the
+#                 commands stay live rather than going stale in ~/.claude/commands.
+#
+# Deliberately NOT --strict-mcp-config: that would suppress the user's own MCP
+# servers, which is the opposite of "behaves as before".
+#
+# In global scope these live in ~/.claude and need no per-launch flags, so the
+# extra arguments are simply omitted.
+# ─────────────────────────────────────────────────────────────────────────────
+CLAUDE_SCOPE_ARGS=()
+_coding_scope="${CODING_AGENT_SCOPE:-}"
+if [[ -z "$_coding_scope" && -f "$CODING_REPO_DIR/.env" ]]; then
+    _coding_scope="$(grep -m1 '^CODING_AGENT_SCOPE=' "$CODING_REPO_DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
+fi
+if [[ "${_coding_scope:-wrapper}" != "global" ]]; then
+    if _runtime_out="$(CODING_REPO="$CODING_REPO_DIR" node "$CODING_REPO_DIR/scripts/build-claude-runtime-config.mjs" 2>/dev/null)"; then
+        _derived_settings="$(sed -n '1p' <<<"$_runtime_out")"
+        _plugin_dir="$(sed -n '2p' <<<"$_runtime_out")"
+        [[ -f "$_derived_settings" ]] && CLAUDE_SCOPE_ARGS+=(--settings "$_derived_settings")
+        [[ -d "$_plugin_dir" ]]      && CLAUDE_SCOPE_ARGS+=(--plugin-dir "$_plugin_dir")
+        echo -e "${BLUE}🔒 Wrapper-scoped: hooks and skills injected for this session only${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Could not build per-launch Claude config — hooks/skills may be inactive${NC}"
+    fi
+fi
+
 # Display minimal startup information
 echo -e "${BLUE}🚀 Starting Claude Code with MCP Integration${NC}"
 
@@ -144,12 +180,12 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
     
     # Launch Claude normally (without exec to preserve trap)
     # Run Claude directly with proper argument handling
-    NODE_NO_WARNINGS=1 claude --mcp-config "$MCP_CONFIG" "$@"
+    NODE_NO_WARNINGS=1 claude --mcp-config "$MCP_CONFIG" "${CLAUDE_SCOPE_ARGS[@]}" "$@"
     CLAUDE_EXIT_CODE=$?
     
     # Exit with Claude's exit code (this will trigger the trap)
     exit $CLAUDE_EXIT_CODE
 else
     # Launch Claude without logging
-    NODE_NO_WARNINGS=1 exec claude --mcp-config "$MCP_CONFIG" "$@"
+    NODE_NO_WARNINGS=1 exec claude --mcp-config "$MCP_CONFIG" "${CLAUDE_SCOPE_ARGS[@]}" "$@"
 fi
