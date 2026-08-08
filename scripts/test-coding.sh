@@ -2372,6 +2372,90 @@ fi
 
 
 # =============================================================================
+# fastembed degradation on an unsupported platform
+# =============================================================================
+#
+# onnxruntime-node is prebuilt-only — no source-build fallback — so on a platform
+# with no prebuilt (musl, exotic arch) host-side embeddings simply cannot work.
+# install_fastembed_native() is supposed to notice and set
+# CODING_EMBEDDINGS_HOST=off so retrieval defers to the container, rather than
+# letting obs-api crash later at runtime.
+#
+# WHY THIS IS A UNIT TEST AND NOT A CONTAINER SHAPE. The cross-platform plan
+# wanted this proven by running the Docker harness under --platform linux/arm64,
+# on the premise that arm64 Linux has no tokenizer because package-lock.json
+# lists only darwin-universal / linux-x64-gnu / win32-x64-msvc. That premise is
+# false: the tokenizer is installed with `npm install <pkg> --no-save`, which
+# resolves against the REGISTRY and never reads the lockfile.
+# @anush008/tokenizers-linux-arm64-gnu exists there, and the harness confirms
+# fastembed LOADS on real aarch64. So arm64 proves the supported path, not the
+# degraded one, and the degradation needed a different vehicle.
+#
+# Faking the platform is that vehicle: it is deterministic, runs everywhere in
+# under a second, and tests the branch that would otherwise only be reachable by
+# finding real musl or riscv hardware.
+print_section "fastembed degradation on an unsupported platform"
+
+if [[ ! -f "$CODING_ROOT/install.sh" ]]; then
+    print_fail "install.sh not found — cannot check fastembed degradation"
+else
+    fe_sandbox="$(mktemp -d)"
+    fe_out="$fe_sandbox/out.txt"
+    touch "$fe_sandbox/.env"
+    (
+        # shellcheck disable=SC1091
+        source "$CODING_ROOT/install.sh"
+        # After the source: install.sh assigns CODING_REPO at load time.
+        CODING_REPO="$fe_sandbox"
+        INSTALL_LOG="$fe_sandbox/install.log"
+        INSTALLATION_WARNINGS=()
+
+        # A platform with no prebuilt tokenizer, and a node that cannot load one.
+        # Shell functions take precedence over the real binaries.
+        uname() { case "${1:-}" in -s) echo Linux ;; -m) echo riscv64 ;; *) echo Linux ;; esac; }
+        node()  { return 1; }
+        npm()   { echo "REGRESSION: npm called for an arch with no known build" ; return 1; }
+
+        install_fastembed_native
+        echo "FE_RC=$?"
+    ) > "$fe_out" 2>&1
+
+    fe_env="$(grep -m1 '^CODING_EMBEDDINGS_HOST=' "$fe_sandbox/.env" 2>/dev/null | cut -d= -f2- || true)"
+
+    # 1. It must not abort the install — a machine without host embeddings is
+    #    degraded, not broken.
+    if grep -q "FE_RC=0" "$fe_out"; then
+        print_pass "fastembed: unsupported platform does not abort the install"
+    else
+        print_fail "fastembed: unsupported platform returned non-zero ($(grep -o 'FE_RC=[0-9]*' "$fe_out"))"
+    fi
+
+    # 2. It must record the mitigation, or obs-api crashes later instead.
+    if [[ "$fe_env" == "off" ]]; then
+        print_pass "fastembed: wrote CODING_EMBEDDINGS_HOST=off to defer to the container"
+    else
+        print_fail "fastembed: did NOT set CODING_EMBEDDINGS_HOST=off (got '${fe_env:-<unset>}')"
+    fi
+
+    # 3. It must not try to install a package it has no name for.
+    if grep -q "REGRESSION: npm called" "$fe_out"; then
+        print_fail "fastembed: attempted an npm install with no known package for the arch"
+    else
+        print_pass "fastembed: skipped the npm install when no prebuilt exists"
+    fi
+
+    # 4. The warning has to say what still works, not just what broke.
+    if grep -q "embedding listener is unaffected" "$fe_out"; then
+        print_pass "fastembed: degradation explains the consequence"
+    else
+        print_fail "fastembed: degradation gave no explanation of the consequence"
+    fi
+
+    rm -rf "$fe_sandbox"
+fi
+
+
+# =============================================================================
 # SUMMARY REPORT
 # =============================================================================
 

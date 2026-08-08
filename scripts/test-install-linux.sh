@@ -10,12 +10,24 @@
 #   no-egress  — no network at all. The installer must fail AT PREFLIGHT with
 #                actionable guidance, not minutes later inside a native
 #                postinstall.
+#   arch       — the arch-specific fastembed tokenizer. Asserts the installer
+#                picks the tokenizer matching the container's real architecture,
+#                and that "fastembed loads" and "CODING_EMBEDDINGS_HOST=off"
+#                never disagree.
 #
 # Usage:
-#   scripts/test-install-linux.sh                  # all shapes
+#   scripts/test-install-linux.sh                  # all shapes, HOST arch
 #   scripts/test-install-linux.sh direct           # one shape
-#   scripts/test-install-linux.sh --arm64          # exercise the missing
-#                                                  # tokenizers-linux-arm64-gnu path
+#   scripts/test-install-linux.sh --arm64 arch     # arm64 tokenizer path
+#   scripts/test-install-linux.sh --amd64 arch     # x64 tokenizer path (emulated
+#                                                  # on Apple Silicon, so slow)
+#
+# MIND THE DEFAULT PLATFORM. With no --arm64/--amd64 flag, Docker builds for the
+# HOST architecture. On an Apple Silicon Mac that means every run has been
+# testing linux/arm64 — so a green "15/15" on this machine says nothing about
+# linux/amd64, which is what most Linux users and every GitHub hosted runner
+# actually are. The banner prints the platform for exactly this reason. Run both
+# before trusting a claim about "Linux".
 #
 # SCOPE — what this harness does and does NOT prove.
 #
@@ -73,6 +85,12 @@ if [[ "${1:-}" == "--in-container" ]]; then
     rc=$?
     echo "--------------------------------------------------------------------"
     echo "INSTALLER_EXIT=$rc"
+    # Surface the arch-dependent outcome the host side needs to assert. The
+    # installer writes CODING_EMBEDDINGS_HOST=off only when fastembed cannot
+    # load, so its presence or absence IS the degradation signal.
+    echo "CONTAINER_ARCH=$(uname -m)"
+    echo "ENV_EMBEDDINGS_HOST=$(grep -m1 '^CODING_EMBEDDINGS_HOST=' .env 2>/dev/null | cut -d= -f2- || true)"
+    echo "TOKENIZER_PRESENT=$(ls -d node_modules/@anush008/tokenizers-* 2>/dev/null | tr '\n' ' ' || true)"
     exit 0
 fi
 
@@ -81,12 +99,12 @@ for arg in "$@"; do
     case "$arg" in
         --arm64)  PLATFORM_FLAG="--platform=linux/arm64" ;;
         --amd64)  PLATFORM_FLAG="--platform=linux/amd64" ;;
-        direct|proxy-only|no-egress) SHAPES+=("$arg") ;;
-        -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+        direct|proxy-only|no-egress|arch) SHAPES+=("$arg") ;;
+        -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
         *) echo "unknown argument: $arg"; exit 2 ;;
     esac
 done
-[[ ${#SHAPES[@]} -eq 0 ]] && SHAPES=(direct proxy-only no-egress)
+[[ ${#SHAPES[@]} -eq 0 ]] && SHAPES=(direct proxy-only no-egress arch)
 
 command -v docker >/dev/null 2>&1 || { echo "docker is required"; exit 2; }
 docker info >/dev/null 2>&1 || { echo "docker daemon is not running"; exit 2; }
@@ -121,7 +139,7 @@ cleanup_ctx() { [[ -n "${CTX:-}" && -d "$CTX" ]] && rm -rf "$CTX"; }
 prepare_context
 
 # ── build ────────────────────────────────────────────────────────────────────
-info "Building $IMAGE ${PLATFORM_FLAG:+($PLATFORM_FLAG)}..."
+info "Building $IMAGE for ${PLATFORM_FLAG:-linux/$(docker version --format '{{.Server.Arch}}' 2>/dev/null || echo '?') (host default)}..."
 # shellcheck disable=SC2086
 docker build $PLATFORM_FLAG -f "$CTX/Dockerfile.install-test" \
     -t "$IMAGE" "$CTX" >/tmp/coding-install-build.log 2>&1 \
@@ -284,11 +302,91 @@ shape_no_egress() {
     fi
 }
 
+# ── shape: arch ──────────────────────────────────────────────────────────────
+# The arch-specific fastembed tokenizer path, asserted per platform.
+#
+# WHAT THIS CORRECTED. The plan that commissioned this shape assumed arm64 Linux
+# was a DEGRADED platform, on the grounds that package-lock.json carries
+# darwin-universal / linux-x64-gnu / win32-x64-msvc and no linux-arm64-gnu. That
+# inference is wrong: install_fastembed_native() installs the tokenizer with
+# `npm install <pkg> --no-save`, which resolves against the REGISTRY and never
+# consults the lockfile. @anush008/tokenizers-linux-arm64-gnu exists there
+# (0.6.0), and on real aarch64 Linux fastembed loads. So arm64 is supported, and
+# this shape asserts that rather than asserting a degradation that never happens.
+#
+# It is written to be correct on either platform: it derives the EXPECTED
+# tokenizer from the container's own arch, then requires the two outcomes to be
+# consistent — a loaded fastembed must NOT have set CODING_EMBEDDINGS_HOST=off,
+# and a failed one MUST have. Inconsistency is the real bug either way, and it
+# would be silent at install time and only surface later as an obs-api crash.
+shape_arch() {
+    echo; info "── shape: arch (fastembed tokenizer per platform) ──"
+    local out; out="$(run_installer "-e INSTALL_ARGS=--ci")"
+    echo "$out" > /tmp/coding-install-arch.log
+
+    local carch expected_pkg embed_host
+    carch="$(grep -m1 '^CONTAINER_ARCH=' <<<"$out" | cut -d= -f2- | tr -d '\r')"
+    embed_host="$(grep -m1 '^ENV_EMBEDDINGS_HOST=' <<<"$out" | cut -d= -f2- | tr -d '\r')"
+    info "container arch: ${carch:-<unknown>}   CODING_EMBEDDINGS_HOST=${embed_host:-<unset>}"
+
+    case "$carch" in
+        aarch64|arm64)  expected_pkg="tokenizers-linux-arm64-gnu" ;;
+        x86_64|amd64)   expected_pkg="tokenizers-linux-x64-gnu" ;;
+        *)              expected_pkg="" ;;
+    esac
+
+    if [[ -z "$carch" ]]; then
+        fail "arch: container did not report its architecture"
+        return 0
+    fi
+
+    # 1. The installer must select the tokenizer for the arch it is actually on.
+    if [[ -n "$expected_pkg" ]]; then
+        if grep -q "TOKENIZER_PRESENT=.*$expected_pkg" <<<"$out"; then
+            pass "arch: installed $expected_pkg for $carch"
+        else
+            fail "arch: expected $expected_pkg on $carch, got '$(grep -m1 '^TOKENIZER_PRESENT=' <<<"$out")'"
+        fi
+    else
+        info "arch: $carch has no known prebuilt — degradation is the correct outcome"
+    fi
+
+    # 2. fastembed either loads or degrades, and the two signals must agree.
+    if grep -q "fastembed loads on this host" <<<"$out"; then
+        if [[ "$embed_host" == "off" ]]; then
+            fail "arch: fastembed loaded yet CODING_EMBEDDINGS_HOST=off was written"
+        else
+            pass "arch: fastembed loads on $carch, host retrieval left enabled"
+        fi
+    elif grep -q "fastembed cannot load on this platform" <<<"$out"; then
+        if [[ "$embed_host" == "off" ]]; then
+            pass "arch: fastembed unavailable on $carch, degraded to CODING_EMBEDDINGS_HOST=off"
+        else
+            fail "arch: fastembed cannot load but CODING_EMBEDDINGS_HOST was NOT set to off"
+        fi
+        if grep -q "container's" <<<"$out"; then
+            pass "arch: degradation explains that container embeddings still work"
+        else
+            fail "arch: degradation gave no explanation of the consequence"
+        fi
+    else
+        fail "arch: installer reported neither success nor failure for fastembed"
+    fi
+
+    # 3. Whatever happened above, it must not have aborted the npm phase.
+    if grep -q "Node.js dependencies installed" <<<"$out"; then
+        pass "arch: npm phase completed on $carch"
+    else
+        fail "arch: npm phase did not complete on $carch"
+    fi
+}
+
 for shape in "${SHAPES[@]}"; do
     case "$shape" in
         direct)     shape_direct ;;
         proxy-only) shape_proxy_only ;;
         no-egress)  shape_no_egress ;;
+        arch)       shape_arch ;;
     esac
 done
 
