@@ -122,48 +122,17 @@ Proceed? [y/N/skip-all]:
 ```
 
 **Shell Configuration Backup:**
-Before modifying your shell configuration (`.bashrc`, `.zshrc`), the installer:
-1. Creates a timestamped backup (e.g., `.zshrc.coding-backup.20260110120000`)
+Before modifying your shell configuration, the installer:
+1. Copies the original **once**, to `<file>.coding-orig`, if that copy does not
+   already exist — the state from before this project ever touched the file
 2. Asks for confirmation before making changes
-3. Uses clear markers (`# === CODING TOOLS START/END ===`) for easy identification
+3. Writes a single marked block (`# === CODING TOOLS START/END ===`) for easy identification
 4. Verifies the modified configuration is syntactically valid
 
-This ensures you can always restore your original shell configuration if needed.
-
-### Installation Safety
-
-The installer follows a **non-intrusive installation policy**: it will NEVER modify system tools or configurations outside the coding repository without your explicit consent.
-
-**Confirmation Prompts:**
-When the installer detects missing system dependencies (Node.js, Python, jq, etc.), it will:
-1. Display what action is requested
-2. Show potential risks (e.g., "May upgrade existing packages")
-3. Ask for confirmation before proceeding
-
-**Response Options:**
-- `y` - Proceed with this specific change
-- `N` (default) - Skip this change, continue installation
-- `skip-all` - Skip ALL system-level changes for the rest of installation
-
-**Example Prompt:**
-```
-╔══════════════════════════════════════════════════════════════════════╗
-║               SYSTEM MODIFICATION REQUEST                            ║
-╠══════════════════════════════════════════════════════════════════════╣
-║ Action: Install Node.js via Homebrew                                 ║
-║ Risk:   This may upgrade existing packages and break other tools     ║
-╚══════════════════════════════════════════════════════════════════════╝
-Proceed? [y/N/skip-all]:
-```
-
-**Shell Configuration Backup:**
-Before modifying your shell configuration (`.bashrc`, `.zshrc`), the installer:
-1. Creates a timestamped backup (e.g., `.zshrc.coding-backup.20260110120000`)
-2. Asks for confirmation before making changes
-3. Uses clear markers (`# === CODING TOOLS START/END ===`) for easy identification
-4. Verifies the modified configuration is syntactically valid
-
-This ensures you can always restore your original shell configuration if needed.
+Only `$SHELL_RC` (the rc file for your login shell) is touched — not all four of
+`.bashrc`, `.bash_profile`, `.zshrc`, `.zprofile`. `./uninstall.sh` reports the
+`.coding-orig` files rather than deleting them, so the original is always
+recoverable.
 
 ### What Gets Installed
 
