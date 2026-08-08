@@ -90,11 +90,17 @@
         ]
       }
     ],
+    "judge": {
+      "requested": "claude-opus-4.8",
+      "served": null,
+      "provider": "claude-code",
+      "mismatch": null
+    },
     "contaminatedRows": 0,
     "selfIdentifiedProbeRows": 2,
     "toolEscapeRows": 0,
     "retiredQuestions": [],
-    "generatedAt": "2026-08-08T05:52:09.523Z"
+    "generatedAt": "2026-08-08T07:03:21.264Z"
   },
   "byArm": {
     "grep": {

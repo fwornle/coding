@@ -85,6 +85,21 @@ const report = {
     // sandboxed run from one where the arms could read the answer key.
     sandbox: meta.sandbox ?? null,
     history: meta.history ?? null,
+    // The judge identity that ACTUALLY graded these cells, taken from the rows rather
+    // than from the run's stated intent. r6 and r7 both recorded a requested
+    // `claude-opus-4.8` in run.json while every call was answered by claude-haiku-4-5,
+    // so the requested name is not evidence of anything. Older runs have no served
+    // field at all; report it as unrecorded rather than silently echoing the request.
+    judge: (() => {
+      const served = [...new Set(rows.map((r) => r.judge_model_served).filter(Boolean))];
+      const requested = meta.judge?.requested?.model ?? meta.judge?.model ?? null;
+      return {
+        requested,
+        served: served.length ? served : null,
+        provider: meta.judge?.served?.provider ?? meta.judge?.requested?.provider ?? meta.judge?.provider ?? null,
+        mismatch: served.length ? served.some((m) => m !== requested) : null,
+      };
+    })(),
     contaminatedRows: rows.filter((r) => r.contaminated).length,
     // Answers that GUESSED they were being probed without citing anything. Not
     // contamination — an arm that searches, finds nothing, and concludes the question is
