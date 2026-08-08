@@ -2772,8 +2772,28 @@ install_node_dependencies() {
     if npm ci --ignore-scripts || npm install --ignore-scripts; then
         success "✓ Node.js dependencies installed"
     else
+        # Fatal for a real install — without node_modules nothing downstream
+        # means anything, and the user needs to know immediately rather than read
+        # it off a summary of cascading failures.
+        #
+        # Downgraded under --ci for the same reason as every other infra gate:
+        # the contract is that a portability run completes with a summary. The
+        # case that prompted this was the harness's proxy-only shape, where npm
+        # died of its OWN internal bug ("npm error Exit handler never called!")
+        # behind squid — not something about this installer, and not a reason to
+        # abandon the run and report nothing.
+        #
+        # NOTE this makes exit status alone insufficient to prove npm worked in
+        # CI, so .github/workflows/cross-platform-lite.yml asserts the
+        # "Node.js dependencies installed" line explicitly. Downgrading a gate
+        # without moving its assertion somewhere just deletes the check.
+        if [[ "$CI_LITE" == "true" ]]; then
+            warning "Failed to install Node.js dependencies — continuing (CI-lite portability run)"
+            info "  → everything downstream that needs node_modules will also fail; see the summary"
+            INSTALLATION_FAILURES+=("Node.js dependencies failed to install")
+            return 0
+        fi
         error_exit "Failed to install Node.js dependencies"
-        return 1
     fi
 
     # Because scripts were skipped, native modules must be built explicitly.

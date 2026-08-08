@@ -196,8 +196,31 @@ jobs:
         timeout-minutes: 25
         run: |
           set -e
-          ./install.sh --ci
-          echo "installer exit=$?"
+          # tee: the npm assertion below needs the output, and --ci deliberately
+          # downgrades failures so exit status alone no longer proves much.
+          ./install.sh --ci 2>&1 | tee /tmp/install-ci.log
+          echo "installer exit=${PIPESTATUS[0]}"
+
+      - name: npm dependency install must have SUCCEEDED
+        run: |
+          set -e
+          # --ci downgrades an npm failure to a warning so the run can reach its
+          # summary. That is right for the installer and wrong for this job: a
+          # broken npm phase would otherwise sail through as exit 0. Assert the
+          # success line directly, the way scripts/test-install-linux.sh does.
+          # Key on the message emitted AT THE MOMENT OF FAILURE, not the summary
+          # line: the summary only appears if the run reaches the end, so a later
+          # abort would leave this check matching nothing and reporting the wrong
+          # reason. This pattern covers both the fatal and the --ci-downgraded
+          # wording, since both contain it.
+          if grep -q "Failed to install Node.js dependencies" /tmp/install-ci.log; then
+            echo "::error::npm dependency install FAILED (downgraded by --ci, caught here)"
+            grep -E "npm error|npm ERR" /tmp/install-ci.log | tail -20 || true
+            exit 1
+          fi
+          grep -q "Node.js dependencies installed" /tmp/install-ci.log \
+            || { echo "::error::no evidence the npm phase ran at all"; exit 1; }
+          echo "npm phase confirmed successful"
 
       - name: bin/coding --help must work afterwards
         run: |

@@ -39,10 +39,15 @@
 #
 # It does NOT verify a complete installation. The container has no Docker and no
 # credentials for the private submodule remotes, and the build context is a
-# pruned file copy rather than a git checkout — so `git submodule update --init`
-# cannot succeed and install.sh exits non-zero at install_memory_visualizer.
-# That is expected here and is NOT a regression. Full-install completion has to
-# be verified on a real machine (see docs; the corporate box and Windows/WSL).
+# pruned file copy rather than a git checkout, so `git submodule update --init`
+# cannot succeed. Under --ci those are now downgraded to recorded failures rather
+# than aborts, so the installer RUNS TO ITS SUMMARY and exits 0 with a list of
+# what it could not do — which is the --ci contract, and what the direct and arch
+# shapes assert. A genuinely working stack still has to be verified on a real
+# machine (the corporate box, Windows/WSL).
+#
+# proxy-only is the exception: it is scoped to preflight and does not require
+# completion. See the comment in shape_proxy_only().
 #
 # The image deliberately has no C compiler, so better-sqlite3's source-build
 # fallback fails — this is the hostile case a user without build tools hits, and
@@ -214,11 +219,30 @@ run_installer_cached() {
     cat "$f"
 }
 
+# A container the harness had to KILL has not proven anything, whatever it managed
+# to log before dying. Without this, a run that hit the 900s cap and took SIGKILL
+# still reported "passed: N   failed: 0" — the assertions all fired on the early
+# output and nothing looked at how the run ended. Call this from any shape whose
+# contract includes reaching the end.
+assert_ran_to_completion() {
+    local label="$1" out="$2"
+    if grep -q "HARNESS_TIMEOUT" <<<"$out"; then
+        fail "$label: container killed at the harness timeout — run did not complete"
+        return 1
+    fi
+    if ! grep -q "INSTALLER_EXIT=" <<<"$out"; then
+        fail "$label: installer produced no exit code — it died before finishing"
+        return 1
+    fi
+    return 0
+}
+
 # ── shape: direct ────────────────────────────────────────────────────────────
 shape_direct() {
     echo; info "── shape: direct (normal egress) ──"
     local out; out="$(run_installer_cached "-e INSTALL_ARGS=--ci")"
     echo "$out" > /tmp/coding-install-direct.log
+    assert_ran_to_completion "direct" "$out"
 
     if grep -q "reachable directly — no proxy needed" <<<"$out"; then
         pass "direct: detected direct access, pinned no proxy"
@@ -288,6 +312,18 @@ shape_proxy_only() {
         -e https_proxy=http://squid-proxy:3128 -e http_proxy=http://squid-proxy:3128")"
     echo "$out" > /tmp/coding-install-proxy.log
 
+    # NOT assert_ran_to_completion: this shape deliberately does not require the
+    # install to finish. All three of its assertions are satisfied at preflight,
+    # and completion is blocked in this environment by npm's OWN bug behind squid
+    # ("npm error Exit handler never called!") — not by anything in install.sh.
+    # Before install.sh downgraded that npm failure under --ci it error_exit'd in
+    # ~2 minutes; now it continues and exceeds the 900s cap. Both outcomes leave
+    # this shape's actual contract — proxy used, no ENOTFOUND, preflight passes —
+    # fully verified.
+    if grep -q "HARNESS_TIMEOUT" <<<"$out"; then
+        info "proxy-only: run did not complete (expected here — see comment above)"
+    fi
+
     if grep -qE "Your existing proxy works|Using proxy" <<<"$out"; then
         pass "proxy-only: installer used the proxy"
     else
@@ -312,6 +348,7 @@ shape_no_egress() {
     # fail-fast is only observable in a real (non-CI-lite) install.
     local out; out="$(run_installer "--network none -e INSTALL_ARGS=")"
     echo "$out" > /tmp/coding-install-noegress.log
+    assert_ran_to_completion "no-egress" "$out"
 
     if grep -q "Network preflight failed" <<<"$out"; then
         pass "no-egress: failed at preflight"
@@ -357,6 +394,7 @@ shape_arch() {
     echo; info "── shape: arch (fastembed tokenizer per platform) ──"
     local out; out="$(run_installer_cached "-e INSTALL_ARGS=--ci")"
     echo "$out" > /tmp/coding-install-arch.log
+    assert_ran_to_completion "arch" "$out"
 
     local carch expected_pkg embed_host
     carch="$(grep -m1 '^CONTAINER_ARCH=' <<<"$out" | cut -d= -f2- | tr -d '\r')"
