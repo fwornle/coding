@@ -1668,11 +1668,17 @@ else
     print_fail "Playwright CLI skill missing"
 fi
 
-print_check "Playwright browser"
-if npx playwright --version >/dev/null 2>&1; then
-    print_pass "Playwright CLI available ($(npx playwright --version 2>/dev/null))"
+# NOTE: there is deliberately no "Playwright browser" check here any more.
+# The old check ran `npx playwright --version`, which only prints the JS CLI
+# version string — it succeeds whether or not a browser binary exists or can
+# launch, so it asserted nothing and masked a real breakage on Linux.
+# The installer no longer downloads a browser at all: gsd-browser is the
+# mandated tool (CLAUDE.md) and ships its own Chrome for Testing.
+print_check "gsd-browser (mandated browser automation tool)"
+if command -v gsd-browser >/dev/null 2>&1; then
+    print_pass "gsd-browser available ($(command -v gsd-browser))"
 else
-    print_warning "Playwright not installed — run: npx playwright install chromium"
+    print_warning "gsd-browser not on PATH — browser automation and visual UI verification unavailable"
 fi
 
 print_check "No Playwright MCP server in config"

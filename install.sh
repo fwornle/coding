@@ -132,7 +132,17 @@ detect_platform() {
             PLATFORM="macos"
             ;;
         Linux*)
-            PLATFORM="linux"
+            # WSL reports "Linux" from `uname -s` but is NOT a native Linux host:
+            # there is no launchd, `systemctl --user` may be absent entirely
+            # (WSL1 and older WSL2 without systemd), and Docker is Docker Desktop
+            # running on the Windows side. Detecting it as its own platform lets
+            # those branches be skipped with an explanation instead of failing.
+            if [[ -n "${WSL_DISTRO_NAME:-}" ]] \
+               || grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
+                PLATFORM="wsl"
+            else
+                PLATFORM="linux"
+            fi
             ;;
         MINGW*|CYGWIN*|MSYS*)
             PLATFORM="windows"
@@ -261,83 +271,248 @@ warning() {
     log "WARNING: $1"
 }
 
-# Detect network location and set repository URLs
-detect_network_and_set_repos() {
-    info "Detecting network location (CN vs Public)..."
-    
-    local inside_cn=false
-    local cn_ssh_ok=false
-    local public_ssh_ok=false
-    
-    # Test BMW GitHub accessibility to determine if inside CN
-    info "Testing cc-github.bmwgroup.net accessibility..."
-    local bmw_response=$(timeout 5s ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -T git@cc-github.bmwgroup.net 2>&1 || true)
-    if echo "$bmw_response" | grep -q -iE "(successfully authenticated|Welcome to GitLab|You've successfully authenticated)"; then
-        success "Inside Corporate Network - SSH access to cc-github.bmwgroup.net works"
-        inside_cn=true
-        cn_ssh_ok=true
+# Set KEY=VALUE in the repo-local .env, replacing any existing line for KEY.
+# Idempotent: re-running never appends a duplicate. Repo-local only — this
+# never touches the user's shell environment or any file outside $CODING_REPO.
+set_env_var() {
+    local key="$1" value="$2"
+    local env_file="$CODING_REPO/.env"
+
+    [[ -f "$env_file" ]] || touch "$env_file"
+
+    if grep -q "^${key}=" "$env_file" 2>/dev/null; then
+        local tmp
+        tmp="$(mktemp)"
+        awk -v k="$key" -v v="$value" '
+            $0 ~ "^" k "=" { print k "=" v; found=1; next }
+            { print }
+            END { if (!found) print k "=" v }
+        ' "$env_file" > "$tmp" && mv "$tmp" "$env_file"
     else
-        # Try HTTPS to CN to double-check
-        if timeout 5s curl -s --connect-timeout 5 https://cc-github.bmwgroup.net >/dev/null 2>&1; then
-            info "Inside Corporate Network - cc-github.bmwgroup.net accessible via HTTPS"
-            inside_cn=true
+        echo "${key}=${value}" >> "$env_file"
+    fi
+    log "Set ${key}=${value} in .env"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Proxy configuration for the install itself
+#
+# WHY THIS EXISTS: `npm install` resolves and downloads from the network, and
+# native modules (fastembed -> onnxruntime-node) fetch prebuilt binaries from
+# github.com in their lifecycle scripts. Behind a corporate proxy with no
+# proxy env set, that fails with `getaddrinfo ENOTFOUND github.com` several
+# minutes into the install. This must therefore run BEFORE any network step.
+#
+# INVARIANT: this function never unsets a proxy variable it did not set itself.
+# scripts/detect-network.sh deliberately unsets HTTP_PROXY/HTTPS_PROXY when it
+# cannot reach proxydetox — correct for a macOS launcher, actively harmful here,
+# because on a corporate Linux box the user's own working proxy would be
+# destroyed. We reuse its detection, never its mutation.
+#
+# Opt out entirely with CODING_INSTALL_PROXY=0.
+# ─────────────────────────────────────────────────────────────────────────────
+
+PROXY_SOURCE=""          # human-readable origin of the proxy we selected
+NETWORK_DIRECT_OK=false  # true when github.com is reachable with no proxy
+
+# Verify a proxy candidate by actually fetching through it. A listening port is
+# not evidence; a 200/301 from github.com is.
+_proxy_verifies() {
+    local px="$1"
+    [[ -n "$px" ]] || return 1
+    curl -sS -o /dev/null --connect-timeout 6 --max-time 20 -x "$px" https://github.com/ >/dev/null 2>&1
+}
+
+_direct_verifies() {
+    curl -sS -o /dev/null --connect-timeout 6 --max-time 20 --noproxy '*' https://github.com/ >/dev/null 2>&1
+}
+
+# Collect candidate proxies from the places corporate Linux/Windows boxes
+# actually keep them. Order matters: the user's own environment wins.
+_proxy_candidates() {
+    local c
+
+    # 1. Whatever the user already exported (captured before we touch anything)
+    [[ -n "${USER_PROXY:-}" ]] && echo "$USER_PROXY"
+
+    # 2. An existing npm proxy config (honours a hand-written ~/.npmrc)
+    if command -v npm >/dev/null 2>&1; then
+        for c in $(npm config get https-proxy 2>/dev/null) $(npm config get proxy 2>/dev/null); do
+            [[ "$c" == "null" || "$c" == "undefined" || -z "$c" ]] || echo "$c"
+        done
+    fi
+
+    # 3. /etc/environment — the standard system-wide spot on Debian/Ubuntu
+    if [[ -r /etc/environment ]]; then
+        grep -hoiE '(https?_proxy)=["'"'"']?[^"'"'"'[:space:]]+' /etc/environment 2>/dev/null \
+            | sed -E 's/^[^=]+=["'"'"']?//' || true
+    fi
+
+    # 4. APT's proxy — very common corporate footprint, and often the only one set
+    if compgen -G "/etc/apt/apt.conf.d/*" >/dev/null 2>&1; then
+        grep -hoiE 'Acquire::https?::Proxy[[:space:]]+"[^"]+"' /etc/apt/apt.conf.d/* 2>/dev/null \
+            | sed -E 's/.*"([^"]+)".*/\1/' || true
+    fi
+
+    # 5. A local PAC-aware proxy (proxydetox / cntlm), the sanctioned Linux answer
+    echo "http://127.0.0.1:3128"
+}
+
+configure_proxy_for_install() {
+    if [[ "${CODING_INSTALL_PROXY:-1}" == "0" ]]; then
+        info "Proxy auto-configuration disabled (CODING_INSTALL_PROXY=0) — using the environment as-is"
+        return 0
+    fi
+
+    echo -e "\n${CYAN}🌐 Configuring network access for the installation...${NC}"
+
+    # Capture the user's proxy BEFORE anything can modify the environment.
+    USER_PROXY="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-}}}}"
+
+    # Reuse the launcher's detection library. It is written for `set -e` only,
+    # so relax `set -u` across the source+call and restore it afterwards.
+    local _had_u=0
+    case "$-" in *u*) _had_u=1 ;; esac
+    set +u
+    : "${CODING_FORCE_CN:=}"
+    if [[ -r "$CODING_REPO/scripts/detect-network.sh" ]]; then
+        # shellcheck source=/dev/null
+        source "$CODING_REPO/scripts/detect-network.sh" >/dev/null 2>&1 || true
+        if declare -f detect_corporate_network >/dev/null 2>&1; then
+            detect_corporate_network >/dev/null 2>&1 || true
+        fi
+    fi
+    if [[ "$_had_u" == "1" ]]; then set -u; fi
+
+    if [[ "${INSIDE_CN:-false}" == "true" ]]; then
+        info "Corporate network detected"
+    else
+        info "Corporate network not detected (public or VPN-less)"
+    fi
+
+    # 1. Test the environment EXACTLY as npm will see it. If the user already
+    #    has a working setup (proxy or not), change nothing at all.
+    if curl -sS -o /dev/null --connect-timeout 8 --max-time 25 https://github.com/ >/dev/null 2>&1; then
+        PROXY_WORKING=true
+        if [[ -n "$USER_PROXY" ]]; then
+            PROXY_SOURCE="$USER_PROXY"
+            success "Your existing proxy works ($USER_PROXY) — leaving it untouched"
         else
-            info "Outside Corporate Network - cc-github.bmwgroup.net not accessible"
-            inside_cn=false
+            NETWORK_DIRECT_OK=true
+            PROXY_SOURCE="direct"
+            success "github.com reachable directly — no proxy needed"
         fi
+        return 0
     fi
-    
-    if [[ "$inside_cn" == true ]]; then
-        info "🏢 Corporate Network detected - using selective CN mirrors"
-        INSIDE_CN=true
-        # Memory Visualizer: Use CN mirror (has modifications)
-        MEMORY_VISUALIZER_REPO_SSH="$MEMORY_VISUALIZER_CN_SSH"
-        MEMORY_VISUALIZER_REPO_HTTPS="$MEMORY_VISUALIZER_CN_HTTPS"
-        # Semantic Analysis: Use CN mirror (has corporate modifications)
-        SEMANTIC_ANALYSIS_REPO_SSH="$SEMANTIC_ANALYSIS_CN_SSH"
-        SEMANTIC_ANALYSIS_REPO_HTTPS="$SEMANTIC_ANALYSIS_CN_HTTPS"
 
-    else
-        info "🌍 Public network detected - using public repositories"
-        # Test public GitHub SSH
-        info "Testing github.com SSH access..."
-        local github_response=$(timeout 5s ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -T git@github.com 2>&1 || true)
-        if echo "$github_response" | grep -q -i "successfully authenticated"; then
-            success "SSH access to github.com works"
-            public_ssh_ok=true
+    # 2. The environment as-is does NOT work. If a proxy is configured, it is
+    #    the likely culprit — check whether bypassing it succeeds. This is the
+    #    one case where we override a user proxy, and only for this process:
+    #    a verifiably broken proxy is not something to preserve.
+    if [[ -n "$USER_PROXY" ]] && _direct_verifies; then
+        warning "Configured proxy '$USER_PROXY' cannot reach github.com, but direct access works"
+        info "  Bypassing it for this installation only (your shell config is not modified)"
+        unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+        NETWORK_DIRECT_OK=true
+        PROXY_WORKING=true
+        PROXY_SOURCE="direct (configured proxy bypassed)"
+        return 0
+    fi
+
+    info "Neither direct access nor the current environment reaches github.com — searching for a proxy..."
+
+    local cand seen=""
+    while IFS= read -r cand; do
+        [[ -n "$cand" ]] || continue
+        # Normalise before dedup: bare host:port -> URL, and strip trailing
+        # slashes so "…:3128/" and "…:3128" are not probed twice.
+        [[ "$cand" == *://* ]] || cand="http://$cand"
+        cand="${cand%%/}"
+        case "$seen" in *"|$cand|"*) continue ;; esac
+        seen="$seen|$cand|"
+
+        info "  trying $cand ..."
+        if _proxy_verifies "$cand"; then
+            export HTTP_PROXY="$cand"  HTTPS_PROXY="$cand"
+            export http_proxy="$cand"  https_proxy="$cand"
+            # npm honours these and, unlike a config file, they propagate into
+            # the child processes that native lifecycle scripts spawn.
+            export npm_config_proxy="$cand" npm_config_https_proxy="$cand"
+
+            # NO_PROXY is additive — never clobber what the user set.
+            local base_no_proxy="localhost,127.0.0.1,::1,.bmwgroup.net"
+            if [[ -n "${NO_PROXY:-${no_proxy:-}}" ]]; then
+                export NO_PROXY="${NO_PROXY:-$no_proxy},$base_no_proxy"
+            else
+                export NO_PROXY="$base_no_proxy"
+            fi
+            export no_proxy="$NO_PROXY"
+
+            PROXY_WORKING=true
+            PROXY_SOURCE="$cand"
+            success "Using proxy $cand for this installation"
+            info "  (exported for this process only — your shell config is not modified)"
+            return 0
         fi
-        
-        # All repositories: Use public repos
-        MEMORY_VISUALIZER_REPO_SSH="$MEMORY_VISUALIZER_PUBLIC_SSH"
-        MEMORY_VISUALIZER_REPO_HTTPS="$MEMORY_VISUALIZER_PUBLIC_HTTPS"
-        SEMANTIC_ANALYSIS_REPO_SSH="$SEMANTIC_ANALYSIS_PUBLIC_SSH"
-        SEMANTIC_ANALYSIS_REPO_HTTPS="$SEMANTIC_ANALYSIS_PUBLIC_HTTPS"
+    done < <(_proxy_candidates)
 
-    fi
-    
-    # Log selected repositories
-    info "Selected repositories:"
-    info "  Memory Visualizer: $(echo "$MEMORY_VISUALIZER_REPO_SSH" | sed 's/git@//' | sed 's/.git$//')"
-    info "  Semantic Analysis: $(echo "$SEMANTIC_ANALYSIS_REPO_SSH" | sed 's/git@//' | sed 's/.git$//')"
-    
+    # Nothing worked. Change NOTHING and let preflight fail with real guidance.
+    PROXY_WORKING=false
+    PROXY_SOURCE=""
+    warning "No working proxy found — leaving your environment untouched"
     return 0
 }
 
-# Test proxy connectivity for external repos
-test_proxy_connectivity() {
-    if [[ "$INSIDE_CN" == false ]]; then
-        PROXY_WORKING=true  # Outside CN, assume direct access works
+# Fail fast, before the expensive npm install, with an actionable message.
+preflight_network() {
+    echo -e "\n${CYAN}🔎 Verifying network reachability before installing dependencies...${NC}"
+
+    local failed=()
+    local host
+
+    # With a proxy configured the client does not resolve the target itself —
+    # the proxy does — so only DNS-check when we are going direct.
+    if [[ -z "$PROXY_SOURCE" || "$PROXY_SOURCE" == "direct" ]]; then
+        if ! python3 -c "import socket,sys; socket.gethostbyname('github.com')" >/dev/null 2>&1; then
+            failed+=("DNS: cannot resolve github.com")
+        fi
+    fi
+
+    for host in "https://github.com/" "https://registry.npmjs.org/"; do
+        if ! curl -sS -o /dev/null --connect-timeout 8 --max-time 25 "$host" >/dev/null 2>&1; then
+            failed+=("HTTP: cannot reach $host")
+        fi
+    done
+
+    if [[ ${#failed[@]} -eq 0 ]]; then
+        success "Network OK (via ${PROXY_SOURCE:-direct})"
         return 0
     fi
-    
-    info "Testing proxy connectivity for external repositories..."
-    if timeout 5s curl -s --connect-timeout 5 https://google.de >/dev/null 2>&1; then
-        success "Proxy is working - external repositories accessible"
-        PROXY_WORKING=true
-    else
-        warning "Proxy not working or external access blocked"
-        PROXY_WORKING=false
+
+    echo ""
+    echo -e "${RED}Network preflight failed:${NC}"
+    local f; for f in "${failed[@]}"; do echo "  ✗ $f"; done
+    echo ""
+    echo -e "${YELLOW}This is the exact failure that kills 'npm install' several minutes in,${NC}"
+    echo -e "${YELLOW}inside onnxruntime-node's postinstall (ENOTFOUND github.com).${NC}"
+    echo ""
+    echo -e "${CYAN}Detected:${NC}"
+    echo "  corporate network : ${INSIDE_CN:-false}"
+    echo "  proxy in use      : ${PROXY_SOURCE:-none}"
+    echo ""
+    echo -e "${CYAN}Fix one of these, then re-run ./install.sh:${NC}"
+    echo "  • export https_proxy=http://<corp-proxy>:<port>   (check /etc/environment, or ask IT)"
+    echo "  • run a local PAC-aware proxy (proxydetox, cntlm) on 127.0.0.1:3128"
+    echo "  • connect to the VPN, or leave the corporate network entirely"
+    echo ""
+
+    if [[ "$CI_LITE" == "true" ]]; then
+        warning "Network unreachable — continuing (CI-lite portability run)"
+        INSTALLATION_FAILURES+=("Network preflight failed: ${failed[*]}")
+        return 0
     fi
+
+    error_exit "Network preflight failed — see the guidance above."
 }
 
 # Check for required dependencies
@@ -390,17 +565,27 @@ check_dependencies() {
         missing_deps+=("python3")
     fi
     
-    if ! command -v jq >/dev/null 2>&1; then
-        missing_deps+=("jq")
-    fi
-    
-    if ! command -v plantuml >/dev/null 2>&1; then
-        missing_deps+=("plantuml")
+    if ! command -v curl >/dev/null 2>&1; then
+        missing_deps+=("curl")
     fi
 
-    if ! command -v tmux >/dev/null 2>&1; then
-        missing_deps+=("tmux")
-    fi
+    # ── Soft dependencies: report, never block ───────────────────────────────
+    # None of these justify aborting the install:
+    #
+    #   jq       Every consumer has a non-jq fallback (setup_mcp_config, the
+    #            Claude hook installer). Absence degrades, it does not break.
+    #   plantuml install_plantuml() runs LATER in main() and offers both a
+    #            "skip" option and a repo-local JAR fallback. Gating on it here
+    #            aborted the install before its own installer could ever run —
+    #            the gate and the installer for the same tool were inverted.
+    #   tmux     Never used by install.sh at all. It is a launch-time need and
+    #            is already enforced where it belongs, in config/agents/*.sh.
+    #            On Windows the hint below even admits tmux is unavailable
+    #            natively, yet the gate still killed the install.
+    local soft_deps=()
+    command -v jq       >/dev/null 2>&1 || soft_deps+=("jq")
+    command -v plantuml >/dev/null 2>&1 || soft_deps+=("plantuml")
+    command -v tmux     >/dev/null 2>&1 || soft_deps+=("tmux")
 
     # Platform-specific checks
     if [[ "$PLATFORM" == "macos" ]]; then
@@ -439,116 +624,27 @@ check_dependencies() {
         fi
     fi
     
-# Clone repository with SSH first, fallback to HTTPS
-clone_repository() {
-    local ssh_url="$1"
-    local https_url="$2"
-    local target_dir="$3"
-    local repo_name=$(basename "$target_dir")
-    
-    # Determine if this is a BMW repository
-    local is_bmw_repo=false
-    if [[ "$ssh_url" == *"bmwgroup.net"* ]]; then
-        is_bmw_repo=true
-    fi
-    
-    info "Attempting to clone $repo_name..."
-    
-    # Try SSH first
-    if git clone "$ssh_url" "$target_dir" 2>/dev/null; then
-        success "Successfully cloned $repo_name using SSH"
-        return 0
-    else
-        if [[ "$is_bmw_repo" == true ]]; then
-            warning "SSH clone failed (may be outside VPN), trying HTTPS..."
-        else
-            warning "SSH clone failed (may be inside VPN), trying HTTPS..."
-        fi
-        
-        if git clone "$https_url" "$target_dir" 2>/dev/null; then
-            success "Successfully cloned $repo_name using HTTPS"
-            return 0
-        else
-            # For external repos, if HTTPS fails inside VPN, provide helpful message
-            if [[ "$is_bmw_repo" == false ]]; then
-                error_exit "Failed to clone $repo_name. If you're inside the corporate VPN, external GitHub access may be blocked."
-            else
-                error_exit "Failed to clone $repo_name. Please check your network connection and credentials."
-            fi
-            return 1
-        fi
-    fi
-}
-
-# Handle non-mirrored repository inside CN (with proxy detection)
-handle_non_mirrored_repo_cn() {
-    local repo_name="$1"
-    local ssh_url="$2"
-    local https_url="$3"
-    local target_dir="$4"
-    
-    if [[ -d "$target_dir" ]]; then
-        info "$repo_name already exists, attempting update..."
-        cd "$target_dir"
-        
-        if [[ "$PROXY_WORKING" == true ]]; then
-            info "Proxy working - attempting update from external repo"
-            if timeout 5s git pull origin main 2>/dev/null; then
-                success "$repo_name updated successfully"
-                return 0
-            else
-                warning "Could not update $repo_name (network/proxy issue)"
-                INSTALLATION_WARNINGS+=("$repo_name: Could not update from external repo")
-                return 0  # Continue - we have existing code
-            fi
-        else
-            warning "Proxy not working - skipping update of $repo_name"
-            INSTALLATION_WARNINGS+=("$repo_name: Skipped update due to proxy/network issues")
-            return 0  # Continue - we have existing code
-        fi
-    else
-        # Repository doesn't exist - try to clone
-        if [[ "$PROXY_WORKING" == true ]]; then
-            info "Proxy working - attempting to clone $repo_name"
-            if clone_repository "$ssh_url" "$https_url" "$target_dir" 2>/dev/null; then
-                success "$repo_name cloned successfully"
-                return 0
-            else
-                warning "Failed to clone $repo_name despite working proxy"
-                INSTALLATION_FAILURES+=("$repo_name: Failed to clone external repository")
-                return 1
-            fi
-        else
-            warning "Cannot clone $repo_name - proxy not working and no existing copy"
-            INSTALLATION_FAILURES+=("$repo_name: Cannot clone - no proxy access and repository missing")
-            return 1
-        fi
-    fi
-}
-
     if [[ ${#missing_deps[@]} -ne 0 ]]; then
         echo -e "${RED}Missing required dependencies: ${missing_deps[*]}${NC}"
         echo -e "${YELLOW}Please install the missing dependencies and run the installer again.${NC}"
         
-        # Provide installation hints
+        # Provide installation hints — these list ONLY the hard requirements.
+        # Soft deps are reported separately below and never block.
         echo -e "\n${CYAN}Installation hints:${NC}"
         case "$PLATFORM" in
             macos)
                 echo "  - Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-                echo "  - Then run: brew install git node python3 jq plantuml tmux"
+                echo "  - Then run: brew install git node python3 curl"
                 ;;
-            linux)
-                echo "  - Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y git nodejs npm python3 python3-pip jq plantuml tmux"
-                echo "  - RHEL/CentOS: sudo yum install -y git nodejs npm python3 python3-pip jq plantuml tmux"
-                echo "  - Arch: sudo pacman -S git nodejs npm python python-pip jq plantuml tmux"
+            linux|wsl)
+                echo "  - Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y git nodejs npm python3 python3-pip curl"
+                echo "  - RHEL/CentOS:   sudo yum install -y git nodejs npm python3 python3-pip curl"
+                echo "  - Arch:          sudo pacman -S git nodejs npm python python-pip curl"
                 ;;
             windows)
                 echo "  - Install Git Bash: https://git-scm.com/downloads"
-                echo "  - Install Node.js: https://nodejs.org/"
-                echo "  - Install Python: https://www.python.org/downloads/"
-                echo "  - Install jq: https://stedolan.github.io/jq/download/"
-                echo "  - Install tmux: use WSL, or 'pacman -S tmux' under MSYS2"
-                echo "  - Install PlantUML: https://plantuml.com/download (needs Java)"
+                echo "  - Install Node.js:  https://nodejs.org/"
+                echo "  - Install Python:   https://www.python.org/downloads/"
                 ;;
         esac
         if [[ "$CI_LITE" == "true" ]]; then
@@ -561,6 +657,22 @@ handle_non_mirrored_repo_cn() {
 
     if [[ ${#missing_deps[@]} -eq 0 ]]; then
         success "All required dependencies are installed"
+    fi
+
+    # Soft dependencies: inform, then carry on. Each line says what is lost and
+    # who fixes it, so the user never has to guess whether it matters.
+    if [[ ${#soft_deps[@]} -ne 0 ]]; then
+        echo ""
+        info "Optional tools not found: ${soft_deps[*]} (installation continues)"
+        local _sd
+        for _sd in "${soft_deps[@]}"; do
+            case "$_sd" in
+                jq)       echo "    • jq       — JSON edits fall back to python3/node. Install for cleaner merges." ;;
+                plantuml) echo "    • plantuml — this installer offers to install it later, or use a repo-local JAR." ;;
+                tmux)     echo "    • tmux     — only needed when you launch an agent via 'coding'; install before first use." ;;
+            esac
+        done
+        INSTALLATION_WARNINGS+=("Optional tools missing: ${soft_deps[*]}")
     fi
 }
 
@@ -1147,7 +1259,7 @@ setup_project_level_mcp_config() {
         macos)
             claude_config_dir="$HOME/Library/Application Support/Claude"
             ;;
-        linux)
+        linux|wsl)
             claude_config_dir="$HOME/.config/Claude"
             ;;
         windows)
@@ -1766,7 +1878,7 @@ install_plantuml() {
                         install_plantuml_jar
                     fi
                     ;;
-                linux)
+                linux|wsl)
                     if command -v apt-get >/dev/null 2>&1; then
                         if confirm_system_change \
                             "Install PlantUML via apt-get (sudo apt-get install plantuml)" \
@@ -2141,13 +2253,26 @@ setup_llm_cli_proxy() {
         return 0
     fi
 
-    # Offer to install as persistent service
-    case "$(uname -s)" in
-        Darwin*)
+    # Offer to install as persistent service.
+    # Dispatch on $PLATFORM, not `uname -s`: WSL reports "Linux" but frequently
+    # has no user systemd instance (WSL1, and WSL2 without systemd enabled), so
+    # the Linux branch would install a unit that can never start.
+    case "$PLATFORM" in
+        macos)
             create_llm_proxy_launchd "$proxy_dir" "$proxy_port"
             ;;
-        Linux*)
+        linux)
             create_llm_proxy_systemd "$proxy_dir" "$proxy_port"
+            ;;
+        wsl)
+            # Only offer systemd when a user instance actually exists.
+            if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+                create_llm_proxy_systemd "$proxy_dir" "$proxy_port"
+            else
+                info "  WSL without a user systemd instance — no autostart service installed."
+                info "  Start manually when needed: cd $proxy_dir && npm start"
+                INSTALLATION_WARNINGS+=("LLM proxy: no autostart on this WSL (systemd --user unavailable); start manually")
+            fi
             ;;
         *)
             info "  Start manually: cd $proxy_dir && npm start"
@@ -2264,140 +2389,6 @@ SYSTEMD_EOF
     fi
 }
 
-# Legacy: Install Ollama for local LLM inference (DEPRECATED - use DMR instead)
-# Kept for backward compatibility on systems without Docker Desktop
-install_ollama() {
-    warning "Ollama is deprecated - prefer Docker Model Runner (DMR)"
-    info "Checking Ollama for local LLM inference (fallback)..."
-
-    # Check if already installed
-    if command -v ollama >/dev/null 2>&1; then
-        success "✓ Ollama already installed"
-        # Ensure llama3.2:latest model is available
-        ensure_ollama_model
-        return 0
-    fi
-
-    # Ollama is optional - ask if user wants to install
-    echo ""
-    echo -e "${CYAN}Ollama is not installed (legacy fallback - prefer DMR).${NC}"
-    echo -e "  ${GREEN}y${NC} = Install Ollama"
-    echo -e "  ${GREEN}n${NC} = Skip"
-    echo ""
-    read_or_default install_ollama_choice "n" "$(echo -e ${CYAN}Install Ollama? [y/N]: ${NC})"
-
-    case "$install_ollama_choice" in
-        [yY]|[yY][eE][sS])
-            # Proceed with installation
-            ;;
-        *)
-            info "Skipping Ollama installation"
-            SKIPPED_SYSTEM_DEPS+=("ollama")
-            return 0
-            ;;
-    esac
-
-    case "$PLATFORM" in
-        macos)
-            if command -v brew >/dev/null 2>&1; then
-                if confirm_system_change \
-                    "Install Ollama via Homebrew (brew install ollama)" \
-                    "Homebrew may update dependencies. This is a ~500MB+ download."; then
-                    info "Installing Ollama via Homebrew..."
-                    if brew install ollama; then
-                        success "✓ Ollama installed via Homebrew"
-                        ensure_ollama_model
-                    else
-                        warning "Failed to install Ollama via Homebrew"
-                        INSTALLATION_WARNINGS+=("Ollama: Failed to install via Homebrew")
-                        return 1
-                    fi
-                else
-                    info "Skipping Ollama installation"
-                    SKIPPED_SYSTEM_DEPS+=("ollama")
-                    return 0
-                fi
-            else
-                if confirm_system_change \
-                    "Install Ollama via official script (curl | sh)" \
-                    "This downloads and executes an installer script from ollama.com."; then
-                    info "Installing Ollama via official script..."
-                    if curl -fsSL https://ollama.com/install.sh | sh; then
-                        success "✓ Ollama installed via official script"
-                        ensure_ollama_model
-                    else
-                        warning "Failed to install Ollama"
-                        INSTALLATION_WARNINGS+=("Ollama: Installation failed")
-                        return 1
-                    fi
-                else
-                    info "Skipping Ollama installation"
-                    SKIPPED_SYSTEM_DEPS+=("ollama")
-                    return 0
-                fi
-            fi
-            ;;
-        linux)
-            if confirm_system_change \
-                "Install Ollama via official script (curl | sh)" \
-                "This downloads and executes an installer script from ollama.com."; then
-                info "Installing Ollama via official script..."
-                if curl -fsSL https://ollama.com/install.sh | sh; then
-                    success "✓ Ollama installed"
-                    ensure_ollama_model
-                else
-                    warning "Failed to install Ollama"
-                    INSTALLATION_WARNINGS+=("Ollama: Installation failed")
-                    return 1
-                fi
-            else
-                info "Skipping Ollama installation"
-                SKIPPED_SYSTEM_DEPS+=("ollama")
-                return 0
-            fi
-            ;;
-        windows)
-            info "Windows: Ollama requires manual installation from https://ollama.com/download"
-            SKIPPED_SYSTEM_DEPS+=("ollama")
-            return 0
-            ;;
-        *)
-            info "Unknown platform: install Ollama manually from https://ollama.com if needed"
-            SKIPPED_SYSTEM_DEPS+=("ollama")
-            return 0
-            ;;
-    esac
-}
-
-# Ensure Ollama has the required model downloaded
-ensure_ollama_model() {
-    local model="llama3.2:latest"
-    info "Ensuring Ollama model '$model' is available..."
-
-    # Start ollama service if not running (needed for model operations)
-    if ! pgrep -x "ollama" >/dev/null 2>&1; then
-        info "Starting Ollama service..."
-        ollama serve >/dev/null 2>&1 &
-        sleep 2  # Give it time to start
-    fi
-
-    # Check if model exists
-    if ollama list 2>/dev/null | grep -q "llama3.2"; then
-        success "✓ Model '$model' already available"
-        return 0
-    fi
-
-    # Pull the model
-    info "Downloading model '$model' (this may take a few minutes)..."
-    if ollama pull "$model"; then
-        success "✓ Model '$model' downloaded successfully"
-    else
-        warning "Failed to download model '$model'"
-        warning "You can download it later with: ollama pull $model"
-        INSTALLATION_WARNINGS+=("Ollama: Model download failed, run 'ollama pull $model' manually")
-    fi
-}
-
 # Install Node.js dependencies for agent-agnostic functionality
 install_node_dependencies() {
     info "Installing Node.js dependencies for agent-agnostic functionality..."
@@ -2409,37 +2400,161 @@ install_node_dependencies() {
 
     cd "$CODING_REPO"
 
-    if npm install; then
-        success "✓ Node.js dependencies installed (including better-sqlite3 for knowledge databases)"
+    # Never let any sub-install download a browser. gsd-browser is the mandated
+    # browser tool (see CLAUDE.md) and ships its own Chrome for Testing.
+    export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-        # Rebuild better-sqlite3 to ensure native bindings are compiled
-        # This is necessary because some package managers may block build scripts
-        info "Rebuilding better-sqlite3 native bindings..."
-        if npm rebuild better-sqlite3 2>&1 | grep -q "rebuilt dependencies successfully"; then
-            success "✓ better-sqlite3 native bindings rebuilt"
-        else
-            warning "better-sqlite3 rebuild may have issues, but installation will continue"
-            INSTALLATION_WARNINGS+=("better-sqlite3 rebuild had warnings")
-        fi
+    # --ignore-scripts is the fix for the corporate-network install failure.
+    # Without it, fastembed -> onnxruntime-node runs a postinstall that downloads
+    # a ~200MB prebuilt binary from github.com, which dies with
+    # `getaddrinfo ENOTFOUND github.com` behind a proxy and takes the whole
+    # install with it (this step used to be fatal).
+    #
+    # This mirrors what the container build has done all along —
+    # docker/Dockerfile.coding-services: `npm ci --ignore-scripts || npm install --ignore-scripts`
+    # followed by an explicit arch-specific native install. The host path simply
+    # never got the same treatment.
+    #
+    # NOT --omit=optional: the onnxruntime and tokenizer binaries ARE
+    # optionalDependencies, so omitting them is precisely what breaks fastembed.
+    if npm ci --ignore-scripts || npm install --ignore-scripts; then
+        success "✓ Node.js dependencies installed"
     else
         error_exit "Failed to install Node.js dependencies"
         return 1
     fi
 
-    # Install Playwright browsers
-    info "Installing Playwright browsers for browser automation fallback..."
-    if npx playwright install chromium; then
-        success "✓ Playwright browsers installed"
-    else
-        warning "Failed to install Playwright browsers. Browser automation may not work."
-        INSTALLATION_WARNINGS+=("Playwright browsers not installed")
+    # Because scripts were skipped, native modules must be built explicitly.
+    # Each is rebuilt individually so one failure does not mask the others.
+    local native_mod
+    for native_mod in better-sqlite3 classic-level; do
+        info "Building native bindings for $native_mod..."
+        if npm rebuild "$native_mod" >/dev/null 2>&1; then
+            success "✓ $native_mod native bindings built"
+        else
+            warning "$native_mod native build failed — features depending on it may not work"
+            INSTALLATION_WARNINGS+=("Native build failed: $native_mod")
+        fi
+    done
+
+    ensure_km_core_link
+    install_fastembed_native
+    install_vkb_server_deps
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# @fwornle/km-core: submodule + node_modules link
+#
+# km-core is consumed as `@fwornle/km-core` but is NOT a package.json dependency
+# — it is the lib/km-core git submodule, reached through a symlink at
+# node_modules/@fwornle/km-core. Two things therefore have to be true, and
+# neither happened automatically before:
+#
+#   1. The submodule must be checked out. install.sh initialised every OTHER
+#      submodule but never this one, so on a fresh clone lib/km-core was empty.
+#   2. The symlink must exist. `npm ci` wipes node_modules, and because the
+#      package is not declared, npm prunes it as extraneous — so switching to
+#      `npm ci` actively deletes it.
+#
+# When it is missing, every ETM spawn dies instantly with
+#   ERR_MODULE_NOT_FOUND: Cannot find package '@fwornle/km-core'
+#     imported from src/live-logging/ObservationWriter.js
+# which surfaces as a red LSL badge while the health API still reports green.
+#
+# It is deliberately NOT added to package.json as a `file:` dependency: that
+# would make a failed submodule fetch (no network, no SSH key, CN restrictions)
+# abort the ENTIRE install, instead of degrading to "session logging disabled".
+# ─────────────────────────────────────────────────────────────────────────────
+ensure_km_core_link() {
+    local km_src="$CODING_REPO/lib/km-core"
+    local scope_dir="$CODING_REPO/node_modules/@fwornle"
+    local link="$scope_dir/km-core"
+
+    # 1. Check out the submodule if it is missing or empty.
+    if [[ ! -f "$km_src/package.json" ]]; then
+        info "Initializing lib/km-core submodule..."
+        if ! (cd "$CODING_REPO" && git submodule update --init lib/km-core >/dev/null 2>&1); then
+            warning "Could not initialize the lib/km-core submodule"
+            info "  → live session logging (LSL) and observations will be unavailable."
+            info "  → fix later with: git submodule update --init lib/km-core && ./install.sh"
+            INSTALLATION_WARNINGS+=("km-core submodule unavailable — LSL/observations disabled")
+            return 0
+        fi
     fi
 
-    # Install vkb-server dependencies
+    # 2. km-core has its own dependencies (graphology, classic-level, fastembed…).
+    #    Stripping them breaks semantic-analysis and the vkb-server experiment API.
+    if [[ ! -d "$km_src/node_modules" ]]; then
+        info "Installing km-core dependencies..."
+        (cd "$km_src" && { npm ci --ignore-scripts >/dev/null 2>&1 || npm install --ignore-scripts >/dev/null 2>&1; }) \
+            || warning "km-core dependency install had problems"
+    fi
+
+    # 3. (Re)create the symlink. Relative target so the repo stays movable.
+    mkdir -p "$scope_dir"
+    if [[ -L "$link" || -e "$link" ]]; then
+        rm -rf "$link"
+    fi
+    ln -s "../../lib/km-core" "$link"
+
+    # 4. Verify by resolution, not by file existence.
+    if (cd "$CODING_REPO" && node -e "import('@fwornle/km-core').then(()=>process.exit(0),()=>process.exit(1))" >/dev/null 2>&1); then
+        success "✓ @fwornle/km-core linked and resolvable"
+    else
+        warning "@fwornle/km-core is linked but does not import cleanly"
+        info "  → check that lib/km-core/dist exists (it may need building)"
+        INSTALLATION_WARNINGS+=("km-core present but not importable")
+    fi
+}
+
+# fastembed's tokenizer ships as per-platform prebuilt packages. --ignore-scripts
+# skips the platform selection, so install the right one explicitly. This is a
+# host-side port of docker/Dockerfile.coding-services' arch-conditional step.
+#
+# fastembed is genuinely needed on the HOST (obs-api owns retrieval — see
+# src/retrieval/retrieval-service.js) as well as in the container (the
+# embedding-listener in docker/supervisord.conf), so this is not optional work.
+install_fastembed_native() {
+    local os arch pkg
+    os="$(uname -s)"
+    arch="$(uname -m)"
+
+    case "$os:$arch" in
+        Darwin:*)                 pkg="@anush008/tokenizers-darwin-universal" ;;
+        Linux:x86_64|Linux:amd64) pkg="@anush008/tokenizers-linux-x64-gnu" ;;
+        Linux:aarch64|Linux:arm64) pkg="@anush008/tokenizers-linux-arm64-gnu" ;;
+        MINGW*:*|MSYS*:*|CYGWIN*:*) pkg="@anush008/tokenizers-win32-x64-msvc" ;;
+        *)                        pkg="" ;;
+    esac
+
+    if [[ -n "$pkg" ]]; then
+        info "Installing platform tokenizer for fastembed ($os/$arch)..."
+        npm install "$pkg" --no-save --ignore-scripts >/dev/null 2>&1 || true
+    else
+        warning "No known fastembed tokenizer build for $os/$arch"
+    fi
+
+    # Verify rather than assume. onnxruntime-node is prebuilt-only — there is no
+    # source-build fallback — so on an unsupported platform (musl, exotic arch)
+    # host-side embeddings simply cannot work. Degrade explicitly instead of
+    # letting obs-api crash at runtime: retrieval then defers to the container's
+    # embedding listener, which is a supported Debian/glibc target.
+    if node -e "require('fastembed')" >/dev/null 2>&1; then
+        success "✓ fastembed loads on this host"
+    else
+        warning "fastembed cannot load on this platform ($os/$arch)"
+        info "  → host-side semantic retrieval will be disabled; the container's"
+        info "    embedding listener is unaffected, so knowledge features still work."
+        INSTALLATION_WARNINGS+=("fastembed unavailable on host ($os/$arch) — host retrieval disabled")
+        set_env_var CODING_EMBEDDINGS_HOST off
+    fi
+}
+
+install_vkb_server_deps() {
     info "Installing vkb-server dependencies..."
     if [ -d "$CODING_REPO/lib/vkb-server" ]; then
         cd "$CODING_REPO/lib/vkb-server"
-        if npm install; then
+        if npm ci --ignore-scripts >/dev/null 2>&1 || npm install --ignore-scripts >/dev/null 2>&1; then
             success "✓ vkb-server dependencies installed"
         else
             warning "Failed to install vkb-server dependencies"
@@ -2547,11 +2662,6 @@ setup_unified_launcher() {
 # The vscode-km-copilot extension has been removed as part of the agent-agnostic
 # architecture update. Integration is now handled through the unified agent API.
 # See: lib/agent-api/ for the new adapter-based architecture
-setup_vscode_extension() {
-    info "[DEPRECATED] VSCode extension has been removed - using native agent integration"
-    return 0
-}
-
 # Optional: Set up admin/management API keys for real-time spend tracking
 setup_api_admin_keys() {
     info "API Admin Key Setup (for real-time spend tracking in status bar)"
@@ -2787,6 +2897,13 @@ main() {
         log "Running in SANDBOX MODE"
     fi
 
+    # Network FIRST. Everything below this line may hit the network, and the
+    # heaviest step (install_node_dependencies -> native postinstalls fetching
+    # from github.com) is the one that fails hardest without a proxy. Detecting
+    # the network after that step — as this script used to — is useless.
+    configure_proxy_for_install
+    preflight_network
+
     # Run installation steps
     check_dependencies
     detect_agents
@@ -2797,8 +2914,6 @@ main() {
     install_plantuml
     setup_local_llm  # DMR preferred, Ollama as fallback
     setup_llm_cli_proxy  # HTTP bridge for claude/copilot CLI in Docker
-    detect_network_and_set_repos
-    test_proxy_connectivity
     install_memory_visualizer
     install_semantic_analysis
     install_constraint_monitor
@@ -2811,7 +2926,6 @@ main() {
     initialize_shared_memory
     create_example_configs
     setup_mcp_config
-    setup_vscode_extension
     install_enhanced_lsl
     install_mastra_opencode
     install_compaction_guard
