@@ -13,21 +13,42 @@ Load and summarize recent Live Session Logs (LSL) to provide continuity from pre
 
 ### Tooling Rules (read first — these keep /sl prompt-free)
 
-**Use ONLY `Glob` and `Read` for every step below. Never use Bash.**
+**Use exactly the two `ls` forms below for discovery, and `Read` for content. Nothing else.**
 
-`Glob` is ungated, and `Read` on `.specstory/history/**` is pre-allowed in
-`~/.claude/settings.json` for every project (see [Permissions](#permissions)). Together they
-make `/sl` run without a single permission prompt, in any project.
+> Do NOT use `Glob`. Claude Code no longer exposes a `Glob` tool to the main agent — search is
+> done through `Bash`. An earlier version of this skill mandated `Glob` and banned `Bash`
+> outright, which made every `/sl` run open with an apology about the preferred tool being
+> unavailable before falling back to an ad-hoc `find`. The two commands below are the
+> replacement; they are pre-allowed, so they do not prompt.
 
-**Never** reach for these — each one triggers a prompt even when a matching `Bash(...)` allow
+The two allowed discovery commands (`<ROOT>` is `.specstory/history` for the current project,
+or the absolute coding path for Step 3):
+
+```
+ls -d <ROOT>/[0-9][0-9][0-9][0-9]/[0-9][0-9]      # list YYYY/MM tranche dirs, oldest→newest
+ls -1r <ROOT>/<YYYY>/<MM>                          # list one month's files, NEWEST FIRST
+```
+
+Both are matched by user-level allow rules (see [Permissions](#permissions)), so they run
+prompt-free in **any** project.
+
+Two things the numeric `[0-9]` pattern buys you — do not "simplify" it away:
+
+- `.specstory/history` also contains non-LSL subtrees (`logs/`, `docs/`). A recursive
+  `**/*.md` sweep over the coding project returns **~23,000 files**, almost all noise. The
+  numeric year/month pattern selects only real LSL tranches.
+- Listing one month at a time keeps the result at tens of files, not thousands.
+
+**Never** reach for these — each one triggers a prompt even where a matching `Bash(...)` allow
 rule exists, because the permission matcher cannot statically resolve the command it runs:
 
 - `find … -exec <cmd>` (the `-exec` payload is opaque to the matcher)
 - `xargs <cmd>` / `` `cmd` `` / `$(cmd)` (nested command)
-- `ls`/`find`/`head`/`wc` pipelines — allow rules are per-project, so they prompt in every
-  project except `coding`
+- pipelines (`ls … | head`, `find … | sort`) — every stage needs its own allow rule, and the
+  project-scoped ones only exist in `coding`
 
-If you catch yourself writing a shell one-liner to list or size these files: stop, use `Glob`.
+If you catch yourself writing a shell one-liner to size or filter these files: stop, use the
+two `ls` forms plus `Read`.
 
 ### Step 1: Determine Current Project
 
@@ -37,13 +58,17 @@ If you catch yourself writing a shell one-liner to list or size these files: sto
 
 ### Step 2: Load LSL Files from Current Project
 
-1. Discover files with **Glob**, pattern `.specstory/history/**/*.md`.
-   Files are nested by year/month (`.specstory/history/YYYY/MM/`), so the `**` matters — a
-   flat `.specstory/history/*.md` finds nothing.
-2. **Sort by filename, NOT by modification time.** Filenames are date-encoded
-   (`YYYY-MM-DD_HHMM-HHMM-<hash>.md`) and are the only reliable ordering: a `git checkout`,
-   clone, or submodule update rewrites mtimes wholesale and will surface months-old files as
-   "most recent". Take the lexicographically greatest filename as newest.
+1. `ls -d .specstory/history/[0-9][0-9][0-9][0-9]/[0-9][0-9]` — take the **last** line as the
+   newest tranche. Files are nested by year/month (`.specstory/history/YYYY/MM/`); a flat
+   `.specstory/history/*.md` finds nothing.
+2. `ls -1r .specstory/history/<YYYY>/<MM>` for that tranche — newest first.
+   **This orders by filename, NOT by modification time**, which is what you want: filenames
+   are date-encoded (`YYYY-MM-DD_HHMM-HHMM-<hash>.md`) and are the only reliable ordering. A
+   `git checkout`, clone, or submodule update rewrites mtimes wholesale and would surface
+   months-old files as "most recent".
+   Suffixed siblings (`…-1_<hash>.md`, `…-2_<hash>.md`) are continuations of the same time
+   tranche — treat them as one session, newest suffix last.
+   If the newest tranche has too few files, repeat for the preceding month.
 3. **Read** the most recent file.
 4. Judge length from what `Read` returned:
    - **Short** (a few hundred lines, or the content is one aborted/trivial exchange) → also
@@ -55,7 +80,9 @@ If you catch yourself writing a shell one-liner to list or size these files: sto
 
 **Only if current project is NOT `coding`:**
 
-1. **Glob** `/Users/Q284340/Agentic/coding/.specstory/history/**/*.md`
+1. `ls -d /Users/Q284340/Agentic/coding/.specstory/history/[0-9][0-9][0-9][0-9]/[0-9][0-9]`,
+   then `ls -1r /Users/Q284340/Agentic/coding/.specstory/history/<YYYY>/<MM>` for the
+   tranche(s) covering the Step 2 range
 2. Find files that fall within or overlap the timestamp range from Step 2
 3. **Read** the most recent coding LSL file from that time range
 4. If that file is short, also Read 1-2 previous files from coding
@@ -103,8 +130,8 @@ Judged from the `Read` result — do not shell out to `wc`/`ls -l` to measure a 
 
 - **Short**: a few hundred lines, or a single aborted/trivial exchange → load additional files
 - **Sufficient**: a full session of prompts and tool calls → enough context alone
-- **Very large**: `Read` truncates at 2000 lines → focus on the most recent sections, and use
-  `Glob`/`Read` on neighbouring files rather than re-reading the same one
+- **Very large**: `Read` truncates at 2000 lines → focus on the most recent sections, and
+  `Read` neighbouring files rather than re-reading the same one with offsets
 
 ## Path Constants
 
@@ -113,22 +140,27 @@ Judged from the `Read` result — do not shell out to `wc`/`ls -l` to measure a 
 
 ## Permissions
 
-`/sl` is designed to run with **zero permission prompts** in any project. That relies on two
+`/sl` is designed to run with **zero permission prompts** in any project. That relies on six
 user-level rules in `~/.claude/settings.json`:
 
 ```json
 "Read(//Users/Q284340/**/.specstory/history/**)",
-"Read(//Users/Q284340/Agentic/coding/.specstory/history/**)"
+"Read(//Users/Q284340/Agentic/coding/.specstory/history/**)",
+"Bash(ls -d .specstory/history/:*)",
+"Bash(ls -1r .specstory/history/:*)",
+"Bash(ls -d /Users/Q284340/Agentic/coding/.specstory/history/:*)",
+"Bash(ls -1r /Users/Q284340/Agentic/coding/.specstory/history/:*)"
 ```
 
-The first covers the history folder of whatever project is current; the second explicitly
-covers the cross-project read in Step 3 (needed because that path is outside the workspace
-whenever the current project is not `coding`). They are user-level, so they apply everywhere —
-project `.claude/settings.local.json` allow rules do NOT, which is why Bash listing commands
-prompt outside `coding`.
+The relative pair covers whatever project is current; the absolute pair covers the
+cross-project access in Step 3 (needed because that path is outside the workspace whenever the
+current project is not `coding`). They are user-level, so they apply everywhere — project
+`.claude/settings.local.json` allow rules do NOT, which is why an ad-hoc `find` or `ls` in a
+different shape prompts outside `coding`.
 
-If a prompt ever appears, the cause is almost always a Bash call that crept back into Steps
-1-3 — not a missing rule. Re-read the Tooling Rules.
+If a prompt ever appears, the cause is almost always a command that deviates from the two
+exact `ls` forms — a different flag order, a pipe, or a `find`. Re-read the Tooling Rules
+rather than adding a rule.
 
 ## User Arguments
 
