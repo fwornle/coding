@@ -291,6 +291,21 @@ describe('answer-file elicitation', () => {
     }
   });
 
+  it('pins PWD to the sandbox and drops OLDPWD — the sandbox-escape regression', async () => {
+    // spawn({cwd}) changes the child's directory but leaves PWD pointing at the runner's
+    // cwd, the real repo. In the first cross-agent smoke run opencode read $PWD, grepped
+    // correctly, and wrote its answer into the LIVE repository. Every later cell would then
+    // have been measuring a tree the benchmark contaminated itself.
+    const res = await runAgent({
+      prompt: 'q', arm: ARM, cwd: dir,
+      env: { ...process.env, OLDPWD: '/somewhere/else' },
+      agent: stub(`printf "PWD=$PWD OLDPWD=[$OLDPWD]" > ${ANSWER_FILE}`),
+    });
+    expect(res.outcome).toBe('ok');
+    expect(res.answer).toContain(`PWD=${dir}`);
+    expect(res.answer).toContain('OLDPWD=[]');
+  });
+
   it('treats an empty answer file as no answer', async () => {
     const res = await runAgent({
       prompt: 'q', arm: ARM, cwd: dir,
