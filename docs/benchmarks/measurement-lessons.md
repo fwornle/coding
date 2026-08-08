@@ -171,9 +171,40 @@ A dry-run regrade is seconds. It caught the S2 regression in Lesson 3 too.
 runs r6 and r7. **Every judge call was answered by `claude-haiku-4-5`.** The harness logged
 its own intent and never checked the response.
 
-Worse, `claude-opus-4.8` is offered by no provider at all, so the substitution was
-guaranteed. An unservable default is more dangerous than a weak one: the proxy quietly
-supplies its own and the run publishes a name nobody served.
+The requested name was simply stale — there is no `claude-opus-4.8`. Opus itself is very
+much available: `claude-code`, on the personal Max subscription, serves **`claude-opus-5`**
+and `claude-sonnet-5`. What it will not do is serve a version that no longer exists, and the
+proxy answers such a request with its own default instead of an error.
+
+**Do not conclude a model is unavailable from a catalog or a single probe.** Both mislead,
+in opposite directions, and the second one is not even deterministic:
+
+- `providerModels` **over-reports**: it lists `claude-opus-4.6` for copilot, which answers
+  `400 The requested model is not supported`. Copilot has no Opus at all.
+- `providerModels` **under-reports**: it lists no Opus 5 or Sonnet 5 anywhere, yet
+  `claude-code` serves both.
+- A **cold** model falls back. The first probe of `claude-code` + `claude-opus-5` was
+  answered by haiku; a second probe on identical settings was answered by
+  `claude-opus-5`, and three consecutive repeats were then stable. A one-shot probe
+  produces a truth table that is confidently wrong.
+
+So availability is established by probing each provider directly, **more than once**, and
+comparing on a canonical name — the same model is spelled `claude-haiku-4.5` (catalog),
+`claude-haiku-4-5-20251001` (response) and `haiku` (CLI alias), so raw string comparison
+reports substitutions that did not happen. That is what `scripts/llm-model-probe.mjs` does;
+it writes `.data/llm-proxy/model-availability.json` and flags any request answered by a
+different model, plus any result that changed across repeats.
+
+```bash
+node scripts/llm-model-probe.mjs                      # every provider, catalog + aliases
+node scripts/llm-model-probe.mjs --provider claude-code --repeats 3
+node scripts/llm-model-probe.mjs --show               # cached result, no calls
+```
+
+Because Opus is on the personal subscription and absent from Copilot, **the strongest
+available judge depends on which network you are on** — `claude-code/claude-opus-5` at home,
+`copilot/claude-sonnet-4.6` inside the corporate network. Whichever serves, the run records
+it.
 
 Cells now carry `judge_model_served`, `judge_model_requested` and
 `judge_served_as_requested`; `run.json` carries `judge.requested` and `judge.served`; a
@@ -267,14 +298,18 @@ These invalidate the obvious mental model and cost a full investigation to estab
 
 1. **`/api/complete` ignores the request-body `model`.** Only `processOverrides`, keyed on
    the `process` literal, select a model.
-2. **The `claude-code` path ignores model selection entirely** and serves
-   `claude-haiku-4-5` — even with an override explicitly naming `claude-opus-4.6`. Only
-   `copilot` honours the model.
-3. **`providerModels` advertises models the provider rejects.** It lists
-   `claude-opus-4.6` for copilot; copilot answers
-   `400 The requested model is not supported`.
-4. **Probe, never assume.** The response body carries `model` and `provider`. One curl
-   settles what a config file only suggests:
+2. **A cold model falls back silently on the `claude-code` path.** The first request for a
+   model the CLI has not served recently is answered by `claude-haiku-4-5`; a repeat is
+   answered correctly, and stays correct. This is what made the path look as though it
+   ignored model selection altogether — it does not. Probe twice before believing either
+   answer.
+3. **`providerModels` is wrong in both directions.** It advertises `claude-opus-4.6` for
+   copilot, which answers `400 The requested model is not supported`; and it omits
+   `claude-opus-5` / `claude-sonnet-5`, which `claude-code` serves.
+4. **Opus is subscription-dependent.** `claude-code` (personal Max) serves Opus 5; Copilot
+   has no Opus at any version. The strongest available judge therefore differs by network.
+5. **Probe, never assume.** The response body carries `model` and `provider`. One curl
+   settles what a config file only suggests — but run it twice, per (2):
 
 ```bash
 curl -s -X POST http://127.0.0.1:12435/api/complete \
@@ -283,9 +318,11 @@ curl -s -X POST http://127.0.0.1:12435/api/complete \
   | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("model"), d.get("provider"))'
 ```
 
-Because of (1) and (2), model choice for any process is a `processOverrides` entry. Install
-via `scripts/configure-wave-analysis-routing.sh` (`--show` to list, `--reset` to remove only
-the `wave-analysis-*` entries) rather than a manual PUT, so it survives a `.data/` wipe.
+Because of (1), model choice for any process is a `processOverrides` entry. Install via
+`scripts/configure-wave-analysis-routing.sh` (`--show` to list, `--reset` to remove only the
+`wave-analysis-*` entries) rather than a manual PUT, so it survives a `.data/` wipe. Verify
+what a process actually gets with `scripts/llm-model-probe.mjs`, never by reading the config
+back — reading back confirms only what was stored, not what will be served.
 
 ---
 
