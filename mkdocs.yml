@@ -95,7 +95,11 @@ nav:
     - Architecture: measurement/architecture.md
     - Prompt Caching: measurement/prompt-caching.md
     - The /experiment Skill: measurement/experiment-skill.md
+    - Benchmarking Agent Systems: measurement/kgbench-guide.md
+    - Experimental Design: measurement/kgbench-experimental-design.md
+    - Benchmark Tutorial: measurement/kgbench-tutorial.md
     - Retrieval Benchmark (kgbench): measurement/kgbench.md
+    - Measurement & Judging Lessons: benchmarks/measurement-lessons.md
   - Integrations:
     - Overview: integrations/index.md
     - Semantic Analysis: integrations/semantic-analysis.md
