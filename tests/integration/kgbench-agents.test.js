@@ -14,10 +14,11 @@
  *     elicitation exists to avoid must stay visible when it still happens
  */
 
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { resolveAgent, armIsFaithful, KNOWN_AGENTS, ANSWER_FILE, _ADAPTERS } from '../../lib/kgbench/agents.mjs';
+import { toCopilotMcp, toOpencodeMcp, prepareAgentMcp } from '../../lib/kgbench/agent-sandbox.mjs';
 import { runAgent } from '../../lib/kgbench/runner.mjs';
 import { resolveModelForAgent, parseModelRef } from '../../lib/experiments/model-resolve.mjs';
 
@@ -94,13 +95,30 @@ describe('enforcement is described, not asserted', () => {
     expect(e).toMatchObject({ mcp_servers: 'enforced', builtins: 'enforced' });
   });
 
-  it.each(['copilot', 'opencode', 'mastracode'])('%s reports built-ins as ungated', (agent) => {
+  // copilot is NOT simply "ungated". It ships --available-tools / --deny-tool, so it is
+  // gateable; this harness just has no verified mapping from arm tool names to copilot's
+  // naming yet. Recording that as `ungated` would understate the agent and make a fixable
+  // gap look like a permanent capability limit.
+  it('copilot is reported as gateable but not currently gated', () => {
+    const e = resolveAgent('copilot', { repoRoot: process.cwd() }).enforcement;
+    expect(e.mcp_servers).toBe('enforced');
+    expect(e.builtins).toBe('not_enforced');
+    expect(e.gateable).toBe(true);
+    expect(e.note).toMatch(/available-tools/);
+  });
+
+  it.each(['opencode', 'mastracode'])('%s is reported as genuinely ungateable', (agent) => {
     const e = resolveAgent(agent, { repoRoot: process.cwd() }).enforcement;
     expect(e.mcp_servers).toBe('enforced');
     expect(e.builtins).toBe('ungated');
-    // The descriptor must never collapse to a single boolean; that would have to lie about
-    // one of the two halves.
+    expect(e.gateable).toBe(false);
+  });
+
+  it.each(['copilot', 'opencode', 'mastracode'])('%s never collapses to a single boolean', (agent) => {
+    const e = resolveAgent(agent, { repoRoot: process.cwd() }).enforcement;
+    // A `tool_enforced: true|false` would have to lie about one of the two halves.
     expect(Object.keys(e)).toEqual(expect.arrayContaining(['mcp_servers', 'builtins', 'verified_by']));
+    expect(e.tool_enforced).toBeUndefined();
   });
 });
 
@@ -115,12 +133,20 @@ describe('armIsFaithful refuses combinations whose label would misdescribe the c
     }
   });
 
-  it('refuses arms that withhold built-in search on an ungated agent', () => {
+  it('refuses arms that withhold built-in search on an agent this harness does not gate', () => {
     for (const arm of [codegraph, graphify]) {
-      const r = armIsFaithful(arm, 'copilot');
-      expect(r.faithful).toBe(false);
-      expect(r.reason).toMatch(/withholding built-in search/i);
+      for (const agent of ['copilot', 'opencode']) {
+        const r = armIsFaithful(arm, agent);
+        expect(r.faithful).toBe(false);
+        expect(r.reason).toMatch(/withholding built-in search/i);
+      }
     }
+  });
+
+  it('says WHY differently for copilot (unfinished) than opencode (impossible)', () => {
+    // Collapsing these would make a fixable gap look like a permanent capability limit.
+    expect(armIsFaithful(codegraph, 'copilot').reason).toMatch(/copilot CAN gate tools/i);
+    expect(armIsFaithful(codegraph, 'opencode').reason).toMatch(/exposes no tool allowlist/i);
   });
 
   it('allows grep and hybrid, whose restriction is MCP-only and therefore enforceable', () => {
@@ -153,6 +179,75 @@ describe('model ids are resolved per agent, including the minor-less Claude 5 ge
   it('rejects an unknown agent loudly instead of guessing', () => {
     expect(() => resolveAgent('cursor', { repoRoot: process.cwd() })).toThrow(/unknown agent/i);
     expect(KNOWN_AGENTS).toEqual(['claude', 'copilot', 'opencode', 'mastracode']);
+  });
+});
+
+describe('MCP restriction is written where each agent actually reads it', () => {
+  let dir;
+  const httpArm = { id: 'graphify', mcpConfig: { mcpServers: { graphify: { type: 'http', url: 'http://localhost:3851/mcp' } } } };
+  const stdioArm = { id: 'codegraph', mcpConfig: { mcpServers: { codegraph: { command: 'docker', args: ['exec', 'x'], env: { A: '1' } } } } };
+  const bareArm = { id: 'grep', mcpConfig: { mcpServers: {} } };
+
+  beforeEach(() => { dir = mkdtempSync(path.join(tmpdir(), 'kgbench-mcp-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('converts an http server to each agent\'s own shape', () => {
+    expect(toCopilotMcp(httpArm.mcpConfig)).toEqual({ servers: { graphify: { type: 'http', url: 'http://localhost:3851/mcp' } } });
+    expect(toOpencodeMcp(httpArm.mcpConfig)).toEqual({ mcp: { graphify: { type: 'remote', url: 'http://localhost:3851/mcp', enabled: true } } });
+  });
+
+  it('converts a stdio server, folding args and env the way each agent expects', () => {
+    expect(toCopilotMcp(stdioArm.mcpConfig)).toEqual({ servers: { codegraph: { type: 'stdio', command: 'docker', args: ['exec', 'x'], env: { A: '1' } } } });
+    expect(toOpencodeMcp(stdioArm.mcpConfig)).toEqual({ mcp: { codegraph: { type: 'local', command: ['docker', 'exec', 'x'], enabled: true, environment: { A: '1' } } } });
+  });
+
+  it('emits an EMPTY server map rather than omitting the key', () => {
+    // A missing key can fall back to a global config; an explicit empty map cannot be read
+    // as "unspecified". For an arm whose whole identity is having no MCP servers, that
+    // difference is the restriction.
+    expect(toCopilotMcp(bareArm.mcpConfig)).toEqual({ servers: {} });
+    expect(toOpencodeMcp(bareArm.mcpConfig)).toEqual({ mcp: {} });
+  });
+
+  it('writes copilot config INSIDE the sandbox worktree, needing no env override', () => {
+    const p = prepareAgentMcp({ agent: 'copilot', arm: httpArm, cwd: dir, runDir: dir });
+    const written = path.join(dir, '.vscode', 'mcp.json');
+    expect(p.wrote).toEqual([written]);
+    expect(JSON.parse(readFileSync(written, 'utf8'))).toEqual({ servers: { graphify: { type: 'http', url: 'http://localhost:3851/mcp' } } });
+    expect(p.env.XDG_CONFIG_HOME).toBeUndefined();
+  });
+
+  it('pins only opencode CONFIG home, leaving auth (XDG_DATA_HOME) untouched', () => {
+    const p = prepareAgentMcp({ agent: 'opencode', arm: httpArm, cwd: dir, runDir: dir });
+    expect(p.env.XDG_CONFIG_HOME).toBe(path.join(dir, 'agent-config', 'graphify'));
+    // Pinning HOME instead would strip the token at ~/.local/share/opencode/auth.json and
+    // fail every cell. XDG_DATA_HOME must be left alone.
+    expect(p.env.XDG_DATA_HOME).toBeUndefined();
+    expect(p.env.HOME).toBeUndefined();
+    expect(JSON.parse(readFileSync(p.wrote[0], 'utf8')).mcp.graphify.type).toBe('remote');
+  });
+
+  it('cleans up the file it planted in the measured tree', () => {
+    const p = prepareAgentMcp({ agent: 'copilot', arm: httpArm, cwd: dir, runDir: dir });
+    expect(existsSync(p.wrote[0])).toBe(true);
+    p.cleanup();
+    // Left behind, it would be a file the run itself created sitting inside the tree the
+    // next cell's containment check inspects.
+    expect(existsSync(p.wrote[0])).toBe(false);
+  });
+
+  it('records the mechanism and the allowed server list, not just a verdict', () => {
+    const p = prepareAgentMcp({ agent: 'opencode', arm: httpArm, cwd: dir, runDir: dir });
+    expect(p.enforcement.mechanism).toMatch(/XDG_CONFIG_HOME/);
+    expect(p.enforcement.allowed_servers).toEqual(['graphify']);
+    expect(p.enforcement.builtins).toBe('ungated');
+  });
+
+  it('is a no-op for claude, which takes its servers on the command line', () => {
+    const p = prepareAgentMcp({ agent: 'claude', arm: httpArm, cwd: dir, runDir: dir });
+    expect(p.wrote).toEqual([]);
+    expect(p.env.XDG_CONFIG_HOME).toBeUndefined();
+    expect(p.enforcement.builtins).toBe('enforced');
   });
 });
 
