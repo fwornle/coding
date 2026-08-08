@@ -5,10 +5,20 @@
  *   kgbench-run.mjs --set replication --arms grep,graphify --reps 3
  *   kgbench-run.mjs --set replication --only L1,S1,A1 --reps 1     # pilot
  *   kgbench-run.mjs --set replication --preflight-only
+ *   kgbench-run.mjs --set coding-v1 --arms grep,hybrid --agents claude,copilot,opencode
+ *   kgbench-run.mjs --set coding-v1 --agents claude --models claude-sonnet-4.6,claude-opus-5
  *
  * Writes .data/kgbench/runs/<runId>/results.jsonl incrementally, so a run can be
  * resumed or inspected mid-flight. Full answers are stored (not truncated) so a
  * fixed grader can be re-applied offline instead of re-running the matrix.
+ *
+ * THE MATRIX IS arm x agent x model x question x rep, and the agent axis is the one that
+ * does not behave like the others. Only claude can be confined to an arm's tool surface, so
+ * some (arm, agent) pairs are REFUSED rather than run: an arm whose identity is "has Read but
+ * not Glob/Grep" cannot be reproduced on an agent that cannot have Glob/Grep withheld, and
+ * running it anyway would produce a cell with more capability than its label claims. Refusals
+ * are decided and printed BEFORE anything executes, and recorded in run.json — a matrix that
+ * quietly shrinks is worse than one that says what it will not do.
  *
  * stdout is progress for a human; the artefacts are the results file and run.json.
  */
@@ -25,6 +35,8 @@ import {
 import { gradeQuestion } from '../lib/kgbench/graders.mjs';
 import { createRunTree } from '../lib/kgbench/sandbox.mjs';
 import { judgeAnswer, reconcile, JUDGE_MODEL, JUDGE_PROVIDER } from '../lib/kgbench/judge.mjs';
+import { resolveAgent, armIsFaithful, cellKey, KNOWN_AGENTS } from '../lib/kgbench/agents.mjs';
+import { prepareAgentMcp } from '../lib/kgbench/agent-sandbox.mjs';
 
 const argv = process.argv.slice(2);
 const out = (s) => console.log(s);
@@ -52,6 +64,17 @@ const questions = only
   : questionSet.questions;
 if (!questions.length) die(`no questions selected from set "${setName}"`);
 
+// ---- agent and model axes --------------------------------------------------
+// Both default to exactly what the single-agent runner did: agent `claude`, and each arm's
+// own model. A run that passes neither flag is byte-identical to one from before the axes
+// existed, which is what keeps r6/r7 comparable with anything measured now.
+const agentIds = opt('agents', null)?.split(',').map((s) => s.trim()).filter(Boolean) ?? ['claude'];
+for (const a of agentIds) {
+  if (!KNOWN_AGENTS.includes(a)) die(`unknown agent "${a}" (known: ${KNOWN_AGENTS.join(', ')})`);
+}
+// `null` in the model list means "this arm's configured model" — the pre-axis behaviour.
+const modelRefs = opt('models', null)?.split(',').map((s) => s.trim()).filter(Boolean) ?? [null];
+
 // ---- preflight -------------------------------------------------------------
 // Runs before anything executes. A down MCP server is indistinguishable from a
 // backend that answers badly, and a whole matrix run under that condition is worthless.
@@ -71,6 +94,44 @@ for (const p of pre) {
   else { blocked = true; out(`  FAIL  ${p.arm}: ${p.problems.join('; ')}`); }
 }
 if (blocked) die('preflight failed — fix the arms above or drop them with --arms');
+
+// ---- which (arm, agent) pairs can honestly be run ---------------------------
+// Decided here, before a single cell executes, and printed. An arm defined by WITHHOLDING
+// built-in search cannot be reproduced on an agent whose built-ins are ungated — the cell
+// would run with more capability than its label states, which is the defect this benchmark
+// exists to avoid rather than to commit.
+const combos = [];
+const refusals = [];
+for (const arm of arms) {
+  for (const agentId of agentIds) {
+    const verdict = armIsFaithful(arm, agentId);
+    if (!verdict.faithful) { refusals.push({ arm: arm.id, agent: agentId, reason: verdict.reason }); continue; }
+    for (const modelRef of modelRefs) {
+      let agent;
+      try {
+        agent = resolveAgent(agentId, { modelRef: modelRef ?? arm.model, repoRoot });
+      } catch (err) {
+        refusals.push({ arm: arm.id, agent: agentId, model: modelRef, reason: err.message });
+        continue;
+      }
+      combos.push({ arm, agentId, agent, modelRef: modelRef ?? arm.model });
+    }
+  }
+}
+if (agentIds.length > 1 || agentIds[0] !== 'claude' || modelRefs[0] !== null) {
+  out(`kgbench: ${combos.length} (arm, agent, model) combination(s):`);
+  for (const c of combos) {
+    out(`  run    ${c.arm.id.padEnd(12)} ${c.agentId.padEnd(10)} ${c.agent.model}`
+      + `  [builtins ${c.agent.enforcement.builtins}, answer via ${c.agent.elicitation}]`);
+  }
+}
+for (const r of refusals) {
+  out(`  REFUSE ${r.arm.padEnd(12)} ${r.agent.padEnd(10)} ${r.reason}`);
+}
+if (!combos.length) {
+  die('every (arm, agent) combination was refused — nothing left to measure.\n'
+    + '  Use --arms hybrid for cross-agent runs, or --agents claude for the restricted arms.');
+}
 if (flag('preflight-only')) process.exit(0);
 
 // ---- run bookkeeping -------------------------------------------------------
@@ -122,11 +183,23 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 }
 
 // Resume: skip cells already recorded.
+//
+// The key gained agent and model, which would have orphaned every row written before those
+// axes existed — a resume would have re-run the whole of r6/r7 rather than skipping it. Rows
+// without an `agent` were all claude, and rows without a `model` ran on their arm's own
+// model, so both are filled in from what was true at the time.
+const armModel = Object.fromEntries(arms.map((a) => [a.id, a.model]));
 const done = new Set();
 if (existsSync(resultsFile)) {
   for (const line of readFileSync(resultsFile, 'utf8').split('\n')) {
     if (!line.trim()) continue;
-    try { const r = JSON.parse(line); done.add(`${r.arm}|${r.id}|${r.rep}`); } catch { /* partial line */ }
+    try {
+      const r = JSON.parse(line);
+      done.add(cellKey({
+        arm: r.arm, agent: r.agent, model: r.model, question: r.id, rep: r.rep,
+        armModel: armModel[r.arm],
+      }));
+    } catch { /* partial line */ }
   }
   if (done.size) out(`kgbench: resuming, ${done.size} cell(s) already recorded`);
 }
@@ -145,24 +218,51 @@ if (!builtins?.length) {
 }
 out(`  ${builtins.length} built-in tools; each arm denies all but its own grant`);
 
-// ---- per-arm token baseline ------------------------------------------------
+// ---- token baseline, per (arm, agent, model) --------------------------------
 // content_tokens = total - baseline. Without this the fixed ~140k floor of system
 // prompt + tool schemas dominates and every arm looks the same.
-const baselines = {};
+//
+// Keyed by the whole combination, not just the arm, because the floor is a property of the
+// SESSION: a copilot session and a claude session start from different system prompts and
+// different tool schemas, and subtracting one from the other measures the difference between
+// two CLIs rather than between two retrieval strategies. The baseline also records the token
+// SOURCE it was measured through, so a DB-derived cell total is never reduced by a
+// stream-json floor — those two account for prompt caching differently, and the difference
+// would not be a difference of anything.
+const baselines = {};      // "arm|agent|model" -> in_tokens
+const baselineSource = {}; // "arm|agent|model" -> 'stream-json' | 'proxy-db-*' | null
+const comboKey = (c) => `${c.arm.id}|${c.agentId}|${c.agent.model}`;
+// Non-claude probes cost a session each and their tokens can arrive late, so one sample is
+// the default there; claude's are cheap and immediate, so it keeps three.
+const baselineReps = (agentId) => parseInt(opt('baseline-reps', agentId === 'claude' ? '3' : '1'), 10);
 if (!flag('no-baseline')) {
-  out('kgbench: measuring per-arm token baselines...');
+  out('kgbench: measuring token baselines...');
   const leaks = [];
-  for (const arm of arms) {
-    const b = await measureBaseline({ arm, cwd: armCwd, env: process.env, reps: 3, builtins });
-    baselines[arm.id] = b.baseline_in_tokens;
+  for (const c of combos) {
+    const b = await measureBaseline({
+      arm: c.arm, cwd: armCwd, env: process.env, builtins,
+      reps: baselineReps(c.agentId),
+      agent: c.agentId === 'claude' ? null : c.agent,
+      runId,
+      // Baselines happen once per combination rather than once per cell, so they can afford
+      // to wait out a slow stop-adapter that a cell cannot.
+      tokenOpts: c.agentId === 'claude' ? {} : { attempts: 8, settleMs: 5000 },
+    });
+    baselines[comboKey(c)] = b.baseline_in_tokens;
+    baselineSource[comboKey(c)] = b.source ?? null;
     // The baseline probe is a real session with this arm's real flags, so what it
     // reports as available is evidence that isolation applied — checked BEFORE the
-    // matrix runs, rather than discovering 48 voided cells afterwards.
-    const denied = new Set(denyListFor(arm, builtins));
-    const leaked = (b.available_tools ?? []).filter((t) => denied.has(t));
-    if (leaked.length) leaks.push(`  ${arm.id}: ${leaked.join(', ')}`);
-    out(`  ${arm.id.padEnd(12)} baseline_in_tokens=${b.baseline_in_tokens ?? 'n/a'} (${b.samples} samples)`
-      + `, tools=${(b.available_tools ?? []).length}`);
+    // matrix runs, rather than discovering 48 voided cells afterwards. Only claude
+    // reports a tool surface; on the others there is nothing to check, which is
+    // recorded in the enforcement descriptor rather than glossed over here.
+    if (c.agentId === 'claude') {
+      const denied = new Set(denyListFor(c.arm, builtins));
+      const leaked = (b.available_tools ?? []).filter((t) => denied.has(t));
+      if (leaked.length) leaks.push(`  ${c.arm.id}: ${leaked.join(', ')}`);
+    }
+    out(`  ${c.arm.id.padEnd(12)} ${c.agentId.padEnd(10)} baseline_in_tokens=${b.baseline_in_tokens ?? 'n/a'}`
+      + ` (${b.samples} samples${b.source ? `, ${b.source}` : ''})`
+      + (c.agentId === 'claude' ? `, tools=${(b.available_tools ?? []).length}` : ''));
   }
   if (leaks.length) {
     die('arms are not isolated — these tools were denied but are still available:\n'
@@ -170,11 +270,15 @@ if (!flag('no-baseline')) {
       + '\n  Every number from such a run compares arms that are not what their labels say.');
   }
 }
-// The always-on cost of merely having a backend registered, relative to bare grep.
+// The always-on cost of merely having a backend registered, relative to bare grep — compared
+// WITHIN an (agent, model), since a cross-CLI difference is not a schema tax.
 const schemaTax = {};
-const grepBase = baselines.grep;
-for (const [id, b] of Object.entries(baselines)) {
-  schemaTax[id] = b != null && grepBase != null ? b - grepBase : null;
+for (const c of combos) {
+  const key = comboKey(c);
+  const grepKey = `grep|${c.agentId}|${c.agent.model}`;
+  const b = baselines[key];
+  const g = baselines[grepKey];
+  schemaTax[key] = b != null && g != null ? b - g : null;
 }
 
 // Resuming must not erase what the earlier cells actually ran against. run.json was
@@ -198,11 +302,20 @@ writeFileSync(runJsonPath, JSON.stringify({
   runId, set: setName, reps, commit, dirty,
   ...(priorRuns.length ? { history: priorRuns } : {}),
   arms: arms.map((a) => ({ id: a.id, label: a.label, model: a.model, allowedTools: a.allowedTools, backend: a.backend })),
+  agents: agentIds,
+  models: modelRefs,
+  combinations: combos.map((c) => ({
+    arm: c.arm.id, agent: c.agentId, model: c.agent.model,
+    elicitation: c.agent.elicitation, enforcement: c.agent.enforcement,
+  })),
+  // Refusals are part of the manifest, not a log line that scrolls away. A reader comparing
+  // two runs needs to see that a combination was DECLINED rather than merely absent.
+  ...(refusals.length ? { refused: refusals } : {}),
   questions: questions.map((q) => q.id),
   sandbox: tree
     ? { mode: 'worktree', tree_commit: tree.commit, excluded: tree.removed, verified: true }
     : { mode: 'none', verified: false, warning: 'arms could read the answer key; scores not comparable' },
-  baselines, schemaTax,
+  baselines, baselineSource, schemaTax,
   // `requested` is what this process asks the proxy for. `served` is filled in at the end
   // of the run from the judge's own responses, because it is the only evidence of what
   // actually graded the cells — and the two are not the same thing. r6 and r7 both
@@ -214,8 +327,11 @@ writeFileSync(runJsonPath, JSON.stringify({
 if (dirty) out('kgbench: WARNING — working tree is dirty; the indexes and the tree may disagree');
 
 // ---- matrix ----------------------------------------------------------------
-const total = arms.length * questions.length * reps;
+const total = combos.length * questions.length * reps;
 let n = 0;
+// Only worth widening the progress line when there is more than one thing on the axis.
+const showAgent = agentIds.length > 1 || agentIds[0] !== 'claude';
+const showModel = modelRefs.length > 1;
 // The judge identity the proxy actually served, learned from the first response, plus the
 // substitution notice if it differs from what was requested. Both land in run.json so a
 // reader never has to trust the requested name.
@@ -234,14 +350,44 @@ const HOST_STALL_ABORT = 3;
 // Rows whose answer cited the benchmark's own ground truth. With the sandbox in place
 // this should stay empty; if it does not, containment has regressed and the run is void.
 const contaminatedRows = [];
-for (const arm of arms) {
+// Token bookkeeping for the closing summary — see the backfill note at the end of the run.
+let unmeasuredTokenRows = 0;
+let ambiguousTokenRows = 0;
+for (const combo of combos) {
+  const { arm, agentId, agent } = combo;
   for (const q of questions) {
     for (let rep = 1; rep <= reps; rep++) {
       n++;
-      const key = `${arm.id}|${q.id}|${rep}`;
+      const key = cellKey({ arm: arm.id, agent: agentId, model: agent.model, question: q.id, rep });
       if (done.has(key)) continue;
 
-      const res = await runCell({ arm, question: q, rep, cwd: armCwd, env: process.env });
+      // MCP restriction for the non-claude agents, written where each CLI actually reads it
+      // (copilot: .vscode/mcp.json in the sandbox; opencode: a pinned XDG_CONFIG_HOME). Per
+      // cell, and cleaned up per cell — copilot's file lives INSIDE the measured tree, so
+      // leaving it behind would make the next cell's containment check see a file the run
+      // created itself. claude takes its server list on the command line and needs none of
+      // this, so prepareAgentMcp is a no-op there.
+      const mcp = prepareAgentMcp({ agent: agentId, arm, cwd: armCwd, runDir: armCwd, env: process.env });
+      let res;
+      try {
+        res = await runCell({
+          arm, question: q, rep, cwd: armCwd, env: mcp.env,
+          // Two descriptors, each authoritative about a different half. agent-sandbox knows
+          // WHICH FILE restricted MCP for this cell; agents.mjs knows what tool gating is
+          // possible on this CLI, and draws a distinction the generic one flattens — copilot
+          // is `not_enforced` (gateable, but this harness has no verified name mapping)
+          // whereas opencode is `ungated` (no allowlist exists). Spreading mcp.enforcement
+          // last overwrote that with a blanket `ungated`, turning unfinished work into a
+          // permanent capability limit. The tool-gating fields win from the adapter.
+          agent: agentId === 'claude' ? null : {
+            ...agent,
+            enforcement: { ...mcp.enforcement, ...agent.enforcement, mechanism: mcp.enforcement.mechanism },
+          },
+          runId,
+        });
+      } finally {
+        mcp.cleanup();
+      }
 
       // Deterministic grading inline. `llm`-type questions are left ungraded here
       // and picked up by kgbench-judge, so a judge outage cannot lose a run.
@@ -294,21 +440,43 @@ for (const arm of arms) {
         }
       }
 
-      const base = baselines[arm.id];
+      const ck = comboKey(combo);
+      const base = baselines[ck];
+      // content_tokens is a SUBTRACTION, so both sides must be measured the same way. A
+      // DB-derived total minus a stream-json floor is not a difference of anything — the two
+      // account for prompt caching differently — so a source mismatch yields null rather
+      // than a number that looks fine and means nothing.
+      const sourcesAgree = baselineSource[ck] != null
+        && baselineSource[ck] === (res.token_source ?? 'stream-json');
       const row = {
         ...res, ...scored, ...judged,
-        content_tokens: res.total_tokens != null && base != null ? Math.max(0, res.in_tokens - base) + (res.out_tokens ?? 0) : null,
+        content_tokens: res.total_tokens != null && base != null && sourcesAgree
+          ? Math.max(0, res.in_tokens - base) + (res.out_tokens ?? 0)
+          : null,
         baseline_in_tokens: base ?? null,
+        baseline_source: baselineSource[ck] ?? null,
+        ...(res.total_tokens != null && base != null && !sourcesAgree
+          ? { content_tokens_skipped: `baseline measured via ${baselineSource[ck] ?? 'nothing'}, cell via ${res.token_source}` }
+          : {}),
         set: setName, commit, at: new Date().toISOString(),
       };
       appendFileSync(resultsFile, JSON.stringify(row) + '\n');
 
-      if (scored.contaminated) contaminatedRows.push(`${arm.id}/${q.id}`);
+      // A cell whose tokens are not in the DB yet is normal, not an error: copilot's and
+      // opencode's stop-adapters write on their own schedule, and one measured cell's row
+      // landed a full minute after the runner had moved on. Counted so the run can point at
+      // the offline backfill instead of leaving a column quietly empty.
+      if (res.token_source === 'unmeasured') unmeasuredTokenRows++;
+      if (res.token_ambiguous) ambiguousTokenRows++;
+      if (scored.contaminated) contaminatedRows.push(`${arm.id}/${agentId}/${q.id}`);
       const mark = res.outcome !== 'ok' ? res.outcome.toUpperCase()
         : scored.contaminated ? 'CONTAM'
         : scored.score == null ? 'judge'
         : scored.score.toFixed(2);
-      out(`  [${String(n).padStart(3)}/${total}] ${arm.id.padEnd(12)} ${q.id.padEnd(4)} rep${rep}  ${String(mark).padEnd(8)} ${res.wall_s}s`
+      out(`  [${String(n).padStart(3)}/${total}] ${arm.id.padEnd(12)}`
+        + (showAgent ? ` ${agentId.padEnd(10)}` : '')
+        + (showModel ? ` ${String(agent.model).padEnd(24)}` : '')
+        + ` ${q.id.padEnd(4)} rep${rep}  ${String(mark).padEnd(8)} ${res.wall_s}s`
         + (res.outcome === 'api_error' ? `  ${res.error}` : ''));
 
       if (res.outcome === 'host_stalled') {
@@ -357,6 +525,18 @@ if (contaminatedRows.length) {
   out(`kgbench: ${contaminatedRows.length} CONTAMINATED row(s): ${contaminatedRows.join(', ')}`);
   out('kgbench: those answers cited the benchmark ground truth and are excluded from ranking.');
   out('kgbench: containment has regressed — treat this run as void and fix lib/kgbench/sandbox.mjs.');
+}
+if (refusals.length) {
+  out(`kgbench: ${refusals.length} (arm, agent) combination(s) were REFUSED and never ran; run.json lists them.`);
+}
+if (unmeasuredTokenRows) {
+  out(`kgbench: ${unmeasuredTokenRows} cell(s) have no token figure yet — the stop-adapters that write`);
+  out('kgbench: copilot/opencode rows run on their own schedule and can land a minute behind the cell.');
+  out(`kgbench: fill them in with  node scripts/kgbench-backfill-tokens.mjs --run ${runId}`);
+}
+if (ambiguousTokenRows) {
+  out(`kgbench: ${ambiguousTokenRows} cell(s) had more than one session of their agent inside the`);
+  out('kgbench: measurement window — their token sums may include traffic that is not the cell.');
 }
 out(`kgbench: done. results -> ${resultsFile}`);
 out(`kgbench: render with  node scripts/kgbench-report.mjs --run ${runId}`);

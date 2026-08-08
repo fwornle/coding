@@ -18,17 +18,34 @@ node scripts/kgbench-run.mjs --set coding-v1 --preflight-only
 # the full matrix (17 questions x 3 arms x 3 reps)
 node scripts/kgbench-run.mjs --set coding-v1 --reps 3 --run-id my-run
 
+# across agents (see Cross-agent cells below — some combinations are refused)
+node scripts/kgbench-run.mjs --set coding-v1 --arms grep,hybrid \
+  --agents claude,copilot,opencode --reps 3 --run-id cross
+
+# across models
+node scripts/kgbench-run.mjs --set coding-v1 --models claude-sonnet-4.6,claude-opus-5
+
 # render the report
 node scripts/kgbench-report.mjs --run my-run
 ```
+
+The matrix is **arm × agent × model × question × rep**. Both new axes default to what the
+single-agent runner did — agent `claude`, each arm's own model — so a run that passes
+neither flag is identical to one from before they existed, and stays comparable with the
+earlier runs.
 
 Results stream to `.data/kgbench/runs/<run-id>/results.jsonl` as they complete, so a run
 can be inspected mid-flight and resumed with the same `--run-id`. Full answers are
 stored, which means a fixed grader can be re-applied offline instead of re-running the
 matrix.
 
-Useful flags: `--arms grep,graphify` to select arms, `--only L1,T3` to select questions,
-`--no-judge` to skip the LLM cross-check, `--no-baseline` to skip token-floor measurement.
+Useful flags: `--arms grep,graphify` to select arms, `--agents`/`--models` for the other
+axes, `--only L1,T3` to select questions, `--no-judge` to skip the LLM cross-check,
+`--no-baseline` to skip token-floor measurement, `--baseline-reps N` to change how many
+probes measure each token floor.
+
+`--preflight-only` prints the (arm, agent, model) combinations that will run **and the ones
+that will be refused, with reasons**, before anything is spent.
 
 ## Prerequisites
 
@@ -161,6 +178,26 @@ reporting that as a finding. The grader and containment contracts run there too.
 
 A cell can be run by claude, copilot or opencode. The axes are not equally measurable, and
 the report says so wherever the numbers appear rather than once at the bottom.
+
+**Some combinations are refused, before anything runs.** `graphify` and `codegraph` are
+defined by having `Read` *without* `Glob`/`Grep`, and that exclusion cannot be honoured on an
+agent whose built-ins are ungated. Those pairs are declined at preflight, printed with the
+reason, and recorded in `run.json` under `refused` — a matrix that quietly shrinks is worse
+than one that says what it will not do. `grep` and `hybrid` survive: `grep` withholds only
+MCP servers, which every agent can be restricted from, and `hybrid` grants everything, so
+"ungated" *is* its surface.
+
+```
+run    grep         copilot    claude-sonnet-5  [builtins not_enforced, answer via answer-file]
+REFUSE graphify     opencode   arm "graphify" is defined by WITHHOLDING built-in search …
+```
+
+**Baselines are per (arm, agent, model), not per arm.** The token floor is a property of the
+session: a copilot session and a claude session start from different system prompts and tool
+schemas, so subtracting one from the other measures the difference between two CLIs rather
+than between two retrieval strategies. Each baseline also records the token *source* it was
+measured through, and `content_tokens` is left null when a cell's source differs from its
+baseline's — a DB-derived total minus a stream-json floor is not a difference of anything.
 
 **Only claude is tool-enforced.** `--allowedTools`, `--disallowedTools` and
 `--strict-mcp-config` are claude flags. For the others an arm's MCP servers are restricted

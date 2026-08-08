@@ -69,16 +69,31 @@ const report = {
     questionCount: selected.length,
     // Reps vary per question once a later pass deepens a subset, so report the real
     // per-question range instead of the last pass's --reps value.
+    //
+    // Counted per (arm, AGENT, MODEL, question). Keying on (arm, question) alone counted one
+    // rep run by three agents as "3 reps/arm" — the report claimed triple the replication it
+    // had, which is precisely the kind of overstated confidence the winner gate exists to
+    // prevent elsewhere.
     reps: (() => {
       const per = new Map();
-      for (const r of rows) per.set(`${r.arm}|${r.id}`, (per.get(`${r.arm}|${r.id}`) ?? 0) + 1);
+      for (const r of rows) {
+        const k = `${r.arm}|${r.agent ?? 'claude'}|${r.model ?? ''}|${r.id}`;
+        per.set(k, (per.get(k) ?? 0) + 1);
+      }
       const v = [...per.values()];
+      if (!v.length) return '0';
       const lo = Math.min(...v), hi = Math.max(...v);
       return lo === hi ? String(lo) : `${lo}-${hi}`;
     })(),
     commit: meta.commit,
     dirty: meta.dirty,
-    model: meta.arms[0]?.model ?? 'unknown',
+    // The model is an axis now. Naming one in the header is only honest when the run used one.
+    model: (() => {
+      const used = [...new Set(rows.map((r) => r.model).filter(Boolean))];
+      if (used.length === 1) return used[0];
+      if (used.length > 1) return used.join('`, `');
+      return meta.arms[0]?.model ?? 'unknown';
+    })(),
     baselines: meta.baselines,
     schemaTax: meta.schemaTax,
     // Containment state travels with the report: a reader must be able to tell a
