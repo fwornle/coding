@@ -16,7 +16,7 @@
  * the post-hoc check that refuses to score a cell where an ungranted tool actually ran.
  */
 
-import { denyListFor, toolViolations, DENYABLE_BUILTINS } from '../../lib/kgbench/runner.mjs';
+import { denyListFor, toolViolations, agentEnv, DENYABLE_BUILTINS } from '../../lib/kgbench/runner.mjs';
 import { loadArms, resolveArm, REPO_ROOT } from '../../lib/kgbench/arms.mjs';
 
 const grepArm = { id: 'grep', allowedTools: ['Glob', 'Grep', 'Read'] };
@@ -24,6 +24,30 @@ const graphArm = {
   id: 'graphify',
   allowedTools: ['Read', 'mcp__graphify__query_graph', 'mcp__graphify__get_node'],
 };
+
+describe('the cell environment closes the out-of-band knowledge channel', () => {
+  // The sandbox controls what is in the TREE. This channel never touches the tree:
+  // knowledge-injection-hook.js is a USER-LEVEL UserPromptSubmit hook, so it fires in every
+  // working directory, semantically retrieves this project's knowledge base against the
+  // PROMPT, and prepends what it finds. Run from an empty temp directory against a real
+  // question prompt it returned a digest of a PREVIOUS run answering that question, naming
+  // the file and the line. Containment cannot see it and no existing test could fail on it.
+  it('disables knowledge injection for every spawned agent', () => {
+    expect(agentEnv({}).CODING_KNOWLEDGE_INJECTION).toBe('0');
+  });
+
+  it('overrides an inherited value rather than deferring to it', () => {
+    // An operator shell with injection explicitly on must not silently re-enable it for cells.
+    expect(agentEnv({ CODING_KNOWLEDGE_INJECTION: '1' }).CODING_KNOWLEDGE_INJECTION).toBe('0');
+  });
+
+  it('still strips the API keys and pins the proxy', () => {
+    const e = agentEnv({ ANTHROPIC_API_KEY: 'sk-x', ANTHROPIC_AUTH_TOKEN: 't' });
+    expect(e.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(e.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    expect(e.ANTHROPIC_BASE_URL).toContain('12435');
+  });
+});
 
 describe('denyListFor', () => {
   it('denies every built-in the arm was not granted', () => {
