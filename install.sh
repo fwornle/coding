@@ -67,6 +67,46 @@ DRY_RUN=false
 CODING_AGENT_SCOPE="wrapper"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Run one installation step under the --ci contract.
+#
+# WHY THIS EXISTS. `--ci` documents itself as downgrading missing-infra gates
+# "from fatal to warnings, so a portability run completes with a summary". It
+# did not. An audit of the 39 steps main() runs found TWELVE that can return
+# non-zero, every call unguarded, with `set -euo pipefail` active — so any one of
+# them killed the run mid-way and the summary was never printed. That is why no
+# CI job had ever verified a complete install: it was not possible.
+#
+# Those returns are not requests to abort. Every one of them is preceded by a
+# `warning` and often a "you can fix it later with…" hint, and several push onto
+# INSTALLATION_WARNINGS — the author's intent is unmistakably "skip this step and
+# carry on", which is exactly what a script with an end-of-run failure summary is
+# built for. `error_exit` is this script's mechanism for a real abort.
+#
+# Scoped to CI_LITE deliberately. An interactive install keeps today's behaviour,
+# because changing when a real user's install stops is a separate decision from
+# making the documented --ci contract true. The same argument probably applies
+# there too, and it is worth a follow-up.
+# ─────────────────────────────────────────────────────────────────────────────
+run_step() {
+    local fn="$1"
+    if [[ "$CI_LITE" != "true" ]]; then
+        "$fn"
+        return $?
+    fi
+    # `local rc=0` then `|| rc=$?`, NOT `if ! "$fn"; then local rc=$?`: after a
+    # negated test `$?` is the NEGATION's status, so the latter always reports 0
+    # and the diagnostic would state the opposite of what happened. The `||`
+    # form also keeps `set -e` from firing on the failure it is here to absorb.
+    local rc=0
+    "$fn" || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        warning "Step ${fn}() returned ${rc} — continuing (CI-lite portability run)"
+        INSTALLATION_FAILURES+=("${fn} did not complete (returned ${rc})")
+    fi
+    return 0
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # MUTATION MANIFEST
 #
 # Every change this installer can make OUTSIDE the repo is declared here, in one
@@ -863,18 +903,46 @@ install_memory_visualizer() {
         fi
     else
         info "Initializing memory-visualizer submodule..."
-        git submodule update --init --recursive integrations/memory-visualizer || error_exit "Failed to initialize memory-visualizer submodule"
+        # The submodule remote is SSH (git@github.com:…), so this needs a key.
+        # A public CI runner has none, and neither does the Docker install
+        # harness — the clone fails on authentication, which is missing infra
+        # rather than an installer defect. --ci promises to downgrade exactly
+        # that class of gate, so honour the promise here too: before this, a
+        # --ci run aborted at this line and never reached the remaining steps,
+        # which is why CI could not verify a complete install even in principle.
+        if ! git submodule update --init --recursive integrations/memory-visualizer; then
+            if [[ "$CI_LITE" == "true" ]]; then
+                warning "Could not clone memory-visualizer (no credentials for the private remote) — skipping (CI-lite portability run)"
+                INSTALLATION_FAILURES+=("memory-visualizer submodule unavailable (vkb visualiser not built)")
+                return 0
+            fi
+            error_exit "Failed to initialize memory-visualizer submodule"
+        fi
     fi
 
     cd "$MEMORY_VISUALIZER_DIR"
 
     # Install dependencies
     info "Installing memory-visualizer dependencies..."
-    npm install || error_exit "Failed to install memory-visualizer dependencies"
+    if ! npm install; then
+        if [[ "$CI_LITE" == "true" ]]; then
+            warning "memory-visualizer dependencies failed to install — skipping (CI-lite portability run)"
+            INSTALLATION_FAILURES+=("memory-visualizer dependencies failed")
+            return 0
+        fi
+        error_exit "Failed to install memory-visualizer dependencies"
+    fi
 
     # Build the visualizer
     info "Building memory-visualizer..."
-    npm run build || error_exit "Failed to build memory-visualizer"
+    if ! npm run build; then
+        if [[ "$CI_LITE" == "true" ]]; then
+            warning "memory-visualizer build failed — skipping (CI-lite portability run)"
+            INSTALLATION_FAILURES+=("memory-visualizer build failed")
+            return 0
+        fi
+        error_exit "Failed to build memory-visualizer"
+    fi
 
     # Update browserslist database to suppress warnings
     info "Updating browserslist database..."
@@ -907,7 +975,26 @@ install_semantic_analysis() {
         fi
     else
         info "Initializing mcp-server-semantic-analysis submodule..."
-        git submodule update --init --recursive integrations/mcp-server-semantic-analysis || error_exit "Failed to initialize semantic-analysis submodule"
+        # Same reasoning as memory-visualizer above: on a machine that cannot
+        # reach the private remote this is missing infra, and --ci promises to
+        # downgrade that class. It stays FATAL for a real install, because a
+        # user without the semantic-analysis server has no working MCP layer and
+        # should be told so immediately rather than discovering it later.
+        #
+        # Two distinct causes both land here, which is why the message does not
+        # name one: a CI runner has the git checkout but no SSH key for
+        # git@github.com, while the Docker install harness builds from a tar of
+        # tracked files and so has no .git at all ("not a git repository").
+        if ! git submodule update --init --recursive integrations/mcp-server-semantic-analysis; then
+            if [[ "$CI_LITE" == "true" ]]; then
+                warning "Could not initialize the semantic-analysis submodule"
+                info "  → the semantic-analysis MCP server will be unavailable."
+                info "  → fix later with: git submodule update --init --recursive integrations/mcp-server-semantic-analysis && ./install.sh"
+                INSTALLATION_FAILURES+=("semantic-analysis submodule unavailable (MCP server not built)")
+                return 0
+            fi
+            error_exit "Failed to initialize semantic-analysis submodule"
+        fi
     fi
 
     # Only proceed with build if we have the repository
@@ -1843,7 +1930,7 @@ verify_installation() {
         success "vkb command is available"
     else
         error_exit "vkb command not found or not executable"
-        ((errors++))
+        errors=$((errors + 1))
     fi
     
     # Check memory visualizer
@@ -1851,7 +1938,7 @@ verify_installation() {
         success "Memory visualizer is built"
     else
         warning "Memory visualizer dist directory not found"
-        ((errors++))
+        errors=$((errors + 1))
     fi
     
     # Check Constraint Monitor with Professional Dashboard
@@ -3656,35 +3743,35 @@ main() {
 
     # Run installation steps
     check_dependencies
-    detect_agents
+    run_step detect_agents
     configure_team_setup
     setup_history_repo
-    install_node_dependencies
+    run_step install_node_dependencies
     initialize_knowledge_databases
     install_plantuml
     setup_local_llm  # DMR preferred, Ollama as fallback
     setup_llm_cli_proxy  # HTTP bridge for claude/copilot CLI in Docker
     install_memory_visualizer
-    install_semantic_analysis
-    install_constraint_monitor
-    install_system_health_dashboard
+    run_step install_semantic_analysis
+    run_step install_constraint_monitor
+    run_step install_system_health_dashboard
     install_graphify
     configure_docker_mode
     create_command_wrappers
-    setup_unified_launcher
+    run_step setup_unified_launcher
     configure_shell_environment
     initialize_shared_memory
     create_example_configs
     setup_mcp_config
     install_enhanced_lsl
-    install_mastra_opencode
-    install_compaction_guard
-    install_knowledge_injection
-    install_copilot_file_hooks
+    run_step install_mastra_opencode
+    run_step install_compaction_guard
+    run_step install_knowledge_injection
+    run_step install_copilot_file_hooks
     install_skills
     create_project_local_settings
-    install_okb_snapshot_guard
-    install_constraint_monitor_hooks
+    run_step install_okb_snapshot_guard
+    run_step install_constraint_monitor_hooks
     verify_installation
     setup_api_admin_keys
 

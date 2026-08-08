@@ -44,7 +44,7 @@ _check_transition_lock() {
       _agent_log "⏳ Docker mode transition in progress, waiting..."
     fi
     sleep 1
-    ((wait_count++))
+    wait_count=$((wait_count + 1))
   done
 
   if [ -f "$lock_file" ]; then

@@ -196,23 +196,23 @@ TOTAL_CHECKS=0
 PASSED_CHECKS=0
 
 # ConditionalLoggingPattern
-((TOTAL_CHECKS++))
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 [ "$CONSOLE_LOG_COUNT" -eq 0 ] && ((PASSED_CHECKS++))
 
 # Redux (if React project)
 if [ -f "package.json" ] && grep -q "react" package.json 2>/dev/null; then
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     [ "$REDUX_COUNT" -gt 0 ] && ((PASSED_CHECKS++))
 fi
 
 # Network awareness (if install.sh exists)
 if [ -f "install.sh" ]; then
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     [ "$NETWORK_CHECK" -gt 0 ] && ((PASSED_CHECKS++))
 fi
 
 # Documentation
-((TOTAL_CHECKS++))
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 [ "$UNDOCUMENTED_FUNCTIONS" -lt 10 ] && ((PASSED_CHECKS++))
 
 SCORE=$((PASSED_CHECKS * 100 / TOTAL_CHECKS))

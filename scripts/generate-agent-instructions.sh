@@ -133,7 +133,7 @@ install_claude_global() {
     for cmd_file in "$COMMANDS_DIR"/*.md; do
         [[ -f "$cmd_file" ]] || continue
         cp "$cmd_file" "$target/$(basename "$cmd_file")"
-        ((count++))
+        count=$((count + 1))
     done
 
     _CLAUDE_GLOBAL_INSTALLED=true
