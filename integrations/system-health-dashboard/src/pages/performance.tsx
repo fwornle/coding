@@ -33,6 +33,14 @@ import { AvenuePanel } from '@/components/performance/avenue-panel'
 import { ExperimentLauncher } from '@/components/performance/experiment-launcher'
 import { RunMonitor } from '@/components/performance/run-monitor'
 import { ComparisonMatrix } from '@/components/performance/comparison-matrix'
+import { KgbenchLauncher } from '@/components/performance/kgbench-launcher'
+import { KgbenchMonitor } from '@/components/performance/kgbench-monitor'
+import { KgbenchResults } from '@/components/performance/kgbench-results'
+import {
+  fetchKgbenchActiveRun,
+  setKgbenchActiveRunId,
+  selectKgbenchActiveRunId,
+} from '@/store/slices/kgbenchSlice'
 
 // DASH-01/DASH-02 Performance page. Layout mirrors token-usage.tsx (header +
 // summary Card focal point + Tabs body) but ALL shared state lives in the
@@ -148,6 +156,14 @@ export function PerformancePage() {
   // CTA can switch to the Compare tab (which mounts the DifferenceViewer).
   const [activeTab, setActiveTab] = useState('runs')
 
+  // The Performance page now hosts TWO measurement surfaces, and this is the switch between
+  // them. Experiments measure one agent turn against a spec's variants; Benchmarks (kgbench)
+  // measure retrieval arms against a graded question set. They share this page because they
+  // answer the same operator question — "which way of working is better, and what did it
+  // cost" — and share nothing else: different runners, different servers, different run
+  // identities. Sub-tabs rather than a second top-level nav entry, per the agreed scope.
+  const [surface, setSurface] = useState('experiments')
+
   // Fetch on mount AND poll every 30s. Mount-only left runs completed by ANY source
   // OTHER than the in-UI launcher (a CLI `experiment-run.mjs`, the coordinator, or a
   // run finished while this tab sat open) invisible until a manual reload — the exact
@@ -179,6 +195,25 @@ export function PerformancePage() {
     return () => { cancelled = true; clearInterval(id) }
   }, [dispatch, activeRunId])
 
+  // The same auto-attach for kgbench: a matrix launched from the CLI or the /kgbench skill
+  // must surface in the Benchmarks monitor, not only one launched from this tab. Polled at
+  // 15s rather than the experiments' 5s — a kgbench cell is a whole agent session (tens of
+  // seconds at best), so a faster poll would only add requests, not information.
+  const kgbenchRunId = useAppSelector(selectKgbenchActiveRunId)
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled || kgbenchRunId) return
+      const res = await dispatch(fetchKgbenchActiveRun())
+      if (!cancelled && fetchKgbenchActiveRun.fulfilled.match(res) && res.payload.runId) {
+        dispatch(setKgbenchActiveRunId(res.payload.runId))
+      }
+    }
+    tick()
+    const id = setInterval(tick, 15_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [dispatch, kgbenchRunId])
+
   if (loading && runs.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -208,6 +243,15 @@ export function PerformancePage() {
           Task-anchored query over experiment runs — cost, route quality, and outcome scores
         </p>
       </div>
+
+      {/* Surface switch: Experiments (specs × variants × agents) | Benchmarks (kgbench). */}
+      <Tabs value={surface} onValueChange={setSurface}>
+        <TabsList>
+          <TabsTrigger value="experiments" data-testid="experiments-surface-tab">Experiments</TabsTrigger>
+          <TabsTrigger value="benchmarks" data-testid="benchmarks-surface-tab">Benchmarks</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="experiments" className="mt-4 space-y-6">
 
       {/* Summary cards — the visual focal point — with the D-10 quarantine
           control re-homed here (out of the sidebar) with a live count. */}
@@ -298,6 +342,26 @@ export function PerformancePage() {
         </TabsContent>
         <TabsContent value="reports" className="mt-4">
           <ReportsSubview />
+        </TabsContent>
+      </Tabs>
+
+        </TabsContent>
+
+        {/* Benchmarks — kgbench. Launcher, live monitor, and results, in the order an
+            operator uses them. The monitor self-gates on there being an active run, so a
+            first visit shows the launcher and the results picker and nothing dead. */}
+        <TabsContent value="benchmarks" className="mt-4 space-y-6">
+          <div>
+            <h2 className="text-base font-semibold">Code-retrieval benchmark (kgbench)</h2>
+            <p className="text-sm text-muted-foreground">
+              Retrieval arms — grep, graphify, codegraph, hybrid — answering a graded question set,
+              across agents and models. Runs detached and resumable; launch it here or with{' '}
+              <span className="font-mono">/kgbench</span>.
+            </p>
+          </div>
+          <KgbenchLauncher />
+          <KgbenchMonitor />
+          <KgbenchResults />
         </TabsContent>
       </Tabs>
 

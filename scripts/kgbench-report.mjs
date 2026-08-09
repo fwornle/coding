@@ -11,7 +11,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { aggregate, renderMarkdown } from '../lib/kgbench/report.mjs';
+import { aggregate, renderMarkdown, buildReportMeta, findDisagreements } from '../lib/kgbench/report.mjs';
 import { loadQuestions, REPO_ROOT } from '../lib/kgbench/arms.mjs';
 
 const argv = process.argv.slice(2);
@@ -89,82 +89,16 @@ if (agentFilter) {
 
 const agg = aggregate(rows, { arms: armIds, questions: selected });
 
-// Checklist vs judge disagreement, when both graded the same answer.
-const disagreements = rows
-  .filter((r) => r.score != null && r.judge_score != null && Math.abs(r.score - r.judge_score) > 0.25)
-  .map((r) => ({
-    id: r.id, arm: r.arm, checklist: r.score, judge: r.judge_score,
-    kind: r.judge_score > r.score ? 'judge_higher' : 'checklist_higher',
-  }));
+// Checklist vs judge disagreement, and the meta block, both come from lib/kgbench/report.mjs.
+// They used to be built inline here. The Benchmarks dashboard sub-tab aggregates a run's rows
+// live and needs the same numbers, and several of these fields exist because an earlier
+// version of them was quietly wrong (the reps key counted one rep by three agents as three;
+// the judge identity echoed a request that was never served). A second copy would be a second
+// place for that to happen again, so there is one.
+const disagreements = findDisagreements(rows);
 
 const report = {
-  meta: {
-    set: meta.set,
-    runId,
-    questionCount: selected.length,
-    // Reps vary per question once a later pass deepens a subset, so report the real
-    // per-question range instead of the last pass's --reps value.
-    //
-    // Counted per (arm, AGENT, MODEL, question). Keying on (arm, question) alone counted one
-    // rep run by three agents as "3 reps/arm" — the report claimed triple the replication it
-    // had, which is precisely the kind of overstated confidence the winner gate exists to
-    // prevent elsewhere.
-    reps: (() => {
-      const per = new Map();
-      for (const r of rows) {
-        const k = `${r.arm}|${r.agent ?? 'claude'}|${r.model ?? ''}|${r.id}`;
-        per.set(k, (per.get(k) ?? 0) + 1);
-      }
-      const v = [...per.values()];
-      if (!v.length) return '0';
-      const lo = Math.min(...v), hi = Math.max(...v);
-      return lo === hi ? String(lo) : `${lo}-${hi}`;
-    })(),
-    commit: meta.commit,
-    dirty: meta.dirty,
-    // The model is an axis now. Naming one in the header is only honest when the run used one.
-    model: (() => {
-      const used = [...new Set(rows.map((r) => r.model).filter(Boolean))];
-      if (used.length === 1) return used[0];
-      if (used.length > 1) return used.join('`, `');
-      return meta.arms[0]?.model ?? 'unknown';
-    })(),
-    baselines: meta.baselines,
-    schemaTax: meta.schemaTax,
-    // Containment state travels with the report: a reader must be able to tell a
-    // sandboxed run from one where the arms could read the answer key.
-    sandbox: meta.sandbox ?? null,
-    history: meta.history ?? null,
-    // The agents THIS pass covered, so the provenance note can say what the latest pass did
-    // rather than assert a reason. `history` carries the same field for earlier passes.
-    agents: meta.agents ?? null,
-    // The judge identity that ACTUALLY graded these cells, taken from the rows rather
-    // than from the run's stated intent. r6 and r7 both recorded a requested
-    // `claude-opus-4.8` in run.json while every call was answered by claude-haiku-4-5,
-    // so the requested name is not evidence of anything. Older runs have no served
-    // field at all; report it as unrecorded rather than silently echoing the request.
-    judge: (() => {
-      const served = [...new Set(rows.map((r) => r.judge_model_served).filter(Boolean))];
-      const requested = meta.judge?.requested?.model ?? meta.judge?.model ?? null;
-      return {
-        requested,
-        served: served.length ? served : null,
-        provider: meta.judge?.served?.provider ?? meta.judge?.requested?.provider ?? meta.judge?.provider ?? null,
-        mismatch: served.length ? served.some((m) => m !== requested) : null,
-      };
-    })(),
-    contaminatedRows: rows.filter((r) => r.contaminated).length,
-    // Answers that GUESSED they were being probed without citing anything. Not
-    // contamination — an arm that searches, finds nothing, and concludes the question is
-    // a trap is doing the job the abstain class asks for. Counted because a set whose
-    // traps are guessable from their phrasing is measuring something narrower than
-    // retrieval, and that is a fact about the QUESTIONS, not about the arms.
-    selfIdentifiedProbeRows: rows.filter((r) => r.contamination_weak?.length).length,
-    toolEscapeRows: rows.filter((r) => r.outcome === 'tool_escape').length,
-    retiredQuestions: retiredIds,
-    agentFilter: agentFilterMeta,
-    generatedAt: new Date().toISOString(),
-  },
+  meta: buildReportMeta({ rows, meta, runId, selected, retiredIds, agentFilterMeta }),
   ...agg,
   disagreements,
 };
