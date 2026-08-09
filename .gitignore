@@ -412,9 +412,20 @@ local_cache/
 # filename, so those slipped through — ~550-590K each, five of them across r6/r7.
 # regrade.json keeps the part that matters (what changed and why); the pre-images
 # are reproducible by re-running the grader against results.jsonl.
+#
+# supervise.status is live runtime state, not provenance: the supervisor rewrites
+# it as a run moves through running -> failed -> complete, so a tracked copy goes
+# dirty every time a run is in flight and its committed value is whatever instant
+# the commit happened to catch. The end state that matters is in run.json and in
+# results.jsonl's cell count.
 !.data/kgbench/
+# Both pre-image spellings are in use — `results.pre-<what>.jsonl` and
+# `results.jsonl.pre-<what>`. Matching only one lets ~1M snapshots through on the
+# next naming choice, which is how these got missed the first time.
 .data/kgbench/runs/*/results.jsonl
 .data/kgbench/runs/*/results.pre-*.jsonl
+.data/kgbench/runs/*/results.jsonl.pre-*
+.data/kgbench/runs/*/supervise.status
 
 # Code-graph gate results and freshness sidecars. Small, non-regenerable provenance
 # (what was measured, at which commit) kept deliberately in the repo. The indexes
