@@ -494,6 +494,36 @@ class SystemHealthAPIServer {
              }
          });
 
+         // kgbench Benchmarks API — the parallel of the experiments proxy above, for the
+         // Performance → Benchmarks sub-tab. Same shape and same reason: the page is served
+         // from this container and fetches same-origin /api/kgbench/..., so the only
+         // consistent path to the vkb-server is forwarding to the host on :8080.
+         //
+         // A longer timeout than a plain read would need, because one route here is not a
+         // read: POST /api/kgbench/probe-models runs the host model probe, which serialises a
+         // completion per candidate model and takes minutes. Without an explicit signal the
+         // undici default would abort it mid-probe and leave the operator with a failed
+         // request for a probe that is still running.
+         this.app.use('/api/kgbench', async (req, res) => {
+             try {
+                 const qs = new URLSearchParams(req.query).toString();
+                 const url = `http://host.docker.internal:8080/api/kgbench${req.path}${qs ? '?' + qs : ''}`;
+                 const init = {
+                     method: req.method,
+                     headers: { 'Content-Type': 'application/json' },
+                     signal: AbortSignal.timeout(req.path === '/probe-models' ? 20 * 60_000 : 60_000),
+                 };
+                 if (req.method !== 'GET' && req.method !== 'HEAD' && req.body !== undefined) {
+                     init.body = JSON.stringify(req.body);
+                 }
+                 const resp = await fetch(url, init);
+                 const data = await resp.json();
+                 res.status(resp.status).json(data);
+             } catch (err) {
+                 res.status(502).json({ error: 'kgbench API (vkb-server) unreachable', details: err.message });
+             }
+         });
+
          // Observations API (Phase 23)
         this.app.get('/api/observations', this.handleGetObservations.bind(this));
         this.app.get('/api/observations/projects', this.handleGetObservationProjects.bind(this));

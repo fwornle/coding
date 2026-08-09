@@ -181,6 +181,18 @@ services:
       # via _repoRoot()=/coding. Not baked into the image, so mount it live
       # (Phase 85 Plan 06 live-deploy fix — the spec list was empty otherwise).
       - ${CODING_REPO:-.}/config/experiments:/coding/config/experiments:ro
+      # kgbench (Benchmarks sub-tab) — the /api/kgbench/* family dynamic-imports
+      # ../kgbench/{arms,agents,report}.mjs and reads config/kgbench/. Both must be mounted
+      # LIVE for the same reason lib/experiments is: the image carries a stale copy of
+      # lib/kgbench that predates the agent axis — it has no agents.mjs at all, so
+      # /api/kgbench/config would 500 on a missing module while looking like a config bug.
+      - ${CODING_REPO:-.}/lib/kgbench:/coding/lib/kgbench:ro
+      - ${CODING_REPO:-.}/config/kgbench:/coding/config/kgbench:ro
+      # Published benchmark artefacts (docs/benchmarks/<name>/report.json) — read by
+      # /api/kgbench/published so the results view can show what was PUBLISHED alongside a
+      # run's live aggregate. docs/ is not in the image; without this the published list is
+      # silently empty, which reads as "no benchmarks exist".
+      - ${CODING_REPO:-.}/docs/benchmarks:/coding/docs/benchmarks:ro
       # KM-Core dist (live-mounted to avoid Docker rebuild for TS changes — Phase 37)
       - ${CODING_REPO:-.}/lib/km-core/dist:/coding/lib/km-core/dist:ro
     networks:

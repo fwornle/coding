@@ -3303,6 +3303,126 @@ app.post('/experiments/avenue-prune', async (req, res) => {
 });
 
 // =====================================================================
+// kgbench host seam — launch / cancel / model-probe for the Benchmarks sub-tab.
+// =====================================================================
+// Same trust boundary and same reason as /experiments/* above: a kgbench cell spawns
+// `claude` / `copilot` / `opencode`, and those binaries exist only on the HOST. The
+// coding-services container has `node` and nothing else, so the vkb-server's
+// /api/kgbench/* routes forward here rather than spawning.
+//
+// The three handlers are deliberately thin: validation lives in the executor module (one
+// place, exercised by its own tests), and each response is the executor's JSON with an `ok`
+// flag — never re-shaped, so the dashboard sees exactly what the host decided.
+
+let kgbenchExecutorModule = null;
+async function getKgbenchExecutor() {
+  if (kgbenchExecutorModule) return kgbenchExecutorModule;
+  kgbenchExecutorModule = await import('../lib/kgbench/kgbench-executor.mjs');
+  return kgbenchExecutorModule;
+}
+
+// Mirror of the experiment gate, against the kgbench runs root. kgbench ids are longer than
+// experiment ids (they are operator-chosen and descriptive: `coding-v1-VOID-tool-escape` is
+// 26 chars), so the length bound differs — see isValidKgbenchRunId in the executor for why.
+const KGBENCH_RUN_ID_RE = /^[A-Za-z0-9._-]{1,48}$/;
+const KGBENCH_RUNS_ROOT = path.resolve(REPO_ROOT, '.data', 'kgbench', 'runs');
+function isValidKgbenchRunIdLocal(runId) {
+  return typeof runId === 'string' && KGBENCH_RUN_ID_RE.test(runId) && runId !== '.' && runId !== '..';
+}
+function isContainedKgbenchRunDir(runDir) {
+  if (typeof runDir !== 'string' || runDir.length === 0) return false;
+  const abs = path.isAbsolute(runDir) ? path.resolve(runDir) : path.resolve(REPO_ROOT, runDir);
+  return abs === KGBENCH_RUNS_ROOT || abs.startsWith(KGBENCH_RUNS_ROOT + path.sep);
+}
+
+// POST /kgbench/run — detached host launch of scripts/kgbench-supervise.sh.
+//   body: { run_id, run_dir, set, reps?, arms?, agents?, models?, only?, deepen?, … }
+//   200: { ok:true, success:true, pid }   409: { slot_busy:true, holder }
+//   400: missing/invalid fields           403: external origin
+app.post('/kgbench/run', async (req, res) => {
+  if (!isExperimentOriginAllowed(req)) {
+    log(`kgbench/run rejected external origin ${req.socket?.remoteAddress}`, 'WARN');
+    return res.status(403).json({ ok: false, error: 'origin not allowed' });
+  }
+  const body = req.body || {};
+  const { run_id, run_dir } = body;
+  if (!run_id || !run_dir) {
+    return res.status(400).json({ ok: false, error: 'run_id and run_dir required' });
+  }
+  if (!isValidKgbenchRunIdLocal(run_id)) {
+    log(`kgbench/run rejected invalid run_id: ${JSON.stringify(run_id)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'invalid run_id' });
+  }
+  if (!isContainedKgbenchRunDir(run_dir)) {
+    log(`kgbench/run rejected out-of-tree run_dir: ${JSON.stringify(run_dir)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'run_dir escapes .data/kgbench/runs/' });
+  }
+  try {
+    const { runKgbench } = await getKgbenchExecutor();
+    const result = await runKgbench({ ...body, env: process.env });
+    const status = result.success ? 200 : (result.slot_busy ? 409 : 500);
+    return res.status(status).json({ ok: result.success, ...result });
+  } catch (err) {
+    log(`kgbench/run threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /kgbench/cancel — group-kill the supervisor's process group.
+//   body: { run_id, run_dir }   NOTE: no pid. The run's own supervise.pid is the authority;
+//   accepting a caller-supplied pid would only add a way to signal the wrong process.
+app.post('/kgbench/cancel', async (req, res) => {
+  if (!isExperimentOriginAllowed(req)) {
+    log(`kgbench/cancel rejected external origin ${req.socket?.remoteAddress}`, 'WARN');
+    return res.status(403).json({ ok: false, error: 'origin not allowed' });
+  }
+  const { run_id, run_dir } = req.body || {};
+  if (!run_dir) {
+    return res.status(400).json({ ok: false, error: 'run_dir required' });
+  }
+  if (run_id !== undefined && run_id !== null && !isValidKgbenchRunIdLocal(run_id)) {
+    log(`kgbench/cancel rejected invalid run_id: ${JSON.stringify(run_id)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'invalid run_id' });
+  }
+  if (!isContainedKgbenchRunDir(run_dir)) {
+    log(`kgbench/cancel rejected out-of-tree run_dir: ${JSON.stringify(run_dir)}`, 'WARN');
+    return res.status(400).json({ ok: false, error: 'run_dir escapes .data/kgbench/runs/' });
+  }
+  try {
+    const { cancelKgbench } = await getKgbenchExecutor();
+    const result = await cancelKgbench({ run_id, run_dir });
+    return res.status(result.success ? 200 : 500).json({ ok: result.success, ...result });
+  } catch (err) {
+    log(`kgbench/cancel threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /kgbench/probe-models — run scripts/llm-model-probe.mjs on the host and refresh
+// .data/llm-proxy/model-availability.json.
+//
+// Host-only for two reasons: the probe targets the proxy on 127.0.0.1, and it temporarily
+// INSTALLS a processOverride to select each candidate (the only way a model can be chosen —
+// /api/complete ignores the request-body model). Mutating live routing config is not a thing
+// the container gets to do. Slow by construction (probes serialise on the shared override
+// key), so this is operator-triggered, never fired on page load.
+app.post('/kgbench/probe-models', async (req, res) => {
+  if (!isExperimentOriginAllowed(req)) {
+    log(`kgbench/probe-models rejected external origin ${req.socket?.remoteAddress}`, 'WARN');
+    return res.status(403).json({ ok: false, error: 'origin not allowed' });
+  }
+  const { provider, models } = req.body || {};
+  try {
+    const { probeKgbenchModels } = await getKgbenchExecutor();
+    const result = await probeKgbenchModels({ provider, models, env: process.env });
+    return res.status(result.success ? 200 : 500).json({ ok: result.success, ...result });
+  } catch (err) {
+    log(`kgbench/probe-models threw: ${err.message}`, 'ERROR');
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// =====================================================================
 // Phase 33-15: Test injection endpoints (loopback-gated, AC#13)
 // =====================================================================
 // Replaces 33-12's plist-propagation approach (empirically falsified — see

@@ -155,13 +155,41 @@ const resultsFile = path.join(runDir, 'results.jsonl');
 // tree it could not clear.
 let tree = null;
 let armCwd = repoRoot;
+
+// Always give the worktree back, including on Ctrl-C — a leaked worktree wedges the
+// next run's `git worktree add` and leaves a stale copy of the repo in /tmp.
+//
+// REGISTERED BEFORE THE TREE IS BUILT, and holding a cleanup handed over the moment the
+// worktree exists rather than the one attached to the finished `tree` object. Building a tree
+// takes about a minute (worktree add, then the exclusion sweep, then containment
+// verification), and this used to be registered AFTER it — so a signal arriving during
+// construction left a worktree nothing had a handle on. `git worktree prune` cannot reclaim
+// it either, because prune only drops entries whose directory is gone and this one's is not.
+//
+// That was a theoretical window while the only way to stop a run was Ctrl-C minutes in. The
+// dashboard's Cancel button makes stopping a run in its first seconds an ordinary act, and it
+// leaked on the first try.
+let releaseWorktree = null;
+const releaseTree = () => {
+  if (releaseWorktree) { const fn = releaseWorktree; releaseWorktree = null; tree = null; fn(); }
+};
+process.on('exit', releaseTree);
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => { releaseTree(); process.exit(130); });
+}
+
 if (flag('no-sandbox')) {
   out('kgbench: WARNING — --no-sandbox: arms can read config/kgbench/questions.');
   out('kgbench:           Scores from this run are NOT comparable and must not be published.');
 } else {
   out('kgbench: building sandboxed run tree (this takes ~1 min on a large repo)...');
   try {
-    tree = createRunTree({ repoRoot, questions });
+    tree = createRunTree({
+      repoRoot,
+      questions,
+      // Fires as soon as `git worktree add` succeeds — long before this call returns.
+      onWorktreeCreated: ({ cleanup }) => { releaseWorktree = cleanup; },
+    });
     armCwd = tree.dir;
     out(`  tree     ${tree.dir}`);
     out(`  commit   ${tree.commit.slice(0, 9)}`);
@@ -172,14 +200,6 @@ if (flag('no-sandbox')) {
 // A worktree is built from the COMMIT, so uncommitted work is not what gets searched.
 if (dirty && tree) {
   out(`kgbench: NOTE — working tree is dirty; arms search ${tree.commit.slice(0, 9)}, not your edits.`);
-}
-
-// Always give the worktree back, including on Ctrl-C — a leaked worktree wedges the
-// next run's `git worktree add` and leaves a stale copy of the repo in /tmp.
-const releaseTree = () => { if (tree) { tree.cleanup(); tree = null; } };
-process.on('exit', releaseTree);
-for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => { releaseTree(); process.exit(130); });
 }
 
 // Resume: skip cells already recorded.
