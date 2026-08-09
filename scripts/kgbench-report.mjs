@@ -49,8 +49,43 @@ const armIds = meta.arms.map((a) => a.id);
 // answer to it could be graded) leaves rows behind, and aggregating them would fold a
 // known-broken question into the medians.
 const selectedIds = new Set(selected.map((q) => q.id));
-const rows = allRows.filter((r) => selectedIds.has(r.id));
+let rows = allRows.filter((r) => selectedIds.has(r.id));
 const retiredIds = [...new Set(allRows.filter((r) => !selectedIds.has(r.id)).map((r) => r.id))];
+
+// --agents publishes a SUBSET of a run's agents, for the case where part of a matrix is
+// void and the rest is not. x2 is the case that forced this: its 192 claude cells are
+// valid, and its 192 copilot/opencode cells read a previous cell's stale answer file, so
+// one opencode answer text was graded against eleven different questions. Reporting the
+// run whole would have put that artefact in the pooled Overall table as a 0.00 median —
+// publishable-looking, and a capability claim about opencode that the data cannot support.
+//
+// The alternative — deleting the bad rows from results.jsonl — would destroy the evidence
+// that the bug happened. Filter at report time; keep the raw run intact.
+//
+// --void-reason is required alongside it, because an unexplained subset is worse than a
+// pooled one: the reader cannot tell a deliberate exclusion from a run that never had
+// those cells.
+const agentFilter = opt('agents', null);
+const voidReason = opt('void-reason', null);
+let agentFilterMeta = null;
+if (agentFilter) {
+  const keep = new Set(agentFilter.split(',').map((s) => s.trim()).filter(Boolean));
+  const agentOf = (r) => r.agent ?? 'claude';
+  const present = [...new Set(rows.map(agentOf))];
+  const unknown = [...keep].filter((a) => !present.includes(a));
+  if (unknown.length) die(`--agents names agent(s) not in this run: ${unknown.join(', ')} (run has: ${present.join(', ')})`);
+  if (!voidReason) die('--agents requires --void-reason "<why the others are excluded>"');
+  const before = rows.length;
+  rows = rows.filter((r) => keep.has(agentOf(r)));
+  agentFilterMeta = {
+    kept: [...keep],
+    excluded: present.filter((a) => !keep.has(a)),
+    rowsExcluded: before - rows.length,
+    reason: voidReason,
+  };
+  out(`  --agents: kept ${rows.length}/${before} rows (${agentFilterMeta.kept.join(', ')}), `
+    + `excluded ${agentFilterMeta.rowsExcluded} (${agentFilterMeta.excluded.join(', ')})`);
+}
 
 const agg = aggregate(rows, { arms: armIds, questions: selected });
 
@@ -124,6 +159,7 @@ const report = {
     selfIdentifiedProbeRows: rows.filter((r) => r.contamination_weak?.length).length,
     toolEscapeRows: rows.filter((r) => r.outcome === 'tool_escape').length,
     retiredQuestions: retiredIds,
+    agentFilter: agentFilterMeta,
     generatedAt: new Date().toISOString(),
   },
   ...agg,

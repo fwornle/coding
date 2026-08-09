@@ -2,8 +2,58 @@
   "runId": "coding-v1-x2",
   "set": "coding-v1",
   "reps": 3,
-  "commit": "48c9206d1",
+  "commit": "ebd7da004",
   "dirty": true,
+  "history": [
+    {
+      "commit": "48c9206d1",
+      "reps": 3,
+      "startedAt": "2026-08-08T11:45:57.151Z",
+      "sandbox_commit": "48c9206d1fafe5a712365a9213a40aed8b4fec17",
+      "questions": [
+        "L1",
+        "L2",
+        "L3",
+        "S1",
+        "S2",
+        "S3",
+        "B1",
+        "B2",
+        "B3",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "T1",
+        "T3",
+        "T4"
+      ]
+    },
+    {
+      "commit": "ebd7da004",
+      "reps": 3,
+      "startedAt": "2026-08-08T19:56:26.185Z",
+      "sandbox_commit": "ebd7da004c68d3d0de5aa1c2623addb673b1637e",
+      "questions": [
+        "L1",
+        "L2",
+        "L3",
+        "S1",
+        "S2",
+        "S3",
+        "B1",
+        "B2",
+        "B3",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "T1",
+        "T3",
+        "T4"
+      ]
+    }
+  ],
   "arms": [
     {
       "id": "grep",
@@ -206,7 +256,7 @@
   ],
   "sandbox": {
     "mode": "worktree",
-    "tree_commit": "48c9206d1fafe5a712365a9213a40aed8b4fec17",
+    "tree_commit": "ebd7da004c68d3d0de5aa1c2623addb673b1637e",
     "excluded": [
       "config/kgbench/questions",
       "lib/kgbench/graders.mjs",
@@ -272,8 +322,11 @@
       "provider": "claude-code",
       "model": "claude-opus-5"
     },
-    "served": null,
+    "served": {
+      "model": "claude-opus-5",
+      "provider": "claude-code"
+    },
     "enabled": true
   },
-  "startedAt": "2026-08-08T11:45:57.151Z"
+  "startedAt": "2026-08-08T22:11:46.616Z"
 }
