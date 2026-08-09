@@ -355,6 +355,13 @@ if (existsSync(runJsonPath)) {
       commit: prev.commit, reps: prev.reps, startedAt: prev.startedAt,
       sandbox_commit: prev.sandbox?.tree_commit ?? null,
       questions: prev.questions,
+      // WHICH AGENTS A PASS COVERED. Without this the report cannot tell a pass that
+      // DEEPENED some questions from one that REPLACED an agent's whole half of the
+      // matrix, and it printed the first explanation unconditionally. coding-v1-x2's
+      // third pass re-ran every copilot and opencode cell after they were voided for
+      // reading stale answer files; the report described that as "later passes added
+      // reps to a subset of questions", which is not what happened.
+      agents: prev.agents ?? null,
     }];
   } catch { /* unreadable manifest: start a fresh history */ }
 }

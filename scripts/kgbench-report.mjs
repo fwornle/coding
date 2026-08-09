@@ -135,6 +135,9 @@ const report = {
     // sandboxed run from one where the arms could read the answer key.
     sandbox: meta.sandbox ?? null,
     history: meta.history ?? null,
+    // The agents THIS pass covered, so the provenance note can say what the latest pass did
+    // rather than assert a reason. `history` carries the same field for earlier passes.
+    agents: meta.agents ?? null,
     // The judge identity that ACTUALLY graded these cells, taken from the rows rather
     // than from the run's stated intent. r6 and r7 both recorded a requested
     // `claude-opus-4.8` in run.json while every call was answered by claude-haiku-4-5,

@@ -2,7 +2,7 @@
   "runId": "coding-v1-x2",
   "set": "coding-v1",
   "reps": 3,
-  "commit": "ebd7da004",
+  "commit": "56d581a48",
   "dirty": true,
   "history": [
     {
@@ -33,6 +33,30 @@
       "commit": "ebd7da004",
       "reps": 3,
       "startedAt": "2026-08-08T19:56:26.185Z",
+      "sandbox_commit": "ebd7da004c68d3d0de5aa1c2623addb673b1637e",
+      "questions": [
+        "L1",
+        "L2",
+        "L3",
+        "S1",
+        "S2",
+        "S3",
+        "B1",
+        "B2",
+        "B3",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "T1",
+        "T3",
+        "T4"
+      ]
+    },
+    {
+      "commit": "ebd7da004",
+      "reps": 3,
+      "startedAt": "2026-08-08T22:11:46.616Z",
       "sandbox_commit": "ebd7da004c68d3d0de5aa1c2623addb673b1637e",
       "questions": [
         "L1",
@@ -111,7 +135,6 @@
     }
   ],
   "agents": [
-    "claude",
     "copilot",
     "opencode"
   ],
@@ -119,17 +142,6 @@
     null
   ],
   "combinations": [
-    {
-      "arm": "grep",
-      "agent": "claude",
-      "model": "claude-sonnet-5",
-      "elicitation": "stream-json",
-      "enforcement": {
-        "mcp_servers": "enforced",
-        "builtins": "enforced",
-        "verified_by": "deny-list plus post-hoc audit of executed tools"
-      }
-    },
     {
       "arm": "grep",
       "agent": "copilot",
@@ -153,39 +165,6 @@
         "builtins": "ungated",
         "gateable": false,
         "verified_by": "nothing — no tool allowlist to enforce with, and no tool trace to audit"
-      }
-    },
-    {
-      "arm": "graphify",
-      "agent": "claude",
-      "model": "claude-sonnet-5",
-      "elicitation": "stream-json",
-      "enforcement": {
-        "mcp_servers": "enforced",
-        "builtins": "enforced",
-        "verified_by": "deny-list plus post-hoc audit of executed tools"
-      }
-    },
-    {
-      "arm": "codegraph",
-      "agent": "claude",
-      "model": "claude-sonnet-5",
-      "elicitation": "stream-json",
-      "enforcement": {
-        "mcp_servers": "enforced",
-        "builtins": "enforced",
-        "verified_by": "deny-list plus post-hoc audit of executed tools"
-      }
-    },
-    {
-      "arm": "hybrid",
-      "agent": "claude",
-      "model": "claude-sonnet-5",
-      "elicitation": "stream-json",
-      "enforcement": {
-        "mcp_servers": "enforced",
-        "builtins": "enforced",
-        "verified_by": "deny-list plus post-hoc audit of executed tools"
       }
     },
     {
@@ -256,7 +235,7 @@
   ],
   "sandbox": {
     "mode": "worktree",
-    "tree_commit": "ebd7da004c68d3d0de5aa1c2623addb673b1637e",
+    "tree_commit": "56d581a48fadc4d6fcff160b9c32366e1d53cf06",
     "excluded": [
       "config/kgbench/questions",
       "lib/kgbench/graders.mjs",
@@ -288,32 +267,20 @@
     "verified": true
   },
   "baselines": {
-    "grep|claude|claude-sonnet-5": 22436,
     "grep|copilot|claude-sonnet-5": 63569,
     "grep|opencode|rapid-proxy/claude-sonnet-5": 64935,
-    "graphify|claude|claude-sonnet-5": 23035,
-    "codegraph|claude|claude-sonnet-5": 21837,
-    "hybrid|claude|claude-sonnet-5": 25859,
     "hybrid|copilot|claude-sonnet-5": 95569,
     "hybrid|opencode|rapid-proxy/claude-sonnet-5": 33117
   },
   "baselineSource": {
-    "grep|claude|claude-sonnet-5": "stream-json",
     "grep|copilot|claude-sonnet-5": "proxy-db-window",
     "grep|opencode|rapid-proxy/claude-sonnet-5": "proxy-db-window",
-    "graphify|claude|claude-sonnet-5": "stream-json",
-    "codegraph|claude|claude-sonnet-5": "stream-json",
-    "hybrid|claude|claude-sonnet-5": "stream-json",
     "hybrid|copilot|claude-sonnet-5": "proxy-db-window",
     "hybrid|opencode|rapid-proxy/claude-sonnet-5": "proxy-db-window"
   },
   "schemaTax": {
-    "grep|claude|claude-sonnet-5": 0,
     "grep|copilot|claude-sonnet-5": 0,
     "grep|opencode|rapid-proxy/claude-sonnet-5": 0,
-    "graphify|claude|claude-sonnet-5": 599,
-    "codegraph|claude|claude-sonnet-5": -599,
-    "hybrid|claude|claude-sonnet-5": 3423,
     "hybrid|copilot|claude-sonnet-5": 32000,
     "hybrid|opencode|rapid-proxy/claude-sonnet-5": -31818
   },
@@ -326,7 +293,12 @@
       "model": "claude-opus-5",
       "provider": "claude-code"
     },
-    "enabled": true
+    "enabled": true,
+    "substitution": {
+      "requested": "claude-opus-5",
+      "served": "claude-haiku-4-5-20251001",
+      "provider": "claude-code"
+    }
   },
-  "startedAt": "2026-08-08T22:11:46.616Z"
+  "startedAt": "2026-08-09T06:15:33.508Z"
 }
