@@ -137,8 +137,13 @@ function deriveSummary(state) {
         issues.push(`db ${state.databases.status}`);
     }
     if (state && Array.isArray(state.services)) {
+        // 'busy' is a working service whose event loop is blocked by known
+        // heavy work (see health-coordinator.js reclassifyBusyService). It is
+        // not an issue, and reporting it as one told the operator
+        // "service obs_api stopped" about a service that never stopped.
+        const OK_SERVICE_STATUSES = new Set(['running', 'busy']);
         for (const svc of state.services) {
-            if (svc && svc.status && svc.status !== 'running') {
+            if (svc && svc.status && !OK_SERVICE_STATUSES.has(svc.status)) {
                 issues.push(`service ${svc.name} ${svc.status}`);
             }
         }

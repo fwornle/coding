@@ -38,7 +38,7 @@ const execFileAsync = promisify(execFile);
 import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
-import { probeHttpHealth, probeTcpPort } from '../lib/utils/service-probe.js';
+import { probeHttpHealth, probeTcpPort, PROBE_TIMEOUT_ERROR } from '../lib/utils/service-probe.js';
 import net from 'node:net';
 import http from 'node:http';
 import https from 'node:https';
@@ -498,6 +498,51 @@ let obsApiConsecutiveFailures = 0;
 let obsApiRestartCount = 0;
 let obsApiLastRestartAt = 0;
 
+// ----- obs_api busy window (2026-08-09) -----
+// obs_api is single-owner-rw and single-threaded: a consolidation run blocks
+// its event loop, so BOTH probes below time out while it is perfectly alive.
+// Idle latency is ~1ms, so a 2-3s timeout is never "a bit slow" — it means the
+// loop is blocked. That produced two bad outcomes:
+//   1. services[].status='stopped' → the prompt hook told the operator
+//      "service obs_api stopped" when nothing had stopped (observed 2026-08-09).
+//   2. knowledge_pipeline.status='unreachable' → two consecutive ticks (~4s on
+//      the 2s status probe) would dispatch restart_obs_api, killing obs_api
+//      MID-CONSOLIDATION. Never fired in practice (launchd runs=1), but the
+//      path is live and gets likelier as the digest backlog grows.
+// So: when we know heavy work is in flight, a TIMEOUT means busy, not dead.
+// A refused connection still means dead — see PROBE_TIMEOUT_ERROR for why that
+// distinction is reliable rather than a fudge. The window is bounded so a
+// genuinely dead obs_api still heals within OBS_API_BUSY_GRACE_MS.
+const OBS_API_BUSY_GRACE_MS = Number(process.env.OBS_API_BUSY_GRACE_MS) || 120_000;
+let obsApiBusyUntil = 0;
+
+/** Mark obs_api as legitimately busy for the next grace period. */
+function noteObsApiBusy(reason) {
+  const until = Date.now() + OBS_API_BUSY_GRACE_MS;
+  if (until > obsApiBusyUntil) {
+    obsApiBusyUntil = until;
+    log(`obs_api busy window opened (${reason}, ${Math.round(OBS_API_BUSY_GRACE_MS / 1000)}s)`, 'DEBUG');
+  }
+}
+
+/** Whether obs_api is inside a known-busy window right now. */
+function obsApiBusyNow() {
+  return Date.now() < obsApiBusyUntil;
+}
+
+/**
+ * Reclassify a probe result for a service that is blocked but alive.
+ * Only obs_api has a busy notion today, and only a TIMEOUT qualifies —
+ * ECONNREFUSED means the listening socket is gone, which is death, not load.
+ */
+function reclassifyBusyService(name, result) {
+  if (name !== 'obs_api') return result;
+  if (result.status !== 'stopped') return result;
+  if (result.error !== PROBE_TIMEOUT_ERROR) return result;
+  if (!obsApiBusyNow()) return result;
+  return { ...result, status: 'busy' };
+}
+
 // ----- Proxy supervision constants (Phase 34 D-01 / D-02 / D-06) -----
 const PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:12435';
 const PROXY_PROBE_INTERVAL_MS = 60_000;          // D-01: cheap probe every 60s
@@ -719,6 +764,22 @@ async function pollKnowledgePipeline() {
     }
     body = await r.json();
   } catch (err) {
+    // A timeout inside a known-busy window means the event loop is blocked by
+    // consolidation, not that obs_api died — reporting 'unreachable' here is
+    // what would dispatch restart_obs_api mid-run. A refused connection is
+    // still death and still heals. Preserve the previous slice's data so the
+    // [📚] badge doesn't blank out during a consolidation burst.
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    if (timedOut && obsApiBusyNow()) {
+      const prev = currentState.knowledge_pipeline || {};
+      currentState.knowledge_pipeline = {
+        ...prev,
+        status: 'busy',
+        reason: 'consolidation in flight (probe timed out)',
+        last_probe_end: probeEndedAt()
+      };
+      return;
+    }
     currentState.knowledge_pipeline = {
       status: 'unreachable',
       reason: err.message,
@@ -770,6 +831,15 @@ async function pollKnowledgePipeline() {
     inflight: body.inflight,
     last_probe_end: probeEndedAt()
   };
+  // obs_api told us work is in flight — any timeout from here until the grace
+  // period expires is that work blocking the loop, not a dead service.
+  if (body.inflight) noteObsApiBusy('inflight reported by obs_api');
+  // NOTE: this is the ONLY call site, and it sits on the probe's success path,
+  // where status is never 'unreachable' — so the unreachable branch inside the
+  // FSM is currently unreachable itself and obs_api auto-heal has never fired
+  // (corroborated by launchd runs=1). Left as-is deliberately: wiring up the
+  // failure paths would switch on a restart path that has never run in
+  // production, which is a change to make on purpose, not as a side effect.
   evaluateObsApiAutoHeal();
 
   // Auto-trigger consolidation when undigested observations accumulate.
@@ -789,6 +859,11 @@ async function pollKnowledgePipeline() {
   ) {
     pollKnowledgePipeline._lastAutoConsolidate = now;
     log(`[auto-consolidation] triggering: ${body.undigested} undigested observations`);
+    // We are about to hand obs_api heavy work: open the busy window BEFORE the
+    // POST, so the very next 5s tick — which may well catch a blocked loop —
+    // already knows why. Waiting for `inflight` to come back would be too late;
+    // that read needs a responsive obs_api, which is exactly what we just lost.
+    noteObsApiBusy('auto-consolidation dispatched');
     fetch(`${OBS_API_URL}/api/consolidation/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -938,6 +1013,11 @@ function evaluateObsApiAutoHeal() {
   if (!rule || rule.auto_heal !== true) return;
 
   const status = currentState.knowledge_pipeline?.status;
+  // 'busy' is obs_api working, not failing: freeze the counters rather than
+  // counting a failure OR claiming recovery. Defensive — the only call site is
+  // on the probe's success path today, so this function cannot currently
+  // observe 'busy' (or 'unreachable'; see the note at the call site).
+  if (status === 'busy') return;
   if (status !== 'unreachable') {
     if (obsApiConsecutiveFailures > 0) {
       log(`obs_api auto-heal -> healthy (recovered after ${obsApiConsecutiveFailures} failures, ${obsApiRestartCount} restarts)`, 'INFO');
@@ -2748,6 +2828,8 @@ async function runAllChecks() {
         log(`services.${name} probe threw: ${err.message}`, 'ERROR');
         result = { status: 'unknown', latency_ms: null, error: err.message };
       }
+      // A blocked-but-alive service reads as a timeout; don't report it dead.
+      result = reclassifyBusyService(name, result);
       const idx = currentState.services.findIndex(s => s.name === name);
       const prevLastSeen = idx >= 0 ? currentState.services[idx].last_seen : null;
       const entry = {
