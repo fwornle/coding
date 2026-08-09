@@ -81620,5 +81620,68 @@
       "createdAt": "2026-08-08T19:42:39.313Z"
     },
     "project": "coding"
+  },
+  {
+    "id": "dfab78b6-5723-47b4-b5fd-fc9171a0760a",
+    "date": "2026-08-08",
+    "theme": "Git changeset review and commit preparation",
+    "summary": "Reviewed the git changeset before committing to ensure only genuine code changes were included.\n\n- Discovered `.activate` was a build-generated artifact produced by `install.sh`, not a real change\n- Verified gitignore rules and restored the file via `git checkout -- .activate` to avoid a false commit\n- Prepared to proceed with committing only legitimate code changes after ruling out spurious files",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-08-08T21:07:59.435Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-08-08",
+      "theme": "Git changeset review and commit preparation",
+      "summary": "Reviewed the git changeset before committing to ensure only genuine code changes were included.\n\n- Discovered `.activate` was a build-generated artifact produced by `install.sh`, not a real change\n- Verified gitignore rules and restored the file via `git checkout -- .activate` to avoid a false commit\n- Prepared to proceed with committing only legitimate code changes after ruling out spurious files",
+      "observation_ids": [
+        "6e05891d-d452-4c95-b4a5-80773e837907"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-08-08T21:07:59.435Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2c8fea47-700f-47b4-ad83-bd9d6d50a5a5",
+    "date": "2026-08-08",
+    "theme": "kgbench coding-v1-x2 benchmark run monitoring, repair, and analysis",
+    "summary": "Monitored, investigated, and planned repairs for a full cross-agent matrix benchmark run (`kgbench coding-v1-x2`, 384 cells total) that had aborted mid-run at 183 cells.\n\n- Inspected `supervise.log` to confirm the abort at 183/384 cells was intentional rather than a crash\n- After resume, verified 222/384 cells complete with zero new failures; confirmed codegraph backend functioning correctly (42 `mcp_codegraph_explore`, 214 `Read` calls)\n- Identified three `graphify/claude/A4` cells recorded as `api_error` and skipped on resume due to done-set keying — these must be deleted and re-run to restore balanced class median coverage\n- Noted a design gap: session-limit errors should be treated as retryable on resume\n- By 277/384 cells, hybrid/claude arm data (38 cells) revealed strong agent preference for text-search over graph tools: 114 `Grep` calls vs. 3 graph-tool calls, despite graph tools scoring 1.00 when forced — replicating prior findings under clean conditions\n- Planned a post-run backfill/repair sequence: (1) backfill late token writes from Copilot/opencode stop-adapters, (2) delete and re-run the three failed `graphify/claude/A4` cells, (3) backfill again, (4) generate final per-agent report with tool-choice, token provenance, and graph-vs-grep comparison",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-08-08T21:07:59.435Z",
+    "metadata": {
+      "sourceCount": 4,
+      "date": "2026-08-08",
+      "theme": "kgbench coding-v1-x2 benchmark run monitoring, repair, and analysis",
+      "summary": "Monitored, investigated, and planned repairs for a full cross-agent matrix benchmark run (`kgbench coding-v1-x2`, 384 cells total) that had aborted mid-run at 183 cells.\n\n- Inspected `supervise.log` to confirm the abort at 183/384 cells was intentional rather than a crash\n- After resume, verified 222/384 cells complete with zero new failures; confirmed codegraph backend functioning correctly (42 `mcp_codegraph_explore`, 214 `Read` calls)\n- Identified three `graphify/claude/A4` cells recorded as `api_error` and skipped on resume due to done-set keying — these must be deleted and re-run to restore balanced class median coverage\n- Noted a design gap: session-limit errors should be treated as retryable on resume\n- By 277/384 cells, hybrid/claude arm data (38 cells) revealed strong agent preference for text-search over graph tools: 114 `Grep` calls vs. 3 graph-tool calls, despite graph tools scoring 1.00 when forced — replicating prior findings under clean conditions\n- Planned a post-run backfill/repair sequence: (1) backfill late token writes from Copilot/opencode stop-adapters, (2) delete and re-run the three failed `graphify/claude/A4` cells, (3) backfill again, (4) generate final per-agent report with tool-choice, token provenance, and graph-vs-grep comparison",
+      "observation_ids": [
+        "f86f0d14-0b9d-465a-8301-9326bd1b1ed4",
+        "889588e4-9544-44b3-a009-8dcd1a302204",
+        "69797962-2b15-4106-9d79-068d9ee9bf55",
+        "f9bf96e2-0e49-4f2b-ac92-88e35f24d7d1"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-08-08T21:07:59.435Z"
+    },
+    "project": "coding"
   }
 ]
