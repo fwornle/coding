@@ -16,7 +16,7 @@ grader, judge or report logic:
 | `scripts/kgbench-supervise.sh` | detached, self-resuming matrix supervisor |
 | `scripts/kgbench-run.mjs` | the matrix itself (`--set --arms --only --reps --run-id`) |
 | `scripts/kgbench-regrade.mjs` | re-apply graders offline; `--rejudge` re-runs the judge |
-| `scripts/kgbench-report.mjs` | render `README.md` + `report.json` |
+| `scripts/kgbench-report.mjs` | render `RESULTS.md` + `report.json` (refuses to clobber hand-written files) |
 | `scripts/kgbench-charts.mjs` | render the SVG figures |
 | `scripts/kgbench-verify-questions.mjs` | validate questions and every evidence `file:line` |
 
@@ -97,17 +97,30 @@ append-only across passes, so a naive grep replays old stalls as if they were ne
 
 ## Step 3 — `report`
 
+**Two files, two owners.** `RESULTS.md` is generated and may be re-rendered at will.
+`README.md` is hand-written analysis built around those numbers — the charts, the question
+set, the measurement defects — and **nothing regenerates it**.
+
 ```bash
-node scripts/kgbench-report.mjs --run <runId> --out /tmp/kgb/README.md
+node scripts/kgbench-report.mjs --run <runId> --out docs/benchmarks/coding-v1/RESULTS.md
 node scripts/kgbench-charts.mjs --run <runId> --out docs/images
-cp /tmp/kgb/{README.md,report.json} docs/benchmarks/coding-v1/
 ```
 
-Check before publishing, using the run's own data rather than by eye:
+Publishing used to be `--out /tmp/kgb/README.md` followed by a `cp` onto the published
+`README.md`. That replaced 632 lines of analysis with the machine version — twice, at
+`f6bb7875c` and again on 2026-08-09, neither time mentioned in the commit that did it,
+because a diff against the already-collapsed file shows only growth. `--out` now refuses
+any target lacking its generated marker, so the old command fails loudly instead of
+succeeding destructively. Use `--force` only when replacing prose is the actual intent.
 
-- **Provenance**: how many commits, which passes, which questions in each. This section has
+After a re-render, update `README.md` **by hand** wherever it quotes a number, and check
+before publishing, using the run's own data rather than by eye:
+
+- **Provenance**: how many commits, which passes, which agents in each. This section has
   been wrong before precisely because it is the section nobody re-reads.
-- **Secondary scorer**: is `judge.served` present and equal to `judge.requested`?
+- **Secondary scorer**: is `judge.served` present and equal to `judge.requested`? A mixed
+  list means the proxy substituted mid-run; the medians are unaffected (they use the
+  deterministic checklist score) but the disagreements section is.
 - **Disagreements**: cause identified for each — *not assumed to be the question*.
 
 ## Step 4 — `regrade`

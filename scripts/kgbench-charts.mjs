@@ -49,9 +49,30 @@ const activeIds = new Set(
   JSON.parse(readFileSync(path.join(repoRoot, 'config/kgbench/questions', `${setName}.json`), 'utf8'))
     .questions.filter((q) => q.enabled !== false).map((q) => q.id),
 );
-const rows = readFileSync(path.join(repoRoot, '.data/kgbench/runs', runId, 'results.jsonl'), 'utf8')
+// AGENT SCOPE. A bar labelled `grep` that averages claude, copilot and opencode is the
+// pooling the report itself calls "arithmetic, not comparable" — three agents with
+// different tool enforcement and different elicitation have no meaningful midpoint, and on
+// a run where one agent answers 12% of the time the pooled bar is mostly the other two.
+// Charts had no agent axis at all, so a multi-agent run silently produced pooled figures
+// that a per-agent table then contradicted. Pass --agent to scope them; the published
+// figures use claude, the only agent whose tool surface is actually enforced.
+const agentFilter = opt('agent', null);
+const allRows = readFileSync(path.join(repoRoot, '.data/kgbench/runs', runId, 'results.jsonl'), 'utf8')
   .split('\n').filter(Boolean).map((l) => JSON.parse(l))
   .filter((r) => activeIds.has(r.id));
+const agentsPresent = [...new Set(allRows.map((r) => r.agent ?? 'claude'))];
+if (!agentFilter && agentsPresent.length > 1) {
+  console.error(`kgbench-charts: WARNING — this run has ${agentsPresent.length} agents `
+    + `(${agentsPresent.join(', ')}) and no --agent was given, so every bar pools them. `
+    + 'That is the comparison the report marks as not meaningful. Pass --agent claude.');
+}
+const rows = agentFilter
+  ? allRows.filter((r) => (r.agent ?? 'claude') === agentFilter)
+  : allRows;
+if (!rows.length) {
+  console.error(`kgbench-charts: no rows for --agent ${agentFilter} in ${runId}`);
+  process.exit(2);
+}
 
 /**
  * Which arms this run contains, and what colour each one wears.
