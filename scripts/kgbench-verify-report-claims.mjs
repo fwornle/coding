@@ -184,6 +184,30 @@ check('cross-question answer reuse (all agents)', (() => {
   return n;
 })(), 0);
 
+process.stdout.write('\n== figure captions (a caption is part of the figure) ==\n');
+// The arch figure asserted "A1-A4, 10 reps each" — hardcoded from the runs that deepened the
+// architecture questions — while its own lane labels read n=12 for a 3-rep run, and it was
+// published that way. Only a visual check caught it, because nothing reads an SVG's text.
+{
+  const svg = readFileSync('docs/images/kgbench-arch-spread-light.svg', 'utf8');
+  const archIds = [...new Set(rows.filter((r) => r.cls === 'arch').map((r) => r.id))].sort();
+  const claudeArch = rows.filter((r) => r.agent === 'claude' && r.cls === 'arch');
+  const reps = Math.max(...archIds.map((id) => claudeArch.filter((r) => r.arm === 'grep' && r.id === id).length));
+  const span = `${archIds[0]}-${archIds[archIds.length - 1]}`;
+  check('arch caption question span', svg.includes(span), true);
+  check('arch caption rep count', svg.includes(`${reps} rep${reps === 1 ? '' : 's'} each`), true);
+  check('arch caption agrees with lane n=', svg.includes(`n=${archIds.length * reps}`), true);
+}
+// Both image trees must carry the same bytes, or the site and GitHub show different figures.
+for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread']) {
+  for (const mode of ['light', 'dark']) {
+    const a = readFileSync(`docs/images/${name}-${mode}.svg`, 'utf8');
+    const b = existsSync(`docs-content/images/${name}-${mode}.svg`)
+      ? readFileSync(`docs-content/images/${name}-${mode}.svg`, 'utf8') : null;
+    check(`${name}-${mode} mirrored to docs-content`, b === a, true);
+  }
+}
+
 process.stdout.write('\n== prose claims that must match the data ==\n');
 claims('defect table has 18 rows', '| 18 |');
 claims('says eighteen defects', 'Eighteen defects were found');

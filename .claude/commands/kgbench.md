@@ -111,6 +111,21 @@ Pass `--agent` to the charts on any multi-agent run, or every bar pools agents w
 enforcement differs — the comparison the report itself marks as not meaningful. The script
 warns when you omit it.
 
+**Publication.** The site (`https://fwornle.github.io/coding`) builds from `docs-content/`
+only, so a benchmark written to `docs/` reaches GitHub and nothing else — which is why
+coding-v1 sat unpublished. It is now reachable through symlinks:
+
+```
+docs-content/benchmarks/coding-v1/README.md  -> ../../../docs/benchmarks/coding-v1/README.md
+docs-content/benchmarks/coding-v1/RESULTS.md -> ../../../docs/benchmarks/coding-v1/RESULTS.md
+```
+
+Symlinks rather than copies, because the sibling `kgbench-replication` benchmark is a hand-made
+copy and copies drift. `kgbench-charts.mjs` writes figures to **both** image trees for the same
+reason — a figure in `docs/images` alone renders on GitHub and is broken on the site. Verify a
+publish with `python3 -m mkdocs build --strict`; `--strict` catches a dangling markdown link
+but **not** a broken image inside a raw `<picture>` block, so look at the page as well.
+
 Publishing used to be `--out /tmp/kgb/README.md` followed by a `cp` onto the published
 `README.md`. That replaced 632 lines of analysis with the machine version — twice, at
 `f6bb7875c` and again on 2026-08-09, neither time mentioned in the commit that did it,

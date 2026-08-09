@@ -99,6 +99,7 @@ nav:
     - Experimental Design: measurement/kgbench-experimental-design.md
     - Benchmark Tutorial: measurement/kgbench-tutorial.md
     - Retrieval Benchmark (kgbench): measurement/kgbench.md
+    - 'Results: Retrieval Benchmark (coding-v1)': benchmarks/coding-v1/README.md
     - Measurement & Judging Lessons: benchmarks/measurement-lessons.md
   - Integrations:
     - Overview: integrations/index.md
