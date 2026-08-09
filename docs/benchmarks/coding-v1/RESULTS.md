@@ -3,7 +3,7 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3 reps/arm) against 4 arms.
-Repo at `56d581a48`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-09T10:18:32.004Z.
+Repo at `56d581a48`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-09T10:24:44.513Z.
 
 Secondary scorer: `claude-haiku-4-5-20251001`, `claude-opus-5` via `claude-code`. **Requested `claude-opus-5` — the proxy served something else; the served model is what graded these cells.**
 
