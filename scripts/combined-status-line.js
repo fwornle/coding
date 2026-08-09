@@ -2135,6 +2135,14 @@ class CombinedStatusLine {
          // 'unreachable' case below ([📚🔴]). Only fade when truly idle.
          parts.push(userActive ? '[📚✅]' : `[📚${obsIcon}]`);
          break;
+       case 'busy':
+         // Consolidation is blocking obs_api's event loop. The pipeline is
+         // working — in fact working hard — so this must not go red. It is
+         // also transient (bounded by OBS_API_BUSY_GRACE_MS), hence its own
+         // icon rather than borrowing ✅: the operator can see why the [📚]
+         // detail view is briefly showing stale totals.
+         parts.push('[📚⏳]');
+         break;
        case 'disabled':
          parts.push('[📚🔇]');
          break;
@@ -2517,6 +2525,7 @@ class CombinedStatusLine {
     };
     const verdictIcon = ({
       healthy: '✅',
+      busy: '⏳',
       stale: '⚠️',
       stalled: '🔴',
       unreachable: '❌',
