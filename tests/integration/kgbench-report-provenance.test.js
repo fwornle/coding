@@ -35,9 +35,11 @@ const renderMeta = (rows, extra) => {
 };
 
 describe('a partially void run says so before it shows a number', () => {
-  // x2: 192 claude cells valid, 192 copilot/opencode cells read a previous cell's stale
-  // answer file. The subset is publishable; the run as a whole is not. What makes that
-  // safe to publish is the header saying which axis was dropped — without it, every count
+  // The incident that motivated this (coding-v1-x2: 192 claude cells valid, 192
+  // copilot/opencode cells reading a previous cell's stale answer file) has since been
+  // REPAIRED — those cells were re-run under the fix and x2 is whole again. The mechanism
+  // stays tested because the next partial run will need it: a publishable subset is only
+  // safe to publish if the header says which axis was dropped, and without it every count
   // below reads as a count over the full run.
   const md = renderMeta([claudeRow()], {
     agentFilter: {
@@ -66,6 +68,49 @@ describe('a partially void run says so before it shows a number', () => {
 
   it('stays silent for an ordinary whole run — the warning is not boilerplate', () => {
     expect(render([claudeRow()])).not.toContain('Partial run:');
+  });
+});
+
+describe('a multi-pass run states what the passes did, and never guesses why', () => {
+  // THE DEFECT THIS PINS. The note read "later passes added reps to a subset of questions"
+  // for ANY run spanning more than one commit. That is one reason a run spans commits, and
+  // it was the wrong one for coding-v1-x2, whose last pass REPLACED every copilot and
+  // opencode cell after they were voided for reading stale answer files. Provenance is the
+  // section nobody re-reads, so a fabricated explanation survives republication unchallenged.
+  const multiPass = {
+    commit: 'ccc333', agents: ['copilot', 'opencode'],
+    history: [
+      { commit: 'aaa111', agents: ['claude', 'copilot', 'opencode'] },
+      { commit: 'bbb222', agents: ['claude', 'copilot', 'opencode'] },
+    ],
+  };
+
+  it('names each pass with the agents it covered', () => {
+    const md = renderMeta([claudeRow()], multiPass);
+    expect(md).toContain('in 3 pass(es)');
+    expect(md).toContain('`ccc333` (copilot, opencode)');
+    expect(md).toContain('`aaa111` (claude, copilot, opencode)');
+  });
+
+  it('no longer claims later passes added reps', () => {
+    const md = renderMeta([claudeRow()], multiPass);
+    expect(md).not.toContain('added reps to a subset of questions');
+  });
+
+  it('keeps the warning that cells span tree states', () => {
+    expect(renderMeta([claudeRow()], multiPass)).toContain('Cells are not all from one tree state');
+  });
+
+  it('prints the commit alone for passes recorded before the agents field existed', () => {
+    // Backfilling a reason onto an old pass would be inventing provenance, not recovering it.
+    const md = renderMeta([claudeRow()], { commit: 'ccc333', history: [{ commit: 'aaa111' }] });
+    expect(md).toContain('`aaa111`');
+    expect(md).not.toMatch(/`aaa111` \(/);
+  });
+
+  it('stays silent for a single-commit run — the note is not boilerplate', () => {
+    const md = renderMeta([claudeRow()], { commit: 'aaa111', history: [{ commit: 'aaa111' }] });
+    expect(md).not.toContain('Assembled across');
   });
 });
 
