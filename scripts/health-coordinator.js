@@ -1694,6 +1694,11 @@ let _lastEtmSpawnCheck = 0;
  * tmux's view of "what windows are open" is the truest signal, so we
  * union it with the mtime-based discovery — any project with a live
  * tmux session bypasses the 2-min gate.
+ *
+ * A live session is authoritative wherever it lives on disk. Paths under
+ * `agenticDir` are accepted unconditionally (the historical rule); paths
+ * outside it must carry a project marker (see looksLikeProjectDir) so that a
+ * throwaway shell in $HOME or /tmp cannot conscript an ETM.
  */
 function tmuxOpenProjectPaths(agenticDir) {
   try {
@@ -1706,13 +1711,29 @@ function tmuxOpenProjectPaths(agenticDir) {
     for (const line of out.stdout.split('\n')) {
       const p = line.trim();
       if (!p) continue;
-      if (!p.startsWith(agenticDir + '/')) continue;
-      if (fs.existsSync(p)) paths.add(p);
+      if (!fs.existsSync(p)) continue;
+      if (p.startsWith(agenticDir + '/') || looksLikeProjectDir(p)) paths.add(p);
     }
     return paths;
   } catch {
     return new Set();
   }
+}
+
+/**
+ * Whether a directory outside the `~/Agentic` tree is a real project worth
+ * monitoring. Requires either a marker the agent launcher writes on first
+ * launch (.specstory / .coding / CLAUDE.md) or a git repo. $HOME and a
+ * filesystem root never qualify — a session opened there is a scratch shell,
+ * not a project, and spawning an ETM for it would litter the directory with
+ * LSL output.
+ */
+const PROJECT_MARKERS = ['.specstory', '.coding', 'CLAUDE.md', '.git'];
+function looksLikeProjectDir(dirPath) {
+  const resolved = path.resolve(dirPath);
+  if (process.env.HOME && resolved === path.resolve(process.env.HOME)) return false;
+  if (resolved === path.parse(resolved).root) return false;
+  return PROJECT_MARKERS.some(marker => fs.existsSync(path.join(resolved, marker)));
 }
 
 /**
@@ -1829,7 +1850,19 @@ function ensureEtmForActiveProjects() {
   const tmuxOpen = tmuxOpenProjectPaths(agenticDir);
   const openCodeFresh = openCodeFreshProjects(now);
 
-  for (const projectPath of discoverProjectCandidates(agenticDir)) {
+  // Candidates = the ~/Agentic tree walk UNION whatever the live-session signals
+  // point at. The union is load-bearing: discoverProjectCandidates only walks
+  // two levels under ~/Agentic, so a project outside that tree (e.g.
+  // ~/Documents/WiMa) could never become a candidate — and the tmux/OpenCode
+  // bypasses below had nothing to qualify. Result: no ETM was ever spawned for
+  // it and its statusline sat at [LSL🔴] forever (found 2026-08-09).
+  const candidates = new Set(discoverProjectCandidates(agenticDir));
+  for (const p of tmuxOpen) candidates.add(p);
+  for (const p of openCodeFresh) {
+    if (p.startsWith(agenticDir + '/') || looksLikeProjectDir(p)) candidates.add(p);
+  }
+
+  for (const projectPath of candidates) {
     const projectName = path.basename(projectPath);
     if (coveredProjects.has(projectName)) continue;
 

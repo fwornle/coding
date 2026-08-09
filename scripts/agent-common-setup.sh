@@ -456,8 +456,19 @@ start_transcript_monitoring() {
 
   # Phase 54: if com.coding.etm launchd label is loaded, prefer kickstart (auto-respawn).
   # Otherwise fall back to nohup spawn for backward compat.
+  #
+  # The launchd job is hardcoded to the coding repo (ProgramArguments in
+  # ~/Library/LaunchAgents/com.coding.etm.plist end with "$CODING_REPO"), so it
+  # can only ever monitor that one tree. Taking this branch for ANY other project
+  # kickstarted the coding ETM and returned, leaving the project that was actually
+  # being launched with no monitor at all — a permanent [LSL🔴] badge, with the
+  # working nohup path below unreachable as dead code (found 2026-08-09).
+  # Gate on identity: launchd owns the coding repo, nohup owns everything else.
   local uid_gui="gui/$(id -u)"
-  if launchctl print "${uid_gui}/com.coding.etm" >/dev/null 2>&1; then
+  local project_real coding_real
+  project_real=$(cd "$project_dir" 2>/dev/null && pwd -P) || project_real="$project_dir"
+  coding_real=$(cd "$coding_repo" 2>/dev/null && pwd -P) || coding_real="$coding_repo"
+  if [ "$project_real" = "$coding_real" ] && launchctl print "${uid_gui}/com.coding.etm" >/dev/null 2>&1; then
     # Kill any orphan manually-spawned ETM for THIS (coding) project that might
     # still hold the transcript file. Scope the match to ETMs whose project-path
     # ARGUMENT is the coding repo — the com.coding.etm singleton is coding-only.
@@ -483,10 +494,27 @@ start_transcript_monitoring() {
       log "Warning: launchd kickstart did not produce a running ETM PID"
     fi
   else
-    pkill -f "enhanced-transcript-monitor.js.*$(basename "$project_dir")" 2>/dev/null || true
+    # Match on the project-path ARGUMENT, not basename. A basename match is both
+    # too broad (the script path itself contains "coding", so basename=coding
+    # killed every ETM on the box) and too loose (a project named "rec" matches
+    # "rec", "recorder", …). Anchor on the exact argv the spawn below uses.
+    pkill -f "enhanced-transcript-monitor\.js ${project_real}\$" 2>/dev/null || true
+
+    # Log outside the project: this fallback now runs for every non-coding
+    # project, and dropping transcript-monitor.log into the user's working tree
+    # is litter they never asked for.
+    mkdir -p "$coding_repo/.logs"
+    local etm_log="$coding_repo/.logs/etm-$(basename "$project_dir").log"
+
     cd "$project_dir"
-    # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd()
-    CODING_AGENT="${CODING_AGENT:-claude}" nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_dir" > transcript-monitor.log 2>&1 &
+    # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd().
+    # Env mirrors what the coordinator's auto-spawner sets (health-coordinator.js
+    # ensureEtmForActiveProjects) so both spawn paths produce identical ETMs.
+    CODING_AGENT="${CODING_AGENT:-claude}" \
+    CODING_REPO="$coding_repo" \
+    CODING_TOOLS_PATH="$coding_repo" \
+    TRANSCRIPT_SOURCE_PROJECT="$project_real" \
+      nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_real" > "$etm_log" 2>&1 &
     local new_pid=$!
 
     sleep 1
