@@ -251,7 +251,20 @@ function figArchSpread(mode) {
   // Describe the ENCODING, not the finding. This subtitle used to assert that the
   // spreads overlap completely, which was true of the run it was written for and false
   // of the next one — a conclusion baked into a renderer silently outlives its evidence.
-  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one lane per arm · each dot is one answer (A1-A4, 10 reps each) · black rule = median</text>`;
+  //
+  // The same line then did it again with a FACT rather than a conclusion: "A1-A4, 10 reps
+  // each" was hardcoded from the runs that deepened the architecture questions to 10 reps.
+  // coding-v1-x2 ran 3, so the figure asserted 10 while its own lane labels read n=12, and
+  // it published that way. A caption is part of the figure; deriving the questions and the
+  // rep count from the rows is the only version that cannot go stale.
+  const archIds = [...new Set(rows.filter((r) => r.cls === 'arch').map((r) => r.id))].sort();
+  const repsPerQ = Math.max(...ARMS.map((a) => {
+    const perQ = archIds.map((id) => rows.filter((r) => r.arm === a && r.id === id).length);
+    return perQ.length ? Math.max(...perQ) : 0;
+  }), 0);
+  const span = archIds.length > 1 ? `${archIds[0]}-${archIds[archIds.length - 1]}` : (archIds[0] ?? 'none');
+  s += `<text x="0" y="32" font-size="11" fill="${t.muted}">one lane per arm · each dot is one answer `
+    + `(${span}, ${repsPerQ} rep${repsPerQ === 1 ? '' : 's'} each) · black rule = median</text>`;
 
   for (let i = 0; i <= 4; i++) {
     const v = i / 4, x = L + v * pw;
@@ -308,11 +321,35 @@ const figures = {
   'kgbench-arch-spread': figArchSpread,
 };
 
-mkdirSync(path.join(repoRoot, outDir), { recursive: true });
+/**
+ * WRITE TO BOTH IMAGE TREES.
+ *
+ * This project has two: `docs/` is where the source documents live, and `docs-content/` is
+ * mkdocs's `docs_dir` — the only tree the published site can see. A figure written to one is
+ * invisible in the other, and the failure is silent in the direction that matters: the page
+ * renders perfectly on GitHub while the site shows three broken images.
+ *
+ * Copying by hand is what the sibling benchmark does, and it is why this one was never
+ * published at all. A generator that emits into only half the places its output is consumed
+ * from makes drift the default and correctness the manual step. So the mirror is derived from
+ * `--out` rather than requested: ask for one tree and get the matching path in the other.
+ */
+const MIRROR = { 'docs/images': 'docs-content/images', 'docs-content/images': 'docs/images' };
+const outDirs = [...new Set([outDir, MIRROR[outDir]].filter(Boolean))];
+if (outDirs.length === 1) {
+  console.error(`kgbench-charts: NOTE — ${outDir} has no docs-content mirror, so these figures `
+    + 'will not reach the published site. Use --out docs/images for anything published.');
+}
+
+for (const dir of outDirs) mkdirSync(path.join(repoRoot, dir), { recursive: true });
 for (const [name, fn] of Object.entries(figures)) {
   for (const mode of ['light', 'dark']) {
-    const file = path.join(repoRoot, outDir, `${name}-${mode}.svg`);
-    writeFileSync(file, fn(mode));
-    console.log(`wrote ${path.relative(repoRoot, file)}`);
+    // Render once per figure, not once per tree: two trees must not be able to disagree.
+    const svg = fn(mode);
+    for (const dir of outDirs) {
+      const file = path.join(repoRoot, dir, `${name}-${mode}.svg`);
+      writeFileSync(file, svg);
+      console.log(`wrote ${path.relative(repoRoot, file)}`);
+    }
   }
 }
