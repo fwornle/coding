@@ -29,6 +29,46 @@ const opencodeRow = (o = {}) => ({
 
 const render = (rows) => renderMarkdown({ ...META, meta: META, ...aggregate(rows, { arms: ['grep'], questions: QUESTIONS }) });
 
+const renderMeta = (rows, extra) => {
+  const meta = { ...META, ...extra };
+  return renderMarkdown({ ...meta, meta, ...aggregate(rows, { arms: ['grep'], questions: QUESTIONS }) });
+};
+
+describe('a partially void run says so before it shows a number', () => {
+  // x2: 192 claude cells valid, 192 copilot/opencode cells read a previous cell's stale
+  // answer file. The subset is publishable; the run as a whole is not. What makes that
+  // safe to publish is the header saying which axis was dropped — without it, every count
+  // below reads as a count over the full run.
+  const md = renderMeta([claudeRow()], {
+    agentFilter: {
+      kept: ['claude'],
+      excluded: ['copilot', 'opencode'],
+      rowsExcluded: 192,
+      reason: 'stale answer files — see PARTIAL-VOID.md',
+    },
+  });
+
+  it('names the kept agent, the excluded agents, and the count', () => {
+    expect(md).toContain('only `claude` cells are reported here');
+    expect(md).toContain('192 cell(s) from `copilot`, `opencode` are excluded');
+  });
+
+  it('gives the reason rather than just asserting an exclusion', () => {
+    expect(md).toContain('stale answer files — see PARTIAL-VOID.md');
+  });
+
+  it('warns ABOVE the first table, so no number is read as a full-run number', () => {
+    const warnIdx = md.indexOf('Partial run:');
+    const tableIdx = md.indexOf('| Arm | ranked |');
+    expect(warnIdx).toBeGreaterThan(-1);
+    expect(warnIdx).toBeLessThan(tableIdx);
+  });
+
+  it('stays silent for an ordinary whole run — the warning is not boilerplate', () => {
+    expect(render([claudeRow()])).not.toContain('Partial run:');
+  });
+});
+
 describe('a single-agent claude run is untouched by the agent axis', () => {
   const md = render([claudeRow(), claudeRow({ id: 'L1', rep: 2 })]);
 
