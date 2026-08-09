@@ -65,10 +65,10 @@ New in this run, and the more consequential finding:
 |---|---|--:|--:|--:|--:|
 | grep | claude | **48/48** | 1.00 | 74,872 | 17.8s |
 | grep | copilot | **48/48** | 1.00 | 132,147 | 35.2s |
-| grep | opencode | **6/48** | 1.00 | 58,469 | 23.4s |
+| grep | opencode | **6/48** | 1.00 | 43,571 | 23.4s |
 | hybrid | claude | **48/48** | 1.00 | 83,081 | 20.1s |
 | hybrid | copilot | **48/48** | 1.00 | 105,865 | 33.6s |
-| hybrid | opencode | **6/48** | 1.00 | 121,431 | 18.3s |
+| hybrid | opencode | **6/48** | 1.00 | 79,003 | 18.3s |
 
 Every agent that produces an answer is **equally correct**. What separates them is whether
 they answer at all, and what they spend getting there. opencode **fails to answer 88% of the
@@ -437,8 +437,11 @@ catch, and it came from the arm with no index.
   removable — it is what makes those cells answer at all.
 - **Only claude's arms are enforced.** copilot and opencode keep their built-in search on every
   arm, so their `grep` and `hybrid` rows differ by MCP configuration alone.
-- **opencode's token figures rest on 6 ranked cells per arm**, and 10 of its 12 answered cells
-  carry an ambiguous token window. Treat its cost numbers as indicative only.
+- **opencode's token figures rest on 6 ranked cells per arm.** Treat its cost numbers as
+  indicative. They are no longer ambiguous — every non-claude cell is now attributed per
+  session rather than per timestamp (defect 17), which removed a neighbour's trailing calls
+  from 94 of 96 opencode cells and cut its medians by 25–35%. copilot's medians did not move
+  at all, which is the check that the correction touched only the cells it should have.
 - **The secondary judge changed model mid-run** (see below), so the disagreement section is
   weaker evidence than usual. Medians are unaffected — they use the deterministic checklist.
 
@@ -517,7 +520,7 @@ Full per-pass provenance is in the run manifest's `history` block, and
 
 ## What went wrong building this
 
-Sixteen defects were found across the runs behind this page, and runs were discarded
+Eighteen defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -542,13 +545,21 @@ documented because the failure modes generalise to any agent benchmark.
 | 14 | **Long runs were being killed silently.** Two attempts were terminated part-way with no error and nothing in any project log. | Diagnosed, not guessed: the runner cleans up its worktree on SIGINT/SIGTERM but would *leak* it on SIGKILL, and no worktree leaked — so it caught a signal. Both deaths were runs tracked by a task manager, while the same workload detached ran on untouched. `kgbench-supervise.sh` now detaches and resumes on signal deaths only. |
 | 15 | **A cell read the previous cell's answer file.** Cells share one worktree and the answer file has a fixed name; the runner never deleted it, and the reader only asked "is this file non-empty?". An agent that exited without writing inherited its predecessor's answer, recorded `ok`, and was graded against the wrong question — one text was scored against **eleven** different questions. | This inverted the mechanism's entire purpose. The answer file exists *so that* an early exit surfaces as `no_result` instead of a false success; staleness turned every early exit back into a false success **with a plausible answer attached**. It presented as opencode scoring a median of 0.00 on everything — indistinguishable from a capability finding, and reported as one until the distinct-answer count was checked. Now the file is deleted before each spawn, and a file older than the spawn is rejected outright. |
 | 16 | **Publishing the report destroyed the report.** This page is hand-written around generated tables. Publishing was documented as rendering to a temp file and copying it onto this path, which replaces the analysis with the machine version. It happened twice — 619 lines at `f6bb7875c`, in a commit whose message is entirely about an answer key, and again on 2026-08-09. | Neither commit mentioned it, because a diff against the already-collapsed file shows only *growth*. The page carried a warning about exactly this — inside the file, so the first clobber destroyed the warning too. Prose inside the blast radius is not a control. Generated output now goes to `RESULTS.md`, and `--out` refuses any target without its generated marker. |
+| 17 | **Tokens were attributed by timestamp, so each cell was charged part of its predecessor's.** A session does not stop when the process that started it does — its last calls are still being written while the next cell is already running. Summing the rows *stamped* inside a cell's window therefore mixed two cells. On `grep/L1 rep1`, 25,620 tokens of the previous cell's traffic; across the run, 94 of 96 opencode cells. | The old detector reported this as "more than one session ran concurrently", which reads as a *busy machine* — and sent an investigation hunting a background process that did not exist. The cells were simply adjacent, which is the normal case, not an anomaly. Attribution now follows whole sessions that BEGAN inside the window, so adjacency is charged correctly and "ambiguous" once again means something really did run alongside. opencode's medians fell 25–35%; copilot's did not move, which is how you know the correction was surgical. |
+| 18 | **A re-attribution kept the verdict it had just overturned.** The offline re-resolver merges with `Object.assign`, which only overwrites keys the new result *has*. Every re-attributed cell kept `token_ambiguous: true` and the old "2 distinct sessions ran inside this cell's window" text, beside fresh fields stating it had been cleanly attributed to exactly one session. | The report reads the stale field, so the fix appeared to have done nothing: 94 ambiguous before, 94 after. Two more rounds of "why didn't that work" would have been spent on the attribution logic, which was already correct. Same shape as defect 15 — a merge that only ever adds lets a previous answer outlive the question. The resolver now declares every field it owns and the re-resolver clears them first, with a test that fails if a new field escapes the declaration. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
-manufactured a capability finding out of a termination bug, and 16 destroyed the explanation of
-all the others. The lesson is not "the graph arms were flattered", it is that **every
-measurement defect found here was invisible in the output it produced.** Each one yielded a
-clean-looking table.
+manufactured a capability finding out of a termination bug, 16 destroyed the explanation of all
+the others, and 17 quietly charged every cell part of its neighbour's bill. The lesson is not
+"the graph arms were flattered", it is that **every measurement defect found here was invisible
+in the output it produced.** Each one yielded a clean-looking table.
+
+Defect 18 deserves its own line, because it is the failure mode of *fixing* things. It made a
+correct fix look inert — the ambiguity count read 94 before and 94 after — by leaving the old
+verdict in place beside the new evidence. A stale field that contradicts a fresh one is worse
+than either a wrong answer or no answer, because it argues against the repair that just
+succeeded. The same shape as defect 15, in the tooling rather than the data.
 
 Most were found by instrumentation rather than by reading results: the tool-surface check, the
 containment scan, the orphaned-MCP-server guard, and the grader's own disagreement counter,

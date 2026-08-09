@@ -34,7 +34,7 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import path from 'node:path';
 import { REPO_ROOT } from '../lib/kgbench/arms.mjs';
-import { resolveCellTokens } from '../lib/kgbench/tokens.mjs';
+import { resolveCellTokens, TOKEN_FIELDS } from '../lib/kgbench/tokens.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(`--${n}`);
@@ -85,6 +85,17 @@ for (const r of candidates) {
   });
   if (t.token_source === 'unmeasured') { stillEmpty++; continue; }
 
+  // CLEAR BEFORE MERGE. Object.assign only overwrites keys the new result HAS, so any field
+  // the previous resolution set and this one does not would survive as a verdict about a
+  // computation that no longer exists. That is not hypothetical: when attribution moved from
+  // window sums to session sets, every re-attributed cell kept its old
+  // `token_ambiguous: true` and the old "2 distinct sessions ran inside this cell's window"
+  // message, sitting next to fresh fields saying the cell was cleanly attributed to exactly
+  // one session. The run looked unimproved because the stale verdict was what the report read.
+  //
+  // Same shape as the stale answer file this harness fixed earlier: a merge that only ever
+  // adds lets a previous answer outlive the question.
+  for (const k of TOKEN_FIELDS) delete r[k];
   Object.assign(r, t);
   // content_tokens is derived, so it has to be recomputed from the new in_tokens or it stays
   // null next to a populated total — the exact inconsistency that makes a reader distrust a table.

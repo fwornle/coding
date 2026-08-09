@@ -3,7 +3,7 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3 reps/arm) against 4 arms.
-Repo at `56d581a48`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-09T09:41:55.854Z.
+Repo at `56d581a48`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-09T10:18:32.004Z.
 
 Secondary scorer: `claude-haiku-4-5-20251001`, `claude-opus-5` via `claude-code`. **Requested `claude-opus-5` — the proxy served something else; the served model is what graded these cells.**
 
@@ -17,10 +17,10 @@ Assembled across 3 commits, in 4 pass(es): `48c9206d1`, `ebd7da004`, `ebd7da004`
 
 | Arm | ranked | correctness (median) | content tokens (median) | total tokens (median) | tool calls | latency s | hard-fail | hallucination |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
-| grep † | 102/144 | 1.00 | 103745 | 156080 | 4.0 | 25.4 | 29% | 1% |
+| grep † | 102/144 | 1.00 | 102303 | 153301 | 4.0 | 25.4 | 29% | 1% |
 | graphify | 48/48 | 1.00 | 180527 | 203562 | 8.0 | 36.5 | 0% | 0% |
 | codegraph | 48/48 | 1.00 | 133001 | 154838 | 6.0 | 33.4 | 0% | 0% |
-| hybrid † | 102/144 | 1.00 | 90333 | 143388 | 4.0 | 24.1 | 29% | 0% |
+| hybrid † | 102/144 | 1.00 | 86191 | 135607 | 4.0 | 24.1 | 29% | 0% |
 
 **content tokens** = total minus that arm's measured empty-run baseline. Whole-session totals are dominated by a fixed floor of system prompt + tool schemas, which compresses every ratio; content tokens are what separate retrieval strategies.
 
@@ -33,13 +33,13 @@ These are the numbers the run actually produced. The `Overall` table above pools
 | Arm | Agent | ranked | correctness | content tokens | total tokens | tool calls | latency s | hard-fail | built-ins | answer via | tokens from |
 |---|---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
 | grep | claude | 48/48 | 1.00 | 74872 | 97308 | 4.0 | 17.8 | 0% | enforced | stream-json | stream-json×48 |
-| grep | copilot | 48/48 | 1.00 | 132147 | 195716 | — | 35.2 | 0% | not_enforced | answer-file | proxy-db-window×48 |
-| grep | opencode | 6/48 | 1.00 | 58469 | 123404 | — | 23.4 | 88% | ungated | answer-file | proxy-db-window×48 |
+| grep | copilot | 48/48 | 1.00 | 132147 | 195716 | — | 35.2 | 0% | not_enforced | answer-file | proxy-db-session×48 |
+| grep | opencode | 6/48 | 1.00 | 43571 | 108506 | — | 23.4 | 88% | ungated | answer-file | proxy-db-session×48 |
 | graphify | claude | 48/48 | 1.00 | 180527 | 203562 | 8.0 | 36.5 | 0% | enforced | stream-json | stream-json×48 |
 | codegraph | claude | 48/48 | 1.00 | 133001 | 154838 | 6.0 | 33.4 | 0% | enforced | stream-json | stream-json×48 |
 | hybrid | claude | 48/48 | 1.00 | 83081 | 108940 | 4.0 | 20.1 | 0% | enforced | stream-json | stream-json×48 |
-| hybrid | copilot | 48/48 | 1.00 | 105865 | 201434 | — | 33.6 | 0% | not_enforced | answer-file | proxy-db-window×48 |
-| hybrid | opencode | 6/48 | 1.00 | 121431 | 154548 | — | 18.3 | 88% | ungated | answer-file | proxy-db-window×48 |
+| hybrid | copilot | 48/48 | 1.00 | 105865 | 201434 | — | 33.6 | 0% | not_enforced | answer-file | proxy-db-session×48 |
+| hybrid | opencode | 6/48 | 1.00 | 79003 | 112120 | — | 18.3 | 88% | ungated | answer-file | proxy-db-session×48 |
 
 `tool calls` is blank for any agent elicited by answer file: only claude's stream-json reports a tool trace, so a dash there means **not measured**, not zero.
 
@@ -77,11 +77,9 @@ Failed runs are counted, never dropped. An arm that stalls is not cheap — it i
 | Source | cells | what it means |
 |---|--:|---|
 | `stream-json` | 192 | the agent reported its own usage — first-party and exact |
-| `proxy-db-window` | 192 | proxy rows that ran while the cell ran — a time join, weaker than a tag |
+| `proxy-db-session` | 192 | whole proxy sessions that BEGAN while the cell ran — attributed per session, so a neighbour's trailing calls are not charged here |
 
 A cell whose tokens are `unmeasured` still ranks on correctness; it is only absent from the token medians. Reporting 0 there would make the least measurable agent look the cheapest.
-
-> **94 cell(s) had more than one session of the same agent inside their window.** Their token figures may include traffic that is not the cell's. This happens when another session of that agent runs alongside the benchmark; re-run those cells on an otherwise idle machine before quoting their cost.
 
 Agents in this run: `claude`, `copilot`, `opencode`.
 

@@ -144,7 +144,7 @@
     "toolEscapeRows": 0,
     "retiredQuestions": [],
     "agentFilter": null,
-    "generatedAt": "2026-08-09T09:41:55.854Z"
+    "generatedAt": "2026-08-09T10:18:32.004Z"
   },
   "byArm": {
     "grep": {
@@ -168,7 +168,7 @@
         ],
         "token_sources": {
           "stream-json": 48,
-          "proxy-db-window": 96
+          "proxy-db-session": 96
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -176,7 +176,7 @@
           "not_enforced",
           "ungated"
         ],
-        "ambiguous_token_rows": 47
+        "ambiguous_token_rows": 0
       },
       "metrics": {
         "score": {
@@ -188,17 +188,17 @@
           "n": 102
         },
         "total_tokens": {
-          "mean": 211105.8137254902,
-          "median": 156080,
+          "mean": 208811.0588235294,
+          "median": 153301,
           "min": 45720,
           "max": 1025279,
           "p95": 779931,
           "n": 102
         },
         "content_tokens": {
-          "mean": 166813.16666666666,
-          "median": 103745,
-          "min": 12135,
+          "mean": 164518.41176470587,
+          "median": 102302.5,
+          "min": 12843,
           "max": 961710,
           "p95": 757495,
           "n": 102
@@ -402,7 +402,7 @@
         ],
         "token_sources": {
           "stream-json": 48,
-          "proxy-db-window": 96
+          "proxy-db-session": 96
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -410,7 +410,7 @@
           "not_enforced",
           "ungated"
         ],
-        "ambiguous_token_rows": 47
+        "ambiguous_token_rows": 0
       },
       "metrics": {
         "score": {
@@ -422,16 +422,16 @@
           "n": 102
         },
         "total_tokens": {
-          "mean": 207660.67647058822,
-          "median": 143387.5,
+          "mean": 205082.27450980392,
+          "median": 135607,
           "min": 52127,
           "max": 1173504,
           "p95": 591784,
           "n": 102
         },
         "content_tokens": {
-          "mean": 148570.0294117647,
-          "median": 90332.5,
+          "mean": 145991.6274509804,
+          "median": 86190.5,
           "min": 26268,
           "max": 1077935,
           "p95": 496215,
@@ -765,7 +765,7 @@
           "answer-file"
         ],
         "token_sources": {
-          "proxy-db-window": 48
+          "proxy-db-session": 48
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -831,13 +831,13 @@
           "answer-file"
         ],
         "token_sources": {
-          "proxy-db-window": 48
+          "proxy-db-session": 48
         },
         "builtins_enforced": false,
         "builtins_states": [
           "ungated"
         ],
-        "ambiguous_token_rows": 47
+        "ambiguous_token_rows": 0
       },
       "metrics": {
         "score": {
@@ -849,19 +849,19 @@
           "n": 6
         },
         "total_tokens": {
-          "mean": 147240.33333333334,
-          "median": 123404,
-          "min": 77070,
-          "max": 277112,
-          "p95": 277112,
+          "mean": 108229.5,
+          "median": 108506,
+          "min": 77778,
+          "max": 135700,
+          "p95": 135700,
           "n": 6
         },
         "content_tokens": {
-          "mean": 82305.33333333333,
-          "median": 58469,
-          "min": 12135,
-          "max": 212177,
-          "p95": 212177,
+          "mean": 43294.5,
+          "median": 43571,
+          "min": 12843,
+          "max": 70765,
+          "p95": 70765,
           "n": 6
         },
         "tool_calls": {
@@ -1095,7 +1095,7 @@
           "answer-file"
         ],
         "token_sources": {
-          "proxy-db-window": 48
+          "proxy-db-session": 48
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -1161,13 +1161,13 @@
           "answer-file"
         ],
         "token_sources": {
-          "proxy-db-window": 48
+          "proxy-db-session": 48
         },
         "builtins_enforced": false,
         "builtins_states": [
           "ungated"
         ],
-        "ambiguous_token_rows": 47
+        "ambiguous_token_rows": 0
       },
       "metrics": {
         "score": {
@@ -1179,19 +1179,19 @@
           "n": 6
         },
         "total_tokens": {
-          "mean": 154179.33333333334,
-          "median": 154548,
-          "min": 112580,
-          "max": 220861,
-          "p95": 220861,
+          "mean": 110346.5,
+          "median": 112120,
+          "min": 79092,
+          "max": 133686,
+          "p95": 133686,
           "n": 6
         },
         "content_tokens": {
-          "mean": 121062.33333333333,
-          "median": 121431,
-          "min": 79463,
-          "max": 187744,
-          "p95": 187744,
+          "mean": 77229.5,
+          "median": 79003,
+          "min": 45975,
+          "max": 100569,
+          "p95": 100569,
           "n": 6
         },
         "tool_calls": {
@@ -1225,7 +1225,7 @@
     ],
     "token_sources": {
       "stream-json": 192,
-      "proxy-db-window": 192
+      "proxy-db-session": 192
     },
     "builtins_enforced": false,
     "builtins_states": [
@@ -1233,7 +1233,7 @@
       "not_enforced",
       "ungated"
     ],
-    "ambiguous_token_rows": 94
+    "ambiguous_token_rows": 0
   },
   "disagreements": [
     {
