@@ -103,8 +103,13 @@ set, the measurement defects — and **nothing regenerates it**.
 
 ```bash
 node scripts/kgbench-report.mjs --run <runId> --out docs/benchmarks/coding-v1/RESULTS.md
-node scripts/kgbench-charts.mjs --run <runId> --out docs/images
+node scripts/kgbench-charts.mjs --run <runId> --agent claude --out docs/images
+node scripts/kgbench-verify-report-claims.mjs      # does README still match the data?
 ```
+
+Pass `--agent` to the charts on any multi-agent run, or every bar pools agents whose tool
+enforcement differs — the comparison the report itself marks as not meaningful. The script
+warns when you omit it.
 
 Publishing used to be `--out /tmp/kgb/README.md` followed by a `cp` onto the published
 `README.md`. That replaced 632 lines of analysis with the machine version — twice, at
@@ -113,8 +118,11 @@ because a diff against the already-collapsed file shows only growth. `--out` now
 any target lacking its generated marker, so the old command fails loudly instead of
 succeeding destructively. Use `--force` only when replacing prose is the actual intent.
 
-After a re-render, update `README.md` **by hand** wherever it quotes a number, and check
-before publishing, using the run's own data rather than by eye:
+After a re-render, update `README.md` **by hand** wherever it quotes a number, then run
+`kgbench-verify-report-claims.mjs` — it recomputes every figure the prose asserts from
+`results.jsonl` and fails on the ones that drifted. Its first run caught a chart generated on
+every publish but embedded nowhere, and a judge claim describing one agent's split as the whole
+run's. Also check, using the run's own data rather than by eye:
 
 - **Provenance**: how many commits, which passes, which agents in each. This section has
   been wrong before precisely because it is the section nobody re-reads.

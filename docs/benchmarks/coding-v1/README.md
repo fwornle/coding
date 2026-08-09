@@ -355,6 +355,16 @@ graph arms still answered without making a single graph call in **6 of 48 cells 
 
 CodeGraph is the only arm that loses points anywhere, and both losses have the same shape.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../images/kgbench-arch-spread-dark.svg">
+  <img alt="Dot plot of every architecture-class run on claude — grep, graphify and hybrid cluster together while codegraph spreads lower" src="../../images/kgbench-arch-spread-light.svg">
+</picture>
+
+Every dot is one architecture-class cell, so it shows A2 and A4 but **not** L2, which is a
+`lookup` question and appears in the table below rather than the figure. The `arch` median is
+1.00 for all four arms, which is why the automatic winner check prints "tie" — correctly,
+because two questions moving is not a class-level effect.
+
 | Question | grep | graphify | codegraph | hybrid |
 |---|--:|--:|--:|--:|
 | L2 — which module implements `summaryStats` | 1.00 | 1.00 | **0.00** | 1.00 |
@@ -471,12 +481,27 @@ The detector is also blind to the most common defect of all: because the judge's
 built from the same checklist, a **wrong key makes both graders agree** and produces zero
 disagreements.
 
-**This run's disagreements carry an extra caveat.** The judge was requested as
-`claude-opus-5`, and the proxy served it for the first 20 judged cells before falling back to
-`claude-haiku-4-5` for the remaining 76 — a documented behaviour of the `claude-code` route,
-which ignores model selection. Two different judges graded two parts of this run, so a
-disagreement may be a judge difference rather than an answer difference. Every median and
-ranking on this page uses the deterministic checklist score and is unaffected.
+**This run's disagreements carry an extra caveat: two different models did the judging.**
+`claude-opus-5` was requested throughout. What the proxy actually served:
+
+| Cells | judged by `claude-opus-5` | judged by `claude-haiku-4-5` | not judged |
+|---|--:|--:|--:|
+| claude | 3 | 150 | 39 |
+| copilot | 20 | 58 | 18 |
+| opencode | 0 | 10 | 86 |
+
+The `claude-code` route ignores model selection and falls back to haiku, which is documented
+behaviour. Within the copilot half the substitution is cleanly time-ordered — the first 20
+cells got opus, everything after it got haiku — so it is a mid-run fallback rather than random
+variation. The claude half had already been judged mostly by haiku in its earlier passes.
+
+Two consequences worth stating separately. A disagreement in the table above may be a
+difference between two judges rather than a difference in the answer. And the 143 unjudged
+cells are not a judge failure: most are opencode's `no_result` rows, and abstain questions
+carry no checklist and are never judged by design.
+
+Every median and ranking on this page uses the deterministic checklist score, so none of them
+is affected by any of this.
 
 ---
 
@@ -608,6 +633,9 @@ node scripts/kgbench-regrade.mjs --run my-run --dry-run
 # render the generated tables and the figures
 node scripts/kgbench-report.mjs --run my-run --out docs/benchmarks/coding-v1/RESULTS.md
 node scripts/kgbench-charts.mjs --run my-run --agent claude --out docs/images
+
+# does the prose on this page still match the data it describes?
+node scripts/kgbench-verify-report-claims.mjs
 ```
 
 **`RESULTS.md` is generated; this page is not.** `kgbench-report.mjs --out` refuses to write
@@ -634,6 +662,7 @@ the matrix.
 | `lib/kgbench/runner.mjs` | Cell execution, tool-surface enforcement, host-stall detection, answer-file freshness |
 | `lib/kgbench/agents.mjs` | The agent axis — per-agent elicitation, enforcement, and the faithfulness refusal |
 | `scripts/kgbench-charts.mjs` | Regenerates the figures on this page from `results.jsonl` |
+| `scripts/kgbench-verify-report-claims.mjs` | Recomputes every number this page asserts from the run data, and fails on drift |
 | `scripts/kgbench-supervise.sh` | Detached, self-resuming runner — survives a signalled process group |
 | `lib/kgbench/judge.mjs` | The second scorer. Excluded from the run tree: its prompt states what a right answer contains |
 | `scripts/kgbench-regrade.mjs` | Re-applies fixed graders to stored answers, without re-running cells |
