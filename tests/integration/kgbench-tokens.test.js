@@ -15,7 +15,7 @@
  *     time join and its whole validity rests on nothing else of that agent running
  */
 
-import { cellTaskId, bindCellEnv, resolveCellTokens, DEFAULT_WIRE_BIND } from '../../lib/kgbench/tokens.mjs';
+import { cellTaskId, bindCellEnv, resolveCellTokens, DEFAULT_WIRE_BIND, TOKEN_FIELDS } from '../../lib/kgbench/tokens.mjs';
 
 const EMPTY = { totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, reasoning_tokens: 0, calls: 0 }, sessions: [], byAgentModel: [] };
 const rows = (o) => ({
@@ -25,6 +25,17 @@ const rows = (o) => ({
 });
 // No settle delay in tests: the polling exists for adapter write lag, not for logic.
 const NOW = { attempts: 1, settleMs: 0 };
+
+/** One row of aggregateSessionsTouchingWindow: a whole session with its full lifespan. */
+const session = (o) => ({
+  task_id: 'ses_x', user_hash: 'opcadt', agent: 'opencode',
+  first_seen: '2026-08-08T09:00:00.000Z', last_seen: '2026-08-08T09:00:10.000Z',
+  input_tokens: 0, output_tokens: 0, total_tokens: 0,
+  reasoning_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, calls: 1, ...o,
+});
+const sessionSet = (sessions) => ({ sessions });
+/** Every path that reaches the DB must be injected, or a test reads the developer's real one. */
+const NO_SESSIONS = () => sessionSet([]);
 
 describe('the composite task_id', () => {
   it('puts agent and model in the second segment, where the proxy looks for them', () => {
@@ -118,20 +129,22 @@ describe('resolving a finished cell\'s tokens', () => {
     expect(windowHits).toBe(0);
   });
 
-  it('recovers stop-adapter rows by window when no task_id join exists', async () => {
+  it('recovers stop-adapter rows by session when no task_id join exists', async () => {
     // The real case: opencode's rows carry ses_01f58a8b…, a session id the harness that
     // spawned the process never learns.
     const t = await resolveCellTokens({
       result: {}, agent: 'opencode', taskId: 'a--b--c',
       startedAt: '2026-08-08T09:15:00.000Z', endedAt: '2026-08-08T09:15:25.000Z',
       byTaskId: () => EMPTY,
-      byWindow: () => rows({
-        input_tokens: 117617, output_tokens: 724, total_tokens: 118341, calls: 8,
-        sessions: [{ task_id: 'ses_01f58a8b2ffeiszwjsaXKo8DhQ', user_hash: 'opcadt', total_tokens: 118341, calls: 8 }],
-      }),
+      bySessionSet: () => sessionSet([
+        session({
+          task_id: 'ses_01f58a8b2ffeiszwjsaXKo8DhQ', first_seen: '2026-08-08T09:15:02.000Z',
+          input_tokens: 117617, output_tokens: 724, total_tokens: 118341, calls: 8,
+        }),
+      ]),
       ...NOW,
     });
-    expect(t.token_source).toBe('proxy-db-window');
+    expect(t.token_source).toBe('proxy-db-session');
     expect(t.total_tokens).toBe(118341);
     expect(t.token_window_sessions).toBe(1);
     expect(t.token_ambiguous).toBeUndefined();
@@ -157,22 +170,142 @@ describe('resolving a finished cell\'s tokens', () => {
     expect(t.cache_read_tokens).toBe(108398);
   });
 
-  it('flags a window that caught more than one session of the same agent', async () => {
+  it('flags two sessions that STARTED inside one cell — a real concurrent run', async () => {
     const t = await resolveCellTokens({
       result: {}, agent: 'opencode', taskId: 'a--b--c',
       startedAt: '2026-08-08T09:00:00.000Z', endedAt: '2026-08-08T09:00:30.000Z',
       byTaskId: () => EMPTY,
-      byWindow: () => rows({
-        total_tokens: 200, calls: 4,
-        sessions: [
-          { task_id: 'ses_A', user_hash: 'opcadt', total_tokens: 150, calls: 3 },
-          { task_id: 'ses_B', user_hash: 'opcadt', total_tokens: 50, calls: 1 },
-        ],
-      }),
+      bySessionSet: () => sessionSet([
+        session({ task_id: 'ses_A', first_seen: '2026-08-08T09:00:05.000Z', total_tokens: 150, calls: 3 }),
+        session({ task_id: 'ses_B', first_seen: '2026-08-08T09:00:12.000Z', total_tokens: 50, calls: 1 }),
+      ]),
       ...NOW,
     });
     expect(t.token_ambiguous).toBe(true);
     expect(t.token_window_sessions).toBe(2);
+    expect(t.total_tokens).toBe(200);
+  });
+
+  describe('a neighbouring cell\'s trailing calls are not this cell\'s tokens', () => {
+    // THE DEFECT THIS PINS. Cells run back-to-back, and a session does not stop when the
+    // process that started it does — its last calls are still being written while the next
+    // cell is already running. Summing rows BY TIMESTAMP therefore charged each cell part of
+    // its predecessor's traffic. Real numbers, run coding-v1-x2 cell grep/L1 rep1:
+    //
+    //   ses_…iG1tHz  06:58:37 → 06:59:14   started 33s BEFORE the cell spawned
+    //   ses_…SBBuDZ  06:59:15 → 06:59:22   started inside the window — the cell's own
+    //
+    // 25,620 of the predecessor's tokens landed inside this cell's window. It hit 94 of 96
+    // opencode cells, and the old detector called it "more than one session ran
+    // concurrently", which reads as a busy machine and sent an investigation looking for a
+    // background process that did not exist.
+    const predecessorStillWriting = () => sessionSet([
+      session({
+        task_id: 'ses_iG1tHz', first_seen: '2026-08-09T06:58:37.964Z',
+        last_seen: '2026-08-09T06:59:14.829Z', total_tokens: 72887, calls: 5,
+      }),
+      session({
+        task_id: 'ses_SBBuDZ', first_seen: '2026-08-09T06:59:15.774Z',
+        last_seen: '2026-08-09T06:59:22.712Z', total_tokens: 71723, calls: 3,
+      }),
+    ]);
+    const cell = {
+      result: {}, agent: 'opencode', taskId: 'a--b--c',
+      startedAt: '2026-08-09T06:59:10.400Z', endedAt: '2026-08-09T06:59:22.966Z',
+      byTaskId: () => EMPTY, bySessionSet: predecessorStillWriting, ...NOW,
+    };
+
+    it('charges only the session that began inside the window', async () => {
+      expect((await resolveCellTokens(cell)).total_tokens).toBe(71723);
+    });
+
+    it('does not call adjacency ambiguous — one session started here, so this is clean', async () => {
+      const t = await resolveCellTokens(cell);
+      expect(t.token_ambiguous).toBeUndefined();
+      expect(t.token_window_sessions).toBe(1);
+    });
+
+    it('records that a predecessor was present, so the attribution stays auditable', async () => {
+      expect((await resolveCellTokens(cell)).token_sessions_inherited).toBe(1);
+    });
+  });
+
+  it('counts a session\'s FULL spend, including calls written after the window closed', async () => {
+    // The same boundary in the other direction: this cell's own last call lands after the
+    // window's upper bound, and a timestamp sum would silently drop it. Attribution follows
+    // the session, so where the rows fall in time stops mattering.
+    const t = await resolveCellTokens({
+      result: {}, agent: 'opencode', taskId: 'a--b--c',
+      startedAt: '2026-08-09T07:00:00.000Z', endedAt: '2026-08-09T07:00:20.000Z',
+      byTaskId: () => EMPTY,
+      bySessionSet: () => sessionSet([
+        session({
+          task_id: 'ses_own', first_seen: '2026-08-09T07:00:03.000Z',
+          last_seen: '2026-08-09T07:00:41.000Z', total_tokens: 90000, calls: 6,
+        }),
+      ]),
+      ...NOW,
+    });
+    expect(t.total_tokens).toBe(90000);
+    expect(t.token_source).toBe('proxy-db-session');
+  });
+
+  it('falls back to the time join when NO session began inside the window, and says so', async () => {
+    // An agent that reuses one long-lived session across cells cannot be attributed per
+    // session. Reporting zero would be a lie; reporting the window sum without saying which
+    // method produced it would hide exactly the weakness the session logic exists to remove.
+    const t = await resolveCellTokens({
+      result: {}, agent: 'opencode', taskId: 'a--b--c',
+      startedAt: '2026-08-09T08:00:00.000Z', endedAt: '2026-08-09T08:00:20.000Z',
+      byTaskId: () => EMPTY,
+      bySessionSet: () => sessionSet([
+        session({ task_id: 'ses_long', first_seen: '2026-08-09T07:30:00.000Z', total_tokens: 500000, calls: 40 }),
+      ]),
+      byWindow: () => rows({ total_tokens: 4200, calls: 2 }),
+      ...NOW,
+    });
+    expect(t.token_source).toBe('proxy-db-window');
+    expect(t.total_tokens).toBe(4200);
+    expect(t.token_ambiguous).toBe(true);
+    expect(t.token_ambiguity).toMatch(/cannot be attributed by session/);
+    expect(t.token_window_sessions).toBe(0);
+  });
+
+  it('declares every field it can emit, so a re-resolution can clear them first', async () => {
+    // THE DEFECT THIS PINS. Re-resolution merges with Object.assign, which only overwrites
+    // keys the NEW result has. A conditional field set by an earlier resolution and omitted
+    // by a later one therefore survives as a verdict about a computation that no longer
+    // exists. When attribution moved from window sums to session sets, all 94 re-attributed
+    // cells kept `token_ambiguous: true` and the old "2 distinct sessions ran inside this
+    // cell's window" text, sitting beside fresh fields saying the cell was cleanly attributed
+    // to exactly one session — and the report read the stale one, so the fix looked inert.
+    //
+    // The invariant that prevents it: TOKEN_FIELDS must name every key this function emits.
+    const emitted = new Set();
+    const collect = (t) => Object.keys(t).forEach((k) => emitted.add(k));
+
+    collect(await resolveCellTokens({ result: { total_tokens: 5 }, agent: 'claude', taskId: 'a--b--c', ...NOW }));
+    collect(await resolveCellTokens({
+      result: {}, agent: 'opencode', taskId: 'a--b--c',
+      startedAt: '2026-08-08T09:00:00.000Z', endedAt: '2026-08-08T09:00:30.000Z',
+      byTaskId: () => EMPTY,
+      bySessionSet: () => sessionSet([
+        session({ task_id: 'ses_A', first_seen: '2026-08-08T09:00:05.000Z', total_tokens: 150 }),
+        session({ task_id: 'ses_B', first_seen: '2026-08-08T09:00:12.000Z', total_tokens: 50 }),
+      ]),
+      ...NOW,
+    }));
+    collect(await resolveCellTokens({
+      result: {}, agent: 'opencode', taskId: 'a--b--c',
+      startedAt: '2026-08-08T09:00:00.000Z', endedAt: '2026-08-08T09:00:30.000Z',
+      byTaskId: () => EMPTY,
+      bySessionSet: () => sessionSet([session({ task_id: 'ses_old', first_seen: '2026-08-08T08:00:00.000Z', total_tokens: 9 })]),
+      byWindow: () => rows({ total_tokens: 42 }),
+      ...NOW,
+    }));
+
+    const undeclared = [...emitted].filter((k) => !TOKEN_FIELDS.includes(k));
+    expect(undeclared).toEqual([]);
   });
 
   it('reports unmeasured rather than zero when nothing is found', async () => {
@@ -181,7 +314,7 @@ describe('resolving a finished cell\'s tokens', () => {
     const t = await resolveCellTokens({
       result: {}, agent: 'copilot', taskId: 'a--b--c',
       startedAt: '2026-08-08T09:00:00.000Z', endedAt: '2026-08-08T09:00:30.000Z',
-      byTaskId: () => EMPTY, byWindow: () => EMPTY, ...NOW,
+      byTaskId: () => EMPTY, bySessionSet: NO_SESSIONS, byWindow: () => EMPTY, ...NOW,
     });
     expect(t.token_source).toBe('unmeasured');
     expect(t.total_tokens).toBeUndefined();
@@ -193,6 +326,7 @@ describe('resolving a finished cell\'s tokens', () => {
       result: {}, agent: 'copilot', taskId: 'a--b--c',
       startedAt: '2026-08-08T09:00:00.000Z', endedAt: '2026-08-08T09:00:30.000Z',
       byTaskId: () => { throw new Error('database is locked'); },
+      bySessionSet: () => { throw new Error('database is locked'); },
       byWindow: () => { throw new Error('database is locked'); },
       ...NOW,
     });
@@ -206,7 +340,8 @@ describe('resolving a finished cell\'s tokens', () => {
     await resolveCellTokens({
       result: {}, agent: 'opencode', taskId: null,
       startedAt: '2026-08-08T09:00:10.000Z', endedAt: '2026-08-08T09:00:20.000Z',
-      byWindow: (a) => { seen = a; return EMPTY; }, ...NOW,
+      bySessionSet: (a) => { seen = a; return sessionSet([]); },
+      byWindow: () => EMPTY, ...NOW,
     });
     expect(seen.startedAt).toBe('2026-08-08T09:00:09.000Z');
     expect(seen.endedAt).toBe('2026-08-08T09:00:21.000Z');

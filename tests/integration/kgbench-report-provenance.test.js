@@ -165,7 +165,16 @@ describe('token provenance is stated per source', () => {
     const md = render([claudeRow(), opencodeRow()]);
     expect(md).toContain('| `stream-json` | 1 |');
     expect(md).toContain('| `proxy-db-window` | 1 |');
-    expect(md).toContain('a time join, weaker than a tag');
+    expect(md).toContain('a time join');
+  });
+
+  it('distinguishes session attribution from a time join, because they differ in kind', () => {
+    // A window sums rows by TIMESTAMP and cannot tell a neighbouring cell's trailing calls
+    // from this cell's; session attribution charges whole sessions that BEGAN here. Both are
+    // inferred rather than tagged, so the table has to say which one produced a number.
+    const md = render([claudeRow(), opencodeRow({ token_source: 'proxy-db-session' })]);
+    expect(md).toContain('| `proxy-db-session` | 1 |');
+    expect(md).toMatch(/BEGAN while the cell ran/);
   });
 
   it('surfaces an ambiguous window as a blockquote warning', () => {
