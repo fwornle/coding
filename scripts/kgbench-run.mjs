@@ -48,6 +48,14 @@ const setName = opt('set', 'replication');
 const reps = parseInt(opt('reps', '3'), 10);
 const only = opt('only', null)?.split(',').map((s) => s.trim());
 const repoRoot = opt('repo', REPO_ROOT);
+// Continuation turns granted to an answer-file agent that finished without writing one.
+// SYMMETRIC BY CONSTRUCTION: the flag is not per-agent, because the asymmetry is the thing
+// being corrected. Defaults to the arm/config value (0), so an unflagged run is unchanged.
+const continuationsFlag = opt('continuations', null);
+const continuationBudget = continuationsFlag == null ? null : parseInt(continuationsFlag, 10);
+if (continuationBudget != null && (!Number.isInteger(continuationBudget) || continuationBudget < 0 || continuationBudget > 5)) {
+  die('--continuations must be an integer 0-5');
+}
 
 let armsDoc, questionSet;
 try {
@@ -392,6 +400,10 @@ writeFileSync(runJsonPath, JSON.stringify({
   arms: arms.map((a) => ({ id: a.id, label: a.label, model: a.model, allowedTools: a.allowedTools, backend: a.backend })),
   agents: agentIds,
   models: modelRefs,
+  // Provenance for the continuation budget. It changes both what an agent can achieve and
+  // what a cell costs, so a run's numbers are not comparable to another run's unless this
+  // matches — which a reader can only check if it is recorded.
+  continuationBudget: continuationBudget ?? arms[0]?.continuationBudget ?? 0,
   combinations: combos.map((c) => ({
     arm: c.arm.id, agent: c.agentId, model: c.agent.model,
     elicitation: c.agent.elicitation, enforcement: c.agent.enforcement,
@@ -472,6 +484,7 @@ for (const combo of combos) {
             enforcement: { ...mcp.enforcement, ...agent.enforcement, mechanism: mcp.enforcement.mechanism },
           },
           runId,
+          continuationBudget: continuationBudget ?? arm.continuationBudget ?? 0,
         });
       } finally {
         mcp.cleanup();

@@ -8,9 +8,13 @@
  * mechanics: building a real worktree takes ~50s and does not belong in lite CI.
  */
 
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// ESM: no __dirname. The repo root is two levels up from tests/integration/.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { leakNeedles, scanTreeForLeaks, classifyLeaks, DEFAULT_EXCLUDES } from '../../lib/kgbench/sandbox.mjs';
 
 const QUESTIONS = [
@@ -120,5 +124,117 @@ describe('DEFAULT_EXCLUDES', () => {
     // on the scale for one arm, and carries absolute paths back out of the sandbox.
     expect(DEFAULT_EXCLUDES).toContain('CLAUDE.md');
     expect(DEFAULT_EXCLUDES).toContain('.claude');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Leak #5: the harness quoting its own questions.
+//
+// A comment in runner.mjs reproduced L1's prompt verbatim and named the file that is L1's
+// answer. runner.mjs is B2's and A2's ground truth, so it CANNOT be excluded — it has to stay
+// readable and be clean. The scanner saw it and let it through: two of L1's five windows
+// matched, `minWindows` is three, so it was filed as `weak` and the run proceeded. Every arm
+// that grepped L1's subject was handed the answer by the harness grading it.
+//
+// These pin the mechanical control, because prose discipline demonstrably does not hold here:
+// the first fix kept the sentence frame and still matched, and the comment written to explain
+// THAT put the frame back in the tree.
+// ---------------------------------------------------------------------------
+
+describe('a question\'s wording must never appear in harness source that reaches the arms', () => {
+  const REPO = path.resolve(__dirname, '..', '..');
+
+  // Every file the arms can read that belongs to the benchmark itself.
+  function harnessFilesInTree() {
+    const dirs = [['lib', 'kgbench'], ['scripts']];
+    const out = [];
+    for (const parts of dirs) {
+      const abs = path.join(REPO, ...parts);
+      let entries = [];
+      try { entries = readdirSync(abs); } catch { continue; }
+      for (const f of entries) {
+        const rel = [...parts, f].join('/');
+        if (parts[0] === 'scripts' && !f.startsWith('kgbench-')) continue;
+        if (!/\.(mjs|js|sh)$/.test(f)) continue;
+        if (DEFAULT_EXCLUDES.includes(rel)) continue;   // never reaches the tree
+        out.push(rel);
+      }
+    }
+    return out;
+  }
+
+  function liveQuestions() {
+    const sets = ['coding-v1', 'replication'];
+    return sets.flatMap((s) => {
+      const doc = JSON.parse(readFileSync(path.join(REPO, 'config/kgbench/questions', `${s}.json`), 'utf8'));
+      return doc.questions ?? doc;
+    });
+  }
+
+  it('no harness file that reaches the arms quotes any live question prompt', () => {
+    const needles = leakNeedles(liveQuestions());
+    const offenders = [];
+    for (const rel of harnessFilesInTree()) {
+      const txt = readFileSync(path.join(REPO, rel), 'utf8');
+      const hit = needles.filter((n) => txt.includes(n.text));
+      if (hit.length) offenders.push(`${rel} → ${[...new Set(hit.map((h) => h.id))].join(', ')}`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('classifies ANY harness-source hit as decisive, however few windows match', () => {
+    const qs = liveQuestions().filter((q) => q.id === 'L1');
+    // The exact historical hit: 2 of 5 windows, under the 3-window threshold.
+    const hits = [
+      { needle: 'prompt:L1', text: 'Which file defines the shell', files: ['lib/kgbench/runner.mjs'] },
+      { needle: 'prompt:L1', text: 'file defines the shell variable', files: ['lib/kgbench/runner.mjs'] },
+    ];
+    const { leaks, weak } = classifyLeaks(hits, qs);
+    expect(leaks).toHaveLength(1);
+    expect(weak).toHaveLength(0);
+    expect(leaks[0].reason).toMatch(/harness source/);
+    // Below the threshold — it is decisive because of WHERE it is, not how much matched.
+    expect(leaks[0].matched).toBeLessThan(3);
+  });
+
+  it('still tolerates the same overlap in ordinary repo prose', () => {
+    // The thresholds exist for this: a repo's docs share vocabulary with questions about that
+    // repo. Making harness hits decisive must not make every coincidence decisive.
+    const qs = liveQuestions().filter((q) => q.id === 'L1');
+    const hits = [
+      { needle: 'prompt:L1', text: 'Which file defines the shell', files: ['docs/some-guide.md'] },
+      { needle: 'prompt:L1', text: 'file defines the shell variable', files: ['docs/some-guide.md'] },
+    ];
+    const { leaks, weak } = classifyLeaks(hits, qs);
+    expect(leaks).toHaveLength(0);
+    expect(weak).toHaveLength(1);
+  });
+
+  it('does not fire on an EXCLUDED harness file — it never reaches the tree', () => {
+    // graders.mjs is full of question wording by design. It is excluded, so nothing can read
+    // it, and treating it as a leak would fail containment on a file whose point is absence.
+    const qs = liveQuestions().filter((q) => q.id === 'L1');
+    const hits = [
+      { needle: 'prompt:L1', text: 'Which file defines the shell', files: ['lib/kgbench/graders.mjs'] },
+    ];
+    const { leaks } = classifyLeaks(hits, qs);
+    expect(leaks).toHaveLength(0);
+  });
+});
+
+describe('the agent adapters are withheld from the tree', () => {
+  it('excludes agents.mjs — it addresses the model that is searching the tree', () => {
+    // It carries the answer-file directive verbatim. opencode found it, called it a
+    // prompt-injection attempt, and refused it; copilot complied 96 times; claude never sees
+    // it. One agent penalised by an artifact of the harness is a broken comparison.
+    expect(DEFAULT_EXCLUDES).toContain('lib/kgbench/agents.mjs');
+  });
+
+  it('keeps runner.mjs and arms.mjs IN the tree — they are questions\' ground truth', () => {
+    // The tempting fix (exclude everything under lib/kgbench) would make B2, A2 and B1
+    // unanswerable and score every arm 0 on them — which reads as a finding about the arms.
+    expect(DEFAULT_EXCLUDES).not.toContain('lib/kgbench/runner.mjs');
+    expect(DEFAULT_EXCLUDES).not.toContain('lib/kgbench/arms.mjs');
+    expect(DEFAULT_EXCLUDES).not.toContain('lib/kgbench/report.mjs');
   });
 });
