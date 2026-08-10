@@ -17,10 +17,20 @@ import type { RootState } from '@/store'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export interface KgbenchQuestion {
+  id: string
+  cls: string
+  // A hand-written few-word summary of what the question asks, carried in the question file.
+  // The full prompt is deliberately NOT served: it is what the arms are tested on, and a
+  // control surface has no reason to put it on a screen where it can be read or copied.
+  label: string | null
+}
+
 export interface KgbenchQuestionSet {
   name: string
   questionCount?: number
   classes?: Record<string, number>
+  questions?: KgbenchQuestion[]
   ids?: string[]
   error?: string
 }
@@ -47,7 +57,10 @@ export interface KgbenchArm {
 export interface KgbenchConfig {
   sets: KgbenchQuestionSet[]
   arms: KgbenchArm[]
+  // The agents the launcher offers. A strict subset of `allAgents`: the runner knows
+  // `mastracode` but it has never produced a cell, so it is not offered.
   agents: string[]
+  allAgents?: string[]
   defaults: { model?: string; agents?: string[]; models?: string[]; timeoutMs?: number; maxAttempts?: number }
 }
 
@@ -186,7 +199,13 @@ export const fetchKgbenchConfig = createAsyncThunk<KgbenchConfig, void, { reject
   async (_arg, { rejectWithValue }) => {
     try {
       const d = await getJson('/api/kgbench/config')
-      return { sets: d.sets ?? [], arms: d.arms ?? [], agents: d.agents ?? [], defaults: d.defaults ?? {} }
+      return {
+        sets: d.sets ?? [],
+        arms: d.arms ?? [],
+        agents: d.agents ?? [],
+        allAgents: d.allAgents ?? d.agents ?? [],
+        defaults: d.defaults ?? {},
+      }
     } catch (e) {
       return rejectWithValue(e instanceof Error ? e.message : 'Unknown error')
     }
