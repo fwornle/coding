@@ -1,5 +1,5 @@
 ---
-description: Run, resume, regrade and report the kgbench code-retrieval benchmark (coding-v1) across retrieval arms, agents and models — and diagnose the routing that decides which model actually answers
+description: Run, resume, regrade and report the kgbench code-retrieval benchmark (coding-v1) across retrieval arms, agents and models — and diagnose the routing that decides which model actually answers. Also covers the Performance → Benchmarks dashboard sub-tab, the second front-end over the same scripts.
 argument-hint: run [--set coding-v1] [--arms grep,graphify,codegraph,hybrid] [--only A1,A2] [--reps N] [--run-id ID]  |  status  |  report  |  regrade [--rejudge --only ID]  |  doctor
 ---
 
@@ -24,6 +24,40 @@ grader, judge or report logic:
 before changing a question, a matcher or an answer key.** It records defects that cost a
 full investigation each, and one blind spot that makes the obvious diagnosis wrong.
 
+## Two front-ends, one benchmark
+
+There is also a **Performance → Benchmarks** sub-tab at
+[localhost:3032/performance](http://localhost:3032/performance). It is a second front-end
+over the *same* scripts, not a second implementation: its launcher shells to
+`kgbench-supervise.sh` on the host, and its results view renders what
+`lib/kgbench/report.mjs` produces — the function `kgbench-report.mjs` calls. A number shown
+there and a number in the published report can differ only because the data changed.
+
+| | CLI (`/kgbench`) | Dashboard |
+|---|---|---|
+| run / resume | ✅ | ✅ (`Launch`, and a resume offer when the id has cells) |
+| watch a run | `status` | ✅ live monitor + supervisor log tail |
+| cancel a run | Ctrl-C, or kill the group | ✅ `Cancel` |
+| results | `report` → `RESULTS.md` | ✅ live aggregate, and the published artefacts |
+| **regrade / rejudge** | ✅ | ❌ — CLI only, deliberately (Step 4) |
+| **publish** | ✅ | ❌ — CLI only (Step 3) |
+| doctor | ✅ | partial: a model probe, not the judge probe (Step 5) |
+
+Use whichever fits. The dashboard is better for starting a run and watching it; the CLI is
+the only way to regrade or publish, and those are the operations that need `--dry-run` and a
+commit anyway.
+
+**One run at a time — and the guard is one-sided.** The dashboard refuses to launch while any
+kgbench run is live (it scans every run dir for a live supervisor). `kgbench-supervise.sh`
+has no such check: it only refuses to double-launch *the same* `--run-id`. So a CLI launch
+will happily start a second concurrent matrix on top of a dashboard run, and the two will
+interleave their cells' token attribution and fight over the measurement slot. Before
+launching from the CLI, check nothing is already running:
+
+```bash
+curl -s localhost:3032/api/kgbench/active-run     # {"runId":null} when the coast is clear
+```
+
 ---
 
 ## Step 0 — always launch detached
@@ -40,6 +74,15 @@ scripts/kgbench-supervise.sh --run-id coding-v1-r8 --set coding-v1 --reps 3 \
 
 It returns immediately with a pid, a log path and a status path. It refuses to
 double-launch the same `--run-id`.
+
+The dashboard's `Launch` button runs exactly this, on the host via the coordinator seam —
+there is no second launch path to keep in sync. Two consequences worth knowing:
+
+- The pid it reports is the **supervisor's**, read from `supervise.pid`, not the process it
+  spawned. The wrapper invocation exits within milliseconds having re-exec'd itself under
+  `nohup`, so a pid taken from the spawn would be dead on arrival.
+- A dashboard run therefore survives everything the CLI's does — closing the tab, a
+  `docker-compose restart coding-services`, a signal death (it resumes). Verified, not assumed.
 
 **It does not retry a refusal.** kgbench exits 2 when it declines to run — preflight
 failure, containment leak, three consecutive API errors — and those must never be retried:
@@ -95,11 +138,45 @@ When watching a long run, filter for terminal states *and* failure signatures, n
 happy path. And scope the watch to lines appended since it armed — `supervise.log` is
 append-only across passes, so a naive grep replays old stalls as if they were new.
 
+**The dashboard monitor** shows the same thing without the shell: overall state, cells done
+against the expected total, and a per arm×agent×model grid with mean score and hard-fail
+count. It auto-attaches to whatever is running, so a matrix launched from the CLI appears
+there too. Its `Supervisor log` toggle tails `supervise.log` — reach for it whenever the cell
+count is not moving, because a preflight refusal and a slow first cell look identical in the
+grid (the first cell builds a worktree, which takes about a minute before anything is written).
+
+**One status value the CLI never writes: `cancelled:`.** The supervisor updates
+`supervise.status` only at pass boundaries and its EXIT trap removes the lock without touching
+it, so a group-kill would otherwise leave `running` on disk forever and every reader would
+call a dead run live. The dashboard's `Cancel` patches the terminal status itself. If you kill
+a run by hand, write it yourself or the run keeps reporting as active:
+
+```bash
+echo "cancelled: killed by hand $(date -u +%FT%TZ)" > .data/kgbench/runs/<runId>/supervise.status
+```
+
+Cancelling sends SIGTERM to the whole process group, which is what lets the runner clean up
+its worktree — a SIGKILL leaks one, and `git worktree prune` cannot reclaim it because its
+directory still exists.
+
 ## Step 3 — `report`
 
 **Two files, two owners.** `RESULTS.md` is generated and may be re-rendered at will.
 `README.md` is hand-written analysis built around those numbers — the charts, the question
 set, the measurement defects — and **nothing regenerates it**.
+
+**The dashboard reads, it does not publish.** Its results view offers two sources and labels
+which one you are looking at, because they answer different questions:
+
+- **live aggregate** — a run's rows aggregated *now*, straight from `results.jsonl`. Use it
+  to see a matrix before anyone has published it, and to see the effect of a regrade.
+- **published artefact** — the committed `docs/benchmarks/<name>/report.json` that the
+  README's prose was written around.
+
+They can legitimately differ: a regrade moves the live numbers and leaves the document alone.
+That gap is the signal to re-render and update the prose — the commands below — and telling
+the two apart is the difference between "the docs are stale" and "someone is wrong". Nothing
+in the dashboard writes to `docs/`.
 
 ```bash
 node scripts/kgbench-report.mjs --run <runId> --out docs/benchmarks/coding-v1/RESULTS.md
@@ -204,11 +281,33 @@ So the judge silently ran on haiku through runs r6 and r7 while `run.json` publi
 `.data/` wipe. If `doctor` reports a model you did not ask for, fix the override before
 trusting a single number.
 
+**The dashboard covers fact 3 only, and it is a different question.** Its launcher marks each
+model `verified` / `unverified` / `rejected` and blocks a launch on an unverified one until
+you tick an override. That comes from `.data/llm-proxy/model-availability.json`, written by
+`scripts/llm-model-probe.mjs` — which the `Re-probe models` button runs host-side (minutes:
+probes serialise on a shared override key, and each one is a real completion).
+
+The two probes answer different questions and neither substitutes for the other:
+
+| | asks | protects against |
+|---|---|---|
+| `doctor` | which model will the **judge** be served? | a scorer running on something other than what `run.json` publishes |
+| launcher probe | which candidate models does a provider **serve at all**? | a three-hour matrix that 400s at cell one |
+
+So still run `doctor` before a run you intend to publish, even if every model in the launcher
+shows green.
+
 ---
 
 ## Guardrails
 
 - **Never** foreground a full matrix (Step 0).
+- **Never** launch from the CLI without checking `/api/kgbench/active-run` first. The
+  dashboard refuses a concurrent run; `kgbench-supervise.sh` does not, and two live matrices
+  corrupt each other's token attribution.
+- **Never** publish from a screenshot of the dashboard. It renders a *live* aggregate that
+  moves with every regrade; the published numbers come from `kgbench-report.mjs`, and the
+  prose around them is checked by `kgbench-verify-report-claims.mjs`.
 - **Never** publish without checking `judge.served` and the Provenance table against the data.
 - **Never** retire a question for scoring badly — only for a false premise. Retiring on
   score is selection and inflates whichever arm you were hoping for.
