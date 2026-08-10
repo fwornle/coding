@@ -201,10 +201,27 @@ node scripts/llm-model-probe.mjs --provider claude-code --repeats 3
 node scripts/llm-model-probe.mjs --show               # cached result, no calls
 ```
 
-Because Opus is on the personal subscription and absent from Copilot, **the strongest
-available judge depends on which network you are on** — `claude-code/claude-opus-5` at home,
-`copilot/claude-sonnet-4.6` inside the corporate network. Whichever serves, the run records
-it.
+That advice used to end here, with a network-dependent answer: Opus is on the personal
+subscription and absent from Copilot, so pick `claude-code/claude-opus-5` at home and
+`copilot/claude-sonnet-4.6` at work. **It was wrong, and probing is what hid it.** A probe
+establishes that a provider *can* serve a model. It does not establish that it *will* under
+load, and those are different questions.
+
+`claude-code` serves `claude-opus-5` — probed stable, three repeats, ~1.7s. But its direct
+API answers `RATE_LIMITED` most of the time, and the proxy's fallback (CLI worker pool, same
+subscription, different rate-limit bucket) returns `claude-haiku-4-5` **whatever model was
+asked for** — the worker is spawned under `key=claude-opus-5::…` and still answers as haiku.
+On 2026-08-09 the judge got 21 opus-5 calls and 2065 haiku ones, and the haiku stretch covered
+run `coding-v1-x2`.
+
+So the judge is pinned to the provider that **honours** the model, not the one with the best
+catalogue: `copilot/claude-sonnet-5` on both networks (probed 2026-08-10 — copilot returns
+exactly what it is asked for, and 400s on every Opus variant). A grading instrument whose
+model changes with a rate-limit window is not a yardstick, and the gap between "strongest
+model reachable" and "strongest model reliably served" is where that stops being obvious.
+
+**Generalise it:** probe availability *and* probe it under the conditions the caller will
+actually meet. A capability check answers a narrower question than the one being asked.
 
 Cells now carry `judge_model_served`, `judge_model_requested` and
 `judge_served_as_requested`; `run.json` carries `judge.requested` and `judge.served`; a
