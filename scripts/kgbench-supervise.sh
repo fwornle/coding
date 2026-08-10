@@ -41,6 +41,11 @@ cd "$REPO_ROOT" || exit 2
 
 RUN_ID=""; SET_NAME="coding-v1"; REPS="3"; ONLY=""; DEEPEN=""; DEEPEN_REPS="10"; ARMS=""
 AGENTS=""; MODELS=""; BASELINE_WAIT=""
+# Continuation turns per answer-file agent. Threaded into EVERY pass below, never one of
+# them: passes differ in which questions they cover, not in how many turns an agent gets,
+# and a budget that varied between the base and deepen passes would put cells of the same
+# run on different terms — which is the asymmetry the budget exists to remove.
+CONTINUATIONS=""
 MAX_RESTARTS="8"
 
 while [ $# -gt 0 ]; do
@@ -53,6 +58,7 @@ while [ $# -gt 0 ]; do
     --agents)      AGENTS="$2"; shift 2 ;;
     --models)      MODELS="$2"; shift 2 ;;
     --baseline-token-wait-s) BASELINE_WAIT="$2"; shift 2 ;;
+    --continuations) CONTINUATIONS="$2"; shift 2 ;;
     --deepen)      DEEPEN="$2"; shift 2 ;;
     --deepen-reps) DEEPEN_REPS="$2"; shift 2 ;;
     --max-restarts) MAX_RESTARTS="$2"; shift 2 ;;
@@ -81,6 +87,7 @@ if [ -z "${KGBENCH_SUPERVISED:-}" ]; then
     --run-id "$RUN_ID" --set "$SET_NAME" --reps "$REPS" \
     ${ONLY:+--only "$ONLY"} ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} \
     ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} \
+    ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} \
     ${DEEPEN:+--deepen "$DEEPEN"} --deepen-reps "$DEEPEN_REPS" \
     --max-restarts "$MAX_RESTARTS" >>"$LOG" 2>&1 &
   disown
@@ -129,17 +136,17 @@ run_pass() {
   done
 }
 
-say "supervising run '$RUN_ID' (set=$SET_NAME reps=$REPS arms='${ARMS:-all enabled}' agents='${AGENTS:-claude}' models='${MODELS:-per-arm}' only='${ONLY:-all}' deepen='${DEEPEN:-none}')"
+say "supervising run '$RUN_ID' (set=$SET_NAME reps=$REPS arms='${ARMS:-all enabled}' agents='${AGENTS:-claude}' models='${MODELS:-per-arm}' only='${ONLY:-all}' deepen='${DEEPEN:-none}' continuations='${CONTINUATIONS:-0 (arm default)}')"
 set_status "running"
 
 if [ -n "$ONLY" ]; then
-  run_pass "only:$ONLY" --set "$SET_NAME" --reps "$REPS" --only "$ONLY" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} --run-id "$RUN_ID" || exit $?
+  run_pass "only:$ONLY" --set "$SET_NAME" --reps "$REPS" --only "$ONLY" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} --run-id "$RUN_ID" || exit $?
 else
-  run_pass "matrix" --set "$SET_NAME" --reps "$REPS" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} --run-id "$RUN_ID" || exit $?
+  run_pass "matrix" --set "$SET_NAME" --reps "$REPS" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} --run-id "$RUN_ID" || exit $?
   if [ -n "$DEEPEN" ]; then
     # The axes travel to the deepen pass too: adding reps under a different agent set would
     # deepen a different experiment than the one the matrix measured.
-    run_pass "deepen:$DEEPEN" --set "$SET_NAME" --reps "$DEEPEN_REPS" --only "$DEEPEN" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} --run-id "$RUN_ID" || exit $?
+    run_pass "deepen:$DEEPEN" --set "$SET_NAME" --reps "$DEEPEN_REPS" --only "$DEEPEN" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} --run-id "$RUN_ID" || exit $?
   fi
 fi
 
