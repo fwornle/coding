@@ -16,6 +16,7 @@
   "questions": [
     {
       "id": "L1",
+      "label": "_corpus_signature — defining file",
       "cls": "lookup",
       "prompt": "Which source file in this repository defines the Python function `_corpus_signature`? Reply with ONLY the repo-relative file path.",
       "grader": {
@@ -25,6 +26,7 @@
     },
     {
       "id": "L2",
+      "label": "_reconcile_existing_graph — defining file",
       "cls": "lookup",
       "prompt": "Which source file in this repository defines the Python function `_reconcile_existing_graph`? Reply with ONLY the repo-relative file path.",
       "grader": {
@@ -34,6 +36,7 @@
     },
     {
       "id": "L3",
+      "label": "POST /api/cgr/reindex handler",
       "cls": "lookup",
       "prompt": "Which source file implements the HTTP handler for the route `POST /api/cgr/reindex`? Reply with ONLY the repo-relative file path.",
       "grader": {
@@ -43,6 +46,7 @@
     },
     {
       "id": "S1",
+      "label": "_load_graphifyignore references",
       "cls": "structural",
       "prompt": "List every source file in this repository that references the function `_load_graphifyignore`. Reply with ONLY the repo-relative file paths, one per line.",
       "grader": {
@@ -56,6 +60,7 @@
     },
     {
       "id": "S2",
+      "label": "Caller of _reconcile_existing_graph",
       "cls": "structural",
       "prompt": "In the graphify code, which function contains the call to `_reconcile_existing_graph`? Reply with ONLY the calling function's name.",
       "grader": {
@@ -67,6 +72,7 @@
     },
     {
       "id": "S3",
+      "label": "Re-index script the dashboard spawns",
       "cls": "structural",
       "prompt": "Which shell script does the system-health-dashboard backend spawn to re-index the code graph? Reply with ONLY the script filename.",
       "grader": {
@@ -78,6 +84,7 @@
     },
     {
       "id": "B1",
+      "label": "Callers of _corpus_signature",
       "cls": "blast",
       "prompt": "If I change the signature of the function `_corpus_signature`, which function(s) call it and would need to be updated? Reply with ONLY the calling function name(s).",
       "grader": {
@@ -89,6 +96,7 @@
     },
     {
       "id": "B2",
+      "label": "detect() caller in watch.py",
       "cls": "blast",
       "prompt": "Which function in `watch.py` calls `detect()` during an incremental rebuild? Reply with ONLY the calling function's name.",
       "grader": {
@@ -100,6 +108,7 @@
     },
     {
       "id": "A1",
+      "label": "What .detect_corpus_cache.json caches",
       "cls": "arch",
       "prompt": "In the graphify engine, what does the file `.detect_corpus_cache.json` cache, and what causes a cache miss (invalidation)? Answer in 2-4 sentences.",
       "grader": {

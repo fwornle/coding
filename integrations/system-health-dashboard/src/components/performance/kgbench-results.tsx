@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAppSelector, useAppDispatch } from '@/store'
+import { CorrectnessChart, CostChart } from './kgbench-charts'
 import {
   fetchKgbenchRuns,
   fetchKgbenchPublished,
@@ -332,6 +333,23 @@ export function KgbenchResults() {
                   </AlertDescription>
                 </Alert>
               )}
+            </CardContent>
+          </Card>
+
+          {/* The two headline figures, above the tables they summarise. A reader who wants
+              the shape gets it here; a reader who wants the number reads on. */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Figures</CardTitle>
+              <CardDescription>
+                Drawn live from this run's own rows. Cost is the median, as in the tables below;
+                correctness is the <span className="font-medium">mean</span>, because the median
+                saturates at 1.00 and cannot show a difference. Hover any bar for both.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <CorrectnessChart report={report} />
+              <CostChart report={report} />
             </CardContent>
           </Card>
 

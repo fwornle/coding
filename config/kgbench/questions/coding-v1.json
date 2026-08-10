@@ -32,6 +32,7 @@
   "questions": [
     {
       "id": "L1", "cls": "lookup",
+      "label": "MANAGED_MCP_KEYS — where defined",
       "prompt": "Which file defines the shell variable MANAGED_MCP_KEYS, and what is its purpose? Reply with the repo-relative path and one sentence.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "names install.sh", "match": { "type": "path", "value": "install.sh" } },
@@ -41,6 +42,7 @@
     },
     {
       "id": "L2", "cls": "lookup",
+      "label": "summaryStats — file and importer",
       "_rewriteNote": [
         "Key corrected 2026-08-07 (run r7). The question was right; the key named the wrong",
         "file. It required lib/experiments/compare.mjs as the sole must-have. summaryStats is",
@@ -74,6 +76,7 @@
     },
     {
       "id": "L3", "cls": "lookup",
+      "label": "Dashboard code-graph re-index route",
       "prompt": "Which HTTP route does the system-health dashboard expose to trigger a code-graph re-index, and in which file is it registered? Reply with the route and the repo-relative path.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "POST /api/cgr/reindex", "match": { "type": "regex", "value": "/api/cgr/reindex" } },
@@ -84,6 +87,7 @@
 
     {
       "id": "S1", "cls": "structural",
+      "label": "Backend resolution precedence",
       "prompt": "In config/code-graph.json the active backend is resolved with a precedence order. List the three inputs in priority order, highest first.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "CODE_GRAPH_BACKEND env var first", "match": { "type": "symbol", "value": "CODE_GRAPH_BACKEND" } },
@@ -94,6 +98,7 @@
     },
     {
       "id": "S2", "cls": "structural",
+      "label": "Graphify MCP under supervisord",
       "prompt": "Under supervisord, which program serves the graphify MCP endpoint, what script does it run, and on which port? Reply with the program name, script path and port.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "program graphify", "match": { "type": "regex", "value": "program:graphify|\\bgraphify\\b" } },
@@ -104,6 +109,7 @@
     },
     {
       "id": "S3", "cls": "structural",
+      "label": "Registry backends and transports",
       "prompt": "Which backends does the code-graph registry currently define, and which transport does each use? Reply as a list of name and transport.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "graphify over http", "match": { "type": "regex", "value": "graphify[^\\n]{0,40}http" } },
@@ -114,6 +120,7 @@
 
     {
       "id": "B1", "cls": "blast",
+      "label": "Blast radius of an mcp.tools change",
       "_rewriteNote": [
         "Rewritten 2026-08-07 for a FALSE PREMISE, not for scoring badly — the same",
         "reason T2 was retired. The old required fact f1 claimed that changing mcp.tools",
@@ -138,6 +145,7 @@
     },
     {
       "id": "B2", "cls": "blast",
+      "label": "LLM proxy unreachable — what breaks",
       "prompt": "A change makes the LLM proxy on port 12435 unreachable. Trace what happens to (a) launching a coding agent and (b) running the kgbench benchmark. Answer in 2-4 sentences.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "agent launch aborts fail-closed", "match": { "type": "any-of", "value": ["fail-closed", "fail closed", "abort", "exits", "refuses"] } },
@@ -151,6 +159,7 @@
     },
     {
       "id": "B3", "cls": "blast",
+      "label": "Deleting the empty .codegraph/",
       "prompt": "The repo contains a tracked but empty directory `.codegraph/`. What breaks if it is deleted, and why can Docker not recreate it? Answer in 2-3 sentences.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "the container fails to start / the bind mount cannot attach", "_note": "was any-of including the bare substring \"bind\", which any answer mentioning a bind mount satisfied without stating that anything FAILS. `near` ties the mount to the failure.", "match": { "type": "near", "value": ["bind[- ]?mount|mountpoint|volume", "fail|cannot|can ?not|can'?t|unable|error|refuse|abort|won'?t start"], "within": 140 } },
@@ -162,6 +171,7 @@
 
     {
       "id": "A1", "cls": "arch",
+      "label": "Why .observations is not bind-mounted",
       "prompt": "Why is the `.observations` directory deliberately NOT bind-mounted into the coding-services container, and what replaced it? Answer in 2-4 sentences.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "SQLite WAL/SHM corruption from concurrent openers across the bind mount", "match": { "type": "near", "value": ["sqlite|wal\\b|shm", "corrupt|concurren|race|contention|two[-\\s]+writers|multiple[-\\s]+(openers|writers)"], "within": 160 } },
@@ -172,6 +182,7 @@
     },
     {
       "id": "A2", "cls": "arch",
+      "label": "Why content tokens, not total",
       "prompt": "The kgbench benchmark measures 'content tokens' rather than total tokens. What problem does that solve, and how is the value derived? Answer in 2-4 sentences.",
       "checklist": [
         { "id": "f1", "must": true, "desc": "a large fixed floor (system prompt + tool schemas) dominates totals", "match": { "type": "any-of", "value": ["fixed", "floor", "baseline", "system prompt", "tool schema", "overhead"] } },
@@ -182,6 +193,7 @@
     },
     {
       "id": "A3", "cls": "arch",
+      "label": "Two deliberate registry omissions",
       "_rewriteNote": [
         "Rewritten 2026-08-07. The previous A3 asked why the harness strips ANTHROPIC_API_KEY.",
         "In run r6, 36 of 40 cells answered it with ZERO tool calls — every arm knew that an",
@@ -201,6 +213,7 @@
     },
     {
       "id": "A4", "cls": "arch",
+      "label": "CodeGraph pins and index freshness",
       "_rewriteNote": [
         "Rewritten 2026-08-07. The previous A4 asked how HTTP and stdio backends differ on",
         "failure. In run r6, 34 of 40 cells answered with ZERO tool calls (general transport",
@@ -235,6 +248,7 @@
     },
     {
       "id": "T1", "cls": "abstain",
+      "label": "Memgraph connection config",
       "prompt": "Which file in this repository configures the Memgraph connection used by the code-graph backend? Reply with the repo-relative path, or state clearly that it does not exist.",
       "grader": { "type": "abstain" },
       "forbidden": [
@@ -253,6 +267,7 @@
     },
     {
       "id": "T2", "cls": "abstain", "enabled": false,
+      "label": "runCypherQuery caller query",
       "retired": {
         "on": "2026-08-05",
         "why": "The question's premise is false, so there is no correct answer to grade. It asserts the Cypher path is gone; runCypherQuery still exists and still builds literal Cypher strings — integrations/mcp-server-semantic-analysis/src/services/cgr-query-cache.ts:233 constructs `MATCH (e)-[:CALLS]->(callee) ... RETURN DISTINCT callee.name`. Arms that produced that query were RIGHT and were scored 0; the arm that abstained was scored 1. Retired rather than deleted so the defect stays visible, and retired for a false premise — not for scoring badly, which would be selection. If reinstated it belongs in the lookup class, with the shim as the expected answer.",
@@ -267,6 +282,7 @@
     },
     {
       "id": "T3", "cls": "abstain",
+      "label": "Payment reconciliation module",
       "_leak_terms_note": "Decisive must-not-appear terms. An abstain probe's subject should not exist anywhere in the searchable tree; if it does, either something leaked or the question's premise is false (see retired T2). Any occurrence aborts the run.",
       "leak_terms": ["payment reconciliation"],
       "prompt": "Which module implements the payment reconciliation service in this repository? Reply with the repo-relative path, or state clearly that it does not exist.",
@@ -278,6 +294,7 @@
     },
     {
       "id": "T4", "cls": "abstain",
+      "label": "CODEGRAPH_MAX_DEPTH read site",
       "prompt": "In which file is the CODEGRAPH_MAX_DEPTH environment variable read? Reply with the repo-relative path, or state clearly that it does not exist.",
       "grader": { "type": "abstain" },
       "forbidden": [
