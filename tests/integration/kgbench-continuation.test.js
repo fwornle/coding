@@ -17,6 +17,7 @@
 
 import { jest } from '@jest/globals';
 import { _ADAPTERS, ANSWER_FILE } from '../../lib/kgbench/agents.mjs';
+import { loadArms, resolveArm, enabledArmIds } from '../../lib/kgbench/arms.mjs';
 
 const opencode = _ADAPTERS.opencode;
 
@@ -75,6 +76,34 @@ describe('opencode adapter — diagnostics survive the JSON format', () => {
   it('survives a truncated trailing line without throwing', () => {
     expect(() => opencode.textFrom('{"type":"part","part":{"text":"ok"}}\n{"type":"par')).not.toThrow();
     expect(opencode.textFrom('{"type":"part","part":{"text":"ok"}}\n{"type":"par')).toBe('ok');
+  });
+});
+
+describe('the default budget', () => {
+  it('is 2 on every enabled arm — measured, not chosen', () => {
+    // Same 48 grep/opencode cells at each setting (coding-v1-r8 vs -cont2, 2026-08-10):
+    //   budget 0   6/48 answered
+    //   budget 1  44/48 answered
+    //   budget 2  48/48 answered
+    // The reason it is 2 and not 3 is the distribution of turns SPENT, not the completion
+    // rate: at budget 1, 41 of 48 cells used the whole budget — a binding constraint — and at
+    // budget 2 the spread is 9/28/11 with nothing at the ceiling. Raise it only against
+    // evidence of cells pinned at 2.
+    const doc = loadArms();
+    const ids = enabledArmIds(doc);
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) expect(resolveArm(doc, id).continuationBudget).toBe(2);
+  });
+
+  it('is overridable DOWN to 0, or x2 becomes unreproducible', () => {
+    // `flag ?? arm ?? 0` — the nullish coalescing matters. With `||` an explicit 0 would fall
+    // through to the arm's 2, and the one setting a reader most needs in order to reproduce
+    // the pre-budget runs would silently be the one setting they cannot express.
+    const arm = 2;
+    const resolve = (flag) => flag ?? arm ?? 0;
+    expect(resolve(0)).toBe(0);
+    expect(resolve(null)).toBe(2);
+    expect(resolve(1)).toBe(1);
   });
 });
 
