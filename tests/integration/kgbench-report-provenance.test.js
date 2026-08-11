@@ -177,9 +177,17 @@ describe('token provenance is stated per source', () => {
     expect(md).toMatch(/BEGAN while the cell ran/);
   });
 
-  it('surfaces an ambiguous window as a blockquote warning', () => {
+  it('surfaces an ambiguous window as a blockquote warning, without naming a cause', () => {
+    // The warning has named the wrong cause twice — first concurrent work on the machine, then a
+    // neighbouring cell bleeding across the boundary. Both were wrong for the same 21 rows, which
+    // were simply RETRIED cells owning one session per attempt. Retries no longer flag at all, so
+    // whatever reaches this warning now is genuinely unexplained; asserting the absence of a
+    // confident cause is the point of the test, not incidental to it.
     const md = render([claudeRow(), opencodeRow({ token_ambiguous: true })]);
-    expect(md).toContain('had more than one session of the same agent inside their window');
+    expect(md).toContain('start inside a SINGLE attempt');
+    expect(md).toContain('is priced correctly without appearing');
+    expect(md).not.toMatch(/re-run those cells on an otherwise idle machine/);
+    expect(md).not.toMatch(/bleeding across the window boundary/);
   });
 
   it('says unmeasured cells still rank on correctness', () => {

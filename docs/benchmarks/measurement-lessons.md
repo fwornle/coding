@@ -309,6 +309,51 @@ manufactured 2 fake disagreements. Restored from the backup.
 
 ---
 
+## Lesson 12 — A row must be able to reproduce its own number
+
+`runCell` resolved a cell's tokens over a window spanning every attempt, then built the row by
+spreading the **last** attempt's result. The row therefore carried the last attempt's
+`started_at` and `wall_s` beside an all-attempts token total. Nothing crashed and nothing looked
+wrong; the row simply described a different thing from the number printed next to it.
+
+Three failures fell out of that one line, and only the third was ever noticed:
+
+- **The offline backfill would have destroyed the data it was written to protect.** It
+  re-resolves from `r.started_at`/`r.ended_at`, which on a retried cell is about half the cell,
+  so `--all` would have overwritten 21 correct totals with halved ones — as an improvement.
+- **`wall_s` charged a cell that burned 73.6s as 35.6s.** Which flatters exactly the arms that
+  needed a second attempt.
+- **Every retried cell was flagged ambiguous**, because a retry is a fresh spawn and opens a
+  session of its own, and ambiguity was judged per *cell*.
+
+**The ambiguity flag was then diagnosed wrongly twice, and the second diagnosis was believed
+because it came with arithmetic.** It said one flagged cell's 274,139 tokens was "its own
+139,727 plus its predecessor's 134,412" — which balances exactly, and is wrong. The 134,412 was
+the *same cell's first attempt*; the real predecessor was a third session of 172,223 tokens that
+was never counted. **An identity that balances is not a causal claim.** Two numbers summing to a
+third tells you nothing about which two, and there were three sessions to choose from. The check
+that would have settled it in one query — *does any session start inside more than one cell's
+window?* — was never run until the fix. It returns zero.
+
+**The correction moved the numbers the wrong way, which is the part worth remembering.** Acting
+on the bad diagnosis, the analysis excluded those 21 rows from opencode's medians. A retried cell
+pays for two attempts, so the excluded rows were the expensive ones: the "correction" pushed
+opencode's measured cost from 1.38× claude's down to 1.16×. A cleanup that makes a result *more
+flattering* deserves the same scrutiny as one that makes it worse.
+
+**Three rules.**
+
+1. A row must carry the window its own number was computed over. If it cannot be re-derived from
+   the row alone, offline, the row is a claim rather than a measurement.
+2. Attribute at the granularity work is *spawned* at. Sessions belong to attempts, not to cells.
+3. When a repair reconstructs anything, give it a control that fails loudly. Here: per-attempt and
+   whole-span attribution must agree to the token, which is only possible if every session lands
+   inside exactly one attempt window. It refused all four cells of the budget-2 run — correctly,
+   because that run has a second defect (a continuation `wall_s` that dropped its middle legs)
+   which makes the reconstruction land in the wrong place.
+
+---
+
 ## Proxy routing facts
 
 These invalidate the obvious mental model and cost a full investigation to establish:
@@ -361,3 +406,7 @@ back — reading back confirms only what was stored, not what will be served.
 - [ ] Any defect that moved **every arm identically**? That is a grader bug. (Lesson 3)
 - [ ] Provenance: how many commits, which passes, which questions re-run in each?
 - [ ] `--dry-run` regrade clean, and grader tests passing?
+- [ ] Every row's `wall_s` at least the sum of its own `attempts[]`? (Lesson 12)
+- [ ] `kgbench-backfill-tokens.mjs --all --dry-run` refuses nothing and shrinks nothing?
+- [ ] Any subset excluded from a median — is the exclusion's *cause* established, and does the
+      exclusion move the result in the flattering direction? (Lesson 12)

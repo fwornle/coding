@@ -18,6 +18,7 @@
 import { jest } from '@jest/globals';
 import { _ADAPTERS, ANSWER_FILE } from '../../lib/kgbench/agents.mjs';
 import { loadArms, resolveArm, enabledArmIds } from '../../lib/kgbench/arms.mjs';
+import { spanOfParts } from '../../lib/kgbench/runner.mjs';
 
 const opencode = _ADAPTERS.opencode;
 
@@ -125,5 +126,54 @@ describe('the budget is symmetric and bounded', () => {
       expect(typeof a.textFrom).toBe('function');
       expect(name).toBeTruthy();
     }
+  });
+});
+
+/**
+ * The span of a multi-part run — the rule both the continuation loop and the retry loop must obey.
+ *
+ * `spanOfParts` is pure, so this exercises the arithmetic directly rather than spawning agents.
+ * Every case here corresponds to a defect that shipped.
+ */
+describe('the wall-clock of a run made of several parts', () => {
+  it('sums EVERY leg, not the first and the last', () => {
+    // The shipped version computed `first.wall_s + last.wall_s`, which is correct at a budget of
+    // 1 (there is no middle) and lossy at 2 — the current default. Run coding-v1-r8-cont2 was
+    // measured at budget 2 and contains cells with two continuations, whose middle leg this
+    // silently discarded. Asserting 60 rather than 40 is the whole difference.
+    const span = spanOfParts([{ wall_s: 10 }, { wall_s: 20 }, { wall_s: 30 }]);
+    expect(span.wall_s).toBe(60);
+  });
+
+  it('takes the FIRST start and the LAST end, and keeps one window per timed part', () => {
+    const span = spanOfParts([
+      { started_at: '2026-08-10T17:19:26.000Z', ended_at: '2026-08-10T17:20:04.000Z', wall_s: 38 },
+      { started_at: '2026-08-10T17:20:04.225Z', ended_at: '2026-08-10T17:20:39.888Z', wall_s: 35.6 },
+    ]);
+    expect(span.started_at).toBe('2026-08-10T17:19:26.000Z');
+    expect(span.ended_at).toBe('2026-08-10T17:20:39.888Z');
+    expect(span.wall_s).toBe(73.6);
+    // The windows are what let the token resolver tell a retry apart from a foreign session.
+    expect(span.windows).toEqual([
+      { started_at: '2026-08-10T17:19:26.000Z', ended_at: '2026-08-10T17:20:04.000Z' },
+      { started_at: '2026-08-10T17:20:04.225Z', ended_at: '2026-08-10T17:20:39.888Z' },
+    ]);
+  });
+
+  it('still charges a part that has no timestamps, and gives it no window', () => {
+    // runAgent's spawn-error path resolves before finish() runs, so it carries a wall_s and no
+    // instants. Dropping it from the sum would understate a cell that really did burn the time;
+    // inventing a window for it would hand the resolver a window nothing can start inside.
+    const span = spanOfParts([
+      { wall_s: 5, outcome: 'spawn_error' },
+      { started_at: '2026-08-10T17:20:04.225Z', ended_at: '2026-08-10T17:20:39.888Z', wall_s: 35.6 },
+    ]);
+    expect(span.wall_s).toBe(40.6);
+    expect(span.windows).toHaveLength(1);
+    expect(span.started_at).toBe('2026-08-10T17:20:04.225Z');
+  });
+
+  it('is empty, not NaN, for no parts at all', () => {
+    expect(spanOfParts()).toEqual({ started_at: null, ended_at: null, wall_s: 0, windows: [] });
   });
 });

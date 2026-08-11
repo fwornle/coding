@@ -55,6 +55,40 @@ for (const line of lines) {
   try { rows.push(JSON.parse(line)); } catch { die('results.jsonl has an unparseable line; refusing to rewrite it'); }
 }
 
+/**
+ * The window to re-resolve this row on, or a refusal.
+ *
+ * GUARD A — NEVER RE-RESOLVE ON A WINDOW NARROWER THAN THE CELL. A row written before attempt
+ * windows existed carries its LAST attempt's `started_at`, while its stored token total was
+ * resolved over ALL attempts. Re-resolving from the row's own window therefore returns roughly
+ * half the cell — and `--all` would have written that over the correct number, silently, on all 21
+ * retried rows of run coding-v1-r8. The row carries the evidence to catch it: `attempts[].wall_s`
+ * sums to the cell's real duration, and a window shorter than that cannot be the window that
+ * produced the number.
+ *
+ * @returns {{ok: true, windows: Array<{started_at, ended_at}>|null} | {ok: false, reason: string}}
+ */
+function resolutionWindowFor(r) {
+  const attempts = Array.isArray(r.attempts) ? r.attempts : [];
+  const attemptWallMs = attempts.reduce((a, x) => a + (Number(x?.wall_s) || 0), 0) * 1000;
+  const spanMs = Date.parse(r.ended_at) - Date.parse(r.started_at);
+  // 1s of tolerance absorbs the per-attempt toFixed(1) rounding, and nothing larger.
+  if (attemptWallMs > 0 && Number.isFinite(spanMs) && spanMs + 1000 < attemptWallMs) {
+    return {
+      ok: false,
+      reason: `window ${(spanMs / 1000).toFixed(1)}s is narrower than its ${attempts.length} `
+        + `attempts (${(attemptWallMs / 1000).toFixed(1)}s) — the row predates attempt windows`,
+    };
+  }
+  const timed = attempts.filter((a) => a?.started_at && a?.ended_at);
+  return {
+    ok: true,
+    windows: timed.length > 1 && timed.length === attempts.length
+      ? timed.map(({ started_at, ended_at }) => ({ started_at, ended_at }))
+      : null,
+  };
+}
+
 // A row is a candidate when it has a window to join on and no first-party number. --all also
 // re-resolves window-joined cells, which is what you want after fixing an ambiguity (an
 // interactive session that was running alongside the matrix) — never for stream-json rows,
@@ -69,8 +103,18 @@ out(`kgbench: ${rows.length} row(s) in ${runId}; ${candidates.length} eligible f
 if (!candidates.length) { out('kgbench: nothing to do'); process.exit(0); }
 
 let filled = 0, stillEmpty = 0, ambiguous = 0;
+const refused = [];
 for (const r of candidates) {
   const before = r.token_source;
+  const cell = `${String(r.arm).padEnd(10)} ${String(r.id).padEnd(4)} r${r.rep} ${String(r.agent ?? 'claude').padEnd(9)}`;
+
+  const win = resolutionWindowFor(r);
+  if (!win.ok && !flag('allow-narrow-window')) {
+    refused.push({ cell, reason: win.reason });
+    out(`  ${cell} REFUSED — ${win.reason}`);
+    continue;
+  }
+
   // No polling here: the rows either exist by now or they do not, and this script can simply
   // be run again later. attempts=1 keeps a large run's backfill to one DB query per cell.
   const t = await resolveCellTokens({
@@ -79,11 +123,27 @@ for (const r of candidates) {
     taskId: r.task_id ?? null,
     startedAt: r.started_at,
     endedAt: r.ended_at,
+    // Present only on rows written after attempt windows existed, or repaired into them. A row
+    // without them resolves exactly as it did before.
+    windows: win.ok ? win.windows : null,
     bound: !!r.token_bound,
     attempts: 1,
     settleMs: 0,
   });
   if (t.token_source === 'unmeasured') { stillEmpty++; continue; }
+
+  // GUARD B — A RE-RESOLUTION MUST NOT SHRINK A STORED TOTAL. The proxy's token DB is
+  // append-only, so a fresh resolution returning LESS than the stored number never means the
+  // data changed; it means the window moved. That is the signature of the halving Guard A
+  // catches, reached through a different sense — and it covers rows whose `attempts` array is
+  // missing or untimed, which Guard A has to wave through.
+  const prevTotal = Number(r.total_tokens);
+  if (Number.isFinite(prevTotal) && Number(t.total_tokens) < prevTotal && !flag('allow-shrink')) {
+    const reason = `would shrink ${prevTotal.toLocaleString('en-US')} → ${Number(t.total_tokens).toLocaleString('en-US')}`;
+    refused.push({ cell, reason });
+    out(`  ${cell} REFUSED — ${reason}`);
+    continue;
+  }
 
   // CLEAR BEFORE MERGE. Object.assign only overwrites keys the new result HAS, so any field
   // the previous resolution set and this one does not would survive as a verdict about a
@@ -105,14 +165,26 @@ for (const r of candidates) {
   r.token_backfilled_at = new Date().toISOString();
   filled++;
   if (t.token_ambiguous) ambiguous++;
-  out(`  ${String(r.arm).padEnd(10)} ${String(r.id).padEnd(4)} r${r.rep} ${String(r.agent ?? 'claude').padEnd(9)} `
-    + `${before ?? 'null'} -> ${t.token_source}  total=${t.total_tokens}${t.token_ambiguous ? '  AMBIGUOUS' : ''}`);
+  out(`  ${cell} ${before ?? 'null'} -> ${t.token_source}  total=${t.total_tokens}${t.token_ambiguous ? '  AMBIGUOUS' : ''}`);
 }
 
 out('');
-out(`kgbench: filled ${filled}, still unmeasured ${stillEmpty}${ambiguous ? `, ambiguous ${ambiguous}` : ''}`);
+out(`kgbench: filled ${filled}, still unmeasured ${stillEmpty}${ambiguous ? `, ambiguous ${ambiguous}` : ''}`
+  + `${refused.length ? `, REFUSED ${refused.length}` : ''}`);
 
-if (flag('dry-run')) { out('kgbench: --dry-run, results.jsonl not written'); process.exit(0); }
+if (refused.length) {
+  out('');
+  out(`kgbench: ${refused.length} row(s) were left untouched because re-resolving them would have`);
+  out('kgbench: replaced a correct number with a worse one. These rows describe a window that does');
+  out('kgbench: not cover the cell they measure — their stored totals span every attempt while');
+  out('kgbench: their started_at is the LAST attempt\'s, so a join on the row itself sees half the cell.');
+  out(`kgbench: repair them first:  node scripts/kgbench-repair-attempt-windows.mjs --run ${runId}`);
+  out('kgbench: or override with --allow-narrow-window / --allow-shrink if you know better.');
+}
+
+if (flag('dry-run')) { out('kgbench: --dry-run, results.jsonl not written'); }
+if (flag('strict') && refused.length) process.exit(1);
+if (flag('dry-run')) process.exit(0);
 if (!filled) { out('kgbench: no changes to write'); process.exit(0); }
 
 copyFileSync(resultsFile, `${resultsFile}.bak`);

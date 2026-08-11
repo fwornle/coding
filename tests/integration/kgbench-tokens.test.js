@@ -36,6 +36,8 @@ const session = (o) => ({
 const sessionSet = (sessions) => ({ sessions });
 /** Every path that reaches the DB must be injected, or a test reads the developer's real one. */
 const NO_SESSIONS = () => sessionSet([]);
+/** Attempt windows in the shape runCell records them — one per spawn, in order. */
+const attemptWindows = (...pairs) => pairs.map(([started_at, ended_at]) => ({ started_at, ended_at }));
 
 describe('the composite task_id', () => {
   it('puts agent and model in the second segment, where the proxy looks for them', () => {
@@ -171,6 +173,10 @@ describe('resolving a finished cell\'s tokens', () => {
   });
 
   it('flags two sessions that STARTED inside one cell — a real concurrent run', async () => {
+    // Passes NO attempt windows, so this is a single-attempt cell with two starts: genuine
+    // concurrency, which must keep flagging. Read it as a pair with `does not flag a retried
+    // cell` below — that one has the same two sessions spread across two attempt windows, and
+    // the ONLY thing separating an anomaly from a retry is which window each session began in.
     const t = await resolveCellTokens({
       result: {}, agent: 'opencode', taskId: 'a--b--c',
       startedAt: '2026-08-08T09:00:00.000Z', endedAt: '2026-08-08T09:00:30.000Z',
@@ -303,6 +309,23 @@ describe('resolving a finished cell\'s tokens', () => {
       byWindow: () => rows({ total_tokens: 42 }),
       ...NOW,
     }));
+    // A RETRIED cell — the only path that emits token_attempt_windows/token_attempt_sessions.
+    // Without this call the invariant would pass while saying nothing about the two newest
+    // conditional fields, which is precisely the class of omission it was written to catch.
+    collect(await resolveCellTokens({
+      result: {}, agent: 'opencode', taskId: 'a--b--c',
+      startedAt: '2026-08-08T09:00:00.000Z', endedAt: '2026-08-08T09:00:30.000Z',
+      windows: attemptWindows(
+        ['2026-08-08T09:00:00.000Z', '2026-08-08T09:00:10.000Z'],
+        ['2026-08-08T09:00:11.000Z', '2026-08-08T09:00:30.000Z'],
+      ),
+      byTaskId: () => EMPTY,
+      bySessionSet: () => sessionSet([
+        session({ task_id: 'ses_A', first_seen: '2026-08-08T09:00:02.000Z', total_tokens: 150 }),
+        session({ task_id: 'ses_B', first_seen: '2026-08-08T09:00:14.000Z', total_tokens: 50 }),
+      ]),
+      ...NOW,
+    }));
 
     const undeclared = [...emitted].filter((k) => !TOKEN_FIELDS.includes(k));
     expect(undeclared).toEqual([]);
@@ -346,5 +369,127 @@ describe('resolving a finished cell\'s tokens', () => {
     expect(seen.startedAt).toBe('2026-08-08T09:00:09.000Z');
     expect(seen.endedAt).toBe('2026-08-08T09:00:21.000Z');
     expect(seen.agent).toBe('opencode');
+  });
+});
+
+/**
+ * A RETRIED cell owns one session per attempt.
+ *
+ * THE DEFECT THIS PINS. Ambiguity was judged against the CELL: more than one session starting
+ * inside its window meant something foreign was running. But a retry is a fresh spawn, so it opens
+ * a session of its own, and every retried cell therefore tripped the check. In run coding-v1-r8
+ * that was 21 cells — and the 21 flagged cells were EXACTLY the 21 retried cells, with no foreign
+ * session anywhere in the run. The sums were right; only the label was wrong.
+ *
+ * The cost of believing the label was worse than the label. The published analysis excluded those
+ * rows from opencode's medians as over-counts; since a retried cell pays for two attempts, the
+ * exclusion pushed that agent's measured cost DOWN — a correction in the wrong direction, applied
+ * to correct data, on the strength of a warning that named the wrong cause.
+ */
+describe('one session per attempt is a retry, not an anomaly', () => {
+  // Run coding-v1-r8, cell grep/L2 rep2. Attempt 1 returned no_result and was retried; the row
+  // stored 274,139 = 134,412 + 139,727, which is the cell's true cost across both attempts.
+  const L2r2 = {
+    result: {}, agent: 'opencode', taskId: 'coding-v1-r8--opencode-x--grep-L2-r2',
+    startedAt: '2026-08-10T17:19:26.225Z', endedAt: '2026-08-10T17:20:39.888Z',
+    windows: attemptWindows(
+      ['2026-08-10T17:19:26.225Z', '2026-08-10T17:20:04.225Z'],
+      ['2026-08-10T17:20:04.225Z', '2026-08-10T17:20:39.888Z'],
+    ),
+    byTaskId: () => EMPTY,
+    bySessionSet: () => sessionSet([
+      session({ task_id: 'ses_0135045cbffeuvxJE69Vi3zgRr', first_seen: '2026-08-10T17:19:31.052Z', last_seen: '2026-08-10T17:20:03.971Z', total_tokens: 134412, calls: 7 }),
+      session({ task_id: 'ses_0134fb12fffeHKysw2Y2F4UP3n', first_seen: '2026-08-10T17:20:08.909Z', last_seen: '2026-08-10T17:20:39.650Z', total_tokens: 139727, calls: 6 }),
+    ]),
+    ...NOW,
+  };
+
+  it('does not flag a retried cell, and charges it for both attempts', async () => {
+    const t = await resolveCellTokens(L2r2);
+    expect(t.token_ambiguous).toBeUndefined();
+    expect(t.token_ambiguity).toBeUndefined();
+    expect(t.total_tokens).toBe(274139);
+    expect(t.token_window_sessions).toBe(2);
+    // The structure that makes the verdict auditable: one session in each of two attempts.
+    expect(t.token_attempt_windows).toBe(2);
+    expect(t.token_attempt_sessions).toEqual([1, 1]);
+  });
+
+  it('still flags two sessions inside ONE attempt, and says which attempt', async () => {
+    // Same cell, but a third session starts during attempt 2. That is the genuine concurrency
+    // the old check was reaching for, and it must survive the change that stops flagging retries.
+    const t = await resolveCellTokens({
+      ...L2r2,
+      bySessionSet: () => sessionSet([
+        session({ task_id: 'ses_a', first_seen: '2026-08-10T17:19:31.052Z', total_tokens: 134412 }),
+        session({ task_id: 'ses_b', first_seen: '2026-08-10T17:20:08.909Z', total_tokens: 139727 }),
+        session({ task_id: 'ses_foreign', first_seen: '2026-08-10T17:20:20.000Z', total_tokens: 5000 }),
+      ]),
+    });
+    expect(t.token_ambiguous).toBe(true);
+    expect(t.token_attempt_sessions).toEqual([1, 2]);
+    // Naming the attempt is the point: "2 sessions in this cell" sent the last investigation
+    // looking for a background process that did not exist.
+    expect(t.token_ambiguity).toMatch(/attempt 2 of 2/);
+  });
+
+  it('flags a session that started BETWEEN attempts, belonging to neither', async () => {
+    // The containment guard. A session in the gap is either something foreign, or evidence that
+    // a recorded window is wrong — and the offline repair script relies on this being loud.
+    // Without this case, "assign to the nearest preceding window" would look like a harmless
+    // simplification and would silently delete the only check on a reconstructed window.
+    const t = await resolveCellTokens({
+      ...L2r2,
+      windows: attemptWindows(
+        ['2026-08-10T17:19:26.225Z', '2026-08-10T17:19:40.000Z'],
+        ['2026-08-10T17:20:04.225Z', '2026-08-10T17:20:39.888Z'],
+      ),
+      bySessionSet: () => sessionSet([
+        session({ task_id: 'ses_a', first_seen: '2026-08-10T17:19:31.052Z', total_tokens: 134412 }),
+        session({ task_id: 'ses_gap', first_seen: '2026-08-10T17:19:55.000Z', total_tokens: 900 }),
+        session({ task_id: 'ses_b', first_seen: '2026-08-10T17:20:08.909Z', total_tokens: 139727 }),
+      ]),
+    });
+    expect(t.token_ambiguous).toBe(true);
+    expect(t.token_ambiguity).toMatch(/between two attempts/);
+    expect(t.token_attempt_sessions).toEqual([1, 1]);
+  });
+
+  it('asks the DB exactly once, spanning every attempt', async () => {
+    // Per-attempt attribution is applied in memory. If it ever became one query per attempt, a
+    // 384-cell run would multiply its DB traffic for a verdict it can already compute.
+    const calls = [];
+    await resolveCellTokens({
+      ...L2r2,
+      bySessionSet: (a) => { calls.push(a); return sessionSet([]); },
+      byWindow: () => EMPTY,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].startedAt).toBe('2026-08-10T17:19:25.225Z');   // first window − 1s
+    expect(calls[0].endedAt).toBe('2026-08-10T17:20:40.888Z');     // last window + 1s
+  });
+
+  it('is byte-identical to the old path when no windows are given', async () => {
+    // THE BACKWARDS-COMPATIBILITY CONTRACT, stated as an executable invariant rather than a
+    // comment. Every row of r6, r7 and x2, and all 363 non-retried rows of r8, take this path.
+    const base = {
+      result: {}, agent: 'opencode', taskId: 'a--b--c',
+      startedAt: '2026-08-08T09:00:00.000Z', endedAt: '2026-08-08T09:00:30.000Z',
+      byTaskId: () => EMPTY,
+      bySessionSet: () => sessionSet([
+        session({ task_id: 'ses_A', first_seen: '2026-08-08T09:00:05.000Z', total_tokens: 150, calls: 3 }),
+      ]),
+      ...NOW,
+    };
+    const implicit = await resolveCellTokens(base);
+    const explicit = await resolveCellTokens({
+      ...base,
+      windows: attemptWindows(['2026-08-08T09:00:00.000Z', '2026-08-08T09:00:30.000Z']),
+    });
+    expect(explicit).toEqual(implicit);
+    // A single attempt emits neither new field — one-attempt cells are the overwhelming
+    // majority, and two constant columns on every row would make results.jsonl worse to read.
+    expect(implicit.token_attempt_windows).toBeUndefined();
+    expect(implicit.token_attempt_sessions).toBeUndefined();
   });
 });
