@@ -7,13 +7,22 @@ costs an index, a container service, and a rebuild step. This benchmark exists t
 whether they buy anything a plain `grep` agent doesn't, using measurements rather than
 intuition.
 
-**Run:** `coding-v1-x2` · repo at `56d581a48` · models `claude-sonnet-5`,
+**Run:** `coding-v1-r8` · repo at `f4f13e86a` · models `claude-sonnet-5`,
 `rapid-proxy/claude-sonnet-5` · 16 questions × 4 arms × 3 reps across 3 agents =
-**384 cells**, 0 contaminated, 0 tool escapes.
+**384 cells**, 0 contaminated, 0 tool escapes · **continuation budget 1**.
 
-This run adds an **agent axis** — the same arms run by claude, copilot and opencode — and it
-turns out to matter more than the arms do. Its non-claude half was re-run after a harness
-defect; see [Provenance](#provenance-of-these-numbers).
+Two things distinguish this run from its predecessor `x2`, and both are corrections to the
+measuring instrument rather than to the systems being measured:
+
+- **Every agent now gets the same number of turns.** In `x2`, opencode was allowed one turn
+  and failed 88% of its cells; the harness was measuring its own asymmetry. See
+  [what the continuation budget changed](#what-the-continuation-budget-changed).
+- **One model graded every cell.** `x2` was scored by a mixture of haiku and opus because a
+  pin that looked applied was being discarded downstream. All 308 judged cells here were
+  graded by `claude-sonnet-5`.
+
+Read the arm comparison as a **replication** of `x2` and `r6`. The headline has not moved in
+three runs.
 
 > **The generated tables live in [`RESULTS.md`](RESULTS.md)** and are re-rendered from
 > `results.jsonl` on demand. This page is hand-written around those numbers and is not
@@ -30,54 +39,106 @@ reach a graph tool rather than merely wasn't configured with one.
 | | grep | graphify | codegraph | **hybrid** |
 |---|--:|--:|--:|--:|
 | **Correctness** (median) | **1.00** | **1.00** | **1.00** | **1.00** |
-| Content tokens per query | **74,872** | 180,527 | 133,001 | 83,081 |
-| Latency per query | **17.8s** | 36.5s | 33.4s | 20.1s |
-| Latency p90 | 47.4s | 95.1s | 112.4s | **33.2s** |
-| Cost per query | $0.091 | $0.194 | $0.165 | **$0.087** |
+| Content tokens per query | **77,394** | 131,190 | 161,322 | 86,579 |
+| Latency per query | **18.1s** | 28.1s | 50.3s | 18.5s |
+| Latency p90 | 34.9s | 69.2s | 122.0s | **32.4s** |
+| Cost per query | **$0.084** | $0.153 | $0.192 | $0.090 |
 | Hard failures | 0 / 48 | 0 / 48 | 0 / 48 | 0 / 48 |
 
 **On this question set, neither graph backend buys measurable correctness, and both cost
-1.8–2.4× the tokens, 1.9–2.1× the latency, and 1.8–2.1× the money.**
+1.7–2.1× the tokens, 1.6–2.8× the latency, and 1.8–2.3× the money.** (Graphify is the cheaper
+of the two on every measure; CodeGraph is 2.8× grep's latency and 2.3× its cost.)
 
 The `hybrid` arm is the one to read the others against, because it is the only one shaped
 like production: it has *every* tool and chooses freely. It lands on grep's cost and grep's
-correctness — because **it chooses grep**. Across 48 cells it made 226 tool calls, of which
-**3 were graph queries** and **none were Graphify**. Given the index, the agent declines to
-use it.
+correctness — because **it chooses grep**. Across 48 cells it made 230 tool calls, of which
+**6 were graph queries**: five to CodeGraph and one to Graphify. Given both indexes and no
+instruction either way, the agent reaches for text search 97% of the time.
 
-This reproduces the same finding from the previous run (`r6`: 4 graph calls in 348, none
-Graphify) on a different tree, a different question phrasing for two questions, and a
-corrected answer key. It is the most stable result this benchmark has produced.
+This is the third run to produce it (`r6`: 4 graph calls in 348; `x2`: 3 in 226), across
+different trees, a revised answer key, and now a corrected turn budget and a single grading
+model. It is the most stable result this benchmark has produced.
 
 The hypothesis the set was designed to test — that a graph index answers *"that isn't here"*
 better than grep — **did not reproduce**. All four arms abstained correctly on every trap.
 
 Read this as a **null result on 16 questions**, not as proof that code graphs are worthless.
-There is one real per-question difference, and it is CodeGraph's: it scores **0.00 on L2**
-and **0.33 on A4** where every other arm scores 1.00 and 0.82. See
+The real per-question differences all run the other way, and they are concentrated: CodeGraph
+scores **0.00 on L2**, **0.50 on B3** and **0.65 on A1**, and Graphify **0.65 on L2**, where
+grep scores 1.00 on all sixteen. See
 [where corpus scope shows up](#where-corpus-scope-shows-up).
 
 ### The agent axis is larger than the arm axis
 
-New in this run, and the more consequential finding:
-
 | Arm | Agent | answered | correctness | content tokens | latency |
 |---|---|--:|--:|--:|--:|
-| grep | claude | **48/48** | 1.00 | 74,872 | 17.8s |
-| grep | copilot | **48/48** | 1.00 | 132,147 | 35.2s |
-| grep | opencode | **6/48** | 1.00 | 43,571 | 23.4s |
-| hybrid | claude | **48/48** | 1.00 | 83,081 | 20.1s |
-| hybrid | copilot | **48/48** | 1.00 | 105,865 | 33.6s |
-| hybrid | opencode | **6/48** | 1.00 | 79,003 | 18.3s |
+| grep | claude | **48/48** | 1.00 | 77,394 | 18.1s |
+| grep | copilot | **48/48** | 1.00 | 143,346 | 33.8s |
+| grep | opencode | **44/48** | 1.00 | 90,109 † | 39.5s |
+| hybrid | claude | **48/48** | 1.00 | 86,579 | 18.5s |
+| hybrid | copilot | **48/48** | 1.00 | 139,868 | 32.1s |
+| hybrid | opencode | **46/48** | 1.00 | 113,145 † | 31.6s |
 
-Every agent that produces an answer is **equally correct**. What separates them is whether
-they answer at all, and what they spend getting there. opencode **fails to answer 88% of the
-time** — it terminates at its first toolless step, before writing anything — while copilot
-answers everything at roughly **1.8× claude's token cost** on the same arm.
+† opencode's medians are taken over the cells whose token attribution is unambiguous — 35 of
+48 on `grep`, 40 of 48 on `hybrid`. The excluded rows are real over-counts, not noise; see
+[reliability](#reliability).
 
-That reframes the whole exercise. On this question set, choosing the agent moves the outcome
-far more than choosing the retrieval strategy, and the retrieval strategy is the thing this
-repository spends infrastructure on.
+Every agent that produces an answer is **equally correct**: median 1.00 on every arm, every
+agent, without exception. What separates them is what they spend getting there. copilot costs
+**1.85× claude's content tokens** on the identical arm, and opencode about **1.16×**.
+
+That is the more consequential finding, and it survived the correction that changed
+everything else about opencode's numbers. In `x2` this section reported opencode answering
+6 of 48; that was the harness, not the agent, and it is fixed. The cost gap between agents on
+an identical arm was not the harness, and it did not move: choosing the agent still shifts
+cost further than choosing the retrieval strategy does, and the retrieval strategy is the
+thing this repository spends infrastructure on.
+
+### What the continuation budget changed
+
+`x2` reported opencode answering **6 of 48** cells and concluded it "fails to answer 88% of
+the time". That number was an artifact of the harness and it is now withdrawn.
+
+The three agents were never getting one turn each. claude's `-p` runs an unbounded agentic
+loop; copilot is launched with `--max-autopilot-continues 20`; opencode's headless `run` is a
+single session that ends at the first assistant step with text and no tool call. On
+analysis-shaped questions that step is frequently the one where it has finished investigating
+and is about to write — 36 of `x2`'s 84 opencode failures had a complete answer sitting in
+stdout that was never written to the file. Measuring an agent at a budget of 0 against
+competitors at 20 measures the harness.
+
+Every answer-file agent now gets the **same** budget: one continuation, meaning one chance to
+resume *its own session* and finish. Same 48 cells, same arm, same model:
+
+| grep / opencode | answered | correctness | latency |
+|---|--:|--:|--:|
+| `x2` — budget 0 | 6/48 (13%) | 1.00 | 34.7s |
+| `r8` — budget 1 | **44/48 (92%)** | 1.00 | 45.9s |
+
+85% of cells (41 of 48) needed the extra turn. Across the whole run, **83 of 96 opencode
+cells** used it and **0 of 96 copilot cells** did — copilot's own 20-continue autopilot was
+already absorbing the same failure mode invisibly, which is exactly why the asymmetry was
+hard to see.
+
+It is not a retry. A retry re-runs the question from scratch, and for a deterministic
+narration-stop that just narrates again — `x2` issued 88 retries and got 88 further
+no-results. A continuation resumes the session where the work has already happened.
+
+**What it costs, stated honestly.** The budget converts unscored failures into scored
+answers, and some of those answers are weak. On a 48-cell controlled comparison, mean score
+*over answered cells* **falls** from 0.977 to 0.948 going from budget 1 to budget 2, while
+completion rises from 44/48 to 48/48. Both numbers are real and they point opposite ways. The
+one to use puts non-answers at 0 so both budgets share a denominator, and there the budget
+wins by a fifth of what the completion jump alone suggests: **0.935 → 0.948**.
+
+The corollary matters for reading `x2`: its opencode median of 1.00 was **survivorship**. It
+was computed over the 13% of cells that happened to write, which were the easy ones.
+
+**This run was measured at budget 1.** The repository default is now 2, chosen on evidence
+collected after this run: at budget 1, 41 of 48 cells spent the entire budget — the shape of
+a binding constraint — while at budget 2 the spread is 9/28/11 and nothing reaches the
+ceiling. `r8` is therefore not the run that demonstrates the current default, and runs at
+different budgets are not comparable to each other.
 
 ---
 
@@ -292,10 +353,14 @@ above: a bar pooling three agents with different enforcement has no meaningful m
 | arch | A1 A2 A3 A4 | 12 | 1.00 | 1.00 | 1.00 | 1.00 | tie |
 | abstain | T1 T3 T4 | 9 | 1.00 | 1.00 | 1.00 | 1.00 | tie |
 
-**A class median hides a bad cell, and here it hides two.** `lookup` reads 1.00 for every arm
-while **codegraph sits at 0.00 on L2**, and `arch` reads 1.00 for every arm while **codegraph
-sits at 0.33 on A4** and every arm sits at 0.82. Three questions per class means one weak
-question vanishes into the median. Always read the per-question table.
+**A class median hides a bad cell, and here it hides four.** `lookup` reads 1.00 for every arm
+while **codegraph sits at 0.00 on L2** and **graphify at 0.65**; `blast` reads 1.00 while
+codegraph sits at **0.50 on B3**; `arch` reads 1.00 while codegraph sits at **0.65 on A1** and
+graphify and hybrid at **0.82 on A4**. Three or four questions per class means a weak question
+vanishes into the median. Always read the per-question table.
+
+Every one of those misses belongs to a graph arm. Across all sixteen questions, `grep` does
+not score below 1.00 once.
 
 A winner is declared only at a **≥1.25× median gap with non-overlapping interquartile range**.
 Anything weaker prints "tie", because at these sample sizes a 1.3× gap is not a result — it's
@@ -305,7 +370,7 @@ a coin landing the same way three times.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../images/kgbench-cost-dark.svg">
-  <img alt="Cost per query, claude arms — grep 74.9k content tokens and 17.8s; graphify 180.5k and 36.5s; codegraph 133.0k and 33.4s; hybrid 83.1k and 20.1s" src="../../images/kgbench-cost-light.svg">
+  <img alt="Cost per query, claude arms — grep 77.4k content tokens and 18.1s; graphify 131.2k and 28.1s; codegraph 161.3k and 50.3s; hybrid 86.6k and 18.5s" src="../../images/kgbench-cost-light.svg">
 </picture>
 
 **Content tokens** are total tokens minus each arm's measured empty-run baseline. That matters:
@@ -315,7 +380,12 @@ strategies.
 
 Graph queries pull **substantially larger payloads into context** than a targeted grep does.
 That is the core cost finding, and it runs opposite to the usual intuition that an index should
-be the cheaper path. Graphify is the most expensive arm in this run at 2.4× grep.
+be the cheaper path.
+
+Which backend is most expensive **swapped between runs** — Graphify led in `x2` at 2.4× grep,
+CodeGraph leads here at 2.1× tokens and 2.8× latency — so treat the ordering *between* the two
+graph arms as unresolved at n=48. What replicates is the direction: both are well above grep,
+and `hybrid` sits within 10% of grep on every measure.
 
 The `hybrid` bar is the one that matters: give the agent everything and it costs what grep
 costs. The graph arms' extra tokens are not the price of *having* an index — they are the price
@@ -330,15 +400,19 @@ explore. Over 48 claude cells:
 
 | Tool | Calls |
 |---|--:|
-| `Grep` | 150 |
-| `Read` | 51 |
-| `Glob` | 22 |
-| `mcp__codegraph__codegraph_explore` | 3 |
-| any Graphify tool | **0** |
+| `Grep` | 156 |
+| `Read` | 49 |
+| `Glob` | 19 |
+| `mcp__codegraph__codegraph_explore` | 5 |
+| `mcp__graphify__query_graph` | 1 |
 
-Three graph calls out of 226, and Graphify never once. Only **3 of 48 cells** touched a graph
-tool at all. This is the single most decision-relevant number here: **the infrastructure is
-available, free at the point of use, and declined.**
+Six graph calls out of 230 — 2.6% — and only **6 of 48 cells** touched a graph tool at all.
+This is the single most decision-relevant number here: **the infrastructure is available, free
+at the point of use, and declined.**
+
+`x2` recorded 3 graph calls in 226 and zero to Graphify; `r6`, 4 in 348. The rate is
+consistently within noise of "never", and the fact that Graphify's count moved from 0 to 1
+between runs is not a trend — it is one cell.
 
 Two honest caveats. The tool *descriptions* are what the agent chooses from, so this measures
 the appeal of the advertised interface as much as the index behind it — a better-described
@@ -353,42 +427,47 @@ graph arms still answered without making a single graph call in **6 of 48 cells 
 
 ## Where corpus scope shows up
 
-CodeGraph is the only arm that loses points anywhere, and both losses have the same shape.
+Every point lost in this run belongs to a graph arm. `grep` scores 1.00 on all sixteen
+questions; the graph arms lose on four between them.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../images/kgbench-arch-spread-dark.svg">
   <img alt="Dot plot of every architecture-class run on claude — grep, graphify and hybrid cluster together while codegraph spreads lower" src="../../images/kgbench-arch-spread-light.svg">
 </picture>
 
-Every dot is one architecture-class cell, so it shows A2 and A4 but **not** L2, which is a
-`lookup` question and appears in the table below rather than the figure. The `arch` median is
-1.00 for all four arms, which is why the automatic winner check prints "tie" — correctly,
-because two questions moving is not a class-level effect.
+Every dot is one architecture-class cell, so it shows A1 and A4 but **not** L2 or B3, which
+belong to other classes and appear in the table below rather than the figure. Every class
+median is 1.00 for all four arms, which is why the automatic winner check prints "tie" —
+correctly, because four questions moving across two arms is not a class-level effect.
 
-| Question | grep | graphify | codegraph | hybrid |
-|---|--:|--:|--:|--:|
-| L2 — which module implements `summaryStats` | 1.00 | 1.00 | **0.00** | 1.00 |
-| A2 — why "content tokens" rather than total | 1.00 | 1.00 | **0.65** | 1.00 |
-| A4 — why CodeGraph's runtime is constrained | 0.82 | 0.82 | **0.33** | 0.82 |
+| Question | class | grep | graphify | codegraph | hybrid |
+|---|---|--:|--:|--:|--:|
+| L2 — which module implements `summaryStats` | lookup | 1.00 | **0.65** | **0.00** | 1.00 |
+| B3 — consequences of changing the grader | blast | 1.00 | 1.00 | **0.50** | 1.00 |
+| A1 — why the ETM writes through the API | arch | 1.00 | 1.00 | **0.65** | 1.00 |
+| A4 — why CodeGraph's runtime is constrained | arch | 1.00 | **0.82** | 1.00 | **0.82** |
 
-**L2 is 0.00 on all three reps**, missing both required facts. **A4 is 0.33 on two of three.**
-It is not a case of not trying: on A2 the codegraph arm made a median of **20 tool calls**,
-more than any other arm on any question, and still missed a required fact.
+**L2 is 0.00 on all three codegraph reps**, missing both required facts, and it is not a case
+of not trying: codegraph spent a median of **12 tool calls** there against grep's 7, and still
+missed. That is the one per-question result that has now replicated — L2 was 0.00 for codegraph
+in `x2` as well.
 
-The mechanism is corpus scope. CodeGraph indexes **code entities** into SQLite/FTS5. A4's
-answer lives in prose inside a JSON config — the `_envNote` and `_indexNote` keys of
-`config/code-graph.json` — and comment strings in a config file are not code entities, so its
-index cannot reach them. Rather than find nothing and say so, the arm answers from the one
-source it does have, its own MCP tool description, and produces a fluent, confident account of
-constraints that are not this repository's.
+The mechanism is corpus scope. CodeGraph indexes **code entities** into SQLite/FTS5. When an
+answer lives in prose inside a config file — a `_comment` or `_envNote` key — comment strings
+are not code entities, so the index cannot reach them. Rather than find nothing and say so,
+the arm answers from the one source it does have, its own MCP tool description, and produces a
+fluent, confident account of constraints that are not this repository's.
 
 That is worth stating plainly: **the failure mode of a too-narrow index is not an empty result,
-it is a confident answer from whatever else is in context.** Graphify, which indexes documents
-as well as code, scores 1.00 on L2 and 0.82 on A4. Grep, which has no index at all and just
-reads the file, scores the same.
+it is a confident answer from whatever else is in context.** Grep, which has no index at all
+and just reads the file, scores 1.00 on all four.
 
-Note that A4 is 0.82 for *every* arm, codegraph included but worse. A fact no arm reliably
-finds is a question worth re-reading before it is a finding about backends.
+**The other three questions did not replicate, and that is the more useful caution.** In `x2`
+codegraph lost A2 (0.65) and A4 (0.33) and graphify lost neither; here A2 is clean for
+everyone, codegraph scores a full 1.00 on A4, and the arms that lose A4 are graphify and
+hybrid. Which *particular* question a graph arm drops is unstable at three reps. What is
+stable across three runs is the direction — the losses are always the graph arms', never
+grep's — and L2, which has now failed the same way twice.
 
 ---
 
@@ -398,30 +477,42 @@ finds is a question worth re-reading before it is a finding about backends.
 |---|---|--:|--:|--:|--:|
 | grep | claude | 48 | 48 | 0 | 0% |
 | grep | copilot | 48 | 48 | 0 | 0% |
-| grep | opencode | 48 | **6** | 42 | **88%** |
+| grep | opencode | 48 | 44 | 4 | 8% |
 | graphify | claude | 48 | 48 | 0 | 0% |
 | codegraph | claude | 48 | 48 | 0 | 0% |
 | hybrid | claude | 48 | 48 | 0 | 0% |
 | hybrid | copilot | 48 | 48 | 0 | 0% |
-| hybrid | opencode | 48 | **6** | 42 | **88%** |
+| hybrid | opencode | 48 | 46 | 2 | 4% |
 
-No stalls, no timeouts, no tool escapes, no contamination. Every failure in this run is
-opencode declining to produce an answer, and none of them is a retrieval failure: the 12 cells
-where it *did* answer score 1.00.
+**378 of 384 cells answered.** No stalls, no timeouts, no tool escapes, no contamination. All
+six failures are opencode, and all six are the same termination behaviour that budget 1 does
+not fully cover: the agent finished investigating, said so, and stopped without writing. Their
+stdout tails read *"I have enough detail now"* and *"I have enough. Let me write the answer."*
+A separate 48-cell run at budget 2 answered all of them.
 
-**opencode's 88% is a termination behaviour, not a capability finding.** It ends its run at the
-first step that calls no tool, which on an analysis-shaped prompt is frequently the first step.
-This is why the harness asks for an answer file at all — so that stopping early is recorded as
-`no_result` rather than as a wrong answer. Getting that recording right is what
-[defect 15](#what-went-wrong-building-this) is about.
+Latency tails: p90 is 34.9s for grep, **32.4s for hybrid**, 69.2s for graphify and 122.0s for
+codegraph. The arm with every tool available has the *tightest* tail of all — the same
+inversion `x2` found.
 
-Latency tails: p90 is 47s for grep, **33s for hybrid**, 95s for graphify and 112s for
-codegraph. The arm with every tool available has the *tightest* tail of all.
+**Four hallucinations in 384 cells, and all four are the arms with text search.** Three are T4
+and one is T1 — abstain questions, where the correct answer is that the thing does not exist.
+`grep`/claude fabricated once, `grep`/copilot twice, `hybrid`/opencode once. Every cell scored
+0.00 for it.
 
-**One hallucination in 384 cells**: `grep`/claude on T3 rep 1 asserted a path for the
-non-existent payment reconciliation service. The same arm abstained correctly on the other two
-reps and on both other traps. One row is not a rate, but it is the failure this class exists to
-catch, and it came from the arm with no index.
+Neither forced graph arm hallucinated at all. That is the one result on this page that favours
+an index, and it is too small to lean on — four rows is not a rate, and the graph arms had
+half as many chances (96 cells against 192). But it is the failure this class exists to catch,
+and it is worth noting that it came from the arms that search text and not from the arms that
+query a structured index, which is the opposite of the `x2` pattern where the single
+hallucination was also grep's. Two runs, five rows, same direction.
+
+**Token attribution is not clean for opencode.** 21 of its 96 cells are flagged
+`token_ambiguous`, and the flag is correct: the resolver's window opens fractionally before the
+cell spawns, so a neighbouring cell's session can be counted twice. One flagged cell's 274,139
+tokens is exactly its own 139,727 plus its predecessor's 134,412. Including them inflates the
+`grep`/opencode content-token median by **24%** and `hybrid`/opencode's by **8%**, which is why
+every opencode figure on this page is taken over the unambiguous subset. No other agent is
+affected. This is a measurement defect in the harness, still open.
 
 ---
 
@@ -434,10 +525,10 @@ catch, and it came from the arm with no index.
 - **Indexing cost is excluded.** Per-query numbers ignore what it costs to build and keep the
   indexes fresh. That is a real expense on the graph side, so the graph backends look *better*
   here than their true total cost.
-- **The graph index is stale relative to the tree, deliberately.** It was built at `8a3ea3f0f`;
-  the arms searched `56d581a48`. Rebuilding between the two halves of this run would have given
-  the re-run half a fresher backend than the half it is compared against, which is a worse
-  confound than the staleness. The residual difference is untested.
+- **The indexes match the tree in this run.** Both were rebuilt at `f4f13e86a` immediately
+  before launch, so unlike `x2` — where the graph was 71 files behind what the arms searched —
+  staleness is not available as an explanation for the graph arms' losses here. They lost
+  against a current index.
 - **Corpus scope differs between backends** (graphify indexes docs and PDFs; code-only backends
   do not), so node/edge counts are not comparable at face value.
 - **16 questions is small**, and `arch` is only 4. A null result at this size means "no effect
@@ -447,105 +538,92 @@ catch, and it came from the arm with no index.
   removable — it is what makes those cells answer at all.
 - **Only claude's arms are enforced.** copilot and opencode keep their built-in search on every
   arm, so their `grep` and `hybrid` rows differ by MCP configuration alone.
-- **opencode's token figures rest on 6 ranked cells per arm.** Treat its cost numbers as
-  indicative. They are no longer ambiguous — every non-claude cell is now attributed per
-  session rather than per timestamp (defect 17), which removed a neighbour's trailing calls
-  from 94 of 96 opencode cells and cut its medians by 25–35%. copilot's medians did not move
-  at all, which is the check that the correction touched only the cells it should have.
-- **The secondary judge changed model mid-run** (see below), so the disagreement section is
-  weaker evidence than usual. Medians are unaffected — they use the deterministic checklist.
+- **21 of opencode's 96 cells have inflated token figures** and are excluded from its medians
+  here. The generated tables in `RESULTS.md` do *not* exclude them, so its cost rows there read
+  8–24% high.
+- **This run was measured at continuation budget 1**, and the repository default is now 2. A
+  run at a different budget is not comparable to this one on either completion or cost.
+- **The scores are not comparable to `x2`'s.** `x2` was graded by a mixture of haiku and opus;
+  every judged cell here was graded by `claude-sonnet-5`. Re-grading `x2` under this judge, not
+  comparing the two tables, is the way to put them on one scale.
 
 ---
 
 ## Where the disagreements went
 
-Eight cells out of 384, all `checklist_higher`:
+Twenty cells out of 384, and **every one of them `checklist_higher`** — the deterministic
+checklist scored the answer above the judge, never once below. They fall on five questions:
 
-| Question | Arm | checklist | judge |
-|---|---|--:|--:|
-| A4 | grep | 0.33 | 0.00 |
-| L2 | graphify | 1.00 | 0.50 |
-| A1 | graphify | 1.00 | 0.50 |
-| B2 | codegraph | 1.00 | 0.50 |
-| A2 | codegraph | 1.00 | 0.57 |
-| A4 | codegraph | 0.33 | 0.00 |
-| A4 | codegraph | 0.33 | 0.00 |
-| B2 | hybrid | 1.00 | 0.50 |
+| Question | grep | graphify | codegraph | hybrid | total |
+|---|--:|--:|--:|--:|--:|
+| A4 | 2 | 1 | 1 | 2 | 6 |
+| B2 | 2 | — | 1 | 3 | 6 |
+| B3 | 2 | — | — | 2 | 4 |
+| A1 | — | — | 3 | — | 3 |
+| A2 | — | — | 1 | — | 1 |
+| **by arm** | **6** | **1** | **6** | **7** | **20** |
 
 **This table is an alarm, not a diagnosis.** It says two graders differ; it does not say which
 is wrong, and across every investigation on this set the cause has been a judge rubric, a false
 answer key, a regex, a shared match token, or a matcher too loose and too narrow at once —
 *never* a badly written question. Twice the arms were right and the key was wrong.
 
+**Read the by-arm row first.** The disagreements are spread across all four arms — 6, 1, 6, 7 —
+and every single one points the same direction. A defect that moves every arm alike is a grader
+property, not an arm property: this is the judge applying a stricter reading of B2, B3, A1, A2
+and A4 than the checklist does, on whoever answers them. It is a calibration gap between the
+two scorers, and the questions it concentrates on are the ones worth re-reading.
+
 The detector is also blind to the most common defect of all: because the judge's prompt is
 built from the same checklist, a **wrong key makes both graders agree** and produces zero
 disagreements.
 
-**This run's disagreements carry an extra caveat: two different models did the judging.**
-`claude-opus-5` was requested throughout. What the proxy actually served:
+**Unlike `x2`, one model graded everything.** All 308 judged cells were scored by
+`claude-sonnet-5` via copilot. One cell — `hybrid`/copilot S1 rep1 — was initially graded by
+`claude-haiku-4-5` when a transient copilot failure dropped the judge onto the `claude-code`
+fallback, which ignores model selection; it was re-judged individually and returned the same
+score. The manifest keeps that substitution event on record rather than erasing it.
 
-| Cells | judged by `claude-opus-5` | judged by `claude-haiku-4-5` | not judged |
-|---|--:|--:|--:|
-| claude | 3 | 150 | 39 |
-| copilot | 20 | 58 | 18 |
-| opencode | 0 | 10 | 86 |
-
-The `claude-code` route ignores model selection and falls back to haiku, which is documented
-behaviour. Within the copilot half the substitution is cleanly time-ordered — the first 20
-cells got opus, everything after it got haiku — so it is a mid-run fallback rather than random
-variation. The claude half had already been judged mostly by haiku in its earlier passes.
-
-Two consequences worth stating separately. A disagreement in the table above may be a
-difference between two judges rather than a difference in the answer. And the 143 unjudged
-cells are not a judge failure: most are opencode's `no_result` rows, and abstain questions
-carry no checklist and are never judged by design.
+The 76 unjudged cells are not a judge failure: they are the abstain questions, which carry no
+checklist and are never judged by design, plus the six `no_result` rows.
 
 Every median and ranking on this page uses the deterministic checklist score, so none of them
-is affected by any of this.
+depends on the judge at all.
 
 ---
 
 ## Provenance of these numbers
 
-Not every cell comes from one pass, and the report should say so rather than imply a single
-sitting.
+**All 384 cells come from a single uninterrupted pass** at tree commit `f4f13e86a` — no
+resume, no splice, no re-run. The manifest's `history` block is empty, which is what that looks
+like. `x2` needed a page of provenance because half of it was re-run after a defect; this run
+needs a paragraph.
 
-| Cells | What | Tree commit | When |
-|---|---|---|---|
-| 192 | all claude arms | `ebd7da004` | first passes |
-| 192 | copilot + opencode, `grep` and `hybrid` | `56d581a48` | re-run after the stale-answer repair |
+Three things about it are worth stating anyway, because each would otherwise be invisible:
 
-**The non-claude half was re-run because it was void, not because its results were
-unwelcome.** Cells share one sandbox worktree and the answer file has a fixed name; the runner
-never removed it between cells, so an agent that exited without writing left the *previous*
-cell's answer in place to be read, recorded `ok`, and graded against the wrong question. One
-opencode answer text was scored against **eleven** different questions.
+- **Both indexes were rebuilt at `f4f13e86a` immediately before launch**, so the arms and the
+  graph backends saw the same tree. In `x2` the index was 71 files behind. Staleness is
+  therefore not available as an explanation for anything here.
+- **The working tree was dirty at launch** (`dirty: true`). Arms search the *commit*, not the
+  working tree, so this affects nothing they could read; it is recorded because a reader
+  comparing to a clean-tree run is entitled to know.
+- **Two token figures were reconstructed after the run, not measured during it**, and both are
+  labelled as such in the manifest:
 
-Splicing two tree states is legitimate only if they are equivalent for the questions involved,
-so that was checked rather than assumed:
-
-- The only tree-visible difference between `ebd7da004` and `56d581a48` is `.gitignore`.
-  Everything else that changed is kgbench harness, tests, docs, or `.data`.
-- The question set and every answer key are **byte-identical** across both commits.
-- The graph index was **not** rebuilt between the halves, deliberately, so both saw the same
-  backend state.
-
-Evidence the repair held, measured rather than asserted:
-
-| | before | after |
+| What | Why | How |
 |---|---|---|
-| copilot distinct answers | 34 / 96 | **96 / 96** |
-| answer text reused across *different* questions | 5 texts | **0, all agents** |
-| (arm, question) groups with all reps byte-identical | 59 / 64 | **0 / 34** |
+| 92 cells' tokens | copilot's and opencode's stop-adapters write their proxy rows up to a minute after the cell ends, long after the runner has recorded `unmeasured` | `kgbench-backfill-tokens.mjs`, from the `task_id` and wall-clock window stored on every row |
+| `grep`/copilot's baseline floor | its single baseline probe timed out at 150s and produced 0 samples, which would have left all 48 of its cells without `content_tokens` | re-measured afterwards under the same arm, agent, model and sandbox commit — 3 samples, median 64,025, recorded as `proxy-db-session (post-hoc)` |
 
-Full per-pass provenance is in the run manifest's `history` block, and
-`.data/kgbench/runs/coding-v1-x2/REPAIRED.md` records the void and its resolution.
+The floor is a property of the combination, not of any question, which is what makes measuring
+it afterwards legitimate. It is disclosed on every affected row as `baseline_post_hoc` rather
+than silently merged with the floors measured inline.
 
 ---
 
 ## What went wrong building this
 
-Eighteen defects were found across the runs behind this page, and runs were discarded
+Twenty-eight defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -573,6 +651,17 @@ documented because the failure modes generalise to any agent benchmark.
 | 17 | **Tokens were attributed by timestamp, so each cell was charged part of its predecessor's.** A session does not stop when the process that started it does — its last calls are still being written while the next cell is already running. Summing the rows *stamped* inside a cell's window therefore mixed two cells. On `grep/L1 rep1`, 25,620 tokens of the previous cell's traffic; across the run, 94 of 96 opencode cells. | The old detector reported this as "more than one session ran concurrently", which reads as a *busy machine* — and sent an investigation hunting a background process that did not exist. The cells were simply adjacent, which is the normal case, not an anomaly. Attribution now follows whole sessions that BEGAN inside the window, so adjacency is charged correctly and "ambiguous" once again means something really did run alongside. opencode's medians fell 25–35%; copilot's did not move, which is how you know the correction was surgical. |
 | 18 | **A re-attribution kept the verdict it had just overturned.** The offline re-resolver merges with `Object.assign`, which only overwrites keys the new result *has*. Every re-attributed cell kept `token_ambiguous: true` and the old "2 distinct sessions ran inside this cell's window" text, beside fresh fields stating it had been cleanly attributed to exactly one session. | The report reads the stale field, so the fix appeared to have done nothing: 94 ambiguous before, 94 after. Two more rounds of "why didn't that work" would have been spent on the attribution logic, which was already correct. Same shape as defect 15 — a merge that only ever adds lets a previous answer outlive the question. The resolver now declares every field it owns and the re-resolver clears them first, with a test that fails if a new field escapes the declaration. |
 
+| 19 | **The harness answered its own question.** A comment in `runner.mjs` reproduced L1's prompt verbatim and named `install.sh` — L1's answer. The file cannot be excluded from the tree: it is B2's and A2's ground truth, so it has to stay readable *and* be clean. | The leak scanner saw it and let it through. It derives five overlapping windows per prompt and needs three before a hit is decisive; a one-line quotation matches two, so it was filed `weak` and the run proceeded. Every arm that grepped L1's subject was handed the answer by the thing grading it. Leak #5 in a series where each was a comment explaining the previous leak. |
+| 20 | **The fix leaked twice more.** Replacing the subject left the *sentence frame* matching two of L1's windows — a crib is the question's form as much as its noun — and the paragraph documenting that put the frame straight back into the tree. | Three passes to remove one comment. The control is now mechanical instead of editorial: a needle hit anywhere under `lib/kgbench/` or `scripts/kgbench-*` is decisive regardless of window count, because between the questions and the code that runs them there is no shared vocabulary to tolerate. Prose about what not to write is not a control. |
+| 21 | **The answer-file directive read as a prompt injection.** `agents.mjs` carries the instruction verbatim — *write your complete answer to `<file>`… the task is complete ONLY once it exists* — and it was inside the searchable tree. opencode found it, correctly classified it as an injection attempt, announced it was ignoring it, and stopped. | claude never sees the directive; copilot complied with it 96 times without comment. So the file penalised **exactly one agent**, which is the specific way a cross-agent comparison stops meaning anything. Now excluded outright; no question's evidence points there. |
+| 22 | **One agent had no turns.** claude's `-p` runs an unbounded loop, copilot is launched with `--max-autopilot-continues 20`, and opencode's headless `run` ends at the first toolless step — a budget of zero. | That asymmetry, not retrieval, is what `x2`'s 88% opencode failure rate measured. 36 of its 84 failures had a finished answer in stdout with only the write missing. Every answer-file agent now gets the same budget, recorded per run and per cell. Retrying does not fix it: `x2` issued 88 retries and got 88 further no-results, because a deterministic narration-stop just narrates again. |
+| 23 | **A 6% failure rate appeared in the record once.** opencode's CLI rejected 5.9% of its own bash calls for omitting a required `description` argument — 35 of 589. Exactly one reached a results row, because `stderr` is persisted as `slice(-300)` and only the occurrence that happened to land last survived. | Worse, a cell that *answers* keeps no stderr at all, so a rejection on a successful cell had no channel to the record whatsoever. A rate that shows up once reads as a curiosity, which is how it went uncosted through a 384-cell run. Now counted from the full buffer before truncation, and reported per agent as measurement provenance rather than as a score. |
+| 24 | **A pin that was applied was then discarded.** The judge was pinned to `claude-code`/`claude-opus-5`, and the proxy logs show the pin being honoured — then `RATE_LIMITED`, then a CLI worker-pool fallback that returns `claude-haiku-4-5` whatever model it was asked for. The worker is spawned under `key=claude-opus-5` and still answers as haiku. | On one day that was 21 opus calls against 2,065 haiku ones, and the haiku stretch covered all of `x2`. Availability was never the problem — the model is served fine when the direct path is up — *reachability under load* was. Probing establishes that a provider **can** serve a model, not that it **will**. The judge is now pinned to a provider that honours the model rather than the one with the best catalogue. |
+| 25 | **A baseline that misses its window is gone for the whole run.** `grep`/copilot's floor was measured with a single probe and a 150s wait; the probe's rows never arrived, and a cell's `content_tokens` is `in_tokens` minus that floor. | Unlike a cell's tokens, which are re-resolvable from the proxy DB afterwards, a baseline has no stored window to re-resolve from — all 48 cells would have lost the headline cost metric permanently. Recovered here only because the floor is a property of the *combination* rather than of any question, so it could be re-measured after the fact and is disclosed as post-hoc on every row it touched. |
+| 26 | **The report never stated the terms it was measured under.** `run.json` had carried the continuation budget since the feature landed; the report never read the field. | The one term that makes two runs incomparable was absent from the document a reader compares runs with. Now on the second line, beside the commit and the model. |
+| 27 | **A warning asserted a cause it had not established.** The token-ambiguity note said *another session of that agent runs alongside the benchmark; re-run those cells on an otherwise idle machine.* On this run that was wrong, and following it would have changed nothing. | The machine was idle of other opencode work; the second session was the **previous cell's**, absorbed because the resolver's window opens before the cell spawns — one flagged cell's 274,139 tokens is exactly its own 139,727 plus its predecessor's 134,412. A warning that confidently misdiagnoses is worse than one admitting ignorance: it sends the reader to a remedy that cannot work and leaves them believing the data is repaired. The underlying window bug is **still open**. |
+| 28 | **A flag was parsed, then dropped on detach.** The supervisor re-execs itself under `nohup` to escape the process group, and that relaunch enumerates its flags explicitly. `--continuations` was added to the parser but not to the relaunch. | The run would have proceeded silently at budget 0 while its log said otherwise. Caught before launch by stubbing `node` on `PATH` and reading the argv each pass actually received, rather than trusting that threading a flag through is trivial. |
+
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
 manufactured a capability finding out of a termination bug, 16 destroyed the explanation of all
@@ -585,6 +674,28 @@ correct fix look inert — the ambiguity count read 94 before and 94 after — b
 verdict in place beside the new evidence. A stale field that contradicts a fresh one is worse
 than either a wrong answer or no answer, because it argues against the repair that just
 succeeded. The same shape as defect 15, in the tooling rather than the data.
+
+Defects 19–28 sharpen the same lesson rather than adding a new one, and three of them are worth
+separating out.
+
+**19 and 20 are the fifth and sixth leak in a series where every one was a comment explaining
+the previous leak.** The pattern held right up to the fix: documenting that a sentence *frame*
+leaks required quoting the frame. Editorial discipline has now failed six consecutive times at
+the same task, so the control is no longer editorial — a scan runs against the harness's own
+source and fails the run.
+
+**22 and 23 are the same shape as 15: a harness artifact wearing a capability finding's
+clothes.** `x2` published opencode at 13% completion and a median of 1.00; both numbers were
+artifacts. The completion rate measured a turn budget nobody had equalised, and the 1.00 was
+survivorship over the 13% of cells that happened to write. Correcting the first *lowered* the
+second, because answering more questions means answering harder ones. An agent that looks
+uniformly terrible, or uniformly perfect on a small denominator, is a hypothesis about the
+harness before it is a finding about the agent.
+
+**24 and 27 are both failures of a confident wrong answer over an honest absent one.** A pin
+that logs itself as applied and is then discarded downstream is worse than no pin, and a
+warning that names the wrong cause is worse than one that says it cannot tell — in each case
+the reader stops looking, which is precisely what the mechanism was supposed to prevent.
 
 Most were found by instrumentation rather than by reading results: the tool-surface check, the
 containment scan, the orphaned-MCP-server guard, and the grader's own disagreement counter,
