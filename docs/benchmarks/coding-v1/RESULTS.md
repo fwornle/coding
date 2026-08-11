@@ -3,7 +3,7 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3 reps/arm) against 4 arms.
-Repo at `f4f13e86a`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-10T21:22:26.510Z.
+Repo at `f4f13e86a`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-11T04:32:38.569Z.
 
 Continuation budget: **1** turn(s) per answer-file agent (inert for `claude`, whose loop is unbounded). Runs at different budgets are not comparable.
 
@@ -34,7 +34,7 @@ These are the numbers the run actually produced. The `Overall` table above pools
 |---|---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
 | grep | claude | 48/48 | 1.00 | 77394 | 98616 | 4.0 | 18.1 | 0% | enforced | stream-json | stream-json×48 |
 | grep | copilot | 48/48 | 1.00 | 143346 | 207371 | — | 33.8 | 0% | not_enforced | answer-file | proxy-db-session×48 |
-| grep | opencode | 44/48 | 1.00 | 107170 | 171545 | — | 37.0 | 8% | ungated | answer-file | proxy-db-session×48 |
+| grep | opencode | 44/48 | 1.00 | 107170 | 171545 | — | 41.0 | 8% | ungated | answer-file | proxy-db-session×48 |
 | graphify | claude | 48/48 | 1.00 | 131190 | 152850 | 5.0 | 28.1 | 0% | enforced | stream-json | stream-json×48 |
 | codegraph | claude | 48/48 | 1.00 | 161322 | 181784 | 8.0 | 50.3 | 0% | enforced | stream-json | stream-json×48 |
 | hybrid | claude | 48/48 | 1.00 | 86579 | 111063 | 4.0 | 18.5 | 0% | enforced | stream-json | stream-json×48 |
@@ -80,8 +80,6 @@ Failed runs are counted, never dropped. An arm that stalls is not cheap — it i
 | `proxy-db-session` | 192 | whole proxy sessions that BEGAN while the cell ran — attributed per session, so a neighbour's trailing calls are not charged here |
 
 A cell whose tokens are `unmeasured` still ranks on correctness; it is only absent from the token medians. Reporting 0 there would make the least measurable agent look the cheapest.
-
-> **21 cell(s) had more than one session of the same agent inside their window.** Their token figures may include traffic that is not the cell's, and they are the rows to drop before quoting a cost. Two causes produce this and they are not distinguishable from the count alone: another session of that agent running alongside the benchmark, or an adjacent cell of this same run bleeding across the window boundary. Compare a flagged cell's total against its neighbours' in the proxy token DB before concluding which — if the sum equals this cell plus the one before it, an idle machine will not fix it.
 
 Agents in this run: `claude`, `copilot`, `opencode`.
 

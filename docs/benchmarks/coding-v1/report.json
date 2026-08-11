@@ -85,7 +85,7 @@
     "toolEscapeRows": 0,
     "retiredQuestions": [],
     "agentFilter": null,
-    "generatedAt": "2026-08-10T21:22:26.510Z"
+    "generatedAt": "2026-08-11T04:32:38.569Z"
   },
   "byArm": {
     "grep": {
@@ -117,7 +117,7 @@
           "not_enforced",
           "ungated"
         ],
-        "ambiguous_token_rows": 13
+        "ambiguous_token_rows": 0
       },
       "metrics": {
         "score": {
@@ -129,19 +129,19 @@
           "n": 140
         },
         "total_tokens": {
-          "mean": 220955.4,
+          "mean": 220970.74285714285,
           "median": 147752,
           "min": 43366,
           "max": 1092143,
-          "p95": 766808,
+          "p95": 767540,
           "n": 140
         },
         "content_tokens": {
-          "mean": 171495.7142857143,
+          "mean": 171511.05714285714,
           "median": 102752,
           "min": 7998,
           "max": 1028118,
-          "p95": 702433,
+          "p95": 703165,
           "n": 140
         },
         "tool_calls": {
@@ -153,11 +153,11 @@
           "n": 48
         },
         "wall_s": {
-          "mean": 38.312857142857155,
+          "mean": 43.50357142857143,
           "median": 30.2,
           "min": 7.8,
-          "max": 153.3,
-          "p95": 120.2,
+          "max": 256.8,
+          "p95": 140.4,
           "n": 140
         },
         "cost_usd": {
@@ -351,7 +351,7 @@
           "not_enforced",
           "ungated"
         ],
-        "ambiguous_token_rows": 8
+        "ambiguous_token_rows": 0
       },
       "metrics": {
         "score": {
@@ -363,7 +363,7 @@
           "n": 142
         },
         "total_tokens": {
-          "mean": 213513.4014084507,
+          "mean": 213523.29577464788,
           "median": 146685.5,
           "min": 52185,
           "max": 999214,
@@ -371,7 +371,7 @@
           "n": 142
         },
         "content_tokens": {
-          "mean": 172866.03521126762,
+          "mean": 172875.9295774648,
           "median": 108013.5,
           "min": 27701,
           "max": 935593,
@@ -387,11 +387,11 @@
           "n": 48
         },
         "wall_s": {
-          "mean": 37.292957746478876,
+          "mean": 39.732394366197184,
           "median": 26.549999999999997,
           "min": 8.9,
-          "max": 167.3,
-          "p95": 109.4,
+          "max": 200.7,
+          "p95": 131.9,
           "n": 142
         },
         "cost_usd": {
@@ -778,7 +778,7 @@
         "builtins_states": [
           "ungated"
         ],
-        "ambiguous_token_rows": 13
+        "ambiguous_token_rows": 0
       },
       "metrics": {
         "score": {
@@ -790,18 +790,18 @@
           "n": 44
         },
         "total_tokens": {
-          "mean": 237310.4090909091,
+          "mean": 237359.22727272726,
           "median": 171544.5,
           "min": 72373,
-          "max": 969991,
+          "max": 970704,
           "p95": 726902,
           "n": 44
         },
         "content_tokens": {
-          "mean": 172935.4090909091,
+          "mean": 172984.22727272726,
           "median": 107169.5,
           "min": 7998,
-          "max": 905616,
+          "max": 906329,
           "p95": 662527,
           "n": 44
         },
@@ -814,11 +814,11 @@
           "n": 0
         },
         "wall_s": {
-          "mean": 45.13636363636364,
-          "median": 37,
+          "mean": 61.65227272727273,
+          "median": 40.95,
           "min": 16.4,
-          "max": 153.3,
-          "p95": 82.8,
+          "max": 256.8,
+          "p95": 157.9,
           "n": 44
         }
       }
@@ -1108,7 +1108,7 @@
         "builtins_states": [
           "ungated"
         ],
-        "ambiguous_token_rows": 8
+        "ambiguous_token_rows": 0
       },
       "metrics": {
         "score": {
@@ -1120,19 +1120,19 @@
           "n": 46
         },
         "total_tokens": {
-          "mean": 227279.80434782608,
+          "mean": 227310.34782608695,
           "median": 155010,
           "min": 90284,
-          "max": 884760,
-          "p95": 587646,
+          "max": 885462,
+          "p95": 588349,
           "n": 46
         },
         "content_tokens": {
-          "mean": 193738.80434782608,
+          "mean": 193769.34782608695,
           "median": 121469,
           "min": 56743,
-          "max": 851219,
-          "p95": 554105,
+          "max": 851921,
+          "p95": 554808,
           "n": 46
         },
         "tool_calls": {
@@ -1144,11 +1144,11 @@
           "n": 0
         },
         "wall_s": {
-          "mean": 40.6,
+          "mean": 48.130434782608695,
           "median": 30.1,
           "min": 17.3,
-          "max": 167.3,
-          "p95": 91.3,
+          "max": 200.7,
+          "p95": 131.9,
           "n": 46
         }
       }
@@ -1174,7 +1174,7 @@
       "not_enforced",
       "ungated"
     ],
-    "ambiguous_token_rows": 21
+    "ambiguous_token_rows": 0
   },
   "disagreements": [
     {

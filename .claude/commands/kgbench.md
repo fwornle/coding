@@ -19,6 +19,8 @@ grader, judge or report logic:
 | `scripts/kgbench-report.mjs` | render `RESULTS.md` + `report.json` (refuses to clobber hand-written files) |
 | `scripts/kgbench-charts.mjs` | render the SVG figures |
 | `scripts/kgbench-verify-questions.mjs` | validate questions and every evidence `file:line` |
+| `scripts/kgbench-backfill-tokens.mjs` | re-resolve token fields offline; refuses a window narrower than the cell |
+| `scripts/kgbench-repair-attempt-windows.mjs` | transitional: reconstruct per-attempt windows on runs recorded before the runner wrote them |
 
 **Read [docs/benchmarks/measurement-lessons.md](../../docs/benchmarks/measurement-lessons.md)
 before changing a question, a matcher or an answer key.** It records defects that cost a

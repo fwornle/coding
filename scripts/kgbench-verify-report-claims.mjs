@@ -121,7 +121,7 @@ for (const arm of ['graphify', 'codegraph']) {
 process.stdout.write('\n== agent axis table ==\n');
 const AGENTS = [
   ['grep', 'claude', 48, 48, 77394, 18.1], ['grep', 'copilot', 48, 48, 143346, 33.8],
-  ['grep', 'opencode', 44, 48, 107170, 37.0], ['hybrid', 'claude', 48, 48, 86579, 18.5],
+  ['grep', 'opencode', 44, 48, 107170, 41.0], ['hybrid', 'claude', 48, 48, 86579, 18.5],
   ['hybrid', 'copilot', 48, 48, 139868, 32.1], ['hybrid', 'opencode', 46, 48, 121469, 30.1],
 ];
 for (const [arm, ag, ranked, runs, content, lat] of AGENTS) {
@@ -131,16 +131,20 @@ for (const [arm, ag, ranked, runs, content, lat] of AGENTS) {
   check(`${arm}/${ag} latency`, Number(med(ok(arm, ag).map((x) => x.wall_s)).toFixed(1)), lat, 0.05);
 }
 
-// The agent-axis table on the PAGE quotes opencode over the unambiguous subset, because 21 of
-// its cells double-count a neighbour's session. Checking only the all-cells figure above would
-// pass while the page said something different — the exact rot this checker exists to catch.
+// THE PAGE AND RESULTS.md NOW QUOTE THE SAME DENOMINATOR, and this is what holds them there.
+//
+// They did not before. The page quoted opencode over an "unambiguous subset" of 35 and 40 cells,
+// on the belief that the excluded rows double-counted a neighbour's session. They did not — they
+// were the retried cells, correctly attributed, and dropping them removed the cells that had paid
+// for two attempts, which moved opencode's cost DOWN rather than correcting it. Every retried cell
+// is now attributed per attempt and none are flagged, so the subset IS the ranked set. Asserting
+// that identity is stronger than checking two numbers: it fails the moment a subset reappears.
 const clean = (arm, ag) => ok(arm, ag).filter((r) => !r.token_ambiguous);
-check('grep/opencode content (clean subset, as on the page)', Math.round(med(clean('grep', 'opencode').map((x) => x.content_tokens))), 90109, 1);
-check('hybrid/opencode content (clean subset, as on the page)', Math.round(med(clean('hybrid', 'opencode').map((x) => x.content_tokens))), 113145, 1);
-check('grep/opencode clean n', clean('grep', 'opencode').length, 35);
-check('hybrid/opencode clean n', clean('hybrid', 'opencode').length, 40);
-const ocVsClaude = med(clean('grep', 'opencode').map((x) => x.content_tokens)) / med(ok('grep', 'claude').map((x) => x.content_tokens));
-check('opencode ~1.16x claude tokens', Number(ocVsClaude.toFixed(2)), 1.16, 0.005);
+for (const arm of ['grep', 'hybrid']) {
+  check(`${arm}/opencode: the clean subset IS the ranked set`, clean(arm, 'opencode').length, ok(arm, 'opencode').length);
+}
+const ocVsClaude = med(ok('grep', 'opencode').map((x) => x.content_tokens)) / med(ok('grep', 'claude').map((x) => x.content_tokens));
+check('opencode ~1.38x claude tokens', Number(ocVsClaude.toFixed(2)), 1.38, 0.005);
 check('opencode hard-fail rate %', Math.round((1 - ok('grep', 'opencode').length / 48) * 100), 8);
 const copilotVsClaude = med(ok('grep', 'copilot').map((x) => x.content_tokens)) / med(ok('grep', 'claude').map((x) => x.content_tokens));
 check('copilot ~1.85x claude tokens', Number(copilotVsClaude.toFixed(2)), 1.85, 0.005);
@@ -179,14 +183,32 @@ check('all hallucinations are abstain-class', rows.filter((r) => r.hallucinated)
 check('no forced graph arm hallucinated', rows.filter((r) => r.hallucinated && (r.arm === 'graphify' || r.arm === 'codegraph')).length, 0);
 
 process.stdout.write('\n== token attribution after the fix ==\n');
-// NOT zero, and the page says so. The window opens before the cell spawns, so a neighbour's
-// session can be counted twice; every opencode figure on the page excludes these rows.
-check('ambiguous cells', rows.filter((r) => r.token_ambiguous).length, 21);
-check('ambiguous cells are all opencode', rows.filter((r) => r.token_ambiguous).every((r) => r.agent === 'opencode'), true);
+// ZERO, and it took two corrections to get here. 21 cells were flagged, the page called them
+// double-counts of a neighbour's session, and they were nothing of the kind: they were the 21
+// cells that had been RETRIED, each owning one session per attempt. Ambiguity is now judged per
+// attempt, so a retry is priced without a warning and only genuine concurrency flags.
+check('ambiguous cells', rows.filter((r) => r.token_ambiguous).length, 0);
 check('cells with an inherited predecessor', rows.filter((r) => r.token_sessions_inherited > 0).length, 44);
 check('proxy-db-session cells', rows.filter((r) => r.token_source === 'proxy-db-session').length, 192);
 check('stream-json cells', rows.filter((r) => r.token_source === 'stream-json').length, 192);
 check('unmeasured cells', rows.filter((r) => r.token_source === 'unmeasured').length, 0);
+
+// THE ROW MUST DESCRIBE THE CELL. This is the invariant the whole repair exists to restore, and
+// it is checked on the published rows rather than only in unit tests: a row whose wall_s is less
+// than the attempts it lists is contradicting itself, which is how the defect was visible all
+// along without anything objecting.
+const retried = rows.filter((r) => Array.isArray(r.attempts) && r.attempts.length > 1);
+check('retried cells', retried.length, 21);
+check('every retried cell records a window per attempt',
+  retried.every((r) => r.attempts.every((a) => a.started_at && a.ended_at)), true);
+check('no row is charged less than its own attempts',
+  retried.filter((r) => r.wall_s + 0.05 < r.attempts.reduce((a, x) => a + (x.wall_s ?? 0), 0)).length, 0);
+check('every retried cell attributes one session per attempt',
+  retried.every((r) => (r.token_attempt_sessions ?? []).every((c) => c <= 1)), true);
+// The continuation-budget table refuses to print an x2 latency, because x2's rows still carry the
+// pre-fix understatement. Pinned so nobody "completes" the table with a number that would read as
+// a slowdown the budget did not cause.
+claims('the x2 latency is withheld, not estimated', '| `x2` — budget 0 | 6/48 (13%) | 1.00 | not comparable |');
 
 process.stdout.write('\n== disagreements ==\n');
 check('disagreement count', report.disagreements.length, 20);
@@ -236,8 +258,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 28 rows', '| 28 |');
-claims('says twenty-eight defects', 'Twenty-eight defects were found');
+claims('defect table has 30 rows', '| 30 |');
+claims('says thirty defects', 'Thirty defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');

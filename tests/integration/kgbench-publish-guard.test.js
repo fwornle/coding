@@ -29,6 +29,8 @@ import os from 'node:os';
 const REPO = process.cwd();
 const SCRIPT = path.join(REPO, 'scripts/kgbench-report.mjs');
 const RUN = 'coding-v1-x2';
+/** The run docs/benchmarks/coding-v1 currently describes. Moves with the published page. */
+const PUBLISHED_RUN = 'coding-v1-r8';
 
 /** Run the reporter, returning {status, stderr} instead of throwing on refusal. */
 const render = (outPath, extra = []) => {
@@ -102,5 +104,38 @@ describe('the published coding-v1 pair keeps its roles straight', () => {
 
   it('README links to the generated numbers rather than restating them', () => {
     expect(readFileSync(path.join(dir, 'README.md'), 'utf8')).toContain('RESULTS.md');
+  });
+});
+
+/**
+ * A published row's clock must cover the attempts it says it made.
+ *
+ * THE DEFECT THIS PINS. `runCell` spread the LAST attempt's result onto the row, so a retried cell
+ * reported that attempt's `wall_s` beside an `attempts` array listing every attempt — 35.6s next to
+ * a list summing to 73.6s. The row contradicted itself in plain sight and nothing objected.
+ *
+ * This is a SHAPE check over whatever run is currently published, not a value check: it cannot tell
+ * you the number is right, only that the row is no longer self-contradicting. That is enough to
+ * stop the old row shape being republished.
+ */
+describe('a published row accounts for its own attempts', () => {
+  const RESULTS = path.join(REPO, '.data/kgbench/runs', PUBLISHED_RUN, 'results.jsonl');
+
+  it('wall_s is at least the sum of its attempts', () => {
+    if (!existsSync(RESULTS)) {
+      // Run data is gitignored. Absent on a fresh clone; present wherever it matters.
+      return;
+    }
+    const rows = readFileSync(RESULTS, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    const short = rows
+      .filter((r) => Array.isArray(r.attempts) && r.attempts.length > 1)
+      .map((r) => ({
+        cell: `${r.arm}/${r.agent}/${r.id} rep${r.rep}`,
+        wall_s: r.wall_s,
+        // 0.05 absorbs the per-attempt toFixed(1) rounding, nothing more.
+        attempts_wall_s: +r.attempts.reduce((a, x) => a + (x.wall_s ?? 0), 0).toFixed(1),
+      }))
+      .filter((x) => x.wall_s + 0.05 < x.attempts_wall_s);
+    expect(short).toEqual([]);
   });
 });

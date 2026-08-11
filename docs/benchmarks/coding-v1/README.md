@@ -74,18 +74,18 @@ grep scores 1.00 on all sixteen. See
 |---|---|--:|--:|--:|--:|
 | grep | claude | **48/48** | 1.00 | 77,394 | 18.1s |
 | grep | copilot | **48/48** | 1.00 | 143,346 | 33.8s |
-| grep | opencode | **44/48** | 1.00 | 90,109 † | 39.5s |
+| grep | opencode | **44/48** | 1.00 | 107,170 | 41.0s |
 | hybrid | claude | **48/48** | 1.00 | 86,579 | 18.5s |
 | hybrid | copilot | **48/48** | 1.00 | 139,868 | 32.1s |
-| hybrid | opencode | **46/48** | 1.00 | 113,145 † | 31.6s |
+| hybrid | opencode | **46/48** | 1.00 | 121,469 | 30.1s |
 
-† opencode's medians are taken over the cells whose token attribution is unambiguous — 35 of
-48 on `grep`, 40 of 48 on `hybrid`. The excluded rows are real over-counts, not noise; see
-[reliability](#reliability).
+Every figure is a median over that combination's ranked cells — the same denominator in every
+column. An earlier version of this table quoted opencode over a subset and its latency over
+everything; see [reliability](#reliability) for why the subset existed and why it was wrong.
 
 Every agent that produces an answer is **equally correct**: median 1.00 on every arm, every
 agent, without exception. What separates them is what they spend getting there. copilot costs
-**1.85× claude's content tokens** on the identical arm, and opencode about **1.16×**.
+**1.85× claude's content tokens** on the identical arm, and opencode **1.38×**.
 
 That is the more consequential finding, and it survived the correction that changed
 everything else about opencode's numbers. In `x2` this section reported opencode answering
@@ -112,8 +112,15 @@ resume *its own session* and finish. Same 48 cells, same arm, same model:
 
 | grep / opencode | answered | correctness | latency |
 |---|--:|--:|--:|
-| `x2` — budget 0 | 6/48 (13%) | 1.00 | 34.7s |
-| `r8` — budget 1 | **44/48 (92%)** | 1.00 | 45.9s |
+| `x2` — budget 0 | 6/48 (13%) | 1.00 | not comparable |
+| `r8` — budget 1 | **44/48 (92%)** | 1.00 | 41.0s |
+
+The latency column cannot be filled in for `x2`. 43 of its 48 `grep`/opencode cells were
+retried, and every one of them recorded only its **last** attempt's clock — the defect described
+under [reliability](#reliability). `r8`'s figure is repaired and charges each cell for every
+attempt it made, so putting the two side by side would compare a corrected number against an
+understated one and read as a slowdown the budget did not cause. Completion is the comparison
+this table exists to make, and it is unaffected.
 
 85% of cells (41 of 48) needed the extra turn. Across the whole run, **83 of 96 opencode
 cells** used it and **0 of 96 copilot cells** did — copilot's own 20-continue autopilot was
@@ -506,13 +513,34 @@ and it is worth noting that it came from the arms that search text and not from 
 query a structured index, which is the opposite of the `x2` pattern where the single
 hallucination was also grep's. Two runs, five rows, same direction.
 
-**Token attribution is not clean for opencode.** 21 of its 96 cells are flagged
-`token_ambiguous`, and the flag is correct: the resolver's window opens fractionally before the
-cell spawns, so a neighbouring cell's session can be counted twice. One flagged cell's 274,139
-tokens is exactly its own 139,727 plus its predecessor's 134,412. Including them inflates the
-`grep`/opencode content-token median by **24%** and `hybrid`/opencode's by **8%**, which is why
-every opencode figure on this page is taken over the unambiguous subset. No other agent is
-affected. This is a measurement defect in the harness, still open.
+**The token-attribution warning on this page was wrong, and it has been withdrawn.** An earlier
+version said 21 of opencode's 96 cells double-counted *a neighbouring cell's* session, and
+excluded them from every opencode figure. Both the cause and the remedy were mistaken.
+
+Those 21 cells are exactly the 21 cells that were **retried**. A retry is a fresh spawn, so it
+opens a session of its own; the resolver judged ambiguity per *cell*, saw two sessions, and
+flagged every retried cell in the run. The arithmetic that seemed to confirm the neighbour
+theory — one flagged cell's 274,139 tokens being "its own 139,727 plus its predecessor's
+134,412" — was reading the same cell's **first attempt** as a predecessor. The predecessor cell
+was a third session, 172,223 tokens, never counted at all. Checked across the whole run, no
+session's start falls inside more than one cell's window: there was no bleed to find.
+
+So the sums were right and only the label was wrong — and excluding those rows made the numbers
+worse, not better. A retried cell pays for two attempts, so dropping the retried cells dropped
+the expensive ones: it pushed opencode's measured cost **down**. Restoring them moves its
+content-token median from 90,109 to **107,170** on `grep` and 113,145 to **121,469** on
+`hybrid`, and its cost relative to claude on an identical arm from 1.16× to **1.38×**. The
+correction makes opencode look worse, which is the direction that says the exclusion was not
+protecting anyone.
+
+The underlying defect was in the runner, not the resolver. A cell's tokens were resolved over a
+window spanning every attempt, but the row was built from the *last* attempt — so it recorded
+that attempt's clock beside an all-attempts token total, and could not reproduce its own number.
+`wall_s` was understated by the same mechanism: this section's own latency figures were medians
+over cells charged for one attempt out of two. All of it is fixed; the run's rows were repaired
+in place from the proxy DB, without re-running a cell, and the repair is checked by requiring
+that per-attempt attribution and whole-span attribution agree to the token. **No claude or
+copilot figure on this page moved.**
 
 ---
 
@@ -538,9 +566,14 @@ affected. This is a measurement defect in the harness, still open.
   removable — it is what makes those cells answer at all.
 - **Only claude's arms are enforced.** copilot and opencode keep their built-in search on every
   arm, so their `grep` and `hybrid` rows differ by MCP configuration alone.
-- **21 of opencode's 96 cells have inflated token figures** and are excluded from its medians
-  here. The generated tables in `RESULTS.md` do *not* exclude them, so its cost rows there read
-  8–24% high.
+- **21 of opencode's 96 cells had their tokens re-resolved after the run**, because the runner
+  recorded a window that did not cover the attempts it made. This page and `RESULTS.md` now agree
+  on every figure; an earlier version of this page quoted a subset and did not.
+- **Seven of those 21 rows gained tokens between the run and the repair** — six by about 700, one
+  by 26,661 — because the proxy's token DB is append-only and the stop-adapters write late. The
+  repaired rows carry the later, higher numbers; the rows that needed no repair carry what they
+  were resolved to during the run. Exact reproducibility of a token figure is only ever "as of
+  when that row was resolved".
 - **This run was measured at continuation budget 1**, and the repository default is now 2. A
   run at a different budget is not comparable to this one on either completion or cost.
 - **The scores are not comparable to `x2`'s.** `x2` was graded by a mixture of haiku and opus;
@@ -623,7 +656,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Twenty-eight defects were found across the runs behind this page, and runs were discarded
+Thirty defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -659,8 +692,10 @@ documented because the failure modes generalise to any agent benchmark.
 | 24 | **A pin that was applied was then discarded.** The judge was pinned to `claude-code`/`claude-opus-5`, and the proxy logs show the pin being honoured — then `RATE_LIMITED`, then a CLI worker-pool fallback that returns `claude-haiku-4-5` whatever model it was asked for. The worker is spawned under `key=claude-opus-5` and still answers as haiku. | On one day that was 21 opus calls against 2,065 haiku ones, and the haiku stretch covered all of `x2`. Availability was never the problem — the model is served fine when the direct path is up — *reachability under load* was. Probing establishes that a provider **can** serve a model, not that it **will**. The judge is now pinned to a provider that honours the model rather than the one with the best catalogue. |
 | 25 | **A baseline that misses its window is gone for the whole run.** `grep`/copilot's floor was measured with a single probe and a 150s wait; the probe's rows never arrived, and a cell's `content_tokens` is `in_tokens` minus that floor. | Unlike a cell's tokens, which are re-resolvable from the proxy DB afterwards, a baseline has no stored window to re-resolve from — all 48 cells would have lost the headline cost metric permanently. Recovered here only because the floor is a property of the *combination* rather than of any question, so it could be re-measured after the fact and is disclosed as post-hoc on every row it touched. |
 | 26 | **The report never stated the terms it was measured under.** `run.json` had carried the continuation budget since the feature landed; the report never read the field. | The one term that makes two runs incomparable was absent from the document a reader compares runs with. Now on the second line, beside the commit and the model. |
-| 27 | **A warning asserted a cause it had not established.** The token-ambiguity note said *another session of that agent runs alongside the benchmark; re-run those cells on an otherwise idle machine.* On this run that was wrong, and following it would have changed nothing. | The machine was idle of other opencode work; the second session was the **previous cell's**, absorbed because the resolver's window opens before the cell spawns — one flagged cell's 274,139 tokens is exactly its own 139,727 plus its predecessor's 134,412. A warning that confidently misdiagnoses is worse than one admitting ignorance: it sends the reader to a remedy that cannot work and leaves them believing the data is repaired. The underlying window bug is **still open**. |
+| 27 | **A warning asserted a cause it had not established — twice.** The token-ambiguity note first said *another session of that agent runs alongside the benchmark; re-run those cells on an otherwise idle machine.* The machine was idle, so that remedy changed nothing. It was then rewritten to blame *the previous cell bleeding across the window boundary*, with arithmetic offered as proof: one flagged cell's 274,139 tokens being "its own 139,727 plus its predecessor's 134,412". | That was wrong too, and the arithmetic is what made it convincing. The 134,412 session was the **same cell's first attempt** — the cell had failed once and been retried. The actual predecessor was a third session of 172,223 tokens that was never counted. Across the whole run no session starts inside more than one cell's window, so the bleed never existed. A warning that confidently misdiagnoses is worse than one admitting ignorance, and a *second* confident misdiagnosis of the same rows is worse still: the second one was believed because it came with numbers. The warning now describes what was observed and names no cause. See defect 29 for the underlying bug, now **closed**. |
 | 28 | **A flag was parsed, then dropped on detach.** The supervisor re-execs itself under `nohup` to escape the process group, and that relaunch enumerates its flags explicitly. `--continuations` was added to the parser but not to the relaunch. | The run would have proceeded silently at budget 0 while its log said otherwise. Caught before launch by stubbing `node` on `PATH` and reading the argv each pass actually received, rather than trusting that threading a flag through is trivial. |
+| 29 | **A row described its last attempt while its tokens described the whole cell.** `runCell` resolved tokens over a window spanning every attempt, then built the row by spreading the *last* attempt's result. So a retried cell recorded that attempt's `started_at` and `wall_s` beside an all-attempts token total. Three consequences: the row could not reproduce its own number (re-resolving from its own window returns about half, which the offline backfill would have written back as an improvement); `wall_s` charged a cell that burned 73.6s as 35.6s; and every retried cell tripped the ambiguity check, because a retry is a fresh spawn and opens a session of its own. | The published analysis then *excluded* those 21 rows as over-counts — and since a retried cell pays for two attempts, excluding them pushed opencode's measured cost **down**, from 1.38× to 1.16× claude's. A correction applied in the wrong direction to correct data, on the strength of defect 27's confident wrong cause. Fixed at the source: the row now records the cell's span and per-attempt windows, ambiguity is judged per *attempt* (one session per attempt is a retry, two inside one attempt is an anomaly), and the backfill refuses any window narrower than the cell it describes. The run's rows were repaired offline from the proxy DB with no cell re-run, checked by requiring per-attempt and whole-span attribution to agree to the token. |
+| 30 | **A wall-clock sum dropped its middle legs.** The continuation loop computed `wall_s` as `first + last`, which is exact at a budget of 1 and lossy at 2 — the value the repository had just adopted as its default. | Found while fixing 29, not by a failing test, because no test exercised the continuation loop's arithmetic at all. It also blocks repairing the budget-2 run the same way: with attempt 1's duration under-recorded, the walk-back that reconstructs earlier attempt windows lands too late, and the repair script's controls refuse all four of that run's retried cells rather than writing a plausible wrong answer. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
