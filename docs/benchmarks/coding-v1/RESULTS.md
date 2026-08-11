@@ -3,13 +3,13 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3 reps/arm) against 4 arms.
-Repo at `56d581a48`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-09T10:24:44.513Z.
+Repo at `f4f13e86a`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-10T21:22:26.510Z.
 
-Secondary scorer: `claude-haiku-4-5-20251001`, `claude-opus-5` via `claude-code`. **Requested `claude-opus-5` — the proxy served something else; the served model is what graded these cells.**
+Continuation budget: **1** turn(s) per answer-file agent (inert for `claude`, whose loop is unbounded). Runs at different budgets are not comparable.
 
-Arms searched a sandboxed worktree of `56d581a48` with 26 path(s) removed (answer key, telemetry exports, agent rule files), verified to contain no question prompt or provenance note.
+Secondary scorer: `claude-sonnet-5` via `copilot`.
 
-Assembled across 3 commits, in 4 pass(es): `48c9206d1`, `ebd7da004`, `ebd7da004`, `56d581a48` (copilot, opencode). Cells are not all from one tree state.
+Arms searched a sandboxed worktree of `f4f13e86a` with 31 path(s) removed (answer key, telemetry exports, agent rule files), verified to contain no question prompt or provenance note.
 
 ## Overall
 
@@ -17,10 +17,10 @@ Assembled across 3 commits, in 4 pass(es): `48c9206d1`, `ebd7da004`, `ebd7da004`
 
 | Arm | ranked | correctness (median) | content tokens (median) | total tokens (median) | tool calls | latency s | hard-fail | hallucination |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
-| grep † | 102/144 | 1.00 | 102303 | 153301 | 4.0 | 25.4 | 29% | 1% |
-| graphify | 48/48 | 1.00 | 180527 | 203562 | 8.0 | 36.5 | 0% | 0% |
-| codegraph | 48/48 | 1.00 | 133001 | 154838 | 6.0 | 33.4 | 0% | 0% |
-| hybrid † | 102/144 | 1.00 | 86191 | 135607 | 4.0 | 24.1 | 29% | 0% |
+| grep † | 140/144 | 1.00 | 102752 | 147752 | 4.0 | 30.2 | 3% | 2% |
+| graphify | 48/48 | 1.00 | 131190 | 152850 | 5.0 | 28.1 | 0% | 0% |
+| codegraph | 48/48 | 1.00 | 161322 | 181784 | 8.0 | 50.3 | 0% | 0% |
+| hybrid † | 142/144 | 1.00 | 108014 | 146686 | 4.0 | 26.5 | 1% | 1% |
 
 **content tokens** = total minus that arm's measured empty-run baseline. Whole-session totals are dominated by a fixed floor of system prompt + tool schemas, which compresses every ratio; content tokens are what separate retrieval strategies.
 
@@ -32,14 +32,14 @@ These are the numbers the run actually produced. The `Overall` table above pools
 
 | Arm | Agent | ranked | correctness | content tokens | total tokens | tool calls | latency s | hard-fail | built-ins | answer via | tokens from |
 |---|---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
-| grep | claude | 48/48 | 1.00 | 74872 | 97308 | 4.0 | 17.8 | 0% | enforced | stream-json | stream-json×48 |
-| grep | copilot | 48/48 | 1.00 | 132147 | 195716 | — | 35.2 | 0% | not_enforced | answer-file | proxy-db-session×48 |
-| grep | opencode | 6/48 | 1.00 | 43571 | 108506 | — | 23.4 | 88% | ungated | answer-file | proxy-db-session×48 |
-| graphify | claude | 48/48 | 1.00 | 180527 | 203562 | 8.0 | 36.5 | 0% | enforced | stream-json | stream-json×48 |
-| codegraph | claude | 48/48 | 1.00 | 133001 | 154838 | 6.0 | 33.4 | 0% | enforced | stream-json | stream-json×48 |
-| hybrid | claude | 48/48 | 1.00 | 83081 | 108940 | 4.0 | 20.1 | 0% | enforced | stream-json | stream-json×48 |
-| hybrid | copilot | 48/48 | 1.00 | 105865 | 201434 | — | 33.6 | 0% | not_enforced | answer-file | proxy-db-session×48 |
-| hybrid | opencode | 6/48 | 1.00 | 79003 | 112120 | — | 18.3 | 88% | ungated | answer-file | proxy-db-session×48 |
+| grep | claude | 48/48 | 1.00 | 77394 | 98616 | 4.0 | 18.1 | 0% | enforced | stream-json | stream-json×48 |
+| grep | copilot | 48/48 | 1.00 | 143346 | 207371 | — | 33.8 | 0% | not_enforced | answer-file | proxy-db-session×48 |
+| grep | opencode | 44/48 | 1.00 | 107170 | 171545 | — | 37.0 | 8% | ungated | answer-file | proxy-db-session×48 |
+| graphify | claude | 48/48 | 1.00 | 131190 | 152850 | 5.0 | 28.1 | 0% | enforced | stream-json | stream-json×48 |
+| codegraph | claude | 48/48 | 1.00 | 161322 | 181784 | 8.0 | 50.3 | 0% | enforced | stream-json | stream-json×48 |
+| hybrid | claude | 48/48 | 1.00 | 86579 | 111063 | 4.0 | 18.5 | 0% | enforced | stream-json | stream-json×48 |
+| hybrid | copilot | 48/48 | 1.00 | 139868 | 203489 | — | 32.1 | 0% | not_enforced | answer-file | proxy-db-session×48 |
+| hybrid | opencode | 46/48 | 1.00 | 121469 | 155010 | — | 30.1 | 4% | ungated | answer-file | proxy-db-session×48 |
 
 `tool calls` is blank for any agent elicited by answer file: only claude's stream-json reports a tool trace, so a dash there means **not measured**, not zero.
 
@@ -59,10 +59,10 @@ A winner is declared only at a ≥1.25x median gap with non-overlapping IQR. Any
 
 | Arm | runs | ranked | ungraded | failed | retry rate | hard-fail rate |
 |---|--:|--:|--:|--:|--:|--:|
-| grep † | 144 | 102 | 0 | 42 | 30% | 29% |
+| grep † | 144 | 140 | 0 | 4 | 9% | 3% |
 | graphify | 48 | 48 | 0 | 0 | 0% | 0% |
 | codegraph | 48 | 48 | 0 | 0 | 0% | 0% |
-| hybrid † | 144 | 102 | 0 | 42 | 31% | 29% |
+| hybrid † | 144 | 142 | 0 | 2 | 6% | 1% |
 
 Failed runs are counted, never dropped. An arm that stalls is not cheap — it is unavailable, and averaging only its successes would report the opposite.
 
@@ -81,20 +81,34 @@ Failed runs are counted, never dropped. An arm that stalls is not cheap — it i
 
 A cell whose tokens are `unmeasured` still ranks on correctness; it is only absent from the token medians. Reporting 0 there would make the least measurable agent look the cheapest.
 
+> **21 cell(s) had more than one session of the same agent inside their window.** Their token figures may include traffic that is not the cell's, and they are the rows to drop before quoting a cost. Two causes produce this and they are not distinguishable from the count alone: another session of that agent running alongside the benchmark, or an adjacent cell of this same run bleeding across the window boundary. Compare a flagged cell's total against its neighbours' in the proxy token DB before concluding which — if the sum equals this cell plus the one before it, an idle machine will not fix it.
+
 Agents in this run: `claude`, `copilot`, `opencode`.
 
 ## Checklist vs judge disagreements
 
 | Question | Arm | checklist | judge | note |
 |---|---|--:|--:|---|
-| A4 | grep | 0.33 | 0.00 | checklist_higher |
-| L2 | graphify | 1.00 | 0.50 | checklist_higher |
-| A1 | graphify | 1.00 | 0.50 | checklist_higher |
+| A4 | grep | 1.00 | 0.67 | checklist_higher |
+| A4 | grep | 1.00 | 0.67 | checklist_higher |
+| B2 | grep | 1.00 | 0.50 | checklist_higher |
+| B2 | grep | 1.00 | 0.00 | checklist_higher |
+| B3 | grep | 0.50 | 0.00 | checklist_higher |
+| B3 | grep | 0.50 | 0.00 | checklist_higher |
+| A4 | graphify | 1.00 | 0.67 | checklist_higher |
 | B2 | codegraph | 1.00 | 0.50 | checklist_higher |
-| A2 | codegraph | 1.00 | 0.57 | checklist_higher |
-| A4 | codegraph | 0.33 | 0.00 | checklist_higher |
-| A4 | codegraph | 0.33 | 0.00 | checklist_higher |
+| A1 | codegraph | 0.65 | 0.00 | checklist_higher |
+| A1 | codegraph | 0.65 | 0.00 | checklist_higher |
+| A1 | codegraph | 0.65 | 0.00 | checklist_higher |
+| A2 | codegraph | 0.50 | 0.00 | checklist_higher |
+| A4 | codegraph | 1.00 | 0.67 | checklist_higher |
 | B2 | hybrid | 1.00 | 0.50 | checklist_higher |
+| B3 | hybrid | 1.00 | 0.50 | checklist_higher |
+| A4 | hybrid | 0.82 | 0.33 | checklist_higher |
+| B2 | hybrid | 1.00 | 0.50 | checklist_higher |
+| B2 | hybrid | 1.00 | 0.00 | checklist_higher |
+| B3 | hybrid | 0.50 | 0.00 | checklist_higher |
+| A4 | hybrid | 1.00 | 0.67 | checklist_higher |
 
 `judge_higher` usually means the checklist matcher is too strict (the answer paraphrased a path) — fix the matcher and re-grade offline. `checklist_higher` usually means correct strings were padded into a wrong narrative, which is a real quality signal.
 

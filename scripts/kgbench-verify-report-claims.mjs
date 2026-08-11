@@ -25,7 +25,10 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 
-const RUN = '.data/kgbench/runs/coding-v1-x2';
+// The run the published page describes. Must move with the page: this checker compares the
+// PROSE against the ROWS, so pointing it at a different run than the one README.md analyses
+// makes every number disagree at once — which is loud, but for the wrong reason.
+const RUN = '.data/kgbench/runs/coding-v1-r8';
 if (!existsSync(`${RUN}/results.jsonl`)) {
   process.stdout.write(`kgbench: no run data at ${RUN}/results.jsonl (gitignored) — nothing to check.\n`);
   process.exit(2);
@@ -65,15 +68,15 @@ process.stdout.write('\n== header ==\n');
 check('total cells', rows.length, 384);
 check('contaminated', rows.filter((r) => r.contaminated).length, 0);
 check('tool escapes', rows.filter((r) => r.outcome === 'tool_escape').length, 0);
-check('sandbox paths removed', report.meta.sandbox.excluded.length, 26);
-check('tree commit', report.meta.sandbox.tree_commit.slice(0, 9), '56d581a48');
+check('sandbox paths removed', report.meta.sandbox.excluded.length, 31);
+check('tree commit', report.meta.sandbox.tree_commit.slice(0, 9), 'f4f13e86a');
 
 process.stdout.write('\n== bottom line, claude arms ==\n');
 const BOTTOM = {
-  grep: { content: 74872, lat: 17.8, p90: 47.4, cost: 0.091 },
-  graphify: { content: 180527, lat: 36.5, p90: 95.1, cost: 0.194 },
-  codegraph: { content: 133001, lat: 33.4, p90: 112.4, cost: 0.165 },
-  hybrid: { content: 83081, lat: 20.1, p90: 33.2, cost: 0.087 },
+  grep: { content: 77394, lat: 18.1, p90: 34.9, cost: 0.084 },
+  graphify: { content: 131190, lat: 28.1, p90: 69.2, cost: 0.153 },
+  codegraph: { content: 161322, lat: 50.3, p90: 122.0, cost: 0.192 },
+  hybrid: { content: 86579, lat: 18.5, p90: 32.4, cost: 0.090 },
 };
 for (const [arm, e] of Object.entries(BOTTOM)) {
   const r = ok(arm, 'claude');
@@ -89,56 +92,75 @@ for (const [arm, e] of Object.entries(BOTTOM)) {
 process.stdout.write('\n== the stated ratios ==\n');
 const g = med(ok('grep', 'claude').map((x) => x.content_tokens));
 const ratios = ['graphify', 'codegraph'].map((a) => med(ok(a, 'claude').map((x) => x.content_tokens)) / g);
-check('token ratio range low  (claims 1.8)', Number(Math.min(...ratios).toFixed(1)), 1.8, 0.05);
-check('token ratio range high (claims 2.4)', Number(Math.max(...ratios).toFixed(1)), 2.4, 0.05);
+check('token ratio range low  (claims 1.7)', Number(Math.min(...ratios).toFixed(1)), 1.7, 0.05);
+check('token ratio range high (claims 2.1)', Number(Math.max(...ratios).toFixed(1)), 2.1, 0.05);
 const gl = med(ok('grep', 'claude').map((x) => x.wall_s));
 const lr = ['graphify', 'codegraph'].map((a) => med(ok(a, 'claude').map((x) => x.wall_s)) / gl);
-check('latency ratio low  (claims 1.9)', Number(Math.min(...lr).toFixed(1)), 1.9, 0.05);
-check('latency ratio high (claims 2.1)', Number(Math.max(...lr).toFixed(1)), 2.1, 0.05);
+check('latency ratio low  (claims 1.5)', Number(Math.min(...lr).toFixed(1)), 1.5, 0.05);
+check('latency ratio high (claims 2.8)', Number(Math.max(...lr).toFixed(1)), 2.8, 0.05);
 const gc = med(ok('grep', 'claude').map((x) => x.cost_usd));
 const cr = ['graphify', 'codegraph'].map((a) => med(ok(a, 'claude').map((x) => x.cost_usd)) / gc);
 check('cost ratio low  (claims 1.8)', Number(Math.min(...cr).toFixed(1)), 1.8, 0.05);
-check('cost ratio high (claims 2.1)', Number(Math.max(...cr).toFixed(1)), 2.1, 0.05);
+check('cost ratio high (claims 2.3)', Number(Math.max(...cr).toFixed(1)), 2.3, 0.05);
 
 process.stdout.write('\n== hybrid tool choice ==\n');
 const h = all('hybrid', 'claude');
 const tools = {};
 for (const r of h) for (const t of (r.tools_executed || [])) tools[t] = (tools[t] || 0) + 1;
-check('total tool calls', Object.values(tools).reduce((a, b) => a + b, 0), 226);
-check('graph-tool calls', Object.entries(tools).filter(([k]) => k.startsWith('mcp__')).reduce((a, [, n]) => a + n, 0), 3);
-check('graphify calls', Object.entries(tools).filter(([k]) => k.includes('graphify')).reduce((a, [, n]) => a + n, 0), 0);
-check('cells using any graph tool', h.filter((r) => (r.tools_executed || []).some((t) => t.startsWith('mcp__'))).length, 3);
-check('Grep calls', tools.Grep ?? 0, 150);
-check('Read calls', tools.Read ?? 0, 51);
-check('Glob calls', tools.Glob ?? 0, 22);
+check('total tool calls', Object.values(tools).reduce((a, b) => a + b, 0), 230);
+check('graph-tool calls', Object.entries(tools).filter(([k]) => k.startsWith('mcp__')).reduce((a, [, n]) => a + n, 0), 6);
+check('graphify calls', Object.entries(tools).filter(([k]) => k.includes('graphify')).reduce((a, [, n]) => a + n, 0), 1);
+check('cells using any graph tool', h.filter((r) => (r.tools_executed || []).some((t) => t.startsWith('mcp__'))).length, 6);
+check('Grep calls', tools.Grep ?? 0, 156);
+check('Read calls', tools.Read ?? 0, 49);
+check('Glob calls', tools.Glob ?? 0, 19);
 for (const arm of ['graphify', 'codegraph']) {
   check(`${arm}: cells with no graph call`, all(arm, 'claude').filter((r) => !(r.tools_executed || []).some((t) => t.startsWith('mcp__'))).length, 6);
 }
 
 process.stdout.write('\n== agent axis table ==\n');
 const AGENTS = [
-  ['grep', 'claude', 48, 48, 74872, 17.8], ['grep', 'copilot', 48, 48, 132147, 35.2],
-  ['grep', 'opencode', 6, 48, 43571, 23.4], ['hybrid', 'claude', 48, 48, 83081, 20.1],
-  ['hybrid', 'copilot', 48, 48, 105865, 33.6], ['hybrid', 'opencode', 6, 48, 79003, 18.3],
+  ['grep', 'claude', 48, 48, 77394, 18.1], ['grep', 'copilot', 48, 48, 143346, 33.8],
+  ['grep', 'opencode', 44, 48, 107170, 37.0], ['hybrid', 'claude', 48, 48, 86579, 18.5],
+  ['hybrid', 'copilot', 48, 48, 139868, 32.1], ['hybrid', 'opencode', 46, 48, 121469, 30.1],
 ];
 for (const [arm, ag, ranked, runs, content, lat] of AGENTS) {
   check(`${arm}/${ag} ranked`, ok(arm, ag).length, ranked);
   check(`${arm}/${ag} runs`, all(arm, ag).length, runs);
-  check(`${arm}/${ag} content`, Math.round(med(ok(arm, ag).map((x) => x.content_tokens))), content, 1);
+  check(`${arm}/${ag} content (all cells, as in RESULTS.md)`, Math.round(med(ok(arm, ag).map((x) => x.content_tokens))), content, 1);
   check(`${arm}/${ag} latency`, Number(med(ok(arm, ag).map((x) => x.wall_s)).toFixed(1)), lat, 0.05);
 }
-check('opencode hard-fail rate %', Math.round((1 - ok('grep', 'opencode').length / 48) * 100), 88);
+
+// The agent-axis table on the PAGE quotes opencode over the unambiguous subset, because 21 of
+// its cells double-count a neighbour's session. Checking only the all-cells figure above would
+// pass while the page said something different — the exact rot this checker exists to catch.
+const clean = (arm, ag) => ok(arm, ag).filter((r) => !r.token_ambiguous);
+check('grep/opencode content (clean subset, as on the page)', Math.round(med(clean('grep', 'opencode').map((x) => x.content_tokens))), 90109, 1);
+check('hybrid/opencode content (clean subset, as on the page)', Math.round(med(clean('hybrid', 'opencode').map((x) => x.content_tokens))), 113145, 1);
+check('grep/opencode clean n', clean('grep', 'opencode').length, 35);
+check('hybrid/opencode clean n', clean('hybrid', 'opencode').length, 40);
+const ocVsClaude = med(clean('grep', 'opencode').map((x) => x.content_tokens)) / med(ok('grep', 'claude').map((x) => x.content_tokens));
+check('opencode ~1.16x claude tokens', Number(ocVsClaude.toFixed(2)), 1.16, 0.005);
+check('opencode hard-fail rate %', Math.round((1 - ok('grep', 'opencode').length / 48) * 100), 8);
 const copilotVsClaude = med(ok('grep', 'copilot').map((x) => x.content_tokens)) / med(ok('grep', 'claude').map((x) => x.content_tokens));
-check('copilot ~1.8x claude tokens', Number(copilotVsClaude.toFixed(1)), 1.8, 0.05);
+check('copilot ~1.85x claude tokens', Number(copilotVsClaude.toFixed(2)), 1.85, 0.005);
 
 process.stdout.write('\n== per-question, where the analysis names a number ==\n');
 const q = (id, arm) => med(rows.filter((r) => r.id === id && r.arm === arm && r.agent === 'claude' && r.outcome === 'ok').map((r) => r.score));
 check('codegraph L2', Number(q('L2', 'codegraph').toFixed(2)), 0.00, 0.005);
-check('codegraph A2', Number(q('A2', 'codegraph').toFixed(2)), 0.65, 0.005);
-check('codegraph A4', Number(q('A4', 'codegraph').toFixed(2)), 0.33, 0.005);
-for (const arm of ['grep', 'graphify', 'hybrid']) check(`${arm} A4`, Number(q('A4', arm).toFixed(2)), 0.82, 0.005);
-for (const arm of ['grep', 'graphify', 'hybrid']) check(`${arm} L2`, Number(q('L2', arm).toFixed(2)), 1.00, 0.005);
-check('codegraph A2 median tool calls', med(rows.filter((r) => r.id === 'A2' && r.arm === 'codegraph' && r.agent === 'claude').map((r) => r.tool_calls)), 20);
+check('codegraph B3', Number(q('B3', 'codegraph').toFixed(2)), 0.50, 0.005);
+check('codegraph A1', Number(q('A1', 'codegraph').toFixed(2)), 0.65, 0.005);
+check('graphify L2', Number(q('L2', 'graphify').toFixed(2)), 0.65, 0.005);
+// A4 is the question the graph arms DIDN'T lose this time — codegraph scores a full 1.00 and
+// graphify/hybrid drop it. Pinned because the analysis says so explicitly: which question a
+// graph arm drops is unstable at three reps, and this is the evidence for that claim.
+check('codegraph A4', Number(q('A4', 'codegraph').toFixed(2)), 1.00, 0.005);
+for (const arm of ['graphify', 'hybrid']) check(`${arm} A4`, Number(q('A4', arm).toFixed(2)), 0.82, 0.005);
+check('grep A4', Number(q('A4', 'grep').toFixed(2)), 1.00, 0.005);
+for (const arm of ['grep', 'hybrid']) check(`${arm} L2`, Number(q('L2', arm).toFixed(2)), 1.00, 0.005);
+// grep never scores below 1.00 on any question — the claim the corpus-scope section rests on.
+check('grep is 1.00 on every question', [...new Set(rows.map((r) => r.id))].every((id) => q(id, 'grep') === 1), true);
+check('codegraph L2 median tool calls', med(rows.filter((r) => r.id === 'L2' && r.arm === 'codegraph' && r.agent === 'claude').map((r) => r.tool_calls)), 12);
 
 process.stdout.write('\n== class medians all 1.00 (claude) ==\n');
 for (const cls of [...new Set(rows.map((r) => r.cls))].sort()) {
@@ -150,26 +172,31 @@ for (const cls of [...new Set(rows.map((r) => r.cls))].sort()) {
 process.stdout.write(`  (checked ${5 * 4} class/arm medians)\n`);
 
 process.stdout.write('\n== reliability and hallucination ==\n');
-check('hallucinated rows', rows.filter((r) => r.hallucinated).length, 1);
-const hal = rows.find((r) => r.hallucinated);
-check('the hallucination is grep/claude/T3', `${hal.arm}/${hal.agent}/${hal.id}/rep${hal.rep}`, 'grep/claude/T3/rep1');
+check('hallucinated rows', rows.filter((r) => r.hallucinated).length, 4);
+// All four are abstain questions, and all four come from arms that have text search. Neither
+// forced graph arm hallucinated — the one result on the page that favours an index.
+check('all hallucinations are abstain-class', rows.filter((r) => r.hallucinated).every((r) => r.id.startsWith('T')), true);
+check('no forced graph arm hallucinated', rows.filter((r) => r.hallucinated && (r.arm === 'graphify' || r.arm === 'codegraph')).length, 0);
 
 process.stdout.write('\n== token attribution after the fix ==\n');
-check('ambiguous cells', rows.filter((r) => r.token_ambiguous).length, 0);
-check('cells with an inherited predecessor', rows.filter((r) => r.token_sessions_inherited > 0).length, 94);
+// NOT zero, and the page says so. The window opens before the cell spawns, so a neighbour's
+// session can be counted twice; every opencode figure on the page excludes these rows.
+check('ambiguous cells', rows.filter((r) => r.token_ambiguous).length, 21);
+check('ambiguous cells are all opencode', rows.filter((r) => r.token_ambiguous).every((r) => r.agent === 'opencode'), true);
+check('cells with an inherited predecessor', rows.filter((r) => r.token_sessions_inherited > 0).length, 44);
 check('proxy-db-session cells', rows.filter((r) => r.token_source === 'proxy-db-session').length, 192);
 check('stream-json cells', rows.filter((r) => r.token_source === 'stream-json').length, 192);
 check('unmeasured cells', rows.filter((r) => r.token_source === 'unmeasured').length, 0);
 
 process.stdout.write('\n== disagreements ==\n');
-check('disagreement count', report.disagreements.length, 8);
+check('disagreement count', report.disagreements.length, 20);
 check('all are checklist_higher', report.disagreements.every((d) => d.kind === 'checklist_higher'), true);
 
 process.stdout.write('\n== judge ==\n');
 const served = rows.map((r) => r.judge_model_served).filter(Boolean);
-check('opus-judged cells', served.filter((m) => m.includes('opus')).length, 23);
-check('haiku-judged cells', served.filter((m) => m.includes('haiku')).length, 218);
-check('report records a mismatch', report.meta.judge.mismatch, true);
+check('sonnet-5-judged cells', served.filter((m) => m.includes('sonnet-5')).length, 308);
+check('haiku-judged cells (all re-judged)', served.filter((m) => m.includes('haiku')).length, 0);
+check('report records NO mismatch', report.meta.judge.mismatch, false);
 
 process.stdout.write('\n== provenance ==\n');
 check('claude cells', rows.filter((r) => r.agent === 'claude').length, 192);
@@ -209,8 +236,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 18 rows', '| 18 |');
-claims('says eighteen defects', 'Eighteen defects were found');
+claims('defect table has 28 rows', '| 28 |');
+claims('says twenty-eight defects', 'Twenty-eight defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');
