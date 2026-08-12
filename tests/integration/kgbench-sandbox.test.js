@@ -15,7 +15,10 @@ import { fileURLToPath } from 'node:url';
 
 // ESM: no __dirname. The repo root is two levels up from tests/integration/.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-import { leakNeedles, scanTreeForLeaks, classifyLeaks, DEFAULT_EXCLUDES } from '../../lib/kgbench/sandbox.mjs';
+import {
+  leakNeedles, scanTreeForLeaks, classifyLeaks, DEFAULT_EXCLUDES, indexCoverageProblems,
+} from '../../lib/kgbench/sandbox.mjs';
+import { loadArms, resolveArms, REPO_ROOT as REPO } from '../../lib/kgbench/arms.mjs';
 
 const QUESTIONS = [
   {
@@ -236,5 +239,79 @@ describe('the agent adapters are withheld from the tree', () => {
     expect(DEFAULT_EXCLUDES).not.toContain('lib/kgbench/runner.mjs');
     expect(DEFAULT_EXCLUDES).not.toContain('lib/kgbench/arms.mjs');
     expect(DEFAULT_EXCLUDES).not.toContain('lib/kgbench/report.mjs');
+  });
+});
+
+/**
+ * THE CODE-GRAPH INDEX MUST DESCRIBE THE TREE UNDER TEST.
+ *
+ * Every run up to and including r8 served the codegraph arm an index of the MAIN WORKING
+ * TREE, because the arms' worktree lives under os.tmpdir() and the container that hosts the
+ * index server mounts only ${HOME}/Agentic. The arm therefore either found no index at all
+ * (>=30 of 172 cells said so in as many words) or answered about a different corpus than every
+ * other arm searched — and the preflight passed throughout, because it only asked whether an
+ * index FILE existed on the host.
+ *
+ * These pin the policy, not the 40-second build.
+ */
+describe('index coverage is a gate, not an assumption', () => {
+  const PROJECT = '/coding/.data/kgbench/trees/demo/index';
+  const healthy = { initialized: true, fileCount: 1600, nodeCount: 27000, projectPath: PROJECT };
+
+  it('passes a healthy index of the right project', () => {
+    expect(indexCoverageProblems(healthy, { project: PROJECT })).toEqual([]);
+  });
+
+  it('catches the exact failure the benchmark shipped: an index of the WRONG project', () => {
+    // Initialized, populated, and describing /workspace/coding instead of the run tree.
+    // Nothing about this is detectable from the score — the arm just answers about a repo
+    // the other arms are not searching, and does it fluently.
+    const wrong = { ...healthy, projectPath: '/workspace/coding' };
+    const problems = indexCoverageProblems(wrong, { project: PROJECT });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/describes \/workspace\/coding, expected/);
+  });
+
+  it('catches an uninitialized project — what `docker exec` cwd /coding actually returns', () => {
+    const problems = indexCoverageProblems({ initialized: false, projectPath: '/coding' }, { project: PROJECT });
+    expect(problems.some((p) => /not initialized/.test(p))).toBe(true);
+  });
+
+  it('catches an index that is initialized but empty', () => {
+    const problems = indexCoverageProblems({ ...healthy, fileCount: 0 }, { project: PROJECT });
+    expect(problems.some((p) => /covers 0 files/.test(p))).toBe(true);
+  });
+
+  it('treats a missing status as a problem rather than a pass', () => {
+    // A `codegraph status` that returns nothing must not read as "no problems found".
+    expect(indexCoverageProblems(null, { project: PROJECT })).toHaveLength(1);
+    expect(indexCoverageProblems(undefined, { project: PROJECT })).toHaveLength(1);
+  });
+});
+
+describe('the codegraph MCP server is pinned to a project', () => {
+  it('defaults to the production project when nothing is set', () => {
+    // Unset is the --no-sandbox case and the production case. It must NOT fall back to the
+    // container cwd /coding, which holds no index — that was the standing bug.
+    const [arm] = resolveArms(loadArms(REPO), ['codegraph'], { repoRoot: REPO, env: { PATH: process.env.PATH } });
+    expect(arm.mcpConfig.mcpServers.codegraph.args).toEqual(
+      expect.arrayContaining(['-p', '/workspace/coding']),
+    );
+  });
+
+  it('serves the run tree when kgbench pins one', () => {
+    const project = '/coding/.data/kgbench/trees/demo/index';
+    const env = { ...process.env, CODEGRAPH_PROJECT_DIR: project };
+    const [cg, hy] = resolveArms(loadArms(REPO), ['codegraph', 'hybrid'], { repoRoot: REPO, env });
+    // BOTH arms, not just the codegraph one. hybrid grants the same tool, and 14 of the 17
+    // graph calls behind the tool-choice result went to it — so a fix that reached only the
+    // single-backend arm would leave the headline claim measured against a broken server.
+    expect(cg.mcpConfig.mcpServers.codegraph.args).toEqual(expect.arrayContaining(['-p', project]));
+    expect(hy.mcpConfig.mcpServers.codegraph.args).toEqual(expect.arrayContaining(['-p', project]));
+  });
+
+  it('never leaves the project implicit', () => {
+    const [arm] = resolveArms(loadArms(REPO), ['codegraph'], { repoRoot: REPO });
+    expect(arm.mcpConfig.mcpServers.codegraph.args).toContain('-p');
   });
 });

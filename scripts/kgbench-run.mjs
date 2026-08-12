@@ -33,7 +33,7 @@ import {
   discoverBuiltinTools, denyListFor,
 } from '../lib/kgbench/runner.mjs';
 import { gradeQuestion } from '../lib/kgbench/graders.mjs';
-import { createRunTree } from '../lib/kgbench/sandbox.mjs';
+import { createRunTree, indexCoverageProblems } from '../lib/kgbench/sandbox.mjs';
 import { judgeAnswer, reconcile, JUDGE_MODEL, JUDGE_PROVIDER } from '../lib/kgbench/judge.mjs';
 import { resolveAgent, armIsFaithful, cellKey, KNOWN_AGENTS } from '../lib/kgbench/agents.mjs';
 import { prepareAgentMcp } from '../lib/kgbench/agent-sandbox.mjs';
@@ -57,6 +57,35 @@ if (continuationBudget != null && (!Number.isInteger(continuationBudget) || cont
   die('--continuations must be an integer 0-5');
 }
 
+// Pin the SEARCHED CORPUS to a commit, independently of the harness that runs it. A rerun
+// whose purpose is to change one thing — here, whether the codegraph index covers the tree
+// under test — must hold the corpus still, or the comparison has two moving parts. run.json
+// records both: `commit` is the harness, `sandbox.tree_commit` is what the arms searched.
+const atCommit = opt('commit', null);
+
+// RUN ID IS RESOLVED HERE, ahead of arm resolution, because the per-run index path is
+// derived from it and that path has to be known before the MCP config is built (below).
+// It depends on argv alone, so hoisting it past the preflight block changes nothing else.
+const runId = opt('run-id', `kg${Date.now().toString(36)}`);
+const runDir = path.join(repoRoot, '.data/kgbench/runs', runId);
+mkdirSync(runDir, { recursive: true });
+const resultsFile = path.join(runDir, 'results.jsonl');
+
+// WHERE THE CODEGRAPH INDEX FOR THIS RUN LIVES, on the host and as the container sees it.
+//
+// Two separate requirements force this shape. The container can only read what compose
+// mounts, and os.tmpdir() is not mounted — so an index over the arms' tmp tree is
+// impossible, and the server silently answered about the main working tree instead. And
+// codegraph always writes its DB to `<project>/.codegraph/`, which cannot be relocated —
+// so the indexed tree must NOT be the tree the arms search, because that DB stores
+// file_path and qualified_name for every symbol, i.e. it is an answer key for the lookup
+// questions and `hybrid` has Grep.
+//
+// Hence a second worktree, built from the same commit with the same exclusions, existing
+// only to hold the index. `.data` is bind-mounted rw at /coding/.data.
+const indexTreeHost = path.join(repoRoot, '.data/kgbench/trees', runId, 'index');
+const indexTreeContainer = `/coding/.data/kgbench/trees/${runId}/index`;
+
 let armsDoc, questionSet;
 try {
   armsDoc = loadArms(repoRoot);
@@ -65,7 +94,14 @@ try {
 
 const armIds = opt('arms', null)?.split(',').map((s) => s.trim()) ?? enabledArmIds(armsDoc);
 let arms;
-try { arms = resolveArms(armsDoc, armIds, { repoRoot }); } catch (err) { die(err.message); }
+// CODEGRAPH_PROJECT_DIR reaches the MCP server args through the registry's ${VAR:-default}
+// expansion (lib/code-graph/registry.mjs expandVars), which is the same mechanism that
+// already resolves graphify's port. Unset — which is what --no-sandbox leaves it — the
+// default /workspace/coding applies and behaviour is exactly as before.
+const armEnv = flag('no-sandbox')
+  ? process.env
+  : { ...process.env, CODEGRAPH_PROJECT_DIR: indexTreeContainer };
+try { arms = resolveArms(armsDoc, armIds, { repoRoot, env: armEnv }); } catch (err) { die(err.message); }
 
 const questions = only
   ? questionSet.questions.filter((q) => only.includes(q.id))
@@ -150,11 +186,6 @@ try {
   dirty = execFileSync('git', ['-C', repoRoot, 'status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0;
 } catch { /* not a git checkout */ }
 
-const runId = opt('run-id', `kg${Date.now().toString(36)}`);
-const runDir = path.join(repoRoot, '.data/kgbench/runs', runId);
-mkdirSync(runDir, { recursive: true });
-const resultsFile = path.join(runDir, 'results.jsonl');
-
 // ---- sandboxed run tree ----------------------------------------------------
 // The arms must not be able to read the answer key that grades them. See
 // lib/kgbench/sandbox.mjs — in the coding-v1 pilot the grep arm scored 1.00 on an
@@ -178,8 +209,13 @@ let armCwd = repoRoot;
 // dashboard's Cancel button makes stopping a run in its first seconds an ordinary act, and it
 // leaked on the first try.
 let releaseWorktree = null;
+let releaseIndexTree = null;
 const releaseTree = () => {
   if (releaseWorktree) { const fn = releaseWorktree; releaseWorktree = null; tree = null; fn(); }
+  // The index tree carries a ~120MB .codegraph/ that git never tracked. `worktree remove
+  // --force` handles untracked content, but it is the second thing that can fail here and
+  // a throw would strand the first, so each releases independently.
+  if (releaseIndexTree) { const fn = releaseIndexTree; releaseIndexTree = null; try { fn(); } catch { /* best effort */ } }
 };
 process.on('exit', releaseTree);
 for (const sig of ['SIGINT', 'SIGTERM']) {
@@ -195,15 +231,52 @@ if (flag('no-sandbox')) {
     tree = createRunTree({
       repoRoot,
       questions,
+      at: atCommit,
       // Fires as soon as `git worktree add` succeeds — long before this call returns.
       onWorktreeCreated: ({ cleanup }) => { releaseWorktree = cleanup; },
     });
     armCwd = tree.dir;
     out(`  tree     ${tree.dir}`);
-    out(`  commit   ${tree.commit.slice(0, 9)}`);
+    out(`  commit   ${tree.commit.slice(0, 9)}${atCommit ? `  (pinned via --commit ${atCommit})` : ''}`);
     out(`  excluded ${tree.removed.join(', ')}`);
     out('  verified no question prompt or provenance note survives in the tree');
   } catch (err) { die(err.message); }
+}
+
+// ---- per-run code-graph index ----------------------------------------------
+// Built over a SECOND worktree of the same commit with the same exclusions, so the index
+// describes exactly the corpus the arms search — no more (the main working tree, which is
+// what it used to describe) and no less. Skipped unless an arm actually needs it, because
+// it costs ~40s and ~120MB.
+let indexTree = null;
+const needsCodegraph = arms.some((a) => JSON.stringify(a.mcpConfig?.mcpServers ?? {}).includes('codegraph'));
+if (tree && needsCodegraph) {
+  out('kgbench: building the codegraph index over the run tree...');
+  try {
+    indexTree = createRunTree({
+      repoRoot,
+      questions,
+      at: tree.commit,             // the SAME commit the arms search, not HEAD twice
+      dir: indexTreeHost,
+      onWorktreeCreated: ({ cleanup }) => { releaseIndexTree = cleanup; },
+    });
+    const t0 = Date.now();
+    execFileSync('docker', ['exec', 'coding-services', 'codegraph', 'index', indexTreeContainer],
+      { stdio: 'pipe', encoding: 'utf8', timeout: 15 * 60_000 });
+    const status = JSON.parse(execFileSync('docker',
+      ['exec', 'coding-services', 'codegraph', 'status', indexTreeContainer, '--json'],
+      { encoding: 'utf8', timeout: 60_000 }));
+    // FAIL CLOSED. An index that is missing, empty, or pointed elsewhere is precisely the
+    // condition that produced a page of numbers describing the wrong tree; it must stop the
+    // run rather than quietly degrade it to "the arm answers from memory".
+    const problems = indexCoverageProblems(status, { project: indexTreeContainer });
+    if (problems.length) die(`codegraph index unusable — ${problems.join('; ')}`);
+    indexTree.status = status;
+    out(`  indexed  ${status.fileCount} files, ${status.nodeCount} nodes in ${Math.round((Date.now() - t0) / 1000)}s`);
+    out(`  served   ${indexTreeContainer}`);
+  } catch (err) { die(`codegraph index build failed: ${err.message}`); }
+} else if (needsCodegraph) {
+  out('kgbench: --no-sandbox — codegraph serves /workspace/coding (the live working tree).');
 }
 // A worktree is built from the COMMIT, so uncommitted work is not what gets searched.
 if (dirty && tree) {
@@ -413,7 +486,28 @@ writeFileSync(runJsonPath, JSON.stringify({
   ...(refusals.length ? { refused: refusals } : {}),
   questions: questions.map((q) => q.id),
   sandbox: tree
-    ? { mode: 'worktree', tree_commit: tree.commit, excluded: tree.removed, verified: true }
+    ? {
+      mode: 'worktree',
+      tree_commit: tree.commit,
+      excluded: tree.removed,
+      verified: true,
+      // WHICH CORPUS THE CODE-GRAPH INDEX DESCRIBED. Absent or null means the codegraph arm
+      // was served whatever the container's default project happened to be — which for
+      // every run up to and including r8 was the main working tree, not this one. Recording
+      // it is what makes that difference auditable from the manifest instead of from the
+      // answers' own complaints.
+      code_graph_index: indexTree
+        ? {
+          backend: 'codegraph',
+          project: indexTreeContainer,
+          tree_commit: indexTree.commit,
+          covers_run_tree: indexTree.commit === tree.commit,
+          file_count: indexTree.status?.fileCount ?? null,
+          node_count: indexTree.status?.nodeCount ?? null,
+        }
+        : null,
+      pinned_via_flag: Boolean(atCommit),
+    }
     : { mode: 'none', verified: false, warning: 'arms could read the answer key; scores not comparable' },
   baselines, baselineSource, schemaTax,
   // `requested` is what this process asks the proxy for. `served` is filled in at the end
