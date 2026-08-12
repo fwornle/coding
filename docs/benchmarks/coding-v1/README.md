@@ -558,12 +558,75 @@ The shape is right and the substrate is wrong: the store is SQLite, not LevelDB.
 Graphify's index — it backs `.data/knowledge-graph/` — so the arm reached for the nearest
 indexed neighbour and delivered it with a commit hash and a confident preamble.
 
-**Two caveats, because this is one question.** Failure is probabilistic rather than
+**One caveat, because this is one question.** Failure is probabilistic rather than
 deterministic: the WAL/SHM fact also survives in `docs/observations/README.md` and
 `system-health-dashboard/server.js`, both of which Graphify *does* index, which is why 9 of its
-14 non-citing cells still score 1.00. And **CodeGraph's A1 failures are not explained by this**
-— it cites `docker-compose.yml` in 10 of 16 cells and still scores 1.00 in only 4 of those 10.
-Reaching the file is not its problem on A1, and what is remains unknown.
+14 non-citing cells still score 1.00.
+
+### CodeGraph fails A1 the same way, and the earlier verdict here was a measurement artifact
+
+This page previously said CodeGraph's A1 losses were a *different*, unexplained problem: it
+"cites `docker-compose.yml` in 10 of 16 cells and still scores 1.00 in only 4 of those 10", so
+"reaching the file is not its problem on A1, and what is remains unknown." **Both sentences were
+wrong, and the metric behind them was measuring its own opposite.**
+
+The citation test was `/docker-compose/i.test(answer)` — the file name appearing anywhere in
+the text. Six of those ten "citations" are the arm saying it could **not** read the file:
+
+> *"no live access to this repo's docker-compose right now — file tree here is stripped down for
+> the benchmark"* — `r8` rep1, 0.65
+>
+> *"I can't grep the actual `docker-compose.yml` […] (no Bash/Grep tool, and this working tree
+> has no `.codegraph` index), so treat this as inference from adjacent memory"* — `r8` rep3, 0.65
+>
+> *"the real 'coding' repo isn't checked out here, so I can't verify `docker-compose.yml`
+> directly"* — `r7` rep7, 0.65
+
+The other four are the opposite claim, and they are the four that score 1.00: *"Found the exact
+answer in `docker/docker-compose.yml:82-86`."* **A keyword test counted the denials as
+citations.** Reaching the file is precisely CodeGraph's problem on A1.
+
+Classified by what the answer *claims* rather than which words it contains, all 64 A1 cells
+across the four arms line up on one axis:
+
+| The answer claims… | cells | scoring 1.00 | mean |
+|---|--:|--:|--:|
+| it **read** `docker-compose.yml` | 29 | **29** | **1.000** |
+| the **repository is absent** | 5 | **0** | 0.650 |
+| neither | 30 | 20 | 0.883 |
+
+Twenty-nine cells claim to have read the file and twenty-nine score 1.00, with no exceptions in
+any arm. The middle row is CodeGraph alone.
+
+**The repository was not absent.** The run's sandbox is a full worktree at `f4f13e86a`
+(`run.json` records `mode: worktree`, `verified: true`) whose exclusion list covers `.data`,
+`.specstory`, `CLAUDE.md` and `.claude` — anti-leakage, not the source tree. `docker-compose.yml`
+is present and carries all three facts at lines 82-86, which is how grep reads it in 16 of 16
+cells. CodeGraph is **the only arm that ever asserts otherwise**: 7 such cells out of 172,
+against 0 for grep, 0 for hybrid and 0 for Graphify, five of the seven on A1.
+
+**Why it happens is the same mechanism as Graphify's, one level up.** The `codegraph` and
+`graphify` arms are defined as `Read` plus their backend's MCP tools and **no `Glob`, no
+`Grep`** — deliberately, since that is what distinguishes a code-graph arm from the baseline.
+But `Read` needs a path you already have. With no search tool, the index *is* the path-discovery
+mechanism, so a file the index does not cover is not merely un-summarised, it is
+**unaddressable**. CodeGraph indexes code entities into SQLite/FTS5 and a YAML comment is not a
+code entity, so the arm gets back no path — and from that it infers, wrongly, that the file does
+not exist. Four times in sixteen it guessed `docker/docker-compose.yml` from prior knowledge and
+scored 1.00; twice it recovered `f1` from indexed prose instead (`scripts/observations-api-server.mjs`,
+`docs-content/core-systems/observational-memory.md`), the same redundancy that rescues 9 of
+Graphify's 14 non-citing cells.
+
+So A1 is not two mechanisms. It is one: **the answer lives in a file neither index covers, and
+neither arm has a tool that can find a file its index does not already know about.** The two
+backends differ only in bedside manner. Graphify asserts LevelDB with a confident preamble;
+CodeGraph hedges — 5 of its 10 failures explicitly flag that they are inferring from memory —
+and then asserts LevelDB anyway. Every one of the 10 names LevelDB and none names SQLite. The
+hedge is worth something and it is not worth much: the score is 0.65 either way.
+
+A last honest limit: hedging explains *how* half these failures read, not why the other half
+fail. Five failing cells make no claim about the file in either direction — they simply answer
+from the wrong substrate, indistinguishable in the text from an arm that looked and misread.
 
 ### Which per-question results replicate
 
@@ -814,7 +877,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Thirty-six defects were found across the runs behind this page, and runs were discarded
+Thirty-seven defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -860,6 +923,7 @@ documented because the failure modes generalise to any agent benchmark.
 | 34 | **A null result was published as evidence because it pointed somewhere flattering.** Zero hallucinations in the forced graph arms was called "the one result that favours an index", hedged as too small to lean on, and then leaned on. | Balanced claude-only across four runs it is 2/72 against 0/72, where the expected count under a shared rate is 1.0 and **P(observing zero) = 0.37**. Per-run counts are 0, 0, 1, 4 — `r8` is the outlier that made the pattern visible. Both claude hallucinations are `grep`'s while `hybrid`, also text-search, has none, so the framing fails inside its own family. Detecting a real 1.4% difference needs ~400 abstain cells per family against the 72 available. **Hedging a claim is not a substitute for testing it**: the hedge was accurate and the claim was still repeated in three places. |
 | 35 | **A supporting citation matched no run in the corpus.** The tool-choice section cited `r6` as "4 graph calls in 348" as one of three replications. Scanning every (run, arm, agent) combination, nothing produces 4/348; `r6`'s hybrid arm is **3 in 322**, and the nearest 348-ish figure is `r6`'s *grep* arm at 0/350 — an arm with no graph tools at all. | It survived because it was corroborating evidence for a conclusion that is, as it turns out, correct: pooled over four runs the rate is 1.57% with every run inside Poisson noise. **A wrong number in support of a right answer is the hardest kind to find**, because the conclusion it serves keeps passing review. The fix is structural rather than careful reading — the claims checker now recomputes the pooled counts from `results.jsonl` across all four runs, and refuses to pool a run whose `hybrid` tool surface differs. |
 | 36 | **The replication check itself read medians, and a median hid a cell.** The audit that withdrew A4 and the hallucination result graded each per-question claim on its per-run *medians*. On that basis B3 was published as an `r8`-only artifact. Counting cells instead, CodeGraph also fails a B3 cell in `x2` — the minority value of a 1.00 / 1.00 / 0.00 triple, invisible to the median. The same recount showed Graphify missing 5 of 16 A1 cells across two runs, a result no version of this page had mentioned. | The audit was written to catch exactly this failure and then committed it, one lesson late: **"a class median hides a bad question" and "a per-question median hides a bad cell" are the same defect at two scales**, and only the first had been internalised. Per-question verdicts are now counted in cells across every run sharing the answer key, and the claims checker computes those counts rather than pinning any median. |
+| 37 | **A keyword-in-answer metric counted denials as citations, and a published verdict was built on it.** CodeGraph's A1 losses were reported as a separate, unexplained problem on the strength of `/docker-compose/i.test(answer)`: the arm "cites the file in 10 of 16 cells and still scores 1.00 in only 4 of those 10", therefore "reaching the file is not its problem". Six of those ten cells name the file only to say they could **not** read it — *"the real 'coding' repo isn't checked out here"*. Reaching the file was the entire problem. | **A substring test cannot tell an assertion from its negation**, and the direction it got wrong was the direction the conclusion turned on. Re-classified by what the answer claims rather than which words it contains, the axis is perfect: 29 of 29 cells claiming to have read the file score 1.00, and 0 of 5 claiming the repository is absent do. The checker now pins the claim classification, keeps the 4/10 artifact relabelled so it cannot be cited again, and verifies against `run.json` that the repository was in fact present. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
