@@ -244,6 +244,38 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
   // A4 — every arm loses cells, which is why no A4 median means anything.
   check('A4 costs every arm cells', ['grep', 'graphify', 'codegraph', 'hybrid']
     .every((arm) => below('A4', arm).length >= 10), true);
+  // A1'S MECHANISM. The section claims Graphify misses the RATIONALE while never missing the
+  // entities, because the rationale lives in a YAML comment and Graphify indexes no YAML. Each
+  // link in that chain is checked, because a mechanism story is exactly the kind of claim that
+  // reads well and rots quietly.
+  const gA1bad = below('A1', 'graphify');
+  check('every graphify A1 miss is the same fact (f1)',
+    gA1bad.every((r) => JSON.stringify(r.grade_missing ?? []) === '["f1"]'), true);
+  check('graphify never misses f2 or f3 on A1',
+    gA1bad.some((r) => (r.grade_missing ?? []).some((f) => f !== 'f1')), false);
+  const citesCompose = (r) => /docker-compose/i.test(String(r.answer ?? ''));
+  const a1Of = (arm) => pooledCells.filter((r) => r.id === 'A1' && r.arm === arm);
+  check('graphify cites docker-compose.yml on A1', a1Of('graphify').filter(citesCompose).length, 2);
+  check('grep cites docker-compose.yml on A1', a1Of('grep').filter(citesCompose).length, 14);
+  // The caveat the section states rather than hides: codegraph REACHES the file and still fails,
+  // so its A1 losses are a different, unexplained problem.
+  const cgCiting = a1Of('codegraph').filter(citesCompose);
+  check('codegraph cites the file on A1 and still fails',
+    `${cgCiting.filter((r) => r.score > 0.995).length}/${cgCiting.length}`, '4/10');
+
+  // THE INDEX CLAIM ITSELF. "Graphify indexes no YAML" is the load-bearing premise of the A1
+  // mechanism, and it is a fact about graph.json rather than about any run — so it is checked
+  // against graph.json. A regex scan rather than JSON.parse: the file is ~60MB and parsing it
+  // would cost more than every other check on this page combined, for one boolean.
+  const GRAPH = '.data/graphify/graphify-out/graph.json';
+  if (existsSync(GRAPH)) {
+    const raw = readFileSync(GRAPH, 'utf8');
+    check('graphify indexes no YAML source files', (raw.match(/"source_file":\s*"[^"]*\.ya?ml"/g) ?? []).length, 0);
+    check('docker-compose.yml is not a graphify source', /"source_file":\s*"[^"]*docker-compose\.yml"/.test(raw), false);
+  } else {
+    process.stdout.write('  SKIP  graph.json absent — index-coverage claims unchecked\n');
+  }
+
   // grep pooled is NOT clean, though it is clean within r8.
   const grepBad = [...new Set(pooledCells.filter((r) => r.arm === 'grep' && r.score < 0.995).map((r) => r.id))].sort();
   check('grep drops cells on five questions when pooled', grepBad.join(','), 'A4,B1,B3,T3,T4');
