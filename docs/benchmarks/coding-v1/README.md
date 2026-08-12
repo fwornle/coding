@@ -63,10 +63,13 @@ The hypothesis the set was designed to test — that a graph index answers *"tha
 better than grep — **did not reproduce**. All four arms abstained correctly on every trap.
 
 Read this as a **null result on 16 questions**, not as proof that code graphs are worthless.
-The real per-question differences all run the other way, and they are concentrated: CodeGraph
-scores **0.00 on L2**, **0.50 on B3** and **0.65 on A1**, and Graphify **0.65 on L2**, where
-grep scores 1.00 on all sixteen. See
-[where corpus scope shows up](#where-corpus-scope-shows-up).
+One per-question difference survives replication across three runs, and it runs against the
+graph arms: **CodeGraph scores 0.22 on L2** where grep scores 1.00 (per-run medians 0.50 /
+0.00 / 0.00). CodeGraph on **A1** is weaker too, at 0.78 against grep's 1.00, though less
+consistently (0.65 / 1.00 / 0.65).
+
+Everything else this page used to list here was a single run's noise. See
+[which per-question results replicate](#which-per-question-results-replicate).
 
 ### The agent axis is larger than the arm axis
 
@@ -392,8 +395,10 @@ codegraph sits at **0.50 on B3**; `arch` reads 1.00 while codegraph sits at **0.
 graphify and hybrid at **0.82 on A4**. Three or four questions per class means a weak question
 vanishes into the median. Always read the per-question table.
 
-Every one of those misses belongs to a graph arm. Across all sixteen questions, `grep` does
-not score below 1.00 once.
+But read that table against a replicate, not on its own. Of those four cells, **one replicates
+across runs** — see [which per-question results replicate](#which-per-question-results-replicate).
+Within `r8`, `grep` does not score below 1.00 on any question; across `r7` and `x2` it scores
+0.82 on A4, so that is a fact about this run rather than a property of the arm.
 
 A winner is declared only at a **≥1.25× median gap with non-overlapping interquartile range**.
 Anything weaker prints "tie", because at these sample sizes a 1.3× gap is not a result — it's
@@ -460,8 +465,9 @@ graph arms still answered without making a single graph call in **6 of 48 cells 
 
 ## Where corpus scope shows up
 
-Every point lost in this run belongs to a graph arm. `grep` scores 1.00 on all sixteen
-questions; the graph arms lose on four between them.
+Every point lost **in this run** belongs to a graph arm: `grep` scores 1.00 on all sixteen
+questions here, and the graph arms lose on four between them. Only one of those four survives
+a replicate — [see below](#which-per-question-results-replicate) before quoting any of them.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../../images/kgbench-arch-spread-dark.svg">
@@ -495,12 +501,35 @@ That is worth stating plainly: **the failure mode of a too-narrow index is not a
 it is a confident answer from whatever else is in context.** Grep, which has no index at all
 and just reads the file, scores 1.00 on all four.
 
-**The other three questions did not replicate, and that is the more useful caution.** In `x2`
-codegraph lost A2 (0.65) and A4 (0.33) and graphify lost neither; here A2 is clean for
-everyone, codegraph scores a full 1.00 on A4, and the arms that lose A4 are graphify and
-hybrid. Which *particular* question a graph arm drops is unstable at three reps. What is
-stable across three runs is the direction — the losses are always the graph arms', never
-grep's — and L2, which has now failed the same way twice.
+### Which per-question results replicate
+
+A three-rep median is a fragile statistic, so every per-question claim above was re-checked
+against the two other runs that share this answer key (`r7`, `x2`). Pooled, claude only, 9–16
+cells per arm per question:
+
+| Question | grep | graphify | codegraph | hybrid | per-run medians (codegraph) | verdict |
+|---|--:|--:|--:|--:|---|---|
+| **L2** | 1.00 | 0.91 | **0.22** | 1.00 | 0.50 / 0.00 / 0.00 | **replicates** |
+| **A1** | 1.00 | 0.89 | **0.78** | 1.00 | 0.65 / 1.00 / 0.65 | replicates, weaker |
+| B3 | 0.96 | 1.00 | 0.72 | 0.96 | 1.00 / 1.00 / 0.50 | `r8` only |
+| A4 | 0.82 | 0.81 | 0.78 | 0.89 | 0.82 / 0.33 / 1.00 | no arm effect |
+
+**L2 is the finding.** CodeGraph is worst in all three runs and never reaches grep.
+
+**A4 is not a finding at all, and this page previously reported it as one.** It is a two-value
+question — every cell scores 0.82 or 1.00 — so a three-rep median is decided by which value
+happens to land twice. In `r8` all four arms produced both values, and the medians split
+2–2 by coin flip. Pooled over 16 cells per arm the spread is 0.78–0.89 with `hybrid` the
+**highest**, and `r7` alone, at ten reps per arm, puts all four arms at exactly 0.82. The
+sentence claiming graphify and hybrid drop A4 is withdrawn.
+
+A4 also breaks the tidier claim this section used to make. **`grep` is not 1.00 on all sixteen
+questions in general** — it scores 0.82 on A4 in both `r7` and `x2`. It is 1.00 on all sixteen
+*in `r8`*, which is a fact about this run.
+
+What survives across three runs is narrower than the old wording and still worth having: no
+graph arm beats grep on any question in any run, and L2 fails the same way every time. Which
+*other* question a graph arm drops is noise.
 
 ---
 
@@ -533,12 +562,30 @@ and one is T1 — abstain questions, where the correct answer is that the thing 
 `grep`/claude fabricated once, `grep`/copilot twice, `hybrid`/opencode once. Every cell scored
 0.00 for it.
 
-Neither forced graph arm hallucinated at all. That is the one result on this page that favours
-an index, and it is too small to lean on — four rows is not a rate, and the graph arms had
-half as many chances (96 cells against 192). But it is the failure this class exists to catch,
-and it is worth noting that it came from the arms that search text and not from the arms that
-query a structured index, which is the opposite of the `x2` pattern where the single
-hallucination was also grep's. Two runs, five rows, same direction.
+Neither forced graph arm hallucinated. An earlier version of this page called that "the one
+result that favours an index", hedged it as too small to lean on, and leaned on it anyway.
+**Checked against the other runs, it is indistinguishable from chance and is withdrawn.**
+
+The per-run counts are **0, 0, 1, 4** for `r6`, `r7`, `x2`, `r8`. This run is the high outlier,
+not the typical case. The cleanest comparison is claude alone — the only agent that runs all
+four arms, so arm and agent are not confounded — which gives a perfectly balanced 72 abstain
+cells per family across the four runs:
+
+| | hallucinated |
+|---|--:|
+| text-search (`grep` + `hybrid`) | 2 / 72 |
+| forced-graph (`graphify` + `codegraph`) | 0 / 72 |
+
+At the pooled 1.4% rate you would expect one hallucination in the graph arms, and the chance of
+seeing zero is **P = 0.37**. Pooling all three agents gives 5/144 against 0/72 and P = 0.185.
+Neither is near significance. The framing also fails inside its own family: both claude
+hallucinations are `grep`'s, and `hybrid` — which has text search too — has none.
+
+Settling this would need roughly **400 abstain cells per family** against the 72 available, a
+purpose-built run several times the size of this one. Until someone funds that, "graph arms
+don't fabricate" is not a result this benchmark has. What the four rows do support is narrower
+and still useful: **abstain questions are where fabrication shows up at all** — every
+hallucination in every run is T-class.
 
 **The token-attribution warning on this page was wrong, and it has been withdrawn.** An earlier
 version said 21 of opencode's 96 cells double-counted *a neighbouring cell's* session, and
@@ -683,7 +730,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Thirty-two defects were found across the runs behind this page, and runs were discarded
+Thirty-four defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -725,6 +772,8 @@ documented because the failure modes generalise to any agent benchmark.
 | 30 | **A wall-clock sum dropped its middle legs.** The continuation loop computed `wall_s` as `first + last`, which is exact at a budget of 1 and lossy at 2 — the value the repository had just adopted as its default. | Found while fixing 29, not by a failing test, because no test exercised the continuation loop's arithmetic at all. It also blocks repairing the budget-2 run the same way: with attempt 1's duration under-recorded, the walk-back that reconstructs earlier attempt windows lands too late, and the repair script's controls refuse all four of that run's retried cells rather than writing a plausible wrong answer. |
 | 31 | **A published figure was arithmetically impossible, and nobody multiplied it out.** The budget comparison quoted a shared-denominator mean of `0.935` for budget 1. That run answered 44 of 48 cells with a score sum of 43.00, so the mean over 48 is 0.896; 0.935 would require those 44 cells to average 1.020, above the maximum score. | It survived because it sat between two figures that were right (0.977 over answered, 44/48 answered) and pointed the way the surrounding prose already argued. A number that agrees with the argument does not get checked. The correct value makes the budget look BETTER than the retracted claim — 0.896 → 0.975 rather than 0.935 → 0.948 — so the error was not motivated, merely unverified. The claims checker now recomputes it from the rows rather than matching the text. |
 | 32 | **A trade-off was published from one run's noise.** The budget was reported to buy completion at the cost of quality, mean score over answered cells falling 0.977 → 0.948. Re-running the same 48 cells at the same budget on a corrected harness gives 0.975 — no fall. | The claimed effect was −0.029. Between two runs identical in arm, agent, model, budget and questions, single questions move the 48-cell mean by −0.011, +0.021 and +0.018. The effect was never larger than the noise, and it was published as a candid admission of a cost — the kind of claim that invites no scrutiny because it argues against its author. Per-question figures here need a replicate before they mean anything: within ONE run, a question's content tokens vary across its 3 reps by a median factor of 1.5× (claude), 1.7× (copilot), 1.9× (opencode), worst observed 12.5×. |
+| 33 | **A two-value question was read as an arm difference.** A4 scores either 0.82 or 1.00 and nothing else, so a three-rep median is decided by which value lands twice. In `r8` all four arms produced both values and the medians split 2–2; the page reported that graphify and hybrid "drop A4". | Pooled over three runs the arms sit at 0.78–0.89 with **hybrid highest**, and `r7` alone at ten reps per arm puts all four at exactly 0.82. The tell was visible in the run's own data and never looked at: a per-question median is only meaningful if the underlying cells are not bimodal, and printing the distinct values per question would have shown A4 taking two. The claim is withdrawn, along with the neater sentence it supported — grep is 1.00 on all sixteen questions in `r8`, but scores 0.82 on A4 in `r7` and `x2`. |
+| 34 | **A null result was published as evidence because it pointed somewhere flattering.** Zero hallucinations in the forced graph arms was called "the one result that favours an index", hedged as too small to lean on, and then leaned on. | Balanced claude-only across four runs it is 2/72 against 0/72, where the expected count under a shared rate is 1.0 and **P(observing zero) = 0.37**. Per-run counts are 0, 0, 1, 4 — `r8` is the outlier that made the pattern visible. Both claude hallucinations are `grep`'s while `hybrid`, also text-search, has none, so the framing fails inside its own family. Detecting a real 1.4% difference needs ~400 abstain cells per family against the 72 available. **Hedging a claim is not a substitute for testing it**: the hedge was accurate and the claim was still repeated in three places. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15

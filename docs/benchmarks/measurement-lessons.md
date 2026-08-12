@@ -425,10 +425,31 @@ well a number fits the story, not with how surprising it is.** The corrected fig
 budget look *better* than the retracted ones (0.896 → 0.975 against 0.935 → 0.948), so neither
 error was motivated; they were simply never recomputed.
 
+**Two more shapes of the same error, found by re-checking the page against `r7` and `x2`.**
+
+**A bimodal question has no meaningful median.** A4 scores either 0.82 or 1.00 and nothing
+else, so a three-rep median is decided by which value lands twice. In `r8` all four arms
+produced both values and the medians split 2–2, which the page reported as "graphify and hybrid
+drop A4". Pooled over three runs the arms sit at 0.78–0.89 with **hybrid highest**; `r7` alone,
+at ten reps per arm, puts all four at exactly 0.82. **Print the distinct scores a question
+takes before quoting its median.** If there are two, the median is a coin flip and the question
+needs many more reps or none at all.
+
+**A hedged claim is still a claim.** Zero hallucinations in the forced graph arms was called
+"the one result that favours an index", correctly hedged as too small to lean on, and then
+repeated in three places. Balanced claude-only across four runs it is 2/72 against 0/72:
+expected count under a shared rate 1.0, **P(observing zero) = 0.37**. Per-run counts are
+0, 0, 1, 4 — the run that made the pattern visible is the outlier. Detecting a real 1.4%
+difference needs roughly 400 abstain cells per family against the 72 available. **Compute the
+power before publishing an absence.** If the sample cannot distinguish the effect from zero,
+the hedge does not rescue the claim; only deleting it does.
+
 **Rules.** Derive published figures from the rows in the claims checker rather than matching
-them as text — a checker that greps for `0.935` confirms the typo. And before publishing an
+them as text — a checker that greps for `0.935` confirms the typo. Before publishing an
 effect, compute the same metric on two runs of the identical configuration; if the effect is
-not larger than that gap, it is not an effect.
+not larger than that gap, it is not an effect. And **do not pin a null result in the claims
+checker** — a green check on "no graph arm hallucinated" reads to the next author as a
+finding the tooling endorses.
 
 ---
 
@@ -454,6 +475,8 @@ not larger than that gap, it is not an effect.
 - [ ] Every row's `wall_s` at least the sum of its own `attempts[]`? (Lesson 12)
 - [ ] Every published figure multiplied out — does `mean × n` equal the score sum? (Lesson 13)
 - [ ] Any claimed effect smaller than the single-question run-to-run swing? (Lesson 13)
+- [ ] Any question whose cells take only two distinct scores? Its median is a coin flip. (Lesson 13)
+- [ ] Any claim resting on an **absence** — is the sample large enough to have seen one? (Lesson 13)
 - [ ] `kgbench-backfill-tokens.mjs --all --dry-run` refuses nothing and shrinks nothing?
 - [ ] Any subset excluded from a median — is the exclusion's *cause* established, and does the
       exclusion move the result in the flattering direction? (Lesson 12)
