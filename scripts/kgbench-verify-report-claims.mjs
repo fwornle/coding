@@ -155,15 +155,19 @@ check('codegraph L2', Number(q('L2', 'codegraph').toFixed(2)), 0.00, 0.005);
 check('codegraph B3', Number(q('B3', 'codegraph').toFixed(2)), 0.50, 0.005);
 check('codegraph A1', Number(q('A1', 'codegraph').toFixed(2)), 0.65, 0.005);
 check('graphify L2', Number(q('L2', 'graphify').toFixed(2)), 0.65, 0.005);
-// A4 is the question the graph arms DIDN'T lose this time — codegraph scores a full 1.00 and
-// graphify/hybrid drop it. Pinned because the analysis says so explicitly: which question a
-// graph arm drops is unstable at three reps, and this is the evidence for that claim.
-check('codegraph A4', Number(q('A4', 'codegraph').toFixed(2)), 1.00, 0.005);
-for (const arm of ['graphify', 'hybrid']) check(`${arm} A4`, Number(q('A4', arm).toFixed(2)), 0.82, 0.005);
-check('grep A4', Number(q('A4', 'grep').toFixed(2)), 1.00, 0.005);
+// A4 IS NOT AN ARM DIFFERENCE, and pinning its per-arm medians as though it were is what let
+// the page report one. It is a two-value question — every cell scores 0.82 or 1.00 — so the
+// three-rep median is decided by which value lands twice. What gets pinned is that bimodality,
+// because it is the reason no A4 median means anything.
+const a4 = rows.filter((r) => r.id === 'A4' && r.agent === 'claude' && r.outcome === 'ok');
+check('A4 takes exactly two distinct scores', [...new Set(a4.map((r) => Number(r.score.toFixed(2))))].sort().join('/'), '0.82/1');
+check('every A4 arm produces BOTH values', ['grep', 'graphify', 'codegraph', 'hybrid']
+  .every((arm) => new Set(a4.filter((r) => r.arm === arm).map((r) => Number(r.score.toFixed(2)))).size === 2), true);
 for (const arm of ['grep', 'hybrid']) check(`${arm} L2`, Number(q('L2', arm).toFixed(2)), 1.00, 0.005);
-// grep never scores below 1.00 on any question — the claim the corpus-scope section rests on.
-check('grep is 1.00 on every question', [...new Set(rows.map((r) => r.id))].every((id) => q(id, 'grep') === 1), true);
+// TRUE OF THIS RUN, and the page now says only that. grep scores 0.82 on A4 in r7 and x2, so
+// stating it unqualified turned a run-local fact into a property of the arm.
+check('grep is 1.00 on every question IN THIS RUN', [...new Set(rows.map((r) => r.id))].every((id) => q(id, 'grep') === 1), true);
+claims('the page qualifies that claim to this run', 'so that is a fact about this run rather than a property of the arm');
 check('codegraph L2 median tool calls', med(rows.filter((r) => r.id === 'L2' && r.arm === 'codegraph' && r.agent === 'claude').map((r) => r.tool_calls)), 12);
 
 process.stdout.write('\n== class medians all 1.00 (claude) ==\n');
@@ -177,10 +181,12 @@ process.stdout.write(`  (checked ${5 * 4} class/arm medians)\n`);
 
 process.stdout.write('\n== reliability and hallucination ==\n');
 check('hallucinated rows', rows.filter((r) => r.hallucinated).length, 4);
-// All four are abstain questions, and all four come from arms that have text search. Neither
-// forced graph arm hallucinated — the one result on the page that favours an index.
+// WHAT SURVIVES A REPLICATE, and only that. "No forced graph arm hallucinated" is still true of
+// this run and is NOT pinned as a finding: balanced claude-only across four runs it is 2/72 vs
+// 0/72, P(observe 0) = 0.37. Pinning a null result invites the next reader to quote it.
 check('all hallucinations are abstain-class', rows.filter((r) => r.hallucinated).every((r) => r.id.startsWith('T')), true);
-check('no forced graph arm hallucinated', rows.filter((r) => r.hallucinated && (r.arm === 'graphify' || r.arm === 'codegraph')).length, 0);
+claims('the page withdraws the graph-arm claim', 'indistinguishable from chance and is withdrawn');
+claims('the page states the cost of settling it', '400 abstain cells per family');
 
 process.stdout.write('\n== token attribution after the fix ==\n');
 // ZERO, and it took two corrections to get here. 21 cells were flagged, the page called them
@@ -294,8 +300,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 32 rows', '| 32 |');
-claims('says thirty-two defects', 'Thirty-two defects were found');
+claims('defect table has 34 rows', '| 34 |');
+claims('says thirty-four defects', 'Thirty-four defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');
