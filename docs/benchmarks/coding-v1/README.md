@@ -55,9 +55,11 @@ correctness — because **it chooses grep**. Across 48 cells it made 230 tool ca
 **6 were graph queries**: five to CodeGraph and one to Graphify. Given both indexes and no
 instruction either way, the agent reaches for text search 97% of the time.
 
-This is the third run to produce it (`r6`: 4 graph calls in 348; `x2`: 3 in 226), across
-different trees, a revised answer key, and now a corrected turn budget and a single grading
-model. It is the most stable result this benchmark has produced.
+**This is the one result on the page that a replicate makes stronger rather than weaker.**
+Pooled over the four runs whose `hybrid` arm offers a byte-identical tool surface — `r6`, `r7`,
+`x2`, `r8`, 248 claude cells and 1,084 executed tool calls — **17 calls reach a graph tool:
+1.57%, 95% CI [0.8%, 2.3%]**. No run is an outlier; every one is consistent with a single
+underlying rate. See [what the agent picks](#what-the-agent-picks-when-nothing-is-withheld).
 
 The hypothesis the set was designed to test — that a graph index answers *"that isn't here"*
 better than grep — **did not reproduce**. All four arms abstained correctly on every trap.
@@ -448,9 +450,32 @@ Six graph calls out of 230 — 2.6% — and only **6 of 48 cells** touched a gra
 This is the single most decision-relevant number here: **the infrastructure is available, free
 at the point of use, and declined.**
 
-`x2` recorded 3 graph calls in 226 and zero to Graphify; `r6`, 4 in 348. The rate is
-consistently within noise of "never", and the fact that Graphify's count moved from 0 to 1
-between runs is not a trend — it is one cell.
+### Pooled across four runs
+
+Every other per-question claim on this page shrank when checked against a replicate. This one
+did not, so it is worth stating at full strength. The `hybrid` arm's tool list is byte-identical
+in `r6`, `r7`, `x2` and `r8`, which makes those four runs poolable:
+
+| run | cells | tool calls | graph calls | Graphify | CodeGraph | cells touching the index |
+|---|--:|--:|--:|--:|--:|--:|
+| `r6` | 76 | 322 | 3 | 0 | 3 | 3/76 |
+| `r7` | 76 | 306 | 5 | 2 | 3 | 5/76 |
+| `x2` | 48 | 226 | 3 | 0 | 3 | 3/48 |
+| `r8` | 48 | 230 | 6 | 1 | 5 | 6/48 |
+| **pooled** | **248** | **1,084** | **17** | **3** | **14** | **17/248** |
+
+**1.57% of tool calls, 95% CI [0.8%, 2.3%]. 6.9% of cells, CI [3.7%, 10.0%].** Under a single
+rate of 1.57% the expected counts are 5.0 / 4.8 / 3.5 / 3.6 against observed 3 / 5 / 3 / 6 —
+every run within Poisson noise, no outlier (smallest tail p = 0.16, `r8`). Four runs, four
+trees, two answer keys, and the agent's appetite for the index does not move.
+
+Graphify specifically accounts for **3 of the 17** and is untouched entirely in two of the four
+runs. Its count moving 0 → 2 → 0 → 1 between runs is not a trend; at these numbers each step is
+one or two cells.
+
+An earlier version of this section cited `r6` as "4 graph calls in 348". Both figures were
+wrong — it is 3 in 322 — and no run, arm or agent in the corpus produces 4/348. Recomputed
+here from `results.jsonl`, and the claims checker now derives them rather than matching text.
 
 Two honest caveats. The tool *descriptions* are what the agent chooses from, so this measures
 the appeal of the advertised interface as much as the index behind it — a better-described
@@ -730,7 +755,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Thirty-four defects were found across the runs behind this page, and runs were discarded
+Thirty-five defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -774,6 +799,7 @@ documented because the failure modes generalise to any agent benchmark.
 | 32 | **A trade-off was published from one run's noise.** The budget was reported to buy completion at the cost of quality, mean score over answered cells falling 0.977 → 0.948. Re-running the same 48 cells at the same budget on a corrected harness gives 0.975 — no fall. | The claimed effect was −0.029. Between two runs identical in arm, agent, model, budget and questions, single questions move the 48-cell mean by −0.011, +0.021 and +0.018. The effect was never larger than the noise, and it was published as a candid admission of a cost — the kind of claim that invites no scrutiny because it argues against its author. Per-question figures here need a replicate before they mean anything: within ONE run, a question's content tokens vary across its 3 reps by a median factor of 1.5× (claude), 1.7× (copilot), 1.9× (opencode), worst observed 12.5×. |
 | 33 | **A two-value question was read as an arm difference.** A4 scores either 0.82 or 1.00 and nothing else, so a three-rep median is decided by which value lands twice. In `r8` all four arms produced both values and the medians split 2–2; the page reported that graphify and hybrid "drop A4". | Pooled over three runs the arms sit at 0.78–0.89 with **hybrid highest**, and `r7` alone at ten reps per arm puts all four at exactly 0.82. The tell was visible in the run's own data and never looked at: a per-question median is only meaningful if the underlying cells are not bimodal, and printing the distinct values per question would have shown A4 taking two. The claim is withdrawn, along with the neater sentence it supported — grep is 1.00 on all sixteen questions in `r8`, but scores 0.82 on A4 in `r7` and `x2`. |
 | 34 | **A null result was published as evidence because it pointed somewhere flattering.** Zero hallucinations in the forced graph arms was called "the one result that favours an index", hedged as too small to lean on, and then leaned on. | Balanced claude-only across four runs it is 2/72 against 0/72, where the expected count under a shared rate is 1.0 and **P(observing zero) = 0.37**. Per-run counts are 0, 0, 1, 4 — `r8` is the outlier that made the pattern visible. Both claude hallucinations are `grep`'s while `hybrid`, also text-search, has none, so the framing fails inside its own family. Detecting a real 1.4% difference needs ~400 abstain cells per family against the 72 available. **Hedging a claim is not a substitute for testing it**: the hedge was accurate and the claim was still repeated in three places. |
+| 35 | **A supporting citation matched no run in the corpus.** The tool-choice section cited `r6` as "4 graph calls in 348" as one of three replications. Scanning every (run, arm, agent) combination, nothing produces 4/348; `r6`'s hybrid arm is **3 in 322**, and the nearest 348-ish figure is `r6`'s *grep* arm at 0/350 — an arm with no graph tools at all. | It survived because it was corroborating evidence for a conclusion that is, as it turns out, correct: pooled over four runs the rate is 1.57% with every run inside Poisson noise. **A wrong number in support of a right answer is the hardest kind to find**, because the conclusion it serves keeps passing review. The fix is structural rather than careful reading — the claims checker now recomputes the pooled counts from `results.jsonl` across all four runs, and refuses to pool a run whose `hybrid` tool surface differs. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
