@@ -456,6 +456,19 @@ regression at all. **Report the half that does not flatter the change anyway**, 
 where the second defect was hiding: the only reason anyone read that cell was that it went the
 wrong way. Hybrid's arm mean is 0.985 before and after.
 
+**A regrade is sound only when the PROMPT held still and the KEY moved.** An arm's answer is
+evidence about the question it saw. Re-scoring it against a rewritten question is not a
+correction — it is a category error, and the dangerous kind, because it produces plausible
+numbers on real data and arrives wearing a fix's clothes. Reconciling five older runs against
+the current grader turned up 105 stale rows, and **64 of them were this trap**: cells for
+questions whose text had been rewritten after those runs executed. A one-line regrade would
+have rewritten a third of that run and looked like housekeeping. The other 41 were genuine —
+one key had named the wrong file, so every arm scored 0.15 on a correct answer. **Ask which of
+the two moved before regrading anything**, and enforce it in the tool rather than the habit:
+the script now reconstructs the question set from the run's own commit and refuses what it
+cannot verify. *Cannot verify* is not *verified* — the two runs whose question file was never
+committed are retired rather than reconciled.
+
 **Bound a gap by the unit the grammar uses, not by the one that is easy to count.** That abstain
 window allowed sixty *characters* between the negator and its head, standing in for "a noun
 phrase intervenes". In a code repository the subject of an abstention is a hyphenated, slashed,
