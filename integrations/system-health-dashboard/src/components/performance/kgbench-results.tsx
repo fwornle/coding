@@ -324,10 +324,29 @@ export function KgbenchResults() {
                   {' / '}
                   <span className="font-mono">{String((report.meta as any)?.runId ?? reportRunId ?? '—')}</span>
                 </div>
+                {/* TWO commits, and for a benchmark the CORPUS one is the answer to "what was
+                    measured". `meta.commit` is the harness at launch; `meta.sandbox.tree_commit`
+                    is the tree the arms actually searched. They are equal for an unpinned run —
+                    which is why labelling the harness commit "Commit:" read correctly for every
+                    run until one used `--commit`, and then said the opposite of the truth. The
+                    corpus commit now leads, and the harness is shown only when it differs. */}
                 <div>
-                  <span className="text-muted-foreground">Commit: </span>
-                  <span className="font-mono">{String((report.meta as any)?.commit ?? '—')}</span>
+                  <span className="text-muted-foreground">Corpus commit: </span>
+                  <span className="font-mono">
+                    {String((report.meta as any)?.sandbox?.tree_commit?.slice(0, 9)
+                      ?? (report.meta as any)?.commit ?? '—')}
+                  </span>
                   {(report.meta as any)?.dirty ? <Badge variant="secondary" className="ml-2">tree dirty</Badge> : null}
+                  {(report.meta as any)?.sandbox?.tree_commit
+                    && (report.meta as any)?.commit
+                    && !String((report.meta as any).sandbox.tree_commit).startsWith(String((report.meta as any).commit))
+                    ? (
+                      <div className="text-xs text-muted-foreground">
+                        pinned with <span className="font-mono">--commit</span>; harness was{' '}
+                        <span className="font-mono">{String((report.meta as any).commit)}</span>
+                      </div>
+                    )
+                    : null}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Agents: </span>
