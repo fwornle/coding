@@ -71,10 +71,14 @@ reaching 1.00, where grep and hybrid take all nine. **A1 goes against both backe
 CodeGraph 0.78 and Graphify 0.89, missing 10 and 5 cells of 16 across two runs each, against
 0 of 16 for grep and hybrid.
 
-> **Read the L2 figure with the caveat below.** 0.22 pools two different things: four cells
-> that queried the index and scored 0.50, and five in which **the index was not reachable at
-> all** — a harness defect, not a retrieval result. See
-> [the CodeGraph index does not cover the tree under test](#the-codegraph-index-does-not-cover-the-tree-under-test).
+> **The L2 figure is an artifact and has since been re-measured.** 0.22 pools two different
+> things: four cells that queried the index and scored 0.50, and five in which **the index was
+> not reachable at all**. The harness has been fixed and both affected arms re-run at the same
+> corpus commit: **CodeGraph scores 1.00 on L2** once its index covers the tree under test.
+> A1, whose answer lives outside any code index, does NOT move — so the corpus-scope finding
+> below stands. See
+> [the CodeGraph index does not cover the tree under test](#the-codegraph-index-does-not-cover-the-tree-under-test)
+> and [the re-measurement](#the-index-was-fixed-and-the-two-affected-arms-re-measured--coding-v1-r8-cgidx).
 
 Everything else this page used to list here was a single run's noise. See
 [which per-question results replicate](#which-per-question-results-replicate).
@@ -746,6 +750,90 @@ On this question the rubric pays better for guessing than for an accurate report
 tool — which is exactly backwards from what you want an agent to do, and it is why five
 correct diagnoses sat in the data for three runs looking like a retrieval failure.
 
+### The index was fixed and the two affected arms re-measured — `coding-v1-r8-cgidx`
+
+The harness was repaired and `codegraph` and `hybrid` re-run at **the same corpus commit**
+(`f4f13e86a`, pinned with `--commit`), same questions, reps, agent, model, judge and
+continuation budget. The index is the only variable. 96 cells, all `ok`, run id
+`coding-v1-r8-cgidx`; provenance in that run's `REINDEXED.md`.
+
+**The categorical result, which is the one this run is entitled to claim: cells reporting an
+unreachable index went from 14 to 0.**
+
+| CodeGraph | `r8` | `r8-cgidx` | Δ |
+|---|--:|--:|--:|
+| **L2** | 0.17 | **1.00** | **+0.83** |
+| A2 | 0.83 | 1.00 | +0.17 |
+| B3 | 0.50 | 0.67 | +0.17 |
+| A4 | 0.94 | 0.54 | −0.39 |
+| **A1** | 0.65 | **0.65** | **—** |
+| eleven others | 1.00 | 1.00 | — |
+| **arm mean** | 0.881 | **0.929** | |
+
+**L2 was the page's cleanest per-question finding, and it was an artifact.** CodeGraph took
+all nine of its cells once the index covered the corpus. What the arm had been failing was not
+the question but the tool.
+
+**A1 did not move, and that is the more informative half.** Still 0.65, still missing exactly
+`f1`. Its answer is a six-line YAML comment and CodeGraph indexes no YAML, so the corpus-scope
+finding above stands on its own and is independent of the harness defect. Had A1 moved, the
+explanation this page gives for it would have been wrong.
+
+**A4's drop is not attributed to the fix.** Its own history across runs is 0.82 (`r7`), **0.49**
+(`x2`), 0.94 (`r8`); 0.54 sits inside that spread, on a question this page already classes as
+bimodal with no arm effect. Three cells within a question's known range is not an effect,
+[by this page's own rule](../measurement-lessons.md).
+
+| Hybrid | `r8` | `r8-cgidx` |
+|---|--:|--:|
+| fifteen questions | unchanged | unchanged |
+| T3 | 1.00 | 0.67 *(see below — grader, not arm)* |
+| **arm mean** | 0.985 | 0.964 |
+
+#### The change is behavioural, and it is larger than any score
+
+| CodeGraph | Read | codegraph MCP | MCP share |
+|---|--:|--:|--:|
+| `r8` (index served the wrong tree) | 427 | 67 | 14% |
+| `r8-cgidx` | 94 | 136 | **59%** |
+
+| Hybrid | Read | Grep/Glob | codegraph | graphify | graph share | cells using a graph tool |
+|---|--:|--:|--:|--:|--:|--:|
+| `r8` | 49 | 175 | 5 | 1 | 3% | **6 / 48** |
+| `r8-cgidx` | 48 | 137 | 20 | 1 | 10% | **20 / 48** |
+
+CodeGraph stopped compensating by reading files and started using its index. That reframes
+every earlier CodeGraph number here: they measured an arm quietly degraded to *Read, with a
+broken tool attached*.
+
+**This qualifies the central result of this page.** "Agents overwhelmingly choose grep" was
+measured while one of the two graph backends returned nothing. With it working, hybrid reaches
+for a graph tool in **20 of 48 cells instead of 6**. The direction survives — grep and Read
+still account for 89% of its calls, and **no question's score improved** — but the honest
+statement is narrower than the original: *agents preferred grep, and preferred it far more
+strongly when one backend was broken; with it fixed they consult the graph three times as
+often and answer no better.* A tool being reached for and a tool being useful are different
+claims, and only the second one is still clean.
+
+#### Hybrid's T3 is a grading defect, not a hallucination
+
+T3 is an abstain probe. One cell scored 0.00 with `hallucinated: true`, which would be the
+worst kind of regression — except the answer abstains, twice:
+
+> *"There's no `"payment reconciliation"` module in this repo …"*
+> *"No payment-processing/financial-transaction reconciliation module exists in this codebase."*
+
+Both are missed by the matcher. The first because `\bno (?:module|…)\b` requires the noun
+immediately after *no*, and a quoted subject sits between them. The second because
+`\bno\b[^.!?]{0,60}\b(?:exists?|…)\b` allows sixty characters between *No* and *exists* and
+this subject is **sixty-four**. The arm answered correctly and lost the cell by four
+characters. Counted properly, hybrid's T3 is 1.00 and its arm mean is unchanged.
+
+That the failing cell is also the only one of the three to call a graph tool is not
+coincidence: the graph surfaced the *token*-reconciliation files, the arm named them while
+ruling them out, and the longer subject phrase overran the window. **A working tool made the
+answer more informative and the grader punished it for the extra words.**
+
 ### Which per-question results replicate
 
 A three-rep median is a fragile statistic, so every per-question claim above was re-checked
@@ -995,7 +1083,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Thirty-nine defects were found across the runs behind this page, and runs were discarded
+Forty defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -1043,7 +1131,8 @@ documented because the failure modes generalise to any agent benchmark.
 | 36 | **The replication check itself read medians, and a median hid a cell.** The audit that withdrew A4 and the hallucination result graded each per-question claim on its per-run *medians*. On that basis B3 was published as an `r8`-only artifact. Counting cells instead, CodeGraph also fails a B3 cell in `x2` — the minority value of a 1.00 / 1.00 / 0.00 triple, invisible to the median. The same recount showed Graphify missing 5 of 16 A1 cells across two runs, a result no version of this page had mentioned. | The audit was written to catch exactly this failure and then committed it, one lesson late: **"a class median hides a bad question" and "a per-question median hides a bad cell" are the same defect at two scales**, and only the first had been internalised. Per-question verdicts are now counted in cells across every run sharing the answer key, and the claims checker computes those counts rather than pinning any median. |
 | 37 | **A keyword-in-answer metric counted denials as citations, and a published verdict was built on it.** CodeGraph's A1 losses were reported as a separate, unexplained problem on the strength of `/docker-compose/i.test(answer)`: the arm "cites the file in 10 of 16 cells and still scores 1.00 in only 4 of those 10", therefore "reaching the file is not its problem". Six of those ten cells name the file only to say they could **not** read it — *"the real 'coding' repo isn't checked out here"*. Reaching the file was the entire problem. | **A substring test cannot tell an assertion from its negation**, and the direction it got wrong was the direction the conclusion turned on. Re-classified by what the answer claims rather than which words it contains, the axis is perfect: 29 of 29 cells claiming to have read the file score 1.00, and 0 of 5 claiming the repository is absent do. The checker now pins the claim classification, keeps the 4/10 artifact relabelled so it cannot be cited again, and verifies against `run.json` that the repository was in fact present. |
 | 38 | **The regex written to fix defect 37 committed defect 37, one level in.** Replacing the substring test with a phrase-enumerating one — a list of the ways an answer might say it could not read the file — produced "five failing cells make no claim in either direction" and a cross-question total of 7. Reading all sixteen answers gives **two** silent cells and **at least 18** denial cells: the pattern missed `r7` rep8's *"no `.codegraph/` index or file access available in this sandbox"*, a denial phrased in words it had not listed, and scored two memory-attributed cells as silent. | **Enumerating phrasings is the same defect as matching a substring**: both decide a semantic question with a lexical test, and both fail silently by under-matching rather than loudly by erroring. The categories are now hand-audited from reading all sixteen answers end to end and pinned cell by cell; the regex survives only as a tripwire on the hit count, so changed data forces a re-read instead of letting a stale hand-audit describe it. The one cross-question figure still regex-derived is labelled a lower bound on the page. |
-| 39 | **The CodeGraph arm's index never covered the tree the benchmark was testing.** Arms run in a worktree under `os.tmpdir()`; the container mounts only `${HOME}/Agentic`, so that worktree is invisible to the container-side MCP server, whose default project (`/coding`) is uninitialized. At least 30 of 172 CodeGraph cells report the index unreachable, and when it *does* answer it serves `/workspace/coding` — the main working tree, which is not the de-contaminated one every other arm searches. 15 of 31 sandbox-excluded paths are present in it (not the answer key, not the observation exports). | **The sandbox verifies containment of the tree it builds, and the codegraph arm reads an index of a different tree**, so the guarantee never applied to it. It surfaced only by chasing five L2 zeros that turned out to be correct refusals. Split by whether the index answered, L2 is 0.00×5 (harness) and 0.50×4 (capability) rather than a single 0.22 — the capability result is cleaner than the blend it was reported as. Fix is either to bind the sandbox into the container or to build a per-run index over it; until then the arm's per-question figures carry the caveat inline. |
+| 39 | **The CodeGraph arm's index never covered the tree the benchmark was testing.** Arms run in a worktree under `os.tmpdir()`; the container mounts only `${HOME}/Agentic`, so that worktree is invisible to the container-side MCP server, whose default project (`/coding`) is uninitialized. At least 30 of 172 CodeGraph cells report the index unreachable, and when it *does* answer it serves `/workspace/coding` — the main working tree, which is not the de-contaminated one every other arm searches. 15 of 31 sandbox-excluded paths are present in it (not the answer key, not the observation exports). | **The sandbox verifies containment of the tree it builds, and the codegraph arm reads an index of a different tree**, so the guarantee never applied to it. It surfaced only by chasing five L2 zeros that turned out to be correct refusals. Split by whether the index answered, L2 is 0.00×5 (harness) and 0.50×4 (capability) rather than a single 0.22 — the capability result is cleaner than the blend it was reported as. **FIXED** (`b48c2d38e`, `fddf1aacc`) and re-measured as `coding-v1-r8-cgidx`: the index is now built over a second worktree of the same commit with the same exclusions, and the MCP server is pinned to it. Unreachable-index cells 14 -> 0; L2 0.17 -> 1.00; A1 unchanged, which confirms corpus scope as a separate cause. The larger finding is behavioural — CodeGraph's MCP share went 14% -> 59% — so the earlier numbers measured an arm degraded to Read with a broken tool attached. |
+| 40 | **A correct abstention was scored as a hallucination because its subject phrase was four characters too long.** Hybrid's T3 cell says *"No payment-processing/financial-transaction reconciliation module exists in this codebase"* and was graded 0.00 with `hallucinated: true`. The matcher allows sixty characters between *no* and *exists*; this subject spans sixty-four. A second abstention in the same answer was missed too, because `\bno (?:module|…)` requires the noun immediately after *no* and a quoted subject sat between them. | **The window was tuned on the answers that existed when it was written.** It is the same defect as Lesson 3's decoration mismatches, one layer up: not a character class but a LENGTH. Worse, the failing cell was the only one of three to call a graph tool — the graph surfaced adjacent real files, the arm named them while ruling them out, and the longer sentence overran the window. A working tool made the answer better and the grader punished the extra words. Counted properly hybrid's T3 is 1.00. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
