@@ -434,17 +434,29 @@ separate, unexplained problem. Six of the ten matching cells name the file only 
 could *not* read it (*"the real 'coding' repo isn't checked out here"*). The metric scored a
 denial identically to a citation, and the conclusion it supported was the exact reverse of the
 truth. Re-classified by what the answer *claims* rather than which words it contains, the axis
-is perfect: 29 of 29 cells claiming to have read the file score 1.00, 0 of 5 claiming the
+is perfect: 29 of 29 cells claiming to have read the file score 1.00, 0 of 6 claiming the
 repository is absent do. **When a metric is a substring match, the first thing to check is what
 the surrounding sentence is doing with it** — and prefer a test that matches the assertion
 ("found it in `<file>:<line>`") over one that matches the topic.
+
+**Enumerating phrasings is the same defect as matching a substring.** The fix for the lesson
+above was a regex listing the ways an answer might say it could not read the file. It published
+"five failing cells make no claim in either direction"; reading all sixteen answers gives two.
+It missed a denial phrased *"no `.codegraph/` index or file access available in this sandbox"* —
+words the list did not contain — and scored two cells that name memory as their source as
+silent. The cross-question count it produced, 7, is at least 18. **Both tests decide a semantic
+question with a lexical one, and both fail by under-matching, which is silent.** A lexical test
+is fit for *finding candidates* and unfit for *counting categories*. Where the population is
+small enough to read — sixteen answers — read it, pin the classification cell by cell, and keep
+the regex only as a tripwire on the hit count so changed data forces a re-read. Where it is not,
+label the number a lower bound.
 
 **An agent's report about its own environment is data, not ground truth.** Those five cells
 state that the repository is not checked out. It is: the sandbox is a verified worktree whose
 exclusion list covers `.data`, `.specstory` and `CLAUDE.md` — anti-leakage, not source. The
 arm had `Read` but no `Glob`/`Grep`, so with an index that does not cover YAML it had no path
 to read, and inferred absence from its own inability to search. Only one of four arms ever made
-this claim (7 cells of 172; zero for the other three), which is what made it visible. **Check
+this claim (at least 18 cells of 172; zero for the other three), which is what made it visible. **Check
 environment claims against the harness config, not against plausibility.**
 
 **A per-question median hides a bad cell, exactly as a class median hides a bad question.**

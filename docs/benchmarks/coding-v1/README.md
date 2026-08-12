@@ -592,8 +592,8 @@ across the four arms line up on one axis:
 | The answer claims… | cells | scoring 1.00 | mean |
 |---|--:|--:|--:|
 | it **read** `docker-compose.yml` | 29 | **29** | **1.000** |
-| the **repository is absent** | 5 | **0** | 0.650 |
-| neither | 30 | 20 | 0.883 |
+| the **repository is absent** | 6 | **0** | 0.650 |
+| neither | 29 | 20 | 0.891 |
 
 Twenty-nine cells claim to have read the file and twenty-nine score 1.00, with no exceptions in
 any arm. The middle row is CodeGraph alone.
@@ -602,8 +602,26 @@ any arm. The middle row is CodeGraph alone.
 (`run.json` records `mode: worktree`, `verified: true`) whose exclusion list covers `.data`,
 `.specstory`, `CLAUDE.md` and `.claude` — anti-leakage, not the source tree. `docker-compose.yml`
 is present and carries all three facts at lines 82-86, which is how grep reads it in 16 of 16
-cells. CodeGraph is **the only arm that ever asserts otherwise**: 7 such cells out of 172,
-against 0 for grep, 0 for hybrid and 0 for Graphify, five of the seven on A1.
+cells. CodeGraph is **the only arm that ever asserts otherwise**, and it does so far more widely
+than A1: **at least 18 cells of 172**, against 0 for grep, 0 for hybrid and 0 for Graphify. (An
+earlier version of this paragraph said 7, from the same phrase-enumerating regex that
+under-counted A1; 18 is a widened count and still a lower bound, since only A1's sixteen cells
+have been read individually.)
+
+Denying access is not uniformly fatal — it is fatal when nothing else carries the answer:
+
+| Question | denial cells | scores |
+|---|--:|---|
+| A1 | 6 | 0.65 ×6 |
+| L2 | 2 | 0.00 ×2 |
+| T4 | 6 | 1.00 ×6 |
+| T3 | 2 | 1.00 ×2 |
+| B2, T1 | 1 each | 1.00 |
+
+Where the fact is reachable from the index or correctly held in memory, the arm declares the
+repository absent and answers correctly anyway. Where it is not — A1 and L2, the two questions
+this page already identifies as living outside the index — the same declaration precedes the
+worst scores on the page.
 
 **Why it happens is the same mechanism as Graphify's, one level up.** The `codegraph` and
 `graphify` arms are defined as `Read` plus their backend's MCP tools and **no `Glob`, no
@@ -620,13 +638,35 @@ Graphify's 14 non-citing cells.
 So A1 is not two mechanisms. It is one: **the answer lives in a file neither index covers, and
 neither arm has a tool that can find a file its index does not already know about.** The two
 backends differ only in bedside manner. Graphify asserts LevelDB with a confident preamble;
-CodeGraph hedges — 5 of its 10 failures explicitly flag that they are inferring from memory —
-and then asserts LevelDB anyway. Every one of the 10 names LevelDB and none names SQLite. The
-hedge is worth something and it is not worth much: the score is 0.65 either way.
+CodeGraph discloses and then asserts LevelDB anyway. Every one of the 10 failures names LevelDB
+and none names SQLite. The disclosure is worth something and it is not worth much: the score is
+0.65 either way.
 
-A last honest limit: hedging explains *how* half these failures read, not why the other half
-fail. Five failing cells make no claim about the file in either direction — they simply answer
-from the wrong substrate, indistinguishable in the text from an arm that looked and misread.
+**Every CodeGraph A1 cell was then read end to end**, because the classification above is
+regex-derived and a regex is what produced the retracted verdict in the first place. Hand-audited,
+all sixteen partition without a residue:
+
+| What the answer says about its source | cells | scoring 1.00 |
+|---|--:|--:|
+| read `docker-compose.yml` | 4 | **4** |
+| read an indexed prose file instead | 2 | **2** |
+| denies repository access | 6 | 0 |
+| cites memory as the source, no denial | 2 | 0 |
+| says nothing about its source | 2 | 0 |
+
+**Every cell that claims to have read a file scores 1.00 (6 of 6); every cell that claims no
+file fails (10 of 10).** No cell reads a file and misreads it, and no cell answers from memory
+and gets it right. That is a cleaner partition than the pooled table above, and it is only
+visible by reading.
+
+It also corrects a number this page published one commit ago. The claim was that "five failing
+cells make no claim about the file in either direction". **It is two.** The regex behind the
+five had enumerated the phrasings it expected — it missed `r7` rep8's *"no `.codegraph/` index
+or file access available in this sandbox"*, which is a denial in words the pattern did not
+list, and it counted `r7` rep1 and rep10 as silent when both name memory as their source. Of
+the ten failures, **eight disclose that they are not reading from the repository.** Only two are
+genuinely silent — `r7` rep4 and rep6, which state the LevelDB account flat, with no hedge and
+no source, indistinguishable in the text from an arm that looked and misread.
 
 ### Which per-question results replicate
 
@@ -877,7 +917,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Thirty-seven defects were found across the runs behind this page, and runs were discarded
+Thirty-eight defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -924,6 +964,7 @@ documented because the failure modes generalise to any agent benchmark.
 | 35 | **A supporting citation matched no run in the corpus.** The tool-choice section cited `r6` as "4 graph calls in 348" as one of three replications. Scanning every (run, arm, agent) combination, nothing produces 4/348; `r6`'s hybrid arm is **3 in 322**, and the nearest 348-ish figure is `r6`'s *grep* arm at 0/350 — an arm with no graph tools at all. | It survived because it was corroborating evidence for a conclusion that is, as it turns out, correct: pooled over four runs the rate is 1.57% with every run inside Poisson noise. **A wrong number in support of a right answer is the hardest kind to find**, because the conclusion it serves keeps passing review. The fix is structural rather than careful reading — the claims checker now recomputes the pooled counts from `results.jsonl` across all four runs, and refuses to pool a run whose `hybrid` tool surface differs. |
 | 36 | **The replication check itself read medians, and a median hid a cell.** The audit that withdrew A4 and the hallucination result graded each per-question claim on its per-run *medians*. On that basis B3 was published as an `r8`-only artifact. Counting cells instead, CodeGraph also fails a B3 cell in `x2` — the minority value of a 1.00 / 1.00 / 0.00 triple, invisible to the median. The same recount showed Graphify missing 5 of 16 A1 cells across two runs, a result no version of this page had mentioned. | The audit was written to catch exactly this failure and then committed it, one lesson late: **"a class median hides a bad question" and "a per-question median hides a bad cell" are the same defect at two scales**, and only the first had been internalised. Per-question verdicts are now counted in cells across every run sharing the answer key, and the claims checker computes those counts rather than pinning any median. |
 | 37 | **A keyword-in-answer metric counted denials as citations, and a published verdict was built on it.** CodeGraph's A1 losses were reported as a separate, unexplained problem on the strength of `/docker-compose/i.test(answer)`: the arm "cites the file in 10 of 16 cells and still scores 1.00 in only 4 of those 10", therefore "reaching the file is not its problem". Six of those ten cells name the file only to say they could **not** read it — *"the real 'coding' repo isn't checked out here"*. Reaching the file was the entire problem. | **A substring test cannot tell an assertion from its negation**, and the direction it got wrong was the direction the conclusion turned on. Re-classified by what the answer claims rather than which words it contains, the axis is perfect: 29 of 29 cells claiming to have read the file score 1.00, and 0 of 5 claiming the repository is absent do. The checker now pins the claim classification, keeps the 4/10 artifact relabelled so it cannot be cited again, and verifies against `run.json` that the repository was in fact present. |
+| 38 | **The regex written to fix defect 37 committed defect 37, one level in.** Replacing the substring test with a phrase-enumerating one — a list of the ways an answer might say it could not read the file — produced "five failing cells make no claim in either direction" and a cross-question total of 7. Reading all sixteen answers gives **two** silent cells and **at least 18** denial cells: the pattern missed `r7` rep8's *"no `.codegraph/` index or file access available in this sandbox"*, a denial phrased in words it had not listed, and scored two memory-attributed cells as silent. | **Enumerating phrasings is the same defect as matching a substring**: both decide a semantic question with a lexical test, and both fail silently by under-matching rather than loudly by erroring. The categories are now hand-audited from reading all sixteen answers end to end and pinned cell by cell; the regex survives only as a tripwire on the hit count, so changed data forces a re-read instead of letting a stale hand-audit describe it. The one cross-question figure still regex-derived is labelled a lower bound on the page. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
