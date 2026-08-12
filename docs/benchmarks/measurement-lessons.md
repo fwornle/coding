@@ -427,6 +427,14 @@ error was motivated; they were simply never recomputed.
 
 **Two more shapes of the same error, found by re-checking the page against `r7` and `x2`.**
 
+**A per-question median hides a bad cell, exactly as a class median hides a bad question.**
+This is Lesson 1's defect at a smaller scale, and it was committed *by the audit written to
+catch it*. Grading each per-question claim on its per-run medians published B3 as an `r8`-only
+artifact; counting cells shows CodeGraph also failing a B3 cell in `x2`, the minority value of
+a 1.00 / 1.00 / 0.00 triple. The same recount surfaced Graphify missing 5 of 16 A1 cells across
+two runs, which no version of the page had mentioned. **Count cells. A median is a summary of
+the thing you are trying to inspect.**
+
 **A bimodal question has no meaningful median.** A4 scores either 0.82 or 1.00 and nothing
 else, so a three-rep median is decided by which value lands twice. In `r8` all four arms
 produced both values and the medians split 2–2, which the page reported as "graphify and hybrid

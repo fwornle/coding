@@ -211,6 +211,46 @@ for (const arm of ['grep', 'hybrid']) check(`${arm} L2`, Number(q('L2', arm).toF
 // stating it unqualified turned a run-local fact into a property of the arm.
 check('grep is 1.00 on every question IN THIS RUN', [...new Set(rows.map((r) => r.id))].every((id) => q(id, 'grep') === 1), true);
 claims('the page qualifies that claim to this run', 'so that is a fact about this run rather than a property of the arm');
+// THE PER-QUESTION CLAIMS, COUNTED IN CELLS ACROSS RUNS. Medians are what let a bad cell hide:
+// reading per-run medians alone, B3 looked like an r8 artifact, because its x2 failure is the
+// minority cell of a 1.00/1.00/0.00 triple. This page was published with that verdict. Counting
+// cells has no such blind spot, and it is checked across every run sharing this answer key.
+const KEY_RUNS = ['coding-v1-r7', 'coding-v1-x2', 'coding-v1-r8'];
+const pooledCells = [];
+for (const runId of KEY_RUNS) {
+  const f = `.data/kgbench/runs/${runId}/results.jsonl`;
+  if (!existsSync(f)) continue;
+  for (const r of readFileSync(f, 'utf8').trim().split('\n').map((l) => JSON.parse(l))) {
+    if ((r.agent ?? 'claude') === 'claude' && r.outcome === 'ok') pooledCells.push({ ...r, run: runId });
+  }
+}
+if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
+  const below = (id, arm) => pooledCells.filter((r) => r.id === id && r.arm === arm && r.score < 0.995);
+  const total = (id, arm) => pooledCells.filter((r) => r.id === id && r.arm === arm).length;
+  const runsOf = (id, arm) => new Set(below(id, arm).map((r) => r.run)).size;
+  // L2 — the one result that never once reaches 1.00.
+  check('L2/codegraph cells below 1.00', `${below('L2', 'codegraph').length}/${total('L2', 'codegraph')}`, '9/9');
+  check('L2/codegraph never reaches 1.00', below('L2', 'codegraph').every((r) => r.score <= 0.5), true);
+  check('L2/grep and hybrid are perfect', below('L2', 'grep').length + below('L2', 'hybrid').length, 0);
+  check('L2/graphify is a single-run miss', runsOf('L2', 'graphify'), 1);
+  // A1 — implicates BOTH backends, which the page said only of codegraph until it was counted.
+  check('A1/codegraph cells below 1.00', `${below('A1', 'codegraph').length}/${total('A1', 'codegraph')}`, '10/16');
+  check('A1/graphify cells below 1.00', `${below('A1', 'graphify').length}/${total('A1', 'graphify')}`, '5/16');
+  check('A1/graphify misses span 2 runs', runsOf('A1', 'graphify'), 2);
+  check('A1/grep and hybrid are perfect', below('A1', 'grep').length + below('A1', 'hybrid').length, 0);
+  // B3 — real but thin, and NOT the r8-only artifact a median reading suggested.
+  check('B3/codegraph cells below 1.00', `${below('B3', 'codegraph').length}/${total('B3', 'codegraph')}`, '3/9');
+  check('B3/codegraph misses span 2 runs, not 1', runsOf('B3', 'codegraph'), 2);
+  // A4 — every arm loses cells, which is why no A4 median means anything.
+  check('A4 costs every arm cells', ['grep', 'graphify', 'codegraph', 'hybrid']
+    .every((arm) => below('A4', arm).length >= 10), true);
+  // grep pooled is NOT clean, though it is clean within r8.
+  const grepBad = [...new Set(pooledCells.filter((r) => r.arm === 'grep' && r.score < 0.995).map((r) => r.id))].sort();
+  check('grep drops cells on five questions when pooled', grepBad.join(','), 'A4,B1,B3,T3,T4');
+} else {
+  process.stdout.write('  SKIP  pooled per-question checks (not all key runs present)\n');
+}
+
 check('codegraph L2 median tool calls', med(rows.filter((r) => r.id === 'L2' && r.arm === 'codegraph' && r.agent === 'claude').map((r) => r.tool_calls)), 12);
 
 process.stdout.write('\n== class medians all 1.00 (claude) ==\n');
@@ -343,8 +383,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 35 rows', '| 35 |');
-claims('says thirty-five defects', 'Thirty-five defects were found');
+claims('defect table has 36 rows', '| 36 |');
+claims('says thirty-six defects', 'Thirty-six defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');
