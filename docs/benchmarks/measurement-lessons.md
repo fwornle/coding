@@ -439,6 +439,23 @@ repository is absent do. **When a metric is a substring match, the first thing t
 the surrounding sentence is doing with it** — and prefer a test that matches the assertion
 ("found it in `<file>:<line>`") over one that matches the topic.
 
+**An arm's infrastructure must be verified against the tree under test, not against the
+repository.** The kgbench sandbox builds a de-contaminated worktree in `os.tmpdir()` and greps
+it to prove containment. The CodeGraph arm queries a container-side index of `/workspace/coding`
+— the main working tree — which the sandbox never inspected and the container-side server cannot
+even see the sandbox to replace. The preflight checked that an index *file existed on the host*;
+it never checked that the index *covered the tree the arms were about to search*. **A preflight
+that proves a resource exists has not proved it is the right resource.** For anything
+path-addressed, assert on the path.
+
+**A refusal is a result, and a rubric that scores it zero will bury a broken tool.** Five L2
+cells said, accurately, "there is no index for this project and I will not guess file paths."
+They scored 0.00, while cells that named one right file and one wrong one scored 0.50 — so the
+scoring paid better for guessing than for a correct report of broken infrastructure, and the
+diagnosis sat in the data for three runs looking like a retrieval failure. **When an arm's score
+is unusually bad, read its answers before believing the number**: the distinction between "could
+not" and "got it wrong" is invisible in a mean and is usually the more actionable of the two.
+
 **Enumerating phrasings is the same defect as matching a substring.** The fix for the lesson
 above was a regex listing the ways an answer might say it could not read the file. It published
 "five failing cells make no claim in either direction"; reading all sixteen answers gives two.

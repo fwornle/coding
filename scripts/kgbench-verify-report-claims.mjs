@@ -328,6 +328,53 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
   check('denial is fatal on A1 and L2, harmless elsewhere',
     [...new Set(denialCells.filter((r) => r.score < 0.995).map((r) => r.id))].sort().join(','), 'A1,L2');
 
+  // THE CODEGRAPH INDEX DOES NOT COVER THE SANDBOX. A harness defect, so it is checked against
+  // the harness (sandbox.mjs, docker-compose.yml, the registry) as well as against the answers.
+  const NOINDEX = /codegraph init|not indexed by codegraph|no `?\.codegraph\/?`?( directory| index)?|isn't indexed|not initialized/i;
+  const cgAll = pooledCells.filter((r) => r.arm === 'codegraph');
+  const unreachable = cgAll.filter((r) => NOINDEX.test(String(r.answer ?? '')));
+  check('codegraph cells reporting no index (lower bound)', unreachable.length, 30);
+  check('reporting no index is not uniformly fatal (T4 all pass)',
+    unreachable.filter((r) => r.id === 'T4').every((r) => r.score > 0.995), true);
+  // L2 splits into a harness defect and a capability result. The page quotes BOTH, not the blend.
+  const l2 = cgAll.filter((r) => r.id === 'L2');
+  const l2Bad = l2.filter((r) => NOINDEX.test(String(r.answer ?? '')));
+  const l2Ok = l2.filter((r) => !NOINDEX.test(String(r.answer ?? '')));
+  check('L2: index-unreachable cells all score 0.00',
+    `${l2Bad.length}:${l2Bad.every((r) => r.score < 0.01)}`, '5:true');
+  check('L2: index-reached cells all score exactly 0.50',
+    `${l2Ok.length}:${l2Ok.every((r) => Math.abs(r.score - 0.5) < 0.01)}`, '4:true');
+  check('L2: every index-reached cell misses f2, the importer',
+    l2Ok.every((r) => (r.grade_missing ?? []).includes('f2')), true);
+  // THE STRUCTURAL FACTS, checked at their source rather than quoted from prose.
+  const sbSrc = existsSync('lib/kgbench/sandbox.mjs') ? readFileSync('lib/kgbench/sandbox.mjs', 'utf8') : '';
+  check('sandbox worktree is built under os.tmpdir()',
+    /mkdtempSync\(path\.join\(os\.tmpdir\(\), 'kgbench-tree-'\)\)/.test(sbSrc), true);
+  const compose = existsSync('docker/docker-compose.yml') ? readFileSync('docker/docker-compose.yml', 'utf8') : '';
+  check('container mounts only ~/Agentic as /workspace',
+    /\$\{HOME\}\/Agentic:\/workspace:ro/.test(compose), true);
+  const reg = JSON.parse(readFileSync('config/code-graph.json', 'utf8'));
+  check('codegraph MCP is container-side stdio',
+    `${reg.backends.codegraph.mcp.transport}/${reg.backends.codegraph.mcp.command}`, 'stdio/docker');
+  check('codegraph indexes /workspace/coding, not the sandbox',
+    reg.backends.codegraph.index.target, '/workspace/coding');
+  // The containment hole: excluded paths present in the index. Bounded, and the ANSWER KEY is
+  // not among them — that distinction is the difference between a flaw and a retraction.
+  if (existsSync('.data/codegraph/codegraph.db')) {
+    const { execFileSync } = await import('node:child_process');
+    const q = (sql) => execFileSync('sqlite3', ['.data/codegraph/codegraph.db', sql], { encoding: 'utf8' }).trim();
+    check('answer key is NOT in the codegraph index',
+      q("SELECT count(*) FROM files WHERE path LIKE 'config/kgbench%';"), '0');
+    check('observation exports are NOT in the codegraph index',
+      q("SELECT count(*) FROM files WHERE path LIKE '.data/%';"), '0');
+    const excluded = JSON.parse(readFileSync(`${RUN}/run.json`, 'utf8')).sandbox.excluded;
+    const indexed = q('SELECT path FROM files;').split('\n');
+    const leaked = excluded.filter((e) => indexed.some((p) => p === e || p.startsWith(`${e.replace(/\/$/, '')}/`)));
+    check('sandbox-excluded paths reachable via the index', `${leaked.length}/${excluded.length}`, '15/31');
+  } else {
+    process.stdout.write('  SKIP  codegraph.db absent — index-containment claims unchecked\n');
+  }
+
   // TRIPWIRE. Not a classifier — a change detector. If the answers behind the hand-audit are ever
   // replaced, the broad net's hit count moves and this fires, forcing a re-read rather than
   // letting a stale hand-audit silently describe different data.
@@ -513,8 +560,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 38 rows', '| 38 |');
-claims('says thirty-eight defects', 'Thirty-eight defects were found');
+claims('defect table has 39 rows', '| 39 |');
+claims('says thirty-nine defects', 'Thirty-nine defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');

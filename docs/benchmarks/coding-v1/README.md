@@ -71,6 +71,11 @@ reaching 1.00, where grep and hybrid take all nine. **A1 goes against both backe
 CodeGraph 0.78 and Graphify 0.89, missing 10 and 5 cells of 16 across two runs each, against
 0 of 16 for grep and hybrid.
 
+> **Read the L2 figure with the caveat below.** 0.22 pools two different things: four cells
+> that queried the index and scored 0.50, and five in which **the index was not reachable at
+> all** — a harness defect, not a retrieval result. See
+> [the CodeGraph index does not cover the tree under test](#the-codegraph-index-does-not-cover-the-tree-under-test).
+
 Everything else this page used to list here was a single run's noise. See
 [which per-question results replicate](#which-per-question-results-replicate).
 
@@ -668,6 +673,79 @@ the ten failures, **eight disclose that they are not reading from the repository
 genuinely silent — `r7` rep4 and rep6, which state the LevelDB account flat, with no hedge and
 no source, indistinguishable in the text from an arm that looked and misread.
 
+### The CodeGraph index does not cover the tree under test
+
+Chasing the L2 zeros turned up a defect in the harness rather than in the backend. The five
+CodeGraph L2 cells that score 0.00 are not wrong answers. They are **refusals**, and they are
+correct:
+
+> *"I don't have a way to search this codebase right now — there's no `.codegraph` index for
+> this project, and I don't have Grep/Glob/Bash tools available in this session (only `Read`
+> and `codegraph_explore`). I can't reliably locate `summaryStats` or its importer without
+> guessing at paths, which I'd rather not do."* — `r8` rep2, scored **0.00**
+
+Three of the five ask the operator to run `codegraph init`. That is verbatim what the tool
+tells them, and the reason is structural:
+
+| | path |
+|---|---|
+| Arms run in | a git worktree under `os.tmpdir()` (`lib/kgbench/sandbox.mjs:364`) |
+| Container mounts | `${HOME}/Agentic → /workspace:ro` only — `/var/folders` does not exist inside it |
+| Index covers | `/workspace/coding`, the **main working tree** |
+| MCP server's cwd | `/coding`, which reports `⚠ Not initialized` |
+
+The CodeGraph MCP server is a container-side stdio process (`docker exec -i coding-services
+codegraph serve --mcp`). **The sandbox worktree is invisible to it**, and its default project
+resolves to an uninitialized directory, so a call succeeds only if the agent supplies
+`projectPath: /workspace/coding` — a container path it cannot derive from its own environment.
+Reproduced directly against the running container:
+
+```
+$ docker exec -w /workspace/coding coding-services codegraph status
+  Project: /workspace/coding          Index Statistics: …
+$ docker exec coding-services codegraph status          # default cwd /coding
+  ⚠ Not initialized    ℹ Run "codegraph init" to initialize
+```
+
+**Two consequences, and the second is worse than the first.**
+
+*It sometimes returns nothing.* At least **30 of 172** CodeGraph cells report the index
+unreachable (a lower bound — the count comes from the answers' own words). It is not uniformly
+costly: on T4 all nine such cells still score 1.00, because that question does not need
+retrieval. It is very costly where the question does.
+
+*When it does answer, it describes the wrong tree.* A successful `codegraph_explore` serves
+`/workspace/coding` — the main repository — while every other arm searches the de-contaminated
+worktree. The sandbox verifies containment by grepping the tree it builds; that guarantee does
+not extend to an index of a different tree. **15 of the 31 sandbox-excluded paths are present
+in the index**, including `lib/kgbench/graders.mjs`, `judge.mjs`, `sandbox.mjs` and ten test
+files. The answer key is *not* among them (`config/kgbench/questions/` is JSON, and no JSON is
+indexed), nor are the observation exports (`.data/` is not indexed) — so the contamination the
+sandbox was built to stop did not get through this hole. No cell demonstrably exploited it
+either: six answers across all four arms name an excluded path, but grep and hybrid do so
+without any index, so those are inferences, not retrievals.
+
+The index is also pinned to its own build commit rather than the run's — `6ecbbe7f` against
+`f4f13e86a`. Here that is one file apart and immaterial, but nothing enforces it.
+
+**What this costs the L2 result.** Split by whether the index answered:
+
+| CodeGraph on L2 | cells | scores |
+|---|--:|---|
+| index unreachable | 5 | 0.00 ×5 — refusals |
+| index reached | 4 | **0.50 ×4** — implementer right, importer wrong every time |
+
+The published 0.22 blends a harness defect with a capability result. **The capability result
+survives and is cleaner than the blend**: given a working index, CodeGraph named
+`lib/kgbench/report.mjs` correctly and `scripts/kgbench-charts.mjs` wrongly in four cells out
+of four, where grep and hybrid score 1.00. The 0.22 is not a number about CodeGraph.
+
+**The scoring is what hid it.** A cell that says "I cannot search this repository, and I will
+not guess" scores 0.00, while a cell that names one right file and one wrong one scores 0.50.
+On this question the rubric pays better for guessing than for an accurate report of a broken
+tool — which is exactly backwards from what you want an agent to do, and it is why five
+correct diagnoses sat in the data for three runs looking like a retrieval failure.
+
 ### Which per-question results replicate
 
 A three-rep median is a fragile statistic, so every per-question claim above was re-checked
@@ -917,7 +995,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Thirty-eight defects were found across the runs behind this page, and runs were discarded
+Thirty-nine defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -965,6 +1043,7 @@ documented because the failure modes generalise to any agent benchmark.
 | 36 | **The replication check itself read medians, and a median hid a cell.** The audit that withdrew A4 and the hallucination result graded each per-question claim on its per-run *medians*. On that basis B3 was published as an `r8`-only artifact. Counting cells instead, CodeGraph also fails a B3 cell in `x2` — the minority value of a 1.00 / 1.00 / 0.00 triple, invisible to the median. The same recount showed Graphify missing 5 of 16 A1 cells across two runs, a result no version of this page had mentioned. | The audit was written to catch exactly this failure and then committed it, one lesson late: **"a class median hides a bad question" and "a per-question median hides a bad cell" are the same defect at two scales**, and only the first had been internalised. Per-question verdicts are now counted in cells across every run sharing the answer key, and the claims checker computes those counts rather than pinning any median. |
 | 37 | **A keyword-in-answer metric counted denials as citations, and a published verdict was built on it.** CodeGraph's A1 losses were reported as a separate, unexplained problem on the strength of `/docker-compose/i.test(answer)`: the arm "cites the file in 10 of 16 cells and still scores 1.00 in only 4 of those 10", therefore "reaching the file is not its problem". Six of those ten cells name the file only to say they could **not** read it — *"the real 'coding' repo isn't checked out here"*. Reaching the file was the entire problem. | **A substring test cannot tell an assertion from its negation**, and the direction it got wrong was the direction the conclusion turned on. Re-classified by what the answer claims rather than which words it contains, the axis is perfect: 29 of 29 cells claiming to have read the file score 1.00, and 0 of 5 claiming the repository is absent do. The checker now pins the claim classification, keeps the 4/10 artifact relabelled so it cannot be cited again, and verifies against `run.json` that the repository was in fact present. |
 | 38 | **The regex written to fix defect 37 committed defect 37, one level in.** Replacing the substring test with a phrase-enumerating one — a list of the ways an answer might say it could not read the file — produced "five failing cells make no claim in either direction" and a cross-question total of 7. Reading all sixteen answers gives **two** silent cells and **at least 18** denial cells: the pattern missed `r7` rep8's *"no `.codegraph/` index or file access available in this sandbox"*, a denial phrased in words it had not listed, and scored two memory-attributed cells as silent. | **Enumerating phrasings is the same defect as matching a substring**: both decide a semantic question with a lexical test, and both fail silently by under-matching rather than loudly by erroring. The categories are now hand-audited from reading all sixteen answers end to end and pinned cell by cell; the regex survives only as a tripwire on the hit count, so changed data forces a re-read instead of letting a stale hand-audit describe it. The one cross-question figure still regex-derived is labelled a lower bound on the page. |
+| 39 | **The CodeGraph arm's index never covered the tree the benchmark was testing.** Arms run in a worktree under `os.tmpdir()`; the container mounts only `${HOME}/Agentic`, so that worktree is invisible to the container-side MCP server, whose default project (`/coding`) is uninitialized. At least 30 of 172 CodeGraph cells report the index unreachable, and when it *does* answer it serves `/workspace/coding` — the main working tree, which is not the de-contaminated one every other arm searches. 15 of 31 sandbox-excluded paths are present in it (not the answer key, not the observation exports). | **The sandbox verifies containment of the tree it builds, and the codegraph arm reads an index of a different tree**, so the guarantee never applied to it. It surfaced only by chasing five L2 zeros that turned out to be correct refusals. Split by whether the index answered, L2 is 0.00×5 (harness) and 0.50×4 (capability) rather than a single 0.22 — the capability result is cleaner than the blend it was reported as. Fix is either to bind the sandbox into the container or to build a per-run index over it; until then the arm's per-question figures carry the caveat inline. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
