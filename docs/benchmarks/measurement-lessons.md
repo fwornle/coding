@@ -439,6 +439,22 @@ repository is absent do. **When a metric is a substring match, the first thing t
 the surrounding sentence is doing with it** — and prefer a test that matches the assertion
 ("found it in `<file>:<line>`") over one that matches the topic.
 
+**A fixed tool changes what the agent DOES, not just how well it scores — and the behavioural
+change is the bigger result.** Repairing the CodeGraph index moved the arm's mean 0.881 → 0.929,
+which reads as marginal. What actually happened is that its Read calls collapsed from 427 to 94
+while its index calls doubled from 67 to 136: the arm had been compensating for a broken tool by
+reading files, and every earlier number described *Read with a broken tool attached* rather than
+the backend named on the label. **When a tool is repaired, diff the tool mix before the scores.**
+A score that barely moves can conceal a strategy that changed completely — and the hybrid arm,
+whose scores did not move at all, tripled its graph usage.
+
+**Repairing a tool can lower a score honestly.** The same fix cost hybrid a T3 cell: the graph
+surfaced adjacent real files, the arm named them while ruling them out, and the longer sentence
+overran the abstain matcher's sixty-character window by four characters — scoring a correct
+abstention as a hallucination. The improvement and the regression have the same cause. **Do not
+report only the half that flatters the change**, and when a fix produces a loss, check the
+grader before crediting the arm.
+
 **An arm's infrastructure must be verified against the tree under test, not against the
 repository.** The kgbench sandbox builds a de-contaminated worktree in `os.tmpdir()` and greps
 it to prove containment. The CodeGraph arm queries a container-side index of `/workspace/coding`
@@ -447,6 +463,14 @@ even see the sandbox to replace. The preflight checked that an index *file exist
 it never checked that the index *covered the tree the arms were about to search*. **A preflight
 that proves a resource exists has not proved it is the right resource.** For anything
 path-addressed, assert on the path.
+
+**The harness can reproduce the bug its own question set documents.** Building the per-run
+index on a Docker bind mount ran ~47× slower than baseline and then died with *"unable to open
+database file"*. That is exactly what `docker-compose.yml` explains about `.observations`, and
+exactly what question A1 asks: SQLite's WAL/SHM does not survive the bind-mount boundary. The
+answer was in the repository, in the file the benchmark grades an arm for finding. **Before
+debugging infrastructure, grep your own docs for the symptom** — a project that writes down its
+failures has already paid for the lesson once.
 
 **A refusal is a result, and a rubric that scores it zero will bury a broken tool.** Five L2
 cells said, accurately, "there is no index for this project and I will not guess file paths."

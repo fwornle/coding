@@ -375,6 +375,66 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
     process.stdout.write('  SKIP  codegraph.db absent — index-containment claims unchecked\n');
   }
 
+  // THE RE-MEASUREMENT. Every number in the r8-cgidx section is computed here rather than
+  // transcribed, including the ones that went AGAINST the fix — a section that pins only its
+  // good news is a press release.
+  const FIXED = '.data/kgbench/runs/coding-v1-r8-cgidx/results.jsonl';
+  if (existsSync(FIXED)) {
+    const fx = readFileSync(FIXED, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    const base = rows.filter((r) => r.agent === 'claude' && r.outcome === 'ok');
+    const qm = (set, arm, id) => {
+      const v = set.filter((r) => r.arm === arm && r.id === id);
+      return v.reduce((a, b) => a + b.score, 0) / v.length;
+    };
+    check('cgidx ran 96 cells, all ok', `${fx.length}:${fx.every((r) => r.outcome === 'ok')}`, '96:true');
+    check('cgidx corpus is pinned to r8\'s commit',
+      JSON.parse(readFileSync('.data/kgbench/runs/coding-v1-r8-cgidx/run.json', 'utf8')).sandbox.tree_commit.slice(0, 9),
+      'f4f13e86a');
+    // L2 — the artifact, now resolved.
+    check('L2/codegraph r8 -> cgidx', `${qm(base, 'codegraph', 'L2').toFixed(2)} -> ${qm(fx, 'codegraph', 'L2').toFixed(2)}`, '0.17 -> 1.00');
+    // A1 — must NOT move, or the corpus-scope explanation on this page is wrong.
+    check('A1/codegraph is unchanged (corpus scope, not the harness)',
+      `${qm(base, 'codegraph', 'A1').toFixed(2)} -> ${qm(fx, 'codegraph', 'A1').toFixed(2)}`, '0.65 -> 0.65');
+    check('A1 still misses exactly f1',
+      fx.filter((r) => r.arm === 'codegraph' && r.id === 'A1' && r.score < 0.995)
+        .every((r) => JSON.stringify(r.grade_missing ?? []) === '["f1"]'), true);
+    // A4 — the one that went DOWN, and the reason it is not claimed as an effect.
+    check('A4/codegraph dropped', `${qm(fx, 'codegraph', 'A4').toFixed(2)}`, '0.54');
+    check('A4 0.54 is inside its historical spread (x2 was lower)',
+      qm(pooledCells.filter((r) => r.run === 'coding-v1-x2'), 'codegraph', 'A4') <= qm(fx, 'codegraph', 'A4'), true);
+    // Arm means.
+    const mean = (set, arm) => {
+      const v = set.filter((r) => r.arm === arm);
+      return v.reduce((a, b) => a + b.score, 0) / v.length;
+    };
+    check('codegraph arm mean', `${mean(base, 'codegraph').toFixed(3)} -> ${mean(fx, 'codegraph').toFixed(3)}`, '0.881 -> 0.929');
+    // THE BEHAVIOURAL RESULT, which is the larger one.
+    const tools = (set, arm, pred) => set.filter((r) => r.arm === arm).flatMap((r) => r.tools_executed ?? []).filter(pred).length;
+    const isRead = (t) => t === 'Read'; const isCg = (t) => t.includes('codegraph');
+    check('codegraph Read calls collapse', `${tools(base, 'codegraph', isRead)} -> ${tools(fx, 'codegraph', isRead)}`, '427 -> 94');
+    check('codegraph MCP calls double', `${tools(base, 'codegraph', isCg)} -> ${tools(fx, 'codegraph', isCg)}`, '67 -> 136');
+    const touched = (set, arm) => set.filter((r) => r.arm === arm && (r.tools_executed ?? []).some((t) => t.startsWith('mcp__'))).length;
+    check('hybrid cells using a graph tool', `${touched(base, 'hybrid')}/48 -> ${touched(fx, 'hybrid')}/48`, '6/48 -> 20/48');
+    // ...and the direction that SURVIVES the fix: more reaching, no better answers.
+    check('no hybrid question improved', [...new Set(fx.filter((r) => r.arm === 'hybrid').map((r) => r.id))]
+      .every((id) => qm(fx, 'hybrid', id) <= qm(base, 'hybrid', id) + 0.001), true);
+    // Containment: the index is over the SWEPT corpus, so excluded paths must not surface.
+    const EXCLUDED_PATHS = ['lib/kgbench/judge.mjs', 'lib/kgbench/graders.mjs', 'lib/kgbench/agents.mjs'];
+    check('no cgidx cell cites a sandbox-excluded path',
+      fx.filter((r) => EXCLUDED_PATHS.some((p) => String(r.answer).includes(p))).length, 0);
+    // T3 — the grader defect, pinned at the character count so nobody "fixes" the prose alone.
+    const t3 = fx.find((r) => r.arm === 'hybrid' && r.id === 'T3' && r.score < 0.995);
+    check('hybrid T3 lost a cell', Boolean(t3), true);
+    if (t3) {
+      const gap = String(t3.answer).match(/\bNo\b([^.!?]*?)\bexists?\b/i);
+      check('the abstention overran the 60-char window', gap ? gap[1].length : null, 64);
+      check('T3 cell was graded a hallucination despite abstaining',
+        `${t3.hallucinated}:${/\bno\b[^.!?]{0,60}\b(?:exists?)\b/i.test(String(t3.answer))}`, 'true:false');
+    }
+  } else {
+    process.stdout.write('  SKIP  coding-v1-r8-cgidx absent — re-measurement claims unchecked\n');
+  }
+
   // TRIPWIRE. Not a classifier — a change detector. If the answers behind the hand-audit are ever
   // replaced, the broad net's hit count moves and this fires, forcing a re-read rather than
   // letting a stale hand-audit silently describe different data.
@@ -560,8 +620,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 39 rows', '| 39 |');
-claims('says thirty-nine defects', 'Thirty-nine defects were found');
+claims('defect table has 40 rows', '| 40 |');
+claims('says forty defects', 'Forty defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');
