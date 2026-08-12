@@ -37,6 +37,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { gradeQuestion } from '../lib/kgbench/graders.mjs';
 import { loadQuestions, REPO_ROOT } from '../lib/kgbench/arms.mjs';
@@ -61,7 +62,62 @@ const byId = Object.fromEntries(questions.map((q) => [q.id, q]));
 
 const only = opt('only', null)?.split(',').map((x) => x.trim());
 const rows = readFileSync(resultsFile, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
-const inScope = (r) => !only || only.includes(r.id);
+
+/**
+ * Refuse to re-score an answer against a question it was never asked.
+ *
+ * Regrading is only sound when the PROMPT is fixed and the KEY moved: the arm's answer is
+ * evidence about the question it saw. When the prompt itself was rewritten, the stored
+ * answer is a response to different words, and scoring it with today's checklist is not a
+ * correction — it is a category error that looks exactly like a correction, because it
+ * produces plausible numbers on real data.
+ *
+ * This is not hypothetical either. `coding-v1-r5` predates `c31d07b02`, which rewrote A3
+ * and A4 outright; 64 of the 78 rows a blind regrade wanted to touch there were A3, A4 and
+ * B1 — questions whose text had changed underneath them. Only 14 were genuine key fixes.
+ * A one-line `--run` would have quietly rewritten a third of that run's scores.
+ *
+ * The prompt as executed is reconstructed from `run.json`'s `commit`. A run with no commit,
+ * or a set file that did not exist at that commit, cannot be checked — those are reported
+ * and skipped rather than assumed safe, because "cannot verify" is not "verified".
+ */
+const promptDrift = new Map();
+if (!flag('ignore-prompt-drift')) {
+  const setPath = `config/kgbench/questions/${meta.set}.json`;
+  let past = null;
+  if (meta.commit) {
+    try {
+      const raw = execFileSync('git', ['show', `${meta.commit}:${setPath}`],
+        { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const parsed = JSON.parse(raw);
+      past = Object.fromEntries((parsed.questions ?? parsed).map((q) => [q.id, q]));
+    } catch { past = null; }
+  }
+  if (!past) {
+    promptDrift.set('*', meta.commit
+      ? `${setPath} is unreadable at ${meta.commit} — the questions as executed cannot be recovered`
+      : 'run.json records no commit — the questions as executed cannot be recovered');
+  } else {
+    for (const [id, q] of Object.entries(byId)) {
+      const then = past[id];
+      if (!then) promptDrift.set(id, 'question did not exist at run time');
+      else if (then.prompt !== q.prompt) promptDrift.set(id, 'prompt was rewritten after this run');
+    }
+  }
+}
+const unverifiable = promptDrift.has('*');
+const inScope = (r) => (!only || only.includes(r.id))
+  && !promptDrift.has(r.id) && !unverifiable;
+
+if (promptDrift.size) {
+  out('kgbench-regrade: HOLDING BACK cells whose question is not the one that was asked —');
+  for (const [id, why] of promptDrift) {
+    const n = rows.filter((r) => (id === '*' || r.id === id) && (!only || only.includes(r.id))).length;
+    out(`    ${id === '*' ? 'ENTIRE RUN' : id.padEnd(4)}  ${String(n).padStart(3)} row(s)  ${why}`);
+  }
+  out('    Their stored scores are left exactly as they are. Pass --ignore-prompt-drift to');
+  out('    override, and say so wherever the numbers are published.');
+}
 
 const changes = [];
 const regraded = rows.map((r) => {

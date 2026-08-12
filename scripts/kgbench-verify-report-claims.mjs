@@ -459,6 +459,31 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
     process.stdout.write('  SKIP  coding-v1-r8-cgidx absent — re-measurement claims unchecked\n');
   }
 
+  // THE CORPUS AGREES WITH ITS OWN GRADER, or is knowingly held back. Every run's stored
+  // scores were reconciled against the current grader; what could not be reconciled is
+  // recorded here rather than left to be rediscovered. r5/r6 carried scores from a
+  // SUPERSEDED ANSWER KEY (L2's key named the wrong file, so every arm scored 0.15 on a
+  // correct answer); replication-full predates the contamination detector.
+  const REGRADED = {
+    'coding-v1-r5': 14, 'coding-v1-r6': 14, 'replication-full': 6,
+    'coding-v1-r8': 1, 'coding-v1-x2': 1, 'coding-v1-r8-cgidx': 1,
+  };
+  for (const [run, n] of Object.entries(REGRADED)) {
+    const f = `.data/kgbench/runs/${run}/regrade.json`;
+    if (!existsSync(f)) { process.stdout.write(`  SKIP  ${run} regrade log absent\n`); continue; }
+    check(`${run} last regrade moved ${n} cell(s)`, JSON.parse(readFileSync(f, 'utf8')).changed, n);
+  }
+  // ...and the cells that must NOT have been regraded. r5 and r6 predate c31d07b02, which
+  // rewrote A3/A4 (and B1) outright: their stored answers respond to different words, so
+  // re-scoring them with today's checklist would be a category error that produces
+  // plausible numbers on real data. If a future pass sweeps them in, these fire.
+  for (const [run, held] of [['coding-v1-r5', ['A3', 'A4', 'B1']], ['coding-v1-r6', ['A4', 'B1']]]) {
+    const f = `.data/kgbench/runs/${run}/regrade.json`;
+    if (!existsSync(f)) continue;
+    check(`${run} never regraded a rewritten prompt`,
+      JSON.parse(readFileSync(f, 'utf8')).changes.some((c) => held.includes(c.id)), false);
+  }
+
   // TRIPWIRE. Not a classifier — a change detector. If the answers behind the hand-audit are ever
   // replaced, the broad net's hit count moves and this fires, forcing a re-read rather than
   // letting a stale hand-audit silently describe different data.
@@ -645,8 +670,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 40 rows', '| 40 |');
-claims('says forty defects', 'Forty defects were found');
+claims('defect table has 41 rows', '| 41 |');
+claims('says forty-one defects', 'Forty-one defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');

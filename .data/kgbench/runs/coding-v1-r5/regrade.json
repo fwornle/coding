@@ -1,7 +1,7 @@
 {
-  "runId": "coding-v1-r6",
-  "at": "2026-08-12T12:49:58.733Z",
-  "rows": 304,
+  "runId": "coding-v1-r5",
+  "at": "2026-08-12T12:49:58.622Z",
+  "rows": 228,
   "changed": 14,
   "changes": [
     {
@@ -10,7 +10,7 @@
       "rep": 1,
       "score": [
         0.15,
-        1
+        0.5
       ],
       "hallucinated": [
         false,
@@ -20,15 +20,15 @@
         false,
         false
       ],
-      "detail": "2/2 required, 0/1 optional"
+      "detail": "1/2 required, 0/1 optional"
     },
     {
       "arm": "grep",
       "id": "L2",
       "rep": 2,
       "score": [
-        0.15,
-        1
+        1,
+        0.65
       ],
       "hallucinated": [
         false,
@@ -38,15 +38,15 @@
         false,
         false
       ],
-      "detail": "2/2 required, 0/1 optional"
+      "detail": "1/2 required, 1/1 optional"
     },
     {
       "arm": "grep",
       "id": "L2",
       "rep": 3,
       "score": [
-        0.15,
-        1
+        1,
+        0.65
       ],
       "hallucinated": [
         false,
@@ -56,7 +56,61 @@
         false,
         false
       ],
-      "detail": "2/2 required, 0/1 optional"
+      "detail": "1/2 required, 1/1 optional"
+    },
+    {
+      "arm": "grep",
+      "id": "T3",
+      "rep": 1,
+      "score": [
+        1,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-grading-machinery) — answer cites benchmark ground truth"
+    },
+    {
+      "arm": "grep",
+      "id": "T3",
+      "rep": 2,
+      "score": [
+        1,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-grading-machinery) — answer cites benchmark ground truth"
+    },
+    {
+      "arm": "grep",
+      "id": "T3",
+      "rep": 3,
+      "score": [
+        1,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-grading-machinery) — answer cites benchmark ground truth"
     },
     {
       "arm": "graphify",
@@ -81,8 +135,8 @@
       "id": "L2",
       "rep": 2,
       "score": [
-        0.15,
-        1
+        1,
+        0.65
       ],
       "hallucinated": [
         false,
@@ -92,7 +146,7 @@
         false,
         false
       ],
-      "detail": "2/2 required, 0/1 optional"
+      "detail": "1/2 required, 1/1 optional"
     },
     {
       "arm": "graphify",
@@ -100,7 +154,7 @@
       "rep": 3,
       "score": [
         0.15,
-        1
+        0.5
       ],
       "hallucinated": [
         false,
@@ -110,7 +164,7 @@
         false,
         false
       ],
-      "detail": "2/2 required, 0/1 optional"
+      "detail": "1/2 required, 0/1 optional"
     },
     {
       "arm": "codegraph",
@@ -185,11 +239,11 @@
       "detail": "1/2 required, 1/1 optional"
     },
     {
-      "arm": "hybrid",
-      "id": "L2",
-      "rep": 1,
+      "arm": "graphify",
+      "id": "A1",
+      "rep": 4,
       "score": [
-        0.15,
+        0.65,
         1
       ],
       "hallucinated": [
@@ -200,61 +254,7 @@
         false,
         false
       ],
-      "detail": "2/2 required, 0/1 optional"
-    },
-    {
-      "arm": "graphify",
-      "id": "A1",
-      "rep": 4,
-      "score": [
-        1,
-        0.65
-      ],
-      "hallucinated": [
-        false,
-        false
-      ],
-      "contaminated": [
-        false,
-        false
-      ],
-      "detail": "1/2 required, 1/1 optional"
-    },
-    {
-      "arm": "graphify",
-      "id": "A1",
-      "rep": 9,
-      "score": [
-        1,
-        0.65
-      ],
-      "hallucinated": [
-        false,
-        false
-      ],
-      "contaminated": [
-        false,
-        false
-      ],
-      "detail": "1/2 required, 1/1 optional"
-    },
-    {
-      "arm": "codegraph",
-      "id": "A1",
-      "rep": 4,
-      "score": [
-        1,
-        0.65
-      ],
-      "hallucinated": [
-        false,
-        false
-      ],
-      "contaminated": [
-        false,
-        false
-      ],
-      "detail": "1/2 required, 1/1 optional"
+      "detail": "2/2 required, 1/1 optional"
     }
   ],
   "judgeChanged": 0,

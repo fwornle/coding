@@ -19,6 +19,7 @@ import {
   selectKgbenchReportLoading,
   selectKgbenchReportError,
   type KgbenchArmReport,
+  type KgbenchRunSummary,
   type KgbenchStats,
 } from '@/store/slices/kgbenchSlice'
 
@@ -204,6 +205,28 @@ export function KgbenchResults() {
   )
   const armIds = useMemo(() => armRows.map(([id]) => id), [armRows])
 
+  // Newest run first, by WHEN IT RAN. `updatedAt` is the mtime of results.jsonl, so an
+  // offline regrade — which rewrites scores without re-running a single cell — would float
+  // the oldest runs in the corpus to the top of a list labelled "latest". The API sorts this
+  // way too; repeating it here keeps the order right if this list is ever served or cached
+  // by something that does not.
+  const runWhenIso = (r: KgbenchRunSummary) => r.startedAt ?? r.updatedAt ?? ''
+  const runsNewestFirst = useMemo(
+    () => [...runs].sort((a, b) =>
+      runWhenIso(b).localeCompare(runWhenIso(a)) || a.runId.localeCompare(b.runId)),
+    [runs]
+  )
+  // Local-time `YYYY-MM-DD HH:mm`, fixed width so the ids stay in a column. Undated runs get
+  // a same-width placeholder rather than collapsing the alignment.
+  const runWhen = (r: KgbenchRunSummary) => {
+    const iso = runWhenIso(r)
+    if (!iso) return '(undated)      '
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return '(undated)      '
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  }
+
   return (
     <div className="space-y-6">
       <Card data-testid="kgbench-results">
@@ -235,11 +258,11 @@ export function KgbenchResults() {
                   ))}
                 </optgroup>
               )}
-              {runs.length > 0 && (
-                <optgroup label="Runs (.data/kgbench/runs)">
-                  {runs.map((r) => (
+              {runsNewestFirst.length > 0 && (
+                <optgroup label="Runs (.data/kgbench/runs) — newest first">
+                  {runsNewestFirst.map((r) => (
                     <option key={`run:${r.runId}`} value={`run:${r.runId}`} disabled={r.cells === 0}>
-                      {r.runId} — {r.cells} cells{r.status ? ` · ${r.status}` : ''}
+                      {runWhen(r)} · {r.runId} — {r.cells} cells{r.status ? ` · ${r.status}` : ''}
                     </option>
                   ))}
                 </optgroup>

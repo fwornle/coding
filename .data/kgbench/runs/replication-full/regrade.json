@@ -1,0 +1,118 @@
+{
+  "runId": "replication-full",
+  "at": "2026-08-12T12:53:39.529Z",
+  "rows": 54,
+  "changed": 6,
+  "changes": [
+    {
+      "arm": "grep",
+      "id": "S1",
+      "rep": 1,
+      "score": [
+        0.33333333333333337,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-question-set) — answer cites benchmark ground truth"
+    },
+    {
+      "arm": "grep",
+      "id": "S1",
+      "rep": 2,
+      "score": [
+        0.33333333333333337,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-question-set) — answer cites benchmark ground truth"
+    },
+    {
+      "arm": "grep",
+      "id": "S1",
+      "rep": 3,
+      "score": [
+        0.33333333333333337,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-question-set) — answer cites benchmark ground truth"
+    },
+    {
+      "arm": "graphify",
+      "id": "S1",
+      "rep": 1,
+      "score": [
+        0.4615384615384615,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-question-set) — answer cites benchmark ground truth"
+    },
+    {
+      "arm": "graphify",
+      "id": "S1",
+      "rep": 2,
+      "score": [
+        0.4615384615384615,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-question-set) — answer cites benchmark ground truth"
+    },
+    {
+      "arm": "graphify",
+      "id": "S1",
+      "rep": 3,
+      "score": [
+        0.33333333333333337,
+        null
+      ],
+      "hallucinated": [
+        false,
+        false
+      ],
+      "contaminated": [
+        false,
+        true
+      ],
+      "detail": "contaminated (cites-question-set) — answer cites benchmark ground truth"
+    }
+  ],
+  "judgeChanged": 0,
+  "judgeChanges": []
+}
