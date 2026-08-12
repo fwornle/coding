@@ -46,6 +46,10 @@ AGENTS=""; MODELS=""; BASELINE_WAIT=""
 # and a budget that varied between the base and deepen passes would put cells of the same
 # run on different terms — which is the asymmetry the budget exists to remove.
 CONTINUATIONS=""
+# Pin the SEARCHED CORPUS to a commit, independently of the harness running it. A rerun that
+# exists to change one variable — a fixed backend, a new grader — must hold the tree still, or
+# the comparison has two moving parts and neither can be attributed. Empty = HEAD, as before.
+AT_COMMIT=""
 MAX_RESTARTS="8"
 
 while [ $# -gt 0 ]; do
@@ -59,6 +63,7 @@ while [ $# -gt 0 ]; do
     --models)      MODELS="$2"; shift 2 ;;
     --baseline-token-wait-s) BASELINE_WAIT="$2"; shift 2 ;;
     --continuations) CONTINUATIONS="$2"; shift 2 ;;
+    --commit)      AT_COMMIT="$2"; shift 2 ;;
     --deepen)      DEEPEN="$2"; shift 2 ;;
     --deepen-reps) DEEPEN_REPS="$2"; shift 2 ;;
     --max-restarts) MAX_RESTARTS="$2"; shift 2 ;;
@@ -87,7 +92,7 @@ if [ -z "${KGBENCH_SUPERVISED:-}" ]; then
     --run-id "$RUN_ID" --set "$SET_NAME" --reps "$REPS" \
     ${ONLY:+--only "$ONLY"} ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} \
     ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} \
-    ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} \
+    ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} ${AT_COMMIT:+--commit "$AT_COMMIT"} \
     ${DEEPEN:+--deepen "$DEEPEN"} --deepen-reps "$DEEPEN_REPS" \
     --max-restarts "$MAX_RESTARTS" >>"$LOG" 2>&1 &
   disown
@@ -136,17 +141,17 @@ run_pass() {
   done
 }
 
-say "supervising run '$RUN_ID' (set=$SET_NAME reps=$REPS arms='${ARMS:-all enabled}' agents='${AGENTS:-claude}' models='${MODELS:-per-arm}' only='${ONLY:-all}' deepen='${DEEPEN:-none}' continuations='${CONTINUATIONS:-0 (arm default)}')"
+say "supervising run '$RUN_ID' (set=$SET_NAME reps=$REPS arms='${ARMS:-all enabled}' agents='${AGENTS:-claude}' models='${MODELS:-per-arm}' only='${ONLY:-all}' deepen='${DEEPEN:-none}' continuations='${CONTINUATIONS:-0 (arm default)}' commit='${AT_COMMIT:-HEAD}')"
 set_status "running"
 
 if [ -n "$ONLY" ]; then
-  run_pass "only:$ONLY" --set "$SET_NAME" --reps "$REPS" --only "$ONLY" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} --run-id "$RUN_ID" || exit $?
+  run_pass "only:$ONLY" --set "$SET_NAME" --reps "$REPS" --only "$ONLY" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} ${AT_COMMIT:+--commit "$AT_COMMIT"} --run-id "$RUN_ID" || exit $?
 else
-  run_pass "matrix" --set "$SET_NAME" --reps "$REPS" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} --run-id "$RUN_ID" || exit $?
+  run_pass "matrix" --set "$SET_NAME" --reps "$REPS" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} ${AT_COMMIT:+--commit "$AT_COMMIT"} --run-id "$RUN_ID" || exit $?
   if [ -n "$DEEPEN" ]; then
     # The axes travel to the deepen pass too: adding reps under a different agent set would
     # deepen a different experiment than the one the matrix measured.
-    run_pass "deepen:$DEEPEN" --set "$SET_NAME" --reps "$DEEPEN_REPS" --only "$DEEPEN" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} --run-id "$RUN_ID" || exit $?
+    run_pass "deepen:$DEEPEN" --set "$SET_NAME" --reps "$DEEPEN_REPS" --only "$DEEPEN" ${ARMS:+--arms "$ARMS"} ${AGENTS:+--agents "$AGENTS"} ${MODELS:+--models "$MODELS"} ${BASELINE_WAIT:+--baseline-token-wait-s "$BASELINE_WAIT"} ${CONTINUATIONS:+--continuations "$CONTINUATIONS"} ${AT_COMMIT:+--commit "$AT_COMMIT"} --run-id "$RUN_ID" || exit $?
   fi
 fi
 

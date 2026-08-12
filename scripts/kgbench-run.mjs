@@ -71,20 +71,30 @@ const runDir = path.join(repoRoot, '.data/kgbench/runs', runId);
 mkdirSync(runDir, { recursive: true });
 const resultsFile = path.join(runDir, 'results.jsonl');
 
-// WHERE THE CODEGRAPH INDEX FOR THIS RUN LIVES, on the host and as the container sees it.
+// WHERE THE CODEGRAPH INDEX FOR THIS RUN LIVES. Three constraints, and they leave one shape.
 //
-// Two separate requirements force this shape. The container can only read what compose
-// mounts, and os.tmpdir() is not mounted — so an index over the arms' tmp tree is
-// impossible, and the server silently answered about the main working tree instead. And
-// codegraph always writes its DB to `<project>/.codegraph/`, which cannot be relocated —
-// so the indexed tree must NOT be the tree the arms search, because that DB stores
-// file_path and qualified_name for every symbol, i.e. it is an answer key for the lookup
-// questions and `hybrid` has Grep.
+// 1. The container can only read what compose mounts, and os.tmpdir() is not mounted, so an
+//    index over the arms' own tmp worktree is impossible — which is why the server answered
+//    about the main working tree instead, for every run up to r8.
+// 2. codegraph always writes its DB to `<project>/.codegraph/` and that cannot be relocated.
+//    The DB stores file_path and qualified_name for every symbol, so it is an answer key for
+//    the lookup questions and `hybrid` has Grep. The indexed tree therefore must not be the
+//    searched tree.
+// 3. THE INDEX CANNOT LIVE ON A BIND MOUNT. Building it on /coding/.data ran ~47x slower than
+//    the 36s baseline and then died with "unable to open database file" after 14 minutes.
+//    That is not a mystery: it is the failure this repository already documents in
+//    docker-compose.yml, where `.observations` is deliberately NOT bind-mounted because
+//    SQLite's WAL/SHM cannot survive concurrent access across the boundary. Question A1 of
+//    this very benchmark asks why. The harness reproduced the bug its own question set
+//    describes.
 //
-// Hence a second worktree, built from the same commit with the same exclusions, existing
-// only to hold the index. `.data` is bind-mounted rw at /coding/.data.
-const indexTreeHost = path.join(repoRoot, '.data/kgbench/trees', runId, 'index');
-const indexTreeContainer = `/coding/.data/kgbench/trees/${runId}/index`;
+// So: stage the swept corpus on the host (a worktree, for provenance and identical
+// exclusions), copy it into the CONTAINER'S OWN filesystem, and index it there. The DB never
+// touches a bind mount, and it is doubly out of the arms' reach — a different tree AND a
+// different filesystem.
+const indexStageHost = path.join(repoRoot, '.data/kgbench/trees', runId, 'index');
+const indexStageContainer = `/coding/.data/kgbench/trees/${runId}/index`;
+const indexTreeContainer = `/tmp/kgbench-index-${runId}`;
 
 let armsDoc, questionSet;
 try {
@@ -210,12 +220,18 @@ let armCwd = repoRoot;
 // leaked on the first try.
 let releaseWorktree = null;
 let releaseIndexTree = null;
+let releaseContainerIndex = null;
 const releaseTree = () => {
   if (releaseWorktree) { const fn = releaseWorktree; releaseWorktree = null; tree = null; fn(); }
   // The index tree carries a ~120MB .codegraph/ that git never tracked. `worktree remove
   // --force` handles untracked content, but it is the second thing that can fail here and
   // a throw would strand the first, so each releases independently.
   if (releaseIndexTree) { const fn = releaseIndexTree; releaseIndexTree = null; try { fn(); } catch { /* best effort */ } }
+  // And the container-local copy, which nothing on the host would ever reclaim.
+  if (releaseContainerIndex) {
+    const p = releaseContainerIndex; releaseContainerIndex = null;
+    try { execFileSync('docker', ['exec', 'coding-services', 'rm', '-rf', p], { stdio: 'ignore', timeout: 60_000 }); } catch { /* best effort */ }
+  }
 };
 process.on('exit', releaseTree);
 for (const sig of ['SIGINT', 'SIGTERM']) {
@@ -250,19 +266,59 @@ if (flag('no-sandbox')) {
 // it costs ~40s and ~120MB.
 let indexTree = null;
 const needsCodegraph = arms.some((a) => JSON.stringify(a.mcpConfig?.mcpServers ?? {}).includes('codegraph'));
-if (tree && needsCodegraph) {
-  out('kgbench: building the codegraph index over the run tree...');
+// A RESUME MUST REUSE THE INDEX IT ALREADY BUILT, for the same reason it reuses the baseline
+// floors it already measured: rebuilding costs ~40s and ~120MB, and — worse — a second build
+// is a second chance to differ from the corpus the first half of the run was scored against.
+// The tree path is deterministic per run id, so "already there and still describing the right
+// commit" is checkable rather than assumed.
+// The index lives inside the container, so "is it already there" is a container question.
+const containerHas = (p) => {
   try {
-    indexTree = createRunTree({
-      repoRoot,
-      questions,
-      at: tree.commit,             // the SAME commit the arms search, not HEAD twice
-      dir: indexTreeHost,
-      onWorktreeCreated: ({ cleanup }) => { releaseIndexTree = cleanup; },
-    });
+    execFileSync('docker', ['exec', 'coding-services', 'test', '-f', `${p}/.codegraph/codegraph.db`],
+      { stdio: 'ignore', timeout: 30_000 });
+    return true;
+  } catch { return false; }
+};
+const priorIndex = needsCodegraph && containerHas(indexTreeContainer);
+if (tree && needsCodegraph) {
+  out(priorIndex
+    ? 'kgbench: reusing the codegraph index from a previous pass of this run...'
+    : 'kgbench: building the codegraph index over the run tree...');
+  try {
+    indexTree = priorIndex
+      ? { dir: indexTreeContainer, commit: tree.commit, removed: tree.removed, reused: true }
+      : createRunTree({
+        repoRoot,
+        questions,
+        at: tree.commit,           // the SAME commit the arms search, not HEAD twice
+        dir: indexStageHost,
+        onWorktreeCreated: ({ cleanup }) => { releaseIndexTree = cleanup; },
+      });
     const t0 = Date.now();
-    execFileSync('docker', ['exec', 'coding-services', 'codegraph', 'index', indexTreeContainer],
-      { stdio: 'pipe', encoding: 'utf8', timeout: 15 * 60_000 });
+    // `init` BUILDS the index as part of initialising, so a fresh tree needs exactly one
+    // command and a resumed one needs none. Neither subcommand is a no-op in the wrong
+    // state: `index` on a virgin project exits "CodeGraph not initialized" and `init` on an
+    // existing one exits "Already initialized", so the branch is on state, not on hope.
+    // Mirrors docker/codegraph-index.sh's own dispatch.
+    //
+    // stdin is CLOSED deliberately — `init` ends with an interactive freshness prompt that
+    // hangs forever under a non-tty parent, which is a 15-minute timeout rather than an error.
+    if (!priorIndex) {
+      // Bulk sequential copy off the bind mount into container-local storage. One large
+      // streaming read is what VirtioFS is good at; the thousands of small synchronous
+      // SQLite writes that follow are what it is bad at, and those now land on overlayfs.
+      releaseContainerIndex = indexTreeContainer;
+      execFileSync('docker', ['exec', 'coding-services', 'rm', '-rf', indexTreeContainer],
+        { stdio: 'ignore', timeout: 120_000 });
+      execFileSync('docker', ['exec', 'coding-services', 'cp', '-a', indexStageContainer, indexTreeContainer],
+        { stdio: 'pipe', encoding: 'utf8', timeout: 10 * 60_000 });
+      // `init` BUILDS the index as part of initialising, so a fresh tree needs exactly one
+      // command. stdin is CLOSED deliberately — it ends with an interactive freshness prompt
+      // that hangs forever under a non-tty parent, i.e. a timeout rather than an error.
+      execFileSync('docker',
+        ['exec', '-i', 'coding-services', 'codegraph', 'init', indexTreeContainer],
+        { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', timeout: 15 * 60_000 });
+    }
     const status = JSON.parse(execFileSync('docker',
       ['exec', 'coding-services', 'codegraph', 'status', indexTreeContainer, '--json'],
       { encoding: 'utf8', timeout: 60_000 }));
@@ -272,8 +328,26 @@ if (tree && needsCodegraph) {
     const problems = indexCoverageProblems(status, { project: indexTreeContainer });
     if (problems.length) die(`codegraph index unusable — ${problems.join('; ')}`);
     indexTree.status = status;
-    out(`  indexed  ${status.fileCount} files, ${status.nodeCount} nodes in ${Math.round((Date.now() - t0) / 1000)}s`);
+    out(`  ${priorIndex ? 'reused  ' : 'indexed '} ${status.fileCount} files, ${status.nodeCount} nodes`
+      + `${priorIndex ? '' : ` in ${Math.round((Date.now() - t0) / 1000)}s`}`);
     out(`  served   ${indexTreeContainer}`);
+
+    // PROOF THAT THE SERVED INDEX IS THE SANDBOX ONE, not the main working tree. `-p` sets
+    // the server's DEFAULT project and the MCP session ranks a client-supplied rootUri above
+    // it, so the flag alone is an intention rather than a guarantee.
+    //
+    // The probe is decisive because it keys on a file the sandbox REMOVES: judge.mjs is
+    // excluded from the corpus but present in /workspace/coding, so a non-zero hit count for
+    // one of its symbols means the arm would have been served the wrong tree — the exact
+    // condition this whole change exists to end. Costs ~2s.
+    const probe = execFileSync('docker',
+      ['exec', 'coding-services', 'codegraph', 'explore', 'judgeAnswer', '-p', indexTreeContainer],
+      { encoding: 'utf8', timeout: 120_000 });
+    if (/lib\/kgbench\/judge\.mjs/.test(probe)) {
+      die('the codegraph index contains lib/kgbench/judge.mjs, which the sandbox excludes — '
+        + `it is indexing the wrong tree (expected ${indexTreeContainer})`);
+    }
+    out('  verified the index excludes what the sandbox removed (judge.mjs absent)');
   } catch (err) { die(`codegraph index build failed: ${err.message}`); }
 } else if (needsCodegraph) {
   out('kgbench: --no-sandbox — codegraph serves /workspace/coding (the live working tree).');
