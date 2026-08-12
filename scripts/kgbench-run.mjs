@@ -336,18 +336,30 @@ if (tree && needsCodegraph) {
     // the server's DEFAULT project and the MCP session ranks a client-supplied rootUri above
     // it, so the flag alone is an intention rather than a guarantee.
     //
-    // The probe is decisive because it keys on a file the sandbox REMOVES: judge.mjs is
-    // excluded from the corpus but present in /workspace/coding, so a non-zero hit count for
-    // one of its symbols means the arm would have been served the wrong tree — the exact
-    // condition this whole change exists to end. Costs ~2s.
-    const probe = execFileSync('docker',
-      ['exec', 'coding-services', 'codegraph', 'explore', 'judgeAnswer', '-p', indexTreeContainer],
-      { encoding: 'utf8', timeout: 120_000 });
-    if (/lib\/kgbench\/judge\.mjs/.test(probe)) {
-      die('the codegraph index contains lib/kgbench/judge.mjs, which the sandbox excludes — '
+    // This asks the FILESYSTEM the index was built from, for EVERY path the sandbox removed.
+    // The previous version grepped the free text of `codegraph explore judgeAnswer` for
+    // "lib/kgbench/judge.mjs" — and that string occurs in an IMPORT inside
+    // scripts/kgbench-run.mjs, which sandbox.mjs deliberately keeps in the corpus because it
+    // is B2's ground truth. So the probe could not tell "judge.mjs is indexed" from "a corpus
+    // file names judge.mjs", and it refused a legitimate run at an older commit. A containment
+    // check that fires on a mention rather than on the artefact is the same defect this
+    // benchmark keeps finding in its own graders, one layer down.
+    //
+    // The replacement is STRICTLY STRONGER, not weaker: it covers every exclusion instead of
+    // one symbol, and `test -e` cannot be satisfied by a coincidence of text.
+    const leaked = (tree.removed ?? []).filter((rel) => {
+      try {
+        execFileSync('docker', ['exec', 'coding-services', 'test', '-e', `${indexTreeContainer}/${rel}`],
+          { stdio: 'ignore', timeout: 30_000 });
+        return true;
+      } catch { return false; }
+    });
+    if (leaked.length) {
+      die(`the codegraph index tree still contains ${leaked.length} path(s) the sandbox removed `
+        + `(${leaked.slice(0, 3).join(', ')}${leaked.length > 3 ? ', …' : ''}) — `
         + `it is indexing the wrong tree (expected ${indexTreeContainer})`);
     }
-    out('  verified the index excludes what the sandbox removed (judge.mjs absent)');
+    out(`  verified the index excludes all ${(tree.removed ?? []).length} path(s) the sandbox removed`);
   } catch (err) { die(`codegraph index build failed: ${err.message}`); }
 } else if (needsCodegraph) {
   out('kgbench: --no-sandbox — codegraph serves /workspace/coding (the live working tree).');

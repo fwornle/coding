@@ -315,3 +315,33 @@ describe('the codegraph MCP server is pinned to a project', () => {
     expect(arm.mcpConfig.mcpServers.codegraph.args).toContain('-p');
   });
 });
+
+describe('the index containment check keys on the artefact, not a mention of it', () => {
+  // The check that proves the codegraph index is the SANDBOX tree and not the main working
+  // tree used to grep the free text of `codegraph explore judgeAnswer` for
+  // "lib/kgbench/judge.mjs". That string is in an IMPORT inside scripts/kgbench-run.mjs —
+  // a file sandbox.mjs deliberately KEEPS, because it is B2's ground truth. So the probe
+  // could not tell "judge.mjs is indexed" from "a corpus file names judge.mjs", and it
+  // refused a legitimate run at an older commit whose exclusion set is smaller.
+  const runner = readFileSync(path.join(REPO, 'scripts/kgbench-run.mjs'), 'utf8');
+
+  it('the corpus really does contain a file that names the excluded path', () => {
+    // If this ever stops being true the regression below is no longer meaningful, and the
+    // retired regex would look safe again to whoever reads it next.
+    expect(runner).toMatch(/from '\.\.\/lib\/kgbench\/judge\.mjs'/);
+    expect(DEFAULT_EXCLUDES).not.toContain('scripts/kgbench-run.mjs');
+  });
+
+  it('the retired text probe false-positives on that import', () => {
+    const importLine = "import { judgeAnswer } from '../lib/kgbench/judge.mjs';";
+    expect(/lib\/kgbench\/judge\.mjs/.test(importLine)).toBe(true);
+  });
+
+  it('the check now tests the filesystem for every removed path', () => {
+    // `test -e` per exclusion cannot be satisfied by a coincidence of text, and it covers
+    // the whole exclusion set rather than one symbol — strictly stronger than what it replaced.
+    expect(runner).toMatch(/tree\.removed \?\? \[\]/);
+    expect(runner).toMatch(/'test', '-e'/);
+    expect(runner).not.toMatch(/codegraph', 'explore', 'judgeAnswer'/);
+  });
+});
