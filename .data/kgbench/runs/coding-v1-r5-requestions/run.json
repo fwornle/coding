@@ -1,0 +1,175 @@
+{
+  "runId": "coding-v1-r5-requestions",
+  "set": "coding-v1",
+  "reps": 3,
+  "commit": "d1cb27640",
+  "dirty": true,
+  "history": [
+    {
+      "commit": "56752f6cf",
+      "reps": 10,
+      "startedAt": "2026-08-12T17:21:02.569Z",
+      "sandbox_commit": "199bf1f3f37b0b442fc9d45636aff006227ba47d",
+      "questions": [
+        "A3",
+        "A4"
+      ],
+      "agents": [
+        "claude"
+      ]
+    },
+    {
+      "commit": "56752f6cf",
+      "reps": 10,
+      "startedAt": "2026-08-12T17:28:17.992Z",
+      "sandbox_commit": "199bf1f3f37b0b442fc9d45636aff006227ba47d",
+      "questions": [
+        "A3",
+        "A4"
+      ],
+      "agents": [
+        "claude"
+      ]
+    }
+  ],
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    },
+    {
+      "id": "graphify",
+      "label": "Graphify code graph",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes"
+      ],
+      "backend": "graphify"
+    },
+    {
+      "id": "codegraph",
+      "label": "CodeGraph (SQLite)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": "codegraph"
+    }
+  ],
+  "agents": [
+    "claude"
+  ],
+  "models": [
+    "claude-sonnet-5"
+  ],
+  "continuationBudget": 2,
+  "combinations": [
+    {
+      "arm": "grep",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "graphify",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "codegraph",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    }
+  ],
+  "questions": [
+    "B1"
+  ],
+  "sandbox": {
+    "mode": "worktree",
+    "tree_commit": "199bf1f3f37b0b442fc9d45636aff006227ba47d",
+    "excluded": [
+      "config/kgbench/questions",
+      "lib/kgbench/graders.mjs",
+      "lib/kgbench/sandbox.mjs",
+      "lib/kgbench/judge.mjs",
+      "tests/integration/kgbench-graders.test.js",
+      "tests/integration/kgbench-sandbox.test.js",
+      "tests/integration/kgbench-tool-enforcement.test.js",
+      "docs/measurement/kgbench.md",
+      "docs-content/measurement/kgbench.md",
+      ".data",
+      ".specstory",
+      "CLAUDE.md",
+      ".claude",
+      ".github/copilot-instructions.md"
+    ],
+    "verified": true,
+    "code_graph_index": {
+      "backend": "codegraph",
+      "project": "/tmp/kgbench-index-coding-v1-r5-requestions",
+      "tree_commit": "199bf1f3f37b0b442fc9d45636aff006227ba47d",
+      "covers_run_tree": true,
+      "file_count": 946,
+      "node_count": 14021
+    },
+    "pinned_via_flag": true
+  },
+  "baselines": {
+    "grep|claude|claude-sonnet-5": 21236,
+    "graphify|claude|claude-sonnet-5": 21674,
+    "codegraph|claude|claude-sonnet-5": 20808
+  },
+  "baselineSource": {
+    "grep|claude|claude-sonnet-5": "stream-json",
+    "graphify|claude|claude-sonnet-5": "stream-json",
+    "codegraph|claude|claude-sonnet-5": "stream-json"
+  },
+  "schemaTax": {
+    "grep|claude|claude-sonnet-5": 0,
+    "graphify|claude|claude-sonnet-5": 438,
+    "codegraph|claude|claude-sonnet-5": -428
+  },
+  "judge": {
+    "requested": {
+      "provider": "copilot",
+      "model": "claude-sonnet-5"
+    },
+    "served": {
+      "model": "claude-sonnet-5",
+      "provider": "copilot"
+    },
+    "enabled": true
+  },
+  "startedAt": "2026-08-12T17:54:41.995Z"
+}

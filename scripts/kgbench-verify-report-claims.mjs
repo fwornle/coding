@@ -484,6 +484,54 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
       JSON.parse(readFileSync(f, 'utf8')).changes.some((c) => held.includes(c.id)), false);
   }
 
+  // THE RE-MEASUREMENT OF r5/r6'S REWRITTEN QUESTIONS. Every figure in that section is
+  // computed here, including the one that COSTS this page a claim — a section that pins only
+  // its comfortable numbers is a press release.
+  for (const [run, commit, n, qs] of [
+    ['coding-v1-r5-requestions', '199bf1f3f', 69, ['A3', 'A4', 'B1']],
+    ['coding-v1-r6-requestions', 'fcfedffaa', 52, ['A4', 'B1']],
+  ]) {
+    const f = `.data/kgbench/runs/${run}/results.jsonl`;
+    if (!existsSync(f)) { process.stdout.write(`  SKIP  ${run} absent\n`); continue; }
+    const rr = readFileSync(f, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    const meta = JSON.parse(readFileSync(`.data/kgbench/runs/${run}/run.json`, 'utf8'));
+    check(`${run} ran ${n} cells, all ok`, `${rr.length}:${rr.every((r) => r.outcome === 'ok')}`, `${n}:true`);
+    // The corpus is the OLD run's tree — that is the entire point of running these separately.
+    check(`${run} corpus is pinned to its own run's commit`, meta.sandbox.tree_commit.slice(0, 9), commit);
+    // ...and the model IS recorded, which r5/r6 never did. If this regresses the runs become
+    // as uninterpretable as the ones they exist to stand beside.
+    check(`${run} records a model on every cell`,
+      [...new Set(rr.map((r) => r.model))].join(','), 'claude-sonnet-5');
+    check(`${run} is clean`, `${rr.filter((r) => r.hallucinated).length}:${rr.filter((r) => r.contaminated).length}`, '0:0');
+    check(`${run} covers exactly the held-back questions`,
+      [...new Set(rr.map((r) => r.id))].sort().join(','), qs.join(','));
+  }
+  const qmean = (run, q, arm) => {
+    const rr = readFileSync(`.data/kgbench/runs/${run}/results.jsonl`, 'utf8').trim()
+      .split('\n').map((l) => JSON.parse(l)).filter((r) => r.id === q && r.arm === arm);
+    return rr.length ? Number((rr.reduce((a, b) => a + b.score, 0) / rr.length).toFixed(2)) : null;
+  };
+  if (existsSync('.data/kgbench/runs/coding-v1-r6-requestions/results.jsonl')) {
+    // THE STRONG RESULT: codegraph collapses on A4 in BOTH runs.
+    check('A4/codegraph @199bf1f3f', qmean('coding-v1-r5-requestions', 'A4', 'codegraph'), 0.61);
+    check('A4/codegraph @fcfedffaa', qmean('coding-v1-r6-requestions', 'A4', 'codegraph'), 0.56);
+    check('and every other arm on A4 is far above it',
+      ['grep', 'graphify'].every((a) => qmean('coding-v1-r5-requestions', 'A4', a) >= 0.87)
+      && ['grep', 'graphify', 'hybrid'].every((a) => qmean('coding-v1-r6-requestions', 'A4', a) >= 0.87), true);
+    // THE COUNTER-EXAMPLE, pinned as such. If someone "fixes" the prose back to an absolute,
+    // this fires. The direction claim is only allowed to be absolute while this is false.
+    check('a forced-graph arm DOES beat grep on r6/B1',
+      `${qmean('coding-v1-r6-requestions', 'B1', 'graphify')} vs ${qmean('coding-v1-r6-requestions', 'B1', 'grep')}`,
+      '1 vs 0.94');
+    check('and it rests on ONE grep cell', readFileSync('.data/kgbench/runs/coding-v1-r6-requestions/results.jsonl', 'utf8')
+      .trim().split('\n').map((l) => JSON.parse(l))
+      .filter((r) => r.id === 'B1' && r.arm === 'grep' && r.score < 0.995).length, 1);
+    claims('the page does not restate the absolute', 'except once, on three cells');
+    // A3 is a three-way tie — no arm effect.
+    check('A3 is a three-way tie at 1.00',
+      ['grep', 'graphify', 'codegraph'].map((a) => qmean('coding-v1-r5-requestions', 'A3', a)).join(','), '1,1,1');
+  }
+
   // TRIPWIRE. Not a classifier — a change detector. If the answers behind the hand-audit are ever
   // replaced, the broad net's hit count moves and this fires, forcing a re-read rather than
   // letting a stale hand-audit silently describe different data.
@@ -670,8 +718,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 41 rows', '| 41 |');
-claims('says forty-one defects', 'Forty-one defects were found');
+claims('defect table has 42 rows', '| 42 |');
+claims('says forty-two defects', 'Forty-two defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');

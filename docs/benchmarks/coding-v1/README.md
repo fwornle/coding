@@ -900,9 +900,59 @@ abstention the grader could not parse.
 
 What survives across three runs is narrower than the old wording and still worth having:
 
-- **No graph arm beats grep on any question in any run.** The direction never reverses.
+- **No graph arm beats grep on any question in any run.** The direction never reverses —
+  *except once, on three cells, in a run added later*. See the re-measurement below.
 - **L2 fails the same way every time**, and A1 fails for both backends across two runs.
 - Which *other* question a graph arm drops is noise, and A4 is not an arm effect at all.
+
+### `r5`/`r6`'s rewritten questions, re-measured beside them
+
+A3, A4 and B1 were rewritten after `r5` and `r6` ran, so those runs' scores for them describe a
+question that no longer exists and cannot be regraded (defect 41). They have now been
+**re-measured rather than patched**: two new runs, `coding-v1-r5-requestions` (69 cells) and
+`coding-v1-r6-requestions` (52 cells), each pinned to **its own run's corpus commit**
+(`199bf1f3f`, `fcfedffaa`) with that run's arms and rep counts, on `claude-sonnet-5`.
+
+**They are deliberately NOT spliced into `r5`/`r6`.** Those runs recorded no model at all —
+not run-level, not row-level — and judged with `claude-opus-4.8`. Overwriting three questions
+inside them would leave one model answering A3/A4/B1 and an unknown one answering the other
+thirteen, confounding arm with model on exactly the questions under test. A run's whole purpose
+here is a *within-run* arm comparison, so the repair would have destroyed the thing being
+repaired. Beside them, they cost nothing and confound nothing.
+
+121 cells, all `ok`, **zero hallucinated, zero contaminated**.
+
+Read the arm columns, not any before/after: the old scores answer different words, so a delta
+across them mixes question, model and date. Within each re-measurement the question, model and
+corpus are constant, which is what makes arm-vs-arm clean.
+
+| | grep | graphify | codegraph | hybrid |
+|---|--:|--:|--:|--:|
+| A3 `@199bf1f3f` | 1.00 | 1.00 | 1.00 | — |
+| A4 `@199bf1f3f` | **0.93** | 0.90 | 0.61 | — |
+| B1 `@199bf1f3f` | 1.00 | 1.00 | 0.94 | — |
+| A4 `@fcfedffaa` | 0.87 | 0.89 | 0.56 | **0.94** |
+| B1 `@fcfedffaa` | 0.94 | **1.00** | **1.00** | 1.00 |
+
+**The one result that is strong: CodeGraph collapses on A4, in both runs.** 0.61 and 0.56
+against 0.87-0.94 for every other arm — the largest arm gap anywhere on this page, replicated
+across two independent corpus commits older than any run behind the tables above. A4 asks what
+pins CodeGraph's own env vars and what owns index freshness; the arm that *is* CodeGraph is the
+one that cannot answer it.
+
+**And the one that costs this page a claim.** On `r6`'s B1, graphify and codegraph both score
+**1.00 against grep's 0.94** — the first time in this corpus that a forced-graph arm finishes
+above grep by more than the 0.03 floor. By this page's own standard it is far too thin to be a
+finding: grep lost exactly **one cell of three** (`rep3` = 0.82), and at three reps one cell
+*is* 0.06. It is quoted for the same reason B3 is — not because it shows anything, but because
+"the direction never reverses" was an absolute, and an absolute is refuted by one
+counter-example or it is not an absolute. The honest version is *the direction reverses only
+where a single cell can reverse it.*
+
+Everything else replicates the published direction. A3 is a three-way tie at 1.00 — no arm
+effect at all. A4's spread flips grep between first (`r5`, 0.93) and third (`r6`, 0.87), which
+is exactly the two-value behaviour this page already describes for A4, on the same question
+text.
 
 ---
 
@@ -1108,7 +1158,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Forty-one defects were found across the runs behind this page, and runs were discarded
+Forty-two defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -1158,7 +1208,8 @@ documented because the failure modes generalise to any agent benchmark.
 | 38 | **The regex written to fix defect 37 committed defect 37, one level in.** Replacing the substring test with a phrase-enumerating one — a list of the ways an answer might say it could not read the file — produced "five failing cells make no claim in either direction" and a cross-question total of 7. Reading all sixteen answers gives **two** silent cells and **at least 18** denial cells: the pattern missed `r7` rep8's *"no `.codegraph/` index or file access available in this sandbox"*, a denial phrased in words it had not listed, and scored two memory-attributed cells as silent. | **Enumerating phrasings is the same defect as matching a substring**: both decide a semantic question with a lexical test, and both fail silently by under-matching rather than loudly by erroring. The categories are now hand-audited from reading all sixteen answers end to end and pinned cell by cell; the regex survives only as a tripwire on the hit count, so changed data forces a re-read instead of letting a stale hand-audit describe it. The one cross-question figure still regex-derived is labelled a lower bound on the page. |
 | 39 | **The CodeGraph arm's index never covered the tree the benchmark was testing.** Arms run in a worktree under `os.tmpdir()`; the container mounts only `${HOME}/Agentic`, so that worktree is invisible to the container-side MCP server, whose default project (`/coding`) is uninitialized. At least 30 of 172 CodeGraph cells report the index unreachable, and when it *does* answer it serves `/workspace/coding` — the main working tree, which is not the de-contaminated one every other arm searches. 15 of 31 sandbox-excluded paths are present in it (not the answer key, not the observation exports). | **The sandbox verifies containment of the tree it builds, and the codegraph arm reads an index of a different tree**, so the guarantee never applied to it. It surfaced only by chasing five L2 zeros that turned out to be correct refusals. Split by whether the index answered, L2 is 0.00×5 (harness) and 0.50×4 (capability) rather than a single 0.22 — the capability result is cleaner than the blend it was reported as. **FIXED** (`b48c2d38e`, `fddf1aacc`) and re-measured as `coding-v1-r8-cgidx`: the index is now built over a second worktree of the same commit with the same exclusions, and the MCP server is pinned to it. Unreachable-index cells 14 -> 0; L2 0.17 -> 1.00; A1 unchanged, which confirms corpus scope as a separate cause. The larger finding is behavioural — CodeGraph's MCP share went 14% -> 59% — so the earlier numbers measured an arm degraded to Read with a broken tool attached. |
 | 40 | **A correct abstention was scored as a hallucination because its subject phrase was four characters too long.** Hybrid's T3 cell says *"No payment-processing/financial-transaction reconciliation module exists in this codebase"* and was graded 0.00 with `hallucinated: true`. The matcher allows sixty characters between *no* and *exists*; this subject spans sixty-four. A second abstention in the same answer was missed too, because `\bno (?:module|…)` requires the noun immediately after *no* and a quoted subject sat between them. | **The window was tuned on the answers that existed when it was written.** It is the same defect as Lesson 3's decoration mismatches, one layer up: not a character class but a LENGTH. Worse, the failing cell was the only one of three to call a graph tool — the graph surfaced adjacent real files, the arm named them while ruling them out, and the longer sentence overran the window. A working tool made the answer better and the grader punished the extra words. Counted properly hybrid's T3 is 1.00. **FIXED**: the gap between the negator and its head is now counted in WORDS, not characters, which also subsumes the adjacency defect. Regraded from stored answers across every run in the corpus; it moved exactly three cells — `r8` grep/T4, `x2` grep/T3, `r8-cgidx` hybrid/T3 — each 0.00 -> 1.00 with a false `hallucinated` cleared. The page's hallucination count drops 4 -> 3 and grep's pooled drop-list loses T3. |
-| 41 | **Four runs were carrying scores from a superseded answer key, and a blind fix would have corrupted a fifth.** Reconciling every run against the current grader found 105 stale rows. Fourteen in `r5` and fourteen in `r6` were L2 and A1 scored with keys since corrected — L2's key had named the wrong file, so every arm scored **0.15 on a correct answer**. Six in `replication-full` were S1 cells that predate the contamination detector and cite the benchmark's own ground truth; they are now void rather than scored. | **The remaining 64 rows were the trap.** They were `r5`/`r6` cells for A3, A4 and B1 — questions whose PROMPTS were rewritten by `c31d07b02` after those runs executed. Their stored answers respond to different words, so re-scoring them with today's checklist is not a correction; it is a category error **that looks exactly like a correction, because it produces plausible numbers on real data**. A one-line regrade would have quietly rewritten a third of `r5`. The fix is structural: `kgbench-regrade.mjs` now reconstructs the question set from the run's own `commit` and refuses any question whose prompt moved, and refuses an entire run whose set cannot be recovered — which is what retires the two pilots, whose question file was never committed. *Cannot verify* is not *verified*. |
+| 41 | **Four runs were carrying scores from a superseded answer key, and a blind fix would have corrupted a fifth.** Reconciling every run against the current grader found 105 stale rows. Fourteen in `r5` and fourteen in `r6` were L2 and A1 scored with keys since corrected — L2's key had named the wrong file, so every arm scored **0.15 on a correct answer**. Six in `replication-full` were S1 cells that predate the contamination detector and cite the benchmark's own ground truth; they are now void rather than scored. | **The remaining 64 rows were the trap.** They were `r5`/`r6` cells for A3, A4 and B1 — questions whose PROMPTS were rewritten by `c31d07b02` after those runs executed. Their stored answers respond to different words, so re-scoring them with today's checklist is not a correction; it is a category error **that looks exactly like a correction, because it produces plausible numbers on real data**. A one-line regrade would have quietly rewritten a third of `r5`. The fix is structural: `kgbench-regrade.mjs` now reconstructs the question set from the run's own `commit` and refuses any question whose prompt moved, and refuses an entire run whose set cannot be recovered — which is what retires the two pilots, whose question file was never committed. *Cannot verify* is not *verified*. **PARTLY RESOLVED**: the 64 refused rows have been RE-MEASURED rather than regraded, as `coding-v1-r5-requestions` and `coding-v1-r6-requestions` at each run's own corpus commit — beside `r5`/`r6`, not inside them, because those runs recorded no model and splicing would confound arm with model on exactly the questions under test. `r5`/`r6`'s own A3/A4/B1 columns remain those of a superseded question set and always will; that is a fact about the runs, not a defect left open. |
+| 42 | **A 121-cell run was killed twice, at cells 2 and 18, by the tool that launched it.** Neither death produced an error: the log simply stopped, `supervise.status` stayed `running`, and no process remained. The cause was the launching harness's 10-minute call ceiling killing the process group it hosted — `kgbench-supervise.sh` detaches, but detaching does not leave the group. | **A supervisor that survives signals does not survive its own parent's death, and the two failures are indistinguishable from the outside.** The tell is `status: running` with zero live processes, which is why the monitor now asserts BOTH rather than either. Re-hosting under `launchctl submit` fixed it. Nothing was lost at any point — the runner writes cells incrementally and resumes from `results.jsonl`, so the restart continued at cell 18 rather than redoing 18. **Incremental writes are what turned two silent kills into a delay instead of a loss**, and that property is worth more than the supervisor's retry logic. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15

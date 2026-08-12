@@ -1,0 +1,217 @@
+{
+  "runId": "coding-v1-r6-requestions",
+  "set": "coding-v1",
+  "reps": 10,
+  "commit": "d1cb27640",
+  "dirty": true,
+  "history": [
+    {
+      "commit": "d1cb27640",
+      "reps": 10,
+      "startedAt": "2026-08-12T18:05:27.649Z",
+      "sandbox_commit": "fcfedffaafc4c43680fffa431faf215c11940a16",
+      "questions": [
+        "A4"
+      ],
+      "agents": [
+        "claude"
+      ]
+    },
+    {
+      "commit": "d1cb27640",
+      "reps": 10,
+      "startedAt": "2026-08-12T18:25:48.007Z",
+      "sandbox_commit": "fcfedffaafc4c43680fffa431faf215c11940a16",
+      "questions": [
+        "A4"
+      ],
+      "agents": [
+        "claude"
+      ]
+    },
+    {
+      "commit": "d1cb27640",
+      "reps": 3,
+      "startedAt": "2026-08-12T18:45:30.639Z",
+      "sandbox_commit": "fcfedffaafc4c43680fffa431faf215c11940a16",
+      "questions": [
+        "B1"
+      ],
+      "agents": [
+        "claude"
+      ]
+    }
+  ],
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    },
+    {
+      "id": "graphify",
+      "label": "Graphify code graph",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes"
+      ],
+      "backend": "graphify"
+    },
+    {
+      "id": "codegraph",
+      "label": "CodeGraph (SQLite)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Read",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": "codegraph"
+    },
+    {
+      "id": "hybrid",
+      "label": "All tools, agent chooses",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": null
+    }
+  ],
+  "agents": [
+    "claude"
+  ],
+  "models": [
+    "claude-sonnet-5"
+  ],
+  "continuationBudget": 2,
+  "combinations": [
+    {
+      "arm": "grep",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "graphify",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "codegraph",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    },
+    {
+      "arm": "hybrid",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    }
+  ],
+  "questions": [
+    "A4"
+  ],
+  "sandbox": {
+    "mode": "worktree",
+    "tree_commit": "fcfedffaafc4c43680fffa431faf215c11940a16",
+    "excluded": [
+      "config/kgbench/questions",
+      "lib/kgbench/graders.mjs",
+      "lib/kgbench/sandbox.mjs",
+      "lib/kgbench/judge.mjs",
+      "scripts/kgbench-regrade.mjs",
+      "scripts/kgbench-supervise.sh",
+      "tests/integration/kgbench-graders.test.js",
+      "tests/integration/kgbench-sandbox.test.js",
+      "tests/integration/kgbench-tool-enforcement.test.js",
+      "docs/measurement/kgbench.md",
+      "docs-content/measurement/kgbench.md",
+      "docs/benchmarks/coding-v1",
+      ".data",
+      ".specstory",
+      "CLAUDE.md",
+      ".claude",
+      ".github/copilot-instructions.md"
+    ],
+    "verified": true,
+    "code_graph_index": {
+      "backend": "codegraph",
+      "project": "/tmp/kgbench-index-coding-v1-r6-requestions",
+      "tree_commit": "fcfedffaafc4c43680fffa431faf215c11940a16",
+      "covers_run_tree": true,
+      "file_count": 947,
+      "node_count": 14053
+    },
+    "pinned_via_flag": true
+  },
+  "baselines": {
+    "grep|claude|claude-sonnet-5": 21260,
+    "graphify|claude|claude-sonnet-5": 21698,
+    "codegraph|claude|claude-sonnet-5": 20832,
+    "hybrid|claude|claude-sonnet-5": 24854
+  },
+  "baselineSource": {
+    "grep|claude|claude-sonnet-5": "stream-json",
+    "graphify|claude|claude-sonnet-5": "stream-json",
+    "codegraph|claude|claude-sonnet-5": "stream-json",
+    "hybrid|claude|claude-sonnet-5": "stream-json"
+  },
+  "schemaTax": {
+    "grep|claude|claude-sonnet-5": 0,
+    "graphify|claude|claude-sonnet-5": 438,
+    "codegraph|claude|claude-sonnet-5": -428,
+    "hybrid|claude|claude-sonnet-5": 3594
+  },
+  "judge": {
+    "requested": {
+      "provider": "copilot",
+      "model": "claude-sonnet-5"
+    },
+    "served": null,
+    "enabled": true
+  },
+  "startedAt": "2026-08-12T18:59:11.424Z"
+}
