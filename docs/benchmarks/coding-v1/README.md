@@ -131,21 +131,47 @@ It is not a retry. A retry re-runs the question from scratch, and for a determin
 narration-stop that just narrates again — `x2` issued 88 retries and got 88 further
 no-results. A continuation resumes the session where the work has already happened.
 
-**What it costs, stated honestly.** The budget converts unscored failures into scored
-answers, and some of those answers are weak. On a 48-cell controlled comparison, mean score
-*over answered cells* **falls** from 0.977 to 0.948 going from budget 1 to budget 2, while
-completion rises from 44/48 to 48/48. Both numbers are real and they point opposite ways. The
-one to use puts non-answers at 0 so both budgets share a denominator, and there the budget
-wins by a fifth of what the completion jump alone suggests: **0.935 → 0.948**.
+**What it costs.** An earlier version of this section reported that the budget buys completion
+at the price of quality — mean score over answered cells *falling* from 0.977 to 0.948 while
+completion rose from 44/48 to 48/48. **That trade-off does not replicate**, and the number it
+was measured against was wrong.
+
+The budget-2 run was repeated at the same settings on a corrected harness
+(`coding-v1-r8-cont2b`). On the same 48-cell comparison:
+
+| grep / opencode | answered | mean over answered | mean, non-answers at 0 |
+|---|--:|--:|--:|
+| budget 1 (`r8`) | 44/48 | 0.977 | 0.896 |
+| budget 2 (`cont2b`) | **48/48** | 0.975 | **0.975** |
+
+The claimed quality cost was −0.029. Between the two budget-2 runs — identical arm, agent,
+model, budget and questions — single questions move the 48-cell mean by −0.011, +0.021 and
++0.018, which is the same size. The "cost" was one or two questions' ordinary run-to-run
+variance, published as an effect. Completion, which moves 44 → 48 in both runs, is real.
+
+The shared-denominator figure was also arithmetically impossible as published (0.935). Budget
+1's 44 answered cells sum to 43.00, so the mean over 48 is 0.896; reaching 0.935 would require
+those 44 cells to average 1.020, above the maximum score. Correctly stated, the budget's gain
+on a shared denominator is **0.896 → 0.975**, which is larger than the retracted claim, not
+smaller.
 
 The corollary matters for reading `x2`: its opencode median of 1.00 was **survivorship**. It
 was computed over the 13% of cells that happened to write, which were the easy ones.
 
-**This run was measured at budget 1.** The repository default is now 2, chosen on evidence
-collected after this run: at budget 1, 41 of 48 cells spent the entire budget — the shape of
-a binding constraint — while at budget 2 the spread is 9/28/11 and nothing reaches the
-ceiling. `r8` is therefore not the run that demonstrates the current default, and runs at
-different budgets are not comparable to each other.
+**This run was measured at budget 1.** The repository default is 2, on evidence collected
+after it. At budget 1, 41 of 48 cells spent the entire budget and 4 failed to answer — the
+shape of a binding constraint. At budget 2 the spread over 0/1/2 continuations is **7/31/10**
+(`cont2b`; `cont2` gave 9/28/11), and **all 48 answer**.
+
+Note that about a fifth of cells still spend the budget in full — 10 of 48 here, 11 of 48 in
+`cont2`. An earlier version of this paragraph said "nothing reaches the ceiling", which
+contradicted the spread quoted in the same sentence. What actually changes is the
+*consequence* of reaching it: every cell that spent both continuations still answered, and
+answered correctly (10/10 and 11/11, median 1.00). The budget stops binding on the outcome
+rather than stopping being spent.
+
+`r8` is therefore not the run that demonstrates the current default, and runs at different
+budgets are not comparable to each other.
 
 ---
 
@@ -495,7 +521,8 @@ grep's — and L2, which has now failed the same way twice.
 six failures are opencode, and all six are the same termination behaviour that budget 1 does
 not fully cover: the agent finished investigating, said so, and stopped without writing. Their
 stdout tails read *"I have enough detail now"* and *"I have enough. Let me write the answer."*
-A separate 48-cell run at budget 2 answered all of them.
+Two separate 48-cell runs at budget 2 (`coding-v1-r8-cont2`, and `coding-v1-r8-cont2b` on the
+corrected harness) each answered all 48.
 
 Latency tails: p90 is 34.9s for grep, **32.4s for hybrid**, 69.2s for graphify and 122.0s for
 codegraph. The arm with every tool available has the *tightest* tail of all — the same
@@ -656,7 +683,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Thirty defects were found across the runs behind this page, and runs were discarded
+Thirty-two defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -696,6 +723,8 @@ documented because the failure modes generalise to any agent benchmark.
 | 28 | **A flag was parsed, then dropped on detach.** The supervisor re-execs itself under `nohup` to escape the process group, and that relaunch enumerates its flags explicitly. `--continuations` was added to the parser but not to the relaunch. | The run would have proceeded silently at budget 0 while its log said otherwise. Caught before launch by stubbing `node` on `PATH` and reading the argv each pass actually received, rather than trusting that threading a flag through is trivial. |
 | 29 | **A row described its last attempt while its tokens described the whole cell.** `runCell` resolved tokens over a window spanning every attempt, then built the row by spreading the *last* attempt's result. So a retried cell recorded that attempt's `started_at` and `wall_s` beside an all-attempts token total. Three consequences: the row could not reproduce its own number (re-resolving from its own window returns about half, which the offline backfill would have written back as an improvement); `wall_s` charged a cell that burned 73.6s as 35.6s; and every retried cell tripped the ambiguity check, because a retry is a fresh spawn and opens a session of its own. | The published analysis then *excluded* those 21 rows as over-counts — and since a retried cell pays for two attempts, excluding them pushed opencode's measured cost **down**, from 1.38× to 1.16× claude's. A correction applied in the wrong direction to correct data, on the strength of defect 27's confident wrong cause. Fixed at the source: the row now records the cell's span and per-attempt windows, ambiguity is judged per *attempt* (one session per attempt is a retry, two inside one attempt is an anomaly), and the backfill refuses any window narrower than the cell it describes. The run's rows were repaired offline from the proxy DB with no cell re-run, checked by requiring per-attempt and whole-span attribution to agree to the token. |
 | 30 | **A wall-clock sum dropped its middle legs.** The continuation loop computed `wall_s` as `first + last`, which is exact at a budget of 1 and lossy at 2 — the value the repository had just adopted as its default. | Found while fixing 29, not by a failing test, because no test exercised the continuation loop's arithmetic at all. It also blocks repairing the budget-2 run the same way: with attempt 1's duration under-recorded, the walk-back that reconstructs earlier attempt windows lands too late, and the repair script's controls refuse all four of that run's retried cells rather than writing a plausible wrong answer. |
+| 31 | **A published figure was arithmetically impossible, and nobody multiplied it out.** The budget comparison quoted a shared-denominator mean of `0.935` for budget 1. That run answered 44 of 48 cells with a score sum of 43.00, so the mean over 48 is 0.896; 0.935 would require those 44 cells to average 1.020, above the maximum score. | It survived because it sat between two figures that were right (0.977 over answered, 44/48 answered) and pointed the way the surrounding prose already argued. A number that agrees with the argument does not get checked. The correct value makes the budget look BETTER than the retracted claim — 0.896 → 0.975 rather than 0.935 → 0.948 — so the error was not motivated, merely unverified. The claims checker now recomputes it from the rows rather than matching the text. |
+| 32 | **A trade-off was published from one run's noise.** The budget was reported to buy completion at the cost of quality, mean score over answered cells falling 0.977 → 0.948. Re-running the same 48 cells at the same budget on a corrected harness gives 0.975 — no fall. | The claimed effect was −0.029. Between two runs identical in arm, agent, model, budget and questions, single questions move the 48-cell mean by −0.011, +0.021 and +0.018. The effect was never larger than the noise, and it was published as a candid admission of a cost — the kind of claim that invites no scrutiny because it argues against its author. Per-question figures here need a replicate before they mean anything: within ONE run, a question's content tokens vary across its 3 reps by a median factor of 1.5× (claude), 1.7× (copilot), 1.9× (opencode), worst observed 12.5×. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
