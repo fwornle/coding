@@ -270,21 +270,70 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
   // the axis the section now rests on: claiming to have READ the file predicts 1.00 perfectly,
   // and claiming the repository is ABSENT predicts failure perfectly.
   const claimsRead = (r) => /found (it|the (exact )?answer)[^.]{0,40}docker[/-]compose|docker\/docker-compose\.yml[`']?\s*[:#]\s*\d/i.test(String(r.answer ?? ''));
-  const claimsAbsent = (r) => /no live access|can't grep|cannot grep|isn't present in this working tree|stripped down for the benchmark|don't have live filesystem|no Bash\/Grep tool|working tree has no|isn't checked out here|no direct filesystem access|no shell\/grep access|memory-derived|from (my )?(stored )?memory rather than|inference from adjacent memory/i.test(String(r.answer ?? ''));
+  // THE ABSENCE CLASSIFICATION IS HAND-AUDITED, NOT PATTERN-MATCHED. A phrase-enumerating regex
+  // stood here for one commit and published "five failing cells make no claim in either
+  // direction". It was two: the pattern missed r7/8's "no `.codegraph/` index or file access
+  // available in this sandbox" — a denial in words it had not listed — and counted r7/1 and
+  // r7/10 as silent when both name memory as their source. Enumerating phrasings is the same
+  // defect as the substring test it replaced, one level in. So the categories below come from
+  // reading all sixteen answers end to end, and the regex survives only as a TRIPWIRE (below)
+  // that fires if the underlying answers ever change.
+  const A1_AUDIT = {
+    'r7/9': 'read-compose', 'x2/1': 'read-compose', 'x2/2': 'read-compose', 'x2/3': 'read-compose',
+    'r7/2': 'read-other-file', 'r7/3': 'read-other-file',
+    'r7/5': 'denies-access', 'r7/7': 'denies-access', 'r7/8': 'denies-access',
+    'r8/1': 'denies-access', 'r8/2': 'denies-access', 'r8/3': 'denies-access',
+    'r7/1': 'memory-sourced', 'r7/10': 'memory-sourced',
+    'r7/4': 'silent', 'r7/6': 'silent',
+  };
+  const shortRun = (r) => r.run.replace('coding-v1-', '');
+  const cgA1 = pooledCells.filter((r) => r.id === 'A1' && r.arm === 'codegraph');
+  const bucket = (name) => cgA1.filter((r) => A1_AUDIT[`${shortRun(r)}/${r.rep}`] === name);
+  check('A1 hand-audit covers every codegraph cell',
+    cgA1.every((r) => A1_AUDIT[`${shortRun(r)}/${r.rep}`] !== undefined) && cgA1.length === 16, true);
+  for (const [name, expect] of [['read-compose', '4/4'], ['read-other-file', '2/2'],
+    ['denies-access', '0/6'], ['memory-sourced', '0/2'], ['silent', '0/2']]) {
+    const v = bucket(name);
+    check(`A1/codegraph ${name}`, `${v.filter((r) => r.score > 0.995).length}/${v.length}`, expect);
+  }
+  // The partition the section rests on: claiming a file read is exactly equivalent to scoring 1.00.
+  const claimedRead = cgA1.filter((r) => ['read-compose', 'read-other-file'].includes(A1_AUDIT[`${shortRun(r)}/${r.rep}`]));
+  check('A1/codegraph: every file-read claim scores 1.00',
+    claimedRead.every((r) => r.score > 0.995) && claimedRead.length === 6, true);
+  check('A1/codegraph: every non-claim fails',
+    cgA1.filter((r) => !claimedRead.includes(r)).every((r) => r.score < 0.995), true);
+  check('A1/codegraph: 8 of 10 failures disclose a non-repo source',
+    bucket('denies-access').length + bucket('memory-sourced').length, 8);
   const a1All = pooledCells.filter((r) => r.id === 'A1');
   const readers = a1All.filter(claimsRead);
-  const absenters = a1All.filter((r) => !claimsRead(r) && claimsAbsent(r));
+  const absenters = bucket('denies-access');
   check('A1: claiming to have read the file is a perfect predictor',
     `${readers.filter((r) => r.score > 0.995).length}/${readers.length}`, '29/29');
   check('A1: claiming the repo is absent is a perfect predictor of failure',
-    `${absenters.filter((r) => r.score > 0.995).length}/${absenters.length}`, '0/5');
+    `${absenters.filter((r) => r.score > 0.995).length}/${absenters.length}`, '0/6');
   check('A1: only codegraph ever claims the repo is absent',
     [...new Set(absenters.map((r) => r.arm))].join(','), 'codegraph');
-  // Across EVERY question, not just A1 — the false-absence claim is one arm's behaviour.
-  const absentAll = pooledCells.filter(claimsAbsent);
-  check('false-absence claims are codegraph-only, all questions',
-    [...new Set(absentAll.map((r) => r.arm))].join(','), 'codegraph');
-  check('false-absence claim count, all questions', absentAll.length, 7);
+  // THE CROSS-QUESTION SPREAD. Regex-derived and therefore a LOWER BOUND, labelled as one on the
+  // page: only A1's sixteen cells have been read individually. Widened to include the phrasing
+  // that produced the retracted count of 7.
+  const DENY_RE = /no live access|can't grep|cannot grep|isn't present in this working tree|stripped down for the benchmark|don't have live filesystem|no Bash\/Grep tool|working tree has no|isn't checked out here|no direct filesystem access|no shell\/grep access|file access available in this sandbox|isn't available in this session|no `?\.codegraph\/?`? index|I'd need file access/i;
+  const denialCells = pooledCells.filter((r) => DENY_RE.test(String(r.answer ?? '')));
+  check('denial-of-access cells, all questions (lower bound)', denialCells.length, 18);
+  check('denial-of-access is codegraph-only across every question',
+    [...new Set(denialCells.map((r) => r.arm))].join(','), 'codegraph');
+  check('denial cells span six questions',
+    [...new Set(denialCells.map((r) => r.id))].sort().join(','), 'A1,B2,L2,T1,T3,T4');
+  // Denial is fatal only where nothing else carries the answer — A1 and L2, the two questions
+  // this page independently identifies as outside the index.
+  check('denial is fatal on A1 and L2, harmless elsewhere',
+    [...new Set(denialCells.filter((r) => r.score < 0.995).map((r) => r.id))].sort().join(','), 'A1,L2');
+
+  // TRIPWIRE. Not a classifier — a change detector. If the answers behind the hand-audit are ever
+  // replaced, the broad net's hit count moves and this fires, forcing a re-read rather than
+  // letting a stale hand-audit silently describe different data.
+  const BROAD = /\b(memory|memories|can'?t|cannot|couldn'?t|unable|no access|not available|isn'?t available|unverified|not verified|sandbox|checked out|working tree|spot-check|treat this as)\b/i;
+  check('TRIPWIRE: broad-net hedge count on codegraph A1 is unchanged',
+    cgA1.filter((r) => BROAD.test(String(r.answer ?? ''))).length, 11);
   // The claim is FALSE: the sandbox is a full worktree and the file is not excluded.
   const r8run = '.data/kgbench/runs/coding-v1-r8/run.json';
   if (existsSync(r8run)) {
@@ -464,8 +513,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 37 rows', '| 37 |');
-claims('says thirty-seven defects', 'Thirty-seven defects were found');
+claims('defect table has 38 rows', '| 38 |');
+claims('says thirty-eight defects', 'Thirty-eight defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');
