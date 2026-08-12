@@ -112,6 +112,49 @@ check('graph-tool calls', Object.entries(tools).filter(([k]) => k.startsWith('mc
 check('graphify calls', Object.entries(tools).filter(([k]) => k.includes('graphify')).reduce((a, [, n]) => a + n, 0), 1);
 check('cells using any graph tool', h.filter((r) => (r.tools_executed || []).some((t) => t.startsWith('mcp__'))).length, 6);
 check('Grep calls', tools.Grep ?? 0, 156);
+
+// THE POOLED TOOL-CHOICE RESULT, computed across every run whose hybrid arm has the identical
+// tool surface. This is the page's central conclusion and the only claim on it that a replicate
+// STRENGTHENED, so it is checked across runs rather than pinned to this one. It also catches the
+// class of error that produced the retracted "r6: 4 graph calls in 348" — a figure matching no
+// run, arm or agent in the corpus, which survived because nothing recomputed it.
+const POOL_RUNS = ['coding-v1-r6', 'coding-v1-r7', 'coding-v1-x2', 'coding-v1-r8'];
+const HYBRID_SURFACE = ['Glob', 'Grep', 'Read', 'mcp__graphify__query_graph', 'mcp__graphify__get_node',
+  'mcp__graphify__get_neighbors', 'mcp__graphify__shortest_path', 'mcp__graphify__graph_stats',
+  'mcp__graphify__god_nodes', 'mcp__codegraph__codegraph_explore'];
+const pooled = { cells: 0, calls: 0, graph: 0, gfy: 0, touched: 0, runs: 0 };
+for (const runId of POOL_RUNS) {
+  const rf = `.data/kgbench/runs/${runId}/results.jsonl`;
+  const mf = `.data/kgbench/runs/${runId}/run.json`;
+  if (!existsSync(rf) || !existsSync(mf)) continue;
+  // Pooling is only legitimate while the tool surface is identical — a run offering different
+  // tools is a different experiment, and averaging it in would hide that.
+  const arm = (JSON.parse(readFileSync(mf, 'utf8')).arms || []).find((a) => a.id === 'hybrid');
+  if (!arm || JSON.stringify(arm.allowedTools) !== JSON.stringify(HYBRID_SURFACE)) continue;
+  pooled.runs += 1;
+  for (const r of readFileSync(rf, 'utf8').trim().split('\n').map((l) => JSON.parse(l))) {
+    if (r.arm !== 'hybrid' || (r.agent ?? 'claude') !== 'claude' || r.outcome !== 'ok') continue;
+    const t = r.tools_executed ?? r.tools ?? [];
+    const g = t.filter((x) => x.startsWith('mcp__'));
+    pooled.cells += 1; pooled.calls += t.length; pooled.graph += g.length;
+    pooled.gfy += t.filter((x) => x.includes('graphify')).length;
+    if (g.length) pooled.touched += 1;
+  }
+}
+if (pooled.runs === POOL_RUNS.length) {
+  check('pooled runs with an identical hybrid surface', pooled.runs, 4);
+  check('pooled hybrid cells', pooled.cells, 248);
+  check('pooled hybrid tool calls', pooled.calls, 1084);
+  check('pooled graph calls', pooled.graph, 17);
+  check('pooled Graphify calls', pooled.gfy, 3);
+  check('pooled cells touching the index', pooled.touched, 17);
+  check('pooled graph share of calls %', Number((100 * pooled.graph / pooled.calls).toFixed(2)), 1.57, 0.005);
+  check('pooled cell share %', Number((100 * pooled.touched / pooled.cells).toFixed(1)), 6.9, 0.05);
+  // The retracted figure must not come back: no run in the pool has 4 graph calls or 348 calls.
+  claims('the page records that r6 is 3 in 322', '3 in 322');
+} else {
+  process.stdout.write(`  SKIP  pooled tool-choice checks (${pooled.runs}/${POOL_RUNS.length} runs present)\n`);
+}
 check('Read calls', tools.Read ?? 0, 49);
 check('Glob calls', tools.Glob ?? 0, 19);
 for (const arm of ['graphify', 'codegraph']) {
@@ -300,8 +343,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 34 rows', '| 34 |');
-claims('says thirty-four defects', 'Thirty-four defects were found');
+claims('defect table has 35 rows', '| 35 |');
+claims('says thirty-five defects', 'Thirty-five defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');
