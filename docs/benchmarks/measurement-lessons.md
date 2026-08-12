@@ -456,6 +456,24 @@ regression at all. **Report the half that does not flatter the change anyway**, 
 where the second defect was hiding: the only reason anyone read that cell was that it went the
 wrong way. Hybrid's arm mean is 0.985 before and after.
 
+**When a run cannot be repaired, measure beside it rather than inside it.** `r5`/`r6`'s
+rewritten questions could not be regraded, and re-running them *into* those runs would have
+been worse than leaving them: neither run recorded a model, so three questions would have been
+answered by a known model and thirteen by an unknown one — confounding arm with model on
+exactly the questions under test, inside runs whose only purpose is a within-run arm
+comparison. **The repair would have destroyed the thing being repaired.** Run beside, at the
+old run's own pinned corpus commit, it costs nothing and confounds nothing; the comparison is
+then honestly cross-run and says so. **"Fix the artefact" and "answer the question the artefact
+raised" are different jobs, and only the second one is always available.**
+
+**An absolute is refuted by one counter-example or it is not an absolute.** "No graph arm beats
+grep on any question in any run" survived every run on this page until a 52-cell re-measurement
+produced one question where two graph arms finish above grep — on a single grep cell out of
+three. The result is far too thin to be a finding and is not quoted as one. It is quoted
+because the claim was stated without qualification, and the qualification is now load-bearing:
+*the direction reverses only where a single cell can reverse it.* **The cost of an absolute is
+that it is cheap to break; state the rate instead of the impossibility.**
+
 **A regrade is sound only when the PROMPT held still and the KEY moved.** An arm's answer is
 evidence about the question it saw. Re-scoring it against a rewritten question is not a
 correction — it is a category error, and the dangerous kind, because it produces plausible
@@ -488,6 +506,17 @@ even see the sandbox to replace. The preflight checked that an index *file exist
 it never checked that the index *covered the tree the arms were about to search*. **A preflight
 that proves a resource exists has not proved it is the right resource.** For anything
 path-addressed, assert on the path.
+
+**`status: running` with zero live processes is a distinct failure mode, and monitors that
+check either one alone will wait forever.** A 121-cell run was killed twice — at cells 2 and 18
+— by the 10-minute call ceiling of the tool that launched it, which signalled the process group
+it hosted. A supervisor that survives signals does not survive its own parent's death, and
+detaching does not leave the group. Neither death produced an error: the log stopped, the status
+file still said `running`, and nothing was left running. **Assert liveness and progress together,
+and host long jobs somewhere that outlives the session** (`launchctl submit` here). The reason
+this cost time rather than data is that the runner writes cells incrementally and resumes from
+them: the restart continued at cell 18 instead of redoing 18. **Incremental writes are worth
+more than retry logic** — they turn a silent kill into a delay instead of a loss.
 
 **The harness can reproduce the bug its own question set documents.** Building the per-run
 index on a Docker bind mount ran ~47× slower than baseline and then died with *"unable to open
