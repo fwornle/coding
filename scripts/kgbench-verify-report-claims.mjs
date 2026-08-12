@@ -210,6 +210,42 @@ check('every retried cell attributes one session per attempt',
 // a slowdown the budget did not cause.
 claims('the x2 latency is withheld, not estimated', '| `x2` — budget 0 | 6/48 (13%) | 1.00 | not comparable |');
 
+process.stdout.write('\n== the continuation-budget comparison, RECOMPUTED not matched ==\n');
+// A published figure here was arithmetically impossible for weeks — a shared-denominator mean of
+// 0.935 over 44 answered cells summing to 43.00, which needs those cells to average 1.020. It
+// survived because it sat between two correct numbers and agreed with the surrounding argument.
+// So these are derived from the rows and compared to the page, never matched as text.
+const CONT2B = '.data/kgbench/runs/coding-v1-r8-cont2b/results.jsonl';
+const b1 = rows.filter((r) => r.arm === 'grep' && r.agent === 'opencode');
+const b1ok = b1.filter((r) => r.outcome === 'ok');
+const meanOf = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+check('budget 1 answered', b1ok.length, 44);
+check('budget 1 mean over answered', Number(meanOf(b1ok.map((r) => r.score)).toFixed(3)), 0.977, 0.0005);
+check('budget 1 mean with non-answers at 0',
+  Number(meanOf(b1.map((r) => (r.outcome === 'ok' ? r.score : 0))).toFixed(3)), 0.896, 0.0005);
+claims('the page prints the shared-denominator pair it can support', '0.896 → 0.975');
+// The impossible figure is still ON the page — inside defect 31, which is where a withdrawn
+// number belongs. What must never come back is 0.935 stated as a live result, and the check
+// above is what enforces that: the live pair is 0.896 → 0.975 and there is only one of them.
+claims('defect 31 names the figure it withdraws', '0.935 → 0.948');
+
+if (existsSync(CONT2B)) {
+  const c2b = readFileSync(CONT2B, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const c2bok = c2b.filter((r) => r.outcome === 'ok');
+  check('budget 2 answered (cont2b)', c2bok.length, 48);
+  check('budget 2 mean over answered (cont2b)', Number(meanOf(c2bok.map((r) => r.score)).toFixed(3)), 0.975, 0.0005);
+  // The retracted claim was that this FALLS below budget 1's 0.977. It does not.
+  check('budget 2 does NOT fall materially below budget 1',
+    meanOf(c2bok.map((r) => r.score)) > meanOf(b1ok.map((r) => r.score)) - 0.01, true);
+  const spread = [0, 1, 2].map((k) => c2b.filter((r) => (r.continuations_used ?? 0) === k).length);
+  check('budget 2 continuation spread (cont2b)', spread.join('/'), '7/31/10');
+  // The page used to say "nothing reaches the ceiling" beside a spread whose last number IS the
+  // ceiling count. Pinned as a number so the contradiction cannot come back.
+  check('cells that spend the budget in full', spread[2], 10);
+  check('every ceiling cell still answered',
+    c2b.filter((r) => (r.continuations_used ?? 0) >= 2).every((r) => r.outcome === 'ok'), true);
+}
+
 process.stdout.write('\n== disagreements ==\n');
 check('disagreement count', report.disagreements.length, 20);
 check('all are checklist_higher', report.disagreements.every((d) => d.kind === 'checklist_higher'), true);
@@ -258,8 +294,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 30 rows', '| 30 |');
-claims('says thirty defects', 'Thirty defects were found');
+claims('defect table has 32 rows', '| 32 |');
+claims('says thirty-two defects', 'Thirty-two defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');

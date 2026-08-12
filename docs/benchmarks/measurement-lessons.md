@@ -388,6 +388,51 @@ back — reading back confirms only what was stored, not what will be served.
 
 ---
 
+## Lesson 13 — Know the noise floor before publishing an effect
+
+Two claims on the published page were smaller than this benchmark's own run-to-run variance,
+and both survived review because they were *modest*.
+
+**The effect that was noise.** The continuation budget was reported to buy completion at the
+cost of quality: mean score over answered cells falling 0.977 → 0.948. Re-running the same 48
+cells at the same budget gives 0.975. The claimed effect was −0.029; between two runs identical
+in arm, agent, model, budget and questions, single questions move the 48-cell mean by −0.011,
++0.021, +0.018. It was never bigger than the noise.
+
+**Measure the floor, don't assume it.** Within a SINGLE run, the same question at the same
+settings varies across its 3 reps by a median factor of:
+
+| agent | median max/min content tokens | worst |
+|---|--:|--:|
+| claude | 1.5× | 2.6× |
+| copilot | 1.7× | 5.0× |
+| opencode | 1.9× | 6.1× |
+
+At budget 2, opencode reaches 2.1–3.1× median and 12.5× worst. **A per-question token figure on
+this benchmark is worth nothing without a replicate.** Arm medians over 48 cells are far more
+stable, which is why the headline arm comparison survives three runs while per-question token
+figures swing ±100% between two.
+
+**The number that was impossible.** A shared-denominator mean of `0.935` was published for a run
+answering 44 of 48 cells whose scores sum to 43.00. The mean over 48 is 0.896; 0.935 would need
+those 44 cells to average 1.020, above the maximum score. One multiplication would have caught
+it at any point.
+
+**Why both survived.** Each sat next to numbers that were correct, and each pointed the way the
+surrounding argument already went. A candidly-admitted cost and a modest gain are exactly the
+claims nobody audits — they read as the author being careful. **Scrutiny should scale with how
+well a number fits the story, not with how surprising it is.** The corrected figures made the
+budget look *better* than the retracted ones (0.896 → 0.975 against 0.935 → 0.948), so neither
+error was motivated; they were simply never recomputed.
+
+**Rules.** Derive published figures from the rows in the claims checker rather than matching
+them as text — a checker that greps for `0.935` confirms the typo. And before publishing an
+effect, compute the same metric on two runs of the identical configuration; if the effect is
+not larger than that gap, it is not an effect.
+
+---
+
+
 ## Checklist — before adding a question
 
 - [ ] Is every required fact **true of the repository**? Verify against source, not memory.
@@ -407,6 +452,8 @@ back — reading back confirms only what was stored, not what will be served.
 - [ ] Provenance: how many commits, which passes, which questions re-run in each?
 - [ ] `--dry-run` regrade clean, and grader tests passing?
 - [ ] Every row's `wall_s` at least the sum of its own `attempts[]`? (Lesson 12)
+- [ ] Every published figure multiplied out — does `mean × n` equal the score sum? (Lesson 13)
+- [ ] Any claimed effect smaller than the single-question run-to-run swing? (Lesson 13)
 - [ ] `kgbench-backfill-tokens.mjs --all --dry-run` refuses nothing and shrinks nothing?
 - [ ] Any subset excluded from a median — is the exclusion's *cause* established, and does the
       exclusion move the result in the flattering direction? (Lesson 12)
