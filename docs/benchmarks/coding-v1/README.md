@@ -65,10 +65,11 @@ The hypothesis the set was designed to test — that a graph index answers *"tha
 better than grep — **did not reproduce**. All four arms abstained correctly on every trap.
 
 Read this as a **null result on 16 questions**, not as proof that code graphs are worthless.
-One per-question difference survives replication across three runs, and it runs against the
-graph arms: **CodeGraph scores 0.22 on L2** where grep scores 1.00 (per-run medians 0.50 /
-0.00 / 0.00). CodeGraph on **A1** is weaker too, at 0.78 against grep's 1.00, though less
-consistently (0.65 / 1.00 / 0.65).
+Two per-question differences survive replication across three runs, and both run against the
+graph arms. **CodeGraph scores 0.22 on L2**, failing all nine of its cells and never once
+reaching 1.00, where grep and hybrid take all nine. **A1 goes against both backends** —
+CodeGraph 0.78 and Graphify 0.89, missing 10 and 5 cells of 16 across two runs each, against
+0 of 16 for grep and hybrid.
 
 Everything else this page used to list here was a single run's noise. See
 [which per-question results replicate](#which-per-question-results-replicate).
@@ -529,17 +530,34 @@ and just reads the file, scores 1.00 on all four.
 ### Which per-question results replicate
 
 A three-rep median is a fragile statistic, so every per-question claim above was re-checked
-against the two other runs that share this answer key (`r7`, `x2`). Pooled, claude only, 9–16
-cells per arm per question:
+against the two other runs that share this answer key (`r7`, `x2`).
 
-| Question | grep | graphify | codegraph | hybrid | per-run medians (codegraph) | verdict |
-|---|--:|--:|--:|--:|---|---|
-| **L2** | 1.00 | 0.91 | **0.22** | 1.00 | 0.50 / 0.00 / 0.00 | **replicates** |
-| **A1** | 1.00 | 0.89 | **0.78** | 1.00 | 0.65 / 1.00 / 0.65 | replicates, weaker |
-| B3 | 0.96 | 1.00 | 0.72 | 0.96 | 1.00 / 1.00 / 0.50 | `r8` only |
-| A4 | 0.82 | 0.81 | 0.78 | 0.89 | 0.82 / 0.33 / 1.00 | no arm effect |
+**Counted in cells, not medians.** A per-question median hides a bad cell exactly the way a
+class median hides a bad question, and it did: reading medians alone, B3 looks like an `r8`
+artifact, because its `x2` failure is the minority cell in a 1.00 / 1.00 / 0.00 triple. The
+table below therefore counts every claude cell scoring below 1.00, pooled over the three runs:
 
-**L2 is the finding.** CodeGraph is worst in all three runs and never reaches grep.
+| Question | arm | cells < 1.00 | in runs | pooled mean | verdict |
+|---|---|--:|---|--:|---|
+| **L2** | **codegraph** | **9/9** | r7, x2, r8 | **0.22** | **replicates — never once reaches 1.00** |
+| **A1** | **codegraph** | **10/16** | r7, r8 | **0.78** | **replicates** |
+| **A1** | **graphify** | **5/16** | r7, x2 | **0.89** | **replicates** |
+| B3 | codegraph | 3/9 | x2, r8 | 0.72 | real but thin — 3 cells, 2 runs |
+| L2 | graphify | 2/9 | r8 | 0.91 | one run only |
+| B3 | grep | 1/9 | x2 | 0.96 | one cell |
+| B3 | hybrid | 1/9 | r8 | 0.96 | one cell |
+| A4 | *all four arms* | 10–12/16 | all | 0.78–0.89 | no arm effect |
+
+**L2 is the finding.** CodeGraph scores below 1.00 on every one of its nine cells across three
+runs, and never exceeds 0.50. Nothing else on this page is that clean.
+
+**A1 is the second finding, and it implicates both backends.** CodeGraph misses 10 of 16 across
+two runs and Graphify 5 of 16 across two runs, against 0/16 for grep and hybrid. Earlier
+versions of this page named CodeGraph on A1 and not Graphify; the cell counts say both.
+
+**B3 was previously labelled an `r8` artifact here. That was wrong** — CodeGraph also fails a
+cell in `x2`, which its 1.00 median concealed. Three failing cells across two runs is real but
+thin, and it is quoted as such rather than as a finding.
 
 **A4 is not a finding at all, and this page previously reported it as one.** It is a two-value
 question — every cell scores 0.82 or 1.00 — so a three-rep median is decided by which value
@@ -548,13 +566,16 @@ happens to land twice. In `r8` all four arms produced both values, and the media
 **highest**, and `r7` alone, at ten reps per arm, puts all four arms at exactly 0.82. The
 sentence claiming graphify and hybrid drop A4 is withdrawn.
 
-A4 also breaks the tidier claim this section used to make. **`grep` is not 1.00 on all sixteen
-questions in general** — it scores 0.82 on A4 in both `r7` and `x2`. It is 1.00 on all sixteen
-*in `r8`*, which is a fact about this run.
+**`grep` is not 1.00 everywhere either, once you stop reading medians.** It is 1.00 on all
+sixteen questions *in `r8`* — a fact about this run, which earlier versions of this page
+generalised. Pooled over the three runs it drops cells on five questions: A4 (10 of 16), and
+one cell each on B1, B3, T3 and T4. The T3 and T4 cells are its two hallucinations.
 
-What survives across three runs is narrower than the old wording and still worth having: no
-graph arm beats grep on any question in any run, and L2 fails the same way every time. Which
-*other* question a graph arm drops is noise.
+What survives across three runs is narrower than the old wording and still worth having:
+
+- **No graph arm beats grep on any question in any run.** The direction never reverses.
+- **L2 fails the same way every time**, and A1 fails for both backends across two runs.
+- Which *other* question a graph arm drops is noise, and A4 is not an arm effect at all.
 
 ---
 
@@ -755,7 +776,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Thirty-five defects were found across the runs behind this page, and runs were discarded
+Thirty-six defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -800,6 +821,7 @@ documented because the failure modes generalise to any agent benchmark.
 | 33 | **A two-value question was read as an arm difference.** A4 scores either 0.82 or 1.00 and nothing else, so a three-rep median is decided by which value lands twice. In `r8` all four arms produced both values and the medians split 2–2; the page reported that graphify and hybrid "drop A4". | Pooled over three runs the arms sit at 0.78–0.89 with **hybrid highest**, and `r7` alone at ten reps per arm puts all four at exactly 0.82. The tell was visible in the run's own data and never looked at: a per-question median is only meaningful if the underlying cells are not bimodal, and printing the distinct values per question would have shown A4 taking two. The claim is withdrawn, along with the neater sentence it supported — grep is 1.00 on all sixteen questions in `r8`, but scores 0.82 on A4 in `r7` and `x2`. |
 | 34 | **A null result was published as evidence because it pointed somewhere flattering.** Zero hallucinations in the forced graph arms was called "the one result that favours an index", hedged as too small to lean on, and then leaned on. | Balanced claude-only across four runs it is 2/72 against 0/72, where the expected count under a shared rate is 1.0 and **P(observing zero) = 0.37**. Per-run counts are 0, 0, 1, 4 — `r8` is the outlier that made the pattern visible. Both claude hallucinations are `grep`'s while `hybrid`, also text-search, has none, so the framing fails inside its own family. Detecting a real 1.4% difference needs ~400 abstain cells per family against the 72 available. **Hedging a claim is not a substitute for testing it**: the hedge was accurate and the claim was still repeated in three places. |
 | 35 | **A supporting citation matched no run in the corpus.** The tool-choice section cited `r6` as "4 graph calls in 348" as one of three replications. Scanning every (run, arm, agent) combination, nothing produces 4/348; `r6`'s hybrid arm is **3 in 322**, and the nearest 348-ish figure is `r6`'s *grep* arm at 0/350 — an arm with no graph tools at all. | It survived because it was corroborating evidence for a conclusion that is, as it turns out, correct: pooled over four runs the rate is 1.57% with every run inside Poisson noise. **A wrong number in support of a right answer is the hardest kind to find**, because the conclusion it serves keeps passing review. The fix is structural rather than careful reading — the claims checker now recomputes the pooled counts from `results.jsonl` across all four runs, and refuses to pool a run whose `hybrid` tool surface differs. |
+| 36 | **The replication check itself read medians, and a median hid a cell.** The audit that withdrew A4 and the hallucination result graded each per-question claim on its per-run *medians*. On that basis B3 was published as an `r8`-only artifact. Counting cells instead, CodeGraph also fails a B3 cell in `x2` — the minority value of a 1.00 / 1.00 / 0.00 triple, invisible to the median. The same recount showed Graphify missing 5 of 16 A1 cells across two runs, a result no version of this page had mentioned. | The audit was written to catch exactly this failure and then committed it, one lesson late: **"a class median hides a bad question" and "a per-question median hides a bad cell" are the same defect at two scales**, and only the first had been internalised. Per-question verdicts are now counted in cells across every run sharing the answer key, and the claims checker computes those counts rather than pinning any median. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
