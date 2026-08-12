@@ -260,9 +260,22 @@ export function KgbenchResults() {
               )}
               {runsNewestFirst.length > 0 && (
                 <optgroup label="Runs (.data/kgbench/runs) — newest first">
-                  {runsNewestFirst.map((r) => (
-                    <option key={`run:${r.runId}`} value={`run:${r.runId}`} disabled={r.cells === 0}>
+                  {runsNewestFirst.map((r, i) => (
+                    <option
+                      key={`run:${r.runId}`}
+                      value={`run:${r.runId}`}
+                      disabled={r.cells === 0}
+                      data-newest={i === 0 ? 'true' : undefined}
+                      // Light blue on the most recent run. A native <option> honours only a
+                      // handful of properties, and background-color is one Chrome does render
+                      // in its own popup — but it is NOT reliable across every platform's
+                      // native menu, so the row also carries a "◀ newest" marker in its TEXT.
+                      // Colour is the nice-to-have; the text is what guarantees the run is
+                      // identifiable when the platform drops the paint.
+                      style={i === 0 ? { backgroundColor: '#dbeafe', color: '#0c4a6e' } : undefined}
+                    >
                       {runWhen(r)} · {r.runId} — {r.cells} cells{r.status ? ` · ${r.status}` : ''}
+                      {i === 0 ? '   ◀ newest' : ''}
                     </option>
                   ))}
                 </optgroup>
