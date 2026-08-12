@@ -527,6 +527,44 @@ That is worth stating plainly: **the failure mode of a too-narrow index is not a
 it is a confident answer from whatever else is in context.** Grep, which has no index at all
 and just reads the file, scores 1.00 on all four.
 
+### The same mechanism, on the other backend
+
+A1 makes the point a second time, for Graphify, and the file boundary is sharper. The question
+asks *why* `.observations` is not bind-mounted. The entire answer — all three checklist facts —
+exists in one place: a six-line **YAML comment** at `docker/docker-compose.yml:82-86`.
+
+**Graphify indexes no YAML at all.** Of the 4,346 distinct source files in `graph.json`, zero
+are `.yml` or `.yaml`, so that comment is not narrowly missed, it is categorically outside the
+corpus. The consequence shows in what the arm cites: across 16 A1 cells Graphify names
+`docker-compose.yml` **twice**, against grep's **14 of 16**.
+
+All five Graphify failures miss the identical fact — `f1`, the SQLite WAL/SHM corruption
+rationale — and none ever miss `f2` (obs-api is the single owner) or `f3` (the container reaches
+it over HTTP). That asymmetry is the mechanism in miniature. `obs-api` appears in 284 files and
+`OBS_API_URL` in 22, so both have a structural footprint the graph can reach. The *reason* has
+none: it is prose, in a comment, in a file type the indexer skips.
+
+And again the arm does not abstain. Side by side, same question, same run:
+
+> **grep** (1.00, 3 tool calls) — "Previously the container and host both opened the same SQLite
+> `observations.db` across the Docker bind-mount boundary, which caused WAL/SHM corruption from
+> concurrent access."
+>
+> **graphify** (0.65, 5 tool calls) — "This confirms the mechanism and file evidence. I have
+> enough to answer directly. […] the **obs-api HTTP service**, which owns the **LevelDB** lock
+> […] specifically to avoid two writers racing on the shared store."
+
+The shape is right and the substrate is wrong: the store is SQLite, not LevelDB. LevelDB is in
+Graphify's index — it backs `.data/knowledge-graph/` — so the arm reached for the nearest
+indexed neighbour and delivered it with a commit hash and a confident preamble.
+
+**Two caveats, because this is one question.** Failure is probabilistic rather than
+deterministic: the WAL/SHM fact also survives in `docs/observations/README.md` and
+`system-health-dashboard/server.js`, both of which Graphify *does* index, which is why 9 of its
+14 non-citing cells still score 1.00. And **CodeGraph's A1 failures are not explained by this**
+— it cites `docker-compose.yml` in 10 of 16 cells and still scores 1.00 in only 4 of those 10.
+Reaching the file is not its problem on A1, and what is remains unknown.
+
 ### Which per-question results replicate
 
 A three-rep median is a fragile statistic, so every per-question claim above was re-checked
