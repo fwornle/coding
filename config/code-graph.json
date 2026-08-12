@@ -113,7 +113,24 @@
           "coding-services",
           "codegraph",
           "serve",
-          "--mcp"
+          "--mcp",
+          "-p",
+          "${CODEGRAPH_PROJECT_DIR:-/workspace/coding}"
+        ],
+        "_pathNote": [
+          "-p PINS THE PROJECT THE SERVER ANSWERS ABOUT, and without it this backend is",
+          "silently wrong. `docker exec` lands in the container's WORKDIR /coding, which",
+          "holds no index ('Not initialized'), so an MCP call with no explicit projectPath",
+          "resolved there and returned nothing. Resolution order is client rootUri ->",
+          "workspaceFolders -> this flag -> cwd, so the flag is the lowest explicit signal",
+          "and a client that sends rootUri still wins.",
+          "",
+          "The default is the production project. The variable exists for kgbench, which",
+          "must point the server at the SANDBOX corpus rather than the live working tree —",
+          "otherwise the codegraph arm answers about a different tree than every other arm",
+          "searches, which is exactly the defect this note exists because of (see",
+          "docs/benchmarks/coding-v1/README.md, 'The CodeGraph index does not cover the",
+          "tree under test'). Unset, behaviour is unchanged."
         ],
         "toolPrefix": "mcp__codegraph__",
         "tools": [

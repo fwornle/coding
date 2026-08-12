@@ -426,6 +426,11 @@ local_cache/
 .data/kgbench/runs/*/results.pre-*.jsonl
 .data/kgbench/runs/*/results.jsonl.pre-*
 .data/kgbench/runs/*/supervise.status
+# Per-run worktrees. A full checkout (~280MB) plus a ~120MB code-graph index, both
+# transient and both reconstructible from the commit recorded in run.json. They live
+# under .data/ rather than /tmp because the coding-services container must be able to
+# READ the one it indexes, and compose mounts .data but not os.tmpdir().
+.data/kgbench/trees/
 
 # Code-graph gate results and freshness sidecars. Small, non-regenerable provenance
 # (what was measured, at which commit) kept deliberately in the repo. The indexes
