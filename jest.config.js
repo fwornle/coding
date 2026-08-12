@@ -38,6 +38,11 @@ export default {
     // + an old health-coordinator.js). Without this, jest matches N stale copies of
     // every test and reports failures against frozen code we never edit.
     '/\\.data/run-restores/',
+    // Same hazard, different producer: kgbench builds a per-run worktree here to hold the
+    // code-graph index. .gitignore does not help — jest walks the filesystem, not git — so
+    // without this every test in the repo is collected a second time from a frozen copy for
+    // as long as a benchmark run is in flight.
+    '/\\.data/kgbench/trees/',
     '/\\.claude/worktrees/'
   ],
   extensionsToTreatAsEsm: ['.ts']
