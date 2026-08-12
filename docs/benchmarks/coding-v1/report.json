@@ -85,7 +85,7 @@
     "toolEscapeRows": 0,
     "retiredQuestions": [],
     "agentFilter": null,
-    "generatedAt": "2026-08-11T04:32:38.569Z"
+    "generatedAt": "2026-08-12T12:40:22.828Z"
   },
   "byArm": {
     "grep": {
@@ -96,7 +96,7 @@
       "failed": 4,
       "hard_fail_rate": 0.027777777777777776,
       "retry_rate": 0.09027777777777778,
-      "hallucination_rate": 0.02142857142857143,
+      "hallucination_rate": 0.014285714285714285,
       "provenance": {
         "agents": [
           "claude",
@@ -121,7 +121,7 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9688095238095238,
+          "mean": 0.9759523809523809,
           "median": 1,
           "min": 0,
           "max": 1,
@@ -409,7 +409,7 @@
     "abstain": {
       "scores": {
         "grep": {
-          "mean": 0.88,
+          "mean": 0.92,
           "median": 1,
           "min": 0,
           "max": 1,
@@ -716,7 +716,7 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9545138888888888,
+          "mean": 0.9753472222222221,
           "median": 1,
           "min": 0,
           "max": 1,

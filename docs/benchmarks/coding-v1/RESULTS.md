@@ -3,7 +3,7 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3 reps/arm) against 4 arms.
-Repo at `f4f13e86a`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-11T04:32:38.569Z.
+Repo at `f4f13e86a`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-12T12:40:22.828Z.
 
 Continuation budget: **1** turn(s) per answer-file agent (inert for `claude`, whose loop is unbounded). Runs at different budgets are not comparable.
 
@@ -17,7 +17,7 @@ Arms searched a sandboxed worktree of `f4f13e86a` with 31 path(s) removed (answe
 
 | Arm | ranked | correctness (median) | content tokens (median) | total tokens (median) | tool calls | latency s | hard-fail | hallucination |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
-| grep † | 140/144 | 1.00 | 102752 | 147752 | 4.0 | 30.2 | 3% | 2% |
+| grep † | 140/144 | 1.00 | 102752 | 147752 | 4.0 | 30.2 | 3% | 1% |
 | graphify | 48/48 | 1.00 | 131190 | 152850 | 5.0 | 28.1 | 0% | 0% |
 | codegraph | 48/48 | 1.00 | 161322 | 181784 | 8.0 | 50.3 | 0% | 0% |
 | hybrid † | 142/144 | 1.00 | 108014 | 146686 | 4.0 | 26.5 | 1% | 1% |

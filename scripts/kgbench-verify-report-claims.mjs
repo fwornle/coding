@@ -422,14 +422,38 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
     const EXCLUDED_PATHS = ['lib/kgbench/judge.mjs', 'lib/kgbench/graders.mjs', 'lib/kgbench/agents.mjs'];
     check('no cgidx cell cites a sandbox-excluded path',
       fx.filter((r) => EXCLUDED_PATHS.some((p) => String(r.answer).includes(p))).length, 0);
-    // T3 — the grader defect, pinned at the character count so nobody "fixes" the prose alone.
-    const t3 = fx.find((r) => r.arm === 'hybrid' && r.id === 'T3' && r.score < 0.995);
-    check('hybrid T3 lost a cell', Boolean(t3), true);
+    // T3 — the grader defect this run exposed, now FIXED. What is pinned is the mechanism, not
+    // the outcome: the cell must be scored correctly AND the old character window must still be
+    // demonstrably wrong about it. Pinning only "T3 is 1.00" would stay green if someone
+    // special-cased the answer; pinning only the gap length would stay green if the fix were
+    // reverted. Both together say: this specific sentence is why the unit changed.
+    const t3 = fx.find((r) => r.arm === 'hybrid' && r.id === 'T3'
+      && /No payment-processing/i.test(String(r.answer)));
+    check('the cgidx T3 cell is present', Boolean(t3), true);
     if (t3) {
       const gap = String(t3.answer).match(/\bNo\b([^.!?]*?)\bexists?\b/i);
-      check('the abstention overran the 60-char window', gap ? gap[1].length : null, 64);
-      check('T3 cell was graded a hallucination despite abstaining',
-        `${t3.hallucinated}:${/\bno\b[^.!?]{0,60}\b(?:exists?)\b/i.test(String(t3.answer))}`, 'true:false');
+      check('its abstention is 64 chars wide — the old window allowed 60', gap ? gap[1].length : null, 64);
+      check('the retired 60-CHARACTER window rejects it',
+        /\bno\b[^.!?]{0,60}\b(?:exists?)\b/i.test(String(t3.answer)), false);
+      check('the retired adjacent-noun pattern rejects it too',
+        /\bno (?:module|file|service|implementation)\b/i.test(String(t3.answer)), false);
+      check('the WORD-counted gap accepts it', /\bno\b(?:\s+[^\s.!?]+){0,6}\s+(?:exists?)\b/i
+        .test(String(t3.answer)), true);
+      check('and it is now scored as the correct abstention it is',
+        `${t3.score}:${t3.hallucinated}`, '1:false');
+    }
+    // The regrade touched three cells in three runs and nothing else. Pinned because a scoring
+    // fix that quietly moved a fourth cell would be a measurement change wearing a fix's clothes.
+    for (const [run, expect] of [['coding-v1-r8', 'grep/T4/1'], ['coding-v1-x2', 'grep/T3/1'],
+      ['coding-v1-r8-cgidx', 'hybrid/T3/2']]) {
+      const f = `.data/kgbench/runs/${run}/regrade.json`;
+      if (!existsSync(f)) { process.stdout.write(`  SKIP  ${run} regrade log absent\n`); continue; }
+      const g = JSON.parse(readFileSync(f, 'utf8'));
+      check(`${run} regrade moved exactly one cell`,
+        g.changes.map((c) => `${c.arm}/${c.id}/${c.rep}`).join(','), expect);
+      check(`${run} regrade only cleared a false hallucination`,
+        g.changes.every((c) => c.score[0] === 0 && c.score[1] === 1
+          && c.hallucinated[0] === true && c.hallucinated[1] === false), true);
     }
   } else {
     process.stdout.write('  SKIP  coding-v1-r8-cgidx absent — re-measurement claims unchecked\n');
@@ -483,7 +507,7 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
 
   // grep pooled is NOT clean, though it is clean within r8.
   const grepBad = [...new Set(pooledCells.filter((r) => r.arm === 'grep' && r.score < 0.995).map((r) => r.id))].sort();
-  check('grep drops cells on five questions when pooled', grepBad.join(','), 'A4,B1,B3,T3,T4');
+  check('grep drops cells on four questions when pooled', grepBad.join(','), 'A4,B1,B3,T4');
 } else {
   process.stdout.write('  SKIP  pooled per-question checks (not all key runs present)\n');
 }
@@ -500,10 +524,11 @@ for (const cls of [...new Set(rows.map((r) => r.cls))].sort()) {
 process.stdout.write(`  (checked ${5 * 4} class/arm medians)\n`);
 
 process.stdout.write('\n== reliability and hallucination ==\n');
-check('hallucinated rows', rows.filter((r) => r.hallucinated).length, 4);
+check('hallucinated rows', rows.filter((r) => r.hallucinated).length, 3);
 // WHAT SURVIVES A REPLICATE, and only that. "No forced graph arm hallucinated" is still true of
-// this run and is NOT pinned as a finding: balanced claude-only across four runs it is 2/72 vs
-// 0/72, P(observe 0) = 0.37. Pinning a null result invites the next reader to quote it.
+// this run and is NOT pinned as a finding: balanced claude-only across four runs it is 1/72 vs
+// 0/72, P(observe 0) = 0.61. Pinning a null result invites the next reader to quote it. The
+// abstain fix moved it from 2/72 and P = 0.37 — a withdrawn claim getting weaker, as it should.
 check('all hallucinations are abstain-class', rows.filter((r) => r.hallucinated).every((r) => r.id.startsWith('T')), true);
 claims('the page withdraws the graph-arm claim', 'indistinguishable from chance and is withdrawn');
 claims('the page states the cost of settling it', '400 abstain cells per family');

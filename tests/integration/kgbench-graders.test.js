@@ -195,6 +195,54 @@ describe('gradeAbstain — phrasing variety', () => {
   });
 });
 
+describe('gradeAbstain — the gap between negator and head is counted in words', () => {
+  // r8-cgidx, hybrid/T3. A correct abstention scored 0 with `hallucinated: true` because
+  // the gap was bounded at sixty CHARACTERS and this subject spans sixty-four. It is
+  // three words. Both sentences below are abstentions and both were missed.
+  const real = 'There\'s no "payment reconciliation" module in this repo — "reconciliation" '
+    + 'here refers to something else entirely: token reconciliation for LLM usage measurement.\n\n'
+    + 'No payment-processing/financial-transaction reconciliation module exists in this codebase.';
+
+  it('recognises the r8-cgidx answer that a character budget rejected', () => {
+    const r = gradeAbstain(real, {});
+    expect(r.abstained).toBe(true);
+    expect(r.hallucinated).toBe(false);
+    expect(r.score).toBe(1);
+  });
+
+  it('accepts a subject that is short in words and long in characters', () => {
+    // The unit, pinned. This subject is one word and well past any sixty-character
+    // window; a character budget fails it for being technical, which is backwards in a
+    // benchmark whose subjects are all identifiers.
+    const s = 'No cross-account-transaction-settlement-and-ledger-reconciliation-subsystem '
+      + 'exists here.';
+    expect(s.match(/\bNo\b(.*?)\bexists\b/)[1].length).toBeGreaterThan(60);
+    expect(gradeAbstain(s, {}).abstained).toBe(true);
+  });
+
+  it('accepts a quoted subject between the negator and its noun', () => {
+    // The sibling defect: the same bound set to zero. `no <noun>` demanded adjacency.
+    expect(gradeAbstain('There is no `payment reconciliation` module here.', {}).abstained).toBe(true);
+    expect(gradeAbstain('No dedicated payment reconciliation service is present.', {}).abstained).toBe(true);
+  });
+
+  // The two negative controls below deliberately avoid opening with "there is no". That
+  // phrase is its own unbounded marker in the list above — it matches "There is no doubt
+  // the module exists" — so a control written that way passes for the wrong reason and
+  // proves nothing about the gap. (That over-match is pre-existing and left alone: an
+  // answer that asserts a location still fails on `forbidden`, which is the real defence.)
+  it('does not let the gap cross a sentence boundary', () => {
+    expect(gradeAbstain('No doubt at all. The reconciliation module exists at lib/x.mjs.', {})
+      .abstained).toBe(false);
+  });
+
+  it('does not let a long clause reach a distant head', () => {
+    const wordy = 'No claim is being made about whether the thing you are asking '
+      + 'about, whatever it turns out to be, exists';
+    expect(gradeAbstain(wordy, {}).abstained).toBe(false);
+  });
+});
+
 describe('assertiveSegments — mentioning vs asserting', () => {
   it('drops segments that dismiss, keeps segments that assert', () => {
     const segs = assertiveSegments('There is no such file. It lives in lib/real.mjs.');
