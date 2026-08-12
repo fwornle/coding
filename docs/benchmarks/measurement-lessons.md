@@ -448,12 +448,24 @@ the backend named on the label. **When a tool is repaired, diff the tool mix bef
 A score that barely moves can conceal a strategy that changed completely — and the hybrid arm,
 whose scores did not move at all, tripled its graph usage.
 
-**Repairing a tool can lower a score honestly.** The same fix cost hybrid a T3 cell: the graph
-surfaced adjacent real files, the arm named them while ruling them out, and the longer sentence
-overran the abstain matcher's sixty-character window by four characters — scoring a correct
-abstention as a hallucination. The improvement and the regression have the same cause. **Do not
-report only the half that flatters the change**, and when a fix produces a loss, check the
-grader before crediting the arm.
+**When a fix produces a loss, check the grader before crediting the arm.** The index repair
+appeared to cost hybrid a T3 cell: the graph surfaced adjacent real files, the arm named them
+while ruling them out, and the longer sentence overran the abstain matcher's sixty-character
+window by four characters — scoring a correct abstention as a hallucination. It was not a
+regression at all. **Report the half that does not flatter the change anyway**, because that is
+where the second defect was hiding: the only reason anyone read that cell was that it went the
+wrong way. Hybrid's arm mean is 0.985 before and after.
+
+**Bound a gap by the unit the grammar uses, not by the one that is easy to count.** That abstain
+window allowed sixty *characters* between the negator and its head, standing in for "a noun
+phrase intervenes". In a code repository the subject of an abstention is a hyphenated, slashed,
+dotted compound, so a character budget tightens exactly as the subject gets more technical —
+it discriminates against the vocabulary the benchmark is made of. The subject that broke it is
+sixty-four characters and **three words**. Counted in words the bound stops being a tuning
+parameter, which matters because the character count had been retuned before: **a threshold you
+have already adjusted once is not a threshold, it is a symptom.** The sibling defect was the
+same bound set to zero — `no <noun>` demanded adjacency, so a quoted subject slipped past too.
+One shape fixed both, and it moved exactly three cells across every run in the corpus.
 
 **An arm's infrastructure must be verified against the tree under test, not against the
 repository.** The kgbench sandbox builds a de-contaminated worktree in `os.tmpdir()` and greps

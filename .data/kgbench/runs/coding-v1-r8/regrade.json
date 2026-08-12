@@ -1,0 +1,28 @@
+{
+  "runId": "coding-v1-r8",
+  "at": "2026-08-12T12:35:04.045Z",
+  "rows": 384,
+  "changed": 1,
+  "changes": [
+    {
+      "arm": "grep",
+      "id": "T4",
+      "rep": 1,
+      "score": [
+        0,
+        1
+      ],
+      "hallucinated": [
+        true,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "abstained correctly"
+    }
+  ],
+  "judgeChanged": 0,
+  "judgeChanges": []
+}

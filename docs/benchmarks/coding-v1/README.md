@@ -786,9 +786,12 @@ bimodal with no arm effect. Three cells within a question's known range is not a
 
 | Hybrid | `r8` | `r8-cgidx` |
 |---|--:|--:|
-| fifteen questions | unchanged | unchanged |
-| T3 | 1.00 | 0.67 *(see below — grader, not arm)* |
-| **arm mean** | 0.985 | 0.964 |
+| all sixteen questions | unchanged | unchanged |
+| **arm mean** | 0.985 | **0.985** |
+
+Hybrid's T3 first read 0.67 here, and that was a grader defect rather than an arm effect;
+[it is now fixed and regraded](#hybrids-t3-was-a-grading-defect--since-fixed-and-regraded).
+Not one of hybrid's sixteen questions moved in either direction.
 
 #### The change is behavioural, and it is larger than any score
 
@@ -815,21 +818,33 @@ strongly when one backend was broken; with it fixed they consult the graph three
 often and answer no better.* A tool being reached for and a tool being useful are different
 claims, and only the second one is still clean.
 
-#### Hybrid's T3 is a grading defect, not a hallucination
+#### Hybrid's T3 was a grading defect — since fixed and regraded
 
-T3 is an abstain probe. One cell scored 0.00 with `hallucinated: true`, which would be the
-worst kind of regression — except the answer abstains, twice:
+T3 is an abstain probe. One cell scored 0.00 with `hallucinated: true`, which would have been
+the worst kind of regression — except the answer abstains, twice:
 
 > *"There's no `"payment reconciliation"` module in this repo …"*
 > *"No payment-processing/financial-transaction reconciliation module exists in this codebase."*
 
-Both are missed by the matcher. The first because `\bno (?:module|…)\b` requires the noun
-immediately after *no*, and a quoted subject sits between them. The second because
-`\bno\b[^.!?]{0,60}\b(?:exists?|…)\b` allows sixty characters between *No* and *exists* and
+Both were missed by the matcher. The first because `\bno (?:module|…)\b` required the noun
+immediately after *no*, and a quoted subject sat between them. The second because
+`\bno\b[^.!?]{0,60}\b(?:exists?|…)\b` allowed sixty characters between *No* and *exists* and
 this subject is **sixty-four**. The arm answered correctly and lost the cell by four
-characters. Counted properly, hybrid's T3 is 1.00 and its arm mean is unchanged.
+characters.
 
-That the failing cell is also the only one of the three to call a graph tool is not
+Both bounds were the same bound — how much may sit between the negator and its head — and both
+were counted in the wrong unit. **The gap is now measured in words, not characters**,
+because in a code repository the subject of an abstention is a hyphenated, slashed, dotted
+compound: a character budget tightens exactly as the subject gets more technical, which is
+backwards. Three words, sixty-four characters.
+
+The fix moves **three cells in three runs** and nothing else — `r8` grep/T4, `x2` grep/T3, and
+this run's hybrid/T3, each 0.00 → 1.00 with `hallucinated` cleared. All three were regraded from
+the stored answers, so no cell was re-run and no measurement changed; the pre-regrade files sit
+beside each `results.jsonl`. **Hybrid's arm mean is 0.985 both before and after the index fix.**
+The apparent regression was entirely the grader's.
+
+That the failing cell was also the only one of the three to call a graph tool is not
 coincidence: the graph surfaced the *token*-reconciliation files, the arm named them while
 ruling them out, and the longer subject phrase overran the window. **A working tool made the
 answer more informative and the grader punished it for the extra words.**
@@ -875,8 +890,10 @@ sentence claiming graphify and hybrid drop A4 is withdrawn.
 
 **`grep` is not 1.00 everywhere either, once you stop reading medians.** It is 1.00 on all
 sixteen questions *in `r8`* — a fact about this run, which earlier versions of this page
-generalised. Pooled over the three runs it drops cells on five questions: A4 (10 of 16), and
-one cell each on B1, B3, T3 and T4. The T3 and T4 cells are its two hallucinations.
+generalised. Pooled over the three runs it drops cells on four questions: A4 (10 of 16), and
+one cell each on B1, B3 and T4. The T4 cell is its one hallucination. It was five questions and
+two hallucinations until the abstain matcher was fixed: its `x2`/T3 cell was a correct
+abstention the grader could not parse.
 
 What survives across three runs is narrower than the old wording and still worth having:
 
@@ -910,28 +927,33 @@ Latency tails: p90 is 34.9s for grep, **32.4s for hybrid**, 69.2s for graphify a
 codegraph. The arm with every tool available has the *tightest* tail of all — the same
 inversion `x2` found.
 
-**Four hallucinations in 384 cells, and all four are the arms with text search.** Three are T4
+**Three hallucinations in 384 cells, and all three are the arms with text search.** Two are T4
 and one is T1 — abstain questions, where the correct answer is that the thing does not exist.
-`grep`/claude fabricated once, `grep`/copilot twice, `hybrid`/opencode once. Every cell scored
+`grep`/claude fabricated once, `grep`/copilot once, `hybrid`/opencode once. Every cell scored
 0.00 for it.
+
+This count was four until the abstain matcher was fixed; the fourth was a correct abstention the
+grader could not parse. Two of the five hallucinations this page once reported across all runs
+were the grader's, not the arms'.
 
 Neither forced graph arm hallucinated. An earlier version of this page called that "the one
 result that favours an index", hedged it as too small to lean on, and leaned on it anyway.
 **Checked against the other runs, it is indistinguishable from chance and is withdrawn.**
 
-The per-run counts are **0, 0, 1, 4** for `r6`, `r7`, `x2`, `r8`. This run is the high outlier,
-not the typical case. The cleanest comparison is claude alone — the only agent that runs all
+The per-run counts are **0, 0, 0, 3** for `r6`, `r7`, `x2`, `r8`. This run is the high outlier,
+not the typical case — and it is now the only run with any hallucination at all. The cleanest comparison is claude alone — the only agent that runs all
 four arms, so arm and agent are not confounded — which gives a perfectly balanced 72 abstain
 cells per family across the four runs:
 
 | | hallucinated |
 |---|--:|
-| text-search (`grep` + `hybrid`) | 2 / 72 |
+| text-search (`grep` + `hybrid`) | 1 / 72 |
 | forced-graph (`graphify` + `codegraph`) | 0 / 72 |
 
-At the pooled 1.4% rate you would expect one hallucination in the graph arms, and the chance of
-seeing zero is **P = 0.37**. Pooling all three agents gives 5/144 against 0/72 and P = 0.185.
-Neither is near significance. The framing also fails inside its own family: both claude
+At the pooled 0.7% rate the chance of seeing zero in the graph arms is **P = 0.61**. Pooling all
+three agents gives 3/144 against 0/72 and P = 0.37. Neither is remotely near significance — and
+both moved *further* from it when the grader was fixed, which is the direction a withdrawn claim
+should move. The framing also fails inside its own family: both claude
 hallucinations are `grep`'s, and `hybrid` — which has text search too — has none.
 
 Settling this would need roughly **400 abstain cells per family** against the 72 available, a
@@ -1132,7 +1154,7 @@ documented because the failure modes generalise to any agent benchmark.
 | 37 | **A keyword-in-answer metric counted denials as citations, and a published verdict was built on it.** CodeGraph's A1 losses were reported as a separate, unexplained problem on the strength of `/docker-compose/i.test(answer)`: the arm "cites the file in 10 of 16 cells and still scores 1.00 in only 4 of those 10", therefore "reaching the file is not its problem". Six of those ten cells name the file only to say they could **not** read it — *"the real 'coding' repo isn't checked out here"*. Reaching the file was the entire problem. | **A substring test cannot tell an assertion from its negation**, and the direction it got wrong was the direction the conclusion turned on. Re-classified by what the answer claims rather than which words it contains, the axis is perfect: 29 of 29 cells claiming to have read the file score 1.00, and 0 of 5 claiming the repository is absent do. The checker now pins the claim classification, keeps the 4/10 artifact relabelled so it cannot be cited again, and verifies against `run.json` that the repository was in fact present. |
 | 38 | **The regex written to fix defect 37 committed defect 37, one level in.** Replacing the substring test with a phrase-enumerating one — a list of the ways an answer might say it could not read the file — produced "five failing cells make no claim in either direction" and a cross-question total of 7. Reading all sixteen answers gives **two** silent cells and **at least 18** denial cells: the pattern missed `r7` rep8's *"no `.codegraph/` index or file access available in this sandbox"*, a denial phrased in words it had not listed, and scored two memory-attributed cells as silent. | **Enumerating phrasings is the same defect as matching a substring**: both decide a semantic question with a lexical test, and both fail silently by under-matching rather than loudly by erroring. The categories are now hand-audited from reading all sixteen answers end to end and pinned cell by cell; the regex survives only as a tripwire on the hit count, so changed data forces a re-read instead of letting a stale hand-audit describe it. The one cross-question figure still regex-derived is labelled a lower bound on the page. |
 | 39 | **The CodeGraph arm's index never covered the tree the benchmark was testing.** Arms run in a worktree under `os.tmpdir()`; the container mounts only `${HOME}/Agentic`, so that worktree is invisible to the container-side MCP server, whose default project (`/coding`) is uninitialized. At least 30 of 172 CodeGraph cells report the index unreachable, and when it *does* answer it serves `/workspace/coding` — the main working tree, which is not the de-contaminated one every other arm searches. 15 of 31 sandbox-excluded paths are present in it (not the answer key, not the observation exports). | **The sandbox verifies containment of the tree it builds, and the codegraph arm reads an index of a different tree**, so the guarantee never applied to it. It surfaced only by chasing five L2 zeros that turned out to be correct refusals. Split by whether the index answered, L2 is 0.00×5 (harness) and 0.50×4 (capability) rather than a single 0.22 — the capability result is cleaner than the blend it was reported as. **FIXED** (`b48c2d38e`, `fddf1aacc`) and re-measured as `coding-v1-r8-cgidx`: the index is now built over a second worktree of the same commit with the same exclusions, and the MCP server is pinned to it. Unreachable-index cells 14 -> 0; L2 0.17 -> 1.00; A1 unchanged, which confirms corpus scope as a separate cause. The larger finding is behavioural — CodeGraph's MCP share went 14% -> 59% — so the earlier numbers measured an arm degraded to Read with a broken tool attached. |
-| 40 | **A correct abstention was scored as a hallucination because its subject phrase was four characters too long.** Hybrid's T3 cell says *"No payment-processing/financial-transaction reconciliation module exists in this codebase"* and was graded 0.00 with `hallucinated: true`. The matcher allows sixty characters between *no* and *exists*; this subject spans sixty-four. A second abstention in the same answer was missed too, because `\bno (?:module|…)` requires the noun immediately after *no* and a quoted subject sat between them. | **The window was tuned on the answers that existed when it was written.** It is the same defect as Lesson 3's decoration mismatches, one layer up: not a character class but a LENGTH. Worse, the failing cell was the only one of three to call a graph tool — the graph surfaced adjacent real files, the arm named them while ruling them out, and the longer sentence overran the window. A working tool made the answer better and the grader punished the extra words. Counted properly hybrid's T3 is 1.00. |
+| 40 | **A correct abstention was scored as a hallucination because its subject phrase was four characters too long.** Hybrid's T3 cell says *"No payment-processing/financial-transaction reconciliation module exists in this codebase"* and was graded 0.00 with `hallucinated: true`. The matcher allows sixty characters between *no* and *exists*; this subject spans sixty-four. A second abstention in the same answer was missed too, because `\bno (?:module|…)` requires the noun immediately after *no* and a quoted subject sat between them. | **The window was tuned on the answers that existed when it was written.** It is the same defect as Lesson 3's decoration mismatches, one layer up: not a character class but a LENGTH. Worse, the failing cell was the only one of three to call a graph tool — the graph surfaced adjacent real files, the arm named them while ruling them out, and the longer sentence overran the window. A working tool made the answer better and the grader punished the extra words. Counted properly hybrid's T3 is 1.00. **FIXED**: the gap between the negator and its head is now counted in WORDS, not characters, which also subsumes the adjacency defect. Regraded from stored answers across every run in the corpus; it moved exactly three cells — `r8` grep/T4, `x2` grep/T3, `r8-cgidx` hybrid/T3 — each 0.00 -> 1.00 with a false `hallucinated` cleared. The page's hallucination count drops 4 -> 3 and grep's pooled drop-list loses T3. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15

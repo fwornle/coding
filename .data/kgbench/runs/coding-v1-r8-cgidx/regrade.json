@@ -1,0 +1,28 @@
+{
+  "runId": "coding-v1-r8-cgidx",
+  "at": "2026-08-12T12:35:04.144Z",
+  "rows": 96,
+  "changed": 1,
+  "changes": [
+    {
+      "arm": "hybrid",
+      "id": "T3",
+      "rep": 2,
+      "score": [
+        0,
+        1
+      ],
+      "hallucinated": [
+        true,
+        false
+      ],
+      "contaminated": [
+        false,
+        false
+      ],
+      "detail": "abstained correctly"
+    }
+  ],
+  "judgeChanged": 0,
+  "judgeChanges": []
+}
