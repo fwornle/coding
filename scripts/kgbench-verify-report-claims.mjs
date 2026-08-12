@@ -257,11 +257,60 @@ if (new Set(pooledCells.map((r) => r.run)).size === KEY_RUNS.length) {
   const a1Of = (arm) => pooledCells.filter((r) => r.id === 'A1' && r.arm === arm);
   check('graphify cites docker-compose.yml on A1', a1Of('graphify').filter(citesCompose).length, 2);
   check('grep cites docker-compose.yml on A1', a1Of('grep').filter(citesCompose).length, 14);
-  // The caveat the section states rather than hides: codegraph REACHES the file and still fails,
-  // so its A1 losses are a different, unexplained problem.
+  // THE RETRACTED CLAIM, KEPT AS A PIN. This page once read 4/10 here as "codegraph reaches the
+  // file and still fails", concluding its A1 losses were a separate unexplained problem. The
+  // number is real; the reading was backwards, because `citesCompose` is a KEYWORD test and six
+  // of those ten cells name the file only to say they could not read it. The pin stays so the
+  // artifact stays reproducible, relabelled so nobody reaches for it as evidence again.
   const cgCiting = a1Of('codegraph').filter(citesCompose);
-  check('codegraph cites the file on A1 and still fails',
+  check('ARTIFACT: keyword-citation metric on codegraph A1',
     `${cgCiting.filter((r) => r.score > 0.995).length}/${cgCiting.length}`, '4/10');
+
+  // WHAT THE CELLS ACTUALLY CLAIM. Classified by assertion rather than vocabulary, and this is
+  // the axis the section now rests on: claiming to have READ the file predicts 1.00 perfectly,
+  // and claiming the repository is ABSENT predicts failure perfectly.
+  const claimsRead = (r) => /found (it|the (exact )?answer)[^.]{0,40}docker[/-]compose|docker\/docker-compose\.yml[`']?\s*[:#]\s*\d/i.test(String(r.answer ?? ''));
+  const claimsAbsent = (r) => /no live access|can't grep|cannot grep|isn't present in this working tree|stripped down for the benchmark|don't have live filesystem|no Bash\/Grep tool|working tree has no|isn't checked out here|no direct filesystem access|no shell\/grep access|memory-derived|from (my )?(stored )?memory rather than|inference from adjacent memory/i.test(String(r.answer ?? ''));
+  const a1All = pooledCells.filter((r) => r.id === 'A1');
+  const readers = a1All.filter(claimsRead);
+  const absenters = a1All.filter((r) => !claimsRead(r) && claimsAbsent(r));
+  check('A1: claiming to have read the file is a perfect predictor',
+    `${readers.filter((r) => r.score > 0.995).length}/${readers.length}`, '29/29');
+  check('A1: claiming the repo is absent is a perfect predictor of failure',
+    `${absenters.filter((r) => r.score > 0.995).length}/${absenters.length}`, '0/5');
+  check('A1: only codegraph ever claims the repo is absent',
+    [...new Set(absenters.map((r) => r.arm))].join(','), 'codegraph');
+  // Across EVERY question, not just A1 — the false-absence claim is one arm's behaviour.
+  const absentAll = pooledCells.filter(claimsAbsent);
+  check('false-absence claims are codegraph-only, all questions',
+    [...new Set(absentAll.map((r) => r.arm))].join(','), 'codegraph');
+  check('false-absence claim count, all questions', absentAll.length, 7);
+  // The claim is FALSE: the sandbox is a full worktree and the file is not excluded.
+  const r8run = '.data/kgbench/runs/coding-v1-r8/run.json';
+  if (existsSync(r8run)) {
+    const sb = JSON.parse(readFileSync(r8run, 'utf8')).sandbox ?? {};
+    check('r8 sandbox is a verified worktree', `${sb.mode}/${sb.verified}`, 'worktree/true');
+    check('docker-compose.yml is NOT sandbox-excluded',
+      (sb.excluded ?? []).some((p) => p.includes('docker')), false);
+  }
+  // The tool surface is the root cause: these arms have Read but no way to FIND a path.
+  const surfaceOf = (arm) => [...new Set(pooledCells.filter((r) => r.arm === arm)
+    .map((r) => JSON.stringify(r.available_tools ?? [])))];
+  for (const arm of ['codegraph', 'graphify']) {
+    const s = surfaceOf(arm);
+    check(`${arm} arm has exactly one tool surface`, s.length, 1);
+    check(`${arm} arm has Read`, JSON.parse(s[0]).includes('Read'), true);
+    check(`${arm} arm has no path-discovery tool`,
+      JSON.parse(s[0]).some((t) => t === 'Glob' || t === 'Grep'), false);
+  }
+  check('grep arm does have them', JSON.parse(surfaceOf('grep')[0]).join(','), 'Glob,Grep,Read');
+  // Both backends fail A1 on the same substrate error, which is why it is ONE mechanism.
+  const cgA1bad = below('A1', 'codegraph');
+  check('every codegraph A1 miss is also f1',
+    cgA1bad.every((r) => JSON.stringify(r.grade_missing ?? []) === '["f1"]'), true);
+  check('every codegraph A1 miss names LevelDB, none names SQLite',
+    `${cgA1bad.filter((r) => /leveldb/i.test(String(r.answer))).length}/${cgA1bad.filter((r) => /sqlite/i.test(String(r.answer))).length}`,
+    '10/0');
 
   // THE INDEX CLAIM ITSELF. "Graphify indexes no YAML" is the load-bearing premise of the A1
   // mechanism, and it is a fact about graph.json rather than about any run — so it is checked
@@ -415,8 +464,8 @@ for (const name of ['kgbench-correctness', 'kgbench-cost', 'kgbench-arch-spread'
 }
 
 process.stdout.write('\n== prose claims that must match the data ==\n');
-claims('defect table has 36 rows', '| 36 |');
-claims('says thirty-six defects', 'Thirty-six defects were found');
+claims('defect table has 37 rows', '| 37 |');
+claims('says thirty-seven defects', 'Thirty-seven defects were found');
 claims('links RESULTS.md', '[`RESULTS.md`](RESULTS.md)');
 claims('embeds the correctness chart', 'kgbench-correctness-light.svg');
 claims('embeds the cost chart', 'kgbench-cost-light.svg');
