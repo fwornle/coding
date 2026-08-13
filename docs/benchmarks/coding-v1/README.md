@@ -1379,3 +1379,5 @@ the matrix.
 | `scripts/kgbench-regrade.mjs` | Re-applies fixed graders to stored answers, without re-running cells |
 | `.data/kgbench/runs/coding-v1-x2/` | Raw results, run manifest, and `REPAIRED.md` (the void and its resolution) |
 | [`../measurement-lessons.md`](../measurement-lessons.md) | The defects above, written up as transferable lessons |
+| [`../graphify-vs-grep/`](../graphify-vs-grep/README.md) | The predecessor benchmark (2026-08-05, 9 queries, 2 arms, no sandbox). Superseded by this page; kept as a record |
+| [`../kgbench-replication/`](../kgbench-replication/README.md) | The 9-question replication set this harness was first validated against |
