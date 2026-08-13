@@ -7,22 +7,25 @@ costs an index, a container service, and a rebuild step. This benchmark exists t
 whether they buy anything a plain `grep` agent doesn't, using measurements rather than
 intuition.
 
-**Run:** `coding-v1-r8` · repo at `f4f13e86a` · models `claude-sonnet-5`,
+**Run:** `coding-v1-r9` · repo at `d8a9b0647` · models `claude-sonnet-5`,
 `rapid-proxy/claude-sonnet-5` · 16 questions × 4 arms × 3 reps across 3 agents =
 **384 cells**, 0 contaminated, 0 tool escapes · **continuation budget 1**.
 
-Two things distinguish this run from its predecessor `x2`, and both are corrections to the
-measuring instrument rather than to the systems being measured:
+**This run exists because the previous one was measuring a broken tool.** `r8` is kept
+throughout as the comparison, because the difference between the two is the clearest evidence
+on this page. Three defects found after `r8` published are fixed here:
 
-- **Every agent now gets the same number of turns.** In `x2`, opencode was allowed one turn
-  and failed 88% of its cells; the harness was measuring its own asymmetry. See
-  [what the continuation budget changed](#what-the-continuation-budget-changed).
-- **One model graded every cell.** `x2` was scored by a mixture of haiku and opus because a
-  pin that looked applied was being discarded downstream. All 308 judged cells here were
-  graded by `claude-sonnet-5`.
+- **CodeGraph's index now covers the tree under test.** In `r8` it indexed a different tree,
+  so the arm was silently degraded to *Read with a broken tool attached*. This is the change
+  that moves the most numbers on this page — see [the bottom line](#bottom-line).
+- **A correct abstention is no longer scored as a hallucination.** The matcher bounded the gap
+  between a negator and its head in characters; it is now bounded in words.
+- **The index containment check tests the artefact, not a mention of it**, so a legitimate run
+  at an older commit is no longer refused.
 
-Read the arm comparison as a **replication** of `x2` and `r6`. The headline has not moved in
-three runs.
+Read the arm comparison as a **replication of `x2`, `r6` and `r8` on correctness** — the
+headline null result has now held for four runs — and as a **correction to `r8` on cost**,
+where one arm's figures turn out to have described a defect.
 
 > **The generated tables live in [`RESULTS.md`](RESULTS.md)** and are re-rendered from
 > `results.jsonl` on demand. This page is hand-written around those numbers and is not
@@ -39,21 +42,32 @@ reach a graph tool rather than merely wasn't configured with one.
 | | grep | graphify | codegraph | **hybrid** |
 |---|--:|--:|--:|--:|
 | **Correctness** (median) | **1.00** | **1.00** | **1.00** | **1.00** |
-| Content tokens per query | **77,394** | 131,190 | 161,322 | 86,579 |
-| Latency per query | **18.1s** | 28.1s | 50.3s | 18.5s |
-| Latency p90 | 34.9s | 69.2s | 122.0s | **32.4s** |
-| Cost per query | **$0.084** | $0.153 | $0.192 | $0.090 |
+| Content tokens per query | **69,164** | 139,809 | 72,662 | 78,854 |
+| Latency per query | 16.2s | 29.3s | 15.1s | **14.4s** |
+| Latency p90 | **30.5s** | 81.8s | 45.1s | 35.4s |
+| Cost per query | **$0.080** | $0.168 | $0.180 | $0.115 |
 | Hard failures | 0 / 48 | 0 / 48 | 0 / 48 | 0 / 48 |
 
-**On this question set, neither graph backend buys measurable correctness, and both cost
-1.7–2.1× the tokens, 1.6–2.8× the latency, and 1.8–2.3× the money.** (Graphify is the cheaper
-of the two on every measure; CodeGraph is 2.8× grep's latency and 2.3× its cost.)
+**Neither graph backend buys measurable correctness — every arm's median is 1.00 — but the
+cost of asking is no longer uniform, and that is new.** Graphify runs 2.0× grep's tokens,
+1.8× its latency and 2.1× its money. **CodeGraph runs 1.05× grep's tokens and 0.93× its
+latency — it is now marginally *faster* than grep and costs about the same to run**, while
+still costing 2.2× in dollars because its calls price differently.
+
+That is a reversal of what this page said for four runs, and it is the clearest single
+consequence of the fixes. In `r8` CodeGraph read 161,322 tokens and took 50.3s — **2.1× the
+tokens and 2.8× the latency of grep**. Its index was serving the wrong tree, so the arm was
+quietly degraded to *Read with a broken tool attached*, and reading files is expensive. Given
+an index that covers the corpus, the same arm answers the same questions for grep's price.
+**The old cost finding measured a defect, not a backend.**
 
 The `hybrid` arm is the one to read the others against, because it is the only one shaped
-like production: it has *every* tool and chooses freely. It lands on grep's cost and grep's
-correctness — because **it chooses grep**. Across 48 cells it made 230 tool calls, of which
-**6 were graph queries**: five to CodeGraph and one to Graphify. Given both indexes and no
-instruction either way, the agent reaches for text search 97% of the time.
+like production: it has *every* tool and chooses freely. It is now the **fastest arm on the
+page** at 14.4s. Across 48 cells it made 227 tool calls, of which **20 were graph queries**,
+all to CodeGraph — **18 of its 48 cells consult a graph**, against 6 in `r8`. Given both
+indexes and no instruction either way, the agent still reaches for text search **91%** of the
+time, but "overwhelmingly ignores the graph" is no longer the right description: it ignored a
+graph that did not work.
 
 **This is the one result on the page that a replicate makes stronger rather than weaker.**
 Pooled over the four runs whose `hybrid` arm offers a byte-identical tool surface — `r6`, `r7`,
@@ -65,18 +79,42 @@ The hypothesis the set was designed to test — that a graph index answers *"tha
 better than grep — **did not reproduce**. All four arms abstained correctly on every trap.
 
 Read this as a **null result on 16 questions**, not as proof that code graphs are worthless.
-Two per-question differences survive replication across three runs, and both run against the
-graph arms. **CodeGraph scores 0.22 on L2**, failing all nine of its cells and never once
-reaching 1.00, where grep and hybrid take all nine. **A1 goes against both backends** —
-CodeGraph 0.78 and Graphify 0.89, missing 10 and 5 cells of 16 across two runs each, against
-0 of 16 for grep and hybrid.
+One per-question difference runs against the graph arms and **two now run in their favour**.
 
-> **The L2 figure is an artifact and has since been re-measured.** 0.22 pools two different
-> things: four cells that queried the index and scored 0.50, and five in which **the index was
-> not reachable at all**. The harness has been fixed and both affected arms re-run at the same
-> corpus commit: **CodeGraph scores 1.00 on L2** once its index covers the tree under test.
+**A1 is the finding that survives, and it is the only one left against the graph arms.**
+CodeGraph misses **all three** of its A1 cells (median 0.65); Graphify and hybrid miss one of
+three; grep misses none. Its answer is a six-line YAML comment, and neither backend indexes
+YAML — a fact about what a code index *contains*, not about how well it searches. It survived
+the index repair untouched, which is what makes it trustworthy: the fix that erased L2 left A1
+exactly where it was.
+
+**L2 is withdrawn. All four arms now score 1.00.** For four runs this page reported CodeGraph
+failing every one of its L2 cells and called it "the finding — nothing else is that clean". It
+was an artefact of an index that never covered the tree under test. With the index repaired
+the arm takes all of them, and its median tool calls on L2 drop from **12 to 2**: it had been
+flailing against a tool that returned nothing. **The cleanest result on the page was the
+cleanest measurement of a defect.**
+
+**And two questions tip the other way — by one cell each, which is not a finding and is
+reported as such.** On **B3** and on **T1** (an abstain probe) grep drops a single cell of
+three while all three graph-bearing arms drop none. **Every median involved is 1.00**, so this
+is invisible in the headline table and would be invisible in any per-question median: it shows
+up only by counting cells, which is the discipline this page adopted after B3 was once
+misread the other way. Two single cells are noise. What is worth recording is only that the
+sign has changed — for four runs no graph arm was ahead of grep anywhere, and the reason was
+partly that one of them was broken.
+
+**CodeGraph also collapses on A4**, missing all three cells for a median of 0.33 where every
+other arm lands on 0.82 or 1.00. That reproduces the same collapse the r5/r6 re-measurements
+found at two older corpus commits, so it is now seen in three independent trees. A4 asks what
+pins CodeGraph's own environment variables and what owns index freshness.
+
+> **The L2 figure was an artifact, and this run settles it.** The 0.22 this page reported for
+> four runs pooled two different things: cells that queried the index and scored 0.50, and
+> cells in which **the index was not reachable at all**. Repaired, CodeGraph scores **1.00** on
+> L2 in a full run at HEAD — not just in the targeted re-measurement that first showed it.
 > A1, whose answer lives outside any code index, does NOT move — so the corpus-scope finding
-> below stands. See
+> below stands on its own. See
 > [the CodeGraph index does not cover the tree under test](#the-codegraph-index-does-not-cover-the-tree-under-test)
 > and [the re-measurement](#the-index-was-fixed-and-the-two-affected-arms-re-measured--coding-v1-r8-cgidx).
 
@@ -513,9 +551,15 @@ a replicate — [see below](#which-per-question-results-replicate) before quotin
 </picture>
 
 Every dot is one architecture-class cell, so it shows A1 and A4 but **not** L2 or B3, which
-belong to other classes and appear in the table below rather than the figure. Every class
-median is 1.00 for all four arms, which is why the automatic winner check prints "tie" —
-correctly, because four questions moving across two arms is not a class-level effect.
+belong to other classes and appear in the table below rather than the figure.
+
+**Four of the five classes tie at 1.00 across all four arms. `arch` no longer does:
+CodeGraph's median there is 0.65.** That is new, and it is the first class-level difference
+this benchmark has produced. It is also entirely two questions — A1, whose answer is a YAML
+comment no code index covers, and A4, where CodeGraph misses all three cells. A class median
+that moves because both of its hard questions moved is a restatement of those two questions,
+not an independent finding, and it is quoted here as such. The other three arms remain at
+1.00 in every class.
 
 | Question | class | grep | graphify | codegraph | hybrid |
 |---|---|--:|--:|--:|--:|
@@ -1129,14 +1173,20 @@ depends on the judge at all.
 
 ## Provenance of these numbers
 
-**All 384 cells come from a single uninterrupted pass** at tree commit `f4f13e86a` — no
-resume, no splice, no re-run. The manifest's `history` block is empty, which is what that looks
-like. `x2` needed a page of provenance because half of it was re-run after a defect; this run
-needs a paragraph.
+**All 384 cells come from a single uninterrupted pass** at tree commit `d8a9b0647` — no
+resume, no splice, no re-run. `x2` needed a page of provenance because half of it was re-run
+after a defect; this run needs a paragraph.
+
+One thing this run does NOT share with `r8`: copilot's 95 token rows were filled in
+afterwards by `kgbench-backfill-tokens.mjs`. That is routine rather than a repair — copilot's
+stop-adapter writes its row about a minute after the cell ends, long after the runner has
+recorded `unmeasured`, and waiting per-cell would cost hours of sleeping. Every cell is
+measured now (`192` stream-json, `192` proxy-db-session, **0 unmeasured, 0 ambiguous**), and
+the backfill joins on `task_id` and the stored wall-clock window rather than on proximity.
 
 Three things about it are worth stating anyway, because each would otherwise be invisible:
 
-- **Both indexes were rebuilt at `f4f13e86a` immediately before launch**, so the arms and the
+- **Both indexes were rebuilt at `d8a9b0647` immediately before launch**, so the arms and the
   graph backends saw the same tree. In `x2` the index was 71 files behind. Staleness is
   therefore not available as an explanation for anything here.
 - **The working tree was dirty at launch** (`dirty: true`). Arms search the *commit*, not the
@@ -1158,7 +1208,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Forty-two defects were found across the runs behind this page, and runs were discarded
+Forty-three defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -1210,6 +1260,7 @@ documented because the failure modes generalise to any agent benchmark.
 | 40 | **A correct abstention was scored as a hallucination because its subject phrase was four characters too long.** Hybrid's T3 cell says *"No payment-processing/financial-transaction reconciliation module exists in this codebase"* and was graded 0.00 with `hallucinated: true`. The matcher allows sixty characters between *no* and *exists*; this subject spans sixty-four. A second abstention in the same answer was missed too, because `\bno (?:module|…)` requires the noun immediately after *no* and a quoted subject sat between them. | **The window was tuned on the answers that existed when it was written.** It is the same defect as Lesson 3's decoration mismatches, one layer up: not a character class but a LENGTH. Worse, the failing cell was the only one of three to call a graph tool — the graph surfaced adjacent real files, the arm named them while ruling them out, and the longer sentence overran the window. A working tool made the answer better and the grader punished the extra words. Counted properly hybrid's T3 is 1.00. **FIXED**: the gap between the negator and its head is now counted in WORDS, not characters, which also subsumes the adjacency defect. Regraded from stored answers across every run in the corpus; it moved exactly three cells — `r8` grep/T4, `x2` grep/T3, `r8-cgidx` hybrid/T3 — each 0.00 -> 1.00 with a false `hallucinated` cleared. The page's hallucination count drops 4 -> 3 and grep's pooled drop-list loses T3. |
 | 41 | **Four runs were carrying scores from a superseded answer key, and a blind fix would have corrupted a fifth.** Reconciling every run against the current grader found 105 stale rows. Fourteen in `r5` and fourteen in `r6` were L2 and A1 scored with keys since corrected — L2's key had named the wrong file, so every arm scored **0.15 on a correct answer**. Six in `replication-full` were S1 cells that predate the contamination detector and cite the benchmark's own ground truth; they are now void rather than scored. | **The remaining 64 rows were the trap.** They were `r5`/`r6` cells for A3, A4 and B1 — questions whose PROMPTS were rewritten by `c31d07b02` after those runs executed. Their stored answers respond to different words, so re-scoring them with today's checklist is not a correction; it is a category error **that looks exactly like a correction, because it produces plausible numbers on real data**. A one-line regrade would have quietly rewritten a third of `r5`. The fix is structural: `kgbench-regrade.mjs` now reconstructs the question set from the run's own `commit` and refuses any question whose prompt moved, and refuses an entire run whose set cannot be recovered — which is what retires the two pilots, whose question file was never committed. *Cannot verify* is not *verified*. **PARTLY RESOLVED**: the 64 refused rows have been RE-MEASURED rather than regraded, as `coding-v1-r5-requestions` and `coding-v1-r6-requestions` at each run's own corpus commit — beside `r5`/`r6`, not inside them, because those runs recorded no model and splicing would confound arm with model on exactly the questions under test. `r5`/`r6`'s own A3/A4/B1 columns remain those of a superseded question set and always will; that is a fact about the runs, not a defect left open. |
 | 42 | **A 121-cell run was killed twice, at cells 2 and 18, by the tool that launched it.** Neither death produced an error: the log simply stopped, `supervise.status` stayed `running`, and no process remained. The cause was the launching harness's 10-minute call ceiling killing the process group it hosted — `kgbench-supervise.sh` detaches, but detaching does not leave the group. | **A supervisor that survives signals does not survive its own parent's death, and the two failures are indistinguishable from the outside.** The tell is `status: running` with zero live processes, which is why the monitor now asserts BOTH rather than either. Re-hosting under `launchctl submit` fixed it. Nothing was lost at any point — the runner writes cells incrementally and resumes from `results.jsonl`, so the restart continued at cell 18 rather than redoing 18. **Incremental writes are what turned two silent kills into a delay instead of a loss**, and that property is worth more than the supervisor's retry logic. |
+| 43 | **Four runs of cost figures described a defect rather than a backend.** `r8` reported CodeGraph at 161,322 tokens and 50.3s — 2.1x grep's tokens and 2.8x its latency — and the page built its headline economic claim on it: *"both cost 1.7-2.1x the tokens, 1.6-2.8x the latency"*. With an index that actually covers the corpus, the same arm on the same questions runs at **1.05x grep's tokens and 0.93x its latency**. Its median tool calls on L2 fall from 12 to 2. | **A broken retrieval tool does not look broken in a cost table; it looks expensive.** The arm compensated by reading files, and reading files is what the tokens measured. Nothing in the correctness column flagged it, because the arm still answered correctly — it just paid Read prices to do it. **The tell was in the tool mix, which no published table showed.** A benchmark that reports what an arm COSTS without reporting what it DOES cannot distinguish an expensive backend from a broken one. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
