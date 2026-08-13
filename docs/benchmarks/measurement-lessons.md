@@ -439,6 +439,15 @@ repository is absent do. **When a metric is a substring match, the first thing t
 the surrounding sentence is doing with it** — and prefer a test that matches the assertion
 ("found it in `<file>:<line>`") over one that matches the topic.
 
+**A broken retrieval tool does not look broken in a cost table — it looks expensive.** For four
+runs this benchmark reported CodeGraph as the costly arm: 2.1x grep's tokens, 2.8x its latency.
+Its index was serving the wrong tree, so the arm compensated by reading files, and reading files
+is what the tokens measured. Correctness never flagged it, because the arm still answered
+correctly — it just paid Read prices to do it. Repaired, the same arm on the same questions runs
+at **1.05x grep's tokens and 0.93x its latency**. **A benchmark that reports what an arm COSTS
+without reporting what it DOES cannot tell an expensive backend from a broken one**, and the
+tell was in the tool mix, which no published table showed.
+
 **A fixed tool changes what the agent DOES, not just how well it scores — and the behavioural
 change is the bigger result.** Repairing the CodeGraph index moved the arm's mean 0.881 → 0.929,
 which reads as marginal. What actually happened is that its Read calls collapsed from 427 to 94

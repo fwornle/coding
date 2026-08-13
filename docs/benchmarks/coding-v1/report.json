@@ -1,36 +1,36 @@
 {
   "meta": {
     "set": "coding-v1",
-    "runId": "coding-v1-r8",
+    "runId": "coding-v1-r9",
     "questionCount": 16,
     "reps": "3",
-    "commit": "f4f13e86a",
+    "commit": "d8a9b0647",
     "dirty": true,
     "continuationBudget": 1,
     "model": "claude-sonnet-5`, `rapid-proxy/claude-sonnet-5",
     "baselines": {
-      "grep|claude|claude-sonnet-5": 21222,
-      "grep|copilot|claude-sonnet-5": 64025,
-      "grep|opencode|rapid-proxy/claude-sonnet-5": 64375,
-      "graphify|claude|claude-sonnet-5": 21660,
-      "codegraph|claude|claude-sonnet-5": 20462,
-      "hybrid|claude|claude-sonnet-5": 24484,
-      "hybrid|copilot|claude-sonnet-5": 63621,
-      "hybrid|opencode|rapid-proxy/claude-sonnet-5": 33541
+      "grep|claude|claude-sonnet-5": 21420,
+      "grep|copilot|claude-sonnet-5": 133039,
+      "grep|opencode|rapid-proxy/claude-sonnet-5": 32482,
+      "graphify|claude|claude-sonnet-5": 21858,
+      "codegraph|claude|claude-sonnet-5": 20992,
+      "hybrid|claude|claude-sonnet-5": 25014,
+      "hybrid|copilot|claude-sonnet-5": 95807,
+      "hybrid|opencode|rapid-proxy/claude-sonnet-5": 63388
     },
     "schemaTax": {
       "grep|claude|claude-sonnet-5": 0,
-      "grep|copilot|claude-sonnet-5": null,
+      "grep|copilot|claude-sonnet-5": 0,
       "grep|opencode|rapid-proxy/claude-sonnet-5": 0,
       "graphify|claude|claude-sonnet-5": 438,
-      "codegraph|claude|claude-sonnet-5": -760,
-      "hybrid|claude|claude-sonnet-5": 3262,
-      "hybrid|copilot|claude-sonnet-5": null,
-      "hybrid|opencode|rapid-proxy/claude-sonnet-5": -30834
+      "codegraph|claude|claude-sonnet-5": -428,
+      "hybrid|claude|claude-sonnet-5": 3594,
+      "hybrid|copilot|claude-sonnet-5": -37232,
+      "hybrid|opencode|rapid-proxy/claude-sonnet-5": 30906
     },
     "sandbox": {
       "mode": "worktree",
-      "tree_commit": "f4f13e86a388a6efac79a24e41abd6069d94d030",
+      "tree_commit": "d8a9b06472b1a08c00d03db2be14cb2278b4bb30",
       "excluded": [
         "config/kgbench/questions",
         "lib/kgbench/graders.mjs",
@@ -64,7 +64,16 @@
         ".claude",
         ".github/copilot-instructions.md"
       ],
-      "verified": true
+      "verified": true,
+      "code_graph_index": {
+        "backend": "codegraph",
+        "project": "/tmp/kgbench-index-coding-v1-r9",
+        "tree_commit": "d8a9b06472b1a08c00d03db2be14cb2278b4bb30",
+        "covers_run_tree": true,
+        "file_count": 962,
+        "node_count": 14610
+      },
+      "pinned_via_flag": false
     },
     "history": null,
     "agents": [
@@ -85,7 +94,7 @@
     "toolEscapeRows": 0,
     "retiredQuestions": [],
     "agentFilter": null,
-    "generatedAt": "2026-08-12T12:40:22.828Z"
+    "generatedAt": "2026-08-13T00:22:07.714Z"
   },
   "byArm": {
     "grep": {
@@ -95,8 +104,8 @@
       "ungraded": 0,
       "failed": 4,
       "hard_fail_rate": 0.027777777777777776,
-      "retry_rate": 0.09027777777777778,
-      "hallucination_rate": 0.014285714285714285,
+      "retry_rate": 0.0625,
+      "hallucination_rate": 0.007142857142857143,
       "provenance": {
         "agents": [
           "claude",
@@ -121,7 +130,7 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9759523809523809,
+          "mean": 0.9792857142857142,
           "median": 1,
           "min": 0,
           "max": 1,
@@ -129,43 +138,43 @@
           "n": 140
         },
         "total_tokens": {
-          "mean": 220970.74285714285,
-          "median": 147752,
-          "min": 43366,
-          "max": 1092143,
-          "p95": 767540,
+          "mean": 214162.62857142856,
+          "median": 146214,
+          "min": 46517,
+          "max": 1203916,
+          "p95": 764531,
           "n": 140
         },
         "content_tokens": {
-          "mean": 171511.05714285714,
-          "median": 102752,
-          "min": 7998,
-          "max": 1028118,
-          "p95": 703165,
+          "mean": 151041.62142857144,
+          "median": 88643,
+          "min": 622,
+          "max": 1070877,
+          "p95": 732049,
           "n": 140
         },
         "tool_calls": {
-          "mean": 4.75,
+          "mean": 4.875,
           "median": 4,
           "min": 1,
-          "max": 18,
-          "p95": 12,
+          "max": 23,
+          "p95": 10,
           "n": 48
         },
         "wall_s": {
-          "mean": 43.50357142857143,
-          "median": 30.2,
-          "min": 7.8,
-          "max": 256.8,
-          "p95": 140.4,
+          "mean": 38.72642857142857,
+          "median": 28.35,
+          "min": 7.6,
+          "max": 206.3,
+          "p95": 122.3,
           "n": 140
         },
         "cost_usd": {
-          "mean": 0.1052726875,
-          "median": 0.08394735,
-          "min": 0.019305,
-          "max": 0.5686751999999999,
-          "p95": 0.202905,
+          "mean": 0.10125963125,
+          "median": 0.080178,
+          "min": 0.0282561,
+          "max": 0.47065619999999997,
+          "p95": 0.2316189,
           "n": 48
         }
       }
@@ -178,7 +187,7 @@
       "failed": 0,
       "hard_fail_rate": 0,
       "retry_rate": 0,
-      "hallucination_rate": 0,
+      "hallucination_rate": 0.020833333333333332,
       "provenance": {
         "agents": [
           "claude"
@@ -197,51 +206,51 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9708333333333333,
+          "mean": 0.9680555555555556,
           "median": 1,
-          "min": 0.5,
+          "min": 0,
           "max": 1,
           "p95": 1,
           "n": 48
         },
         "total_tokens": {
-          "mean": 226659.54166666666,
-          "median": 152849.5,
-          "min": 46514,
-          "max": 1717197,
-          "p95": 583794,
+          "mean": 325843.875,
+          "median": 161667.5,
+          "min": 47278,
+          "max": 3996537,
+          "p95": 1095443,
           "n": 48
         },
         "content_tokens": {
-          "mean": 204999.54166666666,
-          "median": 131189.5,
-          "min": 24854,
-          "max": 1695537,
-          "p95": 562134,
+          "mean": 303985.875,
+          "median": 139809.5,
+          "min": 25420,
+          "max": 3974679,
+          "p95": 1073585,
           "n": 48
         },
         "tool_calls": {
-          "mean": 7.041666666666667,
-          "median": 5,
+          "mean": 8.895833333333334,
+          "median": 6.5,
           "min": 1,
-          "max": 35,
-          "p95": 16,
+          "max": 51,
+          "p95": 23,
           "n": 48
         },
         "wall_s": {
-          "mean": 37.03541666666666,
-          "median": 28.1,
-          "min": 7.8,
-          "max": 163.2,
-          "p95": 82,
+          "mean": 41.65625,
+          "median": 29.3,
+          "min": 6.9,
+          "max": 308.3,
+          "p95": 96.2,
           "n": 48
         },
         "cost_usd": {
-          "mean": 0.2031873,
-          "median": 0.15268425000000002,
-          "min": 0.0337374,
-          "max": 1.1702358,
-          "p95": 0.4646601,
+          "mean": 0.2626409375,
+          "median": 0.16771455000000002,
+          "min": 0.0356172,
+          "max": 2.2944318000000004,
+          "p95": 0.7934625000000001,
           "n": 48
         }
       }
@@ -273,7 +282,7 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.8805555555555555,
+          "mean": 0.9190972222222222,
           "median": 1,
           "min": 0,
           "max": 1,
@@ -281,43 +290,43 @@
           "n": 48
         },
         "total_tokens": {
-          "mean": 344133.3541666667,
-          "median": 181784,
-          "min": 42990,
-          "max": 2626391,
-          "p95": 977636,
+          "mean": 170072.83333333334,
+          "median": 93654,
+          "min": 45575,
+          "max": 818416,
+          "p95": 472317,
           "n": 48
         },
         "content_tokens": {
-          "mean": 323671.3541666667,
-          "median": 161322,
-          "min": 22528,
-          "max": 2605929,
-          "p95": 957174,
+          "mean": 149080.83333333334,
+          "median": 72662,
+          "min": 24583,
+          "max": 797424,
+          "p95": 451325,
           "n": 48
         },
         "tool_calls": {
-          "mean": 10.291666666666666,
-          "median": 8,
+          "mean": 3.5208333333333335,
+          "median": 2,
           "min": 1,
-          "max": 82,
-          "p95": 26,
+          "max": 15,
+          "p95": 9,
           "n": 48
         },
         "wall_s": {
-          "mean": 58.19166666666667,
-          "median": 50.25,
-          "min": 8,
-          "max": 247.7,
-          "p95": 143.3,
+          "mean": 23.299999999999997,
+          "median": 15.1,
+          "min": 6.4,
+          "max": 104.8,
+          "p95": 49.8,
           "n": 48
         },
         "cost_usd": {
-          "mean": 0.3026623562500001,
-          "median": 0.19213395,
-          "min": 0.0333066,
-          "max": 1.6548153,
-          "p95": 0.8433873000000001,
+          "mean": 0.23139991249999994,
+          "median": 0.17981234999999998,
+          "min": 0.0161382,
+          "max": 0.7236741,
+          "p95": 0.5903985,
           "n": 48
         }
       }
@@ -325,12 +334,12 @@
     "hybrid": {
       "arm": "hybrid",
       "runs": 144,
-      "ranked": 142,
+      "ranked": 140,
       "ungraded": 0,
-      "failed": 2,
-      "hard_fail_rate": 0.013888888888888888,
-      "retry_rate": 0.05555555555555555,
-      "hallucination_rate": 0.007042253521126761,
+      "failed": 4,
+      "hard_fail_rate": 0.027777777777777776,
+      "retry_rate": 0.041666666666666664,
+      "hallucination_rate": 0.007142857142857143,
       "provenance": {
         "agents": [
           "claude",
@@ -355,51 +364,51 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9630281690140845,
+          "mean": 0.9728571428571428,
           "median": 1,
           "min": 0,
           "max": 1,
           "p95": 1,
-          "n": 142
+          "n": 140
         },
         "total_tokens": {
-          "mean": 213523.29577464788,
-          "median": 146685.5,
-          "min": 52185,
-          "max": 999214,
-          "p95": 767994,
-          "n": 142
+          "mean": 221612.57857142857,
+          "median": 167882.5,
+          "min": 53632,
+          "max": 1151770,
+          "p95": 582234,
+          "n": 140
         },
         "content_tokens": {
-          "mean": 172875.9295774648,
-          "median": 108013.5,
-          "min": 27701,
-          "max": 935593,
-          "p95": 704373,
-          "n": 142
+          "mean": 160266.29285714286,
+          "median": 93259,
+          "min": 28618,
+          "max": 1055963,
+          "p95": 486427,
+          "n": 140
         },
         "tool_calls": {
-          "mean": 4.791666666666667,
+          "mean": 4.729166666666667,
           "median": 4,
           "min": 1,
-          "max": 20,
-          "p95": 10,
+          "max": 16,
+          "p95": 12,
           "n": 48
         },
         "wall_s": {
-          "mean": 39.732394366197184,
-          "median": 26.549999999999997,
-          "min": 8.9,
-          "max": 200.7,
-          "p95": 131.9,
-          "n": 142
+          "mean": 37.79357142857143,
+          "median": 27.5,
+          "min": 7.1,
+          "max": 157.9,
+          "p95": 112,
+          "n": 140
         },
         "cost_usd": {
-          "mean": 0.10478763124999997,
-          "median": 0.09031875,
-          "min": 0.0317562,
-          "max": 0.3394716,
-          "p95": 0.2272443,
+          "mean": 0.12889510625,
+          "median": 0.11487869999999999,
+          "min": 0.0189375,
+          "max": 0.4658241,
+          "p95": 0.2878119,
           "n": 48
         }
       }
@@ -409,17 +418,17 @@
     "abstain": {
       "scores": {
         "grep": {
-          "mean": 0.92,
+          "mean": 0.9615384615384616,
           "median": 1,
           "min": 0,
           "max": 1,
           "p95": 1,
-          "n": 25
+          "n": 26
         },
         "graphify": {
-          "mean": 1,
+          "mean": 0.8888888888888888,
           "median": 1,
-          "min": 1,
+          "min": 0,
           "max": 1,
           "p95": 1,
           "n": 9
@@ -450,36 +459,36 @@
     "arch": {
       "scores": {
         "grep": {
-          "mean": 0.9892156862745098,
+          "mean": 0.9847222222222223,
           "median": 1,
           "min": 0.8166666666666667,
           "max": 1,
           "p95": 1,
-          "n": 34
+          "n": 36
         },
         "graphify": {
-          "mean": 0.9694444444444444,
+          "mean": 0.9555555555555556,
           "median": 1,
-          "min": 0.8166666666666667,
+          "min": 0.65,
           "max": 1,
           "p95": 1,
           "n": 12
         },
         "codegraph": {
-          "mean": 0.8555555555555555,
-          "median": 1,
-          "min": 0.5,
+          "mean": 0.6763888888888889,
+          "median": 0.65,
+          "min": 0,
           "max": 1,
           "p95": 1,
           "n": 12
         },
         "hybrid": {
-          "mean": 0.9569444444444445,
+          "mean": 0.9573529411764705,
           "median": 1,
-          "min": 0,
+          "min": 0.65,
           "max": 1,
           "p95": 1,
-          "n": 36
+          "n": 34
         }
       },
       "winner": {
@@ -491,36 +500,36 @@
     "blast": {
       "scores": {
         "grep": {
-          "mean": 0.9629629629629629,
+          "mean": 0.946,
           "median": 1,
           "min": 0.5,
           "max": 1,
           "p95": 1,
-          "n": 27
+          "n": 25
         },
         "graphify": {
-          "mean": 0.9796296296296296,
+          "mean": 1,
           "median": 1,
-          "min": 0.8166666666666667,
+          "min": 1,
           "max": 1,
           "p95": 1,
           "n": 9
         },
         "codegraph": {
-          "mean": 0.8333333333333334,
+          "mean": 1,
           "median": 1,
-          "min": 0,
+          "min": 1,
           "max": 1,
           "p95": 1,
           "n": 9
         },
         "hybrid": {
-          "mean": 0.892,
+          "mean": 0.948076923076923,
           "median": 1,
-          "min": 0.15,
+          "min": 0.5,
           "max": 1,
           "p95": 1,
-          "n": 25
+          "n": 26
         }
       },
       "winner": {
@@ -540,17 +549,17 @@
           "n": 27
         },
         "graphify": {
-          "mean": 0.9055555555555556,
+          "mean": 1,
           "median": 1,
-          "min": 0.5,
+          "min": 1,
           "max": 1,
           "p95": 1,
           "n": 9
         },
         "codegraph": {
-          "mean": 0.7222222222222222,
+          "mean": 1,
           "median": 1,
-          "min": 0,
+          "min": 1,
           "max": 1,
           "p95": 1,
           "n": 9
@@ -578,7 +587,7 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 27
+          "n": 26
         },
         "graphify": {
           "mean": 1,
@@ -602,7 +611,7 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 27
+          "n": 26
         }
       },
       "winner": {
@@ -650,7 +659,7 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9753472222222221,
+          "mean": 0.9642361111111111,
           "median": 1,
           "min": 0,
           "max": 1,
@@ -658,35 +667,35 @@
           "n": 48
         },
         "total_tokens": {
-          "mean": 123129.04166666667,
-          "median": 98616,
-          "min": 43366,
-          "max": 587174,
-          "p95": 242420,
+          "mean": 125255.60416666667,
+          "median": 90584,
+          "min": 46517,
+          "max": 798648,
+          "p95": 181319,
           "n": 48
         },
         "content_tokens": {
-          "mean": 101907.04166666667,
-          "median": 77394,
-          "min": 22144,
-          "max": 565952,
-          "p95": 221198,
+          "mean": 103835.60416666667,
+          "median": 69164,
+          "min": 25097,
+          "max": 777228,
+          "p95": 159899,
           "n": 48
         },
         "tool_calls": {
-          "mean": 4.75,
+          "mean": 4.875,
           "median": 4,
           "min": 1,
-          "max": 18,
-          "p95": 12,
+          "max": 23,
+          "p95": 10,
           "n": 48
         },
         "wall_s": {
-          "mean": 22.78125,
-          "median": 18.15,
-          "min": 7.8,
-          "max": 93.6,
-          "p95": 56.9,
+          "mean": 20.31041666666667,
+          "median": 16.25,
+          "min": 7.6,
+          "max": 104.5,
+          "p95": 42,
           "n": 48
         }
       }
@@ -716,27 +725,27 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9753472222222221,
+          "mean": 0.9961805555555555,
           "median": 1,
-          "min": 0,
+          "min": 0.8166666666666667,
           "max": 1,
           "p95": 1,
           "n": 48
         },
         "total_tokens": {
-          "mean": 303789.6666666667,
-          "median": 207371,
-          "min": 101811,
-          "max": 1092143,
-          "p95": 912835,
+          "mean": 315522.1458333333,
+          "median": 209559.5,
+          "min": 129987,
+          "max": 1203916,
+          "p95": 958751,
           "n": 48
         },
         "content_tokens": {
-          "mean": 239764.66666666666,
-          "median": 143346,
-          "min": 37786,
-          "max": 1028118,
-          "p95": 848810,
+          "mean": 182614.375,
+          "median": 76520.5,
+          "min": 622,
+          "max": 1070877,
+          "p95": 825712,
           "n": 48
         },
         "tool_calls": {
@@ -748,11 +757,11 @@
           "n": 0
         },
         "wall_s": {
-          "mean": 47.58958333333333,
-          "median": 33.8,
-          "min": 21.3,
-          "max": 150.1,
-          "p95": 138.5,
+          "mean": 48.02083333333332,
+          "median": 36.65,
+          "min": 17.4,
+          "max": 165.9,
+          "p95": 135.9,
           "n": 48
         }
       }
@@ -790,19 +799,19 @@
           "n": 44
         },
         "total_tokens": {
-          "mean": 237359.22727272726,
-          "median": 171544.5,
-          "min": 72373,
-          "max": 970704,
-          "p95": 726902,
+          "mean": 200578.0909090909,
+          "median": 150899,
+          "min": 76644,
+          "max": 764531,
+          "p95": 377328,
           "n": 44
         },
         "content_tokens": {
-          "mean": 172984.22727272726,
-          "median": 107169.5,
-          "min": 7998,
-          "max": 906329,
-          "p95": 662527,
+          "mean": 168096.0909090909,
+          "median": 118417,
+          "min": 44162,
+          "max": 732049,
+          "p95": 344846,
           "n": 44
         },
         "tool_calls": {
@@ -814,11 +823,11 @@
           "n": 0
         },
         "wall_s": {
-          "mean": 61.65227272727273,
-          "median": 40.95,
-          "min": 16.4,
-          "max": 256.8,
-          "p95": 157.9,
+          "mean": 48.67727272727272,
+          "median": 38,
+          "min": 15.3,
+          "max": 206.3,
+          "p95": 94,
           "n": 44
         }
       }
@@ -848,43 +857,43 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9708333333333333,
+          "mean": 0.9680555555555556,
           "median": 1,
-          "min": 0.5,
+          "min": 0,
           "max": 1,
           "p95": 1,
           "n": 48
         },
         "total_tokens": {
-          "mean": 226659.54166666666,
-          "median": 152849.5,
-          "min": 46514,
-          "max": 1717197,
-          "p95": 583794,
+          "mean": 325843.875,
+          "median": 161667.5,
+          "min": 47278,
+          "max": 3996537,
+          "p95": 1095443,
           "n": 48
         },
         "content_tokens": {
-          "mean": 204999.54166666666,
-          "median": 131189.5,
-          "min": 24854,
-          "max": 1695537,
-          "p95": 562134,
+          "mean": 303985.875,
+          "median": 139809.5,
+          "min": 25420,
+          "max": 3974679,
+          "p95": 1073585,
           "n": 48
         },
         "tool_calls": {
-          "mean": 7.041666666666667,
-          "median": 5,
+          "mean": 8.895833333333334,
+          "median": 6.5,
           "min": 1,
-          "max": 35,
-          "p95": 16,
+          "max": 51,
+          "p95": 23,
           "n": 48
         },
         "wall_s": {
-          "mean": 37.03541666666666,
-          "median": 28.1,
-          "min": 7.8,
-          "max": 163.2,
-          "p95": 82,
+          "mean": 41.65625,
+          "median": 29.3,
+          "min": 6.9,
+          "max": 308.3,
+          "p95": 96.2,
           "n": 48
         }
       }
@@ -914,7 +923,7 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.8805555555555555,
+          "mean": 0.9190972222222222,
           "median": 1,
           "min": 0,
           "max": 1,
@@ -922,35 +931,35 @@
           "n": 48
         },
         "total_tokens": {
-          "mean": 344133.3541666667,
-          "median": 181784,
-          "min": 42990,
-          "max": 2626391,
-          "p95": 977636,
+          "mean": 170072.83333333334,
+          "median": 93654,
+          "min": 45575,
+          "max": 818416,
+          "p95": 472317,
           "n": 48
         },
         "content_tokens": {
-          "mean": 323671.3541666667,
-          "median": 161322,
-          "min": 22528,
-          "max": 2605929,
-          "p95": 957174,
+          "mean": 149080.83333333334,
+          "median": 72662,
+          "min": 24583,
+          "max": 797424,
+          "p95": 451325,
           "n": 48
         },
         "tool_calls": {
-          "mean": 10.291666666666666,
-          "median": 8,
+          "mean": 3.5208333333333335,
+          "median": 2,
           "min": 1,
-          "max": 82,
-          "p95": 26,
+          "max": 15,
+          "p95": 9,
           "n": 48
         },
         "wall_s": {
-          "mean": 58.19166666666667,
-          "median": 50.25,
-          "min": 8,
-          "max": 247.7,
-          "p95": 143.3,
+          "mean": 23.299999999999997,
+          "median": 15.1,
+          "min": 6.4,
+          "max": 104.8,
+          "p95": 49.8,
           "n": 48
         }
       }
@@ -980,43 +989,43 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9850694444444444,
+          "mean": 0.9604166666666667,
           "median": 1,
-          "min": 0.65,
+          "min": 0,
           "max": 1,
           "p95": 1,
           "n": 48
         },
         "total_tokens": {
-          "mean": 123080.79166666667,
-          "median": 111063,
-          "min": 52185,
-          "max": 381586,
-          "p95": 235493,
+          "mean": 136303.52083333334,
+          "median": 103868.5,
+          "min": 53632,
+          "max": 501048,
+          "p95": 296260,
           "n": 48
         },
         "content_tokens": {
-          "mean": 98596.79166666667,
-          "median": 86579,
-          "min": 27701,
-          "max": 357102,
-          "p95": 211009,
+          "mean": 111289.52083333333,
+          "median": 78854.5,
+          "min": 28618,
+          "max": 476034,
+          "p95": 271246,
           "n": 48
         },
         "tool_calls": {
-          "mean": 4.791666666666667,
+          "mean": 4.729166666666667,
           "median": 4,
           "min": 1,
-          "max": 20,
-          "p95": 10,
+          "max": 16,
+          "p95": 12,
           "n": 48
         },
         "wall_s": {
-          "mean": 20.88333333333333,
-          "median": 18.5,
-          "min": 8.9,
-          "max": 70.4,
-          "p95": 41.6,
+          "mean": 19.66875,
+          "median": 14.45,
+          "min": 7.1,
+          "max": 76.5,
+          "p95": 43.2,
           "n": 48
         }
       }
@@ -1054,19 +1063,19 @@
           "n": 48
         },
         "total_tokens": {
-          "mean": 290753.2083333333,
-          "median": 203489,
-          "min": 101525,
-          "max": 999214,
-          "p95": 890509,
+          "mean": 336834.3125,
+          "median": 222013,
+          "min": 130107,
+          "max": 1151770,
+          "p95": 1146702,
           "n": 48
         },
         "content_tokens": {
-          "mean": 227132.20833333334,
-          "median": 139868,
-          "min": 37904,
-          "max": 935593,
-          "p95": 826888,
+          "mean": 241027.3125,
+          "median": 126206,
+          "min": 34300,
+          "max": 1055963,
+          "p95": 1050895,
           "n": 48
         },
         "tool_calls": {
@@ -1078,11 +1087,11 @@
           "n": 0
         },
         "wall_s": {
-          "mean": 50.53333333333333,
-          "median": 32.15,
-          "min": 17.7,
-          "max": 167.2,
-          "p95": 162,
+          "mean": 50.737500000000004,
+          "median": 34.1,
+          "min": 17.4,
+          "max": 157.9,
+          "p95": 138.6,
           "n": 48
         }
       }
@@ -1091,9 +1100,9 @@
       "arm": "hybrid",
       "agent": "opencode",
       "runs": 48,
-      "ranked": 46,
-      "failed": 2,
-      "hard_fail_rate": 0.041666666666666664,
+      "ranked": 44,
+      "failed": 4,
+      "hard_fail_rate": 0.08333333333333333,
       "provenance": {
         "agents": [
           "opencode"
@@ -1112,28 +1121,28 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9054347826086956,
+          "mean": 0.9609848484848484,
           "median": 1,
-          "min": 0,
+          "min": 0.5,
           "max": 1,
           "p95": 1,
-          "n": 46
+          "n": 44
         },
         "total_tokens": {
-          "mean": 227310.34782608695,
-          "median": 155010,
-          "min": 90284,
-          "max": 885462,
-          "p95": 588349,
-          "n": 46
+          "mean": 188980.56818181818,
+          "median": 156647,
+          "min": 106371,
+          "max": 478322,
+          "p95": 415996,
+          "n": 44
         },
         "content_tokens": {
-          "mean": 193769.34782608695,
-          "median": 121469,
-          "min": 56743,
-          "max": 851921,
-          "p95": 554808,
-          "n": 46
+          "mean": 125592.56818181818,
+          "median": 93259,
+          "min": 42983,
+          "max": 414934,
+          "p95": 352608,
+          "n": 44
         },
         "tool_calls": {
           "mean": null,
@@ -1144,12 +1153,12 @@
           "n": 0
         },
         "wall_s": {
-          "mean": 48.130434782608695,
-          "median": 30.1,
-          "min": 17.3,
-          "max": 200.7,
-          "p95": 131.9,
-          "n": 46
+          "mean": 43.445454545454545,
+          "median": 31.549999999999997,
+          "min": 16.9,
+          "max": 156,
+          "p95": 98.8,
+          "n": 44
         }
       }
     }
@@ -1178,20 +1187,6 @@
   },
   "disagreements": [
     {
-      "id": "A4",
-      "arm": "grep",
-      "checklist": 1,
-      "judge": 0.67,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A4",
-      "arm": "grep",
-      "checklist": 1,
-      "judge": 0.67,
-      "kind": "checklist_higher"
-    },
-    {
       "id": "B2",
       "arm": "grep",
       "checklist": 1,
@@ -1202,7 +1197,35 @@
       "id": "B2",
       "arm": "grep",
       "checklist": 1,
-      "judge": 0,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "grep",
+      "checklist": 0.65,
+      "judge": 1,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "grep",
+      "checklist": 0.8166666666666667,
+      "judge": 0.33,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.667,
       "kind": "checklist_higher"
     },
     {
@@ -1213,108 +1236,59 @@
       "kind": "checklist_higher"
     },
     {
-      "id": "B3",
+      "id": "A1",
       "arm": "grep",
-      "checklist": 0.5,
-      "judge": 0,
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B2",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.5,
       "kind": "checklist_higher"
     },
     {
       "id": "A4",
       "arm": "graphify",
       "checklist": 1,
-      "judge": 0.67,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B2",
-      "arm": "codegraph",
-      "checklist": 1,
-      "judge": 0.5,
+      "judge": 0.33,
       "kind": "checklist_higher"
     },
     {
       "id": "A1",
       "arm": "codegraph",
-      "checklist": 0.65,
-      "judge": 0,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A1",
-      "arm": "codegraph",
-      "checklist": 0.65,
-      "judge": 0,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A1",
-      "arm": "codegraph",
-      "checklist": 0.65,
+      "checklist": 0.5,
       "judge": 0,
       "kind": "checklist_higher"
     },
     {
       "id": "A2",
       "arm": "codegraph",
-      "checklist": 0.5,
+      "checklist": 0.65,
       "judge": 0,
       "kind": "checklist_higher"
     },
     {
       "id": "A4",
       "arm": "codegraph",
-      "checklist": 1,
-      "judge": 0.67,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B2",
-      "arm": "hybrid",
-      "checklist": 1,
-      "judge": 0.5,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B3",
-      "arm": "hybrid",
-      "checklist": 1,
-      "judge": 0.5,
+      "checklist": 0.3333333333333333,
+      "judge": 0,
       "kind": "checklist_higher"
     },
     {
       "id": "A4",
-      "arm": "hybrid",
-      "checklist": 0.8166666666666667,
-      "judge": 0.33,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B2",
-      "arm": "hybrid",
-      "checklist": 1,
-      "judge": 0.5,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B2",
-      "arm": "hybrid",
-      "checklist": 1,
+      "arm": "codegraph",
+      "checklist": 0.3333333333333333,
       "judge": 0,
       "kind": "checklist_higher"
     },
     {
       "id": "B3",
       "arm": "hybrid",
-      "checklist": 0.5,
+      "checklist": 0.65,
       "judge": 0,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A4",
-      "arm": "hybrid",
-      "checklist": 1,
-      "judge": 0.67,
       "kind": "checklist_higher"
     }
   ]

@@ -3,13 +3,13 @@
 # Code-retrieval benchmark: coding-v1
 
 Question set `coding-v1` (16 questions, 3 reps/arm) against 4 arms.
-Repo at `f4f13e86a`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-12T12:40:22.828Z.
+Repo at `d8a9b0647`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-13T00:22:07.714Z.
 
 Continuation budget: **1** turn(s) per answer-file agent (inert for `claude`, whose loop is unbounded). Runs at different budgets are not comparable.
 
 Secondary scorer: `claude-sonnet-5` via `copilot`.
 
-Arms searched a sandboxed worktree of `f4f13e86a` with 31 path(s) removed (answer key, telemetry exports, agent rule files), verified to contain no question prompt or provenance note.
+Arms searched a sandboxed worktree of `d8a9b0647` with 31 path(s) removed (answer key, telemetry exports, agent rule files), verified to contain no question prompt or provenance note.
 
 ## Overall
 
@@ -17,10 +17,10 @@ Arms searched a sandboxed worktree of `f4f13e86a` with 31 path(s) removed (answe
 
 | Arm | ranked | correctness (median) | content tokens (median) | total tokens (median) | tool calls | latency s | hard-fail | hallucination |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
-| grep † | 140/144 | 1.00 | 102752 | 147752 | 4.0 | 30.2 | 3% | 1% |
-| graphify | 48/48 | 1.00 | 131190 | 152850 | 5.0 | 28.1 | 0% | 0% |
-| codegraph | 48/48 | 1.00 | 161322 | 181784 | 8.0 | 50.3 | 0% | 0% |
-| hybrid † | 142/144 | 1.00 | 108014 | 146686 | 4.0 | 26.5 | 1% | 1% |
+| grep † | 140/144 | 1.00 | 88643 | 146214 | 4.0 | 28.4 | 3% | 1% |
+| graphify | 48/48 | 1.00 | 139810 | 161668 | 6.5 | 29.3 | 0% | 2% |
+| codegraph | 48/48 | 1.00 | 72662 | 93654 | 2.0 | 15.1 | 0% | 0% |
+| hybrid † | 140/144 | 1.00 | 93259 | 167883 | 4.0 | 27.5 | 3% | 1% |
 
 **content tokens** = total minus that arm's measured empty-run baseline. Whole-session totals are dominated by a fixed floor of system prompt + tool schemas, which compresses every ratio; content tokens are what separate retrieval strategies.
 
@@ -32,14 +32,14 @@ These are the numbers the run actually produced. The `Overall` table above pools
 
 | Arm | Agent | ranked | correctness | content tokens | total tokens | tool calls | latency s | hard-fail | built-ins | answer via | tokens from |
 |---|---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
-| grep | claude | 48/48 | 1.00 | 77394 | 98616 | 4.0 | 18.1 | 0% | enforced | stream-json | stream-json×48 |
-| grep | copilot | 48/48 | 1.00 | 143346 | 207371 | — | 33.8 | 0% | not_enforced | answer-file | proxy-db-session×48 |
-| grep | opencode | 44/48 | 1.00 | 107170 | 171545 | — | 41.0 | 8% | ungated | answer-file | proxy-db-session×48 |
-| graphify | claude | 48/48 | 1.00 | 131190 | 152850 | 5.0 | 28.1 | 0% | enforced | stream-json | stream-json×48 |
-| codegraph | claude | 48/48 | 1.00 | 161322 | 181784 | 8.0 | 50.3 | 0% | enforced | stream-json | stream-json×48 |
-| hybrid | claude | 48/48 | 1.00 | 86579 | 111063 | 4.0 | 18.5 | 0% | enforced | stream-json | stream-json×48 |
-| hybrid | copilot | 48/48 | 1.00 | 139868 | 203489 | — | 32.1 | 0% | not_enforced | answer-file | proxy-db-session×48 |
-| hybrid | opencode | 46/48 | 1.00 | 121469 | 155010 | — | 30.1 | 4% | ungated | answer-file | proxy-db-session×48 |
+| grep | claude | 48/48 | 1.00 | 69164 | 90584 | 4.0 | 16.3 | 0% | enforced | stream-json | stream-json×48 |
+| grep | copilot | 48/48 | 1.00 | 76521 | 209560 | — | 36.6 | 0% | not_enforced | answer-file | proxy-db-session×48 |
+| grep | opencode | 44/48 | 1.00 | 118417 | 150899 | — | 38.0 | 8% | ungated | answer-file | proxy-db-session×48 |
+| graphify | claude | 48/48 | 1.00 | 139810 | 161668 | 6.5 | 29.3 | 0% | enforced | stream-json | stream-json×48 |
+| codegraph | claude | 48/48 | 1.00 | 72662 | 93654 | 2.0 | 15.1 | 0% | enforced | stream-json | stream-json×48 |
+| hybrid | claude | 48/48 | 1.00 | 78855 | 103869 | 4.0 | 14.4 | 0% | enforced | stream-json | stream-json×48 |
+| hybrid | copilot | 48/48 | 1.00 | 126206 | 222013 | — | 34.1 | 0% | not_enforced | answer-file | proxy-db-session×48 |
+| hybrid | opencode | 44/48 | 1.00 | 93259 | 156647 | — | 31.5 | 8% | ungated | answer-file | proxy-db-session×48 |
 
 `tool calls` is blank for any agent elicited by answer file: only claude's stream-json reports a tool trace, so a dash there means **not measured**, not zero.
 
@@ -48,7 +48,7 @@ These are the numbers the run actually produced. The `Overall` table above pools
 | Class | grep | graphify | codegraph | hybrid | winner |
 |---|--:|--:|--:|--:|---|
 | abstain | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
-| arch | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
+| arch | 1.00 | 1.00 | 0.65 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
 | blast | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
 | lookup | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
 | structural | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
@@ -59,10 +59,10 @@ A winner is declared only at a ≥1.25x median gap with non-overlapping IQR. Any
 
 | Arm | runs | ranked | ungraded | failed | retry rate | hard-fail rate |
 |---|--:|--:|--:|--:|--:|--:|
-| grep † | 144 | 140 | 0 | 4 | 9% | 3% |
+| grep † | 144 | 140 | 0 | 4 | 6% | 3% |
 | graphify | 48 | 48 | 0 | 0 | 0% | 0% |
 | codegraph | 48 | 48 | 0 | 0 | 0% | 0% |
-| hybrid † | 144 | 142 | 0 | 2 | 6% | 1% |
+| hybrid † | 144 | 140 | 0 | 4 | 4% | 3% |
 
 Failed runs are counted, never dropped. An arm that stalls is not cheap — it is unavailable, and averaging only its successes would report the opposite.
 
@@ -87,26 +87,21 @@ Agents in this run: `claude`, `copilot`, `opencode`.
 
 | Question | Arm | checklist | judge | note |
 |---|---|--:|--:|---|
-| A4 | grep | 1.00 | 0.67 | checklist_higher |
-| A4 | grep | 1.00 | 0.67 | checklist_higher |
 | B2 | grep | 1.00 | 0.50 | checklist_higher |
-| B2 | grep | 1.00 | 0.00 | checklist_higher |
+| B2 | grep | 1.00 | 0.50 | checklist_higher |
+| B3 | grep | 0.65 | 1.00 | judge_higher |
+| B3 | grep | 1.00 | 0.50 | checklist_higher |
+| A4 | grep | 0.82 | 0.33 | checklist_higher |
+| A4 | grep | 1.00 | 0.67 | checklist_higher |
 | B3 | grep | 0.50 | 0.00 | checklist_higher |
-| B3 | grep | 0.50 | 0.00 | checklist_higher |
-| A4 | graphify | 1.00 | 0.67 | checklist_higher |
-| B2 | codegraph | 1.00 | 0.50 | checklist_higher |
-| A1 | codegraph | 0.65 | 0.00 | checklist_higher |
-| A1 | codegraph | 0.65 | 0.00 | checklist_higher |
-| A1 | codegraph | 0.65 | 0.00 | checklist_higher |
-| A2 | codegraph | 0.50 | 0.00 | checklist_higher |
-| A4 | codegraph | 1.00 | 0.67 | checklist_higher |
-| B2 | hybrid | 1.00 | 0.50 | checklist_higher |
-| B3 | hybrid | 1.00 | 0.50 | checklist_higher |
-| A4 | hybrid | 0.82 | 0.33 | checklist_higher |
-| B2 | hybrid | 1.00 | 0.50 | checklist_higher |
-| B2 | hybrid | 1.00 | 0.00 | checklist_higher |
-| B3 | hybrid | 0.50 | 0.00 | checklist_higher |
-| A4 | hybrid | 1.00 | 0.67 | checklist_higher |
+| A1 | grep | 1.00 | 0.50 | checklist_higher |
+| B2 | graphify | 1.00 | 0.50 | checklist_higher |
+| A4 | graphify | 1.00 | 0.33 | checklist_higher |
+| A1 | codegraph | 0.50 | 0.00 | checklist_higher |
+| A2 | codegraph | 0.65 | 0.00 | checklist_higher |
+| A4 | codegraph | 0.33 | 0.00 | checklist_higher |
+| A4 | codegraph | 0.33 | 0.00 | checklist_higher |
+| B3 | hybrid | 0.65 | 0.00 | checklist_higher |
 
 `judge_higher` usually means the checklist matcher is too strict (the answer paraphrased a path) — fix the matcher and re-grade offline. `checklist_higher` usually means correct strings were padded into a wrong narrative, which is a real quality signal.
 
