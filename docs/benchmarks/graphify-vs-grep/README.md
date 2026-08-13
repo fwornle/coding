@@ -1,5 +1,30 @@
 # Graphify-vs-Grep Benchmark — Phase 1 Report
 
+> ## Superseded — see [`../coding-v1`](../coding-v1/README.md)
+>
+> This is the **first** retrieval benchmark in this repository (2026-08-05, repo at
+> `20469b25d`). It has been replaced by [**coding-v1**](../coding-v1/README.md), which is
+> larger and, more importantly, measured on a harness that did not exist when this ran:
+>
+> | | this page | `coding-v1` |
+> |---|---|---|
+> | Arms | 2 — `grep`, `graphify` | 4 — adds **CodeGraph** and a **hybrid** arm with every tool |
+> | Questions | 9 × 3 reps = 54 runs | 16 × 3 reps × 3 agents = **384 cells** |
+> | Agents | claude only | claude, copilot, opencode |
+> | Corpus | the working tree | a **de-contaminated worktree** at a pinned commit, with the benchmark's own answer key removed and verified absent |
+> | Known defects | not tracked | **43**, each written up with its cause |
+>
+> **The numbers below are not retracted** — nothing has been found wrong with them, and this
+> page's central result (rough token parity, no 5–70× multiple) is the same conclusion
+> `coding-v1` reaches at larger scale. They are simply narrower, and they were measured
+> before the containment, grading and index defects catalogued on the newer page were known.
+> In particular this run had **no sandbox**: the arms searched a tree that still contained the
+> benchmark's own ground truth, so contamination was possible and was not checked for.
+>
+> Kept as a historical record, and because the defect list on the newer page is partly a
+> record of what was learned after this one.
+
+
 **Repo:** coding @ `20469b25d` (grep and graph saw identical state; graph `built_at == HEAD`).
 **Driver:** `claude -p` headless, model `claude-sonnet-5`, `--strict-mcp-config`.
 **Arms (forced):** `grep` = Glob/Grep/Read only · `graph` = Graphify MCP (:3851) tools + Read, no Grep/Glob.
