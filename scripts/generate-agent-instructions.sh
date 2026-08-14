@@ -97,7 +97,13 @@ emit_skill_list() {
         local desc
         desc=$(extract_description "$cmd_file")
         if [[ -z "$desc" ]]; then
-            desc=$(grep -v '^#\|^---\|^$' "$cmd_file" | head -1)
+            # Use grep's own -m1 (stop after first match) instead of piping to
+            # `head -1`: with `set -o pipefail`, head closing the pipe early
+            # sends grep a SIGPIPE (exit 141), which — combined with `set -e` —
+            # aborts the whole script when this is called as `desc=$(...)`.
+            # The `|| true` covers the other half: a file with no matching line
+            # exits 1, which would abort just as surely.
+            desc=$(grep -m1 -v '^#\|^---\|^$' "$cmd_file" || true)
         fi
         echo "- **${prefix}${name}** (\`.claude/commands/$name.md\`): $desc"
     done

@@ -467,6 +467,94 @@ warning() {
     log "WARNING: $1"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# run_with_timeout <seconds> <command...>
+#
+# WHY THIS EXISTS. `timeout` is GNU coreutils. It is NOT present on a stock
+# macOS, and this installer's own dependency gate treats it as SOFT: the user
+# can decline `brew install coreutils` and the run continues with
+# SKIPPED_SYSTEM_DEPS+=("coreutils"). So every bare `timeout` call site is
+# conditional on a dependency we explicitly allow to be missing.
+#
+# The failure is silent rather than loud, which is what makes it worth a helper.
+# `timeout 5s copilot --version` on a box without coreutils does not report
+# "timeout not found" to the user — it fails, the guard reads that as "copilot
+# did not respond", and the installer skips proxy setup for someone who has
+# copilot installed and working. Same shape at the `git pull` sites: a missing
+# binary is indistinguishable from a network stall.
+#
+# Resolution order: `timeout`, then `gtimeout` (Homebrew's un-prefixed name),
+# then a bash-native watchdog. The identity probe matters on Windows, where
+# `timeout` can resolve to C:\Windows\System32\timeout.exe — a completely
+# different command (`timeout /t N`, pauses for a keypress). Matching on the
+# coreutils banner rejects it rather than handing it arguments it will misread.
+#
+# The probe captures with $( ) instead of piping to `grep -q`: grep closing the
+# pipe early sends SIGPIPE, pipefail turns that into a non-zero pipeline, and we
+# would reject the very GNU timeout we were looking for.
+#
+# Returns 124 on timeout, matching GNU timeout, so call sites can tell "timed
+# out" from "command failed" identically on all three platforms.
+# ─────────────────────────────────────────────────────────────────────────────
+CODING_TIMEOUT_BIN=""
+CODING_TIMEOUT_RESOLVED=false
+
+resolve_timeout_bin() {
+    [[ "$CODING_TIMEOUT_RESOLVED" == "true" ]] && return 0
+    CODING_TIMEOUT_RESOLVED=true
+    local candidate ver
+    for candidate in timeout gtimeout; do
+        command -v "$candidate" >/dev/null 2>&1 || continue
+        ver="$("$candidate" --version 2>/dev/null || true)"
+        case "$ver" in
+            *[Cc]oreutils*) CODING_TIMEOUT_BIN="$candidate"; return 0 ;;
+        esac
+    done
+    CODING_TIMEOUT_BIN=""
+    return 0
+}
+
+run_with_timeout() {
+    local secs="$1"; shift
+    resolve_timeout_bin
+
+    if [[ -n "$CODING_TIMEOUT_BIN" ]]; then
+        "$CODING_TIMEOUT_BIN" "${secs}s" "$@"
+        return $?
+    fi
+
+    # No GNU timeout on this machine. Run the command in the background and let
+    # a watchdog kill it. The watchdog's output goes to /dev/null so it never
+    # holds open the pipe of a `$(run_with_timeout ...)` capture — otherwise the
+    # substitution would block for the full timeout even when the command
+    # finished immediately.
+    "$@" &
+    local cmd_pid=$!
+    (
+        rwt_elapsed=0
+        while [[ "$rwt_elapsed" -lt "$secs" ]]; do
+            kill -0 "$cmd_pid" 2>/dev/null || exit 0
+            sleep 1
+            # `rwt_elapsed=$(( ... + 1 ))`, never `((rwt_elapsed++))`: the latter
+            # evaluates to the PRE-increment value, so at 0 it returns 1, and
+            # under `set -e` bash 5 (Linux) aborts where bash 3.2 (macOS) does
+            # not. That divergence has bitten this repo before.
+            rwt_elapsed=$((rwt_elapsed + 1))
+        done
+        kill -TERM "$cmd_pid" 2>/dev/null || true
+    ) >/dev/null 2>&1 &
+    local dog_pid=$!
+
+    local rc=0
+    wait "$cmd_pid" 2>/dev/null || rc=$?
+    kill -TERM "$dog_pid" 2>/dev/null || true
+    wait "$dog_pid" 2>/dev/null || true
+
+    # 143 = SIGTERM, i.e. the watchdog fired. Report it as GNU timeout would.
+    [[ $rc -eq 143 ]] && rc=124
+    return $rc
+}
+
 # Gate for anything that writes a config file SHARED with the user's own tools
 # (~/.claude, ~/.claude.json, ~/.config/opencode, ~/.opencode, ~/.copilot).
 #
@@ -772,7 +860,10 @@ check_dependencies() {
             echo -e "${YELLOW}Homebrew library version mismatches (e.g., libsimdjson, libuv).${NC}"
             echo ""
             echo -e "${CYAN}Error:${NC}"
-            echo "$node_health_output" | head -5
+            # `|| true`: head -5 closes the pipe once it has its five lines,
+            # echo takes SIGPIPE (141), and under pipefail+errexit that would
+            # abort the installer in the middle of explaining a broken Node.
+            echo "$node_health_output" | head -5 || true
             echo ""
             echo -e "${CYAN}Common causes and fixes:${NC}"
             echo -e "  ${GREEN}1.${NC} Library mismatch after Homebrew update - try: brew upgrade"
@@ -938,7 +1029,7 @@ install_memory_visualizer() {
     if [[ -d "$MEMORY_VISUALIZER_DIR/.git" ]] || [[ -f "$MEMORY_VISUALIZER_DIR/.git" ]]; then
         info "Memory visualizer submodule already exists, updating..."
         cd "$MEMORY_VISUALIZER_DIR"
-        if timeout 10s git pull origin main 2>/dev/null; then
+        if run_with_timeout 10 git pull origin main 2>/dev/null; then
             success "Memory visualizer updated"
         else
             info "Could not update memory-visualizer (may be on specific commit)"
@@ -1010,7 +1101,7 @@ install_semantic_analysis() {
     if [[ -d "$SEMANTIC_ANALYSIS_DIR/.git" ]] || [[ -f "$SEMANTIC_ANALYSIS_DIR/.git" ]]; then
         info "mcp-server-semantic-analysis submodule already exists, updating..."
         cd "$SEMANTIC_ANALYSIS_DIR"
-        if timeout 10s git pull origin main 2>/dev/null; then
+        if run_with_timeout 10 git pull origin main 2>/dev/null; then
             success "mcp-server-semantic-analysis updated"
         else
             info "Could not update mcp-server-semantic-analysis (may be on specific commit)"
@@ -1050,8 +1141,52 @@ install_semantic_analysis() {
             return 1
         fi
 
-        # Install dependencies and build
-        npm install || warning "Failed to install semantic analysis dependencies"
+        # This package.json pins @fwornle/km-core to a PACKED TARBALL
+        # (file:../../lib/km-core/fwornle-km-core-0.1.0.tgz) rather than to the
+        # submodule directory, and that tarball is npm-pack output: gitignored,
+        # never committed, and produced nowhere else in this script. On a fresh
+        # clone it simply does not exist, so `npm install` here fails with an
+        # ENOENT on a path no error message explains. Pack it first.
+        #
+        # ensure_km_core_link() has already built lib/km-core/dist by this point,
+        # which matters: km-core's "files" field ships dist/ and nothing else,
+        # and it declares no prepack script — so packing an unbuilt submodule
+        # yields a tarball with no code in it and the failure moves to runtime.
+        local km_core_dir="$CODING_REPO/lib/km-core"
+        if [[ -f "$km_core_dir/package.json" ]]; then
+            # Derive the expected filename from the pin instead of assuming the
+            # version. npm names the archive after the version in package.json,
+            # so a km-core version bump silently stops satisfying a pin that
+            # still spells 0.1.0 — better to say so than to emit a bare ENOENT.
+            local km_pin km_tgz
+            km_pin="$(node -p "require('./package.json').dependencies['@fwornle/km-core'] || ''" 2>/dev/null || true)"
+            km_tgz="${km_pin##*/}"
+            info "Packing @fwornle/km-core tarball for semantic-analysis..."
+            (cd "$km_core_dir" && npm pack >/dev/null 2>&1) \
+                || warning "Failed to pack @fwornle/km-core tarball"
+            if [[ -n "$km_tgz" && "$km_pin" == file:* && ! -f "$km_core_dir/$km_tgz" ]]; then
+                warning "km-core packed, but not as '$km_tgz' (version drift?)"
+                info "  → produced: $(cd "$km_core_dir" && ls -1 ./*.tgz 2>/dev/null | tr '\n' ' ')"
+                info "  → fix: update the @fwornle/km-core pin in $SEMANTIC_ANALYSIS_DIR/package.json"
+            fi
+        fi
+
+        # Install dependencies and build.
+        #
+        # --legacy-peer-deps: openai declares an optional peer dep on zod@^3.23.8
+        # while this package needs zod@^4.3.6 (required by @modelcontextprotocol/sdk).
+        # openai only arrives optionally via @rapid/llm-proxy, so relaxing peer
+        # resolution is safe here and the alternative is a hard install failure.
+        #
+        # --ignore-scripts: same reason as km-core's install above —
+        # onnxruntime-node's postinstall downloads a GPU binary straight from
+        # github.com using undici, which ignores HTTP(S)_PROXY and so hangs or
+        # fails outright behind a corporate proxy. Verified safe to skip here:
+        # this package has no dependency that needs a postinstall to be usable
+        # (no better-sqlite3, no node-gyp build). The one platform-specific
+        # binary that does matter, fastembed's tokenizer, is installed
+        # explicitly by install_fastembed_native().
+        npm install --legacy-peer-deps --ignore-scripts || warning "Failed to install semantic analysis dependencies"
         npm run build || warning "Failed to build semantic analysis server"
 
         # Make built server executable
@@ -1079,7 +1214,7 @@ install_constraint_monitor() {
     if [[ -d "$constraint_monitor_dir/.git" ]] || [[ -f "$constraint_monitor_dir/.git" ]]; then
         info "mcp-constraint-monitor submodule already exists, updating..."
         cd "$constraint_monitor_dir"
-        if timeout 10s git pull origin main 2>/dev/null; then
+        if run_with_timeout 10 git pull origin main 2>/dev/null; then
             success "mcp-constraint-monitor updated"
         else
             info "Could not update mcp-constraint-monitor (may be on specific commit)"
@@ -1125,6 +1260,24 @@ install_constraint_monitor() {
             info "Dashboard runs on port 3030"
         else
             warning "Dashboard directory not found in constraint monitor"
+        fi
+
+        # better-sqlite3 is a native module: it ships a .node binary compiled
+        # against one specific NODE_MODULE_VERSION. `npm install` above does NOT
+        # rebuild it when the installed copy already satisfies the semver range —
+        # it only rebuilds what it actually (re)installs — so a binary left over
+        # from an earlier Node major survives untouched and fails at RUNTIME with
+        # "was compiled against a different Node.js version". That is not
+        # hypothetical here: d622385a3 settled this project on Node 22 LTS, so
+        # anyone upgrading from an older default hits exactly this. Rebuild
+        # against whatever Node is active right now.
+        #
+        # Non-fatal: on a machine with no toolchain (common on Windows without
+        # Build Tools) the rebuild fails, and a warning is the right outcome —
+        # the prebuilt binary may well be correct already.
+        if [[ -d "node_modules/better-sqlite3" ]]; then
+            npm rebuild better-sqlite3 >/dev/null 2>&1 \
+                || warning "mcp-constraint-monitor: failed to rebuild better-sqlite3 for the active Node version"
         fi
 
         success "MCP Constraint Monitor with Professional Dashboard installed"
@@ -1830,7 +1983,7 @@ initialize_shared_memory() {
         if command -v node >/dev/null 2>&1; then
             cd "$CODING_REPO"
             # Run import and capture output
-            if timeout 60 node bin/graph-sync import 2>&1 | grep -E "^✓|entities|relations" | head -10; then
+            if run_with_timeout 60 node bin/graph-sync import 2>&1 | grep -E "^✓|entities|relations" | head -10; then
                 success "Knowledge imported from JSON exports to GraphDB"
             else
                 warning "Knowledge import encountered issues (non-fatal)"
@@ -2521,11 +2674,17 @@ setup_llm_cli_proxy() {
 
     info "Setting up LLM CLI Proxy (optional)..."
 
-    # Check if claude CLI is available
+    # Check if claude CLI is available.
+    # The `|| true` is load-bearing: if `claude --version` ever emits more than
+    # one line, `head -1` closes the pipe and the writer takes SIGPIPE (exit
+    # 141); with `set -o pipefail` that becomes the substitution's status, and
+    # `set -e` then kills install.sh on this line. Same shape as the copilot
+    # probe below. Bounded too, for the same reason as copilot: a wedged CLI
+    # must not hang an unattended install.
     if command -v claude >/dev/null 2>&1; then
         local claude_version
-        claude_version=$(claude --version 2>/dev/null | head -1)
-        success "  claude CLI found: $claude_version"
+        claude_version=$(run_with_timeout 10 claude --version 2>/dev/null | head -1 || true)
+        success "  claude CLI found: ${claude_version:-unknown version}"
         has_cli=true
     else
         info "  claude CLI not found"
@@ -2544,14 +2703,28 @@ setup_llm_cli_proxy() {
         fi
     fi
 
-    # Check if copilot-cli is available
-    if command -v copilot-cli >/dev/null 2>&1; then
+    # Check if the GitHub Copilot CLI is available. The binary is named
+    # `copilot`, NOT `copilot-cli` — this probe looked for a name that does not
+    # exist, so it reported "not found (optional)" on every machine, including
+    # ones where copilot was installed and working.
+    #
+    # Bounded, because `command -v copilot` can resolve to the VS Code Copilot
+    # Chat extension's shim (~/.config/Code/User/globalStorage/
+    # github.copilot-chat/copilotCli/copilot) rather than the real CLI. That shim
+    # re-launches the `code` binary to answer --version, which can block forever
+    # in a headless or non-interactive shell — so a stray shim on PATH would
+    # otherwise hang the whole install.
+    if command -v copilot >/dev/null 2>&1; then
         local copilot_version
-        copilot_version=$(copilot-cli --version 2>/dev/null | head -1)
-        success "  copilot-cli found: $copilot_version"
-        has_cli=true
+        copilot_version=$(run_with_timeout 5 copilot --version 2>/dev/null | head -1 || true)
+        if [[ -n "$copilot_version" ]]; then
+            success "  copilot CLI found: $copilot_version"
+            has_cli=true
+        else
+            info "  copilot CLI on PATH did not respond within 5s (skipping)"
+        fi
     else
-        info "  copilot-cli not found (optional)"
+        info "  copilot CLI not found (optional)"
     fi
 
     # If no CLI tools available, skip proxy setup
@@ -2573,8 +2746,14 @@ setup_llm_cli_proxy() {
             return 1
         fi
     else
-        warning "  LLM CLI Proxy directory not found at $proxy_dir"
-        return 1
+        # The directory was removed upstream when the proxy was consolidated into
+        # @rapid/llm-proxy 2.0.0. integrations/llm-cli-proxy no longer exists in
+        # this repo, so this branch is now the NORMAL path, not an error — it was
+        # failing the step on every single install. Skip and carry on.
+        info "  Skipping LLM CLI Proxy setup — not vendored here any more"
+        info "  → superseded by @rapid/llm-proxy; nothing to build at $proxy_dir"
+        SKIPPED_SYSTEM_DEPS+=("llm-cli-proxy")
+        return 0
     fi
 
     # Check if already running
@@ -2884,10 +3063,33 @@ ensure_km_core_link() {
 
     # 2. km-core has its own dependencies (graphology, classic-level, fastembed…).
     #    Stripping them breaks semantic-analysis and the vkb-server experiment API.
-    if [[ ! -d "$km_src/node_modules" ]]; then
+    #
+    #    Checking only "does node_modules/ exist" is not enough — it has been
+    #    observed sitting there populated with nothing but stray transitive
+    #    scoped packages (e.g. @napi-rs, @esbuild) while every direct dependency
+    #    (graphology, classic-level, …) is missing, so resolution still fails
+    #    silently. Verify a direct dependency actually resolves instead.
+    if [[ ! -d "$km_src/node_modules" ]] || ! (cd "$km_src" && node -e "require.resolve('graphology')" >/dev/null 2>&1); then
         info "Installing km-core dependencies..."
         (cd "$km_src" && { npm ci --ignore-scripts >/dev/null 2>&1 || npm install --ignore-scripts >/dev/null 2>&1; }) \
             || warning "km-core dependency install had problems"
+    fi
+
+    # 2b. km-core is TypeScript and nothing imports it without a compiled dist/.
+    #     `dist/` is NOT tracked in the submodule (`git ls-files dist` is empty),
+    #     so a fresh clone has none, and neither step 1 nor step 2 produces it:
+    #     package.json declares no `prepare`/`prepack` script, so even `npm pack`
+    #     would happily ship an empty tarball. Step 4 below already anticipated
+    #     this — "check that lib/km-core/dist exists (it may need building)" —
+    #     but only ever reported it. Build it.
+    #
+    #     Must run BEFORE install_semantic_analysis(), which packs this directory
+    #     into the tarball its package.json pins. It does: ensure_km_core_link is
+    #     called from install_node_dependencies, several steps earlier in main().
+    if [[ ! -f "$km_src/dist/index.js" ]]; then
+        info "Building km-core (tsc)..."
+        (cd "$km_src" && npm run build >/dev/null 2>&1) \
+            || warning "km-core build had problems"
     fi
 
     # 3. (Re)create the symlink. Relative target so the repo stays movable.
@@ -3028,7 +3230,7 @@ initialize_knowledge_databases() {
     # Check if Qdrant is available (optional)
     local qdrant_available=false
     info "Checking Qdrant availability (optional for vector search)..."
-    if timeout 3s curl -s http://localhost:6333/health >/dev/null 2>&1; then
+    if run_with_timeout 3 curl -s http://localhost:6333/health >/dev/null 2>&1; then
         qdrant_available=true
         success "✓ Qdrant is running on localhost:6333"
     else
@@ -3336,7 +3538,10 @@ setup_history_repo() {
     local existing=""
 
     if [[ -f "$env_file" ]] && grep -q '^CODING_HISTORY_REPO=' "$env_file"; then
-        existing="$(grep '^CODING_HISTORY_REPO=' "$env_file" | head -1 | cut -d= -f2-)"
+        # grep -m1 rather than `| head -1`: head closing the pipe SIGPIPEs grep
+        # (141), which pipefail+errexit turn into an abort of the whole install
+        # on a .env that happens to carry two CODING_HISTORY_REPO lines.
+        existing="$(grep -m1 '^CODING_HISTORY_REPO=' "$env_file" | cut -d= -f2- || true)"
     fi
 
     local derived live=""
@@ -4527,7 +4732,8 @@ install_constraint_monitor_hooks() {
         echo -e "${YELLOW}version mismatches (e.g., simdjson, libuv).${NC}"
         echo ""
         echo -e "${CYAN}Error output:${NC}"
-        echo "$node_test_output" | head -5
+        # Same SIGPIPE guard as the health-check path above.
+        echo "$node_test_output" | head -5 || true
         echo ""
         echo -e "${CYAN}Common causes and fixes:${NC}"
         echo -e "  ${GREEN}1.${NC} Library mismatch after Homebrew update - try: brew upgrade"
