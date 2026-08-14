@@ -421,10 +421,16 @@ local_cache/
 !.data/kgbench/
 # Both pre-image spellings are in use — `results.pre-<what>.jsonl` and
 # `results.jsonl.pre-<what>`. Matching only one lets ~1M snapshots through on the
-# next naming choice, which is how these got missed the first time.
+# next naming choice, which is how these got missed the first time. A THIRD spelling
+# then appeared anyway (`results.jsonl.bak-rejudge`, `run.json.bak-prefloor`), so the
+# last rule matches the suffix rather than the stem: any pre-image, any file, any
+# label. r8 alone had 3.2M of these. They are snapshots taken before a regrade, a
+# floor change or a rescope; the live file is the end state and regrade.json records
+# what changed and why.
 .data/kgbench/runs/*/results.jsonl
 .data/kgbench/runs/*/results.pre-*.jsonl
 .data/kgbench/runs/*/results.jsonl.pre-*
+.data/kgbench/runs/*/*.bak-*
 .data/kgbench/runs/*/supervise.status
 # Per-run worktrees. A full checkout (~280MB) plus a ~120MB code-graph index, both
 # transient and both reconstructible from the commit recorded in run.json. They live

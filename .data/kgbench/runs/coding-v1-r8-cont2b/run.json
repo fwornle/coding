@@ -1,0 +1,118 @@
+{
+  "runId": "coding-v1-r8-cont2b",
+  "set": "coding-v1",
+  "reps": 3,
+  "commit": "d2475d122",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    }
+  ],
+  "agents": [
+    "opencode"
+  ],
+  "models": [
+    null
+  ],
+  "continuationBudget": 2,
+  "combinations": [
+    {
+      "arm": "grep",
+      "agent": "opencode",
+      "model": "rapid-proxy/claude-sonnet-5",
+      "elicitation": "answer-file",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "ungated",
+        "gateable": false,
+        "verified_by": "nothing — no tool allowlist to enforce with, and no tool trace to audit"
+      }
+    }
+  ],
+  "questions": [
+    "L1",
+    "L2",
+    "L3",
+    "S1",
+    "S2",
+    "S3",
+    "B1",
+    "B2",
+    "B3",
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "T1",
+    "T3",
+    "T4"
+  ],
+  "sandbox": {
+    "mode": "worktree",
+    "tree_commit": "d2475d12266313fc93205fab2562c7be99ee1ba4",
+    "excluded": [
+      "config/kgbench/questions",
+      "lib/kgbench/graders.mjs",
+      "lib/kgbench/sandbox.mjs",
+      "lib/kgbench/agents.mjs",
+      "lib/kgbench/judge.mjs",
+      "scripts/kgbench-regrade.mjs",
+      "scripts/kgbench-supervise.sh",
+      "tests/integration/kgbench-agents.test.js",
+      "tests/integration/kgbench-continuation.test.js",
+      "tests/integration/kgbench-dashboard-control.test.js",
+      "tests/integration/kgbench-graders.test.js",
+      "tests/integration/kgbench-publish-guard.test.js",
+      "tests/integration/kgbench-report-provenance.test.js",
+      "tests/integration/kgbench-sandbox.test.js",
+      "tests/integration/kgbench-tokens.test.js",
+      "tests/integration/kgbench-tool-arg-errors.test.js",
+      "tests/integration/kgbench-tool-enforcement.test.js",
+      "docs/measurement/kgbench-experimental-design.md",
+      "docs/measurement/kgbench-guide.md",
+      "docs/measurement/kgbench-tutorial.md",
+      "docs/measurement/kgbench.md",
+      "docs-content/measurement/kgbench-experimental-design.md",
+      "docs-content/measurement/kgbench-guide.md",
+      "docs-content/measurement/kgbench-tutorial.md",
+      "docs-content/measurement/kgbench.md",
+      "docs/benchmarks/coding-v1",
+      ".data",
+      ".specstory",
+      "CLAUDE.md",
+      ".claude",
+      ".github/copilot-instructions.md"
+    ],
+    "verified": true
+  },
+  "baselines": {
+    "grep|opencode|rapid-proxy/claude-sonnet-5": 65096
+  },
+  "baselineSource": {
+    "grep|opencode|rapid-proxy/claude-sonnet-5": "proxy-db-session"
+  },
+  "schemaTax": {
+    "grep|opencode|rapid-proxy/claude-sonnet-5": 0
+  },
+  "judge": {
+    "requested": {
+      "provider": "copilot",
+      "model": "claude-sonnet-5"
+    },
+    "served": {
+      "model": "claude-sonnet-5",
+      "provider": "copilot"
+    },
+    "enabled": true
+  },
+  "startedAt": "2026-08-11T04:51:13.155Z"
+}
