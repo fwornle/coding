@@ -126,6 +126,16 @@ ensure_coding_runtime_ignored() {
     "*.log"
     ".specstory/validation-report.json"
     ".specstory/change-log.json"
+    # Session transcripts. Ignored unconditionally, NOT only once
+    # ensure_private_history_repo has bootstrapped the nested private repo.
+    # That bootstrap is skipped whenever the project is not yet a git repo,
+    # the user declined, or gh is unavailable — and without this line a single
+    # `git add -A` in any of those states sweeps verbatim chat logs into the
+    # outer repo. Observed on a project that was git-init'd after the session
+    # had already started, so the launch-time offer had nothing to act on.
+    # Ignoring the path does not impede the private nested checkout: git
+    # treats a directory containing .git as a separate repo regardless.
+    ".specstory/history/"
   )
 
   local added=false
@@ -183,17 +193,22 @@ ensure_private_history_repo() {
   # 3a. Refuse to migrate if outer repo already tracks files under .specstory/history/
   # Adding it to .gitignore would NOT untrack existing files — that needs a deliberate
   # `git rm --cached` by the user. Print the recipe and skip.
+  #
+  # Deliberately does NOT write $skipped_marker. This condition means transcripts
+  # are already committed to the outer repo — the state most worth fixing, and one
+  # the user can fix in a minute with the script below. Marking it "skipped" (as
+  # this branch once did) silenced the warning permanently on exactly the repos
+  # that were leaking, so the leak stayed invisible. The marker is reserved for a
+  # deliberate "no thanks" at the prompt in step 5.
   local tracked_history_count
   tracked_history_count=$(git -C "$project_dir" ls-files .specstory/history 2>/dev/null | wc -l | tr -d ' ')
   if [ "${tracked_history_count:-0}" -gt 0 ]; then
     log "⚠️  Outer repo already tracks $tracked_history_count file(s) under .specstory/history/"
+    log "    Session transcripts are committed to this project's git history."
     log "    Refusing to bootstrap a private history repo over tracked files."
-    log "    To migrate manually:"
-    log "      cd $project_dir"
-    log "      git rm -r --cached .specstory/history/"
-    log "      git commit -m 'chore: stop tracking .specstory/history (moving to private repo)'"
-    log "    Then re-run coding/bin/coding to bootstrap the private repo."
-    touch "$skipped_marker"
+    log "    To migrate (untrack, bootstrap the private repo, optionally purge past commits):"
+    log "      $_AGENT_COMMON_DIR/migrate-history-to-private.sh $project_dir"
+    log "    Add --purge to also remove them from every past commit (rewrites history)."
     return 0
   fi
 
