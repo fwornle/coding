@@ -1,0 +1,130 @@
+{
+  "runId": "coding-v1-abdesc-actionable",
+  "set": "coding-v1",
+  "reps": 3,
+  "commit": "b2a557797",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "hybrid",
+      "label": "All tools, agent chooses",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": null
+    }
+  ],
+  "agents": [
+    "claude"
+  ],
+  "models": [
+    null
+  ],
+  "continuationBudget": 1,
+  "combinations": [
+    {
+      "arm": "hybrid",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    }
+  ],
+  "questions": [
+    "L1",
+    "L2",
+    "L3",
+    "S1",
+    "S2",
+    "S3",
+    "B1",
+    "B2",
+    "B3",
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "T1",
+    "T3",
+    "T4"
+  ],
+  "sandbox": {
+    "mode": "worktree",
+    "tree_commit": "d8a9b06472b1a08c00d03db2be14cb2278b4bb30",
+    "excluded": [
+      "config/kgbench/questions",
+      "lib/kgbench/graders.mjs",
+      "lib/kgbench/sandbox.mjs",
+      "lib/kgbench/agents.mjs",
+      "lib/kgbench/judge.mjs",
+      "scripts/kgbench-regrade.mjs",
+      "scripts/kgbench-supervise.sh",
+      "tests/integration/kgbench-agents.test.js",
+      "tests/integration/kgbench-continuation.test.js",
+      "tests/integration/kgbench-dashboard-control.test.js",
+      "tests/integration/kgbench-graders.test.js",
+      "tests/integration/kgbench-publish-guard.test.js",
+      "tests/integration/kgbench-report-provenance.test.js",
+      "tests/integration/kgbench-sandbox.test.js",
+      "tests/integration/kgbench-tokens.test.js",
+      "tests/integration/kgbench-tool-arg-errors.test.js",
+      "tests/integration/kgbench-tool-enforcement.test.js",
+      "docs/measurement/kgbench-experimental-design.md",
+      "docs/measurement/kgbench-guide.md",
+      "docs/measurement/kgbench-tutorial.md",
+      "docs/measurement/kgbench.md",
+      "docs-content/measurement/kgbench-experimental-design.md",
+      "docs-content/measurement/kgbench-guide.md",
+      "docs-content/measurement/kgbench-tutorial.md",
+      "docs-content/measurement/kgbench.md",
+      "docs/benchmarks/coding-v1",
+      ".data",
+      ".specstory",
+      "CLAUDE.md",
+      ".claude",
+      ".github/copilot-instructions.md"
+    ],
+    "verified": true,
+    "code_graph_index": {
+      "backend": "codegraph",
+      "project": "/tmp/kgbench-index-coding-v1-abdesc-actionable",
+      "tree_commit": "d8a9b06472b1a08c00d03db2be14cb2278b4bb30",
+      "covers_run_tree": true,
+      "file_count": 962,
+      "node_count": 14610
+    },
+    "pinned_via_flag": true
+  },
+  "baselines": {
+    "hybrid|claude|claude-sonnet-5": 25608
+  },
+  "baselineSource": {
+    "hybrid|claude|claude-sonnet-5": "stream-json"
+  },
+  "schemaTax": {
+    "hybrid|claude|claude-sonnet-5": null
+  },
+  "judge": {
+    "requested": {
+      "provider": "copilot",
+      "model": "claude-sonnet-5"
+    },
+    "served": null,
+    "enabled": false
+  },
+  "startedAt": "2026-08-15T10:47:47.433Z"
+}

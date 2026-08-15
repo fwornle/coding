@@ -25,7 +25,7 @@ import { execFileSync } from 'node:child_process';
 import { createLogger } from '../../lib/logging/Logger.js';
 import {
   REPO_ROOT, loadRun, byQuestion, determinism, toolHistogram, cellUsedGraph, isGraphTool,
-  fisherExact, mcnemarExact, median, mean, POOLED_RUNS, CURRENT_RUN,
+  fisherExact, mcnemarExact, median, mean, POOLED_RUNS, CURRENT_RUN, ALL_HYBRID_RUNS,
 } from './tool-selection-lib.mjs';
 
 const logger = createLogger('kgbench-analysis', { timestamp: false });
@@ -183,7 +183,7 @@ w();
 w('| run / question | graph reps, mean tokens | grep reps, mean tokens | ratio | graph score | grep score |');
 w('|---|--:|--:|--:|--:|--:|');
 const ratios = []; const deltas = []; const scoreDeltas = [];
-for (const run of ALL_RUNS) {
+for (const run of ALL_HYBRID_RUNS) {
   const rows = loadRun(run, { arm: 'hybrid', agent: 'claude' });
   const groups = new Map();
   for (const r of rows) {
@@ -204,13 +204,36 @@ for (const run of ALL_RUNS) {
   }
 }
 w();
-w(`Paired comparisons available: **${ratios.length}**. `
-  + `Mean token ratio graph : grep = **${mean(ratios).toFixed(2)}×**. `
-  + `Mean latency delta ${mean(deltas) >= 0 ? '+' : ''}${mean(deltas).toFixed(1)}s. `
-  + `Mean score delta ${mean(scoreDeltas).toFixed(3)}.`);
+const nPairs = ratios.length;
+const mRatio = mean(ratios);
+const sdRatio = Math.sqrt(ratios.reduce((s2, x) => s2 + (x - mRatio) ** 2, 0) / (nPairs - 1));
+const seRatio = sdRatio / Math.sqrt(nPairs);
+const cheaper = ratios.filter((x) => x < 1).length;
+const lfac = (k) => { let t = 0; for (let i = 2; i <= k; i += 1) t += Math.log(i); return t; };
+const lch = (aa, bb) => lfac(aa) - lfac(bb) - lfac(aa - bb);
+let tail = 0;
+for (let k = Math.max(cheaper, nPairs - cheaper); k <= nPairs; k += 1) tail += Math.exp(lch(nPairs, k)) * 0.5 ** nPairs;
+w(`Paired comparisons available: **${nPairs}**.`);
 w();
-w('n is small and this is a caution rather than a finding — but it inverts the sign of the');
-w('cross-cell table above, so the within-hybrid cost inference should be retired.');
+w('| statistic | value |');
+w('|---|--:|');
+w(`| mean token ratio graph : grep | **${mRatio.toFixed(3)}×** |`);
+w(`| 95% CI | **[${(mRatio - 1.96 * seRatio).toFixed(3)}, ${(mRatio + 1.96 * seRatio).toFixed(3)}]** |`);
+w(`| graph cheaper in | ${cheaper}/${nPairs} pairs |`);
+w(`| sign test, two-sided | p = ${Math.min(1, 2 * tail).toFixed(3)} |`);
+w(`| mean score delta | ${mean(scoreDeltas).toFixed(3)} |`);
+w();
+w('**The interval spans 1.0 and the sign test is nowhere near significance.** Controlling for');
+w('the question, the token difference between reaching for a graph and not reaching for one is');
+w('indistinguishable from zero — the graph is neither reliably cheaper nor reliably dearer.');
+w('That is the honest reading, and it supersedes an earlier n=8 pass of this same comparison');
+w('which gave 0.81× and was written up as a reversal. Three more pairs moved the mean to');
+w(`${mRatio.toFixed(2)}× and widened the interval across 1.0; a mean of eight ratios quoted`);
+w('without dispersion read as a result it never was.');
+w();
+w('What survives is the negative half: the cross-cell table above is confounded by question');
+w('difficulty and cannot support the claim that using a graph costs 2.29× more. That inference');
+w('is retired. It is NOT replaced by the opposite one.');
 w();
 
 // ── 7. question shape ────────────────────────────────────────────────────────

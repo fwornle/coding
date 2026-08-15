@@ -116,4 +116,15 @@ export const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.leng
 
 /** The four runs whose hybrid tool surface the README treats as poolable, newest last. */
 export const POOLED_RUNS = ['coding-v1-r6', 'coding-v1-r7', 'coding-v1-x2', 'coding-v1-r8'];
+
+/**
+ * Every run with a hybrid/claude arm, for the WITHIN-QUESTION paired cost comparison only.
+ * Poolability there is weaker than for POOLED_RUNS — the tool surface differs across these —
+ * but the comparison is between reps of ONE question inside ONE run, so a surface that varies
+ * between runs does not contaminate a pair. More pairs is the whole difficulty: there are 11.
+ */
+export const ALL_HYBRID_RUNS = [
+  'coding-v1-r6', 'coding-v1-r7', 'coding-v1-x2', 'coding-v1-r8', 'coding-v1-r9',
+  'coding-v1-abdesc-actionable',
+];
 export const CURRENT_RUN = 'coding-v1-r9';

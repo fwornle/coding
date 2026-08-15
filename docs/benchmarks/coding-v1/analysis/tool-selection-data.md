@@ -121,11 +121,31 @@ same-run, same-question pairs where some reps used a graph and some did not.
 | `coding-v1-r8` / B2 | 93101 | 140677 | 0.66× | 1.00 | 1.00 |
 | `coding-v1-r9` / A1 | 34589 | 82153 | 0.42× | 0.65 | 1.00 |
 | `coding-v1-r9` / L2 | 71148 | 79461 | 0.90× | 1.00 | 1.00 |
+| `coding-v1-abdesc-actionable` / A1 | 172420 | 86227 | 2.00× | 1.00 | 1.00 |
+| `coding-v1-abdesc-actionable` / A2 | 148157 | 170776 | 0.87× | 1.00 | 1.00 |
+| `coding-v1-abdesc-actionable` / T3 | 61099 | 63485 | 0.96× | 1.00 | 1.00 |
 
-Paired comparisons available: **8**. Mean token ratio graph : grep = **0.81×**. Mean latency delta +0.9s. Mean score delta -0.028.
+Paired comparisons available: **11**.
 
-n is small and this is a caution rather than a finding — but it inverts the sign of the
-cross-cell table above, so the within-hybrid cost inference should be retired.
+| statistic | value |
+|---|--:|
+| mean token ratio graph : grep | **0.935×** |
+| 95% CI | **[0.685, 1.186]** |
+| graph cheaper in | 7/11 pairs |
+| sign test, two-sided | p = 0.549 |
+| mean score delta | -0.021 |
+
+**The interval spans 1.0 and the sign test is nowhere near significance.** Controlling for
+the question, the token difference between reaching for a graph and not reaching for one is
+indistinguishable from zero — the graph is neither reliably cheaper nor reliably dearer.
+That is the honest reading, and it supersedes an earlier n=8 pass of this same comparison
+which gave 0.81× and was written up as a reversal. Three more pairs moved the mean to
+0.94× and widened the interval across 1.0; a mean of eight ratios quoted
+without dispersion read as a result it never was.
+
+What survives is the negative half: the cross-cell table above is confounded by question
+difficulty and cannot support the claim that using a graph costs 2.29× more. That inference
+is retired. It is NOT replaced by the opposite one.
 
 ## 7. Are the questions keyword-addressable?
 
@@ -136,22 +156,22 @@ claim being tested is reachability, not ranking.
 
 | question | token from the prompt | files hit | ground truth reachable |
 |---|---|--:|---|
-| L1 | `MANAGED_MCP_KEYS` | 15 | **yes** |
-| L2 | `summaryStats` | 17 | **yes** |
-| L3 | `system-health` | 229 | **yes** |
-| S1 | `config/code-graph.json` | 27 | **yes** |
-| S2 | `supervisord` | 74 | **yes** |
-| S3 | `transport` | 161 | **yes** |
-| B1 | `mcp.tools` | 11 | **yes** |
-| B2 | `12435` | 255 | **yes** |
-| B3 | `.codegraph` | 21 | **yes** |
-| A1 | `.observations` | 237 | **yes** |
-| A2 | `content tokens` | 28 | **yes** |
-| A3 | `code-graph.json` | 30 | **yes** |
-| A4 | `CodeGraph` | 247 | **yes** |
-| T1 | `Memgraph` | 104 | no |
-| T3 | `payment reconciliation` | 10 | — (abstain: nothing to find) |
-| T4 | `CODEGRAPH_MAX_DEPTH` | 12 | — (abstain: nothing to find) |
+| L1 | `MANAGED_MCP_KEYS` | 18 | **yes** |
+| L2 | `summaryStats` | 20 | **yes** |
+| L3 | `system-health` | 231 | **yes** |
+| S1 | `config/code-graph.json` | 30 | **yes** |
+| S2 | `supervisord` | 77 | **yes** |
+| S3 | `transport` | 164 | **yes** |
+| B1 | `mcp.tools` | 13 | **yes** |
+| B2 | `12435` | 258 | **yes** |
+| B3 | `.codegraph` | 24 | **yes** |
+| A1 | `.observations` | 240 | **yes** |
+| A2 | `content tokens` | 33 | **yes** |
+| A3 | `code-graph.json` | 33 | **yes** |
+| A4 | `CodeGraph` | 252 | **yes** |
+| T1 | `Memgraph` | 107 | no |
+| T3 | `payment reconciliation` | 12 | — (abstain: nothing to find) |
+| T4 | `CODEGRAPH_MAX_DEPTH` | 15 | — (abstain: nothing to find) |
 
 **13 of 14** gradeable non-abstain questions have their ground truth in
 the hit set of a single literal grep of a token the question hands the agent. This is a
