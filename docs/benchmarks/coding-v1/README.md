@@ -72,8 +72,15 @@ graph that did not work.
 **This is the one result on the page that a replicate makes stronger rather than weaker.**
 Pooled over the four runs whose `hybrid` arm offers a byte-identical tool surface — `r6`, `r7`,
 `x2`, `r8`, 248 claude cells and 1,084 executed tool calls — **17 calls reach a graph tool:
-1.57%, 95% CI [0.8%, 2.3%]**. No run is an outlier; every one is consistent with a single
-underlying rate. See [what the agent picks](#what-the-agent-picks-when-nothing-is-withheld).
+1.57%, 95% CI [0.1%, 3.0%]** once the interval is clustered on the question rather than
+computed over calls. No run is an outlier.
+
+But **a single rate is the wrong summary**, and that is the sharper version of this finding:
+of the 16 questions, **4 ever elicit a graph call in any of the four runs and 12 never do in
+any of them**. The agent is not sampling a strategy at a low rate — it applies a
+near-deterministic policy that happens to select the graph for a small, stable set of
+questions. See [what the agent picks](#what-the-agent-picks-when-nothing-is-withheld) and, for
+why the interval moved, [`tool-selection.md`](tool-selection.md).
 
 The hypothesis the set was designed to test — that a graph index answers *"that isn't here"*
 better than grep — **did not reproduce**. All four arms abstained correctly on every trap.
@@ -515,10 +522,27 @@ in `r6`, `r7`, `x2` and `r8`, which makes those four runs poolable:
 | `r8` | 48 | 230 | 6 | 1 | 5 | 6/48 |
 | **pooled** | **248** | **1,084** | **17** | **3** | **14** | **17/248** |
 
-**1.57% of tool calls, 95% CI [0.8%, 2.3%]. 6.9% of cells, CI [3.7%, 10.0%].** Under a single
-rate of 1.57% the expected counts are 5.0 / 4.8 / 3.5 / 3.6 against observed 3 / 5 / 3 / 6 —
-every run within Poisson noise, no outlier (smallest tail p = 0.16, `r8`). Four runs, four
-trees, two answer keys, and the agent's appetite for the index does not move.
+**1.57% of tool calls, 95% CI [0.1%, 3.0%].** Under a single rate of 1.57% the expected counts
+are 5.0 / 4.8 / 3.5 / 3.6 against observed 3 / 5 / 3 / 6 — every run within Poisson noise, no
+outlier (smallest tail p = 0.16, `r8`). Four runs, four trees, two answer keys, and the agent's
+appetite for the index does not move.
+
+> **That interval is the cluster-robust one, and it is 4.0× wider than what this section
+> published for four runs.** The figure used to read *95% CI [0.8%, 2.3%]*, which is the naive
+> binomial interval over 1,084 calls — and it treats those calls as 1,084 independent draws.
+> They are not. They come from 16 questions asked three times each, and the reps of one
+> question agree with each other almost perfectly: in every run, 14 to 16 of the 16 questions
+> have all three reps making the same choice. Clustering on the question — the unit that
+> actually varies — the interval is **[0.1%, 3.0%]**. The point estimate does not move; the
+> precision claimed for it was never earned. The same correction applies to the per-cell
+> figure, which is why it is no longer quoted.
+
+**A better statement of the same data: of the 16 questions, 4 ever elicit a graph call in any
+of the four runs, and 12 never do in any of them.** The four are A1 (1 run of 4), A4 (3), B1 (3)
+and B2 (1). "1.57% of calls" averages a bimodal population and describes no member of it — the
+agent is not sampling a strategy at a low rate, it is applying a near-deterministic policy that
+happens to select the graph for a small, stable set of questions. See
+[`tool-selection.md`](tool-selection.md).
 
 Graphify specifically accounts for **3 of the 17** and is untouched entirely in two of the four
 runs. Its count moving 0 → 2 → 0 → 1 between runs is not a trend; at these numbers each step is
