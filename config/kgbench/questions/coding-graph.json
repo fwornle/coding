@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "set": "coding-graph",
+  "_comment": [
+    "QUESTIONS A CODE GRAPH COULD WIN. A SUPPLEMENT TO coding-v1, NOT A REPLACEMENT.",
+    "",
+    "coding-v1 returned a null result on correctness across five runs, and the investigation",
+    "in docs/benchmarks/coding-v1/tool-selection.md found part of the reason in the question",
+    "set itself: 13 of its 14 gradeable non-abstain questions have their ground truth in the",
+    "hit set of a SINGLE literal grep of a token the prompt hands over. That set measures",
+    "keyword-addressable retrieval, and grep is the optimal instrument for keyword-addressable",
+    "retrieval. It cannot detect a graph advantage even if one exists.",
+    "",
+    "This set is the missing arm of that argument. Every question here is chosen so that the",
+    "textual signal is either ABSENT or ACTIVELY MISLEADING, and the answer depends on edges",
+    "rather than strings — the cases a resolved index can answer and a regex provably cannot:",
+    "a symbol whose dependents never mention its name, a name that collides with an unrelated",
+    "local, a chain of calls whose intermediate hops share no substring with either endpoint.",
+    "",
+    "WHY A SEPARATE FILE. There is no set-hash anywhere in the harness, so adding questions to",
+    "coding-v1.json would silently change what `coding-v1` means and make r5 through r9",
+    "incomparable to everything after — a per-question table would gain rows with no run",
+    "behind them, and the pooled figures would mix two different instruments. A new set keeps",
+    "the replication intact and lets this one be reported on its own terms.",
+    "",
+    "READ THE RESULT WITH THE OBVIOUS CAVEAT. A set built to favour an index will favour an",
+    "index; it demonstrates that a difference EXISTS and bounds its size on questions of this",
+    "shape. It says nothing about how often questions of this shape get asked, which is the",
+    "thing coding-v1 measures and the reason both sets have to be read together."
+  ],
+  "questions": [
+    {
+      "id": "G1",
+      "cls": "structural",
+      "label": "isMainModule — dependents that never name it",
+      "prompt": "The helper `isMainModule` in `lib/utils/esm-cli.js` is referenced by name in only a couple of places in this repository, yet changing what it returns would affect dozens of CLI scripts. Explain the mechanism: name the function that mediates that dependency, state roughly how many files depend on the mediator, and explain why searching the text for `isMainModule` both understates the real dependents and turns up at least one match that is not one. Answer in 3-5 sentences.",
+      "checklist": [
+        {
+          "id": "f1",
+          "must": true,
+          "desc": "names runIfMain as the mediator",
+          "match": { "type": "symbol", "value": "runIfMain" }
+        },
+        {
+          "id": "f2",
+          "must": true,
+          "desc": "gives the scale of the mediator's dependents (~31 files)",
+          "match": { "type": "regex", "value": "\\b(2[5-9]|3[0-9])\\b|dozens|thirty" }
+        },
+        {
+          "id": "f3",
+          "must": true,
+          "desc": "identifies the false positive: an unrelated local of the same name in scripts/process-state-manager.js",
+          "match": { "type": "path", "value": "scripts/process-state-manager.js" }
+        },
+        {
+          "id": "f4",
+          "must": true,
+          "desc": "states that the real dependents never mention isMainModule (they import runIfMain), which is why text search undercounts",
+          "match": {
+            "type": "near",
+            "value": [
+              "import|call|use|depend",
+              "runIfMain"
+            ],
+            "within": 160
+          }
+        }
+      ],
+      "provenance": {
+        "verified_by": "human",
+        "note": "isMainModule has exactly two textual references in its own file (definition at L19, call at L38). scripts/process-state-manager.js:877 declares an UNRELATED local const of the same name computed inline, which any text search returns as a third hit. The 31 files that actually depend on the helper import runIfMain and never write the string isMainModule. Precision and recall failure of text search in one question, and both are resolved by an edge.",
+        "evidence": [
+          "lib/utils/esm-cli.js:19",
+          "lib/utils/esm-cli.js:37",
+          "scripts/process-state-manager.js:877"
+        ]
+      }
+    },
+    {
+      "id": "G2",
+      "cls": "blast",
+      "label": "Logger — the funnel every level passes through",
+      "prompt": "Every log line this repository writes to a terminal passes through one private method of the Logger class in `lib/logging/Logger.js`. Name that method, name the single method it is called from, list the public logging methods that reach it, and say roughly how many files would be affected if its output format changed. Answer in 3-5 sentences.",
+      "checklist": [
+        {
+          "id": "f1",
+          "must": true,
+          "desc": "names _writeToConsole",
+          "match": { "type": "symbol", "value": "_writeToConsole" }
+        },
+        {
+          "id": "f2",
+          "must": true,
+          "desc": "names _log as its only caller",
+          "match": { "type": "symbol", "value": "_log" }
+        },
+        {
+          "id": "f3",
+          "must": true,
+          "desc": "lists the public level methods that funnel into it",
+          "match": { "type": "regex", "value": "error[\\s\\S]{0,120}warn[\\s\\S]{0,120}info" }
+        },
+        {
+          "id": "f4",
+          "must": true,
+          "desc": "gives the scale of affected files (~33 importers of the module)",
+          "match": { "type": "regex", "value": "\\b(2[5-9]|3[0-9]|4[0-5])\\b|dozens|thirty" }
+        }
+      ],
+      "provenance": {
+        "verified_by": "human",
+        "note": "_writeToConsole is defined at L191 and called from exactly one place, _log at L166. error/warn/info/debug/trace (L266-L284) all delegate to _log, as do time() and the express middleware. 33 own-code files import the module. No file outside Logger.js mentions _writeToConsole, so the blast radius is invisible to text search from any dependent's side.",
+        "evidence": [
+          "lib/logging/Logger.js:191",
+          "lib/logging/Logger.js:166",
+          "lib/logging/Logger.js:266",
+          "lib/logging/Logger.js:393"
+        ]
+      }
+    },
+    {
+      "id": "G3",
+      "cls": "structural",
+      "label": "arms → tool list — the chain with no shared substring",
+      "prompt": "In `config/kgbench/arms.json` the `hybrid` arm lists a token rather than concrete tool names. Trace what turns that token into the tool list a claude cell is actually launched with: name each function involved and the file it lives in, in call order, ending at the flag the agent process receives. Answer in 3-5 sentences.",
+      "checklist": [
+        {
+          "id": "f1",
+          "must": true,
+          "desc": "resolveArm in lib/kgbench/arms.mjs expands the token",
+          "match": { "type": "symbol", "value": "resolveArm" }
+        },
+        {
+          "id": "f2",
+          "must": true,
+          "desc": "allowedToolsFor in lib/code-graph/registry.mjs supplies each backend's tools",
+          "match": { "type": "symbol", "value": "allowedToolsFor" }
+        },
+        {
+          "id": "f3",
+          "must": true,
+          "desc": "the result reaches the agent as --allowedTools",
+          "match": { "type": "regex", "value": "--allowedTools|allowedTools" }
+        },
+        {
+          "id": "f4",
+          "must": false,
+          "desc": "notes the claude adapter in lib/kgbench/agents.mjs builds the argv",
+          "match": { "type": "any-of", "value": ["agents.mjs", "argv", "adapter"] }
+        }
+      ],
+      "provenance": {
+        "verified_by": "human",
+        "note": "$allBackendTools -> resolveArm (arms.mjs) -> listEnabled + allowedToolsFor (registry.mjs) -> arm.allowedTools -> the claude adapter's argv() in agents.mjs -> --allowedTools. The intermediate hops share no substring with the token, so grepping $allBackendTools finds the expansion site and stops; the rest is edges.",
+        "evidence": [
+          "lib/kgbench/arms.mjs:73",
+          "lib/code-graph/registry.mjs:1",
+          "lib/kgbench/agents.mjs:122",
+          "config/kgbench/arms.json:1"
+        ]
+      }
+    }
+  ]
+}

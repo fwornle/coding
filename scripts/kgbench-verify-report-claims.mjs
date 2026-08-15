@@ -63,6 +63,18 @@ const claims = (label, needle) => {
   process.stdout.write(`  ${good ? 'PASS' : 'FAIL'}  ${label.padEnd(58)} "${needle.slice(0, 44)}"\n`);
   good ? pass++ : fail++;
 };
+/**
+ * A retracted figure may appear AT MOST `max` times — which is how a retraction is written:
+ * the old number is quoted once, inside the paragraph withdrawing it. Plain absence is the
+ * wrong test (it fails the retraction itself); a positive check on the replacement is too
+ * weak (it passes while both numbers sit in the file, one of them looking more confident).
+ */
+const claimsAtMost = (label, needle, max) => {
+  const n = md.split(needle).length - 1;
+  const good = n <= max;
+  process.stdout.write(`  ${good ? 'PASS' : 'FAIL'}  ${label.padEnd(58)} <=${max}x, found ${n}x  "${needle.slice(0, 30)}"\n`);
+  good ? pass++ : fail++;
+};
 
 process.stdout.write('\n== header ==\n');
 check('total cells', rows.length, 384);
@@ -122,6 +134,13 @@ const POOL_RUNS = ['coding-v1-r6', 'coding-v1-r7', 'coding-v1-x2', 'coding-v1-r8
 const HYBRID_SURFACE = ['Glob', 'Grep', 'Read', 'mcp__graphify__query_graph', 'mcp__graphify__get_node',
   'mcp__graphify__get_neighbors', 'mcp__graphify__shortest_path', 'mcp__graphify__graph_stats',
   'mcp__graphify__god_nodes', 'mcp__codegraph__codegraph_explore'];
+// Per-question tallies alongside the pooled totals, because the QUESTION is the unit that
+// actually varies. Reps of one question are near-perfectly correlated — in every run, 14 to
+// 16 of 16 questions have all three reps making the same tool choice — so a binomial interval
+// over 1,084 calls claims a precision the design never had. This is what caught the retracted
+// `95% CI [0.8%, 2.3%]`, which was 4x narrower than the clustered interval over the same data.
+const pooledByQuestion = new Map();
+const questionEverGraph = new Map();
 const pooled = { cells: 0, calls: 0, graph: 0, gfy: 0, touched: 0, runs: 0 };
 for (const runId of POOL_RUNS) {
   const rf = `.data/kgbench/runs/${runId}/results.jsonl`;
@@ -139,6 +158,11 @@ for (const runId of POOL_RUNS) {
     pooled.cells += 1; pooled.calls += t.length; pooled.graph += g.length;
     pooled.gfy += t.filter((x) => x.includes('graphify')).length;
     if (g.length) pooled.touched += 1;
+    if (!pooledByQuestion.has(r.id)) pooledByQuestion.set(r.id, { calls: 0, graph: 0 });
+    const q = pooledByQuestion.get(r.id);
+    q.calls += t.length; q.graph += g.length;
+    if (!questionEverGraph.has(r.id)) questionEverGraph.set(r.id, false);
+    if (g.length) questionEverGraph.set(r.id, true);
   }
 }
 if (pooled.runs === POOL_RUNS.length) {
@@ -152,6 +176,30 @@ if (pooled.runs === POOL_RUNS.length) {
   check('pooled cell share %', Number((100 * pooled.touched / pooled.cells).toFixed(1)), 6.9, 0.05);
   // The retracted figure must not come back: no run in the pool has 4 graph calls or 348 calls.
   claims('the page records that r6 is 3 in 322', '3 in 322');
+
+  // CLUSTER-ROBUST INTERVAL, clustering on the question. Ratio-estimator variance:
+  //   var(p) = sum_k (g_k - p*n_k)^2 / (K*(K-1)*nbar^2)
+  // The naive binomial alternative is sqrt(p(1-p)/n) and is ~4x tighter on this data. The
+  // check asserts the PUBLISHED interval matches the clustered one, so restoring the narrow
+  // figure fails the build rather than reading as a more confident result.
+  const p = pooled.graph / pooled.calls;
+  const K = pooledByQuestion.size;
+  const nbar = pooled.calls / K;
+  let ss = 0;
+  for (const q of pooledByQuestion.values()) ss += (q.graph - p * q.calls) ** 2;
+  const seCluster = Math.sqrt(ss / (K * (K - 1) * nbar ** 2));
+  const lo = Math.max(0, 100 * (p - 1.96 * seCluster));
+  const hi = 100 * (p + 1.96 * seCluster);
+  check('pooled questions (the clustering unit)', K, 16);
+  check('cluster-robust CI lower bound %', Number(lo.toFixed(1)), 0.1, 0.05);
+  check('cluster-robust CI upper bound %', Number(hi.toFixed(1)), 3.0, 0.05);
+  claims('the page quotes the CLUSTERED interval', '95% CI [0.1%, 3.0%]');
+  claimsAtMost('the naive interval appears only in its own retraction', '95% CI [0.8%, 2.3%]', 1);
+
+  // The bimodality that makes a single rate the wrong summary in the first place.
+  const everCount = [...questionEverGraph.values()].filter(Boolean).length;
+  check('questions ever eliciting a graph call, any pooled run', everCount, 4);
+  check('questions never eliciting one in any pooled run', K - everCount, 12);
 } else {
   process.stdout.write(`  SKIP  pooled tool-choice checks (${pooled.runs}/${POOL_RUNS.length} runs present)\n`);
 }
