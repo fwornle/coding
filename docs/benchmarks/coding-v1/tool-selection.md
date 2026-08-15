@@ -315,6 +315,23 @@ graph share moved 8.8% → 12.0%. Rewriting one backend's advertising is enough 
 index* gets used and nowhere near enough to displace text search: `Grep` is still 130 of 216
 calls. The lever is real, it is causal, and it mostly reallocates within the losing category.
 
+> **A reviewer asked whether this design can distinguish "descriptions are a weak lever against
+> grep" from "descriptions are a strong lever applied to only one of two competitors" — i.e.
+> whether the missing cell is *both* backends described applicability-first.** It is not
+> missing: **the treatment condition already is that cell.** CodeGraph's description was never
+> terse. It reads *"PRIMARY TOOL — call FIRST for almost any question… Usually the ONLY call
+> you need — more accurate context, in far fewer tokens and round-trips than a search/Read/Grep
+> loop"* — 582 chars that state applicability and name grep as the thing to displace. It is the
+> most aggressively-framed tool on the surface, it was pinned at `@colbymchenry/codegraph@1.5.0`
+> in both runs, and nothing in this work touched it. So the arms are
+> **{terse, aggressive} → {actionable, aggressive}**, and 12.0% is the graph share when *both*
+> indexes advertise applicability-first while grep advertises nothing at all. That is the
+> ceiling measurement, and it is the strongest available form of the finding rather than a gap
+> in it. What the design genuinely cannot do is separate *description quality* from *tool
+> identity* in the intra-category shift — CodeGraph may have lost those five calls because
+> Graphify's new text is better, or because two applicability-first descriptions now compete
+> and the first-listed wins. That needs a swap: make Graphify aggressive and CodeGraph terse.
+
 It cost nothing measurable in correctness: median score 1.00 in both, mean 0.960 → 0.989,
 48/48 answered in both, hallucinations 1 → 0. Content tokens rose ~12% (78.9k → 88.6k median).
 Latency is not comparable between these two runs — the treatment ran while a background
@@ -602,6 +619,10 @@ Ranked by information per unit of effort.
    textual signal is absent or actively misleading: a symbol with 31 dependents that never name
    it plus one unrelated same-named local, a private method no dependent mentions, and a chain
    whose hops share no substring with its start. Ground truth machine-verified; not yet run.
+   **Graph *share* on that set will not be comparable to the 8.8%/12.0% figures above** — the
+   questions were selected for it, so a higher share is a selection effect, not an improvement.
+   Correctness and cost transfer across sets; share does not. The set file says so in its own
+   header so the two cannot drift into being quoted side by side.
 4. ~~**Restate the pooled statistics clustered by question.**~~ **Done** — the README now
    quotes the cluster-robust interval [0.1%, 3.0%] (4.0× wider than the naive one it carried
    for four runs) and the 4-of-16 / 12-of-16 split, both derived by the claims checker rather
