@@ -534,6 +534,16 @@ graph tool might get picked more. And a preference is not a justification: the a
 choosing wrong. But it is not choosing wrong *and* paying for it, because its correctness
 matches the forced-grep arm exactly.
 
+> **This finding has since been investigated in its own right, and three of the claims in this
+> section need qualifying.** See [**`tool-selection.md`**](tool-selection.md). In short: the
+> pooled figure is **claude-only** (copilot and opencode record no tool calls at all, so the
+> obvious cross-agent test cannot currently be run); the **cell-level statistics here are too
+> precise**, because 48 cells are 3 reps of 16 questions and reps are near-perfectly
+> correlated; and the choice is **not a rate** but a near-deterministic function of the
+> question, committed on the first tool call and essentially never revised. The
+> tool-description caveat above turns out to be measurable rather than hypothetical — the two
+> backends differ by 5–7× in uptake, and the difference tracks their advertising.
+
 The forced arms show a milder version of the same reluctance: given only their backend, the
 graph arms still answered without making a single graph call in **6 of 48 cells each**.
 
@@ -1366,6 +1376,8 @@ the matrix.
 | Path | What |
 |---|---|
 | [`RESULTS.md`](RESULTS.md) | The generated tables for this run — re-rendered, never hand-edited |
+| [`tool-selection.md`](tool-selection.md) | **Why the agent picks grep** — the follow-up investigation into the finding below, which corrects three claims on this page |
+| [`analysis/tool-selection-data.md`](analysis/tool-selection-data.md) | Generated data appendix for that investigation |
 | `config/kgbench/questions/coding-v1.json` | The questions, checklists, and `file:line` ground truth |
 | `config/kgbench/arms.json` | Arm definitions — the tool surface each one gets |
 | `lib/kgbench/sandbox.mjs` | The sandboxed run tree and containment verification |
