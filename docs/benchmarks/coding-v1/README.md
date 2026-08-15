@@ -565,8 +565,12 @@ matches the forced-grep arm exactly.
 > precise**, because 48 cells are 3 reps of 16 questions and reps are near-perfectly
 > correlated; and the choice is **not a rate** but a near-deterministic function of the
 > question, committed on the first tool call and essentially never revised. The
-> tool-description caveat above turns out to be measurable rather than hypothetical — the two
-> backends differ by 5–7× in uptake, and the difference tracks their advertising.
+> tool-description caveat above turns out to be **causal, and it has now been tested directly**.
+> Restating Graphify's six tool descriptions in applicability-first form — same names, same
+> schemas, same handlers, same results, same pinned corpus — moved it from **0 calls across all
+> 48 cells to 11**, and from **0 of 16 questions to 6** (McNemar exact p = 0.031). It acts on
+> the *opening* tool call, and it cost nothing in correctness. Most of what it won came out of
+> the other graph backend rather than out of grep, so total graph share moved only 8.8% → 12.0%.
 
 The forced arms show a milder version of the same reluctance: given only their backend, the
 graph arms still answered without making a single graph call in **6 of 48 cells each**.
@@ -1402,6 +1406,8 @@ the matrix.
 | [`RESULTS.md`](RESULTS.md) | The generated tables for this run — re-rendered, never hand-edited |
 | [`tool-selection.md`](tool-selection.md) | **Why the agent picks grep** — the follow-up investigation into the finding below, which corrects three claims on this page |
 | [`analysis/tool-selection-data.md`](analysis/tool-selection-data.md) | Generated data appendix for that investigation |
+| [`analysis/tool-description-ab.md`](analysis/tool-description-ab.md) | The tool-description A/B — terse vs applicability-first Graphify descriptions |
+| `config/kgbench/questions/coding-graph.json` | A separate question set built so a code graph *could* win — the missing arm of this page's null |
 | `config/kgbench/questions/coding-v1.json` | The questions, checklists, and `file:line` ground truth |
 | `config/kgbench/arms.json` | Arm definitions — the tool surface each one gets |
 | `lib/kgbench/sandbox.mjs` | The sandboxed run tree and containment verification |
