@@ -22,6 +22,12 @@ services:
       - CONSTRAINT_MONITOR_PORT=3849
       - GRAPHIFY_MCP_PORT=3851
       - GRAPHIFY_OUT=/coding/.data/graphify/graphify-out
+      # Which tool-description variant graphify advertises over MCP: `terse` (default,
+      # what it has always shipped) or `actionable`. This is the manipulated variable of
+      # the coding-v1 description A/B — see docs/benchmarks/coding-v1/tool-selection.md.
+      # It changes only the `description` strings in tools/list; names, schemas, handlers
+      # and results are identical either way.
+      - GRAPHIFY_TOOL_DESCRIPTIONS=${GRAPHIFY_TOOL_DESCRIPTIONS:-terse}
       # Graphify full (docs/PDF) extraction routes through the host llm-cli-proxy's
       # OpenAI-compatible shim. T2 egress lockdown: no raw provider keys — only the
       # local proxy. Code extraction (--code-only/update) needs no LLM at all.
