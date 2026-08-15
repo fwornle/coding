@@ -36,6 +36,7 @@ null, and one cannot be settled with this data.
 | **Tool-description framing** | **CONFIRMED by a controlled A/B** — [see below](#the-ab-description-framing-is-causal) | **0 → 11 calls, p = 0.031** |
 | **Question shape** — the set is keyword-addressable by construction | **Supported** | 13/14 questions |
 | **Corpus shape** — the answers frequently are not in any index | **Supported** | 8/25 evidence files |
+| Graph use being *cheaper* per question (an earlier claim here) | **Withdrawn** — null on 11 pairs | CI [0.69, 1.19] |
 | Index coverage driving the choice adaptively | **Null** — coverage does not predict uptake | 9.3% vs 9.6% |
 | Model pretraining prior | **Consistent, unfalsifiable here** | — |
 
@@ -445,20 +446,31 @@ questions, which are the harder ones. The table compares questions, not strategi
 Restricting to same-run, same-question pairs where some reps used the graph and some did not —
 the only unconfounded comparison the corpus permits:
 
-| | value |
+| statistic | value |
 |---|--:|
-| paired comparisons available | **8** |
-| mean token ratio, graph : grep | **0.81×** |
-| mean latency delta | +0.9s |
-| mean score delta | −0.028 |
+| paired comparisons available | **11** |
+| mean token ratio, graph : grep | **0.935×** |
+| **95% CI** | **[0.685, 1.186]** |
+| graph cheaper in | 7 / 11 pairs |
+| sign test, two-sided | **p = 0.549** |
+| mean score delta | −0.021 |
 
-**Within a question, the graph-using reps consumed 19% *fewer* tokens.**
+**The interval spans 1.0.** Controlling for the question, the token difference between reaching
+for a graph and not reaching for one is indistinguishable from zero. The graph is neither
+reliably cheaper nor reliably dearer.
 
-n = 8 is thin, and this is reported as a caution rather than a finding. But it inverts the sign
-of the headline, and it means the claim *"grep is the cheapest and fastest option"* is
-currently unsupported once question difficulty is held constant. The cross-arm cost table in
-the README is a comparison of *forced* strategies and is unaffected; the within-hybrid
-inference is the one to retire.
+> **This supersedes an earlier version of this section, and the correction is worth stating.**
+> An n = 8 pass of the same comparison gave 0.81× and was written up here as *"the graph is 19%
+> cheaper — it inverts the sign of the headline."* Three further pairs, from the description
+> A/B, moved the mean to 0.94× and widened the interval across 1.0. The error was not the
+> arithmetic; it was quoting a mean of eight ratios with no dispersion beside it, which reads
+> as a result when it is a point estimate with an interval nobody computed. The discipline this
+> page applies to the README's cell-level intervals applies to its own numbers.
+
+What survives is the **negative half**: the cross-cell comparison is confounded by question
+difficulty, so it cannot support the claim that using a graph costs 2.29× more. That inference
+is retired — and it is *not* replaced by its opposite. The cross-arm cost table in the README
+compares *forced* strategies and is unaffected.
 
 *Appendix: [section 6](analysis/tool-selection-data.md).*
 
@@ -594,8 +606,11 @@ Ranked by information per unit of effort.
    quotes the cluster-robust interval [0.1%, 3.0%] (4.0× wider than the naive one it carried
    for four runs) and the 4-of-16 / 12-of-16 split, both derived by the claims checker rather
    than typed.
-5. **Re-run the cost comparison paired within question.** The 2.29× is confounded and the n=8
-   estimate points the other way.
+5. ~~**Re-run the cost comparison paired within question.**~~ **Done, and it came back null** —
+   11 pairs, ratio 0.935× with 95% CI [0.685, 1.186]. The 2.29× cross-cell figure is confounded
+   and is retired; nothing replaces it. Getting a real answer needs a design that *forces* the
+   comparison — same question, reps deliberately split between arms — rather than harvesting
+   the accidental pairs a free-choice arm happens to produce.
 
 Two further experiments follow from the mechanism rather than from the gaps, and are larger:
 
