@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { RefreshCw, Zap, TrendingUp, Clock, ArrowUpDown, Settings } from 'lucide-react'
 import { TokenUsageSettingsDialog } from './token-usage-settings-dialog'
+import { normalizeProvider, getProviderColor } from '@/lib/providers'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -122,47 +123,18 @@ function hashKey(s: string): number {
   return Math.abs(h)
 }
 
-// Keyed by ACCOUNT — the thing that gets billed, not the company that owns the
-// model. getProviderColor() normalizes its argument first, so historical wire
-// labels (`copilot`, `claude-code`, `anthropic`) resolve here too.
-const PROVIDER_COLORS: Record<string, string> = {
-  'gh-copilot': '#2563eb',       // corporate GitHub Copilot contract
-  'claude-code-max': '#d97706',  // personal Claude Max subscription
-  'anthropic-api': '#b45309',    // metered Anthropic key — deliberately distinct from Max
-  'groq': '#7c3aed',
-  'openai': '#059669',
-  'gaia': '#64748b',
-}
-
-// The wire has carried several names for the same account over time, and one
-// name for two DIFFERENT accounts. Normalize to the account id the routing
-// config uses (rapid-llm-proxy config/llm-routing.yaml).
+// Account identity — normalizeProvider, PROVIDER_COLORS, getProviderColor — now
+// lives in lib/providers, so this page and the routing dialog's Flow tab group
+// and colour an account identically. The wire has carried several names for the
+// same account over time, and one name for two DIFFERENT accounts; that file has
+// the mapping and the note on why `anthropic` resolves to Max.
 //
-// This used to collapse to the COMPANY instead — `copilot` → `github`, and
-// `claude-code` → `anthropic`. That second mapping was the damaging one: it
+// The mapping used to collapse to the COMPANY instead — `copilot` → `github`,
+// and `claude-code` → `anthropic`. That second one was the damaging mapping: it
 // merged personal Max-subscription traffic with metered anthropic-api traffic
 // under a single "anthropic" label, so the By Provider pie could read
 // "anthropic 100%" while telling you nothing about which account your tokens
 // actually came out of — the two have completely different cost consequences.
-//
-// Historical rows written before the account-id change still carry the old
-// labels, so they are mapped forward here rather than left to render as their
-// own slices. `anthropic` is the ambiguous one: on the /v1/messages tap it meant
-// Max, which is what the overwhelming majority of those rows are, so it maps to
-// claude-code-max. Direct API-key traffic now writes `anthropic-api` explicitly.
-const PROVIDER_ALIASES: Record<string, string> = {
-  'copilot': 'gh-copilot',
-  'github-copilot': 'gh-copilot',
-  'github': 'gh-copilot',
-  'claude-code': 'claude-code-max',
-  'anthropic': 'claude-code-max',
-  'max-subscription': 'claude-code-max',
-}
-function normalizeProvider(provider: string | null | undefined): string {
-  if (!provider) return provider ?? ''
-  const key = provider.trim().toLowerCase()
-  return PROVIDER_ALIASES[key] ?? key
-}
 
 const SUBSCRIPTION_LABELS: Record<string, string> = {
   'copilot-subscription': 'GitHub Copilot',
@@ -304,10 +276,6 @@ function getProcessColor(process: string): string {
   if (canonical) return canonical
   const palette = SAFE_EVOLUTION_PALETTE.length > 0 ? SAFE_EVOLUTION_PALETTE : EVOLUTION_PALETTE
   return palette[hashKey(process) % palette.length]
-}
-
-function getProviderColor(provider: string): string {
-  return PROVIDER_COLORS[normalizeProvider(provider)] || '#6b7280'
 }
 
 // Merge by_provider rows that resolve to the same canonical provider (copilot +
@@ -635,6 +603,7 @@ export function TokenUsagePage() {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         proxyBase={PROXY_BASE}
+        hours={Number(hoursWindow) || 24}
       />
 
       {/* Summary Cards */}
