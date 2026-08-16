@@ -201,10 +201,27 @@ node scripts/llm-model-probe.mjs --provider claude-code --repeats 3
 node scripts/llm-model-probe.mjs --show               # cached result, no calls
 ```
 
-Because Opus is on the personal subscription and absent from Copilot, **the strongest
-available judge depends on which network you are on** — `claude-code/claude-opus-5` at home,
-`copilot/claude-sonnet-4.6` inside the corporate network. Whichever serves, the run records
-it.
+That advice used to end here, with a network-dependent answer: Opus is on the personal
+subscription and absent from Copilot, so pick `claude-code/claude-opus-5` at home and
+`copilot/claude-sonnet-4.6` at work. **It was wrong, and probing is what hid it.** A probe
+establishes that a provider *can* serve a model. It does not establish that it *will* under
+load, and those are different questions.
+
+`claude-code` serves `claude-opus-5` — probed stable, three repeats, ~1.7s. But its direct
+API answers `RATE_LIMITED` most of the time, and the proxy's fallback (CLI worker pool, same
+subscription, different rate-limit bucket) returns `claude-haiku-4-5` **whatever model was
+asked for** — the worker is spawned under `key=claude-opus-5::…` and still answers as haiku.
+On 2026-08-09 the judge got 21 opus-5 calls and 2065 haiku ones, and the haiku stretch covered
+run `coding-v1-x2`.
+
+So the judge is pinned to the provider that **honours** the model, not the one with the best
+catalogue: `copilot/claude-sonnet-5` on both networks (probed 2026-08-10 — copilot returns
+exactly what it is asked for, and 400s on every Opus variant). A grading instrument whose
+model changes with a rate-limit window is not a yardstick, and the gap between "strongest
+model reachable" and "strongest model reliably served" is where that stops being obvious.
+
+**Generalise it:** probe availability *and* probe it under the conditions the caller will
+actually meet. A capability check answers a narrower question than the one being asked.
 
 Cells now carry `judge_model_served`, `judge_model_requested` and
 `judge_served_as_requested`; `run.json` carries `judge.requested` and `judge.served`; a
@@ -292,6 +309,51 @@ manufactured 2 fake disagreements. Restored from the backup.
 
 ---
 
+## Lesson 12 — A row must be able to reproduce its own number
+
+`runCell` resolved a cell's tokens over a window spanning every attempt, then built the row by
+spreading the **last** attempt's result. The row therefore carried the last attempt's
+`started_at` and `wall_s` beside an all-attempts token total. Nothing crashed and nothing looked
+wrong; the row simply described a different thing from the number printed next to it.
+
+Three failures fell out of that one line, and only the third was ever noticed:
+
+- **The offline backfill would have destroyed the data it was written to protect.** It
+  re-resolves from `r.started_at`/`r.ended_at`, which on a retried cell is about half the cell,
+  so `--all` would have overwritten 21 correct totals with halved ones — as an improvement.
+- **`wall_s` charged a cell that burned 73.6s as 35.6s.** Which flatters exactly the arms that
+  needed a second attempt.
+- **Every retried cell was flagged ambiguous**, because a retry is a fresh spawn and opens a
+  session of its own, and ambiguity was judged per *cell*.
+
+**The ambiguity flag was then diagnosed wrongly twice, and the second diagnosis was believed
+because it came with arithmetic.** It said one flagged cell's 274,139 tokens was "its own
+139,727 plus its predecessor's 134,412" — which balances exactly, and is wrong. The 134,412 was
+the *same cell's first attempt*; the real predecessor was a third session of 172,223 tokens that
+was never counted. **An identity that balances is not a causal claim.** Two numbers summing to a
+third tells you nothing about which two, and there were three sessions to choose from. The check
+that would have settled it in one query — *does any session start inside more than one cell's
+window?* — was never run until the fix. It returns zero.
+
+**The correction moved the numbers the wrong way, which is the part worth remembering.** Acting
+on the bad diagnosis, the analysis excluded those 21 rows from opencode's medians. A retried cell
+pays for two attempts, so the excluded rows were the expensive ones: the "correction" pushed
+opencode's measured cost from 1.38× claude's down to 1.16×. A cleanup that makes a result *more
+flattering* deserves the same scrutiny as one that makes it worse.
+
+**Three rules.**
+
+1. A row must carry the window its own number was computed over. If it cannot be re-derived from
+   the row alone, offline, the row is a claim rather than a measurement.
+2. Attribute at the granularity work is *spawned* at. Sessions belong to attempts, not to cells.
+3. When a repair reconstructs anything, give it a control that fails loudly. Here: per-attempt and
+   whole-span attribution must agree to the token, which is only possible if every session lands
+   inside exactly one attempt window. It refused all four cells of the budget-2 run — correctly,
+   because that run has a second defect (a continuation `wall_s` that dropped its middle legs)
+   which makes the reconstruction land in the wrong place.
+
+---
+
 ## Proxy routing facts
 
 These invalidate the obvious mental model and cost a full investigation to establish:
@@ -326,6 +388,216 @@ back — reading back confirms only what was stored, not what will be served.
 
 ---
 
+## Lesson 13 — Know the noise floor before publishing an effect
+
+Two claims on the published page were smaller than this benchmark's own run-to-run variance,
+and both survived review because they were *modest*.
+
+**The effect that was noise.** The continuation budget was reported to buy completion at the
+cost of quality: mean score over answered cells falling 0.977 → 0.948. Re-running the same 48
+cells at the same budget gives 0.975. The claimed effect was −0.029; between two runs identical
+in arm, agent, model, budget and questions, single questions move the 48-cell mean by −0.011,
++0.021, +0.018. It was never bigger than the noise.
+
+**Measure the floor, don't assume it.** Within a SINGLE run, the same question at the same
+settings varies across its 3 reps by a median factor of:
+
+| agent | median max/min content tokens | worst |
+|---|--:|--:|
+| claude | 1.5× | 2.6× |
+| copilot | 1.7× | 5.0× |
+| opencode | 1.9× | 6.1× |
+
+At budget 2, opencode reaches 2.1–3.1× median and 12.5× worst. **A per-question token figure on
+this benchmark is worth nothing without a replicate.** Arm medians over 48 cells are far more
+stable, which is why the headline arm comparison survives three runs while per-question token
+figures swing ±100% between two.
+
+**The number that was impossible.** A shared-denominator mean of `0.935` was published for a run
+answering 44 of 48 cells whose scores sum to 43.00. The mean over 48 is 0.896; 0.935 would need
+those 44 cells to average 1.020, above the maximum score. One multiplication would have caught
+it at any point.
+
+**Why both survived.** Each sat next to numbers that were correct, and each pointed the way the
+surrounding argument already went. A candidly-admitted cost and a modest gain are exactly the
+claims nobody audits — they read as the author being careful. **Scrutiny should scale with how
+well a number fits the story, not with how surprising it is.** The corrected figures made the
+budget look *better* than the retracted ones (0.896 → 0.975 against 0.935 → 0.948), so neither
+error was motivated; they were simply never recomputed.
+
+**Two more shapes of the same error, found by re-checking the page against `r7` and `x2`.**
+
+**A keyword test cannot distinguish an assertion from its negation.** "Does the answer cite
+`docker-compose.yml`?" was implemented as `/docker-compose/i.test(answer)`, and on that basis
+CodeGraph was published as reaching the file and failing anyway — its A1 losses filed as a
+separate, unexplained problem. Six of the ten matching cells name the file only to say they
+could *not* read it (*"the real 'coding' repo isn't checked out here"*). The metric scored a
+denial identically to a citation, and the conclusion it supported was the exact reverse of the
+truth. Re-classified by what the answer *claims* rather than which words it contains, the axis
+is perfect: 29 of 29 cells claiming to have read the file score 1.00, 0 of 6 claiming the
+repository is absent do. **When a metric is a substring match, the first thing to check is what
+the surrounding sentence is doing with it** — and prefer a test that matches the assertion
+("found it in `<file>:<line>`") over one that matches the topic.
+
+**A broken retrieval tool does not look broken in a cost table — it looks expensive.** For four
+runs this benchmark reported CodeGraph as the costly arm: 2.1x grep's tokens, 2.8x its latency.
+Its index was serving the wrong tree, so the arm compensated by reading files, and reading files
+is what the tokens measured. Correctness never flagged it, because the arm still answered
+correctly — it just paid Read prices to do it. Repaired, the same arm on the same questions runs
+at **1.05x grep's tokens and 0.93x its latency**. **A benchmark that reports what an arm COSTS
+without reporting what it DOES cannot tell an expensive backend from a broken one**, and the
+tell was in the tool mix, which no published table showed.
+
+**A fixed tool changes what the agent DOES, not just how well it scores — and the behavioural
+change is the bigger result.** Repairing the CodeGraph index moved the arm's mean 0.881 → 0.929,
+which reads as marginal. What actually happened is that its Read calls collapsed from 427 to 94
+while its index calls doubled from 67 to 136: the arm had been compensating for a broken tool by
+reading files, and every earlier number described *Read with a broken tool attached* rather than
+the backend named on the label. **When a tool is repaired, diff the tool mix before the scores.**
+A score that barely moves can conceal a strategy that changed completely — and the hybrid arm,
+whose scores did not move at all, tripled its graph usage.
+
+**When a fix produces a loss, check the grader before crediting the arm.** The index repair
+appeared to cost hybrid a T3 cell: the graph surfaced adjacent real files, the arm named them
+while ruling them out, and the longer sentence overran the abstain matcher's sixty-character
+window by four characters — scoring a correct abstention as a hallucination. It was not a
+regression at all. **Report the half that does not flatter the change anyway**, because that is
+where the second defect was hiding: the only reason anyone read that cell was that it went the
+wrong way. Hybrid's arm mean is 0.985 before and after.
+
+**When a run cannot be repaired, measure beside it rather than inside it.** `r5`/`r6`'s
+rewritten questions could not be regraded, and re-running them *into* those runs would have
+been worse than leaving them: neither run recorded a model, so three questions would have been
+answered by a known model and thirteen by an unknown one — confounding arm with model on
+exactly the questions under test, inside runs whose only purpose is a within-run arm
+comparison. **The repair would have destroyed the thing being repaired.** Run beside, at the
+old run's own pinned corpus commit, it costs nothing and confounds nothing; the comparison is
+then honestly cross-run and says so. **"Fix the artefact" and "answer the question the artefact
+raised" are different jobs, and only the second one is always available.**
+
+**An absolute is refuted by one counter-example or it is not an absolute.** "No graph arm beats
+grep on any question in any run" survived every run on this page until a 52-cell re-measurement
+produced one question where two graph arms finish above grep — on a single grep cell out of
+three. The result is far too thin to be a finding and is not quoted as one. It is quoted
+because the claim was stated without qualification, and the qualification is now load-bearing:
+*the direction reverses only where a single cell can reverse it.* **The cost of an absolute is
+that it is cheap to break; state the rate instead of the impossibility.**
+
+**A regrade is sound only when the PROMPT held still and the KEY moved.** An arm's answer is
+evidence about the question it saw. Re-scoring it against a rewritten question is not a
+correction — it is a category error, and the dangerous kind, because it produces plausible
+numbers on real data and arrives wearing a fix's clothes. Reconciling five older runs against
+the current grader turned up 105 stale rows, and **64 of them were this trap**: cells for
+questions whose text had been rewritten after those runs executed. A one-line regrade would
+have rewritten a third of that run and looked like housekeeping. The other 41 were genuine —
+one key had named the wrong file, so every arm scored 0.15 on a correct answer. **Ask which of
+the two moved before regrading anything**, and enforce it in the tool rather than the habit:
+the script now reconstructs the question set from the run's own commit and refuses what it
+cannot verify. *Cannot verify* is not *verified* — the two runs whose question file was never
+committed are retired rather than reconciled.
+
+**Bound a gap by the unit the grammar uses, not by the one that is easy to count.** That abstain
+window allowed sixty *characters* between the negator and its head, standing in for "a noun
+phrase intervenes". In a code repository the subject of an abstention is a hyphenated, slashed,
+dotted compound, so a character budget tightens exactly as the subject gets more technical —
+it discriminates against the vocabulary the benchmark is made of. The subject that broke it is
+sixty-four characters and **three words**. Counted in words the bound stops being a tuning
+parameter, which matters because the character count had been retuned before: **a threshold you
+have already adjusted once is not a threshold, it is a symptom.** The sibling defect was the
+same bound set to zero — `no <noun>` demanded adjacency, so a quoted subject slipped past too.
+One shape fixed both, and it moved exactly three cells across every run in the corpus.
+
+**An arm's infrastructure must be verified against the tree under test, not against the
+repository.** The kgbench sandbox builds a de-contaminated worktree in `os.tmpdir()` and greps
+it to prove containment. The CodeGraph arm queries a container-side index of `/workspace/coding`
+— the main working tree — which the sandbox never inspected and the container-side server cannot
+even see the sandbox to replace. The preflight checked that an index *file existed on the host*;
+it never checked that the index *covered the tree the arms were about to search*. **A preflight
+that proves a resource exists has not proved it is the right resource.** For anything
+path-addressed, assert on the path.
+
+**`status: running` with zero live processes is a distinct failure mode, and monitors that
+check either one alone will wait forever.** A 121-cell run was killed twice — at cells 2 and 18
+— by the 10-minute call ceiling of the tool that launched it, which signalled the process group
+it hosted. A supervisor that survives signals does not survive its own parent's death, and
+detaching does not leave the group. Neither death produced an error: the log stopped, the status
+file still said `running`, and nothing was left running. **Assert liveness and progress together,
+and host long jobs somewhere that outlives the session** (`launchctl submit` here). The reason
+this cost time rather than data is that the runner writes cells incrementally and resumes from
+them: the restart continued at cell 18 instead of redoing 18. **Incremental writes are worth
+more than retry logic** — they turn a silent kill into a delay instead of a loss.
+
+**The harness can reproduce the bug its own question set documents.** Building the per-run
+index on a Docker bind mount ran ~47× slower than baseline and then died with *"unable to open
+database file"*. That is exactly what `docker-compose.yml` explains about `.observations`, and
+exactly what question A1 asks: SQLite's WAL/SHM does not survive the bind-mount boundary. The
+answer was in the repository, in the file the benchmark grades an arm for finding. **Before
+debugging infrastructure, grep your own docs for the symptom** — a project that writes down its
+failures has already paid for the lesson once.
+
+**A refusal is a result, and a rubric that scores it zero will bury a broken tool.** Five L2
+cells said, accurately, "there is no index for this project and I will not guess file paths."
+They scored 0.00, while cells that named one right file and one wrong one scored 0.50 — so the
+scoring paid better for guessing than for a correct report of broken infrastructure, and the
+diagnosis sat in the data for three runs looking like a retrieval failure. **When an arm's score
+is unusually bad, read its answers before believing the number**: the distinction between "could
+not" and "got it wrong" is invisible in a mean and is usually the more actionable of the two.
+
+**Enumerating phrasings is the same defect as matching a substring.** The fix for the lesson
+above was a regex listing the ways an answer might say it could not read the file. It published
+"five failing cells make no claim in either direction"; reading all sixteen answers gives two.
+It missed a denial phrased *"no `.codegraph/` index or file access available in this sandbox"* —
+words the list did not contain — and scored two cells that name memory as their source as
+silent. The cross-question count it produced, 7, is at least 18. **Both tests decide a semantic
+question with a lexical one, and both fail by under-matching, which is silent.** A lexical test
+is fit for *finding candidates* and unfit for *counting categories*. Where the population is
+small enough to read — sixteen answers — read it, pin the classification cell by cell, and keep
+the regex only as a tripwire on the hit count so changed data forces a re-read. Where it is not,
+label the number a lower bound.
+
+**An agent's report about its own environment is data, not ground truth.** Those five cells
+state that the repository is not checked out. It is: the sandbox is a verified worktree whose
+exclusion list covers `.data`, `.specstory` and `CLAUDE.md` — anti-leakage, not source. The
+arm had `Read` but no `Glob`/`Grep`, so with an index that does not cover YAML it had no path
+to read, and inferred absence from its own inability to search. Only one of four arms ever made
+this claim (at least 18 cells of 172; zero for the other three), which is what made it visible. **Check
+environment claims against the harness config, not against plausibility.**
+
+**A per-question median hides a bad cell, exactly as a class median hides a bad question.**
+This is Lesson 1's defect at a smaller scale, and it was committed *by the audit written to
+catch it*. Grading each per-question claim on its per-run medians published B3 as an `r8`-only
+artifact; counting cells shows CodeGraph also failing a B3 cell in `x2`, the minority value of
+a 1.00 / 1.00 / 0.00 triple. The same recount surfaced Graphify missing 5 of 16 A1 cells across
+two runs, which no version of the page had mentioned. **Count cells. A median is a summary of
+the thing you are trying to inspect.**
+
+**A bimodal question has no meaningful median.** A4 scores either 0.82 or 1.00 and nothing
+else, so a three-rep median is decided by which value lands twice. In `r8` all four arms
+produced both values and the medians split 2–2, which the page reported as "graphify and hybrid
+drop A4". Pooled over three runs the arms sit at 0.78–0.89 with **hybrid highest**; `r7` alone,
+at ten reps per arm, puts all four at exactly 0.82. **Print the distinct scores a question
+takes before quoting its median.** If there are two, the median is a coin flip and the question
+needs many more reps or none at all.
+
+**A hedged claim is still a claim.** Zero hallucinations in the forced graph arms was called
+"the one result that favours an index", correctly hedged as too small to lean on, and then
+repeated in three places. Balanced claude-only across four runs it is 2/72 against 0/72:
+expected count under a shared rate 1.0, **P(observing zero) = 0.37**. Per-run counts are
+0, 0, 1, 4 — the run that made the pattern visible is the outlier. Detecting a real 1.4%
+difference needs roughly 400 abstain cells per family against the 72 available. **Compute the
+power before publishing an absence.** If the sample cannot distinguish the effect from zero,
+the hedge does not rescue the claim; only deleting it does.
+
+**Rules.** Derive published figures from the rows in the claims checker rather than matching
+them as text — a checker that greps for `0.935` confirms the typo. Before publishing an
+effect, compute the same metric on two runs of the identical configuration; if the effect is
+not larger than that gap, it is not an effect. And **do not pin a null result in the claims
+checker** — a green check on "no graph arm hallucinated" reads to the next author as a
+finding the tooling endorses.
+
+---
+
+
 ## Checklist — before adding a question
 
 - [ ] Is every required fact **true of the repository**? Verify against source, not memory.
@@ -344,3 +616,11 @@ back — reading back confirms only what was stored, not what will be served.
 - [ ] Any defect that moved **every arm identically**? That is a grader bug. (Lesson 3)
 - [ ] Provenance: how many commits, which passes, which questions re-run in each?
 - [ ] `--dry-run` regrade clean, and grader tests passing?
+- [ ] Every row's `wall_s` at least the sum of its own `attempts[]`? (Lesson 12)
+- [ ] Every published figure multiplied out — does `mean × n` equal the score sum? (Lesson 13)
+- [ ] Any claimed effect smaller than the single-question run-to-run swing? (Lesson 13)
+- [ ] Any question whose cells take only two distinct scores? Its median is a coin flip. (Lesson 13)
+- [ ] Any claim resting on an **absence** — is the sample large enough to have seen one? (Lesson 13)
+- [ ] `kgbench-backfill-tokens.mjs --all --dry-run` refuses nothing and shrinks nothing?
+- [ ] Any subset excluded from a median — is the exclusion's *cause* established, and does the
+      exclusion move the result in the flattering direction? (Lesson 12)
