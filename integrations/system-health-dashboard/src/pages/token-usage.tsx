@@ -122,26 +122,41 @@ function hashKey(s: string): number {
   return Math.abs(h)
 }
 
-// Keyed by CANONICAL provider (the company, not the product) — see
-// PROVIDER_ALIASES. getProviderColor() normalizes its argument first, so raw
-// labels (`copilot`, `github-copilot`, `claude-code`) resolve here too.
+// Keyed by ACCOUNT — the thing that gets billed, not the company that owns the
+// model. getProviderColor() normalizes its argument first, so historical wire
+// labels (`copilot`, `claude-code`, `anthropic`) resolve here too.
 const PROVIDER_COLORS: Record<string, string> = {
-  'github': '#2563eb',
-  'anthropic': '#d97706',
+  'gh-copilot': '#2563eb',       // corporate GitHub Copilot contract
+  'claude-code-max': '#d97706',  // personal Claude Max subscription
+  'anthropic-api': '#b45309',    // metered Anthropic key — deliberately distinct from Max
+  'groq': '#7c3aed',
+  'openai': '#059669',
+  'gaia': '#64748b',
 }
 
-// The proxy emits several route/product aliases for the same underlying
-// provider. We canonicalize to the COMPANY name for consistency: `github` owns
-// the Copilot product (tagged `copilot` / `github-copilot` on the wire), just as
-// `anthropic` owns Claude Code (tagged `claude-code` on the CLI-adapter path and
-// `anthropic` on the direct `/v1/messages` path). Collapse each alias set to one
-// canonical company label so the By Provider pie, its legend, the per-provider
-// call breakdown, and the Evolution stacks never split one provider into two.
-// Matching is case-insensitive.
+// The wire has carried several names for the same account over time, and one
+// name for two DIFFERENT accounts. Normalize to the account id the routing
+// config uses (rapid-llm-proxy config/llm-routing.yaml).
+//
+// This used to collapse to the COMPANY instead — `copilot` → `github`, and
+// `claude-code` → `anthropic`. That second mapping was the damaging one: it
+// merged personal Max-subscription traffic with metered anthropic-api traffic
+// under a single "anthropic" label, so the By Provider pie could read
+// "anthropic 100%" while telling you nothing about which account your tokens
+// actually came out of — the two have completely different cost consequences.
+//
+// Historical rows written before the account-id change still carry the old
+// labels, so they are mapped forward here rather than left to render as their
+// own slices. `anthropic` is the ambiguous one: on the /v1/messages tap it meant
+// Max, which is what the overwhelming majority of those rows are, so it maps to
+// claude-code-max. Direct API-key traffic now writes `anthropic-api` explicitly.
 const PROVIDER_ALIASES: Record<string, string> = {
-  'github-copilot': 'github',
-  'copilot': 'github',
-  'claude-code': 'anthropic',
+  'copilot': 'gh-copilot',
+  'github-copilot': 'gh-copilot',
+  'github': 'gh-copilot',
+  'claude-code': 'claude-code-max',
+  'anthropic': 'claude-code-max',
+  'max-subscription': 'claude-code-max',
 }
 function normalizeProvider(provider: string | null | undefined): string {
   if (!provider) return provider ?? ''
@@ -175,6 +190,16 @@ interface TokenSummary {
     input_tokens: number
     output_tokens: number
     total_tokens: number
+  }>
+  // Same aggregate split by the ACCOUNT that served it. Present on proxies that
+  // ship the (provider, model) grouping; absent on older ones, which is why the
+  // By Model table falls back to `by_model`.
+  by_provider_model?: Array<{
+    provider: string
+    model: string
+    calls: number
+    total_tokens: number
+    avg_latency?: number
   }>
   by_model: Array<{
     model: string
@@ -311,18 +336,31 @@ function mergeByProvider(rows: TokenSummary['by_provider']): TokenSummary['by_pr
 // model, summing token and call totals. Latency percentiles are dropped: the
 // By Model list shows totals only, and re-weighting medians across the merged
 // rows would be misleading here.
+//
+// Keyed by (provider, model), not model alone. A bare model name does not tell
+// you what a call cost: claude-sonnet-5 on the corporate Copilot contract and
+// the same model on a metered Anthropic key are entirely different money. Rows
+// render as `<provider>/<model>` — the naming used in the routing config, the
+// proxy logs and the docs, so the same call is called the same thing everywhere.
+//
+// Falls back to the older model-keyed `by_model` when the proxy predates
+// `by_provider_model`, in which case the provider reads "unknown" rather than
+// the table silently attributing tokens to an account that may not have served
+// them.
 function mergeByModel(
-  rows: TokenSummary['by_model']
-): Array<{ model: string; calls: number; total_tokens: number }> {
-  const acc = new Map<string, { model: string; calls: number; total_tokens: number }>()
-  for (const r of rows) {
+  rows: TokenSummary['by_provider_model'] | TokenSummary['by_model']
+): Array<{ key: string; provider: string; model: string; calls: number; total_tokens: number }> {
+  const acc = new Map<string, { key: string; provider: string; model: string; calls: number; total_tokens: number }>()
+  for (const r of rows as Array<{ provider?: string; model: string; calls: number; total_tokens: number }>) {
     const model = normalizeModel(r.model) || r.model
-    const cur = acc.get(model)
+    const provider = r.provider ? normalizeProvider(r.provider) : 'unknown'
+    const key = `${provider}/${model}`
+    const cur = acc.get(key)
     if (cur) {
       cur.calls += r.calls
       cur.total_tokens += r.total_tokens
     } else {
-      acc.set(model, { model, calls: r.calls, total_tokens: r.total_tokens })
+      acc.set(key, { key, provider, model, calls: r.calls, total_tokens: r.total_tokens })
     }
   }
   return Array.from(acc.values()).sort((a, b) => b.total_tokens - a.total_tokens)
@@ -452,7 +490,7 @@ export function TokenUsagePage() {
   // punctuation-merged models, so the By Provider pie and By Model list count
   // each provider/model exactly once (see mergeByProvider / mergeByModel).
   const byProvider = mergeByProvider(summary.by_provider)
-  const byModel = mergeByModel(summary.by_model)
+  const byModel = mergeByModel(summary.by_provider_model ?? summary.by_model)
 
   // Prepare treemap data for process breakdown
   const treemapData = summary.by_process
@@ -733,12 +771,21 @@ export function TokenUsagePage() {
                 </ResponsiveContainer>
 
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium mb-2">By Model</h4>
+                  <h4 className="text-sm font-medium mb-2">By Provider / Model</h4>
                   {byModel
                     .filter(m => (m.total_tokens / (summary.total_tokens || 1)) >= MAIN_CONSUMER_THRESHOLD)
                     .map(m => (
-                      <div key={m.model} className="flex justify-between items-center text-sm py-1">
-                        <span className="text-muted-foreground truncate mr-2">{m.model}</span>
+                      <div key={m.key} className="flex justify-between items-center text-sm py-1">
+                        {/* The account is what determines cost, so it leads. The same
+                            model on two accounts is two rows, not one — that distinction
+                            is the whole point of naming the provider here. */}
+                        <span className="truncate mr-2" title={m.key}>
+                          <span
+                            className="font-medium"
+                            style={{ color: getProviderColor(m.provider) }}
+                          >{m.provider}</span>
+                          <span className="text-muted-foreground">/{m.model}</span>
+                        </span>
                         <span className="font-mono text-xs">{formatTokens(m.total_tokens)}</span>
                       </div>
                     ))}
