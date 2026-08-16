@@ -1,0 +1,90 @@
+@startuml llm-routing-architecture
+!include _standard-style.puml
+
+' Every LLM call from coding — foreground conversation and background cognitive
+' services alike — transits the llm-proxy, which decides where it goes from two
+' YAML files. See docs/architecture/llm-routing.md.
+
+title All LLM egress goes through the proxy — and the proxy obeys two config files
+
+top to bottom direction
+skinparam nodesep 12
+skinparam ranksep 28
+
+package "Callers" #F7FAFF {
+  component "Coding Agent  (foreground)\nclaude · copilot · opencode · mastra" as agent <<agent>>
+  package "Sandbox (docker)" #EEF4FC {
+    component "LLM-based services · Agent systems · Diagnostics\n(background)" as bgsvc <<core>>
+  }
+}
+
+package "LLM proxy  :12435" #E3EEFB {
+  component "Route resolution\nproxy-bridge/routing-config.mjs" as router <<core>>
+  component "Fallback chain + capability gate" as chain <<core>>
+  component "Token counter → token_usage.db" as counter <<storage>>
+}
+
+package "Config — the only source of routing" #FFF6E0 {
+  artifact "llm-routing.yaml\nwhich provider + model" as cfgroute <<storage>>
+  artifact "llm-fallback.yaml\nwhat happens on failure" as cfgfall <<storage>>
+}
+
+package "Provider accounts — billed separately" #F5F5F5 {
+  package "Subscriptions (no per-token cost)" #EFEFEF {
+    component "gh-copilot\ncorporate contract" as copilot <<external>>
+    component "claude-code-max\npersonal Max" as maxsub <<external>>
+  }
+  package "Metered API keys" #EFEFEF {
+    component "groq" as groq <<external>>
+    component "openai" as openai <<external>>
+    component "anthropic-api" as anthapi <<external>>
+    component "gaia — declared,\nnot implemented" as gaia <<external>>
+  }
+}
+
+component "Dashboard :3032\nToken Usage · LLM Routing" as dash <<api>>
+
+' ── Request path ────────────────────────────────────────────────────────────
+agent  -[#B22222]->  router : fg-chat/<agent>
+bgsvc  -[#B22222]->  router : bg-<service>
+
+' ── Config drives it ────────────────────────────────────────────────────────
+cfgroute -[#8A2BE2]-> router  : rules
+cfgfall  -[#8A2BE2]-> chain   : chains + guards
+
+router --> chain  : resolved provider/model
+chain  --> counter
+
+' ── Egress. There is no path from a caller straight to a provider: that is the
+'    property the design guarantees, not a convention to remember. ───────────
+chain --> copilot
+chain --> maxsub
+chain --> groq
+chain --> openai
+chain --> anthapi
+chain ..> gaia : disabled
+
+counter --> dash : rows stamped with the ACCOUNT id
+dash -[#8A2BE2]-> cfgroute : edits (validated before write)
+
+note right of router
+  Lookup — three steps, in order:
+    1. routes["<job>/<agent>"]
+    2. routes["<job>"]
+    3. defaults[<class>]
+  The band (small | medium | high) then
+  picks the model from the CHOSEN
+  provider's own table, so a fallback
+  always gets a model that provider
+  actually serves.
+end note
+
+note right of maxsub
+  Foreground Claude Code reaches this
+  account over an Anthropic-protocol
+  passthrough. A route pointing it
+  anywhere else is refused with 501 —
+  never silently forwarded.
+end note
+
+@enduml
