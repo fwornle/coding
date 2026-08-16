@@ -712,8 +712,10 @@ for (const combo of combos) {
             judgeSubstitution = { requested: j.requested_model, served: j.served_model, provider: j.served_provider };
             out(`kgbench: WARNING — judge requested ${j.requested_model} but the proxy served `
               + `${j.served_model} (${j.served_provider}). Scores are graded by what was SERVED; `
-              + 'run.json records that. Pin it with a processOverride for `kgbench-judge` '
-              + '(scripts/configure-wave-analysis-routing.sh) — /api/complete ignores the request `model`.');
+              + 'run.json records that. The judge model is set by the `bg-kgbench-judge` route in '
+              + 'rapid-llm-proxy config/llm-routing.yaml (provider + complexity band) — '
+              + '/api/complete ignores the request `model`. Check what it resolves to with: '
+              + 'curl -s "localhost:12435/api/llm/routing/resolve?job=bg-kgbench-judge"');
           }
           if (j.served_model && !judgeObserved) judgeObserved = { model: j.served_model, provider: j.served_provider };
           // For an llm-only question the judge IS the score.
