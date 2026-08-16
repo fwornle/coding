@@ -2156,6 +2156,11 @@ async function pollNetworkStatus() {
       // A dead port (TCP connect refused) is a HARD, unambiguous signal —
       // proxydetox is genuinely not listening — so it is NOT debounced.
       const FUNCTIONAL_FAIL_THRESHOLD = 3;
+      // Floor on how often a proxydetox heal may restart the LLM proxy. Restarting
+      // it drops every in-flight request and leaves :12435 refusing connections for
+      // ~10s, so it must stay a rare corrective action rather than something that
+      // can ride a repeating heal loop.
+      const LLM_PROXY_RESTART_MIN_INTERVAL_MS = 10 * 60 * 1000;
       if (portListening) {
         if (proxyFunctional) {
           netState.consecutive_functional_failures = 0;
@@ -2211,12 +2216,38 @@ async function pollNetworkStatus() {
               proxyFunctional = false;
               log('network: proxydetox kickstarted — port listening but still not functional', 'WARN');
             }
-            // Also restart LLM proxy — its HTTP connections are stale after network change
-            try {
-              await execFileAsync('bash', ['-c', 'launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy'], { timeout: 5000 });
-              log('network: LLM proxy kickstarted after proxydetox auto-heal (stale connections)', 'INFO');
-            } catch (e) {
-              log(`network: LLM proxy kickstart failed: ${e.message}`, 'WARN');
+            // Also restart the LLM proxy — its HTTP connections are stale after a
+            // network change.
+            //
+            // ONLY when the heal actually SUCCEEDED. This block used to sit outside
+            // the try/catch above, so it fired on every heal ATTEMPT — including the
+            // failing ones — while logging "after proxydetox auto-heal" when no heal
+            // had occurred. Off-corp that probe can never succeed (proxydetox is the
+            // corporate proxy and the reachability host is unreachable from home), so
+            // the coordinator restarted the LLM proxy every ~35s, indefinitely.
+            //
+            // Observed 2026-08-16: seven restarts in four minutes, each opening a
+            // ~10s window where :12435 refuses connections — long enough to break a
+            // dashboard fetch (ERR_CONNECTION_REFUSED on /api/llm/routing) and to
+            // abort in-flight agent calls mid-turn.
+            //
+            // Debounced as well: even a genuinely repeated heal must not restart the
+            // LLM proxy more than once per LLM_PROXY_RESTART_MIN_INTERVAL_MS. A
+            // restart is not free — it drops every in-flight request.
+            const nowMs = Date.now();
+            if (!proxyFunctional) {
+              log('network: proxydetox heal did NOT restore function — leaving the LLM proxy alone (restarting it would not help)', 'WARN');
+            } else if (nowMs - (netState.last_llm_proxy_restart_at || 0) < LLM_PROXY_RESTART_MIN_INTERVAL_MS) {
+              const agoS = Math.round((nowMs - netState.last_llm_proxy_restart_at) / 1000);
+              log(`network: skipping LLM proxy restart — last one was ${agoS}s ago (min interval ${LLM_PROXY_RESTART_MIN_INTERVAL_MS / 1000}s)`, 'INFO');
+            } else {
+              try {
+                await execFileAsync('bash', ['-c', 'launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy'], { timeout: 5000 });
+                netState.last_llm_proxy_restart_at = nowMs;
+                log('network: LLM proxy kickstarted after proxydetox auto-heal (stale connections)', 'INFO');
+              } catch (e) {
+                log(`network: LLM proxy kickstart failed: ${e.message}`, 'WARN');
+              }
             }
           } else {
             log('network: proxydetox kickstart failed — port still dead', 'WARN');

@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { FlowTab } from './token-usage-flow-tab'
 
 /**
  * LLM Routing settings — the front end for rapid-llm-proxy's two config files:
@@ -46,6 +47,8 @@ interface ProviderInfo {
   enabled: boolean
   tools: boolean
   fgCapable: boolean
+  /** Everything this account can serve. The band table is a choice out of it. */
+  availableModels?: string[]
   models: Partial<Record<'small' | 'medium' | 'high', string>>
 }
 
@@ -77,6 +80,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   proxyBase: string
+  /** Traffic window the Flow tab weights its edges by. Mirrors the page selector. */
+  hours: number
 }
 
 const BANDS = ['small', 'medium', 'high'] as const
@@ -93,9 +98,9 @@ function modelFor(providers: ProviderInfo[], providerId: string, band: string): 
     || '—'
 }
 
-export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Props) {
+export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours }: Props) {
   const [data, setData] = useState<RoutingData | null>(null)
-  const [tab, setTab] = useState<'routing' | 'fallback'>('routing')
+  const [tab, setTab] = useState<'routing' | 'fallback' | 'flow'>('routing')
   const [routeDraft, setRouteDraft] = useState<Record<string, RouteEntry>>({})
   const [defaultDraft, setDefaultDraft] = useState<Record<string, RouteEntry>>({})
   const [fallbackDraft, setFallbackDraft] = useState<RoutingData['fallback'] | null>(null)
@@ -247,7 +252,9 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl flex flex-col max-h-[88vh]">
+      {/* Wide enough that the Flow tab's 1030-unit canvas fits without a
+          horizontal scrollbar; the two table tabs simply get more air. */}
+      <DialogContent className="max-w-6xl flex flex-col max-h-[88vh]">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>LLM Routing</DialogTitle>
           <DialogDescription>
@@ -273,6 +280,11 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
               variant={tab === 'fallback' ? 'default' : 'ghost'}
               onClick={() => setTab('fallback')}
             >Fallback</Button>
+            <Button
+              size="sm"
+              variant={tab === 'flow' ? 'default' : 'ghost'}
+              onClick={() => setTab('flow')}
+            >Flow</Button>
             <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
               network: <Badge variant="outline">{data.runtime.network}</Badge>
             </span>
@@ -353,6 +365,23 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase }: Prop
                 ))}
               </RouteTable>
             </div>
+          )}
+
+          {/* The Flow tab reads the DRAFTS, not the saved payload, so the graph
+              is a live preview of an unsaved edit — change a provider on the
+              Routing tab and the edge moves before you press Save. */}
+          {!loading && data && fallbackDraft && tab === 'flow' && (
+            <FlowTab
+              proxyBase={proxyBase}
+              hours={hours}
+              data={{
+                providers: data.providers,
+                routes: routeDraft,
+                defaults: defaultDraft,
+                fallback: { chains: fallbackDraft.chains },
+                runtime: data.runtime,
+              }}
+            />
           )}
 
           {!loading && data && fallbackDraft && tab === 'fallback' && (
