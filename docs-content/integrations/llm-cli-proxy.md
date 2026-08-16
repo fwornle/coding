@@ -48,14 +48,34 @@ sequenceDiagram
 
 ### Provider routing
 
-Auto-route preference depends on the caller's session type:
+> **This section previously described an auto-route that no longer exists.** It said preference
+> depended on the caller's session type (`claude-code` first for Claude sessions, `copilot` first
+> for OpenCode/corporate), and that operator pins persisted to `.data/llm-proxy/llm-settings.json`.
+> That was the `processOverrides` runtime-state mechanism, and the session-type ternary inside
+> `server.mjs` — **both are deleted**. Routing is now config-driven end to end.
 
-- **Claude sessions**: `claude-code` first, then `copilot`, then API-key providers (groq → openai → anthropic).
-- **OpenCode / corporate sessions**: `copilot` first (the claude CLI can't reach `api.anthropic.com` through the corporate proxy in some VPN modes), then groq → openai → anthropic.
+Every decision comes from two version-controlled YAML files in the proxy repo, and nothing else:
+`config/llm-routing.yaml` (which provider + model) and `config/llm-fallback.yaml` (chains +
+guards). There is no auto-route, no session-type heuristic, and no runtime pin file. Lookup is
+three fixed steps — `routes["<job>/<agent>"]` → `routes["<job>"]` → `defaults[<class>]` — and the
+complexity band picks the model from the *chosen* provider's own table, so a fallback always lands
+on something that provider actually serves.
 
-Operators can pin specific cognitive processes to specific (provider, model) pairs in the Token Usage dashboard's Settings dialog. Pin data persists at `.data/llm-proxy/llm-settings.json`. **Pinning expresses intent — the dispatcher never silently re-routes a pinned provider to a different one.** Within `claude-code`, the direct→CLI fallback ladder applies because both paths run on the same Max subscription.
+Providers are named by the **account that gets billed** (`claude-code-max`, `gh-copilot`), not the
+company. The old company-level labels above (`claude-code`, `copilot`, `anthropic`) survive only as
+`impl` values in the config and as historical `token_usage` rows the dashboard maps forward.
 
-![LLM Routing Settings dialog (Token Usage → Settings)](../images/llm-routing-settings-dialog.png)
+Edit through **Token Usage → Settings** — the *Routing* and *Fallback* tabs write the YAML back
+with comments preserved and validation before write, and the *Flow* tab draws the result as a graph
+weighted by real traffic.
+
+![LLM Routing settings — Routing tab](../images/llm-routing-settings.png)
+
+Within `claude-code-max`, the direct→CLI fallback ladder still applies, because both paths run on
+the same Max subscription.
+
+**Full reference: [LLM Routing](../architecture/llm-routing.md).** Prefer it over this section —
+it is maintained alongside the code that obeys it.
 
 ### Observed behaviour
 

@@ -52,10 +52,39 @@ dashboard, and here.
 | `anthropic-api` | `anthropic-api` | yes | Metered — distinct from `claude-code-max` |
 | `gaia` | `corporate-api` | — | Declared for completeness; **disabled**, no implementation yet |
 
-Model lists in the config are what each account **verifiably serves**, taken from 30 days of
-`token_usage` plus a catalogue probe — not from a vendor page. Notably the Copilot leg
-rejects every `opus` id with `400 The requested model is not supported`, so none is listed
-under `gh-copilot`.
+### `available_models` — the catalogue, separate from the choice
+
+Each provider declares two different things, and the distinction matters:
+
+```yaml
+gh-copilot:
+  available_models:            # everything this ACCOUNT can serve
+    - claude-haiku-4.5
+    - claude-sonnet-4.6
+    - claude-sonnet-5
+    - gpt-4o
+    - gpt-4o-mini
+  models:                      # which of them each BAND currently picks
+    small:  claude-haiku-4.5
+    medium: claude-sonnet-4.6
+    high:   claude-sonnet-5
+```
+
+`models` is a **choice out of** `available_models`. A band naming a model outside the
+catalogue **fails validation at boot**, with a message naming the key — so a stale id is
+caught the moment a vendor retires it, rather than as a `400` on the next call. It is also
+what lets the dashboard offer *alternatives* for a band: without a catalogue there is
+nothing to choose from.
+
+These lists are what each account **verifiably serves**, taken from 30 days of `token_usage`
+plus a catalogue probe — not from a vendor page. Notably the Copilot leg rejects every
+`opus` id with `400 The requested model is not supported`, so none is listed under
+`gh-copilot`. The Copilot CLI's *own* BYOK path does serve opus, but that is a different
+catalogue reached by a different route — **do not copy ids between the two**.
+
+The field is optional, and an **empty list constrains nothing**, so a provider can be
+declared before anyone has probed it. `gaia` is exactly that case. Without that escape
+hatch, adding the field to one provider would break every other.
 
 ---
 
@@ -194,6 +223,47 @@ the offending key.
 Provider badges show reachability (`unreachable`, `disabled`) separately from configuration.
 A provider being logged out is a *runtime fact*, never a routing decision — conflating the
 two is how "is it configured?" and "is it working?" became the same question.
+
+### The Flow tab — config against reality
+
+The two tables above are exact, but answering *"what goes where"* from them means holding
+35 route rows and 5 chains in your head at once. The **Flow** tab draws the same data — it
+is the same payload, not a second source of truth.
+
+![LLM Routing settings — Flow tab](../images/llm-routing-flow.png)
+
+Two things are kept deliberately distinct, because conflating them is the failure mode this
+whole page exists to avoid:
+
+| | Means | Drawn as |
+|---|---|---|
+| **Config** | Where a call is **declared** to go | Solid edges, always drawn — even for a provider that has served nothing |
+| **Traffic** | Where calls **actually went** | Edge thickness and the per-account token totals, from `token_usage` over the page's window |
+
+So a thick edge to a provider no route names means work is **arriving by fallback**. The
+screenshot above is that state: `gh-copilot` is the declared target of nearly every route
+and served **zero tokens**, while `claude-code-max` carries the traffic through the chain —
+because the Copilot quota is exhausted. Neither table shows this.
+
+Reading it:
+
+- The 31 background routes collapse to the **three `(provider, band)` pairs they actually
+  target**. That fan-in is the point; 31 near-identical nodes would bury it. Hover a group
+  for its member list.
+- The four foreground routes stay individual, because there the **agent identity is the
+  route key**.
+- Accounts are ordered subscriptions → metered keys → disabled, the config's own grouping,
+  and the one that answers *who is paying*.
+- Dashed edges are fallback chains; dotted are chains with a guard.
+- Account tooltips carry `available_models` — everything that account can serve, not just
+  the three bands currently pointed at it.
+
+The graph reads the **unsaved drafts**, so it is a live preview: change a provider on the
+Routing tab and the edge moves before you press Save.
+
+If `token_usage` is unreachable the graph still draws the configuration, just unweighted,
+with a note saying so. A flow diagram that renders nothing because a metrics call failed
+would be worse than one that renders the config alone.
 
 ### By hand
 

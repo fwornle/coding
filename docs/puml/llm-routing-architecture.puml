@@ -42,7 +42,7 @@ package "Provider accounts — billed separately" #F5F5F5 {
   }
 }
 
-component "Dashboard :3032\nToken Usage · LLM Routing" as dash <<api>>
+component "Dashboard :3032\nToken Usage · LLM Routing\nRouting · Fallback · Flow" as dash <<api>>
 
 ' ── Request path ────────────────────────────────────────────────────────────
 agent  -[#B22222]->  router : fg-chat/<agent>
@@ -77,6 +77,22 @@ note right of router
   provider's own table, so a fallback
   always gets a model that provider
   actually serves.
+
+  Each provider also declares
+  available_models — everything the
+  ACCOUNT can serve. The band table is a
+  choice out of it; a band naming a model
+  outside it fails validation at BOOT,
+  not as a 400 on the next call.
+end note
+
+note left of dash
+  The Flow tab overlays these two inputs:
+  CONFIG edges from llm-routing.yaml and
+  TRAFFIC weight from token_usage. A thick
+  edge to a provider no route names means
+  work is arriving by FALLBACK — which no
+  table on the other tabs can show.
 end note
 
 note right of maxsub
