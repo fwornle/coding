@@ -429,6 +429,36 @@ configure_proxy_routing() {
     exit 1
   fi
 
+  # Ask the proxy which model this agent's foreground conversation is routed to.
+  # The answer comes from rapid-llm-proxy config/llm-routing.yaml (`fg-chat/<agent>`),
+  # which is the same lookup the proxy itself performs on every request — so the
+  # launcher and the proxy cannot disagree about which model an agent is running.
+  #
+  # These used to be literals here (`claude-opus-4.8`, `claude-haiku-4-5`), which
+  # is how the launcher, the experiment harness and the proxy each ended up
+  # believing a different model was in use.
+  #
+  # Fail-soft: an empty result leaves the caller's own COPILOT_MODEL (or the
+  # agent's default) in place. The /health gate above already covers "proxy down";
+  # this guard is only for a config the proxy could not resolve, which it logs.
+  _resolve_routed_model() {
+    local agent="$1"
+    curl -sf --max-time 5 "${base}/api/llm/routing/resolve?job=fg-chat&agent=${agent}" 2>/dev/null \
+      | node -e '
+          let s = "";
+          process.stdin.on("data", (d) => { s += d; });
+          process.stdin.on("end", () => {
+            try {
+              // The HEAD of the chain — the provider the config routes to. The
+              // tail is the fallback order, which the proxy applies per request;
+              // the launcher only needs the model it starts the agent on.
+              const head = JSON.parse(s).chain?.[0];
+              if (head?.model) process.stdout.write(head.model);
+            } catch { /* unresolvable -> empty -> caller keeps its own default */ }
+          });
+        ' 2>/dev/null
+  }
+
   case "${AGENT_NAME:-$AGENT}" in
     claude)
       # VERIFIED: Claude Code honours ANTHROPIC_BASE_URL and forwards its Max-OAuth
@@ -490,12 +520,13 @@ configure_proxy_routing() {
         export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot/t/${TASK_ID}"
         export COPILOT_PROVIDER_TYPE="openai"
         export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
-        # Phase 88-01 (ALIGN-01): the copilot measured-span default lives in ONE place —
-        # lib/experiments/agent-routing.mjs (COPILOT_MEASURED_DEFAULT_MODEL) — consulted by BOTH
-        # the experiment cell path and this shell launcher. Fail-soft: `2>/dev/null || echo <literal>`
-        # keeps the interactive launcher byte-identical on the happy path and unbroken if node/helper
-        # is unavailable (no regression to the working launcher).
-        export COPILOT_MODEL="${COPILOT_MODEL:-$(node "${CODING_REPO}/lib/experiments/agent-routing.mjs" default copilot 2>/dev/null || echo claude-haiku-4-5)}"
+        # The model comes from the `fg-chat/copilot` route in rapid-llm-proxy
+        # config/llm-routing.yaml — the same lookup the proxy performs when it
+        # serves the request, so the launcher cannot announce one model while the
+        # proxy uses another. (Phase 88-01 centralised this in
+        # lib/experiments/agent-routing.mjs; the config file is now that one place,
+        # and it covers the proxy too, which the JS module never could.)
+        export COPILOT_MODEL="${COPILOT_MODEL:-$(_resolve_routed_model copilot)}"
         export COPILOT_AUTO_UPDATE="false"
         # COPILOT_PROVIDER_WIRE_MODEL is honoured if the caller pre-set it (wire name ≠ COPILOT_MODEL);
         # left inherited rather than forced, since the launcher has no wire-name mapping.
@@ -504,10 +535,13 @@ configure_proxy_routing() {
         export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot"
         export COPILOT_PROVIDER_TYPE="openai"
         export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
-        # The BYOK provider serves the proxy's copilot catalog, not GitHub's — default to the
-        # dotted opus id the proxy's copilot client verifiably serves (COPILOT_MODEL_MAP handles
-        # the -fast / dash aliases on the send path).
-        export COPILOT_MODEL="${COPILOT_MODEL:-claude-opus-4.8}"
+        # Same route as the measured path above — an interactive copilot session and
+        # a measured one must not run different models by accident, which is what
+        # the two separate literals here (claude-haiku-4-5 vs claude-opus-4.8) caused.
+        # Note the old opus default could not have worked through this leg anyway:
+        # the proxy's copilot catalogue rejects every opus id with
+        # `400 The requested model is not supported` (re-probed 2026-08-15).
+        export COPILOT_MODEL="${COPILOT_MODEL:-$(_resolve_routed_model copilot)}"
         export COPILOT_AUTO_UPDATE="false"
         _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; AMBIENT — task_id from reconciler slot; model=${COPILOT_MODEL}; opt-out COPILOT_AMBIENT_ROUTE=0)"
       else
