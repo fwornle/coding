@@ -460,6 +460,12 @@ PID=$(/bin/ps ax -o pid,command | grep -E "combined-status-line" | grep -v grep 
 
 Sessions get the correct command from `scripts/tmux-session-wrapper.sh`. Already-running sessions keep whatever they were created with, so after changing it either restart them or re-apply with `tmux set-option -t <session> status-right …`.
 
+!!! info "Narrow panes truncate rather than overflow"
+
+    `leftPadToStableCellWidth()` emits **exactly** `pane_width − status-left` cells at every size. When the content does not fit, it is truncated from the **left** — `status-right` is right-anchored, so the clock and LSL tranche survive and the leading badges are dropped, marked with a leading `…`.
+
+    A payload rendering at its natural width instead of the target is the bug, not the truncation: a content-dependent width is what leaves residue. If you see badges missing behind a `…`, the pane is simply too narrow for the full line — widen it or shorten the session name (the reserve is `len(session_name) + 3`).
+
 ### Status bar completely blank?
 
 ```bash
