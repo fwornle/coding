@@ -213,12 +213,63 @@ function statusLeftReserveCells() {
   return Math.min(name.length + 3, cap);
 }
 
+// Drop content from the LEFT until it fits `target` cells, keeping the right
+// edge intact. status-right is right-anchored and the rightmost segments (clock,
+// LSL tranche) are the ones worth preserving, so the leading badges are what go.
+//
+// Splitting has to be token-aware in two ways or it corrupts the payload:
+//   • `#[...]` style markers are zero-width and must never be cut in half — half
+//     a marker renders as literal text and desynchronises every following style.
+//   • a base codepoint plus its VS16 / ZWJ / combining marks is ONE visible cell
+//     group; slicing between them changes the rendered width.
+// Both are handled by tokenising rather than slicing by code unit.
+//
+// A leading … marks the elision, so a narrow pane reads as "truncated" rather
+// than as badges having silently vanished. The #[fg=default] reset in front of
+// it matters: truncation can drop an opening `#[fg=colourN]` while keeping the
+// `●#[fg=default]` that closed it, which would otherwise tint the ellipsis and
+// the first surviving glyph with whatever style was left active.
+function truncateFromLeftToCells(text, target) {
+  const ELLIPSIS = '…';                 // U+2026, EAW=Ambiguous ⇒ 1 cell (measured in tmux)
+  const budget = target - 1;            // reserve the ellipsis cell
+  if (budget <= 0) return ELLIPSIS;
+  // Escapes, not literals: VS16 / ZWJ / combining marks are invisible in source
+  // and a stray edit could silently delete one.
+  const tokens = text.match(/#\[[^\]]*\]|[\s\S][\uFE0F\u200D\u0300-\u036F]*/gu) || [];
+  const kept = [];
+  let w = 0;
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const tw = visibleCellWidth(tokens[i]);
+    if (w + tw > budget) break;
+    kept.push(tokens[i]);
+    w += tw;
+  }
+  kept.reverse();
+  return `#[fg=default]${ELLIPSIS}${kept.join('')}`;
+}
+
+// Returns a payload of EXACTLY `target` visible cells whenever target > 0.
+//
+// The exactness is the whole point: tmux does not clear status-right cells when
+// the payload shrinks, so any render-to-render width change leaves the previous
+// frame's rightmost cells on screen (the "15:322" trailing-digit artifact). This
+// used to return `text` untouched when it already met or exceeded the target,
+// which made the width content-dependent in exactly the case where content is
+// biggest — narrow panes — and reintroduced the residue there. Over-long content
+// is now truncated to the target instead of being emitted at its natural width.
 function leftPadToStableCellWidth(text, paneWidth) {
   const target = (parseInt(paneWidth, 10) || 200) - statusLeftReserveCells();
+  // Non-positive target means status-left alone already fills the row; there is
+  // no sane payload, so emit the text unchanged rather than blanking the bar.
   if (target <= 0) return text;
-  const cur = visibleCellWidth(text);
-  if (cur >= target) return text;
-  return ' '.repeat(target - cur) + text;
+  let body = text;
+  let cur = visibleCellWidth(body);
+  if (cur > target) {
+    body = truncateFromLeftToCells(body, target);
+    cur = visibleCellWidth(body);
+  }
+  if (cur >= target) return body;
+  return ' '.repeat(target - cur) + body;
 }
 
 // Load configuration
