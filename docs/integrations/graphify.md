@@ -1,181 +1,165 @@
 # Graphify
 
-Static, file-based code knowledge graph for semantic code understanding, relationship mapping, and intelligent code navigation.
+Static, file-based code knowledge graph built with tree-sitter. No database.
 
 ## Overview
 
-Graphify parses your codebase with tree-sitter into a static `graph.json` (NetworkX node-link format), enabling:
-
-- **Structural Code Search** - Find code by relationship, not just text matching
-- **Relationship Mapping** - Understand how functions, classes, and modules connect
-- **Call Graph Analysis** - Trace function calls and dependencies
-- **Impact Analysis** - Identify what code is affected by changes
-
-There is **no database, no Cypher, and no embeddings** — the entire graph is a single JSON file that is served over an HTTP MCP endpoint. All Python runs inside the `coding-services` container.
+| Property | Value |
+|----------|-------|
+| Component | `graphify` |
+| Type | MCP Server (HTTP) |
+| Runs in | `coding-services` container (supervisord `mcp-servers:graphify`) |
+| MCP endpoint | `http://localhost:3851/mcp` |
+| Graph | `graph.json` (NetworkX node-link) at `.data/graphify/graphify-out/graph.json` |
+| Host CLI | `bin/graphify` shim (→ `docker exec coding-services graphify …`) |
 
 ## Architecture
 
 ```mermaid
-flowchart LR
-    subgraph Input
-        SRC[Source Files]
-    end
-
-    subgraph Processing
-        PARSER[tree-sitter<br/>AST Parser]
-        BUILDER[Graph Builder<br/>NetworkX]
-    end
-
-    subgraph Storage
-        GJ[(graph.json<br/>node-link)]
-    end
-
-    subgraph Interfaces
-        MCP[MCP Server<br/>HTTP :3851]
-    end
-
-    SRC --> PARSER
-    PARSER --> BUILDER
-    BUILDER --> GJ
-    GJ <--> MCP
+graph TD
+    SRC[Source Files] --> PARSER[tree-sitter<br/>AST Parser]
+    PARSER --> BUILDER[Graph Builder<br/>NetworkX]
+    BUILDER --> GJ[(graph.json<br/>node-link)]
+    GJ <--> MCP[MCP Server<br/>HTTP :3851]
 ```
 
-**Components:**
-- **tree-sitter Parser** - Extracts AST/syntax tree from source files
-- **Graph Builder** - Builds a NetworkX graph of code elements and relationships
-- **graph.json** - Static node-link JSON at `.data/graphify/graphify-out/graph.json`, stamped with `built_at_commit`
-- **MCP Server** - HTTP MCP endpoint providing query tools for Claude Code / Copilot / OpenCode
+- **tree-sitter parser** — extracts the AST from source files
+- **Graph builder** — builds a NetworkX graph of code elements and their relationships
+- **`graph.json`** — static node-link JSON at `.data/graphify/graphify-out/graph.json`, stamped with `built_at_commit`
+- **MCP server** — HTTP endpoint serving query tools to Claude Code / Copilot / OpenCode
 
-## Where It Runs
+All Python stays inside the container. The host talks to it through the `bin/graphify` shim,
+which forwards to `docker exec coding-services graphify …`.
 
-Graphify runs **inside the `coding-services` container** as the supervisord program `mcp-servers:graphify`. It serves an HTTP MCP endpoint at:
+## What It Does
 
-| Service | Endpoint | Description |
-|---------|----------|-------------|
-| Graphify MCP | `http://localhost:3851/mcp` | HTTP MCP tools over the static graph |
+- **AST Extraction** - Parses code with tree-sitter into a static graph
+- **Graph Storage** - Persists nodes and relationships in a single `graph.json` (no database, no Cypher, no embeddings)
+- **Structural Search** - Query the graph for callers, dependencies, and paths
+- **Call Graph** - Function dependency analysis
+- **Path Finding** - Shortest path between two code concepts
 
-**MCP tools**: `query_graph`, `get_node`, `get_neighbors`, `shortest_path`, `graph_stats`, `god_nodes`.
+The graph is stamped with `built_at_commit` so staleness can be detected against `HEAD`.
 
-All Python stays in the container. The host talks to it through the `bin/graphify` shim, which forwards to `docker exec coding-services graphify …`.
+## MCP Tools
 
-## Extraction Scope
+| Tool | Description |
+|------|-------------|
+| `query_graph` | Structural / natural-language query over the graph (BFS/DFS) |
+| `get_node` | Retrieve a single node by id |
+| `get_neighbors` | List a node's neighbours |
+| `shortest_path` | Shortest path between two nodes |
+| `graph_stats` | Graph size and shape statistics |
+| `god_nodes` | Most-connected hub nodes |
 
-What graphify parses is controlled by a repo-root `.graphifyignore` file (same semantics as `.gitignore`). Add paths there to keep large or irrelevant trees out of the graph.
+## Actions
 
-## Installation
+### Query the Graph
 
-Graphify is a git submodule built into the `coding-services` Docker image — it ships with the container. No separate install or database provisioning is required. Bringing up the stack starts it automatically:
+```
+query_graph { "query": "What functions call UserService.create_user?" }
+```
+
+### Get a Node
+
+```
+get_node { "id": "app.services.UserService" }
+```
+
+### Shortest Path
+
+```
+shortest_path { "source": "ObservationWriter", "target": "obs-api" }
+```
+
+## Host CLI
+
+The `bin/graphify` shim forwards to the container — all Python stays inside `coding-services`:
 
 ```bash
-cd docker && docker-compose up -d coding-services
+graphify query "what calls captureForegroundTokens"     # structural query
+graphify path "ObservationWriter" "obs-api"             # shortest path
+graphify god-nodes --top 20                             # most-connected hubs
 ```
 
-The graph output directory (`.data/graphify/graphify-out/`) is bind-mounted, so the built `graph.json` persists on the host across container restarts.
+A `/graphify` skill is registered for claude / copilot / opencode.
 
-## Usage
+## The Graph File
 
-### Via MCP Tools
-
-Graphify exposes MCP tools accessible in Claude Code / Copilot / OpenCode:
-
-```javascript
-// Ask a structural question (BFS over the graph)
-mcp__graphify__query_graph({
-  query: "What functions call captureForegroundTokens?"
-})
-
-// Fetch a single node
-mcp__graphify__get_node({ id: "ObservationWriter" })
-
-// Explore neighbours of a node
-mcp__graphify__get_neighbors({ id: "ObservationWriter" })
-
-// Shortest path between two concepts
-mcp__graphify__shortest_path({ source: "ObservationWriter", target: "obs-api" })
-
-// Graph statistics / most-connected hubs
-mcp__graphify__graph_stats()
-mcp__graphify__god_nodes({ top: 20 })
-```
-
-### Via the Host CLI
-
-The `bin/graphify` shim forwards to the container:
+The graph is a static NetworkX node-link JSON — there is no database and no Cypher:
 
 ```bash
-graphify query "How does the ETM watchdog reclaim a stalled session?"   # BFS, broad context
-graphify query "what calls captureForegroundTokens" --dfs               # DFS, trace a path
-graphify path "ObservationWriter" "obs-api"                             # shortest path between two concepts
-graphify explain "CodeGraphAgent"                                       # plain-language node explanation
-graphify god-nodes --top 20                                            # most-connected hubs
+# Inspect the graph and its built_at_commit stamp
+ls -la .data/graphify/graphify-out/graph.json
+
+# Quick stats via the CLI
+graphify god-nodes --top 20
 ```
 
-A `/graphify` skill is registered for claude / copilot / opencode as the preferred entry point for structural codebase questions.
+Extraction scope is controlled by a repo-root `.graphifyignore`.
+
+## Indexed Entities
+
+| Entity Type | Description |
+|-------------|-------------|
+| `Function` | Functions and methods |
+| `Class` | Classes and types |
+| `Module` | Files and packages |
+| `Import` | Import relationships |
+| `Call` | Function call relationships |
+
+## Use Cases
+
+### Understanding Code
+
+```
+"What functions call registerWithPSM?"
+"Show me all classes that implement the Repository interface"
+"How does the authentication flow work?"
+```
+
+### Finding Dependencies
+
+```
+"What modules import UserService?"
+"Show the call graph for processPayment"
+```
 
 ## Rebuilding the Graph
 
-The `graph.json` is a static snapshot stamped with `built_at_commit`; rebuild it when it drifts behind `HEAD`.
-
 ```bash
-graphify update /workspace/coding        # incremental (AST only, no LLM) — fast, use this most of the time
-graphify extract /workspace/coding       # full re-extract incl. docs/PDF semantic pass (routes docs LLM via the proxy)
+graphify update /workspace/coding        # incremental (AST only) — fast, use this most of the time
+graphify extract /workspace/coding       # full re-extract (incl. docs semantic pass)
 graphify extract /workspace/coding --code-only   # full code re-extract, no LLM/network
 ```
 
-Paths are **container paths** — the repo is mounted read-only at `/workspace/coding`; output is written to the bind-mounted `.data/graphify`.
+The dashboard **Re-index** button runs `graphify update` via `scripts/graphify-reindex.sh`, and
+shows how many commits behind the graph currently is.
 
-### Dashboard Re-index Button
+Freshness is decided by comparing the graph's `built_at_commit` against `HEAD`:
 
-The System Health Dashboard shows how many commits behind the graph is and provides a **Re-index** button. That button runs `graphify update` (incremental AST) via `scripts/graphify-reindex.sh`.
-
-## Health Monitoring
-
-Graph freshness is monitored by the system health dashboard:
-
-- **Freshness Check**: Compares the graph's `built_at_commit` against current `HEAD`
-- **Dashboard**: Visible in the System Health Dashboard (`http://localhost:3032`)
-
-### Graph Freshness Status
-
-| Status | Commits Behind | Action |
-|--------|---------------|--------|
-| Fresh | 0-50 | None needed |
-| Stale | >50 | Re-index recommended (`graphify update`) |
-| Diverged | N/A (not in history) | Re-index required |
-| No Graph | N/A | Initial extraction needed (`graphify extract`) |
+| Status | Commits behind | Action |
+|--------|----------------|--------|
+| Fresh | 0–50 | none needed |
+| Stale | > 50 | re-index recommended (`graphify update`) |
+| Diverged | commit not in history | re-index required |
+| No graph | — | initial extraction needed (`graphify extract`) |
 
 ## Integration with Semantic Analysis
 
-The `analyze_code_graph` tool exposed by the semantic-analysis MCP server reads the **same** `graph.json` — there is no separate database to keep in sync.
+The `analyze_code_graph` tool in the semantic-analysis MCP server reads the same `graph.json` — no separate database to keep in sync.
 
 ## Troubleshooting
 
-### Container Not Running
+### Container not running
 
 ```bash
 # Symptom: "graphify: container 'coding-services' is not running"
 cd docker && docker-compose up -d coding-services
 ```
 
-### Graph Missing or Empty
+### Graph out of date
 
 ```bash
-# Verify the graph exists and check its built_at_commit stamp
-ls -la .data/graphify/graphify-out/graph.json
-
-# Build it from scratch
-graphify extract /workspace/coding
-```
-
-### Graph Out of Date
-
-```bash
-# Incremental rebuild (fast)
 graphify update /workspace/coding
 ```
-
-## Related Documentation
-
-- [Health System](../health-system/README.md) - System health monitoring including graph freshness
-- [Getting Started](../getting-started.md) - Installation and configuration
-- [System Overview](../system-overview.md) - How Graphify fits into the system

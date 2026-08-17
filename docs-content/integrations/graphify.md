@@ -13,6 +13,24 @@ Static, file-based code knowledge graph built with tree-sitter. No database.
 | Graph | `graph.json` (NetworkX node-link) at `.data/graphify/graphify-out/graph.json` |
 | Host CLI | `bin/graphify` shim (→ `docker exec coding-services graphify …`) |
 
+## Architecture
+
+```mermaid
+graph TD
+    SRC[Source Files] --> PARSER[tree-sitter<br/>AST Parser]
+    PARSER --> BUILDER[Graph Builder<br/>NetworkX]
+    BUILDER --> GJ[(graph.json<br/>node-link)]
+    GJ <--> MCP[MCP Server<br/>HTTP :3851]
+```
+
+- **tree-sitter parser** — extracts the AST from source files
+- **Graph builder** — builds a NetworkX graph of code elements and their relationships
+- **`graph.json`** — static node-link JSON at `.data/graphify/graphify-out/graph.json`, stamped with `built_at_commit`
+- **MCP server** — HTTP endpoint serving query tools to Claude Code / Copilot / OpenCode
+
+All Python stays inside the container. The host talks to it through the `bin/graphify` shim,
+which forwards to `docker exec coding-services graphify …`.
+
 ## What It Does
 
 - **AST Extraction** - Parses code with tree-sitter into a static graph
@@ -115,7 +133,17 @@ graphify extract /workspace/coding       # full re-extract (incl. docs semantic 
 graphify extract /workspace/coding --code-only   # full code re-extract, no LLM/network
 ```
 
-The dashboard **Re-index** button runs `graphify update` via `scripts/graphify-reindex.sh`.
+The dashboard **Re-index** button runs `graphify update` via `scripts/graphify-reindex.sh`, and
+shows how many commits behind the graph currently is.
+
+Freshness is decided by comparing the graph's `built_at_commit` against `HEAD`:
+
+| Status | Commits behind | Action |
+|--------|----------------|--------|
+| Fresh | 0–50 | none needed |
+| Stale | > 50 | re-index recommended (`graphify update`) |
+| Diverged | commit not in history | re-index required |
+| No graph | — | initial extraction needed (`graphify extract`) |
 
 ## Integration with Semantic Analysis
 
