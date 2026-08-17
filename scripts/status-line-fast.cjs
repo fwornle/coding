@@ -66,29 +66,36 @@ function reunderline(text, targetAbbrev) {
   return s;
 }
 
-// Lifecycle icons we may patch in place. Mirrors the bands in
-// combined-status-line.js:ageToActivityIcon. Health icons (🟡 / 🔴) are
-// excluded — those reflect ETM health, not idle age, and must come from
-// the full CSL.
+// Lifecycle icons we may patch in place. These MUST stay byte-identical to
+// LIFECYCLE_ICONS in combined-status-line.js: this file rewrites glyphs inside
+// a string that file produced, so the two are a matched pair. When they drifted
+// (this file still listing the retired emoji after CSL moved to the tinted-●
+// ramp) the patch regex simply stopped matching and silently no-op'd — bubbles
+// then froze at whatever the last full CSL render wrote. A silent no-op is the
+// friendly failure; the dangerous one is a PARTIAL match, where substituting a
+// glyph of a different cell width changes the payload width after CSL already
+// left-padded it, which reintroduces trailing residue.
 //
-// The icons fade green → orange → brown → black → 💤. 🟡 and 🔴 are
-// intentionally omitted: 🟡 is the warning indicator and 🔴 is the
-// critical indicator. Retired icons 🌲/🫒/🪨 had wcwidth mismatches
-// in tmux (🫒 U+1FAD2 and 🪨 U+1FAA8 are Unicode 13.0 — too new for
-// most tmux wcwidth tables; tmux counted them as 1 cell while VS
-// Code / iTerm rendered as 2, producing recurring right-edge
-// residue).
-const LIFECYCLE_ICONS = ['🟢', '🟠', '🟤', '⚫', '💤'];
+// Health icons (🟡 / 🔴) are excluded — those reflect ETM health, not idle age,
+// and must come from the full CSL.
+const LIFECYCLE_ICONS = [
+  '#[fg=colour41]●#[fg=default]',   // Active
+  '#[fg=colour34]●#[fg=default]',   // Cooling
+  '#[fg=colour28]●#[fg=default]',   // Fading
+  '#[fg=colour22]●#[fg=default]',   // Inactive
+  '#[fg=colour238]●#[fg=default]',  // Sleeping
+];
+const ICON_ACTIVE = LIFECYCLE_ICONS[0];
 function ageToActivityIcon(ageMs) {
-  // null age (no transcript anywhere) renders as Inactive ⚫, NOT Active 🟢.
-  // Same reasoning as combined-status-line.js: under-promise activity rather
-  // than mis-claim a stale session is Active.
-  if (ageMs == null) return '⚫';
-  if (ageMs < 5 * 60_000) return '🟢';
-  if (ageMs < 30 * 60_000) return '🟠';
-  if (ageMs < 6 * 60 * 60_000) return '🟤';
-  if (ageMs < 24 * 60 * 60_000) return '⚫';
-  return '💤';
+  // null age (no transcript anywhere) renders as Inactive, NOT Active. Same
+  // reasoning as combined-status-line.js: under-promise activity rather than
+  // mis-claim a stale session is Active.
+  if (ageMs == null) return LIFECYCLE_ICONS[3];
+  if (ageMs < 5 * 60_000) return LIFECYCLE_ICONS[0];
+  if (ageMs < 30 * 60_000) return LIFECYCLE_ICONS[1];
+  if (ageMs < 6 * 60 * 60_000) return LIFECYCLE_ICONS[2];
+  if (ageMs < 24 * 60 * 60_000) return LIFECYCLE_ICONS[3];
+  return LIFECYCLE_ICONS[4];
 }
 
 // Read the sidecar { projectName: {tp, hbTs} } map written by the full
@@ -119,8 +126,53 @@ function normalizeMappingEntry(v) {
 // alone so health-degraded sessions keep their warning icon. Returns
 // { text, anyTranscriptNewerThanCache } so the caller can decide
 // whether to also force a background refresh.
+// Newest timestamped record at the tail of a transcript .jsonl, or 0.
+// MUST mirror CombinedStatusLine._lastContentTimestampMs — this file is CommonJS
+// and CSL is ESM, so the logic is duplicated rather than imported; keep them in
+// step. Rationale (the whole reason this is not a plain statSync): Claude Code
+// rewrites four timestamp-less trailing records — last-prompt, ai-title, mode,
+// permission-mode — on a session that is merely open, so an abandoned
+// transcript's mtime stays minutes-fresh forever. Patching off mtime here would
+// silently re-promote idle projects to Active on every fast tick and undo the
+// content-derived bucketing CSL does.
+function lastContentTimestampMs(transcriptPath, tailBytes = 64 * 1024) {
+  if (!transcriptPath || !transcriptPath.endsWith('.jsonl')) return 0;
+  let fd = null;
+  try {
+    const size = fs.statSync(transcriptPath).size;
+    if (size === 0) return 0;
+    const readLen = Math.min(size, tailBytes);
+    const buf = Buffer.allocUnsafe(readLen);
+    fd = fs.openSync(transcriptPath, 'r');
+    fs.readSync(fd, buf, 0, readLen, size - readLen);
+    const lines = buf.toString('utf8').split('\n');
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line || line[0] !== '{') continue;
+      let rec;
+      try { rec = JSON.parse(line); } catch { continue; }
+      if (!rec || typeof rec.timestamp !== 'string') continue;
+      const ts = Date.parse(rec.timestamp);
+      if (Number.isFinite(ts)) return ts;
+    }
+    return 0;
+  } catch {
+    return 0;
+  } finally {
+    if (fd !== null) {
+      try { fs.closeSync(fd); } catch { /* fd already gone */ }
+    }
+  }
+}
+
+// Escape regex metacharacters. REQUIRED now that the lifecycle icons are tmux
+// style strings: `#[fg=colour41]●#[fg=default]` contains `[` and `]`, which an
+// unescaped alternation would parse as a character class — matching single
+// characters instead of the intended glyph, and corrupting the payload.
+function reEscape(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
 function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
-  const lifecycleAlt = LIFECYCLE_ICONS.join('|');
+  const lifecycleAlt = LIFECYCLE_ICONS.map(reEscape).join('|');
   let out = text;
   let anyNewer = false;
 
@@ -134,7 +186,12 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
   const now = Date.now();
   for (const [, { tp, hbTs, subMt, caTs }, abbrev] of entries) {
     let parentMt;
-    try { parentMt = fs.statSync(tp).mtimeMs; } catch { continue; }
+    // Content timestamp, not mtime — see lastContentTimestampMs above. Falls
+    // back to mtime only when no timestamped record is readable (non-Claude
+    // transcript), which is also the only case where mtime carries meaning.
+    try {
+      parentMt = lastContentTimestampMs(tp) || fs.statSync(tp).mtimeMs;
+    } catch { continue; }
     // Effective mtime folds in the freshest sub-agent transcript so the
     // bubble reflects activity happening inside Task-tool / wave-execute
     // sub-agents (whose writes don't touch the parent .jsonl). Phase 51
@@ -151,8 +208,8 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     // immune to the sparse hourly-bucketed specstory mtime that lags far
     // behind a long OpenCode turn; fall back to transcript mtime when absent.
     const activeAge = caTs > 0 ? (now - caTs) : (now - mt);
-    if (newIcon !== '🟢' && hbTs > 0 && (now - hbTs) < 5 * 60_000 && activeAge < 45 * 60_000) {
-      newIcon = '🟢';
+    if (newIcon !== ICON_ACTIVE && hbTs > 0 && (now - hbTs) < 5 * 60_000 && activeAge < 45 * 60_000) {
+      newIcon = ICON_ACTIVE;
     }
     // anyNewer also fires if a sub-agent file is fresher than the cache —
     // so the next tick triggers a CSL refresh that re-walks subagents/

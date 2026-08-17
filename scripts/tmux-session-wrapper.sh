@@ -73,7 +73,17 @@ tmux_session_wrapper() {
   # letting status-line-fast.cjs / combined-status-line.js size the right-pad to fit
   # the actual pane width (the prerequisite for residue-free trailing-edge filling).
   local transcript_project="${TRANSCRIPT_SOURCE_PROJECT:-${CODING_PROJECT_DIR:-$(pwd)}}"
-  local status_cmd="CODING_REPO=${coding_repo} TRANSCRIPT_SOURCE_PROJECT=${transcript_project} TMUX_PANE_WIDTH=#{pane_width} node ${coding_repo}/scripts/status-line-fast.cjs"
+  # TMUX_SESSION_NAME + TMUX_STATUS_LEFT_LENGTH are what let the renderer reserve
+  # the cells status-left occupies (statusLeftReserveCells() in
+  # combined-status-line.js). WITHOUT them the reserve silently evaluates to 0 and
+  # status-right is padded to the FULL pane width, so status-left + status-right
+  # exceeds window_width — tmux overruns the two and xterm.js leaks the previous
+  # frame's rightmost cells as trailing residue (the "15:322" / "07:407"
+  # leftover-digit artifact). The reserve fix lived only in ~/.tmux.conf's GLOBAL
+  # status-right, which every session created here overrides one line below, so it
+  # never actually ran. Both values come from tmux formats so they track the real
+  # session name and the configured status-left-length rather than a guess.
+  local status_cmd="CODING_REPO=${coding_repo} TRANSCRIPT_SOURCE_PROJECT=${transcript_project} TMUX_PANE_WIDTH=#{pane_width} TMUX_SESSION_NAME=#{session_name} TMUX_STATUS_LEFT_LENGTH=#{status-left-length} node ${coding_repo}/scripts/status-line-fast.cjs"
 
   # Export so tmux environment inherits it (needed for the status-right #() command)
   export CODING_REPO

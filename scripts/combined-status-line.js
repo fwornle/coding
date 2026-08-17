@@ -2269,8 +2269,8 @@ class CombinedStatusLine {
          // (fresh ETM heartbeat), a high obsAge means "observation pending
          // until the exchange closes" — NOT a stale/dead pipeline — so render
          // healthy. Genuine in-session breakage still surfaces via the
-         // 'unreachable' case below ([📚🔴]). Only fade when truly idle.
-         parts.push(userActive ? '[📚✅]' : `[📚${obsIcon}]`);
+         // 'unreachable' case below (red dot). Only fade when truly idle.
+         parts.push(userActive ? `[📚${STATE_DOTS.OK}]` : `[📚${obsIcon}]`);
          break;
        case 'busy':
          // Consolidation is blocking obs_api's event loop. The pipeline is
