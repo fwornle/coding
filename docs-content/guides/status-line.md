@@ -9,7 +9,7 @@ Real-time visual indicators of system health and development activity rendered v
 ### Example Display
 
 ```
-[🏥✅] [RA⚫C🟢] [🔒77% ⚙️IMP] [📚✅] [N:VPN] [P:ON] [📋18-19] 18:34
+[🏥✅] [RA●C●] [🔒77% ⚙️IMP] [📚✅] [N:VPN] [P:ON] [📋18-19] 18:34
 ```
 
 The current pane's project is rendered with an underline (`#[underscore]…#[nounderscore]`) so each parallel tmux window highlights its own project.
@@ -19,7 +19,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | Component | Example | Description |
 |-----------|---------|-------------|
 | System Health | `[🏥✅]` | Coordinator-derived health rollup (services + databases + container) |
-| Active Sessions | `[RA⚫C🟢]` | Per-project abbreviations with graduated activity icons |
+| Active Sessions | `[RA●C●]` | Per-project abbreviations with a graduated green activity ramp |
 | Constraint | `[🔒77%]` | Code quality % (with optional `🟡N` violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
 | Network Location | `[N:VPN]` | Network environment: VPN / CN / OPEN / ?? |
@@ -45,33 +45,42 @@ The badge is derived live from the coordinator at `:3034/health/state`. There is
 
 ### Session Activity Indicators
 
-Sessions use a **graduated color scheme** based on time since last activity. **All sessions are always displayed** — sleeping sessions show as 💤, never hidden. Sessions are only removed when the agent process exits.
+Sessions use a **graduated green ramp** based on time since last activity. **All sessions are always displayed** — sleeping sessions show as a grey dot, never hidden. Sessions are only removed when the agent process exits.
 
-The "time since last activity" signal is the project's Claude `.jsonl` transcript mtime — i.e., the time of the last *prompt boundary*. A long-running agent turn (one prompt that takes 25 minutes) writes nothing to the transcript while it's in flight, so a project actively being worked on by an agent looks idle by mtime alone. To capture that, a **heartbeat promotion** rule overrides the transcript-derived band: if the project's ETM heartbeat (`state.lsl[*].lastBeat`) is fresh (< 5 min) and the transcript-derived icon would be anything other than 🟢, the icon is promoted to 🟢. The heartbeat is the canonical "agent/user is here right now" signal. The promotion also handles non-Claude sessions (OpenCode / Copilot) whose `transcriptPath` is not a real file — pure transcript-mtime logic would mis-bucket them.
+The "time since last activity" signal is the **newest timestamped record** in the project's Claude `.jsonl` transcript — i.e. the time of the last *prompt boundary*.
 
-| Icon | Status | Time Since Activity | Description |
-|------|--------|---------------------|-------------|
-| 🟢 | Active | < 5 minutes | Active session with recent activity |
-| 🟠 | Cooling | 5 - 30 minutes | Session cooling down |
-| 🟤 | Fading | 30 min - 6 hours | Session fading, still tracked |
-| ⚫ | Inactive | 6 - 24 hours | Session inactive but tracked |
-| 💤 | Sleeping | > 24 hours | Long-term dormant session |
+!!! warning "It is deliberately not the file's mtime"
+
+    Claude Code rewrites four trailing bookkeeping records — `last-prompt`, `ai-title`, `mode`, `permission-mode` — on a session that is merely *open*, and none of them carry a `timestamp`. A transcript last spoken to days ago therefore has an mtime from minutes ago. Bucketing on mtime pinned every live session near the top of the ramp and made the Fading / Inactive / Sleeping rungs unreachable; only timestamped records mean somebody actually said something.
+
+A long-running agent turn (one prompt that takes 25 minutes) writes nothing to the transcript while it's in flight, so a project actively being worked on by an agent looks idle by timestamp alone. To capture that, a **heartbeat promotion** rule overrides the transcript-derived band: if the project's ETM heartbeat (`state.lsl[*].lastBeat`) is fresh (< 5 min) **and** there is genuine recent content activity, a non-Active band is promoted to Active. The heartbeat alone is not sufficient — it also fires after laptop wake — which is why the second condition exists. The promotion also handles non-Claude sessions (OpenCode / Copilot) whose `transcriptPath` is not a real file.
+
+| Shade | Band | Age since last activity | Meaning |
+|-------|------|-------------------------|---------|
+| ● bright green (`colour41`) | Active | < 5 minutes | Someone is working here now |
+| ● mid green (`colour34`) | Cooling | 5 – 30 minutes | Just stepped away |
+| ● dark green (`colour28`) | Fading | 30 min – 6 hours | Idle, still tracked |
+| ● very dark green (`colour22`) | Inactive | 6 – 24 hours | Dormant but open |
+| ● grey (`colour238`) | Sleeping | > 24 hours | Long-term dormant |
 | ❌ | Error | Any | Health check failed or service crash |
 
-**Visual progression:** circles fade green → orange → brown → black, then 💤 once the session has been idle over a day.
+**Visual progression:** one glyph, five shades — the dot darkens through green as the signal ages, then drops to grey once the session has been idle over a day. Unicode has only one green circle emoji, so the ramp is a 1-cell `●` tinted with tmux colours rather than an emoji sequence.
 ```
-🟢 Active → 🟠 Cooling → 🟤 Fading → ⚫ Inactive → 💤 Sleeping
+● Active → ● Cooling → ● Fading → ● Inactive → ● Sleeping
+(colour41 → colour34 → colour28 → colour22 → colour238)
    <5min      5-30min     30m-6hr     6-24hr       >24hr
 ```
 
 !!! note "Color choice rationale"
-    🟡 (yellow) and 🔴 (red) are intentionally omitted from the lifecycle — they are reserved as health-state indicators (warning / critical) in the `[🏥]`, `[LSL]`, `[📚]` and `[🧠]` badges. Lifecycle icons must be distinguishable from health icons at a glance, so the lifecycle uses green → orange → brown → black exclusively.
+    🟡 (yellow) and 🔴 (red) are intentionally omitted from the lifecycle — they are reserved as health-state indicators (warning / critical) in the `[🏥]`, `[LSL]`, `[📚]` and `[🧠]` badges. An alarm must *break* the pattern rather than read as one more point on the fade scale, so the lifecycle stays inside a single green ramp and the alarms stay emoji.
+
+    The ramp used to detour through 🟠 (orange) and 🟤 (brown) for its middle rungs, because Unicode contains exactly **one** green circle emoji (🟢 U+1F7E2) — a green fade is simply not expressible in emoji. Those hue swings read as distinct *states* rather than as a fading signal. Switching to a tmux-tinted `●` gives a real luminance ramp, and as a side benefit removes the emoji-width hazard: `●` (U+25CF) is one cell in both tmux and the terminal, so it needs no `codepoint-widths` override to stay aligned.
 
 !!! info "Agent Age Cap"
     When an agent process (Claude, Copilot, OpenCode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant — the session starts green and naturally progresses through the cooling scheme based on how long the current session has been idle.
 
 !!! warning "Not-Found Transcript Guard"
-    Agents that don't produce Claude-compatible transcripts (e.g., OpenCode) have `transcriptInfo.status: 'not_found'`. The age cap logic skips these sessions — they correctly display as ⚫ inactive instead of falsely showing as 🟢 active.
+    Agents that don't produce Claude-compatible transcripts (e.g., OpenCode) have `transcriptInfo.status: 'not_found'`. The age cap logic skips these sessions — they correctly display as the Inactive shade instead of falsely showing as Active.
 
 ### Network & Proxy Indicators
 
@@ -114,11 +123,11 @@ The badge reflects the freshness of the **observation → digest → insight** p
 | Status | Icon | Meaning |
 |--------|------|---------|
 | Healthy | `[📚✅]` | Last observation written within 15 minutes — pipeline is ingesting |
-| Fresh | `[📚🟢]` | Last observation 15 min – 1 hour ago |
-| Aging | `[📚🟠]` | Last observation 1 – 3 hours ago |
-| Fading | `[📚🟤]` | Last observation 3 – 6 hours ago |
-| Dormant | `[📚⚫]` | Last observation 6 – 12 hours ago |
-| Sleeping | `[📚💤]` | Last observation > 12 hours ago |
+| Fresh | `[📚●]` bright green | Last observation 15 min – 1 hour ago |
+| Aging | `[📚●]` mid green | Last observation 1 – 3 hours ago |
+| Fading | `[📚●]` dark green | Last observation 3 – 6 hours ago |
+| Dormant | `[📚●]` very dark green | Last observation 6 – 12 hours ago |
+| Sleeping | `[📚●]` grey | Last observation > 12 hours ago |
 | Disabled | `[📚🔇]` | obs_api reachable but no rows in any pipeline table |
 | Unknown | `[📚❓]` | Coordinator just started, slice not yet populated |
 | Unreachable | `[📚🔴]` | obs_api unreachable, returning non-OK, or returning unparseable JSON |
@@ -229,7 +238,7 @@ The recurring trailing-digit residue at the right edge (`07:538`, `12:411`, `07:
 **Full refresh:**
 
 1. **Shared coordinator probe**: a single memoized `fetch(:3034/health/state)` per render (with one retry @ 1.5 s) feeds five `getXxxStatus()` methods — replaces the previous pattern of 5 independent `execSync(curl)` calls per render
-2. **Per-project activity age**: stat each `lsl[*].transcriptPath` mtime → bucket into the lifecycle (🟢 / 🟠 / 🟤 / ⚫ / 💤). A fresh ETM heartbeat (< 5 min) promotes a non-Active band to 🟢 (captures long-running agent turns and non-Claude sessions).
+2. **Per-project activity age**: read the newest timestamped record in each `lsl[*].transcriptPath` (bounded tail read, NOT the file mtime) → bucket into the ramp (bright → mid → dark → very dark green → grey). A fresh ETM heartbeat (< 5 min) plus genuine content activity promotes a non-Active band to 🟢 (captures long-running agent turns and non-Claude sessions).
 3. **Constraint compliance**: separate call to constraint-monitor API (port 3031)
 4. **Render**: assemble parts, pad to paneWidth cells via `leftPadToStableCellWidth()` using VS16-aware `visibleCellWidth()` — see [Right-edge stability](#right-edge-stability-cell-width-consistency) above
 5. **Cache write**: save to `.logs/combined-status-line-cache-<project>-w<paneWidth>.txt`
@@ -273,7 +282,7 @@ The supervision architecture includes guards to prevent runaway process spawning
 - Coordinator unreachable → Offline (💤)
 
 **Session States** (graduated cooling scheme):
-- Driven by `transcriptPath` mtime in coordinator state, bucketed: 🟢 (<5 m) → 🟠 (<30 m) → 🟤 (<6 h) → ⚫ (<24 h) → 💤 (≥24 h)
+- Driven by the newest timestamped record in `transcriptPath` (not its mtime), bucketed: colour41 (<5 m) → colour34 (<30 m) → colour28 (<6 h) → colour22 (<24 h) → colour238 (≥24 h)
 - **Heartbeat-promotion override:** if `lsl[*].lastBeat` is < 5 min, any non-🟢 band is overridden to 🟢. Captures long-running agent turns (one prompt that takes >5 min) and non-Claude sessions whose `transcriptPath` is not a real file
 - Sessions only removed when the project's ETM stops heartbeating, never hidden while alive
 
@@ -382,7 +391,7 @@ After editing, run `tmux source-file ~/.tmux.conf`. New tmux sessions inherit it
 Every 15 seconds, the statusline-health-monitor broadcasts status to all Claude session terminals via ANSI escape codes:
 
 ```
-Terminal Tab: "C🟢 | UT🟤 CA🟠"
+Terminal Tab: "C● | UT● CA●"
               ↑          ↑
         Current     Other active sessions
         project     (all sessions shown)

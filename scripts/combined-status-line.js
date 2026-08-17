@@ -123,6 +123,34 @@ function visibleCellWidth(s) {
   return width;
 }
 
+// Activity-lifecycle ramp for the per-project bubbles and the [📚] observation
+// badge: one glyph, five shades, monotonically darker as the signal ages.
+//
+// Why a coloured glyph and not emoji: Unicode has exactly ONE green circle
+// (🟢 U+1F7E2), so a green fade is impossible with emoji — which is why the
+// ladder used to detour through 🟠 (orange) and 🟤 (brown) for its middle rungs.
+// Those read as different *states*, not as a fading green, and the hue swing
+// carried no meaning. A 1-cell ● tinted through a green ramp is a real
+// luminance scale, so "older" is legible without a legend.
+//
+// Width: ● is U+25CF, EAW=Ambiguous ⇒ 1 cell in both tmux and xterm.js under a
+// non-East-Asian locale (measured: tmux cursor advance = 1). visibleCellWidth()
+// already lands on 1 for it via the narrow fallthrough, and already strips
+// #[...] markers as zero-width, so neither needs changing. Unlike the emoji it
+// replaces, ● needs no `codepoint-widths` entry in ~/.tmux.conf to stay aligned.
+//
+// 256-colour indices, not #RRGGBB: this string is emitted through a tmux
+// `#(...)` shell substitution, and tmux re-parses that output for formats where
+// `#` is itself the escape introducer. Indices keep the payload free of `#`
+// outside the `#[...]` markers. Hex equivalents noted for reference.
+const LIFECYCLE_ICONS = {
+  ACTIVE:   '#[fg=colour41]●#[fg=default]',   // #00d75f  bright green
+  COOLING:  '#[fg=colour34]●#[fg=default]',   // #00af00  mid green
+  FADING:   '#[fg=colour28]●#[fg=default]',   // #008700  dark green
+  INACTIVE: '#[fg=colour22]●#[fg=default]',   // #005f00  very dark green
+  SLEEPING: '#[fg=colour238]●#[fg=default]',  // #444444  grey — off the green scale
+};
+
 // Left-pad a status-line payload with regular spaces so tmux always allocates
 // the same number of cells for status-right, regardless of payload length.
 //
@@ -484,14 +512,71 @@ class CombinedStatusLine {
       // the coordinator's userActiveNow) the proxy-probe back-off. Use the
       // transcript .jsonl mtime, written by the CLI only on real tool calls / user
       // messages — the authentic activity clock.
+      // Correction: the claim above that the .jsonl mtime is "written by the CLI
+      // only on real tool calls / user messages" is FALSE. Claude Code also
+      // rewrites four timestamp-less trailing records (last-prompt, ai-title,
+      // mode, permission-mode) on a session that is merely open, so the mtime of
+      // an abandoned session stays minutes-fresh indefinitely — which kept
+      // userActiveNow() true, and background LLM work running, long after the
+      // user walked away. Use the newest timestamped record instead; fall back to
+      // mtime only when no timestamp is readable.
       return Object.values(lsl).some(entry => {
         if (!entry || entry.status === 'stopped' || !entry.transcriptPath) return false;
-        let mt = 0;
-        try { mt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { mt = 0; }
+        let mt = CombinedStatusLine._lastContentTimestampMs(entry.transcriptPath);
+        if (mt === 0) {
+          try { mt = fs.statSync(entry.transcriptPath).mtimeMs; } catch { mt = 0; }
+        }
         return mt > 0 && (now - mt) < FRESH_MS;
       });
     })();
     return this._userActivePromise;
+  }
+
+  /**
+   * Newest `timestamp` (ms) among the real conversation records at the tail of a
+   * transcript .jsonl, or 0 when none can be read.
+   *
+   * Why this exists: the file's mtime is NOT an activity signal. Claude Code
+   * rewrites four trailing bookkeeping records — last-prompt, ai-title, mode,
+   * permission-mode — on a session that is merely *open*, and none of them carry
+   * a `timestamp`. A transcript last spoken to on Friday therefore has a mtime
+   * from minutes ago. Only timestamped records mean somebody said something.
+   *
+   * Bounded on purpose: this runs on every status-line tick (multiple times a
+   * second across panes), so it reads at most the last TAIL_BYTES and scans
+   * backwards, stopping at the first timestamp it finds. Transcripts grow to
+   * many MB; reading them whole here would be a per-tick cost regression.
+   */
+  static _lastContentTimestampMs(transcriptPath, tailBytes = 64 * 1024) {
+    if (!transcriptPath || !transcriptPath.endsWith('.jsonl')) return 0;
+    let fd = null;
+    try {
+      const size = fs.statSync(transcriptPath).size;
+      if (size === 0) return 0;
+      const readLen = Math.min(size, tailBytes);
+      const buf = Buffer.allocUnsafe(readLen);
+      fd = fs.openSync(transcriptPath, 'r');
+      fs.readSync(fd, buf, 0, readLen, size - readLen);
+      const lines = buf.toString('utf8').split('\n');
+      // Scan backwards: the newest timestamped record wins. A truncated first
+      // line (we started mid-record) simply fails to parse and is skipped.
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim();
+        if (!line || line[0] !== '{') continue;
+        let rec;
+        try { rec = JSON.parse(line); } catch { continue; }
+        if (!rec || typeof rec.timestamp !== 'string') continue;
+        const ts = Date.parse(rec.timestamp);
+        if (Number.isFinite(ts)) return ts;
+      }
+      return 0;
+    } catch {
+      return 0;
+    } finally {
+      if (fd !== null) {
+        try { fs.closeSync(fd); } catch { /* fd already gone */ }
+      }
+    }
   }
 
   /**
@@ -518,7 +603,21 @@ class CombinedStatusLine {
    */
   static _effectiveActivityMtime(parentTranscriptPath, projectName, registry) {
     let mt = 0;
-    try { mt = fs.statSync(parentTranscriptPath).mtimeMs; } catch { /* ignore */ }
+    // Prefer the newest CONTENT timestamp over the raw file mtime. A live-but-idle
+    // Claude session keeps rewriting timestamp-less trailing metadata records
+    // (last-prompt / ai-title / mode / permission-mode), so the mtime of a
+    // transcript nobody has touched for days still reads "minutes old". That made
+    // every project bubble stick at Active: the mtime landed in the Cooling band
+    // and the ETM-heartbeat promotion below then rounded it up to Active, so the
+    // Fading / Inactive / Sleeping rungs were unreachable for any running session.
+    // The last timestamped entry is the honest clock. Fall back to mtime only when
+    // no timestamp can be read (non-Claude transcripts, unreadable file).
+    const contentMt = CombinedStatusLine._lastContentTimestampMs(parentTranscriptPath);
+    if (contentMt > 0) {
+      mt = contentMt;
+    } else {
+      try { mt = fs.statSync(parentTranscriptPath).mtimeMs; } catch { /* ignore */ }
+    }
     if (registry && projectName) {
       try {
         const subMt = registry.getProjectSubMt(projectName, { stateDir: join(rootDir, '.data') });
@@ -1063,7 +1162,17 @@ class CombinedStatusLine {
             try {
               const jsonls = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
               for (const f of jsonls) {
-                const age = Date.now() - fs.statSync(join(dir, f)).mtimeMs;
+                // Content timestamp, not mtime — same reason as
+                // _lastContentTimestampMs: idle sessions churn their trailing
+                // metadata records and would otherwise all read as minutes-fresh.
+                // Because freshestAge takes the MINIMUM across every source, one
+                // mtime-derived reading here is enough to outvote an accurate
+                // multi-day age from the specstory scan below, so this path has to
+                // be content-derived too or the fix does nothing.
+                const full = join(dir, f);
+                const contentMt = CombinedStatusLine._lastContentTimestampMs(full);
+                const mt = contentMt > 0 ? contentMt : fs.statSync(full).mtimeMs;
+                const age = Date.now() - mt;
                 if (freshestAge === null || age < freshestAge) freshestAge = age;
               }
             } catch { /* try next candidate */ }
@@ -1094,12 +1203,12 @@ class CombinedStatusLine {
         // Treat it as Inactive ⚫ rather than Active 🟢 — better to
         // under-promise activity than to over-promise it, and the user
         // can tell at a glance that this session has no observable signal.
-        if (ageMs === null) return '⚫';
-        if (ageMs < 5 * 60_000) return '🟢';
-        if (ageMs < 30 * 60_000) return '🟠';
-        if (ageMs < 6 * 60 * 60_000) return '🟤';
-        if (ageMs < 24 * 60 * 60_000) return '⚫';
-        return '💤';
+        if (ageMs === null) return LIFECYCLE_ICONS.INACTIVE;
+        if (ageMs < 5 * 60_000) return LIFECYCLE_ICONS.ACTIVE;
+        if (ageMs < 30 * 60_000) return LIFECYCLE_ICONS.COOLING;
+        if (ageMs < 6 * 60 * 60_000) return LIFECYCLE_ICONS.FADING;
+        if (ageMs < 24 * 60 * 60_000) return LIFECYCLE_ICONS.INACTIVE;
+        return LIFECYCLE_ICONS.SLEEPING;
       };
       // Freshest ETM heartbeat age for a project. Used to promote the
       // transcript-derived icon to 🟢 when the ETM is actively observing
@@ -1138,22 +1247,25 @@ class CombinedStatusLine {
           icon = ageToActivityIcon(activityAgeMs);
           // Heartbeat promotion: if the transcript-derived icon is not
           // already Active but the ETM is heartbeating fresh (<5min),
-          // override to 🟢. The transcript is updated only at prompt
+          // override to Active. The transcript advances only at prompt
           // boundaries, so a session in the middle of a long agent turn
-          // looks idle by mtime but is actually in full swing. The
+          // looks idle by timestamp but is actually in full swing. The
           // heartbeat is the canonical "monitor is alive" signal, but on
           // its own it also fires after laptop wake — so we gate promotion
           // on genuine recent activity. Prefer the ETM's real-time
-          // content-activity clock (immune to sparse specstory writes);
-          // fall back to the transcript mtime only when it's unavailable.
-          if (icon !== '🟢') {
+          // content-activity clock; fall back to the transcript age only
+          // when it's unavailable. Both are now content-derived (the
+          // fallback used to be raw mtime, which an idle session's metadata
+          // rewrites kept minutes-fresh — that made this promotion
+          // unconditional and pinned every live session at Active).
+          if (icon !== LIFECYCLE_ICONS.ACTIVE) {
             const hbAge = heartbeatAgeMs(projectName);
             const contentAge = contentActivityAgeMs(projectName);
             const activeEnough = contentAge !== null
               ? contentAge < 45 * 60_000
               : (activityAgeMs !== null && activityAgeMs < 45 * 60_000);
             if (hbAge !== null && hbAge < 5 * 60_000 && activeEnough) {
-              icon = '🟢';
+              icon = LIFECYCLE_ICONS.ACTIVE;
             }
           }
 
@@ -1162,8 +1274,10 @@ class CombinedStatusLine {
         } else {
           icon = '🔴';
         }
-        // All graduated activity icons (🟢🟠🟤⚫💤) reflect a healthy ETM
-        // with varying user-activity age. Only 🟡 / 🔴 are unhealthy.
+        // All five ramp shades (see LIFECYCLE_ICONS) reflect a healthy ETM with
+        // varying user-activity age. Only 🟡 / 🔴 are unhealthy — they stay emoji
+        // deliberately, because an alarm should NOT read as a point on the fade
+        // scale; it has to break the pattern to catch the eye.
         const sessionStatus = icon === '🟡' ? 'warning'
                             : icon === '🔴' ? 'unhealthy'
                             : 'healthy';
@@ -2105,11 +2219,11 @@ class CombinedStatusLine {
      const obsIcon = (() => {
        if (obsAgeMs == null) return '❓';
        if (obsAgeMs < 15 * 60_000) return '✅';
-       if (obsAgeMs < 60 * 60_000) return '🟢';
-       if (obsAgeMs < 3 * 60 * 60_000) return '🟠';
-       if (obsAgeMs < 6 * 60 * 60_000) return '🟤';
-       if (obsAgeMs < 24 * 60 * 60_000) return '⚫';
-       return '💤';
+       if (obsAgeMs < 60 * 60_000) return LIFECYCLE_ICONS.ACTIVE;
+       if (obsAgeMs < 3 * 60 * 60_000) return LIFECYCLE_ICONS.COOLING;
+       if (obsAgeMs < 6 * 60 * 60_000) return LIFECYCLE_ICONS.FADING;
+       if (obsAgeMs < 24 * 60 * 60_000) return LIFECYCLE_ICONS.INACTIVE;
+       return LIFECYCLE_ICONS.SLEEPING;
      })();
      switch (knowledge.status) {
        case 'healthy':

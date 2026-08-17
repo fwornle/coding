@@ -6,7 +6,7 @@
 > - The `[🏥...]` health badge reads live from the coordinator at `:3034/health/state`; the `.health/verification-status.json` file is no longer written.
 > - Per-pane LSL status comes from the coordinator's `lsl_by_project` rollup + `lsl[*].transcriptPath` mtime; the `.logs/statusline-health-status.txt` file is no longer written.
 > - The right edge is anchored with codepoint-floor padding (≥220 codepoints, after stripping zero-width tmux markup) plus a non-breaking-space terminator (U+00A0) to survive tmux's `#(shell-cmd)` trailing-whitespace strip.
-> - The graduated cooling lifecycle (🟢 → 🟠 → 🟤 → ⚫ → 💤) is preserved and is now driven by `lsl[*].transcriptPath` mtime instead of in-memory monitor state.
+> - The graduated cooling lifecycle (a single `●` ramped colour41 → colour34 → colour28 → colour22 → colour238) is preserved and is now driven by the newest timestamped record in `lsl[*].transcriptPath` — NOT its mtime, instead of in-memory monitor state.
 > - `[program:health-verifier]` and `[program:browser-access]` supervisord blocks are gone.
 
 Real-time visual indicators of system health and development activity, rendered in the **tmux status bar** for all coding agents (Claude Code, CoPilot, and future agents).
@@ -167,20 +167,21 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
-| 🟢 | Active | < 5 minutes | Active session with recent activity |
-| 🟠 | Cooling | 5 - 30 minutes | Session cooling down |
-| 🟤 | Fading | 30 min - 6 hours | Session fading, still tracked |
-| ⚫ | Inactive | 6 - 24 hours | Session inactive but tracked |
-| 💤 | Sleeping | > 24 hours | Long-term dormant session |
+| ● bright green (`colour41`) | Active | < 5 minutes | Someone is working here now |
+| ● mid green (`colour34`) | Cooling | 5 - 30 minutes | Just stepped away |
+| ● dark green (`colour28`) | Fading | 30 min - 6 hours | Idle, still tracked |
+| ● very dark green (`colour22`) | Inactive | 6 - 24 hours | Dormant but open |
+| ● grey (`colour238`) | Sleeping | > 24 hours | Long-term dormant |
 | ❌ | Error | Any | Health check failed or service crash |
 
 **Session Lifecycle**:
 ```
-🟢 Active → 🟠 Cooling → 🟤 Fading → ⚫ Inactive → 💤 Sleeping
+● Active → ● Cooling → ● Fading → ● Inactive → ● Sleeping
+(colour41 → colour34 → colour28 → colour22 → colour238)
    <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
 ```
 
-**Sessions are only removed** when the agent process has exited (session closed). A session with a running agent always shows as 🟢 Active, regardless of transcript age.
+**Sessions are only removed** when the agent process has exited (session closed). A running agent does NOT pin the session to Active — that was a bug (the file mtime is bumped by timestamp-less bookkeeping records on a merely-open session), fixed by bucketing on the newest timestamped record. Regardless of transcript age.
 
 **No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings (e.g. stale health data). Normal session inactivity is shown through the graduated cooling sequence.
 
@@ -364,18 +365,18 @@ Where:
 - **Offline** (💤) - Health verifier not running
 
 **Session Activity States** (for project sessions - graduated cooling scheme):
-- **Active** (🟢) - Currently active (< 5 min)
-- **Cooling** (🟠) - Recently active (5-30 min)
-- **Fading** (🟤) - Activity fading (30 min - 6 hr)
+- **Active** (● colour41) - Currently active (< 5 min)
+- **Cooling** (● colour34) - Recently active (5-30 min)
+- **Fading** (● colour28) - Activity fading (30 min - 6 hr)
 
-- **Inactive** (⚫) - Session idle (6-24 hr) - last visible state
-- **Sleeping** (💤) - Long-term dormant (> 24 hr) - still shown
+- **Inactive** (● colour22) - Session idle (6-24 hr) - last visible state
+- **Sleeping** (● colour238) - Long-term dormant (> 24 hr) - still shown
 
 **Transitions**:
 - Health check success → Healthy (✅)
 - GCM or Health Verifier issues → Warning (⚠️)
 - Critical failures → Critical (❌)
-- Time passage → 🟢 → 🟠 → 🟤 → ⚫ → 💤
+- Time passage → ● colour41 → colour34 → colour28 → colour22 → colour238
 - Sessions only removed when agent exits, never hidden while running
 
 ### Status Display States
@@ -570,7 +571,7 @@ The status line system now includes **automatic terminal title updates** that wo
 Every 15 seconds, the statusline-health-monitor broadcasts status to all Claude session terminals via ANSI escape codes:
 
 ```
-Terminal Tab: "C🟢 | UT🟤 CA🟠"
+Terminal Tab: "C● | UT● CA●"
               ↑          ↑
         Current     Other active sessions
         project     (sleeping sessions hidden)

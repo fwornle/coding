@@ -733,6 +733,17 @@ class EnhancedTranscriptMonitor {
           const exchanges = await this.getUnprocessedExchanges();
           if (exchanges.length > 0) {
             await this.processExchanges(exchanges);
+            // Real content-activity clock. Keyed on PARSED EXCHANGES, not on the
+            // `currentSize !== tracker.lastFileSize` test above, because a file-size
+            // change is NOT evidence of conversation content: an idle Claude session
+            // keeps rewriting timestamp-less trailing metadata records
+            // (last-prompt / ai-title / mode / permission-mode), which move both the
+            // size and the mtime. Keying on size here would republish "active" for a
+            // session untouched for days and re-create the false-green the statusline
+            // promotion guard exists to prevent. Metadata records never parse into
+            // exchanges, and lastProcessedUuid is persisted, so a restart cannot
+            // replay old ones — this signal only fires on genuinely new conversation.
+            this.lastContentActivityTs = Date.now();
           }
           // Long-turn coverage: evaluate a progress fire on EVERY poll while a
           // turn is in flight — not only when NEW exchanges landed. opencode/
@@ -4466,10 +4477,18 @@ ORDER BY m.time_created ASC;`;
       const hasNew = stats.size !== this.lastFileSize;
       this.lastFileSize = stats.size;
 
-      // Update activity time when we see new content
+      // Update activity time when we see new content.
+      //
+      // NOTE: lastContentActivityTs is deliberately NOT set here. File size is a
+      // poor proxy for conversation content — an idle Claude session keeps
+      // rewriting timestamp-less trailing metadata (last-prompt / ai-title / mode
+      // / permission-mode), which grows the file without anyone typing. The
+      // content clock is stamped where exchanges are actually parsed (see the
+      // processExchanges call sites), which metadata records never reach.
+      // The OpenCode branch above is different and DOES stamp it: there the
+      // signal is a message COUNT, which only advances on real messages.
       if (hasNew) {
         this.lastActivityTime = Date.now();
-        if (this._contentBaselined) this.lastContentActivityTs = Date.now();
       }
       this._contentBaselined = true;
 
@@ -4845,6 +4864,9 @@ ORDER BY m.time_created ASC;`;
         this.isProcessingSince = Date.now();
         try {
           const exchanges = await this.getUnprocessedExchanges();
+          // Real content-activity clock — see the note in hasNewContent() for why
+          // this keys on parsed exchanges and not on the file-size test.
+          if (exchanges.length > 0) this.lastContentActivityTs = Date.now();
           console.log(`[ObsDebug-single] ${exchanges.length} exchanges, promptSet=${this.currentUserPromptSet.length}, lastUuid=${this.lastProcessedUuid?.slice(-8) || 'none'}`);
           if (exchanges.length > 0) {
             await this.processExchanges(exchanges);
