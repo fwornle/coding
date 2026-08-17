@@ -105,8 +105,8 @@ note bottom of STATUSLINE
   Knowledge pipeline fading:
   📚✅ fresh (<15min)
   📚🟢 recent (15min-1h)
-  📚🟠 aging (1-3h)
-  📚🟤 stale (3-6h)
+  📚● aging (1-3h, mid green)
+  📚● stale (3-6h, dark green)
   📚⚫ dormant (6-12h)
   📚💤 deep dormant (>12h)
   📚🔴 ONLY when obs_api
