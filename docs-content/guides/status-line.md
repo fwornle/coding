@@ -9,7 +9,7 @@ Real-time visual indicators of system health and development activity rendered v
 ### Example Display
 
 ```
-[🏥✅] [RA●C●] [🔒77% ⚙️IMP] [📚✅] [N:VPN] [P:ON] [📋18-19] 18:34
+[🏥●] [RA●C●] [🔒77% ⚙️IMP] [📚●] [N:VPN] [P:ON] [📋18-19] 18:34
 ```
 
 The current pane's project is rendered with an underline (`#[underscore]…#[nounderscore]`) so each parallel tmux window highlights its own project.
@@ -18,10 +18,10 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 
 | Component | Example | Description |
 |-----------|---------|-------------|
-| System Health | `[🏥✅]` | Coordinator-derived health rollup (services + databases + container) |
+| System Health | `[🏥●]` green | Coordinator-derived health rollup (services + databases + container) |
 | Active Sessions | `[RA●C●]` | Per-project abbreviations with a graduated green activity ramp |
-| Constraint | `[🔒77%]` | Code quality % (with optional `🟡N` violations sub-segment when non-zero) |
-| Knowledge Pipeline | `[📚✅]` | Observation/digest/insight pipeline freshness |
+| Constraint | `[🔒77%]` | Code quality % (with optional `●N` (amber) violations sub-segment when non-zero) |
+| Knowledge Pipeline | `[📚●]` green | Observation/digest/insight pipeline freshness |
 | Network Location | `[N:VPN]` | Network environment: VPN / CN / OPEN / ?? |
 | Proxy Status | `[P:AUTO]` | Local proxy daemon (proxydetox): ON / AUTO / OFF |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
@@ -29,7 +29,28 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 
 ---
 
-## Complete Emoji Reference
+## Complete Glyph Reference
+
+Every badge follows one rule: **the emoji is the label, the dot is the state.**
+
+The leading emoji (🏥 🔒 📚 🧠) says *what the badge is about* and never changes. The glyph after it says *how that thing is doing*, and when the answer is purely a severity it is a tinted `●` on a shared four-colour scale:
+
+| Dot | Meaning | tmux colour |
+|-----|---------|-------------|
+| ● green | Healthy | `colour41` — the same green as an Active project, so "green means fine" reads identically everywhere on the bar |
+| ● amber | Warning — degraded, or violations present | `colour214` |
+| ● red | Critical — downed service, unreachable API | `colour196` |
+| ● grey | Idle or offline | `colour238` |
+
+Some states are **not** severities, and those keep a pictogram, because a dot scale can only say *how bad* — never *what happened*:
+
+| Glyph | Meaning |
+|-------|---------|
+| ⏰ | Stale — the data itself is too old to trust |
+| ⏳ | Pending / aging |
+| 🔇 | Suppressed (idle-quiesced, not broken) |
+| ❓ | Unknown — probe returned nothing usable |
+| 🚫 | Blocked |
 
 ### System Health Indicators
 
@@ -37,11 +58,11 @@ The badge is derived live from the coordinator at `:3034/health/state`. There is
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[🏥✅]` | All systems healthy | None needed |
-| `[🏥🟡]` | Non-critical issue (e.g. degraded service or GCM warning) | Check dashboard for details |
+| `[🏥●]` green | All systems healthy | None needed |
+| `[🏥●]` amber | Non-critical issue (e.g. degraded service or GCM warning) | Check dashboard for details |
 | `[🏥⏰]` | **Stale** — coordinator's `generated_at` >3 minutes old | Coordinator may be down; check container |
-| `[🏥❌]` | Critical issue (downed service, unhealthy DB, container probe fail) | Immediate attention required |
-| `[🏥💤]` | Coordinator unreachable | Verify dashboard service is running |
+| `[🏥●]` red | Critical issue (downed service, unhealthy DB, container probe fail) | Immediate attention required |
+| `[🏥●]` grey | Coordinator unreachable | Verify dashboard service is running |
 
 ### Session Activity Indicators
 
@@ -72,7 +93,7 @@ A long-running agent turn (one prompt that takes 25 minutes) writes nothing to t
 ```
 
 !!! note "Color choice rationale"
-    🟡 (yellow) and 🔴 (red) are intentionally omitted from the lifecycle — they are reserved as health-state indicators (warning / critical) in the `[🏥]`, `[LSL]`, `[📚]` and `[🧠]` badges. An alarm must *break* the pattern rather than read as one more point on the fade scale, so the lifecycle stays inside a single green ramp and the alarms stay emoji.
+    The lifecycle stays inside a single green ramp so that "older" is a smooth luminance change rather than a hue jump. Project-level alarms (🟡 warning / 🔴 critical, emitted when the ETM itself is degraded or stopped) stay **emoji** on purpose: an alarm must *break* the pattern, not read as one more point on the fade scale.
 
     The ramp used to detour through 🟠 (orange) and 🟤 (brown) for its middle rungs, because Unicode contains exactly **one** green circle emoji (🟢 U+1F7E2) — a green fade is simply not expressible in emoji. Those hue swings read as distinct *states* rather than as a fading signal. Switching to a tmux-tinted `●` gives a real luminance ramp, and as a side benefit removes the emoji-width hazard: `●` (U+25CF) is one cell in both tmux and the terminal, so it needs no `codepoint-widths` override to stay aligned.
 
@@ -122,7 +143,7 @@ The badge reflects the freshness of the **observation → digest → insight** p
 
 | Status | Icon | Meaning |
 |--------|------|---------|
-| Healthy | `[📚✅]` | Last observation written within 15 minutes — pipeline is ingesting |
+| Healthy | `[📚●]` green | Last observation written within 15 minutes — pipeline is ingesting |
 | Fresh | `[📚●]` bright green | Last observation 15 min – 1 hour ago |
 | Aging | `[📚●]` mid green | Last observation 1 – 3 hours ago |
 | Fading | `[📚●]` dark green | Last observation 3 – 6 hours ago |
@@ -130,7 +151,7 @@ The badge reflects the freshness of the **observation → digest → insight** p
 | Sleeping | `[📚●]` grey | Last observation > 12 hours ago |
 | Disabled | `[📚🔇]` | obs_api reachable but no rows in any pipeline table |
 | Unknown | `[📚❓]` | Coordinator just started, slice not yet populated |
-| Unreachable | `[📚🔴]` | obs_api unreachable, returning non-OK, or returning unparseable JSON |
+| Unreachable | `[📚●]` red | obs_api unreachable, returning non-OK, or returning unparseable JSON |
 
 !!! note "Red is reserved for pipeline failure"
     🔴 is shown **only** when `obs_api` is unreachable (confirmed pipeline failure). Time-based staleness uses a graduated fading scheme (🟢 → 🟠 → 🟤 → ⚫ → 💤) — red is never used for age alone.

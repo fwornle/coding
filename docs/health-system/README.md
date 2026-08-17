@@ -287,21 +287,21 @@ The status line appears automatically in Claude Code:
 
 **Native Mode:**
 ```
-[C● UT●] [🔒67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
+[C● UT●] [🔒67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚●] [🏥●] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:✅] [C● UT●] [🔒67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
+[🐳] [🐳MCP:✅] [C● UT●] [🔒67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚●] [🏥●] 📋17-18
 ```
 
 **Components:**
 - `[🐳]` - Docker mode indicator (only shown when running in Docker mode)
 - `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, GF=Graphify
 - `[C● UT●]` - Active sessions on the green activity ramp (all sessions shown, grey dot for sleeping)
-- `[🔒67%]` - Constraint compliance percentage (with optional `🟡N` violations sub-segment when non-zero)
-- `[📚✅]` - Knowledge system status (icons only, no counts)
-- `[🏥✅]` - Unified health (GCM + Health Verifier + Enforcement)
+- `[🔒67%]` - Constraint compliance percentage (with optional `●N` (amber) violations sub-segment when non-zero)
+- `[📚●]` green - Knowledge system status (icons only, no counts)
+- `[🏥●]` green - Unified health (GCM + Health Verifier + Enforcement)
 - `📋17-18` - LSL time window (HHMM-HHMM)
 
 See [Status Line System](./status-line.md) for complete documentation.

@@ -164,7 +164,7 @@ Output:
 ```
 🔒 Live Guardrails - System Status
 ═══════════════════════════════════════════════
-📊 Current Status: [🔒85%] [🧠✅]
+📊 Current Status: [🔒85%] [🧠●]
 
 🎯 Detailed Metrics:
 📊 Compliance: 85%
@@ -232,9 +232,9 @@ The Live Guardrails system monitors for:
 
 The `/lg` command complements the status line display:
 
-**Status Line**: `[🔒85%] [🧠✅]`
+**Status Line**: `[🔒85%] [🧠●]`
 - Quick visual indicator in every message
-- Compact format (drops to `[🔒75%🟡4]` when active violations are present)
+- Compact format (drops to `[🔒75%●4]` when active violations are present)
 
 **`/lg` Command**: Detailed breakdown
 - Full compliance metrics

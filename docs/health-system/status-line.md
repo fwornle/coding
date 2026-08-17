@@ -32,12 +32,12 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Native Mode:**
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] 📋17-18
+[🏥●] [Gq$0FEB A$0 O$0 X$25] [C● UT●] [🔒67% 🔍EX] [📚●] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:SA✅CM✅GF✅] [🏥✅] [C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] 📋17-18
+[🐳] [🐳MCP:SA✅CM✅GF✅] [🏥●] [C● UT●] [🔒67% 🔍EX] [📚●] 📋17-18
 ```
 
 ### Reading the Status Line
@@ -47,10 +47,10 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 **Components**:
 - `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
 - `[🐳MCP:SA✅CM✅GF✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
-- `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
-- `[C🟢 UT🟤]` - **Active Sessions**: Project abbreviations with activity icons
-- `🔒67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `🟡N` violations sub-segment when non-zero)
-- `[📚✅]` - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
+- `[🏥●]` green - **System Health**: Unified health (infrastructure + services)
+- `[C● UT●]` - **Active Sessions**: Project abbreviations with activity icons
+- `🔒67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `●N` (amber) violations sub-segment when non-zero)
+- `[📚●]` green - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
 ### Internal Health Status (Raw Output)
@@ -109,15 +109,15 @@ The `[🏥...]` section shows **unified system health** combining:
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[🏥✅]` | All systems healthy | None needed |
-| `[🏥🟡]` | Issues detected | Check dashboard for details |
+| `[🏥●]` green | All systems healthy | None needed |
+| `[🏥●]` amber | Issues detected | Check dashboard for details |
 | `[🏥⏰]` | **Stale** - verification data >2 minutes old | Health verifier may have crashed |
-| `[🏥❌]` | Critical issues or error | Immediate attention required |
-| `[🏥💤]` | Health verifier offline | Start health verifier |
+| `[🏥●]` red | Critical issues or error | Immediate attention required |
+| `[🏥●]` grey | Health verifier offline | Start health verifier |
 
 **Note**: Violation counts are no longer shown in the status line. Details are available on the health dashboard at http://localhost:3033.
 
-**Common Causes of `[🏥🟡]` (Issues)**:
+**Common Causes of `[🏥●]` amber (Issues)**:
 - Constraint enforcement disabled
 - Service health check failures
 - Database connectivity issues
@@ -287,12 +287,12 @@ The status line displays information for **multiple active coding agent sessions
 
 **Single Active Session**:
 ```
-[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢] [🔒67% 🔍EX] [📚✅] 📋17-18
+[🏥●] [Gq$0FEB A$0 O$0 X$25] [C●] [🔒67% 🔍EX] [📚●] 📋17-18
 ```
 
 **Multiple Active Sessions**:
 ```
-[🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤 CA🟠] [🔒67% 🔍EX] [📚✅] 📋17-18
+[🏥●] [Gq$0FEB A$0 O$0 X$25] [C● UT● CA●] [🔒67% 🔍EX] [📚●] 📋17-18
 ```
 
 Where:
@@ -443,7 +443,7 @@ node scripts/status-line-fast.cjs
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥🟡] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🟤] [🔒67% 🔍EX] [📚✅] 📋17-18
+# [🏥●] [Gq$0FEB A$0 O$0 X$25] [C● UT●] [🔒67% 🔍EX] [📚●] 📋17-18
 ```
 
 ### Troubleshooting

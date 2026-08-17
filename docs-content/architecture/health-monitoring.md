@@ -127,9 +127,9 @@ Statusline mapping (`combined-status-line.js`):
 
 | `semantic_ok` | `semantic_strong_ok` | Badge | Meaning |
 |:-:|:-:|:-:|---|
-| `true` | `true` | `[🧠✅]` | Both probes pass. |
+| `true` | `true` | `[🧠●]` green | Both probes pass. |
 | `true` | `false` | `[🧠⚠️]` (amber) | Cheap path fine, configured pipeline silently broken (typical example: observation-writer pinned to `claude-code/sonnet`, Anthropic 429 + no working fallback). |
-| `false` | any | `[🧠❌]` / `[🧠🟡]` per existing rules | Proxy itself is unreachable; auto-heal FSM engages. |
+| `false` | any | `[🧠●]` red / `[🧠●]` amber per existing rules | Proxy itself is unreachable; auto-heal FSM engages. |
 | `null` | any | `[🧠❓]` | Pre-first-probe. |
 
 The strong probe runs **fire-and-forget** with a 30s timeout — the CLI-fallback path through claude-code/sonnet currently takes ~14s end-to-end, and we don't want the strong probe serializing the coordinator's tick loop. Errors are caught and write to `semantic_strong_reason` for diagnostics.
@@ -318,7 +318,7 @@ If the coordinator proxy fails (network or coordinator down) the dashboard falls
 
 ## Troubleshooting
 
-### Coordinator unreachable / `[🏥💤]`
+### Coordinator unreachable / `[🏥●]` grey
 
 ```bash
 # Is the container up?
