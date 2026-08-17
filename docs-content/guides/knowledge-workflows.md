@@ -283,12 +283,12 @@ Knowledge ages over time with configurable decay rates:
 
 | Status | Icon | Meaning |
 |--------|------|---------|
-| Ready | `[📚✅]` | Knowledge extraction ready and operational |
+| Ready | `[📚●]` green | Knowledge extraction ready and operational |
 | Processing | `[📚⏳]` | Actively extracting knowledge from session |
-| Idle | `[📚💤]` | Operational but waiting/sleeping |
-| Warning | `[📚🟡 🟡N]` | Has N errors but still operational |
+| Idle | `[📚●]` grey | Operational but waiting/sleeping |
+| Warning | `[📚●]` amber + `●N` | Has N errors but still operational |
 | Paused/Disabled | `[📚🔇]` | Knowledge extraction disabled in config |
-| Offline | `[📚❌]` | System offline or initialization failed |
+| Offline | `[📚●]` red | System offline or initialization failed |
 
 ---
 

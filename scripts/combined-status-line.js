@@ -151,6 +151,28 @@ const LIFECYCLE_ICONS = {
   SLEEPING: '#[fg=colour238]●#[fg=default]',  // #444444  grey — off the green scale
 };
 
+// Severity dots for the badge states ([🏥] health, [🔒] constraints, [📚]
+// knowledge pipeline, [🧠] online learning).
+//
+// Same principle as LIFECYCLE_ICONS, applied to the other half of the bar: the
+// LABEL stays an emoji because it identifies *what* the badge is about, while
+// the STATE becomes a tinted dot because it only ever encodes *how bad it is*.
+// Before this split the bar mixed two dot idioms side by side — coloured ●
+// project bubbles next to a 🟡 emoji dot in [🔒78%🟡5] — which read as two
+// unrelated scales. OK deliberately reuses the ramp's Active green so "green
+// means fine" is one language across the whole line.
+//
+// Deliberately NOT converted: ⏰ (stale), ⏳ (pending), 🔇 (suppressed),
+// ❓ (unknown), 🚫 (blocked). Those are not severities — they say *why* a badge
+// is not green, and collapsing them into one amber dot would destroy that. A
+// dot scale can only express "how bad", never "what happened".
+const STATE_DOTS = {
+  OK:   '#[fg=colour41]●#[fg=default]',   // #00d75f  healthy      (was ✅)
+  WARN: '#[fg=colour214]●#[fg=default]',  // #ffaf00  warning      (was 🟡)
+  CRIT: '#[fg=colour196]●#[fg=default]',  // #ff0000  critical     (was ❌ / 🔴)
+  IDLE: '#[fg=colour238]●#[fg=default]',  // #444444  idle/offline (was ⚫ / 💤)
+};
+
 // Left-pad a status-line payload with regular spaces so tmux always allocates
 // the same number of cells for status-right, regardless of payload length.
 //
@@ -2092,28 +2114,28 @@ class CombinedStatusLine {
         && !healthVerifier.autoHealingActive;
 
       if (criticalCount > 0) {
-        parts.push('[🏥❌]'); // Critical - check dashboard
+        parts.push(`[🏥${STATE_DOTS.CRIT}]`); // Critical - check dashboard
         overallColor = 'red';
       } else if (!gcmHealthy) {
-        parts.push('[🏥🟡]'); // GCM unhealthy (independent of verifier)
+        parts.push(`[🏥${STATE_DOTS.WARN}]`); // GCM unhealthy (independent of verifier)
         if (overallColor === 'green') overallColor = 'yellow';
       } else if (verifierHealthy || violationCount === 0) {
-        parts.push('[🏥✅]'); // All healthy (GCM + services)
+        parts.push(`[🏥${STATE_DOTS.OK}]`); // All healthy (GCM + services)
       } else {
-        parts.push('[🏥🟡]'); // Non-accepted violations
+        parts.push(`[🏥${STATE_DOTS.WARN}]`); // Non-accepted violations
         if (overallColor === 'green') overallColor = 'yellow';
       }
     } else if (healthVerifier && healthVerifier.status === 'stale') {
       parts.push('[🏥⏰]'); // Stale
       if (overallColor === 'green') overallColor = 'yellow';
     } else if (!gcmHealthy) {
-      parts.push('[🏥🟡]'); // GCM unhealthy
+      parts.push(`[🏥${STATE_DOTS.WARN}]`); // GCM unhealthy
       if (overallColor === 'green') overallColor = 'yellow';
     } else if (healthVerifier && healthVerifier.status === 'error') {
-      parts.push('[🏥❌]'); // Error
+      parts.push(`[🏥${STATE_DOTS.CRIT}]`); // Error
       if (overallColor === 'green') overallColor = 'yellow';
     } else {
-      parts.push('[🏥💤]'); // Offline
+      parts.push(`[🏥${STATE_DOTS.IDLE}]`); // Offline
     }
 
     // Sessions Display (without separate GCM indicator - merged into 🏥)
@@ -2176,26 +2198,27 @@ class CombinedStatusLine {
       const score = `${compliancePercent}%`;
       const violationsCount = constraint.violations || 0;
 
-      // Build constraint section: shield + score + optional violations.
-      // The pre/post 🟡 spaces were anti-overlap workarounds back when
-      // ⚠️ (U+26A0) had a cell-width mismatch between tmux's wcwidth and
-      // xterm.js's rendered glyph — a 1-cell drift visually clobbered
-      // adjacent characters. After moving warning indicators to 🟡
-      // (U+1F7E1, EAW=Wide) AND adding the explicit codepoint-widths
-      // override in ~/.tmux.conf, the cell count agrees across script,
-      // tmux, and renderer — the spaces are no longer needed.
+      // Build constraint section: shield + score + optional violations. The
+      // violation count carries an amber severity dot rather than a 🟡 emoji —
+      // see STATE_DOTS. Historical note, because it keeps getting rediscovered:
+      // the spaces that used to bracket that indicator were anti-overlap
+      // workarounds from when ⚠️ (U+26A0) had a cell-width mismatch between
+      // tmux's wcwidth and xterm.js's rendered glyph, and the 1-cell drift
+      // visually clobbered adjacent characters. No padding is needed now —
+      // ● (U+25CF) is unambiguously one cell in both, so unlike every emoji it
+      // replaces it needs no codepoint-widths override in ~/.tmux.conf at all.
       let constraintPart = `[🔒${score}`;
       if (violationsCount > 0) {
-        constraintPart += `🟡${violationsCount}`;
+        constraintPart += `${STATE_DOTS.WARN}${violationsCount}`;
         overallColor = 'yellow';
       }
       constraintPart += `]`;
       parts.push(constraintPart);
     } else if (constraint.status === 'degraded') {
-      parts.push('[🔒 🟡]');
+      parts.push(`[🔒 ${STATE_DOTS.WARN}]`);
       overallColor = 'yellow';
     } else {
-      parts.push('[🔒 ❌]');
+      parts.push(`[🔒 ${STATE_DOTS.CRIT}]`);
       overallColor = 'red';
     }
 
@@ -2227,7 +2250,7 @@ class CombinedStatusLine {
      })();
      switch (knowledge.status) {
        case 'healthy':
-         parts.push('[📚✅]');
+         parts.push(`[📚${STATE_DOTS.OK}]`);
          break;
        case 'stale':
        case 'stalled':
@@ -2266,7 +2289,7 @@ class CombinedStatusLine {
        case 'unreachable':
        default:
          // obs_api service itself is down — this IS broken.
-         parts.push('[📚🔴]');
+         parts.push(`[📚${STATE_DOTS.CRIT}]`);
          if (overallColor === 'green') overallColor = 'red';
          break;
      }
@@ -2312,7 +2335,7 @@ class CombinedStatusLine {
     // Visually distinguishable.
     switch (proxy?.status) {
       case 'healthy':
-        parts.push('[🧠✅]');
+        parts.push(`[🧠${STATE_DOTS.OK}]`);
         break;
       case 'partial':
         // 3b: cheap haiku probe OK, configured semantic pipeline failing
@@ -2323,16 +2346,16 @@ class CombinedStatusLine {
         // tmux/terminal cell-width mismatch on U+26A0+VS16 documented at
         // lines 60-61 / 1912 of this file, which leaks trailing chars
         // past the visible-drift threshold.
-        parts.push('[🧠🟡]');
+        parts.push(`[🧠${STATE_DOTS.WARN}]`);
         if (overallColor === 'green') overallColor = 'yellow';
         break;
       case 'degraded':
         // Idle suppression: a degraded proxy semantic-probe during idle is
         // typically the probe-window missing rather than a real outage.
         if (!userActive) {
-          parts.push('[🧠⚫]');
+          parts.push(`[🧠${STATE_DOTS.IDLE}]`);
         } else {
-          parts.push('[🧠🟡]');
+          parts.push(`[🧠${STATE_DOTS.WARN}]`);
           if (overallColor === 'green') overallColor = 'yellow';
         }
         break;
@@ -2340,7 +2363,7 @@ class CombinedStatusLine {
         // The auto-heal cooldown state is transient; during idle it's not
         // a user-actionable problem — show idle instead of red.
         if (!userActive) {
-          parts.push('[🧠⚫]');
+          parts.push(`[🧠${STATE_DOTS.IDLE}]`);
         } else {
           parts.push('[🧠🚫]');
           overallColor = 'red';
@@ -2354,7 +2377,7 @@ class CombinedStatusLine {
         break;
       case 'unreachable':
       default:
-        parts.push('[🧠❌]');
+        parts.push(`[🧠${STATE_DOTS.CRIT}]`);
         if (overallColor === 'green') overallColor = 'yellow';
         break;
     }

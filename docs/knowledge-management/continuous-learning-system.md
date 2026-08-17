@@ -200,7 +200,7 @@ CODING_REPO=/path/to/coding node scripts/combined-status-line.js
 node scripts/test-knowledge-extraction.js [--verbose]
 ```
 
-**Expected status line**: `[📚✅]` - Knowledge extraction ready and operational
+**Expected status line**: `[📚●]` green - Knowledge extraction ready and operational
 
 **Expected test results**: 6/8 tests pass (2 tests require actual session data)
 
@@ -210,12 +210,12 @@ The status line shows the current state of the knowledge management system:
 
 | Status | Icon | Meaning |
 |--------|------|---------|
-| Ready | `[📚✅]` | Knowledge extraction ready and operational |
+| Ready | `[📚●]` green | Knowledge extraction ready and operational |
 | Processing | `[📚⏳]` | Actively extracting knowledge from session |
-| Idle | `[📚💤]` | Operational but waiting/sleeping |
-| Warning | `[📚🟡 🟡N]` | Has N errors but still operational |
+| Idle | `[📚●]` grey | Operational but waiting/sleeping |
+| Warning | `[📚●]` amber + `●N` | Has N errors but still operational |
 | Paused/Disabled | `[📚🔇]` | Knowledge extraction disabled in config |
-| Offline | `[📚❌]` | System offline or initialization failed |
+| Offline | `[📚●]` red | System offline or initialization failed |
 
 ### Automatic Operation
 

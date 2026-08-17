@@ -343,7 +343,7 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 
 ### Current Display
 ```
-[C● UT●] [🔒67% 🔍EX] [📚✅] [🏥✅] 📋17-18
+[C● UT●] [🔒67% 🔍EX] [📚●] [🏥●] 📋17-18
 ```
 
 ### Component Breakdown
@@ -352,8 +352,8 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 |-----------|------|-------------|---------|
 | Active Sessions | `[C● UT●]` | Project abbreviations with activity icons | C=coding (active), UT=ui-template (fading) |
 | Constraint Compliance | `🔒67%` | Code quality compliance | 67% compliance |
-| Knowledge System | `[📚✅]` | Knowledge extraction status | ✅=healthy, ⚠️=issues |
-| Unified Health | `[🏥✅]` | GCM + Health Verifier + Enforcement | ✅=all healthy |
+| Knowledge System | `[📚●]` green | Knowledge extraction status | ✅=healthy, ⚠️=issues |
+| Unified Health | `[🏥●]` green | GCM + Health Verifier + Enforcement | ✅=all healthy |
 | LSL Time Window | `📋17-18` | Session time range | 17:00-18:00 |
 
 ### Session Activity Indicators
@@ -377,11 +377,11 @@ The `[🏥...]` indicator combines:
 
 | Display | Meaning |
 |---------|---------|
-| `[🏥✅]` | All systems healthy |
-| `[🏥🟡]` | Issues detected - check dashboard |
+| `[🏥●]` green | All systems healthy |
+| `[🏥●]` amber | Issues detected - check dashboard |
 | `[🏥⏰]` | Health data stale (>2 min old) |
-| `[🏥❌]` | Critical issues |
-| `[🏥💤]` | Health verifier offline |
+| `[🏥●]` red | Critical issues |
+| `[🏥●]` grey | Health verifier offline |
 
 **Note**: Violation counts are no longer shown. Details available on dashboard at http://localhost:3033.
 
