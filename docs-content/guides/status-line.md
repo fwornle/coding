@@ -431,6 +431,35 @@ Terminal Tab: "C● | UT● CA●"
 
 ## Troubleshooting
 
+### Trailing junk after the clock (`15:322`, `07:407`)?
+
+A leftover cell from the previous, wider frame. tmux does not clear `status-right` cells when the content shrinks, so the renderer left-pads every line to a **constant** cell count. Residue means that count stopped being constant.
+
+**It is almost never an emoji-width problem.** That is the intuitive theory and it has been wrong every time it was tested — tmux's own per-codepoint width agrees with `visibleCellWidth()` for every glyph in use. Measure before assuming:
+
+```bash
+# tmux's OWN width for a glyph — prompt-free pane, read cursor_x
+tmux new-session -d -s wp -x 80 -y 5 "printf '%s' '●'; sleep 20"; sleep 0.6
+tmux display-message -p -t wp '#{cursor_x}'    # 1 for ●, 2 for emoji
+```
+
+The real cause is a width the renderer could not reserve correctly. Check the invariant directly — for each live cache, `pane_width − rendered_width` must equal the width of `status-left`:
+
+```bash
+ls -t .logs/combined-status-line-cache-*-w*.txt | head -3
+# reserve == 0 means status-right was padded to the FULL pane width,
+# so status-left + status-right overruns the row.
+```
+
+If the reserve is 0, the renderer never received `TMUX_SESSION_NAME` (it derives the reserve from the session name's length). **Read the environment of a live process, not the config** — sessions override the global `status-right` with their own command, so `~/.tmux.conf` can look correct while the running command is missing the variable:
+
+```bash
+PID=$(/bin/ps ax -o pid,command | grep -E "combined-status-line" | grep -v grep | awk 'NR==1{print $1}')
+/bin/ps -E -p "$PID" -o command= | tr ' ' '\n' | grep '^TMUX_'
+```
+
+Sessions get the correct command from `scripts/tmux-session-wrapper.sh`. Already-running sessions keep whatever they were created with, so after changing it either restart them or re-apply with `tmux set-option -t <session> status-right …`.
+
 ### Status bar completely blank?
 
 ```bash
