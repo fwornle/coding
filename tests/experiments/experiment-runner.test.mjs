@@ -538,7 +538,7 @@ function fakeStore() {
 
 // Base seams for a runMatrix invocation. `cells` is served through an injected resolveSpec
 // so tests fully control the matrix (incl. agents real validateCells would reject, e.g.
-// mastracode). Every side effect is recorded for assertions.
+// pi). Every side effect is recorded for assertions.
 function matrixHarness({ cells, repeats = 1, done = [], preflight, spawnImpl } = {}) {
   const rec = { starts: [], stops: [], launched: [], opens: 0, preflights: [] };
   const store = fakeStore();
@@ -664,19 +664,19 @@ test('runMatrix: a failed pre-flight on a REQUIRED agent is a recorded skip — 
 
 test('runMatrix: a cell whose launch throws is recorded best-effort — the matrix does not stall', async () => {
   const cells = [
-    { agent: 'mastracode', model: 'm', framework: 'mastra', env: 'default' },
+    { agent: 'pi', model: 'm', framework: 'straight', env: 'default' },
     { agent: 'claude', model: 'm', framework: 'none', env: 'default' },
   ];
   const spawnImpl = async ({ argv }) => {
-    if (argv.join(' ').includes('--prompt')) throw new Error('spawn ENOENT: mastra binary missing');
+    if (argv.join(' ').includes('--approve')) throw new Error('spawn ENOENT: pi binary missing');
     return 'complete';
   };
   const { opts } = matrixHarness({ cells, repeats: 1, spawnImpl });
   const summary = await runMatrix({}, opts);
   assert.equal(summary.length, 2, 'the matrix continued past the failing cell');
-  const mastra = summary.find((s) => s.task_id.includes('mastracode'));
-  assert.equal(mastra.status, 'ran');
-  assert.equal(mastra.terminal_state, 'abort', 'a launch failure is recorded as abort (best-effort)');
+  const piCell = summary.find((s) => s.task_id.includes('pi'));
+  assert.equal(piCell.status, 'ran');
+  assert.equal(piCell.terminal_state, 'abort', 'a launch failure is recorded as abort (best-effort)');
   const claude = summary.find((s) => s.task_id.includes('claude'));
   assert.equal(claude.terminal_state, 'complete');
 });

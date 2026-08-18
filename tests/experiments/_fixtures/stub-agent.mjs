@@ -3,7 +3,7 @@
 // Phase 78, Plan 78-03 — a tiny controllable stub "agent" for the runner's
 // terminal-state machine tests. It stands in for a real headless agent CLI so the
 // SIGTERM→SIGKILL / exit-code → terminal-state mapping is exercised without spawning
-// claude/copilot/opencode/mastra.
+// claude/copilot/opencode/pi.
 //
 // Behaviour is driven by STUB_MODE (env) or the first positional argv token:
 //   exit0  → print cwd + LLM_PROXY_DATA_DIR, exit 0   (runner maps → terminal_state 'complete')

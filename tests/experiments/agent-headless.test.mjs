@@ -31,40 +31,61 @@ const AGENTS_DIR = path.resolve(__dirname, '..', '..', 'config', 'agents');
 const GOAL = 'add a feature and update the changelog';
 const MODEL = 'claude-sonnet-4';
 
+// argvForAgent appends a uniform EXECUTION directive to EVERY agent's prompt (see
+// the source: headless copilot/opencode otherwise narrate and exit without editing).
+// These expectations previously omitted it and so had been failing for all four
+// agents — asserting a contract the function had deliberately stopped honouring.
+// Deriving the expected string from the ACTUAL argv would assert nothing, so it is
+// spelled out here and the goal-prefix is checked explicitly.
+const EXECUTION_DIRECTIVE =
+  ' \n\nIMPORTANT — EXECUTION, NOT ANALYSIS: Use your file-editing tools to implement this'
+  + ' change directly on disk right now. Do NOT merely describe, plan, or explain what you'
+  + ' would do. Keep working (reading, editing, verifying) until the change is actually made;'
+  + ' the task is complete ONLY once the edits exist on disk.';
+const EXEC = (goal) => `${goal}${EXECUTION_DIRECTIVE}`;
+
 const allStrings = (argv) =>
   Array.isArray(argv) && argv.every((a) => typeof a === 'string');
 
 test('argvForAgent(claude) → -p goal --model --permission-mode acceptEdits', () => {
   const argv = argvForAgent('claude', GOAL, { model: MODEL });
   assert.deepEqual(argv, [
-    '-p', GOAL, '--model', MODEL, '--permission-mode', 'acceptEdits',
+    '-p', EXEC(GOAL), '--model', MODEL, '--permission-mode', 'acceptEdits',
   ]);
+  assert.ok(argv[1].startsWith(GOAL), 'the goal is the prefix of the augmented prompt');
 });
 
 test('argvForAgent(opencode) → run goal -m model --dangerously-skip-permissions', () => {
   const argv = argvForAgent('opencode', GOAL, { model: MODEL });
-  assert.deepEqual(argv, ['run', GOAL, '-m', MODEL, '--dangerously-skip-permissions']);
+  assert.deepEqual(argv, ['run', EXEC(GOAL), '-m', MODEL, '--dangerously-skip-permissions']);
 });
 
-test('argvForAgent(mastracode) → --prompt goal -m model', () => {
-  const argv = argvForAgent('mastracode', GOAL, { model: MODEL });
-  assert.deepEqual(argv, ['--prompt', GOAL, '-m', MODEL]);
+test('argvForAgent(pi) → -p goal --provider rapid-proxy-pi --model model --approve', () => {
+  const argv = argvForAgent('pi', GOAL, { model: MODEL });
+  // --approve is what keeps a headless pi from hanging on its project-trust prompt.
+  assert.deepEqual(argv, [
+    '-p', EXEC(GOAL), '--provider', 'rapid-proxy-pi', '--model', MODEL, '--approve',
+  ]);
 });
 
-test('argvForAgent(copilot) → -p goal --allow-all-tools --model model', () => {
+test('argvForAgent(copilot) → -p goal --allow-all-tools --mode autopilot --model model', () => {
   const argv = argvForAgent('copilot', GOAL, { model: MODEL });
-  assert.deepEqual(argv, ['-p', GOAL, '--allow-all-tools', '--model', MODEL]);
+  assert.deepEqual(argv, [
+    '-p', EXEC(GOAL), '--allow-all-tools', '--no-ask-user',
+    '--mode', 'autopilot', '--max-autopilot-continues', '20', '--model', MODEL,
+  ]);
 });
 
 test('every returned argv is an array of strings; goal stays a single element even with spaces', () => {
   const spacey = 'do X   and   then Y with a "quoted" phrase';
-  for (const agent of ['claude', 'opencode', 'mastracode', 'copilot']) {
+  for (const agent of ['claude', 'opencode', 'pi', 'copilot']) {
     const argv = argvForAgent(agent, spacey, { model: MODEL });
     assert.ok(allStrings(argv), `${agent} argv must be all strings`);
-    // the goal is passed as ONE argv element (no shell splitting)
-    assert.ok(argv.includes(spacey), `${agent} must carry goal as a single element`);
+    // the goal is passed as ONE argv element (no shell splitting) — as the prefix of
+    // the execution-directive-augmented prompt.
+    assert.ok(argv.includes(EXEC(spacey)), `${agent} must carry goal as a single element`);
     assert.equal(
-      argv.filter((a) => a === spacey).length,
+      argv.filter((a) => a.startsWith(spacey)).length,
       1,
       `${agent} must carry goal exactly once`,
     );
@@ -76,7 +97,7 @@ test('argvForAgent throws on an unknown agent', () => {
 });
 
 test('WR-03: argvForAgent fails fast when model is missing (never pushes undefined into argv)', () => {
-  for (const agent of ['claude', 'opencode', 'mastracode', 'copilot']) {
+  for (const agent of ['claude', 'opencode', 'pi', 'copilot']) {
     // No opts.model → must THROW a clear error (routed through the D-12 record path),
     // NOT push `undefined` into the fixed argv (which spawn rejects with a raw TypeError).
     assert.throws(
@@ -96,7 +117,7 @@ test('resolveAgentBinary(claude) parses AGENT_COMMAND yet overrides to `claude` 
 });
 
 test('resolveAgentBinary reads the registry AGENT_COMMAND for non-overridden agents', () => {
-  assert.equal(resolveAgentBinary('mastracode', AGENTS_DIR), 'mastracode');
+  assert.equal(resolveAgentBinary('pi', AGENTS_DIR), 'pi');
   assert.equal(resolveAgentBinary('copilot', AGENTS_DIR), 'copilot');
 });
 
@@ -235,9 +256,9 @@ test('preflightAgent is bounded by an AbortController armed at timeoutMs (a hung
   assert.match(res.reason, /unreachable/);
 });
 
-test('preflightAgent(mastracode) is out of the 3-agent scope → ok without any round-trip', async () => {
+test('preflightAgent(unknown) is out of scope → ok without any round-trip', async () => {
   let called = false;
-  const res = await preflightAgent('mastracode', {
+  const res = await preflightAgent('someunknownagent', {
     model: 'x',
     fetchImpl: async () => { called = true; return { status: 200 }; },
   });

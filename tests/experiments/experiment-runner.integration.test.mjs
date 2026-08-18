@@ -70,7 +70,7 @@ function argAfter(argv, flag) {
 /** Derive the agent from the fixed argv argvForAgent emits (claude '-p' / opencode 'run'). */
 function agentFromArgv(argv) {
   if (argv[0] === 'run') return 'opencode';
-  if (argv.includes('--prompt')) return 'mastracode';
+  if (argv.includes('--approve')) return 'pi';
   return 'claude'; // the `-p` path (claude/copilot); these tests use claude only
 }
 

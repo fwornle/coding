@@ -10,7 +10,7 @@
 // Covers the four Task-1 behaviors:
 //   1. synthesizeAvenueSpec returns a spec whose goal_sentence === origin prompt,
 //      snapshot_id === origin snapshot_id, one cell per chosen variant.
-//   2. The synthesized spec passes resolveExperimentSpec/validateCells (mastra cell
+//   2. The synthesized spec passes resolveExperimentSpec/validateCells (pi cell
 //      legal; env kb-on/kb-off preserved).
 //   3. The synthesized spec is SCRIPTABLE — serializes to YAML a power user could
 //      hand to `experiment-run.mjs --spec` (D-01 CLI-backed, not UI-only), and the
@@ -86,11 +86,11 @@ test('AVN-01: origin_span_id links the avenue back to the forked origin span', (
 // Behavior 2: the synthesized spec passes resolveExperimentSpec/validateCells
 // ---------------------------------------------------------------------------
 
-test('AVN-01: synthesized spec resolves (mastracode cell legal; kb-on/kb-off env accepted)', () => {
+test('AVN-01: synthesized spec resolves (pi cell legal; kb-on/kb-off env accepted)', () => {
   const spec = synthesizeAvenueSpec({
     originRun: originRun(),
     variants: [
-      { agent: 'mastracode', model: 'default', framework: 'straight', env: 'kb-on' },
+      { agent: 'pi', model: 'default', framework: 'straight', env: 'kb-on' },
       { agent: 'claude', model: 'sonnet', framework: 'tdd', env: 'kb-off' },
     ],
   });
@@ -99,7 +99,7 @@ test('AVN-01: synthesized spec resolves (mastracode cell legal; kb-on/kb-off env
   const resolved = resolveExperimentSpec(spec);
   assert.equal(resolved.goal_sentence, 'Add a health endpoint to the API');
   assert.equal(resolved.cells.length, 2, 'both cells survive validation');
-  assert.ok(resolved.cells.some((c) => c.agent === 'mastracode'), 'mastracode cell legal (AVN-03)');
+  assert.ok(resolved.cells.some((c) => c.agent === 'pi'), 'pi cell legal');
   assert.ok(resolved.cells.every((c) => c.env === 'kb-on' || c.env === 'kb-off'), 'env kb-on/kb-off preserved');
 });
 
