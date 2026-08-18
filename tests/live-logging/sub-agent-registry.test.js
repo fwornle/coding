@@ -11,7 +11,7 @@
  *   5.  listByProject filters across agents
  *   6.  markCompleted sets status='completed' + observations_written + completed_at
  *   7.  markCompleted with error sets status='failed'
- *   8.  AGENTS exports locked 4-tuple ['claude','opencode','copilot','mastra']
+ *   8.  AGENTS exports locked 3-tuple ['claude','opencode','copilot']
  *   9.  loadAdapter(agentId) returns null when no adapter file + stderr notice
  *  10.  loadAdapter(agentId) with fixture adapter returns adapter export
  *  11.  getAgentSearchPaths('claude') honors LSL_CLAUDE_PROJECTS_DIR
@@ -43,7 +43,6 @@ beforeEach(() => {
     LSL_CLAUDE_PROJECTS_DIR: process.env.LSL_CLAUDE_PROJECTS_DIR,
     LSL_OPENCODE_DB: process.env.LSL_OPENCODE_DB,
     LSL_COPILOT_SESSIONS_DIR: process.env.LSL_COPILOT_SESSIONS_DIR,
-    LSL_MASTRA_TRANSCRIPTS_DIR: process.env.LSL_MASTRA_TRANSCRIPTS_DIR,
     LSL_ADAPTERS_DIR: process.env.LSL_ADAPTERS_DIR,
   };
 });
@@ -111,17 +110,15 @@ describe('createRegistry — Registry shape', () => {
     expect(r.get('claude', 'a7e8c41').sub_index).toBe(2);
   });
 
-  test('Test 4: listByAgent filters by agent across all four ids', () => {
+  test('Test 4: listByAgent filters by agent across all three ids', () => {
     const r = createRegistry();
     r.upsert(sampleRow({ agent: 'claude', sub_hash: 'cl1' }));
     r.upsert(sampleRow({ agent: 'claude', sub_hash: 'cl2' }));
     r.upsert(sampleRow({ agent: 'opencode', sub_hash: 'oc1' }));
     r.upsert(sampleRow({ agent: 'copilot', sub_hash: 'co1' }));
-    r.upsert(sampleRow({ agent: 'mastra', sub_hash: 'ma1' }));
     expect(r.listByAgent('claude')).toHaveLength(2);
     expect(r.listByAgent('opencode')).toHaveLength(1);
     expect(r.listByAgent('copilot')).toHaveLength(1);
-    expect(r.listByAgent('mastra')).toHaveLength(1);
     expect(r.listByAgent('nonexistent')).toEqual([]);
   });
 
@@ -165,7 +162,7 @@ describe('createRegistry — Registry shape', () => {
 
 describe('adapters/index.mjs — loader contract', () => {
   test('Test 8: AGENTS exports the locked 4-tuple in canonical order', () => {
-    expect(AGENTS).toEqual(['claude', 'opencode', 'copilot', 'mastra']);
+    expect(AGENTS).toEqual(['claude', 'opencode', 'copilot']);
     // Frozen — append should throw.
     expect(() => AGENTS.push('xtra')).toThrow();
   });

@@ -11,7 +11,7 @@
  * START timestamp, resetting on a turn boundary, firing for a token-less
  * (opencode) turn, and minting a UNIQUE snapshot id per fire.
  *
- * Root cause it guards: opencode/copilot/mastra transcripts carry no
+ * Root cause it guards: opencode/copilot transcripts carry no
  * usage.output_tokens, so a long autonomous turn produced ZERO observations
  * until the next user prompt — leaving the global [📚] badge orange during
  * active parallel work.

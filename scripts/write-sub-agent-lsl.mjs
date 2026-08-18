@@ -5,7 +5,7 @@
  * Phase 51 Plan 06 Task 3.
  *
  * Drives a sweep across the four supported coding agents
- * (claude/opencode/copilot/mastra), then writes per-sub-agent LSL files
+ * (claude/opencode/copilot), then writes per-sub-agent LSL files
  * under .specstory/history/{YYYY}/{MM}/ following the verbatim
  * D-LSL-Filename convention:
  *   {YYYY-MM-DD}_{HHHH-HHHH}_S{parent-slot}-{sub-index}-{sub-hash}[-part{N}].md
@@ -57,7 +57,6 @@ import {
 import { parseClaudeExchanges } from '../lib/lsl/adapters/claude-jsonl-tree.mjs';
 import { parseCopilotExchanges } from '../lib/lsl/adapters/copilot-events.mjs';
 import { parseOpencodeExchanges } from '../lib/lsl/adapters/opencode-sqlite.mjs';
-import { parseMastraExchanges } from '../lib/lsl/adapters/mastra-ndjson.mjs';
 
 const DEFAULT_LIMIT = 100;
 const DEFAULT_OUTPUT_ROOT = path.join('.specstory', 'history');
@@ -90,7 +89,7 @@ coding agents and writes per-sub-agent LSL files following the
 convention. Closes CONTEXT.md AC #2 (LSL parity).
 
 Options:
-  --agent <id>        Restrict to one agent (claude|opencode|copilot|mastra).
+  --agent <id>        Restrict to one agent (claude|opencode|copilot).
                       Default: all four in AGENTS order.
   --project <name>    Project filter forwarded to adapter.discover().
                       Default: coding.
@@ -133,11 +132,6 @@ function pickParserForAgent(agentId) {
         return parseOpencodeExchanges(m[1], m[2]);
       };
     }
-    case 'mastra':
-      return async (row) => {
-        const meta = row.agent_metadata || {};
-        return parseMastraExchanges(row.transcript_path, meta.subAgentSessionId);
-      };
     default:
       return null;
   }

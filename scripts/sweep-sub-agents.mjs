@@ -4,7 +4,7 @@
  *
  * Phase 51 Plan 01 Task 2 (CONTEXT.md D-Order Path-B-first + D-Live-Sweep-Tags).
  *
- * Drives all four supported coding agents (claude/opencode/copilot/mastra)
+ * Drives all supported coding agents (claude/opencode/copilot)
  * through one Path-B sweep pass. For each agent in AGENTS order:
  *   1. loadAdapter(agentId)               — null when not yet implemented
  *   2. getAgentSearchPaths(agentId)       — config + env-var overrides
@@ -42,7 +42,6 @@
  *   LSL_CLAUDE_PROJECTS_DIR      ~/.claude/projects/ override
  *   LSL_OPENCODE_DB              ~/.local/share/opencode/opencode.db override
  *   LSL_COPILOT_SESSIONS_DIR     ~/.copilot/session-state/ override
- *   LSL_MASTRA_TRANSCRIPTS_DIR   .observations/transcripts/ override
  */
 
 import path from 'node:path';
@@ -84,7 +83,7 @@ Agent-agnostic Phase 51 Path-B sweep dispatcher. Drives the four supported
 coding agents through one discover + convertToObservations pass.
 
 Options:
-  --agent <id>      Restrict to one agent (claude|opencode|copilot|mastra).
+  --agent <id>      Restrict to one agent (claude|opencode|copilot).
                     Default: all four in AGENTS order.
   --since <iso>     ISO timestamp filter; skip transcripts older than this.
   --dry-run         Discover only; do not invoke convertToObservations.
