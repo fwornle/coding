@@ -189,8 +189,12 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     // Content timestamp, not mtime — see lastContentTimestampMs above. Falls
     // back to mtime only when no timestamped record is readable (non-Claude
     // transcript), which is also the only case where mtime carries meaning.
+    // contentTs > 0 also tells us this is a real Claude .jsonl (a readable
+    // timestamped record was found) — used by the promotion gate below.
+    let contentTs = 0;
     try {
-      parentMt = lastContentTimestampMs(tp) || fs.statSync(tp).mtimeMs;
+      contentTs = lastContentTimestampMs(tp);
+      parentMt = contentTs || fs.statSync(tp).mtimeMs;
     } catch { continue; }
     // Effective mtime folds in the freshest sub-agent transcript so the
     // bubble reflects activity happening inside Task-tool / wave-execute
@@ -207,8 +211,17 @@ function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
     // Prefer the ETM's real-time content-activity clock (caTs), which is
     // immune to the sparse hourly-bucketed specstory mtime that lags far
     // behind a long OpenCode turn; fall back to transcript mtime when absent.
-    const activeAge = caTs > 0 ? (now - caTs) : (now - mt);
-    if (newIcon !== ICON_ACTIVE && hbTs > 0 && (now - hbTs) < 5 * 60_000 && activeAge < 45 * 60_000) {
+    //
+    // MUST match combined-status-line.js's gate (~line 1334). A fresh heartbeat
+    // proves the MONITOR is alive, not that anyone is working — a closed
+    // session's ETM outlives it and kept this promotion painting the project
+    // bright green. So the fallback to transcript age is allowed ONLY for a
+    // non-Claude transcript (contentTs === 0), the one case where a missing
+    // content clock is normal rather than evidence of absence.
+    const activeEnough = caTs > 0
+      ? (now - caTs) < 45 * 60_000
+      : (contentTs === 0 && (now - mt) < 45 * 60_000);
+    if (newIcon !== ICON_ACTIVE && hbTs > 0 && (now - hbTs) < 5 * 60_000 && activeEnough) {
       newIcon = ICON_ACTIVE;
     }
     // anyNewer also fires if a sub-agent file is fresher than the cache —
