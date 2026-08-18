@@ -328,12 +328,15 @@ describe('EtmTailSheet', () => {
     }
   })
 
-  test('Test 11: agent color map — claude=violet, copilot=blue, opencode=teal, mastra=amber', async () => {
+  test('Test 11: agent color map — claude=violet, copilot=blue, opencode=teal, pi=amber, legacy mastra=fuchsia', async () => {
     useViewerStore.setState({
       etmObservations: [
         { id: 'c', agent: 'claude', project: 'p', content: 'c1', artifacts: [], timestamp: '' },
         { id: 'p', agent: 'copilot', project: 'p', content: 'p1', artifacts: [], timestamp: '' },
         { id: 'o', agent: 'opencode', project: 'p', content: 'o1', artifacts: [], timestamp: '' },
+        { id: 'i', agent: 'pi', project: 'p', content: 'i1', artifacts: [], timestamp: '' },
+        // legacy row: the agent is gone but historical observations still carry it,
+        // and they must keep rendering with their own colour rather than the fallback.
         { id: 'm', agent: 'mastra', project: 'p', content: 'm1', artifacts: [], timestamp: '' },
       ],
       etmSheetOpen: true,
@@ -344,7 +347,8 @@ describe('EtmTailSheet', () => {
       expect(screen.getByTestId('etm-row-c-agent').className).toMatch(/text-violet-500/)
       expect(screen.getByTestId('etm-row-p-agent').className).toMatch(/text-blue-500/)
       expect(screen.getByTestId('etm-row-o-agent').className).toMatch(/text-teal-500/)
-      expect(screen.getByTestId('etm-row-m-agent').className).toMatch(/text-amber-500/)
+      expect(screen.getByTestId('etm-row-i-agent').className).toMatch(/text-amber-500/)
+      expect(screen.getByTestId('etm-row-m-agent').className).toMatch(/text-fuchsia-500/)
     } finally {
       r.restore()
     }

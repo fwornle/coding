@@ -25,12 +25,14 @@ import {
 } from '@/store/slices/performanceSlice'
 
 // AVN-03 (D-03) — the four fork axes rendered as curated-by-default groups. The
-// agent literals match the runner's KNOWN_AGENTS (mastra is surfaced as the
-// `mastracode` literal Plan 87-02 added). SDD-framework options are the
+// agent literals match the runner's KNOWN_AGENTS. pi is spelled the same
+// everywhere, so there is no display mapping any more — the agent it replaced was
+// `mastra` in one half of the system and `mastracode` in the other, and this
+// picker had to translate. SDD-framework options are the
 // spec-driven-development harnesses (disambiguated from a code framework). The
 // knowledge-injection dimension is a prominent on/off toggle encoded server-side
 // into the existing `env` axis as kb-on/kb-off (Plan 87-02) — NOT a 5th cell key.
-const FORK_AGENTS = ['claude', 'copilot', 'opencode', 'mastracode'] as const
+const FORK_AGENTS = ['claude', 'copilot', 'opencode', 'pi'] as const
 const FORK_MODELS = ['opus', 'sonnet', 'gpt-5', 'haiku'] as const
 const FORK_FRAMEWORKS = ['gsd', 'spec-workflow', 'none'] as const
 

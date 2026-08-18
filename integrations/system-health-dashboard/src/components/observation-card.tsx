@@ -9,7 +9,8 @@ const AGENT_BORDER_COLORS: Record<string, string> = {
   claude: 'border-l-blue-500',
   copilot: 'border-l-green-500',
   opencode: 'border-l-cyan-500',
-  mastra: 'border-l-fuchsia-500',
+  pi: 'border-l-violet-500',
+  mastra: 'border-l-fuchsia-500', // legacy: historical observations still carry it
 }
 
 interface LlmTokens {

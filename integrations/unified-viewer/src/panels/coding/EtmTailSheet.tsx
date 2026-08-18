@@ -25,7 +25,7 @@
 //   claude   → text-violet-500
 //   copilot  → text-blue-500
 //   opencode → text-teal-500
-//   mastra   → text-amber-500
+//   pi       → text-amber-500  (mastra kept as a legacy alias)
 //
 // KEYBOARD `t` (UI-SPEC §10):
 //   Document-level keydown handler toggles etmSheetOpen. Skipped when
@@ -56,7 +56,9 @@ const AGENT_COLOR: Record<string, string> = {
   claude: 'text-violet-500',
   copilot: 'text-blue-500',
   opencode: 'text-teal-500',
-  mastra: 'text-amber-500',
+  pi: 'text-amber-500',
+  // legacy: historical ETM observations still carry agent='mastra'
+  mastra: 'text-fuchsia-500',
 }
 const DEFAULT_AGENT_COLOR = 'text-muted-foreground'
 

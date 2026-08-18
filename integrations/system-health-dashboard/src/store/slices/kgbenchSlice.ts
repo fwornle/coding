@@ -58,7 +58,7 @@ export interface KgbenchConfig {
   sets: KgbenchQuestionSet[]
   arms: KgbenchArm[]
   // The agents the launcher offers. A strict subset of `allAgents`: the runner knows
-  // `mastracode` but it has never produced a cell, so it is not offered.
+  // every KNOWN_AGENT; the two lists coincide now that the never-run agent is gone.
   agents: string[]
   allAgents?: string[]
   defaults: { model?: string; agents?: string[]; models?: string[]; timeoutMs?: number; maxAttempts?: number }

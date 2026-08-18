@@ -357,7 +357,7 @@ export function KgbenchLauncher() {
 
               <PickGroup
                 title="Agents"
-                hint="Which coding CLI drives the cell. Only claude can be held to an arm's tool surface — mastracode is omitted here because it has never produced a cell in any run."
+                hint="Which coding CLI drives the cell. Only claude can be held to an arm's tool surface; copilot and pi are gateable but their tool names are not yet mapped, and opencode has no allowlist at all."
                 options={agentOptions}
                 selected={pickedAgents}
                 onChange={setPickedAgents}

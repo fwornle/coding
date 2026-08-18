@@ -583,11 +583,11 @@ export interface RunProgress {
 // dimension is encoded into the runner's existing `env` axis as `kb-on`/`kb-off`
 // (Plan 87-02 — NOT a 5th cell key), so the frontend surfaces it as a prominent
 // on/off toggle and the server maps env==='kb-off' → CODING_KNOWLEDGE_INJECTION=0.
-// `agent` uses the runner literals (mastra is surfaced as `mastracode`, the
+// `agent` uses the runner literals (one spelling per agent now — the
 // literal Plan 87-02 added to KNOWN_AGENTS). Every field optional — an empty
 // object means "seed from the origin span's own agent/model".
 export interface ForkAxes {
-  // Multi-select agent literals (claude / copilot / opencode / mastracode).
+  // Multi-select agent literals (claude / copilot / opencode / pi).
   agents?: string[]
   // Multi-select model literals (opus / sonnet / gpt-5 / haiku / …).
   models?: string[]
@@ -807,7 +807,7 @@ export const fetchTimeline = createAsyncThunk(
     try {
       // AGENT-AGNOSTIC ambient window: derive the run's wall-clock window from the
       // Run record (started_at/ended_at) and pass it to the backend. Non-opencode
-      // agents (claude/copilot/mastra) barely tag foreground rows with task_id, so a
+      // agents (claude/copilot) barely tag foreground rows with task_id, so a
       // timeline-derived window would be empty for them — the run's own timestamps are
       // the only reliable, agent-independent anchor. Back/forward-pad 5min to catch
       // observations stamped at user-prompt time (which precede the turns). Backend

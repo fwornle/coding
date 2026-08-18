@@ -661,7 +661,7 @@ export function PerformanceTimeline() {
 
   // AGENT-AGNOSTIC lane totals. summarizeByRole only sees task_id-scoped (foreground)
   // rows — which is why Knowledge/Infrastructure read 0/0 for EVERY agent whose
-  // background work isn't task-stamped (claude/copilot/mastra barely tag foreground
+  // background work isn't task-stamped (claude/copilot barely tag foreground
   // rows at all, opencode tags 100%). The ambient rows are time-window matched to this
   // run and the backend already EXCLUDES this run's own task_id, so they are DISJOINT
   // from `stats` — folding them in is additive, never double-counted. Experiment cells

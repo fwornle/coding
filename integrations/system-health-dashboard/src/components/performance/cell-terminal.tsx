@@ -25,6 +25,8 @@ const AGENT_ACCENTS: Record<string, { text: string; ring: string; dot: string }>
   claude: { text: 'text-amber-500', ring: 'ring-amber-500/30', dot: 'bg-amber-500' },
   opencode: { text: 'text-teal-500', ring: 'ring-teal-500/30', dot: 'bg-teal-500' },
   copilot: { text: 'text-sky-500', ring: 'ring-sky-500/30', dot: 'bg-sky-500' },
+  pi: { text: 'text-violet-500', ring: 'ring-violet-500/30', dot: 'bg-violet-500' },
+  // legacy: pre-existing cells recorded under the old agent literal
   mastracode: { text: 'text-fuchsia-500', ring: 'ring-fuchsia-500/30', dot: 'bg-fuchsia-500' },
 }
 

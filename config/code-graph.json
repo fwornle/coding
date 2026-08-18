@@ -29,7 +29,7 @@
     "copilot": {
       "backend": "inherit"
     },
-    "mastra": {
+    "pi": {
       "backend": "inherit"
     }
   },

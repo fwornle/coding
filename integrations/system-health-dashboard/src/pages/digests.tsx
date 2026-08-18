@@ -37,7 +37,8 @@ const AGENT_COLORS: Record<string, string> = {
   claude: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   copilot: 'bg-green-500/20 text-green-400 border-green-500/30',
   opencode: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  mastra: 'bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30',
+  pi: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  mastra: 'bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30', // legacy
 }
 
 function DigestCard({ digest, isExpanded, onToggle }: { digest: Digest; isExpanded: boolean; onToggle: () => void }) {
