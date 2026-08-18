@@ -30,7 +30,8 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, accessSync, constants as fsConstants } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, accessSync, mkdtempSync, constants as fsConstants } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
@@ -258,6 +259,45 @@ describe('Session capture — pi (native session JSONL)', () => {
     const src = readText('config/agents/pi.sh');
     expect(src).toMatch(/PI_CODING_AGENT_DIR/);
     expect(src).toMatch(/\.pi-agent/);
+  });
+
+  // REGRESSION ANCHOR (2026-08-18): models.json declared `"x-task-id": "$TASK_ID"`
+  // unconditionally. An interactive `coding --pi` has no TASK_ID, and pi's header
+  // interpolation (dist/core/resolve-config-value.js) has NO default-value form and
+  // treats empty as missing, so resolveHeadersOrThrow aborted the whole provider:
+  //   "API key auth failed for provider rapid-proxy-pi: Failed to resolve provider
+  //    "rapid-proxy-pi" header "x-task-id" from environment variable: TASK_ID"
+  // Every interactive prompt failed on the first keystroke with no LLM call made.
+  //
+  // Executes the generator rather than grepping it: the bug was in WHICH BRANCH ran,
+  // which a source grep for "x-task-id" passes either way.
+  describe('models.json task binding', () => {
+    const generate = (env) => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), 'pi-models-'));
+      execFileSync('bash', ['-c',
+        `_agent_log() { :; }; source "${path.join(REPO, 'config/agents/pi.sh')}"; ` +
+        `_pi_write_models_json "${dir}"`,
+      ], { cwd: REPO, env: { ...process.env, ...env }, encoding: 'utf8' });
+      return JSON.parse(readFileSync(path.join(dir, 'models.json'), 'utf8'))
+        .providers['rapid-proxy-pi'];
+    };
+
+    it('omits x-task-id when there is no task, so interactive launches work', () => {
+      const { TASK_ID: _drop, ...envWithoutTaskId } = process.env;
+      const provider = generate({ ...envWithoutTaskId, TASK_ID: undefined });
+      expect(provider.headers['x-agent']).toBe('pi');
+      // Absent, NOT empty: pi treats an empty value as unresolvable too.
+      expect(provider.headers).not.toHaveProperty('x-task-id');
+    });
+
+    it('keeps the $TASK_ID reference when a measured run binds a cell', () => {
+      const provider = generate({ TASK_ID: 'exp-cell-42' });
+      expect(provider.headers['x-agent']).toBe('pi');
+      // The literal reference, not the resolved value: ONE static file serves every
+      // cell because pi re-interpolates it per process (agent-routing.mjs sets TASK_ID
+      // per cell, and the harness does not rewrite this file).
+      expect(provider.headers['x-task-id']).toBe('$TASK_ID');
+    });
   });
 });
 
