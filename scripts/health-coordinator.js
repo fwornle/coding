@@ -2009,6 +2009,20 @@ function ensureEtmForActiveProjects() {
     const hasOpenCode = openCodeFresh.has(projectPath);
     if (!transcriptFresh && !tmuxAlive && !hasOpenCode) continue;
 
+    // Do not resurrect what the reaper just took. A session closed seconds ago
+    // still satisfies `transcriptFresh` (the transcript was written on the way
+    // out), so without this the two fight and the project flickers back within
+    // ~10s. Any signal NEWER than the reap — a transcript write, a new tmux
+    // session, OpenCode activity — is genuine new work and clears the block.
+    const reapedAt = _reapedProjects.get(projectName);
+    if (reapedAt) {
+      if (tmuxAlive || hasOpenCode || latestMtime > reapedAt) {
+        _reapedProjects.delete(projectName);
+      } else {
+        continue;
+      }
+    }
+
     log(`spawning ETM for active project ${projectName} (${projectPath})`, 'INFO');
     try {
       const child = spawn('node', [monitorScript, projectPath], {
@@ -2026,6 +2040,84 @@ function ensureEtmForActiveProjects() {
     } catch (err) {
       log(`failed to spawn ETM for ${projectName}: ${err.message}`, 'ERROR');
     }
+  }
+}
+
+/**
+ * Projects whose ETM we reaped because their session went away, and when.
+ * Suppresses the immediate respawn that `ensureEtmForActiveProjects` would
+ * otherwise do: a just-closed session still has a transcript inside the 2-minute
+ * freshness window, so without this the reaper and the spawner fight — measured
+ * before this existed: evicted at t=5s, respawned t=10s, back in the rollup t=20s.
+ * Self-clearing: any transcript write NEWER than the reap is real new activity
+ * and re-qualifies the project.
+ */
+const _reapedProjects = new Map(); // projectName -> reapedAt (ms)
+
+/**
+ * Stop ETMs whose session has gone away, so a closed project leaves the
+ * statusline AT ONCE rather than lingering until the ETM's own 30-minute idle
+ * timeout. Runs every tick (not on the 30s spawn interval) — closing a session
+ * should be visible within one tick.
+ *
+ * This is the missing counterpart to `ensureEtmForActiveProjects`, which was a
+ * spawner with no reaper. Nothing else reaps: in steady state an ETM's parent is
+ * THIS process, not the session, so closing the tmux pane leaves it heartbeating
+ * happily and the project rendered as live.
+ *
+ * Reaping is deliberately conservative — a wrongly-reaped project vanishes from
+ * the statusline while someone is working in it, which is far worse than one
+ * lingering. Three independent things must ALL say "nobody is here":
+ *   • no tmux session rooted at the project path
+ *   • no fresh OpenCode session for it
+ *   • no fresh content-activity clock from the ETM itself — the honest "the
+ *     agent is genuinely working right now" signal (set only on observed
+ *     transcript growth). This is what protects a session running outside tmux:
+ *     while it is actually doing anything, its ETM is not reaped.
+ * Note transcript freshness is deliberately NOT one of them; it is what makes a
+ * just-closed session look alive for 2 minutes, and immediacy is the point.
+ *
+ * Fails OPEN: if tmux reports nothing at all (not running, or the query failed)
+ * we cannot distinguish "no sessions" from "cannot tell", so we reap nothing.
+ */
+const REAP_CONTENT_ACTIVE_MS = 2 * 60 * 1000;
+
+function reapEtmsForClosedSessions() {
+  const agenticDir = path.dirname(REPO_ROOT);
+  let live;
+  try {
+    live = tmuxOpenProjectPaths(agenticDir);
+  } catch {
+    return; // cannot tell → reap nothing
+  }
+  // Empty set means "tmux told us nothing" — including the failure path, which
+  // returns an empty Set indistinguishably. Reaping on that would wipe every
+  // project the moment tmux hiccups.
+  if (!live || live.size === 0) return;
+
+  const now = Date.now();
+  let openCode;
+  try { openCode = openCodeFreshProjects(now); } catch { openCode = new Set(); }
+
+  for (const [key, e] of Object.entries(currentState.lsl)) {
+    if (!e || e.status !== 'running' || !e.projectPath) continue;
+    if (live.has(e.projectPath)) continue;
+    if (openCode.has(e.projectPath)) continue;
+    const ca = e.lastContentActivityTs || 0;
+    if (ca > 0 && (now - ca) < REAP_CONTENT_ACTIVE_MS) continue;
+
+    // pid is embedded in the heartbeat key (`etm-<pid>-<start>:project`), the
+    // same convention _probeHolderLiveness relies on.
+    const m = /^[a-z]+-(\d+)-/.exec(key);
+    const pid = m ? parseInt(m[1], 10) : 0;
+    if (pid > 0) {
+      // SIGTERM, not SIGKILL: the ETM's shutdown handler announces a clean stop,
+      // flushes any pending prompt set, and unregisters from PSM.
+      try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+    }
+    delete currentState.lsl[key];
+    if (e.projectName) _reapedProjects.set(e.projectName, now);
+    log(`lsl: reaped ETM for '${e.projectName}' — session closed (pid=${pid || 'unknown'})`, 'INFO');
   }
 }
 
@@ -2487,6 +2579,7 @@ async function runAllChecks() {
       }
       currentState.lsl_by_project = rollup;
     } else {
+      reapEtmsForClosedSessions();
       refreshLslStaleness();
     }
 
