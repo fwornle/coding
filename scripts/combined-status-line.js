@@ -727,12 +727,17 @@ class CombinedStatusLine {
       const lslEntries = Object.values(result.state.lsl || {});
       const now = Date.now();
       const heartbeatByProject = new Map();
+      const contentByProject = new Map();
       for (const e of lslEntries) {
         if (!e?.projectName) continue;
         if (e.status === 'stopped') continue;
         const lb = e.lastBeat || 0;
         if (lb > (heartbeatByProject.get(e.projectName) || 0)) {
           heartbeatByProject.set(e.projectName, lb);
+        }
+        const ca = e.lastContentActivityTs || 0;
+        if (ca > (contentByProject.get(e.projectName) || 0)) {
+          contentByProject.set(e.projectName, ca);
         }
       }
       const registry = await getRegistryReader();
@@ -743,7 +748,14 @@ class CombinedStatusLine {
           const effMt = CombinedStatusLine._effectiveActivityMtime(entry.transcriptPath, entry.projectName, registry);
           let age = effMt > 0 ? now - effMt : now - fs.statSync(entry.transcriptPath).mtimeMs;
           if (age >= 5 * 60_000 && age < 45 * 60_000 && entry.projectName) {
-            const lb = heartbeatByProject.get(entry.projectName);
+            // Same gate as the bubble's promotion (~line 1334) — these two must
+            // agree or the [KB] badge and the project bubble contradict each
+            // other. A heartbeat alone no longer counts as activity; see the
+            // commentary there.
+            const ca = contentByProject.get(entry.projectName) || 0;
+            const isClaudeTranscript = !!(entry.transcriptPath && entry.transcriptPath.endsWith('.jsonl'));
+            const activeEnough = ca > 0 ? (now - ca) < 45 * 60_000 : !isClaudeTranscript;
+            const lb = activeEnough ? heartbeatByProject.get(entry.projectName) : null;
             if (lb) {
               const hbAge = now - lb;
               if (hbAge < 5 * 60_000) age = hbAge;
@@ -1312,6 +1324,19 @@ class CombinedStatusLine {
         }
         return latest > 0 ? Date.now() - latest : null;
       };
+      // Does this project have a readable Claude .jsonl transcript? Only such a
+      // project is EXPECTED to publish lastContentActivityTs, so it is the only
+      // one for which a MISSING content clock is informative rather than normal.
+      // Gates the promotion fallback below.
+      const hasClaudeTranscript = (projectName) => {
+        for (const e of lslEntries) {
+          if (e?.projectName !== projectName) continue;
+          if (e.status === 'stopped') continue;
+          if (!e.transcriptPath || !e.transcriptPath.endsWith('.jsonl')) continue;
+          try { if (fs.statSync(e.transcriptPath).size > 0) return true; } catch { /* unreadable */ }
+        }
+        return false;
+      };
       for (const [projectName, status] of Object.entries(rollup)) {
         let icon;
         let activityAgeMs = null;
@@ -1334,9 +1359,25 @@ class CombinedStatusLine {
           if (icon !== LIFECYCLE_ICONS.ACTIVE) {
             const hbAge = heartbeatAgeMs(projectName);
             const contentAge = contentActivityAgeMs(projectName);
+            // A fresh heartbeat proves the MONITOR is alive, not that anyone is
+            // working. Those came apart once an ETM could outlive its session:
+            // the coordinator's spawner has no reaper, so a closed session's ETM
+            // keeps beating and this promotion painted the project bright green —
+            // "actively working" — for as long as it survived.
+            //
+            // The content-activity clock is the honest signal (set only on
+            // observed transcript growth, never on spawn or wake). Measured on a
+            // closed session vs a live one: NULL vs 2s.
+            //
+            // So the fallback to transcript age is allowed ONLY where a missing
+            // content clock is normal rather than evidence of absence — a
+            // non-Claude session (OpenCode/Copilot) whose transcript path is not
+            // a readable .jsonl and which therefore never publishes one. For a
+            // real Claude transcript, no content clock now means no promotion.
             const activeEnough = contentAge !== null
               ? contentAge < 45 * 60_000
-              : (activityAgeMs !== null && activityAgeMs < 45 * 60_000);
+              : (!hasClaudeTranscript(projectName)
+                 && activityAgeMs !== null && activityAgeMs < 45 * 60_000);
             if (hbAge !== null && hbAge < 5 * 60_000 && activeEnough) {
               icon = LIFECYCLE_ICONS.ACTIVE;
             }
