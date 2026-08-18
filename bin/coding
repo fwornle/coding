@@ -123,7 +123,6 @@ OPTIONS:
   --claude           Force Claude Code (same as --agent claude)
   --copilot, --copi  Force CoPilot (same as --agent copilot)
   --opencode         Force OpenCode (same as --agent opencode)
-  --mastra           Force Mastracode (same as --agent mastra)
   --pi               Force Pi (same as --agent pi)
   --force            Kill ALL coding-related processes for a clean start
   --copilot-stop     Stop all CoPilot fallback services
@@ -139,7 +138,6 @@ EXAMPLES:
   coding-agent --copilot          # Force CoPilot
   coding-agent --copilot-stop     # Stop CoPilot services
   coding-agent --claude           # Force Claude Code
-  coding-agent --mastra           # Force Mastracode
   coding-agent --pi               # Force Pi
   coding-agent --project /path/to/project  # Work in specific project
   coding-agent suggest "add tests" # Pass command to agent
@@ -147,7 +145,6 @@ EXAMPLES:
 AGENTS:
   claude     Claude Code with MCP servers (memory, browser, logging)
   copilot    GitHub CoPilot with fallback services
-  mastra     Mastracode with observational memory (mastra.ai)
   pi         Pi coding agent, proxy-routed + measured (pi.dev)
   <name>     Any agent with a config at config/agents/<name>.sh
 
@@ -189,10 +186,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --opencode)
       FORCE_AGENT="opencode"
-      shift
-      ;;
-    --mastra)
-      FORCE_AGENT="mastra"
       shift
       ;;
     --pi)

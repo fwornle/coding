@@ -18,18 +18,11 @@
 # Copilot participates under env:default so validateCells passes WITHOUT mutating the frozen
 # gate; the standalone one-turn drivability probe (runMatrix) alone decides run-vs-skip-Run.
 #
-# WHY NO mastra cell (deviation — see 78-05 SUMMARY / checkpoint): the D-05 agent enum
-# KNOWN_AGENTS (lib/experiments/experiment-spec.mjs:39) is FROZEN at [claude, copilot, opencode]
-# and is a shared source-of-truth with lib/experiments/route-trace-resolve.mjs:27 (guarded by a
-# divergence test). `mastracode` is NOT in the enum, so authoring a mastra cell makes
-# validateCells hard-throw and abort the WHOLE matrix before run 0 (D-06 fail-fast) — which
-# would prevent the REQUIRED claude+opencode cells from ever running (SC#4). D-12's "mastra
-# best-effort recorded-skip" presupposes mastra reaches the runner's per-cell try/catch, which
-# requires it in KNOWN_AGENTS. Admitting `mastracode` is an architectural change to a frozen,
-# test-guarded, route-attribution-coupled enum (out of this yaml-only plan's scope, Rule 4).
-# The mastra cell is therefore intentionally OMITTED here and surfaced at the human-verify
-# checkpoint for an operator decision (extend the enum in a follow-up plan vs. accept the
-# 3-agent smoke as sufficient for SC#4's "≥2 agents").
+# The fourth agent is now pi, and it has a real cell below. This paragraph used to explain at
+# length why there was no mastra cell — that KNOWN_AGENTS was frozen at three agents and adding
+# a fourth would make validateCells hard-throw and abort the whole matrix. That reasoning had
+# already gone stale before pi arrived (the enum did contain the fourth agent), which is exactly
+# how a comment that documents an absence rots: nothing fails when it stops being true.
 version: 1
 
 # Declare-time baseline snapshot (D-09) each cell restores into an ISOLATED sandbox worktree
@@ -63,5 +56,11 @@ variants:
   # decides run (copilot -p --allow-all-tools) vs. recorded skip (copilot-headless-unsupported).
   - agent: copilot
     model: auto
+    framework: straight
+    env: default
+  # pi via -p, routed through its own models.json custom provider (rapid-proxy-pi). --approve is
+  # supplied by argvForAgent — without it a headless pi blocks on its project-trust prompt.
+  - agent: pi
+    model: claude-sonnet-5
     framework: straight
     env: default

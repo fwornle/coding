@@ -343,7 +343,7 @@ _inject_knowledge_context() {
 
   # Per-avenue injection toggle (Phase 87, AVN-04). An avenue declaring env=kb-off gets
   # CODING_KNOWLEDGE_INJECTION=0 in the spawned agent's env (runner, Plan 03). This ONE
-  # guard covers opencode/copilot/mastra: early-return before running any adapter. Default
+  # guard covers opencode/copilot/pi: early-return before running any adapter. Default
   # ON; only the literal 0/false/off disables. Scoped to this process env (Pitfall 4) — the
   # operator's interactive session leaves the var unset, so injection stays on for them.
   local _kb="$(printf '%s' "${CODING_KNOWLEDGE_INJECTION:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
@@ -387,8 +387,8 @@ _inject_knowledge_context() {
 #   claude    ANTHROPIC_BASE_URL  → proxy /v1/messages (Max-OAuth bearer forwarded)
 #   opencode  ANTHROPIC_BASE_URL  → same seam (opencode's AI-SDK anthropic provider
 #                                    honours it) for the anthropic path
-#   mastra    self-routed by its config (MASTRACODE_MODEL_ID=rapid-proxy-mastra →
-#                                    proxy /v1/mastra); nothing to add here
+#   pi        self-routed by its models.json custom provider (rapid-proxy-pi →
+#                                    proxy /v1/chat/completions); TASK_ID binds it
 #   copilot   no base-URL override on the Copilot CLI (GitHub-enterprise OAuth) —
 #                                    not yet proxy-routable; flagged honestly
 #
@@ -487,27 +487,17 @@ configure_proxy_routing() {
       export ANTHROPIC_BASE_URL="${base}"
       _agent_log "🔌 opencode → proxy ${base}/v1/messages (anthropic path; best-effort — validate live)"
       ;;
-    mastra)
-      # Self-routed in mastra.sh's agent_pre_launch via the customProvider seam. The MASTRACODE_MODEL_ID
-      # → /v1/mastra path is NOT launcher-controlled per-launch (no base-URL path seam to embed a
-      # task_id), so mastra stays AMBIENT-BOUND this phase (documented deviation — see SUMMARY).
-      if [ -n "${MASTRACODE_MODEL_ID:-}" ]; then
-        _agent_log "🔌 mastra → proxy ${base}/v1/mastra (self-routed via MASTRACODE_MODEL_ID; ambient-bound this phase)"
-      else
-        _agent_log "⚠️  mastra: MASTRACODE_MODEL_ID unset — proxy routing may be inactive."
-      fi
-      ;;
     pi)
-      # Self-routed in pi.sh's agent_pre_launch, but — unlike mastra below — with
-      # a real per-request binding. pi's models.json provider carries
+      # Self-routed in pi.sh's agent_pre_launch, but with a real per-request binding
+      # (the agent it replaced had none). pi's models.json provider carries
       # `"x-task-id": "$TASK_ID"`, and pi interpolates that from its own process
       # environment at config load, so exporting TASK_ID here is enough to bind
       # every call this launch makes. Verified live: a run with TASK_ID set
       # produced a token_usage row carrying exactly that id.
       #
       # Nothing to export for the base URL: it is baked into models.json, which
-      # pi.sh rewrites each launch. That is the same "self-routed" shape mastra
-      # had, WITHOUT the ambient-bound consequence, which is why pi is absent
+      # pi.sh rewrites each launch. Self-routed WITHOUT the ambient-bound
+      # consequence the previous agent had, which is why pi is absent
       # from AMBIENT_BOUND_AGENTS in lib/experiments/experiment-runner.mjs.
       _agent_log "🔌 pi → proxy ${base}/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=${TASK_ID:-<ambient>})"
       ;;

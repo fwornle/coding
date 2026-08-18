@@ -8,7 +8,7 @@
 # Run with non-zero token usage — so the dashboard /performance Compare view shows real deltas.
 #
 # Shares the smoke spec's structure (see its header for the WHY of `variants:`, copilot env:default
-# probe-gating, and the omitted mastra cell): each agent needs a different model-string FORMAT, so
+# probe-gating): each agent needs a different model-string FORMAT, so
 # the explicit named-variant escape hatch gives each cell its own model, all resolving to the
 # canonical {agent, model, framework, env, test_command} shape.
 #
