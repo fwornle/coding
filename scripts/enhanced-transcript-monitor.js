@@ -44,7 +44,7 @@ import AdaptiveExchangeExtractor from '../src/live-logging/AdaptiveExchangeExtra
 // SemanticAnalyzer removed — called APIs directly without proxy support, hanging on VPN
 import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
 import StreamingTranscriptReader from '../src/live-logging/StreamingTranscriptReader.js';
-import MastraTranscriptReader from '../src/live-logging/MastraTranscriptReader.js';
+import PiSessionReader from '../src/live-logging/PiSessionReader.js';
 import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import LSLFileManager from '../src/live-logging/LSLFileManager.js';
@@ -93,7 +93,7 @@ import { runIfMain } from '../lib/utils/esm-cli.js';
 // Agent-agnostic tool-name sets for artifact/activity extraction. Tool names are
 // NOT normalized to a single casing across agents: Claude emits capitalized
 // names (Edit/Write/Read/MultiEdit), opencode maps `part.tool` verbatim →
-// lowercase (edit/write/read), and copilot/mastra vary. All comparisons against
+// lowercase (edit/write/read), and copilot/pi vary. All comparisons against
 // these sets MUST lowercase the incoming name first. This is why opencode
 // sessions reported "Artifacts: none" — the old code matched only 'Edit'/'Write'.
 const MODIFY_TOOL_NAMES = new Set([
@@ -218,7 +218,7 @@ class EnhancedTranscriptMonitor {
     // Wall-clock companion to progressTokenDelta: fire an in-progress observation
     // when a live turn has been in flight this many ms since the last fire (or
     // turn start), REGARDLESS of output tokens. This is the ONLY long-turn
-    // coverage that works for opencode/copilot/mastra — their normalized
+    // coverage that works for opencode/copilot/pi — their normalized
     // transcripts carry no usage.output_tokens (see readOpenCodeMessages), so
     // sumOutputTokens is always 0 and the token-delta trigger is inert. Without
     // it, a long autonomous non-Claude turn writes zero observations until the
@@ -506,21 +506,21 @@ class EnhancedTranscriptMonitor {
       transcripts.push({ path: openCodeTranscript, mtime: new Date(), source: 'opencode' });
     }
 
-    // Mastra NDJSON transcripts
-    const mastraTranscriptDir = this.findMastraTranscriptDir();
-    if (mastraTranscriptDir && fs.existsSync(mastraTranscriptDir)) {
+    // pi session JSONL
+    const piSessionDir = this.findPiSessionDir();
+    if (piSessionDir && fs.existsSync(piSessionDir)) {
       try {
-        const mastraFiles = fs.readdirSync(mastraTranscriptDir)
-          .filter(f => f.endsWith('.jsonl') || f.endsWith('.ndjson'))
+        const piFiles = fs.readdirSync(piSessionDir)
+          .filter(f => f.endsWith('.jsonl'))
           .map(f => {
-            const fp = path.join(mastraTranscriptDir, f);
+            const fp = path.join(piSessionDir, f);
             const stats = fs.statSync(fp);
-            return { path: fp, mtime: stats.mtime, source: 'mastra' };
+            return { path: fp, mtime: stats.mtime, source: 'pi' };
           })
           .filter(f => (Date.now() - f.mtime.getTime()) < this.config.sessionDuration * 2);
-        transcripts.push(...mastraFiles);
+        transcripts.push(...piFiles);
       } catch (e) {
-        this.debug(`Error scanning Mastra transcripts: ${e.message}`);
+        this.debug(`Error scanning pi sessions: ${e.message}`);
       }
     }
 
@@ -751,7 +751,7 @@ class EnhancedTranscriptMonitor {
           }
           // Long-turn coverage: evaluate a progress fire on EVERY poll while a
           // turn is in flight — not only when NEW exchanges landed. opencode/
-          // copilot/mastra transcripts carry no usage.output_tokens, so the
+          // copilot transcripts carry no usage.output_tokens, so the
           // token-delta trigger is inert for them; the wall-clock trigger in
           // _maybeFireProgressObservation is what emits their periodic snapshots
           // (root-cause fix for the orange [📚] badge during active opencode work).
@@ -1234,7 +1234,7 @@ class EnhancedTranscriptMonitor {
         if (!filePath) continue;
         // Agent-agnostic tool-name matching. Claude emits capitalized names
         // (Edit/Write/Read); opencode maps `part.tool` verbatim → lowercase
-        // (edit/write/read); other agents (copilot/mastra) vary too. Match
+        // (edit/write/read); other agents (copilot/pi) vary too. Match
         // case-insensitively across the known file-mutation / read tool variants
         // so artifacts are captured regardless of which agent produced the turn.
         const name = String(tc.name || '').toLowerCase();
@@ -1632,30 +1632,30 @@ class EnhancedTranscriptMonitor {
       }
     }
 
-    // Check Mastra transcript directory (.observations/transcripts/)
-    const mastraTranscriptDir = this.findMastraTranscriptDir();
-    if (mastraTranscriptDir) {
+    // Check the pi session directory
+    const piSessionDir = this.findPiSessionDir();
+    if (piSessionDir) {
       try {
-        const mastraFiles = fs.readdirSync(mastraTranscriptDir)
-          .filter(f => f.endsWith('.jsonl') || f.endsWith('.ndjson'))
+        const piFiles = fs.readdirSync(piSessionDir)
+          .filter(f => f.endsWith('.jsonl'))
           .map(f => {
-            const fp = path.join(mastraTranscriptDir, f);
+            const fp = path.join(piSessionDir, f);
             const stats = fs.statSync(fp);
             return { path: fp, mtime: stats.mtime, size: stats.size };
           })
           .filter(f => (Date.now() - f.mtime.getTime()) < this.config.sessionDuration * 2)
           .sort((a, b) => b.mtime - a.mtime);
 
-        if (mastraFiles.length > 0) {
-          candidates.push({ path: mastraFiles[0].path, mtime: mastraFiles[0].mtime, source: 'mastra' });
+        if (piFiles.length > 0) {
+          candidates.push({ path: piFiles[0].path, mtime: piFiles[0].mtime, source: 'pi' });
         }
       } catch (e) {
-        this.debug(`Error scanning Mastra transcripts: ${e.message}`);
+        this.debug(`Error scanning pi sessions: ${e.message}`);
       }
     }
 
     if (candidates.length === 0) {
-      this.debug('No active transcripts found (copilot, Claude, OpenCode, or Mastra)');
+      this.debug('No active transcripts found (copilot, Claude, OpenCode, or pi)');
       return null;
     }
 
@@ -1668,25 +1668,32 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
-   * Find the mastra transcript directory.
-   * Mastra lifecycle hooks write NDJSON transcripts to .observations/transcripts/
-   * relative to the project path.
+   * Find the pi session directory.
+   *
+   * config/agents/pi.sh pins PI_CODING_AGENT_SESSION_DIR to
+   * <project>/.observations/pi-sessions/, so that env var is authoritative when
+   * present and the project-relative path is just the fallback for a pi started
+   * outside the launcher. This is why there is no guesswork here: pi's own
+   * default would be ~/.pi/agent/sessions/--<cwd-with-slashes-replaced>--/, and
+   * the mastra version of this function had to probe a directory and infer the
+   * agent from three different env vars because nothing pinned it.
    */
-  findMastraTranscriptDir() {
-    // Check if this is a mastra session (via env or agent adapter)
-    const isMastraAgent = process.env.CODING_AGENT === 'mastra' ||
-      process.env.AGENT_TRANSCRIPT_FMT === 'mastra' ||
-      process.env.CODING_TRANSCRIPT_FORMAT === 'mastra';
+  findPiSessionDir() {
+    const pinned = process.env.PI_CODING_AGENT_SESSION_DIR;
+    if (pinned) return pinned;
 
-    // Transcripts go to the target project's .observations/transcripts/
-    const transcriptDir = path.join(this.config.projectPath, '.observations', 'transcripts');
-    if (fs.existsSync(transcriptDir)) {
-      return transcriptDir;
+    const isPiAgent = process.env.CODING_AGENT === 'pi' ||
+      process.env.AGENT_TRANSCRIPT_FMT === 'pi' ||
+      process.env.CODING_TRANSCRIPT_FORMAT === 'pi';
+
+    const sessionDir = path.join(this.config.projectPath, '.observations', 'pi-sessions');
+    if (fs.existsSync(sessionDir)) {
+      return sessionDir;
     }
 
-    // Only create if explicitly a mastra session
-    if (isMastraAgent) {
-      return transcriptDir; // Will be created by MastraTranscriptReader.start()
+    // Only create if explicitly a pi session
+    if (isPiAgent) {
+      return sessionDir; // Will be created by PiSessionReader.start()
     }
 
     return null;
@@ -2175,7 +2182,7 @@ class EnhancedTranscriptMonitor {
    * Uses agent-specific completion signals to avoid flushing mid-response.
    *
    * @param {string} transcriptPath - The transcript path (file path or virtual opencode:// path)
-   * @param {string} agentType - Agent type: 'opencode', 'claude', 'copilot', 'mastra'
+   * @param {string} agentType - Agent type: 'opencode', 'claude', 'copilot', 'pi'
    * @param {Array} promptSet - Current prompt set exchanges (used for fallback heuristics)
    * @returns {{ complete: boolean, reason: string }}
    */
@@ -2245,14 +2252,17 @@ class EnhancedTranscriptMonitor {
       return { complete: false, reason: 'no copilot response yet' };
     }
 
-    // Mastra: the Stop hook fires when the assistant finishes, so any assistant
-    // message in the transcript means the response is complete
-    if (agentType === 'mastra') {
+    // pi: an assistant message is only persisted to the session file once the
+    // turn is terminal (pi replaces the streaming "pending" stopReason with a
+    // completion reason before writing), so its presence means the response is
+    // complete. Same conclusion mastra reached via its Stop hook, but read from
+    // the agent's own durable state rather than from a hook we installed.
+    if (agentType === 'pi') {
       const lastExchange = promptSet[promptSet.length - 1];
       if (lastExchange?.claudeResponse || lastExchange?.assistantMessage) {
-        return { complete: true, reason: 'mastra Stop hook fired' };
+        return { complete: true, reason: 'pi assistant message persisted' };
       }
-      return { complete: false, reason: 'no mastra response yet' };
+      return { complete: false, reason: 'no pi response yet' };
     }
 
     // Unknown agent — fall back to assuming complete (preserve existing behavior)
@@ -2745,15 +2755,14 @@ ORDER BY m.time_created ASC;`;
         return this.normalizeCopilotMessages(messages);
       }
 
-      // If this is a mastra NDJSON transcript, normalize to Claude-compatible format
-      const isMastraTranscript = this.agentType === 'mastra' ||
-        (messages.length > 0 && (
-          messages[0].type === 'session_start' ||
-          (messages[0].type === 'message' && messages.some(m => m.type === 'onStepFinish' || m.type === 'onToolCall'))
-        ));
-      if (isMastraTranscript) {
-        this.debug('Detected mastra NDJSON transcript — normalizing to Claude format');
-        return this.normalizeMastraMessages(messages);
+      // If this is a pi session file, normalize to Claude-compatible format.
+      // Detected by pi's own header line rather than by sniffing for event names:
+      // every pi session starts {"type":"session","version":N,...}.
+      const isPiSession = this.agentType === 'pi' ||
+        (messages.length > 0 && messages[0].type === 'session' && messages[0].version !== undefined);
+      if (isPiSession) {
+        this.debug('Detected pi session JSONL — normalizing to Claude format');
+        return this.normalizePiMessages(messages);
       }
 
       return messages;
@@ -2764,126 +2773,80 @@ ORDER BY m.time_created ASC;`;
   }
 
   /**
-   * Normalize mastra lifecycle hook NDJSON events to Claude-compatible message format.
-   * Maps mastra event types (message, onStepFinish, onToolCall, etc.) to the
-   * user/assistant message format that the ETM exchange extraction pipeline expects.
+   * Normalize pi session entries to Claude-compatible message format.
    *
-   * Per D-09: native mastra format is read by a dedicated normalizer.
+   * pi entries nest their payload under `.message` and carry content as an ARRAY
+   * of typed blocks (text / thinking / toolCall / image), with roles
+   * user / assistant / toolResult. See pi's docs/session-format.md.
+   *
+   * `thinking` blocks are dropped: they are the model's reasoning rather than its
+   * answer, and folding them into observation content would distort summaries and
+   * persist reasoning the user never saw.
+   *
+   * Per D-09: native agent format is read by a dedicated normalizer.
    * Per D-11: agent identity captured in metadata, not filename.
    */
-  normalizeMastraMessages(events) {
+  normalizePiMessages(entries) {
     const normalized = [];
     let messageIndex = 0;
 
-    for (const event of events) {
-      const ts = event.timestamp || new Date().toISOString();
-      const uuid = event.id || event.sessionId || `mastra_${messageIndex++}`;
+    const flatten = (content) => {
+      if (typeof content === 'string') return content;
+      if (!Array.isArray(content)) return '';
+      return content
+        .filter(b => b && b.type === 'text' && typeof b.text === 'string')
+        .map(b => b.text)
+        .join('');
+    };
 
-      switch (event.type) {
-        case 'message': {
-          if (event.role === 'user' && event.content) {
-            normalized.push({
-              type: 'user',
-              uuid,
-              timestamp: ts,
-              message: {
-                role: 'user',
-                content: event.content
-              },
-              mastraAgent: true
-            });
-          } else if (event.role === 'assistant' && event.content) {
-            normalized.push({
-              type: 'assistant',
-              uuid,
-              timestamp: ts,
-              message: {
-                role: 'assistant',
-                content: event.content,
-                stop_reason: 'end_turn'
-              },
-              mastraAgent: true
-            });
-          }
-          break;
-        }
-        case 'onStepFinish': {
-          if (event.output) {
-            const content = typeof event.output === 'string' ? event.output : JSON.stringify(event.output);
-            normalized.push({
-              type: 'assistant',
-              uuid,
-              timestamp: ts,
-              message: {
-                role: 'assistant',
-                content,
-                stop_reason: 'end_turn'
-              },
-              mastraAgent: true
-            });
-          }
-          break;
-        }
-        case 'onToolCall': {
-          normalized.push({
-            type: 'assistant',
-            uuid,
-            timestamp: ts,
-            message: {
-              role: 'assistant',
-              content: [{
-                type: 'tool_use',
-                id: event.toolCallId || uuid,
-                name: event.tool || event.name || 'unknown',
-                input: event.input || {}
-              }]
-            },
-            mastraAgent: true
-          });
-          break;
-        }
-        case 'onToolResult': {
-          const resultContent = typeof event.output === 'string'
-            ? event.output
-            : JSON.stringify(event.output || {});
-          normalized.push({
-            type: 'user',
-            uuid,
-            timestamp: ts,
-            message: {
-              role: 'user',
-              content: [{
-                type: 'tool_result',
-                tool_use_id: event.toolCallId || uuid,
-                content: resultContent,
-                is_error: event.is_error || false
-              }]
-            },
-            mastraAgent: true
-          });
-          break;
-        }
-        // session_start and session_end are metadata-only; skip for exchange extraction
-        case 'session_start':
-        case 'session_end':
-          break;
-        default:
-          // Unknown event with content — treat as assistant message
-          if (event.content) {
-            const content = typeof event.content === 'string' ? event.content : JSON.stringify(event.content);
-            normalized.push({
-              type: 'assistant',
-              uuid,
-              timestamp: ts,
-              message: {
-                role: 'assistant',
-                content,
-                stop_reason: 'end_turn'
-              },
-              mastraAgent: true
-            });
-          }
-          break;
+    for (const entry of entries) {
+      if (!entry || entry.type !== 'message' || !entry.message) continue;
+
+      const msg = entry.message;
+      const ts = entry.timestamp || new Date().toISOString();
+      const uuid = entry.id || `pi_${messageIndex++}`;
+
+      if (msg.role === 'user') {
+        const content = flatten(msg.content);
+        if (!content) continue;
+        normalized.push({
+          type: 'user',
+          uuid,
+          timestamp: ts,
+          message: { role: 'user', content },
+          piAgent: true
+        });
+      } else if (msg.role === 'assistant') {
+        const content = flatten(msg.content);
+        // A tool-call-only assistant entry has no text. Emitting it as an empty
+        // assistant message would close the exchange with a blank response.
+        if (!content) continue;
+        normalized.push({
+          type: 'assistant',
+          uuid,
+          timestamp: ts,
+          message: {
+            role: 'assistant',
+            content,
+            model: msg.model || null,
+            // pi reports real token usage, so this survives to the token path
+            // instead of the zero-token special case mastra needed.
+            usage: msg.usage || null
+          },
+          piAgent: true
+        });
+      } else if (msg.role === 'toolResult') {
+        const content = flatten(msg.content);
+        normalized.push({
+          type: 'assistant',
+          uuid,
+          timestamp: ts,
+          message: {
+            role: 'assistant',
+            content: `[tool:${msg.toolName || 'unknown'}]` + (content ? ` ${content}` : '')
+          },
+          piAgent: true
+        });
       }
     }
 
@@ -3533,7 +3496,7 @@ ORDER BY m.time_created ASC;`;
       }
 
       // Per D-11: Agent identity captured in LSL file header/metadata, not filename
-      const agentDisplayName = this.agentType === 'mastra' ? 'Mastracode' :
+      const agentDisplayName = this.agentType === 'pi' ? 'Pi' :
         this.agentType === 'copilot' ? 'GitHub Copilot' :
         this.agentType === 'opencode' ? 'OpenCode' : 'Claude Code';
       const agentLine = `**Agent:** ${agentDisplayName}\n`;
