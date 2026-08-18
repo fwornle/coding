@@ -22,7 +22,7 @@
  *   5. report shape      — { matched, unmatched_wire, unmatched_transcript,
  *                          fallback, perRequest:[{tool_call_id,method,deltas,
  *                          flagged}], flaggedCount }.
- *   6. stamp-only        — opencode/mastra still return 0 (guard preserved).
+ *   6. stamp-only        — opencode/pi still return 0 (guard preserved).
  *   7. unmatched_wire    — a span-window wire row with NO transcript counterpart
  *                          is counted via the POST-LOOP DB query; all-matched → 0.
  *
@@ -390,8 +390,8 @@ test('report shape: matched/unmatched_wire/unmatched_transcript/fallback/perRequ
 // ---------------------------------------------------------------------------
 // Test 6 — stamp-only agents untouched (guard preserved) even with reconcile.
 // ---------------------------------------------------------------------------
-test('stamp-only: opencode/mastra return 0 even with reconcile:true (double-count guard preserved)', async () => {
-  for (const agent of ['opencode', 'mastra']) {
+test('stamp-only: opencode/pi return 0 even with reconcile:true (double-count guard preserved)', async () => {
+  for (const agent of ['opencode', 'pi']) {
     const { dir, dbPath } = newTempDb();
     try {
       const fixture = writeClaudeFixture(dir, [claudeTurn('req-x')]);

@@ -206,12 +206,12 @@ test('isForegroundGroup: claude/copilot file-adapter hashes are foreground', () 
   assert.equal(isForegroundGroup({ user_hash: 'copadt', process: 'token-adapter-copilot' }), true, 'copilot adapter');
 });
 
-test('isForegroundGroup: opencode/mastra proxy rows (session hash, own process name) are foreground', () => {
+test('isForegroundGroup: opencode/pi proxy rows (session hash, own process name) are foreground', () => {
   // Regression for the "unmeasured" bug: opencode routes through the proxy, so its
   // foreground row carries the SESSION hash (not cladpt/copadt) and stamps
   // process='opencode'. It must still classify as foreground.
   assert.equal(isForegroundGroup({ user_hash: 'c197ef', process: 'opencode' }), true, 'opencode fg via process');
-  assert.equal(isForegroundGroup({ user_hash: 'abc123', process: 'mastra' }), true, 'mastra fg via process');
+  assert.equal(isForegroundGroup({ user_hash: 'abc123', process: 'pi' }), true, 'pi fg via process');
 });
 
 test('isForegroundGroup: background daemons are NOT foreground (denylist wins over any hint)', () => {
