@@ -13,7 +13,7 @@
  *   4.  writeSubAgentLSL writes to .specstory/history/{YYYY}/{MM}/.
  *   5.  Body uses Format B labels + ps_<ms> anchors (Phase 50 parser compat).
  *   6.  Frontmatter carries the locked field set + sub_session_id.
- *   7.  Per-agent sub_hash rule applied (claude/copilot/opencode/mastra).
+ *   7.  Per-agent sub_hash rule applied (claude/copilot/opencode).
  *   8.  Backward-compat: parent LSL file byte-identical after sub-agent write.
  *   9.  Idempotency: rerun returns {skipped:true} and writes 0 bytes.
  *   10. --force overrides idempotency and overwrites.
@@ -200,7 +200,7 @@ describe('writeSubAgentLSL', () => {
     expect(fm).toMatch(/captured_at:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
-  test('Test 7: per-agent sub_hash rule applied across all four agents', async () => {
+  test('Test 7: per-agent sub_hash rule applied across all three agents', async () => {
     const cases = [
       {
         row: makeBaseRow({
@@ -228,15 +228,6 @@ describe('writeSubAgentLSL', () => {
         }),
         expectedSubHash: 'ses_309',
         expectedSubSession: 'ses_309f0c4f',
-      },
-      {
-        row: makeBaseRow({
-          agent: 'mastra',
-          sub_hash: 'sub_abc',
-          agent_metadata: { subAgentSessionId: 'sub_abcd123' },
-        }),
-        expectedSubHash: 'sub_abc',
-        expectedSubSession: 'sub_abcd123',
       },
     ];
     for (const tc of cases) {

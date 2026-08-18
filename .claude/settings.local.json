@@ -224,13 +224,9 @@
       "Bash(instance already running\", creating a rapid crash-loop that exhausted GPS''s:*)",
       "Bash(find /Users/Q284340/Agentic/coding -type f \\\\\\(-name *.puml -o -name *.png -o -name *.md -o -name mkdocs.yml \\\\\\))",
       "Bash(find /Users/Q284340/Agentic/coding/docs -type f \\\\\\(-name *.puml -o -name *.png -o -name *.md -o -name mkdocs.yml \\\\\\))",
-      "WebFetch(domain:mastra.ai)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:code.mastra.ai)",
       "WebFetch(domain:opencode.ai)",
       "Skill(gsd:verify-work)",
-      "Bash(mastracode --help)",
-      "Read(//Users/Q284340/.mastracode/**)",
       "Read(//Users/Q284340/Agentic/_work/onboarding-repro/.specstory/history/**)",
       "Skill(gsd:ui-phase)",
       "Bash(1 echo:*)",
@@ -599,7 +595,11 @@
       "Read(//Library/LaunchAgents/**)",
       "Bash(/bin/ps aux *)",
       "Bash(/usr/bin/grep -nE \"consolidation/run|consolidation/status|new ObservationConsolidator|setInterval|_INTERVAL|_THRESHOLD|schedule|cron|app\\\\.\\(get|post\\)\" scripts/observations-api-server.mjs)",
-      "Bash(gh pr *)"
+      "Bash(gh pr *)",
+      "Bash(/usr/bin/grep -n \"^\\\\*\\\\*User Message:\\\\*\\\\*\\\\|^\\\\*\\\\*User Request:\\\\*\\\\*\" .specstory/history/2026/08/2026-08-16_1000-1100_c197ef.md)",
+      "Bash(/usr/bin/grep -n -B2 -A12 \"^theme:\" mkdocs.yml)",
+      "Bash(/usr/bin/sed -n '40,70p' mkdocs.yml)",
+      "Bash(/usr/bin/grep -n -A12 \"^plugins:\" mkdocs.yml)"
     ],
     "deny": [],
     "ask": []

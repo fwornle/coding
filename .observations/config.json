@@ -17,13 +17,13 @@
       "model": "anthropic/claude-haiku-4-5",
       "maxDailyTokens": 500000
     },
-    "mastra": {
-      "model": "anthropic/claude-haiku-4-5",
-      "maxDailyTokens": 500000
-    },
     "claude": {
       "model": "groq/llama-3.3-70b-versatile",
       "maxDailyTokens": 1000000
+    },
+    "pi": {
+      "model": "anthropic/claude-haiku-4-5",
+      "maxDailyTokens": 500000
     }
   }
 }

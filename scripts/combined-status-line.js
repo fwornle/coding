@@ -297,7 +297,7 @@ class CombinedStatusLine {
       claude:   { prefix: '',  color: '' },           // Default (no prefix for claude — most common)
       opencode: { prefix: 'oc:', color: '' },          // OpenCode sessions
       copilot:  { prefix: 'cp:', color: '' },          // Copilot sessions
-      mastra:   { prefix: '#[fg=colour13]M#[fg=default]:', color: 'colour13' }  // Mastra: magenta diamond
+      pi:       { prefix: '#[fg=colour13]pi#[fg=default]:', color: 'colour13' }  // pi: magenta
     };
   }
 
@@ -2250,7 +2250,7 @@ class CombinedStatusLine {
             const abbrev = this.getProjectAbbreviation(project);
             const isCurrentProject = abbrev === currentAbbrev;
             const displayAbbrev = isCurrentProject ? `#[underscore]${abbrev}#[nounderscore]` : abbrev;
-            // Add agent type prefix for non-Claude agents (mastra, opencode, copilot)
+            // Add agent type prefix for non-Claude agents (pi, opencode, copilot)
             const agentType = health.details ? this.extractAgentType(health.details) : null;
             const agentPrefix = agentType && this.agentDisplay[agentType] ? this.agentDisplay[agentType].prefix : '';
             if ((health.icon === '🟡' || health.icon === '🔴') && health.reason) {
@@ -2544,7 +2544,9 @@ class CombinedStatusLine {
   extractAgentType(details) {
     if (!details) return null;
     const detailsLower = details.toLowerCase();
-    for (const agentType of ['mastra', 'opencode', 'copilot']) {
+    // Order matters: 'pi' is a two-letter substring and would match inside other words,
+    // so the longer, more specific ids are tested first and 'pi' is the last resort.
+    for (const agentType of ['opencode', 'copilot', 'pi']) {
       if (detailsLower.startsWith(agentType) || detailsLower.includes(agentType)) {
         return agentType;
       }

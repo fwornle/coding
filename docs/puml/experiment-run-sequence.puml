@@ -70,9 +70,10 @@ end
 
 note over runner, proxy
   Parallel caveat: opencode (rapid-proxy provider → its own session id)
-  and mastracode (task_id='') are ambient-slot-bound — with no global
-  slot they measure ~0 tokens. claude (x-task-id) and copilot
-  (task-scoped adapter) stay per-request bound. Run serially to measure them.
+  is ambient-slot-bound — with no global slot it measures ~0 tokens.
+  claude (x-task-id), copilot (task-scoped adapter) and pi
+  (x-task-id from $TASK_ID) stay per-request bound. Run serially
+  to measure opencode.
 end note
 
 == Compare & surface ==

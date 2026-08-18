@@ -7,7 +7,7 @@
  *  1. --help exits 0 and prints all 5 flag names
  *  2. With four fake adapters, calls discover() then convertToObservations()
  *     on each agent in AGENTS order
- *  3. --agent claude filters to ONE agent (skips other three)
+ *  3. --agent claude filters to ONE agent (skips the other two)
  *  4. --dry-run calls discover() but NOT convertToObservations(); stderr
  *     reports dry-run + nonzero discovered count
  *  5. Missing adapter → stderr 'no adapter' + exit 0 if any other succeeded,
@@ -134,7 +134,7 @@ function setupAllFour(tmpDir, opts = {}) {
   fs.mkdirSync(adaptersDir, { recursive: true });
   fs.mkdirSync(sidecarDir, { recursive: true });
   const sidecars = {};
-  for (const a of ['claude', 'opencode', 'copilot', 'mastra']) {
+  for (const a of ['claude', 'opencode', 'copilot']) {
     sidecars[a] = writeFakeAdapter(adaptersDir, sidecarDir, a, opts);
   }
   return { adaptersDir, sidecarDir, sidecars };
@@ -152,14 +152,14 @@ describe('scripts/sweep-sub-agents.mjs CLI', () => {
     expect(combined).toMatch(/--limit/);
   });
 
-  test('Test 2: with all four fake adapters, calls discover then convertToObservations on each in AGENTS order', async () => {
+  test('Test 2: with all three fake adapters, calls discover then convertToObservations on each in AGENTS order', async () => {
     const { adaptersDir, sidecars } = setupAllFour(tmpDir);
     const { code, stderr } = await runCLI(['--project', 'coding'], {
       LSL_ADAPTERS_DIR: adaptersDir,
     });
     expect(code).toBe(0);
     // Each adapter must have BOTH calls recorded.
-    for (const a of ['claude', 'opencode', 'copilot', 'mastra']) {
+    for (const a of ['claude', 'opencode', 'copilot']) {
       const data = readSidecar(sidecars[a]);
       const methods = data.calls.map((c) => c.method);
       expect(methods).toEqual(['discover', 'convertToObservations']);
@@ -168,11 +168,11 @@ describe('scripts/sweep-sub-agents.mjs CLI', () => {
     expect(stderr).toMatch(/agent=claude/);
     expect(stderr).toMatch(/agent=opencode/);
     expect(stderr).toMatch(/agent=copilot/);
-    expect(stderr).toMatch(/agent=mastra/);
+    expect(stderr).toMatch(/agent=copilot/);
     expect(stderr).toMatch(/aggregate/);
   });
 
-  test('Test 3: --agent claude filters to ONE agent (skips other three)', async () => {
+  test('Test 3: --agent claude filters to ONE agent (skips the other two)', async () => {
     const { adaptersDir, sidecars } = setupAllFour(tmpDir);
     const { code } = await runCLI(['--agent', 'claude', '--project', 'coding'], {
       LSL_ADAPTERS_DIR: adaptersDir,
@@ -181,7 +181,7 @@ describe('scripts/sweep-sub-agents.mjs CLI', () => {
     const claudeData = readSidecar(sidecars.claude);
     const claudeMethods = claudeData.calls.map((c) => c.method);
     expect(claudeMethods).toEqual(['discover', 'convertToObservations']);
-    for (const a of ['opencode', 'copilot', 'mastra']) {
+    for (const a of ['opencode', 'copilot']) {
       const data = readSidecar(sidecars[a]);
       expect(data.calls).toEqual([]);
     }
@@ -193,7 +193,7 @@ describe('scripts/sweep-sub-agents.mjs CLI', () => {
       LSL_ADAPTERS_DIR: adaptersDir,
     });
     expect(code).toBe(0);
-    for (const a of ['claude', 'opencode', 'copilot', 'mastra']) {
+    for (const a of ['claude', 'opencode', 'copilot']) {
       const data = readSidecar(sidecars[a]);
       const methods = data.calls.map((c) => c.method);
       expect(methods).toEqual(['discover']);
@@ -203,8 +203,8 @@ describe('scripts/sweep-sub-agents.mjs CLI', () => {
     expect(stderr).toMatch(/discovered=[1-9]/);
   });
 
-  test('Test 5: missing adapter → stderr "no adapter" + exit 0 when others succeed; exit 2 when all four missing', async () => {
-    // Scenario A: claude+opencode present, copilot+mastra missing → exit 0
+  test('Test 5: missing adapter → stderr "no adapter" + exit 0 when others succeed; exit 2 when all three missing', async () => {
+    // Scenario A: claude+opencode present, copilot missing → exit 0
     const adaptersDir = path.join(tmpDir, 'adapters-partial');
     const sidecarDir = path.join(tmpDir, 'sidecars-partial');
     fs.mkdirSync(adaptersDir, { recursive: true });
@@ -216,7 +216,7 @@ describe('scripts/sweep-sub-agents.mjs CLI', () => {
     });
     expect(a.code).toBe(0);
     expect(a.stderr).toMatch(/no adapter/);
-    expect(a.stderr).toMatch(/copilot|mastra/);
+    expect(a.stderr).toMatch(/copilot/);
 
     // Scenario B: no adapter files at all → exit 2
     const emptyDir = path.join(tmpDir, 'empty-adapters');
@@ -239,7 +239,7 @@ describe('scripts/sweep-sub-agents.mjs CLI', () => {
     // adapter+writer's own content_hash gate is what makes observation writes
     // idempotent — verified via Plan 50's race-guard + content-hash test path.
     // Here we assert the dispatcher does NOT call adapters more than 1 pair per run.
-    for (const a of ['claude', 'opencode', 'copilot', 'mastra']) {
+    for (const a of ['claude', 'opencode', 'copilot']) {
       const data = readSidecar(sidecars[a]);
       expect(data.calls).toHaveLength(4);
       const methods = data.calls.map((c) => c.method);
@@ -253,7 +253,7 @@ describe('scripts/sweep-sub-agents.mjs CLI', () => {
       LSL_ADAPTERS_DIR: adaptersDir,
     });
     expect(code).toBe(0);
-    for (const a of ['claude', 'opencode', 'copilot', 'mastra']) {
+    for (const a of ['claude', 'opencode', 'copilot']) {
       const data = readSidecar(sidecars[a]);
       const discoverCall = data.calls.find((c) => c.method === 'discover');
       expect(discoverCall).toBeDefined();

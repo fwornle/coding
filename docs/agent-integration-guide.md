@@ -372,16 +372,18 @@ coding --lsl-status
 - Demonstrates the minimum integration: `AGENT_NAME` + `AGENT_COMMAND` + `agent_check_requirements()`
 - **Native LSL support**: The transcript monitor reads directly from OpenCode's SQLite database (`~/.local/share/opencode/opencode.db`) — no pipe-pane capture needed for session logging
 
-### Mastracode (`config/agents/mastra.sh`)
+### Pi (`config/agents/pi.sh`)
 
-- `AGENT_COMMAND="mastracode"` — launches standalone mastracode TUI
-- `AGENT_ENABLE_PIPE_CAPTURE=false` — uses lifecycle hook transcripts for LSL
-- `AGENT_INSTALL_COMMAND="npm install -g mastracode"` — auto-installs on first launch
+- `AGENT_COMMAND="pi"` — launches standalone pi TUI
+- `AGENT_ENABLE_PIPE_CAPTURE=false` — pi writes its own session JSONL, so there is nothing for the terminal-scraping path to add
+- `AGENT_INSTALL_COMMAND="npm install -g --ignore-scripts @earendil-works/pi-coding-agent"` — auto-installs on first launch
 - `agent_pre_launch()` — handles first-run OAuth setup, network-adaptive model selection, hooks config
-- Transcript capture via `MastraTranscriptReader` reading NDJSON from mastra lifecycle hooks
+- Transcript capture via `PiSessionReader`, reading pi's NATIVE session JSONL from the directory `pi.sh` pins via `PI_CODING_AGENT_SESSION_DIR` (no hooks to install)
 - Observational memory via km-core `GraphKMStore` at `.data/knowledge-graph/` (legacy LibSQL/SQLite `.observations/observations.db` archived 2026-06-05 under Phase 44 Plan 18)
 
-![Mastracode running in coding](images/coding-mastra.png)
+<!-- Screenshot pending: run `coding --pi` interactively and capture the tmux
+     session as docs/images/coding-pi.png. The previous image showed Mastracode, the agent pi
+     replaced, so it was removed rather than relabelled. -->
 
 ---
 

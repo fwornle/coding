@@ -9,7 +9,7 @@ rectangle "Coding Agents" <<agent>> {
   component "Claude Code" as claude
   component "Copilot CLI" as copilot
   component "OpenCode" as opencode
-  component "Mastracode" as mastra
+  component "Pi" as pi
 }
 
 rectangle "Enhanced Transcript Monitor\n(host, per project)" <<core>> as etm {
@@ -51,7 +51,7 @@ rectangle "coding-services container\n(no .observations bind mount)" <<infra>> a
 claude --> etm
 copilot --> etm
 opencode --> etm
-mastra --> etm
+pi --> etm
 
 fire --> etmclient : messages\n(fire-and-forget)
 etmclient SYNC_LINE ep_messages : POST\n/api/observations/messages

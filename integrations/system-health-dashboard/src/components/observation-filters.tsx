@@ -13,7 +13,9 @@ import {
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
 
-const ALL_AGENTS = ['claude', 'copilot', 'opencode', 'mastra'] as const
+// 'mastra' is retained as a legacy filter so the historical observations that carry
+// it remain reachable in the UI; the agent itself was replaced by pi.
+const ALL_AGENTS = ['claude', 'copilot', 'opencode', 'pi', 'mastra'] as const
 
 export interface FilterState {
   agents: string[]

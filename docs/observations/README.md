@@ -10,7 +10,7 @@ Observational Memory captures per-exchange observations during coding sessions. 
 
 - **Real-Time Capture** - Every exchange generates an observation via fire-and-forget (never blocks LSL)
 - **LLM Summarization** - Structured summaries via the LLM CLI proxy with automatic provider fallback
-- **Multi-Agent Support** - Claude Code, Copilot CLI, OpenCode, and Mastracode all generate observations
+- **Multi-Agent Support** - Claude Code, Copilot CLI, OpenCode, and Pi all generate observations
 - **Browsable Dashboard** - Filter by agent, project, time range, and full-text search
 - **Zero-Cost** - Routes through subscription providers (Claude Max, Copilot Enterprise)
 - **Backfill Support** - Historical transcripts can be batch-converted into observations
@@ -71,7 +71,7 @@ All four agents generate observations:
 | **Claude Code** | ETM transcript monitoring | `path.basename(projectPath)` |
 | **GitHub Copilot** | ETM pipe-pane capture | `path.basename(projectPath)` |
 | **OpenCode** | ETM pipe-pane capture | `path.basename(projectPath)` |
-| **Mastracode** | ETM lifecycle hook transcripts | `path.basename(projectPath)` |
+| **Pi** | ETM reads pi's native session JSONL | `path.basename(projectPath)` |
 
 ## Dashboard
 
@@ -79,7 +79,7 @@ Access at `http://localhost:3032/observations`.
 
 ![Observation Viewer -- list view with filters](../images/observation-viewer.png)
 
-- **Agent filter** -- checkbox per agent (claude, copilot, opencode, mastra)
+- **Agent filter** -- checkbox per agent (claude, copilot, opencode, pi)
 - **Time range** -- date pickers for from/to
 - **Project filter** -- dropdown of projects with observations
 - **Full-text search** -- FTS5 search across observation summaries
@@ -131,7 +131,7 @@ CREATE TABLE observations (
   id TEXT PRIMARY KEY,
   summary TEXT,
   messages TEXT,      -- JSON array of original messages
-  agent TEXT,         -- claude, copilot, opencode, mastra
+  agent TEXT,         -- claude, copilot, opencode, pi
   session_id TEXT,
   source_file TEXT,
   created_at TEXT,    -- ISO 8601
@@ -154,14 +154,10 @@ CREATE TABLE observations (
   "agents": {
     "claude": { "model": "groq/llama-3.3-70b-versatile" },
     "opencode": { "model": "anthropic/claude-haiku-4-5" },
-    "mastra": { "model": "anthropic/claude-haiku-4-5" }
+    "pi": { "model": "anthropic/claude-haiku-4-5" }
   }
 }
 ```
-
-### Mastracode built-in OM
-
-Mastracode has its own observational memory system (separate from ours). It can be disabled in `~/Library/Application Support/mastracode/settings.json` by setting `activeOmPackId: "disabled"`.
 
 ## Deduplication
 

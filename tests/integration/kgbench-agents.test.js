@@ -59,7 +59,7 @@ describe('non-claude agents are driven to write an answer file', () => {
   // An analysis-shaped prompt makes copilot exit in ~6s and opencode yield on its first
   // toolless step. The directive is the only thing that makes them act, so its presence is
   // a contract, not a detail.
-  it.each(['copilot', 'opencode', 'mastracode'])('%s prompt carries the answer-file directive', (agent) => {
+  it.each(['copilot', 'opencode', 'pi'])('%s prompt carries the answer-file directive', (agent) => {
     const argv = _ADAPTERS[agent].argv({ prompt: 'Which file does X?', model: 'm', answerFile: ANSWER_FILE });
     const prompt = argv.find((a) => a.includes('Which file does X?'));
     expect(prompt).toBeDefined();
@@ -80,7 +80,7 @@ describe('non-claude agents are driven to write an answer file', () => {
   });
 
   it('no non-claude adapter emits a claude-only gating flag', () => {
-    for (const agent of ['copilot', 'opencode', 'mastracode']) {
+    for (const agent of ['copilot', 'opencode', 'pi']) {
       const argv = _ADAPTERS[agent].argv({ prompt: 'q', model: 'm', answerFile: ANSWER_FILE });
       expect(argv).not.toContain('--allowedTools');
       expect(argv).not.toContain('--disallowedTools');
@@ -107,14 +107,14 @@ describe('enforcement is described, not asserted', () => {
     expect(e.note).toMatch(/available-tools/);
   });
 
-  it.each(['opencode', 'mastracode'])('%s is reported as genuinely ungateable', (agent) => {
+  it.each(['opencode'])('%s is reported as genuinely ungateable', (agent) => {
     const e = resolveAgent(agent, { repoRoot: process.cwd() }).enforcement;
     expect(e.mcp_servers).toBe('enforced');
     expect(e.builtins).toBe('ungated');
     expect(e.gateable).toBe(false);
   });
 
-  it.each(['copilot', 'opencode', 'mastracode'])('%s never collapses to a single boolean', (agent) => {
+  it.each(['copilot', 'opencode', 'pi'])('%s never collapses to a single boolean', (agent) => {
     const e = resolveAgent(agent, { repoRoot: process.cwd() }).enforcement;
     // A `tool_enforced: true|false` would have to lie about one of the two halves.
     expect(Object.keys(e)).toEqual(expect.arrayContaining(['mcp_servers', 'builtins', 'verified_by']));
@@ -201,7 +201,7 @@ describe('model ids are resolved per agent, including the minor-less Claude 5 ge
 
   it('rejects an unknown agent loudly instead of guessing', () => {
     expect(() => resolveAgent('cursor', { repoRoot: process.cwd() })).toThrow(/unknown agent/i);
-    expect(KNOWN_AGENTS).toEqual(['claude', 'copilot', 'opencode', 'mastracode']);
+    expect(KNOWN_AGENTS).toEqual(['claude', 'copilot', 'opencode', 'pi']);
   });
 });
 

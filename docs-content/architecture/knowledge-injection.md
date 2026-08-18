@@ -6,7 +6,7 @@ Automatic surfacing of accumulated knowledge into coding agent conversations.
 
 The Knowledge Context Injection pipeline (v6.0) makes the coding project's accumulated knowledge actionable by injecting relevant context into every agent conversation. When you type a prompt in any coding agent, the system retrieves semantically relevant observations, digests, insights, and knowledge graph entities, then injects them as invisible context that shapes the agent's response.
 
-The pipeline is fully agent-agnostic: Claude, Copilot, OpenCode, and Mastra all receive knowledge injection through their native hook/plugin mechanisms. Claude and Copilot inject **per turn** (fresh, task-relevant knowledge on every prompt); OpenCode and Mastra inject a **session-start baseline**, which Copilot also gets on top of its per-turn injection.
+The pipeline is fully agent-agnostic: Claude, Copilot, OpenCode, and Pi all receive knowledge injection through their native hook/plugin mechanisms. Claude and Copilot inject **per turn** (fresh, task-relevant knowledge on every prompt); OpenCode and Pi inject a **session-start baseline**, which Copilot also gets on top of its per-turn injection.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ The pipeline is fully agent-agnostic: Claude, Copilot, OpenCode, and Mastra all 
 | Copilot Baseline Adapter | `src/hooks/knowledge-injection-copilot.js` | Session-start workspace instructions writer |
 | Copilot Per-Turn Injector | `src/hooks/knowledge-injection-copilot-posttool.js` | Per-turn injection via `additionalContext` (multi-channel) |
 | Copilot Channel Resolver | `src/hooks/copilot-channel-capabilities.js` | Maps Copilot version → honored injection channel(s) |
-| Mastra Adapter | `src/hooks/knowledge-injection-mastra.js` | Session-start context file writer |
+| Pi Adapter | `src/hooks/knowledge-injection-pi.js` | Session-start context file writer |
 | Working Memory | `src/retrieval/working-memory.js` | Live KG + STATE.md project summary |
 | Agent Profiles | `config/agent-profiles.json` | Per-agent tier weight multipliers |
 | Session State | `scripts/write-session-state.js` | Cross-agent continuity on agent switch |
@@ -85,7 +85,7 @@ The Claude adapter runs as a `UserPromptSubmit` hook registered in `~/.claude/se
 
 **Fail-open**: 2-second HTTP timeout, 5-second safety ceiling. Any error exits 0 with no output.
 
-### OpenCode, Copilot, Mastra (session-start baseline)
+### OpenCode, Copilot, Pi (session-start baseline)
 
 These adapters run once at session start via `launch-agent-common.sh`:
 
@@ -93,7 +93,7 @@ These adapters run once at session start via `launch-agent-common.sh`:
 |-------|-------------|-----------|
 | OpenCode | `.opencode/knowledge-context.md` | Custom instructions file |
 | Copilot | `.github/copilot-instructions.md` | Workspace context (marker-based merge) |
-| Mastra | `.mastra/context.md` | Custom context file |
+| Pi | `AGENTS.md` in pi's config dir | Read via pi's own context-file discovery |
 
 The launch system calls `_inject_knowledge_context()` at step 12.5, which dispatches the appropriate adapter with a 10-second timeout. For Copilot this is only the **baseline** — task-relevant per-turn injection is layered on top (see below).
 
@@ -154,7 +154,7 @@ Each agent gets differently weighted retrieval results based on their typical wo
   "claude": { "insights": 1.3, "digests": 1.2, "kg_entities": 1.0, "observations": 0.9 },
   "opencode": { "insights": 1.0, "digests": 1.0, "kg_entities": 1.2, "observations": 1.1 },
   "copilot": { "insights": 0.9, "digests": 1.0, "kg_entities": 1.3, "observations": 1.1 },
-  "mastra": { "insights": 1.1, "digests": 1.3, "kg_entities": 1.0, "observations": 1.0 }
+  "pi": { "insights": 1.1, "digests": 1.3, "kg_entities": 1.0, "observations": 1.0 }
 }
 ```
 

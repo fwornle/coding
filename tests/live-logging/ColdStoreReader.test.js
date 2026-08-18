@@ -46,7 +46,7 @@ function buildObservationFixtures(daysBack) {
     rows.push({
       id: `obs-${i}`,
       summary: `Intent: fixture ${i}\nApproach: synthetic\nResult: ok`,
-      agent: 'mastra',
+      agent: 'pi',
       project: 'coding',
       quality: 'normal',
       createdAt: iso,
@@ -74,7 +74,7 @@ function buildDigestFixtures(daysBack) {
       theme: `fixture-theme-${i}`,
       summary: `digest fixture ${i}`,
       observationIds: [`obs-${i}`],
-      agents: ['mastra'],
+      agents: ['pi'],
       filesTouched: [],
       quality: 'normal',
       createdAt: iso,

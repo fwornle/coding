@@ -21,7 +21,7 @@ package "Per-agent native channel" as chan_pkg {
   component "claude\n--append-system-prompt" as claude <<agent>>
   component "opencode\n.opencode/knowledge-context.md" as opencode <<agent>>
   component "copilot\n.github/copilot-instructions.md" as copilot <<agent>>
-  component "mastra\n.mastra/context.md" as mastra <<agent>>
+  component "pi\n--append-system-prompt" as pi <<agent>>
 }
 
 cell --> off : env != kb-on
@@ -32,7 +32,7 @@ idf --> judge : top-K candidates
 judge --> claude : survivors -> markdown
 judge --> opencode
 judge --> copilot
-judge --> mastra
+judge --> pi
 
 note right of judge
   **fail-CLOSED for experiment cells**

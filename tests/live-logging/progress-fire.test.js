@@ -101,7 +101,7 @@ describe('progressFireDecision', () => {
 describe('progressFireDecision — wall-clock trigger (token-less agents)', () => {
   const ELAPSED = 5 * 60 * 1000; // 5 min
 
-  test('fires on elapsed time even with 0 output tokens (opencode/copilot/mastra case)', () => {
+  test('fires on elapsed time even with 0 output tokens (opencode/copilot case)', () => {
     const t0 = 1_000_000;
     // 0 tokens, but 5 min since turn start → fire; markAt advances to now
     const r = progressFireDecision({

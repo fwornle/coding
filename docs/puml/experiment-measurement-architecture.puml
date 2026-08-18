@@ -87,7 +87,7 @@ note right of inject
   claude   --append-system-prompt
   opencode .opencode/knowledge-context.md
   copilot  .github/copilot-instructions.md
-  mastra   .mastra/context.md
+  pi       --append-system-prompt (argv)
   kb-off/default -> CODING_KNOWLEDGE_INJECTION=0
 end note
 

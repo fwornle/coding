@@ -3,7 +3,7 @@
  * tests/integration/agent-startup-contract.test.js
  *
  * Validates that all FOUR supported coding agents — claude (default), copilot,
- * opencode, mastra — share a sound startup contract and that the cross-cutting
+ * opencode, pi — share a sound startup contract and that the cross-cutting
  * "basic operations" wiring is intact:
  *
  *   1. Agent definition       — config/agents/<agent>.sh present + well-formed
@@ -38,7 +38,7 @@ import yaml from 'js-yaml';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..', '..');
 
-const AGENTS = ['claude', 'copilot', 'opencode', 'mastra'];
+const AGENTS = ['claude', 'copilot', 'opencode', 'pi'];
 
 // The two always-present stdio servers, plus whichever code-graph backend the
 // registry says is active. Derived rather than frozen: pinning the literal set
@@ -238,26 +238,26 @@ describe('Hook wiring — claude (unified hook config)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2c. Hook wiring — MASTRA (runtime-generated NDJSON transcript hooks)
+// 2c. Session capture — pi (native session JSONL, no hooks to install)
 // ---------------------------------------------------------------------------
-describe('Hook wiring — mastra (lifecycle transcript hooks)', () => {
-  it('the agent config wires a hook generator that targets transcript-writer.py', () => {
-    const src = readText('config/agents/mastra.sh');
-    expect(src).toMatch(/_generate_mastra_hooks_config\s*\(\)/);
-    expect(src).toMatch(/transcript-writer\.py/);
+// There is nothing here about hook wiring because pi needs none. mastra, which
+// this replaces, had no readable transcript, so its config generated a Python
+// hook script and registered it against six lifecycle events — and the contract
+// test had to assert that generator existed. pi persists its own sessions, so
+// what matters instead is that the launcher PINS where they land.
+describe('Session capture — pi (native session JSONL)', () => {
+  it('the agent config pins the session directory rather than generating hooks', () => {
+    const src = readText('config/agents/pi.sh');
+    expect(src).toMatch(/PI_CODING_AGENT_SESSION_DIR/);
+    expect(src).toMatch(/pi-sessions/);
+    // No hook generation, and nothing written into the user's config root.
+    expect(src).not.toMatch(/hooks\.json/);
   });
 
-  it('if ~/.mastracode/hooks.json exists, it covers the lifecycle events', () => {
-    const abs = path.join(process.env.HOME || '', '.mastracode', 'hooks.json');
-    if (!existsSync(abs)) {
-      console.warn('[skip] ~/.mastracode/hooks.json not generated yet (mastra not launched)');
-      return;
-    }
-    const cfg = JSON.parse(readFileSync(abs, 'utf8'));
-    for (const ev of ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop']) {
-      expect(Array.isArray(cfg[ev])).toBe(true);
-      expect(cfg[ev][0].command).toMatch(/transcript-writer\.py/);
-    }
+  it('the config dir is wrapper-scoped so a bare `pi` is unaffected', () => {
+    const src = readText('config/agents/pi.sh');
+    expect(src).toMatch(/PI_CODING_AGENT_DIR/);
+    expect(src).toMatch(/\.pi-agent/);
   });
 });
 

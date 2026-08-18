@@ -174,8 +174,8 @@ export class HealthRemediationActions {
         case 'check_llm_cli_proxy':
           result = await this.checkLLMCLIProxy(issueDetails);
           break;
-        case 'check_mastra_agent':
-          result = await this.checkMastraAgent(issueDetails);
+        case 'check_pi_agent':
+          result = await this.checkPiAgent(issueDetails);
           break;
         case 'experiment_run':
           result = await this.experimentRun(issueDetails);
@@ -680,59 +680,61 @@ export class HealthRemediationActions {
   }
 
   /**
-   * Check mastra agent health and attempt recovery
-   * Detects mastra process via tmux session (coding-mastra-*) or ps.
+   * Check pi agent health and attempt recovery
+   * Detects the pi process via tmux session (coding-pi-*) or ps.
    * Per D-15: LLM proxy unreachable at startup warns but does NOT block —
-   * mastra agent is NOT marked unhealthy just because proxy is down.
+   * the pi agent is NOT marked unhealthy just because the proxy is down.
    */
-  async checkMastraAgent(details) {
+  async checkPiAgent(details) {
     try {
-      this.log('Checking mastra agent health...');
+      this.log('Checking pi agent health...');
 
-      // Check if mastra process is running via tmux sessions
-      let mastraSessions = '';
+      // Check if pi is running via tmux sessions
+      let piSessions = '';
       try {
-        const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null | grep "^coding-mastra-"', { timeout: 5000 });
-        mastraSessions = stdout.trim();
+        const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null | grep "^coding-pi-"', { timeout: 5000 });
+        piSessions = stdout.trim();
       } catch (e) {
-        // No mastra tmux sessions — normal if not running
+        // No pi tmux sessions — normal if not running
       }
 
-      // Also check via ps for mastra/mastracode processes
-      let mastraProcesses = '';
+      // Also check via ps. EXACT equality on comm, never a substring match: `pi` is a
+      // two-character name, so `pgrep pi` or a grep would match python, pip, mpirun and
+      // most of /usr/bin. This is the one agent where a loose matcher is actively unsafe.
+      let piProcesses = '';
       try {
-        const { stdout } = await execAsync('ps -eo pid,comm | awk \'$2 == "mastra" || $2 == "mastracode" {print $1}\'', { timeout: 5000 });
-        mastraProcesses = stdout.trim();
+        const { stdout } = await execAsync('ps -eo pid,comm | awk \'$2 == "pi" {print $1}\'', { timeout: 5000 });
+        piProcesses = stdout.trim();
       } catch (e) {
-        // No mastra processes — normal if not running
+        // No pi processes — normal if not running
       }
 
-      const isRunning = !!(mastraSessions || mastraProcesses);
+      const isRunning = !!(piSessions || piProcesses);
 
       if (!isRunning) {
         return {
           success: true,
-          message: 'Mastra agent is not running (no active sessions or processes)'
+          message: 'pi agent is not running (no active sessions or processes)'
         };
       }
 
-      // Mastra is running — check LLM proxy connectivity (non-blocking per D-15)
+      // pi is running — check LLM proxy connectivity (non-blocking per D-15)
       const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
       const proxyHost = 'host.docker.internal';
       const proxyHealthy = await this.checkHttpHealth(`http://${proxyHost}:${proxyPort}/health`, 3000);
 
       if (!proxyHealthy) {
         // WARN only — do not mark mastra as unhealthy (D-15: non-blocking)
-        this.log('Mastra agent running but LLM proxy unreachable — warning only (non-blocking per D-15)', 'WARN');
+        this.log('pi agent running but LLM proxy unreachable — warning only (non-blocking per D-15)', 'WARN');
         return {
           success: true,
-          message: `Mastra agent running (sessions: ${mastraSessions || 'via ps'}). LLM proxy on port ${proxyPort} unreachable — warning only.`
+          message: `pi agent running (sessions: ${piSessions || 'via ps'}). LLM proxy on port ${proxyPort} unreachable — warning only.`
         };
       }
 
       return {
         success: true,
-        message: `Mastra agent healthy (sessions: ${mastraSessions || 'via ps'}, LLM proxy OK)`
+        message: `pi agent healthy (sessions: ${piSessions || 'via ps'}, LLM proxy OK)`
       };
 
     } catch (error) {

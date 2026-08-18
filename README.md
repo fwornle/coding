@@ -1,6 +1,6 @@
 # Coding - AI Development Toolkit
 
-A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting Claude Code, GitHub Copilot CLI, OpenCode, and Mastracode. **Zero-cost LLM routing** via existing Claude Code and GitHub Copilot subscriptions.
+A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting Claude Code, GitHub Copilot CLI, OpenCode, and Pi. **Zero-cost LLM routing** via existing Claude Code and GitHub Copilot subscriptions.
 
 ---
 
@@ -17,7 +17,7 @@ coding
 coding --claude
 coding --copilot
 coding --opencode
-coding --mastra
+coding --pi
 
 # Clean start (kills all orphaned processes, frees ports)
 coding --force
@@ -41,7 +41,7 @@ coding --copilot
 
 **MCP Configuration**: `claude-mcp-launcher.sh` wires the stdio-proxy → SSE bridge so the agent talks to the containerized MCP servers.
 
-**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, OpenCode, and Mastracode. The shared orchestrator (`scripts/launch-agent-common.sh`) handles service startup, monitoring, session management, and **auto-installation of missing agent CLIs** — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) treats Redis and Qdrant as stack containers and graphify (the file-based code knowledge graph) as a built-in of the coding-services container, so it never spawns duplicates.
+**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, OpenCode, and Pi. The shared orchestrator (`scripts/launch-agent-common.sh`) handles service startup, monitoring, session management, and **auto-installation of missing agent CLIs** — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) treats Redis and Qdrant as stack containers and graphify (the file-based code knowledge graph) as a built-in of the coding-services container, so it never spawns duplicates.
 
 ![Coding Environment — Tmux Status Bar](docs/images/status-line.png)
 
@@ -52,7 +52,7 @@ coding --copilot
 | **Claude Code** (default) | `coding` or `coding --claude` | Native transcript support |
 | **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
 | **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
-| **Mastracode** | `coding --mastra` | Lifecycle hook transcripts |
+| **Pi** | `coding --pi` | Native session JSONL |
 
 All agents get the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, constraint enforcement, and **shared skills** (see [Skills System](docs/skills-system.md)). Missing agent CLIs are auto-installed on first launch (with user confirmation).
 
@@ -60,7 +60,9 @@ All agents get the same infrastructure: tmux session wrapping, status line, heal
 
 ![OpenCode running in coding](docs/images/coding-opencode.png)
 
-![Mastracode running in coding](docs/images/coding-mastra.png)
+<!-- Screenshot pending: run `coding --pi` interactively and capture the tmux
+     session as docs-content/images/coding-pi.png. The previous image showed Mastracode, the agent pi
+     replaced, so it was removed rather than relabelled. -->
 
 See [Agent Integration Guide](docs/agent-integration-guide.md) for adding new agents.
 
@@ -242,7 +244,7 @@ Real-time code quality enforcement through PreToolUse hooks
 #### [👁️ Observational Memory](docs/observations/)
 Real-time per-exchange observations from live coding sessions, inspired by the observational memory concepts in the Mastra codebase:
 - **Structured LLM summaries**: Each exchange summarized into Intent/Approach/Artifacts/Result via subscription providers
-- **Multi-agent capture**: All four agents (Claude, Copilot, OpenCode, Mastracode) generate observations
+- **Multi-agent capture**: All four agents (Claude, Copilot, OpenCode, Pi) generate observations
 - **Dashboard**: Browsable at `http://localhost:3032/observations` with filters, search, compact view
 - **Auto-fallback**: LLM proxy automatically tries the next provider on failure (health tracking with cooldowns)
 - **Transcript converters**: Batch-convert historical Claude JSONL, Copilot events, and .specstory files
@@ -252,7 +254,9 @@ Real-time per-exchange observations from live coding sessions, inspired by the o
 
 ![Observation Viewer -- expanded observation with structured summary](docs/images/observation-viewer-item.png)
 
-![Mastracode in VS Code](docs/images/coding-mastracode-vscode.png)
+<!-- Screenshot pending: run `coding --pi` interactively and capture the tmux
+     session as docs-content/images/coding-pi-vscode.png. The previous image showed Mastracode, the agent pi
+     replaced, so it was removed rather than relabelled. -->
 
 ### Integration Components
 

@@ -802,7 +802,7 @@ async function main() {
   //   warning so the uncaptured tokens are VISIBLE rather than silently lost
   //   (A1 / T-75-43). This reuses byAgentModel/fgGroups already computed — no new
   //   query — and is a WARNING only: it NEVER blocks the close.
-  const IN_SCOPE_AGENTS = new Set(['claude', 'copilot', 'opencode', 'mastra']);
+  const IN_SCOPE_AGENTS = new Set(['claude', 'copilot', 'opencode', 'pi']);
   if (IN_SCOPE_AGENTS.has(foregroundAgent)
       && byAgentModel.length === 0
       && fgGroups.length === 0) {

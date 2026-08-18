@@ -72,7 +72,7 @@ rectangle "Knowledge Access" as ACCESS {
 
 rectangle "Context Injection (v6.0)" as INJECTION {
     [Retrieval Service\n(Hybrid Search + RRF)] as RETR_SVC
-    [Agent Adapters\n(Claude/Copilot/OpenCode/Mastra)] as ADAPT
+    [Agent Adapters\n(Claude/Copilot/OpenCode/Pi)] as ADAPT
     [Working Memory\n(KG + STATE.md)] as WMEM
 
     note right of RETR_SVC

@@ -215,16 +215,14 @@ const currentState = {
   // via lib/lsl/registry-reader.mjs (the same helper Plan 51-10's statusline
   // uses). status: 'unknown' before first probe · 'healthy' if at least one
   // live daemon has a fresh heartbeat · 'degraded' if all heartbeats are
-  // stale (>90s) or missing. Mastra is forward-compat (no Path A daemon yet
-  // per CONTEXT.md / RESEARCH-mastra.md), so it always reports available:
-  // false with the documented rationale.
+  // stale (>90s) or missing. The set mirrors lib/lsl/adapters AGENTS: only
+  // agents with a real sub-agent sweep adapter appear here.
   sub_agent_capture: {
     status: 'unknown',
     live_registrations: {
       claude: { running: 0, last_heartbeat_age_ms: null },
       opencode: { running: 0, last_heartbeat_age_ms: null },
-      copilot: { running: 0, last_heartbeat_age_ms: null },
-      mastra: { running: 0, available: false, reason: 'Path A not viable per RESEARCH-mastra.md' }
+      copilot: { running: 0, last_heartbeat_age_ms: null }
     },
     last_sweep_at: null,
     last_sweep_summary: null,
@@ -925,9 +923,6 @@ async function pollKnowledgePipeline() {
  *                  OR the live tier is silent while sweep evidence exists
  *   - 'unknown'  — no heartbeat files exist yet (cold boot / pre-install)
  *
- * Mastra is forward-compat: RESEARCH-mastra.md found no Path A spawn hook,
- * so the agent's `available:false` slot is permanent per CONTEXT.md.
- *
  * Dynamic-imports registry-reader.mjs so a stale/missing module doesn't
  * crash the coordinator at startup (defensive — coordinator MUST keep
  * running even if Phase 51's lib/lsl is in flux during a deploy).
@@ -949,8 +944,7 @@ async function pollSubAgentCapture() {
       live_registrations: {
         claude: { running: 0, last_heartbeat_age_ms: null },
         opencode: { running: 0, last_heartbeat_age_ms: null },
-        copilot: { running: 0, last_heartbeat_age_ms: null },
-        mastra: { running: 0, available: false, reason: 'Path A not viable per RESEARCH-mastra.md' }
+        copilot: { running: 0, last_heartbeat_age_ms: null }
       },
       last_sweep_at: null,
       last_sweep_summary: null,
@@ -969,8 +963,7 @@ async function pollSubAgentCapture() {
   const liveRegistrations = {
     claude: { running: 0, last_heartbeat_age_ms: null },
     opencode: { running: 0, last_heartbeat_age_ms: null },
-    copilot: { running: 0, last_heartbeat_age_ms: null },
-    mastra: { running: 0, available: false, reason: 'Path A not viable per RESEARCH-mastra.md' }
+    copilot: { running: 0, last_heartbeat_age_ms: null }
   };
 
   let anyFresh = false;
@@ -2676,8 +2669,7 @@ async function runAllChecks() {
       live_registrations: {
         claude: { running: 0, last_heartbeat_age_ms: null },
         opencode: { running: 0, last_heartbeat_age_ms: null },
-        copilot: { running: 0, last_heartbeat_age_ms: null },
-        mastra: { running: 0, available: false, reason: 'Path A not viable per RESEARCH-mastra.md' }
+        copilot: { running: 0, last_heartbeat_age_ms: null }
       },
       last_sweep_at: null,
       last_sweep_summary: null,

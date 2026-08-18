@@ -11,7 +11,7 @@
  *   - STOP_ADAPTERS.claude.mode === 'transcript' with userHash 'cladpt' and a
  *     real `build` function (Claude bypasses the proxy → must build main-session
  *     rows and insert them as cladpt).
- *   - STOP_ADAPTERS.copilot / opencode / mastra each mode === 'stamp-only' with
+ *   - STOP_ADAPTERS.copilot / opencode / pi each mode === 'stamp-only' with
  *     NO `build` function — these are already in token_usage via the proxy, so a
  *     transcript adapter would DOUBLE-COUNT (the D-04 anti-pattern guard).
  *   - captureForegroundTokens, given a span + the fixture main-session path,
@@ -119,13 +119,13 @@ test('STOP_ADAPTERS.copilot is a transcript adapter (copadt + build) — Copilot
   assert.equal(STOP_ADAPTERS.copilot.subagents, false, 'copilot has no Task sub-agents');
 });
 
-test('STOP_ADAPTERS mastra is stamp-only with NO build (double-count guard — it routes through the proxy)', () => {
-  assert.ok(STOP_ADAPTERS.mastra, 'mastra adapter present');
-  assert.equal(STOP_ADAPTERS.mastra.mode, 'stamp-only', 'mastra is proxy-routed → stamp-only');
+test('STOP_ADAPTERS pi is stamp-only with NO build (double-count guard — it routes through the proxy)', () => {
+  assert.ok(STOP_ADAPTERS.pi, 'pi adapter present');
+  assert.equal(STOP_ADAPTERS.pi.mode, 'stamp-only', 'pi is proxy-routed → stamp-only');
   assert.equal(
-    typeof STOP_ADAPTERS.mastra.build,
+    typeof STOP_ADAPTERS.pi.build,
     'undefined',
-    'mastra must NOT carry a transcript build (would double-count proxy rows)',
+    'pi must NOT carry a transcript build (would double-count proxy rows)',
   );
 });
 

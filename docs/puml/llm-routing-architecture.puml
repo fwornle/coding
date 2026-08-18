@@ -12,7 +12,7 @@ skinparam nodesep 12
 skinparam ranksep 28
 
 package "Callers" #F7FAFF {
-  component "Coding Agent  (foreground)\nclaude · copilot · opencode · mastra" as agent <<agent>>
+  component "Coding Agent  (foreground)\nclaude · copilot · opencode · pi" as agent <<agent>>
   package "Sandbox (docker)" #EEF4FC {
     component "LLM-based services · Agent systems · Diagnostics\n(background)" as bgsvc <<core>>
   }

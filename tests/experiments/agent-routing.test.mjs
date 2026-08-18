@@ -6,7 +6,7 @@
 // (scripts/launch-agent-common.sh configure_proxy_routing()).
 //
 // Task 1: resolveCellModel (dash→dot opencode normalization KEEPING the rapid-proxy/ prefix;
-//         copilot `auto`→measured-default; claude/mastracode passthrough) + buildAgentRoutingEnv
+//         copilot `auto`→measured-default; claude/pi passthrough) + buildAgentRoutingEnv
 //         (the per-agent env map lifted verbatim from configureProxyRoutingEnv's switch).
 // Task 2: the runCell wiring — a copilot 'auto' cell spawns with the RESOLVED launch model while
 //         its recorded task_id/variant keep the ORIGINAL model (task_hash comparability, D-05).
@@ -56,10 +56,10 @@ test('resolveCellModel: copilot already-valid id is a passthrough', () => {
   assert.equal(resolveCellModel('copilot', 'claude-opus-4.8'), 'claude-opus-4.8');
 });
 
-test('resolveCellModel: claude/mastracode aliases pass through untouched', () => {
+test('resolveCellModel: claude/pi aliases pass through untouched', () => {
   assert.equal(resolveCellModel('claude', 'opus'), 'opus');
   assert.equal(resolveCellModel('claude', 'sonnet'), 'sonnet');
-  assert.equal(resolveCellModel('mastracode', 'rapid-proxy-mastra'), 'rapid-proxy-mastra');
+  assert.equal(resolveCellModel('pi', 'rapid-proxy-pi'), 'rapid-proxy-pi');
 });
 
 // ---------------------------------------------------------------------------
