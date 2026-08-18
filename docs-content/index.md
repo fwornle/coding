@@ -122,9 +122,7 @@ All agents share the same infrastructure: tmux session wrapping, status line, he
 
 ![OpenCode running in coding](images/coding-opencode.png)
 
-<!-- Screenshot pending: run `coding --pi` interactively and capture the tmux
-     session as docs-content/images/coding-pi.png. The previous image showed Mastracode, the agent pi
-     replaced, so it was removed rather than relabelled. -->
+![Pi running in coding](images/coding-pi.png)
 
 [Agent Integration Guide](guides/agent-integration.md){ .md-button }
 
