@@ -221,14 +221,32 @@ if [ "${CREATE_ANS:-n}" = "y" ] || [ "$CREATE_ANS" = "Y" ]; then
     HOST_PART=""
     REPO_PART=""
   fi
-  echo "  Checking gh for: $HOST_PART/$REPO_PART"
-  if gh -R "$HOST_PART/$REPO_PART" repo view >/dev/null 2>&1; then
-    ok "Remote repo exists"
+  if [ -z "$HOST_PART" ] || [ -z "$REPO_PART" ]; then
+    # The URL parsed as neither https://host/owner/repo.git nor git@host:owner/repo.git
+    # — e.g. a bare local path passed via --remote. Both branches below would then be
+    # called with an empty "/" argument, and `gh repo create /` is a request we have no
+    # business making. Skip the whole block; the push below still works for a local remote.
+    echo "  (remote is not a host/owner/repo URL — skipping gh existence check + auto-create)"
   else
-    if gh repo create "$HOST_PART/$REPO_PART" --private --description "Private LSL history for $NAME" >/dev/null 2>&1; then
-      ok "Created private remote repo: $HOST_PART/$REPO_PART"
+    echo "  Checking gh for: $HOST_PART/$REPO_PART"
+    # Existence check via the REST API, NOT `gh -R <repo> repo view`: -R is not a valid
+    # pre-subcommand flag (gh 2.96 exits with "unknown shorthand flag: 'R' in -R"), so
+    # that form ALWAYS reported "missing" and fell through to create — silently, because
+    # stderr was discarded. On a repo that already exists the create then failed too and
+    # printed the manual-fix warning, which read as a real problem when nothing was wrong.
+    #
+    # REST rather than `gh repo view --json`: both work, but repo view goes through
+    # GraphQL, and this host returned a transient `Post https://api.bmw.ghe.com/graphql:
+    # Bad Gateway` during testing. A false "missing" is only mildly wrong (create fails,
+    # push still succeeds), but there is no reason to take the flakier path.
+    if gh api --hostname "$HOST_PART" "repos/$REPO_PART" >/dev/null 2>&1; then
+      ok "Remote repo exists"
     else
-      echo "  ⚠️  Could not auto-create remote — create manually then re-run push"
+      if gh repo create "$HOST_PART/$REPO_PART" --private --description "Private LSL history for $NAME" >/dev/null 2>&1; then
+        ok "Created private remote repo: $HOST_PART/$REPO_PART"
+      else
+        echo "  ⚠️  Could not auto-create remote — create manually then re-run push"
+      fi
     fi
   fi
 fi
