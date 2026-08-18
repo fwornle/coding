@@ -412,10 +412,43 @@ function ingestSignal(signal) {
       // each (session, project) pair its own slot so all projects surface in
       // the rollup and the per-pane lookup can pick the right one.
       const key = `${sid}:${projectName}`;
+
+      // A CLEAN STOP evicts immediately — it does NOT serve the 5-minute
+      // EVICT_AFTER_STOPPED_MS window. The two ways an entry reaches 'stopped'
+      // mean different things and must not share a policy:
+      //
+      //   • THIS path — an explicit `status: 'stopped'` signal. The ETM said
+      //     goodbye from its shutdown handler, so the session is definitively
+      //     over and there is nothing to wait for. Holding the entry only makes
+      //     a deliberately-closed project render amber ("degraded") in the
+      //     statusline for five minutes after it is gone.
+      //   • refreshLslStaleness() — 'stopped' INFERRED from a missing heartbeat
+      //     (crash, kill -9, machine sleep, a wedged poll loop). There the grace
+      //     window is the point: a transient stall must not wipe a session that
+      //     is about to resume, and `getLSLHealthStatus()` mapping stopped→down
+      //     is how an ETM crash-loop is diagnosed. That path is unchanged.
+      //
+      // Deleting rather than marking is what makes it immediate: the rollup
+      // below counts only entries that still exist, so the project disappears
+      // instead of transitioning to 'degraded'.
+      if (status === 'stopped') {
+        delete currentState.lsl[key];
+        // Recompute now rather than waiting for the next tick — otherwise
+        // `lsl_by_project` still advertises the project for up to TICK_MS and
+        // the statusline keeps rendering it, which is the very lag this
+        // removes. Cheap and idempotent; the staleness pass it also runs is a
+        // no-op for entries that are already fresh.
+        refreshLslStaleness();
+        break;
+      }
+
       currentState.lsl[key] = {
         status,
         lastBeat: ts,
-        ...(status === 'stopped' ? { stoppedAt: ts } : {}),
+        // No stoppedAt here: `status` is necessarily 'running' past the
+        // clean-stop guard above. refreshLslStaleness() sets stoppedAt when it
+        // infers a stop from a missing heartbeat, which is the only path that
+        // still needs the eviction timer.
         sessionId: sid,
         projectPath,
         projectName,
