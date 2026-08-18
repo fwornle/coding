@@ -331,13 +331,17 @@ class EnhancedTranscriptMonitor {
    * 'stopped' after >15s with no signal (D-10), which is the correct
    * R6 surface (NEVER 'healthy' on exception).
    */
-  async _postSignal(signal) {
+  async _postSignal(signal, { timeoutMs } = {}) {
     const url = process.env.HEALTH_COORDINATOR_URL || 'http://localhost:3034';
     try {
       const r = await fetch(`${url}/signals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(signal)
+        body: JSON.stringify(signal),
+        // Opt-in only: the shutdown goodbye is awaited on the exit path and must
+        // never hang there. Per-poll heartbeats pass nothing and keep their
+        // existing unbounded behaviour.
+        ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {})
       });
       if (!r.ok) {
         this.debug(`signal POST returned ${r.status}`);
@@ -4969,7 +4973,14 @@ ORDER BY m.time_created ASC;`;
       }
     }
 
-    this.cleanupHealthFile();
+    // AWAITED: the caller (`shutdown`) runs `process.exit(0)` the instant this
+    // resolves, so a fire-and-forget POST here loses the race and the clean-stop
+    // signal never reaches the coordinator — the entry then falls through to the
+    // 15s staleness path and sits 'degraded' for the full 5-minute eviction
+    // window. Measured before this fix: stoppedAt landed 19s after the last
+    // heartbeat (i.e. inferred), never at the same ts as the goodbye.
+    // Bounded so an unreachable coordinator cannot hang shutdown into a SIGKILL.
+    await this.cleanupHealthFile();
     console.log('📋 Enhanced transcript monitor stopped');
   }
 
@@ -5128,9 +5139,15 @@ ORDER BY m.time_created ASC;`;
 
   /**
    * Phase 33: POST a 'stopped' lsl_heartbeat signal on graceful shutdown.
-   * Replaces the legacy file write at this position. The coordinator's
-   * 5-minute eviction window (D-10) drops the entry from /health/state.lsl
-   * after this signal lands.
+   * Replaces the legacy file write at this position.
+   *
+   * The coordinator evicts on THIS signal immediately — it does not serve the
+   * 5-minute EVICT_AFTER_STOPPED_MS window, which now applies only to stops it
+   * INFERS from a missing heartbeat (crash / kill -9 / sleep). So landing this
+   * signal is the difference between a closed project vanishing from the
+   * statusline at once and it rendering amber ('degraded') for five minutes.
+   * That is why the caller awaits it and why it is bounded rather than
+   * fire-and-forget.
    */
   async cleanupHealthFile() {
     try {
@@ -5146,7 +5163,7 @@ ORDER BY m.time_created ASC;`;
           uptimeSeconds: Math.round(process.uptime())
         },
         ts: Date.now()
-      });
+      }, { timeoutMs: 2000 });
       this.debug('Stopped signal posted');
     } catch (error) {
       this.debug(`Failed to post stopped signal: ${error.message}`);
