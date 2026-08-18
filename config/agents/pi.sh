@@ -135,6 +135,41 @@ JSON
   _agent_log "Wrote pi provider config: $models_file"
 }
 
+# Merge our provider/model pins into pi's settings.json, preserving keys pi owns.
+#
+# $1 = the pi config directory.
+_pi_merge_settings() {
+  local cfg_dir="$1"
+  local settings_file="$cfg_dir/settings.json"
+
+  mkdir -p "$cfg_dir"
+  python3 - "$settings_file" <<'PYSETTINGS'
+import io, json, os, sys
+
+path = sys.argv[1]
+try:
+    with io.open(path, encoding="utf-8") as fh:
+        settings = json.load(fh)
+    if not isinstance(settings, dict):
+        settings = {}
+except (OSError, ValueError):
+    settings = {}
+
+settings["defaultProvider"] = "rapid-proxy-pi"
+settings["defaultModel"] = "claude-sonnet-5"
+# Keep the Ctrl+P picker honest: the proxy decides the real model, so offering
+# other ids here would advertise a choice that routing discards.
+settings["enabledModels"] = ["claude-sonnet-5"]
+
+tmp = path + ".tmp"
+with io.open(tmp, "w", encoding="utf-8") as fh:
+    json.dump(settings, fh, indent=2)
+    fh.write("\n")
+os.replace(tmp, path)
+PYSETTINGS
+  _agent_log "Pinned pi provider/model in $settings_file (rapid-proxy-pi/claude-sonnet-5)"
+}
+
 # Configure pi and validate environment.
 # Note: agent_pre_launch runs AFTER detect_network_and_configure_proxy,
 # so INSIDE_CN and PROXY_WORKING are already set.
@@ -176,11 +211,35 @@ agent_pre_launch() {
 
   _pi_write_models_json "$_pi_cfg_dir"
 
-  # Pin provider + model for this launch. pi reads both from the environment,
-  # so no argv juggling is needed and the user can still switch mid-session with
-  # /model or Ctrl+L.
-  export PI_PROVIDER="rapid-proxy-pi"
-  export PI_MODEL="claude-sonnet-5"
+  # Deny the direct-provider escape hatch.
+  #
+  # tmux-session-wrapper.sh propagates ANTHROPIC_API_KEY into the agent session
+  # (opencode needs it). pi treats an authenticated provider as selectable, and
+  # with a key present it picked `anthropic` over our proxy provider outright —
+  # observed live: the TUI came up on "(anthropic) claude-opus-4-8" and billed
+  # the user's Anthropic account directly until it hit a credit error. That is a
+  # silent egress bypass of the one audited path, which is exactly what the T1-T4
+  # lockdown exists to prevent.
+  #
+  # Unsetting here (agent_pre_launch runs BEFORE the wrapper builds its env list,
+  # and the wrapper skips empty vars) means pi has no credential of its own and
+  # can only reach a model through the proxy. If the proxy is down pi fails
+  # loudly rather than quietly spending on a different account — the intended
+  # trade, and the same reason the claude launcher pins its base URL.
+  unset ANTHROPIC_API_KEY
+
+  # Pin provider + model for this launch via settings.json.
+  #
+  # NOT via PI_PROVIDER/PI_MODEL: those look like the obvious seam and are not.
+  # pi EXPORTS them into its own tool environment so a bash tool can report which
+  # model is running; it does not read them to choose one (the PI_PROVIDER=...
+  # form in pi's docs belongs to its evals package, not the CLI). Setting them
+  # had no effect — pi came up on whatever provider it found a credential for.
+  #
+  # Merged, not overwritten: pi owns this file too (it stores
+  # lastChangelogVersion here), so clobbering it would fight the agent for its
+  # own state on every launch.
+  _pi_merge_settings "$_pi_cfg_dir"
 
   # Session storage, pinned to a deterministic project-local path.
   #
