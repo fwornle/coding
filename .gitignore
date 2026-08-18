@@ -446,3 +446,15 @@ local_cache/
 # with `*` into .data/codegraph, which would override any root-level negation.
 !.data/code-graph-meta/
 !.data/code-graph-meta/**
+
+# pi agent: wrapper-scoped config dir (models.json + injected AGENTS.md), written
+# fresh by config/agents/pi.sh on every launch. Runtime state, not source.
+.pi-agent/
+
+# pi agent: session transcripts. config/agents/pi.sh pins
+# PI_CODING_AGENT_SESSION_DIR here so PiSessionReader has a deterministic path
+# instead of decoding pi's default ~/.pi/agent/sessions/--<encoded-cwd>--/.
+# Conversation logs, so never source. (.observations/transcripts/ — mastra's
+# equivalent — was never ignored and did show up as untracked noise; not
+# repeating that here.)
+.observations/pi-sessions/

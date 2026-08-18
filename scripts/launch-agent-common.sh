@@ -497,6 +497,20 @@ configure_proxy_routing() {
         _agent_log "⚠️  mastra: MASTRACODE_MODEL_ID unset — proxy routing may be inactive."
       fi
       ;;
+    pi)
+      # Self-routed in pi.sh's agent_pre_launch, but — unlike mastra below — with
+      # a real per-request binding. pi's models.json provider carries
+      # `"x-task-id": "$TASK_ID"`, and pi interpolates that from its own process
+      # environment at config load, so exporting TASK_ID here is enough to bind
+      # every call this launch makes. Verified live: a run with TASK_ID set
+      # produced a token_usage row carrying exactly that id.
+      #
+      # Nothing to export for the base URL: it is baked into models.json, which
+      # pi.sh rewrites each launch. That is the same "self-routed" shape mastra
+      # had, WITHOUT the ambient-bound consequence, which is why pi is absent
+      # from AMBIENT_BOUND_AGENTS in lib/experiments/experiment-runner.mjs.
+      _agent_log "🔌 pi → proxy ${base}/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=${TASK_ID:-<ambient>})"
+      ;;
     copilot)
       # BYOK measurement seam (Phase-81 verified live). The Copilot CLI cannot set request headers,
       # so its ONLY per-request binding seam is the task-scoped base-URL PATH (/v1/copilot/t/<task_id>,
