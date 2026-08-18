@@ -9,7 +9,7 @@ rectangle "Coding Agents" as AGENTS {
   [Claude Code] <<agent>> as CLAUDE
   [OpenCode] <<agent>> as OPENCODE
   [GitHub Copilot] <<agent>> as COPILOT
-  [Mastracode] <<agent>> as MASTRA
+  [Pi] <<agent>> as PI
 }
 
 rectangle "Agent Adapters" as ADAPTERS {
@@ -17,7 +17,7 @@ rectangle "Agent Adapters" as ADAPTERS {
   component "OpenCode Adapter\n(session-start)" <<core>> as OC_ADAPTER
   component "Copilot Baseline\n(session-start file)" <<core>> as CP_ADAPTER
   component "Copilot Per-Turn Hook\n(.github/hooks, multi-channel)" <<core>> as CP_HOOK
-  component "Mastra Adapter\n(session-start)" <<core>> as MA_ADAPTER
+  component "Pi Adapter\n(session-start)" <<core>> as PI_ADAPTER
 
   note right of CLAUDE_HOOK
     Per-prompt injection via
@@ -85,7 +85,7 @@ CLAUDE SYNC_LINE CLAUDE_HOOK : every prompt
 OPENCODE SYNC_LINE OC_ADAPTER : session start
 COPILOT SYNC_LINE CP_ADAPTER : session start
 COPILOT SYNC_LINE CP_HOOK : every prompt / tool
-MASTRA SYNC_LINE MA_ADAPTER : session start
+PI SYNC_LINE PI_ADAPTER : session start
 
 ' === Adapter to Shared Client ===
 CLAUDE_HOOK SYNC_LINE CLIENT : callRetrieval()

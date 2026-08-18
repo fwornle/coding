@@ -45,7 +45,7 @@ You then confirm: **Run it** · **Run ungated** (drop the test) · **Edit** (cor
 | Field | How it's derived | Default |
 |-------|------------------|---------|
 | `goal_sentence` | your description rewritten as one precise imperative sentence (the `task_hash` source) | — |
-| variants | agents you name → `claude` / `copilot` / `opencode` / `mastracode`, each with its model-string convention | `claude` (sonnet) + `opencode` (haiku) |
+| variants | agents you name → `claude` / `copilot` / `opencode` / `pi`, each with its model-string convention | `claude` (sonnet) + `opencode` (haiku) |
 | `repeats` | "run each N times" | `1` |
 | `task_class` | the zero-LLM keyword scorer `deriveClassFromText` over the goal | `new-feature` |
 | `test_command` | a drafted `node --test` gate if the goal is checkable — **shown for confirmation** | ungated if not checkable |
@@ -91,7 +91,7 @@ What changes under `--parallel`:
 - **Shared background activity.** The background service traffic during the run overlaps all cells, so it is recorded once and overlaid on **every** cell's timeline with a disclaimer that it cannot be attributed to any single cell. Each run is stamped `execution_mode: parallel | serial`.
 
 !!! warning "Ambient-bound agents measure ~0 tokens in parallel"
-    **opencode** and **mastracode** are *ambient-slot-bound*: opencode's `rapid-proxy` provider traffic carries opencode's own session id (not the cell's `task_id`), and mastracode lands `task_id=''`. In serial mode the global span slot re-stamps those rows with the cell's `task_id`; parallel mode removes the slot, so these cells run fine but **record 0 tokens** and show as *unmeasured* in the Runs table. **claude** (`x-task-id` header) and **copilot** (task-scoped adapter) are per-request bound and measure correctly either way. Run the matrix **serially** when you need opencode/mastracode token numbers; the runner also prints a loud stderr warning when it detects this combination.
+    **opencode** is *ambient-slot-bound*: its `rapid-proxy` provider traffic carries opencode's own session id (not the cell's `task_id`), and pi lands `task_id=''`. In serial mode the global span slot re-stamps those rows with the cell's `task_id`; parallel mode removes the slot, so these cells run fine but **record 0 tokens** and show as *unmeasured* in the Runs table. **claude** (`x-task-id` header) and **copilot** (task-scoped adapter) are per-request bound and measure correctly either way. Run the matrix **serially** when you need opencode/pi token numbers; the runner also prints a loud stderr warning when it detects this combination.
 
 `--parallel` and **capture raw bodies** are mutually exclusive — raw-body capture is armed off the global span slot, which parallel mode never writes, so the launcher disables that checkbox while parallel is on.
 
@@ -121,7 +121,7 @@ What changes under `--parallel`:
 
 ## Operational notes
 
-- **Run unattended.** claude and copilot bind their tokens **per-request** (an `x-task-id` header / a task-scoped adapter path), so those cells capture reliably. In **serial** mode a cell also opens the ambient `active-measurement.json` span, which is what attributes opencode/mastracode traffic (and is also how a *concurrent* interactive call in the same repo can be swept into the open cell — keep the matrix unattended). In **[parallel](#serial-vs-parallel-execution)** mode there is no global slot, so opencode/mastracode go unmeasured (see the warning above) but there is nothing for a stray interactive call to be mis-swept into.
+- **Run unattended.** claude and copilot bind their tokens **per-request** (an `x-task-id` header / a task-scoped adapter path), so those cells capture reliably. In **serial** mode a cell also opens the ambient `active-measurement.json` span, which is what attributes opencode/pi traffic (and is also how a *concurrent* interactive call in the same repo can be swept into the open cell — keep the matrix unattended). In **[parallel](#serial-vs-parallel-execution)** mode there is no global slot, so opencode/pi go unmeasured (see the warning above) but there is nothing for a stray interactive call to be mis-swept into.
 - **`test_command` must be fixed-argv.** The spec validator rejects shell metacharacters (`&&`, `|`, `;`, `$()`, newline). Use a single command — e.g. `grep -qi stall notes.md`, not `test -s notes.md && grep …` — or the whole matrix aborts before run 0.
 - **Phrase deliverables as execution, not analysis.** opencode's headless `run` ends its agentic loop on the first assistant message with *no* tool call; an analysis-shaped goal ("explain how…") gets narrated and never written. Say "create file X, write it directly, done only once it exists" to get a real artifact (this affects sonnet too, not just haiku).
 - **A free-form model WARN is expected.** `WARN: unrecognized model 'rapid-proxy/claude-sonnet-4.6' — free-form, not blocked (D-05)` is informational, not an error.

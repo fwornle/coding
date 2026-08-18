@@ -42,7 +42,7 @@ scraping of runner stdout.
 
 > **Parallel is the default execution mode.** Run cells concurrently (Step 4) unless the user
 > explicitly asks for serial/sequential execution, or the matrix includes an agent whose tokens
-> must be measured and that agent is ambient-slot-bound (opencode / mastracode — see Step 4). Only
+> must be measured and that agent is ambient-slot-bound (opencode — see Step 4). Only
 > then fall back to serial.
 
 ## Instructions
@@ -78,7 +78,7 @@ Apply these deterministic rules so every agent behaves identically. This is **sp
    and literal newlines).
 
 2. **Variants (agent × model)** — map every agent named in the prose to a member of the known set
-   `claude | copilot | opencode | mastracode` (`lib/experiments/experiment-spec.mjs` `KNOWN_AGENTS`).
+   `claude | copilot | opencode | pi` (`lib/experiments/experiment-spec.mjs` `KNOWN_AGENTS`).
 
    **Resolve the model ONCE, per agent, with the shared resolver — never hand-formulate the three
    spellings.** The user names a model ONE way ("opus 4.8", "Sonnet 4.6", "claude-opus-4.8", …); the
@@ -317,14 +317,14 @@ cell's tokens are captured at all; it is NOT special to any one agent, so don't 
 | claude | per-request `x-task-id` header | ✅ yes |
 | copilot | per-request task-scoped adapter path | ✅ yes |
 | opencode | rows carry opencode's own session id | ❌ needs the serial slot |
-| mastracode | rows land `task_id=''` | ❌ needs the serial slot |
+| pi | per-request `x-task-id` header (from `$TASK_ID`) | ✅ yes |
 
-**When to run SERIAL instead** (drop `--parallel`): only when the matrix includes **opencode** or
-**mastracode** *and* you need their **token** numbers. Their rows aren't per-request bound, so only
+**When to run SERIAL instead** (drop `--parallel`): only when the matrix includes **opencode**
+*and* you need its **token** numbers. Its rows aren't per-request bound, so only
 the serial global `active-measurement.json` slot re-stamps them with the cell's `task_id`. In
 **parallel** mode there is no global slot, so those cells still run and are **rubric-scored on their
 diff** (goal/quality/coverage) but report **0 tokens (unmeasured)** on the cost axis. If the
-comparison is about the *fix* (not cost), parallel is fine; if you need opencode/mastracode **cost**,
+comparison is about the *fix* (not cost), parallel is fine; if you need opencode **cost**,
 run serially. State which you chose and why in the preview.
 
 **RUN UNATTENDED.** In **parallel** mode spans are slotless (per-cell), so there is no global slot for

@@ -42,7 +42,7 @@ The coding infrastructure consists of six interconnected systems that work toget
 
     ---
 
-    Real-time observation capture across all four agents (Claude, Copilot, OpenCode, Mastra), consolidated daily into thematic digests and weekly into persistent project insights.
+    Real-time observation capture across all four agents (Claude, Copilot, OpenCode, Pi), consolidated daily into thematic digests and weekly into persistent project insights.
 
     - Three-tier memory hierarchy
     - Single-owner SQLite + km-core graph store

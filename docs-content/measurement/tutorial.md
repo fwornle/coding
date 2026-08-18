@@ -117,7 +117,7 @@ You can also launch from the dashboard: pick a spec in **Launch experiment**, ti
 
 ![Launch panel with "Run cells in parallel" checked and the live mini-terminal grid](../images/measurement-parallel-launch.png)
 
-Parallel mode runs the cells through a bounded worker pool instead of one at a time. It's faster, but **opencode and mastracode cells will show as *unmeasured*** (they attribute tokens only via the serial span slot) — run serially when you need their token numbers. See [Serial vs parallel execution](experiment-skill.md#serial-vs-parallel-execution) for the details.
+Parallel mode runs the cells through a bounded worker pool instead of one at a time. It's faster, but **opencode cells will show as *unmeasured*** (they attribute tokens only via the serial span slot) — run serially when you need their token numbers. See [Serial vs parallel execution](experiment-skill.md#serial-vs-parallel-execution) for the details.
 
 ### Step 2 — Read the ranked comparison
 

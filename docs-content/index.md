@@ -91,7 +91,7 @@ vkb           # Opens http://localhost:8080
 
 ### Status Line
 
-Real-time feedback via the unified tmux status bar showing system health, costs, and development state. All coding agents (Claude, Copilot, OpenCode, Mastracode) are wrapped in tmux sessions with a shared status line rendered by `combined-status-line.js`.
+Real-time feedback via the unified tmux status bar showing system health, costs, and development state. All coding agents (Claude, Copilot, OpenCode, Pi) are wrapped in tmux sessions with a shared status line rendered by `combined-status-line.js`.
 
 ![Coding Environment — Tmux Status Bar](images/status-line.png)
 
@@ -114,7 +114,7 @@ While Claude Code is the primary and default agent, **coding** is fully agent-ag
 | **Claude Code** (default) | `coding` or `coding --claude` | Full MCP integration |
 | **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
 | **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
-| **Mastracode** | `coding --mastra` | Lifecycle hook transcripts |
+| **Pi** | `coding --pi` | Native session JSONL |
 
 All agents share the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, and constraint enforcement. Missing agent CLIs are auto-installed on first launch.
 
@@ -122,7 +122,9 @@ All agents share the same infrastructure: tmux session wrapping, status line, he
 
 ![OpenCode running in coding](images/coding-opencode.png)
 
-![Mastracode running in coding](images/coding-mastra.png)
+<!-- Screenshot pending: run `coding --pi` interactively and capture the tmux
+     session as docs-content/images/coding-pi.png. The previous image showed Mastracode, the agent pi
+     replaced, so it was removed rather than relabelled. -->
 
 [Agent Integration Guide](guides/agent-integration.md){ .md-button }
 
@@ -155,7 +157,7 @@ vkb
 
 | Principle | Description |
 |-----------|-------------|
-| **Agent-Agnostic** | Designed for any AI assistant — add a new agent with [a single config file](guides/agent-integration.md). Claude, CoPilot, OpenCode, and Mastracode integrated |
+| **Agent-Agnostic** | Designed for any AI assistant — add a new agent with [a single config file](guides/agent-integration.md). Claude, CoPilot, OpenCode, and Pi integrated |
 | **Non-Intrusive** | Docker deployment keeps your system clean |
 | **Provider Flexible** | Works with Anthropic, OpenAI, Groq, and local LLMs (DMR/llama.cpp) |
 | **Multi-Project** | Handle multiple projects with automatic context routing |

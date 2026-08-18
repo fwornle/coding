@@ -51,7 +51,7 @@ for the full mechanism. Two consequences are visible in the UI:
 
 - **Capture raw bodies is disabled** while parallel is on (raw capture is armed off the global slot,
   which parallel mode never writes) — the checkbox greys out with a hint.
-- **opencode / mastracode cells show as *unmeasured*** (0 tokens) in parallel mode — they are
+- **opencode cells show as *unmeasured*** (0 tokens) in parallel mode — they are
   ambient-slot-bound and only attribute via the global slot. Run serially to measure them. claude
   and copilot are per-request bound and measure either way.
 
@@ -60,7 +60,7 @@ for the full mechanism. Two consequences are visible in the UI:
 The Run monitor renders each cell as a scaled-down **live terminal** that tails the cell's own log
 (`<runDir>/cells/<taskId>.log`, polled every ~1.5 s via `GET /api/experiments/run-log/:runId/:taskId`).
 Each terminal card shows: a header with the agent (in a stable per-agent accent — claude amber,
-opencode teal, copilot blue, mastracode magenta), model + `kb-on` chips, a state badge, and a ticking
+opencode teal, copilot blue, pi violet), model + `kb-on` chips, a state badge, and a ticking
 elapsed timer; a colorized auto-scrolling log body (errors red, tool calls cyan, infra dimmed) with a
 blinking cursor while running; and a footer with live tokens in/out, tool-call count, and a
 lines-per-minute activity sparkline. Completed cells dim with a green edge-glow; a timeout/abort gets
@@ -78,7 +78,7 @@ the shared-background disclaimer. **Esc** or a backdrop click shrinks it back.
 !!! warning "Run experiments UNATTENDED"
     In **serial** mode there is a single global measurement span slot and a shared host proxy: a
     concurrent in-repo agent LLM call gets mis-stamped with the open cell's `task_id`. In
-    **parallel** mode there is no global slot to mis-stamp, but opencode/mastracode go unmeasured
+    **parallel** mode there is no global slot to mis-stamp, but opencode goes unmeasured
     (above). Either way, never drive a matrix from an interactive agent working the same repo.
 
 ---
@@ -104,7 +104,7 @@ Expanded, each parent reveals its per-agent child cells with their composite `ta
 | **Run** | `goal_sentence` (bold) + `task_id` (mono, muted) | task_id only when no goal |
 | **When** | Relative age + absolute date, or "running Nm" | Turns amber **"· stuck?"** when a run is open > 20 min |
 | **Class** | `task_class` | "unclassified" (muted) when null |
-| **Agent** | `claude` / `opencode` / `copilot` / `mastracode` | em-dash if null |
+| **Agent** | `claude` / `opencode` / `copilot` / `pi` | em-dash if null |
 | **Chat model** | Normalized `canonical_model` | italic **"unmeasured"** when empty |
 | **Background models** | Distinct background models for the cell | em-dash if none |
 | **Goal ↑ · Quality ↑ · Coverage ↑ · Regress. ↓ · Drift ↓** | The 5-dim rubric (0–1) | null renders **"—"**, never 0 — see [glossary](#score-dimension-glossary) |
@@ -340,7 +340,7 @@ lists, × tier weight, × project/topic-overlap boosts."*
 - **avenue** — a forked exploration branch grouped by `origin_span_id`; normal `/experiment` cells have
   no `origin_span_id`, so they appear in neither the Avenues cards nor a grouped Runs list.
 - **foreground vs background** — foreground = user-driven work (file adapters cladpt/copadt/opnadt;
-  proxy processes opencode/mastra); background = consolidator / health-coordinator / observation-writer
+  proxy processes opencode/pi); background = consolidator / health-coordinator / observation-writer
   / backfill / route-judge. Denylist wins.
 - **honesty spine** — ranked / failed / ungated / unscored (an **ungated** variant has no `test_command`
   and is compared on tokens/wallclock only, never cost-ranked).
