@@ -67,9 +67,17 @@ git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1 \
 OUTER_REMOTE="$(git -C "$PROJECT_DIR" config --get remote.origin.url 2>/dev/null || true)"
 echo "  Outer origin: ${OUTER_REMOTE:-(none)}"
 
-# Permit untracked content inside .specstory/history/ (it migrates with us);
-# block anything else.
-DIRTY="$(git -C "$PROJECT_DIR" status --porcelain | grep -vE '^\?\? \.specstory/history/' || true)"
+# Permit ANY change inside .specstory/history/ (it migrates with us); block
+# anything else.
+#
+# This deliberately matches every porcelain status code, not just '??'. The
+# earlier '^\?\? ' pattern permitted untracked files only, which made the
+# script refuse to start on exactly the repos it exists to repair: once the
+# outer repo tracks history files, the live LSL writer keeps them permanently
+# ' M', so preflight failed on a modification that phase A was about to
+# untrack anyway. Racing it with a commit does not help — the writer touches
+# the tree again within seconds.
+DIRTY="$(git -C "$PROJECT_DIR" status --porcelain | grep -vE '^.. "?\.specstory/history/' || true)"
 if [ -n "$DIRTY" ]; then
   echo "$DIRTY" | sed 's/^/  /'
   fail "Working tree not clean (changes outside .specstory/history/) — commit or stash first"
