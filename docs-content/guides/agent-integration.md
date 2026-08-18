@@ -399,9 +399,7 @@ coding --lsl-status
 - Transcript capture via `PiSessionReader`, reading pi's NATIVE session JSONL from the directory `pi.sh` pins via `PI_CODING_AGENT_SESSION_DIR` (no hooks to install)
 - Observational memory via km-core `GraphKMStore` at `.data/knowledge-graph/` (legacy LibSQL/SQLite `.observations/observations.db` archived 2026-06-05 under Phase 44 Plan 18)
 
-<!-- Screenshot pending: run `coding --pi` interactively and capture the tmux
-     session as docs-content/images/coding-pi.png. The previous image showed Mastracode, the agent pi
-     replaced, so it was removed rather than relabelled. -->
+![Pi running in coding](../images/coding-pi.png)
 
 ---
 
