@@ -495,6 +495,13 @@ configure_proxy_routing() {
       # every call this launch makes. Verified live: a run with TASK_ID set
       # produced a token_usage row carrying exactly that id.
       #
+      # An INTERACTIVE launch has no TASK_ID, and pi cannot express "no task" in a
+      # header value: its resolver has no default form and treats empty as missing,
+      # so a declared-but-unresolvable x-task-id aborts the provider outright. pi.sh
+      # therefore OMITS the header entirely in that case, which the proxy reads as
+      # the ambient span — the same unbound posture claude gets from its blank
+      # ANTHROPIC_CUSTOM_HEADERS just above.
+      #
       # Nothing to export for the base URL: it is baked into models.json, which
       # pi.sh rewrites each launch. Self-routed WITHOUT the ambient-bound
       # consequence the previous agent had, which is why pi is absent

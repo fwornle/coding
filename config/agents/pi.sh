@@ -108,6 +108,46 @@ _pi_write_models_json() {
   # (provider, complexity) resolves to in llm-routing.yaml, so a longer list
   # would offer a choice that Ctrl+P appears to make and routing then silently
   # discards. fg-chat/pi is the real control; edit it there.
+  # x-task-id is emitted ONLY when this launch actually has a task to bind.
+  #
+  # pi's header interpolation is strict and has no default-value form
+  # (dist/core/resolve-config-value.js): `${TASK_ID:-}` fails its ENV_VAR_NAME_RE
+  # and would be sent as the LITERAL text "${TASK_ID:-}", and
+  # resolveEnvConfigValue tests `env[name] || process.env[name] || undefined`
+  # with `||` rather than `??`, so an EMPTY TASK_ID is indistinguishable from a
+  # missing one. Either way resolveHeadersOrThrow aborts the whole provider
+  # before a single request leaves:
+  #
+  #   Error: API key auth failed for provider rapid-proxy-pi: Failed to resolve
+  #   provider "rapid-proxy-pi" header "x-task-id" from environment variable: TASK_ID
+  #
+  # An interactive `coding --pi` has no TASK_ID — and exporting an empty one
+  # cannot help, because tmux-session-wrapper.sh only forwards NON-EMPTY vars
+  # (`[ -n "${!var}" ]`, ~:139). Declaring the header unconditionally therefore
+  # made every interactive prompt fail on the FIRST keystroke, with no LLM call
+  # attempted. This is not the tools-gate 429 seen during Phase 82 bring-up; it
+  # fires earlier, at provider auth, and is total.
+  #
+  # Omitting the header is the correct encoding, not a workaround. The proxy
+  # reads an absent x-task-id as the ambient span (server.mjs ~:3157, taskId then
+  # `taskId || resolveLiveTaskId()`), which is exactly the unbound-interactive
+  # posture claude already gets from its blank ANTHROPIC_CUSTOM_HEADERS and
+  # copilot from its non-task-scoped /v1/copilot path. x-agent still stamps
+  # agent='pi', so interactive usage stays attributed — it is only the CELL
+  # binding that is (correctly) absent when there is no cell.
+  #
+  # A measured run sets TASK_ID before agent_pre_launch, so it still gets the
+  # header and keeps the per-request binding that keeps pi out of
+  # AMBIENT_BOUND_AGENTS.
+  local headers_json='"x-agent": "pi"'
+  if [ -n "${TASK_ID:-}" ]; then
+    headers_json="${headers_json},
+        \"x-task-id\": \"\$TASK_ID\""
+    _agent_log "Task-bound launch: models.json carries x-task-id (TASK_ID=${TASK_ID})"
+  else
+    _agent_log "Interactive launch: x-task-id omitted (proxy binds the ambient span)"
+  fi
+
   cat > "$models_file" <<JSON
 {
   "providers": {
@@ -116,8 +156,7 @@ _pi_write_models_json() {
       "baseUrl": "http://127.0.0.1:${port}/v1",
       "apiKey": "coding-local-proxy-no-auth",
       "headers": {
-        "x-agent": "pi",
-        "x-task-id": "\$TASK_ID"
+        ${headers_json}
       },
       "models": [
         {
