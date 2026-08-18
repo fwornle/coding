@@ -4756,7 +4756,7 @@ ORDER BY m.time_created ASC;`;
           // be treated as "intentional stop" and leave the project unmonitored.)
           if (this.intervalId) clearInterval(this.intervalId);
           if (this.healthIntervalId) clearInterval(this.healthIntervalId);
-          await this.stop({ setStopMarker: false });
+          await this.stop({ setStopMarker: false, announceStop: false });
           process.exit(ETM_EXIT_RELAUNCH);
         }
       }
@@ -4927,9 +4927,27 @@ ORDER BY m.time_created ASC;`;
    * @param {boolean} [options.setStopMarker=true] - Whether to set stop marker in PSM.
    *   Set to false for idle timeout exits so PSM can restart the monitor.
    *   Set to true for intentional stops (SIGINT/SIGTERM) to prevent restart loops.
+   * @param {boolean} [options.announceStop=true] - Whether to send the coordinator
+   *   a clean-stop goodbye, which evicts the session from the statusline AT ONCE.
+   *
+   *   Announce only when this process is NOT coming back. The rule is about the
+   *   session, not the process: an ETM that stands down expecting a relaunch
+   *   (idle-cycle exit, auto-restart on code change) leaves the session itself
+   *   very much alive, and announcing there blinks the project out of the badge
+   *   cluster until the replacement re-registers. Those pass false and let the
+   *   coordinator INFER a stall from the missing heartbeat instead — the
+   *   5-minute grace window comfortably outlasts a relaunch, so the badge never
+   *   flickers.
+   *
+   *   Not hypothetical: auto-restart-on-code-change fired twice while editing
+   *   this file, recycling every project's ETM.
+   *
+   *   `setStopMarker` does NOT encode this distinction and cannot be reused for
+   *   it — signal shutdown and idle exit both pass false there, but they differ
+   *   here (a signal means the tmux session closed; an idle exit does not).
    */
   async stop(options = {}) {
-    const { setStopMarker = true } = options;
+    const { setStopMarker = true, announceStop = true } = options;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -4973,14 +4991,16 @@ ORDER BY m.time_created ASC;`;
       }
     }
 
-    // AWAITED: the caller (`shutdown`) runs `process.exit(0)` the instant this
-    // resolves, so a fire-and-forget POST here loses the race and the clean-stop
-    // signal never reaches the coordinator — the entry then falls through to the
-    // 15s staleness path and sits 'degraded' for the full 5-minute eviction
-    // window. Measured before this fix: stoppedAt landed 19s after the last
-    // heartbeat (i.e. inferred), never at the same ts as the goodbye.
-    // Bounded so an unreachable coordinator cannot hang shutdown into a SIGKILL.
-    await this.cleanupHealthFile();
+    if (announceStop) {
+      // AWAITED: the caller runs process.exit() the instant this resolves, so a
+      // fire-and-forget POST loses the race and the clean-stop signal never
+      // reaches the coordinator — the entry then falls through to the 15s
+      // staleness path and sits 'degraded' for the full 5-minute eviction
+      // window. Measured before this was awaited: stoppedAt landed 19s after
+      // the last heartbeat (i.e. inferred), never at the same ts as the goodbye.
+      // Bounded so an unreachable coordinator cannot hang shutdown into a SIGKILL.
+      await this.cleanupHealthFile();
+    }
     console.log('📋 Enhanced transcript monitor stopped');
   }
 
@@ -5362,7 +5382,7 @@ async function main() {
         './timezone-utils.js',
         './classification-logger.js'
       ],
-      cleanupFn: () => monitor.stop({ setStopMarker: false }),
+      cleanupFn: () => monitor.stop({ setStopMarker: false, announceStop: false }),
       logger: (msg) => monitor.debug(msg)
     });
   } catch (error) {
