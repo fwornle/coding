@@ -1,8 +1,44 @@
 # Resume: work blocked on the copilot quota
 
-Everything in this file is blocked by one thing — the copilot monthly quota. Read
-"The gate" first; it explains why unrelated-looking things all stop at the same wall,
-and why several plausible workarounds cannot work.
+> **RESOLVED 2026-08-19.** The quota is back and the work this file was holding is done.
+> Kept because §1 (the gate), §3 and §4 remain true and useful, and because two of its
+> conclusions turned out to be WRONG in a way worth recording — see "What resuming found".
+>
+> | § | was | now |
+> |---|---|---|
+> | 0 | quota blocked everything | **open** — copilot serves tools-bearing requests; judge is on `gh-copilot/claude-sonnet-5` |
+> | 2.1 | tool telemetry missing | **done** — `toolTraceFrom()` for copilot and opencode, 22 new tests |
+> | 2.2 | opencode hang, cause unknown | **root-caused** — inherited **stdin**, NOT the quota. The harness was never affected |
+> | 2.4 | `COPILOT_MODEL` untested | still untested |
+> | 2.5 | `enableFileHooks` rejected | **still reproduces** on copilot 1.0.80 |
+> | 2.3, 2.6, 2.7, 2.8 | open | still open |
+
+## What resuming found
+
+**The quota was never opencode's problem.** §2.2 attributed the hang to the quota gate and
+listed nine eliminated causes. The real cause is none of them: `opencode run` blocks on
+**inherited stdin**. With stdin left attached it hangs forever and writes zero bytes; with
+stdin closed it succeeds in seconds.
+
+```bash
+opencode run 'say ok' -m rapid-proxy/claude-sonnet-5 --dangerously-skip-permissions
+#   -> hangs until killed, 0 bytes                      (exit 124)
+opencode run 'say ok' -m rapid-proxy/claude-sonnet-5 --dangerously-skip-permissions < /dev/null
+#   -> "ok"                                             (exit 0)
+```
+
+It reproduces with **no flags at all** (`opencode run 'say ok'`), on the direct
+`github-copilot/*` leg as well as the proxy leg, and with `mcp: {}`. So it is not the
+proxy, not the model, not MCP, and not the quota. `opencode models` works throughout,
+which is why the binary looked healthy.
+
+**Why this cost two sessions:** every reproduction was a manual CLI probe from an
+interactive shell, which inherits stdin. The kgbench harness spawns with
+`stdio: ['ignore', 'pipe', 'pipe']` (`runner.mjs:337`) — stdin already `/dev/null` — so
+the harness path never had this bug. The sessions were diagnosing an artefact of the probe
+method and attributing it to the system under test. **A manual CLI reproduction of a
+harness spawn must close stdin**, exactly as §1's trap says a curl reproduction of an
+agent call must include `tools[]`. Same class of error, different tool.
 
 ---
 
@@ -78,7 +114,41 @@ being spawned with `--tools ''`? Right now one exhausted quota stops every agent
 
 ## 2. Open points
 
-### 2.1 Tool telemetry for copilot and opencode — the main task
+### 2.1 Tool telemetry for copilot and opencode — DONE (2026-08-19)
+
+> Implemented. `lib/kgbench/agents.mjs` gained `toolTraceFrom()` on the copilot and opencode
+> adapters plus `--output-format json` on copilot's argv; `readAnswerFile()` takes a
+> `toolTrace` and the runner's audit block gained a third state. Event names were captured
+> from real runs, and the fixtures under `tests/fixtures/kgbench/` are those streams trimmed
+> to the events the parsers read — so a CLI changing shape breaks a test rather than
+> silently zeroing a column. 22 tests in `tests/integration/kgbench-tool-telemetry.test.js`;
+> the kgbench suite is 265/265.
+>
+> **Observed vocabularies** — copilot `view`, `create`, `bash`, `task_complete`; opencode
+> `read`, `write`, `bash`, `grep`, `glob`.
+>
+> **`tool_audit` now has THREE states, and the third is the point.** Wiring the trace
+> straight into the existing check marks EVERY copilot and opencode cell `tool_escape`,
+> because not one of those names appears in any arm's `allowedTools` — arms are written in
+> claude's vocabulary. That would have read as a finding ("non-claude agents escape their
+> arm constantly") and been an artefact of naming alone. So:
+>
+> - `unavailable` — no trace (pi, or a stream with no events)
+> - `observed` — trace exists, but names are the agent's own, so arm conformance is **not
+>   decidable**; what ran is recorded, no verdict is claimed
+> - `audited` — trace exists AND names are the arm's, so conformance is decided (claude)
+>
+> This is the same principle as the "do not guess event names" warning below: an unverified
+> mapping presents an unchecked cell as a checked one. Establishing the copilot name mapping
+> empirically (§ enforcement note in `agents.mjs`) would promote copilot to `audited`.
+>
+> **`task_complete` is reported separately** as `tool_control_calls`. It is copilot's
+> autopilot sentinel; claude has no equivalent, so counting it plainly makes every copilot
+> cell read one tool busier than a comparable claude cell — and this benchmark compares tool
+> counts.
+
+<details><summary>Original text (what was open)</summary>
+
 
 `tools_executed`, `tool_calls` and `tool_audit` are `null` for these two agents, so their
 cells are unauditable. `runner.mjs:827` sets `tool_audit = 'unavailable'` when
@@ -107,7 +177,21 @@ is `-p / --allow-all-tools / --no-ask-user / --model` (`agents.mjs:142-145`). op
 already runs with `--format json`, but only the session id is parsed out of it
 (`agents.mjs:160`).
 
-### 2.2 opencode end-to-end — unverified
+</details>
+
+### 2.2 opencode end-to-end — ROOT-CAUSED (2026-08-19)
+
+> **Cause: inherited stdin.** Not the quota, and not any of the nine causes eliminated
+> below. See "What resuming found" at the top for the reproduction. A full opencode run now
+> completes end-to-end: reads a file, writes the answer file, exits 0, emits a parseable
+> `--format json` stream. The harness spawns with stdin already closed, so kgbench itself
+> was never affected.
+>
+> Add to the eliminated list, now tested: `mcp: {}` (hangs identically), the direct
+> `github-copilot/*` leg (hangs identically), no-flags invocation (hangs identically).
+
+<details><summary>Original text (what was believed)</summary>
+
 
 Its default model was changed to `rapid-proxy/claude-sonnet-5` in
 `~/.config/opencode/opencode.json`. Verified: valid JSON, MCP servers/providers intact,
@@ -129,6 +213,8 @@ Already eliminated as causes, each by direct test — do not re-test these: prox
 proxy hang, proxy streaming, model name, our two custom plugins (`compaction-guard.js`,
 `knowledge-injection.js` — hangs with both moved aside), `--format json`,
 `--dangerously-skip-permissions`, MCP config, needing a git repo.
+
+</details>
 
 ### 2.3 Opus is not reachable by opencode through the proxy
 
@@ -157,7 +243,13 @@ is the copilot CLI's own BYOK path rather than the proxy leg, so it may be entir
 but it is the same string the proxy leg rejects, so it is worth one probe once quota is
 back. Not changed on a guess.
 
-### 2.5 copilot 1.0.80 rejects `enableFileHooks`
+### 2.5 copilot 1.0.80 rejects `enableFileHooks` — STILL REPRODUCES (re-checked 2026-08-19)
+
+> Unchanged. Every `copilot` invocation this session opened with:
+> `Warning: Ignoring unknown top-level key(s) in user settings file
+> "/Users/Q284340/.copilot/settings.json": "enableFileHooks"`. Still its own investigation,
+> and still a silent confound for any KB-on/KB-off arm run on copilot.
+
 
 `copilot` warns: *Ignoring unknown top-level key(s) in user settings file
 `~/.copilot/settings.json`: "enableFileHooks"*. The key is present and `true`. This likely
