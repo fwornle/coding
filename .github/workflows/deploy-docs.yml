@@ -119,10 +119,101 @@ jobs:
       - name: Build documentation
         run: mkdocs build --strict
 
+      # Publish the content hash of what was just built, so a later run can ask the LIVE
+      # SITE what it is serving instead of inferring it from the gate. See the `freshness`
+      # job — this file is the only thing that makes that check possible.
+      - name: Stamp the docs manifest into the site
+        run: |
+          scripts/docs-manifest.sh > site/.docs-manifest
+          echo "published manifest: $(cat site/.docs-manifest)"
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./site
+
+  # ---------------------------------------------------------------------
+  # freshness — the guard for a WRONG GATE.
+  #
+  # The gate skipping is normal: most pushes are code-only and must not rebuild. What is
+  # not normal is the gate skipping while the site is actually stale, and that failure is
+  # invisible by construction — `build: skipped` reports the whole run as SUCCESS, so
+  # nothing anywhere says the published site no longer matches main.
+  #
+  # It has already happened. docs-content/benchmarks/coding-v1/RESULTS.md is a symlink into
+  # docs/, so publishing a benchmark report changed the symlink's TARGET and not the
+  # symlink; the gate matched only `docs-content/` and skipped. Five consecutive green runs
+  # on 2026-08-19, ~25s each, none of which ran mkdocs, and the coding-v1 report never
+  # reached the site. Yesterday's image-link fix had gone the same way unnoticed.
+  #
+  # Widening the gate fixed that instance. This job exists because the NEXT wrong gate would
+  # be just as silent — so rather than trust the pattern, it checks the invariant directly:
+  # the content hash of everything mkdocs renders (symlinks resolved) must equal the hash
+  # the live site is serving. It is independent of the gate's pattern by design; if the two
+  # ever disagree, this fails loudly and names the fix.
+  #
+  # Asymmetric on purpose: FAIL only on positive evidence of staleness (a hash mismatch).
+  # If the manifest cannot be fetched — first run after this change, Pages not yet live, a
+  # network blip — warn and pass. A guard that goes red on its own infrastructure gets
+  # disabled, and then protects nothing.
+  # ---------------------------------------------------------------------
+  freshness:
+    needs: gate
+    if: needs.gate.outputs.docs-changed == 'false' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Does the live site still match main?
+        env:
+          SITE_URL: https://fwornle.github.io/coding
+        run: |
+          set -uo pipefail
+          LOCAL="$(scripts/docs-manifest.sh)"
+          echo "main renders:  $LOCAL"
+
+          LIVE=""
+          for attempt in 1 2 3; do
+            LIVE=$(curl -fsSL --max-time 30 "$SITE_URL/.docs-manifest" 2>/dev/null | tr -d '[:space:]') && break
+            echo "attempt $attempt: could not fetch the live manifest"
+            LIVE=""
+            sleep 5
+          done
+
+          if [ -z "$LIVE" ]; then
+            echo "::warning::Could not read $SITE_URL/.docs-manifest — cannot verify freshness."
+            echo "Expected on the first run after this guard was added (the file only exists"
+            echo "once a build has published it). Passing rather than failing on a check that"
+            echo "could not run; a guard that goes red on its own infrastructure gets disabled."
+            exit 0
+          fi
+
+          echo "site serves:   $LIVE"
+          if [ "$LOCAL" = "$LIVE" ]; then
+            echo "Site matches main. The skip was correct."
+            exit 0
+          fi
+
+          echo "::error::The docs gate SKIPPED the build, but the live site does not match main."
+          cat <<'MSG'
+
+          The published site is STALE and nothing else would have told you.
+
+          What this means: this push changed something mkdocs renders, and the gate's path
+          pattern did not recognise it — the same class of bug as the symlink case this
+          guard was written for (docs-content/**/RESULTS.md -> docs/**/RESULTS.md).
+
+          Fix, in order:
+            1. Publish the current docs now:
+                 gh workflow run deploy-docs.yml --ref main
+            2. Work out which path the gate missed, and widen the pattern in the `gate` job.
+               Compare what changed against the pattern:
+                 git diff --name-only HEAD~1 HEAD
+            3. If it was another symlink, prefer widening to the whole source directory over
+               enumerating individual files — an enumeration has to be maintained, and
+               forgetting to extend it fails exactly this silently.
+          MSG
+          exit 1
 
   deploy:
     needs: [gate, build]
