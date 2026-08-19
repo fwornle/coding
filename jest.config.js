@@ -1,3 +1,14 @@
+import { nodeTestFilesRelative } from './scripts/lib/test-inventory.mjs';
+
+// Suites that register their tests with node:test. jest collects them (they end
+// in .test.js) but cannot see a single one of their registrations, so each was
+// reported as "Your test suite must contain at least one test". They are run by
+// `npm run test:node` instead. Derived from the same inventory that runner uses,
+// so a file can never be claimed by both runners or dropped by both.
+const NODE_TEST_SUITES = nodeTestFilesRelative().map(
+  (f) => `/${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`
+);
+
 // Copies of this repo that live INSIDE it. Each carries a full lib/km-core, and
 // jest-haste-map indexes every package.json it can reach — so 19 stale snapshots
 // under .data/run-restores/ made `@fwornle/km-core` ambiguous and took out 57 of
@@ -54,7 +65,8 @@ export default {
     // every test and reports failures against frozen code we never edit.
     // kgbench builds a per-run worktree under .data/kgbench/trees/ for the same
     // reason. .gitignore does not help — jest walks the filesystem, not git.
-    ...REPO_COPIES
+    ...REPO_COPIES,
+    ...NODE_TEST_SUITES
   ],
   // Keeps the same paths out of the MODULE MAP. Separate setting, separate scan:
   // without this, jest still indexes their package.json files and errors out on

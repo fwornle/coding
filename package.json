@@ -8,7 +8,9 @@
     "coding": "./bin/coding"
   },
   "scripts": {
-    "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest",
+    "test": "node scripts/run-tests.mjs",
+    "test:jest": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest",
+    "test:node": "node scripts/run-node-tests.mjs",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --coverage",
     "lint": "eslint lib/",
