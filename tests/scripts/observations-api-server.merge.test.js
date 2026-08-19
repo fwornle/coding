@@ -339,16 +339,23 @@ describe('Phase 35-07: source-level invariants', () => {
     mergeSrc = fs.readFileSync(MERGE_PATH, 'utf8');
   });
 
-  it('Phase 35-07 contract: offset===0 gate has been removed from cold-store branch in both handlers', () => {
-    // The Phase 35-04 gate was `if (from && offset === 0 && _writer?.retentionDays)`.
-    // Under 35-07 the gate is `if (from && _writer?.retentionDays)` — no offset clause.
-    // Zero occurrences of the offset==0 conjunction in cold-store gate context.
-    const matches = serverSrc.match(/offset === 0 && _writer\?\.retentionDays/g) || [];
-    expect(matches).toHaveLength(0);
-    // And the new gate shape is present at least twice (observations + digests).
-    const newGate = serverSrc.match(/from && _writer\?\.retentionDays/g) || [];
-    expect(newGate.length).toBeGreaterThanOrEqual(2);
-  });
+  // REMOVED: 'Phase 35-07 contract: offset===0 gate has been removed from cold-store
+  // branch in both handlers'.
+  //
+  // It asserted the server source contained `from && _writer?.retentionDays` at least
+  // twice — the read-path cold-store merge gate. 8f19991aa (44-07, 2026-06-03, "A-side
+  // hard cutover") DELETED both gates and both _mergeObservations/_mergeDigests call
+  // sites when the handlers went km-core-native; the diff is removals with no
+  // replacement. The contract this test pinned no longer exists, so there is no
+  // correct assertion to migrate it to — a source-text grep for a deleted branch can
+  // only ever be made green by weakening it into something that proves nothing.
+  //
+  // NOTE for whoever picks this up: scripts/observations-api-server.mjs still imports
+  // (:47) and re-exports (:2734) _mergeObservations/_mergeDigests/_computeRetentionBoundary,
+  // and still builds a ColdStoreReader (:253), with no caller for any of them. The 18
+  // unit tests below still cover observations-api-merge.mjs itself. Whether that module
+  // is now dead code or a cutover left half-finished is a product question, deliberately
+  // not decided here.
 
   it('Phase 35-07: merge module sets coldOnFirstPageOnly to false (contract change)', () => {
     const matches = mergeSrc.match(/coldOnFirstPageOnly:\s*false/g) || [];

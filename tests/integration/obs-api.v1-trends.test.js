@@ -7,9 +7,10 @@
  *   { nodeId, entity:{id,name,entityType[,description]}, trendScore, trends:{last7Days,last30Days,last90Days} }
  * Envelope per Phase 44 contract: `{ success: true, data: { patterns: TrendingPattern[] } }`.
  *
- * Seeds 3 Patterns with varying createdAt + metadata.occurrences[] so the
- * trend-score ordering is deterministic without locking us to any particular
- * decay formula (we assert relative ordering, not absolute values).
+ * Seeds 3 Insights at 1 / 14 / 100 days old so the trend-score ordering is
+ * deterministic without locking us to any particular decay formula (we assert
+ * relative ordering, not absolute values). The source class is Insight, not
+ * Pattern, since the 2026-06-19 redefinition — see the seed block for why.
  */
 
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
@@ -52,30 +53,38 @@ describe('GET /api/v1/trends — TrendingPattern envelope (Phase 55 Plan 06 Task
     });
     await kmStore.open();
 
-    // Seed 3 Patterns:
-    //   - alpha: recent + many occurrences  → should top the list
-    //   - bravo: mid-age + few occurrences  → middle
-    //   - charlie: old + many occurrences   → should rank below alpha despite count
+    // Seed 3 Insights, ranked purely by recency.
+    //
+    // These used to be Pattern-class rows carrying an `occurrences` array, because
+    // the endpoint originally ranked Patterns by occurrence-decay. d4d5ec1f8
+    // (2026-06-19) redefined the panel: the coding KG only ever held 2 stale 2025
+    // Pattern stubs with no occurrence tracking, so every score decayed to ~0 and the
+    // panel was dead. TRENDS_SOURCE_CLASS is now 'Insight' and the score is recency of
+    // updatedAt alone (30-day half-life), with the wire shape deliberately preserved.
+    //
+    // So the seed changes class and drops `occurrences` — carrying it would imply
+    // volume still moves the ranking, which is exactly the misreading that made the
+    // old panel look correct while returning nothing. Ages alone decide the order:
+    //   - alpha:   1 day old   → tops the list, lights all three buckets
+    //   - bravo:  14 days old  → middle
+    //   - charlie: 100 days old → last, and strictly below alpha
     const seed = [
       {
         id: mintEntityId(),
         name: 'TrendAlpha',
         createdAt: ISO_RECENT,
-        occurrences: Array.from({ length: 20 }, (_, i) => ({ at: ISO_RECENT, idx: i })),
         description: 'recent high-volume pattern',
       },
       {
         id: mintEntityId(),
         name: 'TrendBravo',
         createdAt: ISO_MID,
-        occurrences: Array.from({ length: 5 }, (_, i) => ({ at: ISO_MID, idx: i })),
         description: 'mid-age low-volume pattern',
       },
       {
         id: mintEntityId(),
         name: 'TrendCharlie',
         createdAt: ISO_OLD,
-        occurrences: Array.from({ length: 20 }, (_, i) => ({ at: ISO_OLD, idx: i })),
         description: 'old high-volume pattern',
       },
     ];
@@ -84,13 +93,12 @@ describe('GET /api/v1/trends — TrendingPattern envelope (Phase 55 Plan 06 Task
         {
           id: row.id,
           name: row.name,
-          entityType: 'Pattern',
-          ontologyClass: 'Pattern',
+          entityType: 'Insight',
+          ontologyClass: 'Insight',
           layer: 'pattern',
           description: row.description,
           createdAt: row.createdAt,
           updatedAt: row.createdAt,
-          metadata: { occurrences: row.occurrences },
         },
         { skipOntologyCheck: true },
       );
@@ -165,8 +173,9 @@ describe('GET /api/v1/trends — TrendingPattern envelope (Phase 55 Plan 06 Task
     }
     const names = body.data.patterns.map((p) => p.entity.name);
     expect(names[0]).toBe('TrendAlpha');
-    // TrendCharlie has same occurrence count as TrendAlpha but is much older,
-    // so its score MUST be strictly less than TrendAlpha's.
+    // TrendCharlie is 100 days old against TrendAlpha's 1, and recency is the only
+    // input to trendScore since the 2026-06-19 redefinition, so its score MUST be
+    // strictly less than TrendAlpha's.
     const alphaScore = body.data.patterns.find((p) => p.entity.name === 'TrendAlpha').trendScore;
     const charlieScore = body.data.patterns.find((p) => p.entity.name === 'TrendCharlie').trendScore;
     expect(charlieScore).toBeLessThan(alphaScore);
