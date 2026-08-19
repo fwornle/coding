@@ -160,8 +160,14 @@ describe('ObservationWriter → km-core round-trip (Phase 44 Plan 12)', () => {
     expect(entity.legacyId).toBeDefined();
     expect(entity.legacyId.system).toBe('A');
     expect(entity.legacyId.id).toBe(obsId);
+    // entityType and ontologyClass deliberately DIVERGE (bc5fe8012, 2026-06-12).
+    // entityType stays the free-form category; ontologyClass is forced to 'Detail'
+    // so the node sits inside the 4-class hierarchy {Project, Component,
+    // SubComponent, Detail} that VKB and unified-viewer colour and filter against.
+    // Asserting both pins the split — the lookup above still finds it by category
+    // because findByOntologyClass ORs entityType and ontologyClass.
     expect(entity.entityType).toBe('Observation');
-    expect(entity.ontologyClass).toBe('Observation');
+    expect(entity.ontologyClass).toBe('Detail');
     expect(entity.layer).toBe('evidence');
     expect(entity.createdBy).toBeDefined();
     expect(entity.createdBy.provider).toBe('observation-writer');
@@ -193,8 +199,9 @@ describe('ObservationWriter → km-core round-trip (Phase 44 Plan 12)', () => {
     expect(entity.legacyId).toBeDefined();
     expect(entity.legacyId.system).toBe('A');
     expect(entity.legacyId.id).toBe('digest-uuid-1');
+    // Same deliberate split as writeObservation above.
     expect(entity.entityType).toBe('Digest');
-    expect(entity.ontologyClass).toBe('Digest');
+    expect(entity.ontologyClass).toBe('Detail');
     expect(entity.layer).toBe('pattern');
     expect(entity.createdBy).toBeDefined();
     expect(entity.createdBy.provider).toBe('observation-writer');

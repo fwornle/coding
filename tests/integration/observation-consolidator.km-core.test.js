@@ -165,12 +165,28 @@ function buildFetchMock() {
     } else {
       content = '';
     }
+    // _callLLM reads the body with response.text() and JSON.parses it itself
+    // (6a5a0b14b, 2026-06-12 — it wants the raw text so a non-OK response can be
+    // logged as a bodySample). This mock used to return the ENVELOPE from json()
+    // but the bare content string from text(); after that change the parse threw,
+    // `content` came back undefined, and every call burned its full retry ladder
+    // (2s+5s+10s = the 17s these tests were taking) before returning null. Both
+    // accessors are derived from one body here so they cannot drift apart again.
+    const body = {
+      content,
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5',
+      // Well clear of MAX_TOKENS so the truncation branch (empty content near the
+      // cap ⇒ deterministic, no retry) is not what this canned response exercises.
+      tokens: { input: 100, output: 200 },
+    };
+    const bodyText = JSON.stringify(body);
     return {
       ok: true,
       status: 200,
       statusText: 'OK',
-      json: async () => ({ content, provider: 'anthropic', model: 'claude-haiku-4-5' }),
-      text: async () => content,
+      json: async () => JSON.parse(bodyText),
+      text: async () => bodyText,
     };
   });
 }
@@ -240,6 +256,20 @@ describe('ObservationConsolidator → km-core round-trip (Phase 44 Plan 17)', ()
       runId: 'test-' + label + '-' + Date.now(),
     });
     await consolidator.init();
+
+    // Keep the suite hermetic: pin _getEmbedder to its documented "resource
+    // unavailable" return. It is the single seam through which the insight and
+    // digest-merge paths reach fastembed + Qdrant, and its contract already says
+    // callers must fail open (merge planning degrades to all-'insert').
+    //
+    // Without this the suite still PASSES but jest never exits: loading fastembed
+    // pulls in the @anush008/tokenizers native addon, which registers a CustomGC
+    // handle jest cannot tear down (`--detectOpenHandles` names it twice, once per
+    // copy under node_modules). It also opens real Qdrant connections from a unit
+    // test. None of the six tests here assert on embedding-backed dedup, so this
+    // removes a dependency they never exercised — it does not skip coverage.
+    consolidator._getEmbedder = async () => null;
+
     return { dir, store, consolidator };
   }
 
