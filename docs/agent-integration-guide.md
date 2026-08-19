@@ -40,7 +40,7 @@ The Coding system is designed to support multiple AI coding assistants through a
 
 ### Agent-Agnostic Design
 
-![Agent-Agnostic Architecture - Components](../images/agent-agnostic-architecture-components.png)
+![Agent-Agnostic Architecture - Components](images/agent-agnostic-architecture-components.png)
 
 The system follows a layered architecture:
 
@@ -54,7 +54,7 @@ The system follows a layered architecture:
 
 ### Integration Flow
 
-![Agent Integration Flow](../images/agent-integration-flow.png)
+![Agent Integration Flow](images/agent-integration-flow.png)
 
 When a new agent is launched:
 1. `bin/coding` validates config exists in `config/agents/<name>.sh`
@@ -68,7 +68,7 @@ When a new agent is launched:
 
 ### Launcher Docker Mode Flow
 
-![Launcher Docker Mode Flow](../images/launcher-docker-mode-flow.png)
+![Launcher Docker Mode Flow](images/launcher-docker-mode-flow.png)
 
 All agents share identical Docker mode logic via `launch-agent-common.sh`:
 - Transition lock checking (waits for mode transitions)

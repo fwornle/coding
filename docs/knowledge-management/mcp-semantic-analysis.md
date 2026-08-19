@@ -136,7 +136,7 @@ The **SmartOrchestrator** manages all agents with:
 
 The System Health Dashboard provides real-time visualization of workflow execution:
 
-![UKB Workflow Monitor](../images/health-monitor-dag.png)
+![UKB Workflow Monitor](../images/health-monitor-multi-agent-wf.png)
 
 **Dashboard Features:**
 - **Visual DAG Workflow Graph** - Shows agent execution flow with QA as central coordinator
