@@ -42,9 +42,22 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 
-const { captureForegroundTokens } = await import(
+const { captureForegroundTokens, STOP_ADAPTERS } = await import(
   '../../lib/lsl/token/stop-adapter-registry.mjs'
 );
+
+/**
+ * Agents the registry currently declares stamp-only, derived rather than listed.
+ *
+ * This used to be the literal ['opencode', 'pi']. Phase 85 moved opencode to
+ * mode:'transcript' (it bypasses the proxy for github-copilot, so there IS a gap
+ * to reconstruct) and the literal was never updated — the test then asserted a
+ * property of opencode that had deliberately stopped being true. Reading the
+ * registry means a future mode change updates this test instead of breaking it.
+ */
+const STAMP_ONLY_AGENTS = Object.entries(STOP_ADAPTERS)
+  .filter(([, adapter]) => adapter.mode === 'stamp-only')
+  .map(([agent]) => agent);
 
 /** The span window every fixture / wire row is timestamped inside. */
 const STARTED_AT = '2026-06-29T05:29:00.000Z';
@@ -389,9 +402,21 @@ test('report shape: matched/unmatched_wire/unmatched_transcript/fallback/perRequ
 
 // ---------------------------------------------------------------------------
 // Test 6 — stamp-only agents untouched (guard preserved) even with reconcile.
+//
+// The invariant is about the MODE, not about any particular agent: an adapter
+// declared stamp-only routes through the proxy, so its rows are already in
+// token_usage and doing transcript work would double-count them. Which agents
+// carry that mode is the registry's business and is read from it.
 // ---------------------------------------------------------------------------
-test('stamp-only: opencode/pi return 0 even with reconcile:true (double-count guard preserved)', async () => {
-  for (const agent of ['opencode', 'pi']) {
+test('stamp-only agents return 0 even with reconcile:true (double-count guard preserved)', async () => {
+  // Guard against the test quietly becoming vacuous if the last stamp-only
+  // adapter is ever converted — an empty loop asserts nothing but still passes.
+  assert.ok(
+    STAMP_ONLY_AGENTS.length > 0,
+    'precondition: STOP_ADAPTERS must declare at least one stamp-only agent',
+  );
+
+  for (const agent of STAMP_ONLY_AGENTS) {
     const { dir, dbPath } = newTempDb();
     try {
       const fixture = writeClaudeFixture(dir, [claudeTurn('req-x')]);
