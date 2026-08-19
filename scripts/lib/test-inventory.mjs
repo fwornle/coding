@@ -75,7 +75,9 @@ export const EXCLUDED = new Map([
  * build` for dist/). Nothing is listed here on suspicion.
  *
  * Deliberately NOT a way to quieten a failing test: a suite belongs here only when
- * the thing it needs cannot exist on the runner.
+ * the thing it needs cannot exist on the runner. Every entry below meets that bar —
+ * the two that were once parked here as "NOT ROOT-CAUSED" turned out to be portability
+ * bugs in the tests themselves and were fixed rather than skipped.
  */
 export const CI_SKIPPED = new Map([
   ['tests/integration/sub-agent-launchd-install.test.js',
@@ -106,14 +108,6 @@ export const CI_SKIPPED = new Map([
     'runMatrix threads argv through measurement-start — unreachable without the sibling proxy dist'],
   ['tests/experiments/variant-override.test.mjs',
     'same: asserts on --base-variant in the measurement-start argv runMatrix never emits here'],
-  // --- Linux differences that are NOT yet root-caused. Listed with that said
-  // plainly rather than given a plausible-sounding reason: they fail on Linux,
-  // pass on macOS, and nobody has looked into why. They are the first thing to
-  // pick up if this list is ever revisited.
-  ['tests/live-logging/adapter-opencode.test.js',
-    'NOT ROOT-CAUSED: discover() returns [] on Linux (5 tests). Not the uid gate — reproduced with matching ownership'],
-  ['tests/integration/kgbench-tool-arg-errors.test.js',
-    'NOT ROOT-CAUSED: one count is off by one on Linux ("records the tax on a cell that ANSWERED")'],
 ]);
 
 /** True when running under CI, where {@link CI_SKIPPED} applies. */

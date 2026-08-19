@@ -39,9 +39,10 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const DAEMON_SCRIPT = path.join(REPO_ROOT, 'scripts/sub-agent-live-opencode.mjs');
 
 let seedOpencodeFixture;
+let FIXTURE_PROJECT_ROOT;
 
 beforeAll(async () => {
-  ({ seedOpencodeFixture } = await import('../fixtures/opencode/seed-opencode-fixture.mjs'));
+  ({ seedOpencodeFixture, FIXTURE_PROJECT_ROOT } = await import('../fixtures/opencode/seed-opencode-fixture.mjs'));
 });
 
 let tmpDir;
@@ -71,7 +72,7 @@ function spawnDaemon({ pollIntervalMs = 200, heartbeatIntervalSec = 1 } = {}) {
     [
       DAEMON_SCRIPT,
       '--db-path', dbPath,
-      '--project-root', '/Users/Q284340/Agentic/coding',
+      '--project-root', FIXTURE_PROJECT_ROOT,
       '--state-file', stateFile,
       '--poll-interval', String(pollIntervalMs),
       '--heartbeat-interval', String(heartbeatIntervalSec),
@@ -79,7 +80,7 @@ function spawnDaemon({ pollIntervalMs = 200, heartbeatIntervalSec = 1 } = {}) {
     {
       env: {
         ...process.env,
-        LSL_PROJECT_ROOT_CODING: '/Users/Q284340/Agentic/coding',
+        LSL_PROJECT_ROOT_CODING: FIXTURE_PROJECT_ROOT,
         // Point the writer at a dead port so ObservationApiClient.init()
         // fails and the daemon falls back to its no-op writer — the test
         // must never POST seeded fixture messages to the production obs-api
