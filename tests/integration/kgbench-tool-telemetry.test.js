@@ -16,7 +16,18 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _ADAPTERS } from '../../lib/kgbench/agents.mjs';
-import { toolViolations, mergeToolTraces } from '../../lib/kgbench/runner.mjs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { toolViolations, mergeToolTraces, runAgent } from '../../lib/kgbench/runner.mjs';
+import { ANSWER_FILE } from '../../lib/kgbench/agents.mjs';
+
+/** Drive the real spawn path for a stub adapter. Returns a promise — always await it. */
+function runAgentOnce(agent, cwd) {
+  return runAgent({
+    prompt: 'q', arm: { id: 'grep', allowedTools: [], timeoutMs: 20000, mcpConfig: { mcpServers: {} } },
+    cwd, builtins: [], agent,
+  });
+}
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'kgbench');
 const copilotStream = readFileSync(path.join(FIX, 'copilot-tool-stream.jsonl'), 'utf8');
@@ -215,5 +226,57 @@ describe('a continued cell reports the WHOLE cell, not its last leg', () => {
     const m = mergeToolTraces([copilotish]);
     expect(m.in_tokens).toBeNull();
     expect(m.tool_control_calls).toBe(1);
+  });
+});
+
+describe('the INVESTIGATING leg carries its trace — end-to-end, not just mergeToolTraces', () => {
+  // WHY THIS EXISTS SEPARATELY FROM THE MERGE TESTS ABOVE.
+  //
+  // Those test mergeToolTraces() on hand-built legs and passed while the real path stayed
+  // broken, because the defect was UPSTREAM of the merge: readAnswerFile's `no_result`
+  // branch returned no tool fields at all, so the investigating leg had `tools_executed:
+  // undefined`, the merge filtered it out, and summed the recovery leg alone. The re-run
+  // that was meant to prove the fix still reported 1.0 tool calls per cell.
+  //
+  // A unit test of a merge cannot catch a leg that never carries anything to merge. This
+  // one drives the real spawn path.
+  let dir;
+  beforeEach(() => { dir = mkdtempSync(path.join(tmpdir(), 'kgbench-trace-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  // A stub opencode: emits a real-shaped tool_use event stream, and — like the real CLI —
+  // does NOT write the answer file on the first turn.
+  const ev = (tool, callID) => JSON.stringify({
+    type: 'tool_use',
+    sessionID: 'ses_stub',
+    part: { type: 'tool', tool, callID, state: { status: 'completed', input: {}, output: 'x' } },
+  });
+
+  const investigatingOnly = {
+    id: 'opencode', binary: '/bin/sh', model: 'm',
+    elicitation: 'answer-file', answerFile: ANSWER_FILE,
+    toolVocabulary: 'native',
+    toolTraceFrom: _ADAPTERS.opencode.toolTraceFrom,
+    argv: () => ['-c', `echo '${ev('grep', 'c1')}'; echo '${ev('read', 'c2')}'`],
+  };
+
+  test('a no_result leg reports the tools it ran instead of reporting nothing', async () => {
+    const r = await runAgentOnce(investigatingOnly, dir);
+    expect(r.outcome).toBe('no_result');
+    // The regression: this used to be undefined, which made the leg invisible to the merge.
+    expect(r.tools_executed).toEqual(['grep', 'read']);
+    expect(r.tool_calls).toBe(2);
+  });
+
+  test('so a standalone failure row can distinguish "searched then gave up" from "did nothing"', async () => {
+    const didNothing = {
+      ...investigatingOnly,
+      argv: () => ['-c', 'echo "no events"'],
+    };
+    const busy = await runAgentOnce(investigatingOnly, dir);
+    const idle = await runAgentOnce(didNothing, dir);
+    expect(busy.tools_executed).toEqual(['grep', 'read']);
+    // No events at all => null, still distinguishable from an empty list.
+    expect(idle.tools_executed ?? null).toBeNull();
   });
 });

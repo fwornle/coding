@@ -156,7 +156,11 @@ describe('an unenforced arm is marked where its numbers appear, not only at the 
 
   it('renders a missing tool trace as a dash and says a dash is not a zero', () => {
     expect(md).toMatch(/\| grep \| opencode \|[^\n]*\| — \|/);
-    expect(md).toContain('a dash there means **not measured**, not zero');
+    // Asserts the INVARIANT, not one phrasing of it. The wording changed when copilot and
+    // opencode gained tool-trace parsers — the old sentence claimed only claude reports a
+    // trace, which then contradicted the very column it explained. What must never change
+    // is that a dash is stated to be unmeasured rather than zero.
+    expect(md).toMatch(/dash[^.]*\*\*not measured\*\*, (?:not|never) zero/);
   });
 });
 
