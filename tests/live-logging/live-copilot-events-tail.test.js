@@ -160,6 +160,21 @@ async function tick(ms) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Poll `predicate` until it is true. Replaces a fixed sleep wherever the wait is
+ * for the watcher to NOTICE something — the scan interval is 50ms, and on a
+ * loaded machine (a full jest run is ~10 workers deep) a 50ms sleep routinely
+ * expires before the scan has run at all.
+ */
+async function waitFor(predicate, { timeoutMs = 5000, stepMs = 10 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await predicate()) return;
+    await tick(stepMs);
+  }
+  throw new Error(`waitFor: condition not met within ${timeoutMs}ms`);
+}
+
 const PROJECT_ROOT = '/Users/Q284340/Agentic/coding';
 
 describe('copilot-events-tail watcher contract', () => {
@@ -439,6 +454,22 @@ branch: main
     const sessionDir = makeSession('uuid-11', { eventsLines: [], locked: true });
     const eventsPath = path.join(sessionDir, 'events.jsonl');
 
+    // Make the write PROVABLY in flight when stop() is called, instead of hoping a
+    // fixed sleep lands inside it. The old shape was `append; await tick(50); stop()`
+    // against a 50ms scan interval — on a loaded machine the scan had often not run
+    // at all, so no write had started, so there was nothing to drain and the row was
+    // simply absent. The test failed on the drain assertion while the drain was never
+    // exercised, which is the worst of both: red for a reason it does not name.
+    let writeEntered;
+    const entered = new Promise((resolve) => { writeEntered = resolve; });
+    writer.processMessages = async (messages, metadata) => {
+      writerCalls.push({ messages, metadata });
+      writeEntered();
+      // Hold the write open long enough that stop() cannot possibly arrive after it.
+      await tick(100);
+      return { observations: 1, errors: 0 };
+    };
+
     const handle = await mod.startCopilotWatcher({
       sessionStateDir: tmpRoot,
       registry,
@@ -446,18 +477,23 @@ branch: main
       projectRoot: PROJECT_ROOT,
       liveSessionScanIntervalMs: 50,
     });
-    await tick(150);
+    // Wait for the watcher to be scanning, not for a guessed number of milliseconds.
+    await waitFor(() => fs.existsSync(eventsPath));
     fs.appendFileSync(
       eventsPath,
       startedEvent('toolu_vrtx_01DRAIN01') + '\n' +
       completedEvent('toolu_vrtx_01DRAIN01') + '\n',
     );
-    await tick(50);
+
+    // stop() is now issued strictly INSIDE processMessages.
+    await entered;
     await handle.stop();
-    // After stop, the write should have been allowed to complete
+
+    // After stop, the write should have been allowed to complete.
     const row = registry.get('copilot', '01DRAIN');
     expect(row).toBeDefined();
-  });
+    expect(writerCalls.length).toBeGreaterThan(0);
+  }, 15000);
 
   test('Test 12 — getStats returns shape with last_scan_at', async () => {
     const handle = await mod.startCopilotWatcher({
