@@ -8,6 +8,7 @@
     "coding": "./bin/coding"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "test": "node scripts/run-tests.mjs",
     "test:jest": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest",
     "test:node": "node scripts/run-node-tests.mjs",

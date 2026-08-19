@@ -126,8 +126,19 @@ test('writeReportJson refuses a traversal task_hash (no write outside reports di
   try {
     assert.throws(() => writeReportJson(fakeReport('x'), '../../etc/passwd', { repoRoot: tmp }),
       /invalid|traversal|separator/i);
-    // nothing was written outside the reports dir
-    assert.ok(!fs.existsSync(path.join(tmp, '..', '..', 'etc', 'passwd')));
+    // Nothing was written. The previous check here was
+    //   assert.ok(!fs.existsSync(path.join(tmp, '..', '..', 'etc', 'passwd')))
+    // which asserts that the REAL /etc/passwd does not exist: os.tmpdir() is
+    // /tmp/<x> on Linux, so two levels up is /, and the expression resolved to a
+    // file this test never touches and that always exists. It only ever looked
+    // correct on macOS, where tmpdir sits deep under /var/folders/... and the same
+    // expression points at nothing. Assert what the guard actually promises, which
+    // is also stronger: resolveReportPath throws BEFORE mkdirSync, so a refused
+    // traversal leaves the reports dir uncreated.
+    assert.ok(
+      !fs.existsSync(path.join(tmp, '.data', 'experiments', 'reports')),
+      'a refused traversal must not even create the reports dir',
+    );
   } finally {
     cleanup();
   }
