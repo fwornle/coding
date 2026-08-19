@@ -63,7 +63,26 @@ jobs:
           CHANGED_PATHS=$(git diff --name-only "$BASE" HEAD || true)
           echo "Files changed in push:"
           echo "$CHANGED_PATHS" | sed 's/^/  /'
-          if echo "$CHANGED_PATHS" | grep -qE '^(docs-content/|mkdocs\.yml$|\.github/workflows/deploy-docs\.yml$)'; then
+          # `docs/` is in this pattern, and it is not redundant with `docs-content/`.
+          #
+          # Several files under docs-content/ are SYMLINKS into docs/ — e.g.
+          # docs-content/benchmarks/coding-v1/RESULTS.md -> ../../../docs/benchmarks/coding-v1/RESULTS.md.
+          # Updating one changes the symlink's TARGET, not the symlink, so `git diff
+          # --name-only` reports only the docs/ path and a docs-content-only pattern does not
+          # match. The site then keeps serving the old page while the workflow reports
+          # SUCCESS, because the gate succeeds and build/deploy are merely skipped:
+          #
+          #     gate: success   build: skipped   deploy: skipped
+          #
+          # That is how the 2026-08-19 coding-v1 benchmark report was published to the repo
+          # and never reached https://fwornle.github.io/coding — five consecutive green runs,
+          # ~25s each, none of which ran mkdocs. A silent no-op that reports success is worse
+          # than a failure, so the gate now errs toward building.
+          #
+          # Cost of the widening: pushes that touch docs/ but render nothing now rebuild.
+          # docs/ is documentation by definition and a build is ~30s, so this is cheap
+          # insurance against a failure mode that is invisible by construction.
+          if echo "$CHANGED_PATHS" | grep -qE '^(docs/|docs-content/|mkdocs\.yml$|\.github/workflows/deploy-docs\.yml$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Docs-relevant paths detected — will build"
           else
