@@ -12,7 +12,12 @@
  * - Graceful degradation when agent features unavailable
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+// Runner: jest. Written against vitest, which is NOT a dependency of this repo —
+// only lib/km-core vendors it, for its own suite — so this import resolved to
+// nothing and the file failed to load rather than failing a test. The only vitest
+// API used anywhere in these suites was jest.fn, which is jest.fn, so the conversion
+// is this line plus that rename.
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { AgentAgnosticCache } from '../../src/caching/AgentAgnosticCache.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -65,9 +70,9 @@ describe('Agent Adapter Integration Tests', () => {
     it('should work with HTTP backend (remote agents)', async () => {
       // Mock HTTP server
       const mockHttpServer = {
-        get: vi.fn().mockResolvedValue({ data: 'cached-value' }),
-        set: vi.fn().mockResolvedValue(true),
-        delete: vi.fn().mockResolvedValue(true)
+        get: jest.fn().mockResolvedValue({ data: 'cached-value' }),
+        set: jest.fn().mockResolvedValue(true),
+        delete: jest.fn().mockResolvedValue(true)
       };
 
       cache = new AgentAgnosticCache({
@@ -93,8 +98,8 @@ describe('Agent Adapter Integration Tests', () => {
     it('should work with MCP backend (Claude Code)', async () => {
       // Mock MCP Memory server
       const mockMcpClient = {
-        createEntities: vi.fn().mockResolvedValue({ success: true }),
-        searchNodes: vi.fn().mockResolvedValue({
+        createEntities: jest.fn().mockResolvedValue({ success: true }),
+        searchNodes: jest.fn().mockResolvedValue({
           nodes: [{ name: 'test', entityType: 'cache', observations: ['{"data":"mcp-value"}'] }]
         })
       };
@@ -119,8 +124,8 @@ describe('Agent Adapter Integration Tests', () => {
     it('should gracefully degrade from MCP to file when MCP unavailable', async () => {
       // Mock MCP client that fails
       const mockMcpClient = {
-        createEntities: vi.fn().mockRejectedValue(new Error('MCP server unavailable')),
-        searchNodes: vi.fn().mockRejectedValue(new Error('MCP server unavailable'))
+        createEntities: jest.fn().mockRejectedValue(new Error('MCP server unavailable')),
+        searchNodes: jest.fn().mockRejectedValue(new Error('MCP server unavailable'))
       };
 
       cache = new AgentAgnosticCache({
@@ -174,12 +179,12 @@ describe('Agent Adapter Integration Tests', () => {
     it('should extract from Claude Code LSL format', async () => {
       // Mock knowledge extractor with LSL parser
       const mockExtractor = {
-        parseLSL: vi.fn().mockReturnValue({
+        parseLSL: jest.fn().mockReturnValue({
           exchanges: [
             { user: 'How to cache?', assistant: 'Use Map for simple caching' }
           ]
         }),
-        extractKnowledge: vi.fn().mockResolvedValue({
+        extractKnowledge: jest.fn().mockResolvedValue({
           extracted: 1,
           knowledge: [{ type: 'coding_pattern', confidence: 0.8 }]
         })
@@ -202,7 +207,7 @@ describe('Agent Adapter Integration Tests', () => {
     it('should extract from generic markdown transcript format', async () => {
       // Mock parser for generic format
       const mockParser = {
-        parseGenericMarkdown: vi.fn().mockReturnValue({
+        parseGenericMarkdown: jest.fn().mockReturnValue({
           exchanges: [
             { user: 'Question', assistant: 'Answer' }
           ]
@@ -220,7 +225,7 @@ AI: Answer`;
     it('should extract from JSON transcript format', async () => {
       // Mock JSON parser
       const mockParser = {
-        parseJSON: vi.fn().mockReturnValue({
+        parseJSON: jest.fn().mockReturnValue({
           exchanges: [
             { role: 'user', content: 'Q' },
             { role: 'assistant', content: 'A' }
@@ -241,7 +246,7 @@ AI: Answer`;
 
     it('should handle malformed transcripts gracefully', async () => {
       const mockExtractor = {
-        extractFromSession: vi.fn().mockResolvedValue({
+        extractFromSession: jest.fn().mockResolvedValue({
           extracted: 0,
           knowledge: [],
           errors: ['Failed to parse transcript']
@@ -261,8 +266,8 @@ AI: Answer`;
     it('should track costs regardless of agent type', async () => {
       // Mock budget tracker
       const mockBudget = {
-        trackCost: vi.fn().mockResolvedValue(true),
-        getCurrentUsage: vi.fn().mockResolvedValue({
+        trackCost: jest.fn().mockResolvedValue(true),
+        getCurrentUsage: jest.fn().mockResolvedValue({
           used: 1.50,
           limit: 8.33,
           percentage: 18.0
@@ -288,7 +293,7 @@ AI: Answer`;
     it('should enforce budget limits universally', async () => {
       // Mock budget tracker at limit
       const mockBudget = {
-        checkBudget: vi.fn().mockResolvedValue({
+        checkBudget: jest.fn().mockResolvedValue({
           allowed: false,
           reason: 'Monthly budget exceeded'
         })
@@ -322,7 +327,7 @@ AI: Answer`;
     it('should fallback to local models when remote unavailable', async () => {
       // Mock inference engine with failover
       const mockInference = {
-        infer: vi.fn().mockImplementation(async (prompt, options) => {
+        infer: jest.fn().mockImplementation(async (prompt, options) => {
           // Simulate remote failure, fallback to local
           return {
             content: 'local model response',
@@ -341,7 +346,7 @@ AI: Answer`;
     it('should handle database unavailability gracefully', async () => {
       // Mock knowledge storage with database failure
       const mockStorage = {
-        storeKnowledge: vi.fn().mockImplementation(async (knowledge) => {
+        storeKnowledge: jest.fn().mockImplementation(async (knowledge) => {
           // Simulate database failure, fallback to file
           return {
             stored: true,
@@ -362,7 +367,7 @@ AI: Answer`;
     it('should continue knowledge extraction with heuristic fallback when LLM unavailable', async () => {
       // Mock extractor with heuristic classification
       const mockExtractor = {
-        extractKnowledge: vi.fn().mockResolvedValue({
+        extractKnowledge: jest.fn().mockResolvedValue({
           extracted: 1,
           knowledge: [{
             type: 'coding_pattern',
@@ -385,8 +390,8 @@ AI: Answer`;
     it('should allow knowledge extracted by one agent to be retrieved by another', async () => {
       // Mock knowledge storage and retrieval
       const mockKnowledge = {
-        store: vi.fn().mockResolvedValue({ id: 'k1', stored: true }),
-        search: vi.fn().mockResolvedValue({
+        store: jest.fn().mockResolvedValue({ id: 'k1', stored: true }),
+        search: jest.fn().mockResolvedValue({
           results: [
             { id: 'k1', type: 'pattern', extractedBy: 'claude', relevance: 0.95 }
           ]

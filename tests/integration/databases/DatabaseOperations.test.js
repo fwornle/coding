@@ -11,7 +11,12 @@
  * 7. Schema migrations
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+// Runner: jest. Written against vitest, which is NOT a dependency of this repo —
+// only lib/km-core vendors it, for its own suite — so this import resolved to
+// nothing and the file failed to load rather than failing a test. The only vitest
+// API used anywhere in these suites was jest.fn, which is jest.fn, so the conversion
+// is this line plus that rename.
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import Database from 'better-sqlite3';
 import fs from 'fs/promises';
@@ -660,7 +665,7 @@ describe('Database Operations Integration Tests', () => {
     it('should recover from failed write to Qdrant', async () => {
       // Mock Qdrant failure
       const originalUpsert = dbManager.qdrantClient.upsert;
-      dbManager.qdrantClient.upsert = vi.fn().mockRejectedValue(new Error('Qdrant unavailable'));
+      dbManager.qdrantClient.upsert = jest.fn().mockRejectedValue(new Error('Qdrant unavailable'));
 
       try {
         await dbManager.storeKnowledge({
