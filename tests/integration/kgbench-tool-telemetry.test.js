@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _ADAPTERS } from '../../lib/kgbench/agents.mjs';
-import { toolViolations } from '../../lib/kgbench/runner.mjs';
+import { toolViolations, mergeToolTraces } from '../../lib/kgbench/runner.mjs';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'kgbench');
 const copilotStream = readFileSync(path.join(FIX, 'copilot-tool-stream.jsonl'), 'utf8');
@@ -146,5 +146,74 @@ describe('copilot argv carries the flag that makes the trace exist at all', () =
   test('the answer-file directive is still appended — elicitation is unchanged', () => {
     const argv = _ADAPTERS.copilot.argv({ prompt: 'q', model: 'm', answerFile: '.a.md' });
     expect(argv[argv.indexOf('-p') + 1]).toContain('.a.md');
+  });
+});
+
+describe('a continued cell reports the WHOLE cell, not its last leg', () => {
+  // Regression for run kgv1-telemetry: 13 of 16 opencode cells recorded ['write'] alone
+  // while scoring 1.00 with exact file paths and line numbers. opencode's headless `run`
+  // ends at its first toolless step — right after it finishes investigating — so leg 1
+  // holds every grep and read and the recovery leg holds only the write. Taking the last
+  // leg discards exactly the retrieval calls this benchmark counts.
+  const investigating = {
+    outcome: 'no_result',
+    tool_calls: 4,
+    tools: ['grep', 'read', 'read', 'grep'],
+    tools_executed: ['grep', 'read', 'read', 'grep'],
+    tools_denied: [],
+    tool_result_tokens_est: 900,
+    in_tokens: 60000, out_tokens: 400, total_tokens: 60400, num_turns: 5,
+  };
+  const recovery = {
+    outcome: 'ok',
+    tool_calls: 1,
+    tools: ['write'],
+    tools_executed: ['write'],
+    tools_denied: [],
+    tool_result_tokens_est: 6,
+    in_tokens: 70000, out_tokens: 430, total_tokens: 70430, num_turns: 2,
+  };
+
+  test('concatenates the tools of every leg in order', () => {
+    const m = mergeToolTraces([investigating, recovery]);
+    expect(m.tools_executed).toEqual(['grep', 'read', 'read', 'grep', 'write']);
+    expect(m.tool_calls).toBe(5);
+  });
+
+  test('the retrieval calls survive — the whole point', () => {
+    const m = mergeToolTraces([investigating, recovery]);
+    expect(m.tools_executed.filter((t) => t === 'grep')).toHaveLength(2);
+    // The bug's signature: the merged trace must NOT be the recovery leg alone.
+    expect(m.tools_executed).not.toEqual(['write']);
+  });
+
+  test('sums tokens and tool-result volume across legs — the operator paid for both', () => {
+    const m = mergeToolTraces([investigating, recovery]);
+    expect(m.in_tokens).toBe(130000);
+    expect(m.total_tokens).toBe(130830);
+    expect(m.tool_result_tokens_est).toBe(906);
+  });
+
+  test('an uncontinued cell is unchanged', () => {
+    const m = mergeToolTraces([recovery]);
+    expect(m.tools_executed).toEqual(['write']);
+    expect(m.tool_calls).toBe(1);
+  });
+
+  test('returns null when NO leg has a trace, so pi stays tool_audit unavailable', () => {
+    expect(mergeToolTraces([{ outcome: 'ok', tools_executed: null }])).toBeNull();
+    expect(mergeToolTraces([])).toBeNull();
+  });
+
+  test('a null field stays null rather than collapsing to a measured zero', () => {
+    // copilot reports no per-cell token totals; 0 would read as "measured, and it was zero".
+    const copilotish = {
+      tool_calls: 2, tools: ['view', 'create'], tools_executed: ['view', 'create'],
+      tools_denied: [], tool_control_calls: 1, tool_result_tokens_est: 40,
+      in_tokens: null, out_tokens: null, total_tokens: null,
+    };
+    const m = mergeToolTraces([copilotish]);
+    expect(m.in_tokens).toBeNull();
+    expect(m.tool_control_calls).toBe(1);
   });
 });
