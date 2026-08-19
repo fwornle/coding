@@ -1,8 +1,19 @@
-# Resume: work blocked on the copilot quota
+# kgbench: open points
 
-> **RESOLVED 2026-08-19.** The quota is back and the work this file was holding is done.
-> Kept because §1 (the gate), §3 and §4 remain true and useful, and because two of its
-> conclusions turned out to be WRONG in a way worth recording — see "What resuming found".
+Standing list of what is unresolved in the kgbench harness, what was resolved and must not be
+re-litigated, and the diagnostic traps that have cost real time. Read §2 for what is still
+open; §3 and §4 exist to stop work being redone or re-learned.
+
+> **History, and why the section numbering starts mid-story.** This file was written on
+> 2026-08-16 as `resume-when-copilot-quota-returns.md`, a handover for work blocked behind
+> the copilot monthly quota. The quota returned on 2026-08-19, that work was completed, and
+> running it surfaced more than it closed — so the file outlived its title and was renamed.
+> §0 and §1 are kept verbatim because the quota gate is a live single point of failure that
+> will bite again, not because it is currently biting. Two of the original file's conclusions
+> turned out to be WRONG; that is recorded in "What resuming found" rather than quietly
+> corrected, because the way they were wrong is the useful part.
+>
+> **Status as of 2026-08-19:**
 >
 > | § | was | now |
 > |---|---|---|
