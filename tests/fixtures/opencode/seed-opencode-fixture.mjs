@@ -25,6 +25,22 @@
  */
 
 import Database from 'better-sqlite3';
+import os from 'node:os';
+import path from 'node:path';
+
+/**
+ * Default `session.directory` for seeded sub-sessions.
+ *
+ * MUST stay identical to resolveProjectRoot('coding') in
+ * lib/lsl/adapters/opencode-sqlite.mjs, because discover()'s SQL filters
+ * `WHERE directory = ? OR directory LIKE ?` against exactly that value. This was
+ * the literal '/Users/Q284340/Agentic/coding' — the author's own home path — so
+ * the two sides matched on ONE machine and the filter returned zero rows
+ * everywhere else. Deriving both from the same expression is what makes the
+ * match a fact rather than a coincidence.
+ */
+export const FIXTURE_PROJECT_ROOT =
+  process.env.LSL_PROJECT_ROOT_CODING || path.join(os.homedir(), 'Agentic', 'coding');
 
 /**
  * Open a writable better-sqlite3 connection for fixture-side mutations
@@ -175,7 +191,7 @@ export function insertTaskCompletionRow(db, opts) {
  *        (ms since epoch). RESEARCH-opencode.md sample value — a 2026 ms ts.
  * @param {Array<number>} [opts.migrationIds=[1,2,3,4]]  rows inserted into
  *        __drizzle_migrations; SUPPORTED_MIGRATIONS allowlist gate hits MAX(id).
- * @param {string} [opts.directory='/Users/Q284340/Agentic/coding']  session.directory
+ * @param {string} [opts.directory=FIXTURE_PROJECT_ROOT]  session.directory
  *        for sub-sessions. Top-level sessions inserted with same directory.
  * @param {Array<{directory:string,parentId?:string}>} [opts.extraSubSessions=[]]
  *        Additional sub-sessions in DIFFERENT directories — for Test 6
@@ -192,7 +208,7 @@ export function seedOpencodeFixture(dbPath, opts = {}) {
     parentId = 'ses_parent_1ffeXX',
     baseTimeMs = 1770570503748,
     migrationIds = [1, 2, 3, 4],
-    directory = '/Users/Q284340/Agentic/coding',
+    directory = FIXTURE_PROJECT_ROOT,
     extraSubSessions = [],
     messagesPerSession = null,
   } = opts;

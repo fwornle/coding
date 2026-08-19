@@ -28,6 +28,7 @@ jest.unstable_mockModule('../../src/live-logging/ObservationWriter.js', () => ({
 let startOpencodeWatcher;
 let stopOpencodeWatcher;
 let seedOpencodeFixture;
+let FIXTURE_PROJECT_ROOT;
 let openWriterDb;
 let insertSubSessionRow;
 let bumpSessionUpdate;
@@ -45,6 +46,7 @@ beforeAll(async () => {
   ));
   ({
     seedOpencodeFixture,
+    FIXTURE_PROJECT_ROOT,
     openWriterDb,
     insertSubSessionRow,
     bumpSessionUpdate,
@@ -126,7 +128,7 @@ describe('opencode poll watcher - surface', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 10000,
     });
     try {
@@ -157,7 +159,7 @@ describe('opencode poll watcher - discover (initial tick)', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 50,
     });
     try {
@@ -208,7 +210,7 @@ describe('opencode poll watcher - schema-version guard', () => {
         dbPath,
         registry,
         observationWriter: writer,
-        projectRoot: '/Users/Q284340/Agentic/coding',
+        projectRoot: FIXTURE_PROJECT_ROOT,
         pollIntervalMs: 100,
       }),
     ).rejects.toThrow(/unsupported opencode schema.*session.*missing.*agent/i);
@@ -227,7 +229,7 @@ describe('opencode poll watcher - schema-version guard', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 200,
     });
     try {
@@ -248,7 +250,7 @@ describe('opencode poll watcher - cadence', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 50,
     });
     try {
@@ -270,7 +272,7 @@ describe('opencode poll watcher - incremental detection', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 60,
     });
     try {
@@ -284,7 +286,7 @@ describe('opencode poll watcher - incremental detection', () => {
       insertSubSessionRow(writerDb, {
         id: sid2,
         parentId: 'ses_parent_1ffeXX',
-        directory: '/Users/Q284340/Agentic/coding',
+        directory: FIXTURE_PROJECT_ROOT,
         timeMs: futureMs,
       });
       writerDb.close();
@@ -316,7 +318,7 @@ describe('opencode poll watcher - incremental message fetch', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 60,
     });
     try {
@@ -362,7 +364,7 @@ describe('opencode poll watcher - stats', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 50,
     });
     try {
@@ -390,7 +392,7 @@ describe('opencode poll watcher - graceful stop', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 50,
     });
     await wait(80);
@@ -418,7 +420,7 @@ describe('opencode poll watcher - error resilience', () => {
       dbPath,
       registry,
       observationWriter: failingWriter,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 50,
       onError: (err) => errors.push(err),
     });
@@ -437,10 +439,12 @@ describe('opencode poll watcher - directory filter', () => {
   test('Test 11: only sub-sessions matching projectRoot or projectRoot/% are processed', async () => {
     const dbPath = seed({
       numSubSessions: 2,
-      directory: '/Users/Q284340/Agentic/coding',
+      directory: FIXTURE_PROJECT_ROOT,
       extraSubSessions: [
-        { directory: '/Users/Q284340/Agentic/other' },
-        { directory: '/Users/Q284340/Agentic/another' },
+        // Siblings of the project root — must be OUTSIDE it for the filter to reject
+        // them, so they are derived from it rather than written as a parallel literal.
+        { directory: path.join(path.dirname(FIXTURE_PROJECT_ROOT), 'other') },
+        { directory: path.join(path.dirname(FIXTURE_PROJECT_ROOT), 'another') },
       ],
     });
     const registry = createRegistry();
@@ -449,7 +453,7 @@ describe('opencode poll watcher - directory filter', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 50,
     });
     try {
@@ -486,7 +490,7 @@ describe('opencode poll watcher - completion detection', () => {
       dbPath,
       registry,
       observationWriter: writer,
-      projectRoot: '/Users/Q284340/Agentic/coding',
+      projectRoot: FIXTURE_PROJECT_ROOT,
       pollIntervalMs: 50,
     });
     try {
@@ -511,7 +515,7 @@ describe('opencode poll watcher - Plan 03 cumulative gate', () => {
     expect(typeof buildSubAgentRow).toBe('function');
 
     expect(
-      projectFromOpencodeRow({ directory: '/Users/Q284340/Agentic/coding' }),
+      projectFromOpencodeRow({ directory: FIXTURE_PROJECT_ROOT }),
     ).toBe('coding');
     expect(projectFromOpencodeRow({ directory: '/x/.. evil' })).toBe('unknown');
     expect(projectFromOpencodeRow({})).toBe('unknown');
@@ -520,7 +524,7 @@ describe('opencode poll watcher - Plan 03 cumulative gate', () => {
       {
         id: 'ses_abcdef0123456',
         parent_id: 'ses_parentXX',
-        directory: '/Users/Q284340/Agentic/coding',
+        directory: FIXTURE_PROJECT_ROOT,
         agent: 'general',
         title: 'T',
         slug: 's',

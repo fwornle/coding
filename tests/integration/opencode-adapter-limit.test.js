@@ -44,10 +44,11 @@ jest.unstable_mockModule('../../src/live-logging/ObservationWriter.js', () => ({
 
 let adapter;
 let seedOpencodeFixture;
+let FIXTURE_PROJECT_ROOT;
 
 beforeAll(async () => {
   ({ adapter } = await import('../../lib/lsl/adapters/opencode-sqlite.mjs'));
-  ({ seedOpencodeFixture } = await import('../fixtures/opencode/seed-opencode-fixture.mjs'));
+  ({ seedOpencodeFixture, FIXTURE_PROJECT_ROOT } = await import('../fixtures/opencode/seed-opencode-fixture.mjs'));
 });
 
 let tmpDir;
@@ -87,7 +88,7 @@ function seedWithNRows(numSubSessions) {
 describe('opencode-sqlite adapter — --limit plumb-through (CR-01)', () => {
   test('Test 1: passing limit=500 retrieves up to 500 rows (300 seeded → all 300 returned, NOT capped at 100)', async () => {
     const dbPath = seedWithNRows(300);
-    process.env.LSL_PROJECT_ROOT_CODING = '/Users/Q284340/Agentic/coding';
+    process.env.LSL_PROJECT_ROOT_CODING = FIXTURE_PROJECT_ROOT;
 
     const rows = await adapter.discover({
       searchPaths: [{ type: 'sqlite', dbPath }],
@@ -104,7 +105,7 @@ describe('opencode-sqlite adapter — --limit plumb-through (CR-01)', () => {
 
   test('Test 2: omitting limit defaults to 100 rows (regression guard for the existing default)', async () => {
     const dbPath = seedWithNRows(300);
-    process.env.LSL_PROJECT_ROOT_CODING = '/Users/Q284340/Agentic/coding';
+    process.env.LSL_PROJECT_ROOT_CODING = FIXTURE_PROJECT_ROOT;
 
     const rows = await adapter.discover({
       searchPaths: [{ type: 'sqlite', dbPath }],
@@ -120,7 +121,7 @@ describe('opencode-sqlite adapter — --limit plumb-through (CR-01)', () => {
 
   test('Test 3: limit=0 (falsy/invalid) falls back to default 100 (defensive)', async () => {
     const dbPath = seedWithNRows(150);
-    process.env.LSL_PROJECT_ROOT_CODING = '/Users/Q284340/Agentic/coding';
+    process.env.LSL_PROJECT_ROOT_CODING = FIXTURE_PROJECT_ROOT;
 
     const rows = await adapter.discover({
       searchPaths: [{ type: 'sqlite', dbPath }],
@@ -138,7 +139,7 @@ describe('opencode-sqlite adapter — --limit plumb-through (CR-01)', () => {
     // not a magic constant. We probe by seeding exactly limit+5 rows then
     // asserting we got exactly limit back.
     const dbPath = seedWithNRows(155);
-    process.env.LSL_PROJECT_ROOT_CODING = '/Users/Q284340/Agentic/coding';
+    process.env.LSL_PROJECT_ROOT_CODING = FIXTURE_PROJECT_ROOT;
 
     const rows = await adapter.discover({
       searchPaths: [{ type: 'sqlite', dbPath }],

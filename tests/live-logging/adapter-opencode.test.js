@@ -51,10 +51,11 @@ jest.unstable_mockModule('../../src/live-logging/ObservationApiClient.js', () =>
 // ---- Adapter SUT (lazy import after mock declaration) -------------------
 let adapter;
 let seedOpencodeFixture;
+let FIXTURE_PROJECT_ROOT;
 
 beforeAll(async () => {
   ({ adapter } = await import('../../lib/lsl/adapters/opencode-sqlite.mjs'));
-  ({ seedOpencodeFixture } = await import('../fixtures/opencode/seed-opencode-fixture.mjs'));
+  ({ seedOpencodeFixture, FIXTURE_PROJECT_ROOT } = await import('../fixtures/opencode/seed-opencode-fixture.mjs'));
 });
 
 // ---- Per-test tmpdir + env snapshot --------------------------------------
@@ -198,13 +199,13 @@ describe('opencode-sqlite adapter — discover()', () => {
   test('Test 6: filter — by project directory (2 of 4 in coding root)', async () => {
     const dbPath = seed({
       numSubSessions: 2,
-      directory: '/Users/Q284340/Agentic/coding',
+      directory: FIXTURE_PROJECT_ROOT,
       extraSubSessions: [
-        { directory: '/Users/Q284340/Agentic/other' },
-        { directory: '/Users/Q284340/Agentic/another' },
+        { directory: path.join(path.dirname(FIXTURE_PROJECT_ROOT), 'other') },
+        { directory: path.join(path.dirname(FIXTURE_PROJECT_ROOT), 'another') },
       ],
     });
-    process.env.LSL_PROJECT_ROOT_CODING = '/Users/Q284340/Agentic/coding';
+    process.env.LSL_PROJECT_ROOT_CODING = FIXTURE_PROJECT_ROOT;
     const rows = await adapter.discover({
       searchPaths: [{ type: 'sqlite', dbPath }],
       project: 'coding',
@@ -283,18 +284,18 @@ describe('opencode-sqlite adapter — discover()', () => {
     const sids = db.prepare(
       'SELECT id FROM session WHERE parent_id IS NOT NULL ORDER BY id',
     ).all();
-    // basename('/Users/Q284340/Agentic/coding/.. evil') === '.. evil' on POSIX,
+    // basename(`${FIXTURE_PROJECT_ROOT}/.. evil`) === '.. evil' on POSIX,
     // which contains '.', ' ', and starts with '..' — all rejected by /^[a-z0-9-]+$/i.
     db.prepare('UPDATE session SET directory = ? WHERE id = ?')
-      .run('/Users/Q284340/Agentic/coding/.. evil', sids[1].id);
+      .run(`${FIXTURE_PROJECT_ROOT}/.. evil`, sids[1].id);
     db.close();
 
-    process.env.LSL_PROJECT_ROOT_CODING = '/Users/Q284340/Agentic/coding';
+    process.env.LSL_PROJECT_ROOT_CODING = FIXTURE_PROJECT_ROOT;
     const rows = await adapter.discover({
       searchPaths: [{ type: 'sqlite', dbPath: dbPath }],
       project: 'coding',
     });
-    // First sub-session passes (directory = '/Users/Q284340/Agentic/coding',
+    // First sub-session passes (directory = FIXTURE_PROJECT_ROOT,
     // basename = 'coding', allowlist-clean).
     // Second sub-session matched by SQL prefix `dir/%` but rejected by the
     // basename allowlist guard with a stderr log line.

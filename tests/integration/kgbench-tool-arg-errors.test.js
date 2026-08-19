@@ -112,7 +112,14 @@ describe('the count reaches the row', () => {
     argv: () => ['-c', script],
   });
 
-  const REJECTION = 'Error: The bash tool was called with invalid arguments: SchemaError(Missing key\\n  at [\\"description\\"]).\\n';
+  // The double quotes are NOT backslash-escaped, and must not be. This string is
+  // interpolated into `printf '<REJECTION>'` — inside single quotes a `"` is already
+  // literal, so the escape is redundant, and POSIX printf has no `\"` escape to
+  // consume it. bash's printf strips the backslash anyway; dash emits it verbatim.
+  // So on Debian (/bin/sh IS dash) the stub wrote `at [\"description\"]` and the
+  // arg-name parser produced a different key, failing the deep-equal by one entry.
+  // The agent binary here is /bin/sh, so the fixture has to be POSIX-portable.
+  const REJECTION = 'Error: The bash tool was called with invalid arguments: SchemaError(Missing key\\n  at ["description"]).\\n';
 
   it('records the tax on a cell that ANSWERED — the case a per-failure counter loses', () => {
     // This is the whole reason the counter lives in finish() rather than in the no_result
