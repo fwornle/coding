@@ -64,6 +64,11 @@ describe('obs-api legacy /api/* endpoints km-core round-trip (Phase 44 Plan 14)'
 
   // Per-process run identifier used in every seeded provenance stamp so
   // post-hoc queries can attribute test fixtures vs production rows.
+  // legacyId -> km-core minted id. The coverage endpoint publishes the km-core key,
+  // not the legacy id (see the assertion in the coverage test), so the expectation has
+  // to be captured at seed time — the minted id is a UUIDv7 and cannot be written down.
+  const mintedInsightIds = new Map();
+
   const TEST_RUN_ID = 'obs-api-legacy-test-' + Date.now();
   const SEED_TS = '2026-06-04T10:00:00.000Z';
 
@@ -247,7 +252,8 @@ describe('obs-api legacy /api/* endpoints km-core round-trip (Phase 44 Plan 14)'
     ];
     for (const row of seedInsights) {
       const entity = legacyInsightToEntity(row, TEST_RUN_ID, SEED_TS);
-      await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      mintedInsightIds.set(row.id, mintedId);
     }
 
     // Import the obs-api module AFTER seeding env + paths.
@@ -339,7 +345,13 @@ describe('obs-api legacy /api/* endpoints km-core round-trip (Phase 44 Plan 14)'
     // Per-insight payload matches the seed.
     expect(Array.isArray(body.perInsight)).toBe(true);
     expect(body.perInsight.length).toBe(1);
-    expect(body.perInsight[0].id).toBe('ins-coding-1');
+    // The public id is the km-core UUID key, NOT the legacyId (25f53b9ea, 2026-06-20).
+    // legacyId?.id can be a topic-string or null, and the coverage tile's
+    // `/insights#insight-<id>` deep-link has to match the insights-list card id, so the
+    // km-core key is the only one that resolves. Asserting both halves: it IS the minted
+    // id for this row, and it is NOT the legacy id a regression would put back.
+    expect(body.perInsight[0].id).toBe(mintedInsightIds.get('ins-coding-1'));
+    expect(body.perInsight[0].id).not.toBe('ins-coding-1');
     expect(body.perInsight[0].topic).toBe('CodingInsight');
     expect(body.perInsight[0].confidence).toBe(0.85);
     // Taxonomy match — LiveLoggingSystem alias ('lsl') appears in the
