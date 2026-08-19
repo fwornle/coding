@@ -19,7 +19,9 @@
 
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { nodeTestFilesRelative, EXCLUDED, REPO_ROOT } from './lib/test-inventory.mjs';
+import {
+  nodeTestFilesRelative, EXCLUDED, REPO_ROOT, CI_SKIPPED, isCI,
+} from './lib/test-inventory.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name) => argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
@@ -43,6 +45,7 @@ if (has('list')) {
   for (const f of files) console.log(f);
   console.log(`\n${files.length} node:test suite(s)`);
   for (const [f, why] of EXCLUDED) console.log(`excluded: ${f} — ${why}`);
+  for (const [f, why] of CI_SKIPPED) console.log(`ci-skipped: ${f} — ${why}`);
   process.exit(0);
 }
 
@@ -53,6 +56,11 @@ if (files.length === 0) {
 
 console.log(`node:test — ${files.length} suite(s), concurrency ${concurrency}`);
 for (const [f, why] of EXCLUDED) console.log(`  (excluded: ${f} — ${why})`);
+// Print what CI drops, every run. A skip nobody can see is indistinguishable from
+// a test that does not exist.
+if (isCI()) {
+  for (const [f, why] of CI_SKIPPED) console.log(`  (CI-skipped: ${f} — ${why})`);
+}
 
 const child = spawn(
   process.execPath,

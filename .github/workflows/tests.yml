@@ -1,0 +1,124 @@
+name: tests
+
+# Runs both halves of the suite — jest AND node:test — on every push to main and
+# every PR. Until this existed NOTHING ran the tests: the three prior workflows
+# are cross-platform-lite (installer portability), deploy-docs and egress-lint.
+# That is why the suite had drifted to 140 jest failures and 84 node:test suites
+# no runner ever reached.
+#
+# The setup below is not boilerplate. Four steps are load-bearing and each one was
+# established by reproducing its absence in a linux/amd64 container:
+#
+#   1. lib/km-core is a git submodule pinned via an SSH URL. It is cloned here
+#      explicitly over HTTPS at the pinned SHA — the repo is public, so no secret
+#      is needed, and `submodules: true` would fail on the PRIVATE integrations/*
+#      submodules that the tests do not need (jest already ignores /integrations/).
+#   2. node_modules/@fwornle/km-core is a hand-made SYMLINK, not a dependency. It
+#      appears in no package.json, so `npm ci` neither creates nor restores it, and
+#      13 suites die instantly with ERR_MODULE_NOT_FOUND without it.
+#   3. km-core's dist/ is gitignored, so a fresh clone has no built km-core at all
+#      and must be built before any consumer can import it.
+#   4. THIS repo's dist/ is gitignored too and had no build script. Skipping the
+#      build costs ~60 failures on "Could not locate module
+#      ../../dist/embedding/embedding-service.js".
+#
+# Suites that cannot run on a hosted runner (macOS-only tooling, a live obs-api,
+# gitignored local run artifacts, the sibling _work/rapid-llm-proxy repo) are
+# skipped via CI_SKIPPED in scripts/lib/test-inventory.mjs. Each entry carries the
+# reason it was verified against, and every run prints the list, so a skip stays
+# visible rather than looking like a test that does not exist.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Private submodules (integrations/*) are unreachable with the default
+          # token and are not needed — jest ignores /integrations/ and km-core is
+          # cloned explicitly below.
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'          # package.json engines: >=22
+          cache: npm
+
+      # ── km-core: public repo, private-looking SSH pin ───────────────────────
+      # Clone at exactly the SHA the superproject points at, so CI tests the same
+      # km-core the developer has. Fetching the single commit keeps this cheap.
+      - name: Clone km-core at the pinned SHA
+        run: |
+          set -euo pipefail
+          SHA="$(git ls-tree HEAD lib/km-core | awk '{print $3}')"
+          test -n "$SHA" || { echo "could not read the lib/km-core gitlink"; exit 1; }
+          echo "km-core pinned at $SHA"
+          rm -rf lib/km-core && mkdir -p lib/km-core
+          git -C lib/km-core init -q
+          git -C lib/km-core remote add origin https://github.com/fwornle/km-core.git
+          git -C lib/km-core fetch -q --depth 1 origin "$SHA"
+          git -C lib/km-core checkout -q FETCH_HEAD
+
+      - name: Install root dependencies
+        run: npm ci --no-audit --no-fund
+
+      # Recreate the hand-made link `npm ci` knows nothing about. Without it every
+      # km-core import fails, which is also how this breaks on a dev machine when
+      # node_modules is wiped (see CLAUDE.md).
+      - name: Link @fwornle/km-core
+        run: |
+          set -euo pipefail
+          mkdir -p node_modules/@fwornle
+          ln -sfn ../../lib/km-core node_modules/@fwornle/km-core
+          node -e "import('@fwornle/km-core').then(()=>console.log('km-core resolves'))" \
+            || echo "km-core not importable yet — expected until it is built"
+
+      - name: Build km-core (its dist/ is gitignored)
+        run: |
+          set -euo pipefail
+          cd lib/km-core
+          npm ci --no-audit --no-fund
+          npm run build
+
+      # tsc exits 2 on 5 pre-existing type errors but still EMITS (no
+      # noEmitOnError), and the emitted dist/ is what the tests import. Failing the
+      # job here would block on type debt unrelated to the tests, so the emit is
+      # verified explicitly instead of trusting the exit code.
+      - name: Build dist/
+        run: |
+          set -euo pipefail
+          npm run build || echo "tsc reported type errors — emit continues (no noEmitOnError)"
+          test -f dist/embedding/embedding-service.js \
+            || { echo "BUILD DID NOT EMIT — dist/embedding/embedding-service.js missing"; exit 1; }
+
+      - name: Verify km-core resolves
+        run: node -e "import('@fwornle/km-core').then(m=>console.log('km-core OK:', typeof m.GraphKMStore))"
+
+      # Run the halves separately so the summary says WHICH one failed, and always
+      # run node:test even when jest is red — chaining them would hide the second
+      # result for as long as the first is broken.
+      - name: jest
+        id: jest
+        run: npm run test:jest
+
+      - name: node:test
+        if: ${{ !cancelled() }}
+        run: npm run test:node

@@ -60,6 +60,13 @@ describeOrSkip('context-turns.jsonl granularity (A3/OQ1 empirical check)', () =>
     // Emitted only when the whole block is skipped (no captured runs on a fresh checkout).
     // eslint-disable-next-line no-console
     console.warn('SKIP context-turns-granularity: no .data/measurements/*/context-turns.jsonl(.gz) present')
+    // A describe.skip that registers NOTHING still fails the suite with "Your test
+    // suite must contain at least one test" — which is exactly the fresh-checkout
+    // case this branch was written to handle gracefully. It went unnoticed because
+    // every dev machine has captured runs in .data/; CI, which has none, is the
+    // only place the branch is ever taken. Register one skipped test so the suite
+    // reports as skipped rather than erroring.
+    test('skipped: no captured context-turns.jsonl on this checkout', () => {})
     return
   }
 

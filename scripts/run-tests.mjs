@@ -18,6 +18,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const { CI_SKIPPED, isCI } = await import('./lib/test-inventory.mjs');
+if (isCI()) {
+  console.log(`CI environment — ${CI_SKIPPED.size} suite(s) skipped, each with a verified reason:`);
+  for (const [f, why] of CI_SKIPPED) console.log(`  ${f}\n      ${why}`);
+}
 const onlyArg = process.argv.slice(2).find((a) => a.startsWith('--only='))?.split('=')[1];
 
 function run(name, command, args, env = {}) {
