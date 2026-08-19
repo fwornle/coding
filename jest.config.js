@@ -1,11 +1,17 @@
-import { nodeTestFilesRelative } from './scripts/lib/test-inventory.mjs';
+import { jestExcludedFilesRelative } from './scripts/lib/test-inventory.mjs';
 
-// Suites that register their tests with node:test. jest collects them (they end
-// in .test.js) but cannot see a single one of their registrations, so each was
-// reported as "Your test suite must contain at least one test". They are run by
-// `npm run test:node` instead. Derived from the same inventory that runner uses,
-// so a file can never be claimed by both runners or dropped by both.
-const NODE_TEST_SUITES = nodeTestFilesRelative().map(
+// Files jest collects but cannot run, in two kinds — both derived from the same
+// inventory `npm run test:node` uses, so a file can never be claimed by both
+// runners or dropped by both:
+//
+//   * node:test suites. They end in .test.js, so jest collects them, but it cannot
+//     see a single node:test registration and reported "Your test suite must
+//     contain at least one test" for each.
+//   * executable harnesses — `#!/usr/bin/env node`, run as `node <file>` (several
+//     are invoked by scripts/deploy-enhanced-lsl.sh and scripts/test-coding.sh).
+//     Same misleading "must contain at least one test". They keep their paths
+//     BECAUSE those scripts reference them; excluding beats renaming here.
+const NOT_JEST_SUITES = jestExcludedFilesRelative().map(
   (f) => `/${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`
 );
 
@@ -66,7 +72,10 @@ export default {
     // kgbench builds a per-run worktree under .data/kgbench/trees/ for the same
     // reason. .gitignore does not help — jest walks the filesystem, not git.
     ...REPO_COPIES,
-    ...NODE_TEST_SUITES
+    // Self-contained npm package: own package.json, own deps that root install does
+    // not provide, own `npm test`. The `**/test/**` glob was reaching into it.
+    '/lib/knowledge-api/',
+    ...NOT_JEST_SUITES
   ],
   // Keeps the same paths out of the MODULE MAP. Separate setting, separate scan:
   // without this, jest still indexes their package.json files and errors out on
