@@ -82,6 +82,29 @@ function stopFakeProxy(handle) {
 }
 
 /**
+ * Fake health-coordinator serving /health/state.
+ *
+ * The wrapper's AFK gate (sub-agent-sweep-job.sh "1b") asks the coordinator
+ * whether the operator is present and, on user_active === false, exits 0 WITHOUT
+ * running the sweep or writing state. Tests 4 and 5 did not stub it, so they hit
+ * the real coordinator on :3034 and their outcome depended on whether the
+ * developer happened to be at the keyboard — they passed in isolation and failed
+ * in a full run for that reason alone, with a diff ("state file missing") that
+ * pointed nowhere near the cause.
+ */
+function startFakeCoordinator(userActive) {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ user_active: userActive }));
+    });
+    server.listen(0, '127.0.0.1', () => {
+      resolve({ server, url: `http://127.0.0.1:${server.address().port}` });
+    });
+  });
+}
+
+/**
  * Build a tmpdir + a fake sweep script that mimics the Plan 51-01 CLI.
  * `exitCode` controls how the fake CLI terminates. We also write its
  * captured argv into a sidecar file so tests can assert --since
@@ -104,6 +127,7 @@ function makeFakeSweep(tmpDir, exitCode) {
 describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integration', () => {
   let tmpDir;
   let proxy;
+  let coordinator;
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sub-agent-sweep-'));
@@ -111,6 +135,7 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
 
   afterEach(async () => {
     if (proxy) { await stopFakeProxy(proxy); proxy = null; }
+    if (coordinator) { await stopFakeProxy(coordinator); coordinator = null; }
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   });
 
@@ -140,6 +165,7 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
 
   test('Test 4: first run with no state file — defaults --since to 7 days ago + writes fresh state', async () => {
     proxy = await startFakeProxy(400);  // 4xx = reachable probe success
+    coordinator = await startFakeCoordinator(true);  // operator present ⇒ do not skip
     const statePath = path.join(tmpDir, 'state.json');
     const { fakePath, argvLog } = makeFakeSweep(tmpDir, 0);
     expect(fs.existsSync(statePath)).toBe(false);
@@ -148,6 +174,7 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
       SUB_AGENT_SWEEP_STATE_FILE: statePath,
       SWEEP_BIN: fakePath,
       LLM_CLI_PROXY_URL: proxy.url,
+      HEALTH_COORDINATOR_URL: coordinator.url,
     });
 
     expect(code).toBe(0);
@@ -168,6 +195,7 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
 
   test('Test 5: subsequent run — reads last_run_at from state file as --since; updates state on success', async () => {
     proxy = await startFakeProxy(400);
+    coordinator = await startFakeCoordinator(true);  // operator present ⇒ do not skip
     const statePath = path.join(tmpDir, 'state.json');
     const priorIso = '2026-04-01T12:00:00Z';
     fs.writeFileSync(statePath, JSON.stringify({ last_run_at: priorIso, last_run_limit: 100 }));
@@ -180,6 +208,7 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
       SUB_AGENT_SWEEP_STATE_FILE: statePath,
       SWEEP_BIN: fakePath,
       LLM_CLI_PROXY_URL: proxy.url,
+      HEALTH_COORDINATOR_URL: coordinator.url,
     });
 
     expect(code).toBe(0);
@@ -189,6 +218,31 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
     expect(newState.last_run_at).toBeTruthy();
     expect(newState.last_run_at).not.toBe(priorIso);
     expect(fs.statSync(statePath).mtimeMs).toBeGreaterThan(priorMtime);
+  }, 15000);
+
+  test('Test 5a: operator AFK (coordinator user_active=false) — exits 0, runs no sweep, leaves state untouched', async () => {
+    // The branch that was silently deciding Tests 4 and 5 before they stubbed the
+    // coordinator, and which had no test of its own. Pinning it means a change to the
+    // AFK gate fails HERE, naming the gate, instead of surfacing as "state file
+    // missing" in an unrelated test on a machine where the operator happened to be away.
+    proxy = await startFakeProxy(400);
+    coordinator = await startFakeCoordinator(false);  // operator away ⇒ skip the run
+    const statePath = path.join(tmpDir, 'state.json');
+    const { fakePath, argvLog } = makeFakeSweep(tmpDir, 0);
+
+    const { code, stderr } = await runWrapper({
+      SUB_AGENT_SWEEP_STATE_FILE: statePath,
+      SWEEP_BIN: fakePath,
+      LLM_CLI_PROXY_URL: proxy.url,
+      HEALTH_COORDINATOR_URL: coordinator.url,
+    });
+
+    expect(code).toBe(0);
+    // The --since window must be preserved for the first run after the operator
+    // returns, so the state file stays absent and the CLI is never invoked.
+    expect(fs.existsSync(statePath)).toBe(false);
+    expect(fs.existsSync(argvLog)).toBe(false);
+    expect(stderr).toMatch(/AFK/i);
   }, 15000);
 
   test('Test 6: LLM proxy unreachable — wrapper exits 0 without running sweep or updating state', async () => {
