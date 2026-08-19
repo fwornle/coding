@@ -252,9 +252,7 @@ Real-time per-exchange observations from live coding sessions, inspired by the o
 
 ![Observation Viewer -- expanded observation with structured summary](docs/images/observation-viewer-item.png)
 
-<!-- Screenshot pending: run `coding --pi` interactively and capture the tmux
-     session as docs-content/images/coding-pi-vscode.png. The previous image showed Mastracode, the agent pi
-     replaced, so it was removed rather than relabelled. -->
+![Pi in VS Code](docs/images/coding-pi-vscode.png)
 
 ### Integration Components
 
