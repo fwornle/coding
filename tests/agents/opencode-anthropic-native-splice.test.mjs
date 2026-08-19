@@ -24,7 +24,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OPENCODE_SH = path.resolve(__dirname, '..', '..', 'config', 'agents', 'opencode.sh');
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const OPENCODE_SH = path.resolve(REPO_ROOT, 'config', 'agents', 'opencode.sh');
 
 /**
  * Sources config/agents/opencode.sh in a controlled bash subprocess, calls
@@ -47,7 +48,18 @@ agent_pre_launch
 printf '%s' "$OPENCODE_CONFIG_CONTENT"
 `;
 
-  const result = spawnSync('bash', ['-c', script], {
+  // --norc --noprofile is load-bearing, not tidiness. Passing a restricted `env`
+  // is NOT sufficient isolation on its own: macOS /bin/bash sources ~/.bashrc even
+  // for a non-interactive `bash -c`, so every variable the developer exports there
+  // reappears inside the subprocess AFTER we chose what to pass. On this machine
+  // ~/.bashrc:2 exports CODING_REPO, which switches on the wrapper-scoped plugin
+  // splice further down agent_pre_launch and rewrites OPENCODE_CONFIG_CONTENT.
+  //
+  // That made the two default-blob assertions below pass or fail depending on whose
+  // ~/.bashrc was in play — green on a clean machine, red here, for a reason the
+  // diff ("unexpected plugin/compaction keys") pointed nowhere near. The env option
+  // controls what goes IN; --norc controls what bash adds back.
+  const result = spawnSync('bash', ['--norc', '--noprofile', '-c', script], {
     encoding: 'utf8',
     // Deliberately NOT spreading process.env so the subprocess only sees what we pass.
     // This prevents a host OPENCODE_ANTHROPIC_NATIVE=1 from contaminating the "unset" tests.
@@ -71,6 +83,12 @@ printf '%s' "$OPENCODE_CONFIG_CONTENT"
 
 // ---------------------------------------------------------------------------
 // a. Default (OPENCODE_ANTHROPIC_NATIVE unset) — byte-identical to original blob
+//
+// CODING_REPO is unset in these two (see renderOpenCodeConfigContent), so the
+// wrapper-scoped plugin splice is inert and the blob is exactly what the network
+// branch assigned. Byte-identity is the right assertion here precisely BECAUSE the
+// subprocess is now hermetic — before --norc it was asserting against whatever the
+// host's ~/.bashrc happened to enable.
 // ---------------------------------------------------------------------------
 
 test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE unset (public branch) → OPENCODE_CONFIG_CONTENT equals default blob exactly', () => {
@@ -161,4 +179,54 @@ test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE=1 → LLM_CLI_PROXY_PORT respected;
     baseURL.includes('19999'),
     `custom LLM_CLI_PROXY_PORT 19999 must appear in baseURL; got: ${baseURL}`,
   );
+});
+
+// ---------------------------------------------------------------------------
+// c. Wrapper-scoped plugins present (CODING_REPO set) — the flag still adds nothing
+//
+// Every session started through `coding` runs with CODING_REPO set, so the plugin
+// splice is ON and the blob is NOT the bare default. Section (a) deliberately turns
+// that off to test one thing at a time, which would leave the real-world shape
+// untested — and it was: the plugin splice landed in P2, silently broke (a)'s
+// byte-identity, and nothing reported it because no runner executed this file.
+//
+// The invariant this file exists to protect is narrower than "the blob never
+// changes": with OPENCODE_ANTHROPIC_NATIVE unset there must be NO provider entry,
+// whatever else is legitimately spliced in. Asserting that directly means the next
+// legitimate addition to the blob does not read as a regression here.
+// ---------------------------------------------------------------------------
+
+test('opencode.sh: plugins spliced (CODING_REPO set) + flag unset → still no provider entry', () => {
+  const rendered = renderOpenCodeConfigContent({
+    INSIDE_CN: 'false',
+    CODING_REPO: REPO_ROOT,
+  });
+  const parsed = JSON.parse(rendered);
+
+  assert.equal(
+    'provider' in parsed, false,
+    `no provider entry may be spliced while OPENCODE_ANTHROPIC_NATIVE is unset; got: ${rendered}`,
+  );
+  // The network branch's own choices must survive the plugin splice untouched.
+  assert.equal(parsed.model, 'claude-opus-4-6', 'model must survive the plugin splice');
+  assert.deepEqual(parsed.disabled_providers, ['copilot'], 'disabled_providers must survive the plugin splice');
+  // And the splice must actually have happened, or this test proves nothing.
+  assert.ok(Array.isArray(parsed.plugin) && parsed.plugin.length > 0,
+    'precondition: CODING_REPO set must splice the wrapper-scoped plugins');
+});
+
+test('opencode.sh: plugins spliced (CODING_REPO set) + flag set → provider AND plugins coexist', () => {
+  const rendered = renderOpenCodeConfigContent({
+    INSIDE_CN: 'false',
+    CODING_REPO: REPO_ROOT,
+    OPENCODE_ANTHROPIC_NATIVE: '1',
+  });
+  const parsed = JSON.parse(rendered);
+
+  // Both splices target the same `{`-prefix seam, so a regression in either one
+  // silently drops the other. Valid JSON alone does not catch that.
+  assert.ok(parsed.provider?.anthropic, 'provider.anthropic must survive alongside the plugin splice');
+  assert.ok(Array.isArray(parsed.plugin) && parsed.plugin.length > 0,
+    'plugins must survive alongside the provider splice');
+  assert.equal(parsed.model, 'claude-opus-4-6', 'model must survive both splices');
 });
