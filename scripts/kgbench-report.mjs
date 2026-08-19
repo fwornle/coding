@@ -101,6 +101,10 @@ const report = {
   meta: buildReportMeta({ rows, meta, runId, selected, retiredIds, agentFilterMeta }),
   ...agg,
   disagreements,
+  // Declared in the run's own run.json, so a merged run stays self-describing: regenerating
+  // the report reproduces the provenance block instead of losing it. Rows record arm, agent
+  // and task_id but not which RUN wrote them, so nothing else in the artefact can say this.
+  merged_from: meta?.merged_from ?? null,
 };
 
 /**

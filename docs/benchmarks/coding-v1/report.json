@@ -1,22 +1,22 @@
 {
   "meta": {
     "set": "coding-v1",
-    "runId": "coding-v1-r9",
+    "runId": "kgv1-final",
     "questionCount": 16,
-    "reps": "3",
-    "commit": "d8a9b0647",
+    "reps": "1",
+    "commit": "7924e45bd",
     "dirty": true,
-    "continuationBudget": 1,
+    "continuationBudget": 2,
     "model": "claude-sonnet-5`, `rapid-proxy/claude-sonnet-5",
     "baselines": {
-      "grep|claude|claude-sonnet-5": 21420,
-      "grep|copilot|claude-sonnet-5": 133039,
-      "grep|opencode|rapid-proxy/claude-sonnet-5": 32482,
-      "graphify|claude|claude-sonnet-5": 21858,
-      "codegraph|claude|claude-sonnet-5": 20992,
-      "hybrid|claude|claude-sonnet-5": 25014,
-      "hybrid|copilot|claude-sonnet-5": 95807,
-      "hybrid|opencode|rapid-proxy/claude-sonnet-5": 63388
+      "grep|claude|claude-sonnet-5": 22727,
+      "grep|copilot|claude-sonnet-5": 172396,
+      "grep|opencode|rapid-proxy/claude-sonnet-5": 64808,
+      "graphify|claude|claude-sonnet-5": 23165,
+      "codegraph|claude|claude-sonnet-5": 22299,
+      "hybrid|claude|claude-sonnet-5": 26321,
+      "hybrid|copilot|claude-sonnet-5": 64256,
+      "hybrid|opencode|rapid-proxy/claude-sonnet-5": 32802
     },
     "schemaTax": {
       "grep|claude|claude-sonnet-5": 0,
@@ -25,12 +25,12 @@
       "graphify|claude|claude-sonnet-5": 438,
       "codegraph|claude|claude-sonnet-5": -428,
       "hybrid|claude|claude-sonnet-5": 3594,
-      "hybrid|copilot|claude-sonnet-5": -37232,
-      "hybrid|opencode|rapid-proxy/claude-sonnet-5": 30906
+      "hybrid|copilot|claude-sonnet-5": -108140,
+      "hybrid|opencode|rapid-proxy/claude-sonnet-5": -32006
     },
     "sandbox": {
       "mode": "worktree",
-      "tree_commit": "d8a9b06472b1a08c00d03db2be14cb2278b4bb30",
+      "tree_commit": "7924e45bdb07769f4a42c1e9e66f86ace1e56c32",
       "excluded": [
         "config/kgbench/questions",
         "lib/kgbench/graders.mjs",
@@ -39,6 +39,7 @@
         "lib/kgbench/judge.mjs",
         "scripts/kgbench-regrade.mjs",
         "scripts/kgbench-supervise.sh",
+        "scripts/analysis",
         "tests/integration/kgbench-agents.test.js",
         "tests/integration/kgbench-continuation.test.js",
         "tests/integration/kgbench-dashboard-control.test.js",
@@ -49,6 +50,7 @@
         "tests/integration/kgbench-tokens.test.js",
         "tests/integration/kgbench-tool-arg-errors.test.js",
         "tests/integration/kgbench-tool-enforcement.test.js",
+        "tests/integration/kgbench-tool-telemetry.test.js",
         "docs/measurement/kgbench-experimental-design.md",
         "docs/measurement/kgbench-guide.md",
         "docs/measurement/kgbench-tutorial.md",
@@ -58,6 +60,9 @@
         "docs-content/measurement/kgbench-tutorial.md",
         "docs-content/measurement/kgbench.md",
         "docs/benchmarks/coding-v1",
+        "docs-content/benchmarks/coding-v1",
+        "docs/benchmarks/graphify-vs-grep",
+        "docs-content/benchmarks/graphify-vs-grep",
         ".data",
         ".specstory",
         "CLAUDE.md",
@@ -67,11 +72,11 @@
       "verified": true,
       "code_graph_index": {
         "backend": "codegraph",
-        "project": "/tmp/kgbench-index-coding-v1-r9",
-        "tree_commit": "d8a9b06472b1a08c00d03db2be14cb2278b4bb30",
+        "project": "/tmp/kgbench-index-kgv1-telemetry",
+        "tree_commit": "7924e45bdb07769f4a42c1e9e66f86ace1e56c32",
         "covers_run_tree": true,
-        "file_count": 962,
-        "node_count": 14610
+        "file_count": 959,
+        "node_count": 14591
       },
       "pinned_via_flag": false
     },
@@ -86,7 +91,7 @@
       "served": [
         "claude-sonnet-5"
       ],
-      "provider": "copilot",
+      "provider": "gh-copilot",
       "mismatch": false
     },
     "contaminatedRows": 0,
@@ -94,18 +99,18 @@
     "toolEscapeRows": 0,
     "retiredQuestions": [],
     "agentFilter": null,
-    "generatedAt": "2026-08-13T00:22:07.714Z"
+    "generatedAt": "2026-08-19T10:42:57.636Z"
   },
   "byArm": {
     "grep": {
       "arm": "grep",
-      "runs": 144,
-      "ranked": 140,
+      "runs": 48,
+      "ranked": 47,
       "ungraded": 0,
-      "failed": 4,
-      "hard_fail_rate": 0.027777777777777776,
-      "retry_rate": 0.0625,
-      "hallucination_rate": 0.007142857142857143,
+      "failed": 1,
+      "hard_fail_rate": 0.020833333333333332,
+      "retry_rate": 0.041666666666666664,
+      "hallucination_rate": 0,
       "provenance": {
         "agents": [
           "claude",
@@ -117,8 +122,9 @@
           "stream-json"
         ],
         "token_sources": {
-          "stream-json": 48,
-          "proxy-db-session": 96
+          "stream-json": 32,
+          "unmeasured": 15,
+          "proxy-db-window": 1
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -126,139 +132,63 @@
           "not_enforced",
           "ungated"
         ],
-        "ambiguous_token_rows": 0
+        "ambiguous_token_rows": 1
       },
       "metrics": {
         "score": {
-          "mean": 0.9792857142857142,
+          "mean": 0.9893617021276596,
           "median": 1,
-          "min": 0,
+          "min": 0.5,
           "max": 1,
           "p95": 1,
-          "n": 140
+          "n": 47
         },
         "total_tokens": {
-          "mean": 214162.62857142856,
-          "median": 146214,
-          "min": 46517,
-          "max": 1203916,
-          "p95": 764531,
-          "n": 140
+          "mean": 159455.57575757575,
+          "median": 132628,
+          "min": 49834,
+          "max": 333629,
+          "p95": 329715,
+          "n": 33
         },
         "content_tokens": {
-          "mean": 151041.62142857144,
-          "median": 88643,
-          "min": 622,
-          "max": 1070877,
-          "p95": 732049,
-          "n": 140
+          "mean": 132240.65625,
+          "median": 99911.5,
+          "min": 27107,
+          "max": 301756,
+          "p95": 297842,
+          "n": 32
         },
         "tool_calls": {
-          "mean": 4.875,
-          "median": 4,
+          "mean": 5.829787234042553,
+          "median": 5,
           "min": 1,
-          "max": 23,
-          "p95": 10,
-          "n": 48
+          "max": 22,
+          "p95": 15,
+          "n": 47
         },
         "wall_s": {
-          "mean": 38.72642857142857,
-          "median": 28.35,
-          "min": 7.6,
-          "max": 206.3,
-          "p95": 122.3,
-          "n": 140
+          "mean": 49.21063829787234,
+          "median": 33.5,
+          "min": 9.7,
+          "max": 182.2,
+          "p95": 164.5,
+          "n": 47
         },
         "cost_usd": {
-          "mean": 0.10125963125,
-          "median": 0.080178,
-          "min": 0.0282561,
-          "max": 0.47065619999999997,
-          "p95": 0.2316189,
-          "n": 48
+          "mean": 0.15176945625000002,
+          "median": 0.13248690000000002,
+          "min": 0.0917658,
+          "max": 0.27180659999999995,
+          "p95": 0.27180659999999995,
+          "n": 16
         }
       }
     },
     "graphify": {
       "arm": "graphify",
-      "runs": 48,
-      "ranked": 48,
-      "ungraded": 0,
-      "failed": 0,
-      "hard_fail_rate": 0,
-      "retry_rate": 0,
-      "hallucination_rate": 0.020833333333333332,
-      "provenance": {
-        "agents": [
-          "claude"
-        ],
-        "elicitations": [
-          "stream-json"
-        ],
-        "token_sources": {
-          "stream-json": 48
-        },
-        "builtins_enforced": true,
-        "builtins_states": [
-          "enforced"
-        ],
-        "ambiguous_token_rows": 0
-      },
-      "metrics": {
-        "score": {
-          "mean": 0.9680555555555556,
-          "median": 1,
-          "min": 0,
-          "max": 1,
-          "p95": 1,
-          "n": 48
-        },
-        "total_tokens": {
-          "mean": 325843.875,
-          "median": 161667.5,
-          "min": 47278,
-          "max": 3996537,
-          "p95": 1095443,
-          "n": 48
-        },
-        "content_tokens": {
-          "mean": 303985.875,
-          "median": 139809.5,
-          "min": 25420,
-          "max": 3974679,
-          "p95": 1073585,
-          "n": 48
-        },
-        "tool_calls": {
-          "mean": 8.895833333333334,
-          "median": 6.5,
-          "min": 1,
-          "max": 51,
-          "p95": 23,
-          "n": 48
-        },
-        "wall_s": {
-          "mean": 41.65625,
-          "median": 29.3,
-          "min": 6.9,
-          "max": 308.3,
-          "p95": 96.2,
-          "n": 48
-        },
-        "cost_usd": {
-          "mean": 0.2626409375,
-          "median": 0.16771455000000002,
-          "min": 0.0356172,
-          "max": 2.2944318000000004,
-          "p95": 0.7934625000000001,
-          "n": 48
-        }
-      }
-    },
-    "codegraph": {
-      "arm": "codegraph",
-      "runs": 48,
-      "ranked": 48,
+      "runs": 16,
+      "ranked": 16,
       "ungraded": 0,
       "failed": 0,
       "hard_fail_rate": 0,
@@ -272,7 +202,7 @@
           "stream-json"
         ],
         "token_sources": {
-          "stream-json": 48
+          "stream-json": 16
         },
         "builtins_enforced": true,
         "builtins_states": [
@@ -282,64 +212,140 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9190972222222222,
+          "mean": 0.9364583333333334,
+          "median": 1,
+          "min": 0.3333333333333333,
+          "max": 1,
+          "p95": 1,
+          "n": 16
+        },
+        "total_tokens": {
+          "mean": 312935.5,
+          "median": 241533,
+          "min": 50681,
+          "max": 894949,
+          "p95": 894949,
+          "n": 16
+        },
+        "content_tokens": {
+          "mean": 289770.5,
+          "median": 218368,
+          "min": 27516,
+          "max": 871784,
+          "p95": 871784,
+          "n": 16
+        },
+        "tool_calls": {
+          "mean": 9.4375,
+          "median": 9.5,
+          "min": 1,
+          "max": 21,
+          "p95": 21,
+          "n": 16
+        },
+        "wall_s": {
+          "mean": 46.63125,
+          "median": 40.9,
+          "min": 9.6,
+          "max": 108.1,
+          "p95": 108.1,
+          "n": 16
+        },
+        "cost_usd": {
+          "mean": 0.30726103125,
+          "median": 0.22200974999999998,
+          "min": 0.09459569999999999,
+          "max": 0.696438,
+          "p95": 0.696438,
+          "n": 16
+        }
+      }
+    },
+    "codegraph": {
+      "arm": "codegraph",
+      "runs": 16,
+      "ranked": 16,
+      "ungraded": 0,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "retry_rate": 0,
+      "hallucination_rate": 0,
+      "provenance": {
+        "agents": [
+          "claude"
+        ],
+        "elicitations": [
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 16
+        },
+        "builtins_enforced": true,
+        "builtins_states": [
+          "enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.8416666666666667,
           "median": 1,
           "min": 0,
           "max": 1,
           "p95": 1,
-          "n": 48
+          "n": 16
         },
         "total_tokens": {
-          "mean": 170072.83333333334,
-          "median": 93654,
-          "min": 45575,
-          "max": 818416,
-          "p95": 472317,
-          "n": 48
+          "mean": 139461.75,
+          "median": 97127.5,
+          "min": 48873,
+          "max": 375919,
+          "p95": 375919,
+          "n": 16
         },
         "content_tokens": {
-          "mean": 149080.83333333334,
-          "median": 72662,
-          "min": 24583,
-          "max": 797424,
-          "p95": 451325,
-          "n": 48
+          "mean": 117162.75,
+          "median": 74828.5,
+          "min": 26574,
+          "max": 353620,
+          "p95": 353620,
+          "n": 16
         },
         "tool_calls": {
-          "mean": 3.5208333333333335,
+          "mean": 2.875,
           "median": 2,
           "min": 1,
-          "max": 15,
-          "p95": 9,
-          "n": 48
+          "max": 6,
+          "p95": 6,
+          "n": 16
         },
         "wall_s": {
-          "mean": 23.299999999999997,
-          "median": 15.1,
-          "min": 6.4,
-          "max": 104.8,
-          "p95": 49.8,
-          "n": 48
+          "mean": 22.56875,
+          "median": 16.8,
+          "min": 8.5,
+          "max": 55.8,
+          "p95": 55.8,
+          "n": 16
         },
         "cost_usd": {
-          "mean": 0.23139991249999994,
-          "median": 0.17981234999999998,
-          "min": 0.0161382,
-          "max": 0.7236741,
-          "p95": 0.5903985,
-          "n": 48
+          "mean": 0.26608996874999996,
+          "median": 0.20444099999999998,
+          "min": 0.0974469,
+          "max": 0.8524323,
+          "p95": 0.8524323,
+          "n": 16
         }
       }
     },
     "hybrid": {
       "arm": "hybrid",
-      "runs": 144,
-      "ranked": 140,
+      "runs": 48,
+      "ranked": 47,
       "ungraded": 0,
-      "failed": 4,
-      "hard_fail_rate": 0.027777777777777776,
-      "retry_rate": 0.041666666666666664,
-      "hallucination_rate": 0.007142857142857143,
+      "failed": 1,
+      "hard_fail_rate": 0.020833333333333332,
+      "retry_rate": 0.020833333333333332,
+      "hallucination_rate": 0.02127659574468085,
       "provenance": {
         "agents": [
           "claude",
@@ -351,8 +357,9 @@
           "stream-json"
         ],
         "token_sources": {
-          "stream-json": 48,
-          "proxy-db-session": 96
+          "stream-json": 32,
+          "unmeasured": 15,
+          "proxy-db-session": 1
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -364,52 +371,52 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9728571428571428,
+          "mean": 0.9599290780141844,
           "median": 1,
           "min": 0,
           "max": 1,
           "p95": 1,
-          "n": 140
+          "n": 47
         },
         "total_tokens": {
-          "mean": 221612.57857142857,
-          "median": 167882.5,
-          "min": 53632,
-          "max": 1151770,
-          "p95": 582234,
-          "n": 140
+          "mean": 157755.625,
+          "median": 136510.5,
+          "min": 57754,
+          "max": 528067,
+          "p95": 437556,
+          "n": 32
         },
         "content_tokens": {
-          "mean": 160266.29285714286,
-          "median": 93259,
-          "min": 28618,
-          "max": 1055963,
-          "p95": 486427,
-          "n": 140
+          "mean": 127418.84375,
+          "median": 96757.5,
+          "min": 31433,
+          "max": 501746,
+          "p95": 405197,
+          "n": 32
         },
         "tool_calls": {
-          "mean": 4.729166666666667,
+          "mean": 5.212765957446808,
           "median": 4,
           "min": 1,
-          "max": 16,
-          "p95": 12,
-          "n": 48
+          "max": 22,
+          "p95": 17,
+          "n": 47
         },
         "wall_s": {
-          "mean": 37.79357142857143,
-          "median": 27.5,
-          "min": 7.1,
-          "max": 157.9,
-          "p95": 112,
-          "n": 140
+          "mean": 32.84468085106383,
+          "median": 24.8,
+          "min": 10.7,
+          "max": 139.2,
+          "p95": 64.1,
+          "n": 47
         },
         "cost_usd": {
-          "mean": 0.12889510625,
-          "median": 0.11487869999999999,
-          "min": 0.0189375,
-          "max": 0.4658241,
-          "p95": 0.2878119,
-          "n": 48
+          "mean": 0.1678835625,
+          "median": 0.148893,
+          "min": 0.09643829999999999,
+          "max": 0.46166340000000006,
+          "p95": 0.46166340000000006,
+          "n": 16
         }
       }
     }
@@ -418,22 +425,6 @@
     "abstain": {
       "scores": {
         "grep": {
-          "mean": 0.9615384615384616,
-          "median": 1,
-          "min": 0,
-          "max": 1,
-          "p95": 1,
-          "n": 26
-        },
-        "graphify": {
-          "mean": 0.8888888888888888,
-          "median": 1,
-          "min": 0,
-          "max": 1,
-          "p95": 1,
-          "n": 9
-        },
-        "codegraph": {
           "mean": 1,
           "median": 1,
           "min": 1,
@@ -441,13 +432,29 @@
           "p95": 1,
           "n": 9
         },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 3
+        },
+        "codegraph": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 3
+        },
         "hybrid": {
-          "mean": 0.9629629629629629,
+          "mean": 0.875,
           "median": 1,
           "min": 0,
           "max": 1,
           "p95": 1,
-          "n": 27
+          "n": 8
         }
       },
       "winner": {
@@ -459,36 +466,36 @@
     "arch": {
       "scores": {
         "grep": {
-          "mean": 0.9847222222222223,
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 12
+        },
+        "graphify": {
+          "mean": 0.8333333333333333,
+          "median": 1,
+          "min": 0.3333333333333333,
+          "max": 1,
+          "p95": 1,
+          "n": 4
+        },
+        "codegraph": {
+          "mean": 0.6166666666666667,
+          "median": 0.7333333333333334,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 4
+        },
+        "hybrid": {
+          "mean": 0.9847222222222222,
           "median": 1,
           "min": 0.8166666666666667,
           "max": 1,
           "p95": 1,
-          "n": 36
-        },
-        "graphify": {
-          "mean": 0.9555555555555556,
-          "median": 1,
-          "min": 0.65,
-          "max": 1,
-          "p95": 1,
           "n": 12
-        },
-        "codegraph": {
-          "mean": 0.6763888888888889,
-          "median": 0.65,
-          "min": 0,
-          "max": 1,
-          "p95": 1,
-          "n": 12
-        },
-        "hybrid": {
-          "mean": 0.9573529411764705,
-          "median": 1,
-          "min": 0.65,
-          "max": 1,
-          "p95": 1,
-          "n": 34
         }
       },
       "winner": {
@@ -500,12 +507,12 @@
     "blast": {
       "scores": {
         "grep": {
-          "mean": 0.946,
+          "mean": 0.9444444444444444,
           "median": 1,
           "min": 0.5,
           "max": 1,
           "p95": 1,
-          "n": 25
+          "n": 9
         },
         "graphify": {
           "mean": 1,
@@ -513,23 +520,23 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 9
+          "n": 3
         },
         "codegraph": {
-          "mean": 1,
+          "mean": 0.6666666666666666,
           "median": 1,
-          "min": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 3
+        },
+        "hybrid": {
+          "mean": 0.9611111111111111,
+          "median": 1,
+          "min": 0.65,
           "max": 1,
           "p95": 1,
           "n": 9
-        },
-        "hybrid": {
-          "mean": 0.948076923076923,
-          "median": 1,
-          "min": 0.5,
-          "max": 1,
-          "p95": 1,
-          "n": 26
         }
       },
       "winner": {
@@ -546,15 +553,15 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 27
+          "n": 9
         },
         "graphify": {
-          "mean": 1,
+          "mean": 0.8833333333333333,
           "median": 1,
-          "min": 1,
+          "min": 0.65,
           "max": 1,
           "p95": 1,
-          "n": 9
+          "n": 3
         },
         "codegraph": {
           "mean": 1,
@@ -562,15 +569,15 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 9
+          "n": 3
         },
         "hybrid": {
-          "mean": 1,
+          "mean": 0.9611111111111111,
           "median": 1,
-          "min": 1,
+          "min": 0.65,
           "max": 1,
           "p95": 1,
-          "n": 27
+          "n": 9
         }
       },
       "winner": {
@@ -587,7 +594,7 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 26
+          "n": 8
         },
         "graphify": {
           "mean": 1,
@@ -595,7 +602,7 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 9
+          "n": 3
         },
         "codegraph": {
           "mean": 1,
@@ -603,7 +610,7 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 9
+          "n": 3
         },
         "hybrid": {
           "mean": 1,
@@ -611,7 +618,7 @@
           "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 26
+          "n": 9
         }
       },
       "winner": {
@@ -637,8 +644,8 @@
     "grep@claude": {
       "arm": "grep",
       "agent": "claude",
-      "runs": 48,
-      "ranked": 48,
+      "runs": 16,
+      "ranked": 16,
       "failed": 0,
       "hard_fail_rate": 0,
       "provenance": {
@@ -649,7 +656,7 @@
           "stream-json"
         ],
         "token_sources": {
-          "stream-json": 48
+          "stream-json": 16
         },
         "builtins_enforced": true,
         "builtins_states": [
@@ -659,54 +666,54 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9642361111111111,
+          "mean": 1,
           "median": 1,
-          "min": 0,
+          "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 48
+          "n": 16
         },
         "total_tokens": {
-          "mean": 125255.60416666667,
-          "median": 90584,
-          "min": 46517,
-          "max": 798648,
-          "p95": 181319,
-          "n": 48
+          "mean": 134935.8125,
+          "median": 102065,
+          "min": 49834,
+          "max": 308796,
+          "p95": 308796,
+          "n": 16
         },
         "content_tokens": {
-          "mean": 103835.60416666667,
-          "median": 69164,
-          "min": 25097,
-          "max": 777228,
-          "p95": 159899,
-          "n": 48
+          "mean": 112208.8125,
+          "median": 79338,
+          "min": 27107,
+          "max": 286069,
+          "p95": 286069,
+          "n": 16
         },
         "tool_calls": {
-          "mean": 4.875,
+          "mean": 5.25,
           "median": 4,
           "min": 1,
-          "max": 23,
-          "p95": 10,
-          "n": 48
+          "max": 14,
+          "p95": 14,
+          "n": 16
         },
         "wall_s": {
-          "mean": 20.31041666666667,
-          "median": 16.25,
-          "min": 7.6,
-          "max": 104.5,
-          "p95": 42,
-          "n": 48
+          "mean": 22.625,
+          "median": 17.299999999999997,
+          "min": 9.7,
+          "max": 49,
+          "p95": 49,
+          "n": 16
         }
       }
     },
     "grep@copilot": {
       "arm": "grep",
       "agent": "copilot",
-      "runs": 48,
-      "ranked": 48,
-      "failed": 0,
-      "hard_fail_rate": 0,
+      "runs": 16,
+      "ranked": 15,
+      "failed": 1,
+      "hard_fail_rate": 0.0625,
       "provenance": {
         "agents": [
           "copilot"
@@ -715,40 +722,33 @@
           "answer-file"
         ],
         "token_sources": {
-          "proxy-db-session": 48
+          "unmeasured": 15,
+          "proxy-db-window": 1
         },
         "builtins_enforced": false,
         "builtins_states": [
           "not_enforced"
         ],
-        "ambiguous_token_rows": 0
+        "ambiguous_token_rows": 1
       },
       "metrics": {
         "score": {
-          "mean": 0.9961805555555555,
+          "mean": 1,
           "median": 1,
-          "min": 0.8166666666666667,
+          "min": 1,
           "max": 1,
           "p95": 1,
-          "n": 48
+          "n": 15
         },
         "total_tokens": {
-          "mean": 315522.1458333333,
-          "median": 209559.5,
-          "min": 129987,
-          "max": 1203916,
-          "p95": 958751,
-          "n": 48
+          "mean": 156733,
+          "median": 156733,
+          "min": 156733,
+          "max": 156733,
+          "p95": 156733,
+          "n": 1
         },
         "content_tokens": {
-          "mean": 182614.375,
-          "median": 76520.5,
-          "min": 622,
-          "max": 1070877,
-          "p95": 825712,
-          "n": 48
-        },
-        "tool_calls": {
           "mean": null,
           "median": null,
           "min": null,
@@ -756,23 +756,31 @@
           "p95": null,
           "n": 0
         },
+        "tool_calls": {
+          "mean": 8.266666666666667,
+          "median": 6,
+          "min": 4,
+          "max": 22,
+          "p95": 22,
+          "n": 15
+        },
         "wall_s": {
-          "mean": 48.02083333333332,
-          "median": 36.65,
-          "min": 17.4,
-          "max": 165.9,
-          "p95": 135.9,
-          "n": 48
+          "mean": 66.00666666666666,
+          "median": 34.2,
+          "min": 21.5,
+          "max": 175.3,
+          "p95": 175.3,
+          "n": 15
         }
       }
     },
     "grep@opencode": {
       "arm": "grep",
       "agent": "opencode",
-      "runs": 48,
-      "ranked": 44,
-      "failed": 4,
-      "hard_fail_rate": 0.08333333333333333,
+      "runs": 16,
+      "ranked": 16,
+      "failed": 0,
+      "hard_fail_rate": 0,
       "provenance": {
         "agents": [
           "opencode"
@@ -781,7 +789,7 @@
           "answer-file"
         ],
         "token_sources": {
-          "proxy-db-session": 48
+          "stream-json": 16
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -791,52 +799,52 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9772727272727273,
+          "mean": 0.96875,
           "median": 1,
           "min": 0.5,
           "max": 1,
           "p95": 1,
-          "n": 44
+          "n": 16
         },
         "total_tokens": {
-          "mean": 200578.0909090909,
-          "median": 150899,
-          "min": 76644,
-          "max": 764531,
-          "p95": 377328,
-          "n": 44
+          "mean": 184145.5,
+          "median": 161589.5,
+          "min": 78726,
+          "max": 333629,
+          "p95": 333629,
+          "n": 16
         },
         "content_tokens": {
-          "mean": 168096.0909090909,
-          "median": 118417,
-          "min": 44162,
-          "max": 732049,
-          "p95": 344846,
-          "n": 44
+          "mean": 152272.5,
+          "median": 129716.5,
+          "min": 46853,
+          "max": 301756,
+          "p95": 301756,
+          "n": 16
         },
         "tool_calls": {
-          "mean": null,
-          "median": null,
-          "min": null,
-          "max": null,
-          "p95": null,
-          "n": 0
+          "mean": 4.125,
+          "median": 4,
+          "min": 2,
+          "max": 8,
+          "p95": 8,
+          "n": 16
         },
         "wall_s": {
-          "mean": 48.67727272727272,
-          "median": 38,
-          "min": 15.3,
-          "max": 206.3,
-          "p95": 94,
-          "n": 44
+          "mean": 60.05,
+          "median": 46.25,
+          "min": 17.3,
+          "max": 182.2,
+          "p95": 182.2,
+          "n": 16
         }
       }
     },
     "graphify@claude": {
       "arm": "graphify",
       "agent": "claude",
-      "runs": 48,
-      "ranked": 48,
+      "runs": 16,
+      "ranked": 16,
       "failed": 0,
       "hard_fail_rate": 0,
       "provenance": {
@@ -847,7 +855,7 @@
           "stream-json"
         ],
         "token_sources": {
-          "stream-json": 48
+          "stream-json": 16
         },
         "builtins_enforced": true,
         "builtins_states": [
@@ -857,52 +865,52 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9680555555555556,
+          "mean": 0.9364583333333334,
           "median": 1,
-          "min": 0,
+          "min": 0.3333333333333333,
           "max": 1,
           "p95": 1,
-          "n": 48
+          "n": 16
         },
         "total_tokens": {
-          "mean": 325843.875,
-          "median": 161667.5,
-          "min": 47278,
-          "max": 3996537,
-          "p95": 1095443,
-          "n": 48
+          "mean": 312935.5,
+          "median": 241533,
+          "min": 50681,
+          "max": 894949,
+          "p95": 894949,
+          "n": 16
         },
         "content_tokens": {
-          "mean": 303985.875,
-          "median": 139809.5,
-          "min": 25420,
-          "max": 3974679,
-          "p95": 1073585,
-          "n": 48
+          "mean": 289770.5,
+          "median": 218368,
+          "min": 27516,
+          "max": 871784,
+          "p95": 871784,
+          "n": 16
         },
         "tool_calls": {
-          "mean": 8.895833333333334,
-          "median": 6.5,
+          "mean": 9.4375,
+          "median": 9.5,
           "min": 1,
-          "max": 51,
-          "p95": 23,
-          "n": 48
+          "max": 21,
+          "p95": 21,
+          "n": 16
         },
         "wall_s": {
-          "mean": 41.65625,
-          "median": 29.3,
-          "min": 6.9,
-          "max": 308.3,
-          "p95": 96.2,
-          "n": 48
+          "mean": 46.63125,
+          "median": 40.9,
+          "min": 9.6,
+          "max": 108.1,
+          "p95": 108.1,
+          "n": 16
         }
       }
     },
     "codegraph@claude": {
       "arm": "codegraph",
       "agent": "claude",
-      "runs": 48,
-      "ranked": 48,
+      "runs": 16,
+      "ranked": 16,
       "failed": 0,
       "hard_fail_rate": 0,
       "provenance": {
@@ -913,7 +921,7 @@
           "stream-json"
         ],
         "token_sources": {
-          "stream-json": 48
+          "stream-json": 16
         },
         "builtins_enforced": true,
         "builtins_states": [
@@ -923,52 +931,52 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9190972222222222,
+          "mean": 0.8416666666666667,
           "median": 1,
           "min": 0,
           "max": 1,
           "p95": 1,
-          "n": 48
+          "n": 16
         },
         "total_tokens": {
-          "mean": 170072.83333333334,
-          "median": 93654,
-          "min": 45575,
-          "max": 818416,
-          "p95": 472317,
-          "n": 48
+          "mean": 139461.75,
+          "median": 97127.5,
+          "min": 48873,
+          "max": 375919,
+          "p95": 375919,
+          "n": 16
         },
         "content_tokens": {
-          "mean": 149080.83333333334,
-          "median": 72662,
-          "min": 24583,
-          "max": 797424,
-          "p95": 451325,
-          "n": 48
+          "mean": 117162.75,
+          "median": 74828.5,
+          "min": 26574,
+          "max": 353620,
+          "p95": 353620,
+          "n": 16
         },
         "tool_calls": {
-          "mean": 3.5208333333333335,
+          "mean": 2.875,
           "median": 2,
           "min": 1,
-          "max": 15,
-          "p95": 9,
-          "n": 48
+          "max": 6,
+          "p95": 6,
+          "n": 16
         },
         "wall_s": {
-          "mean": 23.299999999999997,
-          "median": 15.1,
-          "min": 6.4,
-          "max": 104.8,
-          "p95": 49.8,
-          "n": 48
+          "mean": 22.56875,
+          "median": 16.8,
+          "min": 8.5,
+          "max": 55.8,
+          "p95": 55.8,
+          "n": 16
         }
       }
     },
     "hybrid@claude": {
       "arm": "hybrid",
       "agent": "claude",
-      "runs": 48,
-      "ranked": 48,
+      "runs": 16,
+      "ranked": 16,
       "failed": 0,
       "hard_fail_rate": 0,
       "provenance": {
@@ -979,7 +987,7 @@
           "stream-json"
         ],
         "token_sources": {
-          "stream-json": 48
+          "stream-json": 16
         },
         "builtins_enforced": true,
         "builtins_states": [
@@ -989,52 +997,52 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9604166666666667,
+          "mean": 0.9375,
           "median": 1,
           "min": 0,
           "max": 1,
           "p95": 1,
-          "n": 48
+          "n": 16
         },
         "total_tokens": {
-          "mean": 136303.52083333334,
-          "median": 103868.5,
-          "min": 53632,
-          "max": 501048,
-          "p95": 296260,
-          "n": 48
+          "mean": 140712.5,
+          "median": 107933,
+          "min": 57754,
+          "max": 528067,
+          "p95": 528067,
+          "n": 16
         },
         "content_tokens": {
-          "mean": 111289.52083333333,
-          "median": 78854.5,
-          "min": 28618,
-          "max": 476034,
-          "p95": 271246,
-          "n": 48
+          "mean": 114391.5,
+          "median": 81612,
+          "min": 31433,
+          "max": 501746,
+          "p95": 501746,
+          "n": 16
         },
         "tool_calls": {
-          "mean": 4.729166666666667,
+          "mean": 4.4375,
           "median": 4,
           "min": 1,
-          "max": 16,
-          "p95": 12,
-          "n": 48
+          "max": 17,
+          "p95": 17,
+          "n": 16
         },
         "wall_s": {
-          "mean": 19.66875,
-          "median": 14.45,
-          "min": 7.1,
-          "max": 76.5,
-          "p95": 43.2,
-          "n": 48
+          "mean": 19.849999999999998,
+          "median": 17.05,
+          "min": 10.7,
+          "max": 64.1,
+          "p95": 64.1,
+          "n": 16
         }
       }
     },
     "hybrid@copilot": {
       "arm": "hybrid",
       "agent": "copilot",
-      "runs": 48,
-      "ranked": 48,
+      "runs": 16,
+      "ranked": 16,
       "failed": 0,
       "hard_fail_rate": 0,
       "provenance": {
@@ -1045,7 +1053,8 @@
           "answer-file"
         ],
         "token_sources": {
-          "proxy-db-session": 48
+          "unmeasured": 15,
+          "proxy-db-session": 1
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -1055,54 +1064,54 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9961805555555555,
+          "mean": 0.9885416666666667,
           "median": 1,
           "min": 0.8166666666666667,
           "max": 1,
           "p95": 1,
-          "n": 48
+          "n": 16
         },
         "total_tokens": {
-          "mean": 336834.3125,
-          "median": 222013,
-          "min": 130107,
-          "max": 1151770,
-          "p95": 1146702,
-          "n": 48
+          "mean": 134797,
+          "median": 134797,
+          "min": 134797,
+          "max": 134797,
+          "p95": 134797,
+          "n": 1
         },
         "content_tokens": {
-          "mean": 241027.3125,
-          "median": 126206,
-          "min": 34300,
-          "max": 1055963,
-          "p95": 1050895,
-          "n": 48
+          "mean": 70541,
+          "median": 70541,
+          "min": 70541,
+          "max": 70541,
+          "p95": 70541,
+          "n": 1
         },
         "tool_calls": {
-          "mean": null,
-          "median": null,
-          "min": null,
-          "max": null,
-          "p95": null,
-          "n": 0
+          "mean": 7.5625,
+          "median": 6,
+          "min": 4,
+          "max": 22,
+          "p95": 22,
+          "n": 16
         },
         "wall_s": {
-          "mean": 50.737500000000004,
-          "median": 34.1,
-          "min": 17.4,
-          "max": 157.9,
-          "p95": 138.6,
-          "n": 48
+          "mean": 45.85000000000001,
+          "median": 34.3,
+          "min": 22.4,
+          "max": 139.2,
+          "p95": 139.2,
+          "n": 16
         }
       }
     },
     "hybrid@opencode": {
       "arm": "hybrid",
       "agent": "opencode",
-      "runs": 48,
-      "ranked": 44,
-      "failed": 4,
-      "hard_fail_rate": 0.08333333333333333,
+      "runs": 16,
+      "ranked": 15,
+      "failed": 1,
+      "hard_fail_rate": 0.0625,
       "provenance": {
         "agents": [
           "opencode"
@@ -1111,7 +1120,7 @@
           "answer-file"
         ],
         "token_sources": {
-          "proxy-db-session": 48
+          "stream-json": 16
         },
         "builtins_enforced": false,
         "builtins_states": [
@@ -1121,44 +1130,44 @@
       },
       "metrics": {
         "score": {
-          "mean": 0.9609848484848484,
+          "mean": 0.9533333333333334,
           "median": 1,
-          "min": 0.5,
+          "min": 0.65,
           "max": 1,
           "p95": 1,
-          "n": 44
+          "n": 15
         },
         "total_tokens": {
-          "mean": 188980.56818181818,
-          "median": 156647,
-          "min": 106371,
-          "max": 478322,
-          "p95": 415996,
-          "n": 44
+          "mean": 177465.53333333333,
+          "median": 146765,
+          "min": 108058,
+          "max": 437556,
+          "p95": 437556,
+          "n": 15
         },
         "content_tokens": {
-          "mean": 125592.56818181818,
-          "median": 93259,
-          "min": 42983,
-          "max": 414934,
-          "p95": 352608,
-          "n": 44
+          "mean": 145106.53333333333,
+          "median": 114406,
+          "min": 75699,
+          "max": 405197,
+          "p95": 405197,
+          "n": 15
         },
         "tool_calls": {
-          "mean": null,
-          "median": null,
-          "min": null,
-          "max": null,
-          "p95": null,
-          "n": 0
+          "mean": 3.533333333333333,
+          "median": 3,
+          "min": 2,
+          "max": 6,
+          "p95": 6,
+          "n": 15
         },
         "wall_s": {
-          "mean": 43.445454545454545,
-          "median": 31.549999999999997,
-          "min": 16.9,
-          "max": 156,
-          "p95": 98.8,
-          "n": 44
+          "mean": 32.83333333333333,
+          "median": 29.6,
+          "min": 17.1,
+          "max": 62.9,
+          "p95": 62.9,
+          "n": 15
         }
       }
     }
@@ -1174,8 +1183,10 @@
       "stream-json"
     ],
     "token_sources": {
-      "stream-json": 192,
-      "proxy-db-session": 192
+      "stream-json": 96,
+      "unmeasured": 30,
+      "proxy-db-window": 1,
+      "proxy-db-session": 1
     },
     "builtins_enforced": false,
     "builtins_states": [
@@ -1183,113 +1194,62 @@
       "not_enforced",
       "ungated"
     ],
-    "ambiguous_token_rows": 0
+    "ambiguous_token_rows": 1
   },
   "disagreements": [
     {
-      "id": "B2",
-      "arm": "grep",
-      "checklist": 1,
-      "judge": 0.5,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B2",
-      "arm": "grep",
-      "checklist": 1,
-      "judge": 0.5,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B3",
-      "arm": "grep",
-      "checklist": 0.65,
-      "judge": 1,
-      "kind": "judge_higher"
-    },
-    {
-      "id": "B3",
-      "arm": "grep",
-      "checklist": 1,
-      "judge": 0.5,
-      "kind": "checklist_higher"
-    },
-    {
       "id": "A4",
       "arm": "grep",
-      "checklist": 0.8166666666666667,
-      "judge": 0.33,
+      "checklist": 1,
+      "judge": 0.67,
       "kind": "checklist_higher"
     },
     {
       "id": "A4",
       "arm": "grep",
       "checklist": 1,
-      "judge": 0.667,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B3",
-      "arm": "grep",
-      "checklist": 0.5,
-      "judge": 0,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A1",
-      "arm": "grep",
-      "checklist": 1,
-      "judge": 0.5,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B2",
-      "arm": "graphify",
-      "checklist": 1,
-      "judge": 0.5,
+      "judge": 0.67,
       "kind": "checklist_higher"
     },
     {
       "id": "A4",
       "arm": "graphify",
+      "checklist": 0.3333333333333333,
+      "judge": 0,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B2",
+      "arm": "hybrid",
       "checklist": 1,
-      "judge": 0.33,
+      "judge": 0.5,
       "kind": "checklist_higher"
     },
     {
-      "id": "A1",
-      "arm": "codegraph",
-      "checklist": 0.5,
-      "judge": 0,
+      "id": "B2",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
       "kind": "checklist_higher"
     },
     {
-      "id": "A2",
-      "arm": "codegraph",
-      "checklist": 0.65,
-      "judge": 0,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A4",
-      "arm": "codegraph",
-      "checklist": 0.3333333333333333,
-      "judge": 0,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "A4",
-      "arm": "codegraph",
-      "checklist": 0.3333333333333333,
-      "judge": 0,
-      "kind": "checklist_higher"
-    },
-    {
-      "id": "B3",
+      "id": "L2",
       "arm": "hybrid",
       "checklist": 0.65,
       "judge": 0,
       "kind": "checklist_higher"
+    }
+  ],
+  "merged_from": [
+    {
+      "run": "kgv1-telemetry",
+      "supplies": "claude (4 arms) and copilot (grep, hybrid) — 96 cells",
+      "why": "the primary run; its opencode cells are superseded and excluded"
+    },
+    {
+      "run": "kgv1-opencode-fixed",
+      "supplies": "opencode (grep, hybrid) — 32 cells",
+      "why": "re-run after a telemetry defect undercounted opencode tool calls 3.3x; same pinned corpus 7924e45bd"
     }
   ]
 }

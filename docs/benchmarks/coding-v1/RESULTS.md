@@ -2,14 +2,14 @@
 
 # Code-retrieval benchmark: coding-v1
 
-Question set `coding-v1` (16 questions, 3 reps/arm) against 4 arms.
-Repo at `d8a9b0647`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-13T00:22:07.714Z.
+Question set `coding-v1` (16 questions, 1 reps/arm) against 4 arms.
+Repo at `7924e45bd`, model `claude-sonnet-5`, `rapid-proxy/claude-sonnet-5`, generated 2026-08-19T10:42:57.636Z.
 
-Continuation budget: **1** turn(s) per answer-file agent (inert for `claude`, whose loop is unbounded). Runs at different budgets are not comparable.
+Continuation budget: **2** turn(s) per answer-file agent (inert for `claude`, whose loop is unbounded). Runs at different budgets are not comparable.
 
-Secondary scorer: `claude-sonnet-5` via `copilot`.
+Secondary scorer: `claude-sonnet-5` via `gh-copilot`.
 
-Arms searched a sandboxed worktree of `d8a9b0647` with 31 path(s) removed (answer key, telemetry exports, agent rule files), verified to contain no question prompt or provenance note.
+Arms searched a sandboxed worktree of `7924e45bd` with 36 path(s) removed (answer key, telemetry exports, agent rule files), verified to contain no question prompt or provenance note.
 
 ## Overall
 
@@ -17,10 +17,10 @@ Arms searched a sandboxed worktree of `d8a9b0647` with 31 path(s) removed (answe
 
 | Arm | ranked | correctness (median) | content tokens (median) | total tokens (median) | tool calls | latency s | hard-fail | hallucination |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
-| grep † | 140/144 | 1.00 | 88643 | 146214 | 4.0 | 28.4 | 3% | 1% |
-| graphify | 48/48 | 1.00 | 139810 | 161668 | 6.5 | 29.3 | 0% | 2% |
-| codegraph | 48/48 | 1.00 | 72662 | 93654 | 2.0 | 15.1 | 0% | 0% |
-| hybrid † | 140/144 | 1.00 | 93259 | 167883 | 4.0 | 27.5 | 3% | 1% |
+| grep † | 47/48 | 1.00 | 99912 | 132628 | 5.0 | 33.5 | 2% | 0% |
+| graphify | 16/16 | 1.00 | 218368 | 241533 | 9.5 | 40.9 | 0% | 0% |
+| codegraph | 16/16 | 1.00 | 74829 | 97128 | 2.0 | 16.8 | 0% | 0% |
+| hybrid † | 47/48 | 1.00 | 96758 | 136511 | 4.0 | 24.8 | 2% | 2% |
 
 **content tokens** = total minus that arm's measured empty-run baseline. Whole-session totals are dominated by a fixed floor of system prompt + tool schemas, which compresses every ratio; content tokens are what separate retrieval strategies.
 
@@ -32,23 +32,23 @@ These are the numbers the run actually produced. The `Overall` table above pools
 
 | Arm | Agent | ranked | correctness | content tokens | total tokens | tool calls | latency s | hard-fail | built-ins | answer via | tokens from |
 |---|---|--:|--:|--:|--:|--:|--:|--:|---|---|---|
-| grep | claude | 48/48 | 1.00 | 69164 | 90584 | 4.0 | 16.3 | 0% | enforced | stream-json | stream-json×48 |
-| grep | copilot | 48/48 | 1.00 | 76521 | 209560 | — | 36.6 | 0% | not_enforced | answer-file | proxy-db-session×48 |
-| grep | opencode | 44/48 | 1.00 | 118417 | 150899 | — | 38.0 | 8% | ungated | answer-file | proxy-db-session×48 |
-| graphify | claude | 48/48 | 1.00 | 139810 | 161668 | 6.5 | 29.3 | 0% | enforced | stream-json | stream-json×48 |
-| codegraph | claude | 48/48 | 1.00 | 72662 | 93654 | 2.0 | 15.1 | 0% | enforced | stream-json | stream-json×48 |
-| hybrid | claude | 48/48 | 1.00 | 78855 | 103869 | 4.0 | 14.4 | 0% | enforced | stream-json | stream-json×48 |
-| hybrid | copilot | 48/48 | 1.00 | 126206 | 222013 | — | 34.1 | 0% | not_enforced | answer-file | proxy-db-session×48 |
-| hybrid | opencode | 44/48 | 1.00 | 93259 | 156647 | — | 31.5 | 8% | ungated | answer-file | proxy-db-session×48 |
+| grep | claude | 16/16 | 1.00 | 79338 | 102065 | 4.0 | 17.3 | 0% | enforced | stream-json | stream-json×16 |
+| grep | copilot | 15/16 | 1.00 | — | 156733 | 6.0 | 34.2 | 6% | not_enforced | answer-file | unmeasured×15, proxy-db-window×1 |
+| grep | opencode | 16/16 | 1.00 | 129717 | 161590 | 4.0 | 46.3 | 0% | ungated | answer-file | stream-json×16 |
+| graphify | claude | 16/16 | 1.00 | 218368 | 241533 | 9.5 | 40.9 | 0% | enforced | stream-json | stream-json×16 |
+| codegraph | claude | 16/16 | 1.00 | 74829 | 97128 | 2.0 | 16.8 | 0% | enforced | stream-json | stream-json×16 |
+| hybrid | claude | 16/16 | 1.00 | 81612 | 107933 | 4.0 | 17.1 | 0% | enforced | stream-json | stream-json×16 |
+| hybrid | copilot | 16/16 | 1.00 | 70541 | 134797 | 6.0 | 34.3 | 0% | not_enforced | answer-file | unmeasured×15, proxy-db-session×1 |
+| hybrid | opencode | 15/16 | 1.00 | 114406 | 146765 | 3.0 | 29.6 | 6% | ungated | answer-file | stream-json×16 |
 
-`tool calls` is blank for any agent elicited by answer file: only claude's stream-json reports a tool trace, so a dash there means **not measured**, not zero.
+`tool calls` is a dash only where the cell produced no tool trace at all — a dash means **not measured**, never zero. claude reports one via stream-json; copilot and opencode now report one parsed from their own JSON event streams. Their counts are in THEIR OWN tool vocabulary (`view`/`create`, `read`/`write`) rather than the arm's, which is why those cells carry `tool_audit: observed` — what ran is recorded, but conformance to the arm is not decidable from it. copilot's count includes one `task_complete` autopilot sentinel per cell, reported separately as control calls; claude has no equivalent, so subtract it before comparing tool counts across agents.
 
 ## Winner by question class
 
 | Class | grep | graphify | codegraph | hybrid | winner |
 |---|--:|--:|--:|--:|---|
 | abstain | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
-| arch | 1.00 | 1.00 | 0.65 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
+| arch | 1.00 | 1.00 | 0.73 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
 | blast | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
 | lookup | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
 | structural | 1.00 | 1.00 | 1.00 | 1.00 | tie — tie (ratio 1.00x < 1.25x) |
@@ -59,14 +59,21 @@ A winner is declared only at a ≥1.25x median gap with non-overlapping IQR. Any
 
 | Arm | runs | ranked | ungraded | failed | retry rate | hard-fail rate |
 |---|--:|--:|--:|--:|--:|--:|
-| grep † | 144 | 140 | 0 | 4 | 6% | 3% |
-| graphify | 48 | 48 | 0 | 0 | 0% | 0% |
-| codegraph | 48 | 48 | 0 | 0 | 0% | 0% |
-| hybrid † | 144 | 140 | 0 | 4 | 4% | 3% |
+| grep † | 48 | 47 | 0 | 1 | 4% | 2% |
+| graphify | 16 | 16 | 0 | 0 | 0% | 0% |
+| codegraph | 16 | 16 | 0 | 0 | 0% | 0% |
+| hybrid † | 48 | 47 | 0 | 1 | 2% | 2% |
 
 Failed runs are counted, never dropped. An arm that stalls is not cheap — it is unavailable, and averaging only its successes would report the opposite.
 
 ## Measurement provenance
+
+**Rows in this report come from more than one run.** Every source below used the same sandboxed corpus, question set, reps and continuation budget — that is what makes them poolable — but they were executed separately, so anything that varies between runs (model nondeterminism, provider routing at the time) varies across these rows too.
+
+| Run | Supplies | Why |
+|---|---|---|
+| `kgv1-telemetry` | claude (4 arms) and copilot (grep, hybrid) — 96 cells | the primary run; its opencode cells are superseded and excluded |
+| `kgv1-opencode-fixed` | opencode (grep, hybrid) — 32 cells | re-run after a telemetry defect undercounted opencode tool calls 3.3x; same pinned corpus 7924e45bd |
 
 **Only claude cells were tool-enforced.** `--allowedTools`, `--disallowedTools` and `--strict-mcp-config` are claude flags. For copilot and opencode an arm's MCP servers are restricted by writing the config file each CLI reads, but their built-in file and search tools cannot be withheld — so on those agents an arm name describes the retrieval strategy the cell was *asked* to use, not one it was *confined* to. Arms whose identity depends on withholding built-in search are refused outright on those agents rather than run under a label they would not honour.
 
@@ -76,10 +83,14 @@ Failed runs are counted, never dropped. An arm that stalls is not cheap — it i
 
 | Source | cells | what it means |
 |---|--:|---|
-| `stream-json` | 192 | the agent reported its own usage — first-party and exact |
-| `proxy-db-session` | 192 | whole proxy sessions that BEGAN while the cell ran — attributed per session, so a neighbour's trailing calls are not charged here |
+| `stream-json` | 96 | the agent reported its own usage — first-party and exact |
+| `unmeasured` | 30 | no rows found; the field is null, never 0 |
+| `proxy-db-window` | 1 | proxy rows stamped while the cell ran — a time join that cannot separate a neighbour's tail from this cell |
+| `proxy-db-session` | 1 | whole proxy sessions that BEGAN while the cell ran — attributed per session, so a neighbour's trailing calls are not charged here |
 
 A cell whose tokens are `unmeasured` still ranks on correctness; it is only absent from the token medians. Reporting 0 there would make the least measurable agent look the cheapest.
+
+> **1 cell(s) had more than one session of the same agent start inside a SINGLE attempt, or a session that started between their attempts.** A cell that was retried owns one session per attempt and is priced correctly without appearing here, so these are cells where something is genuinely unaccounted for. Two causes produce it and the count alone does not separate them: another session of that agent running alongside the benchmark, or a recorded attempt window that is wrong. Read `token_ambiguity` on the row — it names the attempt — and compare that attempt's span against the session timestamps in the proxy token DB before quoting or dropping the cost.
 
 Agents in this run: `claude`, `copilot`, `opencode`.
 
@@ -87,21 +98,12 @@ Agents in this run: `claude`, `copilot`, `opencode`.
 
 | Question | Arm | checklist | judge | note |
 |---|---|--:|--:|---|
-| B2 | grep | 1.00 | 0.50 | checklist_higher |
-| B2 | grep | 1.00 | 0.50 | checklist_higher |
-| B3 | grep | 0.65 | 1.00 | judge_higher |
-| B3 | grep | 1.00 | 0.50 | checklist_higher |
-| A4 | grep | 0.82 | 0.33 | checklist_higher |
 | A4 | grep | 1.00 | 0.67 | checklist_higher |
-| B3 | grep | 0.50 | 0.00 | checklist_higher |
-| A1 | grep | 1.00 | 0.50 | checklist_higher |
-| B2 | graphify | 1.00 | 0.50 | checklist_higher |
-| A4 | graphify | 1.00 | 0.33 | checklist_higher |
-| A1 | codegraph | 0.50 | 0.00 | checklist_higher |
-| A2 | codegraph | 0.65 | 0.00 | checklist_higher |
-| A4 | codegraph | 0.33 | 0.00 | checklist_higher |
-| A4 | codegraph | 0.33 | 0.00 | checklist_higher |
-| B3 | hybrid | 0.65 | 0.00 | checklist_higher |
+| A4 | grep | 1.00 | 0.67 | checklist_higher |
+| A4 | graphify | 0.33 | 0.00 | checklist_higher |
+| B2 | hybrid | 1.00 | 0.50 | checklist_higher |
+| B2 | grep | 1.00 | 0.50 | checklist_higher |
+| L2 | hybrid | 0.65 | 0.00 | checklist_higher |
 
 `judge_higher` usually means the checklist matcher is too strict (the answer paraphrased a path) — fix the matcher and re-grade offline. `checklist_higher` usually means correct strings were padded into a wrong narrative, which is a real quality signal.
 
@@ -109,7 +111,7 @@ Agents in this run: `claude`, `copilot`, `opencode`.
 
 ## Limitations
 
-- 3 reps per cell on one repository with one scorer, across 3 agents whose cells are not equivalently enforced (see above).
+- 1 reps per cell on one repository with one scorer, across 3 agents whose cells are not equivalently enforced (see above).
 - Arms other than `hybrid` are FORCED onto a single retrieval strategy, which is not how an agent works in practice. Read them against `hybrid`, not against each other.
 - Indexing cost is excluded from per-query numbers; it is reported separately per backend.
 - Corpus scope differs between backends (graphify indexes docs and PDFs; code-only backends do not), so node/edge counts are not comparable at face value.
