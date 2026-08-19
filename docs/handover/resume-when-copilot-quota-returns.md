@@ -7,11 +7,17 @@
 > | § | was | now |
 > |---|---|---|
 > | 0 | quota blocked everything | **open** — copilot serves tools-bearing requests; judge is on `gh-copilot/claude-sonnet-5` |
-> | 2.1 | tool telemetry missing | **done** — `toolTraceFrom()` for copilot and opencode, 22 new tests |
+> | 2.1 | tool telemetry missing | **done, then twice fixed in production** — see 2.1 |
 > | 2.2 | opencode hang, cause unknown | **root-caused** — inherited **stdin**, NOT the quota. The harness was never affected |
 > | 2.4 | `COPILOT_MODEL` untested | still untested |
 > | 2.5 | `enableFileHooks` rejected | **still reproduces** on copilot 1.0.80 |
 > | 2.3, 2.6, 2.7, 2.8 | open | still open |
+> | **2.9 (new)** | — | **the `replication` set is unanswerable** — its subject code is in a submodule the sandbox cannot see |
+> | **2.10 (new)** | — | **the exclude list mirrored `docs/`→`docs-content/` only for measurement docs** — fixed |
+>
+> **A benchmark ran end to end and is published**: `docs/benchmarks/coding-v1/RESULTS.md`
+> (128 cells, 4 arms × 3 agents, corpus `7924e45bd`). Commits `7924e45bd` `ad89caf88`
+> `0c5abdf15` `d55a76cf3` `819bb6ec6`.
 
 ## What resuming found
 
@@ -114,7 +120,58 @@ being spawned with `--tools ''`? Right now one exhausted quota stops every agent
 
 ## 2. Open points
 
-### 2.1 Tool telemetry for copilot and opencode — DONE (2026-08-19)
+### 2.1 Tool telemetry for copilot and opencode — DONE, after two production fixes (2026-08-19)
+
+> **Shipped, then found broken twice by running it.** The unit tests passed at every stage;
+> both defects were only visible in real cells. Recording the sequence because the SHAPE of
+> the mistake repeated, and it is the kind that survives a green test suite:
+>
+> 1. `toolTraceFrom()` for copilot and opencode + `--output-format json` on copilot's argv
+>    (commit in the telemetry merge). Correct as far as it went.
+> 2. **Undercount #1 — the merge.** `runWithContinuations` returns `{...last}`, so a
+>    continued cell reported its LAST leg only. `wall_s` was already summed across legs for
+>    exactly this reason and the code says so; the trace was added with the same defect.
+>    Fixed by `mergeToolTraces()` (`0c5abdf15`), the counterpart of `spanOfParts()`.
+> 3. **Undercount #2 — nothing to merge.** The re-run staged to PROVE fix 2 still reported
+>    1.0 tool calls/cell. `readAnswerFile`'s `no_result` branch returned no tool fields at
+>    all, so the investigating leg had `tools_executed: undefined`, the merge filtered it
+>    out, and summed the recovery leg alone. Fixed by `d55a76cf3`.
+>
+> **Why the tests kept passing.** Step 2's tests exercised `mergeToolTraces()` on
+> hand-built legs — and a unit test of a merge cannot catch a leg that never carries
+> anything to merge. The stubs had the fields the real legs lacked, so the test encoded the
+> assumption instead of checking it. The tests added in step 3 drive the REAL spawn path
+> (`runAgent` → `readAnswerFile`) with a stub adapter that emits a real-shaped event stream
+> and, like the real CLI, does not write the answer file.
+>
+> **Scale of what was wrong**, same 16 questions, same pinned corpus:
+>
+> | | broken | fixed |
+> |---|--:|--:|
+> | grep/opencode tool calls | 20 | **66** |
+> | grep/opencode content tokens | 678 | **129,717** |
+> | tool mix | `write 16, read 2, grep 1, bash 1` | `bash 40, write 16, read 7, grep 2` |
+>
+> Both numbers were wrong in the same direction — they made opencode look nearly free. It
+> is in fact the second most expensive configuration measured, after graphify. **Four
+> separate claims made from this instrument during the session had to be retracted**, every
+> one flattering opencode. If you extend it to `pi`, assume the same bias until a real cell
+> disproves it.
+>
+> **What is NOT measured, and why the audit state is three-valued.** `tool_audit` is
+> `observed` for copilot and opencode, not `audited`. Their tool names are their own
+> (`view`/`create`, `read`/`write`, `bash`) and arms are written in claude's vocabulary, so
+> feeding `tools_executed` to `toolViolations()` marks EVERY such cell `tool_escape` —
+> verified, not assumed: it returns `[view, create, task_complete]` and `[read, write]` on
+> real traces. The production run then justified this concretely: opencode runs `bash`
+> inside a `grep` arm, which is expected capability on an ungated agent, not a violation.
+>
+> `task_complete` is copilot's autopilot sentinel, counted but reported separately as
+> `tool_control_calls`; claude has no equivalent, so subtract it before comparing tool
+> counts across agents.
+
+<details><summary>Original text (what was open)</summary>
+
 
 > Implemented. `lib/kgbench/agents.mjs` gained `toolTraceFrom()` on the copilot and opencode
 > adapters plus `--output-format json` on copilot's argv; `readAnswerFile()` takes a
@@ -147,7 +204,6 @@ being spawned with `--tools ''`? Right now one exhausted quota stops every agent
 > cell read one tool busier than a comparable claude cell — and this benchmark compares tool
 > counts.
 
-<details><summary>Original text (what was open)</summary>
 
 
 `tools_executed`, `tool_calls` and `tool_audit` are `null` for these two agents, so their
@@ -284,6 +340,60 @@ not done. Revisit only if the floor starts climbing.
 
 ---
 
+### 2.9 The `replication` question set is UNANSWERABLE in the sandbox — NEW, not fixed
+
+`kgbench-run.mjs` defaults to `--set replication` (`opt('set', 'replication')`), and that set
+cannot be answered in the run tree. Its subject code lives in the `graphify` git submodule,
+and `git worktree add` — how `createRunTree` builds the sandbox — does not populate
+submodules. A fresh worktree has **0 entries** in `integrations/graphify`,
+`integrations/mcp-server-semantic-analysis` and `lib/km-core`.
+
+L1 asks which file defines `_corpus_signature`. It is at
+`integrations/graphify/graphify/detect.py:1252` in the live repo and appears NOWHERE in the
+sandbox. A pilot cell confirms the shape: the grep arm answered *"No matches for
+`_corpus_signature` anywhere in this repository"* and scored 0. That is the correct answer to
+the question it was actually able to ask.
+
+**The ugly part, and the reason this was invisible until now.** Before the exclusion added in
+`7924e45bd`, `docs/benchmarks/graphify-vs-grep/` was IN the tree — carrying both the prompts
+(`queries.json`) and 54 rows of `{id, answer, score}` (`results.jsonl`). An arm grepping for
+`_corpus_signature` found the answer key and scored well. **The set's apparent runnability
+depended on the contamination.** Fixing the leak is what made the submodule gap visible.
+
+Not fixed because the choice is a real one and not the fixer's to make:
+
+- populate submodules per run tree (`git submodule update --init` in the worktree) — slow,
+  and it changes what every prior run searched, so old runs stop being comparable;
+- retarget the replication questions at non-submodule code — cheapest, loses the point of the
+  set, which was to replicate the ancestor benchmark;
+- retire the set in favour of `coding-v1`, whose only submodule question (T2) is already
+  disabled, and which ran 128/128 cleanly.
+
+Until then: **do not run the bare default.** `kgbench-run.mjs` with no `--set` produces zeros
+that say nothing about retrieval arms. Pass `--set coding-v1`.
+
+### 2.10 The exclude list mirrored `docs/` → `docs-content/` for measurement docs only — FIXED
+
+mkdocs builds from `docs-content/` (`docs_dir: docs-content`), so every published benchmark
+doc exists TWICE. `DEFAULT_EXCLUDES` had the mirror-pair discipline for measurement docs —
+`docs/measurement/kgbench*.md` AND `docs-content/measurement/kgbench*.md` — and it was never
+extended to `benchmarks/`. So excluding `docs/benchmarks/coding-v1` removed half a leak and
+the run still refused on `term:T3` in
+`docs-content/benchmarks/coding-v1/analysis/tool-selection-data.md`.
+
+Fixed in `ad89caf88`, both mirrors listed. **When you add a benchmark exclusion, add its
+mirror in the same commit** — and note the containment error prints only `leaks.slice(0, 6)`,
+so fixing whichever file it happens to name walks you through them one 1-minute tree build at
+a time. Enumerate them all first with the harness's own scanner:
+
+```js
+import { scanTreeForLeaks, classifyLeaks } from './lib/kgbench/sandbox.mjs';
+classifyLeaks(scanTreeForLeaks(dir, questions), questions);   // needs qs.questions, not qs
+```
+
+Do NOT glob `docs/benchmarks/**` — `docs/benchmarks/kgbench-replication/README.md` is A2's
+ground truth and a glob makes A2 unanswerable, scoring every arm 0 on it.
+
 ## 3. Already done — do not redo
 
 - **vkb-server OOM crash-loop**: root-caused and fixed. A polled read path was rewriting
@@ -297,8 +407,41 @@ not done. Revisit only if the floor starts climbing.
 - **`/api/kgbench/question-sets`**: not a bug. The route does not exist, so vkb's SPA
   catch-all answers `200 text/html` and the proxy mislabels the parse failure as
   "unreachable". The launcher never calls it — it uses `/api/kgbench/config`.
+- **coding-v1 ran end to end and is published** (2026-08-19): 128 cells, 4 arms × 3 agents,
+  corpus `7924e45bd`, at `docs/benchmarks/coding-v1/RESULTS.md`. `docs-content/.../RESULTS.md`
+  is a SYMLINK to it, so publishing to `docs/` updates the mkdocs mirror automatically —
+  do not copy it. `README.md` in that directory is hand-written and the generator refuses to
+  overwrite it; **`RESULTS.md` is the generated target**.
+- **A report can now declare a merged run.** Its rows came from two runs (claude+copilot from
+  `kgv1-telemetry`, opencode from `kgv1-opencode-fixed`). Rows carry arm, agent and task_id
+  but not which RUN wrote them, so the merge would otherwise be invisible. Declare
+  `merged_from` in the run's own `run.json` and it renders into Measurement provenance —
+  in run.json rather than a CLI flag, so regenerating reproduces the block instead of losing
+  it. Only pool runs that match on corpus, question set, reps, continuation budget, judge and
+  model; all six were checked before merging.
+- **The retrieval result, for anyone who just wants the answer.** On coding-v1 at 1 rep,
+  correctness across arms is a TIE by the report's own bar (≥1.25× median gap, non-overlapping
+  IQR). What separates them is cost: `codegraph 75k ≈ grep 79k ≈ hybrid 82k` content tokens
+  vs **`graphify 218k`** — 2.75× for no measurable accuracy gain. Agents prefer grep; nothing
+  here says they are wrong to. Do not quote the score differences as findings at n=16.
 
 ## 4. Diagnostic traps worth remembering
+
+- **A manual CLI reproduction of a harness spawn must close stdin.** The harness spawns with
+  `stdio: ['ignore', …]`; an interactive shell does not. `opencode run` hangs forever on
+  inherited stdin, which cost two sessions of diagnosing a probe artefact as a system defect.
+  Sibling of the `tools[]` trap in §1 — same class, different tool.
+- **A green unit test can hide a broken path when the stubs supply what the real objects
+  lack.** `mergeToolTraces()` was tested on hand-built legs that had `tools_executed`; the
+  real `no_result` leg did not, so the merge silently dropped it and the fix was a no-op.
+  A unit test of a merge cannot catch a leg that never carries anything to merge. When a fix
+  targets a defect seen in PRODUCTION data, the test must drive the production path.
+- **Suspect a new instrument before believing its striking number.** Every surprising figure
+  this session came from telemetry written the same day, and each was wrong in the same
+  direction (opencode looks cheap). The tell was an impossible combination — exact file
+  paths and line numbers from a cell that recorded one tool call and no search.
+- **`file`/`grep` call `lib/kgbench/sandbox.mjs` binary.** It contains 2 deliberate NUL bytes,
+  a sentinel in its two-pass `**`→`*` glob translation. Use `grep -a`. Not corruption.
 
 - A curl reproduction of an agent call **must include `tools[]`** (§1).
 - **`docker stats` lies** about short allocation spikes — it sampled 280 MB against a 4 GiB
