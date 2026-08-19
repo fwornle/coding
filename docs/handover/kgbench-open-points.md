@@ -26,9 +26,14 @@ open; §3 and §4 exist to stop work being redone or re-learned.
 > | **2.9 (new)** | — | **the `replication` set is unanswerable** — its subject code is in a submodule the sandbox cannot see |
 > | **2.10 (new)** | — | **the exclude list mirrored `docs/`→`docs-content/` only for measurement docs** — fixed |
 >
-> **A benchmark ran end to end and is published**: `docs/benchmarks/coding-v1/RESULTS.md`
-> (128 cells, 4 arms × 3 agents, corpus `7924e45bd`). Commits `7924e45bd` `ad89caf88`
-> `0c5abdf15` `d55a76cf3` `819bb6ec6`.
+> **A benchmark ran end to end and is published**: `docs/benchmarks/coding-v1/RESULTS.md`,
+> live at <https://fwornle.github.io/coding/benchmarks/coding-v1/RESULTS/> (128 cells,
+> 4 arms × 3 agents, corpus `7924e45bd`). Commits `7924e45bd` `ad89caf88` `0c5abdf15`
+> `d55a76cf3` `819bb6ec6`.
+>
+> **Publishing it also uncovered a two-day-old CI bug** in which docs pushes reached the
+> repository but never the site, while every run reported success — see §3 and §4. Fixed in
+> `6234399c5` `f686d7896` `ce421dd9d`.
 
 ## What resuming found
 
@@ -423,6 +428,23 @@ ground truth and a glob makes A2 unanswerable, scoring every arm 0 on it.
   is a SYMLINK to it, so publishing to `docs/` updates the mkdocs mirror automatically —
   do not copy it. `README.md` in that directory is hand-written and the generator refuses to
   overwrite it; **`RESULTS.md` is the generated target**.
+- **Publishing a report to the repo did NOT publish it to the site, and said SUCCESS**
+  (2026-08-19, fixed). Not a kgbench bug, but it is what you hit immediately after
+  publishing one, so it lives here. The docs deploy gates on changed paths and matched only
+  `docs-content/`; because `docs-content/**/RESULTS.md` is a SYMLINK into `docs/`, publishing
+  changed the symlink's TARGET and not the symlink, so `git diff --name-only` reported only
+  the `docs/` path, the gate skipped, and `build: skipped` made the whole run green. Five
+  consecutive ~25s runs published nothing, and yesterday's image-link fix had gone the same
+  way unnoticed. Two fixes, both merged:
+    - the gate now includes `docs/` (`6234399c5`) — verified by replaying both patterns over
+      real history, so docs pushes build and code-only pushes still skip;
+    - a `freshness` job (`f686d7896`, `ce421dd9d`) fails loudly when the gate skips while the
+      live site is stale. It compares `scripts/docs-manifest.sh` — the content hash of every
+      TRACKED docs file, symlinks resolved — against `.docs-manifest` served by the site.
+      Independent of the gate's pattern by design, which is the only way it can catch that
+      pattern being wrong.
+  To force a publish at any time: `gh workflow run deploy-docs.yml --ref main` (dispatch
+  always builds, bypassing the gate).
 - **A report can now declare a merged run.** Its rows came from two runs (claude+copilot from
   `kgv1-telemetry`, opencode from `kgv1-opencode-fixed`). Rows carry arm, agent and task_id
   but not which RUN wrote them, so the merge would otherwise be invisible. Declare
@@ -453,6 +475,24 @@ ground truth and a glob makes A2 unanswerable, scoring every arm 0 on it.
   paths and line numbers from a cell that recorded one tool call and no search.
 - **`file`/`grep` call `lib/kgbench/sandbox.mjs` binary.** It contains 2 deliberate NUL bytes,
   a sentinel in its two-pass `**`→`*` glob translation. Use `grep -a`. Not corruption.
+- **A SKIPPED job reports SUCCESS, so a no-op pipeline looks like a working one.** The docs
+  deploy read `gate: success / build: skipped / deploy: skipped` as a green run for two days
+  while publishing nothing. Nothing anywhere says "the site is stale" — the absence of work
+  is indistinguishable from work that had nothing to do. When a pipeline is conditional,
+  check the JOB outcomes (`gh run view <id> --json jobs`), not the run's conclusion; a
+  suspiciously short duration (~25s for a build) is the other tell.
+- **Verify a deploy by CONTENT, not by status code.** `HTTP 200` proves a page exists, not
+  that it is the page you just published — a stale build serves 200 forever. Curl the live
+  URL and grep it for a string that only the new version contains. Every claim about the
+  site in this session was checked that way, which is the only reason the staleness was
+  found at all.
+- **A guard's own determinism is part of the guard.** The freshness check's first live
+  comparison mismatched, and the cause was the check itself: it hashed
+  `find -L docs-content`, the working DIRECTORY, so five gitignored `.DS_Store` files made
+  macOS disagree with CI (366 files vs 361). A false alarm is not a smaller problem than a
+  missed one — it is what gets the check disabled, after which it protects nothing. Fixed by
+  hashing `git ls-files` (the REPOSITORY) instead. Confirm any such digest by computing it
+  on two platforms and comparing to what CI actually published, never from one machine.
 
 - A curl reproduction of an agent call **must include `tools[]`** (§1).
 - **`docker stats` lies** about short allocation spikes — it sampled 280 MB against a 4 GiB
