@@ -17,8 +17,21 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 {
-  # Paths are included in the digest, so a rename or deletion changes the hash even when
-  # the surviving bytes do not.
-  find -L docs-content -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+  # `git ls-files`, NOT `find`. The digest must be a function of the REPOSITORY, not of the
+  # working directory it happens to be computed in — otherwise the two sides disagree for
+  # reasons that have nothing to do with the site.
+  #
+  # Found the hard way: `find -L docs-content -type f` counted 366 files on a macOS checkout
+  # against 361 in CI. The five extras were gitignored .DS_Store files, so the guard's first
+  # live comparison reported a mismatch that meant nothing — a false alarm, which is the one
+  # thing a guard must not produce if it is to stay enabled.
+  #
+  # sha256sum FOLLOWS symlinks when handed a path, so listing the tracked symlink still
+  # hashes the bytes it resolves to — which is what preserved the property this whole guard
+  # exists for (docs-content/**/RESULTS.md -> docs/**/RESULTS.md).
+  #
+  # Paths are in the digest too, so a rename or deletion moves the hash even when the
+  # surviving bytes do not.
+  git ls-files -z docs-content | LC_ALL=C sort -z | xargs -0 sha256sum
   sha256sum mkdocs.yml
 } | sha256sum | cut -d' ' -f1
