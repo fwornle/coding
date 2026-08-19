@@ -1,0 +1,165 @@
+{
+  "runId": "kgv1-opencode-fixed",
+  "set": "coding-v1",
+  "reps": 1,
+  "commit": "d55a76cf3",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    },
+    {
+      "id": "hybrid",
+      "label": "All tools, agent chooses",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read",
+        "mcp__graphify__query_graph",
+        "mcp__graphify__get_node",
+        "mcp__graphify__get_neighbors",
+        "mcp__graphify__shortest_path",
+        "mcp__graphify__graph_stats",
+        "mcp__graphify__god_nodes",
+        "mcp__codegraph__codegraph_explore"
+      ],
+      "backend": null
+    }
+  ],
+  "agents": [
+    "opencode"
+  ],
+  "models": [
+    null
+  ],
+  "continuationBudget": 2,
+  "combinations": [
+    {
+      "arm": "grep",
+      "agent": "opencode",
+      "model": "rapid-proxy/claude-sonnet-5",
+      "elicitation": "answer-file",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "ungated",
+        "gateable": false,
+        "verified_by": "nothing — no tool allowlist to enforce with, and no tool trace to audit"
+      }
+    },
+    {
+      "arm": "hybrid",
+      "agent": "opencode",
+      "model": "rapid-proxy/claude-sonnet-5",
+      "elicitation": "answer-file",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "ungated",
+        "gateable": false,
+        "verified_by": "nothing — no tool allowlist to enforce with, and no tool trace to audit"
+      }
+    }
+  ],
+  "questions": [
+    "L1",
+    "L2",
+    "L3",
+    "S1",
+    "S2",
+    "S3",
+    "B1",
+    "B2",
+    "B3",
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "T1",
+    "T3",
+    "T4"
+  ],
+  "sandbox": {
+    "mode": "worktree",
+    "tree_commit": "7924e45bdb07769f4a42c1e9e66f86ace1e56c32",
+    "excluded": [
+      "config/kgbench/questions",
+      "lib/kgbench/graders.mjs",
+      "lib/kgbench/sandbox.mjs",
+      "lib/kgbench/agents.mjs",
+      "lib/kgbench/judge.mjs",
+      "scripts/kgbench-regrade.mjs",
+      "scripts/kgbench-supervise.sh",
+      "scripts/analysis",
+      "tests/integration/kgbench-agents.test.js",
+      "tests/integration/kgbench-continuation.test.js",
+      "tests/integration/kgbench-dashboard-control.test.js",
+      "tests/integration/kgbench-graders.test.js",
+      "tests/integration/kgbench-publish-guard.test.js",
+      "tests/integration/kgbench-report-provenance.test.js",
+      "tests/integration/kgbench-sandbox.test.js",
+      "tests/integration/kgbench-tokens.test.js",
+      "tests/integration/kgbench-tool-arg-errors.test.js",
+      "tests/integration/kgbench-tool-enforcement.test.js",
+      "tests/integration/kgbench-tool-telemetry.test.js",
+      "docs/measurement/kgbench-experimental-design.md",
+      "docs/measurement/kgbench-guide.md",
+      "docs/measurement/kgbench-tutorial.md",
+      "docs/measurement/kgbench.md",
+      "docs-content/measurement/kgbench-experimental-design.md",
+      "docs-content/measurement/kgbench-guide.md",
+      "docs-content/measurement/kgbench-tutorial.md",
+      "docs-content/measurement/kgbench.md",
+      "docs/benchmarks/coding-v1",
+      "docs-content/benchmarks/coding-v1",
+      "docs/benchmarks/graphify-vs-grep",
+      "docs-content/benchmarks/graphify-vs-grep",
+      ".data",
+      ".specstory",
+      "CLAUDE.md",
+      ".claude",
+      ".github/copilot-instructions.md"
+    ],
+    "verified": true,
+    "code_graph_index": {
+      "backend": "codegraph",
+      "project": "/tmp/kgbench-index-kgv1-opencode-fixed",
+      "tree_commit": "7924e45bdb07769f4a42c1e9e66f86ace1e56c32",
+      "covers_run_tree": true,
+      "file_count": 959,
+      "node_count": 14591
+    },
+    "pinned_via_flag": true
+  },
+  "baselines": {
+    "grep|opencode|rapid-proxy/claude-sonnet-5": 31873,
+    "hybrid|opencode|rapid-proxy/claude-sonnet-5": 32359
+  },
+  "baselineSource": {
+    "grep|opencode|rapid-proxy/claude-sonnet-5": "stream-json",
+    "hybrid|opencode|rapid-proxy/claude-sonnet-5": "stream-json"
+  },
+  "schemaTax": {
+    "grep|opencode|rapid-proxy/claude-sonnet-5": 0,
+    "hybrid|opencode|rapid-proxy/claude-sonnet-5": 486
+  },
+  "judge": {
+    "requested": {
+      "provider": "copilot",
+      "model": "claude-sonnet-5"
+    },
+    "served": {
+      "model": "claude-sonnet-5",
+      "provider": "gh-copilot"
+    },
+    "enabled": true
+  },
+  "startedAt": "2026-08-19T09:56:26.839Z"
+}
