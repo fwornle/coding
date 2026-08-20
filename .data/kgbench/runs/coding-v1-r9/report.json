@@ -1,0 +1,1295 @@
+{
+  "meta": {
+    "set": "coding-v1",
+    "runId": "coding-v1-r9",
+    "questionCount": 16,
+    "reps": "3",
+    "commit": "d8a9b0647",
+    "dirty": true,
+    "continuationBudget": 1,
+    "model": "claude-sonnet-5`, `rapid-proxy/claude-sonnet-5",
+    "baselines": {
+      "grep|claude|claude-sonnet-5": 21420,
+      "grep|copilot|claude-sonnet-5": 133039,
+      "grep|opencode|rapid-proxy/claude-sonnet-5": 32482,
+      "graphify|claude|claude-sonnet-5": 21858,
+      "codegraph|claude|claude-sonnet-5": 20992,
+      "hybrid|claude|claude-sonnet-5": 25014,
+      "hybrid|copilot|claude-sonnet-5": 95807,
+      "hybrid|opencode|rapid-proxy/claude-sonnet-5": 63388
+    },
+    "schemaTax": {
+      "grep|claude|claude-sonnet-5": 0,
+      "grep|copilot|claude-sonnet-5": 0,
+      "grep|opencode|rapid-proxy/claude-sonnet-5": 0,
+      "graphify|claude|claude-sonnet-5": 438,
+      "codegraph|claude|claude-sonnet-5": -428,
+      "hybrid|claude|claude-sonnet-5": 3594,
+      "hybrid|copilot|claude-sonnet-5": -37232,
+      "hybrid|opencode|rapid-proxy/claude-sonnet-5": 30906
+    },
+    "sandbox": {
+      "mode": "worktree",
+      "tree_commit": "d8a9b06472b1a08c00d03db2be14cb2278b4bb30",
+      "excluded": [
+        "config/kgbench/questions",
+        "lib/kgbench/graders.mjs",
+        "lib/kgbench/sandbox.mjs",
+        "lib/kgbench/agents.mjs",
+        "lib/kgbench/judge.mjs",
+        "scripts/kgbench-regrade.mjs",
+        "scripts/kgbench-supervise.sh",
+        "tests/integration/kgbench-agents.test.js",
+        "tests/integration/kgbench-continuation.test.js",
+        "tests/integration/kgbench-dashboard-control.test.js",
+        "tests/integration/kgbench-graders.test.js",
+        "tests/integration/kgbench-publish-guard.test.js",
+        "tests/integration/kgbench-report-provenance.test.js",
+        "tests/integration/kgbench-sandbox.test.js",
+        "tests/integration/kgbench-tokens.test.js",
+        "tests/integration/kgbench-tool-arg-errors.test.js",
+        "tests/integration/kgbench-tool-enforcement.test.js",
+        "docs/measurement/kgbench-experimental-design.md",
+        "docs/measurement/kgbench-guide.md",
+        "docs/measurement/kgbench-tutorial.md",
+        "docs/measurement/kgbench.md",
+        "docs-content/measurement/kgbench-experimental-design.md",
+        "docs-content/measurement/kgbench-guide.md",
+        "docs-content/measurement/kgbench-tutorial.md",
+        "docs-content/measurement/kgbench.md",
+        "docs/benchmarks/coding-v1",
+        ".data",
+        ".specstory",
+        "CLAUDE.md",
+        ".claude",
+        ".github/copilot-instructions.md"
+      ],
+      "verified": true,
+      "code_graph_index": {
+        "backend": "codegraph",
+        "project": "/tmp/kgbench-index-coding-v1-r9",
+        "tree_commit": "d8a9b06472b1a08c00d03db2be14cb2278b4bb30",
+        "covers_run_tree": true,
+        "file_count": 962,
+        "node_count": 14610
+      },
+      "pinned_via_flag": false
+    },
+    "history": null,
+    "agents": [
+      "claude",
+      "copilot",
+      "opencode"
+    ],
+    "judge": {
+      "requested": "claude-sonnet-5",
+      "served": [
+        "claude-sonnet-5"
+      ],
+      "provider": "copilot",
+      "mismatch": false
+    },
+    "contaminatedRows": 0,
+    "selfIdentifiedProbeRows": 0,
+    "toolEscapeRows": 0,
+    "retiredQuestions": [],
+    "agentFilter": null,
+    "generatedAt": "2026-08-13T00:22:07.714Z"
+  },
+  "byArm": {
+    "grep": {
+      "arm": "grep",
+      "runs": 144,
+      "ranked": 140,
+      "ungraded": 0,
+      "failed": 4,
+      "hard_fail_rate": 0.027777777777777776,
+      "retry_rate": 0.0625,
+      "hallucination_rate": 0.007142857142857143,
+      "provenance": {
+        "agents": [
+          "claude",
+          "copilot",
+          "opencode"
+        ],
+        "elicitations": [
+          "answer-file",
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 48,
+          "proxy-db-session": 96
+        },
+        "builtins_enforced": false,
+        "builtins_states": [
+          "enforced",
+          "not_enforced",
+          "ungated"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9792857142857142,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 140
+        },
+        "total_tokens": {
+          "mean": 214162.62857142856,
+          "median": 146214,
+          "min": 46517,
+          "max": 1203916,
+          "p95": 764531,
+          "n": 140
+        },
+        "content_tokens": {
+          "mean": 151041.62142857144,
+          "median": 88643,
+          "min": 622,
+          "max": 1070877,
+          "p95": 732049,
+          "n": 140
+        },
+        "tool_calls": {
+          "mean": 4.875,
+          "median": 4,
+          "min": 1,
+          "max": 23,
+          "p95": 10,
+          "n": 48
+        },
+        "wall_s": {
+          "mean": 38.72642857142857,
+          "median": 28.35,
+          "min": 7.6,
+          "max": 206.3,
+          "p95": 122.3,
+          "n": 140
+        },
+        "cost_usd": {
+          "mean": 0.10125963125,
+          "median": 0.080178,
+          "min": 0.0282561,
+          "max": 0.47065619999999997,
+          "p95": 0.2316189,
+          "n": 48
+        }
+      }
+    },
+    "graphify": {
+      "arm": "graphify",
+      "runs": 48,
+      "ranked": 48,
+      "ungraded": 0,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "retry_rate": 0,
+      "hallucination_rate": 0.020833333333333332,
+      "provenance": {
+        "agents": [
+          "claude"
+        ],
+        "elicitations": [
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 48
+        },
+        "builtins_enforced": true,
+        "builtins_states": [
+          "enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9680555555555556,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 48
+        },
+        "total_tokens": {
+          "mean": 325843.875,
+          "median": 161667.5,
+          "min": 47278,
+          "max": 3996537,
+          "p95": 1095443,
+          "n": 48
+        },
+        "content_tokens": {
+          "mean": 303985.875,
+          "median": 139809.5,
+          "min": 25420,
+          "max": 3974679,
+          "p95": 1073585,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 8.895833333333334,
+          "median": 6.5,
+          "min": 1,
+          "max": 51,
+          "p95": 23,
+          "n": 48
+        },
+        "wall_s": {
+          "mean": 41.65625,
+          "median": 29.3,
+          "min": 6.9,
+          "max": 308.3,
+          "p95": 96.2,
+          "n": 48
+        },
+        "cost_usd": {
+          "mean": 0.2626409375,
+          "median": 0.16771455000000002,
+          "min": 0.0356172,
+          "max": 2.2944318000000004,
+          "p95": 0.7934625000000001,
+          "n": 48
+        }
+      }
+    },
+    "codegraph": {
+      "arm": "codegraph",
+      "runs": 48,
+      "ranked": 48,
+      "ungraded": 0,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "retry_rate": 0,
+      "hallucination_rate": 0,
+      "provenance": {
+        "agents": [
+          "claude"
+        ],
+        "elicitations": [
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 48
+        },
+        "builtins_enforced": true,
+        "builtins_states": [
+          "enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9190972222222222,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 48
+        },
+        "total_tokens": {
+          "mean": 170072.83333333334,
+          "median": 93654,
+          "min": 45575,
+          "max": 818416,
+          "p95": 472317,
+          "n": 48
+        },
+        "content_tokens": {
+          "mean": 149080.83333333334,
+          "median": 72662,
+          "min": 24583,
+          "max": 797424,
+          "p95": 451325,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 3.5208333333333335,
+          "median": 2,
+          "min": 1,
+          "max": 15,
+          "p95": 9,
+          "n": 48
+        },
+        "wall_s": {
+          "mean": 23.299999999999997,
+          "median": 15.1,
+          "min": 6.4,
+          "max": 104.8,
+          "p95": 49.8,
+          "n": 48
+        },
+        "cost_usd": {
+          "mean": 0.23139991249999994,
+          "median": 0.17981234999999998,
+          "min": 0.0161382,
+          "max": 0.7236741,
+          "p95": 0.5903985,
+          "n": 48
+        }
+      }
+    },
+    "hybrid": {
+      "arm": "hybrid",
+      "runs": 144,
+      "ranked": 140,
+      "ungraded": 0,
+      "failed": 4,
+      "hard_fail_rate": 0.027777777777777776,
+      "retry_rate": 0.041666666666666664,
+      "hallucination_rate": 0.007142857142857143,
+      "provenance": {
+        "agents": [
+          "claude",
+          "copilot",
+          "opencode"
+        ],
+        "elicitations": [
+          "answer-file",
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 48,
+          "proxy-db-session": 96
+        },
+        "builtins_enforced": false,
+        "builtins_states": [
+          "enforced",
+          "not_enforced",
+          "ungated"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9728571428571428,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 140
+        },
+        "total_tokens": {
+          "mean": 221612.57857142857,
+          "median": 167882.5,
+          "min": 53632,
+          "max": 1151770,
+          "p95": 582234,
+          "n": 140
+        },
+        "content_tokens": {
+          "mean": 160266.29285714286,
+          "median": 93259,
+          "min": 28618,
+          "max": 1055963,
+          "p95": 486427,
+          "n": 140
+        },
+        "tool_calls": {
+          "mean": 4.729166666666667,
+          "median": 4,
+          "min": 1,
+          "max": 16,
+          "p95": 12,
+          "n": 48
+        },
+        "wall_s": {
+          "mean": 37.79357142857143,
+          "median": 27.5,
+          "min": 7.1,
+          "max": 157.9,
+          "p95": 112,
+          "n": 140
+        },
+        "cost_usd": {
+          "mean": 0.12889510625,
+          "median": 0.11487869999999999,
+          "min": 0.0189375,
+          "max": 0.4658241,
+          "p95": 0.2878119,
+          "n": 48
+        }
+      }
+    }
+  },
+  "byClass": {
+    "abstain": {
+      "scores": {
+        "grep": {
+          "mean": 0.9615384615384616,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 26
+        },
+        "graphify": {
+          "mean": 0.8888888888888888,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "codegraph": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "hybrid": {
+          "mean": 0.9629629629629629,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 27
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "arch": {
+      "scores": {
+        "grep": {
+          "mean": 0.9847222222222223,
+          "median": 1,
+          "min": 0.8166666666666667,
+          "max": 1,
+          "p95": 1,
+          "n": 36
+        },
+        "graphify": {
+          "mean": 0.9555555555555556,
+          "median": 1,
+          "min": 0.65,
+          "max": 1,
+          "p95": 1,
+          "n": 12
+        },
+        "codegraph": {
+          "mean": 0.6763888888888889,
+          "median": 0.65,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 12
+        },
+        "hybrid": {
+          "mean": 0.9573529411764705,
+          "median": 1,
+          "min": 0.65,
+          "max": 1,
+          "p95": 1,
+          "n": 34
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "blast": {
+      "scores": {
+        "grep": {
+          "mean": 0.946,
+          "median": 1,
+          "min": 0.5,
+          "max": 1,
+          "p95": 1,
+          "n": 25
+        },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "codegraph": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "hybrid": {
+          "mean": 0.948076923076923,
+          "median": 1,
+          "min": 0.5,
+          "max": 1,
+          "p95": 1,
+          "n": 26
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "lookup": {
+      "scores": {
+        "grep": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 27
+        },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "codegraph": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "hybrid": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 27
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    },
+    "structural": {
+      "scores": {
+        "grep": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 26
+        },
+        "graphify": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "codegraph": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 9
+        },
+        "hybrid": {
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "p95": 1,
+          "n": 26
+        }
+      },
+      "winner": {
+        "winner": null,
+        "reason": "tie (ratio 1.00x < 1.25x)",
+        "ratio": 1
+      }
+    }
+  },
+  "classes": [
+    "abstain",
+    "arch",
+    "blast",
+    "lookup",
+    "structural"
+  ],
+  "agents": [
+    "claude",
+    "copilot",
+    "opencode"
+  ],
+  "byArmAgent": {
+    "grep@claude": {
+      "arm": "grep",
+      "agent": "claude",
+      "runs": 48,
+      "ranked": 48,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "provenance": {
+        "agents": [
+          "claude"
+        ],
+        "elicitations": [
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 48
+        },
+        "builtins_enforced": true,
+        "builtins_states": [
+          "enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9642361111111111,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 48
+        },
+        "total_tokens": {
+          "mean": 125255.60416666667,
+          "median": 90584,
+          "min": 46517,
+          "max": 798648,
+          "p95": 181319,
+          "n": 48
+        },
+        "content_tokens": {
+          "mean": 103835.60416666667,
+          "median": 69164,
+          "min": 25097,
+          "max": 777228,
+          "p95": 159899,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 4.875,
+          "median": 4,
+          "min": 1,
+          "max": 23,
+          "p95": 10,
+          "n": 48
+        },
+        "wall_s": {
+          "mean": 20.31041666666667,
+          "median": 16.25,
+          "min": 7.6,
+          "max": 104.5,
+          "p95": 42,
+          "n": 48
+        }
+      }
+    },
+    "grep@copilot": {
+      "arm": "grep",
+      "agent": "copilot",
+      "runs": 48,
+      "ranked": 48,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "provenance": {
+        "agents": [
+          "copilot"
+        ],
+        "elicitations": [
+          "answer-file"
+        ],
+        "token_sources": {
+          "proxy-db-session": 48
+        },
+        "builtins_enforced": false,
+        "builtins_states": [
+          "not_enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9961805555555555,
+          "median": 1,
+          "min": 0.8166666666666667,
+          "max": 1,
+          "p95": 1,
+          "n": 48
+        },
+        "total_tokens": {
+          "mean": 315522.1458333333,
+          "median": 209559.5,
+          "min": 129987,
+          "max": 1203916,
+          "p95": 958751,
+          "n": 48
+        },
+        "content_tokens": {
+          "mean": 182614.375,
+          "median": 76520.5,
+          "min": 622,
+          "max": 1070877,
+          "p95": 825712,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null,
+          "p95": null,
+          "n": 0
+        },
+        "wall_s": {
+          "mean": 48.02083333333332,
+          "median": 36.65,
+          "min": 17.4,
+          "max": 165.9,
+          "p95": 135.9,
+          "n": 48
+        }
+      }
+    },
+    "grep@opencode": {
+      "arm": "grep",
+      "agent": "opencode",
+      "runs": 48,
+      "ranked": 44,
+      "failed": 4,
+      "hard_fail_rate": 0.08333333333333333,
+      "provenance": {
+        "agents": [
+          "opencode"
+        ],
+        "elicitations": [
+          "answer-file"
+        ],
+        "token_sources": {
+          "proxy-db-session": 48
+        },
+        "builtins_enforced": false,
+        "builtins_states": [
+          "ungated"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9772727272727273,
+          "median": 1,
+          "min": 0.5,
+          "max": 1,
+          "p95": 1,
+          "n": 44
+        },
+        "total_tokens": {
+          "mean": 200578.0909090909,
+          "median": 150899,
+          "min": 76644,
+          "max": 764531,
+          "p95": 377328,
+          "n": 44
+        },
+        "content_tokens": {
+          "mean": 168096.0909090909,
+          "median": 118417,
+          "min": 44162,
+          "max": 732049,
+          "p95": 344846,
+          "n": 44
+        },
+        "tool_calls": {
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null,
+          "p95": null,
+          "n": 0
+        },
+        "wall_s": {
+          "mean": 48.67727272727272,
+          "median": 38,
+          "min": 15.3,
+          "max": 206.3,
+          "p95": 94,
+          "n": 44
+        }
+      }
+    },
+    "graphify@claude": {
+      "arm": "graphify",
+      "agent": "claude",
+      "runs": 48,
+      "ranked": 48,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "provenance": {
+        "agents": [
+          "claude"
+        ],
+        "elicitations": [
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 48
+        },
+        "builtins_enforced": true,
+        "builtins_states": [
+          "enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9680555555555556,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 48
+        },
+        "total_tokens": {
+          "mean": 325843.875,
+          "median": 161667.5,
+          "min": 47278,
+          "max": 3996537,
+          "p95": 1095443,
+          "n": 48
+        },
+        "content_tokens": {
+          "mean": 303985.875,
+          "median": 139809.5,
+          "min": 25420,
+          "max": 3974679,
+          "p95": 1073585,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 8.895833333333334,
+          "median": 6.5,
+          "min": 1,
+          "max": 51,
+          "p95": 23,
+          "n": 48
+        },
+        "wall_s": {
+          "mean": 41.65625,
+          "median": 29.3,
+          "min": 6.9,
+          "max": 308.3,
+          "p95": 96.2,
+          "n": 48
+        }
+      }
+    },
+    "codegraph@claude": {
+      "arm": "codegraph",
+      "agent": "claude",
+      "runs": 48,
+      "ranked": 48,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "provenance": {
+        "agents": [
+          "claude"
+        ],
+        "elicitations": [
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 48
+        },
+        "builtins_enforced": true,
+        "builtins_states": [
+          "enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9190972222222222,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 48
+        },
+        "total_tokens": {
+          "mean": 170072.83333333334,
+          "median": 93654,
+          "min": 45575,
+          "max": 818416,
+          "p95": 472317,
+          "n": 48
+        },
+        "content_tokens": {
+          "mean": 149080.83333333334,
+          "median": 72662,
+          "min": 24583,
+          "max": 797424,
+          "p95": 451325,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 3.5208333333333335,
+          "median": 2,
+          "min": 1,
+          "max": 15,
+          "p95": 9,
+          "n": 48
+        },
+        "wall_s": {
+          "mean": 23.299999999999997,
+          "median": 15.1,
+          "min": 6.4,
+          "max": 104.8,
+          "p95": 49.8,
+          "n": 48
+        }
+      }
+    },
+    "hybrid@claude": {
+      "arm": "hybrid",
+      "agent": "claude",
+      "runs": 48,
+      "ranked": 48,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "provenance": {
+        "agents": [
+          "claude"
+        ],
+        "elicitations": [
+          "stream-json"
+        ],
+        "token_sources": {
+          "stream-json": 48
+        },
+        "builtins_enforced": true,
+        "builtins_states": [
+          "enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9604166666666667,
+          "median": 1,
+          "min": 0,
+          "max": 1,
+          "p95": 1,
+          "n": 48
+        },
+        "total_tokens": {
+          "mean": 136303.52083333334,
+          "median": 103868.5,
+          "min": 53632,
+          "max": 501048,
+          "p95": 296260,
+          "n": 48
+        },
+        "content_tokens": {
+          "mean": 111289.52083333333,
+          "median": 78854.5,
+          "min": 28618,
+          "max": 476034,
+          "p95": 271246,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": 4.729166666666667,
+          "median": 4,
+          "min": 1,
+          "max": 16,
+          "p95": 12,
+          "n": 48
+        },
+        "wall_s": {
+          "mean": 19.66875,
+          "median": 14.45,
+          "min": 7.1,
+          "max": 76.5,
+          "p95": 43.2,
+          "n": 48
+        }
+      }
+    },
+    "hybrid@copilot": {
+      "arm": "hybrid",
+      "agent": "copilot",
+      "runs": 48,
+      "ranked": 48,
+      "failed": 0,
+      "hard_fail_rate": 0,
+      "provenance": {
+        "agents": [
+          "copilot"
+        ],
+        "elicitations": [
+          "answer-file"
+        ],
+        "token_sources": {
+          "proxy-db-session": 48
+        },
+        "builtins_enforced": false,
+        "builtins_states": [
+          "not_enforced"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9961805555555555,
+          "median": 1,
+          "min": 0.8166666666666667,
+          "max": 1,
+          "p95": 1,
+          "n": 48
+        },
+        "total_tokens": {
+          "mean": 336834.3125,
+          "median": 222013,
+          "min": 130107,
+          "max": 1151770,
+          "p95": 1146702,
+          "n": 48
+        },
+        "content_tokens": {
+          "mean": 241027.3125,
+          "median": 126206,
+          "min": 34300,
+          "max": 1055963,
+          "p95": 1050895,
+          "n": 48
+        },
+        "tool_calls": {
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null,
+          "p95": null,
+          "n": 0
+        },
+        "wall_s": {
+          "mean": 50.737500000000004,
+          "median": 34.1,
+          "min": 17.4,
+          "max": 157.9,
+          "p95": 138.6,
+          "n": 48
+        }
+      }
+    },
+    "hybrid@opencode": {
+      "arm": "hybrid",
+      "agent": "opencode",
+      "runs": 48,
+      "ranked": 44,
+      "failed": 4,
+      "hard_fail_rate": 0.08333333333333333,
+      "provenance": {
+        "agents": [
+          "opencode"
+        ],
+        "elicitations": [
+          "answer-file"
+        ],
+        "token_sources": {
+          "proxy-db-session": 48
+        },
+        "builtins_enforced": false,
+        "builtins_states": [
+          "ungated"
+        ],
+        "ambiguous_token_rows": 0
+      },
+      "metrics": {
+        "score": {
+          "mean": 0.9609848484848484,
+          "median": 1,
+          "min": 0.5,
+          "max": 1,
+          "p95": 1,
+          "n": 44
+        },
+        "total_tokens": {
+          "mean": 188980.56818181818,
+          "median": 156647,
+          "min": 106371,
+          "max": 478322,
+          "p95": 415996,
+          "n": 44
+        },
+        "content_tokens": {
+          "mean": 125592.56818181818,
+          "median": 93259,
+          "min": 42983,
+          "max": 414934,
+          "p95": 352608,
+          "n": 44
+        },
+        "tool_calls": {
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null,
+          "p95": null,
+          "n": 0
+        },
+        "wall_s": {
+          "mean": 43.445454545454545,
+          "median": 31.549999999999997,
+          "min": 16.9,
+          "max": 156,
+          "p95": 98.8,
+          "n": 44
+        }
+      }
+    }
+  },
+  "provenance": {
+    "agents": [
+      "claude",
+      "copilot",
+      "opencode"
+    ],
+    "elicitations": [
+      "answer-file",
+      "stream-json"
+    ],
+    "token_sources": {
+      "stream-json": 192,
+      "proxy-db-session": 192
+    },
+    "builtins_enforced": false,
+    "builtins_states": [
+      "enforced",
+      "not_enforced",
+      "ungated"
+    ],
+    "ambiguous_token_rows": 0
+  },
+  "disagreements": [
+    {
+      "id": "B2",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B2",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "grep",
+      "checklist": 0.65,
+      "judge": 1,
+      "kind": "judge_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "grep",
+      "checklist": 0.8166666666666667,
+      "judge": 0.33,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.667,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "grep",
+      "checklist": 0.5,
+      "judge": 0,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A1",
+      "arm": "grep",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B2",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.5,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "graphify",
+      "checklist": 1,
+      "judge": 0.33,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A1",
+      "arm": "codegraph",
+      "checklist": 0.5,
+      "judge": 0,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A2",
+      "arm": "codegraph",
+      "checklist": 0.65,
+      "judge": 0,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0.3333333333333333,
+      "judge": 0,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "A4",
+      "arm": "codegraph",
+      "checklist": 0.3333333333333333,
+      "judge": 0,
+      "kind": "checklist_higher"
+    },
+    {
+      "id": "B3",
+      "arm": "hybrid",
+      "checklist": 0.65,
+      "judge": 0,
+      "kind": "checklist_higher"
+    }
+  ]
+}
