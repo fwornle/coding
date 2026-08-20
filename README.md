@@ -395,14 +395,6 @@ start_workflow {
 }
 ```
 
-**VSCode CoPilot:**
-```bash
-# Via HTTP API
-curl -X POST http://localhost:8765/api/semantic/analyze-repository \
-  -H "Content-Type: application/json" \
-  -d '{"repository": ".", "depth": 25}'
-```
-
 ---
 
 ## 🛠️ Configuration

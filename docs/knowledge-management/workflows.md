@@ -48,19 +48,6 @@ start_workflow {
 }
 ```
 
-**VSCode CoPilot Example:**
-```bash
-curl -X POST http://localhost:8765/api/semantic/analyze-repository \
-  -H "Content-Type: application/json" \
-  -d '{
-    "repository": "/path/to/project",
-    "depth": 25,
-    "significanceThreshold": 6,
-    "includePatternAnalysis": true,
-    "includeWebSearch": true
-  }'
-```
-
 ### 2. Conversation Analysis Workflow
 
 **Purpose**: Extract structured insights from team discussions, code reviews, and documentation
