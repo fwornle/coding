@@ -101969,5 +101969,68 @@
       "createdAt": "2026-08-19T20:38:11.340Z"
     },
     "project": "coding"
+  },
+  {
+    "id": "20b4af0d-2b48-4956-9639-906c78fd4a9b",
+    "date": "2026-08-19",
+    "theme": "CI Verification Strategy Shift for Tests Run",
+    "summary": "Verified CI success for `tests.yml` run `32300853199` by inspecting actual output content rather than relying on the reported completion status.\n- Approach shifted to content-based inspection to confirm integrity of test results and validate root-cause fixes\n- No artifacts were modified; purely a verification/confidence exercise\n- CI run confirmed successful with root-cause fixes properly validated",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-08-20T06:17:47.087Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-08-19",
+      "theme": "CI Verification Strategy Shift for Tests Run",
+      "summary": "Verified CI success for `tests.yml` run `32300853199` by inspecting actual output content rather than relying on the reported completion status.\n- Approach shifted to content-based inspection to confirm integrity of test results and validate root-cause fixes\n- No artifacts were modified; purely a verification/confidence exercise\n- CI run confirmed successful with root-cause fixes properly validated",
+      "observation_ids": [
+        "5a39d027-084e-45cd-a989-14d7d988bb69"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-08-20T06:17:47.087Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "326c48a3-d5a2-4400-b36e-05c68670517c",
+    "date": "2026-08-20",
+    "theme": "ESLint Configuration Fix and CI Gate Restoration",
+    "summary": "A sustained effort to repair the ESLint configuration and restore it as an active CI build gate, apparently broken for 14 months.\n\n- **Survey phase**: Identified only one tracked eslint config file (`integrations/system-health-dashboard/eslint.config.mjs`), no root-level config, and `eslint ^8.55.0` as a dev dependency with a `lint` script pointing to `lib/` but no `eslintConfig` key in `package.json`.\n- **CI validation**: Monitored CI runs 32336485044 and 32337946855 to confirm the lint gate executed and passed end-to-end.\n- **Outcome**: All three check suites (`eslint`, `jest`, `node:test`) are green locally and in Ubuntu CI; ESLint is now enforced as a build gate for the first time in 14 months.\n- **Remaining issues identified**: broken import paths in the adapters directory (specifically `claude-mcp.js`), orphaned tests, skipped CI suites, and a hazard where `npm install --save-dev` can prune hand-made symlinks.\n- Diagnostic work on the two broken import paths was begun but fixes were not completed within this session.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-08-20T06:17:53.933Z",
+    "metadata": {
+      "sourceCount": 4,
+      "date": "2026-08-20",
+      "theme": "ESLint Configuration Fix and CI Gate Restoration",
+      "summary": "A sustained effort to repair the ESLint configuration and restore it as an active CI build gate, apparently broken for 14 months.\n\n- **Survey phase**: Identified only one tracked eslint config file (`integrations/system-health-dashboard/eslint.config.mjs`), no root-level config, and `eslint ^8.55.0` as a dev dependency with a `lint` script pointing to `lib/` but no `eslintConfig` key in `package.json`.\n- **CI validation**: Monitored CI runs 32336485044 and 32337946855 to confirm the lint gate executed and passed end-to-end.\n- **Outcome**: All three check suites (`eslint`, `jest`, `node:test`) are green locally and in Ubuntu CI; ESLint is now enforced as a build gate for the first time in 14 months.\n- **Remaining issues identified**: broken import paths in the adapters directory (specifically `claude-mcp.js`), orphaned tests, skipped CI suites, and a hazard where `npm install --save-dev` can prune hand-made symlinks.\n- Diagnostic work on the two broken import paths was begun but fixes were not completed within this session.",
+      "observation_ids": [
+        "3904a9ca-3fed-48fc-8d74-f2a097d99d6f",
+        "f9cab110-6618-4047-b33b-edb3f7958c8a",
+        "cb733095-5a34-4260-95fc-4089fa443b30",
+        "09c6da0c-9b84-4a78-a78d-e68ccbaa4aba"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-08-20T06:17:53.933Z"
+    },
+    "project": "coding"
   }
 ]

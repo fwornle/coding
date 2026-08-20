@@ -40,7 +40,9 @@ export default [
   js.configs.recommended,
 
   {
-    files: ['**/*.js', '**/*.mjs'],
+    // .cjs is included so the rule options below apply to it too; the block that
+    // follows re-declares its sourceType as commonjs (later blocks win).
+    files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',        // package.json declares "type": "module"
