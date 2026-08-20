@@ -11,6 +11,16 @@ intuition.
 `rapid-proxy/claude-sonnet-5` · 16 questions × 4 arms × 3 reps across 3 agents =
 **384 cells**, 0 contaminated, 0 tool escapes · **continuation budget 1**.
 
+> **This page analyses `r9`. The generated files beside it do not.**
+> [`RESULTS.md`](RESULTS.md) and `report.json` in this directory were regenerated on
+> 2026-08-19 for a later run — 16 questions × **1 rep**, 128 cells, corpus `7924e45bd`,
+> **continuation budget 2**, merged from `kgv1-telemetry` and `kgv1-opencode-fixed`. That run
+> is **not comparable to this one**: the report states that runs at different continuation
+> budgets are not, and the corpus commit and rep count differ too. Read the two side by side
+> only for their conditions, never for their deltas. `r9`'s own generated report is preserved
+> at `.data/kgbench/runs/coding-v1-r9/report.json`, which is what this page is checked
+> against.
+
 **This run exists because the previous one was measuring a broken tool.** `r8` is kept
 throughout as the comparison, because the difference between the two is the clearest evidence
 on this page. Three defects found after `r8` published are fixed here:
@@ -128,31 +138,39 @@ pins CodeGraph's own environment variables and what owns index freshness.
 Everything else this page used to list here was a single run's noise. See
 [which per-question results replicate](#which-per-question-results-replicate).
 
-### The agent axis is larger than the arm axis
+### The agent axis is large, and its ordering is not stable
 
 | Arm | Agent | answered | correctness | content tokens | latency |
 |---|---|--:|--:|--:|--:|
-| grep | claude | **48/48** | 1.00 | 77,394 | 18.1s |
-| grep | copilot | **48/48** | 1.00 | 143,346 | 33.8s |
-| grep | opencode | **44/48** | 1.00 | 107,170 | 41.0s |
-| hybrid | claude | **48/48** | 1.00 | 86,579 | 18.5s |
-| hybrid | copilot | **48/48** | 1.00 | 139,868 | 32.1s |
-| hybrid | opencode | **46/48** | 1.00 | 121,469 | 30.1s |
+| grep | claude | **48/48** | 1.00 | 69,164 | 16.3s |
+| grep | copilot | **48/48** | 1.00 | 76,521 | 36.6s |
+| grep | opencode | **44/48** | 1.00 | 118,417 | 38.0s |
+| hybrid | claude | **48/48** | 1.00 | 78,855 | 14.4s |
+| hybrid | copilot | **48/48** | 1.00 | 126,206 | 34.1s |
+| hybrid | opencode | **44/48** | 1.00 | 93,259 | 31.5s |
 
 Every figure is a median over that combination's ranked cells — the same denominator in every
 column. An earlier version of this table quoted opencode over a subset and its latency over
 everything; see [reliability](#reliability) for why the subset existed and why it was wrong.
 
 Every agent that produces an answer is **equally correct**: median 1.00 on every arm, every
-agent, without exception. What separates them is what they spend getting there. copilot costs
-**1.85× claude's content tokens** on the identical arm, and opencode **1.38×**.
+agent, without exception. What separates them is what they spend getting there. On the
+identical `grep` arm, opencode costs **1.71× claude's content tokens** and copilot **1.11×**.
 
-That is the more consequential finding, and it survived the correction that changed
-everything else about opencode's numbers. In `x2` this section reported opencode answering
-6 of 48; that was the harness, not the agent, and it is fixed. The cost gap between agents on
-an identical arm was not the harness, and it did not move: choosing the agent still shifts
-cost further than choosing the retrieval strategy does, and the retrieval strategy is the
-thing this repository spends infrastructure on.
+**This table read `r8` until 2026-08-20, and the correction reverses which agent is
+expensive.** In `r8` copilot cost 1.85× claude and opencode 1.38×; in `r9` those are 1.11×
+and 1.71×. The two agents swapped places. Nothing about the page said which run the table
+came from, and the numbers were plausible in both — see
+[defect 44](#what-went-wrong-building-this).
+
+So the honest form of this finding is narrower than the heading it used to carry. **The
+agent axis does not beat the arm axis here**: across claude's four arms the spread is 2.02×
+(grep 69,164 to graphify 139,810), against 1.71× across the three agents on `grep`. What is
+true is that the agent axis beats every arm choice *except* being forced onto graphify —
+grep, codegraph and hybrid sit within 1.14× of each other, well inside the agent spread. And
+the agent ordering did not replicate across two runs, while the arm ordering did. Choosing
+the agent matters as much as choosing the retrieval strategy, and it is the axis this
+repository does not measure when it spends infrastructure on the other one.
 
 ### What the continuation budget changed
 
@@ -1246,7 +1264,7 @@ than silently merged with the floors measured inline.
 
 ## What went wrong building this
 
-Forty-three defects were found across the runs behind this page, and runs were discarded
+Forty-four defects were found across the runs behind this page, and runs were discarded
 repeatedly — two are still on disk carrying `VOID` in their name
 (`coding-v1-VOID-tool-escape`, `coding-v1-x1-VOID-kb-injection`), and a third,
 `coding-v1-x2`, was partially voided and repaired rather than thrown away. Every discard came
@@ -1299,6 +1317,7 @@ documented because the failure modes generalise to any agent benchmark.
 | 41 | **Four runs were carrying scores from a superseded answer key, and a blind fix would have corrupted a fifth.** Reconciling every run against the current grader found 105 stale rows. Fourteen in `r5` and fourteen in `r6` were L2 and A1 scored with keys since corrected — L2's key had named the wrong file, so every arm scored **0.15 on a correct answer**. Six in `replication-full` were S1 cells that predate the contamination detector and cite the benchmark's own ground truth; they are now void rather than scored. | **The remaining 64 rows were the trap.** They were `r5`/`r6` cells for A3, A4 and B1 — questions whose PROMPTS were rewritten by `c31d07b02` after those runs executed. Their stored answers respond to different words, so re-scoring them with today's checklist is not a correction; it is a category error **that looks exactly like a correction, because it produces plausible numbers on real data**. A one-line regrade would have quietly rewritten a third of `r5`. The fix is structural: `kgbench-regrade.mjs` now reconstructs the question set from the run's own `commit` and refuses any question whose prompt moved, and refuses an entire run whose set cannot be recovered — which is what retires the two pilots, whose question file was never committed. *Cannot verify* is not *verified*. **PARTLY RESOLVED**: the 64 refused rows have been RE-MEASURED rather than regraded, as `coding-v1-r5-requestions` and `coding-v1-r6-requestions` at each run's own corpus commit — beside `r5`/`r6`, not inside them, because those runs recorded no model and splicing would confound arm with model on exactly the questions under test. `r5`/`r6`'s own A3/A4/B1 columns remain those of a superseded question set and always will; that is a fact about the runs, not a defect left open. |
 | 42 | **A 121-cell run was killed twice, at cells 2 and 18, by the tool that launched it.** Neither death produced an error: the log simply stopped, `supervise.status` stayed `running`, and no process remained. The cause was the launching harness's 10-minute call ceiling killing the process group it hosted — `kgbench-supervise.sh` detaches, but detaching does not leave the group. | **A supervisor that survives signals does not survive its own parent's death, and the two failures are indistinguishable from the outside.** The tell is `status: running` with zero live processes, which is why the monitor now asserts BOTH rather than either. Re-hosting under `launchctl submit` fixed it. Nothing was lost at any point — the runner writes cells incrementally and resumes from `results.jsonl`, so the restart continued at cell 18 rather than redoing 18. **Incremental writes are what turned two silent kills into a delay instead of a loss**, and that property is worth more than the supervisor's retry logic. |
 | 43 | **Four runs of cost figures described a defect rather than a backend.** `r8` reported CodeGraph at 161,322 tokens and 50.3s — 2.1x grep's tokens and 2.8x its latency — and the page built its headline economic claim on it: *"both cost 1.7-2.1x the tokens, 1.6-2.8x the latency"*. With an index that actually covers the corpus, the same arm on the same questions runs at **1.05x grep's tokens and 0.93x its latency**. Its median tool calls on L2 fall from 12 to 2. | **A broken retrieval tool does not look broken in a cost table; it looks expensive.** The arm compensated by reading files, and reading files is what the tokens measured. Nothing in the correctness column flagged it, because the arm still answered correctly — it just paid Read prices to do it. **The tell was in the tool mix, which no published table showed.** A benchmark that reports what an arm COSTS without reporting what it DOES cannot distinguish an expensive backend from a broken one. |
+| 44 | **The agent-axis table was `r8`'s, on a page whose header declares `r9`.** All six rows matched `r8` exactly — including the giveaway `hybrid`/opencode count of **46/48**, which exists only in `r8` (`r9` is 44/48). The prose built on it — *"copilot costs 1.85x claude's content tokens on the identical arm, and opencode 1.38x"* — is `r8`'s grep-arm ratio. In `r9` those are **1.11x and 1.71x**: the two agents swap places, and the section's old heading (*the agent axis is larger than the arm axis*) inverts with them, because `r9`'s arm spread is 2.02x against an agent spread of 1.71x. | **The checker held the right numbers and never compared them to the page.** `kgbench-verify-report-claims.mjs` already hardcoded `r9`'s values and asserted `opencode ~1.71x` and `copilot ~1.11x` — and passed, because it checks its own constants against `results.jsonl` and never reads a number OUT of the rendered table. Its docstring claims those constants are "a snapshot of what the published page asserts"; for this table they were a snapshot of what it *should* have asserted, and the gap between those two is exactly the defect. **A generated table carries no run label, so a stale paste is indistinguishable from a fresh one** — both are plausible, and this one survived a full rewrite of the surrounding prose. **FIXED**: the table and its ratios are `r9`'s, and the checker now PARSES the six rows and both ratios out of README.md and compares them to the run, so a table from the wrong run fails on sight. A second failure mode is closed with it — the checker read `docs/benchmarks/coding-v1/report.json`, which the NEXT published run overwrites, so publishing the 128-cell run on 2026-08-19 turned four checks red against a page that had not changed; it now reads the run's own preserved `report.json`. |
 
 Defects 1–5 all pointed the **same direction** — flattering the graph arms, penalising grep.
 Defects 7 and 9 point the other way. Defect 10 flattered nobody and hid everybody. Defect 15
