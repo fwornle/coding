@@ -115,6 +115,13 @@ jobs:
       # Run the halves separately so the summary says WHICH one failed, and always
       # run node:test even when jest is red — chaining them would hide the second
       # result for as long as the first is broken.
+      # Lint is a gate now that it passes. It was added to CI only after the 113
+      # findings it reported on arrival were cleared — a step that fails on its
+      # first run teaches everyone to ignore it.
+      - name: lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
       - name: jest
         id: jest
         run: npm run test:jest
