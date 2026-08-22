@@ -56,22 +56,42 @@ The retrieval service (`POST /api/retrieve` on port 3033) processes each request
 
 4. **Token-Budgeted Assembly (Step 3)**: Constructs markdown with tier headers, capped at 700 tokens for semantic results + 300 tokens for working memory = 1000 total.
 
-### The budget is a ceiling the payload cannot reach
+### What limits the injected payload: the stored preview
 
-The 1000-token budget is almost never the binding constraint. `formatResult`
-(`src/retrieval/token-budget.js`) renders each item's `summary_preview`, and that field is
-hard-truncated to `content.substring(0, 200)` at **index** time — `src/embedding/listener.ts:96`
-and the three call sites in `src/embedding/backfill.ts`. So an item contributes **at most 200
-characters (~50 tokens)** however much budget is left, and the injected block names a relevant
-insight then stops mid-sentence, before its actionable content.
+`formatResult` (`src/retrieval/token-budget.js`) renders each item's `summary_preview` and nothing
+else, so whatever the indexer stores in that field is the hard ceiling on what any single item can
+contribute — independent of the token budget.
 
-Measured over 1419 real captures / 4624 injected items: **every** preview is ≤200 chars (none
-exceed it), median 2 items per turn, and median `tokens_used` is **285 of 1000** — 28% of budget.
+That length is `SUMMARY_PREVIEW_CHARS` in **`src/embedding/preview.ts`**, the single source of
+truth for both the live indexer (`listener.ts`) and the batch re-index (`backfill.ts`).
 
-This matters when interpreting the `kb-on` / `kb-off` experiment axis
-(`config/experiments/kb-ab-*.yaml`): that A/B measures whether a *pointer* to knowledge helps, not
-whether the knowledge itself does. Raising the injected payload means raising the indexed preview
-length and re-embedding, not raising the budget.
+It was previously a bare `substring(0, 200)` duplicated across five call sites, which nothing named
+and nothing connected to its consequence. Measured over 1419 captures / 4624 injected items under
+that regime: **every** preview was ≤200 chars, median 2 items per turn, and median `tokens_used`
+**285 of 1000 — 28% of budget**. The injected block named a relevant insight and then stopped
+mid-sentence, before anything actionable. The budget was never the binding constraint; the preview
+was.
+
+It is now **1200 chars**, chosen from where useful content actually sits rather than by feel:
+insight bodies have a median length of 2246 chars, and the decisive fact in the top-ranked insights
+for three sample tasks sat at offsets 520, 592 and 769 — all lost at 200, all captured at 1200. At
+~3.5-4 chars/token that is ~300-340 tokens, so two items fill most of the 700-token semantic budget
+and a third truncates gracefully, preserving the multi-tier breadth the pipeline is designed around.
+
+**Changing it requires a re-index.** The preview is written into the Qdrant payload at index time,
+so a new value only affects items indexed afterwards. Every payload carries `preview_version`, and
+`backfill.ts` skips a point only when `content_hash` *and* `preview_version` both match — a
+content-hash-only check would report every point as current (the content did not change; the policy
+did) and the new length would never reach the index.
+
+```bash
+npm run build && node dist/embedding/backfill.js --prune
+```
+
+The relevance judge deliberately still sees only the first 240 chars of a preview
+(`src/retrieval/relevance-judge.js`): it decides topical usefulness, which the title plus opening
+conveys, and feeding it 12 × 1200 chars would multiply its input tokens fivefold against a 2500 ms
+interactive timeout — buying explainability with fail-opens.
 
 ### Response Shape
 

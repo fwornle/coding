@@ -584,7 +584,11 @@ function KbScoredCard({ item, queryWords }: { item: KbCaptureItem; queryWords?: 
         </p>
       ) : null}
       {p.summary_preview && (
-        <p className="whitespace-pre-wrap break-words text-[11px] leading-snug text-muted-foreground">{p.summary_preview}</p>
+        // Capped height with its own scroll. The stored preview used to be 200 chars
+        // (~3 lines); SUMMARY_PREVIEW_CHARS is now 1200, so an unclamped body is ~18
+        // lines and four insight cards would bury the scores and matched-term chips
+        // that make this view scannable. Nothing is hidden — it scrolls.
+        <p className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-[11px] leading-snug text-muted-foreground">{p.summary_preview}</p>
       )}
     </div>
   )
