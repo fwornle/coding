@@ -56,11 +56,41 @@ The retrieval service (`POST /api/retrieve` on port 3033) processes each request
 
 4. **Token-Budgeted Assembly (Step 3)**: Constructs markdown with tier headers, capped at 700 tokens for semantic results + 300 tokens for working memory = 1000 total.
 
+### The budget is a ceiling the payload cannot reach
+
+The 1000-token budget is almost never the binding constraint. `formatResult`
+(`src/retrieval/token-budget.js`) renders each item's `summary_preview`, and that field is
+hard-truncated to `content.substring(0, 200)` at **index** time — `src/embedding/listener.ts:96`
+and the three call sites in `src/embedding/backfill.ts`. So an item contributes **at most 200
+characters (~50 tokens)** however much budget is left, and the injected block names a relevant
+insight then stops mid-sentence, before its actionable content.
+
+Measured over 1419 real captures / 4624 injected items: **every** preview is ≤200 chars (none
+exceed it), median 2 items per turn, and median `tokens_used` is **285 of 1000** — 28% of budget.
+
+This matters when interpreting the `kb-on` / `kb-off` experiment axis
+(`config/experiments/kb-ab-*.yaml`): that A/B measures whether a *pointer* to knowledge helps, not
+whether the knowledge itself does. Raising the injected payload means raising the indexed preview
+length and re-embedding, not raising the budget.
+
 ### Response Shape
 
 ```json
 {
   "markdown": "## Working Memory\n...\n## Insights\n...\n## Digests\n...",
+  "items": [
+    { "id": "…", "tier": "insights", "rrfScore": 0.374, "score": 0.812, "payload": { "topic": "…" } }
+  ],
+  "trace": {
+    "candidates": { "semantic": 80, "keyword": 0, "fused": 80 },
+    "stages": [
+      { "name": "idf-floor",  "in": 80, "out": 52, "dropped": [], "dropped_total": 28 },
+      { "name": "judge-topk", "in": 52, "out": 12, "dropped": [], "dropped_total": 40 },
+      { "name": "judge",      "in": 12, "out":  3, "dropped": [], "dropped_total":  9 },
+      { "name": "assembly",   "in":  3, "out":  3, "dropped": [], "dropped_total":  0 }
+    ],
+    "injected": 3, "tokens_used": 328, "budget": 700, "judge_outcome": "judged"
+  },
   "meta": {
     "query": "Docker build pipeline",
     "budget": 1000,
@@ -71,6 +101,29 @@ The retrieval service (`POST /api/retrieve` on port 3033) processes each request
   }
 }
 ```
+
+`items` is the structured subset actually injected. `trace` is the selection funnel — per-stage
+in/out counts plus the candidates each stage dropped, so "why was nothing injected?" is
+attributable to a named stage. Each stage names at most its 12 highest-ranked casualties and
+carries an exact `dropped_total`, so a capped list never reads as a complete one. Both fields are
+additive; `retrieval-client.js` and the four agent adapters ignore them.
+
+### Per-Turn Capture
+
+When `/api/retrieve` is called with a `task_id`, obs-api appends one JSONL line per retrieval to
+`.data/retrieval-captures/<task_id>.jsonl` via `src/retrieval/capture-store.js` — `{task_id, turn,
+capturedAt, meta, items, trace}`. Turn ordinals resume from disk after a restart.
+
+This replaced a writer that wrote `<task_id>.json` and **overwrote** it every call: because
+`task_id` is the session UUID for interactive sessions, a 39-turn session kept exactly one capture,
+always the last. Legacy `.json` files are read as a single turn-0 fallback and are not migrated.
+A turn that injected nothing is still recorded whenever a trace explains the silence — the old
+writer discarded that case outright.
+
+`GET /api/retrieve-capture?task_id=…[&turn=N]` serves them: top-level `items`/`meta` are the
+selected turn (default: the last), with the full history under `turns[]`. The dashboard's
+Performance → context explainer renders these as scored cards, a turn picker, and the funnel.
+Retention is 14 days via the existing `com.coding.context-turns-sweeper` job.
 
 ## Agent Adapters
 
