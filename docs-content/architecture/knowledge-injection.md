@@ -88,6 +88,24 @@ did) and the new length would never reach the index.
 npm run build && node dist/embedding/backfill.js --prune
 ```
 
+`--prune` deletes points whose id is absent from the source *after* upserting, so ids that drifted
+under an older indexing scheme do not survive as duplicates. It never drops the collection: every
+agent prompt queries it, so the failure mode to avoid is an empty index, and it refuses to prune
+against an empty source.
+
+Measured on the 200 → 1200 re-index (14,047 points):
+
+| | before | after |
+|---|---|---|
+| median `tokens_used` of 1000 | 285 (28%) | 812 (81%) |
+| median items injected/turn | 2 | 3 |
+| decisive fact present in the block (3 sample tasks) | 1 of 3 | 3 of 3 |
+
+The same run resynced the index with km-core, which had drifted badly while the batch tooling was
+silently a no-op — 636 indexed insights against 709 real ones, and 12,660 observation vectors
+against 8,026 surviving records (the rest pointed at rows the 7-day pruner had already removed).
+All four collections now match the source exactly.
+
 The relevance judge deliberately still sees only the first 240 chars of a preview
 (`src/retrieval/relevance-judge.js`): it decides topical usefulness, which the title plus opening
 conveys, and feeding it 12 × 1200 chars would multiply its input tokens fivefold against a 2500 ms

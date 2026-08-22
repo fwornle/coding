@@ -27,6 +27,17 @@
 # the code sees a normal import and has no reason to name that path; an agent given the insight
 # names it immediately. The judge scores the remaining four rubric dimensions from the diff.
 #
+# PRE-FLIGHT STATUS (re-check before trusting a run). When these specs were first written the
+# treatment arm was hollow: `summary_preview` was truncated to 200 chars at INDEX time, so the
+# injected block named a relevant insight and stopped mid-sentence, and the graded fact was absent
+# for two of the three tasks. A null result would then have read as "injection does not help"
+# rather than "injection delivered 200 chars". That is fixed — SUMMARY_PREVIEW_CHARS is 1200
+# (src/embedding/preview.ts) and the index was rebuilt — and probing live retrieval with each
+# goal_sentence now finds the graded string in all three blocks, at 587-675 of the 1000-token
+# budget (was 63-185). Re-run that probe if the KB or the constant changes again:
+#   curl -s localhost:12436/api/retrieve -H 'Content-Type: application/json' \
+#     -d '{"query":"<goal_sentence>","task_id":"probe--x--r0"}' | jq -r .markdown
+#
 # READ BOTH NUMBERS. Correctness may well tie — a kb-off agent can grep its way there eventually.
 # The effect is as likely to appear in tokens and wall-clock (reaching the same answer cheaper) as
 # in the score, and the runs table carries both.
