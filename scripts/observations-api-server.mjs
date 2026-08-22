@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { ObservationWriter, subscribeObservationWritten } from '../src/live-logging/ObservationWriter.js';
 import { ObservationConsolidator } from '../src/live-logging/ObservationConsolidator.js';
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
+import { appendCapture } from '../src/retrieval/capture-store.js';
 import { ObservationPruner } from '../src/live-logging/ObservationPruner.js';
 import { ColdStoreReader } from '../src/live-logging/ColdStoreReader.js';
 import { ObservationExporter } from '../src/live-logging/ObservationExporter.js';
@@ -1418,35 +1419,36 @@ app.post('/api/insights/verify', async (req, res) => {
   }
 });
 
-// Phase B — structured per-item retrieval capture. When /api/retrieve is called
-// with a `task_id`, persist the exact injected Insights/Digests/Entities/
-// Observations (each with its rrfScore/score) to a per-run JSON the dashboard
-// reads directly from the shared .data bind mount, rendering them as scored cards.
+// Structured per-item retrieval capture. When /api/retrieve is called with a
+// `task_id`, persist the exact injected Insights/Digests/Entities/Observations
+// (each with its rrfScore/score) plus the selection `trace`, to a per-run file the
+// dashboard reads directly from the shared .data bind mount and renders as scored
+// cards + a drop-off funnel.
+//
+// PER-TURN, APPEND-ONLY. This used to write `<task_id>.json` and OVERWRITE it every
+// call. For an interactive session `task_id` is the session UUID (see
+// knowledge-injection-hook.js), so a 39-turn session left exactly ONE capture — the
+// last turn — and "what was injected at turn 12" was unanswerable. We now append one
+// JSONL line per retrieval. The legacy `<task_id>.json` files are NOT migrated; the
+// reader falls back to them when no `.jsonl` exists (dashboard server.js
+// handleRetrieveCapture). A session that spans the cutover therefore starts its
+// jsonl at turn 0 while its legacy single-turn .json is shadowed — accepted, since
+// the legacy file carries no turn number to continue from.
 const RETRIEVAL_CAPTURES_DIR = path.join(
   process.env.CODING_REPO || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
   '.data',
   'retrieval-captures',
 );
-const sanitizeCaptureId = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 200);
-
+// Append/format/ordinal logic lives in src/retrieval/capture-store.js — see there for
+// the on-disk contract. Kept out of this file so it is testable without standing up
+// km-core + express + fastembed.
 function writeRetrievalCapture(taskId, result) {
-  try {
-    const items = Array.isArray(result?.items) ? result.items : [];
-    // Nothing structured to show (e.g. WM-only response) → skip; the client falls
-    // back to its markdown parse rather than showing an empty structured capture.
-    if (items.length === 0) return;
-    fs.mkdirSync(RETRIEVAL_CAPTURES_DIR, { recursive: true });
-    const file = path.join(RETRIEVAL_CAPTURES_DIR, `${sanitizeCaptureId(taskId)}.json`);
-    const payload = {
-      task_id: taskId,
-      capturedAt: new Date().toISOString(),
-      meta: result.meta || null,
-      items,
-    };
-    fs.writeFileSync(file, JSON.stringify(payload), 'utf8');
-  } catch (err) {
-    process.stderr.write(`[obs-api] retrieval-capture write failed (non-fatal): ${err.message}\n`);
-  }
+  appendCapture({
+    dir: RETRIEVAL_CAPTURES_DIR,
+    taskId,
+    result,
+    log: (m) => process.stderr.write(m),
+  });
 }
 
 /**
@@ -2664,6 +2666,10 @@ export const _testHooks = {
   invalidateStalenessCache() {
     _stalenessCache.invalidate();
   },
+  // Where per-turn KB retrieval captures land. The append/ordinal/zero-item
+  // behaviour itself is unit-tested against src/retrieval/capture-store.js, which
+  // needs no server fixture.
+  RETRIEVAL_CAPTURES_DIR,
 };
 
 async function shutdown(signal) {

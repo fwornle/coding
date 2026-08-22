@@ -72,3 +72,51 @@ test('age sweeper deletes >retention, keeps <=retention, never throws on bad dir
     tmp.cleanup();
   }
 });
+
+/** Write <repo>/.data/retrieval-captures/<name> and back-date it. */
+function seedCapture(repoRoot, name, ageDays) {
+  const dir = path.join(repoRoot, '.data', 'retrieval-captures');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, '{"turn":0,"items":[]}\n');
+  const when = new Date((Date.now() / 1000 - ageDays * DAY_SECS) * 1000);
+  fs.utimesSync(file, when, when);
+  return file;
+}
+
+test('age sweeper reclaims aged per-turn KB retrieval captures (flat dir)', () => {
+  const tmp = mkTmpMeasurementsDir();
+  try {
+    const oldJsonl = seedCapture(tmp.dir, 'sess-old.jsonl', 30);
+    const freshJsonl = seedCapture(tmp.dir, 'sess-fresh.jsonl', 1);
+    // Legacy single-turn captures are superseded by .jsonl and swept on the same policy.
+    const oldLegacy = seedCapture(tmp.dir, 'sess-legacy.json', 30);
+
+    const res = runSweeper(tmp.dir, 14);
+    assert.equal(res.status, 0, `sweeper exited non-zero: ${res.stderr}`);
+    assert.equal(fs.existsSync(oldJsonl), false, 'aged .jsonl capture should be deleted');
+    assert.equal(fs.existsSync(oldLegacy), false, 'aged legacy .json capture should be deleted');
+    assert.equal(fs.existsSync(freshJsonl), true, 'fresh .jsonl capture should survive');
+  } finally {
+    tmp.cleanup();
+  }
+});
+
+test('retrieval-captures sweep runs even when the measurements dir is absent', () => {
+  // REGRESSION: the sweeper used to `exit 0` the moment .data/measurements was
+  // missing, which would have skipped the (independent) retrieval-captures pass
+  // entirely on any host that has KB captures but no measurement spans.
+  const tmp = mkTmpMeasurementsDir();
+  try {
+    const oldJsonl = seedCapture(tmp.dir, 'sess-old.jsonl', 30);
+    assert.equal(fs.existsSync(path.join(tmp.dir, '.data', 'measurements')), false,
+      'precondition: no measurements dir');
+
+    const res = runSweeper(tmp.dir, 14);
+    assert.equal(res.status, 0, `sweeper exited non-zero: ${res.stderr}`);
+    assert.equal(fs.existsSync(oldJsonl), false,
+      'aged capture must be reclaimed despite the absent measurements dir');
+  } finally {
+    tmp.cleanup();
+  }
+});

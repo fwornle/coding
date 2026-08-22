@@ -17,6 +17,7 @@ import { spawn, execSync } from 'child_process';
 import net from 'net';
 import { parse as parseYaml } from 'yaml';
 import { runIfMain } from '../../lib/utils/esm-cli.js';
+import { readCaptures } from '../../src/retrieval/capture-store.js';
 import { createRequire } from 'node:module';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
 // RetrievalService now runs in the host Observations API service. The
@@ -5157,10 +5158,20 @@ class SystemHealthAPIServer {
     }
 
     /**
-     * GET /api/retrieve-capture?task_id=... — the structured per-item KB capture
-     * for a run (Phase B). Read straight from the bind-mounted .data written by the
+     * GET /api/retrieve-capture?task_id=...[&turn=N] — the structured per-item KB
+     * capture for a run. Read straight from the bind-mounted .data written by the
      * obs-api /api/retrieve handler; degrade to an empty set on miss (a run that
      * predates the capture, or an agent that injects no KB block).
+     *
+     * TWO on-disk formats. Current: `<id>.jsonl`, one append-only line per TURN
+     * ({turn, capturedAt, meta, items, trace}). Legacy: `<id>.json`, a single object
+     * holding only the session's LAST turn (the pre-per-turn writer overwrote it on
+     * every retrieval). `.jsonl` wins when both exist.
+     *
+     * Response shape is back-compatible: top-level `items`/`meta` are the SELECTED
+     * turn — `&turn=N`, else the last — so the existing explainer keeps working
+     * untouched, while `turns[]` carries the full per-turn history for the new turn
+     * selector and `trace` feeds the drop-off funnel.
      */
     /**
      * Window-match fallback for /api/context-breakdown (see route comment).
@@ -5238,15 +5249,33 @@ class SystemHealthAPIServer {
     async handleRetrieveCapture(req, res) {
         const taskId = String(req.query.task_id || '').trim();
         if (!taskId) return res.status(400).json({ error: 'task_id is required' });
-        const safe = taskId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 200);
-        const file = join(codingRoot, '.data', 'retrieval-captures', `${safe}.json`);
+        const dir = join(codingRoot, '.data', 'retrieval-captures');
+        const empty = { task_id: taskId, items: [], meta: null, turns: [] };
         try {
-            if (!existsSync(file)) return res.json({ task_id: taskId, items: [] });
-            const data = JSON.parse(readFileSync(file, 'utf8'));
-            res.json(data);
+            // Shared with the obs-api writer so the two processes cannot drift on
+            // format, sanitizer or legacy-fallback rules.
+            const turns = readCaptures({ dir, taskId });
+            if (turns.length === 0) return res.json(empty);
+
+            // Selected turn: explicit &turn=N (matched on the recorded ordinal), else
+            // the last. An out-of-range N falls back to the last rather than 404ing.
+            const wantTurn = req.query.turn !== undefined ? Number(req.query.turn) : null;
+            const selected = (Number.isInteger(wantTurn)
+                ? turns.find((t) => t.turn === wantTurn)
+                : null) ?? turns[turns.length - 1];
+
+            res.json({
+                task_id: taskId,
+                turn: selected.turn ?? 0,
+                capturedAt: selected.capturedAt ?? null,
+                meta: selected.meta ?? null,
+                items: Array.isArray(selected.items) ? selected.items : [],
+                trace: selected.trace ?? null,
+                turns,
+            });
         } catch (err) {
             process.stderr.write(`[RetrievalAPI] capture read error: ${err.message}\n`);
-            res.json({ task_id: taskId, items: [] });
+            res.json(empty);
         }
     }
 }
