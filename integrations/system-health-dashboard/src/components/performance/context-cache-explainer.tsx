@@ -390,6 +390,79 @@ interface KbCaptureMeta {
   latency_ms?: number
 }
 
+// The selection funnel (retrieval-service.js `trace`). Retrieval keeps only a handful
+// of the ~80 candidates it fetches; without this the UI could say "why this item" but
+// never "why not that one", and a turn that injected NOTHING looked identical to a turn
+// where the hook never ran. Each stage's `dropped` names its casualties.
+interface KbTraceDrop {
+  id: string | number | null
+  tier: string | null
+  title: string
+  rrfScore: number | null
+  score: number | null
+  reason?: string // assembly only: 'tier-cap' | 'dedup' | 'budget'
+}
+interface KbTraceStage {
+  name: string
+  in: number
+  out: number
+  dropped: KbTraceDrop[]      // capped sample, highest-ranked (the near-misses) first
+  dropped_total?: number      // exact count; absent on captures written before the cap
+  note?: string
+}
+interface KbTrace {
+  candidates?: { semantic?: number; keyword?: number; fused?: number }
+  stages: KbTraceStage[]
+  injected?: number
+  tokens_used?: number
+  budget?: number
+  working_memory_included?: boolean
+  judge_outcome?: string | null
+}
+
+// One captured turn. The capture is append-only, one line per retrieval — a session
+// used to keep only its LAST turn because the writer overwrote a single file.
+interface KbCaptureTurn {
+  turn: number
+  capturedAt?: string | null
+  meta?: KbCaptureMeta | null
+  items?: KbCaptureItem[]
+  trace?: KbTrace | null
+  legacy?: boolean
+}
+
+// Human-readable stage labels + what the stage actually does. Keyed by the `name`
+// retrieval-service.js emits; an unknown stage falls back to its raw name so a new
+// backend stage shows up rather than silently disappearing.
+const KB_STAGE_LABELS: Record<string, { label: string; what: string }> = {
+  'idf-floor': {
+    label: 'Relevance floor',
+    what: 'Drops candidates sharing no discriminating keyword with the prompt. Lenient by design — the judge below is the real precision gate.',
+  },
+  'experiment-tier-gate': {
+    label: 'Curated-tier gate',
+    what: 'Experiment cells only: keeps insights + knowledge-graph entities, drops episodic digests/observations.',
+  },
+  'judge-topk': {
+    label: 'Top-K trim',
+    what: 'Only the highest-ranked handful fit the token budget, so the tail is cut before the judge is asked.',
+  },
+  judge: {
+    label: 'LLM relevance judge',
+    what: 'A cheap batched LLM call keeps only items that genuinely help with THIS task. Fails open (keeps the heuristic set) interactively, closed (injects nothing) for experiment cells.',
+  },
+  assembly: {
+    label: 'Budget assembly',
+    what: 'Per-tier caps, near-duplicate collapse, and the token ceiling. Anything past the ceiling is lost regardless of rank.',
+  },
+}
+
+const KB_DROP_REASONS: Record<string, string> = {
+  'tier-cap': 'tier full',
+  dedup: 'near-duplicate',
+  budget: 'over budget',
+}
+
 // Split the captured query back into the user-prompt part and the `[context: …]`
 // conversation-topic enrichment the hook appended (the closing bracket may be
 // missing when the 500-char truncation cut through it).
@@ -517,6 +590,111 @@ function KbScoredCard({ item, queryWords }: { item: KbCaptureItem; queryWords?: 
   )
 }
 
+/** One dropped candidate in the funnel — same identity cues as a kept card, minus the body. */
+function KbDropRow({ drop }: { drop: KbTraceDrop }): ReactNode {
+  return (
+    <li className="flex items-start justify-between gap-2 py-0.5" data-testid="kb-funnel-drop">
+      <span className="min-w-0 flex-1 truncate" title={drop.title}>{drop.title}</span>
+      <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
+        {drop.reason && <span className="rounded bg-muted px-1">{KB_DROP_REASONS[drop.reason] ?? drop.reason}</span>}
+        {drop.tier && <span className="opacity-70">{drop.tier}</span>}
+        {typeof drop.rrfScore === 'number' && <span>rel {drop.rrfScore.toFixed(3)}</span>}
+      </span>
+    </li>
+  )
+}
+
+/**
+ * The drop-off funnel: how ~80 candidates became the handful that were injected.
+ *
+ * This is the "why NOT that one" half of the explanation. Each stage shows what it
+ * received, what it passed on, and — expandable — exactly which items it killed. When
+ * a stage takes the count to zero it is called out explicitly, because "nothing was
+ * injected" is the case that used to leave no record whatsoever.
+ */
+function KbFunnel({ trace }: { trace: KbTrace }): ReactNode {
+  const stages = trace.stages ?? []
+  if (stages.length === 0) return null
+  const start = stages[0].in
+  const emptiedAt = stages.find((s) => s.in > 0 && s.out === 0) ?? null
+  // Bar widths are relative to the widest stage input, so the taper is readable even
+  // when the first stage already dominates.
+  const pct = (n: number) => (start > 0 ? Math.max(2, Math.round((n / start) * 100)) : 0)
+
+  return (
+    <div className="mt-3 rounded-md border p-3" data-testid="kb-funnel">
+      <p className="text-sm font-semibold">Why these items — and not the others</p>
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        Retrieval fetched{' '}
+        <span className="font-medium text-foreground">
+          {trace.candidates?.fused ?? start} candidate{(trace.candidates?.fused ?? start) === 1 ? '' : 's'}
+        </span>
+        {typeof trace.candidates?.semantic === 'number' && typeof trace.candidates?.keyword === 'number' && (
+          <> ({trace.candidates.semantic} semantic + {trace.candidates.keyword} keyword, fused)</>
+        )}
+        {' '}and injected <span className="font-medium text-foreground">{trace.injected ?? 0}</span>
+        {typeof trace.tokens_used === 'number' && <> using {trace.tokens_used} tokens</>}
+        {typeof trace.budget === 'number' && <> of a {trace.budget}-token semantic budget</>}.
+        Expand a stage to see what it dropped.
+      </p>
+
+      {emptiedAt && (
+        <p className="mt-2 rounded border border-dashed px-2 py-1 text-[11px] text-muted-foreground" data-testid="kb-funnel-emptied">
+          <span className="font-medium text-foreground">Nothing was injected this turn.</span>{' '}
+          Every remaining candidate was dropped at{' '}
+          <span className="font-medium text-foreground">{KB_STAGE_LABELS[emptiedAt.name]?.label ?? emptiedAt.name}</span>
+          {emptiedAt.note ? ` — ${emptiedAt.note}.` : '.'} That is the gate working, not a failure.
+        </p>
+      )}
+
+      <ol className="mt-2 space-y-1.5">
+        {stages.map((s) => {
+          const meta = KB_STAGE_LABELS[s.name]
+          // Trust the stage's own arithmetic for the count, not the (capped) sample
+          // length. `dropped_total` is absent on captures written before the cap.
+          const lost = s.in - s.out
+          const namedCount = s.dropped?.length ?? 0
+          const totalDropped = s.dropped_total ?? namedCount
+          const truncated = totalDropped > namedCount
+          return (
+            <li key={s.name} data-testid={`kb-funnel-stage-${s.name}`}>
+              <details className="rounded border">
+                <summary className={`flex cursor-pointer items-center gap-2 px-2 py-1 text-xs ${lost === 0 ? 'opacity-70' : ''}`}>
+                  <span className="min-w-0 flex-1 truncate font-medium" title={meta?.what}>{meta?.label ?? s.name}</span>
+                  <span className="h-1.5 w-24 shrink-0 overflow-hidden rounded bg-muted" aria-hidden="true">
+                    <span className="block h-full rounded bg-foreground/40" style={{ width: `${pct(s.out)}%` }} />
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    {s.in} → {s.out}{lost > 0 && <span className="ml-1 text-foreground/70">−{lost}</span>}
+                  </span>
+                </summary>
+                <div className="border-t px-2 py-1.5">
+                  {meta?.what && <p className="mb-1 text-[11px] text-muted-foreground">{meta.what}</p>}
+                  {s.note && <p className="mb-1 text-[11px] italic text-muted-foreground">{s.note}</p>}
+                  {lost === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">Dropped nothing — every candidate passed.</p>
+                  ) : (
+                    <>
+                      <ul className="text-[11px]">
+                        {s.dropped.map((d, i) => <KbDropRow key={`${d.id ?? 'x'}-${i}`} drop={d} />)}
+                      </ul>
+                      {truncated && (
+                        <p className="mt-1 text-[10px] italic text-muted-foreground" data-testid="kb-funnel-truncated">
+                          Showing the {namedCount} highest-ranked of {totalDropped} dropped — the rest ranked below these.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </details>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
+}
+
 // 3rd-level sub-modal: the FULL captured content of one KB section. Prefers the
 // structured (scored) capture when present, else falls back to the markdown blocks
 // parsed from the injected text. Stacks on top of KbDetailDialog (Radix nesting).
@@ -575,7 +753,18 @@ function KbCategoryDialog({ name, section, structured, queryWords, onClose }: {
 }
 
 /** Nested pop-up: the deep detail for the Retrieved-Knowledge injection. */
-function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open: boolean; onClose: () => void; real: RealBreakdown | null; agent?: string | null; kbItems?: KbCaptureItem[] | null; kbMeta?: KbCaptureMeta | null }) {
+function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta, kbTrace, kbTurns, selectedTurn, onSelectTurn }: {
+  open: boolean
+  onClose: () => void
+  real: RealBreakdown | null
+  agent?: string | null
+  kbItems?: KbCaptureItem[] | null
+  kbMeta?: KbCaptureMeta | null
+  kbTrace?: KbTrace | null
+  kbTurns?: KbCaptureTurn[] | null
+  selectedTurn?: number | null
+  onSelectTurn?: (turn: number) => void
+}) {
   const injected = real?.knowledge_text?.trim() || null
   const sections = useMemo(() => parseKnowledgeSections(injected), [injected])
   const [openSection, setOpenSection] = useState<string | null>(null)
@@ -585,6 +774,11 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open:
     const tier = nm ? SECTION_TIER[nm] : undefined
     return tier && kbItems ? kbItems.filter((i) => i.tier === tier) : []
   }
+  const turns = kbTurns ?? []
+  // A session retrieves once per user prompt, so >1 turn is the norm; the selector is
+  // only noise when there is a single capture (or a legacy one, which by construction
+  // is the session's last turn and the only one that survived the old overwrite).
+  const showTurnPicker = turns.length > 1
   // Claude (UserPromptSubmit hook) and OpenCode (chat.messages.transform plugin)
   // inject the KB block per prompt. Copilot exposes no per-prompt hook API, so it
   // genuinely can't — its empty-state must say so rather than a misleading "re-run".
@@ -631,6 +825,44 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open:
           </div>
         )}
 
+        {showTurnPicker && (
+          <div className="mt-3 rounded-md border p-3" data-testid="kb-turn-picker">
+            <p className="text-sm font-semibold">
+              Retrieval ran {turns.length} times in this session — one per prompt
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Each turn retrieved against its OWN prompt, so the injected set differs turn to turn.
+              Pick a turn to see what it was given and why.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {turns.map((t) => {
+                const active = t.turn === selectedTurn
+                const n = t.items?.length ?? 0
+                return (
+                  <button
+                    key={t.turn}
+                    type="button"
+                    onClick={() => onSelectTurn?.(t.turn)}
+                    data-testid="kb-turn-button"
+                    aria-pressed={active}
+                    title={`${t.capturedAt ?? ''} — ${n} item${n === 1 ? '' : 's'} injected`}
+                    className={`rounded border px-2 py-0.5 font-mono text-[10px] ${
+                      active ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted'
+                    } ${n === 0 && !active ? 'opacity-50' : ''}`}
+                  >
+                    {t.turn + 1}
+                    <span className="ml-1 opacity-70">{n}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Small number = items injected on that turn. A <span className="font-mono">0</span> is a real
+              answer, not a gap — expand its funnel below to see which stage emptied it.
+            </p>
+          </div>
+        )}
+
         {capturedPrompt && (
           <div className="mt-3 rounded-md border p-3" data-testid="kb-query-block">
             <p className="text-sm font-semibold">The prompt that drove this retrieval</p>
@@ -656,6 +888,8 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open:
           </div>
         )}
 
+        {kbTrace && <KbFunnel trace={kbTrace} />}
+
         <div className="mt-3 rounded-md border p-3">
           <p className="text-sm font-semibold">Budget: 1,000 tokens</p>
           <div className="mt-2 flex h-4 w-full overflow-hidden rounded" title="300 Working Memory + 700 semantic">
@@ -668,7 +902,14 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open:
           </p>
         </div>
 
-        <div className="mt-3 space-y-1.5">
+        {/* `min-w-0` is load-bearing. DialogContent is a CSS grid, and a grid item's
+            automatic minimum size is min-content — so this list of section rows (whose
+            rows contain nowrap `truncate` text) refused to shrink and widened the grid
+            column to 809px inside a 758px dialog. The dialog clips with
+            overflow-x-hidden, so ~50px of EVERY row in the modal was silently cut off
+            at the right edge. Verified by bisection: hiding this subtree took the
+            dialog's scrollWidth from 857 back to exactly its 758px clientWidth. */}
+        <div className="mt-3 min-w-0 space-y-1.5">
           {KB_SECTIONS.map((s) => {
             const sec = sections[s.name]
             const hasContent = !!sec && sec.items.length > 0
@@ -927,6 +1168,11 @@ export function ContextCacheExplainer() {
   // fallback still renders the content).
   const [kbItems, setKbItems] = useState<KbCaptureItem[] | null>(null)
   const [kbMeta, setKbMeta] = useState<KbCaptureMeta | null>(null)
+  // Per-turn captures for this run + which one is on screen. The capture is
+  // append-only (one line per retrieval); `null` selects the last turn, matching the
+  // server's default and the behaviour before per-turn capture existed.
+  const [kbTurns, setKbTurns] = useState<KbCaptureTurn[] | null>(null)
+  const [selectedTurn, setSelectedTurn] = useState<number | null>(null)
 
   const open = taskId != null
   const close = () => dispatch(setExplainTaskId(null))
@@ -965,22 +1211,42 @@ export function ContextCacheExplainer() {
     return () => { cancelled = true }
   }, [open, taskId, run?.started_at, run?.ended_at]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Phase B: the structured per-item KB capture for this run (scored cards).
+  // The structured per-item KB capture for this run (scored cards + funnel). One
+  // request returns EVERY captured turn, so switching turns is local state — no
+  // refetch, and no chance of a stale response landing on the wrong turn.
   useEffect(() => {
-    if (!open || !taskId) { setKbItems(null); setKbMeta(null); return }
+    if (!open || !taskId) { setKbItems(null); setKbMeta(null); setKbTurns(null); setSelectedTurn(null); return }
     let cancelled = false
     setKbItems(null)
     setKbMeta(null)
+    setKbTurns(null)
+    setSelectedTurn(null)
     fetch(`/api/retrieve-capture?task_id=${encodeURIComponent(taskId)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (cancelled || !d) return
+        // Back-compat: top-level items/meta are the server's selected (last) turn.
         if (Array.isArray(d.items)) setKbItems(d.items as KbCaptureItem[])
         if (d.meta && typeof d.meta === 'object') setKbMeta(d.meta as KbCaptureMeta)
+        if (Array.isArray(d.turns) && d.turns.length > 0) {
+          const turns = d.turns as KbCaptureTurn[]
+          setKbTurns(turns)
+          setSelectedTurn(turns[turns.length - 1].turn)
+        }
       })
       .catch(() => { /* no structured capture — markdown parse still renders content */ })
     return () => { cancelled = true }
   }, [open, taskId])
+
+  // The turn on screen. Falls back to the server's top-level fields when the capture
+  // predates per-turn recording (legacy single-object `.json`).
+  const activeTurn = useMemo(() => {
+    if (!kbTurns || kbTurns.length === 0) return null
+    return kbTurns.find((t) => t.turn === selectedTurn) ?? kbTurns[kbTurns.length - 1]
+  }, [kbTurns, selectedTurn])
+  const activeKbItems = activeTurn?.items ?? kbItems
+  const activeKbMeta = activeTurn?.meta ?? kbMeta
+  const activeKbTrace = activeTurn?.trace ?? null
 
   const s = useMemo(() => summarize(timeline, contextTurns), [timeline, contextTurns])
 
@@ -1590,7 +1856,18 @@ export function ContextCacheExplainer() {
           </p>
         </div>
 
-        <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} agent={agent} kbItems={kbItems} kbMeta={kbMeta} />
+        <KbDetailDialog
+          open={kbOpen}
+          onClose={() => setKbOpen(false)}
+          real={activeReal}
+          agent={agent}
+          kbItems={activeKbItems}
+          kbMeta={activeKbMeta}
+          kbTrace={activeKbTrace}
+          kbTurns={kbTurns}
+          selectedTurn={selectedTurn}
+          onSelectTurn={setSelectedTurn}
+        />
         <CategoryDetailModal
           segKey={catOpen}
           onClose={() => setCatOpen(null)}

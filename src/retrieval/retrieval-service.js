@@ -47,6 +47,31 @@ const JUDGE_TOP_K = 12;
  * @param {object} r fused candidate (or a token-budget `skipped` entry)
  * @returns {{id: string|null, tier: string|null, title: string, rrfScore: number|null, score: number|null}}
  */
+/**
+ * How many dropped candidates a single stage names. The `judge-topk` stage routinely
+ * drops 40+ (everything ranked below the batch ceiling), and naming them all made the
+ * trace ~7 KB per turn on its own — for the least informative drop there is: "ranked
+ * too low". Capping keeps a turn's capture at ~5 KB rather than ~15 KB.
+ */
+const TRACE_MAX_DROPPED = 12;
+
+/**
+ * Describe a stage's casualties, highest-ranked first, capped — with an EXACT total
+ * alongside so a truncated list can never read as a complete one. Ordering by rrfScore
+ * means the entries kept are the near-misses, which is what a reader wants to see; the
+ * tail below them is uniformly uninteresting.
+ *
+ * @param {Array<object>} dropped every candidate the stage dropped
+ * @returns {{dropped: object[], dropped_total: number}}
+ */
+function listDropped(dropped) {
+  const ranked = [...dropped].sort((a, b) => (b?.rrfScore ?? -Infinity) - (a?.rrfScore ?? -Infinity));
+  return {
+    dropped: ranked.slice(0, TRACE_MAX_DROPPED).map((r) => describeCandidate(r)),
+    dropped_total: dropped.length,
+  };
+}
+
 function describeCandidate(r) {
   const p = r?.payload || {};
   return {
@@ -215,11 +240,12 @@ export class RetrievalService {
     const stages = [];
     const stage = (name, before, after, note) => {
       const kept = new Set(after.map((r) => String(r.id)));
+      const dropped = before.filter((r) => !kept.has(String(r.id)));
       stages.push({
         name,
         in: before.length,
         out: after.length,
-        dropped: before.filter((r) => !kept.has(String(r.id))).map((r) => describeCandidate(r)),
+        ...listDropped(dropped),
         ...(note ? { note } : {}),
       });
     };
@@ -292,11 +318,13 @@ export class RetrievalService {
     // judged set so the Phase-B `items` capture also reflects only genuinely-useful items.
     const { markdown, tokensUsed, items, skipped } = assembleBudgetedMarkdown(relevant, effectiveSemanticBudget);
     // Assembly drops for three distinct reasons; keep them distinguishable in the funnel.
+    const assemblyDrops = [...(skipped || [])].sort((a, b) => (b?.rrfScore ?? -Infinity) - (a?.rrfScore ?? -Infinity));
     stages.push({
       name: 'assembly',
       in: relevant.length,
       out: items.length,
-      dropped: (skipped || []).map((s) => ({ ...describeCandidate(s), reason: s.reason })),
+      dropped: assemblyDrops.slice(0, TRACE_MAX_DROPPED).map((s) => ({ ...describeCandidate(s), reason: s.reason })),
+      dropped_total: assemblyDrops.length,
       note: `tier caps, content dedup and the ${effectiveSemanticBudget}-token budget`,
     });
 

@@ -96,7 +96,11 @@ describe('retrieve() selection trace (the drop-off funnel)', () => {
     expect(trace).toBeTruthy();
     expect(trace.stages.length).toBeGreaterThan(0);
     for (const s of trace.stages) {
-      expect(s.out + s.dropped.length).toBe(s.in);
+      // `dropped_total` is exact; `dropped` is a capped sample of it (see
+      // TRACE_MAX_DROPPED). Reconciliation is asserted against the total so a
+      // truncated sample can never be mistaken for a complete one.
+      expect(s.out + s.dropped_total).toBe(s.in);
+      expect(s.dropped.length).toBeLessThanOrEqual(s.dropped_total);
     }
     // Stages chain: each stage's input is the previous stage's output.
     for (let i = 1; i < trace.stages.length; i += 1) {
@@ -314,5 +318,67 @@ describe('judgeRelevance onTrace (observability without changing the verdict)', 
       onTrace: () => { throw new Error('sink exploded'); },
     });
     expect(kept.map((c) => c.id)).toEqual(['a']);
+  });
+});
+
+describe('trace size is bounded without ever misreporting the count', () => {
+  let RetrievalService;
+  let codingRoot;
+
+  const insight = (id, topic, summary) => ({
+    id, tier: 'insights',
+    payload: { topic, summary_preview: summary, confidence: 0.9, date: '2026-07-01T00:00:00.000Z' },
+  });
+
+  beforeAll(async () => {
+    _quietStderr = true;
+    ({ RetrievalService } = await import('../../src/retrieval/retrieval-service.js'));
+    codingRoot = mkdtempSync(path.join(tmpdir(), 'trace-cap-'));
+    mkdirSync(path.join(codingRoot, '.planning'), { recursive: true });
+    writeFileSync(path.join(codingRoot, '.planning', 'STATE.md'), '---\nmilestone: m\nstatus: executing\n---\n');
+  }, 30000);
+
+  afterAll(() => {
+    try { if (codingRoot) rmSync(codingRoot, { recursive: true, force: true }); } catch { /* best-effort */ }
+    _quietStderr = false;
+  });
+
+  test('a stage dropping 50 names at most 12 of them but reports all 50', async () => {
+    // 50 candidates that share no discriminating word with the query → all hit the floor.
+    const candidates = Array.from({ length: 50 }, (_, i) =>
+      insight(`off-${i}`, `Statusline Emoji Width ${i}`, 'tmux codepoint widths and padding'));
+    const svc = new RetrievalService({ codingRoot, judge: async (_q, c) => c });
+    svc._initialized = true;
+    svc.embeddingService = { embedOne: async () => new Array(384).fill(0.01) };
+    svc._semanticSearch = async () => candidates.map((c) => ({ ...c, payload: { ...c.payload } }));
+    svc._keywordSearch = () => [];
+    svc._applyFreshnessRerank = async () => {};
+
+    const { trace } = await svc.retrieve('knowledge injection budget relevance', { taskId: 'sess-cap' });
+
+    const floor = trace.stages.find((s) => s.name === 'idf-floor');
+    expect(floor.dropped_total).toBe(50);
+    expect(floor.dropped.length).toBe(12);
+    expect(floor.in).toBe(50);
+    expect(floor.out).toBe(0);
+  });
+
+  test('the named drops are the highest-ranked ones (the near-misses)', async () => {
+    const ranked = Array.from({ length: 30 }, (_, i) => ({
+      ...insight(`off-${i}`, `Statusline Emoji Width ${i}`, 'tmux codepoint widths'),
+    }));
+    const svc = new RetrievalService({ codingRoot, judge: async (_q, c) => c });
+    svc._initialized = true;
+    svc.embeddingService = { embedOne: async () => new Array(384).fill(0.01) };
+    // Descending cosine → descending rrfScore after fusion.
+    svc._semanticSearch = async () => ranked.map((c, i) => ({ ...c, score: 1 - i * 0.01, payload: { ...c.payload } }));
+    svc._keywordSearch = () => [];
+    svc._applyFreshnessRerank = async () => {};
+
+    const { trace } = await svc.retrieve('knowledge injection budget relevance', { taskId: 'sess-rank' });
+
+    const floor = trace.stages.find((s) => s.name === 'idf-floor');
+    const scores = floor.dropped.map((d) => d.rrfScore ?? -Infinity);
+    expect([...scores].sort((a, b) => b - a)).toEqual(scores); // already descending
   });
 });
