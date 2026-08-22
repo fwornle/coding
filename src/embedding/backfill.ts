@@ -296,33 +296,41 @@ async function backfillTier(
     // every point as current and the longer preview never reaches the index. Points
     // written before the stamp existed carry no preview_version and so never match,
     // which is exactly right: they predate the policy and must be rebuilt once.
+    // SCOPED TO THE ITEM'S OWN ID. Matching content_hash anywhere in the collection is
+    // wrong and silently loses data: the live listener indexes items under its own ids,
+    // so a "this content already exists" hit would skip the upsert at the SOURCE id, and
+    // --prune would then delete the listener's differently-keyed copy because that id is
+    // absent from the source — leaving the item in neither place. That cost 83 items on
+    // the first run (85 "skipped", 83 missing afterwards).
+    //
+    // Retrieving the whole batch by id in one request also replaces one HTTP round trip
+    // PER ITEM with one per batch (14k calls -> ~220).
     const toEmbed: Array<BackfillItem & { hash: string }> = [];
+    let current = new Map<string, Record<string, unknown>>();
+    try {
+      const found = await qdrant.retrieve(collectionName, {
+        ids: batch.map((item) => item.id),
+        with_payload: true,
+        with_vector: false,
+      });
+      current = new Map(found.map((p) => [String(p.id), (p.payload ?? {}) as Record<string, unknown>]));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Fail toward re-embedding: an unreadable index must never be read as "current".
+      process.stderr.write(
+        `[Backfill] Warning: id lookup failed for a ${collectionName} batch: ${msg}\n`
+      );
+    }
 
     for (let j = 0; j < batch.length; j++) {
-      try {
-        const existing = await qdrant.scroll(collectionName, {
-          filter: {
-            must: [
-              { key: "content_hash", match: { value: hashes[j] } },
-              { key: "preview_version", match: { value: SUMMARY_PREVIEW_CHARS } },
-            ],
-          },
-          limit: 1,
-          with_payload: false,
-          with_vector: false,
-        });
-
-        if (existing.points.length === 0) {
-          toEmbed.push({ ...batch[j], hash: hashes[j] });
-        } else {
-          skipped++;
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        process.stderr.write(
-          `[Backfill] Warning: scroll check failed for ${batch[j].id}: ${msg}\n`
-        );
-        // If scroll fails, try to embed anyway
+      const payload = current.get(String(batch[j].id));
+      const isCurrent =
+        payload !== undefined &&
+        payload.content_hash === hashes[j] &&
+        payload.preview_version === SUMMARY_PREVIEW_CHARS;
+      if (isCurrent) {
+        skipped++;
+      } else {
         toEmbed.push({ ...batch[j], hash: hashes[j] });
       }
     }
