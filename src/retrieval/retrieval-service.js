@@ -37,6 +37,28 @@ const EXPERIMENT_CURATED_TIERS = new Set(['insights', 'kg_entities']);
 const JUDGE_TOP_K = 12;
 
 /**
+ * Compact description of a candidate for the selection trace.
+ *
+ * Deliberately NOT the full payload: a trace is written on every turn and a rejected
+ * item only needs enough to be recognisable in the funnel (what it was, how it scored).
+ * Carrying `summary_preview` for every dropped candidate would multiply the on-disk
+ * capture several-fold for items the reader chose not to inject.
+ *
+ * @param {object} r fused candidate (or a token-budget `skipped` entry)
+ * @returns {{id: string|null, tier: string|null, title: string, rrfScore: number|null, score: number|null}}
+ */
+function describeCandidate(r) {
+  const p = r?.payload || {};
+  return {
+    id: r?.id ?? null,
+    tier: r?.tier ?? null,
+    title: p.topic || p.theme || p.entityType || (p.agent ? `${p.agent}${p.date ? ` · ${p.date}` : ''}` : '(untitled)'),
+    rrfScore: typeof r?.rrfScore === 'number' ? r.rrfScore : null,
+    score: typeof r?.score === 'number' ? r.score : null,
+  };
+}
+
+/**
  * Orchestrates hybrid retrieval: embed query, parallel semantic + keyword search,
  * RRF fusion, and token-budgeted markdown assembly.
  */
@@ -186,7 +208,26 @@ export class RetrievalService {
     // RANK (rare-term matches rise); this floor is intentionally lenient because the LLM judge
     // below — not this heuristic — is the precision gate. Unannotated items (no rrfScore, or a
     // keyword-less query) are KEPT (fail-open).
-    let relevant = fused.filter((r) => r._relevanceWeight === undefined || r._relevanceWeight > 0);
+    // Selection funnel (see `trace` in the return value). Each stage records how many
+    // candidates went in, how many came out, and WHICH were dropped — the answer to
+    // "why was this injected, and why was that not?". Assembled as we go because the
+    // stages mutate `relevant` in place and the intermediate sets are otherwise lost.
+    const stages = [];
+    const stage = (name, before, after, note) => {
+      const kept = new Set(after.map((r) => String(r.id)));
+      stages.push({
+        name,
+        in: before.length,
+        out: after.length,
+        dropped: before.filter((r) => !kept.has(String(r.id))).map((r) => describeCandidate(r)),
+        ...(note ? { note } : {}),
+      });
+    };
+
+    const afterFloor = fused.filter((r) => r._relevanceWeight === undefined || r._relevanceWeight > 0);
+    stage('idf-floor', fused, afterFloor,
+      'dropped: shares no discriminating keyword with the query');
+    let relevant = afterFloor;
 
     // Step 4.66: Experiment-cell structural gate. ONLY for experiment cells (taskId
     // '<exp>--<variant>--rN'): keep curated know-how tiers (insights + kg_entities), dropping
@@ -195,7 +236,10 @@ export class RetrievalService {
     // semantically by the LLM judge below, so the old fixed EXPERIMENT_META_RE regex is gone.)
     // Interactive sessions keep all tiers.
     if (isExperiment) {
-      relevant = relevant.filter((r) => EXPERIMENT_CURATED_TIERS.has(r.tier));
+      const gated = relevant.filter((r) => EXPERIMENT_CURATED_TIERS.has(r.tier));
+      stage('experiment-tier-gate', relevant, gated,
+        'experiment cell: curated know-how tiers only (insights + kg_entities)');
+      relevant = gated;
     }
 
     // Step 4.7: Freshness rerank — demote insights whose backticked code
@@ -220,7 +264,13 @@ export class RetrievalService {
     // error/timeout/unparseable response, so a proxy outage degrades to the IDF-floored set —
     // never to empty, never blocking. Cached per (query, candidate-ids). Only the top-K are judged
     // (that is all the token budget can hold); the tail is dropped, which is the IDF trim.
-    relevant = await this._judge(query, relevant.slice(0, JUDGE_TOP_K), {
+    // Only the top-K reach the judge; the tail is dropped here, not by the judge.
+    const judgePool = relevant.slice(0, JUDGE_TOP_K);
+    stage('judge-topk', relevant, judgePool,
+      `only the top ${JUDGE_TOP_K} fit the token budget — the tail is trimmed before judging`);
+
+    let judgeOutcome = null;
+    relevant = await this._judge(query, judgePool, {
       // Experiment cells are batch measurements: give the judge a generous cap so a cold/contended
       // proxy usually completes, AND fail CLOSED (inject nothing) if it still can't — "judge-
       // confirmed know-how, or nothing". Interactive stays tight and fails OPEN to the IDF set so
@@ -228,11 +278,27 @@ export class RetrievalService {
       timeoutMs: isExperiment ? 10000 : 2500,
       failClosed: isExperiment,
       log: (m) => process.stderr.write(m),
+      onTrace: (info) => { judgeOutcome = info.outcome; },
     });
+    // The judge reports kept/dropped ids but no per-item reason — see judgeRelevance's
+    // onTrace docblock for why asking it to explain would cost injection quality.
+    stage('judge', judgePool, relevant,
+      judgeOutcome === 'fail-open' ? 'judge unavailable — failed OPEN, kept the heuristic set'
+      : judgeOutcome === 'fail-closed' ? 'judge unavailable — failed CLOSED, injected nothing'
+      : judgeOutcome === 'cache' ? 'judge verdict served from cache'
+      : 'dropped: not genuinely useful for this task');
 
     // Step 5: Token-budgeted markdown assembly (semantic budget after WM). Assembled over the
     // judged set so the Phase-B `items` capture also reflects only genuinely-useful items.
-    const { markdown, tokensUsed, items } = assembleBudgetedMarkdown(relevant, effectiveSemanticBudget);
+    const { markdown, tokensUsed, items, skipped } = assembleBudgetedMarkdown(relevant, effectiveSemanticBudget);
+    // Assembly drops for three distinct reasons; keep them distinguishable in the funnel.
+    stages.push({
+      name: 'assembly',
+      in: relevant.length,
+      out: items.length,
+      dropped: (skipped || []).map((s) => ({ ...describeCandidate(s), reason: s.reason })),
+      note: `tier caps, content dedup and the ${effectiveSemanticBudget}-token budget`,
+    });
 
     // Combine: working-memory prefix + semantic results. WM is included ONLY when at least one
     // relevant item survived the floor AND this is not an experiment cell. With zero survivors
@@ -245,9 +311,24 @@ export class RetrievalService {
     // count (post-floor), NOT the raw candidate count — that is what the hooks gate injection on.
     // `items` (Phase B) is the structured subset actually injected — each with its rrfScore/score
     // — so a caller can persist a per-item capture the dashboard renders as scored cards.
+    //
+    // `trace` is the selection funnel: every stage's in/out counts plus the items it
+    // dropped and why. It is what turns "here is what was injected" into "here is what
+    // was injected AND why nothing else was" — including the case where NOTHING was
+    // injected, which the capture used to discard silently. Purely additive: existing
+    // callers (retrieval-client.js and all four agent adapters) ignore it.
     return {
       markdown: finalMarkdown,
       items,
+      trace: {
+        candidates: { semantic: semanticResults.length, keyword: keywordHits.length, fused: fused.length },
+        stages,
+        injected: items.length,
+        tokens_used: wmTokens + tokensUsed,
+        budget: effectiveSemanticBudget,
+        working_memory_included: includeWM,
+        judge_outcome: judgeOutcome,
+      },
       meta: {
         query,
         budget,

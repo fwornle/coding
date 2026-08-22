@@ -106,11 +106,35 @@ function parseUseful(content, validIds) {
  * @param {number} [opts.timeoutMs]
  * @param {(msg:string)=>void} [opts.log]
  * @param {typeof fetch} [opts.fetchImpl] injectable for tests
+ * @param {(info:{outcome:string,keptIds:string[],droppedIds:string[],judgedCount:number})=>void} [opts.onTrace]
+ *   Observability sink for the selection funnel. Called at most once per invocation with
+ *   the outcome ('judged' | 'cache' | 'fail-open' | 'fail-closed' | 'skipped') and which
+ *   candidate ids survived. Deliberately reports NO per-item reason: the judge prompt asks
+ *   only for {"useful":[ids]}, and extending it to explain rejections would add output
+ *   tokens and latency to a call already capped at 2500ms interactive — more timeouts
+ *   means more fail-opens, i.e. degrading injection quality to buy explainability.
  * @returns {Promise<Array>} the kept subset (or all, fail-open)
  */
 export async function judgeRelevance(query, candidates, opts = {}) {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, log, fetchImpl = fetch, failClosed = false } = opts;
-  if (!query || !Array.isArray(candidates) || candidates.length === 0) return candidates;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, log, fetchImpl = fetch, failClosed = false, onTrace } = opts;
+  // Never let an observability sink break retrieval.
+  const trace = (outcome, kept, judgedCount) => {
+    if (!onTrace) return;
+    try {
+      const keptSet = new Set(kept.map((c) => String(c.id)));
+      onTrace({
+        outcome,
+        keptIds: [...keptSet],
+        droppedIds: candidates.map((c) => String(c.id)).filter((id) => !keptSet.has(id)),
+        judgedCount,
+      });
+    } catch { /* best-effort */ }
+  };
+
+  if (!query || !Array.isArray(candidates) || candidates.length === 0) {
+    trace('skipped', candidates || [], 0);
+    return candidates;
+  }
   // On failure the caller chooses the safe direction: interactive fails OPEN (keep the IDF-ranked
   // set — useful degradation), experiment cells fail CLOSED (inject nothing — "judge-confirmed or
   // nothing", never fall open to noise when the proxy is slow/down).
@@ -123,7 +147,9 @@ export async function judgeRelevance(query, candidates, opts = {}) {
 
   const hit = _cache.get(key);
   if (hit && now - hit.ts < CACHE_TTL_MS) {
-    return candidates.filter((c) => hit.ids.has(String(c.id)));
+    const kept = candidates.filter((c) => hit.ids.has(String(c.id)));
+    trace('cache', kept, pool.length);
+    return kept;
   }
 
   let keptIds;
@@ -146,6 +172,7 @@ export async function judgeRelevance(query, candidates, opts = {}) {
   } catch (err) {
     const fb = onFailure();
     log?.(`[relevance-judge] ${failClosed ? 'fail-closed (0 kept)' : `fail-open (${fb.length} kept)`}: ${err.message}\n`);
+    trace(failClosed ? 'fail-closed' : 'fail-open', fb, pool.length);
     return fb; // interactive: degrade to heuristic set; experiment: inject nothing
   }
 
@@ -156,7 +183,9 @@ export async function judgeRelevance(query, candidates, opts = {}) {
   }
   _cache.set(key, { ts: now, ids: keptIds });
 
-  return candidates.filter((c) => keptIds.has(String(c.id)));
+  const kept = candidates.filter((c) => keptIds.has(String(c.id)));
+  trace('judged', kept, pool.length);
+  return kept;
 }
 
 /** Test-only: clear the module cache. */
