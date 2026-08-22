@@ -1,0 +1,44 @@
+# config/experiments/kb-ab-proxy-endpoint.yaml — knowledge-injection A/B, task 3 of 3.
+#
+# See kb-ab-etm-crashloop.yaml for the full rationale. This spec varies only the task.
+#
+# WHY THIS TASK IS KNOWLEDGE-DECISIVE — AND WHY IT IS THE WEAKEST OF THE THREE (state this when
+# reporting). The decisive fact is that the local LLM proxy serves `POST /api/complete` on port
+# 12435, NOT the OpenAI-shaped `/v1/chat/completions`, and NOT on 3033 — which is the Health API
+# and will answer a POST with `Cannot POST /api/complete` as HTML, masking the wrong-port bug
+# behind a 200-shaped failure.
+#
+# Unlike the other two tasks, a determined kb-off agent CAN grep its way to `12435`: the port is
+# written in several files. What it is much less likely to produce unprompted is the TRAP — that
+# 3033 answers rather than refusing. So this task is expected to show a smaller correctness gap
+# and, if injection helps at all, to show it in tokens and wall-clock instead. Keeping one weak
+# task in the set is deliberate: three tasks that all favour the treatment would not tell you
+# whether you are measuring an effect or your own task design.
+#
+# RUN STANDALONE (one global span slot — see the sibling spec's header):
+#   node scripts/experiment-run.mjs --spec config/experiments/kb-ab-proxy-endpoint.yaml
+version: 1
+
+experiment_id: kb-ab-proxy-endpoint
+
+snapshot_id: smoke-spec
+
+goal_sentence: "Create a file named llm-proxy-client-runbook.md at the repository root telling a developer how to call this project's local LLM proxy from a host-side Node script. The file must give the exact HTTP method, port and path, show the request body fields and the response shape, and warn about the single most common way developers get this wrong and what the misleading symptom of that mistake looks like."
+
+repeats: 3
+
+task_class: docs
+
+# Fixed argv, no shell metacharacters. The port is the minimum bar; the judge's rubric and a
+# by-hand read of the diffs cover whether the run also caught the 3033 trap.
+test_command: "grep -q -F 12435 llm-proxy-client-runbook.md"
+
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-off

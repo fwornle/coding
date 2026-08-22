@@ -1,0 +1,49 @@
+# config/experiments/kb-ab-leveldb-amplification.yaml — knowledge-injection A/B, task 2 of 3.
+#
+# See kb-ab-etm-crashloop.yaml for the full rationale (why not fizzbuzz, why a written doc rather
+# than an analysis question, and the fixed-argv grading constraint). This spec varies only the
+# task.
+#
+# WHY THIS TASK IS KNOWLEDGE-DECISIVE. The bug is a chain no single file states: km-core's
+# `GraphKMStore.close()` persists by default, and `persistGraph` writes the WHOLE graph as ONE
+# value under ONE key — so a store opened purely to READ rewrites everything when it closes. On a
+# 30s-polled HTTP route that appends ~1 MB per request for a graph that exports to 8.3 MB, until
+# `open()` alone exceeds the container's 4 GiB cgroup limit and the kernel OOM-kills the server on
+# every poll. The fix is to pass `readOnly: true` (which sets `persistOnClose: false`).
+#
+# The grep target is `persistOnClose` — an option name that appears in the answer only if you know
+# the mechanism. Reading the route's code shows an ordinary open/read/close and gives no reason to
+# name it.
+#
+# A SECOND, HARDER SIGNAL worth reading off the diffs by hand (the single-pattern gate cannot
+# capture it): whether the runbook warns that `docker stats` LIES here, reporting a few hundred MB
+# against the 4 GiB limit because the spike outruns its 1s sampling, so the operator must read
+# /sys/fs/cgroup/memory.events instead. That is pure experience — an agent will not derive it.
+#
+# RUN STANDALONE (one global span slot — see the sibling spec's header):
+#   node scripts/experiment-run.mjs --spec config/experiments/kb-ab-leveldb-amplification.yaml
+version: 1
+
+experiment_id: kb-ab-leveldb-amplification
+
+snapshot_id: smoke-spec
+
+goal_sentence: "Create a file named leveldb-amplification-runbook.md at the repository root that diagnoses this symptom for an operator: a dashboard HTTP route that only READS data is polled every 30 seconds, and the container serving it is killed by the kernel out-of-memory killer on roughly every poll, even though its own startup logs are clean and fast. The file must state the root cause, name the option that fixes it, and give a cheap positive test that confirms the diagnosis before any fix is applied."
+
+repeats: 3
+
+task_class: docs
+
+# Fixed argv, no shell metacharacters. `persistOnClose` is the option whose name only a correct
+# causal answer contains.
+test_command: "grep -q -F persistOnClose leveldb-amplification-runbook.md"
+
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-off

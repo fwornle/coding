@@ -1,0 +1,68 @@
+# config/experiments/kb-ab-etm-crashloop.yaml — knowledge-injection A/B, task 1 of 3.
+#
+# WHAT THIS MEASURES. Whether the ~1000 injected tokens actually help. The `env` axis carries
+# the reserved values `kb-on` / `kb-off` (experiment-spec.mjs): `kb-off` sets
+# CODING_KNOWLEDGE_INJECTION=0 in the agent's child env so BOTH injection seams hard-off, while
+# `kb-on` fetches the GATED knowledge (obs-api /api/retrieve — IDF floor + LLM relevance judge,
+# fail-CLOSED for cells) and appends it via `claude --append-system-prompt`.
+#
+# WHY NOT FIZZBUZZ. config/experiments/compare-fizzbuzz-kbon.yaml is a single-cell plumbing
+# proof whose CORRECT outcome is that nothing is injected (the floor + judge reject every
+# irrelevant match). It cannot measure benefit — you cannot detect an effect from a task where
+# the treatment is designed to be a no-op. These three specs instead use goals whose ANSWER is
+# accumulated project know-how: causal stories that live in the KB, not in the code.
+#
+# WHY A DOC AND NOT AN ANALYSIS QUESTION. Two hard constraints:
+#   1. isTrivialRun (consequential-events.mjs, TRIVIAL_THRESHOLD=1) short-circuits any run with
+#      no state-changing tool call BEFORE the judge is paid for — a "reply in 3 sentences" goal
+#      would never be scored at all.
+#   2. Headless agents narrate-then-yield on ANALYSIS-shaped goals (opencode `run` ends at the
+#      first toolless step). An EXECUTION-shaped goal ("create this file") avoids both.
+#
+# HOW IT IS GRADED. `test_command` is spawned as a FIXED ARGV — evidence-harness.mjs rejects any
+# command carrying shell metacharacters rather than running it under a shell — so the gate is a
+# single `grep -q -F` for the one string only a correct answer contains. Here that is the symlink
+# path: the failure is that `node_modules/@fwornle/km-core` (a hand-made symlink present in NO
+# package.json, so `npm install` never restores it) has gone missing. An agent that merely reads
+# the code sees a normal import and has no reason to name that path; an agent given the insight
+# names it immediately. The judge scores the remaining four rubric dimensions from the diff.
+#
+# READ BOTH NUMBERS. Correctness may well tie — a kb-off agent can grep its way there eventually.
+# The effect is as likely to appear in tokens and wall-clock (reaching the same answer cheaper) as
+# in the score, and the runs table carries both.
+#
+# RUN STANDALONE. There is ONE global active-measurement.json span slot and a shared host proxy,
+# so any concurrent LLM call in this repo while a cell is open is mis-stamped with that cell's
+# task_id. Do NOT run this from an interactive agent session in this repo:
+#   node scripts/experiment-run.mjs --spec config/experiments/kb-ab-etm-crashloop.yaml
+version: 1
+
+experiment_id: kb-ab-etm-crashloop
+
+snapshot_id: smoke-spec
+
+goal_sentence: "Create a file named etm-crashloop-runbook.md at the repository root that diagnoses this symptom for an operator: the tmux statusline shows [LSL red] and the project's agent letter turns yellow, while the Health API at port 3033 still reports every service green. The file must state the root cause, give the exact shell commands to confirm it, and give the exact command that fixes it."
+
+repeats: 3
+
+# Closed-taxonomy class — an unclassified run quarantines as pending and is EXCLUDED from the
+# default dashboard runs query, i.e. it completes invisibly.
+task_class: docs
+
+# Fixed argv, no shell metacharacters (evidence-harness.mjs would reject those → ungated run).
+# `-F` keeps the pattern literal so the '@' and '/' are not regex-interpreted.
+test_command: "grep -q -F node_modules/@fwornle/km-core etm-crashloop-runbook.md"
+
+# The ONLY axis is injection. Same agent, same pinned model, same framework on both arms, so any
+# difference is attributable to the injected knowledge and nothing else.
+# Model PINNED to claude-sonnet-4-6, never the `sonnet` alias: the alias tracks the CLI's latest
+# Sonnet, so it would silently change model mid-matrix and break arm-to-arm parity.
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-off
