@@ -197,7 +197,13 @@ describe('RetrievalService relevance floor + WM suppression (high-quality-or-not
   }, 30000);
 
   // ── 4c. Interactive session keeps ALL tiers (tier gate is experiment-only) ─────
-  test('interactive session retains digests & observations (tier gate does not apply)', async () => {
+  // CONTRACT CHANGED 2026-08-23: the curated-tier gate now applies to EVERY caller, not just
+  // experiment cells. `digests` and `observations` are the upstream precursors of `insights`
+  // (observations -> digests -> insights) and outnumber them ~15:1, so injecting them spent
+  // budget re-stating what the insight tier already distils. This test previously asserted the
+  // opposite ("tier gate does not apply") and is re-pointed, not relaxed: it still pins exactly
+  // which tiers survive, only now the expected set is the curated one.
+  test('interactive session is gated to curated tiers (insights + entities)', async () => {
     const svc = makeService([
       insight('a', 'Knowledge Injection Quality', 'topic relevance floor for injected knowledge'),
       digest('d', 'Knowledge Injection Session', 'worked on knowledge injection quality yesterday'),
@@ -206,7 +212,11 @@ describe('RetrievalService relevance floor + WM suppression (high-quality-or-not
     const res = await svc.retrieve('improve knowledge injection quality and relevance', {
       taskId: '550e8400-e29b-41d4-a716-446655440000',
     });
-    expect(res.meta.results_count).toBe(3);            // all three tiers retained for interactive
+    expect(res.meta.results_count).toBe(1);            // the insight only; digest + observation gated
+    expect(res.markdown).toContain('## Insights');
+    expect(res.markdown).not.toContain('## Digests');
+    expect(res.markdown).not.toContain('## Observations');
+    // Working Memory is a separate scaffold, not a tier — an interactive session still gets it.
     expect(res.markdown).toContain('## Working Memory');
   }, 30000);
 

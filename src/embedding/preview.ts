@@ -39,8 +39,19 @@
 /**
  * Maximum characters of source text stored in a point's `summary_preview` payload,
  * and therefore the most any single item can contribute to an injected context block.
+ *
+ * Set to the p90 of indexed insight summaries (measured 2026-08-23 over 713 insights:
+ * median 2,239, p90 3,220, max 10,530), so 90% of insights are delivered COMPLETE rather
+ * than mid-sentence. At the previous 1,200 the cap truncated 96% of them.
+ *
+ * This is a DELIVERY limit, not a retrieval one. all-MiniLM-L6-v2 truncates its input at
+ * 512 tokens — measured empirically at ~2,050 chars: two texts sharing a 2,132-char head
+ * and differing entirely after it embed to BYTE-IDENTICAL vectors. So content past ~2,050
+ * chars is invisible to ranking however large this cap is; raising it improves what the
+ * model receives, not what the retriever can find. Fixing that needs per-section chunking
+ * (deliberately deferred — re-measure first).
  */
-export const SUMMARY_PREVIEW_CHARS = 1200;
+export const SUMMARY_PREVIEW_CHARS = 3300;
 
 /**
  * Build the stored preview for a piece of source text.

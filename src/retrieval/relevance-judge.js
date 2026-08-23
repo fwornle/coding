@@ -55,7 +55,12 @@ function buildMessages(query, candidates) {
   const list = candidates
     .map((c) => {
       const p = c.payload || {};
-      const snippet = String(p.summary_preview || '').replace(/\s+/g, ' ').slice(0, 240);
+      // 600, not 240. The judge decides whether an item is genuinely useful know-how for THIS
+      // task; at 240 chars it was ruling on ~11% of a median insight summary (2,239 chars) —
+      // usually just the "## Purpose" preamble, which reads plausibly relevant for almost any
+      // query and makes the gate weakest exactly where it matters. Cost is one cheap batched
+      // call: ~12 candidates x 360 extra chars is well under 1k additional tokens.
+      const snippet = String(p.summary_preview || '').replace(/\s+/g, ' ').slice(0, 600);
       return `- id: ${c.id}\n  title: ${titleOf(p)}\n  snippet: ${snippet}`;
     })
     .join('\n');

@@ -46,7 +46,11 @@ function injectionEnabled() {
 // Minimal, fail-open POST /api/retrieve (inlined so the plugin has no repo deps).
 function callRetrieval(query) {
   return new Promise((resolve) => {
-    const payload = { query, budget: 1000, threshold: 0.7, context: { agent: "opencode" } };
+    // 3000, not 1000. The retrieval service's `defaultBudget` was dead config — every caller
+    // passed this literal, so raising the default alone changed nothing. Sized so ~3 COMPLETE
+    // insights fit: a p90 insight preview is 3,300 chars (~825 tokens) after the 2026-08-23
+    // re-index. Was 1000, of which a hidden `Math.min(..., 700)` clamp made only 700 usable.
+    const payload = { query, budget: 3000, threshold: 0.7, context: { agent: "opencode" } };
     // Phase B: forward the run id when the launcher set it, so the obs-api persists
     // a structured per-item capture keyed by the same task_id the runs table shows.
     if (process.env.TASK_ID) payload.task_id = process.env.TASK_ID;

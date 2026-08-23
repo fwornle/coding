@@ -168,7 +168,10 @@ describe('retrieve() selection trace (the drop-off funnel)', () => {
   });
 
   // ── 5. Experiment cells: the tier gate is a distinct, named stage ─────────────
-  test('experiment cells record the curated-tier gate separately from the floor', async () => {
+  // Stage renamed 'experiment-tier-gate' -> 'tier-gate' on 2026-08-23, when the gate stopped
+  // being experiment-only. The dashboard funnel keys its labels on the stage name and still
+  // carries the legacy key so archived captures render, but new traces emit the new one.
+  test('the curated-tier gate is recorded separately from the floor', async () => {
     const svc = makeService([
       insight('keep', 'Knowledge Injection Quality Gate', 'retrieval budget and the relevance floor'),
       observation('drop', 'knowledge injection budget relevance floor session log'),
@@ -178,7 +181,7 @@ describe('retrieve() selection trace (the drop-off funnel)', () => {
       taskId: 'exp-x--claude-straight-kb-on--r0',
     });
 
-    const gate = stageNamed(trace, 'experiment-tier-gate');
+    const gate = stageNamed(trace, 'tier-gate');
     expect(gate).toBeTruthy();
     expect(gate.dropped.map((d) => d.id)).toContain('drop');
     expect(trace.working_memory_included).toBe(false); // WM stays suppressed for cells

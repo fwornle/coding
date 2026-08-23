@@ -31,7 +31,13 @@ const COLLECTIONS = ['insights', 'digests', 'kg_entities', 'observations'];
  * excluded for experiments — they record *what happened in past sessions*, not know-how,
  * and for a benchmark task they are merely the log of prior runs of the same cell.
  */
-const EXPERIMENT_CURATED_TIERS = new Set(['insights', 'kg_entities']);
+// Curated specialist know-how. `digests` and `observations` are the UPSTREAM PRECURSORS of
+// insights (observations -> digests -> insights, via ObservationConsolidator), not independent
+// knowledge, and they outnumber insights ~15:1 (8,056 + 3,457 vs 713). Injecting them spends
+// budget on raw session records that the insight tier already distils. Experiment cells have
+// been gated to these two tiers for a while; interactive sessions now match, so the freed
+// budget buys MORE COMPLETE insights instead of more numerous fragments.
+const CURATED_TIERS = new Set(['insights', 'kg_entities']);
 
 /** Judge at most this many top-ranked candidates in one batched LLM call. */
 const JUDGE_TOP_K = 12;
@@ -91,7 +97,8 @@ export class RetrievalService {
   /**
    * @param {object} options
    * @param {number} [options.scoreThreshold=0.82] - Minimum Qdrant similarity score (D-04)
-   * @param {number} [options.defaultBudget=1000] - Default token budget (D-08)
+   * @param {number} [options.defaultBudget=3000] - Default token budget (D-08). Sized so ~3
+   *   complete insights fit: a p90 insight preview (3,300 chars) costs ~825 tokens.
    * @param {function} [options.dbGetter] - DEPRECATED — kept only so the
    *   keyword-search path (which still reads FTS5 from the legacy SQLite
    *   handle via KeywordSearch.search) keeps working until that consumer
@@ -109,7 +116,7 @@ export class RetrievalService {
     // back to a noisy keyword-only mix. Lowering the floor lets semantic
     // results in; the topic-relevance pass does the actual ranking.
     this.scoreThreshold = options.scoreThreshold ?? 0.70;
-    this.defaultBudget = options.defaultBudget ?? 1000;
+    this.defaultBudget = options.defaultBudget ?? 3000;
     this.embeddingService = null;
     this.qdrantClient = null;
     this.keywordSearch = new KeywordSearch();
@@ -193,7 +200,12 @@ export class RetrievalService {
     // Step 0: Build working memory (fail-open, per D-03). Skipped for experiment cells — the
     // scaffold is suppressed for them regardless, and this also avoids the VKB round-trip.
     const wm = isExperiment ? { markdown: '', tokens: 0 } : await buildWorkingMemory(this.codingRoot);
-    const semanticBudget = Math.min(budget - wm.tokens, 700);
+    // The caller's budget governs. This used to read `Math.min(budget - wm.tokens, 700)`,
+    // and that 700 was a LITERAL — so a caller asking for 3,000 silently received 700 and
+    // the obvious remedy for "give the block more room" was a no-op. Measured before the
+    // fix: three probe queries against a nominal 1,000-token budget returned tokens_used
+    // 675 / 670 / 689, i.e. pinned against the hidden ceiling, not against the budget.
+    const semanticBudget = budget - wm.tokens;
     // Ensure at least 100 tokens for semantic results even if WM overshoots
     const effectiveSemanticBudget = Math.max(semanticBudget, 100);
 
@@ -255,16 +267,16 @@ export class RetrievalService {
       'dropped: shares no discriminating keyword with the query');
     let relevant = afterFloor;
 
-    // Step 4.66: Experiment-cell structural gate. ONLY for experiment cells (taskId
-    // '<exp>--<variant>--rN'): keep curated know-how tiers (insights + kg_entities), dropping
-    // episodic digests/observations — session activity, not know-how, and for a benchmark task
-    // merely records of prior runs. (Self-reference / benchmark-meta exclusion is now handled
-    // semantically by the LLM judge below, so the old fixed EXPERIMENT_META_RE regex is gone.)
-    // Interactive sessions keep all tiers.
-    if (isExperiment) {
-      const gated = relevant.filter((r) => EXPERIMENT_CURATED_TIERS.has(r.tier));
-      stage('experiment-tier-gate', relevant, gated,
-        'experiment cell: curated know-how tiers only (insights + kg_entities)');
+    // Step 4.66: Structural tier gate, now applied to EVERY caller (was experiment-cells-only).
+    // Keeps curated know-how (insights + kg_entities) and drops episodic digests/observations —
+    // those are the upstream precursors the insight tier already distils, at ~15:1 volume, so
+    // spending budget on them buys repetition rather than knowledge. (Self-reference /
+    // benchmark-meta exclusion is handled semantically by the LLM judge below, so the old fixed
+    // EXPERIMENT_META_RE regex is gone.)
+    {
+      const gated = relevant.filter((r) => CURATED_TIERS.has(r.tier));
+      stage('tier-gate', relevant, gated,
+        'curated know-how tiers only (insights + kg_entities); digests/observations are their upstream precursors');
       relevant = gated;
     }
 
