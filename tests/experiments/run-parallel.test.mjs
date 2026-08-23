@@ -28,11 +28,51 @@ function makeTracker() {
   return t;
 }
 
-function makeSeams({ agentDelayMs = 60, restoreDelayMs = 15 }) {
+/**
+ * A rendezvous for `n` concurrent arrivals.
+ *
+ * WHY, rather than racing two sleeps. Overlap used to be established by wall clock: the agent
+ * slept longer than the restore, so cell 2's agent started before cell 1's finished. That holds
+ * on an idle machine and breaks under load — and NOT proportionally, because the serialized
+ * restore path does synchronous `mkdtempSync` work whose cost depends on filesystem contention,
+ * not on the timer. When `node --test` runs the whole directory, sibling files compete for I/O,
+ * the restore outruns the 80 ms agent timer, and `maxInFlight` collapses to 1. The test then
+ * fails while reporting nothing about the pool it is supposed to be testing.
+ *
+ * The barrier makes the SAME assertion deterministic: each agent blocks until `n` of them are
+ * simultaneously in flight. If the pool overlaps, they meet and all proceed regardless of how
+ * slow the machine is. If the pool has regressed to serial, nobody ever meets, the wait expires,
+ * and the test fails for the real reason. Latency cannot turn a working pool red, and a broken
+ * pool cannot be rescued by a fast machine.
+ */
+function makeBarrier(n, timeoutMs = 5000) {
+  let arrived = 0;
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  return async function arrive() {
+    arrived += 1;
+    if (arrived >= n) { release(); return; }
+    // Bounded: a genuine serialization regression must fail the assertion, not hang the suite.
+    let timer;
+    await Promise.race([gate, new Promise((r) => { timer = setTimeout(r, timeoutMs); })]);
+    clearTimeout(timer);
+  };
+}
+
+function makeSeams({ agentDelayMs = 60, restoreDelayMs = 15, overlapBarrier = 0 }) {
   const restore = makeTracker();
   const spawn = makeTracker();
   const stop = makeTracker();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'run-parallel-'));
+  // Pre-create the per-cell dirs so the serialized restore path holds no synchronous filesystem
+  // work. Keeps the restore window a function of `restoreDelayMs` alone, which is what the
+  // serialization assertions below actually mean to pin.
+  const dirs = Array.from({ length: 8 }, () => ({
+    worktree: fs.mkdtempSync(path.join(tmp, 'wt-')),
+    sandboxDataDir: fs.mkdtempSync(path.join(tmp, 'data-')),
+  }));
+  let dirIdx = 0;
+  const arriveAtBarrier = overlapBarrier > 0 ? makeBarrier(overlapBarrier) : null;
   return {
     trackers: { restore, spawn, stop },
     opts: {
@@ -41,11 +81,12 @@ function makeSeams({ agentDelayMs = 60, restoreDelayMs = 15 }) {
         restore.enter();
         await sleep(restoreDelayMs);
         restore.exit();
-        const worktree = fs.mkdtempSync(path.join(tmp, 'wt-'));
-        return { worktree, sandboxDataDir: fs.mkdtempSync(path.join(tmp, 'data-')) };
+        return dirs[dirIdx++ % dirs.length];
       },
       spawnAgent: async () => {
         spawn.enter();
+        // Rendezvous FIRST (while counted in flight), so the trackers observe real concurrency.
+        if (arriveAtBarrier) await arriveAtBarrier();
         await sleep(agentDelayMs);
         spawn.exit();
         return { state: 'complete' };
@@ -77,7 +118,8 @@ const SPEC = {
 };
 
 test('parallel: agents overlap; restores and stops never do; runs all cells', async () => {
-  const { trackers, opts } = makeSeams({ agentDelayMs: 80 });
+  // agentDelayMs stays short: the barrier — not the sleep — is what proves overlap here.
+  const { trackers, opts } = makeSeams({ agentDelayMs: 20, overlapBarrier: 2 });
   const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-parallel-dir-'));
   const summary = await runMatrix(SPEC, {
     ...opts,
