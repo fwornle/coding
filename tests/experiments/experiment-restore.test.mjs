@@ -23,6 +23,7 @@ import {
   assertRepeatsIdentical,
   runVariantRepeats,
   neutralizeSandboxRules,
+  neutralizeSandboxKnowledge,
 } from '../../lib/experiments/experiment-restore.mjs';
 import { buildWorktreeAddArgs } from '../../lib/repro/restore-snapshot.mjs';
 
@@ -77,6 +78,70 @@ test('neutralizeSandboxRules: fail-soft — no rules files present is a no-op re
 test('neutralizeSandboxRules: an empty/undefined worktree returns [] (never throws)', () => {
   assert.deepEqual(neutralizeSandboxRules(''), []);
   assert.deepEqual(neutralizeSandboxRules(undefined), []);
+});
+
+// ---------------------------------------------------------------------------
+// neutralizeSandboxKnowledge — strip the restored KB corpus + the agent-memory pointer
+// (kb-off leak audit, 2026-08-23)
+// ---------------------------------------------------------------------------
+//
+// WHY. `kb-off` sets CODING_KNOWLEDGE_INJECTION=0, which suppresses the injection SEAM but not
+// the knowledge: a restored snapshot still ships the 45 MB graph export, 989 insight files, and
+// a `.claude/settings.local.json` allow-list naming the host's agent-memory directory by
+// absolute path. Auditing all 18 cells of the 2026-08-22 A/B from their own transcripts, 13
+// followed that pointer — for one it was the FIRST tool call, straight to the file stating the
+// graded answer. Both arms then scored 3/3 and the comparison carried no information.
+
+test('neutralizeSandboxKnowledge: removes the KB corpus and the agent-memory pointer', () => {
+  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'exp-kb-test-'));
+  fs.mkdirSync(path.join(wt, '.data', 'knowledge-graph', 'exports'), { recursive: true });
+  fs.writeFileSync(path.join(wt, '.data', 'knowledge-graph', 'exports', 'general.json'), '{"nodes":[]}');
+  fs.mkdirSync(path.join(wt, '.data', 'observation-export'), { recursive: true });
+  fs.writeFileSync(path.join(wt, '.data', 'observation-export', 'insights.json'), '[]');
+  fs.mkdirSync(path.join(wt, 'knowledge-management', 'insights'), { recursive: true });
+  fs.writeFileSync(path.join(wt, 'knowledge-management', 'insights', 'a.md'), 'the fix is persistOnClose false');
+  fs.mkdirSync(path.join(wt, '.planning'), { recursive: true });
+  fs.writeFileSync(path.join(wt, '.planning', 'STATE.md'), 'state');
+  fs.mkdirSync(path.join(wt, '.specstory'), { recursive: true });
+  fs.mkdirSync(path.join(wt, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(wt, '.claude', 'settings.local.json'), '{"permissions":{"allow":["Bash(ls ~/.claude/projects/-x/memory/foo.md)"]}}');
+  // Ordinary source must survive — this strips knowledge, not the repo.
+  fs.mkdirSync(path.join(wt, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(wt, 'src', 'index.js'), 'export const x = 1;');
+
+  const removed = neutralizeSandboxKnowledge(wt);
+
+  assert.ok(removed.includes(path.join('.claude', 'settings.local.json')), 'the memory pointer must go');
+  assert.ok(removed.includes(path.join('.data', 'knowledge-graph')));
+  assert.ok(removed.includes('knowledge-management'));
+  assert.equal(fs.existsSync(path.join(wt, '.claude', 'settings.local.json')), false);
+  assert.equal(
+    fs.existsSync(path.join(wt, '.data', 'knowledge-graph', 'exports', 'general.json')), false,
+    'the KB export is the corpus kb-on injects — kb-off must not be able to grep it',
+  );
+  assert.equal(fs.existsSync(path.join(wt, 'knowledge-management', 'insights', 'a.md')), false);
+  assert.equal(fs.existsSync(path.join(wt, 'src', 'index.js')), true, 'ordinary source is untouched');
+});
+
+test('neutralizeSandboxKnowledge: stripped directories are recreated EMPTY, not deleted', () => {
+  // A consumer that opens `.data/knowledge-graph` should find an empty dir, not an ENOENT that
+  // surfaces as a cell crash and gets misread as a harness failure.
+  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'exp-kb-empty-'));
+  fs.mkdirSync(path.join(wt, '.data', 'knowledge-graph'), { recursive: true });
+  fs.writeFileSync(path.join(wt, '.data', 'knowledge-graph', 'g.json'), '{}');
+
+  neutralizeSandboxKnowledge(wt);
+
+  const dir = path.join(wt, '.data', 'knowledge-graph');
+  assert.equal(fs.existsSync(dir), true, 'the directory must still exist');
+  assert.deepEqual(fs.readdirSync(dir), [], 'but be empty');
+});
+
+test('neutralizeSandboxKnowledge: fail-soft on absent paths and empty/undefined worktree', () => {
+  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'exp-kb-none-'));
+  assert.deepEqual(neutralizeSandboxKnowledge(wt), []);
+  assert.deepEqual(neutralizeSandboxKnowledge(''), []);
+  assert.deepEqual(neutralizeSandboxKnowledge(undefined), []);
 });
 
 // ---------------------------------------------------------------------------
