@@ -32,7 +32,8 @@
  *   node scripts/experiment-audit-recoverability.mjs --spec <f> --json
  *   node scripts/experiment-audit-recoverability.mjs --spec <f> --strict            # WARN also exits 1
  *
- * With no --worktree, the newest `.data/run-restores/<snapshot_id>-*` for that spec is used. That
+ * With no --worktree, the newest `<CELL_SANDBOX_ROOT>/<snapshot_id>-*` for that spec is used
+ * (falling back to the legacy in-repo `.data/run-restores/`). That
  * is a REAL restored tree, so the audit reflects what the rig actually produces.
  *
  * Diagnostics via process.stdout/stderr .write only (no console.* — no-console-log, CLAUDE.md).
@@ -43,7 +44,11 @@ import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { neutralizeSandboxRules, neutralizeSandboxKnowledge } from '../lib/experiments/experiment-restore.mjs';
+import {
+  neutralizeSandboxRules,
+  neutralizeSandboxKnowledge,
+  CELL_SANDBOX_ROOT,
+} from '../lib/experiments/experiment-restore.mjs';
 import { FACT_SETS } from '../lib/experiments/kb-ab-facts.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -77,14 +82,25 @@ export function gradedPatternFor(testCommand) {
   return null;
 }
 
-/** Newest restored worktree for a snapshot id, or null. */
+/**
+ * Newest restored sandbox for a snapshot id, or null.
+ *
+ * Searches CELL_SANDBOX_ROOT first (cells moved out of the repo tree on 2026-08-23 so they no
+ * longer inherit `/Users/<user>/CLAUDE.md` via the parent-directory rules walk), then falls back
+ * to the legacy in-repo location so this can still audit sandboxes from earlier runs.
+ */
 function newestRestore(snapshotId) {
-  const dir = path.join(REPO_ROOT, '.data', 'run-restores');
-  if (!fs.existsSync(dir)) return null;
-  const hits = fs.readdirSync(dir)
-    .filter((n) => n.startsWith(`${snapshotId}-`))
-    .sort();
-  return hits.length ? path.join(dir, hits[hits.length - 1]) : null;
+  const roots = [CELL_SANDBOX_ROOT, path.join(REPO_ROOT, '.data', 'run-restores')];
+  let newest = null;
+  for (const dir of roots) {
+    if (!fs.existsSync(dir)) continue;
+    const hits = fs.readdirSync(dir).filter((n) => n.startsWith(`${snapshotId}-`)).sort();
+    if (!hits.length) continue;
+    const cand = path.join(dir, hits[hits.length - 1]);
+    // Names are ISO-stamped, so the lexically greatest basename is the most recent across roots.
+    if (!newest || path.basename(cand) > path.basename(newest)) newest = cand;
+  }
+  return newest;
 }
 
 /**
