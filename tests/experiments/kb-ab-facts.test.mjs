@@ -36,7 +36,10 @@ test('a partial answer is REJECTED — the failure the single-token gate could n
   const { ok, results } = gradeFacts('kb-ab-leveldb-amplification', partial);
   assert.equal(ok, false, 'naming the option alone must not be accepted');
   assert.equal(results.find((r) => r.id === 'persist-option').hit, true);
-  assert.equal(results.find((r) => r.id === 'whole-graph-one-key').hit, false);
+  // `read-open-still-writes` replaced `whole-graph-one-key` on 2026-08-23: the old fact scored
+  // 0/6 across BOTH arms because its phrasing lives in this repo's CLAUDE.md, not in the KB, so
+  // retrieval never injected it and the treatment could not supply what the gate demanded.
+  assert.equal(results.find((r) => r.id === 'read-open-still-writes').hit, false);
 });
 
 test('a complete answer is ACCEPTED', () => {

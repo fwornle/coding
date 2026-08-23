@@ -29,9 +29,14 @@
 # It is kept anyway, on the reasoning the original spec set already applied to the proxy task:
 # three tasks that all favour the treatment would not tell you whether you are measuring an effect
 # or your own task design. This one is the control that should show NO kb-on advantage. If it
-# does show one, suspect the harness — not the knowledge. Its sibling specs
-# (kb-ab-leveldb-amplification, kb-ab-llm-routing) are the ones that can discriminate, and both
-# grade on facts that landed AFTER the snapshot.
+# does show one, suspect the harness — not the knowledge. (Measured 2026-08-23: under full
+# isolation it DOES show one — 4.00/4 vs 1.33/4 — and the harness was not at fault. All four
+# facts are grep-able from the tree, yet kb-off spent 123 tool calls across three cells and
+# never found the symlink path or the fix command. Grep-able is not the same as recoverable, so
+# this spec is no longer a null control; it discriminates.) Its sibling spec
+# kb-ab-leveldb-amplification also discriminates and grades on facts that landed AFTER the
+# snapshot. A third sibling, kb-ab-llm-routing, was RETIRED 2026-08-23 — see the retirement note
+# in lib/experiments/kb-ab-facts.mjs for why re-picking its facts could not rescue it.
 #
 # HOW IT IS GRADED. `test_command` is spawned as a FIXED ARGV — evidence-harness.mjs rejects any
 # command carrying shell metacharacters rather than running it under a shell. The gate used to be
