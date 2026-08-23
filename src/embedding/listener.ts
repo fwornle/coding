@@ -15,6 +15,7 @@ import Redis from "ioredis";
 import { getEmbeddingService } from "./embedding-service.js";
 import { getQdrantClient, ensureCollections } from "./qdrant-collections.js";
 import { contentHash } from "./content-hash.js";
+import { makePreview, previewVersion } from "./preview.js";
 
 /** Event message format published by ObservationWriter (and future writers) */
 interface EmbeddingEvent {
@@ -93,7 +94,8 @@ async function main(): Promise<void> {
               ...event.metadata,
               content_hash: hash,
               model_version: embedder.getConfig().version,
-              summary_preview: event.content.substring(0, 200),
+              summary_preview: makePreview(event.content),
+              preview_version: previewVersion(),
             },
           },
         ],

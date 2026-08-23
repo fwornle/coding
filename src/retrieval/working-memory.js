@@ -133,11 +133,22 @@ function parseStateFrontmatter(codingRoot) {
       }
     }
 
+    const status = get('status');
+
+    // A milestone marked `completed` describes FINISHED work, not current work. Reprinting it
+    // every turn spends ~300 tokens telling the model about something already shipped — this
+    // project's block still announced "v7.6 Experiment Harness ... shipped 2026-07-27" a month
+    // later, alongside phase-tagged known issues of the same vintage. Suppress the milestone
+    // fields in that case and keep only genuine blockers, which stay actionable after a ship.
+    // A project with no `.planning/STATE.md` at all already yields null here (the caller is
+    // fail-open), so nothing is required of projects not running a GSD-style workflow.
+    const milestoneCompleted = String(status || '').toLowerCase() === 'completed';
+
     return {
-      milestone: get('milestone'),
-      milestoneName: get('milestone_name'),
-      status: get('status'),
-      stoppedAt: get('stopped_at'),
+      milestone: milestoneCompleted ? null : get('milestone'),
+      milestoneName: milestoneCompleted ? null : get('milestone_name'),
+      status: milestoneCompleted ? null : status,
+      stoppedAt: milestoneCompleted ? null : get('stopped_at'),
       lastActivity: get('last_activity'),
       concerns,
     };

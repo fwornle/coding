@@ -56,11 +56,79 @@ The retrieval service (`POST /api/retrieve` on port 3033) processes each request
 
 4. **Token-Budgeted Assembly (Step 3)**: Constructs markdown with tier headers, capped at 700 tokens for semantic results + 300 tokens for working memory = 1000 total.
 
+### What limits the injected payload: the stored preview
+
+`formatResult` (`src/retrieval/token-budget.js`) renders each item's `summary_preview` and nothing
+else, so whatever the indexer stores in that field is the hard ceiling on what any single item can
+contribute — independent of the token budget.
+
+That length is `SUMMARY_PREVIEW_CHARS` in **`src/embedding/preview.ts`**, the single source of
+truth for both the live indexer (`listener.ts`) and the batch re-index (`backfill.ts`).
+
+It was previously a bare `substring(0, 200)` duplicated across five call sites, which nothing named
+and nothing connected to its consequence. Measured over 1419 captures / 4624 injected items under
+that regime: **every** preview was ≤200 chars, median 2 items per turn, and median `tokens_used`
+**285 of 1000 — 28% of budget**. The injected block named a relevant insight and then stopped
+mid-sentence, before anything actionable. The budget was never the binding constraint; the preview
+was.
+
+It is now **1200 chars**, chosen from where useful content actually sits rather than by feel:
+insight bodies have a median length of 2246 chars, and the decisive fact in the top-ranked insights
+for three sample tasks sat at offsets 520, 592 and 769 — all lost at 200, all captured at 1200. At
+~3.5-4 chars/token that is ~300-340 tokens, so two items fill most of the 700-token semantic budget
+and a third truncates gracefully, preserving the multi-tier breadth the pipeline is designed around.
+
+**Changing it requires a re-index.** The preview is written into the Qdrant payload at index time,
+so a new value only affects items indexed afterwards. Every payload carries `preview_version`, and
+`backfill.ts` skips a point only when `content_hash` *and* `preview_version` both match — a
+content-hash-only check would report every point as current (the content did not change; the policy
+did) and the new length would never reach the index.
+
+```bash
+npm run build && node dist/embedding/backfill.js --prune
+```
+
+`--prune` deletes points whose id is absent from the source *after* upserting, so ids that drifted
+under an older indexing scheme do not survive as duplicates. It never drops the collection: every
+agent prompt queries it, so the failure mode to avoid is an empty index, and it refuses to prune
+against an empty source.
+
+Measured on the 200 → 1200 re-index (14,047 points):
+
+| | before | after |
+|---|---|---|
+| median `tokens_used` of 1000 | 285 (28%) | 812 (81%) |
+| median items injected/turn | 2 | 3 |
+| decisive fact present in the block (3 sample tasks) | 1 of 3 | 3 of 3 |
+
+The same run resynced the index with km-core, which had drifted badly while the batch tooling was
+silently a no-op — 636 indexed insights against 709 real ones, and 12,660 observation vectors
+against 8,026 surviving records (the rest pointed at rows the 7-day pruner had already removed).
+All four collections now match the source exactly.
+
+The relevance judge deliberately still sees only the first 240 chars of a preview
+(`src/retrieval/relevance-judge.js`): it decides topical usefulness, which the title plus opening
+conveys, and feeding it 12 × 1200 chars would multiply its input tokens fivefold against a 2500 ms
+interactive timeout — buying explainability with fail-opens.
+
 ### Response Shape
 
 ```json
 {
   "markdown": "## Working Memory\n...\n## Insights\n...\n## Digests\n...",
+  "items": [
+    { "id": "…", "tier": "insights", "rrfScore": 0.374, "score": 0.812, "payload": { "topic": "…" } }
+  ],
+  "trace": {
+    "candidates": { "semantic": 80, "keyword": 0, "fused": 80 },
+    "stages": [
+      { "name": "idf-floor",  "in": 80, "out": 52, "dropped": [], "dropped_total": 28 },
+      { "name": "judge-topk", "in": 52, "out": 12, "dropped": [], "dropped_total": 40 },
+      { "name": "judge",      "in": 12, "out":  3, "dropped": [], "dropped_total":  9 },
+      { "name": "assembly",   "in":  3, "out":  3, "dropped": [], "dropped_total":  0 }
+    ],
+    "injected": 3, "tokens_used": 328, "budget": 700, "judge_outcome": "judged"
+  },
   "meta": {
     "query": "Docker build pipeline",
     "budget": 1000,
@@ -71,6 +139,29 @@ The retrieval service (`POST /api/retrieve` on port 3033) processes each request
   }
 }
 ```
+
+`items` is the structured subset actually injected. `trace` is the selection funnel — per-stage
+in/out counts plus the candidates each stage dropped, so "why was nothing injected?" is
+attributable to a named stage. Each stage names at most its 12 highest-ranked casualties and
+carries an exact `dropped_total`, so a capped list never reads as a complete one. Both fields are
+additive; `retrieval-client.js` and the four agent adapters ignore them.
+
+### Per-Turn Capture
+
+When `/api/retrieve` is called with a `task_id`, obs-api appends one JSONL line per retrieval to
+`.data/retrieval-captures/<task_id>.jsonl` via `src/retrieval/capture-store.js` — `{task_id, turn,
+capturedAt, meta, items, trace}`. Turn ordinals resume from disk after a restart.
+
+This replaced a writer that wrote `<task_id>.json` and **overwrote** it every call: because
+`task_id` is the session UUID for interactive sessions, a 39-turn session kept exactly one capture,
+always the last. Legacy `.json` files are read as a single turn-0 fallback and are not migrated.
+A turn that injected nothing is still recorded whenever a trace explains the silence — the old
+writer discarded that case outright.
+
+`GET /api/retrieve-capture?task_id=…[&turn=N]` serves them: top-level `items`/`meta` are the
+selected turn (default: the last), with the full history under `turns[]`. The dashboard's
+Performance → context explainer renders these as scored cards, a turn picker, and the funnel.
+Retention is 14 days via the existing `com.coding.context-turns-sweeper` job.
 
 ## Agent Adapters
 

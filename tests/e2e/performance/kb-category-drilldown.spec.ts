@@ -75,6 +75,15 @@ async function findRuns(page: Page): Promise<{ populated: string | null; illustr
 // task_id). The runs table paginates 15 rows at a time, so reveal more rows until the
 // target run's button is present. Returns false if the run never surfaces.
 async function openExplainer(page: Page, taskId: string): Promise<boolean> {
+  // The runs table GROUPS by experiment and the per-cell rows — the only rows that
+  // carry an Explain button — start collapsed. Without expanding first there are zero
+  // such buttons on the page and every test in this file silently skips. (The table
+  // gained grouping after this spec was written; the skip guard hid the regression.)
+  const expandAll = page.getByRole('button', { name: 'Expand all' });
+  if ((await expandAll.count()) > 0) {
+    await expandAll.first().click();
+    await page.waitForTimeout(500);
+  }
   const btn = page.locator(`button[aria-label="Explain context and caching for ${taskId}"]`);
   for (let i = 0; i < 8; i++) {
     if ((await btn.count()) > 0) break;
@@ -144,5 +153,153 @@ test.describe('Performance — Retrieved-Knowledge per-category drill-down', () 
     await expect(empty).toBeVisible();
     await expect(page.locator('[data-testid="kb-real-content"]')).toHaveCount(0);
     await expect(empty).toContainText(/inject|no captured buffer/i);
+  });
+});
+
+/**
+ * Per-turn capture + selection funnel.
+ *
+ * These assert the UI contract against a KNOWN payload via route interception rather
+ * than whatever happens to be on disk: the shapes that matter most (a session with
+ * several turns; a turn where NOTHING was injected; a stage whose drop list was capped)
+ * are precisely the ones you cannot count on finding in live data.
+ *
+ * The behaviour under test only became possible when the capture stopped overwriting a
+ * single file per session — before that a session had exactly one turn to show, always
+ * the last, and a zero-item turn was discarded outright.
+ */
+const CAPTURE_ROUTE = '**/api/retrieve-capture**';
+
+const mkTurn = (turn: number, itemCount: number, opts: { emptiedAt?: string; truncate?: boolean } = {}) => ({
+  turn,
+  capturedAt: `2026-08-22T10:0${turn}:00.000Z`,
+  meta: { query: `prompt for turn ${turn}`, budget: 1000, results_count: itemCount, tokens_used: 120 * itemCount, latency_ms: 140 },
+  items: Array.from({ length: itemCount }, (_, i) => ({
+    id: `t${turn}-i${i}`, tier: 'insights', rrfScore: 0.4 - i * 0.05, score: 0.81,
+    payload: { topic: `Turn ${turn} Insight ${i}`, confidence: 0.9, summary_preview: 'body' },
+  })),
+  trace: {
+    candidates: { semantic: 80, keyword: 0, fused: 80 },
+    injected: itemCount,
+    tokens_used: 120 * itemCount,
+    budget: 700,
+    judge_outcome: 'judged',
+    stages: [
+      {
+        name: 'idf-floor', in: 80, out: opts.emptiedAt === 'idf-floor' ? 0 : 52,
+        dropped: Array.from({ length: opts.truncate ? 12 : 3 }, (_, i) => ({
+          id: `drop-${i}`, tier: 'digests', title: `Off-topic item ${i}`, rrfScore: 0.2 - i * 0.01, score: 0.76,
+        })),
+        dropped_total: opts.truncate ? 28 : 3,
+        note: 'dropped: shares no discriminating keyword with the query',
+      },
+      ...(opts.emptiedAt === 'idf-floor' ? [] : [
+        { name: 'judge', in: 12, out: itemCount, dropped: [{ id: 'j1', tier: 'insights', title: 'Judged not useful', rrfScore: 0.15, score: 0.8 }], dropped_total: 12 - itemCount },
+        { name: 'assembly', in: itemCount, out: itemCount, dropped: [], dropped_total: 0 },
+      ]),
+    ],
+  },
+});
+
+test.describe('Performance — per-turn KB capture and the selection funnel', () => {
+  /**
+   * Open the KB dialog on ANY run, with /api/retrieve-capture mocked.
+   *
+   * Deliberately does NOT use findRuns(): that probes /api/context-breakdown once per
+   * run (1300+ sequential fetches) to find a run with real captured knowledge_text.
+   * These tests supply the capture themselves, so any run will do — the KB band
+   * segment renders regardless of whether the run has its own capture.
+   */
+  async function openKbWithCapture(page: Page, payload: unknown): Promise<boolean> {
+    await page.route(CAPTURE_ROUTE, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
+    });
+    // Take the target from the DOM, not from /api/experiments/runs: the table filters
+    // and paginates, so the API's first row is frequently not one of the rendered ones.
+    const expandAll = page.getByRole('button', { name: 'Expand all' });
+    if ((await expandAll.count()) > 0) {
+      await expandAll.first().click();
+      await page.waitForTimeout(500);
+    }
+    const explain = page.locator('button[aria-label^="Explain context and caching for "]');
+    const total = await explain.count();
+    if (total === 0) return false;
+    // The band only renders a `know` segment when that run's captured buffer actually
+    // carried retrieved knowledge, so not every run can open this modal. Try a handful
+    // rather than probing all ~1300 (findRuns' approach, one HTTP call per run).
+    for (let i = 0; i < Math.min(total, 12); i += 1) {
+      await explain.nth(i).scrollIntoViewIfNeeded();
+      await explain.nth(i).click();
+      await page.waitForSelector(EXPLAINER, { timeout: 8_000 });
+      const seg = page.locator(KB_SEGMENT);
+      if (await seg.isVisible({ timeout: 2_500 }).catch(() => false)) {
+        await seg.click();
+        await expect(page.locator(KB_DIALOG)).toBeVisible();
+        return true;
+      }
+      await page.keyboard.press('Escape');     // close the explainer, try the next run
+      await page.waitForTimeout(200);
+    }
+    return false;
+  }
+
+  test('a multi-turn session offers a turn picker and switches captures locally', async ({ page }) => {
+    const up = await gotoPerformance(page);
+    test.skip(!up, 'dashboard at localhost:3032 not running');
+
+    const turns = [mkTurn(0, 3), mkTurn(1, 2), mkTurn(2, 4)];
+    const ok = await openKbWithCapture(page, {
+      task_id: 'mock', turn: 2, meta: turns[2].meta, items: turns[2].items, trace: turns[2].trace, turns,
+    });
+    test.skip(!ok, 'no run reachable in the runs table');
+
+    const picker = page.locator('[data-testid="kb-turn-picker"]');
+    await expect(picker).toBeVisible();
+    await expect(picker).toContainText('Retrieval ran 3 times');
+    await expect(page.locator('[data-testid="kb-turn-button"]')).toHaveCount(3);
+
+    // Defaults to the LAST turn (4 items), matching the server's default selection.
+    await expect(page.locator('[data-testid="kb-funnel"]')).toContainText('injected 4');
+
+    // Selecting an earlier turn re-renders from local state — no refetch needed.
+    await page.locator('[data-testid="kb-turn-button"]').first().click();
+    await expect(page.locator('[data-testid="kb-funnel"]')).toContainText('injected 3');
+    await expect(page.locator('[data-testid="kb-query-block"]')).toContainText('prompt for turn 0');
+  });
+
+  test('the funnel explains a turn where nothing was injected', async ({ page }) => {
+    const up = await gotoPerformance(page);
+    test.skip(!up, 'dashboard at localhost:3032 not running');
+
+    const empty = mkTurn(0, 0, { emptiedAt: 'idf-floor' });
+    const ok = await openKbWithCapture(page, {
+      task_id: 'mock', turn: 0, meta: empty.meta, items: [], trace: empty.trace, turns: [empty],
+    });
+    test.skip(!ok, 'no run reachable in the runs table');
+
+    // The point: zero injected is an ANSWER, not a gap — and it names the stage.
+    const callout = page.locator('[data-testid="kb-funnel-emptied"]');
+    await expect(callout).toBeVisible();
+    await expect(callout).toContainText('Nothing was injected this turn');
+    await expect(callout).toContainText('Relevance floor');
+    await expect(callout).toContainText('That is the gate working');
+  });
+
+  test('a capped drop list says how many it is not showing', async ({ page }) => {
+    const up = await gotoPerformance(page);
+    test.skip(!up, 'dashboard at localhost:3032 not running');
+
+    const t = mkTurn(0, 3, { truncate: true });
+    const ok = await openKbWithCapture(page, {
+      task_id: 'mock', turn: 0, meta: t.meta, items: t.items, trace: t.trace, turns: [t],
+    });
+    test.skip(!ok, 'no run reachable in the runs table');
+
+    // Expand the floor stage and confirm the sample is labelled as a sample.
+    await page.locator('[data-testid="kb-funnel-stage-idf-floor"] summary').click();
+    await expect(page.locator('[data-testid="kb-funnel-drop"]').first()).toBeVisible();
+    const note = page.locator('[data-testid="kb-funnel-truncated"]').first();
+    await expect(note).toBeVisible();
+    await expect(note).toContainText('Showing the 12 highest-ranked of 28 dropped');
   });
 });

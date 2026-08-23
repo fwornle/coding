@@ -108,7 +108,11 @@ export function truncateResult(item, tokenBudget) {
  *
  * @param {Array<object>} sortedResults - RRF-fused results sorted by score descending
  * @param {number} budget - Token budget (default 1000 per D-08)
- * @returns {{ markdown: string, tokensUsed: number }}
+ * @returns {{ markdown: string, tokensUsed: number, items: object[], skipped: object[] }}
+ *   `items` are the entries actually injected, in injection order. `skipped` are the
+ *   entries this function dropped, each tagged with `reason`: 'tier-cap' | 'dedup' |
+ *   'budget'. Together they account for every input: items.length + skipped.length
+ *   === sortedResults.length.
  */
 /**
  * Compute a content fingerprint for dedup.
@@ -157,24 +161,31 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
   // Phase B: the item objects actually included, in injection order — returned
   // alongside the markdown so callers can persist a structured capture.
   const selected = [];
+  // Items this function drops, and WHY. Assembly silently discarded three distinct
+  // ways ('continue' on tier-cap, 'continue' on dedup, 'break' on budget overflow),
+  // so a highly-ranked item could vanish with no trace and the funnel could not say
+  // whether it lost to a competitor, a duplicate, or simply ran out of budget.
+  const skipped = [];
+  const skip = (result, reason) => skipped.push({ ...pickItem(result), reason });
 
   const tierCounts = Object.fromEntries(TIER_ORDER.map((t) => [t, 0]));
   const seenSignatures = new Set();
 
-  for (const result of sortedResults) {
+  for (const [idx, result] of sortedResults.entries()) {
     // Skip if this tier has reached its cap
     const cap = TIER_MAX_RESULTS[result.tier] ?? 5;
-    if ((tierCounts[result.tier] ?? 0) >= cap) continue;
+    if ((tierCounts[result.tier] ?? 0) >= cap) { skip(result, 'tier-cap'); continue; }
 
     // Skip if we've already included a near-identical result (content dedup)
     const sig = contentSignature(result);
-    if (sig && seenSignatures.has(sig)) continue;
+    if (sig && seenSignatures.has(sig)) { skip(result, 'dedup'); continue; }
 
     const formatted = formatResult(result);
     const tokens = countTokens(formatted);
 
     if (tokensUsed + tokens > budget) {
       const remaining = budget - tokensUsed;
+      let placed = false;
       if (remaining > 50) {
         const truncated = truncateResult(result, remaining);
         if (truncated) {
@@ -183,10 +194,16 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
             buckets[result.tier].push(tf);
             tierCounts[result.tier] = (tierCounts[result.tier] ?? 0) + 1;
             selected.push(pickItem(truncated));
+            placed = true;
           }
           tokensUsed += countTokens(tf);
         }
       }
+      // This item plus every remaining one is lost to the budget. `break` used to
+      // hide the whole tail; record it so the funnel can show what the 1000-token
+      // ceiling actually cost.
+      if (!placed) skip(result, 'budget');
+      for (const rest of sortedResults.slice(idx + 1)) skip(rest, 'budget');
       break;
     }
 
@@ -207,5 +224,5 @@ export function assembleBudgetedMarkdown(sortedResults, budget = 1000) {
     }
   }
 
-  return { markdown: sections.join('\n\n'), tokensUsed, items: selected };
+  return { markdown: sections.join('\n\n'), tokensUsed, items: selected, skipped };
 }

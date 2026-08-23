@@ -100,6 +100,73 @@ export function scaledBand(byKey: Record<string, number>, totalBytes: number): {
   return { view, prefixPct: Math.min(100, prefixW) }
 }
 
+/**
+ * UTF-8 byte length (not UTF-16 code units) — matches how the proxy counts categories.
+ */
+function utf8Bytes(text: string): number {
+  return new TextEncoder().encode(text).length
+}
+
+/**
+ * Bytes of the KB block this run actually received, reconstructed from the retrieval
+ * capture when the wire-side categoriser could not attribute them.
+ *
+ * WHY THIS IS NEEDED. The proxy attributes `know` by anchoring on the block's
+ * "## Working Memory" header inside the outbound MESSAGES. Neither condition holds for an
+ * experiment cell: cell-injection.mjs delivers via `claude --append-system-prompt`, so the
+ * block sits in the SYSTEM prompt and never enters `messages`; and retrieval-service.js
+ * suppresses the Working-Memory scaffold for any task_id containing '--' (every cell), so
+ * there is no header to anchor on either. The category therefore arrives as 0 for every
+ * cell — and since scaledBand() drops zero-byte categories, the band segment disappeared
+ * and a kb-on cell rendered identically to a kb-off one. The 2026-08-22 A/B ran blind for
+ * exactly this reason: 688 tokens were injected into kb-on r1 and the UI showed "0 B".
+ *
+ * Reconstructed from the SAME per-item payloads the drill-down renders, using the injected
+ * format from token-budget.js formatResult() (title line + summary_preview). This is a
+ * derived figure, so callers label it as such rather than passing it off as a wire
+ * measurement. Returns 0 when there is no capture — a genuinely un-injected run (kb-off)
+ * must keep reading 0, not acquire a fabricated segment.
+ */
+export function injectedKnowledgeBytes(
+  items: KbCaptureItem[] | null | undefined,
+  meta: KbCaptureMeta | null | undefined,
+): number {
+  if (Array.isArray(items) && items.length > 0) {
+    const total = items.reduce((acc, it) => {
+      const p = it.payload || {}
+      const title = p.topic || p.theme || p.entityType || p.agent || ''
+      const body = p.summary_preview || ''
+      // `**title**\n` + body + `\n` — the shape formatResult() emits.
+      return acc + utf8Bytes(title) + utf8Bytes(body) + 5
+    }, 0)
+    if (total > 0) return total
+  }
+  // No per-item capture (pre-Phase-B run) but the meta block recorded a token spend:
+  // approximate at the conventional 4 bytes/token so the segment still appears rather
+  // than silently reading zero. Deliberately coarse — it is labelled as an estimate.
+  const tokens = meta?.tokens_used
+  return typeof tokens === 'number' && tokens > 0 ? tokens * 4 : 0
+}
+
+/**
+ * Fold derived KB bytes into a measured category map. The block is physically INSIDE the
+ * system prompt for a claude cell, so the same bytes are already counted in `sys`; adding
+ * `know` without deducting them would inflate the total and misstate every other segment's
+ * share. Deduct only what `sys` can actually give up, and never overwrite a `know` the
+ * wire genuinely measured (an interactive run, where the anchor IS present).
+ */
+export function withDerivedKnowledge(
+  byKey: Record<string, number>,
+  derivedBytes: number,
+): { byKey: Record<string, number>; derived: boolean } {
+  if (!derivedBytes || (byKey.know ?? 0) > 0) return { byKey, derived: false }
+  const takeFromSys = Math.min(derivedBytes, byKey.sys ?? 0)
+  return {
+    byKey: { ...byKey, know: derivedBytes, sys: Math.max(0, (byKey.sys ?? 0) - takeFromSys) },
+    derived: true,
+  }
+}
+
 // Real wire-buffer breakdown as returned by GET /api/context-breakdown (proxy).
 interface RealBreakdown {
   capturedAt: string
@@ -355,12 +422,16 @@ function TopologyStrip({ agent }: { agent: string }) {
 }
 
 // The real facts behind the Retrieved-Knowledge segment (Phase 78 dig).
+// `gated: true` marks a tier that is retrieved and ranked but then DROPPED at the curated-tier
+// gate before assembly (2026-08-23) — listing them as if they were injected is what made this
+// panel misleading once the gate went repo-wide. The funnel's 'Curated-tier gate' stage shows
+// exactly how many candidates each of them lost.
 const KB_SECTIONS = [
-  { name: 'Working Memory', budget: '≤300 tok', src: 'STATE.md + VKB /api/entities', detail: 'Live project state (milestone, phase, known issues) — re-read from disk each prompt, NOT chat history.' },
-  { name: 'Insights', budget: '≤4 items', src: 'Qdrant · insights', detail: 'Highest-confidence learned patterns, RRF-ranked to the prompt.' },
-  { name: 'Digests', budget: '≤3 items', src: 'Qdrant · digests', detail: 'Daily consolidations of observations — cover material not yet promoted to an insight.' },
+  { name: 'Working Memory', budget: 'varies', src: 'STATE.md + VKB /api/entities', detail: 'Live project state (components, known issues) — re-read from disk each prompt, NOT chat history. A milestone marked `completed` is suppressed rather than reprinted as current work.' },
+  { name: 'Insights', budget: '≤4 items', src: 'Qdrant · insights', detail: 'Highest-confidence learned patterns, RRF-ranked to the prompt. Preview capped at 3,300 chars (p90 of indexed summaries).' },
   { name: 'Entities', budget: '≤3 items', src: 'Qdrant · kg_entities', detail: 'Knowledge-graph components/subcomponents relevant to the prompt.' },
-  { name: 'Observations', budget: '≤3 items', src: 'Qdrant · observations', detail: 'Raw per-session records — bridge the recency gap until consolidated into digests/insights.' },
+  { name: 'Digests', budget: 'gated out', gated: true, src: 'Qdrant · digests', detail: 'Daily consolidations of observations. Retrieved and ranked, then dropped: they are an upstream precursor of insights, not independent knowledge.' },
+  { name: 'Observations', budget: 'gated out', gated: true, src: 'Qdrant · observations', detail: 'Raw per-session records. Retrieved and ranked, then dropped for the same reason — and they outnumber insights ~11:1, so they crowded the budget.' },
 ]
 
 // Phase B: one structured item from the retrieval capture (/api/retrieve-capture),
@@ -388,6 +459,85 @@ interface KbCaptureMeta {
   tokens_used?: number
   working_memory_tokens?: number
   latency_ms?: number
+}
+
+// The selection funnel (retrieval-service.js `trace`). Retrieval keeps only a handful
+// of the ~80 candidates it fetches; without this the UI could say "why this item" but
+// never "why not that one", and a turn that injected NOTHING looked identical to a turn
+// where the hook never ran. Each stage's `dropped` names its casualties.
+interface KbTraceDrop {
+  id: string | number | null
+  tier: string | null
+  title: string
+  rrfScore: number | null
+  score: number | null
+  reason?: string // assembly only: 'tier-cap' | 'dedup' | 'budget'
+}
+interface KbTraceStage {
+  name: string
+  in: number
+  out: number
+  dropped: KbTraceDrop[]      // capped sample, highest-ranked (the near-misses) first
+  dropped_total?: number      // exact count; absent on captures written before the cap
+  note?: string
+}
+interface KbTrace {
+  candidates?: { semantic?: number; keyword?: number; fused?: number }
+  stages: KbTraceStage[]
+  injected?: number
+  tokens_used?: number
+  budget?: number
+  working_memory_included?: boolean
+  judge_outcome?: string | null
+}
+
+// One captured turn. The capture is append-only, one line per retrieval — a session
+// used to keep only its LAST turn because the writer overwrote a single file.
+interface KbCaptureTurn {
+  turn: number
+  capturedAt?: string | null
+  meta?: KbCaptureMeta | null
+  items?: KbCaptureItem[]
+  trace?: KbTrace | null
+  legacy?: boolean
+}
+
+// Human-readable stage labels + what the stage actually does. Keyed by the `name`
+// retrieval-service.js emits; an unknown stage falls back to its raw name so a new
+// backend stage shows up rather than silently disappearing.
+const KB_STAGE_LABELS: Record<string, { label: string; what: string }> = {
+  'idf-floor': {
+    label: 'Relevance floor',
+    what: 'Drops candidates sharing no discriminating keyword with the prompt. Lenient by design — the judge below is the real precision gate.',
+  },
+  'tier-gate': {
+    label: 'Curated-tier gate',
+    what: 'Keeps insights + knowledge-graph entities, drops episodic digests/observations — those are the upstream precursors the insight tier already distils, at roughly 15:1 volume.',
+  },
+  // Pre-2026-08-23 name for the same stage, kept so archived captures still render a label
+  // rather than the raw key. The gate used to run for experiment cells only.
+  'experiment-tier-gate': {
+    label: 'Curated-tier gate',
+    what: 'Experiment cells only: keeps insights + knowledge-graph entities, drops episodic digests/observations.',
+  },
+  'judge-topk': {
+    label: 'Top-K trim',
+    what: 'Only the highest-ranked handful fit the token budget, so the tail is cut before the judge is asked.',
+  },
+  judge: {
+    label: 'LLM relevance judge',
+    what: 'A cheap batched LLM call keeps only items that genuinely help with THIS task. Fails open (keeps the heuristic set) interactively, closed (injects nothing) for experiment cells.',
+  },
+  assembly: {
+    label: 'Budget assembly',
+    what: 'Per-tier caps, near-duplicate collapse, and the token ceiling. Anything past the ceiling is lost regardless of rank.',
+  },
+}
+
+const KB_DROP_REASONS: Record<string, string> = {
+  'tier-cap': 'tier full',
+  dedup: 'near-duplicate',
+  budget: 'over budget',
 }
 
 // Split the captured query back into the user-prompt part and the `[context: …]`
@@ -511,8 +661,117 @@ function KbScoredCard({ item, queryWords }: { item: KbCaptureItem; queryWords?: 
         </p>
       ) : null}
       {p.summary_preview && (
-        <p className="whitespace-pre-wrap break-words text-[11px] leading-snug text-muted-foreground">{p.summary_preview}</p>
+        // Capped height with its own scroll. The stored preview used to be 200 chars
+        // (~3 lines); SUMMARY_PREVIEW_CHARS is now 1200, so an unclamped body is ~18
+        // lines and four insight cards would bury the scores and matched-term chips
+        // that make this view scannable. Nothing is hidden — it scrolls.
+        <p className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-[11px] leading-snug text-muted-foreground">{p.summary_preview}</p>
       )}
+    </div>
+  )
+}
+
+/** One dropped candidate in the funnel — same identity cues as a kept card, minus the body. */
+function KbDropRow({ drop }: { drop: KbTraceDrop }): ReactNode {
+  return (
+    <li className="flex items-start justify-between gap-2 py-0.5" data-testid="kb-funnel-drop">
+      <span className="min-w-0 flex-1 truncate" title={drop.title}>{drop.title}</span>
+      <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
+        {drop.reason && <span className="rounded bg-muted px-1">{KB_DROP_REASONS[drop.reason] ?? drop.reason}</span>}
+        {drop.tier && <span className="opacity-70">{drop.tier}</span>}
+        {typeof drop.rrfScore === 'number' && <span>rel {drop.rrfScore.toFixed(3)}</span>}
+      </span>
+    </li>
+  )
+}
+
+/**
+ * The drop-off funnel: how ~80 candidates became the handful that were injected.
+ *
+ * This is the "why NOT that one" half of the explanation. Each stage shows what it
+ * received, what it passed on, and — expandable — exactly which items it killed. When
+ * a stage takes the count to zero it is called out explicitly, because "nothing was
+ * injected" is the case that used to leave no record whatsoever.
+ */
+function KbFunnel({ trace }: { trace: KbTrace }): ReactNode {
+  const stages = trace.stages ?? []
+  if (stages.length === 0) return null
+  const start = stages[0].in
+  const emptiedAt = stages.find((s) => s.in > 0 && s.out === 0) ?? null
+  // Bar widths are relative to the widest stage input, so the taper is readable even
+  // when the first stage already dominates.
+  const pct = (n: number) => (start > 0 ? Math.max(2, Math.round((n / start) * 100)) : 0)
+
+  return (
+    <div className="mt-3 rounded-md border p-3" data-testid="kb-funnel">
+      <p className="text-sm font-semibold">Why these items — and not the others</p>
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        Retrieval fetched{' '}
+        <span className="font-medium text-foreground">
+          {trace.candidates?.fused ?? start} candidate{(trace.candidates?.fused ?? start) === 1 ? '' : 's'}
+        </span>
+        {typeof trace.candidates?.semantic === 'number' && typeof trace.candidates?.keyword === 'number' && (
+          <> ({trace.candidates.semantic} semantic + {trace.candidates.keyword} keyword, fused)</>
+        )}
+        {' '}and injected <span className="font-medium text-foreground">{trace.injected ?? 0}</span>
+        {typeof trace.tokens_used === 'number' && <> using {trace.tokens_used} tokens</>}
+        {typeof trace.budget === 'number' && <> of a {trace.budget}-token semantic budget</>}.
+        Expand a stage to see what it dropped.
+      </p>
+
+      {emptiedAt && (
+        <p className="mt-2 rounded border border-dashed px-2 py-1 text-[11px] text-muted-foreground" data-testid="kb-funnel-emptied">
+          <span className="font-medium text-foreground">Nothing was injected this turn.</span>{' '}
+          Every remaining candidate was dropped at{' '}
+          <span className="font-medium text-foreground">{KB_STAGE_LABELS[emptiedAt.name]?.label ?? emptiedAt.name}</span>
+          {emptiedAt.note ? ` — ${emptiedAt.note}.` : '.'} That is the gate working, not a failure.
+        </p>
+      )}
+
+      <ol className="mt-2 space-y-1.5">
+        {stages.map((s) => {
+          const meta = KB_STAGE_LABELS[s.name]
+          // Trust the stage's own arithmetic for the count, not the (capped) sample
+          // length. `dropped_total` is absent on captures written before the cap.
+          const lost = s.in - s.out
+          const namedCount = s.dropped?.length ?? 0
+          const totalDropped = s.dropped_total ?? namedCount
+          const truncated = totalDropped > namedCount
+          return (
+            <li key={s.name} data-testid={`kb-funnel-stage-${s.name}`}>
+              <details className="rounded border">
+                <summary className={`flex cursor-pointer items-center gap-2 px-2 py-1 text-xs ${lost === 0 ? 'opacity-70' : ''}`}>
+                  <span className="min-w-0 flex-1 truncate font-medium" title={meta?.what}>{meta?.label ?? s.name}</span>
+                  <span className="h-1.5 w-24 shrink-0 overflow-hidden rounded bg-muted" aria-hidden="true">
+                    <span className="block h-full rounded bg-foreground/40" style={{ width: `${pct(s.out)}%` }} />
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    {s.in} → {s.out}{lost > 0 && <span className="ml-1 text-foreground/70">−{lost}</span>}
+                  </span>
+                </summary>
+                <div className="border-t px-2 py-1.5">
+                  {meta?.what && <p className="mb-1 text-[11px] text-muted-foreground">{meta.what}</p>}
+                  {s.note && <p className="mb-1 text-[11px] italic text-muted-foreground">{s.note}</p>}
+                  {lost === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">Dropped nothing — every candidate passed.</p>
+                  ) : (
+                    <>
+                      <ul className="text-[11px]">
+                        {s.dropped.map((d, i) => <KbDropRow key={`${d.id ?? 'x'}-${i}`} drop={d} />)}
+                      </ul>
+                      {truncated && (
+                        <p className="mt-1 text-[10px] italic text-muted-foreground" data-testid="kb-funnel-truncated">
+                          Showing the {namedCount} highest-ranked of {totalDropped} dropped — the rest ranked below these.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </details>
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }
@@ -575,7 +834,18 @@ function KbCategoryDialog({ name, section, structured, queryWords, onClose }: {
 }
 
 /** Nested pop-up: the deep detail for the Retrieved-Knowledge injection. */
-function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open: boolean; onClose: () => void; real: RealBreakdown | null; agent?: string | null; kbItems?: KbCaptureItem[] | null; kbMeta?: KbCaptureMeta | null }) {
+function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta, kbTrace, kbTurns, selectedTurn, onSelectTurn }: {
+  open: boolean
+  onClose: () => void
+  real: RealBreakdown | null
+  agent?: string | null
+  kbItems?: KbCaptureItem[] | null
+  kbMeta?: KbCaptureMeta | null
+  kbTrace?: KbTrace | null
+  kbTurns?: KbCaptureTurn[] | null
+  selectedTurn?: number | null
+  onSelectTurn?: (turn: number) => void
+}) {
   const injected = real?.knowledge_text?.trim() || null
   const sections = useMemo(() => parseKnowledgeSections(injected), [injected])
   const [openSection, setOpenSection] = useState<string | null>(null)
@@ -585,6 +855,11 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open:
     const tier = nm ? SECTION_TIER[nm] : undefined
     return tier && kbItems ? kbItems.filter((i) => i.tier === tier) : []
   }
+  const turns = kbTurns ?? []
+  // A session retrieves once per user prompt, so >1 turn is the norm; the selector is
+  // only noise when there is a single capture (or a legacy one, which by construction
+  // is the session's last turn and the only one that survived the old overwrite).
+  const showTurnPicker = turns.length > 1
   // Claude (UserPromptSubmit hook) and OpenCode (chat.messages.transform plugin)
   // inject the KB block per prompt. Copilot exposes no per-prompt hook API, so it
   // genuinely can't — its empty-state must say so rather than a misleading "re-run".
@@ -631,6 +906,44 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open:
           </div>
         )}
 
+        {showTurnPicker && (
+          <div className="mt-3 rounded-md border p-3" data-testid="kb-turn-picker">
+            <p className="text-sm font-semibold">
+              Retrieval ran {turns.length} times in this session — one per prompt
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Each turn retrieved against its OWN prompt, so the injected set differs turn to turn.
+              Pick a turn to see what it was given and why.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {turns.map((t) => {
+                const active = t.turn === selectedTurn
+                const n = t.items?.length ?? 0
+                return (
+                  <button
+                    key={t.turn}
+                    type="button"
+                    onClick={() => onSelectTurn?.(t.turn)}
+                    data-testid="kb-turn-button"
+                    aria-pressed={active}
+                    title={`${t.capturedAt ?? ''} — ${n} item${n === 1 ? '' : 's'} injected`}
+                    className={`rounded border px-2 py-0.5 font-mono text-[10px] ${
+                      active ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted'
+                    } ${n === 0 && !active ? 'opacity-50' : ''}`}
+                  >
+                    {t.turn + 1}
+                    <span className="ml-1 opacity-70">{n}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Small number = items injected on that turn. A <span className="font-mono">0</span> is a real
+              answer, not a gap — expand its funnel below to see which stage emptied it.
+            </p>
+          </div>
+        )}
+
         {capturedPrompt && (
           <div className="mt-3 rounded-md border p-3" data-testid="kb-query-block">
             <p className="text-sm font-semibold">The prompt that drove this retrieval</p>
@@ -656,19 +969,53 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open:
           </div>
         )}
 
-        <div className="mt-3 rounded-md border p-3">
-          <p className="text-sm font-semibold">Budget: 1,000 tokens</p>
-          <div className="mt-2 flex h-4 w-full overflow-hidden rounded" title="300 Working Memory + 700 semantic">
-            <div className="flex items-center justify-center text-[10px] text-white" style={{ width: '30%', background: '#a855f7' }}>300 WM</div>
-            <div className="flex items-center justify-center text-[10px] text-white" style={{ width: '70%', background: '#7c3aed' }}>700 semantic</div>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            300 tok Working Memory + 700 tok semantic retrieval. Overflows are truncated per-item; the hook output is
-            hard-capped at 9,500 chars.
-          </p>
-        </div>
+        {kbTrace && <KbFunnel trace={kbTrace} />}
 
-        <div className="mt-3 space-y-1.5">
+        {/* Budget — read from THIS run's capture, not hardcoded. The figures were fixed at
+            "1,000 = 300 WM + 700 semantic" and silently went stale when the budget moved;
+            a panel explaining what limited the block must not itself state the wrong limit. */}
+        {(() => {
+          const total = kbMeta?.budget ?? null
+          const wmTok = kbMeta?.working_memory_tokens ?? 0
+          const semantic = total != null ? Math.max(0, total - wmTok) : null
+          const wmPct = total && total > 0 ? Math.round((wmTok / total) * 100) : 0
+          return (
+            <div className="mt-3 rounded-md border p-3">
+              <p className="text-sm font-semibold">
+                {total != null ? `Budget: ${total.toLocaleString()} tokens` : 'Budget: not recorded for this run'}
+              </p>
+              {total != null && (
+                <>
+                  <div className="mt-2 flex h-4 w-full overflow-hidden rounded" title={`${wmTok} Working Memory + ${semantic} semantic`}>
+                    {wmPct > 0 && (
+                      <div className="flex items-center justify-center text-[10px] text-white" style={{ width: `${wmPct}%`, background: '#a855f7' }}>
+                        {wmTok} WM
+                      </div>
+                    )}
+                    <div className="flex items-center justify-center text-[10px] text-white" style={{ width: `${100 - wmPct}%`, background: '#7c3aed' }}>
+                      {semantic} semantic
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {wmTok > 0 ? `${wmTok} tok Working Memory + ` : 'Working Memory suppressed for this run · '}
+                    {semantic} tok semantic retrieval
+                    {typeof kbMeta?.tokens_used === 'number' && <> · <span className="font-medium text-foreground">{kbMeta.tokens_used} actually used</span></>}.
+                    Overflows are truncated per-item.
+                  </p>
+                </>
+              )}
+            </div>
+          )
+        })()}
+
+        {/* `min-w-0` is load-bearing. DialogContent is a CSS grid, and a grid item's
+            automatic minimum size is min-content — so this list of section rows (whose
+            rows contain nowrap `truncate` text) refused to shrink and widened the grid
+            column to 809px inside a 758px dialog. The dialog clips with
+            overflow-x-hidden, so ~50px of EVERY row in the modal was silently cut off
+            at the right edge. Verified by bisection: hiding this subtree took the
+            dialog's scrollWidth from 857 back to exactly its 758px clientWidth. */}
+        <div className="mt-3 min-w-0 space-y-1.5">
           {KB_SECTIONS.map((s) => {
             const sec = sections[s.name]
             const hasContent = !!sec && sec.items.length > 0
@@ -677,7 +1024,8 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta }: { open:
               <>
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
-                    {s.name} <span className="ml-1 font-mono text-xs text-muted-foreground">{s.budget}</span>
+                    <span className={s.gated ? 'text-muted-foreground line-through decoration-1' : undefined}>{s.name}</span>
+                    <span className="ml-1 font-mono text-xs text-muted-foreground">{s.budget}</span>
                     {hasContent && s.name !== 'Working Memory' && (
                       <span className="ml-2 text-xs text-muted-foreground">· {sec.items.length} item{sec.items.length === 1 ? '' : 's'}</span>
                     )}
@@ -927,6 +1275,11 @@ export function ContextCacheExplainer() {
   // fallback still renders the content).
   const [kbItems, setKbItems] = useState<KbCaptureItem[] | null>(null)
   const [kbMeta, setKbMeta] = useState<KbCaptureMeta | null>(null)
+  // Per-turn captures for this run + which one is on screen. The capture is
+  // append-only (one line per retrieval); `null` selects the last turn, matching the
+  // server's default and the behaviour before per-turn capture existed.
+  const [kbTurns, setKbTurns] = useState<KbCaptureTurn[] | null>(null)
+  const [selectedTurn, setSelectedTurn] = useState<number | null>(null)
 
   const open = taskId != null
   const close = () => dispatch(setExplainTaskId(null))
@@ -965,22 +1318,42 @@ export function ContextCacheExplainer() {
     return () => { cancelled = true }
   }, [open, taskId, run?.started_at, run?.ended_at]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Phase B: the structured per-item KB capture for this run (scored cards).
+  // The structured per-item KB capture for this run (scored cards + funnel). One
+  // request returns EVERY captured turn, so switching turns is local state — no
+  // refetch, and no chance of a stale response landing on the wrong turn.
   useEffect(() => {
-    if (!open || !taskId) { setKbItems(null); setKbMeta(null); return }
+    if (!open || !taskId) { setKbItems(null); setKbMeta(null); setKbTurns(null); setSelectedTurn(null); return }
     let cancelled = false
     setKbItems(null)
     setKbMeta(null)
+    setKbTurns(null)
+    setSelectedTurn(null)
     fetch(`/api/retrieve-capture?task_id=${encodeURIComponent(taskId)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (cancelled || !d) return
+        // Back-compat: top-level items/meta are the server's selected (last) turn.
         if (Array.isArray(d.items)) setKbItems(d.items as KbCaptureItem[])
         if (d.meta && typeof d.meta === 'object') setKbMeta(d.meta as KbCaptureMeta)
+        if (Array.isArray(d.turns) && d.turns.length > 0) {
+          const turns = d.turns as KbCaptureTurn[]
+          setKbTurns(turns)
+          setSelectedTurn(turns[turns.length - 1].turn)
+        }
       })
       .catch(() => { /* no structured capture — markdown parse still renders content */ })
     return () => { cancelled = true }
   }, [open, taskId])
+
+  // The turn on screen. Falls back to the server's top-level fields when the capture
+  // predates per-turn recording (legacy single-object `.json`).
+  const activeTurn = useMemo(() => {
+    if (!kbTurns || kbTurns.length === 0) return null
+    return kbTurns.find((t) => t.turn === selectedTurn) ?? kbTurns[kbTurns.length - 1]
+  }, [kbTurns, selectedTurn])
+  const activeKbItems = activeTurn?.items ?? kbItems
+  const activeKbMeta = activeTurn?.meta ?? kbMeta
+  const activeKbTrace = activeTurn?.trace ?? null
 
   const s = useMemo(() => summarize(timeline, contextTurns), [timeline, contextTurns])
 
@@ -1005,7 +1378,7 @@ export function ContextCacheExplainer() {
   //      measured run of any wire (anthropic OR openai).
   //   2. The older /api/context-breakdown per-run buffer capture (activeReal).
   //   3. Illustrative fixed widths, only when neither real source exists.
-  const { segView, prefixPct, realByKey, detailByKey, bandSource, bandTotalBytes, bandMsgCount } = useMemo(() => {
+  const { segView, prefixPct, knowDerived, realByKey, detailByKey, bandSource, bandTotalBytes, bandMsgCount } = useMemo(() => {
     // 1) Per-request context-turns — pick the turn with the largest total
     //    context (the representative "one full prompt sent to the backend").
     if (contextTurns.length > 0) {
@@ -1017,14 +1390,19 @@ export function ContextCacheExplainer() {
         if (total > bestTotal) { bestTotal = total; best = t }
       }
       if (best && bestTotal > 0) {
-        const byKey: Record<string, number> = {}
+        const measured: Record<string, number> = {}
         const detByKey: Record<string, CategoryDetail | undefined> = {}
-        for (const c of best.categories) { byKey[c.key] = num(c.bytes); detByKey[c.key] = c.detail }
+        for (const c of best.categories) { measured[c.key] = num(c.bytes); detByKey[c.key] = c.detail }
+        // Re-attribute the injected KB block the wire could not see (see
+        // injectedKnowledgeBytes) so the segment — the band's entry point into the KB
+        // drill-down — exists for a kb-on cell.
+        const { byKey, derived } = withDerivedKnowledge(measured, injectedKnowledgeBytes(kbItems, kbMeta))
         const band = scaledBand(byKey, bestTotal)
         if (band) {
           return {
             segView: band.view,
             prefixPct: band.prefixPct,
+            knowDerived: derived,
             realByKey: byKey,
             detailByKey: detByKey,
             bandSource: 'turns' as const,
@@ -1036,15 +1414,17 @@ export function ContextCacheExplainer() {
     }
     // 2) /api/context-breakdown capture.
     const real = activeReal
-    const byKey: Record<string, number> = {}
+    const measured2: Record<string, number> = {}
     const detByKey: Record<string, CategoryDetail | undefined> = {}
-    if (real) for (const c of real.categories) { byKey[c.key] = c.bytes; detByKey[c.key] = c.detail }
+    if (real) for (const c of real.categories) { measured2[c.key] = c.bytes; detByKey[c.key] = c.detail }
+    const { byKey, derived: derived2 } = withDerivedKnowledge(measured2, injectedKnowledgeBytes(kbItems, kbMeta))
     if (real && real.total_bytes > 0) {
       const band = scaledBand(byKey, real.total_bytes)
       if (band) {
         return {
           segView: band.view,
           prefixPct: band.prefixPct,
+          knowDerived: derived2,
           realByKey: byKey,
           detailByKey: detByKey,
           bandSource: 'real' as const,
@@ -1054,8 +1434,8 @@ export function ContextCacheExplainer() {
       }
     }
     // 3) Illustrative.
-    return { segView: SEGMENTS, prefixPct: PREFIX_PCT, realByKey: byKey, detailByKey: detByKey, bandSource: 'illustrative' as const, bandTotalBytes: 0, bandMsgCount: 0 }
-  }, [activeReal, contextTurns])
+    return { segView: SEGMENTS, prefixPct: PREFIX_PCT, knowDerived: false, realByKey: byKey, detailByKey: detByKey, bandSource: 'illustrative' as const, bandTotalBytes: 0, bandMsgCount: 0 }
+  }, [activeReal, contextTurns, kbItems, kbMeta])
 
   // True whenever the band is drawn from a real size source (either context-turns
   // or the /api/context-breakdown capture) — controls the "measured" copy + the
@@ -1226,8 +1606,8 @@ export function ContextCacheExplainer() {
                       <TooltipContent side="bottom" className="max-w-xs">
                         <p className="font-semibold">Retrieved Knowledge — the injected KB block</p>
                         <p className="mt-1 text-xs">
-                          ~1,000 tokens prepended every prompt: 300 Working Memory (project/milestone/state) + 700 semantic
-                          (Insights ≤4 · Digests ≤3 · Entities ≤3 · Observations ≤3) via Qdrant RRF from the
+                          The KB block prepended each prompt: Working Memory (project/milestone/state) + semantic retrieval
+                          (Insights ≤4 · Entities ≤3 — digests/observations are gated out as upstream precursors) via Qdrant RRF from the
                           observations/digests/insights DB. <span className="underline">Click for full detail.</span>
                         </p>
                       </TooltipContent>
@@ -1277,6 +1657,15 @@ export function ContextCacheExplainer() {
                   {bandMeasured
                     ? <span className="font-mono text-muted-foreground">{kb(realByKey[seg.key] ?? 0)}</span>
                     : seg.real && <span className="text-muted-foreground">(real ~1k tok · click)</span>}
+                  {/* Provenance: this run's `know` bytes were reconstructed from the retrieval
+                      capture because the wire categoriser could not see the block (system-prompt
+                      delivery + suppressed WM anchor). Say so rather than let a derived number
+                      read as a measured one. */}
+                  {seg.key === 'know' && knowDerived && (
+                    <span className="text-muted-foreground" title="Reconstructed from this run's retrieval capture — the injected block reaches claude via --append-system-prompt, so the wire-side category walker cannot attribute it.">
+                      (from capture)
+                    </span>
+                  )}
                 </div>
               )
             })}
@@ -1590,7 +1979,18 @@ export function ContextCacheExplainer() {
           </p>
         </div>
 
-        <KbDetailDialog open={kbOpen} onClose={() => setKbOpen(false)} real={activeReal} agent={agent} kbItems={kbItems} kbMeta={kbMeta} />
+        <KbDetailDialog
+          open={kbOpen}
+          onClose={() => setKbOpen(false)}
+          real={activeReal}
+          agent={agent}
+          kbItems={activeKbItems}
+          kbMeta={activeKbMeta}
+          kbTrace={activeKbTrace}
+          kbTurns={kbTurns}
+          selectedTurn={selectedTurn}
+          onSelectTurn={setSelectedTurn}
+        />
         <CategoryDetailModal
           segKey={catOpen}
           onClose={() => setCatOpen(null)}

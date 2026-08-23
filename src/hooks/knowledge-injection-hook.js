@@ -54,7 +54,14 @@ safetyTimer.unref();
 
 const MIN_WORDS = 4;
 const MAX_QUERY_CHARS = 500;
-const MAX_OUTPUT_CHARS = 9500;
+// Backstop only — the TOKEN BUDGET is meant to be what limits the block (see
+// retrieval-service.js `semanticBudget`). At 9,500 this was a second hidden ceiling of the
+// same kind as the old hardcoded 700-token clamp: a 3,000-token budget assembles ~12,000
+// chars, so the block was assembled correctly, costed correctly, traced correctly — and then
+// silently sliced here, with only a '[truncated]' marker to show for it. Sized above the
+// budget's reach so it catches runaway output without ever trimming a legitimately assembled
+// block.
+const MAX_OUTPUT_CHARS = 16000;
 const TRANSCRIPT_TAIL_BYTES = 50000; // Read last ~50KB of transcript
 const MAX_CONTEXT_CHARS = 300;       // Context summary for query enrichment
 
@@ -210,7 +217,11 @@ async function main() {
 
     const result = await callRetrieval({
       query,
-      budget: 1000,
+      // 3000, not 1000. The retrieval service's `defaultBudget` was dead config — every caller
+      // passed this literal, so raising the default alone changed nothing. Sized so ~3 COMPLETE
+      // insights fit: a p90 insight preview is 3,300 chars (~825 tokens) after the 2026-08-23
+      // re-index. Was 1000, of which a hidden `Math.min(..., 700)` clamp made only 700 usable.
+      budget: 3000,
       threshold: 0.70,
       context,
       task_id,

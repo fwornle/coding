@@ -31,10 +31,63 @@ const COLLECTIONS = ['insights', 'digests', 'kg_entities', 'observations'];
  * excluded for experiments — they record *what happened in past sessions*, not know-how,
  * and for a benchmark task they are merely the log of prior runs of the same cell.
  */
-const EXPERIMENT_CURATED_TIERS = new Set(['insights', 'kg_entities']);
+// Curated specialist know-how. `digests` and `observations` are the UPSTREAM PRECURSORS of
+// insights (observations -> digests -> insights, via ObservationConsolidator), not independent
+// knowledge, and they outnumber insights ~15:1 (8,056 + 3,457 vs 713). Injecting them spends
+// budget on raw session records that the insight tier already distils. Experiment cells have
+// been gated to these two tiers for a while; interactive sessions now match, so the freed
+// budget buys MORE COMPLETE insights instead of more numerous fragments.
+const CURATED_TIERS = new Set(['insights', 'kg_entities']);
 
 /** Judge at most this many top-ranked candidates in one batched LLM call. */
 const JUDGE_TOP_K = 12;
+
+/**
+ * Compact description of a candidate for the selection trace.
+ *
+ * Deliberately NOT the full payload: a trace is written on every turn and a rejected
+ * item only needs enough to be recognisable in the funnel (what it was, how it scored).
+ * Carrying `summary_preview` for every dropped candidate would multiply the on-disk
+ * capture several-fold for items the reader chose not to inject.
+ *
+ * @param {object} r fused candidate (or a token-budget `skipped` entry)
+ * @returns {{id: string|null, tier: string|null, title: string, rrfScore: number|null, score: number|null}}
+ */
+/**
+ * How many dropped candidates a single stage names. The `judge-topk` stage routinely
+ * drops 40+ (everything ranked below the batch ceiling), and naming them all made the
+ * trace ~7 KB per turn on its own — for the least informative drop there is: "ranked
+ * too low". Capping keeps a turn's capture at ~5 KB rather than ~15 KB.
+ */
+const TRACE_MAX_DROPPED = 12;
+
+/**
+ * Describe a stage's casualties, highest-ranked first, capped — with an EXACT total
+ * alongside so a truncated list can never read as a complete one. Ordering by rrfScore
+ * means the entries kept are the near-misses, which is what a reader wants to see; the
+ * tail below them is uniformly uninteresting.
+ *
+ * @param {Array<object>} dropped every candidate the stage dropped
+ * @returns {{dropped: object[], dropped_total: number}}
+ */
+function listDropped(dropped) {
+  const ranked = [...dropped].sort((a, b) => (b?.rrfScore ?? -Infinity) - (a?.rrfScore ?? -Infinity));
+  return {
+    dropped: ranked.slice(0, TRACE_MAX_DROPPED).map((r) => describeCandidate(r)),
+    dropped_total: dropped.length,
+  };
+}
+
+function describeCandidate(r) {
+  const p = r?.payload || {};
+  return {
+    id: r?.id ?? null,
+    tier: r?.tier ?? null,
+    title: p.topic || p.theme || p.entityType || (p.agent ? `${p.agent}${p.date ? ` · ${p.date}` : ''}` : '(untitled)'),
+    rrfScore: typeof r?.rrfScore === 'number' ? r.rrfScore : null,
+    score: typeof r?.score === 'number' ? r.score : null,
+  };
+}
 
 /**
  * Orchestrates hybrid retrieval: embed query, parallel semantic + keyword search,
@@ -44,7 +97,8 @@ export class RetrievalService {
   /**
    * @param {object} options
    * @param {number} [options.scoreThreshold=0.82] - Minimum Qdrant similarity score (D-04)
-   * @param {number} [options.defaultBudget=1000] - Default token budget (D-08)
+   * @param {number} [options.defaultBudget=3000] - Default token budget (D-08). Sized so ~3
+   *   complete insights fit: a p90 insight preview (3,300 chars) costs ~825 tokens.
    * @param {function} [options.dbGetter] - DEPRECATED — kept only so the
    *   keyword-search path (which still reads FTS5 from the legacy SQLite
    *   handle via KeywordSearch.search) keeps working until that consumer
@@ -62,7 +116,7 @@ export class RetrievalService {
     // back to a noisy keyword-only mix. Lowering the floor lets semantic
     // results in; the topic-relevance pass does the actual ranking.
     this.scoreThreshold = options.scoreThreshold ?? 0.70;
-    this.defaultBudget = options.defaultBudget ?? 1000;
+    this.defaultBudget = options.defaultBudget ?? 3000;
     this.embeddingService = null;
     this.qdrantClient = null;
     this.keywordSearch = new KeywordSearch();
@@ -146,7 +200,12 @@ export class RetrievalService {
     // Step 0: Build working memory (fail-open, per D-03). Skipped for experiment cells — the
     // scaffold is suppressed for them regardless, and this also avoids the VKB round-trip.
     const wm = isExperiment ? { markdown: '', tokens: 0 } : await buildWorkingMemory(this.codingRoot);
-    const semanticBudget = Math.min(budget - wm.tokens, 700);
+    // The caller's budget governs. This used to read `Math.min(budget - wm.tokens, 700)`,
+    // and that 700 was a LITERAL — so a caller asking for 3,000 silently received 700 and
+    // the obvious remedy for "give the block more room" was a no-op. Measured before the
+    // fix: three probe queries against a nominal 1,000-token budget returned tokens_used
+    // 675 / 670 / 689, i.e. pinned against the hidden ceiling, not against the budget.
+    const semanticBudget = budget - wm.tokens;
     // Ensure at least 100 tokens for semantic results even if WM overshoots
     const effectiveSemanticBudget = Math.max(semanticBudget, 100);
 
@@ -186,16 +245,39 @@ export class RetrievalService {
     // RANK (rare-term matches rise); this floor is intentionally lenient because the LLM judge
     // below — not this heuristic — is the precision gate. Unannotated items (no rrfScore, or a
     // keyword-less query) are KEPT (fail-open).
-    let relevant = fused.filter((r) => r._relevanceWeight === undefined || r._relevanceWeight > 0);
+    // Selection funnel (see `trace` in the return value). Each stage records how many
+    // candidates went in, how many came out, and WHICH were dropped — the answer to
+    // "why was this injected, and why was that not?". Assembled as we go because the
+    // stages mutate `relevant` in place and the intermediate sets are otherwise lost.
+    const stages = [];
+    const stage = (name, before, after, note) => {
+      const kept = new Set(after.map((r) => String(r.id)));
+      const dropped = before.filter((r) => !kept.has(String(r.id)));
+      stages.push({
+        name,
+        in: before.length,
+        out: after.length,
+        ...listDropped(dropped),
+        ...(note ? { note } : {}),
+      });
+    };
 
-    // Step 4.66: Experiment-cell structural gate. ONLY for experiment cells (taskId
-    // '<exp>--<variant>--rN'): keep curated know-how tiers (insights + kg_entities), dropping
-    // episodic digests/observations — session activity, not know-how, and for a benchmark task
-    // merely records of prior runs. (Self-reference / benchmark-meta exclusion is now handled
-    // semantically by the LLM judge below, so the old fixed EXPERIMENT_META_RE regex is gone.)
-    // Interactive sessions keep all tiers.
-    if (isExperiment) {
-      relevant = relevant.filter((r) => EXPERIMENT_CURATED_TIERS.has(r.tier));
+    const afterFloor = fused.filter((r) => r._relevanceWeight === undefined || r._relevanceWeight > 0);
+    stage('idf-floor', fused, afterFloor,
+      'dropped: shares no discriminating keyword with the query');
+    let relevant = afterFloor;
+
+    // Step 4.66: Structural tier gate, now applied to EVERY caller (was experiment-cells-only).
+    // Keeps curated know-how (insights + kg_entities) and drops episodic digests/observations —
+    // those are the upstream precursors the insight tier already distils, at ~15:1 volume, so
+    // spending budget on them buys repetition rather than knowledge. (Self-reference /
+    // benchmark-meta exclusion is handled semantically by the LLM judge below, so the old fixed
+    // EXPERIMENT_META_RE regex is gone.)
+    {
+      const gated = relevant.filter((r) => CURATED_TIERS.has(r.tier));
+      stage('tier-gate', relevant, gated,
+        'curated know-how tiers only (insights + kg_entities); digests/observations are their upstream precursors');
+      relevant = gated;
     }
 
     // Step 4.7: Freshness rerank — demote insights whose backticked code
@@ -220,7 +302,13 @@ export class RetrievalService {
     // error/timeout/unparseable response, so a proxy outage degrades to the IDF-floored set —
     // never to empty, never blocking. Cached per (query, candidate-ids). Only the top-K are judged
     // (that is all the token budget can hold); the tail is dropped, which is the IDF trim.
-    relevant = await this._judge(query, relevant.slice(0, JUDGE_TOP_K), {
+    // Only the top-K reach the judge; the tail is dropped here, not by the judge.
+    const judgePool = relevant.slice(0, JUDGE_TOP_K);
+    stage('judge-topk', relevant, judgePool,
+      `only the top ${JUDGE_TOP_K} fit the token budget — the tail is trimmed before judging`);
+
+    let judgeOutcome = null;
+    relevant = await this._judge(query, judgePool, {
       // Experiment cells are batch measurements: give the judge a generous cap so a cold/contended
       // proxy usually completes, AND fail CLOSED (inject nothing) if it still can't — "judge-
       // confirmed know-how, or nothing". Interactive stays tight and fails OPEN to the IDF set so
@@ -228,11 +316,29 @@ export class RetrievalService {
       timeoutMs: isExperiment ? 10000 : 2500,
       failClosed: isExperiment,
       log: (m) => process.stderr.write(m),
+      onTrace: (info) => { judgeOutcome = info.outcome; },
     });
+    // The judge reports kept/dropped ids but no per-item reason — see judgeRelevance's
+    // onTrace docblock for why asking it to explain would cost injection quality.
+    stage('judge', judgePool, relevant,
+      judgeOutcome === 'fail-open' ? 'judge unavailable — failed OPEN, kept the heuristic set'
+      : judgeOutcome === 'fail-closed' ? 'judge unavailable — failed CLOSED, injected nothing'
+      : judgeOutcome === 'cache' ? 'judge verdict served from cache'
+      : 'dropped: not genuinely useful for this task');
 
     // Step 5: Token-budgeted markdown assembly (semantic budget after WM). Assembled over the
     // judged set so the Phase-B `items` capture also reflects only genuinely-useful items.
-    const { markdown, tokensUsed, items } = assembleBudgetedMarkdown(relevant, effectiveSemanticBudget);
+    const { markdown, tokensUsed, items, skipped } = assembleBudgetedMarkdown(relevant, effectiveSemanticBudget);
+    // Assembly drops for three distinct reasons; keep them distinguishable in the funnel.
+    const assemblyDrops = [...(skipped || [])].sort((a, b) => (b?.rrfScore ?? -Infinity) - (a?.rrfScore ?? -Infinity));
+    stages.push({
+      name: 'assembly',
+      in: relevant.length,
+      out: items.length,
+      dropped: assemblyDrops.slice(0, TRACE_MAX_DROPPED).map((s) => ({ ...describeCandidate(s), reason: s.reason })),
+      dropped_total: assemblyDrops.length,
+      note: `tier caps, content dedup and the ${effectiveSemanticBudget}-token budget`,
+    });
 
     // Combine: working-memory prefix + semantic results. WM is included ONLY when at least one
     // relevant item survived the floor AND this is not an experiment cell. With zero survivors
@@ -245,9 +351,24 @@ export class RetrievalService {
     // count (post-floor), NOT the raw candidate count — that is what the hooks gate injection on.
     // `items` (Phase B) is the structured subset actually injected — each with its rrfScore/score
     // — so a caller can persist a per-item capture the dashboard renders as scored cards.
+    //
+    // `trace` is the selection funnel: every stage's in/out counts plus the items it
+    // dropped and why. It is what turns "here is what was injected" into "here is what
+    // was injected AND why nothing else was" — including the case where NOTHING was
+    // injected, which the capture used to discard silently. Purely additive: existing
+    // callers (retrieval-client.js and all four agent adapters) ignore it.
     return {
       markdown: finalMarkdown,
       items,
+      trace: {
+        candidates: { semantic: semanticResults.length, keyword: keywordHits.length, fused: fused.length },
+        stages,
+        injected: items.length,
+        tokens_used: wmTokens + tokensUsed,
+        budget: effectiveSemanticBudget,
+        working_memory_included: includeWM,
+        judge_outcome: judgeOutcome,
+      },
       meta: {
         query,
         budget,
