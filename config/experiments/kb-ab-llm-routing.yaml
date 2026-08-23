@@ -1,0 +1,60 @@
+# config/experiments/kb-ab-llm-routing.yaml — knowledge-injection A/B, task 3 of 3.
+#
+# See kb-ab-etm-crashloop.yaml for the shared rationale (why a written doc rather than an analysis
+# question, and the fixed-argv grading constraint). This spec varies only the task.
+#
+# REPLACES kb-ab-proxy-endpoint.yaml, which was measurably incapable of discriminating. That spec
+# graded on `12435`, and its wider fact set (/api/complete, the 3033 trap, the HTML-200 symptom)
+# fared no better: ALL of it is grep-able from the restored snapshot, because it is long-standing
+# configuration. Its own header had already flagged it as "the weakest of the three" on intuition;
+# scripts/experiment-audit-recoverability.mjs turned that into a measurement — 0 of 4 required
+# facts out of reach, verdict FAIL — and it was retired rather than kept as decoration.
+#
+# WHY THIS TASK IS KNOWLEDGE-DECISIVE. The routing rework landed 2026-08-16. The restored snapshot
+# has a 2026-07-20 content lineage (its "baseline: post-restore" commit is synthetic, created at
+# restore time — read the PARENT commit to date a snapshot). So every identifier this task grades
+# on is absent from the sandbox BY CONSTRUCTION, while the KB carries the story as
+# "Rapid-LLM-Proxy Config-Driven Routing Engine". Verified against the post-strip tree: 0 files
+# for llm-routing.yaml, llm-fallback.yaml, available_models and from-caller.
+#
+# THAT IS THE GENERAL RULE worth reusing: a graded fact discriminates iff it entered the project
+# AFTER the snapshot's content date. Anything older is in the tree, and the control arm can simply
+# read it. Facts drawn from the KB's prose do not help either — KB insights are written ABOUT this
+# repo, so their concrete identifiers are in the repo too (measured: of 121 candidate tokens the
+# KB returned for the ETM goal, only 14 were snapshot-absent, and every one was prose or an
+# absolute host path).
+#
+# HOW IT IS GRADED. `test_command` runs the shared checker as a FIXED ARGV — no shell
+# metacharacters, so evidence-harness.resolveTestCommand accepts it exactly as it accepted the old
+# `grep -q -F`. The checker asserts a CONJUNCTION of facts (lib/experiments/kb-ab-facts.mjs), which
+# a control arm cannot assemble by grepping even when individual facts leak. Re-audit after any
+# change to the snapshot or the repo:
+#   node scripts/experiment-audit-recoverability.mjs --spec config/experiments/kb-ab-llm-routing.yaml
+#
+# RUN STANDALONE (one global span slot — see the sibling spec's header):
+#   node scripts/experiment-run.mjs --spec config/experiments/kb-ab-llm-routing.yaml
+version: 1
+
+experiment_id: kb-ab-llm-routing
+
+snapshot_id: smoke-spec
+
+goal_sentence: "Create a file named llm-routing-runbook.md at the repository root explaining to an operator how this project decides which provider and model serves a given background job. The file must say where the routing configuration lives, what each provider declares about the models it can serve, what happens at start-up when that configuration cannot be parsed, and how a change to it is picked up."
+
+repeats: 3
+
+task_class: docs
+
+# Fixed argv, no shell metacharacters. The checker asserts the conjunction; see kb-ab-facts.mjs
+# for each fact and why it is required.
+test_command: "node scripts/kb-ab-assert.mjs kb-ab-llm-routing"
+
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-off

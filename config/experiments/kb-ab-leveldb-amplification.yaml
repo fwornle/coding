@@ -36,7 +36,7 @@ task_class: docs
 
 # Fixed argv, no shell metacharacters. `persistOnClose` is the option whose name only a correct
 # causal answer contains.
-test_command: "grep -q -F persistOnClose leveldb-amplification-runbook.md"
+test_command: "node scripts/kb-ab-assert.mjs kb-ab-leveldb-amplification"
 
 variants:
   - agent: claude

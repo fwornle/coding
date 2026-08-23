@@ -44,6 +44,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { neutralizeSandboxRules, neutralizeSandboxKnowledge } from '../lib/experiments/experiment-restore.mjs';
+import { FACT_SETS } from '../lib/experiments/kb-ab-facts.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GREP_TIMEOUT_MS = 120_000;
@@ -99,12 +100,69 @@ function filesContaining(root, pattern, { excludeFile } = {}) {
   return res.stdout.split('\n').filter(Boolean).map((p) => path.relative(root, p));
 }
 
+/**
+ * The topic argument of a `node scripts/kb-ab-assert.mjs <topic>` gate, or null when the
+ * test_command is not a checker invocation.
+ */
+export function checkerTopicFor(testCommand) {
+  if (typeof testCommand !== 'string') return null;
+  const argv = testCommand.trim().split(/\s+/).filter(Boolean);
+  const i = argv.findIndex((a) => a.endsWith('kb-ab-assert.mjs'));
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : null;
+}
+
+/**
+ * Files under `root` matching a REGEX (not a literal). Used for per-fact recoverability of a
+ * checker gate, whose facts are regexes rather than fixed strings.
+ *
+ * APPROXIMATE BY CONSTRUCTION: this hands the JS source of the pattern to POSIX ERE, which does
+ * not share every JS construct. It is a leak DETECTOR, so it is tuned to over-report rather than
+ * under-report — a fact wrongly flagged recoverable costs you a spec rewrite, one wrongly cleared
+ * costs you another uninformative experiment. Fixed-string facts are checked exactly.
+ */
+function filesMatchingRegex(root, source, { excludeFile } = {}) {
+  if (!root || !fs.existsSync(root)) return [];
+  const argv = ['-rlE', '--binary-files=without-match', '--exclude-dir=.git'];
+  if (excludeFile) argv.push(`--exclude=${excludeFile}`);
+  argv.push(source, root);
+  const res = spawnSync('/usr/bin/grep', argv, { encoding: 'utf8', timeout: GREP_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
+  if (res.error || typeof res.stdout !== 'string') return [];
+  return res.stdout.split('\n').filter(Boolean).map((p) => path.relative(root, p));
+}
+
 /** Audit one spec against one worktree. Pure given the filesystem. */
 export function auditSpec({ specPath, worktree, memoryDir = HOST_MEMORY_DIR }) {
   const text = fs.readFileSync(specPath, 'utf8');
   const experimentId = readSpecScalar(text, 'experiment_id') || path.basename(specPath, '.yaml');
   const snapshotId = readSpecScalar(text, 'snapshot_id');
   const testCommand = readSpecScalar(text, 'test_command');
+  // Checker gate: enumerate its facts and measure each one's recoverability separately. A
+  // conjunction can discriminate even when SOME of its facts are individually greppable — what
+  // matters is whether at least one required fact is out of reach, so the verdict is computed
+  // over the facts rather than over a single string.
+  const topic = checkerTopicFor(testCommand);
+  if (topic) {
+    const set = FACT_SETS[topic];
+    const tree = worktree || newestRestore(snapshotId);
+    if (!set || !tree) {
+      return { experimentId, snapshotId, testCommand, pattern: null, verdict: 'SKIP', inSandbox: [], inMemory: [],
+               reason: !set ? `unknown checker topic '${topic}'` : `no restored worktree for snapshot '${snapshotId}'` };
+    }
+    neutralizeSandboxRules(tree);
+    neutralizeSandboxKnowledge(tree);
+    const facts = set.facts.map((f) => {
+      const hits = filesMatchingRegex(tree, f.re.source, { excludeFile: set.deliverable });
+      return { id: f.id, required: f.required, recoverable: hits.length > 0, files: hits.slice(0, 3), why: f.why };
+    });
+    const required = facts.filter((f) => f.required);
+    const outOfReach = required.filter((f) => !f.recoverable);
+    // FAIL only when EVERY required fact is grep-able — then the control arm can assemble the
+    // whole answer from the tree and the cell measures nothing.
+    const verdict = outOfReach.length === 0 ? 'FAIL' : (outOfReach.length < required.length ? 'WARN' : 'PASS');
+    return { experimentId, snapshotId, testCommand, topic, worktree: tree, facts, verdict,
+             pattern: null, inSandbox: [], inMemory: [] };
+  }
+
   const pattern = gradedPatternFor(testCommand);
 
   if (!pattern) {
@@ -155,6 +213,15 @@ function main(argv) {
       process.stdout.write(`\n${r.experimentId}\n`);
       process.stdout.write(`  graded string : ${r.pattern ?? '(none)'}\n`);
       if (r.reason) process.stdout.write(`  skipped       : ${r.reason}\n`);
+      if (r.facts) {
+        process.stdout.write(`  gate          : checker '${r.topic}' (${r.facts.length} facts)\n`);
+        process.stdout.write(`  worktree      : ${r.worktree}\n`);
+        for (const f of r.facts) {
+          const tag = f.recoverable ? 'grep-able' : 'OUT OF REACH';
+          const where = f.recoverable ? ` — ${f.files.join(', ')}${f.files.length === 3 ? ', …' : ''}` : '';
+          process.stdout.write(`    ${tag.padEnd(13)} ${f.id}${f.required ? '' : ' (optional)'}${where}\n`);
+        }
+      }
       if (r.pattern && !r.reason) {
         process.stdout.write(`  worktree      : ${r.worktree}\n`);
         process.stdout.write(`  in sandbox    : ${r.inSandbox.length ? `${r.inSandbox.length} file(s) — ${r.inSandbox.slice(0, 4).join(', ')}${r.inSandbox.length > 4 ? ', …' : ''}` : 'absent'}\n`);

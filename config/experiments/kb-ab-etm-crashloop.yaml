@@ -19,13 +19,29 @@
 #   2. Headless agents narrate-then-yield on ANALYSIS-shaped goals (opencode `run` ends at the
 #      first toolless step). An EXECUTION-shaped goal ("create this file") avoids both.
 #
+# THIS IS THE DELIBERATE WEAK TASK — READ THIS BEFORE INTERPRETING ITS RESULT. Its facts (the
+# km-core symlink path, the `ln -s` fix, the launchctl check, the green-health explanation) all
+# predate the snapshot's 2026-07-20 content lineage, so ALL of them are grep-able from the tree:
+# scripts/experiment-audit-recoverability.mjs reports 0 of 4 required facts out of reach, verdict
+# FAIL. That cannot be fixed by choosing a different string — it is a property of when the facts
+# entered the repo, not of how they are graded.
+#
+# It is kept anyway, on the reasoning the original spec set already applied to the proxy task:
+# three tasks that all favour the treatment would not tell you whether you are measuring an effect
+# or your own task design. This one is the control that should show NO kb-on advantage. If it
+# does show one, suspect the harness — not the knowledge. Its sibling specs
+# (kb-ab-leveldb-amplification, kb-ab-llm-routing) are the ones that can discriminate, and both
+# grade on facts that landed AFTER the snapshot.
+#
 # HOW IT IS GRADED. `test_command` is spawned as a FIXED ARGV — evidence-harness.mjs rejects any
-# command carrying shell metacharacters rather than running it under a shell — so the gate is a
-# single `grep -q -F` for the one string only a correct answer contains. Here that is the symlink
-# path: the failure is that `node_modules/@fwornle/km-core` (a hand-made symlink present in NO
-# package.json, so `npm install` never restores it) has gone missing. An agent that merely reads
-# the code sees a normal import and has no reason to name that path; an agent given the insight
-# names it immediately. The judge scores the remaining four rubric dimensions from the diff.
+# command carrying shell metacharacters rather than running it under a shell. The gate used to be
+# a single `grep -q -F` for the symlink path; it is now `node scripts/kb-ab-assert.mjs <topic>`
+# (still fixed argv), asserting a CONJUNCTION declared in lib/experiments/kb-ab-facts.mjs. One
+# token could not distinguish diagnosing the cause from giving the fix — every cell of the
+# 2026-08-22 run passed the old gate while differing sharply in what it actually explained.
+# The underlying failure is still that `node_modules/@fwornle/km-core` (a hand-made symlink
+# present in NO package.json, so `npm install` never restores it) has gone missing.
+# The judge scores the remaining four rubric dimensions from the diff.
 #
 # PRE-FLIGHT STATUS (re-check before trusting a run). When these specs were first written the
 # treatment arm was hollow: `summary_preview` was truncated to 200 chars at INDEX time, so the
@@ -62,7 +78,7 @@ task_class: docs
 
 # Fixed argv, no shell metacharacters (evidence-harness.mjs would reject those → ungated run).
 # `-F` keeps the pattern literal so the '@' and '/' are not regex-interpreted.
-test_command: "grep -q -F node_modules/@fwornle/km-core etm-crashloop-runbook.md"
+test_command: "node scripts/kb-ab-assert.mjs kb-ab-etm-crashloop"
 
 # The ONLY axis is injection. Same agent, same pinned model, same framework on both arms, so any
 # difference is attributable to the injected knowledge and nothing else.
