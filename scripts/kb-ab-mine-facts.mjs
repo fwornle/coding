@@ -2,9 +2,13 @@
 /**
  * Re-derive each kb-ab fact set from what the TREATMENT ARM ACTUALLY WROTE.
  *
- *   node scripts/kb-ab-mine-facts.mjs                       # mine, apply blind filters, rewrite
+ *   node scripts/kb-ab-mine-facts.mjs                       # mine, filter, emit the kbm- namespace
  *   node scripts/kb-ab-mine-facts.mjs --dry-run             # report only, no writes, no LLM calls
  *   node scripts/kb-ab-mine-facts.mjs --since <unix-epoch>  # override the deliverable window
+ *
+ * Reads the pilot's `kbs-` specs and fact sets and WRITES a parallel `kbm-` namespace beside them
+ * (specs, facts, ledger-mined.json). Nothing under `kbs-` is modified — see MINED_PREFIX for why
+ * re-gating in place would have silently produced a half-stale matrix.
  *
  * WHY THIS EXISTS. The first full pilot (8 tasks, 48 cells) did not measure the knowledge base; it
  * measured its own gates. The TREATMENT arm scored 0/3, 1/3, 0/3, 2/3, 0/3, 0/3, 0/3, 1/3 on the
@@ -80,12 +84,38 @@ const WINDOW_FILE = path.join(OUT_ROOT, 'mine-window-start');
 const SANDBOX_ROOT = '/tmp/coding-experiment-sandboxes';
 
 /**
+ * The namespace mined tasks are WRITTEN under, distinct from the `kbs-` tasks they are derived
+ * from.
+ *
+ * WHY A SECOND NAMESPACE RATHER THAN A REWRITE IN PLACE. `task_id` is the runner's idempotency key
+ * (D-10/D-14): a cell whose composite id already completed is SKIPPED on resume. The pilot already
+ * ran all 48 `kbs-` cells, so re-gating those ids in place would not re-run them — and, worse, not
+ * uniformly. Only 26 of the 48 reached `terminal_state: complete`; the other 22 (3 abort, 19
+ * unscored) are NOT in the done-set. A rewrite would therefore have graded 22 fresh cells against
+ * the mined facts while silently keeping 26 stale cells scored against the old broken conjunctions,
+ * and the resulting matrix would have looked complete.
+ *
+ * A mined task is genuinely a DIFFERENT task, not a newer version of one: same insight, same goal,
+ * but a different gate derived from a different source. Giving it its own id says exactly that, and
+ * leaves the pilot intact as the 'before' it needs to be compared against.
+ */
+const MINED_PREFIX = 'kbm';
+const SOURCE_PREFIX = 'kbs';
+
+/**
  * Facts per task. The curated sets that discriminated carry four; the pilot's derived sets carried
  * four to five and were jointly unsatisfiable. A conjunction's difficulty compounds, so the cap is
  * the floor plus one — enough that a single unlucky phrasing does not decide the task, few enough
  * that the treatment arm can actually satisfy all of them.
  */
 const MAX_FACTS = 4;
+
+/** `kbs-<slug>` -> `kbm-<slug>`. Identity only; the slug, goal and deliverable are unchanged. */
+function minedId(topic) {
+  return String(topic).startsWith(`${SOURCE_PREFIX}-`)
+    ? `${MINED_PREFIX}-${String(topic).slice(SOURCE_PREFIX.length + 1)}`
+    : `${MINED_PREFIX}-${topic}`;
+}
 
 const out = (s) => process.stdout.write(s);
 const err = (s) => process.stderr.write(s);
@@ -271,8 +301,10 @@ async function main(argv) {
     throw new Error(`no usable mining window (--since, or ${WINDOW_FILE}); refusing to mine every sandbox on disk`);
   }
 
+  // Only the SOURCE namespace is mined. Without this the second run would re-mine its own `kbm-`
+  // output, whose deliverables are not in the window, and exclude every topic for having none.
   const factSets = fs.readdirSync(FACTS_DIR)
-    .filter((n) => n.endsWith('.json'))
+    .filter((n) => n.endsWith('.json') && n.startsWith(`${SOURCE_PREFIX}-`))
     .map((n) => JSON.parse(fs.readFileSync(path.join(FACTS_DIR, n), 'utf8')));
   if (!factSets.length) throw new Error(`no fact sets in ${FACTS_DIR}`);
 
@@ -319,24 +351,72 @@ async function main(argv) {
   const excluded = reports.filter((r) => r.status !== 'derived');
 
   if (!args.dryRun) {
+    const sourceLedger = JSON.parse(fs.readFileSync(path.join(OUT_ROOT, 'ledger.json'), 'utf8'));
+    const rows = [];
+
     for (const r of derived) {
-      const p = path.join(FACTS_DIR, `${r.topic}.json`);
-      const set = JSON.parse(fs.readFileSync(p, 'utf8'));
+      const minedTopic = minedId(r.topic);
+
+      // facts — a NEW file under the mined id; the source set is never touched.
+      const set = JSON.parse(fs.readFileSync(path.join(FACTS_DIR, `${r.topic}.json`), 'utf8'));
+      set.topic = minedTopic;
+      set.derivedFrom = r.topic;
       set.facts = r.kept.map((f) => ({
         id: f.id, source: f.source, flags: f.flags, required: true, why: f.why, inSandbox: f.inSandbox,
       }));
       set.minedFrom = { deliverables: r.deliverables, window: since, at: new Date().toISOString() };
-      fs.writeFileSync(p, `${JSON.stringify(set, null, 2)}\n`, 'utf8');
+      fs.writeFileSync(path.join(FACTS_DIR, `${minedTopic}.json`), `${JSON.stringify(set, null, 2)}\n`, 'utf8');
+
+      // spec — same goal, same variants, same repeats; only the identity and the gate's argument
+      // move, so the two arms are compared under conditions identical to the pilot's.
+      const spec = fs.readFileSync(path.join(SPECS_DIR, `${r.topic}.yaml`), 'utf8')
+        .replace(`experiment_id: ${r.topic}`, `experiment_id: ${minedTopic}`)
+        .replace(`kb-ab-assert.mjs ${r.topic}`, `kb-ab-assert.mjs ${minedTopic}`);
+      fs.writeFileSync(path.join(SPECS_DIR, `${minedTopic}.yaml`), spec, 'utf8');
+
+      const src = (sourceLedger.tasks ?? []).find((t) => t.topic_id === r.topic) ?? {};
+      rows.push({
+        ...src,
+        topic_id: minedTopic,
+        derivedFrom: r.topic,
+        status: 'derived',
+        reason: null,
+        gateSource: 'mined-from-treatment-deliverables',
+        minedDeliverables: r.deliverables,
+        minedTokens: r.mined,
+        injectedChars: r.injectedChars ?? null,
+        coinageSamples: r.coinageSamples ?? null,
+        referenceSamples: null, // the reference filter does not run on this path
+        dropped: r.dropped,
+      });
     }
-    // A topic that cannot be gated must not stay runnable: loadGeneratedFactSets() merges whatever
-    // is on disk, so leaving its spec behind would re-run a gate this pass just rejected.
+
     for (const r of excluded) {
-      for (const [dir, ext] of [[FACTS_DIR, '.json'], [SPECS_DIR, '.yaml']]) {
-        const p = path.join(dir, `${r.topic}${ext}`);
-        if (fs.existsSync(p)) fs.rmSync(p);
-      }
-      err(`[kb-ab-mine] pruned ${r.topic} (${r.reason})\n`);
+      const src = (sourceLedger.tasks ?? []).find((t) => t.topic_id === r.topic) ?? {};
+      rows.push({
+        ...src, topic_id: minedId(r.topic), derivedFrom: r.topic, status: 'excluded', reason: r.reason,
+      });
+      err(`[kb-ab-mine] excluded ${minedId(r.topic)} (${r.reason})\n`);
     }
+
+    const prov0 = probeProvenance();
+    fs.writeFileSync(path.join(OUT_ROOT, 'ledger-mined.json'), `${JSON.stringify({
+      ...sourceLedger,
+      generatedAt: new Date().toISOString(),
+      derivedFromLedger: 'ledger.json',
+      gateSource: 'mined-from-treatment-deliverables',
+      miningWindow: since,
+      maxFacts: MAX_FACTS,
+      coinageModels: prov0.coinageModels,
+      coinageDowngradesRetried: prov0.coinageDowngrades,
+      referenceSamples: null,
+      derived: derived.length,
+      excluded: excluded.length,
+      errored: 0,
+      tasks: rows,
+    }, null, 2)}\n`, 'utf8');
+    out(`\nwrote ${derived.length} spec(s) + fact set(s) under '${MINED_PREFIX}-' and ledger-mined.json\n`);
+    out(`the pilot's '${SOURCE_PREFIX}-' specs, facts and 48 runs are untouched\n`);
   }
 
   const prov = probeProvenance();
@@ -358,4 +438,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 
-export { deliverablesByTopic, goalForTopic, mineTopic, MAX_FACTS };
+export { deliverablesByTopic, goalForTopic, minedId, mineTopic, MAX_FACTS };
