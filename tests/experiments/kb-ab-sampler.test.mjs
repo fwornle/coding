@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import {
   KEEP_MIN_FACTS,
   MAX_GAPS_PER_BRANCH,
+  mineFactsFromDeliverables,
   patternShapeProblem,
   referencePrompt,
   MIN_SYMPTOM_CHARS,
@@ -383,7 +384,7 @@ test('the coinage probe is skipped entirely when nothing was injected', async ()
 // ── the coinage tier guard ─────────────────────────────────────────────────
 
 test('modelTier ranks the families the routing config actually serves', async () => {
-  const { modelTier } = await import('../../scripts/kb-ab-sample-tasks.mjs');
+  const { modelTier } = await import('../../lib/experiments/kb-ab-probes.mjs');
   assert.equal(modelTier('claude-haiku-4-5-20251001'), 1);
   // The three spellings of one model must rank identically, or the guard fires on a rename.
   assert.equal(modelTier('claude-sonnet-4.6'), 2);
@@ -396,7 +397,7 @@ test('modelTier ranks the families the routing config actually serves', async ()
 });
 
 test('an unrecognised model ranks BELOW the floor, so it fails loudly', async () => {
-  const { modelTier } = await import('../../scripts/kb-ab-sample-tasks.mjs');
+  const { modelTier } = await import('../../lib/experiments/kb-ab-probes.mjs');
   // Silently accepting an unknown id is how a coinage probe ends up on something cheap without
   // anyone noticing — the shape of report pitfall 3. Unknown must be rejected, not assumed fine.
   assert.equal(modelTier('some-new-id-nobody-mapped'), 0);
@@ -404,7 +405,7 @@ test('an unrecognised model ranks BELOW the floor, so it fails loudly', async ()
 });
 
 test('the guard is ONE-SIDED: peer-or-stronger passes, weaker fails', async () => {
-  const { modelTier } = await import('../../scripts/kb-ab-sample-tasks.mjs');
+  const { modelTier } = await import('../../lib/experiments/kb-ab-probes.mjs');
   const cell = modelTier('claude-sonnet-4-6');
   // Coinage on a stronger model drops facts the cells might not have coined — conservative, it can
   // only UNDERSTATE the rate, so it is allowed. A weaker model misses facts the cells WOULD coin;
@@ -557,7 +558,7 @@ test('without a source text the precondition is skipped, not silently failed', (
 });
 
 test('coinage must come from the cells\' model FAMILY, not merely an equal tier', async () => {
-  const { modelFamily, modelTier } = await import('../../scripts/kb-ab-sample-tasks.mjs');
+  const { modelFamily, modelTier } = await import('../../lib/experiments/kb-ab-probes.mjs');
   // The fallback chain behind the coinage route ends in groq/llama-3.3-70b-versatile and
   // openai/gpt-4o. Both clear the tier floor. Neither answers "do THESE weights already carry the
   // fact", which is the only question coinage asks.
@@ -586,4 +587,38 @@ test('ordinary regex groups are not mistaken for redaction placeholders', () => 
   assert.equal(patternShapeProblem('(?<name>foo)bar'), null);
   assert.equal(patternShapeProblem('a<b'), null);
   assert.equal(patternShapeProblem('persistOnClose'), null);
+});
+
+// ── mining from treatment-arm deliverables ─────────────────────────────────
+
+test('mined facts are the INTERSECTION across repeats, never the union', () => {
+  // A token one cell wrote is that cell's phrasing; grading on it measures luck rather than what
+  // injection reliably produces. Only what every repeat wrote is the arm's stable vocabulary.
+  const facts = mineFactsFromDeliverables([
+    'The `_lastFiredExchangeUuid` cursor is read from `enhanced-transcript-monitor.js`.',
+    'Check `_lastFiredExchangeUuid` in `enhanced-transcript-monitor.js` before restarting.',
+    'The `_lastFiredExchangeUuid` field lives in `enhanced-transcript-monitor.js`; also `foo_bar`.',
+  ]);
+  const ids = facts.map((f) => f.id);
+  assert.ok(ids.includes('lastfiredexchangeuuid'), 'a token in all three must survive');
+  assert.ok(ids.includes('enhanced-transcript-monitor-js'), 'filenames in all three must survive');
+  assert.ok(!ids.includes('foo-bar'), 'a token only ONE deliverable wrote must not be graded');
+});
+
+test('a single deliverable yields nothing — one cell cannot show stability', () => {
+  assert.deepEqual(mineFactsFromDeliverables(['`persistOnClose` and `readOnly` matter.']), []);
+  assert.deepEqual(mineFactsFromDeliverables([]), []);
+});
+
+test('platform and tooling names are stopworded, not mined as facts', () => {
+  // `macOS` surfaced as a "stable" token on the first calibration run purely because every
+  // operational document names the platform — a gate an arm that understood nothing would pass.
+  const facts = mineFactsFromDeliverables([
+    'On macOS, run `launchctl kickstart` and read `stdout`; see `observations.db`.',
+    'Under macOS the `launchctl kickstart` path writes `stdout`, then `observations.db` updates.',
+  ]);
+  const ids = facts.map((f) => f.id);
+  assert.ok(!ids.includes('macos'), 'the platform name must never be a graded fact');
+  assert.ok(!ids.includes('stdout'), 'a stream name is satisfied by any operational prose');
+  assert.ok(ids.includes('observations-db'), 'a real identifier must still survive');
 });
