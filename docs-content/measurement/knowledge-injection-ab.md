@@ -4,10 +4,14 @@ This report documents a controlled experiment run on 2026-08-23 that measured wh
 automatically injecting curated project knowledge into a coding agent's prompt makes it
 better at its task.
 
-It is written to be readable without prior exposure to this codebase. The methodology
-section matters as much as the result: the first two attempts at this experiment produced
-confident-looking numbers that were **wrong**, and the measures described here exist
-specifically to stop that happening again.
+It is written to be readable without prior exposure to this codebase, and in that order: what
+the test actually is, what was asked, what came back, and what it does and does not support.
+
+A long section on **pitfalls** follows the result rather than preceding it. That is deliberate.
+The first two attempts at this experiment produced confident-looking numbers that were **wrong**,
+and every measure described there exists to stop that recurring — but none of it is intelligible
+before you know what was being measured. Read it as the audit trail behind the numbers, not as a
+prerequisite for them.
 
 ---
 
@@ -28,7 +32,129 @@ tokens, tool calls and wall-clock time.
 
 ---
 
+## What kind of test this is
+
+This is frequently mistaken for a needle-in-a-haystack test. It is the opposite, and the
+difference decides how the results should be read.
+
+A needle-in-a-haystack test plants a fact *inside* a long context and asks whether the model can
+still find it. The needle is in the haystack; the question is attention over distance.
+
+Here the fact is deliberately **absent** from the haystack. Both arms are dropped into the same
+frozen copy of the repository, with the knowledge base stripped out of it. Only the treatment arm
+additionally receives the fact — a few kilobytes of retrieved insights, prepended to its system
+prompt. It is a **closed-book / open-book exam in which the textbook does not contain the
+answer**: both students get the repository, one also gets the lecturer's private notes, and the
+exam question is one the textbook never covers.
+
+That framing splits the headline question into two independent ones, and a task is only
+informative if both are live:
+
+1. **Does the treatment arm use what it was handed?** Having a fact in the prompt does not put it
+   in the answer. One task in this run received the correct knowledge and wrote a runbook
+   contradicting it.
+2. **Can the control arm reconstruct the fact from the repository?** If it can, the knowledge base
+   is redundant *for that task* — the project is paying to store something the code already says.
+
+Every combination of those two carries a different meaning, and all four occurred at some point
+during the design:
+
+| kb-on produces it | kb-off produces it | What it means |
+|---|---|---|
+| yes | no | Injection carried the answer. **The task discriminates** — this is the measurable case. |
+| yes | yes | The repository already answers it. The task is uninformative and the KB adds nothing here. |
+| no | no | Either the gate demands something the KB does not contain, or the task is beyond both arms. |
+| no | yes | Injection actively **hurt**. Investigate — this happened, and the reason is the most transferable finding in this report. |
+
+Getting a task into the first row is the hard part, and it is where three earlier attempts failed.
+It requires a fact that is simultaneously carried by the knowledge base, absent from the
+repository, and naturally demanded by a realistic goal — an intersection that is nearly empty,
+because knowledge-base insights are prose *about* this repository and therefore tend to name
+identifiers that also exist in it.
+
+---
+
+## The two tasks, verbatim
+
+Each arm receives the goal sentence below and nothing else task-specific. Same model, same
+snapshot, same tools; the injected block is the only difference.
+
+### Task 1 — `kb-ab-etm-crashloop`
+
+> Create a file named `etm-crashloop-runbook.md` at the repository root that diagnoses this
+> symptom for an operator: the tmux statusline shows `[LSL red]` and the project's agent letter
+> turns yellow, while the Health API at port 3033 still reports every service green. The file must
+> state the root cause, give the exact shell commands to confirm it, and give the exact command
+> that fixes it.
+
+The real cause is a hand-made symlink — `node_modules/@fwornle/km-core`, which appears in no
+`package.json`, so `npm install` neither creates nor restores it. When it disappears, every
+telemetry-writer spawn dies instantly, yet the Health API stays green *because the writer is not a
+service*. Nothing at the import site hints at any of this.
+
+| Fact | Pattern | Why it is decisive |
+|---|---|---|
+| `symlink-path` | `node_modules/@fwornle/km-core` | The root cause. The import site gives no hint that the dependency is a hand-made link. |
+| `fix-command` | `ln -s` | An agent that only diagnoses has not finished the task. |
+| `launchctl-check` | `launchctl` | The crash-loop is visible as a non-zero exit in the launchd job, not in any service log. |
+| `health-is-wrong-place` | *green **because** it is not a service* | The decisive insight — it explains why the obvious diagnostic tool lies. |
+
+### Task 2 — `kb-ab-leveldb-amplification`
+
+> Create a file named `leveldb-amplification-runbook.md` at the repository root that diagnoses
+> this symptom for an operator: a dashboard HTTP route that only READS data is polled every 30
+> seconds, and the container serving it is killed by the kernel out-of-memory killer on roughly
+> every poll, even though its own startup logs are clean and fast. The file must state the root
+> cause, name the option that fixes it, and give a cheap positive test that confirms the diagnosis
+> before any fix is applied.
+
+The cause is a chain no single file states: the graph store's `close()` persists by default, and
+it writes the *whole* graph as one value under one key — so a store opened purely to read rewrites
+everything on close. At one megabyte per poll against an eight-megabyte graph, `open()` alone
+eventually exceeds the container's memory limit.
+
+| Fact | Pattern | Why it is decisive |
+|---|---|---|
+| `persist-option` | `persistOnClose` | The option that fixes it. It landed *after* the snapshot, so it cannot be found in the sandbox at all. |
+| `read-open-still-writes` | *close persists even on a read-only open* | The mechanism. Reaching it without the KB means inventing the close-path behaviour — measured 0/3 in the control and 0/3 with no knowledge at all. |
+| `cgroup-not-docker-stats` | `memory.events` / `cgroup` | Pure experience: `docker stats` under-reports, because the spike outruns its one-second sampling. |
+| `cheap-positive-test` | `du -sh` / `.ldb` | The goal demands confirmation before a fix — one GET adding a megabyte of SST files is it. |
+
+### Task 3 — `kb-ab-llm-routing` *(retired)*
+
+> Create a file named `llm-routing-runbook.md` at the repository root explaining to an operator how
+> this project decides which provider and model serves a given background job. The file must say
+> where the routing configuration lives, what each provider declares about the models it can serve,
+> what happens at start-up when that configuration cannot be parsed, and how a change to it is
+> picked up.
+
+Retired after the run, for a reason that turned out to be worth more than the task. See
+[Where injection fails](#where-injection-fails-it-fails-in-an-interesting-way).
+
+### How a deliverable is graded
+
+`node scripts/kb-ab-assert.mjs <topic>` reads the produced file and tests each pattern against it.
+There is **no model in the loop** — grading is a conjunction of regular expressions, so it cannot
+drift between runs. Two numbers are reported:
+
+- **Facts** — the mean count of the four patterns present. Partial credit, showing *how far* an arm
+  got.
+- **Accepted** — the all-four conjunction. A cell passes only if it produced every required fact.
+
+The obvious objection to regex grading is that it tests for a string, not for understanding: a cell
+could in principle emit the right token inside a wrong sentence. Three things bound that risk. The
+gate is a conjunction of four *independent* facts spanning cause, confirmation and fix, which is
+hard to satisfy accidentally. The facts were selected empirically against deliverables already on
+disk rather than chosen by intuition (see [pitfall 4](#4-a-gate-demanding-a-fact-the-knowledge-base-does-not-contain)).
+And the judge separately scores the remaining rubric dimensions from the diff, so a cell that games
+the strings does not thereby score well overall. Grading was previously a single `grep` for one
+token; that gate could not tell diagnosing the cause apart from giving the fix, and every cell of an
+earlier run passed it while differing sharply in what it actually explained.
+
+---
+
 ## Terminology
+
 
 Terms used throughout, defined once.
 
@@ -48,6 +174,7 @@ Terms used throughout, defined once.
 ---
 
 ## How injection works
+
 
 Every prompt the agent submits triggers a retrieval pass. The dashboard exposes exactly what
 happened on each one, which is what makes the experiment auditable rather than a black box.
@@ -105,6 +232,7 @@ succeeds is the experiment.
 
 ## Methodology
 
+
 **Design.** Two arms, three tasks, three repeats per arm — 18 cells. The only difference
 between arms is whether the injected block is present. Same model (`claude-sonnet-4-6`), same
 snapshot, same goal text, same tooling.
@@ -123,10 +251,181 @@ proxy that meters every LLM call.
 
 ---
 
+## Results
+
+
+18 cells, zero leaks, zero untraced cells, all treatment cells confirmed injected.
+
+| Task | Arm | n | Facts | Accepted | Steps | Seconds | Tokens |
+|---|---|---|---|---|---|---|---|
+| etm-crashloop | **kb-on** | 3 | **4.00 / 4** | **3 / 3** | 1.7 | 35 | 3,955 |
+| | kb-off | 3 | 1.33 / 4 | 0 / 3 | 41.0 | 429 | 31,905 |
+| leveldb-amplification | **kb-on** | 3 | **4.00 / 4** | **3 / 3** | 1.3 | 38 | 3,788 |
+| | kb-off | 3 | 1.00 / 4 | 0 / 3 | 12.0 | 179 | 9,665 |
+| llm-routing *(retired)* | kb-on | 3 | 1.00 / 4 | 0 / 3 | 44.0 | 222 | 14,881 |
+| | kb-off | 3 | 2.00 / 4 | 0 / 3 | 5.0 | 394 | 27,305 |
+
+### Where injection works, it works decisively
+
+On both surviving tasks the treatment arm produced **every** required fact in **every** repeat,
+while the control produced roughly one in four and never passed the gate.
+
+The per-fact breakdown shows the split is not uniform — it falls exactly where knowledge is
+required rather than reasoning:
+
+```
+etm-crashloop  kb-on   symlink-path 3/3   fix-command 3/3   launchctl 3/3   health-insight 3/3
+               kb-off  symlink-path 0/3   fix-command 0/3   launchctl 3/3   health-insight 1/3
+```
+
+The control reliably produces the fact that can be inferred (`launchctl`) and sometimes the
+reasoning step, and **never** the two facts that must be known.
+
+**Cost runs the same direction.** On `etm-crashloop` the control used **24× the steps, 12× the
+wall-clock and 8× the tokens** — and still failed. Injection was not a trade of cost for
+accuracy; it was cheaper *and* correct.
+
+### Where injection fails, it fails in an interesting way
+
+The third task was **retired**, and the reason is the most transferable finding here.
+
+Its treatment arm scored **worse than its control** (1.00 vs 2.00 facts) while making 44 tool
+calls to the control's 5. This was not a delivery failure: replaying the exact retrieval showed
+the injected block **did** contain the two facts the arm scored 0/3 on, and the same injection
+path fed the two successful tasks in the same run.
+
+The cause is a **conflict between injected knowledge and the repository**. The graded facts
+describe configuration living in a *separate* repository; meanwhile this repository ships its own
+older, plausible, contradicting configuration file. The cells explored, found the local file, and
+wrote about that.
+
+> **When a repository contains a confident answer that contradicts injected knowledge, the model
+> believes the repository — and searches harder to confirm it.**
+
+Attempting to rescue the task by re-selecting its graded facts was tried and failed: mining every
+candidate from the injected block returned **zero** usable facts, because every term the treatment
+arm wrote was also grep-able from its own sandbox and also appeared in the control. There was
+nothing left to grade.
+
+---
+
+## What this establishes — and what it does not
+
+The effect above is large and perfectly consistent, which makes it easy to over-read. Three
+constraints bound what it supports.
+
+**The tasks were selected, not sampled.** They were written *because* their answers live in the
+knowledge base and not in the code. That yields an existence result — when injection helps, it
+helps decisively and costs less — and it says nothing about how often that case arises in real
+work. A larger set of hand-picked knowledge-decisive tasks would tighten the confidence interval
+around a number that is biased by construction.
+
+**The denominator is three, not two.** The retired task is a result, not an administrative
+nuisance. One of three hand-picked tasks — picked with a thumb on the scale for the treatment —
+had its effect **reversed** by a stale file sitting in the repository. On a curated set biased
+toward success, that adverse rate is arguably the more decision-relevant number of the two.
+
+**The statistics are conditional on that selection.** Pooling the two surviving tasks gives 6/6
+accepted against 0/6 (Fisher exact, one-sided *p* ≈ 0.001); a single task alone gives 3/3 vs 0/3,
+*p* = 0.05. Those quantify how *consistent* the effect is within these tasks. They are not the
+probability that injection helps on an arbitrary task, because the tasks were not drawn at random.
+
+**And the deliverable is a document, not working code.** Nothing here shows that injection improves
+software that has to compile and pass tests.
+
+---
+
+## Where this goes next
+
+Two questions follow naturally from the limits above: would more tasks give statistically
+meaningful evidence, and would programming tasks — rather than retrieval-shaped ones — work at all?
+
+### More tasks, but sampled rather than curated
+
+The binding constraint is task *provenance*, not cell count. Ten more hand-written
+knowledge-decisive tasks would narrow the interval around a biased estimate without making it less
+biased. The change that buys genuine evidence is to define a population and sample from it:
+
+1. Take every knowledge-base insight above a confidence threshold and mechanically derive a runbook
+   goal from the symptom it describes.
+2. Apply the recoverability audit as a **blind inclusion filter**, before any cell runs — not as a
+   post-hoc explanation for tasks that disappointed.
+3. Run whatever survives, and report **two** numbers rather than one:
+    - the **discrimination rate** — what fraction of knowledge-derived tasks the control arm cannot
+      solve, which is a direct measure of how much of the knowledge base is *non-redundant*;
+    - the **effect size on the tasks that do discriminate**, which is what this run already has.
+
+The first number is the one that justifies the system's cost, and it is currently unknown. It is
+also the number that would put the retired task's failure mode on a proper denominator.
+
+Three cheaper power upgrades need no new tasks at all:
+
+- **More models.** Everything here ran on a single pinned model. A result that holds only for one
+  model is not a property of the knowledge base. The matrix already carries an agent/model axis.
+- **Cost as a co-primary outcome.** Steps, tokens and wall-clock separated the arms by factors of
+  8 to 24. They are continuous and low-variance, so they carry far more statistical power per cell
+  than a binary gate — and they remain informative even when correctness ties.
+- **More repeats, where they help.** Within-arm variance was effectively zero on the surviving
+  tasks, so repeats buy little there. They become necessary as soon as the task type is noisier —
+  which is exactly the programming case.
+
+### Programming tasks: possible, but grade a different thing
+
+The concern that non-determinism will drown the signal is the right concern, in the wrong place.
+The problem is not that programming outcomes are stochastic; it is that a programming cell can fail
+for many reasons that have nothing to do with knowledge — a botched edit, a tool error, a timeout,
+a flaky test. That variance is unrelated to the treatment and it lands directly on a binary
+pass/fail outcome. Four measures keep the signal above it.
+
+- **Grade the knowledge-dependent step, not the whole solution.** Not "does the feature work", but
+  "does the diff touch the right file and encode the right mechanism", with the existing test suite
+  as a guard against regression. This isolates the knowledge signal from general coding competence,
+  which is not what the experiment is about.
+- **Choose bugs where diagnosis is hard and the fix is small.** This project's own history is full
+  of them — each recorded lesson is a symptom whose obvious cause is wrong. A recent example: a test
+  that passed alone and failed in a batch, where the obvious explanation (cross-file interference)
+  was wrong and the real cause was a wall-clock race against synchronous filesystem work. An agent
+  without that lesson chases the obvious explanation; the fix itself is a few lines.
+- **Measure the noise before designing around it.** Run one candidate programming task ten times on
+  the *control arm only*. That gives the within-arm pass rate and its variance directly, and from it
+  the number of repeats needed to detect a given effect. This is an afternoon's pilot, not a guess —
+  and it is the step that answers the question rather than arguing about it.
+- **Keep cost in the outcome set.** Correctness is more likely to tie on programming tasks, because
+  a determined agent can often grind its way to a working answer. The cost difference is where the
+  effect will show, and it is the cheaper measurement.
+
+Three things genuinely get harder, and should be planned for rather than discovered:
+
+- **The snapshot must build and test.** The documentation tasks needed only a filesystem. A
+  programming task needs dependencies restored in the sandbox, which for this repository means
+  submodules whose build output is not tracked in version control. That is real engineering work
+  before the first cell runs.
+- **The contradiction failure mode gets worse, not better.** The retired task failed because the
+  repository held a confident, stale, wrong answer and the agent believed it over the injected
+  knowledge. Code is far more likely than operational lore to have a competing implementation
+  sitting in plain sight. Every programming spec needs the check that task lacked: does the sandbox
+  contain a rival answer to this goal?
+- **A diff is more forgiving to grade than a file.** A regex conjunction over a produced runbook is
+  unambiguous. A diff can achieve the right outcome in a shape no pattern anticipates. Expect the
+  test suite to become the primary gate with the pattern conjunction as corroboration, rather than
+  the reverse.
+
+**Suggested order.** Sample the documentation-task population first: it is cheap, it reuses
+machinery that already works, and it produces the discrimination rate — the single number that
+justifies or condemns the whole knowledge-injection system. Then pilot one programming task purely
+to measure its noise. Then decide whether a full programming matrix is worth its cost, on evidence
+rather than on intuition about how noisy such a matrix would be.
+
+---
+
 ## Pitfalls, and the measures built to defeat them
 
-This is the substance of the report. Every item below is a real failure that produced
-plausible but invalid results, followed by the measure now in place.
+Every item below is a real failure that produced plausible but invalid results, followed by the
+measure now in place. Together they are the reason the table above can be believed: three of these
+were found *after* a run had already produced a clean-looking set of numbers.
+
+They are also the transferable part. The specific facts being graded are peculiar to this project;
+the ways an isolated experiment turns out not to be isolated are not.
 
 ### 1. The sandbox leaked the answer
 
@@ -233,64 +532,8 @@ degraded.
 
 ---
 
-## Results
-
-18 cells, zero leaks, zero untraced cells, all treatment cells confirmed injected.
-
-| Task | Arm | n | Facts | Accepted | Steps | Seconds | Tokens |
-|---|---|---|---|---|---|---|---|
-| etm-crashloop | **kb-on** | 3 | **4.00 / 4** | **3 / 3** | 1.7 | 35 | 3,955 |
-| | kb-off | 3 | 1.33 / 4 | 0 / 3 | 41.0 | 429 | 31,905 |
-| leveldb-amplification | **kb-on** | 3 | **4.00 / 4** | **3 / 3** | 1.3 | 38 | 3,788 |
-| | kb-off | 3 | 1.00 / 4 | 0 / 3 | 12.0 | 179 | 9,665 |
-| llm-routing *(retired)* | kb-on | 3 | 1.00 / 4 | 0 / 3 | 44.0 | 222 | 14,881 |
-| | kb-off | 3 | 2.00 / 4 | 0 / 3 | 5.0 | 394 | 27,305 |
-
-### Where injection works, it works decisively
-
-On both surviving tasks the treatment arm produced **every** required fact in **every** repeat,
-while the control produced roughly one in four and never passed the gate.
-
-The per-fact breakdown shows the split is not uniform — it falls exactly where knowledge is
-required rather than reasoning:
-
-```
-etm-crashloop  kb-on   symlink-path 3/3   fix-command 3/3   launchctl 3/3   health-insight 3/3
-               kb-off  symlink-path 0/3   fix-command 0/3   launchctl 3/3   health-insight 1/3
-```
-
-The control reliably produces the fact that can be inferred (`launchctl`) and sometimes the
-reasoning step, and **never** the two facts that must be known.
-
-**Cost runs the same direction.** On `etm-crashloop` the control used **24× the steps, 12× the
-wall-clock and 8× the tokens** — and still failed. Injection was not a trade of cost for
-accuracy; it was cheaper *and* correct.
-
-### Where injection fails, it fails in an interesting way
-
-The third task was **retired**, and the reason is the most transferable finding here.
-
-Its treatment arm scored **worse than its control** (1.00 vs 2.00 facts) while making 44 tool
-calls to the control's 5. This was not a delivery failure: replaying the exact retrieval showed
-the injected block **did** contain the two facts the arm scored 0/3 on, and the same injection
-path fed the two successful tasks in the same run.
-
-The cause is a **conflict between injected knowledge and the repository**. The graded facts
-describe configuration living in a *separate* repository; meanwhile this repository ships its own
-older, plausible, contradicting configuration file. The cells explored, found the local file, and
-wrote about that.
-
-> **When a repository contains a confident answer that contradicts injected knowledge, the model
-> believes the repository — and searches harder to confirm it.**
-
-Attempting to rescue the task by re-selecting its graded facts was tried and failed: mining every
-candidate from the injected block returned **zero** usable facts, because every term the treatment
-arm wrote was also grep-able from its own sandbox and also appeared in the control. There was
-nothing left to grade.
-
----
-
 ## Recommendations
+
 
 **For this knowledge-injection system**
 
@@ -318,13 +561,15 @@ nothing left to grade.
 7. **Check the cheap invariants before trusting a batch.** A null step count on cell one saved a
    50-minute run that would have produced a full, plausible, meaningless table.
 
-**Limits of this result.** Two tasks, three repeats per arm, one model, one repository. The effect
-where it appears is large and consistent, but this establishes *when* injection helps — not a
-general law about how much.
+**Limits** are stated in full under [What this establishes — and what it does
+not](#what-this-establishes-and-what-it-does-not), and the concrete next steps — sampling a task
+population rather than curating one, and whether programming tasks can carry the same measurement —
+under [Where this goes next](#where-this-goes-next).
 
 ---
 
 ## Reproducing
+
 
 ```bash
 # Run a spec (both arms, three repeats)
@@ -341,6 +586,7 @@ Fact definitions, and the retirement note explaining why the third task could no
 are in `lib/experiments/kb-ab-facts.mjs`.
 
 ## See also
+
 
 - [The /experiment Skill](experiment-skill.md) — running experiment matrices
 - [Experimental Design](kgbench-experimental-design.md) — design principles for the retrieval benchmark
