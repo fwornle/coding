@@ -83,6 +83,98 @@ const num = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x)
 const fmt = (n: number): string => n.toLocaleString()
 const kb = (bytes: number): string => (bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`)
 
+// ---------------------------------------------------------------------------
+// Content-block previews: surface what an observer scans, dull what they don't
+// ---------------------------------------------------------------------------
+// The proxy stores each history/tool-output sample as `JSON.stringify(block)`
+// (server.mjs `btext`), so the modal used to render a wall of raw JSON in which
+// `"type":"tool_use"`, `"name":"Bash"` and the human-written `"description"`
+// carried all the meaning and sat buried among opaque `toolu_…` ids and
+// multi-hundred-character `signature` blobs.
+//
+// Parsed CLIENT-SIDE rather than adding fields at the proxy, for one decisive
+// reason: captures already on disk keep whatever shape they were written with,
+// so a server-side field would only ever improve FUTURE runs. Parsing here fixes
+// every run already recorded.
+//
+// Two-tier parse, because previews are truncated at 800 chars with a trailing
+// "… [+N chars]" marker (`_preview`) and therefore often are not valid JSON:
+//   1. JSON.parse — exact, and the common case (a tool_use block is small).
+//   2. Head regexes — a truncated block still begins with its type and name.
+// Anything unrecognised falls through to `kind: null` and renders exactly as it
+// did before. This never throws: an unparseable preview must not blank the modal.
+type BlockKind = 'thinking' | 'tool_use' | 'tool_result' | 'text' | 'image'
+
+interface ParsedBlock {
+  kind: BlockKind | null
+  tool?: string        // tool_use: which tool (Bash, Read, …)
+  description?: string // tool_use: the human-written one-liner, when the tool supplies one
+  primary?: string     // the salient input — command / file_path / pattern / url
+  thinking?: string    // thinking: the reasoning text, when it is non-empty
+  /** thinking block whose text is empty and which therefore carries only a signature. */
+  signatureOnly?: boolean
+  truncated?: boolean
+}
+
+/** Longest `input` field worth promoting, by tool convention. First hit wins. */
+const PRIMARY_INPUT_KEYS = ['command', 'file_path', 'path', 'pattern', 'query', 'url', 'prompt', 'notebook_path']
+
+function parseContentBlock(preview?: string): ParsedBlock {
+  const none: ParsedBlock = { kind: null }
+  if (!preview || typeof preview !== 'string') return none
+  const head = preview.slice(0, 200)
+  if (!head.trimStart().startsWith('{')) return none // plain text sample, not a JSON block
+  const truncated = /\n… \[\+\d+ chars\]$/.test(preview)
+
+  try {
+    const o = JSON.parse(preview) as Record<string, unknown>
+    const kind = typeof o.type === 'string' ? (o.type as BlockKind) : null
+    if (!kind) return none
+    const input = (o.input ?? {}) as Record<string, unknown>
+    const primaryKey = PRIMARY_INPUT_KEYS.find((k) => typeof input[k] === 'string')
+    const thinking = typeof o.thinking === 'string' ? o.thinking : undefined
+    return {
+      kind,
+      truncated,
+      tool: typeof o.name === 'string' ? o.name : undefined,
+      description: typeof input.description === 'string' ? input.description : undefined,
+      primary: primaryKey ? String(input[primaryKey]) : undefined,
+      thinking: thinking || undefined,
+      signatureOnly: kind === 'thinking' && !thinking && typeof o.signature === 'string',
+    }
+  } catch {
+    // Truncated (or otherwise malformed) — recover what the head still shows.
+    const kind = /"type"\s*:\s*"(thinking|tool_use|tool_result|text|image)"/.exec(head)?.[1] as BlockKind | undefined
+    if (!kind) return none
+    const str = (key: string): string | undefined => {
+      // Tolerates escaped quotes inside the value; bounded scan, no backtracking blowup.
+      const m = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.){0,600})"`).exec(preview)
+      if (!m) return undefined
+      try { return JSON.parse(`"${m[1]}"`) as string } catch { return m[1] }
+    }
+    const primaryKey = PRIMARY_INPUT_KEYS.find((k) => new RegExp(`"${k}"\\s*:\\s*"`).test(preview))
+    const thinking = str('thinking')
+    return {
+      kind,
+      truncated: true,
+      tool: str('name'),
+      description: str('description'),
+      primary: primaryKey ? str(primaryKey) : undefined,
+      thinking: thinking || undefined,
+      signatureOnly: kind === 'thinking' && !thinking && /"signature"\s*:\s*"/.test(preview),
+    }
+  }
+}
+
+/** Chip styling per block kind. Colour carries the type; everything else is dulled. */
+const BLOCK_CHIP: Record<BlockKind, string> = {
+  tool_use: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  tool_result: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  thinking: 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+  text: 'border-muted-foreground/30 bg-muted/50 text-muted-foreground',
+  image: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+}
+
 // Build a scaled context-window band from a real per-category byte map. Each
 // PRESENT category (bytes > 0) is floored to a visible sliver (≥1.2%) so a
 // tiny-but-real segment doesn't vanish, then renormalised so widths sum to 100.
@@ -898,6 +990,18 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta, kbTrace, 
             capture tap. New copilot sessions launched via <span className="font-mono">coding --copilot</span> route through the
             proxy and record their buffer. The schema below shows what the block is composed of.
           </div>
+        ) : (kbItems?.length ?? 0) > 0 ? (
+          // The WIRE buffer carries no recognisable KB block, but the retrieval side
+          // captured the items structurally. Saying "no captured buffer" here would
+          // contradict the per-tier rows immediately below, which are populated and
+          // clickable from exactly that capture. Experiment cells land here by design:
+          // they suppress Working Memory, and the wire categoriser identifies the block
+          // by its Working-Memory header, so it never attributes one.
+          <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground" data-testid="kb-structured-only">
+            The verbatim wire block isn’t attributable for this run — the categoriser identifies it by its
+            <span className="font-mono"> ## Working Memory</span> header, which this run suppresses. The retrieval capture
+            recorded what was injected item by item, so the rows below are the real content, each with its score.
+          </div>
         ) : (
           <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground" data-testid="kb-no-content">
             No captured buffer for this run, so the exact injected text isn’t available (it predates the capture tap). Claude and
@@ -1018,8 +1122,24 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta, kbTrace, 
         <div className="mt-3 min-w-0 space-y-1.5">
           {KB_SECTIONS.map((s) => {
             const sec = sections[s.name]
-            const hasContent = !!sec && sec.items.length > 0
-            const preview = hasContent ? kbFirstLine(sec.body) : s.detail
+            // A row lights up if EITHER source has content for it. Gating on the parsed
+            // markdown alone silently killed every row on experiment cells: their
+            // injected block suppresses Working Memory, and the wire-side categoriser
+            // identifies the KB block BY its "## Working Memory / **Project:**" header
+            // (server.mjs KB_RE) — so `knowledge_text` comes back null, `sections` is
+            // empty, and the modal rendered a funnel reporting "2 items injected"
+            // directly above rows claiming to have none. The structured per-tier capture
+            // was fetched and mapped all along (SECTION_TIER / structuredFor) and
+            // KbCategoryDialog already prefers it; only this gate never consulted it.
+            const structured = structuredFor(s.name)
+            const mdItems = sec?.items.length ?? 0
+            const hasContent = mdItems > 0 || structured.length > 0
+            const itemCount = mdItems > 0 ? mdItems : structured.length
+            const structuredPreview = structured.length > 0
+              ? (structured[0].payload?.topic || structured[0].payload?.theme
+                 || structured[0].payload?.summary_preview || s.detail)
+              : s.detail
+            const preview = mdItems > 0 ? kbFirstLine(sec.body) : structuredPreview
             const inner = (
               <>
                 <div className="min-w-0">
@@ -1027,7 +1147,7 @@ function KbDetailDialog({ open, onClose, real, agent, kbItems, kbMeta, kbTrace, 
                     <span className={s.gated ? 'text-muted-foreground line-through decoration-1' : undefined}>{s.name}</span>
                     <span className="ml-1 font-mono text-xs text-muted-foreground">{s.budget}</span>
                     {hasContent && s.name !== 'Working Memory' && (
-                      <span className="ml-2 text-xs text-muted-foreground">· {sec.items.length} item{sec.items.length === 1 ? '' : 's'}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">· {itemCount} item{itemCount === 1 ? '' : 's'}</span>
                     )}
                   </p>
                   <p className={'truncate text-xs ' + (hasContent ? 'text-foreground/80' : 'text-muted-foreground')}>{preview}</p>
@@ -1242,15 +1362,61 @@ function CategoryDetailModal({
               {(detail.count ?? 0) === 1 ? '' : 's'} in this category:
             </p>
             <div className="space-y-2">
-              {(detail.items || []).map((m, i) => (
-                <div key={i} className="min-w-0 rounded border p-2">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    {m.role && <span className="font-mono text-xs font-semibold">{m.role}</span>}
-                    <Badge variant="outline" className="shrink-0 font-mono text-[10px]">{fmtB(m.bytes)}</Badge>
+              {(detail.items || []).map((m, i) => {
+                // Scan order, top to bottom: WHAT kind of block, WHICH tool, WHAT it was
+                // for, then the input it carried. The verbatim JSON — ids, signatures,
+                // schema noise — stays available but folded away and dulled, because it
+                // is never what an observer is reading for while following the turns.
+                const b = parseContentBlock(m.preview)
+                return (
+                  <div key={i} className="min-w-0 rounded border p-2" data-testid="blk-card">
+                    <div className="mb-1 flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        {m.role && <span className="font-mono text-xs font-semibold">{m.role}</span>}
+                        {b.kind && (
+                          <span className={`shrink-0 rounded border px-1.5 py-px font-mono text-[10px] font-semibold ${BLOCK_CHIP[b.kind]}`}>
+                            {b.kind}
+                          </span>
+                        )}
+                        {b.tool && (
+                          <span className="truncate font-mono text-xs font-bold text-foreground" data-testid="blk-tool">{b.tool}</span>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="shrink-0 font-mono text-[10px]">{fmtB(m.bytes)}</Badge>
+                    </div>
+
+                    {b.description && (
+                      <p className="mb-1 break-words text-xs font-medium leading-snug" data-testid="blk-desc">{b.description}</p>
+                    )}
+                    {b.thinking && (
+                      <p className="mb-1 whitespace-pre-wrap break-words text-[11px] italic leading-snug text-violet-700 dark:text-violet-300">{b.thinking}</p>
+                    )}
+                    {b.signatureOnly && (
+                      <p className="mb-1 text-[11px] italic leading-snug text-muted-foreground">
+                        Reasoning text is empty — this block carries only its signature.
+                      </p>
+                    )}
+                    {b.primary && (
+                      <pre className="mb-1 max-h-28 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 px-2 py-1 font-mono text-[11px] leading-snug">{b.primary}</pre>
+                    )}
+
+                    {m.preview && (b.kind ? (
+                      // Everything the header already said, plus the noise. Folded, so the
+                      // default view is the scannable part; one click for the verbatim block.
+                      <details className="group">
+                        <summary className="cursor-pointer select-none text-[10px] text-muted-foreground/70 hover:text-muted-foreground">
+                          raw block{b.truncated ? ' (truncated)' : ''}
+                        </summary>
+                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/30 p-2 text-[11px] leading-snug text-muted-foreground/70">{m.preview}</pre>
+                      </details>
+                    ) : (
+                      // Unrecognised shape (plain text sample, or a block type we do not
+                      // model): render exactly as before rather than hiding it.
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[11px] leading-snug">{m.preview}</pre>
+                    ))}
                   </div>
-                  {m.preview && <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[11px] leading-snug">{m.preview}</pre>}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
