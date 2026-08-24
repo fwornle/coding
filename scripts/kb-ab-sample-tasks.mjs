@@ -321,7 +321,12 @@ function parseArgs(argv) {
     seed: val('seed', 'pilot-1'),
     snapshotId: val('snapshot', 'smoke-spec'),
     minConfidence: Number(val('min-confidence', '0.8')),
-    repeats: Number(val('repeats', '2')),
+    // 3, not 2. At two repeats a single passing cell decides a task's classification, so the
+    // majority reading and the strict reading diverge maximally — measured on the first pilot:
+    // both discriminating tasks were kb-on 1/2, giving 100% by majority and 0% by strict. Two
+    // repeats cannot separate "injection reliably carries the answer" from "it carries it half
+    // the time", which is the distinction the rate is supposed to express.
+    repeats: Number(val('repeats', '3')),
     insights: val('insights', INSIGHTS),
     dryRun: argv.includes('--dry-run'),
     json: argv.includes('--json'),
