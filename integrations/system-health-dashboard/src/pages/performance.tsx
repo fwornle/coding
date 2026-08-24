@@ -293,9 +293,32 @@ export function PerformancePage() {
               track shrink so each child's own overflow-x-auto scrolls in-box. */}
           <div className="grid min-w-0 grid-cols-[260px_1fr] gap-6">
             <FacetedSidebar />
-            <div className="min-w-0 space-y-6">
-              <RunsTable onCompare={() => setActiveTab('compare')} />
-              <PerformanceTimeline />
+            {/* SELECTION | TURNS, side by side. Stacked, the timeline sat below a runs
+                table that is itself hundreds of rows tall, so selecting a run scrolled
+                its detail off-screen and you had to hunt for it. Split horizontally, the
+                selection stays put and the turns for whatever is selected are always in
+                view. Each pane scrolls INDEPENDENTLY and is bounded to the viewport, so
+                neither can push the other away; the timeline is sticky so it holds
+                position while you page through runs.
+
+                Only at 2xl — the runs table carries ~14 columns, so halving its width on
+                a smaller screen would trade one scroll problem for a worse one. Below
+                that it stacks exactly as before. min-w-0 on both tracks: a 1fr track
+                defaults to min-width:auto, which would let the wide table force the whole
+                page to scroll sideways instead of scrolling in-box. */}
+            <div className="grid min-w-0 grid-cols-1 gap-6 2xl:grid-cols-2 2xl:items-start">
+              <div
+                className="min-w-0 2xl:max-h-[calc(100vh-11rem)] 2xl:overflow-y-auto"
+                data-testid="runs-pane"
+              >
+                <RunsTable onCompare={() => setActiveTab('compare')} />
+              </div>
+              <div
+                className="min-w-0 2xl:sticky 2xl:top-4 2xl:max-h-[calc(100vh-11rem)] 2xl:overflow-y-auto"
+                data-testid="timeline-pane"
+              >
+                <PerformanceTimeline />
+              </div>
             </div>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">

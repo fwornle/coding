@@ -74,6 +74,8 @@ function runSortTs(run: Run): string {
 
 // How many runs to reveal per "Show more" step (and the initial page size).
 const RUNS_PAGE_SIZE = 15
+/** Rows revealed per page INSIDE an expanded group (see childCount). */
+const CHILD_PAGE_SIZE = 15
 
 // --- "When" column helpers (recency + stuck detection) ---------------------
 // Parse an ISO run timestamp to epoch ms, or null for absent/unparseable.
@@ -605,6 +607,16 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
   // first page whenever the filtered set changes size (a new facet selection
   // shouldn't leave the operator scrolled deep into a stale window).
   const [visibleCount, setVisibleCount] = useState(RUNS_PAGE_SIZE)
+  // CHILD pagination, per group. Experiment groups hold a handful of cells, but the
+  // "Other activity" bucket collects every ambient auto-measured session — hundreds of
+  // rows — and expanding it used to render all of them at once, burying the rest of the
+  // page under an unbounded scroll. Keyed by group so expanding one does not reset
+  // another, and absent-means-first-page so no seeding pass is needed.
+  const [childCount, setChildCount] = useState<Record<string, number>>({})
+  const childLimitFor = useCallback((key: string) => childCount[key] ?? CHILD_PAGE_SIZE, [childCount])
+  const showMoreChildren = useCallback((key: string, total: number, all = false) => {
+    setChildCount((m) => ({ ...m, [key]: all ? total : Math.min(total, (m[key] ?? CHILD_PAGE_SIZE) + CHILD_PAGE_SIZE) }))
+  }, [])
 
   // 85-06 DEFECT B: the re-run prefill derives the spec file from the server-listed specs by
   // exact goal_sentence match. The launcher normally fetches them on mount, but a defensive
@@ -930,7 +942,7 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
             return (
               <Fragment key={group.key}>
                 <GroupHeaderRow group={group} expanded={groupExpanded} onToggle={() => toggleGroup(group.key)} />
-                {groupExpanded && group.runs.map((run) => {
+                {groupExpanded && group.runs.slice(0, childLimitFor(group.key)).map((run) => {
             const isSelected = run.task_id === selectedTaskId
             const isQuarantined = run.pending === true
             return (
@@ -1187,6 +1199,38 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
               </TableRow>
             )
                 })}
+                {/* Per-group "show more". Only appears once a group actually exceeds a
+                    page, so ordinary experiment groups (a few cells) never grow a
+                    footer — it exists for the ambient "Other activity" bucket, which
+                    otherwise renders every session it has ever recorded in one go. */}
+                {groupExpanded && group.runs.length > childLimitFor(group.key) && (
+                  <TableRow data-testid="group-pagination" data-group={group.key}>
+                    <TableCell colSpan={30} className="bg-muted/20 py-2">
+                      <div className="flex items-center justify-center gap-3">
+                        <span className="text-sm text-muted-foreground">
+                          Showing <span className="font-semibold">{childLimitFor(group.key)}</span> of{' '}
+                          <span className="font-semibold">{group.runs.length}</span> rows
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-testid="group-show-more"
+                          onClick={(e) => { e.stopPropagation(); showMoreChildren(group.key, group.runs.length) }}
+                        >
+                          Show {Math.min(CHILD_PAGE_SIZE, group.runs.length - childLimitFor(group.key))} more
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          data-testid="group-show-all"
+                          onClick={(e) => { e.stopPropagation(); showMoreChildren(group.key, group.runs.length, true) }}
+                        >
+                          Show all ({group.runs.length})
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
               </Fragment>
             )
           })}
