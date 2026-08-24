@@ -14,7 +14,6 @@ import {
   MAX_GAPS_PER_BRANCH,
   mineFactsFromDeliverables,
   patternShapeProblem,
-  referencePrompt,
   MIN_SYMPTOM_CHARS,
   buildGoalSentence,
   deriveTask,
@@ -225,7 +224,7 @@ test('a grep-able fact is KEPT, with inSandbox recorded — the etm regression',
   // facts would have removed that task's entire fact set, rebuilding the selection bias the
   // sampler exists to avoid. `inSandbox` is recorded, never applied.
   const candidates = [{ id: 'symlink', source: 'node_modules/@fwornle/km-core', flags: '', why: 'root cause' }];
-  const signals = new Map([['symlink', { injected: true, referenced: true, coined: false, inSandbox: true }]]);
+  const signals = new Map([['symlink', { injected: true, coined: false, inSandbox: true }]]);
 
   const { kept, dropped } = selectFacts(candidates, signals);
   assert.equal(dropped.length, 0, 'a grep-able fact must NOT be dropped');
@@ -233,25 +232,28 @@ test('a grep-able fact is KEPT, with inSandbox recorded — the etm regression',
   assert.equal(kept[0].inSandbox, true, 'grep-ability is recorded as a covariate');
 });
 
-test('the three blind signals drop, and only they', () => {
+test('the two blind signals drop, and only they', () => {
   const candidates = [
     { id: 'absent-from-block', source: 'aaa', flags: '', why: '' },
-    { id: 'ungradeable', source: 'bbb', flags: '', why: '' },
+    { id: 'injected-uncoined', source: 'bbb', flags: '', why: '' },
     { id: 'coinable', source: 'ccc', flags: '', why: '' },
     { id: 'good', source: 'ddd', flags: '', why: '' },
   ];
   const signals = new Map([
-    ['absent-from-block', { injected: false, referenced: false, coined: false, inSandbox: false }],
-    ['ungradeable', { injected: true, referenced: false, coined: false, inSandbox: false }],
-    ['coinable', { injected: true, referenced: true, coined: true, inSandbox: false }],
-    ['good', { injected: true, referenced: true, coined: false, inSandbox: false }],
+    ['absent-from-block', { injected: false, coined: false, inSandbox: false }],
+    ['injected-uncoined', { injected: true, coined: false, inSandbox: false }],
+    ['coinable', { injected: true, coined: true, inSandbox: false }],
+    ['good', { injected: true, coined: false, inSandbox: false }],
   ]);
 
   const { kept, dropped } = selectFacts(candidates, signals);
-  assert.deepEqual(kept.map((f) => f.id), ['good']);
+  // Two signals now, not three: the reference filter was removed once mining took over the
+  // question it approximated, so an injected, uncoined fact is kept rather than needing a third
+  // vote from a synthesized reference corpus.
+  assert.deepEqual(kept.map((f) => f.id), ['injected-uncoined', 'good']);
   assert.deepEqual(
     dropped.map((f) => [f.id, f.reason]),
-    [['absent-from-block', 'not-injected'], ['ungradeable', 'absent-from-reference'], ['coinable', 'model-coins-it']],
+    [['absent-from-block', 'not-injected'], ['coinable', 'model-coins-it']],
   );
 });
 
@@ -270,16 +272,12 @@ test('a candidate with no measured signals is dropped, never silently kept', () 
  * contain this" — so a test that wants to exercise the reference filter overrides it explicitly.
  */
 function probes({
-  facts, injectedExtra = '', coinage = [], reference, inSandbox = () => false, onCoinage, onReference,
+  facts, injectedExtra = '', coinage = [], inSandbox = () => false, onCoinage,
 } = {}) {
   const mentionsAll = facts.map((f) => `matches ${f.probe ?? f.source}`).join('\n');
   return {
     complete: async () => JSON.stringify({ facts }),
     retrieve: async () => `${mentionsAll}\n${injectedExtra}`,
-    reference: async (goal) => {
-      if (onReference) onReference(goal);
-      return reference ?? [mentionsAll, mentionsAll];
-    },
     coinage: async (goal) => { if (onCoinage) onCoinage(goal); return coinage; },
     inSandbox: async (c) => inSandbox(c),
     symptom: async () => null,
@@ -464,80 +462,22 @@ test('parseFactCandidates applies the shape guard, with the reason recorded', ()
 
 // ── the reference filter ───────────────────────────────────────────────────
 
-test('a fact no correct answer contains is dropped as ungradeable', async () => {
-  const facts = [
-    { id: 'overfit', source: 'alpha', flags: '', why: '' },
-    { id: 'f2', source: 'bravo', flags: '', why: '' },
-    { id: 'f3', source: 'charlie', flags: '', why: '' },
-    { id: 'f4', source: 'delta', flags: '', why: '' },
-  ];
-  // `overfit` IS in the injected block (the KB prose contains it) but in NEITHER reference — the
-  // signature of a pattern that transcribes the insight's wording rather than asserting something
-  // a correct runbook would state. This is the case the injection filter alone cannot see.
-  const ref = ['matches bravo charlie delta', 'matches bravo charlie delta'];
-  const row = await deriveTask(insight(), probes({ facts, reference: ref }));
 
-  assert.equal(row.status, 'derived', 'the three gradeable facts still clear the floor');
-  assert.deepEqual(row.factSet.facts.map((f) => f.id), ['f2', 'f3', 'f4']);
-  assert.ok(row.dropped.some((d) => d.id === 'overfit' && d.reason === 'absent-from-reference'));
-});
 
-test('a fact must appear in EVERY reference, not merely one', async () => {
-  const facts = [
-    { id: 'only-in-one', source: 'alpha', flags: '', why: '' },
-    { id: 'f2', source: 'bravo', flags: '', why: '' },
-    { id: 'f3', source: 'charlie', flags: '', why: '' },
-  ];
-  // Present in the first reference, absent from the second: phrasing-dependent, so not a safe gate.
-  const row = await deriveTask(insight(), probes({
-    facts, reference: ['matches alpha bravo charlie', 'matches bravo charlie'],
-  }));
 
-  assert.equal(row.status, 'excluded');
-  assert.ok(row.dropped.some((d) => d.id === 'only-in-one' && d.reason === 'absent-from-reference'));
-});
-
-test('the reference corpus is sampled once per task, before coinage', async () => {
-  const order = [];
-  const facts = Array.from({ length: 4 }, (_, i) => ({ id: `f${i}`, source: `tok${i}`, flags: '', why: '' }));
-  await deriveTask(insight(), probes({
-    facts,
-    onReference: () => order.push('reference'),
-    onCoinage: () => order.push('coinage'),
-  }));
-  // References usually eliminate the over-fits, and coinage is meaningless for a fact no correct
-  // answer would contain — so paying for coinage first would be paying for nothing.
-  assert.deepEqual(order, ['reference', 'coinage']);
-});
-
-test('coinage is never paid for when the reference filter left nothing', async () => {
+test('coinage is never paid for when injection left nothing', async () => {
+  // Coinage is the expensive probe and it is meaningless for a fact the knowledge base never
+  // injected: whether the model already knew it cannot matter if the treatment arm was not told it.
   const calls = [];
-  const facts = [{ id: 'overfit', source: 'zulu', flags: '', why: '' }];
-  const row = await deriveTask(insight(), probes({
-    facts, reference: ['nothing relevant here', 'nor here'], onCoinage: () => calls.push(1),
-  }));
+  // `probe` makes the retrieve stub mention something OTHER than the fact's own pattern, so
+  // `zulu` is absent from the injected block.
+  const facts = [{ id: 'absent', source: 'zulu', probe: 'yankee', flags: '', why: '' }];
+  const row = await deriveTask(insight(), probes({ facts, onCoinage: () => calls.push(1) }));
   assert.equal(calls.length, 0);
   assert.equal(row.status, 'excluded');
 });
 
-test('a reference probe that returns nothing excludes the task rather than grading it', async () => {
-  const facts = Array.from({ length: 4 }, (_, i) => ({ id: `f${i}`, source: `tok${i}`, flags: '', why: '' }));
-  // An empty corpus must not vacuously satisfy `every()` — that would wave through every candidate
-  // precisely when the filter failed to run.
-  const row = await deriveTask(insight(), probes({ facts, reference: [] }));
-  assert.equal(row.status, 'excluded');
-  assert.equal(row.factSet, undefined);
-});
 
-test('the reference prompt is open-book and varies its wording per sample', () => {
-  const a = referencePrompt(insight(), 'GOAL TEXT', 0).map((m) => m.content).join('\n');
-  const b = referencePrompt(insight(), 'GOAL TEXT', 1).map((m) => m.content).join('\n');
-  // Open-book: it models a CORRECT deliverable, unlike the closed-book coinage probe.
-  assert.match(a, /LevelDB Write Amplification|read-only route/);
-  assert.match(a, /GOAL TEXT/);
-  // Different style directives keep a surviving fact from being an echo of one turn of phrase.
-  assert.notEqual(a, b);
-});
 
 test('the self-match precondition rejects a pattern absent from its own source insight', () => {
   // The measured failure: a generator writing spanning patterns produced six candidates of which

@@ -51,7 +51,6 @@ import { fileURLToPath } from 'node:url';
 
 import {
   CELL_VARIANTS,
-  REFERENCE_SAMPLES,
   buildGoalSentence,
   deriveTask,
   extractSymptoms,
@@ -74,7 +73,6 @@ import {
   coinageProbe,
   inSandboxProbe,
   probeProvenance,
-  referenceProbe,
   retrieveProbe,
   symptomProbe,
 } from '../lib/experiments/kb-ab-probes.mjs';
@@ -194,7 +192,6 @@ async function main(argv) {
             return String(env?.content ?? '');
           },
           retrieve: (goal) => retrieveProbe(goal, topicGuess),
-          reference: (goal) => referenceProbe(ins, goal),
           coinage: coinageProbe,
           inSandbox: (candidate) => inSandboxProbe(sandbox, candidate),
           symptom: symptomProbe,
@@ -279,7 +276,6 @@ async function main(argv) {
     coinageFamily: CELL_FAMILY,
     coinageDowngradesRetried: probeProvenance().coinageDowngrades,
     coinageSamples: COINAGE_SAMPLES,
-    referenceSamples: REFERENCE_SAMPLES,
     variants: CELL_VARIANTS.map((v) => ({ ...v })),
     derived: rows.filter((r) => r.status === 'derived').length,
     excluded: rows.filter((r) => r.status === 'excluded').length,
