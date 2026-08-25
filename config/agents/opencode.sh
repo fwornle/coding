@@ -30,7 +30,30 @@ agent_check_requirements() {
 # Note: agent_pre_launch runs AFTER detect_network_and_configure_proxy,
 # so INSIDE_CN and PROXY_WORKING are already set.
 agent_pre_launch() {
-  if [ "$INSIDE_CN" = "true" ]; then
+  # ── Explicit model override (generic escape hatch) ──────────────────────────
+  # CODING_OPENCODE_MODEL pins the session to one "<provider>/<model>" and skips
+  # the network-based selection below. The provider itself is declared in the
+  # user's ~/.config/opencode/opencode.json, so nothing endpoint-specific (host,
+  # token) lives in this repo. Set it in the untracked $CODING_REPO/.env (sourced
+  # with `set -a` before this hook runs) or inline for a single launch:
+  #   CODING_OPENCODE_MODEL=hga/qwen3.8-27b-hga coding --opencode
+  #
+  # CODING_OPENCODE_NO_PROXY is a comma-separated host/IP list appended to
+  # NO_PROXY so a self-hosted endpoint is dialled DIRECT instead of through
+  # proxydetox (:3128), which answers 502 for hosts it cannot route. This hook
+  # runs AFTER detect_network_and_configure_proxy pins the proxy env, so the
+  # append wins. configure_proxy_routing() runs later still, but only exports
+  # ANTHROPIC_BASE_URL — an openai-compatible provider carrying its own baseURL
+  # ignores that, so the two seams do not collide.
+  if [ -n "${CODING_OPENCODE_MODEL:-}" ]; then
+    if [ -n "${CODING_OPENCODE_NO_PROXY:-}" ]; then
+      export NO_PROXY="${NO_PROXY:+${NO_PROXY},}${CODING_OPENCODE_NO_PROXY}"
+      export no_proxy="$NO_PROXY"
+      _agent_log "🚫 NO_PROXY += ${CODING_OPENCODE_NO_PROXY} (dialled direct)"
+    fi
+    export OPENCODE_CONFIG_CONTENT="{\"model\":\"${CODING_OPENCODE_MODEL}\"}"
+    _agent_log "📌 Model override → ${CODING_OPENCODE_MODEL}"
+  elif [ "$INSIDE_CN" = "true" ]; then
     # VPN/Corporate Network: use GitHub Copilot via corporate subscription
     export OPENCODE_CONFIG_CONTENT='{"model":"github-copilot-enterprise/claude-opus-4.6","disabled_providers":["anthropic"]}'
     _agent_log "🏢 VPN → GitHub Copilot Enterprise (claude-opus-4.6)"
