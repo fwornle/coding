@@ -7,6 +7,11 @@ better at its task.
 It is written to be readable without prior exposure to this codebase, and in that order: what
 the test actually is, what was asked, what came back, and what it does and does not support.
 
+The numbers below come from that first round, which used **three hand-picked tasks**. A second
+round is under way that chooses its tasks *mechanically* instead, in order to answer the question
+the first round could not: how much of the knowledge base is genuinely non-redundant. Its first
+attempt failed, for a reason worth reading — see [When we tried to sample](#when-we-tried-to-sample).
+
 A long section on **pitfalls** follows the result rather than preceding it. That is deliberate.
 The first two attempts at this experiment produced confident-looking numbers that were **wrong**,
 and every measure described there exists to stop that recurring — but none of it is intelligible
@@ -369,6 +374,48 @@ Three cheaper power upgrades need no new tasks at all:
   tasks, so repeats buy little there. They become necessary as soon as the task type is noisier —
   which is exactly the programming case.
 
+### When we tried to sample
+
+That plan was executed on 2026-08-24, and the first full round — **eight tasks, 48 cells** — came
+back with seven of the eight marked `neither-solves`, the label for *neither arm passed*.
+
+That is not a finding about the knowledge base; it is the signature of a broken gate. The giveaway
+was the treatment arm's own scores: 0/3, 1/3, 0/3, 2/3, 0/3, 0/3, 0/3, 1/3 — on conjunctions built
+for it, with the answer sitting in its prompt. A gate the treatment arm cannot pass *with the answer
+in hand* is measuring its own difficulty, not the agent's knowledge.
+
+**The cause was a condition mismatch, not a lax filter.** A fact had been kept only if it appeared
+in every *reference* runbook — an ideal answer written by a model handed the insight directly. But a
+reference is written with no sandbox, no tools, no instruction to actually do the work, and no
+pressure to be brief; a real cell writes under all four. Every fact in a conjunction can appear in
+every reference and the conjunction can still be jointly unsatisfiable for an agent doing the job
+for real.
+
+**The fix was to stop predicting what a good answer looks like and read one.** Gates are now mined
+from what the treatment arm *actually wrote*: the injected arm runs first, three times per task, and
+a fact is eligible only if it appears in **every one** of those deliverables. A task that produced
+fewer than two is dropped outright — one deliverable cannot show that a fact is stable rather than
+incidental.
+This is not a new idea. It is how the three curated tasks in this report were built, which is
+precisely why they never had this problem.
+
+**What that conditions, stated plainly.** Mining the gate from injected output means the treatment
+arm passes its own gate close to by construction — so "the treatment arm scored well" stops being
+evidence of anything, and must never be reported as if it were. The quantity that survives is the
+other one: **what fraction of knowledge-derived tasks the control arm cannot reproduce.** That is
+the discrimination rate this round exists to measure, and it stays a genuine measurement for one
+reason — **the control arm is never consulted while the gate is being built.** Nothing the control
+arm does can widen or narrow the set of facts it is later graded on.
+
+The blind filters from the original design still apply, and are now shared as code rather than
+restated: a fact must survive a shape check, must appear in the block the agent is actually handed,
+must not be something the model already writes unprompted, and must not be given away by the goal
+sentence itself.
+
+The round is in flight at the time of writing, over roughly thirty sampled tasks. Its gates are
+written alongside the originals rather than over them, so a partial pass cannot leave a half-stale
+matrix behind.
+
 ### Programming tasks: possible, but grade a different thing
 
 The concern that non-determinism will drown the signal is the right concern, in the wrong place.
@@ -584,6 +631,18 @@ node scripts/experiment-audit-recoverability.mjs --spec config/experiments/kb-ab
 
 Fact definitions, and the retirement note explaining why the third task could not be rescued,
 are in `lib/experiments/kb-ab-facts.mjs`.
+
+The sampled round adds two steps in front of that, because its gates are derived rather than
+written by hand:
+
+```bash
+# Build the injected-arm-only specs whose deliverables the gates are mined from
+node scripts/kb-ab-make-mine-specs.mjs
+
+# Mine each task's gate from those deliverables
+# --dry-run reports what would be kept without calling a model or writing anything
+node scripts/kb-ab-mine-facts.mjs --dry-run
+```
 
 ## See also
 
