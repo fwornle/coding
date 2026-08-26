@@ -87,12 +87,22 @@ function seconds(row) {
   return Number.isFinite(a) && Number.isFinite(b) ? (b - a) / 1000 : null;
 }
 
-/** Per-arm aggregate for one task. */
+/**
+ * Per-arm aggregate for one task.
+ *
+ * `scored` is the honest denominator, not `n`. A cell that never executed still writes a row —
+ * a preflight skip (`skip_reason: 'preflight:...'`) lands with terminal_state null, no steps and
+ * gate_passed null after ~5 seconds. Counting those rows as gate failures reports "neither arm
+ * solved it" about an agent that was never invoked, which is the exact mislabel this whole report
+ * exists to avoid. All six cells of kbm-smoke-spec-snapshot-restore-km-core-blockers were such
+ * skips in the 2026-08-25 round and were published as 0/3 + 0/3 `neither-solves`.
+ */
 function armStats(rows) {
   const accepted = rows.filter((r) => r.score?.gate_passed === true).length;
   const ungated = rows.filter((r) => r.score?.gate_passed == null).length;
   return {
     n: rows.length,
+    scored: rows.length - ungated,
     accepted,
     ungated,
     steps: mean(rows.map((r) => r.total_step_count).filter((x) => typeof x === 'number')),
@@ -110,7 +120,10 @@ function armStats(rows) {
  * the number and burying it would repeat the sin this whole exercise is correcting.
  */
 export function classify(on, off) {
-  const majority = (a) => a.n > 0 && a.accepted >= Math.ceil(a.n / 2);
+  // An arm with no GRADED repeat has no result to compare. Returning 'neither-solves' here would
+  // claim a measurement about cells that never ran; the task leaves the rate's denominator instead.
+  if (!on.scored || !off.scored) return 'not-run';
+  const majority = (a) => a.scored > 0 && a.accepted >= Math.ceil(a.scored / 2);
   const kbOn = majority(on);
   const kbOff = majority(off);
   if (kbOn && !kbOff) return 'discriminates';
@@ -124,6 +137,7 @@ const OUTCOME_MEANING = {
   'kb-redundant': 'the repository already answers it; the KB adds nothing here',
   'neither-solves': 'a broken gate, or beyond both arms',
   'injection-hurt': 'injection actively hurt — the retired task\'s failure mode',
+  'not-run': 'at least one arm never executed — excluded from the rate, not a result',
 };
 
 // ── main ───────────────────────────────────────────────────────────────────
@@ -194,16 +208,18 @@ async function main(argv) {
       on,
       off,
       outcome: classify(on, off),
-      strictDiscriminates: on.n > 0 && off.n > 0 && on.accepted === on.n && off.accepted === 0,
+      strictDiscriminates: on.scored > 0 && off.scored > 0 && on.accepted === on.scored && off.accepted === 0,
       auditVerdict: verdict,
       requiredFactsOutOfReach: outOfReach,
     });
   }
 
   const run = tasks.filter((t) => t.status === 'run');
-  const discriminating = run.filter((t) => t.outcome === 'discriminates');
-  const rate = wilson(discriminating.length, run.length);
-  const strict = wilson(run.filter((t) => t.strictDiscriminates).length, run.length);
+  // `graded` — every task where BOTH arms actually produced a scored repeat. The rate lives here.
+  const graded = run.filter((t) => t.outcome !== 'not-run');
+  const discriminating = graded.filter((t) => t.outcome === 'discriminates');
+  const rate = wilson(discriminating.length, graded.length);
+  const strict = wilson(graded.filter((t) => t.strictDiscriminates).length, graded.length);
 
   // Effect size, conditioned on the tasks that discriminate — the report's existing number, now
   // sitting on a denominator that was sampled rather than chosen.
@@ -223,7 +239,7 @@ async function main(argv) {
 
   const splitBy = (key, label) => {
     const groups = new Map();
-    for (const t of run) {
+    for (const t of graded) {
       const k = label(t);
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(t);
@@ -243,9 +259,11 @@ async function main(argv) {
     derived: derived.length,
     run: run.length,
     notRun: tasks.filter((t) => t.status === 'not-run').map((t) => t.topic_id),
-    discriminationRate: { ...rate, successes: discriminating.length, n: run.length },
-    strictDiscriminationRate: { ...strict, successes: run.filter((t) => t.strictDiscriminates).length, n: run.length },
-    outcomes: ['discriminates', 'kb-redundant', 'neither-solves', 'injection-hurt']
+    graded: graded.length,
+    neverRan: run.filter((t) => t.outcome === 'not-run').map((t) => t.topic_id),
+    discriminationRate: { ...rate, successes: discriminating.length, n: graded.length },
+    strictDiscriminationRate: { ...strict, successes: graded.filter((t) => t.strictDiscriminates).length, n: graded.length },
+    outcomes: ['discriminates', 'kb-redundant', 'neither-solves', 'injection-hurt', 'not-run']
       .map((o) => ({ outcome: o, meaning: OUTCOME_MEANING[o], tasks: run.filter((t) => t.outcome === o).length })),
     effect,
     byAuditVerdict: splitBy('verdict', (t) => t.auditVerdict ?? 'not-audited'),
@@ -267,16 +285,21 @@ async function main(argv) {
   out(`seed \`${result.seed}\`, ${result.drawn} drawn, ${result.derived} derived, ${result.run} run.\n\n`);
 
   out(`## The rate\n\n`);
-  if (!run.length) {
-    out('No sampled task has been run yet.\n');
+  if (!graded.length) {
+    out('No sampled task has both arms graded yet.\n');
   } else {
-    out(`**${discriminating.length} of ${run.length}** sampled tasks discriminate `);
+    out(`**${discriminating.length} of ${graded.length}** sampled tasks discriminate `);
     out(`— **${fmtPct(rate.point)}** (95% Wilson ${fmtPct(rate.low)}–${fmtPct(rate.high)}).\n\n`);
     out(`Strict reading (every kb-on repeat accepted, no kb-off repeat accepted): `);
-    out(`${result.strictDiscriminationRate.successes} of ${run.length} — ${fmtPct(strict.point)} `);
+    out(`${result.strictDiscriminationRate.successes} of ${graded.length} — ${fmtPct(strict.point)} `);
     out(`(${fmtPct(strict.low)}–${fmtPct(strict.high)}).\n\n`);
-    if (run.length < 20) {
-      out(`> At n=${run.length} the interval is wide enough that this sizes the next run rather than\n`);
+    if (result.neverRan.length) {
+      out(`> ${result.neverRan.length} derived task(s) are NOT in this denominator because at least\n`);
+      out('> one arm never executed (preflight skip / abort — no graded repeat): ');
+      out(`${result.neverRan.join(', ')}.\n> They are not evidence either way; re-run them.\n\n`);
+    }
+    if (graded.length < 20) {
+      out(`> At n=${graded.length} the interval is wide enough that this sizes the next run rather than\n`);
       out('> settling the question. Report it as a pilot.\n\n');
     }
   }
@@ -306,8 +329,8 @@ async function main(argv) {
   out(`| Task | Audit | kb-on | kb-off | Outcome |\n|---|---|---:|---:|---|\n`);
   for (const t of tasks) {
     const a = t.status === 'not-run' ? '—' : (t.auditVerdict ?? '—');
-    const on = t.on?.n ? `${t.on.accepted}/${t.on.n}` : '—';
-    const off = t.off?.n ? `${t.off.accepted}/${t.off.n}` : '—';
+    const on = t.on?.scored ? `${t.on.accepted}/${t.on.scored}` : '—';
+    const off = t.off?.scored ? `${t.off.accepted}/${t.off.scored}` : '—';
     out(`| ${t.topic_id} | ${a} | ${on} | ${off} | ${t.outcome ?? t.status} |\n`);
   }
 

@@ -44,6 +44,8 @@ import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+import yaml from 'js-yaml';
+
 import {
   neutralizeSandboxRules,
   neutralizeSandboxKnowledge,
@@ -59,11 +61,24 @@ const HOST_MEMORY_DIR = path.join(
   process.env.HOME || '', '.claude', 'projects', '-Users-Q284340-Agentic-coding', 'memory',
 );
 
-/** Minimal `key: "value"` reader. Avoids a YAML dep for the four scalars we need. */
+/**
+ * Read one top-level scalar from a spec.
+ *
+ * PARSED, not line-matched. This was a `^key:\s*(.+?)$` regex, on the rationale that three
+ * scalars did not justify a YAML dependency — but js-yaml is already a dependency of the specs'
+ * own generator, and the regex is only correct while every value fits on its line. js-yaml folds
+ * a scalar at 80 columns, so `test_command: node scripts/kb-ab-assert.mjs <long-topic>` becomes a
+ * `>-` block and the regex returned the literal string ">-" as the command. checkerTopicFor then
+ * found no topic and the audit reported SKIP — "no grep -F gate in test_command" — for a spec
+ * whose gate was perfectly well formed. Silent, and it degrades an audit into a non-answer rather
+ * than an error. Same defect class as the one recorded as pitfall 8 in the A/B report, in a second
+ * script: three tasks in the 2026-08-26 round audited as SKIP purely because their topics were
+ * long enough to fold.
+ */
 function readSpecScalar(text, key) {
-  const m = text.match(new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'm'));
-  if (!m) return null;
-  return m[1].replace(/^["']|["']$/g, '');
+  const doc = yaml.load(text);
+  const v = doc && typeof doc === 'object' ? doc[key] : null;
+  return typeof v === 'string' ? v.trim() : (v == null ? null : String(v));
 }
 
 /**
