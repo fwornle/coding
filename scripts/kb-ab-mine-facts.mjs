@@ -58,6 +58,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import yaml from 'js-yaml';
+
 import {
   KEEP_MIN_FACTS,
   goalLeaksFact,
@@ -369,10 +371,30 @@ async function main(argv) {
 
       // spec — same goal, same variants, same repeats; only the identity and the gate's argument
       // move, so the two arms are compared under conditions identical to the pilot's.
-      const spec = fs.readFileSync(path.join(SPECS_DIR, `${r.topic}.yaml`), 'utf8')
-        .replace(`experiment_id: ${r.topic}`, `experiment_id: ${minedTopic}`)
-        .replace(`kb-ab-assert.mjs ${r.topic}`, `kb-ab-assert.mjs ${minedTopic}`);
-      fs.writeFileSync(path.join(SPECS_DIR, `${minedTopic}.yaml`), spec, 'utf8');
+      //
+      // PARSE, do not string-replace. The previous form rewrote the raw YAML text with
+      // `.replace('kb-ab-assert.mjs <topic>', ...)`, which requires the command to sit on ONE line.
+      // js-yaml folds a scalar at 80 columns, so `test_command: node scripts/kb-ab-assert.mjs
+      // kbs-<slug>` folds into a `>-` block the moment 2 + 30 + len(topic) > 80 — putting the topic
+      // on its own line, where the single-space literal no longer matches. String .replace() then
+      // no-ops SILENTLY and the mined spec inherits the pilot's reference-derived gate. Three of
+      // eleven tasks in the 2026-08-25 round were graded that way (slugs of 49, 49 and 51 chars);
+      // the eight that worked were all <= 80 columns. Structural edit + the assertions below make
+      // that failure impossible rather than merely unlikely.
+      const spec = yaml.load(fs.readFileSync(path.join(SPECS_DIR, `${r.topic}.yaml`), 'utf8'));
+      spec.experiment_id = minedTopic;
+      const gateArgv = String(spec.test_command ?? '').trim().split(/\s+/);
+      const topicIdx = gateArgv.lastIndexOf(r.topic);
+      if (topicIdx === -1) {
+        throw new Error(
+          `kb-ab-mine-facts: spec '${r.topic}' has no '${r.topic}' argument in test_command ` +
+            `(${JSON.stringify(spec.test_command)}) — refusing to emit a mined spec whose gate ` +
+            'would silently stay on the reference fact set.',
+        );
+      }
+      gateArgv[topicIdx] = minedTopic;
+      spec.test_command = gateArgv.join(' ');
+      fs.writeFileSync(path.join(SPECS_DIR, `${minedTopic}.yaml`), yaml.dump(spec), 'utf8');
 
       const src = (sourceLedger.tasks ?? []).find((t) => t.topic_id === r.topic) ?? {};
       rows.push({

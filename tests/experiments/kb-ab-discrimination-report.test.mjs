@@ -10,7 +10,12 @@ import assert from 'node:assert/strict';
 
 import { classify, parseTaskId, wilson } from '../../scripts/kb-ab-discrimination-report.mjs';
 
-const arm = (accepted, n) => ({ n, accepted, ungated: 0, steps: null, seconds: null, tokens: null });
+// `ungated` counts rows that exist but were never graded — a preflight skip writes a row with a
+// null terminal_state, no steps and no score. `scored` is therefore the honest denominator, and
+// the helper derives it the same way armStats does.
+const arm = (accepted, n, ungated = 0) => ({
+  n, scored: n - ungated, accepted, ungated, steps: null, seconds: null, tokens: null,
+});
 
 // ── interval ───────────────────────────────────────────────────────────────
 
@@ -77,7 +82,25 @@ test('"produces it" is a majority, so one flaky repeat cannot flip a task', () =
   assert.equal(classify(arm(1, 3), arm(0, 3)), 'neither-solves');
 });
 
-test('an arm with no cells never counts as producing the answer', () => {
-  // A task whose kb-on cells all failed to run must not be scored as if the arm had answered.
-  assert.equal(classify(arm(0, 0), arm(0, 2)), 'neither-solves');
+test('an arm with no cells is not a result, and is not "neither arm solved it"', () => {
+  // A task whose kb-on cells never ran must not be scored as if the arm had answered — and equally
+  // must not be scored as if it had TRIED and failed. This assertion used to expect
+  // 'neither-solves', whose published meaning is "a broken gate, or beyond both arms": a positive
+  // claim about an agent that was never invoked.
+  assert.equal(classify(arm(0, 0), arm(0, 2)), 'not-run');
+});
+
+test('rows that exist but were never graded do not count as failures', () => {
+  // The real shape of the bug: six preflight skips (HTTP 500 on the route) wrote six rows with
+  // gate_passed null. Counting rows rather than scores read them as 0/3 in both arms and published
+  // the task as `neither-solves`. Both arms present, neither graded ⇒ not a result.
+  assert.equal(classify(arm(0, 3, 3), arm(0, 3, 3)), 'not-run');
+  // One arm graded, the other entirely skipped, is still not a comparison.
+  assert.equal(classify(arm(3, 3), arm(0, 3, 3)), 'not-run');
+});
+
+test('the majority rule counts graded repeats, not rows', () => {
+  // 1 of 2 graded is a majority; the same single pass among 3 rows where one never ran is 1 of 2,
+  // still a majority — whereas counting rows would make it 1 of 3 and silently flip the task.
+  assert.equal(classify(arm(1, 3, 1), arm(0, 2)), 'discriminates');
 });
