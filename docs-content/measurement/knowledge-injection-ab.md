@@ -1,26 +1,65 @@
 # Does Knowledge Injection Help? A Controlled A/B
 
-This report documents a controlled experiment run on 2026-08-23 that measured whether
-automatically injecting curated project knowledge into a coding agent's prompt makes it
-better at its task.
+This project maintains a knowledge base built from its own history — insights distilled from past
+sessions, a graph of components, digests, raw observations. A retrieval service selects the pieces
+relevant to whatever an agent is about to do and prepends them to its prompt. That machinery is
+expensive to build and to run, and this report measures whether it works.
 
-It is written to be readable without prior exposure to this codebase, and in that order: what
-the test actually is, what was asked, what came back, and what it does and does not support.
+Two rounds were run, answering two different questions. The first used three hand-written tasks and
+measured **how large the effect is when it occurs**. The second derived its tasks mechanically from
+the knowledge base and measured **how often it occurs at all** — the number that decides whether
+the system earns its keep.
 
-The numbers below come from that first round, which used **three hand-picked tasks**. A second
-round is under way that chooses its tasks *mechanically* instead, in order to answer the question
-the first round could not: how much of the knowledge base is genuinely non-redundant. Its first
-attempt failed, for a reason worth reading — see [When we tried to sample](#when-we-tried-to-sample).
-
-A long section on **pitfalls** follows the result rather than preceding it. That is deliberate.
-The first two attempts at this experiment produced confident-looking numbers that were **wrong**,
-and every measure described there exists to stop that recurring — but none of it is intelligible
-before you know what was being measured. Read it as the audit trail behind the numbers, not as a
-prerequisite for them.
+The report is written to be readable without prior exposure to this codebase.
 
 ---
 
-## What the experiment set out to show
+## Summary
+
+**The setup.** Two arms of the same agent — same model, same tools, same frozen copy of the
+repository — differing only in whether retrieved knowledge is prepended to the prompt. The graded
+fact is deliberately **absent** from the repository, so this is a closed-book/open-book exam, not a
+needle-in-a-haystack test. Each task asks for an operator runbook and is graded mechanically, by
+regular expressions over the produced file, with no model in the loop.
+
+| | Round 1 — curated | Round 2 — sampled |
+|---|---|---|
+| Tasks | 3, hand-written | 11, derived mechanically from KB insights |
+| Cells | 18 | 66 |
+| Answers | how *large* is the effect | how *often* does it arise |
+| Headline | 6/6 accepted vs 0/6 on the two surviving tasks | **9 of 11 tasks discriminate — 82%** (95% Wilson 52%–95%) |
+
+**The result.** On tasks whose answers live in the knowledge base rather than in the code, the
+control arm failed where the treatment arm succeeded in nine cases out of eleven — and spent
+**3.1x the steps, 1.8x the wall-clock and 6.8x the tokens** failing. Injection was not a trade of
+cost against accuracy. It was cheaper *and* correct.
+
+**The caveat that travels with the number.** 82% is not the probability that injection helps on an
+arbitrary task, and must never be quoted as though it were. Round 2's gates are mined from what the
+treatment arm actually wrote, so the treatment arm passes them close to by construction. The
+load-bearing half of the measurement is the *control* arm's failure — a quantity nothing in the
+gate's construction arranged, because **the control arm is never consulted while a gate is built.**
+What the number means precisely is set out under [Design](#design-how-the-experiment-avoids-fooling-itself).
+
+**What it does not establish.** One model, one repository. Deliverables are documents, not code that
+must compile and pass tests. At n=11 the interval is wide enough to size the next round rather than
+settle the question — report it as a pilot. And one curated task showed injection making things
+*worse*, which is the most transferable finding here.
+
+### Reading guide
+
+| If you want | Read |
+|---|---|
+| the result, and nothing else | this summary |
+| grounds to believe it | [Design](#design-how-the-experiment-avoids-fooling-itself) — isolation, task provenance, the rules governing selection |
+| what a task actually looks like | [The tasks, verbatim](#the-tasks-verbatim) |
+| the numbers | [Results](#results) |
+| the limits | [What this establishes](#what-this-establishes-and-what-it-does-not) |
+| how measurements like this go wrong | [Pitfalls](#pitfalls-and-the-measures-built-to-defeat-them) — nine real failures, each with the measure that closed it |
+
+---
+
+## The question
 
 The project maintains a knowledge base built from its own history — insights distilled from
 past sessions, a knowledge graph of components, daily digests, raw observations. A retrieval
@@ -79,10 +118,152 @@ identifiers that also exist in it.
 
 ---
 
-## The two tasks, verbatim
+## Terminology
 
-Each arm receives the goal sentence below and nothing else task-specific. Same model, same
-snapshot, same tools; the injected block is the only difference.
+
+Terms used throughout, defined once.
+
+| Term | Meaning |
+|---|---|
+| **Arm** | One side of the comparison. `kb-on` receives injected knowledge; `kb-off` is identical in every other respect and receives none. |
+| **Cell** | One execution: a single arm × a single repeat of a single task. This run had 18 cells. |
+| **Spec** | A task definition — goal sentence, deliverable filename, grading rule, number of repeats. |
+| **Snapshot** | A frozen copy of the repository at a known commit, plus its knowledge base and config, from which every cell starts. Guarantees all cells begin from identical state. |
+| **Sandbox** | The throwaway working directory a cell runs in, materialised from the snapshot. Discarded afterwards. |
+| **Fact** | One checkable claim the deliverable must contain, expressed as a regular expression. |
+| **Conjunction gate** | A cell passes only if it produces **all** required facts. Replaces earlier single-token grading. |
+| **Coinage** | Whether a model produces a fact unprompted, from its own prior knowledge, with no repository and no knowledge base. A fact the model coins cannot distinguish the arms. |
+| **Recoverable** | Whether the control arm could find a fact by searching the sandbox. |
+| **Leak** | Any path by which a cell reaches information outside its sandbox — the failure mode this experiment spent most of its effort eliminating. |
+| **Blind signal** | A property of a candidate fact measurable *before any cell runs* — and therefore usable to drop it without biasing the result. |
+| **Discrimination rate** | The fraction of knowledge-derived tasks whose answer the control arm cannot reproduce. |
+| **Mined gate** | A conjunction whose facts were taken from deliverables the treatment arm actually produced, intersected across repeats. |
+
+---
+
+## Design — how the experiment avoids fooling itself
+
+An A/B of this shape has one dominant failure mode: producing a clean, confident, **wrong** number.
+Three separate rounds did exactly that before the design below settled. Everything in this section
+exists to close a specific way the measurement can flatter itself, and each measure is traceable to
+a failure recorded under [Pitfalls](#pitfalls-and-the-measures-built-to-defeat-them).
+
+### The four threats
+
+| Threat | If unaddressed | Closed by |
+|---|---|---|
+| **Leakage** — the control arm reaches the answer from outside its sandbox | both arms pass; the effect vanishes | isolation, audited per cell |
+| **Coinage** — the model already knows the fact | both arms pass; the KB gets credit for the model's training | a bare-model probe per fact |
+| **Selection** — facts chosen because they flatter the treatment arm | the rate restates the choices made while building it | blind signals only |
+| **Gate difficulty** — the conjunction is unsatisfiable for a working agent | both arms fail; reads as a hard task | gates mined from real deliverables |
+
+### Isolation
+
+Both arms start from the same snapshot: a frozen copy of the repository at a known commit, with the
+knowledge base stripped out, materialised into a throwaway sandbox. Isolation turned out not to be
+one property but four, each of which had to be closed and verified separately — an allow-list
+naming host paths, project identity leaking through `git` linkage, agent instruction files
+discovered by walking *up* out of the sandbox, and ambient environment. The full account is
+[pitfall 1](#1-the-sandbox-leaked-the-answer); the surviving measure is that every cell's transcript
+is audited for out-of-sandbox paths, and the audit is reported beside the results rather than
+assumed. Round 1: **zero leaks across 18 cells.**
+
+### Where the tasks come from
+
+**Round 1 — curated.** Three tasks were written by hand because their answers were known to live in
+the knowledge base and not in the code. This yields an existence result and a clean effect size, and
+says nothing about frequency: the tasks were chosen *because* they had the property being tested.
+
+**Round 2 — sampled.** To get a frequency, the task population must not be chosen task by task. The
+derivation is mechanical: take every knowledge-base insight above a confidence threshold, draw from
+that frozen population against a recorded seed, and turn each drawn insight into a runbook goal
+built from the symptom it describes. The round reported here drew 36 from a population of 162 at
+confidence ≥ 0.8, under seed `pilot-3`.
+
+Candidate *generation* uses a model, and is deliberately not a measurement: any capable model may
+propose candidate facts, because nothing a generator proposes survives without passing the filters
+below. The round reported here nonetheless carries an **empty generator-provenance record** — see
+[pitfall 10](#10-provenance-that-was-promised-but-not-written) — which does not invalidate it, for
+exactly that reason, but does mean the derivation cannot be fully replayed from the ledger alone.
+The coinage probe's model *is* recorded (`claude-sonnet-4.6`), and that one is load-bearing.
+
+### How a gate is built
+
+A cell passes only if its deliverable contains **every** required fact — a conjunction, not a
+single token. How those facts are chosen is the crux of the whole design.
+
+The instinct is to predict what a good answer looks like: hand a model the insight, let it write an
+ideal runbook, and keep the facts that appear in every such reference. That was tried, and it
+failed measurably. A reference is written with no sandbox, no tools, no instruction to actually do
+the work and no pressure to be brief; a real cell writes under all four. Every fact in a conjunction
+can appear in every reference and the conjunction still be jointly unsatisfiable for an agent doing
+the job for real — which is what produced a round where seven of eight tasks failed in *both* arms.
+
+The design that replaced it stops predicting a good answer and reads one. **Gates are mined from
+what the treatment arm actually wrote.** The injected arm runs first, three times per task, and a
+fact is eligible only if it appears in **every one** of those deliverables. A task producing fewer
+than two deliverables is dropped outright: one deliverable cannot distinguish a stable fact from an
+incidental one. This is how the three curated tasks were built, which is precisely why they never
+had this problem.
+
+### The rules that govern selection
+
+Mining the gate from injected output means the treatment arm passes close to by construction. That
+is an acceptable cost only because of what it does *not* touch — and three rules, each the inverse
+of an instinct, keep the surviving quantity a measurement.
+
+**1. Only blind signals may drop a fact.** A candidate is dropped if it fails a shape check, if it
+does not appear in the block retrieval actually returns, if the bare pinned model coins it
+unprompted, or if the goal sentence gives it away. Every one of those is measurable *before any cell
+runs.* **No arm outcome ever feeds selection.** That is the property that keeps the rate an estimate
+rather than a restatement of the choices made while building it.
+
+**2. The recoverability audit is a covariate, never a filter.** The obvious design runs only the
+tasks whose facts the control arm could not find by searching. It is wrong, and this experiment
+measured why: a curated task whose four facts are *all* grep-able still discriminated decisively,
+because the control arm searched 123 times across three cells and never found two of them. Filtering
+on the audit discards discriminating tasks and biases the rate upward by an unknown amount. Every
+sampled task runs; the verdict is recorded beside it as a column.
+
+**3. The same logic forbids dropping a fact merely because it sits in the sandbox.** Whether the
+control arm can actually reach a fact is the outcome being measured — not an assumption to bake into
+selection.
+
+Finally, **the control arm is never consulted while a gate is built.** Nothing the control arm does
+can widen or narrow the set of facts it is later graded on. That single property is what makes the
+discrimination rate a genuine measurement despite everything conditioned above.
+
+### What the resulting number means, precisely
+
+> The **discrimination rate** is the fraction of knowledge-derived tasks whose answer the *control*
+> arm cannot reproduce. It is a direct measure of how much of the knowledge base is non-redundant.
+
+It is conditional on the derivation — the population, the confidence threshold, the blind filters,
+and gates mined from treatment output — and it is not the unconditional probability that injection
+helps. Reported alongside it is the **effect size on the tasks that discriminate**, because a rate
+without an effect size says nothing about whether the wins are worth having.
+
+### Measurement
+
+Same model (`claude-sonnet-4-6`), same snapshot, same goal text, same tooling; the injected block is
+the only difference between arms. Three repeats per arm. Grading is mechanical — regular expressions
+over the produced file — so it cannot drift. Tokens, tool-call counts and wall-clock are recorded
+per cell from the proxy that meters every LLM call. A task counts as discriminating when a
+*majority* of the treatment arm's repeats are accepted and a majority of the control arm's are not;
+the stricter all-or-nothing reading is reported beside it, because the choice moves the number.
+
+Cells that never executed are excluded rather than scored. A skipped cell writes a row, and counting
+rows rather than graded results reports "neither arm solved it" about an agent that was never
+invoked — see [pitfall 9](#9-a-cell-that-never-ran-counted-as-a-cell-that-failed).
+
+---
+
+## The tasks, verbatim
+
+These are round 1's three hand-written tasks, shown in full because they make the shape of the
+exercise concrete; round 2's eleven are built the same way but derived mechanically. Each arm
+receives the goal sentence and nothing else task-specific. Same model, same snapshot, same tools;
+the injected block is the only difference.
 
 ### Task 1 — `kb-ab-etm-crashloop`
 
@@ -158,26 +339,6 @@ earlier run passed it while differing sharply in what it actually explained.
 
 ---
 
-## Terminology
-
-
-Terms used throughout, defined once.
-
-| Term | Meaning |
-|---|---|
-| **Arm** | One side of the comparison. `kb-on` receives injected knowledge; `kb-off` is identical in every other respect and receives none. |
-| **Cell** | One execution: a single arm × a single repeat of a single task. This run had 18 cells. |
-| **Spec** | A task definition — goal sentence, deliverable filename, grading rule, number of repeats. |
-| **Snapshot** | A frozen copy of the repository at a known commit, plus its knowledge base and config, from which every cell starts. Guarantees all cells begin from identical state. |
-| **Sandbox** | The throwaway working directory a cell runs in, materialised from the snapshot. Discarded afterwards. |
-| **Fact** | One checkable claim the deliverable must contain, expressed as a regular expression. |
-| **Conjunction gate** | A cell passes only if it produces **all** required facts. Replaces earlier single-token grading. |
-| **Coinage** | Whether a model produces a fact unprompted, from its own prior knowledge, with no repository and no knowledge base. A fact the model coins cannot distinguish the arms. |
-| **Recoverable** | Whether the control arm could find a fact by searching the sandbox. |
-| **Leak** | Any path by which a cell reaches information outside its sandbox — the failure mode this experiment spent most of its effort eliminating. |
-
----
-
 ## How injection works
 
 
@@ -235,28 +396,9 @@ succeeds is the experiment.
 
 ---
 
-## Methodology
-
-
-**Design.** Two arms, three tasks, three repeats per arm — 18 cells. The only difference
-between arms is whether the injected block is present. Same model (`claude-sonnet-4-6`), same
-snapshot, same goal text, same tooling.
-
-**Task selection.** A task only carries information if the answer is in the knowledge base and
-*not* reachable from the code. Each task grades a piece of operational know-how that was
-learned after the snapshot was taken.
-
-**Grading.** Each deliverable is checked against a conjunction of required facts. Partial
-credit is reported (facts present) but a cell is only *accepted* if it produces all of them.
-Grading is mechanical — regular expressions over the produced file — with no model in the loop,
-so it cannot drift.
-
-**Cost measurement.** Tokens, tool-call counts and wall-clock are recorded per cell from the
-proxy that meters every LLM call.
-
----
-
 ## Results
+
+### Round 1 — three curated tasks: how large the effect is
 
 
 18 cells, zero leaks, zero untraced cells, all treatment cells confirmed injected.
@@ -314,6 +456,93 @@ nothing left to grade.
 
 ---
 
+### Round 2 — eleven sampled tasks: how often it happens
+
+Thirty-six insights were drawn from a frozen population of 162 above the confidence threshold.
+Eleven survived derivation into runnable tasks; all eleven ran, two arms by three repeats — 66 cells.
+
+> **9 of 11 sampled tasks discriminate — 82%** (95% Wilson 52%–95%).
+> Strict reading, requiring every treatment repeat accepted and no control repeat accepted:
+> **7 of 11 — 64%** (35%–85%).
+
+| Outcome | Tasks | Meaning |
+|---|---:|---|
+| **discriminates** | **9** | injection carried the answer — the measurable case |
+| kb-redundant | 2 | the repository already answers it; the KB adds nothing here |
+| neither-solves | 0 | a broken gate, or beyond both arms |
+| injection-hurt | 0 | injection actively hurt |
+
+Per task, accepted repeats out of graded repeats:
+
+| Task | Audit | kb-on | kb-off | Outcome |
+|---|---|---:|---:|---|
+| category-sub-modal-text-overflow | WARN | 3/3 | 0/3 | discriminates |
+| claude-run-session-title-generation | WARN | 3/3 | 3/3 | kb-redundant |
+| cross-agent-experiment-failure-modes | FAIL | 3/3 | 0/3 | discriminates |
+| graphify-corpus-cache-invalidation | PASS | 3/3 | 0/3 | discriminates |
+| graphify-incremental-rebuild-call-chain | PASS | 3/3 | 0/3 | discriminates |
+| health-coordinator-idle-gate | FAIL | 2/3 | 2/3 | kb-redundant |
+| kgbench-grader-false-positives | PASS | 3/3 | 0/3 | discriminates |
+| llm-proxy-egress-coverage | WARN | 3/3 | 0/3 | discriminates |
+| ontologyfilter-component-unified-viewer | FAIL | 3/3 | 0/3 | discriminates |
+| retrieval-service-hybrid-search-rrf | FAIL | 3/3 | 1/3 | discriminates |
+| smoke-spec-snapshot-restore-blockers | FAIL | 3/3 | 1/3 | discriminates |
+
+**The cost separation reproduces at scale.** Averaged over the nine discriminating tasks:
+
+| Arm | Steps | Seconds | Tokens |
+|---|---:|---:|---:|
+| **kb-on** | **7.3** | **185** | **2,692** |
+| kb-off | 22.6 | 340 | 18,328 |
+
+Three times the steps, nearly twice the wall-clock and **6.8x the tokens** — to reach an answer the
+control arm mostly did not reach at all. Because these measures are continuous rather than binary,
+they carry far more statistical power per cell than the pass/fail gate, and they stay informative
+even where correctness ties.
+
+#### The recoverability audit, as a column
+
+Every task carries a verdict on whether the control arm could grep its way to its graded facts. No
+task is filtered on it — that is design rule 2 — which makes the split itself a measurement:
+
+| Verdict | Tasks | Discriminate |
+|---|---:|---:|
+| **FAIL** — every required fact is grep-able | 5 | **4** |
+| WARN — some reachable, some not | 3 | 2 |
+| PASS — none reachable by search | 3 | 3 |
+
+**Four of the five FAIL-verdict tasks discriminated anyway.** Had the audit been used as the
+inclusion filter that the obvious design calls for, those four would have been discarded as
+unmeasurable and most of the round's signal would have gone with them. This is [pitfall
+2](#2-grep-able-is-not-recoverable) reproduced across a sampled set rather than argued from a single
+task: static searchability describes what a determined grep *could* reach, not what an agent under
+task pressure actually retrieves.
+
+#### Most candidates die before becoming tasks
+
+The funnel matters more than the rate, because it sets what a round of this size costs. Of 36 drawn,
+25 produced no runnable task:
+
+| Reason | Count |
+|---|---:|
+| no deliverable in the window — one cannot show stability | 10 |
+| fewer than the three facts a conjunction needs | 11 |
+| no token appeared in *every* treatment-arm deliverable | 3 |
+| mined token absent from the block the treatment arm receives | 1 |
+
+Two-thirds attrition is the blind filters doing their job, not a defect — but it means a round costs
+roughly three times its visible cell count in candidates, which is the practical constraint on
+scaling this to a number that would settle the question rather than size the next attempt.
+
+#### Reading the two rounds together
+
+Round 1 says that when injection matters it matters decisively and costs less. Round 2 says the
+case arises for roughly four in five knowledge-derived tasks, with the true value plausibly anywhere
+between half and nearly all. The two `kb-redundant` tasks are the honest counterweight: for those,
+the repository already held the answer and the knowledge base earned nothing.
+
+---
+
 ## What this establishes — and what it does not
 
 The effect above is large and perfectly consistent, which makes it easy to over-read. Three
@@ -338,152 +567,27 @@ probability that injection helps on an arbitrary task, because the tasks were no
 **And the deliverable is a document, not working code.** Nothing here shows that injection improves
 software that has to compile and pass tests.
 
-These three constraints describe *this* run — three curated tasks — and are not retracted by
-anything that follows. The first of them is the one that later got an answer: a sampled round of
-eleven mechanically derived tasks is reported under [When we tried to
-sample](#when-we-tried-to-sample), and it supplies the rate that a curated set cannot. It does not
-make these tasks a random sample, and its own conditioning is different rather than absent.
+These constraints bound **round 1**. The first of them is what round 2 was built to answer, and it
+does: a mechanically derived population supplies a rate that no curated set can. That does not make
+round 1's tasks a random sample — it means the two rounds carry different conditioning, and the
+[design section](#design-how-the-experiment-avoids-fooling-itself) states round 2's in full.
 
 ---
 
 ## Where this goes next
 
-Two questions follow naturally from the limits above: would more tasks give statistically
-meaningful evidence, and would programming tasks — rather than retrieval-shaped ones — work at all?
+### Cheaper power, without new tasks
 
-### More tasks, but sampled rather than curated
-
-The binding constraint is task *provenance*, not cell count. Ten more hand-written
-knowledge-decisive tasks would narrow the interval around a biased estimate without making it less
-biased. The change that buys genuine evidence is to define a population and sample from it:
-
-1. Take every knowledge-base insight above a confidence threshold and mechanically derive a runbook
-   goal from the symptom it describes.
-2. Apply the recoverability audit as a **blind inclusion filter**, before any cell runs — not as a
-   post-hoc explanation for tasks that disappointed.
-3. Run whatever survives, and report **two** numbers rather than one:
-    - the **discrimination rate** — what fraction of knowledge-derived tasks the control arm cannot
-      solve, which is a direct measure of how much of the knowledge base is *non-redundant*;
-    - the **effect size on the tasks that do discriminate**, which is what this run already has.
-
-The first number is the one that justifies the system's cost. It was unknown when this report was
-first written; [the round below](#when-we-tried-to-sample) measured it. It is also the number that
-puts the retired task's failure mode on a proper denominator.
-
-Three cheaper power upgrades need no new tasks at all:
-
-- **More models.** Everything here ran on a single pinned model. A result that holds only for one
-  model is not a property of the knowledge base. The matrix already carries an agent/model axis.
-- **Cost as a co-primary outcome.** Steps, tokens and wall-clock separated the arms by factors of
-  8 to 24. They are continuous and low-variance, so they carry far more statistical power per cell
-  than a binary gate — and they remain informative even when correctness ties.
-- **More repeats, where they help.** Within-arm variance was effectively zero on the surviving
-  tasks, so repeats buy little there. They become necessary as soon as the task type is noisier —
-  which is exactly the programming case.
-
-### When we tried to sample
-
-That plan was executed on 2026-08-24, and the first full round — **eight tasks, 48 cells** — came
-back with seven of the eight marked `neither-solves`, the label for *neither arm passed*.
-
-That is not a finding about the knowledge base; it is the signature of a broken gate. The giveaway
-was the treatment arm's own scores: 0/3, 1/3, 0/3, 2/3, 0/3, 0/3, 0/3, 1/3 — on conjunctions built
-for it, with the answer sitting in its prompt. A gate the treatment arm cannot pass *with the answer
-in hand* is measuring its own difficulty, not the agent's knowledge.
-
-**The cause was a condition mismatch, not a lax filter.** A fact had been kept only if it appeared
-in every *reference* runbook — an ideal answer written by a model handed the insight directly. But a
-reference is written with no sandbox, no tools, no instruction to actually do the work, and no
-pressure to be brief; a real cell writes under all four. Every fact in a conjunction can appear in
-every reference and the conjunction can still be jointly unsatisfiable for an agent doing the job
-for real.
-
-**The fix was to stop predicting what a good answer looks like and read one.** Gates are now mined
-from what the treatment arm *actually wrote*: the injected arm runs first, three times per task, and
-a fact is eligible only if it appears in **every one** of those deliverables. A task that produced
-fewer than two is dropped outright — one deliverable cannot show that a fact is stable rather than
-incidental.
-This is not a new idea. It is how the three curated tasks in this report were built, which is
-precisely why they never had this problem.
-
-**What that conditions, stated plainly.** Mining the gate from injected output means the treatment
-arm passes its own gate close to by construction — so "the treatment arm scored well" stops being
-evidence of anything, and must never be reported as if it were. The quantity that survives is the
-other one: **what fraction of knowledge-derived tasks the control arm cannot reproduce.** That is
-the discrimination rate this round exists to measure, and it stays a genuine measurement for one
-reason — **the control arm is never consulted while the gate is being built.** Nothing the control
-arm does can widen or narrow the set of facts it is later graded on.
-
-The blind filters from the original design still apply, and are now shared as code rather than
-restated: a fact must survive a shape check, must appear in the block the agent is actually handed,
-must not be something the model already writes unprompted, and must not be given away by the goal
-sentence itself.
-
-The mined gates are written alongside the originals rather than over them, so a partial pass cannot
-leave a half-stale matrix behind.
-
-**What the round found.** Thirty-six insights were drawn from a frozen population of 162 above the
-confidence threshold. Eleven survived mining into runnable tasks, and all eleven ran — two arms,
-three repeats, sixty-six cells.
-
-**Nine of the eleven discriminate: 82% (95% Wilson 52%–95%)** — and that number means the narrow
-thing the section above defines, not the broad thing it resembles. It is **not** the probability
-that injection helps on an arbitrary task. It is the fraction of gates *mined from what the
-treatment arm wrote* that the control arm could not reproduce, and the treatment arm passes those
-gates close to by construction. The load-bearing half of the measurement is the control arm's
-failure, which nothing in the gate's construction arranged.
-
-On a strict reading — every treatment repeat accepted, no control repeat accepted — seven of eleven,
-64% (35%–85%). The other two tasks are `kb-redundant`: the repository already answers them and
-injection adds nothing. **No task landed in `neither-solves`, and none in `injection-hurt`.**
-
-The effect size, on the nine that discriminate, is the shape the curated tasks already showed:
-
-| Arm | Steps | Seconds | Tokens |
-|---|---:|---:|---:|
-| kb-on | 7.3 | 185 | 2,692 |
-| kb-off | 22.6 | 340 | 18,328 |
-
-Three times the steps, nearly twice the wall-clock and **6.8x the tokens** — to arrive at an answer
-the control arm mostly did not reach at all.
-
-**The mining funnel is where most candidates die**, and its shape matters more than the rate does.
-Of thirty-six drawn, twenty-five produced no runnable task: ten had no deliverable in the window,
-eleven kept fewer than the three facts a conjunction needs, three had no token surviving in *every*
-treatment deliverable, and one mined a token that never appears in the block the treatment arm
-receives. Two-thirds attrition is not a defect — it is the blind filters doing the job the first
-round's reference filter failed at — but it means a round of this size costs roughly three times
-its visible cell count in candidates.
-
-**The recoverability audit is a column here, and it earns the design.** Every task carries a
-verdict on whether the control arm could grep its way to the graded facts, and no task is filtered
-on it:
-
-| Verdict | Tasks | Discriminate |
-|---|---:|---:|
-| FAIL — every required fact is grep-able | 5 | 4 |
-| WARN — some reachable, some not | 3 | 2 |
-| PASS — none reachable by search | 3 | 3 |
-
-**Four of the five FAIL-verdict tasks discriminated anyway.** Had the audit been used as the
-inclusion filter the original plan called for, those four would have been discarded as unmeasurable
-— and with them most of the round's signal. This is the finding from pitfall 2 reproduced on a
-sampled set rather than a single task: static searchability says what a determined grep *could*
-reach, not what an agent under task pressure actually retrieves. The verdict belongs beside the
-result, never in front of it.
-
-**This number was wrong once before it was right.** The round's first pass reported 55%. Two
-defects produced it, both recorded below as pitfalls 8 and 9: three of the eleven tasks were
-silently graded against the reference gate this round exists to replace, and a task whose six cells
-never executed was published as `neither-solves` — a verdict about an agent that was never invoked.
-Neither raised an error, and they moved the headline in opposite directions, which is why reading
-the results did not reveal them. Every `neither-solves` verdict in that first pass turned out to be
-an artefact of one or the other.
-
-At n=11 the interval is still wide enough to size the next round rather than settle the question.
-The honest summary: roughly four in five knowledge-derived tasks were beyond the control arm, with
-the true value plausibly anywhere from half to nearly all — and the cost separation, being
-continuous rather than binary, remains far better powered than the rate.
+- **More models.** Everything here ran on a single pinned model. A result that holds for one model
+  is not yet a property of the knowledge base. The matrix already carries an agent/model axis.
+- **Cost as a co-primary outcome.** Steps, tokens and wall-clock separated the arms by factors of 3
+  to 8. Being continuous and low-variance, they carry far more power per cell than a binary gate,
+  and stay informative when correctness ties.
+- **More repeats, where they help.** Within-arm variance was near zero on the tasks that
+  discriminate, so repeats buy little there. They become necessary as soon as the task type is
+  noisier — which is exactly the programming case.
+- **A larger draw.** At n=11 the interval spans 52%–95%. Narrowing it is a matter of more drawn
+  insights, at roughly three candidates per runnable task.
 
 ### Programming tasks: possible, but grade a different thing
 
@@ -537,9 +641,9 @@ rather than on intuition about how noisy such a matrix would be.
 ## Pitfalls, and the measures built to defeat them
 
 Every item below is a real failure that produced plausible but invalid results, followed by the
-measure now in place. Together they are the reason the table above can be believed: five of these
-were found *after* a run had already produced a clean-looking set of numbers — two of them after a
-*published* set of numbers.
+measure now in place. Together they are why the numbers above can be believed: over half were found
+*after* a run had already produced a clean-looking table, and would not have been found by reading
+that table.
 
 They are also the transferable part. The specific facts being graded are peculiar to this project;
 the ways an isolated experiment turns out not to be isolated are not.
@@ -694,7 +798,7 @@ A cell skipped before the agent starts still writes a row. A preflight route fai
 null terminal state, a null step count, no score and a `skip_reason` — after about five seconds. The
 discrimination report counted rows rather than results: an arm's denominator was the row count and
 its numerator the rows with a passing gate, so six preflight skips read as `0/3` in both arms and
-the task was published as `neither-solves` — whose stated meaning is "a broken gate, or beyond both
+the task was recorded as `neither-solves` — whose stated meaning is "a broken gate, or beyond both
 arms". That is a positive claim about an agent that was never invoked. The report even computed the
 number of ungraded rows, and then never read it.
 
@@ -707,6 +811,33 @@ number of ungraded rows, and then never read it.
 output with the instruction to re-run it. The aggregate splits are computed over the graded set, so
 a never-run task cannot dilute those either.
 
+### 10. Provenance that was promised but not written
+
+A derivation is only auditable if you can say what produced it. Extracting the sampler's probes into
+their own module dropped the line that recorded which model generated each task's candidate facts.
+The comment promising the derivation "stays auditable" moved across with the code; the recording did
+not. The ledger for the round reported here carries `generatorModels: []` — 36 drawn tasks with no
+record of what proposed their candidates.
+
+Fixing that exposed a second fault underneath it. The generator's process name carried a `bg-`
+prefix that the proxy *also* prepends, so it resolved to `bg-bg-…`, matched no route, and silently
+fell through to a default — meaning a routing change made hours earlier had never taken effect. It
+had *looked* verified, because the check queried the routing resolver with the already-resolved
+name. That confirms what the resolver does with a name; it says nothing about what the caller's
+name resolves *to*.
+
+> **Generalisable lesson.** Verifying a fix by asking the component downstream of the bug will
+> confirm the bug is fixed. The check has to start where the real caller starts.
+
+This does not invalidate the round: candidate generation is explicitly not a measurement, and the
+blind filters do the selecting. What was lost is replayability — the draw cannot be reconstructed
+from its own ledger — and resilience, since a derivation that should have been independent of one
+account's quota was not.
+
+**Measure:** provenance is recorded inside the completion call itself, keyed on the process, so a
+caller cannot omit it. Route checks are made by sending the caller's own string end to end and
+reading which provider answered, rather than by consulting the resolver.
+
 ---
 
 ## Recommendations
@@ -714,34 +845,46 @@ a never-run task cannot dilute those either.
 
 **For this knowledge-injection system**
 
-1. **Keep it, for knowledge that is not in the code.** Two tasks showed a large, cheap, repeatable
-   win precisely where the answer is operational know-how rather than something derivable from
-   source.
-2. **Treat contradiction as a first-class failure mode.** Injection does not override what the
+1. **Keep it, for knowledge that is not in the code.** Roughly four in five knowledge-derived tasks
+   were beyond the control arm, and the wins were large, cheap and repeatable — precisely where the
+   answer is operational know-how rather than something derivable from source.
+2. **Expect a redundant minority, and do not begrudge it.** Two of eleven sampled tasks were
+   answered perfectly well by the repository alone. That is the honest cost of a knowledge base
+   that also records things the code already says.
+3. **Treat contradiction as a first-class failure mode.** Injection does not override what the
    agent can read. Where injected knowledge supersedes something still present in the repository,
-   expect the repository to win. The practical mitigation is to fix or remove the stale artefact,
-   not to inject harder.
-3. **Do not let the dependency fail silently.** A fail-open retrieval path plus a wedged service
-   produces an untreated arm that looks normal. Injected byte counts should be asserted, not
-   merely logged.
+   expect the repository to win. The mitigation is to fix or remove the stale artefact, not to
+   inject harder.
+4. **Do not let the dependency fail silently.** A fail-open retrieval path plus a wedged service
+   produces an untreated arm that looks normal. Injected byte counts should be asserted, not merely
+   logged.
 
 **For anyone running a similar experiment**
 
-4. **Verify isolation empirically, per cell, and report it beside the results.** Not as a
+5. **Never let selection see an arm's outcome.** Every filter that drops a task or a fact must be
+   computable before any cell runs. This is the single property separating a measurement from a
+   restatement of the choices made while building it.
+6. **Keep the plausible-looking filter as a covariate.** Screening tasks on whether the control arm
+   *could* find the answer by searching would have discarded four of the five hardest-won results
+   here. Record the verdict; never filter on it.
+7. **Verify isolation empirically, per cell, and report it beside the results.** Not as a
    precondition assumed once. Three separate leaks survived at least one round of "we fixed that".
-5. **Prefer a direct probe to an inference about the mechanism.** The decisive test throughout was
+8. **Prefer a direct probe to an inference about the mechanism.** The decisive test throughout was
    a no-tools question — *"name your memory directory from your system prompt alone"* — which
-   settled in seconds what two rounds of reasoning had got wrong.
-6. **Select graded facts by measurement.** Require: present in the treatment input, absent from
-   the control's reach, produced by the treatment, absent from the control and from bare-model
-   coinage. Facts chosen by intuition graded backwards in this experiment more than once.
-7. **Check the cheap invariants before trusting a batch.** A null step count on cell one saved a
-   50-minute run that would have produced a full, plausible, meaningless table.
+   settled in seconds what two rounds of reasoning had got wrong. The same rule applies to verifying
+   a fix: start where the real caller starts, not downstream of the bug.
+9. **Select graded facts by measurement, from real output.** Require: present in the treatment
+   input, produced by the treatment arm in *every* repeat, and absent from bare-model coinage.
+   Facts chosen by intuition graded backwards more than once; facts predicted from an idealised
+   answer produced a round in which neither arm could pass.
+10. **Check the cheap invariants before trusting a batch.** A null step count on cell one saved a
+    50-minute run that would have produced a full, plausible, meaningless table. Distinguish a cell
+    that failed from a cell that never ran.
 
 **Limits** are stated in full under [What this establishes — and what it does
-not](#what-this-establishes-and-what-it-does-not), and the concrete next steps — sampling a task
-population rather than curating one, and whether programming tasks can carry the same measurement —
-under [Where this goes next](#where-this-goes-next).
+not](#what-this-establishes-and-what-it-does-not); remaining work — more models, a larger draw, and
+whether programming tasks can carry the same measurement — is under
+[Where this goes next](#where-this-goes-next).
 
 ---
 
