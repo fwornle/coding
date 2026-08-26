@@ -1,0 +1,17 @@
+version: 1
+experiment_id: mine-kbs-cold-store-maintenance-dangling-digest
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named cold-store-maintenance-dangling-digest-runbook.md at the
+  repository root that diagnoses this symptom for an operator: Some digests in
+  the cold-store JSON reference observation IDs that no longer exist in the
+  store, despite an earlier fix having been marked resolved. The file must state
+  the root cause, give the exact commands to confirm it, and give the exact
+  command or option that fixes it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on

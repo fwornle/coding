@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-coding-v1-benchmark-per-question-cell-level",
+  "insightId": "019ff4e5-31e8-7770-969f-13479d28f91d",
+  "deliverable": "coding-v1-benchmark-per-question-cell-level-runbook.md",
+  "goalSummary": "A4 appears to show arm separation in a new run",
+  "facts": [
+    {
+      "id": "l2-codegraph-9-9-fail",
+      "source": "9/9",
+      "flags": "",
+      "required": true,
+      "why": "The robustly replicating L2 codegraph failure rate (9/9 cells) must be documented as the sole confirmed finding",
+      "inSandbox": true
+    },
+    {
+      "id": "docker-compose-yaml-location",
+      "source": "docker-compose\\.yml:82",
+      "flags": "i",
+      "required": true,
+      "why": "Exact file and line range where the missing f1 fact resides must be cited",
+      "inSandbox": false
+    },
+    {
+      "id": "graph-json-zero-yaml-nodes",
+      "source": "graph\\.json",
+      "flags": "i",
+      "required": true,
+      "why": "The corpus file confirming zero YAML-sourced nodes must be named as diagnostic evidence",
+      "inSandbox": true
+    },
+    {
+      "id": "cell-level-vs-median-method",
+      "source": "cell-level count",
+      "flags": "i",
+      "required": true,
+      "why": "Fix/methodology: cell-level counting across runs, not median aggregation, is the authoritative replication check",
+      "inSandbox": false
+    },
+    {
+      "id": "a4-retracted",
+      "source": "A4[^.]{0,80}retract|retract[^.]{0,80}A4",
+      "flags": "i",
+      "required": true,
+      "why": "A4 finding was retracted due to lack of arm separation and must be documented as non-replicating",
+      "inSandbox": false
+    },
+    {
+      "id": "hallucination-p-018",
+      "source": "P\\s*=\\s*0\\.18",
+      "flags": "i",
+      "required": true,
+      "why": "The hallucination finding's replication probability (P=0.18) must be recorded as failing replication",
+      "inSandbox": false
+    }
+  ]
+}

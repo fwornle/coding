@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-foreground-task-token-capture-route-architecture",
+  "insightId": "019f23d1-ad13-7153-b738-8356c55feb37",
+  "deliverable": "foreground-task-token-capture-route-architecture-runbook.md",
+  "goalSummary": "Cross-agent cache comparisons appear inconsistent",
+  "facts": [
+    {
+      "id": "cache-read-retransmission",
+      "source": "cache_read",
+      "flags": "",
+      "required": true,
+      "why": "The specific token metric whose semantics (retransmitted on every call) must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "wire-tap-v1-messages-route",
+      "source": "/v1/messages",
+      "flags": "i",
+      "required": true,
+      "why": "The exact wire-tap endpoint used for Claude token capture must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "provider-billing-01x",
+      "source": "0\\.1×|0\\.1x",
+      "flags": "i",
+      "required": true,
+      "why": "The specific billing discount factor for cached computation must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "three-layer-reconciliation",
+      "source": "proxy capture layer.{0,80}token-adapter.{0,80}dashboard query|three-layer reconciliation",
+      "flags": "i",
+      "required": true,
+      "why": "Relationship: the three layers (proxy, adapter, dashboard) must be reconciled before cross-agent comparisons are valid",
+      "inSandbox": false
+    },
+    {
+      "id": "kv-prefix-computation-cache",
+      "source": "KV prefix cache|computation cache",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: the cache is a provider-side computation cache, not a data-transmission optimization, explaining why cache_read tokens are still transmitted",
+      "inSandbox": false
+    },
+    {
+      "id": "structural-vs-capture-gap",
+      "source": "structural|capture gap",
+      "flags": "i",
+      "required": true,
+      "why": "Fix/diagnosis: zero-cache values must be distinguished as structural backend limitations vs genuine capture gaps before investigating",
+      "inSandbox": true
+    }
+  ]
+}

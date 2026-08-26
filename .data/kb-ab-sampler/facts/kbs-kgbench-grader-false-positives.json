@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-kgbench-grader-false-positives",
+  "insightId": "019fd685-9ea8-70a5-8c01-6a77bac47f3c",
+  "deliverable": "kgbench-grader-false-positives-runbook.md",
+  "goalSummary": "Unexpected 0.00 on a cell with valid agent output",
+  "facts": [
+    {
+      "id": "graders-file-path",
+      "source": "lib/kgbench/graders\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must name the exact file containing grader logic including negation detection",
+      "inSandbox": false
+    },
+    {
+      "id": "negation-window-fix",
+      "source": "3-word|60-character",
+      "flags": "i",
+      "required": true,
+      "why": "The specific fix (60-char to 3-word negation bound) that corrected false hallucination flags must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "payment-reconcil-false-positive",
+      "source": "payment\\|reconcil",
+      "flags": "i",
+      "required": true,
+      "why": "The overly broad domain pattern causing false positives must be identified since no such module exists",
+      "inSandbox": false
+    },
+    {
+      "id": "claim-count-249-green",
+      "source": "249 green|249\\b",
+      "flags": "i",
+      "required": true,
+      "why": "Confirmation: published claims stabilized at 249 green after the fix, up from 240",
+      "inSandbox": true
+    },
+    {
+      "id": "prompt-rewrite-boundary-audit",
+      "source": "prompt rewrite boundar",
+      "flags": "i",
+      "required": true,
+      "why": "Fix procedure: git history must be audited for prompt rewrite boundaries before regrading older runs",
+      "inSandbox": false
+    },
+    {
+      "id": "verifier-claims-script-update",
+      "source": "kgbench-verify-report-claims\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "The verifier script must be updated alongside each regrade to reflect corrected claim counts",
+      "inSandbox": false
+    }
+  ]
+}

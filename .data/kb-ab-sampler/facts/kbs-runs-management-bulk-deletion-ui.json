@@ -1,0 +1,32 @@
+{
+  "topic": "kbs-runs-management-bulk-deletion-ui",
+  "insightId": "019f3182-f4b0-7c20-ad56-08b91b163dbe",
+  "deliverable": "runs-management-bulk-deletion-ui-runbook.md",
+  "goalSummary": "Orphaned Score/Outcome/Route records after deletion",
+  "facts": [
+    {
+      "id": "runs-table-file",
+      "source": "runs-table\\.tsx",
+      "flags": "i",
+      "required": true,
+      "why": "The file implementing per-row checkboxes and All/None toggle controls must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "tooltip-confirmation-file",
+      "source": "tooltip\\.tsx",
+      "flags": "i",
+      "required": true,
+      "why": "The primary implementation file for confirmation bar and delete dispatch logic must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "filter-scoped-selection",
+      "source": "active filter|filter-scoped|filtered",
+      "flags": "i",
+      "required": true,
+      "why": "Relationship: All/None toggle scope is bounded strictly to the active filter, a key correctness constraint",
+      "inSandbox": true
+    }
+  ]
+}

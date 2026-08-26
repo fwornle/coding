@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-graphify-corpus-cache-and-invalidation-logic",
+  "insightId": "019fdaee-5da2-76b6-8e74-09e4103c1711",
+  "deliverable": "graphify-corpus-cache-and-invalidation-logic-runbook.md",
+  "goalSummary": "Unexpected cache misses for code files",
+  "facts": [
+    {
+      "id": "corpus-signature-function",
+      "source": "_corpus_signature",
+      "flags": "",
+      "required": true,
+      "why": "The exact function computing the SHA-256 cache signature must be identified",
+      "inSandbox": false
+    },
+    {
+      "id": "detect-corpus-cache-file",
+      "source": "\\.detect_corpus_cache\\.json",
+      "flags": "i",
+      "required": true,
+      "why": "The runtime cache artifact file must be named as the target of invalidation troubleshooting",
+      "inSandbox": false
+    },
+    {
+      "id": "detect-py-sole-caller",
+      "source": "detect\\.py",
+      "flags": "i",
+      "required": true,
+      "why": "The file containing both _corpus_signature and its sole caller detect() must be identified",
+      "inSandbox": false
+    },
+    {
+      "id": "path-deterministic-vs-content-classified",
+      "source": "mtime_ns",
+      "flags": "",
+      "required": true,
+      "why": "Relationship: content-classified files hash path+mtime_ns+size, while path-deterministic files hash only path, explaining differing cache-miss behavior",
+      "inSandbox": false
+    },
+    {
+      "id": "nine-second-classification-cost",
+      "source": "~9s|9 second",
+      "flags": "i",
+      "required": true,
+      "why": "The expensive classification pass duration that the cache avoids must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "graphifyignore-exclusion-fix",
+      "source": "\\.graphifyignore",
+      "flags": "i",
+      "required": true,
+      "why": "Fix: excluding large binary/Office files via .graphifyignore avoids unnecessary content classification overhead",
+      "inSandbox": false
+    }
+  ]
+}

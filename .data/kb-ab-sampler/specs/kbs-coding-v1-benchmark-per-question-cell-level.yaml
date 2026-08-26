@@ -1,0 +1,21 @@
+version: 1
+experiment_id: kbs-coding-v1-benchmark-per-question-cell-level
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named coding-v1-benchmark-per-question-cell-level-runbook.md at
+  the repository root that diagnoses this symptom for an operator: A4 appears to
+  show arm separation in a new run. The file must state the root cause, give the
+  exact commands to confirm it, and give the exact command or option that fixes
+  it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-off
+test_command: node scripts/kb-ab-assert.mjs kbs-coding-v1-benchmark-per-question-cell-level

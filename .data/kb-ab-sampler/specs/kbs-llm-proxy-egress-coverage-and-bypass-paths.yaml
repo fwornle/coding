@@ -1,0 +1,22 @@
+version: 1
+experiment_id: kbs-llm-proxy-egress-coverage-and-bypass-paths
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named llm-proxy-egress-coverage-and-bypass-paths-runbook.md at
+  the repository root that diagnoses this symptom for an operator: Bare CLI
+  invocations of claude, copilot, or opencode outside the coding project fail to
+  reach provider APIs entirely. The file must state the root cause, give the
+  exact commands to confirm it, and give the exact command or option that fixes
+  it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-off
+test_command: node scripts/kb-ab-assert.mjs kbs-llm-proxy-egress-coverage-and-bypass-paths

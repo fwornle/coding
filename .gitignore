@@ -147,10 +147,25 @@ integrations/mcp-server-browserbase/
 # Workflow execution configs (per-run configs with unique IDs)
 .data/workflow-configs/
 
-# Derived kb-ab sampler output (specs + fact sets + ledger). MUST stay untracked: a fact set
-# spells out the graded answers, and snapshot restore materialises COMMITTED content — a tracked
-# fact file would be one re-snapshot away from landing the answers inside the cell sandbox.
-.data/kb-ab-sampler/
+# Derived kb-ab sampler output. The published round's inputs ARE tracked, so its result is
+# reproducible: the derivation ledgers, the frozen insight population they were drawn from, the
+# graded specs and the mined fact sets. Runtime scratch and superseded pilots are not.
+#
+# THIS IS SAFE ONLY BECAUSE THE SANDBOX STRIPS THE DIRECTORY. A fact set spells out the graded
+# answers and the frozen insight file IS the treatment corpus; a sandbox is a git worktree, so it
+# materialises committed content. Tracking these without a strip would hand the answer key to
+# kb-off in every future round — the failure mode recorded as pitfall 1. The strip lives in
+# SANDBOX_KNOWLEDGE_PATHS (lib/experiments/experiment-restore.mjs), runs on BOTH arms before every
+# cell, and is covered by a test that asserts a fact file cannot survive into a sandbox.
+# Do not track anything further here without confirming the strip still covers it.
+.data/kb-ab-sampler/*
+!.data/kb-ab-sampler/specs/
+!.data/kb-ab-sampler/mine-specs/
+!.data/kb-ab-sampler/facts/
+!.data/kb-ab-sampler/ledger.json
+!.data/kb-ab-sampler/ledger-mined.json
+!.data/kb-ab-sampler/mine-window-start
+!.data/kb-ab-sampler/insights-50d4c34bc084c78c.json
 
 # LLM usage cost tracking (runtime, written by BudgetTracker)
 .data/llm-usage-costs.json

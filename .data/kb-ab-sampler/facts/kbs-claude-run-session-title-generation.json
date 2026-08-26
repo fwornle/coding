@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-claude-run-session-title-generation",
+  "insightId": "019f84e5-c780-76cd-a468-7e65d7ff4f64",
+  "deliverable": "claude-run-session-title-generation-runbook.md",
+  "goalSummary": "In the Runs table, Claude session titles display raw leading characters of the original prompt instead of a concise summarized description.",
+  "facts": [
+    {
+      "id": "claude-only-flag",
+      "source": "--claude-only",
+      "flags": "",
+      "required": true,
+      "why": "The specific flag scoping backfill to Claude sessions only must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "llm-session-title-function",
+      "source": "llmSessionTitle",
+      "flags": "",
+      "required": true,
+      "why": "The function that synthesizes summary titles via LLM must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "claude-pass-heuristic-fallback",
+      "source": "claudePass",
+      "flags": "",
+      "required": true,
+      "why": "The Claude-path function falling back to heuristic signal.title must be identified as the regression source",
+      "inSandbox": true
+    },
+    {
+      "id": "signal-title-heuristic",
+      "source": "signal\\.title",
+      "flags": "",
+      "required": true,
+      "why": "The heuristic fallback field producing verbatim prompt text must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "backfill-flag-and-file",
+      "source": "--backfill",
+      "flags": "",
+      "required": true,
+      "why": "The backfill mode flag that re-titles sessions outside the active window must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "auto-measure-foreground-file",
+      "source": "auto-measure-foreground\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "The file implementing claudePass, llmSessionTitle call path, and backfill logic must be identified",
+      "inSandbox": true
+    }
+  ]
+}

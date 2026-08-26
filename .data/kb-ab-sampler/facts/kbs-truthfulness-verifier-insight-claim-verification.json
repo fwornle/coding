@@ -1,0 +1,40 @@
+{
+  "topic": "kbs-truthfulness-verifier-insight-claim-verification",
+  "insightId": "019ebdb2-e91d-7fa4-9bea-5ce126982e2b",
+  "deliverable": "truthfulness-verifier-insight-claim-verification-runbook.md",
+  "goalSummary": "Low-contrast `unverifiable`/`no claims` tiles",
+  "facts": [
+    {
+      "id": "coverage-tsx-file",
+      "source": "coverage\\.tsx",
+      "flags": "i",
+      "required": true,
+      "why": "The single file containing all Coverage page rendering logic must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "pending-grey-exclusive",
+      "source": "pending[^.]{0,60}grey|grey[^.]{0,60}pending",
+      "flags": "i",
+      "required": true,
+      "why": "The exclusive color mapping of grey to the pending state must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "km-core-uuid-deep-link",
+      "source": "UUID|`?id`? field",
+      "flags": "i",
+      "required": true,
+      "why": "Deep-linking must use the native km-core UUID id field as the canonical identifier",
+      "inSandbox": true
+    },
+    {
+      "id": "refresh-cached-not-verifier",
+      "source": "cached insight metadata|not re-execute the verifier",
+      "flags": "i",
+      "required": true,
+      "why": "Relationship: the Refresh button only re-reads cached data and does not re-execute the verifier pass, a key behavioral distinction",
+      "inSandbox": false
+    }
+  ]
+}

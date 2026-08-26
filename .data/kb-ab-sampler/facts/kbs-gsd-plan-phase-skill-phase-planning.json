@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-gsd-plan-phase-skill-phase-planning",
+  "insightId": "019ee99a-44d1-75b8-a6ca-0f14c85b2820",
+  "deliverable": "gsd-plan-phase-skill-phase-planning-runbook.md",
+  "goalSummary": "Planning state contaminating execution",
+  "facts": [
+    {
+      "id": "invocation-command",
+      "source": "/gsd-execute-phase",
+      "flags": "",
+      "required": true,
+      "why": "Runbook must name the exact invocation command for the orchestrator",
+      "inSandbox": true
+    },
+    {
+      "id": "gaps-only-flag",
+      "source": "--gaps-only",
+      "flags": "",
+      "required": true,
+      "why": "Correct runbook must specify the exact flag token, since abbreviations are silently unrecognized",
+      "inSandbox": false
+    },
+    {
+      "id": "gap-closure-frontmatter",
+      "source": "gap_closure:\\s*true",
+      "flags": "i",
+      "required": true,
+      "why": "Relationship between --gaps-only flag and frontmatter field it filters on must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "wave-equals-unrecognized",
+      "source": "--wave=2",
+      "flags": "",
+      "required": true,
+      "why": "Runbook must warn that = syntax is unrecognized and falls back to full-phase execution",
+      "inSandbox": false
+    },
+    {
+      "id": "pre-execution-context-reset",
+      "source": "context reset",
+      "flags": "i",
+      "required": true,
+      "why": "Mandatory pre-execution context reset step must be documented to prevent state contamination",
+      "inSandbox": false
+    },
+    {
+      "id": "integrity-gate-checker",
+      "source": "gsd-plan-checker",
+      "flags": "i",
+      "required": true,
+      "why": "The integrity gate enforced before sub-agent dispatch must be named explicitly",
+      "inSandbox": false
+    }
+  ]
+}

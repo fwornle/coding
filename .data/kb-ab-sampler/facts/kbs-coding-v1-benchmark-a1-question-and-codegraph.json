@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-coding-v1-benchmark-a1-question-and-codegraph",
+  "insightId": "019ff505-58df-70f8-b5fb-96f244bc280d",
+  "deliverable": "coding-v1-benchmark-a1-question-and-codegraph-runbook.md",
+  "goalSummary": "Nominal citation ≠ retrieval",
+  "facts": [
+    {
+      "id": "target-file-docker-compose",
+      "source": "docker-compose\\.yml",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must name the specific file at the center of the A1 retrieval gap",
+      "inSandbox": true
+    },
+    {
+      "id": "graphify-hallucination",
+      "source": "LevelDB",
+      "flags": "i",
+      "required": true,
+      "why": "Specific hallucination (LevelDB instead of SQLite) evidences the graphify failure mode",
+      "inSandbox": true
+    },
+    {
+      "id": "tool-allowlist-restriction",
+      "source": "allowlist",
+      "flags": "i",
+      "required": true,
+      "why": "CodeGraph root cause is a shell-read tool allowlist restriction, not indexing or reasoning failure",
+      "inSandbox": true
+    },
+    {
+      "id": "line-anchored-citation-criterion",
+      "source": "line-anchored",
+      "flags": "i",
+      "required": true,
+      "why": "Confirmation criterion: only line-anchored citations correlate with correct scoring, distinguishing from nominal mentions",
+      "inSandbox": false
+    },
+    {
+      "id": "r7-truncation-anomaly",
+      "source": "truncat|incomplete execution",
+      "flags": "i",
+      "required": true,
+      "why": "r7 anomaly cause: abnormally low tool-result volume indicates truncation, not a reasoning gap",
+      "inSandbox": true
+    }
+  ]
+}

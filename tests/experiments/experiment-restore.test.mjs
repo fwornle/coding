@@ -98,6 +98,14 @@ test('neutralizeSandboxKnowledge: removes the KB corpus and the agent-memory poi
   fs.writeFileSync(path.join(wt, '.data', 'knowledge-graph', 'exports', 'general.json'), '{"nodes":[]}');
   fs.mkdirSync(path.join(wt, '.data', 'observation-export'), { recursive: true });
   fs.writeFileSync(path.join(wt, '.data', 'observation-export', 'insights.json'), '[]');
+  // The sampler's derived output: fact sets are the ANSWER KEY for the graded conjunctions, and
+  // the frozen insight population is the treatment corpus. Tracking these for reproducibility
+  // must not put them in reach of kb-off.
+  fs.mkdirSync(path.join(wt, '.data', 'kb-ab-sampler', 'facts'), { recursive: true });
+  fs.writeFileSync(
+    path.join(wt, '.data', 'kb-ab-sampler', 'facts', 'kbm-x.json'),
+    '{"facts":[{"source":"node_modules/@fwornle/km-core","why":"the root cause"}]}',
+  );
   fs.mkdirSync(path.join(wt, 'knowledge-management', 'insights'), { recursive: true });
   fs.writeFileSync(path.join(wt, 'knowledge-management', 'insights', 'a.md'), 'the fix is persistOnClose false');
   fs.mkdirSync(path.join(wt, '.planning'), { recursive: true });
@@ -120,6 +128,11 @@ test('neutralizeSandboxKnowledge: removes the KB corpus and the agent-memory poi
     'the KB export is the corpus kb-on injects — kb-off must not be able to grep it',
   );
   assert.equal(fs.existsSync(path.join(wt, 'knowledge-management', 'insights', 'a.md')), false);
+  assert.ok(removed.includes(path.join('.data', 'kb-ab-sampler')));
+  assert.equal(
+    fs.existsSync(path.join(wt, '.data', 'kb-ab-sampler', 'facts', 'kbm-x.json')), false,
+    'a fact set is the graded answer key — kb-off must not be able to read it out of the sandbox',
+  );
   assert.equal(fs.existsSync(path.join(wt, 'src', 'index.js')), true, 'ordinary source is untouched');
 });
 

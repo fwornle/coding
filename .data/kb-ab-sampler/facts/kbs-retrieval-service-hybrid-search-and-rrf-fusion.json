@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-retrieval-service-hybrid-search-and-rrf-fusion",
+  "insightId": "019f7a3a-6ada-7834-9b97-74ad26ddb2d6",
+  "deliverable": "retrieval-service-hybrid-search-and-rrf-fusion-runbook.md",
+  "goalSummary": "Injected context includes many marginally relevant or off-topic results, with similarity scores for different items clustering tightly together instead of showing clear separation.",
+  "facts": [
+    {
+      "id": "rrf-fusion-formula",
+      "source": "1/\\(k \\+ rank \\+ 1\\)",
+      "flags": "",
+      "required": true,
+      "why": "Exact RRF fusion formula must be documented as the core ranking mechanism",
+      "inSandbox": false
+    },
+    {
+      "id": "tier-weight-multipliers",
+      "source": "1\\.5×|1\\.2×|0\\.8×",
+      "flags": "",
+      "required": true,
+      "why": "Tier-based weight multipliers applied post-fusion must be specified",
+      "inSandbox": false
+    },
+    {
+      "id": "retrieval-service-orchestrator",
+      "source": "src/retrieval/retrieval-service\\.js",
+      "flags": "i",
+      "required": true,
+      "why": "Main orchestrator file implementing RRF fusion and reranking must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "reranking-pipeline-functions",
+      "source": "_applyContextBoost|_applyFreshnessRerank",
+      "flags": "i",
+      "required": true,
+      "why": "Specific reranking pipeline function names must be identified for troubleshooting stale context",
+      "inSandbox": true
+    },
+    {
+      "id": "topic-prefilter-hook",
+      "source": "knowledge-injection-hook\\.js",
+      "flags": "i",
+      "required": true,
+      "why": "The hook responsible for topic extraction and pre-filtering must be named as the primary relevance gate",
+      "inSandbox": true
+    },
+    {
+      "id": "minilm-score-compression",
+      "source": "0\\.75.{0,10}0\\.82|MiniLM",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: MiniLM cosine score compression explains why topic pre-filtering is necessary for relevance",
+      "inSandbox": true
+    }
+  ]
+}

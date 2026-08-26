@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-category-sub-modal-text-overflow-system-health",
+  "insightId": "019f7e1a-8e36-71ed-a920-2ef0d2353e15",
+  "deliverable": "category-sub-modal-text-overflow-system-health-runbook.md",
+  "goalSummary": "Long path tokens overflowing",
+  "facts": [
+    {
+      "id": "src-components-performance-context-cache",
+      "source": "src/components/performance/context-cache-explainer\\.tsx",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `src/components/performance/context-cache-explainer.tsx`",
+      "inSandbox": false
+    },
+    {
+      "id": "context-cache-explainer-tsx",
+      "source": "context-cache-explainer\\.tsx",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `context-cache-explainer.tsx`",
+      "inSandbox": true
+    },
+    {
+      "id": "overflow-x-hidden",
+      "source": "overflow-x-hidden",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `overflow-x-hidden`",
+      "inSandbox": true
+    },
+    {
+      "id": "overflow-y-auto",
+      "source": "overflow-y: auto",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `overflow-y: auto`",
+      "inSandbox": true
+    }
+  ],
+  "derivedFrom": "kbs-category-sub-modal-text-overflow-system-health",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.072Z"
+  }
+}

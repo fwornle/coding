@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-smoke-spec-snapshot-restore-km-core-blockers",
+  "insightId": "019f834a-a3a8-7178-a8df-b96324e90020",
+  "deliverable": "smoke-spec-snapshot-restore-km-core-blockers-runbook.md",
+  "goalSummary": "Empty knowledge graph after restore",
+  "facts": [
+    {
+      "id": "repro-restore-mjs",
+      "source": "repro-restore\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `repro-restore.mjs`",
+      "inSandbox": true
+    },
+    {
+      "id": "hydratesandbox",
+      "source": "hydrateSandbox",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `hydrateSandbox`",
+      "inSandbox": true
+    },
+    {
+      "id": "kb-capture-mjs",
+      "source": "kb-capture\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `kb-capture.mjs`",
+      "inSandbox": true
+    },
+    {
+      "id": "general-json",
+      "source": "general\\.json",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `general.json`",
+      "inSandbox": true
+    }
+  ],
+  "derivedFrom": "kbs-smoke-spec-snapshot-restore-km-core-blockers",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.134Z"
+  }
+}

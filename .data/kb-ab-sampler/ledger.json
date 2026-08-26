@@ -1,0 +1,3521 @@
+{
+  "generatedAt": "2026-08-25T03:21:28.352Z",
+  "seed": "pilot-3",
+  "n": 50,
+  "repeats": 3,
+  "snapshotId": "smoke-spec",
+  "snapshotContentDate": "2026-07-20T10:33:24+02:00",
+  "minConfidence": 0.8,
+  "populationSize": 162,
+  "insightsDigest": "50d4c34bc084c78c",
+  "insightsFrozenAt": ".data/kb-ab-sampler/insights-50d4c34bc084c78c.json",
+  "insightsCount": 730,
+  "cellModel": "claude-sonnet-4-6",
+  "generatorModels": [],
+  "coinageModels": [
+    "claude-sonnet-4.6"
+  ],
+  "coinageTierFloor": 2,
+  "coinageFamily": "claude",
+  "coinageDowngradesRetried": [
+    {
+      "attempt": 1,
+      "model": "claude-haiku-4-5-20251001",
+      "provider": "claude-code-max"
+    }
+  ],
+  "coinageSamples": 3,
+  "variants": [
+    {
+      "agent": "claude",
+      "model": "claude-sonnet-4-6",
+      "framework": "straight",
+      "env": "kb-on"
+    },
+    {
+      "agent": "claude",
+      "model": "claude-sonnet-4-6",
+      "framework": "straight",
+      "env": "kb-off"
+    }
+  ],
+  "derived": 36,
+  "excluded": 14,
+  "errored": 0,
+  "tasks": [
+    {
+      "insightId": "01a0320d-8f61-7c95-b939-8feb02c53c0c",
+      "topic": "Project Git Workflow — Feature Branch Merges and Pre-Push Discipline",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T04:36:23.283Z",
+      "postSnapshot": true,
+      "slug": "project-git-workflow-feature-branch-merges-and",
+      "goal": "Create a file named project-git-workflow-feature-branch-merges-and-runbook.md at the repository root that diagnoses this symptom for an operator: Post-pop working tree not updated. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 0 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "branch-delete-local-remote",
+          "source": "git branch -d|git push origin --delete",
+          "flags": "i",
+          "why": "Correct runbook must state both local and remote branch deletion commands",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "stash-list-before-drop",
+          "source": "git stash list",
+          "flags": "i",
+          "why": "Insight requires inspecting stash list before any destructive drop operation",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "stash-drop-command",
+          "source": "git stash drop",
+          "flags": "i",
+          "why": "The destructive command being safeguarded against must be named explicitly",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "stash-apply-sha-recovery",
+          "source": "git stash apply\\s*<",
+          "flags": "i",
+          "why": "Recovery fix must reference applying a stash by captured SHA",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "stash-show-identity-check",
+          "source": "git stash show\\s+-p\\s+stash@\\{N\\}",
+          "flags": "i",
+          "why": "Confirmation step to verify stash identity before dropping must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "no-pull-requests-direct-main",
+          "source": "no pull requests|merged directly to `?main`?|push(?:ed)? .{0,80}main.{0,80}origin",
+          "flags": "i",
+          "why": "Cause/context: workflow bypasses PRs and pushes main directly to origin",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 299,
+      "topic_id": null
+    },
+    {
+      "insightId": "019f3182-f4ab-7a68-81aa-0cf4530227fc",
+      "topic": "Measurement Test Display — Dashboard",
+      "confidence": 0.85,
+      "createdAt": "2026-07-08T16:17:30.015Z",
+      "postSnapshot": false,
+      "slug": "measurement-test-display-dashboard",
+      "goal": "Create a file named measurement-test-display-dashboard-runbook.md at the repository root that diagnoses this symptom for an operator: README figures differ from RESULTS.md. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 0 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "verifier-script-path",
+          "source": "scripts/kgbench-verify-report-claims\\.mjs",
+          "flags": "i",
+          "why": "The runbook must name the exact verifier script used to recompute claims",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "results-jsonl-source",
+          "source": "results\\.jsonl",
+          "flags": "i",
+          "why": "Ground-truth data file must be identified as the recomputation source",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "claim-count-r9",
+          "source": "283 claims|244 tests|244 passing",
+          "flags": "i",
+          "why": "Authoritative current claim counts for r9 must be captured",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "results-md-authoritative",
+          "source": "RESULTS\\.md",
+          "flags": "i",
+          "why": "RESULTS.md must be named as the authoritative source when README conflicts",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "stale-round-mismatch",
+          "source": "r8[^.]{0,80}r9|stale data|wrong round",
+          "flags": "i",
+          "why": "Fix/cause: README sections carrying stale prior-round data under new round headers must be flagged",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "clean-subset-median",
+          "source": "clean-subset median",
+          "flags": "i",
+          "why": "Confirmation detail: verifier checks clean-subset medians, not all-cell medians",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 7583,
+      "topic_id": null
+    },
+    {
+      "insightId": "019ee99a-44d1-75b8-a6ca-0f14c85b2820",
+      "topic": "gsd-plan-phase Skill — Phase Planning Orchestration",
+      "confidence": 0.8,
+      "createdAt": "2026-07-08T16:09:09.073Z",
+      "postSnapshot": false,
+      "slug": "gsd-plan-phase-skill-phase-planning",
+      "goal": "Create a file named gsd-plan-phase-skill-phase-planning-runbook.md at the repository root that diagnoses this symptom for an operator: Planning state contaminating execution. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 4614,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-gsd-plan-phase-skill-phase-planning"
+    },
+    {
+      "insightId": "01a03461-4c67-772f-9d88-2f79fa9dce9d",
+      "topic": "KB Injection A/B Experiment — Pilot Matrix Execution",
+      "confidence": 0.8,
+      "createdAt": "2026-08-24T16:52:12.158Z",
+      "postSnapshot": true,
+      "slug": "kb-injection-a-b-experiment-pilot-matrix",
+      "goal": "Create a file named kb-injection-a-b-experiment-pilot-matrix-runbook.md at the repository root that diagnoses this symptom for an operator: Suspiciously fast completions. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 1 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "pilot-log-file",
+          "source": "kb-ab-pilot\\.log",
+          "flags": "i",
+          "why": "Runbook must name the primary run log file polled for completion",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "completion-signal-string",
+          "source": "PILOT MATRIX COMPLETE",
+          "flags": "i",
+          "why": "Exact completion signal string must be documented for confirmation",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "monitor-task-id",
+          "source": "btl4inrkh",
+          "flags": "i",
+          "why": "Background monitor task identifier must be referenced for troubleshooting",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "fast-completion-anomaly",
+          "source": "45\\s*second|45s",
+          "flags": "i",
+          "why": "Cause: suspiciously fast completion timing is the trigger for data integrity concern",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "data-store-verification-fix",
+          "source": "query the data store|data store directly",
+          "flags": "i",
+          "why": "Fix: log-based timing is insufficient, must verify directly against the data store",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 2240,
+      "topic_id": null
+    },
+    {
+      "insightId": "019fed20-679f-75f5-8a31-9175c75b45cc",
+      "topic": "coding-v1 Benchmark — Diagnostic Rerun Methodology",
+      "confidence": 0.85,
+      "createdAt": "2026-08-10T20:15:07.093Z",
+      "postSnapshot": true,
+      "slug": "coding-v1-benchmark-diagnostic-rerun-methodology",
+      "goal": "Create a file named coding-v1-benchmark-diagnostic-rerun-methodology-runbook.md at the repository root that diagnoses this symptom for an operator: On question set B1, the CodeGraph and graphify arms report perfect 1.00 scores, exceeding grep's 0.94 — the reverse of other results. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 9417,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-coding-v1-benchmark-diagnostic-rerun-methodology"
+    },
+    {
+      "insightId": "01a0320e-0b7a-7bd1-8dd4-c5257b2cbd8c",
+      "topic": "Knowledge Context Injection — Retrieval Service Token Budget",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T09:43:38.594Z",
+      "postSnapshot": true,
+      "slug": "knowledge-context-injection-retrieval-service",
+      "goal": "Create a file named knowledge-context-injection-retrieval-service-runbook.md at the repository root that diagnoses this symptom for an operator: Injected context contains far fewer tokens than expected, with relevant insights missing or cut short despite an adequate budget being available. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 2 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "preview-truncation-file",
+          "source": "src/embedding/preview\\.ts",
+          "flags": "i",
+          "why": "Runbook must reference the exact file implementing the per-insight character cap",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "relevance-threshold-value",
+          "source": "0\\.318",
+          "flags": "",
+          "why": "The specific relevance threshold value must be documented for troubleshooting dropped insights",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "char-cap-1200",
+          "source": "1,?200",
+          "flags": "i",
+          "why": "Per-insight character truncation cap must be stated as a checkable fact",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "retrieval-port-3848",
+          "source": "3848",
+          "flags": "",
+          "why": "Runbook must specify the port on which the retrieval HTTP service is invoked",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 9514,
+      "topic_id": null
+    },
+    {
+      "insightId": "019f5b80-7288-7513-9b2b-28cd375003da",
+      "topic": "Cold-Store Maintenance — Dangling Digest References",
+      "confidence": 0.85,
+      "createdAt": "2026-07-13T12:42:52.421Z",
+      "postSnapshot": false,
+      "slug": "cold-store-maintenance-dangling-digest",
+      "goal": "Create a file named cold-store-maintenance-dangling-digest-runbook.md at the repository root that diagnoses this symptom for an operator: Some digests in the cold-store JSON reference observation IDs that no longer exist in the store, despite an earlier fix having been marked resolved. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 3389,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "backup-deletion-git-confirm",
+          "source": "git log[^.]{0,80}(delete|backup)|(delete|backup)[^.]{0,80}git log",
+          "flags": "i",
+          "why": "Fix/safety rule: untracked .data backups must only be deleted after confirming fix commits are in git history",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "resurfacing-reinvestigate",
+          "source": "resurface[sd]?[^.]{0,80}exporter|re-investigat",
+          "flags": "i",
+          "why": "Cause: reappearance of dangling refs after closure signals a residual exporter bug requiring re-investigation, not just sweeper reliance",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "topic_id": "kbs-cold-store-maintenance-dangling-digest"
+    },
+    {
+      "insightId": "019f7e1a-8e36-71ed-a920-2ef0d2353e15",
+      "topic": "Category Sub-Modal Text Overflow — System Health Dashboard",
+      "confidence": 0.9,
+      "createdAt": "2026-07-20T07:05:02.285Z",
+      "postSnapshot": false,
+      "slug": "category-sub-modal-text-overflow-system-health",
+      "goal": "Create a file named category-sub-modal-text-overflow-system-health-runbook.md at the repository root that diagnoses this symptom for an operator: Long path tokens overflowing. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 1830,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "break-words-class",
+          "source": "break-words",
+          "flags": "i",
+          "why": "The wrap fix for long unbreakable tokens like temp paths must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "break-all-fallback",
+          "source": "break-all",
+          "flags": "i",
+          "why": "Last-resort fallback class for tool names with no break opportunity must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "min-w-0-shrink-0",
+          "source": "min-w-0|shrink-0",
+          "flags": "i",
+          "why": "Containment classes preventing min-content expansion and badge collapse must be named",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-category-sub-modal-text-overflow-system-health"
+    },
+    {
+      "insightId": "019ff505-58df-70f8-b5fb-96f244bc280d",
+      "topic": "coding-v1 Benchmark — A1 Question and CodeGraph Retrieval Gap",
+      "confidence": 0.85,
+      "createdAt": "2026-08-12T11:10:16.117Z",
+      "postSnapshot": true,
+      "slug": "coding-v1-benchmark-a1-question-and-codegraph",
+      "goal": "Create a file named coding-v1-benchmark-a1-question-and-codegraph-runbook.md at the repository root that diagnoses this symptom for an operator: Nominal citation ≠ retrieval. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2237,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "graphify-yaml-indexing-gap",
+          "source": "\\.yml|\\.yaml",
+          "flags": "i",
+          "why": "Root cause: graphify indexes zero YAML files, causing the A1 f1 miss",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-coding-v1-benchmark-a1-question-and-codegraph"
+    },
+    {
+      "insightId": "019fe75d-f7d4-73b0-bb37-bdb06810e29a",
+      "topic": "coding-v1 Benchmark — Report Claim Verification",
+      "confidence": 0.8,
+      "createdAt": "2026-08-20T08:18:14.885Z",
+      "postSnapshot": true,
+      "slug": "coding-v1-benchmark-report-claim-verification",
+      "goal": "Create a file named coding-v1-benchmark-report-claim-verification-runbook.md at the repository root that diagnoses this symptom for an operator: README figures differ from RESULTS.md. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2427,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "results-md-authoritative",
+          "source": "RESULTS\\.md",
+          "flags": "i",
+          "why": "RESULTS.md must be named as the authoritative source when README conflicts",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": false
+          }
+        }
+      ],
+      "topic_id": "kbs-coding-v1-benchmark-report-claim-verification"
+    },
+    {
+      "insightId": "019eb544-0ffb-783e-956d-49e444ffcb44",
+      "topic": "Tmux Proxy Badge Detection",
+      "confidence": 0.85,
+      "createdAt": "2026-07-01T14:30:39.519Z",
+      "postSnapshot": false,
+      "slug": "tmux-proxy-badge-detection",
+      "goal": "Create a file named tmux-proxy-badge-detection-runbook.md at the repository root that diagnoses this symptom for an operator: Persistent `P:OFF` when proxy is confirmed running. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 6546,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "p-on-p-off-badges",
+          "source": "P:ON|P:OFF",
+          "flags": "",
+          "why": "The exact badge status strings displayed in the statusline must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-tmux-proxy-badge-detection"
+    },
+    {
+      "insightId": "019fd586-823b-72e6-a0de-a5fb14b1d81b",
+      "topic": "Project Bootstrap — install.sh and Submodule Setup",
+      "confidence": 0.85,
+      "createdAt": "2026-08-08T19:43:56.635Z",
+      "postSnapshot": true,
+      "slug": "project-bootstrap-install-sh-and-submodule-setup",
+      "goal": "Create a file named project-bootstrap-install-sh-and-submodule-setup-runbook.md at the repository root that diagnoses this symptom for an operator: Script exits at counter increment. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2246,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-project-bootstrap-install-sh-and-submodule-setup"
+    },
+    {
+      "insightId": "019fec88-089c-7e64-9373-99a92baea512",
+      "topic": "coding-v1 Benchmark — Cross-Agent Matrix Runs (x1, x2, r8)",
+      "confidence": 0.9,
+      "createdAt": "2026-08-14T15:35:05.172Z",
+      "postSnapshot": true,
+      "slug": "coding-v1-benchmark-cross-agent-matrix-runs-x1",
+      "goal": "Create a file named coding-v1-benchmark-cross-agent-matrix-runs-x1-runbook.md at the repository root that diagnoses this symptom for an operator: Two differently-scoped benchmark runs both labeled \"r9\" report differing cell counts and results, causing figures to be cited inconsistently. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 7838,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-coding-v1-benchmark-cross-agent-matrix-runs-x1"
+    },
+    {
+      "insightId": "019fd7d6-f7e1-774f-9c57-4866dbac1c44",
+      "topic": "coding-v1 Benchmark — Replication Matrix Test Runs",
+      "confidence": 0.85,
+      "createdAt": "2026-08-19T09:24:09.643Z",
+      "postSnapshot": true,
+      "slug": "coding-v1-benchmark-replication-matrix-test-runs",
+      "goal": "Create a file named coding-v1-benchmark-replication-matrix-test-runs-runbook.md at the repository root that diagnoses this symptom for an operator: The hybrid arm on test T4 finishes in about 16 seconds but reports a score of 0.00, unlike other arms completing with perfect scores. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 1 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "supervise-status-file",
+          "source": "supervise\\.status",
+          "flags": "i",
+          "why": "Runbook must reference the specific file tracking run completion status",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "hybrid-t4-zero-score",
+          "source": "hybrid/T4|hybrid.{0,20}T4",
+          "flags": "i",
+          "why": "The specific failing arm/configuration producing the 0.00 score anomaly must be identified",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "r7-cell-discrepancy",
+          "source": "304[^.]{0,80}352|352[^.]{0,80}304",
+          "flags": "i",
+          "why": "Cause: the 304 vs 352 cell count discrepancy in r7 must be resolved before treating results as authoritative",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "zero-score-short-walltime",
+          "source": "0\\.00[^.]{0,80}16\\s*second|16\\s*second[^.]{0,80}0\\.00",
+          "flags": "i",
+          "why": "Diagnostic signature: a 0.00 score with ~16s wall time indicates arm-level failure, not correctness regression",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "grep-copilot-healthy-baseline",
+          "source": "21\\.5\\s*s|21\\.5\\s*second",
+          "flags": "i",
+          "why": "Confirmation: grep/copilot at ~21.5s per cell is documented as the healthy timing baseline",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 8231,
+      "topic_id": null
+    },
+    {
+      "insightId": "019ff866-aa6f-74a7-83d4-bc589d50eae0",
+      "topic": "coding-v1 Benchmark — cgidx Smoke Test Diagnosis",
+      "confidence": 0.85,
+      "createdAt": "2026-08-14T11:18:20.868Z",
+      "postSnapshot": true,
+      "slug": "coding-v1-benchmark-cgidx-smoke-test-diagnosis",
+      "goal": "Create a file named coding-v1-benchmark-cgidx-smoke-test-diagnosis-runbook.md at the repository root that diagnoses this symptom for an operator: The smoke test exits cleanly with code 0, yet the subsequent full run indexes only a small fraction of expected data after many minutes. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2086,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "index-state-values",
+          "source": "indexed|reused|served|verified|unusable|failed",
+          "flags": "i",
+          "why": "The specific state indicator values checked before a full rerun must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "grep-diagnostic-fix",
+          "source": "grep.{0,40}(indexed|verified|served)",
+          "flags": "i",
+          "why": "Fix/diagnosis step: grep the log for indexed, verified, served to confirm L2 success after relaunch",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-coding-v1-benchmark-cgidx-smoke-test-diagnosis"
+    },
+    {
+      "insightId": "019ff4e5-31e8-7770-969f-13479d28f91d",
+      "topic": "coding-v1 Benchmark — Per-Question Cell-Level Findings (L2, B3, A1, A4)",
+      "confidence": 0.85,
+      "createdAt": "2026-08-12T07:34:49.062Z",
+      "postSnapshot": true,
+      "slug": "coding-v1-benchmark-per-question-cell-level",
+      "goal": "Create a file named coding-v1-benchmark-per-question-cell-level-runbook.md at the repository root that diagnoses this symptom for an operator: A4 appears to show arm separation in a new run. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2937,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-coding-v1-benchmark-per-question-cell-level"
+    },
+    {
+      "insightId": "019f7a3a-6ada-7834-9b97-74ad26ddb2d6",
+      "topic": "Retrieval Service — Hybrid Search and RRF Fusion",
+      "confidence": 0.95,
+      "createdAt": "2026-07-19T12:32:55.720Z",
+      "postSnapshot": false,
+      "slug": "retrieval-service-hybrid-search-and-rrf-fusion",
+      "goal": "Create a file named retrieval-service-hybrid-search-and-rrf-fusion-runbook.md at the repository root that diagnoses this symptom for an operator: Injected context includes many marginally relevant or off-topic results, with similarity scores for different items clustering tightly together instead of showing clear separation. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 7871,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-retrieval-service-hybrid-search-and-rrf-fusion"
+    },
+    {
+      "insightId": "01a02d8b-e6cf-73b3-bd6a-0b050492d4f8",
+      "topic": "Knowledge Context Injection — Insight Truncation and Token Budget",
+      "confidence": 0.95,
+      "createdAt": "2026-08-24T09:22:08.067Z",
+      "postSnapshot": true,
+      "slug": "knowledge-context-injection-insight-truncation",
+      "goal": "Create a file named knowledge-context-injection-insight-truncation-runbook.md at the repository root that diagnoses this symptom for an operator: Injected insights appear cut off mid-sentence in the agent's context, showing only a fraction of the original content even when budget headroom seems available. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 7314,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "token-budget-3000",
+          "source": "3,?000 token",
+          "flags": "i",
+          "why": "The interactive-path token budget ceiling must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "retrieval-service-path",
+          "source": "src/retrieval/retrieval-service\\.js",
+          "flags": "i",
+          "why": "File responsible for budget assembly and tier-gating must be named",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "512-token-embedding-window",
+          "source": "512-token|512 token",
+          "flags": "i",
+          "why": "Cause: insights exceeding the 512-token embedding window are noted as an open chunking limitation",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "topic_id": "kbs-knowledge-context-injection-insight-truncation"
+    },
+    {
+      "insightId": "019fd349-48f2-71a5-b866-30d8a7bd4d2d",
+      "topic": "Graphify Incremental Rebuild — watch.py Call Chain",
+      "confidence": 0.9,
+      "createdAt": "2026-08-08T13:51:30.882Z",
+      "postSnapshot": true,
+      "slug": "graphify-incremental-rebuild-watch-py-call-chain",
+      "goal": "Create a file named graphify-incremental-rebuild-watch-py-call-chain-runbook.md at the repository root that diagnoses this symptom for an operator: `_reconcile_existing_graph` not reflecting changes. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 7715,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "reconcile-function",
+          "source": "_reconcile_existing_graph",
+          "flags": "",
+          "why": "The reconciliation function updating the graph based on detected corpus state must be named",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": false
+          }
+        }
+      ],
+      "topic_id": "kbs-graphify-incremental-rebuild-watch-py-call-chain"
+    },
+    {
+      "insightId": "019f36c1-68f0-7080-91ce-158cce5ba43e",
+      "topic": "Phase Validation Workflow",
+      "confidence": 0.8,
+      "createdAt": "2026-07-08T11:11:46.297Z",
+      "postSnapshot": false,
+      "slug": "phase-validation-workflow",
+      "goal": "Create a file named phase-validation-workflow-runbook.md at the repository root that diagnoses this symptom for an operator: `SECURITY.md` missing after close-out with no error. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 5239,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "security-md-output",
+          "source": "SECURITY\\.md",
+          "flags": "i",
+          "why": "The output file name for the security audit workflow must be identified",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": false
+          }
+        }
+      ],
+      "topic_id": "kbs-phase-validation-workflow"
+    },
+    {
+      "insightId": "019ee9cd-6767-71a4-a0c7-54d58bbcf5a5",
+      "topic": "OntologyFilter Component — Unified Viewer",
+      "confidence": 0.85,
+      "createdAt": "2026-06-30T18:44:54.471Z",
+      "postSnapshot": false,
+      "slug": "ontologyfilter-component-unified-viewer",
+      "goal": "Create a file named ontologyfilter-component-unified-viewer-runbook.md at the repository root that diagnoses this symptom for an operator: Per-item checkbox correct but all/none does not work. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 5186,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "ontology-filter-component-file",
+          "source": "OntologyFilter\\.tsx",
+          "flags": "i",
+          "why": "The file containing correct per-item checkbox materialization logic must be identified",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "empty-array-sentinel",
+          "source": "\\[\\]",
+          "flags": "",
+          "why": "The empty array sentinel meaning 'all items visible' is the core state model concept that must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-ontologyfilter-component-unified-viewer"
+    },
+    {
+      "insightId": "019fd609-95f0-742b-b507-0b80ee1c88e5",
+      "topic": "Coding Services Container — codegraph Containerization",
+      "confidence": 0.85,
+      "createdAt": "2026-08-08T17:34:05.081Z",
+      "postSnapshot": true,
+      "slug": "coding-services-container-codegraph",
+      "goal": "Create a file named coding-services-container-codegraph-runbook.md at the repository root that diagnoses this symptom for an operator: The code-graph-rag MCP server fails to reach codegraph functionality when the container isn't running or its persisted index data is missing. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 12480,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "docker-ps-troubleshooting",
+          "source": "docker ps",
+          "flags": "i",
+          "why": "Confirmation step to verify container is running must be documented for troubleshooting unreachable codegraph",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-coding-services-container-codegraph"
+    },
+    {
+      "insightId": "01a005f8-99fe-7d22-888e-beb1110dd88b",
+      "topic": "vkb-server / Kgbench Question-Sets API Stability",
+      "confidence": 0.8999999999999999,
+      "createdAt": "2026-08-19T08:30:10.580Z",
+      "postSnapshot": true,
+      "slug": "vkb-server-kgbench-question-sets-api-stability",
+      "goal": "Create a file named vkb-server-kgbench-question-sets-api-stability-runbook.md at the repository root that diagnoses this symptom for an operator: Stale/bloated store cleanup. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 6548,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-vkb-server-kgbench-question-sets-api-stability"
+    },
+    {
+      "insightId": "01a03326-dc56-709e-a068-4367aa9ab900",
+      "topic": "A/B Experiment Runner — KB Injection Experiment Design",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T10:46:58.996Z",
+      "postSnapshot": true,
+      "slug": "a-b-experiment-runner-kb-injection-experiment",
+      "goal": "Create a file named a-b-experiment-runner-kb-injection-experiment-runbook.md at the repository root that diagnoses this symptom for an operator: `kb-off` cells finishing faster than `kb-on`. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 1 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "kb-ab-facts-file",
+          "source": "kb-ab-facts\\.mjs",
+          "flags": "i",
+          "why": "The fact definitions file consulted during cell runs must be identified",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "experiment-restore-unit-tests",
+          "source": "experiment-restore\\.mjs",
+          "flags": "i",
+          "why": "The isolation enforcement script that must pass all unit tests before the matrix run must be named",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "kb-off-slower-timing",
+          "source": "269s|182s",
+          "flags": "i",
+          "why": "Specific timing baseline showing kb-off cells run longer than kb-on must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "kb-off-faster-anomaly-fix",
+          "source": "re-validate|isolation",
+          "flags": "i",
+          "why": "Fix: if kb-off finishes faster than kb-on, isolation contamination must be re-validated",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "leveldb-lock-contention",
+          "source": "LevelDB lock|lock contention",
+          "flags": "i",
+          "why": "Troubleshooting fact: LevelDB lock contention between runner and harness must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 8072,
+      "topic_id": null
+    },
+    {
+      "insightId": "019f26e3-5114-7047-b860-c2c6926622c7",
+      "topic": "Experiments Recompute Route",
+      "confidence": 0.8,
+      "createdAt": "2026-07-07T00:20:38.308Z",
+      "postSnapshot": false,
+      "slug": "experiments-recompute-route",
+      "goal": "Create a file named experiments-recompute-route-runbook.md at the repository root that diagnoses this symptom for an operator: Guard appears to fire but attribution is still wrong. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 0 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "tags-canonical-field",
+          "source": "\\btags\\b",
+          "flags": "i",
+          "why": "The canonical field that must be read for re-close detection must be identified",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "totals-silent-failure",
+          "source": "\\btotals\\b",
+          "flags": "i",
+          "why": "The incorrect field causing the silent no-op guard failure must be named",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "opus-haiku-misattribution",
+          "source": "[Oo]pus[^.]{0,80}haiku|haiku[^.]{0,80}[Oo]pus",
+          "flags": "",
+          "why": "Relationship: the symptom is Opus runs incorrectly re-stamped with haiku token attribution",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "tags-not-totals-fix",
+          "source": "tags[^.]{0,80}not[^.]{0,80}totals|switch it to.{0,20}tags",
+          "flags": "i",
+          "why": "Fix: the field read must be switched from totals to tags to correct the guard",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "no-log-warning-symptom",
+          "source": "no log warning|no exception|silent failure",
+          "flags": "i",
+          "why": "Confirmation of diagnosis: this failure mode produces no error or log output, only incorrect attribution",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "reclose-guard-abort",
+          "source": "abort re-stamping|re-close guard|re-close prevention",
+          "flags": "i",
+          "why": "The guard's core function of aborting re-stamping to preserve original attribution must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 7774,
+      "topic_id": null
+    },
+    {
+      "insightId": "019fd685-9ea8-70a5-8c01-6a77bac47f3c",
+      "topic": "kgbench Grader False Positives",
+      "confidence": 0.8,
+      "createdAt": "2026-08-12T17:31:30.546Z",
+      "postSnapshot": true,
+      "slug": "kgbench-grader-false-positives",
+      "goal": "Create a file named kgbench-grader-false-positives-runbook.md at the repository root that diagnoses this symptom for an operator: Unexpected 0.00 on a cell with valid agent output. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 6677,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-kgbench-grader-false-positives"
+    },
+    {
+      "insightId": "019fe2ce-3ebd-724e-b1c6-77f43bf48e2a",
+      "topic": "Shell Strict Mode Robustness — Diagnostic Scripts",
+      "confidence": 0.8,
+      "createdAt": "2026-08-12T07:34:23.819Z",
+      "postSnapshot": true,
+      "slug": "shell-strict-mode-robustness-diagnostic-scripts",
+      "goal": "Create a file named shell-strict-mode-robustness-diagnostic-scripts-runbook.md at the repository root that diagnoses this symptom for an operator: Script exits at counter increment. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2246,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-shell-strict-mode-robustness-diagnostic-scripts"
+    },
+    {
+      "insightId": "019f3182-f4b0-7c20-ad56-08b91b163dbe",
+      "topic": "Runs Management — Bulk Deletion UI",
+      "confidence": 0.8,
+      "createdAt": "2026-07-08T03:37:15.494Z",
+      "postSnapshot": false,
+      "slug": "runs-management-bulk-deletion-ui",
+      "goal": "Create a file named runs-management-bulk-deletion-ui-runbook.md at the repository root that diagnoses this symptom for an operator: Orphaned Score/Outcome/Route records after deletion. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 5672,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "cascade-entity-types",
+          "source": "Score.{0,20}Outcome.{0,20}Route|Score,\\s*Outcome,\\s*Route",
+          "flags": "i",
+          "why": "The three associated entity types that must cascade-delete atomically must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "confirmation-threshold",
+          "source": "≥\\s*1|at least one|one or more",
+          "flags": "i",
+          "why": "The confirmation bar must appear when at least one run is selected, gating accidental bulk deletion",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "atomic-batch-delete",
+          "source": "atomic|single batch|batch delete",
+          "flags": "i",
+          "why": "Fix/architecture: deletion must be dispatched as a single atomic batch request to prevent partial cascade failures",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-runs-management-bulk-deletion-ui"
+    },
+    {
+      "insightId": "019f852e-e0d9-75d3-b23b-7f64701f2c12",
+      "topic": "Cross-Agent Experiment Failure Modes and Dashboard Anomalies",
+      "confidence": 0.95,
+      "createdAt": "2026-07-22T06:41:05.446Z",
+      "postSnapshot": true,
+      "slug": "cross-agent-experiment-failure-modes-and",
+      "goal": "Create a file named cross-agent-experiment-failure-modes-and-runbook.md at the repository root that diagnoses this symptom for an operator: 0-token rows / silent aborts. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 4952,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-cross-agent-experiment-failure-modes-and"
+    },
+    {
+      "insightId": "01a03326-dc88-73a0-9618-f61c13d7fbe8",
+      "topic": "API Model Field and Token Count Reliability",
+      "confidence": 0.8,
+      "createdAt": "2026-08-24T16:52:07.940Z",
+      "postSnapshot": true,
+      "slug": "api-model-field-and-token-count-reliability",
+      "goal": "Create a file named api-model-field-and-token-count-reliability-runbook.md at the repository root that diagnoses this symptom for an operator: Retry loops not resolving downgrade. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 1 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "response-model-field",
+          "source": "response\\.model|`model`",
+          "flags": "i",
+          "why": "The specific envelope field whose reliability is in question must be named",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "low-token-count-anomaly",
+          "source": "14 tokens",
+          "flags": "i",
+          "why": "The concrete example of implausibly low token count evidencing misreporting must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "retry-logic-flawed-assumption",
+          "source": "transient",
+          "flags": "i",
+          "why": "Relationship: prior retry logic incorrectly assumed downgrade was transient, must be corrected",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "shrink-request-fix",
+          "source": "shrink.{0,30}request|reduce.{0,30}(request|payload) size",
+          "flags": "i",
+          "why": "Fix: retry logic should shrink request size rather than retrying identical payload",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "not-ground-truth-warning",
+          "source": "ground.?truth",
+          "flags": "i",
+          "why": "Confirmation rule: envelope-level token/model fields cannot be trusted as ground truth for accounting or routing",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 3667,
+      "topic_id": null
+    },
+    {
+      "insightId": "019fe119-114d-7a0c-8063-e3ec5bd4b659",
+      "topic": "kgbench Benchmarking Harness — Timeout and Circuit-Breaker Configuration",
+      "confidence": 0.85,
+      "createdAt": "2026-08-08T13:32:06.800Z",
+      "postSnapshot": true,
+      "slug": "kgbench-benchmarking-harness-timeout-and-circuit",
+      "goal": "Create a file named kgbench-benchmarking-harness-timeout-and-circuit-runbook.md at the repository root that diagnoses this symptom for an operator: Timeout fires at ~950s wall-clock despite 600s setting. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2313,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "timeout-ms-value",
+          "source": "600,?000\\s*ms|600s",
+          "flags": "i",
+          "why": "The configured timeout value (600,000ms/600s, raised from 300,000ms) must be documented",
+          "required": true,
+          "inSandbox": true,
+          "reason": "leaked-by-goal"
+        }
+      ],
+      "topic_id": "kbs-kgbench-benchmarking-harness-timeout-and-circuit"
+    },
+    {
+      "insightId": "019fdaee-5da2-76b6-8e74-09e4103c1711",
+      "topic": "Graphify Corpus Cache and Invalidation Logic",
+      "confidence": 0.9,
+      "createdAt": "2026-08-07T18:28:00.133Z",
+      "postSnapshot": true,
+      "slug": "graphify-corpus-cache-and-invalidation-logic",
+      "goal": "Create a file named graphify-corpus-cache-and-invalidation-logic-runbook.md at the repository root that diagnoses this symptom for an operator: Unexpected cache misses for code files. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 4586,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-graphify-corpus-cache-and-invalidation-logic"
+    },
+    {
+      "insightId": "019f84e5-c782-70df-8380-584a0c13c608",
+      "topic": "Foreground Measurement Sampling — Head+Tail Strategy",
+      "confidence": 0.8,
+      "createdAt": "2026-07-22T06:41:03.382Z",
+      "postSnapshot": true,
+      "slug": "foreground-measurement-sampling-head-tail",
+      "goal": "Create a file named foreground-measurement-sampling-head-tail-runbook.md at the repository root that diagnoses this symptom for an operator: The performance dashboard's distribution charts show only central/average values, with no visible fastest or slowest turn data points for a run. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 6552,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "head-tail-sampling-concept",
+          "source": "head\\+tail|head and tail",
+          "flags": "i",
+          "why": "The core sampling strategy capturing both distribution extremes must be stated",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": false
+          }
+        }
+      ],
+      "topic_id": "kbs-foreground-measurement-sampling-head-tail"
+    },
+    {
+      "insightId": "019fc61d-63b5-7a6a-a365-8cde7dd7730e",
+      "topic": "System Health Dashboard — Build Staleness from Branch Divergence",
+      "confidence": 0.85,
+      "createdAt": "2026-08-04T05:34:16.513Z",
+      "postSnapshot": true,
+      "slug": "system-health-dashboard-build-staleness-from",
+      "goal": "Create a file named system-health-dashboard-build-staleness-from-runbook.md at the repository root that diagnoses this symptom for an operator: The dashboard is missing an expected UI feature, such as the Cost tab, that is confirmed present in the main branch source code. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 0 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "dist-build-output",
+          "source": "gitignored `?dist/?`?|dist/",
+          "flags": "i",
+          "why": "The gitignored build output directory actually served by the dashboard must be identified as the diagnostic target",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "install-sh-conflict-site",
+          "source": "install\\.sh",
+          "flags": "i",
+          "why": "The known merge conflict site between main and the stale feature branch must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "stale-branch-name",
+          "source": "feat/graphify-replace-cgr",
+          "flags": "i",
+          "why": "The specific long-lived feature branch causing build staleness must be named",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "temp-fix-rebuild-from-origin-main",
+          "source": "rebuild.{0,60}origin/main|origin/main.{0,60}rebuild",
+          "flags": "i",
+          "why": "Fix: the temporary remediation is rebuilding dist/ from origin/main source without touching the branch",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "permanent-fix-merge-origin-main",
+          "source": "merge.{0,40}origin/main",
+          "flags": "i",
+          "why": "The permanent fix requires merging origin/main into the stale feature branch",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "pre-merge-wip-diff-check",
+          "source": "uncommitted.{0,60}WIP|WIP.{0,60}uncommitted|diff.{0,60}(clobber|destroy)",
+          "flags": "i",
+          "why": "Confirmation step: diff against main before merging to ensure it won't clobber another session's uncommitted work",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 2426,
+      "topic_id": null
+    },
+    {
+      "insightId": "01a03313-470e-7e66-b939-eee95fb00e4b",
+      "topic": "Project Git Workflow — Feature Branch Merge and Push Procedure",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T16:40:14.020Z",
+      "postSnapshot": true,
+      "slug": "project-git-workflow-feature-branch-merge-and",
+      "goal": "Create a file named project-git-workflow-feature-branch-merge-and-runbook.md at the repository root that diagnoses this symptom for an operator: Stale references after retirement. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 2 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "no-ff-merge-flag",
+          "source": "--no-ff",
+          "flags": "",
+          "why": "The specific merge flag preserving branch topology must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "git-fetch-divergence-check",
+          "source": "git fetch",
+          "flags": "i",
+          "why": "Pre-merge check requiring a fetch and divergence count verification must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "git-grep-reference-discovery",
+          "source": "git grep",
+          "flags": "i",
+          "why": "Fix/procedure: git grep must be used to locate tracked references before retiring a component",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "local-main-ahead-not-error",
+          "source": "ahead of origin|not an error",
+          "flags": "i",
+          "why": "Confirmation: local main being ahead of origin/main pending push is expected behavior, not an error",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 5460,
+      "topic_id": null
+    },
+    {
+      "insightId": "019f834a-a3a8-7178-a8df-b96324e90020",
+      "topic": "Smoke-Spec Snapshot Restore — km-core Blockers",
+      "confidence": 0.8,
+      "createdAt": "2026-07-22T06:41:00.751Z",
+      "postSnapshot": true,
+      "slug": "smoke-spec-snapshot-restore-km-core-blockers",
+      "goal": "Create a file named smoke-spec-snapshot-restore-km-core-blockers-runbook.md at the repository root that diagnoses this symptom for an operator: Empty knowledge graph after restore. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 4450,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-smoke-spec-snapshot-restore-km-core-blockers"
+    },
+    {
+      "insightId": "019f84e5-c780-76cd-a468-7e65d7ff4f64",
+      "topic": "Claude Run Session Title Generation",
+      "confidence": 0.85,
+      "createdAt": "2026-07-22T06:41:02.263Z",
+      "postSnapshot": true,
+      "slug": "claude-run-session-title-generation",
+      "goal": "Create a file named claude-run-session-title-generation-runbook.md at the repository root that diagnoses this symptom for an operator: In the Runs table, Claude session titles display raw leading characters of the original prompt instead of a concise summarized description. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2232,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-claude-run-session-title-generation"
+    },
+    {
+      "insightId": "019eb544-0f9a-7560-baea-199e5a69786c",
+      "topic": "v7.2 Performance Measurement System — Architecture and Scoping",
+      "confidence": 0.9,
+      "createdAt": "2026-07-07T03:43:27.622Z",
+      "postSnapshot": false,
+      "slug": "v7-2-performance-measurement-system-architecture",
+      "goal": "Create a file named v7-2-performance-measurement-system-architecture-runbook.md at the repository root that diagnoses this symptom for an operator: Token usage records show as zero or missing for a run despite the agent task having executed and completed normally. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 8378,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-v7-2-performance-measurement-system-architecture"
+    },
+    {
+      "insightId": "019f0dab-6399-7098-bc8e-992765c518c6",
+      "topic": "Health Coordinator — Idle Gate",
+      "confidence": 0.85,
+      "createdAt": "2026-07-10T08:33:02.134Z",
+      "postSnapshot": false,
+      "slug": "health-coordinator-idle-gate",
+      "goal": "Create a file named health-coordinator-idle-gate-runbook.md at the repository root that diagnoses this symptom for an operator: Hourly \"say OK\" LLM proxy health-check pings continue firing even after several days of no user activity on the machine. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 8736,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "say-ok-ping-symptom",
+          "source": "say OK",
+          "flags": "i",
+          "why": "The exact prompt_preview string of the leaking hourly health-check ping must be documented as the visible symptom",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-health-coordinator-idle-gate"
+    },
+    {
+      "insightId": "019f23d1-ad13-7153-b738-8356c55feb37",
+      "topic": "Foreground Task Token Capture — Route Architecture",
+      "confidence": 0.87,
+      "createdAt": "2026-07-07T02:32:24.943Z",
+      "postSnapshot": false,
+      "slug": "foreground-task-token-capture-route-architecture",
+      "goal": "Create a file named foreground-task-token-capture-route-architecture-runbook.md at the repository root that diagnoses this symptom for an operator: Cross-agent cache comparisons appear inconsistent. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 5176,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-foreground-task-token-capture-route-architecture"
+    },
+    {
+      "insightId": "019f75db-b329-742e-a560-dc164cd7421e",
+      "topic": "Runs Table Component — Timestamp Columns",
+      "confidence": 0.9,
+      "createdAt": "2026-07-19T10:39:41.448Z",
+      "postSnapshot": false,
+      "slug": "runs-table-component-timestamp-columns",
+      "goal": "Create a file named runs-table-component-timestamp-columns-runbook.md at the repository root that diagnoses this symptom for an operator: A run's \"When\" column shows a live \"running Nm\" label that turns amber with a \"stuck?\" hint after roughly twenty minutes without finishing. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 1 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "started-ended-at-fields",
+          "source": "started_at|ended_at",
+          "flags": "i",
+          "why": "The existing schema fields reused for the When column must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "stuck-run-20-min-threshold",
+          "source": "20 minute|20-minute|20min",
+          "flags": "i",
+          "why": "The specific threshold for stuck-run amber detection must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "stuck-hint-label",
+          "source": "stuck\\?",
+          "flags": "i",
+          "why": "The exact stuck-run hint label displayed must be checkable",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "thirty-second-refresh",
+          "source": "30 second|30-second",
+          "flags": "i",
+          "why": "The live timer refresh interval for open runs must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "injectedChars": 3957,
+      "topic_id": null
+    },
+    {
+      "insightId": "019fe0cd-9e61-73b7-8a13-2d9f2ff2c7af",
+      "topic": "CLAUDE.md and Command Documentation Maintenance",
+      "confidence": 0.8,
+      "createdAt": "2026-08-19T08:30:15.674Z",
+      "postSnapshot": true,
+      "slug": "claude-md-and-command-documentation-maintenance",
+      "goal": "Create a file named claude-md-and-command-documentation-maintenance-runbook.md at the repository root that diagnoses this symptom for an operator: Stale Copilot instructions. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2316,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "claude-md-file",
+          "source": "CLAUDE\\.md",
+          "flags": "",
+          "why": "The primary agent instruction file must be identified as the authoritative source",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "copilot-instructions-mirror",
+          "source": "\\.github/copilot-instructions\\.md",
+          "flags": "i",
+          "why": "The Copilot mirror file that must stay in sync with CLAUDE.md must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-claude-md-and-command-documentation-maintenance"
+    },
+    {
+      "insightId": "019fd31b-01b3-7e55-abee-07b9240d307f",
+      "topic": "System Health Dashboard — CGR Reindex API",
+      "confidence": 0.8,
+      "createdAt": "2026-08-08T13:51:38.978Z",
+      "postSnapshot": true,
+      "slug": "system-health-dashboard-cgr-reindex-api",
+      "goal": "Create a file named system-health-dashboard-cgr-reindex-api-runbook.md at the repository root that diagnoses this symptom for an operator: Reindex appears to do nothing. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 8989,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-system-health-dashboard-cgr-reindex-api"
+    },
+    {
+      "insightId": "019ebdb2-e91d-7fa4-9bea-5ce126982e2b",
+      "topic": "Truthfulness Verifier — Insight Claim Verification",
+      "confidence": 0.85,
+      "createdAt": "2026-06-21T19:47:32.636Z",
+      "postSnapshot": false,
+      "slug": "truthfulness-verifier-insight-claim-verification",
+      "goal": "Create a file named truthfulness-verifier-insight-claim-verification-runbook.md at the repository root that diagnoses this symptom for an operator: Low-contrast `unverifiable`/`no claims` tiles. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 2750,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "unverifiable-beige-tan",
+          "source": "unverifiable|beige|tan",
+          "flags": "i",
+          "why": "The distinct color mapping for unverifiable/no-claims states must be documented",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        },
+        {
+          "id": "text-muted-foreground-contrast-issue",
+          "source": "text-muted-foreground",
+          "flags": "i",
+          "why": "The specific Tailwind class causing insufficient legend contrast must be documented as a known issue",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "topic_id": "kbs-truthfulness-verifier-insight-claim-verification"
+    },
+    {
+      "insightId": "01a018ad-5289-7f3e-aa04-68745d9b1efb",
+      "topic": "Telemetry Probe — Opencode Hang and Proxy-Bridge Tool-Capability Gate",
+      "confidence": 0.8,
+      "createdAt": "2026-08-19T07:25:46.004Z",
+      "postSnapshot": true,
+      "slug": "telemetry-probe-opencode-hang-and-proxy-bridge",
+      "goal": "Create a file named telemetry-probe-opencode-hang-and-proxy-bridge-runbook.md at the repository root that diagnoses this symptom for an operator: Tool-bearing requests stuck on copilot despite quota exhaustion. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 8815,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "curl-diagnostic-fix",
+          "source": "curl",
+          "flags": "i",
+          "why": "Fix/diagnosis: replaying the request via curl distinguishes a local opencode stall from an upstream proxy issue",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-telemetry-probe-opencode-hang-and-proxy-bridge"
+    },
+    {
+      "insightId": "01a01aff-51e3-7036-bf71-80e0e7a8c8d3",
+      "topic": "Test Suite — Jest and Node:Test Unified Runner",
+      "confidence": 0.85,
+      "createdAt": "2026-08-20T15:41:53.880Z",
+      "postSnapshot": true,
+      "slug": "test-suite-jest-and-node-test-unified-runner",
+      "goal": "Create a file named test-suite-jest-and-node-test-unified-runner-runbook.md at the repository root that diagnoses this symptom for an operator: `npm install` pruning `km-core` symlink. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 0 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "cjs-extension-fix",
+          "source": "\\.cjs",
+          "flags": "",
+          "why": "The renamed file extension resolving CJS/ESM incompatibility must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "type-module-package-json",
+          "source": "\"type\":\\s*\"module\"",
+          "flags": "",
+          "why": "The root package.json declaration causing all .js files to be ESM by default must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "default-export-unwrapping",
+          "source": "\\.default",
+          "flags": "",
+          "why": "The relationship where require() of an ESM module returns a namespace object requiring .default access must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "agent-registry-cjs-file",
+          "source": "agent-registry\\.cjs",
+          "flags": "i",
+          "why": "The specific renamed CJS registry file must be identified",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "eslint-cjs-glob-rule",
+          "source": "eslint\\.config\\.js",
+          "flags": "i",
+          "why": "The ESLint flat-config file requiring explicit .cjs glob inclusion for no-unused-vars must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "semantic-analysis-bridge-broken",
+          "source": "semantic-analysis-bridge\\.js",
+          "flags": "i",
+          "why": "The known blocking broken file with deleted-module imports must be documented as an open issue",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 0,
+      "topic_id": null
+    },
+    {
+      "insightId": "019fd7bb-f8b2-74fa-b449-63459457bb4d",
+      "topic": "kgbench Contamination Prevention",
+      "confidence": 0.8,
+      "createdAt": "2026-08-19T07:25:49.839Z",
+      "postSnapshot": true,
+      "slug": "kgbench-contamination-prevention",
+      "goal": "Create a file named kgbench-contamination-prevention-runbook.md at the repository root that diagnoses this symptom for an operator: queries.json visible to agent. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 0 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "default-excludes-constant",
+          "source": "DEFAULT_EXCLUDES",
+          "flags": "",
+          "why": "The authoritative exclusion list constant must be named as the central contamination-prevention mechanism",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "sandbox-mjs-file",
+          "source": "sandbox\\.mjs",
+          "flags": "i",
+          "why": "The file containing DEFAULT_EXCLUDES and spawning per-cell runs must be identified",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "graders-mjs-exclusion",
+          "source": "graders\\.mjs",
+          "flags": "i",
+          "why": "The file that must itself be excluded from run trees to prevent trap phrase leakage must be named",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "queries-json-exclusion",
+          "source": "queries\\.json",
+          "flags": "i",
+          "why": "The question/answer set file that must be excluded from benchmark runs must be named",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "leak-terms-mechanism",
+          "source": "leak_terms",
+          "flags": "",
+          "why": "The per-question mechanism declaring must-not-appear strings must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "nul-byte-corruption-fix",
+          "source": "NUL byte|xxd",
+          "flags": "i",
+          "why": "Fix/diagnostic: NUL byte corruption in sandbox.mjs must be inspected and stripped using a hex-safe method",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 1319,
+      "topic_id": null
+    },
+    {
+      "insightId": "019ee69e-0be3-78e5-baa5-f80251b10fb0",
+      "topic": "OKB ApiClient — Dual-Backend Routing and Relation-Cap Honesty",
+      "confidence": 0.9,
+      "createdAt": "2026-06-21T10:50:42.414Z",
+      "postSnapshot": false,
+      "slug": "okb-apiclient-dual-backend-routing-and-relation",
+      "goal": "Create a file named okb-apiclient-dual-backend-routing-and-relation-runbook.md at the repository root that diagnoses this symptom for an operator: Jest globals vs. `node --test` runner mismatch. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "excluded",
+      "reason": "only 0 fact(s) survived the blind filters (need 3)",
+      "dropped": [
+        {
+          "id": "api-version-flag",
+          "source": "apiVersion",
+          "flags": "",
+          "why": "The explicit flag controlling dual-backend routing must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "bridge-server-port-8090",
+          "source": ":8090",
+          "flags": "",
+          "why": "The bridge server port required for legacy-compatibility routes must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "error-unreachable-state",
+          "source": "ErrorUnreachableState",
+          "flags": "",
+          "why": "The dedicated error type distinguishing OKM-down failures from generic errors must be named",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "relation-cap-2000",
+          "source": "2000",
+          "flags": "",
+          "why": "The specific relation-set hard cap must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "precap-total-field",
+          "source": "preCap|pre-cap total",
+          "flags": "i",
+          "why": "Fix/confirmation: callers must read the pre-cap total field to avoid inferring completeness from capped result size",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        },
+        {
+          "id": "client-side-1-hop-expand",
+          "source": "client-side.{0,20}1-hop|1-hop.{0,20}client-side",
+          "flags": "i",
+          "why": "The client-side 1-hop node-expand behavior avoiding server round-trip must be documented",
+          "reason": "not-injected",
+          "signals": {
+            "injected": false,
+            "coined": false,
+            "inSandbox": false
+          }
+        }
+      ],
+      "injectedChars": 0,
+      "topic_id": null
+    },
+    {
+      "insightId": "019f7b3d-eeeb-7d04-81f5-443a7e6301d1",
+      "topic": "Knowledge Injection Architecture",
+      "confidence": 0.85,
+      "createdAt": "2026-07-20T07:04:39.722Z",
+      "postSnapshot": false,
+      "slug": "knowledge-injection-architecture",
+      "goal": "Create a file named knowledge-injection-architecture-runbook.md at the repository root that diagnoses this symptom for an operator: An agent session lacks stable project-wide context at startup, or shows outdated retrieved knowledge on later prompts despite ongoing conversation activity. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 7745,
+      "coinageSamples": 3,
+      "dropped": [
+        {
+          "id": "session-start-trigger",
+          "source": "session start|session-start",
+          "flags": "i",
+          "why": "The trigger condition for the baseline hook (session start) must be documented as distinct from per-turn triggers",
+          "reason": "model-coins-it",
+          "signals": {
+            "injected": true,
+            "coined": true,
+            "inSandbox": true
+          }
+        }
+      ],
+      "topic_id": "kbs-knowledge-injection-architecture"
+    },
+    {
+      "insightId": "019f9deb-9cb8-7c26-b8ef-c02950509dc2",
+      "topic": "LLM Proxy Egress Coverage and Bypass Paths",
+      "confidence": 0.85,
+      "createdAt": "2026-08-02T13:59:21.198Z",
+      "postSnapshot": true,
+      "slug": "llm-proxy-egress-coverage-and-bypass-paths",
+      "goal": "Create a file named llm-proxy-egress-coverage-and-bypass-paths-runbook.md at the repository root that diagnoses this symptom for an operator: Bare CLI invocations of claude, copilot, or opencode outside the coding project fail to reach provider APIs entirely. The file must state the root cause, give the exact commands to confirm it, and give the exact command or option that fixes it.",
+      "status": "derived",
+      "reason": null,
+      "injectedChars": 3380,
+      "coinageSamples": 3,
+      "dropped": [],
+      "topic_id": "kbs-llm-proxy-egress-coverage-and-bypass-paths"
+    }
+  ],
+  "population": [
+    {
+      "insightId": "019eb544-0eea-702a-8a52-7d34c67b3f4e",
+      "topic": "System Health Dashboard — server.js API Backend",
+      "confidence": 0.93,
+      "createdAt": "2026-06-30T18:44:57.067Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0efa-7be8-9960-aa15ec3a1ae3",
+      "topic": "MkDocs Documentation — Directory Layout and Screenshot Placement",
+      "confidence": 0.8,
+      "createdAt": "2026-08-23T11:50:32.473Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0f05-75ba-a64b-7ae8e00dd0fd",
+      "topic": "Knowledge Context Injection — Hook and Agent Adapters",
+      "confidence": 0.85,
+      "createdAt": "2026-07-10T08:50:43.985Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0f0c-75fc-96ac-3a9321c9fd28",
+      "topic": "MCP Server Configuration",
+      "confidence": 0.85,
+      "createdAt": "2026-08-05T21:41:30.159Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0f52-762d-ab12-6e54f37d2cd7",
+      "topic": "VS Code SCM Workspace Configuration — Multi-Repo Visibility",
+      "confidence": 0.85,
+      "createdAt": "2026-05-14T15:27:35.876Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0f59-7a40-bacb-5dab7cf05012",
+      "topic": "LSL (Live Session Logging) Infrastructure",
+      "confidence": 0.85,
+      "createdAt": "2026-08-16T14:24:52.937Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0f5c-7afb-8e54-a0a7c8d980a5",
+      "topic": "OpenCode Compaction Guard Plugin",
+      "confidence": 0.8,
+      "createdAt": "2026-05-14T15:27:35.876Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0f6b-737b-a85f-d0142d5aa7a8",
+      "topic": "Vite Frontend Inventory",
+      "confidence": 0.8,
+      "createdAt": "2026-05-25T17:56:47.943Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0f8d-79f8-a36d-53e23f8fbd04",
+      "topic": "Knowledge Graph API and Working Memory Service",
+      "confidence": 0.85,
+      "createdAt": "2026-07-05T14:31:38.057Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0f9a-7560-baea-199e5a69786c",
+      "topic": "v7.2 Performance Measurement System — Architecture and Scoping",
+      "confidence": 0.9,
+      "createdAt": "2026-07-07T03:43:27.622Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019eb544-0fa9-7c92-8f64-c4897dae1587",
+      "topic": "Git Security — OAuth Token Scrubbing and Redaction Patterns",
+      "confidence": 0.8,
+      "createdAt": "2026-05-14T15:27:35.876Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0fec-7dce-8969-5ffbb41cd377",
+      "topic": "GSD Statusline — Context Window Display",
+      "confidence": 0.8,
+      "createdAt": "2026-07-07T02:32:11.392Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0ff8-7db6-9b98-11b0a88ba618",
+      "topic": "GSD Workflow Conventions — Command Naming and Skill Invocation",
+      "confidence": 0.87,
+      "createdAt": "2026-07-07T18:31:23.065Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-0ffb-783e-956d-49e444ffcb44",
+      "topic": "Tmux Proxy Badge Detection",
+      "confidence": 0.85,
+      "createdAt": "2026-07-01T14:30:39.519Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019eb544-102b-7d6d-9633-3617dc67b04b",
+      "topic": "Git SSH Connectivity Through HTTP Proxy",
+      "confidence": 0.85,
+      "createdAt": "2026-07-02T04:51:32.742Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eb544-102e-7f26-bc6c-a5905828a80d",
+      "topic": "Online Learning System — Health Status and Monitoring",
+      "confidence": 0.85,
+      "createdAt": "2026-06-30T18:44:25.941Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ebb82-5026-7790-8c97-d18adf88ebce",
+      "topic": "LslTimelineStrip — Timeline Selection and Bucket Matching",
+      "confidence": 0.85,
+      "createdAt": "2026-06-21T09:54:58.135Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ebd8e-0048-71c4-8eb1-1cc5279ea3a8",
+      "topic": "Unified Viewer — Filter Infrastructure",
+      "confidence": 0.82,
+      "createdAt": "2026-06-30T18:44:50.596Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ebdb2-e91d-7fa4-9bea-5ce126982e2b",
+      "topic": "Truthfulness Verifier — Insight Claim Verification",
+      "confidence": 0.85,
+      "createdAt": "2026-06-21T19:47:32.636Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019ebdb2-e920-7208-b787-59435ffe248a",
+      "topic": "Insight Claim Verification — Dual-Mode Design",
+      "confidence": 0.9,
+      "createdAt": "2026-06-12T21:17:59.004Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ec2a4-3ed3-7a09-a103-f50cf083ebba",
+      "topic": "Discuss-Phase Planning Workflow",
+      "confidence": 0.9,
+      "createdAt": "2026-07-06T09:49:43.792Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ec565-bd9f-7ee1-be21-c2d3bf61b8ed",
+      "topic": "Concurrent Agent Session Management — Phantom Commits and Inter-Session Communication",
+      "confidence": 0.8,
+      "createdAt": "2026-07-06T09:04:30.430Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ec5ad-91ee-7056-a99d-12cdb9d9bfe9",
+      "topic": "Knowledge Graph Semantic Edges — Online Ingest Pipeline",
+      "confidence": 0.8,
+      "createdAt": "2026-06-21T07:06:17.431Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ed717-d9f7-734d-82e5-5dd529e3f54a",
+      "topic": "gsd-browser Operator Verification Tool",
+      "confidence": 0.82,
+      "createdAt": "2026-07-07T04:12:57.232Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ede27-266c-7a13-b8d2-31f23777f515",
+      "topic": "LSL Session Continuity Bootstrap",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T16:28:09.336Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ee085-f0df-7cb8-a899-ceadcf633753",
+      "topic": "rapid-llm-proxy — Provider Fallback Chain",
+      "confidence": 0.92,
+      "createdAt": "2026-07-08T16:09:00.493Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ee3c1-7938-74f4-b22e-7d31050878c0",
+      "topic": "Consolidator-Insight Service",
+      "confidence": 0.85,
+      "createdAt": "2026-07-05T22:08:39.023Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ee69e-0be3-78e5-baa5-f80251b10fb0",
+      "topic": "OKB ApiClient — Dual-Backend Routing and Relation-Cap Honesty",
+      "confidence": 0.9,
+      "createdAt": "2026-06-21T10:50:42.414Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019ee69e-0be4-73c3-8d99-2e82889c732f",
+      "topic": "LLM Proxy Worker Pool",
+      "confidence": 0.9,
+      "createdAt": "2026-06-21T12:47:16.382Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ee99a-44d1-75b8-a6ca-0f14c85b2820",
+      "topic": "gsd-plan-phase Skill — Phase Planning Orchestration",
+      "confidence": 0.8,
+      "createdAt": "2026-07-08T16:09:09.073Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019ee99a-44ec-7083-b97c-0cbd877a5f72",
+      "topic": "Documentation Diagram Style Guide",
+      "confidence": 0.8,
+      "createdAt": "2026-08-24T16:51:56.942Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ee9cd-6767-71a4-a0c7-54d58bbcf5a5",
+      "topic": "OntologyFilter Component — Unified Viewer",
+      "confidence": 0.85,
+      "createdAt": "2026-06-30T18:44:54.471Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019ee9cd-e681-790b-935b-92752acbde4f",
+      "topic": "gsd-execute-phase Skill — Phase Execution Orchestration",
+      "confidence": 0.87,
+      "createdAt": "2026-07-08T16:08:40.467Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eea13-e417-741a-a6ae-db9471243b26",
+      "topic": "rapid-llm-proxy — Build Process and Repository Structure",
+      "confidence": 0.9,
+      "createdAt": "2026-07-08T12:12:48.533Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eea14-6021-7be6-92b4-7558b234e740",
+      "topic": "Coverage Dashboard — Claim-Type Color Semantics",
+      "confidence": 0.8,
+      "createdAt": "2026-06-21T16:54:28.624Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eea37-a96a-7c99-81b8-c94e6a92cc44",
+      "topic": "GSD Phase Verification File Integrity",
+      "confidence": 0.8,
+      "createdAt": "2026-06-30T18:45:04.649Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eea73-ee78-7626-826b-9df6619b0f04",
+      "topic": "ClaudeWorker and WorkerPool — rapid-llm-proxy Worker Pool Architecture",
+      "confidence": 0.9,
+      "createdAt": "2026-06-21T13:52:38.860Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019eebb9-7e4b-7c31-b72c-0885438f6def",
+      "topic": "Git Commit Staging — Config vs Runtime Artifact Separation",
+      "confidence": 0.8,
+      "createdAt": "2026-08-09T06:12:13.440Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019efd1b-a2f2-7d43-9be2-a7d8f6fdac2e",
+      "topic": "Observation Pipeline — ETM Stuck Loop and KG-Anchor Write Failures",
+      "confidence": 0.92,
+      "createdAt": "2026-07-03T05:26:31.664Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f0dab-43d3-787a-ac5a-f569fa99e5f4",
+      "topic": "Observation Pipeline — ETM Stuck Loop and KG-anchor Write Failures",
+      "confidence": 0.92,
+      "createdAt": "2026-07-03T05:26:37.285Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f0dab-6399-7098-bc8e-992765c518c6",
+      "topic": "Health Coordinator — Idle Gate",
+      "confidence": 0.85,
+      "createdAt": "2026-07-10T08:33:02.134Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f0ec1-4c83-739d-95ce-b7f0e62e75e6",
+      "topic": "Semantic Route Judge — Success Scoring Pipeline",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T16:51:34.636Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f0ed2-bbeb-7bab-afba-3c19fbf13635",
+      "topic": "v7.2 Performance Measurement System",
+      "confidence": 0.88,
+      "createdAt": "2026-07-06T02:12:03.133Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f0f07-e92f-7138-89b6-970c39068f65",
+      "topic": "UI Design Contract Workflow",
+      "confidence": 0.9,
+      "createdAt": "2026-06-29T10:26:53.738Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f189c-8bdb-7b0a-91c1-d9d5485596cc",
+      "topic": "ETM Mid-Turn Progress Observations — Token-Delta Trigger",
+      "confidence": 0.92,
+      "createdAt": "2026-07-07T09:17:10.031Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f18f2-28d7-7b5c-8bfd-fd9cf5b52d19",
+      "topic": "ETM Fire Cursor — State Persistence and Deduplication",
+      "confidence": 0.88,
+      "createdAt": "2026-06-30T15:02:09.948Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f1e17-82d6-74e5-8026-671a2cc66120",
+      "topic": "System Health Dashboard — Dark Mode CSS",
+      "confidence": 0.8,
+      "createdAt": "2026-07-01T14:31:25.141Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f23d1-ad13-7153-b738-8356c55feb37",
+      "topic": "Foreground Task Token Capture — Route Architecture",
+      "confidence": 0.87,
+      "createdAt": "2026-07-07T02:32:24.943Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f25dc-c5ea-7c50-8d9f-5c7151efa6b9",
+      "topic": "LSL Status Indicator — Failure Modes and Diagnosis",
+      "confidence": 0.85,
+      "createdAt": "2026-07-08T11:12:22.586Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f26e3-5114-7047-b860-c2c6926622c7",
+      "topic": "Experiments Recompute Route",
+      "confidence": 0.8,
+      "createdAt": "2026-07-07T00:20:38.308Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f280e-75d0-707e-8f9f-619d6dafebc4",
+      "topic": "Cross-Agent Runner — Phase 78 Architecture",
+      "confidence": 0.82,
+      "createdAt": "2026-07-07T02:13:23.318Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f2cd2-9ed4-7b56-a4fa-465ad94531cf",
+      "topic": "System Health Dashboard — Frontend State Management",
+      "confidence": 0.9,
+      "createdAt": "2026-07-08T09:33:44.438Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f2cfe-2310-7051-8980-b6fdc146a85f",
+      "topic": "LSL Token Usage Database",
+      "confidence": 0.88,
+      "createdAt": "2026-07-04T14:32:30.917Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f2d8c-46e1-72f8-85d4-391b468c33b6",
+      "topic": "OpenCode Measurement Gaps — Model Attribution and Token Scoping",
+      "confidence": 0.87,
+      "createdAt": "2026-07-08T16:09:32.237Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f3182-f4ab-7a68-81aa-0cf4530227fc",
+      "topic": "Measurement Test Display — Dashboard",
+      "confidence": 0.85,
+      "createdAt": "2026-07-08T16:17:30.015Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f3182-f4b0-7c20-ad56-08b91b163dbe",
+      "topic": "Runs Management — Bulk Deletion UI",
+      "confidence": 0.8,
+      "createdAt": "2026-07-08T03:37:15.494Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f3645-9543-7c1d-b108-06a01abd0d30",
+      "topic": "Knowledge Context Injection — Explore Sub-Agent",
+      "confidence": 0.94,
+      "createdAt": "2026-07-10T08:50:41.995Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f36c1-68f0-7080-91ce-158cce5ba43e",
+      "topic": "Phase Validation Workflow",
+      "confidence": 0.8,
+      "createdAt": "2026-07-08T11:11:46.297Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f36c2-17fa-797c-98cc-4071ea1bebea",
+      "topic": "4-Agent LLM Proxy Routing Configuration",
+      "confidence": 0.9,
+      "createdAt": "2026-08-07T19:46:17.884Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f3ac6-4be6-79d8-840b-ccb4a03fd315",
+      "topic": "Background Process Ambient-Span Guard (`isBackgroundProcess`)",
+      "confidence": 0.85,
+      "createdAt": "2026-07-08T16:08:44.943Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f40e7-8b8a-77a5-8117-b0306aa4ebd0",
+      "topic": "Phase 85 — Experiment Control Center",
+      "confidence": 0.85,
+      "createdAt": "2026-07-10T08:50:47.027Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f427d-e408-7f80-a399-a43527981781",
+      "topic": "Experiment Runner Slot-Guard",
+      "confidence": 0.8,
+      "createdAt": "2026-07-08T16:09:34.470Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f427d-f686-7324-95e8-17ac0a353bc6",
+      "topic": "Experiment Runner — Detached Runner Logging and Path Configuration",
+      "confidence": 0.85,
+      "createdAt": "2026-07-09T03:08:49.285Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f4bc0-27cb-763b-a97a-adb414006a1d",
+      "topic": "Cold-Store Maintenance — Dangling Digest References and Periodic Sweep Integration",
+      "confidence": 0.85,
+      "createdAt": "2026-07-13T07:44:26.990Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f4bc0-4bb8-7e04-9856-c03a3f4acbe0",
+      "topic": "Phase 85 Code Review — Critical Findings and Fixes",
+      "confidence": 0.85,
+      "createdAt": "2026-07-10T11:18:41.330Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f4bc0-ac70-77db-a322-7b95b47cbaf2",
+      "topic": "sweep-sub-agents.mjs — ObservationWriter kmStore Re-Burn Bug",
+      "confidence": 0.8,
+      "createdAt": "2026-07-10T11:57:45.426Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f5b80-7288-7513-9b2b-28cd375003da",
+      "topic": "Cold-Store Maintenance — Dangling Digest References",
+      "confidence": 0.85,
+      "createdAt": "2026-07-13T12:42:52.421Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f5c93-e59d-704f-bb6f-2a0b3ad5aede",
+      "topic": "GSD Phase Verification Gate",
+      "confidence": 0.9,
+      "createdAt": "2026-07-13T17:43:44.284Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f5cd3-173b-7d20-aa3e-d6c4b9c162ee",
+      "topic": "Phase 80 — Comparison Endpoint and Experiment Skill",
+      "confidence": 0.8,
+      "createdAt": "2026-07-13T19:02:42.508Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f6e6c-6639-7390-acbf-90115268f13f",
+      "topic": "ETM — Event-Driven Observation Write Mechanism",
+      "confidence": 0.9,
+      "createdAt": "2026-07-17T11:04:29.879Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f6e6c-663e-7ba2-8e41-0398909d8350",
+      "topic": "Heartbeat Badge — Parallel Agent Session Gap",
+      "confidence": 0.85,
+      "createdAt": "2026-07-17T06:18:46.538Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f73eb-79e5-79b6-a048-1fb006c48e55",
+      "topic": "Documentation Maintenance — MkDocs Content Staleness and Update Workflow",
+      "confidence": 0.95,
+      "createdAt": "2026-07-19T10:39:12.938Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f74ed-e23e-728f-8d21-4e269f02d204",
+      "topic": "Runs Table UI — Action Buttons and Tooltips",
+      "confidence": 0.9,
+      "createdAt": "2026-07-19T10:39:29.968Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f7517-0b85-76cc-b6e4-1b514fe4afc4",
+      "topic": "Session Classification and Taxonomy Integration",
+      "confidence": 0.9,
+      "createdAt": "2026-07-19T10:39:33.631Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f75c8-6d8f-7151-8946-c5a448661e6a",
+      "topic": "tmux Session Wrapper — Startup Diagnostics",
+      "confidence": 0.8,
+      "createdAt": "2026-07-19T10:39:36.105Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f75db-b329-742e-a560-dc164cd7421e",
+      "topic": "Runs Table Component — Timestamp Columns",
+      "confidence": 0.9,
+      "createdAt": "2026-07-19T10:39:41.448Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f7a3a-6ada-7834-9b97-74ad26ddb2d6",
+      "topic": "Retrieval Service — Hybrid Search and RRF Fusion",
+      "confidence": 0.95,
+      "createdAt": "2026-07-19T12:32:55.720Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f7afa-ad8f-7939-8759-afa7f3e95624",
+      "topic": "Agent Memory Directory — Git Version Control",
+      "confidence": 0.8,
+      "createdAt": "2026-07-20T07:04:42.104Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f7b3d-eeeb-7d04-81f5-443a7e6301d1",
+      "topic": "Knowledge Injection Architecture",
+      "confidence": 0.85,
+      "createdAt": "2026-07-20T07:04:39.722Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f7e1a-8e36-71ed-a920-2ef0d2353e15",
+      "topic": "Category Sub-Modal Text Overflow — System Health Dashboard",
+      "confidence": 0.9,
+      "createdAt": "2026-07-20T07:05:02.285Z",
+      "postSnapshot": false,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f7eb2-ca0a-738f-af8f-b5cf7bf7e74c",
+      "topic": "compare-fizzbuzz Experiment — Service Lifecycle Safety",
+      "confidence": 0.9,
+      "createdAt": "2026-07-20T08:44:38.294Z",
+      "postSnapshot": false,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f7f77-5790-7b0c-b998-3dffb175426d",
+      "topic": "Background Model Attribution in Ambient Runs",
+      "confidence": 0.8,
+      "createdAt": "2026-07-20T12:19:15.471Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f834a-a3a8-7178-a8df-b96324e90020",
+      "topic": "Smoke-Spec Snapshot Restore — km-core Blockers",
+      "confidence": 0.8,
+      "createdAt": "2026-07-22T06:41:00.751Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f84e5-c780-76cd-a468-7e65d7ff4f64",
+      "topic": "Claude Run Session Title Generation",
+      "confidence": 0.85,
+      "createdAt": "2026-07-22T06:41:02.263Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f84e5-c782-70df-8380-584a0c13c608",
+      "topic": "Foreground Measurement Sampling — Head+Tail Strategy",
+      "confidence": 0.8,
+      "createdAt": "2026-07-22T06:41:03.382Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f852e-e0d9-75d3-b23b-7f64701f2c12",
+      "topic": "Cross-Agent Experiment Failure Modes and Dashboard Anomalies",
+      "confidence": 0.95,
+      "createdAt": "2026-07-22T06:41:05.446Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019f8b63-52b9-7d19-a7b3-b97560013648",
+      "topic": "Experiment Scoring Pipeline — Sandbox Trace Resolution Failures",
+      "confidence": 0.8,
+      "createdAt": "2026-07-23T08:36:50.325Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f8b63-52ba-7eff-9ac4-c05b059d6bea",
+      "topic": "Performance Dashboard — Runs Grouping and Hierarchical View",
+      "confidence": 0.9,
+      "createdAt": "2026-07-23T08:36:52.490Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f8b63-52bb-723c-ab34-23898a5e664b",
+      "topic": "LLM Proxy Startup Script — Corporate Proxy Hardening",
+      "confidence": 0.9,
+      "createdAt": "2026-07-23T08:36:44.946Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f8b63-52bb-723c-ab34-238a8309e8d9",
+      "topic": "Trace-Locator Dual-Path Architecture and Scoring Path Failure",
+      "confidence": 0.85,
+      "createdAt": "2026-07-23T08:36:47.613Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f8d6f-6c4c-7b3c-b22b-b9764d4c94aa",
+      "topic": "Performance Dashboard — Experiment Spec Launcher",
+      "confidence": 0.8,
+      "createdAt": "2026-07-23T05:25:17.514Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f8de1-f91a-7f3a-8b83-b6743ef0d053",
+      "topic": "Opencode Sandbox — Absolute-Path Leak",
+      "confidence": 0.85,
+      "createdAt": "2026-07-23T08:37:15.418Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f8df8-fa43-74c3-a43e-9c745a7abe70",
+      "topic": "Performance Dashboard — Score Column Semantics and Tooltip Data",
+      "confidence": 0.8,
+      "createdAt": "2026-07-23T08:37:24.088Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f8e1f-3b3b-7452-a65e-f4991937f006",
+      "topic": "Semantic Route Judge — Model Configuration and Evidence Harness",
+      "confidence": 0.8,
+      "createdAt": "2026-07-23T08:37:19.290Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f8f80-0fe6-7311-a9a9-6c3f0a0ea03f",
+      "topic": "KB Injection Quality Gate",
+      "confidence": 0.85,
+      "createdAt": "2026-07-27T05:53:47.912Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f9008-e26b-7733-9aa2-d4a6037cc9ab",
+      "topic": "Performance Measurement Documentation Set",
+      "confidence": 0.8,
+      "createdAt": "2026-07-27T05:53:54.741Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f99e9-267a-7960-a9fa-915558d9db4e",
+      "topic": "Cross-Agent Experiment Harness — Model Resolution and Proxy Routing",
+      "confidence": 0.85,
+      "createdAt": "2026-07-26T11:45:02.419Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019f9deb-9cb8-7c26-b8ef-c02950509dc2",
+      "topic": "LLM Proxy Egress Coverage and Bypass Paths",
+      "confidence": 0.85,
+      "createdAt": "2026-08-02T13:59:21.198Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fc159-ca4d-788e-aa49-6dddce49d89b",
+      "topic": "Cross-Platform Compatibility — Install and Test Scripts",
+      "confidence": 0.85,
+      "createdAt": "2026-08-05T05:32:57.692Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fc22f-ef32-7260-920f-bc2ab854185c",
+      "topic": "Token Usage Dashboard — Cost Tracking and Budget Management",
+      "confidence": 0.8,
+      "createdAt": "2026-08-05T05:33:00.575Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fc61d-63b5-7a6a-a365-8cde7dd7730e",
+      "topic": "System Health Dashboard — Build Staleness from Branch Divergence",
+      "confidence": 0.85,
+      "createdAt": "2026-08-04T05:34:16.513Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fc791-9089-7620-8eac-cde9aeec43bf",
+      "topic": "Graphify Dashboard — Reindex Update Mechanics",
+      "confidence": 0.8,
+      "createdAt": "2026-08-05T05:33:54.425Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd206-200e-7b50-bb35-b098006da23e",
+      "topic": "Graphify vs Grep Benchmark",
+      "confidence": 0.9,
+      "createdAt": "2026-08-08T13:51:04.480Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd206-200f-7be9-a45c-c5dcd22add71",
+      "topic": "Dashboard Code Graph Viewer",
+      "confidence": 0.9,
+      "createdAt": "2026-08-08T13:51:02.002Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd206-b1bb-7003-b9ee-78085520b46f",
+      "topic": "Project Git Workflow",
+      "confidence": 0.8332,
+      "createdAt": "2026-08-24T04:51:35.010Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd2fb-4ea4-735d-9af3-bde220502a63",
+      "topic": "Code Graph Backend Registry",
+      "confidence": 0.9,
+      "createdAt": "2026-08-12T17:44:58.126Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd30e-db05-733c-b9ea-4cc68f965793",
+      "topic": "Graphify Corpus Cache and Ignore Logic",
+      "confidence": 0.9,
+      "createdAt": "2026-08-07T04:57:36.463Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd31b-01b3-7e55-abee-07b9240d307f",
+      "topic": "System Health Dashboard — CGR Reindex API",
+      "confidence": 0.8,
+      "createdAt": "2026-08-08T13:51:38.978Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fd349-48f2-71a5-b866-30d8a7bd4d2d",
+      "topic": "Graphify Incremental Rebuild — watch.py Call Chain",
+      "confidence": 0.9,
+      "createdAt": "2026-08-08T13:51:30.882Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fd3de-7cd1-7621-8dda-5bf142b61aa7",
+      "topic": "coding-v1 Benchmark — Design and Scoring",
+      "confidence": 0.9,
+      "createdAt": "2026-08-08T13:32:02.068Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd3de-7cd3-7c16-9d15-b59133e1d364",
+      "topic": "coding-v1 Benchmark — results.jsonl Polling and CONTAM Detection",
+      "confidence": 0.85,
+      "createdAt": "2026-08-07T19:47:35.928Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd586-823b-72e6-a0de-a5fb14b1d81b",
+      "topic": "Project Bootstrap — install.sh and Submodule Setup",
+      "confidence": 0.85,
+      "createdAt": "2026-08-08T19:43:56.635Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fd586-823d-7fd3-a74c-724430b503b8",
+      "topic": "km-core Host node_modules Bind Mount — Dual Consumer Pattern",
+      "confidence": 0.85,
+      "createdAt": "2026-08-06T15:41:37.300Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd609-95f0-742b-b507-0b80ee1c88e5",
+      "topic": "Coding Services Container — codegraph Containerization",
+      "confidence": 0.85,
+      "createdAt": "2026-08-08T17:34:05.081Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fd640-0792-754c-afa3-8f20166e9a18",
+      "topic": "kgbench Contamination Prevention — Trap Phrase Leakage in Harness Source",
+      "confidence": 0.85,
+      "createdAt": "2026-08-06T12:30:42.920Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fd685-9ea8-70a5-8c01-6a77bac47f3c",
+      "topic": "kgbench Grader False Positives",
+      "confidence": 0.8,
+      "createdAt": "2026-08-12T17:31:30.546Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fd7bb-f8b2-74fa-b449-63459457bb4d",
+      "topic": "kgbench Contamination Prevention",
+      "confidence": 0.8,
+      "createdAt": "2026-08-19T07:25:49.839Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fd7d6-f7e1-774f-9c57-4866dbac1c44",
+      "topic": "coding-v1 Benchmark — Replication Matrix Test Runs",
+      "confidence": 0.85,
+      "createdAt": "2026-08-19T09:24:09.643Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fdaee-5da2-76b6-8e74-09e4103c1711",
+      "topic": "Graphify Corpus Cache and Invalidation Logic",
+      "confidence": 0.9,
+      "createdAt": "2026-08-07T18:28:00.133Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fdbf8-05a1-712e-b18d-14a0f4ad009f",
+      "topic": "kgbench Benchmarking Harness — Run Lifecycle and Background Process Reliability",
+      "confidence": 0.8,
+      "createdAt": "2026-08-13T09:03:25.142Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fe02f-3155-709f-9c99-cda1122ed76d",
+      "topic": "A/B Experiment Runner — Multi-Interface Design",
+      "confidence": 0.9,
+      "createdAt": "2026-08-08T13:32:31.846Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fe081-916c-7331-ad68-d9d947a18355",
+      "topic": "coding-v1 Benchmark — Evaluator Disagreement and Judge Score Integrity",
+      "confidence": 0.8,
+      "createdAt": "2026-08-08T11:18:44.289Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fe0cd-9e61-73b7-8a13-2d9f2ff2c7af",
+      "topic": "CLAUDE.md and Command Documentation Maintenance",
+      "confidence": 0.8,
+      "createdAt": "2026-08-19T08:30:15.674Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fe119-114d-7a0c-8063-e3ec5bd4b659",
+      "topic": "kgbench Benchmarking Harness — Timeout and Circuit-Breaker Configuration",
+      "confidence": 0.85,
+      "createdAt": "2026-08-08T13:32:06.800Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fe188-f27b-7a47-8884-c9511f5ce307",
+      "topic": "Install Script Test Suite — Negative Control and Escape Hatch Messaging",
+      "confidence": 0.8,
+      "createdAt": "2026-08-08T13:33:03.703Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fe270-d587-7d57-9798-eb754a8678b6",
+      "topic": "Node.js Version Requirements — Project-Wide Standardization",
+      "confidence": 0.9,
+      "createdAt": "2026-08-09T07:21:32.991Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fe2ce-3ebd-724e-b1c6-77f43bf48e2a",
+      "topic": "Shell Strict Mode Robustness — Diagnostic Scripts",
+      "confidence": 0.8,
+      "createdAt": "2026-08-12T07:34:23.819Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fe537-9c44-7eab-9465-a182956b1763",
+      "topic": "kgbench Benchmarking Harness — Operational Workflow",
+      "confidence": 0.85,
+      "createdAt": "2026-08-09T15:41:38.308Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fe75d-f7d4-73b0-bb37-bdb06810e29a",
+      "topic": "coding-v1 Benchmark — Report Claim Verification",
+      "confidence": 0.8,
+      "createdAt": "2026-08-20T08:18:14.885Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019feb66-3f7d-73e9-b6ca-ddbcbea822f6",
+      "topic": "kgbench Benchmarking Harness — Continuation Budget",
+      "confidence": 0.85,
+      "createdAt": "2026-08-11T05:39:56.544Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019fec88-089c-7e64-9373-99a92baea512",
+      "topic": "coding-v1 Benchmark — Cross-Agent Matrix Runs (x1, x2, r8)",
+      "confidence": 0.9,
+      "createdAt": "2026-08-14T15:35:05.172Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fed20-679f-75f5-8a31-9175c75b45cc",
+      "topic": "coding-v1 Benchmark — Diagnostic Rerun Methodology",
+      "confidence": 0.85,
+      "createdAt": "2026-08-10T20:15:07.093Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019ff4e5-31e8-7770-969f-13479d28f91d",
+      "topic": "coding-v1 Benchmark — Per-Question Cell-Level Findings (L2, B3, A1, A4)",
+      "confidence": 0.85,
+      "createdAt": "2026-08-12T07:34:49.062Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019ff505-58df-70f8-b5fb-96f244bc280d",
+      "topic": "coding-v1 Benchmark — A1 Question and CodeGraph Retrieval Gap",
+      "confidence": 0.85,
+      "createdAt": "2026-08-12T11:10:16.117Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019ff5f6-fd2c-78ad-813c-a74a750fd400",
+      "topic": "coding-v1 Benchmark — CodeGraph Backend Analysis and MCP Tool Share",
+      "confidence": 0.8,
+      "createdAt": "2026-08-14T15:35:00.700Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ff707-a5ef-799c-8792-4c0893513075",
+      "topic": "kgbench Benchmarking Harness — Supervisor and Containment Integrity",
+      "confidence": 0.8,
+      "createdAt": "2026-08-13T09:22:54.060Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "019ff866-aa6f-74a7-83d4-bc589d50eae0",
+      "topic": "coding-v1 Benchmark — cgidx Smoke Test Diagnosis",
+      "confidence": 0.85,
+      "createdAt": "2026-08-14T11:18:20.868Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "019fff9f-8866-7c58-814f-e2b15a8dc5cf",
+      "topic": "Cross-Platform Installer Scripts",
+      "confidence": 0.9,
+      "createdAt": "2026-08-19T09:23:44.640Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a005d7-ec94-7fef-8e47-98d34b06b797",
+      "topic": "Telemetry Probe — Copilot Quota Exhaustion and Opencode Hang Diagnostics",
+      "confidence": 0.85,
+      "createdAt": "2026-08-19T06:20:13.799Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a005f8-99fe-7d22-888e-beb1110dd88b",
+      "topic": "vkb-server / Kgbench Question-Sets API Stability",
+      "confidence": 0.8999999999999999,
+      "createdAt": "2026-08-19T08:30:10.580Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a00708-555b-727f-b480-f49e72176c07",
+      "topic": "Kgbench A/B Run — Analysis Script and Monitoring",
+      "confidence": 0.8,
+      "createdAt": "2026-08-16T11:56:41.625Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a01060-81c3-7d88-91d3-f5654b4ad440",
+      "topic": "Statusline Activity Indicator — lastContentActivityTs Guard and Emoji-to-Glyph Migration",
+      "confidence": 0.85,
+      "createdAt": "2026-08-18T11:41:08.799Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a0111d-e0c2-7e0c-908b-1017dd571095",
+      "topic": "Status Line Fast-Path Renderer — Icon Patching and Width Residue Bugs",
+      "confidence": 0.85,
+      "createdAt": "2026-08-18T11:41:23.885Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a0146b-44c8-73f6-b4c8-e0fd33a89d8a",
+      "topic": "Mastra-to-pi.dev Coding Agent Migration",
+      "confidence": 0.85,
+      "createdAt": "2026-08-18T11:41:58.861Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a014db-a5b1-7813-9721-9030d4f28fe6",
+      "topic": "Rapid-LLM-Proxy — Multi-Provider Fallback Chain and Quota Exhaustion Diagnostics",
+      "confidence": 0.85,
+      "createdAt": "2026-08-20T15:41:51.952Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a018ad-5289-7f3e-aa04-68745d9b1efb",
+      "topic": "Telemetry Probe — Opencode Hang and Proxy-Bridge Tool-Capability Gate",
+      "confidence": 0.8,
+      "createdAt": "2026-08-19T07:25:46.004Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a01924-3fee-7726-9f4f-e80db8c039fb",
+      "topic": "MkDocs Documentation Structure",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T16:51:28.011Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a019a7-9a36-74aa-a3c5-d285f566d070",
+      "topic": "coding-v1 Benchmark — Report Publication and Token Cost Findings",
+      "confidence": 0.85,
+      "createdAt": "2026-08-19T10:53:29.525Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a019bf-0cb8-7bac-9313-58c1b1d00ad3",
+      "topic": "deploy-docs CI/CD Workflow — MkDocs Publication Pipeline",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T16:51:30.963Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a01aff-51e3-7036-bf71-80e0e7a8c8d3",
+      "topic": "Test Suite — Jest and Node:Test Unified Runner",
+      "confidence": 0.85,
+      "createdAt": "2026-08-20T15:41:53.880Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a01e22-9aee-7e0f-964c-17d0094de080",
+      "topic": "CJS/ESM Module Compatibility — Adapter Files",
+      "confidence": 0.8,
+      "createdAt": "2026-08-21T09:12:13.402Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a02c20-b639-7ff8-a840-ef65ee540e62",
+      "topic": "KB Injection A/B Experiment — Design and Execution",
+      "confidence": 0.8,
+      "createdAt": "2026-08-24T16:51:37.541Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a02d8b-e6cd-7dd6-9591-ec5effae9b8b",
+      "topic": "A/B Experiment Cell — Knowledge Injection and Sandbox Neutralization",
+      "confidence": 0.85,
+      "createdAt": "2026-08-24T16:39:59.991Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a02d8b-e6cf-73b3-bd6a-0b050492d4f8",
+      "topic": "Knowledge Context Injection — Insight Truncation and Token Budget",
+      "confidence": 0.95,
+      "createdAt": "2026-08-24T09:22:08.067Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a02f23-20c4-7b4b-a0fd-82a8de77ac8c",
+      "topic": "Experiment Restore — Cell Isolation and Production Guards",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T16:51:39.375Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a031e8-8ec6-7956-94f7-0f092f0716e4",
+      "topic": "Parallel Test Isolation — run-parallel.test.mjs",
+      "confidence": 0.8,
+      "createdAt": "2026-08-24T16:51:53.755Z",
+      "postSnapshot": true,
+      "status": "not-drawn",
+      "reason": "outside the seeded sample"
+    },
+    {
+      "insightId": "01a0320d-8f61-7c95-b939-8feb02c53c0c",
+      "topic": "Project Git Workflow — Feature Branch Merges and Pre-Push Discipline",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T04:36:23.283Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a0320e-0b7a-7bd1-8dd4-c5257b2cbd8c",
+      "topic": "Knowledge Context Injection — Retrieval Service Token Budget",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T09:43:38.594Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a03313-470e-7e66-b939-eee95fb00e4b",
+      "topic": "Project Git Workflow — Feature Branch Merge and Push Procedure",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T16:40:14.020Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a03326-dc56-709e-a068-4367aa9ab900",
+      "topic": "A/B Experiment Runner — KB Injection Experiment Design",
+      "confidence": 0.9,
+      "createdAt": "2026-08-24T10:46:58.996Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a03326-dc88-73a0-9618-f61c13d7fbe8",
+      "topic": "API Model Field and Token Count Reliability",
+      "confidence": 0.8,
+      "createdAt": "2026-08-24T16:52:07.940Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    },
+    {
+      "insightId": "01a03461-4c67-772f-9d88-2f79fa9dce9d",
+      "topic": "KB Injection A/B Experiment — Pilot Matrix Execution",
+      "confidence": 0.8,
+      "createdAt": "2026-08-24T16:52:12.158Z",
+      "postSnapshot": true,
+      "status": "sampled",
+      "reason": null
+    }
+  ]
+}

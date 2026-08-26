@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-ontologyfilter-component-unified-viewer",
+  "insightId": "019ee9cd-6767-71a4-a0c7-54d58bbcf5a5",
+  "deliverable": "ontologyfilter-component-unified-viewer-runbook.md",
+  "goalSummary": "Per-item checkbox correct but all/none does not work",
+  "facts": [
+    {
+      "id": "ontologyfilter-tsx",
+      "source": "OntologyFilter\\.tsx",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `OntologyFilter.tsx`",
+      "inSandbox": true
+    },
+    {
+      "id": "viewer-store-ts",
+      "source": "viewer-store\\.ts",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `viewer-store.ts`",
+      "inSandbox": true
+    },
+    {
+      "id": "filterrail-tsx",
+      "source": "FilterRail\\.tsx",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `FilterRail.tsx`",
+      "inSandbox": true
+    },
+    {
+      "id": "deselectgroup",
+      "source": "deselectGroup",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `deselectGroup`",
+      "inSandbox": true
+    }
+  ],
+  "derivedFrom": "kbs-ontologyfilter-component-unified-viewer",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.122Z"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-coding-services-container-codegraph",
+  "insightId": "019fd609-95f0-742b-b507-0b80ee1c88e5",
+  "deliverable": "coding-services-container-codegraph-runbook.md",
+  "goalSummary": "The code-graph-rag MCP server fails to reach codegraph functionality when the container isn't running or its persisted index data is missing.",
+  "facts": [
+    {
+      "id": "dockerfile-coding-services",
+      "source": "Dockerfile\\.coding-services",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must name the exact Dockerfile defining the containerized codegraph service",
+      "inSandbox": true
+    },
+    {
+      "id": "codegraph-package-name",
+      "source": "@colbymchenry/codegraph",
+      "flags": "i",
+      "required": true,
+      "why": "The exact package name that must run containerized (not globally installed) must be stated",
+      "inSandbox": false
+    },
+    {
+      "id": "no-global-install-fix",
+      "source": "global(ly)?[^.]{0,80}(host|install)|do not install.{0,40}globally",
+      "flags": "i",
+      "required": true,
+      "why": "Fix: codegraph must not be installed globally on the host, only container-only",
+      "inSandbox": true
+    },
+    {
+      "id": "managed-mcp-keys-constant",
+      "source": "MANAGED_MCP_KEYS",
+      "flags": "",
+      "required": true,
+      "why": "The install.sh constant wiring container lifecycle must be identified",
+      "inSandbox": false
+    },
+    {
+      "id": "data-persistence-directory",
+      "source": "\\.data/",
+      "flags": "i",
+      "required": true,
+      "why": "The repository-committed persistence directory for SQLite/FTS5 artifacts must be documented",
+      "inSandbox": true
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-graphify-incremental-rebuild-watch-py-call-chain",
+  "insightId": "019fd349-48f2-71a5-b866-30d8a7bd4d2d",
+  "deliverable": "graphify-incremental-rebuild-watch-py-call-chain-runbook.md",
+  "goalSummary": "`_reconcile_existing_graph` not reflecting changes",
+  "facts": [
+    {
+      "id": "integrations-graphify-graphify-watch-py",
+      "source": "integrations/graphify/graphify/watch\\.py",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `integrations/graphify/graphify/watch.py`",
+      "inSandbox": false
+    },
+    {
+      "id": "detect-corpus-cache-json",
+      "source": "\\.detect_corpus_cache\\.json",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `.detect_corpus_cache.json`",
+      "inSandbox": false
+    },
+    {
+      "id": "detect-corpus-cache-json",
+      "source": "detect_corpus_cache\\.json",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `detect_corpus_cache.json`",
+      "inSandbox": false
+    },
+    {
+      "id": "detect-corpus-cache",
+      "source": "detect_corpus_cache",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `detect_corpus_cache`",
+      "inSandbox": false
+    }
+  ],
+  "derivedFrom": "kbs-graphify-incremental-rebuild-watch-py-call-chain",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.100Z"
+  }
+}

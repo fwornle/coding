@@ -1,0 +1,40 @@
+{
+  "topic": "kbs-ontologyfilter-component-unified-viewer",
+  "insightId": "019ee9cd-6767-71a4-a0c7-54d58bbcf5a5",
+  "deliverable": "ontologyfilter-component-unified-viewer-runbook.md",
+  "goalSummary": "Per-item checkbox correct but all/none does not work",
+  "facts": [
+    {
+      "id": "filter-rail-bug-file",
+      "source": "FilterRail\\.tsx",
+      "flags": "i",
+      "required": true,
+      "why": "The file containing the group-toggle sentinel-bypass bug must be identified as the fix location",
+      "inSandbox": true
+    },
+    {
+      "id": "select-deselect-group-handlers",
+      "source": "selectGroup|deselectGroup",
+      "flags": "",
+      "required": true,
+      "why": "The specific group-level handler functions responsible for the bug must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "fourteen-item-hierarchy-count",
+      "source": "14 (total|items?|nodes?|entries)|14-item",
+      "flags": "i",
+      "required": true,
+      "why": "The exact hierarchy item count (1 L0 + 3 L1 + 10 L2 = 14) must be documented for confirmation checks",
+      "inSandbox": true
+    },
+    {
+      "id": "viewer-store-file",
+      "source": "viewer-store\\.ts",
+      "flags": "i",
+      "required": true,
+      "why": "The Zustand store backing all filter state must be identified as the single source of truth",
+      "inSandbox": true
+    }
+  ]
+}

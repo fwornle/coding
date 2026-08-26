@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-project-bootstrap-install-sh-and-submodule-setup",
+  "insightId": "019fd586-823b-72e6-a0de-a5fb14b1d81b",
+  "deliverable": "project-bootstrap-install-sh-and-submodule-setup-runbook.md",
+  "goalSummary": "Script exits at counter increment",
+  "facts": [
+    {
+      "id": "increment-hazard-pattern",
+      "source": "\\(\\(x\\+\\+\\)\\)",
+      "flags": "",
+      "required": true,
+      "why": "Runbook must show the exact hazardous post-increment pattern that triggers set -e termination",
+      "inSandbox": false
+    },
+    {
+      "id": "increment-safe-fix",
+      "source": "\\(\\(x\\+\\+,\\s*0\\)\\)|\\(\\(x\\s*\\+=\\s*1\\)\\)",
+      "flags": "",
+      "required": true,
+      "why": "Runbook must give the exact safe arithmetic form that avoids exit code 1 under set -e",
+      "inSandbox": false
+    },
+    {
+      "id": "coding-repo-unbound-var",
+      "source": "CODING_REPO",
+      "flags": "",
+      "required": true,
+      "why": "The specific unbound-variable risk variable must be named for set -u hazard diagnosis",
+      "inSandbox": true
+    },
+    {
+      "id": "vkb-diagnostic-script",
+      "source": "vkb-diagnostic\\.sh",
+      "flags": "i",
+      "required": true,
+      "why": "The specific script file containing the unbound variable risk must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "stderr-status-messages",
+      "source": "stderr",
+      "flags": "i",
+      "required": true,
+      "why": "Fix: diagnostic/status messages must be redirected to stderr to avoid stdout pollution in pipelines",
+      "inSandbox": true
+    },
+    {
+      "id": "command-substitution-cache-fix",
+      "source": "command substitution|file-keyed cache|temp-file",
+      "flags": "i",
+      "required": true,
+      "why": "Fix for cache assignment escape failure: use file-keyed/temp-file state instead of subshell variable writes",
+      "inSandbox": true
+    }
+  ]
+}

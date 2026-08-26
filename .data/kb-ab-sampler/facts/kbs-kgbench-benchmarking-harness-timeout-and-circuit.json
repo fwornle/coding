@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-kgbench-benchmarking-harness-timeout-and-circuit",
+  "insightId": "019fe119-114d-7a0c-8063-e3ec5bd4b659",
+  "deliverable": "kgbench-benchmarking-harness-timeout-and-circuit-runbook.md",
+  "goalSummary": "Timeout fires at ~950s wall-clock despite 600s setting",
+  "facts": [
+    {
+      "id": "host-stalled-outcome-type",
+      "source": "host_stalled",
+      "flags": "",
+      "required": true,
+      "why": "The specific outcome type distinguishing OS-level stalls from genuine timeouts must be named",
+      "inSandbox": false
+    },
+    {
+      "id": "security-tooling-culprits",
+      "source": "Defender|epsext|CyberArk|Nexthink",
+      "flags": "i",
+      "required": true,
+      "why": "The specific security tooling processes causing CPU starvation must be identified for diagnosis",
+      "inSandbox": false
+    },
+    {
+      "id": "retryable-errors-exclusion",
+      "source": "RETRYABLE_ERRORS",
+      "flags": "",
+      "required": true,
+      "why": "Fix: host_stalled must be excluded from the retryable errors set to prevent wasteful retries",
+      "inSandbox": false
+    },
+    {
+      "id": "circuit-breaker-three-consecutive",
+      "source": "three consecutive|3 consecutive",
+      "flags": "i",
+      "required": true,
+      "why": "The circuit breaker threshold of three consecutive host_stalled outcomes must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "clean-restart-single-head",
+      "source": "single clean commit|single HEAD|clean commit",
+      "flags": "i",
+      "required": true,
+      "why": "Fix: recovery protocol requires restarting at a single clean commit rather than resuming mid-run",
+      "inSandbox": false
+    }
+  ]
+}

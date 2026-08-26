@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-phase-validation-workflow",
+  "insightId": "019f36c1-68f0-7080-91ce-158cce5ba43e",
+  "deliverable": "phase-validation-workflow-runbook.md",
+  "goalSummary": "`SECURITY.md` missing after close-out with no error",
+  "facts": [
+    {
+      "id": "planning-phases-path",
+      "source": "\\.planning/phases/\\{phase\\}/|\\.planning/phases/",
+      "flags": "i",
+      "required": true,
+      "why": "The directory scanned for PLAN.md threat model artifacts must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "plan-md-artifact",
+      "source": "PLAN\\.md",
+      "flags": "i",
+      "required": true,
+      "why": "The specific artifact file scanned for threat model blocks must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "three-state-decision-tree",
+      "source": "State A|State B|State C",
+      "flags": "",
+      "required": true,
+      "why": "The three-state decision tree structure must be documented to define workflow branching",
+      "inSandbox": true
+    },
+    {
+      "id": "provenance-metadata-preservation",
+      "source": "provenance",
+      "flags": "i",
+      "required": true,
+      "why": "Fix requirement: plan-time provenance metadata must be preserved on consolidated threat register entries",
+      "inSandbox": true
+    },
+    {
+      "id": "malformed-blocks-fallthrough",
+      "source": "fallthrough|fall through",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: malformed or absent threat model blocks trigger fallthrough to State C, explaining the missing SECURITY.md symptom",
+      "inSandbox": true
+    }
+  ]
+}

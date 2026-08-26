@@ -1,0 +1,20 @@
+version: 1
+experiment_id: kbs-gsd-plan-phase-skill-phase-planning
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named gsd-plan-phase-skill-phase-planning-runbook.md at the
+  repository root that diagnoses this symptom for an operator: Planning state
+  contaminating execution. The file must state the root cause, give the exact
+  commands to confirm it, and give the exact command or option that fixes it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-off
+test_command: node scripts/kb-ab-assert.mjs kbs-gsd-plan-phase-skill-phase-planning

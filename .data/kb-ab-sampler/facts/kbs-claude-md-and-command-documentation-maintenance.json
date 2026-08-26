@@ -1,0 +1,40 @@
+{
+  "topic": "kbs-claude-md-and-command-documentation-maintenance",
+  "insightId": "019fe0cd-9e61-73b7-8a13-2d9f2ff2c7af",
+  "deliverable": "claude-md-and-command-documentation-maintenance-runbook.md",
+  "goalSummary": "Stale Copilot instructions",
+  "facts": [
+    {
+      "id": "persistence-ts-patch-location",
+      "source": "src/store/persistence\\.ts",
+      "flags": "i",
+      "required": true,
+      "why": "The correct source location for the km-core patch must be documented to avoid confusion with compiled output",
+      "inSandbox": true
+    },
+    {
+      "id": "dist-gitignored-overwrite-cause",
+      "source": "dist/[^.]{0,60}gitignored|gitignored[^.]{0,60}dist/",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: dist/ is gitignored and rebuilt on every npm run build, so a dist-only patch would be silently overwritten",
+      "inSandbox": false
+    },
+    {
+      "id": "npm-run-build-trigger",
+      "source": "npm run build",
+      "flags": "i",
+      "required": true,
+      "why": "The build command that regenerates dist/ from source must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "scope-discipline-no-commit-metadata",
+      "source": "out of scope|commit metadata",
+      "flags": "i",
+      "required": true,
+      "why": "Scope rule: git/commit metadata management is explicitly out of scope for these documentation files",
+      "inSandbox": true
+    }
+  ]
+}

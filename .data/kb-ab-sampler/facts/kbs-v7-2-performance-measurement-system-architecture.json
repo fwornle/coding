@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-v7-2-performance-measurement-system-architecture",
+  "insightId": "019eb544-0f9a-7560-baea-199e5a69786c",
+  "deliverable": "v7-2-performance-measurement-system-architecture-runbook.md",
+  "goalSummary": "Token usage records show as zero or missing for a run despite the agent task having executed and completed normally.",
+  "facts": [
+    {
+      "id": "measurement-lifecycle-scripts",
+      "source": "measurement-start\\.mjs|measurement-stop\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "The span lifecycle scripts controlling measurement start/stop must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "token-usage-db",
+      "source": "token-usage\\.db",
+      "flags": "i",
+      "required": true,
+      "why": "The SQLite store for token-per-call records must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "task-id-format",
+      "source": "exp-\\{context\\}-\\{condition\\}-\\{model\\}-\\{run\\}|exp-dash-start-control-claude-opus",
+      "flags": "i",
+      "required": true,
+      "why": "The task_id naming format must be documented for cross-agent grouping",
+      "inSandbox": true
+    },
+    {
+      "id": "first-writer-wins-dedup",
+      "source": "first-writer-wins",
+      "flags": "i",
+      "required": true,
+      "why": "The deduplication strategy across worktrees must be documented as the cause of silent discards",
+      "inSandbox": true
+    },
+    {
+      "id": "data-dir-gitignored",
+      "source": "\\.data/[^.]{0,60}git-ignored|git-ignored[^.]{0,60}\\.data/",
+      "flags": "i",
+      "required": true,
+      "why": "The .data/ directory being git-ignored and local-only must be documented, explaining why data doesn't transfer across machines",
+      "inSandbox": true
+    },
+    {
+      "id": "proxy-base-url-vars",
+      "source": "ANTHROPIC_BASE_URL|COPILOT_PROVIDER_BASE_URL",
+      "flags": "",
+      "required": true,
+      "why": "Fix: the env vars that must be exported for token counts to be captured must be named",
+      "inSandbox": true
+    }
+  ]
+}

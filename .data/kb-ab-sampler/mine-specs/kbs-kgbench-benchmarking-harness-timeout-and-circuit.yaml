@@ -1,0 +1,17 @@
+version: 1
+experiment_id: mine-kbs-kgbench-benchmarking-harness-timeout-and-circuit
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named
+  kgbench-benchmarking-harness-timeout-and-circuit-runbook.md at the repository
+  root that diagnoses this symptom for an operator: Timeout fires at ~950s
+  wall-clock despite 600s setting. The file must state the root cause, give the
+  exact commands to confirm it, and give the exact command or option that fixes
+  it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on

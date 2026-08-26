@@ -1,0 +1,17 @@
+version: 1
+experiment_id: mine-kbs-foreground-measurement-sampling-head-tail
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named foreground-measurement-sampling-head-tail-runbook.md at
+  the repository root that diagnoses this symptom for an operator: The
+  performance dashboard's distribution charts show only central/average values,
+  with no visible fastest or slowest turn data points for a run. The file must
+  state the root cause, give the exact commands to confirm it, and give the
+  exact command or option that fixes it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on

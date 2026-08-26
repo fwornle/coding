@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-graphify-corpus-cache-and-invalidation-logic",
+  "insightId": "019fdaee-5da2-76b6-8e74-09e4103c1711",
+  "deliverable": "graphify-corpus-cache-and-invalidation-logic-runbook.md",
+  "goalSummary": "Unexpected cache misses for code files",
+  "facts": [
+    {
+      "id": "integrations-graphify-graphify-detect-py",
+      "source": "integrations/graphify/graphify/detect\\.py",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `integrations/graphify/graphify/detect.py`",
+      "inSandbox": false
+    },
+    {
+      "id": "detect-corpus-cache-json",
+      "source": "\\.detect_corpus_cache\\.json",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `.detect_corpus_cache.json`",
+      "inSandbox": false
+    },
+    {
+      "id": "detect-corpus-cache-json",
+      "source": "detect_corpus_cache\\.json",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `detect_corpus_cache.json`",
+      "inSandbox": false
+    },
+    {
+      "id": "detect-corpus-cache",
+      "source": "detect_corpus_cache",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `detect_corpus_cache`",
+      "inSandbox": false
+    }
+  ],
+  "derivedFrom": "kbs-graphify-corpus-cache-and-invalidation-logic",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.094Z"
+  }
+}

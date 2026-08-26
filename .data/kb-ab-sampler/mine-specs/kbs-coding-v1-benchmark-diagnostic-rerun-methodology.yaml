@@ -1,0 +1,18 @@
+version: 1
+experiment_id: mine-kbs-coding-v1-benchmark-diagnostic-rerun-methodology
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named
+  coding-v1-benchmark-diagnostic-rerun-methodology-runbook.md at the repository
+  root that diagnoses this symptom for an operator: On question set B1, the
+  CodeGraph and graphify arms report perfect 1.00 scores, exceeding grep's 0.94
+  — the reverse of other results. The file must state the root cause, give the
+  exact commands to confirm it, and give the exact command or option that fixes
+  it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on

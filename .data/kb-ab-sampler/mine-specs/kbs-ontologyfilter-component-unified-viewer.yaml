@@ -1,0 +1,16 @@
+version: 1
+experiment_id: mine-kbs-ontologyfilter-component-unified-viewer
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named ontologyfilter-component-unified-viewer-runbook.md at the
+  repository root that diagnoses this symptom for an operator: Per-item checkbox
+  correct but all/none does not work. The file must state the root cause, give
+  the exact commands to confirm it, and give the exact command or option that
+  fixes it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on

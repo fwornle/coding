@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-vkb-server-kgbench-question-sets-api-stability",
+  "insightId": "01a005f8-99fe-7d22-888e-beb1110dd88b",
+  "deliverable": "vkb-server-kgbench-question-sets-api-stability-runbook.md",
+  "goalSummary": "Stale/bloated store cleanup",
+  "facts": [
+    {
+      "id": "persist-on-close-flag",
+      "source": "persistOnClose",
+      "flags": "",
+      "required": true,
+      "why": "The exact fix flag that prevents write amplification on read-only opens must be named",
+      "inSandbox": false
+    },
+    {
+      "id": "open-experiment-store-readonly",
+      "source": "openExperimentStore\\(\\s*\\{\\s*readOnly:\\s*true",
+      "flags": "",
+      "required": true,
+      "why": "Mandatory rule: read-only access must use this exact call pattern",
+      "inSandbox": false
+    },
+    {
+      "id": "oom-kill-cgroup-signals",
+      "source": "oom_kill|cgroup",
+      "flags": "i",
+      "required": true,
+      "why": "Diagnostic signals for the OOM crash-loop root cause must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "leveldb-sst-bloat",
+      "source": "SST|\\.ldb|LevelDB",
+      "flags": "i",
+      "required": true,
+      "why": "The write amplification symptom manifests as LevelDB SST file bloat and must be checkable",
+      "inSandbox": true
+    },
+    {
+      "id": "experiments-runs-endpoint",
+      "source": "/api/experiments/runs",
+      "flags": "i",
+      "required": true,
+      "why": "The specific endpoint suffering from unbounded JSON serialization heap growth must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "pagination-streaming-fix",
+      "source": "pagination|streaming",
+      "flags": "i",
+      "required": true,
+      "why": "Fix for root cause #2 requires adding pagination or streaming to avoid unbounded serialization",
+      "inSandbox": true
+    }
+  ]
+}

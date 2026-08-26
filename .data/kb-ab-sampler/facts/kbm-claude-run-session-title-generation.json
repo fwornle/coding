@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-claude-run-session-title-generation",
+  "insightId": "019f84e5-c780-76cd-a468-7e65d7ff4f64",
+  "deliverable": "claude-run-session-title-generation-runbook.md",
+  "goalSummary": "In the Runs table, Claude session titles display raw leading characters of the original prompt instead of a concise summarized description.",
+  "facts": [
+    {
+      "id": "auto-measure-foreground-mjs",
+      "source": "auto-measure-foreground\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `auto-measure-foreground.mjs`",
+      "inSandbox": true
+    },
+    {
+      "id": "llmsessiontitle",
+      "source": "llmSessionTitle",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `llmSessionTitle`",
+      "inSandbox": true
+    },
+    {
+      "id": "backfill",
+      "source": "--backfill",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `--backfill`",
+      "inSandbox": false
+    },
+    {
+      "id": "claudepass",
+      "source": "claudePass",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `claudePass`",
+      "inSandbox": true
+    }
+  ],
+  "derivedFrom": "kbs-claude-run-session-title-generation",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.079Z"
+  }
+}

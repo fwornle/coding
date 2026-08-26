@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-coding-v1-benchmark-cross-agent-matrix-runs-x1",
+  "insightId": "019fec88-089c-7e64-9373-99a92baea512",
+  "deliverable": "coding-v1-benchmark-cross-agent-matrix-runs-x1-runbook.md",
+  "goalSummary": "Two differently-scoped benchmark runs both labeled \"r9\" report differing cell counts and results, causing figures to be cited inconsistently.",
+  "facts": [
+    {
+      "id": "r9-run-path",
+      "source": "\\.data/kgbench/runs/coding-v1-r9",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must name the authoritative primary run state directory",
+      "inSandbox": false
+    },
+    {
+      "id": "r8-run-path",
+      "source": "\\.data/kgbench/runs/coding-v1-r8",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must name the historical r8 run directory retained as methodology evidence",
+      "inSandbox": false
+    },
+    {
+      "id": "cell-count-ambiguity",
+      "source": "408[^.]{0,80}384|384[^.]{0,80}408",
+      "flags": "i",
+      "required": true,
+      "why": "Relationship: r9's 408-cell grid must be distinguished from a separate 384-cell kgbench r9 run to avoid citation ambiguity",
+      "inSandbox": true
+    },
+    {
+      "id": "measurement-lessons-file",
+      "source": "measurement-lessons\\.md",
+      "flags": "i",
+      "required": true,
+      "why": "The preserved methodology evidence file from r8's defect record must be named",
+      "inSandbox": false
+    },
+    {
+      "id": "r8-claims-checker-pin",
+      "source": "274 claims",
+      "flags": "i",
+      "required": true,
+      "why": "The claims checker is pinned to r8's specific 274-claim count and must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "archive-before-delete-r8",
+      "source": "archive[^.]{0,80}(delete|discard)|(delete|discard)[^.]{0,80}archive",
+      "flags": "i",
+      "required": true,
+      "why": "Fix: r8 leftover data must be archived rather than deleted outright since it is retained as regression evidence",
+      "inSandbox": true
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-graphify-incremental-rebuild-watch-py-call-chain",
+  "insightId": "019fd349-48f2-71a5-b866-30d8a7bd4d2d",
+  "deliverable": "graphify-incremental-rebuild-watch-py-call-chain-runbook.md",
+  "goalSummary": "`_reconcile_existing_graph` not reflecting changes",
+  "facts": [
+    {
+      "id": "rebuild-code-function",
+      "source": "_rebuild_code",
+      "flags": "",
+      "required": true,
+      "why": "The sole orchestrator function of the incremental rebuild pipeline must be named",
+      "inSandbox": false
+    },
+    {
+      "id": "watch-py-file",
+      "source": "watch\\.py",
+      "flags": "i",
+      "required": true,
+      "why": "The file containing the rebuild orchestrator and reconciliation logic must be identified",
+      "inSandbox": false
+    },
+    {
+      "id": "corpus-cache-file",
+      "source": "\\.detect_corpus_cache\\.json",
+      "flags": "i",
+      "required": true,
+      "why": "The cache artifact that can serve stale hits and must be deleted to force re-detection must be identified",
+      "inSandbox": false
+    },
+    {
+      "id": "full-reindex-endpoint",
+      "source": "POST /api/cgr/reindex|graphify-reindex\\.sh",
+      "flags": "i",
+      "required": true,
+      "why": "The contrasting full reindex path must be documented to distinguish it from the incremental path",
+      "inSandbox": false
+    },
+    {
+      "id": "graphifyignore-cache-invalidation",
+      "source": "\\.graphifyignore",
+      "flags": "i",
+      "required": true,
+      "why": "Relationship: edits to .graphifyignore must invalidate the corpus signature/cache, a known failure mode if not",
+      "inSandbox": false
+    }
+  ]
+}

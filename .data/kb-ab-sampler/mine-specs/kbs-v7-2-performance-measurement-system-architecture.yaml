@@ -1,0 +1,17 @@
+version: 1
+experiment_id: mine-kbs-v7-2-performance-measurement-system-architecture
+snapshot_id: smoke-spec
+goal_sentence: >-
+  Create a file named
+  v7-2-performance-measurement-system-architecture-runbook.md at the repository
+  root that diagnoses this symptom for an operator: Token usage records show as
+  zero or missing for a run despite the agent task having executed and completed
+  normally. The file must state the root cause, give the exact commands to
+  confirm it, and give the exact command or option that fixes it.
+repeats: 3
+task_class: docs
+variants:
+  - agent: claude
+    model: claude-sonnet-4-6
+    framework: straight
+    env: kb-on

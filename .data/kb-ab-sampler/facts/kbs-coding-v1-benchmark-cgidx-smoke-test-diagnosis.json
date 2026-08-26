@@ -1,0 +1,40 @@
+{
+  "topic": "kbs-coding-v1-benchmark-cgidx-smoke-test-diagnosis",
+  "insightId": "019ff866-aa6f-74a7-83d4-bc589d50eae0",
+  "deliverable": "coding-v1-benchmark-cgidx-smoke-test-diagnosis-runbook.md",
+  "goalSummary": "The smoke test exits cleanly with code 0, yet the subsequent full run indexes only a small fraction of expected data after many minutes.",
+  "facts": [
+    {
+      "id": "index-state-directory",
+      "source": "\\.data/k(?![a-zA-Z])",
+      "flags": "",
+      "required": true,
+      "why": "Runbook must reference the directory holding per-index state indicator files",
+      "inSandbox": false
+    },
+    {
+      "id": "smoke-log-artifact",
+      "source": "cgidx-smoke\\.log",
+      "flags": "i",
+      "required": true,
+      "why": "Primary post-mortem artifact for smoke test failures must be named",
+      "inSandbox": false
+    },
+    {
+      "id": "db-rollback-masking-cause",
+      "source": "rollback|rolls back",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: DB rollback masks the root error, producing a misleading clean exit code",
+      "inSandbox": true
+    },
+    {
+      "id": "cold-build-baseline-timing",
+      "source": "36 second|52\\s*s",
+      "flags": "i",
+      "required": true,
+      "why": "Confirmation baseline timing for a healthy cold build must be stated",
+      "inSandbox": true
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-smoke-spec-snapshot-restore-km-core-blockers",
+  "insightId": "019f834a-a3a8-7178-a8df-b96324e90020",
+  "deliverable": "smoke-spec-snapshot-restore-km-core-blockers-runbook.md",
+  "goalSummary": "Empty knowledge graph after restore",
+  "facts": [
+    {
+      "id": "repro-restore-cli",
+      "source": "repro-restore\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "The CLI entry point for snapshot restore must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "kb-capture-restoresnapshot",
+      "source": "restoreSnapshot\\(\\)|kb-capture\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "The function and file defining restoreSnapshot() and hydrateSandbox defaults must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "kb-export-artifact-paths",
+      "source": "kb/general\\.json|kb/leveldb",
+      "flags": "i",
+      "required": true,
+      "why": "The specific KB export artifact paths required in the snapshot payload must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "tree-read-error-cause",
+      "source": "tree read error",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: the specific error indicating a corrupted or inaccessible commit must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "unpushed-commit-cause",
+      "source": "pushed to origin|local-only commits",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: only pushed commits are resolvable; local-only commits cause the same checkout failure",
+      "inSandbox": true
+    },
+    {
+      "id": "git-cat-file-verification",
+      "source": "git cat-file -t",
+      "flags": "",
+      "required": true,
+      "why": "Fix/diagnostic: verifying commit existence on origin uses this exact command",
+      "inSandbox": false
+    }
+  ]
+}

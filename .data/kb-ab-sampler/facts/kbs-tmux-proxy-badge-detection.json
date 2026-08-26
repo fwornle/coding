@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-tmux-proxy-badge-detection",
+  "insightId": "019eb544-0ffb-783e-956d-49e444ffcb44",
+  "deliverable": "tmux-proxy-badge-detection-runbook.md",
+  "goalSummary": "Persistent `P:OFF` when proxy is confirmed running",
+  "facts": [
+    {
+      "id": "env-var-primary-signal",
+      "source": "HTTP_PROXY|HTTPS_PROXY",
+      "flags": "",
+      "required": true,
+      "why": "Runbook must identify the env vars used as the authoritative proxy-active signal",
+      "inSandbox": true
+    },
+    {
+      "id": "px-toggle-command",
+      "source": "px-toggle",
+      "flags": "i",
+      "required": true,
+      "why": "The toggle mechanism that unsets env vars but leaves the process running must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "port-3128-legacy-signal",
+      "source": "3128",
+      "flags": "",
+      "required": true,
+      "why": "Legacy port-based detection method must be documented as subordinate to env var check",
+      "inSandbox": true
+    },
+    {
+      "id": "renderer-file",
+      "source": "combined-status-line\\.js",
+      "flags": "i",
+      "required": true,
+      "why": "The statusline renderer file controlling badge state must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "faded-badge-self-resolve",
+      "source": "self-resolve|self resolves",
+      "flags": "i",
+      "required": true,
+      "why": "Confirmation: faded/black badge is transient and self-resolves without intervention",
+      "inSandbox": false
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-retrieval-service-hybrid-search-and-rrf-fusion",
+  "insightId": "019f7a3a-6ada-7834-9b97-74ad26ddb2d6",
+  "deliverable": "retrieval-service-hybrid-search-and-rrf-fusion-runbook.md",
+  "goalSummary": "Injected context includes many marginally relevant or off-topic results, with similarity scores for different items clustering tightly together instead of showing clear separation.",
+  "facts": [
+    {
+      "id": "src-retrieval-retrieval-service-js",
+      "source": "src/retrieval/retrieval-service\\.js",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `src/retrieval/retrieval-service.js`",
+      "inSandbox": true
+    },
+    {
+      "id": "knowledge-injection-hook-js",
+      "source": "knowledge-injection-hook\\.js",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `knowledge-injection-hook.js`",
+      "inSandbox": true
+    },
+    {
+      "id": "retrieval-service-js",
+      "source": "retrieval-service\\.js",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `retrieval-service.js`",
+      "inSandbox": true
+    },
+    {
+      "id": "token-budget-js",
+      "source": "token-budget\\.js",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `token-budget.js`",
+      "inSandbox": true
+    }
+  ],
+  "derivedFrom": "kbs-retrieval-service-hybrid-search-and-rrf-fusion",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.129Z"
+  }
+}

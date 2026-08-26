@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-kgbench-grader-false-positives",
+  "insightId": "019fd685-9ea8-70a5-8c01-6a77bac47f3c",
+  "deliverable": "kgbench-grader-false-positives-runbook.md",
+  "goalSummary": "Unexpected 0.00 on a cell with valid agent output",
+  "facts": [
+    {
+      "id": "tests-integration-kgbench-graders-test-j",
+      "source": "tests/integration/kgbench-graders\\.test\\.js",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `tests/integration/kgbench-graders.test.js`",
+      "inSandbox": false
+    },
+    {
+      "id": "scripts-kgbench-verify-report-claims-mjs",
+      "source": "scripts/kgbench-verify-report-claims\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `scripts/kgbench-verify-report-claims.mjs`",
+      "inSandbox": false
+    },
+    {
+      "id": "kgbench-verify-report-claims-mjs",
+      "source": "kgbench-verify-report-claims\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `kgbench-verify-report-claims.mjs`",
+      "inSandbox": false
+    },
+    {
+      "id": "lib-kgbench-graders-mjs",
+      "source": "lib/kgbench/graders\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `lib/kgbench/graders.mjs`",
+      "inSandbox": false
+    }
+  ],
+  "derivedFrom": "kbs-kgbench-grader-false-positives",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.111Z"
+  }
+}

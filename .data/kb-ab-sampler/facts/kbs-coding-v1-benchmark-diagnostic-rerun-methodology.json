@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-coding-v1-benchmark-diagnostic-rerun-methodology",
+  "insightId": "019fed20-679f-75f5-8a31-9175c75b45cc",
+  "deliverable": "coding-v1-benchmark-diagnostic-rerun-methodology-runbook.md",
+  "goalSummary": "On question set B1, the CodeGraph and graphify arms report perfect 1.00 scores, exceeding grep's 0.94 — the reverse of other results.",
+  "facts": [
+    {
+      "id": "analysis-harness-script",
+      "source": "analyse-requestions\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must name the exact script used for arm-vs-arm comparison analysis",
+      "inSandbox": false
+    },
+    {
+      "id": "run-state-path",
+      "source": "\\.data/kgbench/runs/",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must reference the directory storing run state and results",
+      "inSandbox": false
+    },
+    {
+      "id": "codegraph-a4-collapse-scores",
+      "source": "0\\.61|0\\.56",
+      "flags": "i",
+      "required": true,
+      "why": "CodeGraph A4 collapse scores must be documented as the largest arm gap",
+      "inSandbox": true
+    },
+    {
+      "id": "conditional-claim-language",
+      "source": "conditional",
+      "flags": "i",
+      "required": true,
+      "why": "Fix: report claims must use conditional language rather than absolute rankings, enforced by claim checker",
+      "inSandbox": true
+    },
+    {
+      "id": "graphify-slower-timing",
+      "source": "slower",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: graphify/codegraph cells run slower, affecting timing estimates and stall diagnosis",
+      "inSandbox": true
+    }
+  ]
+}

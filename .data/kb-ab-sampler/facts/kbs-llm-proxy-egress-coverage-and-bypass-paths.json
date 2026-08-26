@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-llm-proxy-egress-coverage-and-bypass-paths",
+  "insightId": "019f9deb-9cb8-7c26-b8ef-c02950509dc2",
+  "deliverable": "llm-proxy-egress-coverage-and-bypass-paths-runbook.md",
+  "goalSummary": "Bare CLI invocations of claude, copilot, or opencode outside the coding project fail to reach provider APIs entirely.",
+  "facts": [
+    {
+      "id": "proxy-port-12435",
+      "source": ":12435",
+      "flags": "",
+      "required": true,
+      "why": "The confined proxy port for all provider egress must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "embeddings-passthrough-endpoint",
+      "source": "POST /v1/embeddings|/v1/embeddings",
+      "flags": "i",
+      "required": true,
+      "why": "The specific embeddings passthrough endpoint added for in-process callers must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "codegraph-chat-completions-shim",
+      "source": "/v1/codegraph/chat/completions",
+      "flags": "i",
+      "required": true,
+      "why": "The shim endpoint for codegraph telemetry stamping must be identified",
+      "inSandbox": false
+    },
+    {
+      "id": "api-key-token-removal",
+      "source": "\\*_API_KEY|\\*_TOKEN",
+      "flags": "",
+      "required": true,
+      "why": "The raw credential env var patterns removed from container bootstrap must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "bin-coding-flags-scope",
+      "source": "--claude|--opencode|--copilot",
+      "flags": "i",
+      "required": true,
+      "why": "Fix: fail-closed isolation must be scoped only to bin/coding invocations with these flags, not machine-wide",
+      "inSandbox": false
+    },
+    {
+      "id": "cross-session-handoff-file",
+      "source": "project_t2_egress_lockdown_next\\.md",
+      "flags": "i",
+      "required": true,
+      "why": "The cross-session task-state file used to resume the multi-tier effort must be identified",
+      "inSandbox": false
+    }
+  ]
+}

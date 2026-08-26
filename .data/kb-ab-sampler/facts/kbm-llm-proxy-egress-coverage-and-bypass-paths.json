@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-llm-proxy-egress-coverage-and-bypass-paths",
+  "insightId": "019f9deb-9cb8-7c26-b8ef-c02950509dc2",
+  "deliverable": "llm-proxy-egress-coverage-and-bypass-paths-runbook.md",
+  "goalSummary": "Bare CLI invocations of claude, copilot, or opencode outside the coding project fail to reach provider APIs entirely.",
+  "facts": [
+    {
+      "id": "opencode",
+      "source": "--opencode",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `--opencode`",
+      "inSandbox": false
+    },
+    {
+      "id": "etc-hosts",
+      "source": "/etc/hosts",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `/etc/hosts`",
+      "inSandbox": true
+    },
+    {
+      "id": "bin-coding",
+      "source": "bin/coding",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `bin/coding`",
+      "inSandbox": true
+    },
+    {
+      "id": "copilot",
+      "source": "--copilot",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `--copilot`",
+      "inSandbox": false
+    }
+  ],
+  "derivedFrom": "kbs-llm-proxy-egress-coverage-and-bypass-paths",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.116Z"
+  }
+}

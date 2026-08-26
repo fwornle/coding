@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-telemetry-probe-opencode-hang-and-proxy-bridge",
+  "insightId": "01a018ad-5289-7f3e-aa04-68745d9b1efb",
+  "deliverable": "telemetry-probe-opencode-hang-and-proxy-bridge-runbook.md",
+  "goalSummary": "Tool-bearing requests stuck on copilot despite quota exhaustion",
+  "facts": [
+    {
+      "id": "stdin-inheritance-cause",
+      "source": "stdin inheritance|inherits.{0,40}stdin",
+      "flags": "i",
+      "required": true,
+      "why": "Root cause of the opencode hang must be documented as stdin inheritance from parent process",
+      "inSandbox": false
+    },
+    {
+      "id": "stdin-redirect-fix",
+      "source": "< /dev/null",
+      "flags": "",
+      "required": true,
+      "why": "The exact fix redirecting stdin explicitly must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "vcs-initialized-freeze",
+      "source": "vcs initialized",
+      "flags": "i",
+      "required": true,
+      "why": "The exact log message where the stall is observed must be documented as the symptom",
+      "inSandbox": false
+    },
+    {
+      "id": "fallback-yaml-config",
+      "source": "config/llm-fal/fallback\\.yaml",
+      "flags": "i",
+      "required": true,
+      "why": "The fallback chain source-of-truth file where tool-capability flags are set must be identified",
+      "inSandbox": false
+    },
+    {
+      "id": "copilot-only-tool-capable-gate",
+      "source": "\\[copilot\\]|only.{0,20}copilot.{0,20}tool-capable",
+      "flags": "i",
+      "required": true,
+      "why": "The proxy-bridge gate collapsing the provider chain to copilot-only for tool requests must be documented",
+      "inSandbox": false
+    }
+  ]
+}

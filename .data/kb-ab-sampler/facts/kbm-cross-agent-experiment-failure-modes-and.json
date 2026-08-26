@@ -1,0 +1,46 @@
+{
+  "topic": "kbm-cross-agent-experiment-failure-modes-and",
+  "insightId": "019f852e-e0d9-75d3-b23b-7f64701f2c12",
+  "deliverable": "cross-agent-experiment-failure-modes-and-runbook.md",
+  "goalSummary": "0-token rows / silent aborts",
+  "facts": [
+    {
+      "id": "lib-experiments-experiment-runner-mjs",
+      "source": "lib/experiments/experiment-runner\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `lib/experiments/experiment-runner.mjs`",
+      "inSandbox": true
+    },
+    {
+      "id": "launch-agent-common-sh",
+      "source": "launch-agent-common\\.sh",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `launch-agent-common.sh`",
+      "inSandbox": true
+    },
+    {
+      "id": "experiment-runner-mjs",
+      "source": "experiment-runner\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `experiment-runner.mjs`",
+      "inSandbox": true
+    },
+    {
+      "id": "agent-headless-mjs",
+      "source": "agent-headless\\.mjs",
+      "flags": "",
+      "required": true,
+      "why": "every treatment-arm repeat wrote `agent-headless.mjs`",
+      "inSandbox": true
+    }
+  ],
+  "derivedFrom": "kbs-cross-agent-experiment-failure-modes-and",
+  "minedFrom": {
+    "deliverables": 3,
+    "window": 1787628104,
+    "at": "2026-08-25T11:29:41.086Z"
+  }
+}

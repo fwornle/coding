@@ -1,0 +1,56 @@
+{
+  "topic": "kbs-cross-agent-experiment-failure-modes-and",
+  "insightId": "019f852e-e0d9-75d3-b23b-7f64701f2c12",
+  "deliverable": "cross-agent-experiment-failure-modes-and-runbook.md",
+  "goalSummary": "0-token rows / silent aborts",
+  "facts": [
+    {
+      "id": "model-id-dot-format",
+      "source": "rapid-proxy/claude-haiku-4\\.5",
+      "flags": "i",
+      "required": true,
+      "why": "Exact model ID example illustrating the dotted format required to avoid silent opencode catalog miss",
+      "inSandbox": true
+    },
+    {
+      "id": "agent-headless-script",
+      "source": "agent-headless\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "The headless invocation script that must replicate proxy-routing env vars must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "launch-agent-common-canonical-source",
+      "source": "launch-agent-common\\.sh",
+      "flags": "i",
+      "required": true,
+      "why": "The canonical env var injection point for proxy routing and BYOK config must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "anthropic-base-url-var",
+      "source": "ANTHROPIC_BASE_URL",
+      "flags": "",
+      "required": true,
+      "why": "The specific env var whose non-propagation causes silent claude aborts must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "assert-cells-verification",
+      "source": "assert-cells\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "The post-run assertion script verifying terminal_state=complete for all cells must be named",
+      "inSandbox": false
+    },
+    {
+      "id": "terminal-state-complete-filter",
+      "source": "terminal_state\\s*=\\s*complete|terminal_state\\s*≠\\s*complete",
+      "flags": "i",
+      "required": true,
+      "why": "Confirmation: valid analysis must filter runs by terminal_state=complete to exclude aborts",
+      "inSandbox": false
+    }
+  ]
+}

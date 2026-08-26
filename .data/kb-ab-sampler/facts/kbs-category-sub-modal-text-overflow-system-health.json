@@ -1,0 +1,32 @@
+{
+  "topic": "kbs-category-sub-modal-text-overflow-system-health",
+  "insightId": "019f7e1a-8e36-71ed-a920-2ef0d2353e15",
+  "deliverable": "category-sub-modal-text-overflow-system-health-runbook.md",
+  "goalSummary": "Long path tokens overflowing",
+  "facts": [
+    {
+      "id": "target-file-path",
+      "source": "context-cache-explainer\\.tsx",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must name the exact component file requiring the overflow fixes",
+      "inSandbox": true
+    },
+    {
+      "id": "overflow-x-hidden-class",
+      "source": "overflow-x-hidden",
+      "flags": "i",
+      "required": true,
+      "why": "The specific CSS class suppressing horizontal scroll bleed on DialogContent must be stated",
+      "inSandbox": true
+    },
+    {
+      "id": "overflow-y-auto-clip-cause",
+      "source": "overflow-y:\\s*auto[^.]{0,80}overflow-x:\\s*clip",
+      "flags": "i",
+      "required": true,
+      "why": "Cause: CSS spec behavior where overflow-y auto forces overflow-x clip explains why the fix is needed",
+      "inSandbox": false
+    }
+  ]
+}

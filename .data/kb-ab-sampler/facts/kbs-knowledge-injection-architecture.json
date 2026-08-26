@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-knowledge-injection-architecture",
+  "insightId": "019f7b3d-eeeb-7d04-81f5-443a7e6301d1",
+  "deliverable": "knowledge-injection-architecture-runbook.md",
+  "goalSummary": "An agent session lacks stable project-wide context at startup, or shows outdated retrieved knowledge on later prompts despite ongoing conversation activity.",
+  "facts": [
+    {
+      "id": "retrieval-service-file",
+      "source": "retrieval-service\\.js",
+      "flags": "i",
+      "required": true,
+      "why": "The file assembling per-turn Retrieved Knowledge segment must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "per-turn-baseline-hooks",
+      "source": "Per-Turn Hook|Baseline Hook",
+      "flags": "i",
+      "required": true,
+      "why": "The two distinct injection pathways must be named to distinguish their trigger conditions",
+      "inSandbox": true
+    },
+    {
+      "id": "knowledge-injection-doc",
+      "source": "docs-content/architecture/knowledge-injection\\.md",
+      "flags": "i",
+      "required": true,
+      "why": "The authoritative documentation file for both injection pathways must be identified",
+      "inSandbox": false
+    },
+    {
+      "id": "channel-resolver-mechanism",
+      "source": "channel-resolver",
+      "flags": "i",
+      "required": true,
+      "why": "The shared mechanism routing context to the appropriate injection pathway must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "kg-entity-context-assembly",
+      "source": "KG entity context|semantic search results",
+      "flags": "i",
+      "required": true,
+      "why": "The specific data components (semantic search results + KG entity context) assembled into the Retrieved Knowledge segment must be documented",
+      "inSandbox": false
+    }
+  ]
+}

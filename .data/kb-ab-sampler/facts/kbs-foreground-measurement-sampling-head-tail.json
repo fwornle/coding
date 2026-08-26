@@ -1,0 +1,48 @@
+{
+  "topic": "kbs-foreground-measurement-sampling-head-tail",
+  "insightId": "019f84e5-c782-70df-8380-584a0c13c608",
+  "deliverable": "foreground-measurement-sampling-head-tail-runbook.md",
+  "goalSummary": "The performance dashboard's distribution charts show only central/average values, with no visible fastest or slowest turn data points for a run.",
+  "facts": [
+    {
+      "id": "auto-measure-foreground-file",
+      "source": "auto-measure-foreground\\.mjs",
+      "flags": "i",
+      "required": true,
+      "why": "The exact file implementing head+tail sampling logic must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "span-time-window-bounds",
+      "source": "span\\.start_time|span\\.end_time",
+      "flags": "i",
+      "required": true,
+      "why": "The specific time-window bounds used before head/tail selection must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "capture-foreground-tokens-function",
+      "source": "captureForegroundTokens",
+      "flags": "",
+      "required": true,
+      "why": "The existing time-windowed aggregation function complemented by head+tail sampling must be named",
+      "inSandbox": true
+    },
+    {
+      "id": "gsd-close-trigger",
+      "source": "/gsd close",
+      "flags": "i",
+      "required": true,
+      "why": "The trigger point for foreground measurement at run close must be documented",
+      "inSandbox": false
+    },
+    {
+      "id": "windowed-filter-before-selection",
+      "source": "window filter.{0,60}before|before.{0,60}head/tail selection",
+      "flags": "i",
+      "required": true,
+      "why": "Fix: the span window filter must be applied before head/tail selection to avoid cross-span boundary contamination",
+      "inSandbox": false
+    }
+  ]
+}

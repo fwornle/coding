@@ -1,0 +1,32 @@
+{
+  "topic": "kbs-knowledge-context-injection-insight-truncation",
+  "insightId": "01a02d8b-e6cf-73b3-bd6a-0b050492d4f8",
+  "deliverable": "knowledge-context-injection-insight-truncation-runbook.md",
+  "goalSummary": "Injected insights appear cut off mid-sentence in the agent's context, showing only a fraction of the original content even when budget headroom seems available.",
+  "facts": [
+    {
+      "id": "preview-truncation-file",
+      "source": "src/embedding/preview\\.ts",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must reference the exact file implementing the per-insight character cap",
+      "inSandbox": false
+    },
+    {
+      "id": "char-cap-1200-2000",
+      "source": "1,?200|2,?000",
+      "flags": "i",
+      "required": true,
+      "why": "The specific character caps for injection (1,200) and backfill (2,000) passes must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "relevance-threshold-value",
+      "source": "0\\.318",
+      "flags": "",
+      "required": true,
+      "why": "The specific relevance threshold value used to drop insights before budget assembly must be stated",
+      "inSandbox": true
+    }
+  ]
+}

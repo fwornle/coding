@@ -1,0 +1,40 @@
+{
+  "topic": "kbs-cold-store-maintenance-dangling-digest",
+  "insightId": "019f5b80-7288-7513-9b2b-28cd375003da",
+  "deliverable": "cold-store-maintenance-dangling-digest-runbook.md",
+  "goalSummary": "Some digests in the cold-store JSON reference observation IDs that no longer exist in the store, despite an earlier fix having been marked resolved.",
+  "facts": [
+    {
+      "id": "sweeper-job-name",
+      "source": "digest-refs-sweeper",
+      "flags": "i",
+      "required": true,
+      "why": "The exact launchd job name performing the sweep must be identified",
+      "inSandbox": true
+    },
+    {
+      "id": "launchd-6-hour-cycle",
+      "source": "launchd",
+      "flags": "i",
+      "required": true,
+      "why": "Runbook must state the sweeper runs as a launchd job on a scheduled cycle",
+      "inSandbox": true
+    },
+    {
+      "id": "six-hour-interval",
+      "source": "6-hour|6 hour",
+      "flags": "i",
+      "required": true,
+      "why": "The specific sweep interval must be documented",
+      "inSandbox": true
+    },
+    {
+      "id": "healthy-exit-signal",
+      "source": "exit 0[^.]{0,80}0\\.0%|0\\.0%[^.]{0,80}dangling",
+      "flags": "i",
+      "required": true,
+      "why": "Confirmation: healthy steady state is exit 0 with 0.0% dangling refs",
+      "inSandbox": false
+    }
+  ]
+}
