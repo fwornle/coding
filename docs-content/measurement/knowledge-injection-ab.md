@@ -455,6 +455,23 @@ receives. Two-thirds attrition is not a defect — it is the blind filters doing
 round's reference filter failed at — but it means a round of this size costs roughly three times
 its visible cell count in candidates.
 
+**The recoverability audit is a column here, and it earns the design.** Every task carries a
+verdict on whether the control arm could grep its way to the graded facts, and no task is filtered
+on it:
+
+| Verdict | Tasks | Discriminate |
+|---|---:|---:|
+| FAIL — every required fact is grep-able | 5 | 4 |
+| WARN — some reachable, some not | 3 | 2 |
+| PASS — none reachable by search | 3 | 3 |
+
+**Four of the five FAIL-verdict tasks discriminated anyway.** Had the audit been used as the
+inclusion filter the original plan called for, those four would have been discarded as unmeasurable
+— and with them most of the round's signal. This is the finding from pitfall 2 reproduced on a
+sampled set rather than a single task: static searchability says what a determined grep *could*
+reach, not what an agent under task pressure actually retrieves. The verdict belongs beside the
+result, never in front of it.
+
 **This number was wrong once before it was right.** The round's first pass reported 55%. Two
 defects produced it, both recorded below as pitfalls 8 and 9: three of the eleven tasks were
 silently graded against the reference gate this round exists to replace, and a task whose six cells
@@ -656,10 +673,20 @@ in both directions at once, which is why reading the results did not reveal it.
 > structurally and then asserted, because the failure mode is not a crash — it is a well-formed file
 > that measures the wrong thing.
 
+**The same fold defeated a second script, in a different way.** The recoverability audit read the
+spec's scalars with a `^key:\s*(.+?)$` regex — "avoids a YAML dep for the three scalars we need" —
+so a folded `test_command` yielded the literal string `>-` as the command. It found no gate in it
+and returned SKIP: *"no `grep -F` gate in test_command"*, for a spec whose gate was perfectly well
+formed. Three tasks audited as SKIP for no reason but the length of their topic, and a SKIP is not
+an error — it is a non-answer that looks like a considered one. The two scalars that never fold,
+`experiment_id` and `snapshot_id`, are why this went unnoticed for so long.
+
 **Measure:** the generator parses the spec, replaces the gate argument in the parsed argv, and
 re-serialises. A spec whose `test_command` does not carry the expected topic argument **throws**
 rather than being emitted. Every emitted spec is checked to assert its own mined topic, and every
-topic to resolve in the fact table, before a run starts.
+topic to resolve in the fact table, before a run starts. The audit parses YAML rather than matching
+lines. And specs are now emitted unfolded (`lineWidth: -1`), because "nothing else parses this by
+line" turned out not to be a safe assumption to make once, and is not worth betting on twice.
 
 ### 9. A cell that never ran, counted as a cell that failed
 
