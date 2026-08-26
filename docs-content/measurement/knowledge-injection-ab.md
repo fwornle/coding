@@ -338,6 +338,12 @@ probability that injection helps on an arbitrary task, because the tasks were no
 **And the deliverable is a document, not working code.** Nothing here shows that injection improves
 software that has to compile and pass tests.
 
+These three constraints describe *this* run — three curated tasks — and are not retracted by
+anything that follows. The first of them is the one that later got an answer: a sampled round of
+eleven mechanically derived tasks is reported under [When we tried to
+sample](#when-we-tried-to-sample), and it supplies the rate that a curated set cannot. It does not
+make these tasks a random sample, and its own conditioning is different rather than absent.
+
 ---
 
 ## Where this goes next
@@ -360,8 +366,9 @@ biased. The change that buys genuine evidence is to define a population and samp
       solve, which is a direct measure of how much of the knowledge base is *non-redundant*;
     - the **effect size on the tasks that do discriminate**, which is what this run already has.
 
-The first number is the one that justifies the system's cost, and it is currently unknown. It is
-also the number that would put the retired task's failure mode on a proper denominator.
+The first number is the one that justifies the system's cost. It was unknown when this report was
+first written; [the round below](#when-we-tried-to-sample) measured it. It is also the number that
+puts the retired task's failure mode on a proper denominator.
 
 Three cheaper power upgrades need no new tasks at all:
 
@@ -412,9 +419,54 @@ restated: a fact must survive a shape check, must appear in the block the agent 
 must not be something the model already writes unprompted, and must not be given away by the goal
 sentence itself.
 
-The round is in flight at the time of writing, over roughly thirty sampled tasks. Its gates are
-written alongside the originals rather than over them, so a partial pass cannot leave a half-stale
-matrix behind.
+The mined gates are written alongside the originals rather than over them, so a partial pass cannot
+leave a half-stale matrix behind.
+
+**What the round found.** Thirty-six insights were drawn from a frozen population of 162 above the
+confidence threshold. Eleven survived mining into runnable tasks, and all eleven ran — two arms,
+three repeats, sixty-six cells.
+
+**Nine of the eleven discriminate: 82% (95% Wilson 52%–95%)** — and that number means the narrow
+thing the section above defines, not the broad thing it resembles. It is **not** the probability
+that injection helps on an arbitrary task. It is the fraction of gates *mined from what the
+treatment arm wrote* that the control arm could not reproduce, and the treatment arm passes those
+gates close to by construction. The load-bearing half of the measurement is the control arm's
+failure, which nothing in the gate's construction arranged.
+
+On a strict reading — every treatment repeat accepted, no control repeat accepted — seven of eleven,
+64% (35%–85%). The other two tasks are `kb-redundant`: the repository already answers them and
+injection adds nothing. **No task landed in `neither-solves`, and none in `injection-hurt`.**
+
+The effect size, on the nine that discriminate, is the shape the curated tasks already showed:
+
+| Arm | Steps | Seconds | Tokens |
+|---|---:|---:|---:|
+| kb-on | 7.3 | 185 | 2,692 |
+| kb-off | 22.6 | 340 | 18,328 |
+
+Three times the steps, nearly twice the wall-clock and **6.8x the tokens** — to arrive at an answer
+the control arm mostly did not reach at all.
+
+**The mining funnel is where most candidates die**, and its shape matters more than the rate does.
+Of thirty-six drawn, twenty-five produced no runnable task: ten had no deliverable in the window,
+eleven kept fewer than the three facts a conjunction needs, three had no token surviving in *every*
+treatment deliverable, and one mined a token that never appears in the block the treatment arm
+receives. Two-thirds attrition is not a defect — it is the blind filters doing the job the first
+round's reference filter failed at — but it means a round of this size costs roughly three times
+its visible cell count in candidates.
+
+**This number was wrong once before it was right.** The round's first pass reported 55%. Two
+defects produced it, both recorded below as pitfalls 8 and 9: three of the eleven tasks were
+silently graded against the reference gate this round exists to replace, and a task whose six cells
+never executed was published as `neither-solves` — a verdict about an agent that was never invoked.
+Neither raised an error, and they moved the headline in opposite directions, which is why reading
+the results did not reveal them. Every `neither-solves` verdict in that first pass turned out to be
+an artefact of one or the other.
+
+At n=11 the interval is still wide enough to size the next round rather than settle the question.
+The honest summary: roughly four in five knowledge-derived tasks were beyond the control arm, with
+the true value plausibly anywhere from half to nearly all — and the cost separation, being
+continuous rather than binary, remains far better powered than the rate.
 
 ### Programming tasks: possible, but grade a different thing
 
@@ -468,8 +520,9 @@ rather than on intuition about how noisy such a matrix would be.
 ## Pitfalls, and the measures built to defeat them
 
 Every item below is a real failure that produced plausible but invalid results, followed by the
-measure now in place. Together they are the reason the table above can be believed: three of these
-were found *after* a run had already produced a clean-looking set of numbers.
+measure now in place. Together they are the reason the table above can be believed: five of these
+were found *after* a run had already produced a clean-looking set of numbers — two of them after a
+*published* set of numbers.
 
 They are also the transferable part. The specific facts being graded are peculiar to this project;
 the ways an isolated experiment turns out not to be isolated are not.
@@ -577,6 +630,56 @@ health is monitored for the duration of a run. In this run all nine treatment ce
 identical injection sizes within their task (5,395 / 5,519 / ~9,000 chars), confirming none was
 degraded.
 
+### 8. A generated gate that silently kept pointing at the gate it replaced
+
+The mined round derives a new gate per task and writes a spec beside the pilot's. The generator
+produced that spec by rewriting the pilot's YAML as text:
+
+```js
+.replace(`kb-ab-assert.mjs ${topic}`, `kb-ab-assert.mjs ${minedTopic}`)
+```
+
+The YAML serialiser folds a scalar at 80 columns. `test_command` is `node scripts/kb-ab-assert.mjs
+<topic>` — two spaces of indent plus thirty characters of command — so the moment a topic pushed the
+line past eighty, the value became a folded `>-` block with the topic on its **own line**. The
+single-space literal then matched nothing, `String.replace` returned its input unchanged, and the
+spec was written still naming the pilot's fact set. No error, no warning: three tasks were graded
+against the very reference-derived gate the round existed to replace.
+
+The boundary is exact. Eight tasks sat at 80 columns or fewer and were gated correctly; the three at
+82, 82 and 84 were not. Those three were also, precisely, the round's anomalies — two of its three
+`neither-solves` verdicts, and one task counted as *discriminating*. The defect moved the headline
+in both directions at once, which is why reading the results did not reveal it.
+
+> **Generalisable lesson.** A string rewrite that finds no match is indistinguishable from one that
+> had nothing to do. Any generated artefact encoding *which thing is being measured* must be edited
+> structurally and then asserted, because the failure mode is not a crash — it is a well-formed file
+> that measures the wrong thing.
+
+**Measure:** the generator parses the spec, replaces the gate argument in the parsed argv, and
+re-serialises. A spec whose `test_command` does not carry the expected topic argument **throws**
+rather than being emitted. Every emitted spec is checked to assert its own mined topic, and every
+topic to resolve in the fact table, before a run starts.
+
+### 9. A cell that never ran, counted as a cell that failed
+
+A cell skipped before the agent starts still writes a row. A preflight route failure lands with a
+null terminal state, a null step count, no score and a `skip_reason` — after about five seconds. The
+discrimination report counted rows rather than results: an arm's denominator was the row count and
+its numerator the rows with a passing gate, so six preflight skips read as `0/3` in both arms and
+the task was published as `neither-solves` — whose stated meaning is "a broken gate, or beyond both
+arms". That is a positive claim about an agent that was never invoked. The report even computed the
+number of ungraded rows, and then never read it.
+
+> **Generalisable lesson.** "Absent" and "negative" are different measurements, and a schema
+> representing both as a missing pass will report the first as the second. It is the same error as
+> this project's own rule about dashes never meaning zeros, one layer down.
+
+**Measure:** the report counts only *scored* repeats. A task with an ungraded arm is classified
+`not-run`, excluded from the rate's denominator rather than counted as a failure, and named in the
+output with the instruction to re-run it. The aggregate splits are computed over the graded set, so
+a never-run task cannot dilute those either.
+
 ---
 
 ## Recommendations
@@ -642,7 +745,14 @@ node scripts/kb-ab-make-mine-specs.mjs
 # Mine each task's gate from those deliverables
 # --dry-run reports what would be kept without calling a model or writing anything
 node scripts/kb-ab-mine-facts.mjs --dry-run
+
+# Run a mined spec (both arms, three repeats), then report the rate over the whole round
+node scripts/experiment-run.mjs --spec .data/kb-ab-sampler/specs/<kbm-topic>.yaml --parallel
+node scripts/kb-ab-discrimination-report.mjs --ledger .data/kb-ab-sampler/ledger-mined.json
 ```
+
+The report names any task it had to exclude for want of a graded repeat. An excluded task is not a
+zero — see pitfall 9 — so re-run it rather than reading past it.
 
 ## See also
 
