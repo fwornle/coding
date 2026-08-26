@@ -394,7 +394,13 @@ async function main(argv) {
       }
       gateArgv[topicIdx] = minedTopic;
       spec.test_command = gateArgv.join(' ');
-      fs.writeFileSync(path.join(SPECS_DIR, `${minedTopic}.yaml`), yaml.dump(spec), 'utf8');
+      // lineWidth: -1 disables folding. The structural edit above is what makes the gate correct;
+      // this keeps the emitted file honest to read and safe for any consumer that is still
+      // line-oriented — a folded `test_command` also silently degraded the recoverability audit to
+      // SKIP, so "nothing else parses this by line" was not a safe assumption to make.
+      fs.writeFileSync(
+        path.join(SPECS_DIR, `${minedTopic}.yaml`), yaml.dump(spec, { lineWidth: -1 }), 'utf8',
+      );
 
       const src = (sourceLedger.tasks ?? []).find((t) => t.topic_id === r.topic) ?? {};
       rows.push({
