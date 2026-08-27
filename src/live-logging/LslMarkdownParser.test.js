@@ -161,6 +161,84 @@ describe('splitPromptSets — anchor, not heading', () => {
     assert.equal(parseBlock(blocks[0], 'A').toolName, 'Grep');
   });
 
+  /**
+   * The oldest LSL layout has NEITHER an anchor NOR a `## Prompt Set` heading —
+   * `### <Tool> - <date> UTC` blocks sit straight under `## Key Activities`.
+   * Without recovery such a chain parses to zero prompt sets, so the backfill
+   * writes no `.jsonl`, records the file as absorbed into a neighbour that
+   * never claimed it, and deletes the markdown. Measured across the seven
+   * history repos before the fix: 256 chains, 260 files, 6,747 tool calls,
+   * reported as `tools=0/4785` for agentic-ai-nano.
+   */
+  it('Test 7b — REGRESSION: blocks with no anchor and no heading are still recovered', () => {
+    const text = HDR
+      + toolBlock('Bash', '2026-08-26 11:00:00')
+      + toolBlock('Grep', '2026-08-26 11:05:00');
+    const sets = splitPromptSets(text, 'A');
+    assert.ok(sets.length >= 1, 'a chain with content must not parse to zero sets');
+    const blocks = sets.flatMap((s) => splitBlocks(s, 'A'));
+    assert.equal(blocks.length, 2, 'both tool blocks must survive');
+    assert.deepEqual(blocks.map((b) => parseBlock(b, 'A').toolName), ['Bash', 'Grep']);
+    // The grouping is inferred, so it must SAY so rather than pass itself off
+    // as structure the markdown recorded.
+    assert.ok(sets.every((s) => s.synthesized === true));
+    assert.ok(sets.every((s) => /^ps_\d+$/.test(s.promptSetId)), 'id shape is matched downstream');
+  });
+
+  it('Test 7c — a new **User Request:** starts a new synthesized set', () => {
+    const other = toolBlock('Grep', '2026-08-26 11:05:00')
+      .replace('**User Request:** do the thing', '**User Request:** something else');
+    const sets = splitPromptSets(HDR + toolBlock('Bash', '2026-08-26 11:00:00') + other, 'A');
+    assert.equal(sets.length, 2, 'two distinct requests are two prompt sets');
+    assert.notEqual(sets[0].promptSetId, sets[1].promptSetId, 'ids must be unique within a file');
+  });
+
+  it('Test 7d — recovery is deterministic, so a re-run reproduces the same ids', () => {
+    const text = HDR + toolBlock('Bash', '2026-08-26 11:00:00') + toolBlock('Grep', '2026-08-26 11:00:00');
+    const a = splitPromptSets(text, 'A').map((s) => s.promptSetId);
+    const b = splitPromptSets(text, 'A').map((s) => s.promptSetId);
+    assert.deepEqual(a, b, 'entry ids are seeded from the promptSetId; it cannot churn');
+    assert.equal(new Set(a).size, a.length, 'blocks sharing a timestamp must not collide');
+  });
+
+  it('Test 7e — recovery never fires when a real anchor is present', () => {
+    const text = HDR + psBlock('ps_1', '2026-08-26T11:00:00.000Z', toolBlock('Bash', '2026-08-26 11:00:00'));
+    const sets = splitPromptSets(text, 'A');
+    assert.equal(sets.length, 1);
+    assert.equal(sets[0].promptSetId, 'ps_1');
+    assert.ok(!sets[0].synthesized, 'a real anchor must not be relabelled as inferred');
+  });
+
+  /**
+   * Blocks before the FIRST anchor belonged to no prompt set and vanished.
+   * Corpus measurement: 17 chains, 21,037 blocks, 25.5 MB — including one 34 MB
+   * chain whose only anchor sits 23.5 MB in, so two thirds of it parsed to
+   * nothing. This is what the `tools=1791423/1811201` gap in the coding repo
+   * turned out to be; it looked like a counting artifact and was not.
+   */
+  it('Test 7f — REGRESSION: blocks before the first anchor are not dropped', () => {
+    const text = HDR
+      + toolBlock('Bash', '2026-08-26 10:00:00')
+      + psBlock('ps_1', '2026-08-26T11:00:00.000Z', toolBlock('Grep', '2026-08-26 11:00:00'));
+    const sets = splitPromptSets(text, 'A');
+    const names = sets.flatMap((x) => splitBlocks(x, 'A')).map((b) => parseBlock(b, 'A').toolName);
+    assert.deepEqual(names, ['Bash', 'Grep'], 'the pre-anchor block must survive, in order');
+    assert.equal(sets.at(-1).promptSetId, 'ps_1', 'the real anchor keeps its own id');
+    assert.ok(sets[0].synthesized, 'the recovered lead is marked as inferred');
+  });
+
+  it('Test 7g — a recovered lead cannot collide with a real anchor id', () => {
+    // The synthesized id derives from the block timestamp; here the real anchor
+    // is given exactly that id, so the recovery must step around it. A collision
+    // would make both sets seed identical entry ids in one file.
+    const ms = Date.parse('2026-08-26T10:00:00Z');
+    const text = HDR
+      + toolBlock('Bash', '2026-08-26 10:00:00')
+      + psBlock(`ps_${ms}`, '2026-08-26T11:00:00.000Z', toolBlock('Grep', '2026-08-26 11:00:00'));
+    const ids = splitPromptSets(text, 'A').map((x) => x.promptSetId);
+    assert.equal(new Set(ids).size, ids.length, `ids must be unique: ${ids.join(', ')}`);
+  });
+
   it('Test 8 — reads slice metadata from the heading when present', () => {
     const text = HDR + '<a name="ps_9"></a>\n## Prompt Set (ps_9) — slice 2/3\n\n**Time:** 2026-08-26T11:00:00.000Z\n**Duration:** 5ms\n**Tool Calls:** 0\n\n';
     const [s] = splitPromptSets(text);

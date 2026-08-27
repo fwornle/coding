@@ -182,6 +182,9 @@ function convertChain(chain, cwd) {
           time: ps.time, durationMs: ps.durationMs, toolCalls: ps.toolCallCount,
           sliceIdx: ps.sliceIdx, totalSlices: ps.totalSlices,
           agent: parsed.header.agent,
+          // Set only for the oldest layout, where prompt-set boundaries are
+          // inferred from **User Request:** rather than read from an anchor.
+          ...(ps.synthesized ? { synthesized: true } : {}),
           ...(parts.length > 1
             ? { partFragment: i + 1, partFragments: parts.length, continuation: i > 0 }
             : {}),
@@ -337,6 +340,18 @@ function processRepo({ project, history }) {
 
     // Verify BEFORE anything is removed.
     let failure = null;
+
+    // A chain that converted to NOTHING must never reach the delete loop. The
+    // loop below iterates result.files, so an empty list left `failure` null and
+    // the chain "passed" vacuously — then every part was unlinked and no
+    // session file replaced them. That is the whole timeline repo (10 files of
+    // one-off 2025 formats: `# Extracted Claude Code Conversation`,
+    // `# Project Session Log`, a SpecStory export) and any dialect the parser
+    // has yet to meet. Quarantining instead keeps unknown formats on disk until
+    // someone teaches the parser about them, which is the safe default for a
+    // corpus whose oldest layouts are still being discovered.
+    if (result.files.length === 0) failure = 'chain produced no session file';
+
     for (const f of result.files) {
       failure = verifyStructural(f.content);
       if (failure) break;

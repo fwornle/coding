@@ -172,7 +172,7 @@
       "id": "aws_secret_truncated",
       "name": "AWS Secret (Truncated)",
       "description": "Truncated AWS secrets in logs (base64-like followed by ...)",
-      "pattern": "[a-zA-Z0-9+/]{8,}\\+[a-zA-Z0-9+/]*\\.{2,3}",
+      "pattern": "[a-zA-Z0-9/]{8,64}\\+[a-zA-Z0-9+/]{0,64}\\.{2,3}",
       "flags": "g",
       "replacementType": "generic",
       "replacement": "<AWS_SECRET_REDACTED>...",

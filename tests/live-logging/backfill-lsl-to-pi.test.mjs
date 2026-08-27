@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
 const SCRIPT = path.join(REPO, 'scripts', 'backfill-lsl-to-pi.mjs');
@@ -41,6 +41,15 @@ const HEADER = '# WORK SESSION (1200-1300)\n\n'
 
 function run(args) {
   return execFileSync('node', [SCRIPT, ...args], { encoding: 'utf8', cwd: REPO });
+}
+
+/**
+ * Same, but tolerating a non-zero exit and capturing stderr: the script exits 1
+ * by design when it quarantines a chain, and reports the reason on stderr.
+ */
+function runAllowFail(args) {
+  const r = spawnSync('node', [SCRIPT, ...args], { encoding: 'utf8', cwd: REPO });
+  return `${r.stdout}${r.stderr}`;
 }
 
 /** The history dir is a real git repo in production; the backfill refuses to
@@ -189,5 +198,28 @@ describe('backfill', () => {
     run([...repoArg(), '--verify', 'structural', '--write', '--keep-md']);
     assert.equal(fs.readFileSync(jsonl, 'utf8'), before,
       'deterministic ids make a re-run a no-op');
+  });
+
+  /**
+   * The delete loop iterates chain.parts, but verification iterated
+   * result.files — so a chain that converted to NOTHING skipped the verify
+   * body entirely, `failure` stayed null, and every part was unlinked with no
+   * session file written. Silent, and total: it was the whole timeline repo
+   * (10 files of one-off 2025 formats the parser does not know).
+   */
+  it('Test 7 — REGRESSION: a chain that converts to nothing keeps its markdown', () => {
+    const md = path.join(history, '2026-08-26_1900-2000_abc.md');
+    // A format the parser has never seen: no WORK SESSION header, no anchors,
+    // no writer-grammar block headings.
+    fs.writeFileSync(md, '# Extracted Claude Code Conversation\n\n'
+      + '_**User (2025-06-27 07:12Z)**_\n\nwhat does this do?\n\n---\n\n'
+      + '_**Agent**_\n\nIt does the thing.\n');
+    commitAll(path.join(tmp, 'proj', '.specstory', 'history'));
+
+    const out = runAllowFail([...repoArg(), '--verify', 'structural', '--write']);
+    assert.ok(fs.existsSync(md), 'markdown for an unconvertible chain must survive');
+    assert.ok(!fs.existsSync(md.replace(/\.md$/, '.jsonl')),
+      'and no empty session file may be written to paper over it');
+    assert.match(out + '', /quarantin/i, 'the chain must be reported, not passed silently');
   });
 });

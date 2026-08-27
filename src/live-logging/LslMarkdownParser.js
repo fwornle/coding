@@ -164,7 +164,7 @@ export function parseHeader(text, chainKey, dialect) {
  * them. The anchor is present in all three dialects; the heading is optional
  * and read only for its slice metadata.
  */
-export function splitPromptSets(text) {
+export function splitPromptSets(text, dialect = 'A') {
   const hits = [];
   const anchor = /<a name="(ps_\d+)"><\/a>/g;
   let m;
@@ -173,7 +173,9 @@ export function splitPromptSets(text) {
     const hRe = /^##\s+Prompt Set(?:\s+\d+)?\s*\((ps_\d+)\)/gm;
     while ((m = hRe.exec(text)) !== null) hits.push({ promptSetId: m[1], offset: m.index });
   }
-  return hits.map((h, i) => {
+  if (hits.length === 0) return synthesizePromptSets(text, dialect);
+
+  const sets = hits.map((h, i) => {
     const body = text.slice(h.offset, i + 1 < hits.length ? hits[i + 1].offset : text.length);
     const psHead = body.split(/^###\s+/m)[0];
     const slice = psHead.match(/^##\s+Prompt Set(?:\s+\d+)?\s*\(ps_\d+\)(?:\s*—\s*slice\s+(\d+)\/(\d+))?/m);
@@ -187,6 +189,102 @@ export function splitPromptSets(text) {
       toolCallCount: Number(field(psHead, 'Tool Calls')) || 0,
     };
   });
+
+  // Blocks BEFORE the first anchor belong to no set and would be dropped
+  // silently. Not hypothetical: one 34 MB chain carries its only anchor 23.5 MB
+  // in, so 67% of it — 17,872 tool markers — parsed to nothing. Corpus-wide,
+  // 17 chains lose 21,037 blocks and 25.5 MB this way. The lead region gets the
+  // same inference the anchor-less path uses, and its ids are kept clear of the
+  // anchors' so the two cannot seed identical entry ids in one file.
+  const lead = hits[0].offset > 0
+    ? synthesizePromptSets(text.slice(0, hits[0].offset), dialect,
+      new Set(hits.map((h) => Number(h.promptSetId.slice(3)))))
+    : [];
+  return lead.length ? [...lead, ...sets] : sets;
+}
+
+/**
+ * Recover prompt sets for chains that have no anchor and no `## Prompt Set`
+ * heading — the oldest layout, where `### <Tool> - <date> UTC` blocks sit
+ * directly under `## Key Activities`.
+ *
+ * WHY THIS EXISTS: without it such a chain parses to ZERO prompt sets and
+ * therefore zero blocks, so the backfill emits no `.jsonl`, records the file as
+ * `absorbedInto` a neighbour that never claimed it, and — with --write —
+ * DELETES the markdown. Measured across the seven history repos: 256 chains,
+ * 260 files, 6,200 exchange blocks and 6,747 tool calls, 95% of them in
+ * agentic-ai-nano. The loss is silent, because "no prompt sets" is
+ * indistinguishable from "empty file" to every counter downstream.
+ *
+ * GROUPING: the layout has no prompt-set boundaries to read, so they are
+ * inferred from `**User Request:**` — the markdown writer repeated it on every
+ * block belonging to one prompt. Consecutive blocks sharing a request become
+ * one set; a block without one continues the current set. Chains with no
+ * request text at all (182 of the 243 in agentic-ai-nano) yield a single set,
+ * which preserves every block without inventing structure.
+ *
+ * Each synthesized set carries `synthesized: true`, which reaches the pi entry
+ * as `data.synthesized`. The grouping is INFERRED, and the corpus should say so
+ * rather than present it as something the markdown recorded.
+ */
+function synthesizePromptSets(text, dialect, taken = new Set()) {
+  const re = blockHeadingRe(dialect);
+  const starts = [];
+  let m;
+  while ((m = re.exec(text)) !== null) starts.push(m.index);
+  if (starts.length === 0) return [];
+
+  const groups = [];
+  let current = null;
+  for (let i = 0; i < starts.length; i++) {
+    const body = text.slice(starts[i], i + 1 < starts.length ? starts[i + 1] : text.length);
+    const req = body.match(/^\*\*User Request:\*\*\s*(.*)$/m)?.[1]?.trim() || null;
+    // A block with no request belongs to the set already open; only a NEW,
+    // different request starts one.
+    if (current && (req === null || req === current.req)) current.end = starts[i] + body.length;
+    else groups.push(current = { req, offset: starts[i], end: starts[i] + body.length });
+  }
+
+  const used = new Set(taken);
+  return groups.map((g) => {
+    const head = text.slice(g.offset, g.end);
+    const time = head.match(/^###[ \t]+.+?[ \t]+-[ \t]+(\d{4}-\d{2}-\d{2}[ \t]+\d{2}:\d{2}:\d{2})[ \t]+UTC/m)?.[1];
+    const ms = time ? Date.parse(`${time.replace(/[ \t]+/, 'T')}Z`) : NaN;
+    // Ids must keep the `ps_<digits>` shape the rest of the pipeline matches on,
+    // and must be STABLE: the writer seeds entry ids from (file, promptSetId),
+    // so a re-run has to reproduce them byte for byte. Derived from the block's
+    // own timestamp, then bumped on collision (two blocks can share a second).
+    let n = Number.isNaN(ms) ? g.offset : ms;
+    while (used.has(n)) n += 1;
+    used.add(n);
+    return {
+      promptSetId: `ps_${n}`,
+      offset: g.offset,
+      body: text.slice(g.offset, g.end),
+      sliceIdx: null,
+      totalSlices: null,
+      time: Number.isNaN(ms) ? null : new Date(ms).toISOString(),
+      durationMs: 0,
+      toolCallCount: (text.slice(g.offset, g.end).match(/^\*\*Tool:\*\*/gm) || []).length,
+      synthesized: true,
+    };
+  });
+}
+
+/**
+ * The WRITER's block-heading grammar, per dialect.
+ *
+ * Shared with splitPromptSets() so the anchor-less fallback recognises exactly
+ * the blocks splitBlocks() will go on to parse — two copies of this regex would
+ * drift, and a fallback that found blocks the splitter then ignored would
+ * produce empty prompt sets.
+ *
+ * Returns a fresh RegExp each call: these are /g and therefore stateful.
+ */
+function blockHeadingRe(dialect) {
+  return dialect === 'B'
+    ? /^###[ \t]+(?:User|Assistant)[ \t]*$/gm
+    : /^###[ \t]+.+?[ \t]+-[ \t]+\d{4}-\d{2}-\d{2}[ \t]+\d{2}:\d{2}:\d{2}[ \t]+UTC.*$/gm;
 }
 
 /**
@@ -213,9 +311,7 @@ export function splitBlocks(ps, dialect) {
     }
     return out;
   }
-  const BLOCK_RE = dialect === 'B'
-    ? /^###[ \t]+(?:User|Assistant)[ \t]*$/gm
-    : /^###[ \t]+.+?[ \t]+-[ \t]+\d{4}-\d{2}-\d{2}[ \t]+\d{2}:\d{2}:\d{2}[ \t]+UTC.*$/gm;
+  const BLOCK_RE = blockHeadingRe(dialect);
   const hits = [];
   let m;
   while ((m = BLOCK_RE.exec(ps.body)) !== null) hits.push(m.index);
@@ -279,7 +375,7 @@ export function parseBlock(b, dialect) {
 export function parseChain(text, chainKey) {
   const dialect = detectDialect(text);
   const header = parseHeader(text, chainKey, dialect);
-  const promptSets = splitPromptSets(text).map((ps) => ({
+  const promptSets = splitPromptSets(text, dialect).map((ps) => ({
     promptSetId: ps.promptSetId,
     offset: ps.offset,
     time: ps.time,
@@ -287,6 +383,7 @@ export function parseChain(text, chainKey) {
     toolCallCount: ps.toolCallCount,
     sliceIdx: ps.sliceIdx,
     totalSlices: ps.totalSlices,
+    ...(ps.synthesized ? { synthesized: true } : {}),
     blocks: splitBlocks(ps, dialect).map((b) => parseBlock(b, dialect)),
   }));
   return { header, dialect, promptSets };
