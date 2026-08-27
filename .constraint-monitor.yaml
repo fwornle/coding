@@ -402,16 +402,18 @@ constraints:
 - id: no-ukb-bash-command
   group: architecture
   pattern: ^ukb\s|^ukb$|\s+ukb\s|\s+ukb$|[;&|]\s*ukb\s|[;&|]\s*ukb$
-  message: 'CRITICAL: ''ukb'' is NOT a shell command! When user types ''ukb'' at Claude
-    prompt, call MCP semantic analysis tool (full or incremental), NOT bash'
+  message: 'CRITICAL: bare ''ukb'' is not a command - it was removed. Run the semantic
+    CLI instead: `semantic workflow run wave-analysis --team coding` (add --debug only
+    if the user said "debug"). See the /semantic skill.'
   severity: critical
   enabled: true
   applies_to: content
   tool_filter:
   - Bash
-  suggestion: 'User typing ''ukb'' at Claude prompt means: Call mcp-server-semantic-analysis
-    tool (full or incremental workflow). Never try to run ''ukb'' as a bash/shell
-    command - it was completely removed from the system.'
+  suggestion: 'The user typing ''ukb'' means: run `semantic workflow run wave-analysis
+    --team coding`. The semantic-analysis MCP tools were retired on 2026-08-27 in favour
+    of that CLI, so the correct path IS a shell command - just not the bare, removed
+    ''ukb'' binary this rule matches.'
 settings:
   compliance:
     excellent_threshold: 9
