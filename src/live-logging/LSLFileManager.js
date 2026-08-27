@@ -491,6 +491,44 @@ class LSLFileManager extends EventEmitter {
   }
   
   /**
+   * Value heuristic for a pi-format tranche, mirroring the markdown one:
+   * a file is worth keeping if it holds at least one user message that is
+   * neither a warmup nor an interruption.
+   *
+   * @param {string} content - raw JSONL
+   * @param {string} filePath
+   * @returns {boolean}
+   */
+  isValuablePiSession(content, filePath) {
+    let promptSets = 0;
+    let userMessages = 0;
+    let worthless = 0;
+
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue;
+      let e;
+      try { e = JSON.parse(line); } catch { continue; }
+      if (e.type === 'custom' && e.customType === 'lsl.promptSet') { promptSets++; continue; }
+      if (e.type !== 'message' || e.message?.role !== 'user') continue;
+      userMessages++;
+      const text = (e.message.content || [])
+        .filter((c) => c.type === 'text').map((c) => c.text).join('');
+      if (/^\[Request interrupted/.test(text) || /^Warmup/i.test(text)) worthless++;
+    }
+
+    if (userMessages === 0) {
+      this.debug(`No user messages in ${promptSets} prompt sets: ${path.basename(filePath)}`);
+      return false;
+    }
+    if (userMessages - worthless === 0) {
+      this.debug(`All ${userMessages} messages are worthless (${promptSets} prompt sets): ${path.basename(filePath)}`);
+      return false;
+    }
+    this.debug(`File has ${userMessages - worthless}/${userMessages} valuable exchanges across ${promptSets} prompt sets: ${path.basename(filePath)}`);
+    return true;
+  }
+
+  /**
    * Analyze LSL file to determine if it contains useful information
    * Returns true if file should be kept, false if it should be removed
    *
@@ -505,6 +543,16 @@ class LSLFileManager extends EventEmitter {
       }
 
       const content = fs.readFileSync(filePath, 'utf8');
+
+      // pi session JSONL (current format). This branch MUST exist before the
+      // caller's filter accepts .jsonl: the markdown heuristics below count
+      // `## Prompt Set` and `**User Message:**`, which are zero in JSONL, so a
+      // JSONL file would be judged worthless and DELETED by
+      // cleanupLowValueLSLFiles(). The two changes are a single edit for that
+      // reason.
+      if (filePath.endsWith('.jsonl')) {
+        return this.isValuablePiSession(content, filePath);
+      }
 
       // UPDATED DETECTION LOGIC FOR NEW LSL FORMAT:
       // Files can have MANY duplicate prompt sets but all are void/meaningless
@@ -593,7 +641,7 @@ class LSLFileManager extends EventEmitter {
       }
 
       const files = fs.readdirSync(directory)
-        .filter(f => f.endsWith('.md') && f.match(/^\d{4}-\d{2}-\d{2}_\d{4}-\d{4}_/))
+        .filter(f => (f.endsWith('.jsonl') || f.endsWith('.md')) && f.match(/^\d{4}-\d{2}-\d{2}_\d{4}-\d{4}_/))
         .map(f => path.join(directory, f));
 
       let removedCount = 0;

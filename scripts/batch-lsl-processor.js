@@ -1098,8 +1098,10 @@ class BatchLSLProcessor {
       for (const dir of dirsToCheck) {
         if (!fs.existsSync(dir)) continue;
 
-        // Recurse YYYY/MM subdirs and flat root
-        const filePaths = lslListAll(dir, (name) => name.endsWith('.md'));
+        // Recurse YYYY/MM subdirs and flat root. Both LSL extensions: the
+        // corpus is mixed while the backfill runs, and parseSpecstory()
+        // dispatches on content rather than on the filename.
+        const filePaths = lslListAll(dir, (name) => name.endsWith('.jsonl') || name.endsWith('.md'));
 
         for (const filePath of filePaths) {
           const filename = path.basename(filePath);
@@ -1765,7 +1767,7 @@ ${foreignOnly ? `**Coding Repository:** ${this.codingRepo}` : ''}
       return [];
     }
     
-    const files = lslListAll(historyDir, (name) => name.endsWith('.md'))
+    const files = lslListAll(historyDir, (name) => name.endsWith('.jsonl') || name.endsWith('.md'))
       .filter(f => {
         const stat = fs.statSync(f);
         return stat.mtime >= start && stat.mtime <= end;

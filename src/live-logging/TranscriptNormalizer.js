@@ -340,6 +340,14 @@ export function parseSpecstory(mdContent, options = {}) {
   // blocks with `**User Request:**` + `### <ToolName>` sub-blocks. Detected
   // by presence of the prompt-set marker near the top of the file. Falls
   // through to the legacy ### Human/Assistant parser when not detected.
+  // pi session JSONL is what the ETM writes now. Detected first because it is
+  // unambiguous (line 1 is a `{"type":"session"` header) and because the
+  // corpus is mixed: the backfill converts in batches, so a directory holding
+  // both formats is a normal steady state, not a transient.
+  if (isPiSessionFormat(mdContent)) {
+    return parsePiSession(mdContent, options);
+  }
+
   if (isLslTrancheFormat(mdContent)) {
     return parseLslTranche(mdContent, options);
   }
@@ -373,6 +381,139 @@ export function parseSpecstory(mdContent, options = {}) {
       },
     });
     messageIndex++;
+  }
+
+  return messages;
+}
+
+/**
+ * Detect pi session JSONL (the current LSL format).
+ *
+ * A tranche file's first line is the pi `session` header. A ROTATED part
+ * written before this migration would not have one — but every part the new
+ * writer emits does, because createSessionFileWithContent() writes a full
+ * header per part. Fall back to scanning the head for any typed entry so a
+ * hand-trimmed or partially-written file still parses.
+ */
+function isPiSessionFormat(content) {
+  const head = content.slice(0, 4096);
+  if (/^\s*\{"type":"session"/.test(head)) return true;
+  return /^\s*\{"type":"(message|custom|session_info|model_change|label)"/m.test(head);
+}
+
+/**
+ * Parse pi session JSONL into MastraDBMessages.
+ *
+ * Deliberately mirrors parseLslTranche()'s OUTPUT contract rather than the
+ * richness of the input: one user message plus one tool-call-synthesis
+ * assistant message per prompt set, capped at 4000 chars. Downstream is an
+ * observation summarizer, and handing it every tool call in full would blow
+ * the token budget and change observation content across the migration. The
+ * full fidelity is still in the file for the dashboard viewer to render.
+ */
+function parsePiSession(content, options = {}) {
+  const messages = [];
+  const sourceFile = options.sourceFile || undefined;
+
+  const entries = [];
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue;
+    try { entries.push(JSON.parse(line)); } catch { /* skip a torn line */ }
+  }
+  if (entries.length === 0) return messages;
+
+  const agent = entries.find((e) => e.customType === 'lsl.tranche')?.data?.agent || 'claude';
+
+  // Group entries by the prompt set they descend from. Sets are sibling
+  // subtrees off the spine, so a parent walk assigns every entry to exactly one.
+  const setOf = new Map();       // entryId -> promptSetId
+  const order = [];              // promptSetIds in file order
+  const meta = new Map();        // promptSetId -> {time}
+  for (const e of entries) {
+    if (e.type === 'custom' && e.customType === 'lsl.promptSet') {
+      const id = e.data?.promptSetId || e.id;
+      setOf.set(e.id, id);
+      if (!meta.has(id)) { meta.set(id, { time: e.timestamp }); order.push(id); }
+      continue;
+    }
+    if (e.parentId && setOf.has(e.parentId)) setOf.set(e.id, setOf.get(e.parentId));
+  }
+
+  const buckets = new Map();
+  for (const e of entries) {
+    const ps = setOf.get(e.id);
+    if (!ps || e.type !== 'message') continue;
+    if (!buckets.has(ps)) buckets.set(ps, []);
+    buckets.get(ps).push(e);
+  }
+
+  for (const psId of order) {
+    const msgs = buckets.get(psId) || [];
+    const blockTs = meta.get(psId)?.time || new Date().toISOString();
+
+    // Emit EVERY user message in the set, not just the first.
+    // parseLslTranche() takes only the first `**User Request:**` in a block,
+    // which measurably loses prompts: a set can legitimately contain more than
+    // one distinct user turn (e.g. a "resume" following a longer request), and
+    // those were being dropped from observation input entirely.
+    const userTexts = msgs
+      .filter((m) => m.message.role === 'user')
+      .map((m) => (m.message.content || [])
+        .filter((c) => c.type === 'text').map((c) => c.text).join('').trim())
+      .filter(Boolean);
+    if (userTexts.length === 0) continue; // no anchor for an observation
+    const userText = userTexts[0];
+
+    // Same synthesis shape parseLslTranche produces, so observations do not
+    // shift when a file is converted.
+    const calls = [];
+    for (const m of msgs) {
+      if (m.message.role !== 'assistant') continue;
+      for (const c of m.message.content || []) {
+        if (c.type === 'toolCall') calls.push({ id: c.id, name: c.name });
+      }
+    }
+    const results = new Map();
+    for (const m of msgs) {
+      if (m.message.role !== 'toolResult') continue;
+      const text = (m.message.content || [])
+        .filter((c) => c.type === 'text').map((c) => c.text).join('');
+      results.set(m.message.toolCallId, { text, isError: m.message.isError });
+    }
+
+    const toolLines = [];
+    let synthLen = 0;
+    const SYNTH_CAP = 4000;
+    for (const call of calls) {
+      const r = results.get(call.id);
+      const icon = r ? (r.isError ? '❌' : '✅') : '';
+      const preview = r ? r.text.trim().split('\n').slice(0, 2).join(' ').slice(0, 200) : '';
+      const line = preview ? `- ${call.name} ${icon}: ${preview}` : `- ${call.name} ${icon}`;
+      if (synthLen + line.length > SYNTH_CAP) {
+        toolLines.push(`- ... (${calls.length - toolLines.length} more tool calls truncated)`);
+        break;
+      }
+      toolLines.push(line);
+      synthLen += line.length + 1;
+    }
+
+    // A set with no tool calls may still carry assistant prose.
+    const assistantProse = msgs
+      .filter((m) => m.message.role === 'assistant')
+      .flatMap((m) => (m.message.content || []).filter((c) => c.type === 'text').map((c) => c.text))
+      .join('\n').trim();
+    const assistantText = toolLines.length > 0
+      ? `Tool-call synthesis (${calls.length} calls):\n${toolLines.join('\n')}`
+      : (assistantProse || '(no tool calls)');
+
+    const md = { agent, format: 'pi-session', sourceFile, promptSetId: psId };
+    for (const t of userTexts) {
+      messages.push({ id: deterministicId(t, blockTs), role: 'user',
+                      content: t, createdAt: blockTs, metadata: md });
+    }
+    messages.push({ id: deterministicId(assistantText, blockTs), role: 'assistant',
+                    content: assistantText,
+                    createdAt: offsetTimestamp(blockTs, userTexts.length), metadata: md });
   }
 
   return messages;
