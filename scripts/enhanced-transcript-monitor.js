@@ -3570,7 +3570,6 @@ ORDER BY m.time_created ASC;`;
       const agentDisplayName = this.agentType === 'pi' ? 'Pi' :
         this.agentType === 'copilot' ? 'GitHub Copilot' :
         this.agentType === 'opencode' ? 'OpenCode' : 'Claude Code';
-      const agentLine = `**Agent:** ${agentDisplayName}\n`;
 
       // pi session header + `session_info` + the `lsl.tranche` spine, replacing
       // the markdown `# WORK SESSION` block. Every field the markdown header
@@ -3895,9 +3894,13 @@ ORDER BY m.time_created ASC;`;
 
         // Build the slice block. Use the SAME ps_id anchor across slices so they're
         // discoverable as parts of the same prompt set (grep -l).
-        // NOTE: sessionFile is picked AFTER sessionContent is built so the
-        // picker can advance to the next part if appending this slice would
-        // push the current file over the size limit (rotation fix 2026-05-27).
+        const sliceFirst = sliceExchanges[0];
+        const sliceLast = sliceExchanges[sliceExchanges.length - 1];
+        const sliceStart = new Date(sliceFirst.timestamp || Date.now());
+        const sliceEnd = new Date(sliceLast.timestamp || Date.now());
+        const sliceDuration = sliceEnd.getTime() - sliceStart.getTime();
+        const sliceToolCalls = sliceExchanges.reduce((sum, ex) => sum + (ex.toolCalls?.length || 0), 0);
+
         // Build the prompt-set subtree as pi entries. Everything the markdown
         // block encoded is preserved: the `<a name>` anchor and `## Prompt Set`
         // heading become the `lsl.promptSet` custom entry (whose promptSetId is
@@ -4045,263 +4048,7 @@ ORDER BY m.time_created ASC;`;
     return true;  // Successfully written
   }
 
-  /**
-   * Format exchange content for logging (returns formatted string instead of writing to file)
-   */
-  async formatExchangeForLogging(exchange, isRedirected) {
-    const timestamp = formatTimestamp(exchange.timestamp);
-    const exchangeTime = timestamp.lslFormat;
-    
-    if (exchange.toolCalls && exchange.toolCalls.length > 0) {
-      // Format tool calls
-      let content = '';
-      for (const toolCall of exchange.toolCalls) {
-        const result = exchange.toolResults.find(r => r.tool_use_id === toolCall.id);
-        content += await this.formatToolCallContent(exchange, toolCall, result, exchangeTime, isRedirected);
-      }
-      return content;
-    } else {
-      // Format text-only exchange
-      return this.formatTextOnlyContent(exchange, exchangeTime, isRedirected);
-    }
-  }
-
-  /**
-   * Format tool call content
-   */
-  async formatToolCallContent(exchange, toolCall, result, exchangeTime, isRedirected) {
-    const toolSuccess = result && !result.is_error;
-
-    // Handle both old and new tool call formats
-    const toolName = toolCall.function?.name || toolCall.name || 'Unknown Tool';
-    const toolArgs = toolCall.function?.arguments || toolCall.input || toolCall.parameters || {};
-
-    let content = `### ${toolName} - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-
-    // Handle both undefined and empty string cases
-    const userMessage = (exchange.userMessage && exchange.userMessage.trim()) ||
-                       (exchange.humanMessage && exchange.humanMessage.trim());
-
-    if (userMessage) {
-      // Handle Promise objects that might be from redactSecrets calls
-      const userMessageStr = userMessage && typeof userMessage === 'object' && userMessage.then ?
-        await userMessage :
-        (typeof userMessage === 'string' ? userMessage : JSON.stringify(userMessage));
-      // SECURITY: Redact user message
-      content += `**User Request:** ${await redactSecrets(userMessageStr)}\n\n`;
-    } else {
-      // This is an automatic execution (hook, system-initiated, etc.)
-      content += `**System Action:** (Initiated automatically)\n\n`;
-    }
-
-    content += `**Tool:** ${toolName}\n`;
-    // SECURITY: Redact tool inputs (may contain API keys, passwords, etc.)
-    content += `**Input:** \`\`\`json\n${await redactSecrets(JSON.stringify(toolArgs, null, 2))}\n\`\`\`\n\n`;
-
-    const status = toolSuccess ? '✅ Success' : '❌ Error';
-    content += `**Result:** ${status}\n`;
-
-    // SECURITY: Redact tool outputs (may contain secrets in responses)
-    if (result?.content) {
-      const output = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
-      content += `**Output:** \`\`\`\n${await redactSecrets(output.slice(0, 500))}${output.length > 500 ? '\n...[truncated]' : ''}\n\`\`\`\n\n`;
-    }
-
-    if (result) {
-      const analysis = this.analyzeExchangeContent(exchange);
-      if (analysis.categories.length > 0) {
-        content += `**AI Analysis:** ${analysis.categories.join(', ')} - routing: ${isRedirected ? 'coding project' : 'local project'}\n`;
-      }
-    }
-
-    content += `\n---\n\n`;
-    return content;
-  }
-
-  /**
-   * Format text-only exchange content
-   */
-  async formatTextOnlyContent(exchange, exchangeTime, isRedirected) {
-    let content = `### Text Exchange - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-
-    const userMsg = exchange.userMessage || '';
-    const assistantResp = exchange.assistantResponse || exchange.claudeResponse || '';
-
-    // Ensure userMsg and assistantResp are strings
-    const userMsgStr = typeof userMsg === 'string' ? userMsg : JSON.stringify(userMsg);
-    const assistantRespStr = typeof assistantResp === 'string' ? assistantResp : JSON.stringify(assistantResp);
-
-    // Only show sections that have content
-    if (userMsgStr && userMsgStr.trim()) {
-      // SECURITY: Redact user messages (may contain API keys in examples, etc.)
-      const truncated = userMsgStr.slice(0, 500);
-      content += `**User Message:** ${await redactSecrets(truncated)}${userMsgStr.length > 500 ? '...' : ''}\n\n`;
-    }
-
-    if (assistantRespStr && assistantRespStr.trim()) {
-      // SECURITY: Redact assistant responses (may echo back secrets from user)
-      const truncated = assistantRespStr.slice(0, 500);
-      content += `**Assistant Response:** ${await redactSecrets(truncated)}${assistantRespStr.length > 500 ? '...' : ''}\n\n`;
-    }
-
-    content += `**Type:** Text-only exchange (no tool calls)\n\n---\n\n`;
-
-    return content;
-  }
-
-  /**
-   * Log exchange to session file
-   */
-  async logExchangeToSession(exchange, sessionFile, targetProject) {
-    const isRedirected = targetProject !== this.config.projectPath;
-    this.debug(`📝 LOGGING TO SESSION: ${sessionFile} (redirected: ${isRedirected})`);
-    
-    // Skip exchanges with no meaningful content (no user message AND no tool calls)
-    if ((!exchange.userMessage || (typeof exchange.userMessage === 'string' && exchange.userMessage.trim().length === 0)) && 
-        (!exchange.toolCalls || exchange.toolCalls.length === 0)) {
-      this.debug(`Skipping exchange with no meaningful content (no user message and no tool calls)`);
-      return;
-    }
-
-    // Skip /sl commands only, process all other exchanges regardless of tool calls
-    if (exchange.userMessage && this.isSlCommand(exchange.userMessage)) {
-      this.debug(`Skipping /sl command: ${exchange.userMessage.substring(0, 50)}...`);
-      return;
-    }
-    
-    
-    this.debug(`Processing exchange: tools=${exchange.toolCalls ? exchange.toolCalls.length : 0}`);
-    
-    // Log tool calls if present, otherwise log text-only exchange
-    if (exchange.toolCalls && exchange.toolCalls.length > 0) {
-      // Log each tool call individually with detailed format (like original monitor)
-      for (const toolCall of exchange.toolCalls) {
-        const result = exchange.toolResults.find(r => r.tool_use_id === toolCall.id);
-        await this.logDetailedToolCall(exchange, toolCall, result, sessionFile, isRedirected);
-      }
-    } else {
-      // Log text-only exchange (no tool calls)
-      await this.logTextOnlyExchange(exchange, sessionFile, isRedirected);
-    }
-  }
-
-  /**
-   * Log text-only exchange (no tool calls)
-   */
-  async logTextOnlyExchange(exchange, sessionFile, isRedirected) {
-    const timestamp = formatTimestamp(exchange.timestamp);
-    const exchangeTime = timestamp.lslFormat;
-
-    // Build exchange entry
-    const exchangeEntry = {
-      timestamp: exchangeTime,
-      user_message: exchange.userMessage,
-      assistant_response: exchange.assistantResponse || exchange.claudeResponse,
-      type: 'text_exchange',
-      has_tool_calls: false
-    };
-
-    // Add routing information if redirected
-    if (isRedirected) {
-      exchangeEntry.routing_info = {
-        original_project: this.config.projectPath,
-        redirected_to: 'coding',
-        reason: 'coding_content_detected'
-      };
-    }
-
-    // Format and append to session file
-    let content = `### Text Exchange - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-
-    const userMsg = exchange.userMessage || '(No user message)';
-    const assistantResp = exchange.assistantResponse || exchange.claudeResponse || '(No response)';
-
-    // Ensure userMsg and assistantResp are strings
-    const userMsgStr = typeof userMsg === 'string' ? userMsg : JSON.stringify(userMsg);
-    const assistantRespStr = typeof assistantResp === 'string' ? assistantResp : JSON.stringify(assistantResp);
-
-    content += `**User Message:** ${userMsgStr}\n\n`;
-
-    if (assistantRespStr && assistantRespStr !== '(No response)' && assistantRespStr.trim()) {
-      content += `**Claude Response:** ${assistantRespStr}\n\n`;
-    }
-
-    content += `---\n\n`;
-    
-    try {
-      this.debug(`📝 WRITING TEXT CONTENT: ${content.length} chars to ${sessionFile}`);
-      fs.appendFileSync(sessionFile, content);
-      
-      // CRITICAL FIX: Verify content was actually written
-      if (fs.existsSync(sessionFile)) {
-        this.debug(`✅ TEXT WRITE COMPLETE`);
-      } else {
-        throw new Error(`File disappeared after write: ${sessionFile}`);
-      }
-    } catch (error) {
-      console.error(`🚨 TEXT CONTENT WRITE FAILED: ${sessionFile}`);
-      console.error(`Error: ${error.message}`);
-      this.logHealthError(`Text content write failed: ${sessionFile} - ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Log individual tool call with detailed JSON input/output (original monitor format)
-   */
-  async logDetailedToolCall(exchange, toolCall, result, sessionFile, isRedirected) {
-    const timestamp = formatTimestamp(exchange.timestamp);
-    const exchangeTime = timestamp.lslFormat;
-    const toolSuccess = result && !result.is_error;
-    
-    // Use built-in fast semantic analysis for routing info (not MCP server)
-    const routingAnalysis = this.analyzeForRouting(exchange, toolCall, result);
-    
-    let content = `### ${toolCall.name} - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-    
-    const userMsg = (exchange.userMessage && exchange.userMessage.trim()) || 
-                    (exchange.humanMessage && exchange.humanMessage.trim());
-    
-    if (userMsg) {
-      // Handle Promise objects that might be from redactSecrets calls
-      const resolvedUserMsg = userMsg && typeof userMsg === 'object' && userMsg.then ? 
-        await userMsg : userMsg;
-      // Ensure userMsg is a string before using slice
-      const userMsgStr = typeof resolvedUserMsg === 'string' ? resolvedUserMsg : JSON.stringify(resolvedUserMsg);
-      content += `**User Request:** ${await redactSecrets(userMsgStr.slice(0, 200))}${userMsgStr.length > 200 ? '...' : ''}\n\n`;
-    } else {
-      // This is an automatic execution (hook, system-initiated, etc.)
-      content += `**System Action:** (Initiated automatically)\n\n`;
-    }
-    content += `**Tool:** ${toolCall.name}\n`;
-    content += `**Input:** \`\`\`json\n${await redactSecrets(JSON.stringify(toolCall.input, null, 2))}\n\`\`\`\n\n`;
-    content += `**Result:** ${toolSuccess ? '✅ Success' : '❌ Error'}\n`;
-    
-    if (result?.content) {
-      const output = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
-      content += `**Output:** \`\`\`\n${await redactSecrets(output.slice(0, 500))}${output.length > 500 ? '\n...[truncated]' : ''}\n\`\`\`\n\n`;
-    }
-    
-    content += `**AI Analysis:** ${routingAnalysis}\n\n---\n\n`;
-    try {
-      this.debug(`📝 WRITING TOOL CONTENT: ${content.length} chars to ${sessionFile}`);
-      fs.appendFileSync(sessionFile, content);
-      
-      // CRITICAL FIX: Verify content was actually written
-      if (fs.existsSync(sessionFile)) {
-        this.debug(`✅ TOOL WRITE COMPLETE`);
-      } else {
-        throw new Error(`File disappeared after write: ${sessionFile}`);
-      }
-    } catch (error) {
-      console.error(`🚨 TOOL CONTENT WRITE FAILED: ${sessionFile}`);
-      console.error(`Error: ${error.message}`);
-      this.logHealthError(`Tool content write failed: ${sessionFile} - ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
+              /**
    * Fast built-in semantic analysis for routing decisions (not MCP server)
    */
   analyzeForRouting(exchange, toolCall, result) {
