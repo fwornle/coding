@@ -107,7 +107,7 @@ describe('computeLSLFilename', () => {
       subHash: 'a7e8c41',
       partNumber: null,
     });
-    expect(fn).toBe('2026-05-23_1400-1500_S1-3-a7e8c41.md');
+    expect(fn).toBe('2026-05-23_1400-1500_S1-3-a7e8c41.jsonl');
   });
 
   test('Test 2: appends -part{N} when partNumber is given', () => {
@@ -119,7 +119,7 @@ describe('computeLSLFilename', () => {
       subHash: 'a7e8c41',
       partNumber: 2,
     });
-    expect(fn).toBe('2026-05-23_1400-1500_S1-3-a7e8c41-part2.md');
+    expect(fn).toBe('2026-05-23_1400-1500_S1-3-a7e8c41-part2.jsonl');
   });
 
   test('Test 3: rejects subHash !== 7 chars', () => {
@@ -157,7 +157,7 @@ describe('writeSubAgentLSL', () => {
     expect(fs.existsSync(monthDir)).toBe(true);
     const files = fs.readdirSync(monthDir);
     expect(files.length).toBeGreaterThanOrEqual(1);
-    const match = files.find((f) => /_S\d+-\d+-[a-z0-9]{7}\.md$/i.test(f));
+    const match = files.find((f) => /_S\d+-\d+-[a-z0-9]{7}\.jsonl$/i.test(f));
     expect(match).toBeTruthy();
   });
 
@@ -170,9 +170,17 @@ describe('writeSubAgentLSL', () => {
       slotAllocator: { state: slotState },
     });
     const content = fs.readFileSync(result.filePath, 'utf-8');
-    expect(content).toContain('**User Message:**');
-    expect(content).toContain('**Assistant Response:**');
-    expect(content).toMatch(/<a name="ps_\d+"><\/a>/);
+    // Format B's `**User Message:**` / `**Assistant Response:**` labels and
+    // `<a name="ps_<ms>">` anchors are now typed entries. The identities are
+    // unchanged — the promptSetId still carries the same millisecond stamp the
+    // anchor did — they are just fields instead of text to regex out.
+    const entries = content.trim().split('\n').map((l) => JSON.parse(l));
+    const roles = entries.filter((e) => e.type === 'message').map((e) => e.message.role);
+    expect(roles).toContain('user');
+    expect(roles).toContain('assistant');
+    const sets = entries.filter((e) => e.customType === 'lsl.promptSet');
+    expect(sets.length).toBeGreaterThan(0);
+    expect(sets[0].data.promptSetId).toMatch(/^ps_\d+$/);
   });
 
   test('Test 6: frontmatter contains the locked field set', async () => {
@@ -184,20 +192,24 @@ describe('writeSubAgentLSL', () => {
       slotAllocator: { state: slotState },
     });
     const content = fs.readFileSync(result.filePath, 'utf-8');
-    // Frontmatter is fenced by --- markers.
-    expect(content.startsWith('---\n')).toBe(true);
-    const endFence = content.indexOf('\n---', 4);
-    expect(endFence).toBeGreaterThan(0);
-    const fm = content.slice(4, endFence);
-    expect(fm).toMatch(/agent:\s*claude/);
-    expect(fm).toMatch(/parent_session_id:\s*5d22e2d5-0fe0-472a-be31-698c48882d0c/);
-    expect(fm).toMatch(/sub_index:\s*3/);
-    expect(fm).toMatch(/sub_hash:\s*a24960e/);
-    expect(fm).toMatch(/project:\s*coding/);
-    expect(fm).toMatch(/sub_session_id:\s*a24960e65f317241e/);
-    expect(fm).toMatch(/lsl_incomplete:\s*false/);
-    expect(fm).toMatch(/captured_via:\s*sub-agent-backfill/);
-    expect(fm).toMatch(/captured_at:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    // The locked field set moved from YAML frontmatter to the `lsl.tranche`
+    // spine entry's `data`. Same keys, same values — but JSON, so reading one
+    // back no longer needs a per-field `^key:\s*(.*)$` scrape.
+    const entries = content.trim().split('\n').map((l) => JSON.parse(l));
+    expect(entries[0].type).toBe('session');
+    expect(entries[0].version).toBe(3);
+    const spine = entries.find((e) => e.customType === 'lsl.tranche');
+    expect(spine).toBeDefined();
+    const fm = spine.data;
+    expect(fm.agent).toBe('claude');
+    expect(fm.parent_session_id).toBe('5d22e2d5-0fe0-472a-be31-698c48882d0c');
+    expect(fm.sub_index).toBe(3);
+    expect(fm.sub_hash).toBe('a24960e');
+    expect(fm.project).toBe('coding');
+    expect(fm.sub_session_id).toBe('a24960e65f317241e');
+    expect(fm.lsl_incomplete).toBe(false);
+    expect(fm.captured_via).toBe('sub-agent-backfill');
+    expect(fm.captured_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   test('Test 7: per-agent sub_hash rule applied across all three agents', async () => {
@@ -241,9 +253,11 @@ describe('writeSubAgentLSL', () => {
         slotAllocator: { state: slotState },
       });
       const content = fs.readFileSync(result.filePath, 'utf-8');
-      expect(content).toContain(`sub_hash: ${tc.expectedSubHash}`);
-      expect(content).toContain(`sub_session_id: ${tc.expectedSubSession}`);
-      expect(content).toContain(`agent: ${tc.row.agent}`);
+      const spine = content.trim().split('\n').map((l) => JSON.parse(l))
+        .find((e) => e.customType === 'lsl.tranche');
+      expect(spine.data.sub_hash).toBe(tc.expectedSubHash);
+      expect(spine.data.sub_session_id).toBe(tc.expectedSubSession);
+      expect(spine.data.agent).toBe(tc.row.agent);
     }
   });
 
@@ -351,10 +365,10 @@ describe('writeSubAgentLSL', () => {
     });
     expect(result.chunked).toBeGreaterThanOrEqual(2);
     const monthDir = path.join(outputRoot, '2026', '05');
-    const partFiles = fs.readdirSync(monthDir).filter((f) => /-part\d+\.md$/.test(f));
+    const partFiles = fs.readdirSync(monthDir).filter((f) => /-part\d+\.jsonl$/.test(f));
     expect(partFiles.length).toBe(result.chunked);
-    // First part filename ends with -part1.md.
-    expect(partFiles.some((f) => f.endsWith('-part1.md'))).toBe(true);
+    // First part filename ends with -part1.jsonl.
+    expect(partFiles.some((f) => f.endsWith('-part1.jsonl'))).toBe(true);
   });
 
   test('Test 12: dry-run — returns filePath but writes nothing to disk', async () => {
@@ -369,7 +383,7 @@ describe('writeSubAgentLSL', () => {
     expect(result.skipped).toBe(false);
     expect(result.bytesWritten).toBe(0);
     expect(result.chunked).toBe(0);
-    expect(result.filePath).toMatch(/\.md$/);
+    expect(result.filePath).toMatch(/\.jsonl$/);
     expect(fs.existsSync(result.filePath)).toBe(false);
   });
 });

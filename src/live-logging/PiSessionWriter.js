@@ -213,7 +213,11 @@ export function exchangesToBlocks(exchanges, { formatTime } = {}) {
       continue;
     }
     for (const tc of toolCalls) {
-      const result = ex.results?.[tc.id] ?? tc.result ?? null;
+      // The ETM pairs results by `tool_use_id`, not by index or a keyed map —
+      // see formatExchangeForLogging(). Keep the same lookup so a tool call
+      // whose result arrived out of order still gets its own output.
+      const result = ex.toolResults?.find((r) => r.tool_use_id === tc.id)
+        ?? ex.results?.[tc.id] ?? tc.result ?? null;
       const raw = result?.content;
       blocks.push({
         kind: 'tool', time, userText,

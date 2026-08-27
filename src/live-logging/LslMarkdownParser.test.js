@@ -261,7 +261,10 @@ describe('PiSessionWriter', () => {
     const blocks = exchangesToBlocks([{
       timestamp: '2026-08-26T11:00:00.000Z', userMessage: 'go',
       toolCalls: [{ id: 't1', name: 'Bash', input: { c: 'ls' } }, { id: 't2', name: 'Read', input: {} }],
-      results: { t1: { content: 'out', is_error: false }, t2: { content: 'x', is_error: true } },
+      toolResults: [
+        { tool_use_id: 't2', content: 'x', is_error: true },
+        { tool_use_id: 't1', content: 'out', is_error: false },
+      ],
     }]);
     assert.equal(blocks.length, 2);
     assert.equal(blocks[0].toolName, 'Bash');
