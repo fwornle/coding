@@ -34,7 +34,8 @@
     ],
     "mcp_patterns": [
       "mcp__constraint-monitor", "mcp__semantic-analysis",
-      "determine_insights", "get_system_status", "search_knowledge"
+      "determine_insights", "get_system_status", "search_knowledge",
+      "semantic workflow run", "constraints check", "bin/semantic", "bin/constraints"
     ]
   },
   "exclusion_patterns": ["brandschutz", "fire safety", "onboarding training", "quiz question", "successfactors"],

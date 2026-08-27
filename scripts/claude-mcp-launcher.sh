@@ -129,9 +129,9 @@ if [[ -f "$SHARED_MEMORY" ]]; then
 
 3. **Knowledge Management Rules:**
    - ❌ NEVER edit GraphDB files (.data/knowledge-graph/) directly
-   - ✅ ALWAYS use: ukb --interactive or ukb --auto
+   - ✅ ALWAYS use: semantic workflow run wave-analysis --team coding
    - ✅ Use vkb to visualize knowledge graph
-   - ✅ ukb is in PATH and works from anywhere
+   - ❌ There is NO working knowledge-base CLI by the old name - a constraint blocks it
    - 📊 Knowledge stored in GraphDB, exported to .data/knowledge-export/*.json
 
 4. **Verify logging is working:**

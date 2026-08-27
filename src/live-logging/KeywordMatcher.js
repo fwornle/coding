@@ -361,8 +361,10 @@ class KeywordMatcher {
           '/coding/', 'scripts/', 'knowledge-management/', '.specstory/'
         ],
         mcp_patterns: [
+          // mcp__ tokens retained for transcripts predating the 2026-08-27 CLI move.
           'mcp__semantic-analysis', 'create_entities',
-          'search_nodes', 'determine_insights'
+          'search_nodes', 'determine_insights',
+          'semantic workflow run', 'constraints check'
         ],
         system_concepts: [
           'knowledge graph', 'semantic analysis', 'MCP integration'

@@ -94,7 +94,7 @@ Scripts are organized here to keep the repository root clean while maintaining e
 ### Command Wrappers in bin/
 - `bin/coding` - Main entry point, routes to agent launchers via config
 - `bin/claude-mcp` - Universal wrapper (added to PATH)
-- `bin/ukb` - Universal wrapper (added to PATH)
+- `bin/semantic` - Knowledge workflows and ontology (replaced the former UKB wrapper)
 - `bin/vkb` - Universal wrapper (added to PATH)
 
 ### Component-Specific Scripts

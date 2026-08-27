@@ -294,7 +294,10 @@ Format: CLASSIFICATION: [CODING_INFRASTRUCTURE|NOT_CODING_INFRASTRUCTURE] | CONF
       'lsl', 'statusline', 'semantic analysis', 'coding tools',
       'generate-proper-lsl', 'redaction', 'tool development',
       'ci/cd', 'repository management', 'mcp__semantic_analysis',
-      'mcp__semantic-analysis', 'mcp integration', 'semantic analyzer'
+      // The mcp__ tokens are retained deliberately: they classify transcripts from
+      // before 2026-08-27, when these were MCP tools rather than CLIs.
+      'mcp__semantic-analysis', 'mcp integration', 'semantic analyzer',
+      'semantic workflow run', 'constraints check'
     ];
     
     const codingScore = codingKeywords.filter(keyword => combinedContent.includes(keyword)).length;

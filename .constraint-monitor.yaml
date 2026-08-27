@@ -131,12 +131,14 @@ constraints:
 - id: knowledge-base-direct-manipulation
   group: architecture
   pattern: (?:\.data/knowledge-(?:export|graph)/|\.data/knowledge-export/.*\.json)
-  message: 'CRITICAL: Knowledge base must only be manipulated through bin/ukb CLI'
+  message: 'CRITICAL: never hand-edit the knowledge base - it is written by the
+    wave-analysis workflow (`semantic workflow run wave-analysis --team coding`)'
   severity: critical
   enabled: true
   applies_to: file_path
-  suggestion: Use 'bin/ukb' CLI for all knowledge base operations. Never directly
-    edit files in .data/knowledge-export/ or .data/knowledge-graph/
+  suggestion: Never directly edit files in .data/knowledge-export/ or
+    .data/knowledge-graph/. Knowledge is written by the wave-analysis workflow; use vkb
+    to inspect it. The former bin/ukb entry point no longer works - do not advise it.
 - id: plantuml-standard-styling
   group: plantuml
   pattern: '@startuml.*\n(?!.*!include _standard-style\.puml)'
@@ -401,10 +403,23 @@ constraints:
     -jar plantuml.jar)'
 - id: no-ukb-bash-command
   group: architecture
-  pattern: ^ukb\s|^ukb$|\s+ukb\s|\s+ukb$|[;&|]\s*ukb\s|[;&|]\s*ukb$
-  message: 'CRITICAL: bare ''ukb'' is not a command - it was removed. Run the semantic
-    CLI instead: `semantic workflow run wave-analysis --team coding` (add --debug only
-    if the user said "debug"). See the /semantic skill.'
+  # Command position only. The previous pattern included `\s+ukb\s`, which matched the
+  # token ANYWHERE in a command — inside quoted strings, grep patterns and heredocs —
+  # and produced four false positives in a single session (an assertion message, two
+  # greps searching for stale references, and the test for this very rule) against zero
+  # real invocations. Anchored alternatives lose no coverage: a genuine invocation is
+  # always at the start of a line or right after ; & | ( or $(.
+  #
+  # Backtick is deliberately NOT a trigger. In shell it means command substitution,
+  # but this repo writes a lot of markdown through heredocs, where a backtick before
+  # the token is code formatting in prose. `$( )` is the modern substitution form and
+  # is still caught, so the archaic form is the cheaper thing to give up.
+  pattern: (?:^|[;&|(]|\$\()\s*ukb(?:\s|$)
+  flags: m
+  message: 'CRITICAL: there is no working knowledge-base command by that name - not on
+    PATH, and the surviving knowledge-management wrapper is non-executable and delegates
+    to a bin/ukb-cli.js that does not exist. Run the semantic CLI instead: `semantic
+    workflow run wave-analysis --team coding` (add --debug only if the user said "debug").'
   severity: critical
   enabled: true
   applies_to: content

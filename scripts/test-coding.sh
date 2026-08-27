@@ -520,7 +520,7 @@ fi
 
 print_section "PHASE 3: Knowledge Management Tools (VKB)"
 
-print_info "UKB command removed - use MCP semantic-analysis workflow instead"
+print_info "UKB command removed - use: semantic workflow run wave-analysis --team coding"
 print_info "Knowledge base updates are now triggered via MCP server only"
 
 print_test "VKB (View Knowledge Base) tool"
@@ -595,7 +595,7 @@ else
     print_info "Will be created when first entity is added"
 fi
 
-# UKB command removed - use MCP semantic-analysis workflow
+# UKB command removed - use: semantic workflow run wave-analysis --team coding
 
 print_test "Continuous Learning Knowledge System Databases"
 
@@ -2006,7 +2006,7 @@ if [ "$KB_FILES_FOUND" = false ]; then
     print_info "Export files at .data/knowledge-export/ will be tracked in git when created"
 fi
 
-# UKB command removed - use MCP semantic-analysis workflow instead
+# UKB command removed - use: semantic workflow run wave-analysis --team coding instead
 
 # Test VSCode Extension Bridge integration
 print_check "VSCode Extension Bridge integration test"

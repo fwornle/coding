@@ -147,7 +147,7 @@ Freshness is decided by comparing the graph's `built_at_commit` against `HEAD`:
 
 ## Integration with Semantic Analysis
 
-The `analyze_code_graph` tool in the semantic-analysis MCP server reads the same `graph.json` — no separate database to keep in sync.
+The `analyze_code_graph` tool (reachable as `semantic tool analyze_code_graph ...`) reads the same `graph.json` — no separate database to keep in sync.
 
 ## Troubleshooting
 

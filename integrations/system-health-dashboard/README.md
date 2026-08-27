@@ -361,7 +361,7 @@ The dashboard includes an interactive workflow visualization for debugging UKB (
 
 Via MCP tool:
 ```
-mcp__semantic-analysis__execute_workflow
+semantic workflow run wave-analysis --team coding
   workflow_name: "batch-analysis"
   async_mode: true
   debug: true
