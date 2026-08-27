@@ -1,0 +1,259 @@
+#!/usr/bin/env bash
+# Host entry point to the semantic-analysis tools.
+#
+# Replaces the former `semantic-analysis` MCP server, whose 19 tool schemas cost
+# ~12.6 KB (~3,160 tokens) in every context window — for tools that are only ever
+# invoked deliberately.
+#
+# Calls POST /tool/<name> on the SSE server the container already runs, rather
+# than executing in-process: `workflow run` dispatches into the in-process state
+# machine whose broadcaster feeds the dashboard's /workflow-events view, so the
+# call has to land inside THAT process for the UI to stay live.
+#
+# See the /semantic skill for when to reach for each subcommand.
+set -euo pipefail
+
+BASE_URL="${SEMANTIC_ANALYSIS_SSE_URL:-http://localhost:${SEMANTIC_ANALYSIS_PORT:-3848}}"
+
+usage() {
+    cat <<'USAGE'
+semantic — knowledge-base analysis, UKB workflows and ontology management
+
+Usage:
+  semantic workflow run <name> [--team <t>] [--debug] [--sync] [--param k=v ...]
+  semantic workflow status
+  semantic ontology status|classes|inject|suggest [--team <t>] [flags]
+  semantic refresh <entity>|'*' --team <t> [--dry-run] [--parallel <n>]
+  semantic checkpoint reset [--days-ago <n>] [--team <t>]
+  semantic insights <file|-> [--type general|code|patterns|architecture]
+  semantic analyze code <file> [--focus patterns|quality|security|performance|architecture]
+  semantic analyze repo <path> [--max-files <n>]
+  semantic tools                       # list every available tool
+  semantic tool <name> --json '{...}'  # generic escape hatch, reaches all 19
+
+Workflow names: wave-analysis (the UKB pass), batch-analysis,
+                incremental-analysis, complete-analysis
+
+Flags:
+  --json    print the raw JSON envelope instead of just the tool's text
+  --url <u> override the server (default $SEMANTIC_ANALYSIS_SSE_URL or :3848)
+
+'workflow run' is async for the long workflows: it returns the workflow id and
+leaves the run going. Watch it on the dashboard (Performance → UKB) or poll
+'semantic workflow status'.
+USAGE
+}
+
+die() { echo "semantic: $*" >&2; exit 2; }
+
+preflight() {
+    if ! curl -sf --max-time 3 "$BASE_URL/health" >/dev/null 2>&1; then
+        echo "semantic: no semantic-analysis service at $BASE_URL" >&2
+        echo "  Start it with:  cd docker && docker-compose up -d coding-services" >&2
+        echo "  Then check:     curl -s $BASE_URL/health" >&2
+        exit 1
+    fi
+}
+
+# call <tool> <json-body>
+call() {
+    local tool="$1" body="$2"
+    preflight
+    local response http
+    response="$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/tool/$tool" \
+        -H 'Content-Type: application/json' -d "$body")"
+    http="$(printf '%s' "$response" | tail -n1)"
+    response="$(printf '%s' "$response" | sed '$d')"
+
+    if [[ "$RAW_JSON" == "1" ]]; then
+        printf '%s\n' "$response"
+    else
+        printf '%s\n' "$response" | node -e '
+          let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+            try { const o=JSON.parse(s); process.stdout.write((o.text ?? JSON.stringify(o))+"\n"); }
+            catch { process.stdout.write(s); }
+          });'
+    fi
+
+    [[ "$http" == "200" ]] || exit 1
+}
+
+# Build a JSON object from `key=value` pairs, coercing true/false/numbers/JSON.
+kv_json() {
+    node -e '
+      const out = {};
+      for (const pair of process.argv.slice(1)) {
+        const i = pair.indexOf("=");
+        if (i < 0) { console.error(`semantic: --param needs key=value, got ${pair}`); process.exit(2); }
+        const k = pair.slice(0, i), v = pair.slice(i + 1);
+        if (v === "true") out[k] = true;
+        else if (v === "false") out[k] = false;
+        else if (v !== "" && !Number.isNaN(Number(v))) out[k] = Number(v);
+        else { try { out[k] = JSON.parse(v); } catch { out[k] = v; } }
+      }
+      process.stdout.write(JSON.stringify(out));
+    ' "$@"
+}
+
+RAW_JSON=0
+ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --json) RAW_JSON=1; shift ;;
+        --url)  BASE_URL="$2"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        *) ARGS+=("$1"); shift ;;
+    esac
+done
+set -- ${ARGS[@]+"${ARGS[@]}"}
+
+[[ $# -gt 0 ]] || { usage; exit 1; }
+
+GROUP="$1"; shift
+
+case "$GROUP" in
+  tools)
+      preflight
+      curl -s "$BASE_URL/tools" | node -e '
+        let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+          for (const t of JSON.parse(s).tools) console.log(`${t.name.padEnd(32)} ${t.description}`);
+        });'
+      ;;
+
+  tool)
+      [[ $# -ge 1 ]] || die "tool needs a name (see: semantic tools)"
+      TOOL="$1"; shift
+      BODY='{}'
+      if [[ "${1:-}" == "--json-args" || "${1:-}" == "--args" ]]; then BODY="$2"
+      elif [[ $# -ge 1 ]]; then BODY="$1"; fi
+      call "$TOOL" "$BODY"
+      ;;
+
+  workflow)
+      SUB="${1:-}"; shift || true
+      case "$SUB" in
+        run)
+            [[ $# -ge 1 ]] || die "workflow run needs a workflow name (e.g. wave-analysis)"
+            NAME="$1"; shift
+            DEBUG=false; ASYNC=true; PARAMS=()
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --debug)  DEBUG=true; shift ;;
+                    --sync)   ASYNC=false; shift ;;
+                    --team)   PARAMS+=("team=$2"); shift 2 ;;
+                    --param)  PARAMS+=("$2"); shift 2 ;;
+                    *) die "unexpected argument to 'workflow run': $1" ;;
+                esac
+            done
+            # In debug mode the MCP tool always paired mockLLM with single-step and
+            # step-into-substeps; keep that pairing so `--debug` means the same thing
+            # it did before the CLI existed.
+            if [[ "$DEBUG" == "true" ]]; then
+                PARAMS+=("singleStepMode=true" "mockLLM=true" "stepIntoSubsteps=true")
+            fi
+            PARAM_JSON="$(kv_json ${PARAMS[@]+"${PARAMS[@]}"})"
+            call execute_workflow "$(node -e '
+              process.stdout.write(JSON.stringify({
+                workflow_name: process.argv[1],
+                async_mode: process.argv[2] === "true",
+                debug: process.argv[3] === "true",
+                parameters: JSON.parse(process.argv[4]),
+              }));' "$NAME" "$ASYNC" "$DEBUG" "$PARAM_JSON")"
+            ;;
+        status) call get_workflow_status '{}' ;;
+        *) die "workflow: expected 'run' or 'status'" ;;
+      esac
+      ;;
+
+  ontology)
+      SUB="${1:-}"; shift || true
+      TEAM=""; EXTRA=()
+      while [[ $# -gt 0 ]]; do
+          case "$1" in
+              --team) TEAM="$2"; shift 2 ;;
+              *) EXTRA+=("${1#--}"); shift ;;
+          esac
+      done
+      [[ -n "$TEAM" ]] && EXTRA+=("team=$TEAM")
+      BODY="$(kv_json ${EXTRA[@]+"${EXTRA[@]}"})"
+      case "$SUB" in
+        status)  call get_ontology_status "$BODY" ;;
+        classes) call list_ontology_classes "$BODY" ;;
+        inject)  call inject_ontology "$BODY" ;;
+        suggest) call suggest_ontology_extension "$BODY" ;;
+        *) die "ontology: expected status|classes|inject|suggest" ;;
+      esac
+      ;;
+
+  refresh)
+      [[ $# -ge 1 ]] || die "refresh needs an entity name, or '*' for all"
+      ENTITY="$1"; shift
+      PAIRS=("entity_name=$ENTITY")
+      while [[ $# -gt 0 ]]; do
+          case "$1" in
+              --team)      PAIRS+=("team=$2"); shift 2 ;;
+              --dry-run)   PAIRS+=("dry_run=true"); shift ;;
+              --parallel)  PAIRS+=("parallel_workers=$2"); shift 2 ;;
+              --force)     PAIRS+=("force_full_refresh=true"); shift ;;
+              --max)       PAIRS+=("max_entities=$2"); shift 2 ;;
+              *) die "unexpected argument to 'refresh': $1" ;;
+          esac
+      done
+      call refresh_entity "$(kv_json "${PAIRS[@]}")"
+      ;;
+
+  checkpoint)
+      [[ "${1:-}" == "reset" ]] || die "checkpoint: only 'reset' is supported"
+      shift
+      PAIRS=()
+      while [[ $# -gt 0 ]]; do
+          case "$1" in
+              --days-ago) PAIRS+=("days_ago=$2"); shift 2 ;;
+              --team)     PAIRS+=("team=$2"); shift 2 ;;
+              *) die "unexpected argument to 'checkpoint reset': $1" ;;
+          esac
+      done
+      call reset_analysis_checkpoint "$(kv_json ${PAIRS[@]+"${PAIRS[@]}"})"
+      ;;
+
+  insights)
+      [[ $# -ge 1 ]] || die "insights needs a file, or - for stdin"
+      SRC="$1"; shift
+      TYPE="general"
+      [[ "${1:-}" == "--type" ]] && { TYPE="$2"; shift 2; }
+      CONTENT="$([[ "$SRC" == "-" ]] && cat || cat "$SRC")"
+      call determine_insights "$(node -e '
+        process.stdout.write(JSON.stringify({ content: process.argv[1], analysis_type: process.argv[2] }));
+      ' "$CONTENT" "$TYPE")"
+      ;;
+
+  analyze)
+      SUB="${1:-}"; shift || true
+      case "$SUB" in
+        code)
+            [[ $# -ge 1 ]] || die "analyze code needs a file"
+            FILE="$1"; shift
+            FOCUS="patterns"
+            [[ "${1:-}" == "--focus" ]] && { FOCUS="$2"; shift 2; }
+            call analyze_code "$(node -e '
+              const fs = require("fs");
+              process.stdout.write(JSON.stringify({
+                code: fs.readFileSync(process.argv[1], "utf8"),
+                file_path: process.argv[1],
+                analysis_focus: process.argv[2],
+              }));' "$FILE" "$FOCUS")"
+            ;;
+        repo)
+            [[ $# -ge 1 ]] || die "analyze repo needs a path"
+            PAIRS=("repository_path=$1"); shift
+            [[ "${1:-}" == "--max-files" ]] && { PAIRS+=("max_files=$2"); shift 2; }
+            call analyze_repository "$(kv_json "${PAIRS[@]}")"
+            ;;
+        *) die "analyze: expected 'code' or 'repo'" ;;
+      esac
+      ;;
+
+  *)
+      die "unknown command '$GROUP' — run 'semantic --help'"
+      ;;
+esac
