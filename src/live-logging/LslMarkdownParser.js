@@ -41,10 +41,13 @@
 import fs from 'fs';
 import path from 'path';
 
-/** `<date>_<window>[-<part>]_<hash>[_from-<project>].md` */
-const NAME_RE = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{4})(?:-(\d+))?_([^.]+?)(?:_from-(.+))?\.md$/;
-/** Sub-agent files: `<date>_<window>_S<n>-<n>-<hash>.md` */
-const SUB_RE = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{4})_(S\d+-\d+-[0-9A-Za-z]+)\.md$/;
+// Both extensions: `.jsonl` is the current pi format, `.md` the legacy corpus.
+// The viewer groups chains across a MIXED directory, which is the steady state
+// until the backfill has run everywhere.
+/** `<date>_<window>[-<part>]_<hash>[_from-<project>].{jsonl,md}` */
+const NAME_RE = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{4})(?:-(\d+))?_([^.]+?)(?:_from-(.+))?\.(?:jsonl|md)$/;
+/** Sub-agent files: `<date>_<window>_S<n>-<n>-<hash>[-part<N>].{jsonl,md}` */
+const SUB_RE = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{4})_(S\d+-\d+-[0-9A-Za-z]+)(?:-part(\d+))?\.(?:jsonl|md)$/;
 
 /**
  * Group part files into chains keyed by (date, window, hash, redirect target).
@@ -60,10 +63,11 @@ export function groupChains(files) {
     const sub = b.match(SUB_RE);
     if (sub) {
       key = `${sub[1]}_${sub[2]}_${sub[3]}`;
+      index = sub[4] ? Number(sub[4]) : 0;
     } else {
       const m = b.match(NAME_RE);
       if (!m) {
-        key = b.replace(/\.md$/, '');
+        key = b.replace(/\.(?:jsonl|md)$/, '');
       } else {
         // The UNSUFFIXED file is the base tranche, written first; `-1_` is the
         // first ROTATION of it (see getActiveSessionFilePath). So the base is
