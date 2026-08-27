@@ -4039,6 +4039,19 @@ class SystemHealthAPIServer {
         const connect = () => {
             process.stderr.write(`[SSE] Connecting to ${sseUrl}\n`);
 
+            // One reconnect per connection attempt. 'error' and 'end' can both
+            // fire for the same dead socket (an aborted stream emits 'error'
+            // then 'end'), and scheduling twice would double the client count
+            // on every restart of the semantic-analysis service.
+            let reconnectScheduled = false;
+            const scheduleReconnect = (why) => {
+                if (reconnectScheduled) return;
+                reconnectScheduled = true;
+                process.stderr.write(`[SSE] ${why}, reconnecting in ${reconnectDelay}ms\n`);
+                setTimeout(connect, reconnectDelay);
+                reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+            };
+
             const req = httpGet(sseUrl, (res) => {
                 if (res.statusCode !== 200) {
                     process.stderr.write(`[SSE] Unexpected status ${res.statusCode}, retrying in ${reconnectDelay}ms\n`);
@@ -4090,20 +4103,20 @@ class SystemHealthAPIServer {
                 });
 
                 res.on('end', () => {
-                    process.stderr.write(`[SSE] Connection closed, reconnecting in ${reconnectDelay}ms\n`);
-                    setTimeout(connect, reconnectDelay);
-                    reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+                    scheduleReconnect('Connection closed');
                 });
 
+                // Previously this only logged. A restart of the semantic-analysis
+                // service aborts the stream, which emits 'error' WITHOUT 'end' --
+                // so the dashboard's workflow feed stayed dead until the dashboard
+                // itself was restarted. Reconnect here too.
                 res.on('error', (err) => {
-                    process.stderr.write(`[SSE] Stream error: ${err.message}\n`);
+                    scheduleReconnect(`Stream error: ${err.message}`);
                 });
             });
 
             req.on('error', (err) => {
-                process.stderr.write(`[SSE] Connection error: ${err.message}, retrying in ${reconnectDelay}ms\n`);
-                setTimeout(connect, reconnectDelay);
-                reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+                scheduleReconnect(`Connection error: ${err.message}`);
             });
         };
 

@@ -44,7 +44,7 @@ User: "ukb"
 - `ukb` is a **keyword in Claude chat**
 - Claude decides: incremental or full analysis
 - **14-agent multi-agent system** with **SmartOrchestrator** semantic coordination
-- **MCP tool integration**: `mcp__semantic-analysis__execute_workflow`
+- **CLI integration**: `semantic workflow run wave-analysis --team coding` (see the `/semantic` skill)
 - **Team synchronization** via git-tracked checkpoint files
 - **Semantic routing**: QA agent acts as central coordinator with confidence scoring
 

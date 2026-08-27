@@ -3,28 +3,8 @@
     "toolInteractionHook": "{{CODING_TOOLS_PATH}}/.mcp-sync/tool-interaction-hook.cjs",
     "postSessionHook": "{{CODING_TOOLS_PATH}}/scripts/post-session-logger.js"
   },
+  "_comment": "semantic-analysis and constraint-monitor were removed as MCP servers: their 23 tool schemas cost ~14 KB (~3,540 tokens) in every context window, of every session, subagent and fork, for tools that are only ever invoked deliberately. They are now the `semantic` and `constraints` CLIs (bin/), with the /semantic and /constraints skills. Both packages keep running — semantic-analysis serves :3848, which bin/semantic calls and the dashboard's workflow view reads. graphify stays an MCP server: its traversal tools are the one set worth reaching for mid-reasoning.",
   "mcpServers": {
-    "semantic-analysis": {
-      "command": "node",
-      "args": ["{{CODING_TOOLS_PATH}}/integrations/mcp-server-semantic-analysis/dist/index.js"],
-      "env": {
-        "CODING_TOOLS_PATH": "{{CODING_TOOLS_PATH}}",
-        "KNOWLEDGE_BASE_PATH": "{{KNOWLEDGE_BASE_PATH}}",
-        "CODING_DOCS_PATH": "{{CODING_DOCS_PATH}}",
-        "GROQ_API_KEY": "{{GROQ_API_KEY}}",
-        "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}",
-        "OPENAI_API_KEY": "{{OPENAI_API_KEY}}"
-      }
-    },
-    "constraint-monitor": {
-      "command": "node",
-      "args": ["{{CODING_TOOLS_PATH}}/integrations/mcp-constraint-monitor/src/server.js"],
-      "env": {
-        "GROK_API_KEY": "{{GROK_API_KEY}}",
-        "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}",
-        "CODING_TOOLS_PATH": "{{CODING_TOOLS_PATH}}"
-      }
-    },
     "graphify": {
       "type": "http",
       "url": "http://localhost:3851/mcp"

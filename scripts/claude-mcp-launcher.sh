@@ -52,9 +52,6 @@ fi
 #   --plugin-dir  this repo's .claude/commands as a session-only plugin, so the
 #                 commands stay live rather than going stale in ~/.claude/commands.
 #
-# Deliberately NOT --strict-mcp-config: that would suppress the user's own MCP
-# servers, which is the opposite of "behaves as before".
-#
 # In global scope these live in ~/.claude and need no per-launch flags, so the
 # extra arguments are simply omitted.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,6 +70,31 @@ if [[ "${_coding_scope:-wrapper}" != "global" ]]; then
     else
         echo -e "${YELLOW}⚠️  Could not build per-launch Claude config — hooks/skills may be inactive${NC}"
     fi
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MCP scoping for this launch.
+#
+# --mcp-config alone is ADDITIVE: Claude Code still loads ~/.claude.json's own
+# mcpServers AND the claude.ai account connectors (Google Calendar, Gmail,
+# Drive) that arrive with the OAuth login and live in no file on disk. Those
+# connectors alone are ~21 KB of tool schema — more than both coding servers
+# used to cost combined — charged to every context window whether or not a
+# calendar is ever touched.
+#
+# --strict-mcp-config restricts the session to $MCP_CONFIG. Verified: with it,
+# `claude -p "list your mcp__ tools"` answers NONE against an empty config;
+# without it, the same probe lists all nine Calendar tools. (`claude mcp list`
+# reads config directly and ignores the flag, so it is not a valid probe.)
+#
+# This is scoped to launches through this wrapper. A bare `claude` in any other
+# terminal — including one started inside this repo — is untouched, which is the
+# whole point of wrapper scope. Set CODING_MCP_STRICT=0 to opt out for a launch
+# that genuinely needs a personal MCP server (mirrors CODING_PROXY_ROUTE=0).
+# ─────────────────────────────────────────────────────────────────────────────
+if [[ "${CODING_MCP_STRICT:-1}" != "0" ]]; then
+    CLAUDE_SCOPE_ARGS+=(--strict-mcp-config)
+    echo -e "${BLUE}🔒 MCP scoped to this project's config (CODING_MCP_STRICT=0 to opt out)${NC}"
 fi
 
 # Display minimal startup information

@@ -62,9 +62,8 @@ Assistant: [provides solution]
 # After solving a complex problem, in Claude chat:
 User: "ukb"
 
-# Claude detects request and calls:
-mcp__semantic-analysis__execute_workflow
-workflow_name: "incremental-analysis"
+# Claude detects request and runs:
+semantic workflow run incremental-analysis --team coding
 
 # 14-Agent System executes:
 1. GitHistoryAgent - analyzes recent commits
