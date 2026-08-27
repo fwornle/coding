@@ -366,3 +366,62 @@ attributed to the part where the containing block began. The backfill must
 write a `chain-map.json` recording that absorption so a missing `.jsonl` for a
 given `.md` is provably "absorbed into part N", not "lost". Do **not** paper
 over it by emitting empty session files.
+
+---
+
+# Execution log
+
+## Phase 1 — writer (done, `a730d141f`)
+
+Both writers emit pi session JSONL. Rotation, tranching, filenames, redirect
+routing and the classifier untouched. Three capabilities markdown could not
+express are now free: `parentSession` chaining of rotation parts, prompt-set
+removal as a subtree filter instead of regex byte-range surgery, and
+JSON-escaped tool output (no fence-break hazard).
+
+**Idempotent re-flush now actually holds** — ids are seeded per
+(filename, promptSetId), so remove-then-re-append is byte-identical.
+
+**Pre-existing data-loss path found, deliberately NOT fixed** (rotation policy
+is out of scope): in the rotation branch, `createSessionFileWithContent()`
+writes only when the target does not exist, and the call sits inside the `else`
+of an existence check — so the slice is silently dropped. Present in the
+markdown code today. Documented in place; worth its own change.
+
+## Phase 2 — readers (done, `047d49f36`)
+
+Both formats supported permanently, dispatching on CONTENT not filename.
+
+**The parity acceptance in §4 Phase 2 failed, in the good direction.** Over 200
+August chains the pi path is a strict SUPERSET of the markdown path in
+**200/200**, recovering **54% more messages** (3,759 vs 2,436). The markdown
+parser was under-reporting three ways: heading-anchored prompt sets (misses the
+521 heading-less anchors), `**User Request:**` only (skips sets whose prompt is
+in a `**User Message:**` block), and first-user-turn-only per set. Expect
+richer observation input from here.
+
+**`LSLFileManager` was the dangerous edit.** `cleanupLowValueLSLFiles()` deletes
+what `isValueableLSLFile()` rejects, and the markdown heuristics return zero on
+JSONL — admitting `.jsonl` to the candidate filter without a format branch
+would have deleted every file the new writer produces. One edit, guarded by a
+test.
+
+`split-lsl-files` stays markdown-only on purpose: slicing JSONL text emits
+headerless fragments, the exact orphan-part problem this migration removes.
+`AdaptiveTranscriptFormatDetector` needed nothing (it learns agent transcript
+formats, not LSL).
+
+## Phase 3 — backfill
+
+`scripts/backfill-lsl-to-pi.mjs`. Chain-unit, `--dry-run` by default,
+verify-before-remove, quarantine on failure, resumable, per-YYYY/MM commits,
+`pre-pi-format` tag per repo before any write.
+
+**Design note — whole sets stay in one part file.** Entries for a prompt set are
+attributed to the part holding its `<a name>` anchor, not spread across parts by
+block. Splitting by block would preserve the original byte distribution but
+leave `parentId` references dangling across file boundaries, breaking pi's tree
+rendering. Keeping sets whole is what makes each part file independently valid.
+The cost is that a part in which no set STARTS emits nothing; those are recorded
+in `chain-map.json` as `absorbedInto`, and test 4 asserts
+`emitted + absorbed == parts` so a source file can never be merely absent.
