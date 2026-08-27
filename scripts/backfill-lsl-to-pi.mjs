@@ -43,7 +43,7 @@ import {
 } from '../src/live-logging/LslMarkdownParser.js';
 import {
   sessionHeader, buildTrancheEntries, buildPromptSetEntries,
-  serialize, makeIdGen, uuidFrom,
+  serialize, makeIdGen, uuidFrom, entryId,
 } from '../src/live-logging/PiSessionWriter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -86,18 +86,35 @@ function discoverRepos() {
   return found;
 }
 
+/**
+ * Transcripts only, and ONLY from the YYYY/ trees.
+ *
+ * `.specstory/history/` holds more than transcripts. `logs/classification/`
+ * carries 952 markdown SUMMARIES whose filenames are byte-identical to the
+ * transcripts they describe — so a naive walk pulls them into the transcript
+ * chains, duplicating every prompt set and, with --write, converting and
+ * DELETING the summaries. `docs/` holds the repo's own documentation. Both are
+ * markdown by design and stay that way.
+ */
+const TRANSCRIPT_DIR_RE = /^\d{4}$/;
+
 function listMarkdown(dir) {
   const acc = [];
-  (function walk(d) {
-    let entries;
-    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      if (e.name === '.git') continue;
-      const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith('.md')) acc.push(p);
-    }
-  })(dir);
+  let roots;
+  try { roots = fs.readdirSync(dir, { withFileTypes: true }); } catch { return acc; }
+  for (const top of roots) {
+    if (!top.isDirectory() || !TRANSCRIPT_DIR_RE.test(top.name)) continue;
+    (function walk(d) {
+      let entries;
+      try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (e.name === '.git') continue;
+        const p = path.join(d, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.name.endsWith('.md')) acc.push(p);
+      }
+    })(path.join(dir, top.name));
+  }
   return acc;
 }
 
@@ -108,61 +125,90 @@ function listMarkdown(dir) {
 function convertChain(chain, cwd) {
   const cat = concatChain(chain);
   const parsed = parseChain(cat.text, chain.key);
-  const idGen = makeIdGen(chain.key);
   const firstIso = parsed.promptSets[0]?.time
     || (parsed.header.date ? `${parsed.header.date}T00:00:00.000Z` : new Date(0).toISOString());
 
-  const { entries: hdrEntries, spineId } = buildTrancheEntries(
-    { ...parsed.header, chainKey: chain.key,
-      parts: cat.ranges.length,
-      gaps: cat.ranges.filter((r) => r.gapBefore).map((r) => r.index) },
-    idGen, firstIso,
-  );
-
-  // Tag each entry with the part its source block STARTED in.
-  const tagged = hdrEntries.map((e) => ({ part: cat.ranges[0].index, entry: e }));
-  for (const ps of parsed.promptSets) {
-    const psPart = partAt(cat.ranges, ps.offset).index;
-    const entries = buildPromptSetEntries({
-      promptSetId: ps.promptSetId,
-      spineId,
-      idGen,
-      fallbackIso: firstIso,
-      meta: {
-        time: ps.time, durationMs: ps.durationMs, toolCalls: ps.toolCallCount,
-        sliceIdx: ps.sliceIdx, totalSlices: ps.totalSlices,
-        agent: parsed.header.agent,
-      },
-      blocks: ps.blocks.map((b) => ({ ...b, part: partAt(cat.ranges, b.offset).index })),
-    });
-    // A set's entries belong to the part its own blocks started in; the set
-    // header itself goes with the part that holds its anchor.
-    for (const e of entries) {
-      tagged.push({ part: e.type === 'custom' ? psPart : psPart, entry: e });
-    }
+  // Per-part spine, exactly as the live writer derives it: every part file is
+  // an independently valid pi session with its own header and spine. That is
+  // what lets a prompt set that SPANS parts be emitted into each part without
+  // leaving parentId references dangling across file boundaries.
+  const spineOf = new Map();
+  for (const r of cat.ranges) {
+    spineOf.set(r.index, entryId(`${path.basename(r.path, '.md')}.jsonl:spine`));
   }
 
-  // Re-attribute message entries to their block's part where known.
-  const byPart = new Map();
-  for (const { part, entry } of tagged) {
-    if (!byPart.has(part)) byPart.set(part, []);
-    byPart.get(part).push(entry);
+  const perPart = new Map();          // part index -> entries
+  const pushTo = (part, e) => {
+    if (!perPart.has(part)) perPart.set(part, []);
+    perPart.get(part).push(e);
+  };
+
+  // Header entries for every part, so no part is left headerless.
+  for (const r of cat.ranges) {
+    const base = `${path.basename(r.path, '.md')}.jsonl`;
+    const idGen = (() => { let i = 0; return () => (i++ === 0 ? entryId(`${base}:info`) : spineOf.get(r.index)); })();
+    const { entries } = buildTrancheEntries(
+      { ...parsed.header, chainKey: chain.key, part: r.index,
+        parts: cat.ranges.length,
+        gaps: cat.ranges.filter((g) => g.gapBefore).map((g) => g.index) },
+      idGen, firstIso,
+    );
+    for (const e of entries) pushTo(r.index, e);
+  }
+
+  for (const ps of parsed.promptSets) {
+    // Group the set's blocks by the part each one STARTED in. A set spanning
+    // parts becomes one fragment per part, all carrying the SAME promptSetId —
+    // the same mechanism the live writer already uses for a set that spans
+    // hourly tranches, so `grep -l ps_X` still reconstructs the whole set.
+    const byPart = new Map();
+    for (const b of ps.blocks) {
+      const part = partAt(cat.ranges, b.offset).index;
+      if (!byPart.has(part)) byPart.set(part, []);
+      byPart.get(part).push({ ...b, part });
+    }
+    // A set whose blocks are all missing still belongs to its anchor's part.
+    if (byPart.size === 0) byPart.set(partAt(cat.ranges, ps.offset).index, []);
+
+    const parts = [...byPart.keys()].sort((a, b) => a - b);
+    parts.forEach((part, i) => {
+      const idGen = makeIdGen(`${chain.key}:${ps.promptSetId}:${part}`);
+      const entries = buildPromptSetEntries({
+        promptSetId: ps.promptSetId,
+        spineId: spineOf.get(part),
+        idGen,
+        fallbackIso: firstIso,
+        meta: {
+          time: ps.time, durationMs: ps.durationMs, toolCalls: ps.toolCallCount,
+          sliceIdx: ps.sliceIdx, totalSlices: ps.totalSlices,
+          agent: parsed.header.agent,
+          ...(parts.length > 1
+            ? { partFragment: i + 1, partFragments: parts.length, continuation: i > 0 }
+            : {}),
+        },
+        blocks: byPart.get(part),
+      });
+      for (const e of entries) pushTo(part, e);
+    });
   }
 
   const files = [];
   const absorbed = [];
   let prevName = null;
+  let toolResults = 0;
   for (const r of cat.ranges) {
-    const entries = byPart.get(r.index);
+    const entries = perPart.get(r.index) || [];
     const base = path.basename(r.path, '.md');
-    if (!entries || entries.length === 0) {
+    // Header-only means no block started here — the part is pure continuation
+    // bytes belonging to a block that began earlier.
+    const hasContent = entries.some((e) => e.type === 'message' || e.customType === 'lsl.promptSet');
+    if (!hasContent) {
       absorbed.push({ md: path.basename(r.path), absorbedInto: prevName });
       continue;
     }
+    toolResults += entries.filter((e) => e.message?.role === 'toolResult').length;
     const head = sessionHeader({
-      id: uuidFrom(base),
-      timestamp: entries[0].timestamp,
-      cwd,
+      id: uuidFrom(base), timestamp: entries[0].timestamp, cwd,
       ...(prevName ? { parentSession: prevName } : {}),
     });
     files.push({
@@ -182,7 +228,7 @@ function convertChain(chain, cwd) {
       srcParts: cat.ranges.length,
       promptSets: parsed.promptSets.length,
       gtTools: parsed.dialect === 'A' ? (cat.text.match(/^\*\*Tool:\*\*/gm) || []).length : null,
-      outTools: tagged.filter(({ entry }) => entry.message?.role === 'toolResult').length,
+      outTools: toolResults,
       gtAnchors: (cat.text.match(/<a name="ps_\d+"><\/a>/g) || []).length,
     },
   };

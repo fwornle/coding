@@ -74,6 +74,21 @@ describe('groupChains / concatChain', () => {
     assert.deepEqual(c.parts.map((p) => p.index), [1, 2, 10]);
   });
 
+  it('Test 1b — REGRESSION: the unsuffixed base file is part 0, not part 1', () => {
+    // Both forms coexist in the corpus. Defaulting the base to 1 collides with
+    // the real `-1_` rotation, and a chain holding both then emits one part's
+    // entries into BOTH files — duplicating content across the conversion.
+    const chains = groupChains([
+      '/h/2026-08-02_1300-1400-1_abc.md',
+      '/h/2026-08-02_1300-1400_abc.md',
+    ]);
+    assert.equal(chains.size, 1, 'base and rotation belong to the same chain');
+    const c = chains.get('2026-08-02_1300-1400_abc');
+    assert.deepEqual(c.parts.map((p) => p.index), [0, 1]);
+    assert.equal(new Set(c.parts.map((p) => p.index)).size, c.parts.length,
+      'part indices must be unique within a chain');
+  });
+
   it('Test 2 — keeps redirect targets in separate chains', () => {
     const chains = groupChains([
       '/h/2026-08-26_1100-1200-1_abc.md',

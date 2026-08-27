@@ -156,6 +156,33 @@ describe('backfill', () => {
     assert.ok(fs.existsSync(md.replace(/\.md$/, '.jsonl')), 'but it is still converted');
   });
 
+  it('Test 5c — REGRESSION: logs/classification is never touched', () => {
+    // Those summaries have filenames byte-identical to the transcripts they
+    // describe. A naive walk pulled them into the transcript chains, doubling
+    // every prompt set and — with --write — converting and DELETING them.
+    const logs = path.join(tmp, 'proj', '.specstory', 'history',
+      'logs', 'classification', '2026', '08');
+    fs.mkdirSync(logs, { recursive: true });
+    const summary = path.join(logs, '2026-08-26_1800-1900_abc.md');
+    fs.writeFileSync(summary, '# classification summary\n\nrouting decisions\n');
+
+    const md = path.join(history, '2026-08-26_1800-1900_abc.md');
+    fs.writeFileSync(md, HEADER + setBlock('ps_8', '2026-08-26T18:00:00.000Z',
+      tool('Bash', '2026-08-26 18:00:00', 'real transcript', 'ok')));
+    commitAll(path.join(tmp, 'proj', '.specstory', 'history'));
+
+    run([...repoArg(), '--verify', 'structural', '--write']);
+
+    assert.ok(fs.existsSync(summary), 'the summary must survive untouched');
+    assert.ok(!fs.existsSync(summary.replace(/\.md$/, '.jsonl')), 'and must not be converted');
+    assert.equal(fs.readFileSync(summary, 'utf8'), '# classification summary\n\nrouting decisions\n');
+
+    const jsonl = path.join(history, '2026-08-26_1800-1900_abc.jsonl');
+    const entries = fs.readFileSync(jsonl, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    assert.equal(entries.filter((e) => e.customType === 'lsl.promptSet').length, 1,
+      'the transcript must carry exactly one prompt set, not a doubled pair');
+  });
+
   it('Test 6 — re-running is idempotent (same bytes, no duplication)', () => {
     const jsonl = path.join(history, '2026-08-26_1500-1600-1_abc.jsonl');
     const before = fs.readFileSync(jsonl, 'utf8');

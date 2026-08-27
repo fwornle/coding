@@ -279,8 +279,16 @@ Consequences — this invalidates the per-file backfill in §4 Phase 3:
 - A part file is **not** an independent document and cannot be parsed alone.
   The backfill must operate on **chains**, keyed by
   `(date, window, hash, redirect-suffix)`, concatenated in part order.
-- **Every** file in 2026 is suffixed `-N_`; there are **zero** unsuffixed
-  files. `-1_` carries the header; `-2_`… do not.
+- ~~**Every** file in 2026 is suffixed `-N_`; there are **zero** unsuffixed
+  files.~~ **WRONG — corrected during Phase 3.** That check used a `find` with
+  negated `-name` patterns that did not do what it looked like it did. Both
+  forms coexist: `2026-08-02_1300-1400_c197ef.md` (320 KB, the base tranche)
+  sits alongside `2026-08-02_1300-1400-1_c197ef.md` (104 KB, its first
+  rotation). The **unsuffixed file is part 0**, not part 1 — see
+  `getActiveSessionFilePath()`, which writes the base file first and only then
+  starts `-1`. Defaulting it to 1 collides with the real `-1_` part, and a
+  chain holding both emits one part's entries into *both* files. Locked by
+  parser test 1b.
 - Chains are **gapped**. One sampled chain has 198 files but a max part index
   of 293 — `LSLFileManager.cleanupLowValueLSLFiles()` deleted 95 mid-chain
   parts. A gap means a block whose continuation no longer exists.
@@ -425,3 +433,37 @@ rendering. Keeping sets whole is what makes each part file independently valid.
 The cost is that a part in which no set STARTS emits nothing; those are recorded
 in `chain-map.json` as `absorbedInto`, and test 4 asserts
 `emitted + absorbed == parts` so a source file can never be merely absent.
+
+
+## Phase 3 execution — two bugs the ground-truth check caught
+
+Both were silent, both would have corrupted the corpus, and neither is visible
+without comparing converted output against counts taken from the source.
+
+1. **Part-index collision (content duplication).** See the correction above.
+   Symptom: chains reporting `parts=1,1`, emitting 27,537 tool results against
+   19,764 in the source — a 39% over-count, because one part's entries were
+   written into two files.
+
+2. **`logs/classification` pulled into transcript chains.**
+   `.specstory/history/` is not only transcripts: `logs/classification/` holds
+   **952 markdown summaries whose filenames are byte-identical to the
+   transcripts they describe**, and `docs/` holds documentation. A recursive
+   walk therefore grouped a summary and its transcript into one chain,
+   doubling every prompt set — and with `--write` would have converted and
+   **deleted the summaries**. The walker is now scoped to the `YYYY/` trees
+   only. Locked by backfill test 5c.
+
+**Post-fix, August 2026:** 342 md → 341 jsonl, 1 absorbed, prompt sets
+**2,524/2,524 (100%)**, tool calls **19,753/19,764 (99.94%)** — exactly the
+parser's own ground truth, with the residual 11 being the known gapped-chain
+artifact.
+
+## One more safety rule added in Phase 3
+
+**Markdown that git cannot restore is never deleted.** The `pre-pi-format` tag
+only protects *committed* content. `km-core`'s history repo has its entire
+`2026/` tree **untracked** with no `origin/main` ref, so a naive unlink would
+have destroyed 37 files with no way back. The backfill now checks each file is
+tracked AND unmodified before removing it, keeps it otherwise, and reports the
+count. `--force-delete-unrecoverable` overrides. Locked by backfill test 5b.

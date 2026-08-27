@@ -65,7 +65,14 @@ export function groupChains(files) {
       if (!m) {
         key = b.replace(/\.md$/, '');
       } else {
-        index = m[3] ? Number(m[3]) : 1;
+        // The UNSUFFIXED file is the base tranche, written first; `-1_` is the
+        // first ROTATION of it (see getActiveSessionFilePath). So the base is
+        // part 0. Defaulting it to 1 collides with the real `-1_` part, and a
+        // chain holding both then emits one part's entries into both files —
+        // silently duplicating content. Both forms genuinely coexist, e.g.
+        // 2026-08-02_1300-1400_c197ef.md (320 KB) alongside
+        // 2026-08-02_1300-1400-1_c197ef.md (104 KB).
+        index = m[3] ? Number(m[3]) : 0;
         key = `${m[1]}_${m[2]}_${m[4]}${m[5] ? `_from-${m[5]}` : ''}`;
       }
     }
