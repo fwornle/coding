@@ -116,17 +116,21 @@ The system supports step-by-step workflow debugging:
 For comprehensive debugging, start workflows with all debug flags enabled:
 
 ```bash
-# Via MCP tool
-mcp__semantic-analysis__execute_workflow
-  workflow_name: "batch-analysis"
-  async_mode: true
-  debug: true
-  parameters: {
-    team: "coding",
-    singleStepMode: true,
-    mockLLM: true,
-    stepIntoSubsteps: true
+# Via the CLI (--debug implies mockLLM + singleStepMode + stepIntoSubsteps)
+semantic workflow run batch-analysis --team coding --debug
+
+# Equivalent long form, if you need to vary one of the debug flags:
+semantic tool execute_workflow '{
+  "workflow_name": "batch-analysis",
+  "async_mode": true,
+  "debug": true,
+  "parameters": {
+    "team": "coding",
+    "singleStepMode": true,
+    "mockLLM": true,
+    "stepIntoSubsteps": true
   }
+}'
 ```
 
 ![Debug Mode Architecture](../images/ukb-workflow-debug-mode.png)

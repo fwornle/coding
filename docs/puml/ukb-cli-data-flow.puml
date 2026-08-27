@@ -1,7 +1,7 @@
 @startuml ukb-cli-data-flow
 !include _standard-style.puml
 
-title Knowledge Update Flow - MCP Integration
+title Knowledge Update Flow - CLI Integration
 
 skinparam activityShape rectangle
 skinparam activity {
@@ -30,21 +30,23 @@ end note
 :Claude detects knowledge update request;<<claude>>
 
 if (Full or Incremental?) then (incremental)
-  :Claude calls MCP tool;<<claude>>
+  :Claude runs the semantic CLI;<<claude>>
   note right
-    mcp__semantic-analysis__execute_workflow
-    workflow_name: "incremental-analysis"
+    semantic workflow run
+      incremental-analysis
+      --team coding
   end note
 else (full)
-  :Claude calls MCP tool;<<claude>>
+  :Claude runs the semantic CLI;<<claude>>
   note right
-    mcp__semantic-analysis__execute_workflow
-    workflow_name: "complete-analysis"
+    semantic workflow run
+      complete-analysis
+      --team coding
   end note
 endif
 
-|MCP Server Processing|
-:MCP receives workflow request;<<mcp>>
+|Analysis Service Processing|
+:Service receives POST /tool/execute_workflow;<<mcp>>
 
 :Load team checkpoint;<<workflow>>
 note right
@@ -109,7 +111,7 @@ note right
 end note
 
 |Response to User|
-:MCP returns results to Claude;<<mcp>>
+:Service returns results to the CLI;<<mcp>>
 
 :Claude displays summary to user;<<claude>>
 note right

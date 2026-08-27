@@ -21,7 +21,7 @@ Claude detects knowledge update request
                           ↓
 Claude decides: incremental or full analysis
                           ↓
-Claude calls MCP tool: mcp__semantic-analysis__execute_workflow
+Claude runs: semantic workflow run incremental-analysis --team coding
                           ↓
 14-Agent workflow executes
                           ↓
@@ -245,13 +245,9 @@ Git pull → JSON import (on startup) → LevelDB → Graphology
 
 Primary tool for running semantic analysis workflows.
 
-```javascript
-mcp__semantic-analysis__execute_workflow({
-  workflow_name: "incremental-analysis",  // or "complete-analysis"
-  parameters: {
-    // optional parameters
-  }
-})
+```bash
+semantic workflow run incremental-analysis --team coding   # or complete-analysis
+semantic workflow run wave-analysis --team coding --debug  # mock LLM, single-step
 ```
 
 **Workflows Available**:
@@ -262,14 +258,14 @@ mcp__semantic-analysis__execute_workflow({
 
 Create a single entity with insight document.
 
-```javascript
-mcp__semantic-analysis__create_ukb_entity_with_insight({
-  entity_name: "CachingPattern",
-  entity_type: "TechnicalPattern",
-  insights: "Detailed insight content...",
-  significance: 8,
-  tags: ["caching", "performance"]
-})
+```bash
+semantic tool create_ukb_entity_with_insight '{
+  "entity_name": "CachingPattern",
+  "entity_type": "TechnicalPattern",
+  "insights": "Detailed insight content...",
+  "significance": 8,
+  "tags": ["caching", "performance"]
+}'
 ```
 
 **Use when**: Creating specific entities programmatically
@@ -426,16 +422,11 @@ rm .data/ukb-last-run.json
 
 For automation or scripting, use MCP tools directly:
 
-```javascript
-// Example: Node.js script using MCP client
-const result = await mcpClient.call_tool({
-  name: "mcp__semantic-analysis__execute_workflow",
-  arguments: {
-    workflow_name: "incremental-analysis"
-  }
-});
-
-console.log(`Created ${result.stats.entitiesCreated} entities`);
+```bash
+# Example: any script, no MCP client needed — the service speaks plain JSON.
+curl -s -X POST localhost:3848/tool/execute_workflow \
+  -H 'Content-Type: application/json' \
+  -d '{"workflow_name":"incremental-analysis","async_mode":true}' | jq -r .text
 ```
 
 ### Custom Workflows

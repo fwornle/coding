@@ -1127,7 +1127,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             <div>
               <h3 className="text-lg font-medium">No Active Workflows</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Start a UKB workflow using the semantic analysis MCP tool to see it here.
+                Start a UKB workflow with the semantic CLI to see it here.
               </p>
               {processes.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-2">
@@ -1136,8 +1136,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               )}
             </div>
             <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg font-mono">
-              mcp__semantic-analysis__execute_workflow<br />
-              workflow_name: "incremental-analysis"
+              semantic workflow run incremental-analysis --team coding
             </div>
           </div>
         </div>

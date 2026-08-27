@@ -30,27 +30,30 @@
 **CRITICAL: Match parameters to what user actually says!**
 
 **"ukb", "full ukb", "ukb full"** → PRODUCTION mode (real LLM calls, runs continuously):
-```
-mcp__semantic-analysis__execute_workflow
-  workflow_name: "wave-analysis"
-  async_mode: true
-  parameters: {team: "coding"}
+```bash
+semantic workflow run wave-analysis --team coding
 ```
 
-**"ukb full debug", "ukb debug"** → DEBUG mode (mock LLM, single-step):
-```
-mcp__semantic-analysis__execute_workflow
-  workflow_name: "wave-analysis"
-  async_mode: true
-  debug: true
-  parameters: {team: "coding", singleStepMode: true, mockLLM: true, stepIntoSubsteps: true}
+**"ukb full debug", "ukb debug"** → DEBUG mode (mock LLM, single-step, step-into-substeps):
+```bash
+semantic workflow run wave-analysis --team coding --debug
 ```
 
-**Fallback — ONLY if MCP tool is unavailable**, use direct SSE call on port 3848 (see `memory/ukb-workflow.md`).
+Progress: `semantic workflow status`, or the dashboard (Performance → UKB). Long workflows are
+async — the command returns a workflow id and leaves the run going. Do not wait on it.
 
-- NEVER run `ukb` as a bash command
-- NEVER use port 3033 for workflows
-- NEVER default to debug mode unless user explicitly says "debug"
+- **NEVER run `ukb` as a bash command** — that is the retired legacy script. `semantic workflow
+  run wave-analysis --team coding` is the correct path; bare `ukb` remains wrong.
+- NEVER use port 3033 for workflows (that is the Health API). `semantic` targets :3848.
+- NEVER default to debug mode unless the user explicitly says "debug"
+
+`semantic` is a CLI, not an MCP server. The 19 semantic-analysis tools and the 4
+constraint-monitor tools were retired as MCP surfaces in favour of `bin/semantic` and
+`bin/constraints` (+ the `/semantic` and `/constraints` skills): their schemas cost ~14 KB
+(~3,540 tokens) in every context window, of every session, subagent and fork, for tools that are
+only ever invoked deliberately. Both services still run — `semantic` POSTs to `/tool/<name>` on
+the SSE server at :3848, which is also what feeds the dashboard's live workflow view. See
+`docs/knowledge-management/mcp-semantic-analysis.md` and the `/semantic` skill.
 
 ## Rebuilding After Code Changes
 
@@ -101,17 +104,19 @@ Symptom of the stale-cache bug: the dashboard backend exits with `SyntaxError: I
 
 ## Code Graph Analysis
 
-`mcp__semantic-analysis__analyze_code_graph` with actions: `nl_query`, `query`, `call_graph`, `similar`. Reads graphify's static `graph.json` (`.data/graphify/graphify-out/graph.json`) — no Memgraph, no database. Rebuild the graph with `graphify update` (host `bin/graphify` shim → `coding-services`) when it drifts behind HEAD. Graphify also serves its own HTTP MCP endpoint at `http://localhost:3851/mcp` (tools: `query_graph`/`get_node`/`get_neighbors`/`shortest_path`/`graph_stats`/`god_nodes`); the `/graphify` skill is the preferred entry point.
+`semantic tool analyze_code_graph '{"action":"nl_query","question":"..."}'` — actions: `nl_query`, `query`, `call_graph`, `similar`. Reads graphify's static `graph.json` (`.data/graphify/graphify-out/graph.json`) — no Memgraph, no database. Rebuild the graph with `graphify update` (host `bin/graphify` shim → `coding-services`) when it drifts behind HEAD. Graphify also serves its own HTTP MCP endpoint at `http://localhost:3851/mcp` (tools: `query_graph`/`get_node`/`get_neighbors`/`shortest_path`/`graph_stats`/`god_nodes`); the `/graphify` skill is the preferred entry point.
 
 ## Available Skills (Auto-Generated)
 
 These skills are defined in `.claude/commands/` and provide reusable workflows.
 Read the full skill file when a task matches its description.
 
+- **/constraints** (`.claude/commands/constraints.md`): Check code or an action against this project's constraint rules, read compliance status and violation history, and add or amend rules. Use before writing code that might trip a guardrail, when a PreToolUse hook has blocked something and you need to see why, or when the user asks about constraints, guardrails or compliance. Replaces the former constraint-monitor MCP tools.
 - **/documentation-style** (`.claude/commands/documentation-style.md`): Enforce consistent styling for documentation artifacts (PlantUML, Mermaid, markdown, PNG diagrams).
 - **/experiment** (`.claude/commands/experiment.md`): Describe a cross-agent experiment in plain English (or with flags), then auto-run the matrix, compare, and render the ranked variant table
 - **/graphify** (`.claude/commands/graphify.md`): Query and rebuild the project's code knowledge graph (graphify). Use for any question about the codebase — architecture, "what calls X", "where is Y", file/function relationships, data-flow tracing — instead of blind greps. The graph is a static graph.json served over MCP by the coding-graphify container; rebuild it with `graphify update` when it's stale.
 - **/kgbench** (`.claude/commands/kgbench.md`): Run, resume, regrade and report the kgbench code-retrieval benchmark (coding-v1) across retrieval arms, agents and models — and diagnose the routing that decides which model actually answers. Also covers the Performance → Benchmarks dashboard sub-tab, the second front-end over the same scripts.
 - **/playwright-cli** (`.claude/commands/playwright-cli.md`): Use this skill whenever the user wants to automate a browser, scrape web content, take screenshots or PDFs of pages, fill out forms, click through UI flows, or run end-to-end tests — without using an MCP server. This skill drives Playwright directly from the bash_tool via Node.js scripts. Trigger whenever the user says things like "open this URL", "screenshot this page", "scrape this site", "automate this form", "test this UI", "extract data from", "click through", "check if this page works", or any task that requires real browser interaction. Prefer this skill over web_fetch when JavaScript rendering, authentication, interaction, or visual output is needed.
+- **/semantic** (`.claude/commands/semantic.md`): Run UKB knowledge-base workflows (wave-analysis and friends), manage the ontology, refresh stale knowledge entities, and reach the semantic-analysis tools. Use whenever the user says "ukb", "ukb full", "ukb debug", asks to run or check a knowledge workflow, or asks about ontology classes and entity refresh. Replaces the former semantic-analysis MCP tools.
 - **/sl** (`.claude/commands/sl.md`): Load session logs (LSL) from current and coding projects for continuity
 

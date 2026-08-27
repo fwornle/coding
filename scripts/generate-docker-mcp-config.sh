@@ -49,28 +49,20 @@ if [ -z "$CODE_GRAPH_ENTRY" ]; then
   CODE_GRAPH_ENTRY="{\"graphify\": {\"type\": \"http\", \"url\": \"http://localhost:$GRAPHIFY_MCP_PORT/mcp\"}}"
 fi
 
-# Generate the Docker MCP configuration. The two stdio proxies are static; the
-# code-graph entry is merged in from the registry.
+# Generate the Docker MCP configuration.
+#
+# semantic-analysis and constraint-monitor used to be emitted here as stdio
+# proxies into the container. They are not any more: their 23 tool schemas cost
+# ~14 KB (~3,540 tokens) in every context window — of every session, subagent
+# and fork — for tools that are only ever invoked deliberately. They are now the
+# `semantic` and `constraints` CLIs, with the /semantic and /constraints skills.
+# Both services keep running; only the agent-facing surface moved.
+#
+# code-graph (graphify) stays: its traversal tools are the one set worth having
+# available mid-reasoning. Its entry is merged in from the registry below.
 cat > "$OUTPUT_FILE" << EOF
 {
-  "mcpServers": {
-    "semantic-analysis": {
-      "command": "node",
-      "args": ["$CODING_REPO/integrations/mcp-server-semantic-analysis/dist/stdio-proxy.js"],
-      "env": {
-        "SEMANTIC_ANALYSIS_SSE_URL": "http://localhost:$SEMANTIC_ANALYSIS_PORT",
-        "CODING_REPO": "$CODING_REPO"
-      }
-    },
-    "constraint-monitor": {
-      "command": "node",
-      "args": ["$CODING_REPO/integrations/mcp-constraint-monitor/src/stdio-proxy.js"],
-      "env": {
-        "CONSTRAINT_MONITOR_SSE_URL": "http://localhost:$CONSTRAINT_MONITOR_PORT",
-        "CODING_REPO": "$CODING_REPO"
-      }
-    }
-  }
+  "mcpServers": {}
 }
 EOF
 
@@ -90,6 +82,7 @@ fi
 
 log "Generated Docker MCP config: $OUTPUT_FILE"
 log "Services configured:"
-log "  - semantic-analysis -> http://localhost:$SEMANTIC_ANALYSIS_PORT"
-log "  - constraint-monitor -> http://localhost:$CONSTRAINT_MONITOR_PORT"
 log "  - code-graph backend: $CODE_GRAPH_BACKEND_ID"
+log "Not MCP servers (CLI + skill instead):"
+log "  - semantic-analysis -> \`semantic\` / /semantic (service still on :$SEMANTIC_ANALYSIS_PORT)"
+log "  - constraint-monitor -> \`constraints\` / /constraints (service still on :$CONSTRAINT_MONITOR_PORT)"
