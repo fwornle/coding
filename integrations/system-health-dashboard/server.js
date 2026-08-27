@@ -5147,7 +5147,11 @@ class SystemHealthAPIServer {
      */
     handleGetLslSessionHtml(req, res) {
         try {
-            const html = lslRenderSessionHtml(codingRoot, req.params.id);
+            // The transcript is an iframe inside a themed dashboard, so it has
+            // to be told which theme to paint. Anything but an explicit 'light'
+            // falls back to pi's own dark shell.
+            const theme = req.query.theme === 'light' ? 'light' : 'dark';
+            const html = lslRenderSessionHtml(codingRoot, req.params.id, { theme });
             if (!html) return res.status(404).send('session not found');
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.send(html);

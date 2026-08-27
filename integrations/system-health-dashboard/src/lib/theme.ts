@@ -74,3 +74,29 @@ export function initTheme(): void {
     }
   }
 }
+
+/** The mode currently painted on <html> — i.e. what applyResolved last wrote. */
+export function currentResolvedTheme(): 'light' | 'dark' {
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+}
+
+/**
+ * Observe the painted mode and call back when it flips.
+ *
+ * Every path that changes the theme — the header toggle, and an OS flip while
+ * 'system' is selected — ends in applyResolved(), which toggles the `dark`
+ * class. Watching that one attribute therefore catches all of them, and callers
+ * do not have to re-derive the stored-vs-system rules for themselves.
+ *
+ * Needed because some views cannot inherit the theme through CSS: an iframe is
+ * a separate document, so its content has to be re-requested for the new theme.
+ */
+export function subscribeResolvedTheme(cb: (mode: 'light' | 'dark') => void): () => void {
+  let last = currentResolvedTheme()
+  const observer = new MutationObserver(() => {
+    const next = currentResolvedTheme()
+    if (next !== last) { last = next; cb(next) }
+  })
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  return () => observer.disconnect()
+}

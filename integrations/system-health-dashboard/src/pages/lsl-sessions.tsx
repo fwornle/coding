@@ -3,6 +3,7 @@ import { RefreshCw, FileJson, FileText, Layers, ExternalLink } from 'lucide-reac
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { currentResolvedTheme, subscribeResolvedTheme } from '@/lib/theme'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -37,10 +38,12 @@ function FormatBadge({ format }: { format: LslSession['format'] }) {
   // The corpus is mixed until the backfill has run everywhere, so the format is
   // worth surfacing rather than hiding: a `markdown` row is rendered by
   // converting it in memory, which is a live preview of what the backfill does.
+  // The -400 shades were picked against a dark panel and wash out on white, so
+  // each badge carries a darker light-mode text colour alongside it.
   const map = {
-    pi: { label: 'pi', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', Icon: FileJson },
-    markdown: { label: 'markdown', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30', Icon: FileText },
-    mixed: { label: 'mixed', cls: 'bg-sky-500/15 text-sky-400 border-sky-500/30', Icon: Layers },
+    pi: { label: 'pi', cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30', Icon: FileJson },
+    markdown: { label: 'markdown', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30', Icon: FileText },
+    mixed: { label: 'mixed', cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30', Icon: Layers },
   }[format]
   const Icon = map.Icon
   return (
@@ -57,6 +60,12 @@ export function LslSessionsPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // The transcript is an iframe, so it is a separate document and cannot
+  // inherit the dashboard's theme through CSS — it has to be re-requested at
+  // the new theme whenever the toggle flips.
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>(currentResolvedTheme)
+
+  useEffect(() => subscribeResolvedTheme(setThemeMode), [])
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -109,7 +118,7 @@ export function LslSessionsPage() {
   }, [sessions])
 
   const viewerSrc = selected
-    ? `${API_BASE_URL}/api/lsl/sessions/${selected}/export.html`
+    ? `${API_BASE_URL}/api/lsl/sessions/${selected}/export.html?theme=${themeMode}`
     : null
 
   return (

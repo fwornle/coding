@@ -35,6 +35,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SHELL_PATH = path.join(__dirname, 'assets', 'pi-export-shell.html');
+const LIGHT_CSS_PATH = path.join(__dirname, 'assets', 'pi-light-theme.css');
 const PLACEHOLDER = '__LSL_SESSION_DATA__';
 
 const isLsl = (n) => n.endsWith('.jsonl') || n.endsWith('.md');
@@ -292,8 +293,18 @@ function aliasToolNames(entries) {
   });
 }
 
-/** Render a chain using pi's own export shell. */
-export function renderSessionHtml(codingRoot, id) {
+/**
+ * Render a chain using pi's own export shell.
+ *
+ * THEMING: the shell pi exports is dark-only, so embedding it unmodified put a
+ * dark transcript inside a light dashboard. It is also regenerated verbatim by
+ * scripts/vendor-pi-export-shell.mjs, which rules out editing its stylesheet —
+ * that lasts until the next pi upgrade. Instead the light palette lives in
+ * assets/pi-light-theme.css and is injected here, keyed off a `data-theme`
+ * attribute the caller sets. Both are emitted regardless of the requested
+ * theme, so the served document can flip themes without a re-fetch.
+ */
+export function renderSessionHtml(codingRoot, id, { theme = 'dark' } = {}) {
   const data = readSession(codingRoot, id);
   if (!data) return null;
   if (!fs.existsSync(SHELL_PATH)) {
@@ -302,7 +313,37 @@ export function renderSessionHtml(codingRoot, id) {
   const shell = fs.readFileSync(SHELL_PATH, 'utf8');
   const forDisplay = { ...data, entries: aliasToolNames(data.entries) };
   const payload = Buffer.from(JSON.stringify(forDisplay)).toString('base64');
-  return shell.replace(PLACEHOLDER, payload);
+  return themeShell(shell, theme).replace(PLACEHOLDER, payload);
+}
+
+/**
+ * Stamp the requested theme onto <html> and append the light palette.
+ *
+ * The stamp goes on the opening <html> tag rather than being applied by script
+ * so the first paint is already correct — an iframe that paints dark and then
+ * corrects itself reads as a flash of the wrong theme on every session switch.
+ */
+function themeShell(shell, theme) {
+  const mode = theme === 'light' ? 'light' : 'dark';
+  const htmlTag = /<html\b[^>]*>/i;
+  if (!htmlTag.test(shell)) {
+    throw new Error('pi export shell has no <html> tag — re-vendor it');
+  }
+  let out = shell.replace(htmlTag, (tag) =>
+    `${tag.replace(/\s*data-theme="[^"]*"/i, '').slice(0, -1)} data-theme="${mode}">`);
+
+  // Missing palette is fatal rather than ignored: without it a light request
+  // renders the dark shell, which looks like a theme bug in the UI instead of a
+  // missing file on disk. assets/ is a container mount, so this is exactly the
+  // failure that would otherwise show up as "light mode doesn't work".
+  if (!fs.existsSync(LIGHT_CSS_PATH)) {
+    throw new Error(`light palette missing at ${LIGHT_CSS_PATH}`);
+  }
+  const css = fs.readFileSync(LIGHT_CSS_PATH, 'utf8');
+  // Last in <head>, so it wins over the shell's :root block on equal
+  // specificity — [data-theme] is more specific anyway, but order makes the
+  // color-scheme fallback deterministic too.
+  return out.replace('</head>', `<style id="lsl-light-theme">\n${css}\n</style>\n</head>`);
 }
 
 /**

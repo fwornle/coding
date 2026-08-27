@@ -102,4 +102,56 @@ test.describe('Sessions tab', () => {
     const res = await request.get(`${API}/api/lsl/sessions/coding/2026/01/does-not-exist`)
     expect(res.status()).toBe(404)
   })
+
+  /**
+   * The shell pi exports is dark-only, so an unthemed embed put a dark
+   * transcript inside a light dashboard. The palette is injected at render time
+   * (assets/pi-light-theme.css) rather than edited into the shell, because
+   * scripts/vendor-pi-export-shell.mjs overwrites the shell wholesale on every
+   * pi upgrade — this test is what catches a re-vendor that silently drops it.
+   */
+  test('7. the transcript is served in the requested theme', async ({ request }) => {
+    const { sessions } = await (await request.get(`${API}/api/lsl/sessions?limit=100&months=2`)).json()
+    const s = sessions.find((x: { promptSets: number }) => x.promptSets > 0)
+    test.skip(!s, 'no session with content yet')
+
+    const light = await (await request.get(`${API}/api/lsl/sessions/${s.id}/export.html?theme=light`)).text()
+    const dark = await (await request.get(`${API}/api/lsl/sessions/${s.id}/export.html?theme=dark`)).text()
+
+    expect(light).toMatch(/<html[^>]*data-theme="light"/)
+    expect(dark).toMatch(/<html[^>]*data-theme="dark"/)
+
+    // The palette must actually be present, not merely requested — a missing
+    // asset would otherwise render light mode as the dark shell.
+    expect(light).toContain('id="lsl-light-theme"')
+    expect(light).toMatch(/:root\[data-theme="light"\]/)
+
+    // Every token the shell's dark :root defines needs a light counterpart, or
+    // that one colour stays dark against a white panel.
+    const darkTokens = [...(dark.match(/:root \{([\s\S]*?)\}/) ?? ['', ''])[1]
+      .matchAll(/--([\w-]+):/g)].map((m) => m[1])
+    const lightBlock = (light.match(/:root\[data-theme="light"\] \{([\s\S]*?)\n\}/) ?? ['', ''])[1]
+    const missing = darkTokens.filter((t) => !lightBlock.includes(`--${t}:`))
+    expect(missing, `tokens with no light value: ${missing.join(', ')}`).toEqual([])
+
+    // Unrecognised themes fall back to pi's own shell rather than erroring.
+    const bogus = await (await request.get(`${API}/api/lsl/sessions/${s.id}/export.html?theme=chartreuse`)).text()
+    expect(bogus).toMatch(/<html[^>]*data-theme="dark"/)
+  })
+
+  test('8. the viewer follows the dashboard theme toggle', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('dashboard-theme', 'light'))
+    await page.goto(`${BASE}/sessions`)
+    const frame = page.getByTestId('lsl-session-viewer')
+    await expect(frame).toBeVisible()
+    await expect(frame).toHaveAttribute('src', /theme=light/)
+
+    // An iframe is a separate document and cannot inherit the theme through
+    // CSS, so the page has to re-request it when the toggle flips.
+    await page.evaluate(() => {
+      localStorage.setItem('dashboard-theme', 'dark')
+      document.documentElement.classList.add('dark')
+    })
+    await expect(frame).toHaveAttribute('src', /theme=dark/)
+  })
 })
