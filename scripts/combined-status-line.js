@@ -173,6 +173,23 @@ const STATE_DOTS = {
   IDLE: '#[fg=colour238]●#[fg=default]',  // #444444  idle/offline (was ⚫ / 💤)
 };
 
+// Alarm dots — same 1-cell ● as everything else, but BOLD on the brightest
+// hue. These replace the 🟡 / 🔴 emoji that were kept deliberately so an alarm
+// would "break the pattern to catch the eye" rather than read as one more point
+// on the green fade ramp. That intent is preserved here without the emoji: on a
+// line of dim, un-bolded green and grey dots, a bold pure-red ● is the only
+// high-intensity mark, so it still breaks the pattern — it just does it in one
+// cell instead of two, and needs no codepoint-widths override in ~/.tmux.conf.
+//
+// Kept SEPARATE from STATE_DOTS.WARN/CRIT on purpose: those mark a badge's own
+// severity ([🔒], [🏥]) where there is exactly one dot and nothing to compete
+// with. ALARM_DOTS are for dots that sit INSIDE a row of other dots — the
+// per-project session list — where salience has to be won, not assumed.
+const ALARM_DOTS = {
+  WARN: '#[fg=colour214,bold]●#[fg=default,nobold]',  // #ffaf00 bold  (was 🟡)
+  CRIT: '#[fg=colour196,bold]●#[fg=default,nobold]',  // #ff0000 bold  (was 🔴)
+};
+
 // Left-pad a status-line payload with regular spaces so tmux always allocates
 // the same number of cells for status-right, regardless of payload length.
 //
@@ -446,9 +463,9 @@ class CombinedStatusLine {
             }
             
             if (remainingMinutes !== null && remainingMinutes <= 5 && remainingMinutes > 0) {
-              return `🟠${currentTranche}-session(${remainingMinutes}min)`;
+              return `${ALARM_DOTS.WARN}${currentTranche}-session(${remainingMinutes}min)`;
             } else if (remainingMinutes !== null && remainingMinutes <= 0) {
-              return `🔴${currentTranche}-session(ended)`;
+              return `${ALARM_DOTS.CRIT}${currentTranche}-session(ended)`;
             } else {
               return `${currentTranche}-session`;
             }
@@ -466,9 +483,9 @@ class CombinedStatusLine {
       }
       
       if (remainingMinutes !== null && remainingMinutes <= 5 && remainingMinutes > 0) {
-        return `🟠${currentTranche}(${remainingMinutes}min)`;
+        return `${ALARM_DOTS.WARN}${currentTranche}(${remainingMinutes}min)`;
       } else if (remainingMinutes !== null && remainingMinutes <= 0) {
-        return `🔴${currentTranche}(ended)`;
+        return `${ALARM_DOTS.CRIT}${currentTranche}(ended)`;
       } else {
         return `${currentTranche}`;
       }
@@ -1384,17 +1401,22 @@ class CombinedStatusLine {
           }
 
         } else if (status === 'degraded' || status === 'stale' || status === 'warning') {
-          icon = '🟡';
+          icon = ALARM_DOTS.WARN;
         } else {
-          icon = '🔴';
+          icon = ALARM_DOTS.CRIT;
         }
         // All five ramp shades (see LIFECYCLE_ICONS) reflect a healthy ETM with
-        // varying user-activity age. Only 🟡 / 🔴 are unhealthy — they stay emoji
-        // deliberately, because an alarm should NOT read as a point on the fade
-        // scale; it has to break the pattern to catch the eye.
-        const sessionStatus = icon === '🟡' ? 'warning'
-                            : icon === '🔴' ? 'unhealthy'
-                            : 'healthy';
+        // varying user-activity age; ALARM_DOTS are the two unhealthy states.
+        //
+        // sessionStatus is derived from `status` — the value we branched on
+        // three lines up — NOT by comparing `icon` back against a literal. The
+        // old form (`icon === '🟡' ? 'warning' : ...`) made the icon the source
+        // of truth for the status, so changing a glyph silently reclassified
+        // every session as 'healthy'. Deriving forward makes the glyph a pure
+        // presentation choice.
+        const sessionStatus = status === 'healthy' ? 'healthy'
+                            : (status === 'degraded' || status === 'stale' || status === 'warning') ? 'warning'
+                            : 'unhealthy';
         result.sessions[projectName] = { icon, status: sessionStatus, activityAgeMs };
       }
 
@@ -2253,7 +2275,7 @@ class CombinedStatusLine {
             // Add agent type prefix for non-Claude agents (pi, opencode, copilot)
             const agentType = health.details ? this.extractAgentType(health.details) : null;
             const agentPrefix = agentType && this.agentDisplay[agentType] ? this.agentDisplay[agentType].prefix : '';
-            if ((health.icon === '🟡' || health.icon === '🔴') && health.reason) {
+            if ((health.status === 'warning' || health.status === 'unhealthy') && health.reason) {
               return `${agentPrefix}${displayAbbrev}${health.icon}(${health.reason})`;
             }
             return `${agentPrefix}${displayAbbrev}${health.icon}`;
@@ -2262,8 +2284,12 @@ class CombinedStatusLine {
 
         parts.push(`[${sessionStatuses}]`);
 
-        const hasUnhealthy = sessionStatuses.includes('🔴');
-        const hasWarning = sessionStatuses.includes('🟡');
+        // Read the STATUS field, never the rendered string. `sessionStatuses`
+        // is display output containing tmux format sequences; substring-matching
+        // it for a glyph coupled the overall line colour to the exact bytes of a
+        // presentation choice.
+        const hasUnhealthy = sessionEntries.some(([, h]) => h.status === 'unhealthy');
+        const hasWarning = sessionEntries.some(([, h]) => h.status === 'warning');
         if (hasUnhealthy) overallColor = 'red';
         else if (hasWarning && overallColor === 'green') overallColor = 'yellow';
       }
@@ -2274,10 +2300,10 @@ class CombinedStatusLine {
     // (rendered above as Sessions Display) already show per-project status.
     const lslStatus = await this.getLSLHealthStatus();
     if (lslStatus === 'down') {
-      parts.push('[LSL🔴]');
+      parts.push(`[LSL${ALARM_DOTS.CRIT}]`);
       overallColor = 'red';
     } else if (lslStatus === 'stale') {
-      parts.push('[LSL🟡]');
+      parts.push(`[LSL${ALARM_DOTS.WARN}]`);
       if (overallColor === 'green') overallColor = 'yellow';
     }
 
@@ -2333,7 +2359,7 @@ class CombinedStatusLine {
      const obsAgeMs = knowledge.obsAgeMs;
      const obsIcon = (() => {
        if (obsAgeMs == null) return '❓';
-       if (obsAgeMs < 15 * 60_000) return '✅';
+       if (obsAgeMs < 15 * 60_000) return LIFECYCLE_ICONS.ACTIVE;
        if (obsAgeMs < 60 * 60_000) return LIFECYCLE_ICONS.ACTIVE;
        if (obsAgeMs < 3 * 60 * 60_000) return LIFECYCLE_ICONS.COOLING;
        if (obsAgeMs < 6 * 60 * 60_000) return LIFECYCLE_ICONS.FADING;
@@ -2482,11 +2508,11 @@ class CombinedStatusLine {
         ukbPart += `${ukbStatus.running}⏳`;
       }
       if (ukbStatus.stale > 0) {
-        ukbPart += `${ukbStatus.stale}🟡`;
+        ukbPart += `${ukbStatus.stale}${ALARM_DOTS.WARN}`;
         if (overallColor === 'green') overallColor = 'yellow';
       }
       if (ukbStatus.frozen > 0) {
-        ukbPart += `${ukbStatus.frozen}🥶`;
+        ukbPart += `${ukbStatus.frozen}${ALARM_DOTS.CRIT}`;
         overallColor = 'red';
       }
       ukbPart += ']';
@@ -2801,7 +2827,7 @@ class CombinedStatusLine {
 
   getErrorStatus(error) {
     return {
-      text: '🟡 SYS:ERR',
+      text: `${ALARM_DOTS.CRIT} SYS:ERR`,
       color: 'red',
       tooltip: `System error: ${error.message || 'Unknown error'}`,
       onClick: 'open-dashboard'
@@ -2877,7 +2903,7 @@ async function main() {
       } catch { /* logging must never throw */ }
       console.error('⚠️ SYS:TIMEOUT - Status line generation took >8s');
       // Pad short marker output so it overwrites the previous render's cells.
-      const timeoutText = leftPadToStableCellWidth('🟡 SYS:TIMEOUT', paneWidth);
+      const timeoutText = leftPadToStableCellWidth(`${ALARM_DOTS.CRIT} SYS:TIMEOUT`, paneWidth);
       process.stdout.write(timeoutText + '\n', () => process.exit(1));
     }, 8000);
 
@@ -2907,7 +2933,7 @@ async function main() {
     console.error(error.stack);
     // Pad the catch-all marker for the same reason as the success path.
     const errPaneWidth = process.env.TMUX_PANE_WIDTH || '';
-    const errText = leftPadToStableCellWidth('🟡 SYS:ERR', errPaneWidth);
+    const errText = leftPadToStableCellWidth(`${ALARM_DOTS.CRIT} SYS:ERR`, errPaneWidth);
     process.stdout.write(errText + '\n', () => process.exit(1));
   }
 }
