@@ -98,11 +98,11 @@ The component’s **minimal footprint** (a README, static assets, a small HTTP s
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for different agents and functionalities. This is evident in the directory structure, where integrations, scripts, and lib are separate directories. For example, the GraphDatabaseAdapter is located in storage/graph-database-adapter.ts, and the OntologyClassificationAgent is located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts. This modular design allows for easy maintenance and scalability of the system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for different agents and functionalities. This is evident in the directory structure, where integrations, scripts, and lib are separate directories. For example, the GraphDatabaseAdapter is located in storage/graph-database-adapter.ts, and the OntologyClassificationAgent is located in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts. This modular design allows for easy maintenance and scalability of the system.
 
 ### Siblings
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter is implemented in storage/graph-database-adapter.ts, showcasing a modular design for database interactions.
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent is implemented in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, demonstrating a modular approach to data classification.
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent is implemented in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, demonstrating a modular approach to data classification.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG is implemented in integrations/code-graph-rag/README.md, showcasing a graph-based representation of code.
 
 ---

@@ -24,7 +24,7 @@ const TEAM = (args.find(a => a.startsWith('--team=')) || '--team=coding').split(
 const log = (...a) => process.stdout.write(a.join(' ') + '\n');
 
 // Load manifest
-const manifestPath = join(__dirname, '..', 'integrations', 'mcp-server-semantic-analysis', 'config', 'component-manifest.yaml');
+const manifestPath = join(__dirname, '..', 'integrations', 'semantic-analysis', 'config', 'component-manifest.yaml');
 const manifest = parse(readFileSync(manifestPath, 'utf8'));
 
 // API helpers

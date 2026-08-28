@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-The WorkflowOrchestrator sub-component is responsible for managing the execution of various agents, including the OntologyClassificationAgent, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
+The WorkflowOrchestrator sub-component is responsible for managing the execution of various agents, including the OntologyClassificationAgent, as implemented in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file.
 
 ## What It Is  
 
 The **WorkflowOrchestrator** is the core sub‑component that drives the execution of the various semantic‑analysis agents. Its implementation lives inside the **SemanticAnalysis** domain and can be traced through the following concrete files:  
 
-* `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts` – the abstract `BaseAgent` class that defines the standardized workflow contract for every agent.  
-* `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` – a concrete agent (the `OntologyClassificationAgent`) that is orchestrated by the WorkflowOrchestrator.  
+* `integrations/semantic-analysis/src/agents/base-agent.ts` – the abstract `BaseAgent` class that defines the standardized workflow contract for every agent.  
+* `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts` – a concrete agent (the `OntologyClassificationAgent`) that is orchestrated by the WorkflowOrchestrator.  
 * `storage/graph-database-adapter.js` – the data‑access layer that the orchestrator (via agents) queries to obtain classification data.  
 
 Together these pieces form a **workflow‑based orchestration layer** that guarantees agents run in a deterministic order, receive the data they need, and expose a uniform interface for future agents to plug into the system.
@@ -125,15 +125,15 @@ All interactions are **synchronous method calls** within the same Node.js proces
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This agent extends the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) class, which provides a standardized structure for agent development. The use of a base agent class ensures consistency across all agents and simplifies the development of new agents. The OntologyClassificationAgent's classification process involves querying the GraphDatabaseAdapter (storage/graph-database-adapter.js) to retrieve relevant data for classification.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component's architecture is designed as a multi-agent system, with each agent responsible for a specific task. For instance, the OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) is used for classifying observations against the ontology system. This agent extends the BaseAgent (integrations/semantic-analysis/src/agents/base-agent.ts) class, which provides a standardized structure for agent development. The use of a base agent class ensures consistency across all agents and simplifies the development of new agents. The OntologyClassificationAgent's classification process involves querying the GraphDatabaseAdapter (storage/graph-database-adapter.js) to retrieve relevant data for classification.
 
 ### Children
 - [AgentExecutionManager](./AgentExecutionManager.md) -- The WorkflowOrchestrator sub-component uses a workflow-based approach to manage the execution of agents, as seen in the parent context.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- The Pipeline uses a batch processing approach, as seen in the batch-analysis.yaml file, to manage the execution of various agents.
-- [Ontology](./Ontology.md) -- The Ontology sub-component uses a hierarchical approach to manage the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
-- [Insights](./Insights.md) -- The Insights sub-component uses a pattern-based approach to generate insights, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
+- [Ontology](./Ontology.md) -- The Ontology sub-component uses a hierarchical approach to manage the ontology system, with upper and lower ontology definitions, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file.
+- [Insights](./Insights.md) -- The Insights sub-component uses a pattern-based approach to generate insights, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter sub-component uses a querying mechanism to retrieve relevant data for classification, as seen in the storage/graph-database-adapter.js file.
 
 ---

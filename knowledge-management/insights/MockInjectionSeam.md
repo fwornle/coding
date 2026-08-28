@@ -2,13 +2,13 @@
 
 **Type:** Detail
 
-The `CRITICAL-ARCHITECTURE-ISSUES.md` document in `integrations/mcp-server-semantic-analysis/` records that prior eager-initialisation approaches required credentials at construction time, making unit tests environment-dependent; the lazy pattern resolved this by moving credential acquisition behind the `ensureLLMInitialized()` boundary.
+The `CRITICAL-ARCHITECTURE-ISSUES.md` document in `integrations/semantic-analysis/` records that prior eager-initialisation approaches required credentials at construction time, making unit tests environment-dependent; the lazy pattern resolved this by moving credential acquisition behind the `ensureLLMInitialized()` boundary.
 
 ## What It Is  
 
-**MockInjectionSeam** is the testing‑only injection point that lives inside the **lazy‑initialisation gate** defined in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`.  The file contains a private (or protected) field that holds the LLM client instance and a single public method, `ensureLLMInitialized()`, which is the *only* sanctioned way for any concrete agent subclass to obtain a live LLM client.  By allowing a test to pre‑populate that internal field **before** invoking `ensureLLMInitialized()`, the gate’s guard (`if (this.llmClient) return;`) short‑circuits the real credential‑driven construction path.  This creates a **seam** that can be mocked without touching the production code‑path, giving tests full control over the LLM client while keeping production code free of test‑specific branches.
+**MockInjectionSeam** is the testing‑only injection point that lives inside the **lazy‑initialisation gate** defined in `integrations/semantic-analysis/src/agents/base-agent.ts`.  The file contains a private (or protected) field that holds the LLM client instance and a single public method, `ensureLLMInitialized()`, which is the *only* sanctioned way for any concrete agent subclass to obtain a live LLM client.  By allowing a test to pre‑populate that internal field **before** invoking `ensureLLMInitialized()`, the gate’s guard (`if (this.llmClient) return;`) short‑circuits the real credential‑driven construction path.  This creates a **seam** that can be mocked without touching the production code‑path, giving tests full control over the LLM client while keeping production code free of test‑specific branches.
 
-The seam is documented in `integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md`, which records the motivation: earlier eager‑initialisation required credentials at object construction time, making unit tests brittle and environment‑dependent.  The lazy pattern moved credential acquisition behind the `ensureLLMInitialized()` boundary, and the seam sits entirely inside `base-agent.ts`, not scattered across each concrete agent.
+The seam is documented in `integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md`, which records the motivation: earlier eager‑initialisation required credentials at object construction time, making unit tests brittle and environment‑dependent.  The lazy pattern moved credential acquisition behind the `ensureLLMInitialized()` boundary, and the seam sits entirely inside `base-agent.ts`, not scattered across each concrete agent.
 
 ---
 
@@ -61,7 +61,7 @@ No additional symbols were discovered, confirming that the seam is deliberately 
 
 ## Integration Points  
 
-* **Concrete Agents** – Every subclass under `integrations/mcp-server-semantic-analysis/src/agents/` calls `ensureLLMInitialized()` whenever it needs to talk to the LLM.  The seam is invisible to them; they simply receive whichever client the gate returns (real or mock).  
+* **Concrete Agents** – Every subclass under `integrations/semantic-analysis/src/agents/` calls `ensureLLMInitialized()` whenever it needs to talk to the LLM.  The seam is invisible to them; they simply receive whichever client the gate returns (real or mock).  
 
 * **Credential Provider** – The real initialisation path depends on `CredentialProvider.getCredentials()` (or an equivalent module) which pulls secrets from the environment.  This dependency is *only* exercised when the seam is not pre‑populated.
 
@@ -149,10 +149,10 @@ The diagram illustrates how the **MockInjectionSeam** sits behind the `ensureLLM
 ## Hierarchy Context
 
 ### Parent
-- [LazyLLMInitializationPattern](./LazyLLMInitializationPattern.md) -- base-agent.ts in integrations/mcp-server-semantic-analysis/src/agents/ is the authoritative source of the pattern, defining ensureLLMInitialized() as the single entry point for LLM client acquisition across all concrete agent subclasses
+- [LazyLLMInitializationPattern](./LazyLLMInitializationPattern.md) -- base-agent.ts in integrations/semantic-analysis/src/agents/ is the authoritative source of the pattern, defining ensureLLMInitialized() as the single entry point for LLM client acquisition across all concrete agent subclasses
 
 ### Siblings
-- [EnsureLLMInitializedGate](./EnsureLLMInitializedGate.md) -- `base-agent.ts` in `integrations/mcp-server-semantic-analysis/src/agents/` centralises LLM client acquisition in `ensureLLMInitialized()`, meaning no concrete subclass may bypass or duplicate this logic — the method is the sole sanctioned path to a live LLM client.
+- [EnsureLLMInitializedGate](./EnsureLLMInitializedGate.md) -- `base-agent.ts` in `integrations/semantic-analysis/src/agents/` centralises LLM client acquisition in `ensureLLMInitialized()`, meaning no concrete subclass may bypass or duplicate this logic — the method is the sole sanctioned path to a live LLM client.
 
 
 ---

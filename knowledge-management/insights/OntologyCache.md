@@ -7,7 +7,7 @@ The OntologyCache is likely a key factor in the OntologyManager's ability to imp
 ## What It Is  
 
 The **OntologyCache** lives inside the **OntologyManager** component of the MCP‑Server Semantic Analysis subsystem.  The only concrete reference we have to the code that drives the cache is the file  
-`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  In that agent the **lazy‑loading approach** is implemented, and the comments in the observation indicate that the lazy loader “likely utilizes the OntologyCache to store loaded ontologies.”  In other words, OntologyCache is the in‑memory store that holds ontology objects after they have been read from their persistent representation, allowing the rest of the system—most notably the `ontology‑classification‑agent`—to retrieve an ontology quickly without re‑reading it from disk or a remote service.
+`integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`.  In that agent the **lazy‑loading approach** is implemented, and the comments in the observation indicate that the lazy loader “likely utilizes the OntologyCache to store loaded ontologies.”  In other words, OntologyCache is the in‑memory store that holds ontology objects after they have been read from their persistent representation, allowing the rest of the system—most notably the `ontology‑classification‑agent`—to retrieve an ontology quickly without re‑reading it from disk or a remote service.
 
 Because the **OntologyManager** “contains OntologyCache,” the cache is not a stand‑alone module but a tightly‑coupled internal member of the manager.  Its purpose is explicitly performance‑oriented: the manager deals with “large or complex ontologies,” and the cache “helps to improve performance by minimizing the number of times an ontology needs to be loaded.”  Thus OntologyCache can be understood as the central repository for already‑materialised ontology instances that the classification agent (and any other consumers) can query on demand.
 
@@ -41,7 +41,7 @@ While the source code itself is not provided, the observations let us infer the 
 
 ## Integration Points  
 
-The primary integration point is the **ontology‑classification‑agent** located at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  This agent relies on OntologyManager (and thus OntologyCache) to obtain ontologies needed for classification tasks.  The agent’s lazy‑loading call path constitutes the public interface of the cache: the agent does not interact with OntologyCache directly; it goes through OntologyManager, preserving encapsulation.
+The primary integration point is the **ontology‑classification‑agent** located at `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`.  This agent relies on OntologyManager (and thus OntologyCache) to obtain ontologies needed for classification tasks.  The agent’s lazy‑loading call path constitutes the public interface of the cache: the agent does not interact with OntologyCache directly; it goes through OntologyManager, preserving encapsulation.
 
 Other potential consumers are not listed, but the observation that OntologyManager “contains OntologyCache” implies that any component that obtains a reference to the manager can also indirectly benefit from the cache.  Therefore, the cache’s **dependency graph** is:
 
@@ -78,7 +78,7 @@ If additional agents or services were added later, they would follow the same pa
 ## Hierarchy Context
 
 ### Parent
-- [OntologyManager](./OntologyManager.md) -- OntologyManager uses a lazy loading approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [OntologyManager](./OntologyManager.md) -- OntologyManager uses a lazy loading approach to improve performance, as implemented in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
 
 ---
 

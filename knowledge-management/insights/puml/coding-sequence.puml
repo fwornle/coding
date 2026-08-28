@@ -3,7 +3,7 @@
 
 participant "Knowledge Management\n(src/knowledge-management)" as KM
 participant "UKB Unified Library\n(lib/ukb-unified)" as UKB
-participant "MCP Semantic Analysis\n(integrations/mcp-server-semantic-analysis/src)" as MCP
+participant "MCP Semantic Analysis\n(integrations/semantic-analysis/src)" as MCP
 participant "Graphology + LevelDB\n(.data/knowledge-graph)" as GraphDB
 participant "JSON Export\n(.data/knowledge-export)" as JSONExport
 

@@ -9,16 +9,16 @@ The SubComponent description explicitly states the dashboard is 'architecturally
 The **DecoupledDeployableUnit** is realized as the *dashboard* component of the **MCP Constraint Monitor** integration. Its source lives under the repository path  
 
 ```
-integrations/mcp-constraint-monitor/dashboard/
+integrations/constraint-monitor/dashboard/
 ```
 
 with the primary documentation entry point at  
 
 ```
-integrations/mcp-constraint-monitor/dashboard/README.md
+integrations/constraint-monitor/dashboard/README.md
 ```
 
-The README explicitly declares the dashboard as a *separate deployable* that possesses its own lifecycle distinct from the main MCP server process. Within the component hierarchy, the dashboard is a child of the **ConstraintDashboard** entity (the parent documentation lives in the same `dashboard/` folder) and sits alongside sibling integration surfaces such as **StatusLineIntegrationSurface**, which is documented in `integrations/mcp-constraint-monitor/docs/status-line-integration.md`. The term *DecoupledDeployableUnit* therefore refers to the architectural artifact that isolates the dashboard into its own process‑bound artifact while still belonging to the broader constraint‑monitoring feature set.
+The README explicitly declares the dashboard as a *separate deployable* that possesses its own lifecycle distinct from the main MCP server process. Within the component hierarchy, the dashboard is a child of the **ConstraintDashboard** entity (the parent documentation lives in the same `dashboard/` folder) and sits alongside sibling integration surfaces such as **StatusLineIntegrationSurface**, which is documented in `integrations/constraint-monitor/docs/status-line-integration.md`. The term *DecoupledDeployableUnit* therefore refers to the architectural artifact that isolates the dashboard into its own process‑bound artifact while still belonging to the broader constraint‑monitoring feature set.
 
 ---
 
@@ -102,10 +102,10 @@ The clear physical separation and dedicated documentation enhance **maintainabil
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintDashboard](./ConstraintDashboard.md) -- integrations/mcp-constraint-monitor/dashboard/README.md documents the dashboard as a separate deployable under the dashboard/ subdirectory, indicating it is architecturally decoupled from the MCP server process
+- [ConstraintDashboard](./ConstraintDashboard.md) -- integrations/constraint-monitor/dashboard/README.md documents the dashboard as a separate deployable under the dashboard/ subdirectory, indicating it is architecturally decoupled from the MCP server process
 
 ### Siblings
-- [StatusLineIntegrationSurface](./StatusLineIntegrationSurface.md) -- `integrations/mcp-constraint-monitor/docs/status-line-integration.md` is a dedicated document titled 'Status Line Integration,' indicating this is a first-class, explicitly designed output channel of the constraint monitoring system rather than an ad-hoc addition
+- [StatusLineIntegrationSurface](./StatusLineIntegrationSurface.md) -- `integrations/constraint-monitor/docs/status-line-integration.md` is a dedicated document titled 'Status Line Integration,' indicating this is a first-class, explicitly designed output channel of the constraint monitoring system rather than an ad-hoc addition
 
 
 ---

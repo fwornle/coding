@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-ConstraintConfigurationManager works with the integrations/mcp-constraint-monitor/docs/constraint-configuration.md file to provide constraint configuration documentation.
+ConstraintConfigurationManager works with the integrations/constraint-monitor/docs/constraint-configuration.md file to provide constraint configuration documentation.
 
 ## What It Is  
 
 The **ConstraintConfigurationManager** lives inside the **ConstraintSystem** sub‑tree and is the authoritative source for all constraint‑related configuration data. It is instantiated from the **ConstraintSystem** component (see the parent‑component description) and works together with its child **ConstraintLoader** to bring configuration into the runtime. The manager reads raw constraint definitions from either a configuration file or a database and stores them using an internal **constraint configuration mechanism**. Documentation for the format and semantics of those definitions is maintained in the file  
 
 ```
-integrations/mcp-constraint-monitor/docs/constraint-configuration.md
+integrations/constraint-monitor/docs/constraint-configuration.md
 ```  
 
 Developers and runtime components retrieve ready‑to‑use constraint configurations from the manager, which also governs their lifecycle—from registration through enforcement to eventual retirement.
@@ -44,7 +44,7 @@ The relationship diagram further clarifies how the manager registers constraints
 
 * **Lifecycle Management** – The manager tracks timestamps and version numbers for each configuration entry. When a new version is loaded, it atomically swaps the old entry, notifies any listeners (such as **ViolationCaptureModule**), and marks the previous version as deprecated. This approach avoids race conditions during hot‑reloading.  
 
-* **Documentation Coupling** – The file `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` is treated as the single source of truth for the configuration schema. The manager validates every loaded configuration against the rules described in that markdown file, ensuring that malformed definitions are rejected early.  
+* **Documentation Coupling** – The file `integrations/constraint-monitor/docs/constraint-configuration.md` is treated as the single source of truth for the configuration schema. The manager validates every loaded configuration against the rules described in that markdown file, ensuring that malformed definitions are rejected early.  
 
 * **Public API** – The manager exposes a read‑only accessor (`getConstraintConfig(name)`) that other components use to fetch the current configuration for enforcement. Because the manager owns the lifecycle, callers receive a stable reference that is automatically refreshed on reload.  
 
@@ -60,7 +60,7 @@ The relationship diagram further clarifies how the manager registers constraints
 
 * **Sibling – HookManager & WorkflowManager** – Both of these components also load definitions from files or databases. Their loading pipelines resemble the manager’s, suggesting a shared design language across the subsystem.  
 
-* **External Documentation** – The markdown file in `integrations/mcp-constraint-monitor/docs/` is an external contract. Any change to constraint schema must be reflected there, otherwise the manager’s validation step will reject the new definitions.  
+* **External Documentation** – The markdown file in `integrations/constraint-monitor/docs/` is an external contract. Any change to constraint schema must be reflected there, otherwise the manager’s validation step will reject the new definitions.  
 
 * **ConstraintLoader** – As the sole child, this loader is the entry point for all raw configuration data. It may be swapped out for a different implementation (e.g., a remote configuration service) without affecting the manager’s public API, thanks to the clear separation of concerns.
 
@@ -70,7 +70,7 @@ The relationship diagram further clarifies how the manager registers constraints
 
 1. **Always Register First** – When adding a new constraint, invoke the manager’s registration API before any enforcement logic runs. This guarantees that the constraint is discoverable by downstream modules.  
 
-2. **Keep Documentation Synchronized** – Any modification to the constraint schema must be mirrored in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. The manager validates against this file at load time, and mismatches will cause startup failures.  
+2. **Keep Documentation Synchronized** – Any modification to the constraint schema must be mirrored in `integrations/constraint-monitor/docs/constraint-configuration.md`. The manager validates against this file at load time, and mismatches will cause startup failures.  
 
 3. **Prefer File‑Based Loading in Development** – For rapid iteration, point the manager to a local configuration file. In production, switch to the database source by configuring the appropriate connection string; the **ConstraintLoader** will handle the switch transparently.  
 

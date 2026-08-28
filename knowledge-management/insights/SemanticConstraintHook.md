@@ -2,19 +2,19 @@
 
 **Type:** Detail
 
-integrations/mcp-constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide') describes how constraints are configured and fed into the semantic hook evaluation pipeline
+integrations/constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide') describes how constraints are configured and fed into the semantic hook evaluation pipeline
 
 ## What It Is  
 
 **SemanticConstraintHook** is the concrete hook implementation that evaluates *semantic constraints* at designated hook points inside the **MCP Constraint Monitor** integration. The hook lives in the documentation hierarchy under  
 
 ```
-integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
-integrations/mcp-constraint-monitor/docs/semantic-detection-design.md
-integrations/mcp-constraint-monitor/docs/constraint-configuration.md
+integrations/constraint-monitor/docs/semantic-constraint-detection.md
+integrations/constraint-monitor/docs/semantic-detection-design.md
+integrations/constraint-monitor/docs/constraint-configuration.md
 ```  
 
-These three markdown assets together define the hook’s purpose, its design rationale, and the way constraints are supplied to it. The hook is a member of the **HookExtensionPattern** (see `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` for the surrounding pattern) and works hand‑in‑hand with its sibling **HookDataFormatContract**, which specifies the exact payload shape that Claude‑generated code emits at each hook point.
+These three markdown assets together define the hook’s purpose, its design rationale, and the way constraints are supplied to it. The hook is a member of the **HookExtensionPattern** (see `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` for the surrounding pattern) and works hand‑in‑hand with its sibling **HookDataFormatContract**, which specifies the exact payload shape that Claude‑generated code emits at each hook point.
 
 In short, **SemanticConstraintHook** is the runtime “plug‑in” that receives a **Claude Code Hook** payload, interprets the semantic intent of the code fragment, and decides whether the configured constraints are satisfied, violated, or need further processing.
 
@@ -125,10 +125,10 @@ Because the hook is part of the **HookExtensionPattern**, it must also expose th
 ## Hierarchy Context
 
 ### Parent
-- [HookExtensionPattern](./HookExtensionPattern.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md documents the data format Claude Code emits at hook points, defining the contract between the hook producer and constraint-monitor consumer
+- [HookExtensionPattern](./HookExtensionPattern.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md documents the data format Claude Code emits at hook points, defining the contract between the hook producer and constraint-monitor consumer
 
 ### Siblings
-- [HookDataFormatContract](./HookDataFormatContract.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md is the authoritative specification for hook payload structure, titled 'Claude Code Hook Data Format'
+- [HookDataFormatContract](./HookDataFormatContract.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md is the authoritative specification for hook payload structure, titled 'Claude Code Hook Data Format'
 
 
 ---

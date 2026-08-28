@@ -45,7 +45,7 @@ Interaction flow: a client request reaches `LLMService` → `LLMService` consult
 
 3. **Docker Model Runner** – The actual inference engine is an external Docker container. DMRService depends on the container being available on the host machine; startup/shutdown scripts (not listed) are likely part of the development environment.  
 
-4. **MockService (`integrations/mcp-server-semantic-analysis/src/mock/llm‑mock‑service.ts`)** – For testing, MockService can replace DMRService by registering a mock provider in the same registry. This illustrates the plug‑in nature of the architecture: swapping a real provider for a mock is a matter of registry configuration.  
+4. **MockService (`integrations/semantic-analysis/src/mock/llm‑mock‑service.ts`)** – For testing, MockService can replace DMRService by registering a mock provider in the same registry. This illustrates the plug‑in nature of the architecture: swapping a real provider for a mock is a matter of registry configuration.  
 
 5. **Sibling Providers** – The Anthropic provider and any future providers share the same interface contract, allowing the rest of the system to remain agnostic to whether the request is handled locally (DMRService) or remotely (Anthropic).  
 
@@ -99,7 +99,7 @@ The modular, plug‑in architecture of LLMAbstraction makes DMRService easy to m
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component employs a modular architecture, with its functionality distributed across multiple files, including integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, lib/llm/llm-service.ts, and lib/llm/providers/anthropic-provider.ts. This modularity contributes to the component's robustness and ease of maintenance, as it allows developers to focus on specific aspects of the system without affecting other parts. For example, the LLMService class in lib/llm/llm-service.ts serves as a high-level facade for all LLM operations, handling mode routing, caching, and circuit breaking. This modular approach also enables the easy addition of new LLM providers, as evidenced by the provider registry in lib/llm/provider-registry.js.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component employs a modular architecture, with its functionality distributed across multiple files, including integrations/semantic-analysis/src/mock/llm-mock-service.ts, lib/llm/llm-service.ts, and lib/llm/providers/anthropic-provider.ts. This modularity contributes to the component's robustness and ease of maintenance, as it allows developers to focus on specific aspects of the system without affecting other parts. For example, the LLMService class in lib/llm/llm-service.ts serves as a high-level facade for all LLM operations, handling mode routing, caching, and circuit breaking. This modular approach also enables the easy addition of new LLM providers, as evidenced by the provider registry in lib/llm/provider-registry.js.
 
 ### Siblings
 - [MockService](./MockService.md) -- MockService uses the llm-mock-service.ts file to simulate LLM responses for testing and development purposes.

@@ -22,7 +22,7 @@ Together these pieces produce a **graph‑based representation of the codebase**
 
 ## Architecture and Design  
 
-The design of CodeGraph follows a **graph‑centric, modular architecture**. The primary architectural pattern evident is the **Pipeline pattern**: the `SemanticAnalysisAgent` (found in `integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts`) pulls a generated `CodeGraph` from the `CodeGraphGenerator` and passes it downstream for classification, insight generation, and validation.  
+The design of CodeGraph follows a **graph‑centric, modular architecture**. The primary architectural pattern evident is the **Pipeline pattern**: the `SemanticAnalysisAgent` (found in `integrations/semantic-analysis/src/agents/semantic-analysis-agent.ts`) pulls a generated `CodeGraph` from the `CodeGraphGenerator` and passes it downstream for classification, insight generation, and validation.  
 
 Within the CodeGraph sub‑component itself, the **Builder/Factory style** is visible in `CodeGraphGenerator`. It orchestrates the creation of nodes and edges, delegating the concrete construction of each element to the extensible factories defined in `code-graph.ts`. This makes the graph **extensible** – new node types can be introduced without touching the core generator.  
 
@@ -71,7 +71,7 @@ The `SemanticAnalysisAgent` obtains a `CodeGraph` by invoking `CodeGraphGenerato
 * **Parent – SemanticAnalysis**: CodeGraph is a child of the `SemanticAnalysis` component. The `SemanticAnalysisAgent` orchestrates its creation and passes the resulting graph to sibling agents (OntologyClassificationAgent, InsightGenerator, EntityValidator).  
 * **Sibling – Pipeline**: The batch processing pipeline defined in the `OntologyClassificationAgent` expects a populated `CodeGraph` to perform classification against the ontology.  
 * **Sibling – Ontology**: Ontology definitions are consumed by `ontology-integration.ts` to annotate graph nodes, establishing a bidirectional link between code structure and domain semantics.  
-* **Sibling – Insights**: The `InsightGenerator` (found in `integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts`) consumes the annotated graph to derive higher‑level insights such as architectural smells or dependency cycles.  
+* **Sibling – Insights**: The `InsightGenerator` (found in `integrations/semantic-analysis/src/insights/insight-generator.ts`) consumes the annotated graph to derive higher‑level insights such as architectural smells or dependency cycles.  
 * **Sibling – EntityValidator**: Validation rules defined in `entity-validator.ts` operate on the graph to ensure that code entities conform to the ontology’s constraints.  
 
 All interactions are mediated through well‑typed TypeScript interfaces, keeping compile‑time safety and allowing each module to evolve independently.
@@ -118,16 +118,16 @@ All interactions are mediated through well‑typed TypeScript interfaces, keepin
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system architecture, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to process git history and LSL sessions. This is evident in the code files, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts, and integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, which define the respective agents and their responsibilities. The use of multiple agents allows for a modular and scalable design, enabling the processing of large amounts of data and the integration of new agents as needed.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system architecture, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to process git history and LSL sessions. This is evident in the code files, such as integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, integrations/semantic-analysis/src/agents/semantic-analysis-agent.ts, and integrations/semantic-analysis/src/agents/code-graph-agent.ts, which define the respective agents and their responsibilities. The use of multiple agents allows for a modular and scalable design, enabling the processing of large amounts of data and the integration of new agents as needed.
 
 ### Children
 - [CodeGraphGenerator](./CodeGraphGenerator.md) -- The CodeGraphGenerator class is mentioned in the hierarchy context as the class performing code graph generation.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, which outlines the responsibilities of the OntologyClassificationAgent.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is responsible for classifying entities based on the ontology.
-- [Insights](./Insights.md) -- The insight generation is performed by the InsightGenerator class in integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts.
-- [EntityValidator](./EntityValidator.md) -- The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/entity-validator.ts.
+- [Pipeline](./Pipeline.md) -- The batch processing pipeline is defined in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, which outlines the responsibilities of the OntologyClassificationAgent.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts is responsible for classifying entities based on the ontology.
+- [Insights](./Insights.md) -- The insight generation is performed by the InsightGenerator class in integrations/semantic-analysis/src/insights/insight-generator.ts.
+- [EntityValidator](./EntityValidator.md) -- The entity validation is performed by the EntityValidator class in integrations/semantic-analysis/src/entity-validator.ts.
 
 ---
 

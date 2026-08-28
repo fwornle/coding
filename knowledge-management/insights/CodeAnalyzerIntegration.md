@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file suggests that the InsightGenerator is designed to work with the CodeAnalyzer, implying a specific implementation of the CodeAnalyzerIntegration.
+The integrations/semantic-analysis/src/agents/insight-generator.ts file suggests that the InsightGenerator is designed to work with the CodeAnalyzer, implying a specific implementation of the CodeAnalyzerIntegration.
 
 ## What It Is  
 
@@ -25,7 +25,7 @@ No explicit architectural patterns such as “micro‑service” or “event‑d
 The only concrete artifact we have is the TypeScript file:
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts
+integrations/semantic-analysis/src/agents/insight-generator.ts
 ```
 
 Within this file the InsightGenerator imports the CodeAnalyzer module (the exact import statement is not listed, but the observation confirms the usage). The typical flow inferred from the description is:
@@ -104,7 +104,7 @@ Because the InsightGenerator resides under the *agents* namespace, it may be orc
 ## Hierarchy Context
 
 ### Parent
-- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
+- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/semantic-analysis/src/agents/insight-generator.ts file.
 
 ---
 

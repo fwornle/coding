@@ -9,12 +9,12 @@
 			"path": ".specstory/history"
 		},
 		{
-			"name": "mcp-constraint-monitor",
-			"path": "integrations/mcp-constraint-monitor"
+			"name": "constraint-monitor",
+			"path": "integrations/constraint-monitor"
 		},
 		{
-			"name": "mcp-server-semantic-analysis",
-			"path": "integrations/mcp-server-semantic-analysis"
+			"name": "semantic-analysis",
+			"path": "integrations/semantic-analysis"
 		},
 		{
 			"name": "memory-visualizer",

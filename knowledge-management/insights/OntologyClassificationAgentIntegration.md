@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The ObservationClassifier, located in the integrations/mcp-server-semantic-analysis/src/agents/observation-classifier.ts file, utilizes the OntologyClassificationAgent for classification purposes.
+The ObservationClassifier, located in the integrations/semantic-analysis/src/agents/observation-classifier.ts file, utilizes the OntologyClassificationAgent for classification purposes.
 
 ## What It Is  
 
 The **OntologyClassificationAgentIntegration** lives inside the **ObservationClassifier** implementation that is located at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/observation-classifier.ts
+integrations/semantic-analysis/src/agents/observation-classifier.ts
 ```  
 
 Within this file the `ObservationClassifier` creates or receives an instance of the **OntologyClassificationAgent** and delegates the actual classification of incoming observations to that agent.  In the terminology of the code base, the integration is the glue layer that connects the classifier logic (the “parent” `ObservationClassifier`) with the external **OntologyClassificationAgent** service.  Because the integration is mentioned as a child of `ObservationClassifier`, it is effectively the component that encapsulates the contract and the call‑site to the agent, keeping the rest of the classifier agnostic to the concrete classification implementation.
@@ -76,7 +76,7 @@ Because the integration is described as “used to classify observations,” it 
 ## Hierarchy Context
 
 ### Parent
-- [ObservationClassifier](./ObservationClassifier.md) -- The ObservationClassifier, located in the integrations/mcp-server-semantic-analysis/src/agents/observation-classifier.ts file, uses the OntologyClassificationAgent to classify observations.
+- [ObservationClassifier](./ObservationClassifier.md) -- The ObservationClassifier, located in the integrations/semantic-analysis/src/agents/observation-classifier.ts file, uses the OntologyClassificationAgent to classify observations.
 
 ---
 

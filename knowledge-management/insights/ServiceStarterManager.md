@@ -6,7 +6,7 @@ The ServiceStarterManager oversees service startup, utilizing the Service Starte
 
 ## What It Is  
 
-The **ServiceStarterManager** is a sub‑component that lives inside the *DockerizedServices* hierarchy.  Its implementation is centred around the **service starter** logic found in **`lib/service-starter.js`**.  The manager’s sole responsibility is to orchestrate the start‑up of Docker‑compose‑managed services—most notably the **`mcp-server-semantic-analysis`** service—by invoking the retry‑with‑back‑off routine supplied by the service starter.  All configuration that drives the manager (service names, ports, credentials, etc.) is supplied through **environment variables** and the **`docker‑compose.yaml`** file that defines the Dockerised ecosystem.
+The **ServiceStarterManager** is a sub‑component that lives inside the *DockerizedServices* hierarchy.  Its implementation is centred around the **service starter** logic found in **`lib/service-starter.js`**.  The manager’s sole responsibility is to orchestrate the start‑up of Docker‑compose‑managed services—most notably the **`semantic-analysis`** service—by invoking the retry‑with‑back‑off routine supplied by the service starter.  All configuration that drives the manager (service names, ports, credentials, etc.) is supplied through **environment variables** and the **`docker‑compose.yaml`** file that defines the Dockerised ecosystem.
 
 ## Architecture and Design  
 
@@ -43,7 +43,7 @@ The manager’s reliance on Docker Compose means that the actual container lifec
 
 * **External Configuration** – The manager reads **environment variables** that are typically defined in the `docker-compose.yaml` `environment:` section.  Changing a variable (e.g., adjusting `STARTUP_MAX_RETRIES`) immediately influences the back‑off behaviour without code changes.
 
-* **Service‑Specific Hooks** – For the `mcp-server-semantic-analysis` service, the manager may also listen for health‑check callbacks or log streams to confirm readiness, integrating tightly with that service’s startup contract.
+* **Service‑Specific Hooks** – For the `semantic-analysis` service, the manager may also listen for health‑check callbacks or log streams to confirm readiness, integrating tightly with that service’s startup contract.
 
 ## Usage Guidelines  
 
@@ -85,11 +85,11 @@ The manager’s reliance on Docker Compose means that the actual container lifec
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the mcp-server-semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component's reliance on Docker Compose, as defined in docker-compose.yaml, enables a standardized and reproducible environment for service orchestration and management. This is particularly evident in the way the semantic-analysis service is configured and managed through environment variables and Docker Compose, demonstrating a modular and adaptable design. The Service Starter, implemented in lib/service-starter.js, utilizes a retry-with-backoff approach to ensure robust service startup, even in the face of failures or errors. This is achieved through the use of configurable retry limits and timeout protection, allowing for flexible and resilient service initialization.
 
 ### Siblings
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService relies on the mcp-server-semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- The SemanticAnalysisService relies on the semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService relies on the semantic-analysis service, as defined in docker-compose.yaml, to enable standardized and reproducible environment for service orchestration and management.
 - [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- The CodeGraphAnalysisService utilizes the CodeGraphAnalyzer to analyze code graphs, demonstrating a modular and adaptable design.
 - [LLMServiceManager](./LLMServiceManager.md) -- The LLMServiceManager manages the lifecycle of LLM services, including provider configuration, mode switching, and dependency injection.
 

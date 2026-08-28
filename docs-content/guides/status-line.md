@@ -37,10 +37,10 @@ The leading emoji (🏥 🔒 📚 🧠) says *what the badge is about* and never
 
 | Dot | Meaning | tmux colour |
 |-----|---------|-------------|
-| ● green | Healthy | `colour41` — the same green as an Active project, so "green means fine" reads identically everywhere on the bar |
-| ● amber | Warning — degraded, or violations present | `colour214` |
-| ● red | Critical — downed service, unreachable API | `colour196` |
-| ● grey | Idle or offline | `colour238` |
+| <span class="dot dot-green">●</span> green | Healthy | `colour41` — the same green as an Active project, so "green means fine" reads identically everywhere on the bar |
+| <span class="dot dot-amber">●</span> amber | Warning — degraded, or violations present | `colour214` |
+| <span class="dot dot-red">●</span> red | Critical — downed service, unreachable API | `colour196` |
+| <span class="dot dot-grey">●</span> grey | Idle or offline | `colour238` |
 
 Some states are **not** severities, and those keep a pictogram, because a dot scale can only say *how bad* — never *what happened*:
 
@@ -78,11 +78,11 @@ A long-running agent turn (one prompt that takes 25 minutes) writes nothing to t
 
 | Shade | Band | Age since last activity | Meaning |
 |-------|------|-------------------------|---------|
-| ● bright green (`colour41`) | Active | < 5 minutes | Someone is working here now |
-| ● mid green (`colour34`) | Cooling | 5 – 30 minutes | Just stepped away |
-| ● dark green (`colour28`) | Fading | 30 min – 6 hours | Idle, still tracked |
-| ● very dark green (`colour22`) | Inactive | 6 – 24 hours | Dormant but open |
-| ● grey (`colour238`) | Sleeping | > 24 hours | Long-term dormant |
+| <span class="dot dot-green">●</span> bright green (`colour41`) | Active | < 5 minutes | Someone is working here now |
+| <span class="dot dot-green-mid">●</span> mid green (`colour34`) | Cooling | 5 – 30 minutes | Just stepped away |
+| <span class="dot dot-green-dark">●</span> dark green (`colour28`) | Fading | 30 min – 6 hours | Idle, still tracked |
+| <span class="dot dot-green-vdark">●</span> very dark green (`colour22`) | Inactive | 6 – 24 hours | Dormant but open |
+| <span class="dot dot-grey">●</span> grey (`colour238`) | Sleeping | > 24 hours | Long-term dormant |
 | ❌ | Error | Any | Health check failed or service crash |
 
 **Visual progression:** one glyph, five shades — the dot darkens through green as the signal ages, then drops to grey once the session has been idle over a day. Unicode has only one green circle emoji, so the ramp is a 1-cell `●` tinted with tmux colours rather than an emoji sequence.

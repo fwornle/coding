@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-Referenced explicitly in the Insights sub-component description and elaborated in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, `BaseAgent<TInput, TOutput>` uses TypeScript generics to enforce distinct data shapes at ingestion (`TInput`) and emission (`TOutput`) without coupling individual agents to a common payload schema.
+Referenced explicitly in the Insights sub-component description and elaborated in `integrations/semantic-analysis/docs/architecture/agents.md`, `BaseAgent<TInput, TOutput>` uses TypeScript generics to enforce distinct data shapes at ingestion (`TInput`) and emission (`TOutput`) without coupling individual agents to a common payload schema.
 
 ## What It Is  
 
-**BaseAgentGenericContract** is the core type‑level contract that underpins every Insight agent in the **Insights** sub‑system.  It lives in the documentation hierarchy of the semantic‑analysis integration, specifically referenced in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.  The contract is expressed as the generic class `BaseAgent<TInput, TOutput>` – a TypeScript abstraction that forces each concrete agent to declare the shape of the data it **ingests** (`TInput`) and the shape of the data it **emits** (`TOutput`).  Because the contract is generic, agents can be heterogeneous (e.g., call‑graph pattern detectors, dependency‑cluster discoverers, naming‑convention validators) while still being orchestrated by a single pipeline.  
+**BaseAgentGenericContract** is the core type‑level contract that underpins every Insight agent in the **Insights** sub‑system.  It lives in the documentation hierarchy of the semantic‑analysis integration, specifically referenced in `integrations/semantic-analysis/docs/architecture/agents.md`.  The contract is expressed as the generic class `BaseAgent<TInput, TOutput>` – a TypeScript abstraction that forces each concrete agent to declare the shape of the data it **ingests** (`TInput`) and the shape of the data it **emits** (`TOutput`).  Because the contract is generic, agents can be heterogeneous (e.g., call‑graph pattern detectors, dependency‑cluster discoverers, naming‑convention validators) while still being orchestrated by a single pipeline.  
 
 A mandatory method, `generateRouting()`, is defined on `BaseAgent`.  The method does not issue hard routing commands; instead it returns **ConfidenceBasedRoutingHints** – a lightweight hint object that the downstream orchestration layer interprets to decide whether a pattern proceeds to the knowledge‑report authoring stage (high confidence) or is sent back for re‑analysis (low confidence).  This makes confidence‑driven routing a first‑class concern of every Insight agent rather than an optional add‑on.
 
@@ -14,7 +14,7 @@ A mandatory method, `generateRouting()`, is defined on `BaseAgent`.  The method 
 
 ## Architecture and Design  
 
-The architecture around **BaseAgentGenericContract** follows a **generic‑type‑driven orchestration** pattern.  By parameterising the contract with `<TInput, TOutput>`, the system decouples the *payload schema* from the *execution engine*.  All agents share a common runtime interface (`BaseAgent`) but retain compile‑time safety for their specific data models.  This design enables a **single orchestration pipeline** (described in `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`) to treat every agent uniformly: it can instantiate, invoke, and collect results without needing bespoke adapters for each payload shape.
+The architecture around **BaseAgentGenericContract** follows a **generic‑type‑driven orchestration** pattern.  By parameterising the contract with `<TInput, TOutput>`, the system decouples the *payload schema* from the *execution engine*.  All agents share a common runtime interface (`BaseAgent`) but retain compile‑time safety for their specific data models.  This design enables a **single orchestration pipeline** (described in `integrations/semantic-analysis/docs/architecture/README.md`) to treat every agent uniformly: it can instantiate, invoke, and collect results without needing bespoke adapters for each payload shape.
 
 The mandatory `generateRouting()` method introduces a **routing‑hint** pattern.  Rather than embedding routing logic inside the orchestrator, each agent contributes a confidence signal that is later aggregated.  The sibling component **ConfidenceBasedRoutingHints** formalises this signal, allowing the orchestrator to combine multiple hints (e.g., from different agents analysing the same artifact) before committing a pattern to the downstream **knowledge‑report authoring** stage.  This yields a **pipeline‑centric, confidence‑weighted decision model**.
 
@@ -31,7 +31,7 @@ Because the contract lives in the **Insights** parent component, all Insight age
   * a routing flag (e.g., `high`, `low`),
   * optional metadata (e.g., reason codes).
 
-* **Interaction with Orchestrator** – The orchestration layer (documented in `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`) treats each agent as a black box that:
+* **Interaction with Orchestrator** – The orchestration layer (documented in `integrations/semantic-analysis/docs/architecture/README.md`) treats each agent as a black box that:
   1. Receives a `TInput` payload,
   2. Executes its domain‑specific logic,
   3. Emits a `TOutput` payload,
@@ -45,8 +45,8 @@ Because the contract lives in the **Insights** parent component, all Insight age
   No changes to the orchestration code are required because the generic contract guarantees compatibility.
 
 * **Documentation Anchor** – All of the above is described in the architectural docs located at:
-  * `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` (contract definition and routing hint semantics),
-  * `integrations/mcp-server-semantic-analysis/docs/architecture/README.md` (pipeline orchestration overview).
+  * `integrations/semantic-analysis/docs/architecture/agents.md` (contract definition and routing hint semantics),
+  * `integrations/semantic-analysis/docs/architecture/README.md` (pipeline orchestration overview).
 
 ---
 
@@ -56,7 +56,7 @@ Because the contract lives in the **Insights** parent component, all Insight age
 
 2. **ConfidenceBasedRoutingHints Sibling** – The contract’s `generateRouting()` method returns objects defined by the **ConfidenceBasedRoutingHints** contract.  This tight coupling ensures that any evolution of the hint schema is reflected across all agents automatically.
 
-3. **Orchestration Layer** – The orchestration engine (see `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`) consumes agents via the generic contract.  It supplies `TInput` data, collects `TOutput` results, and aggregates the routing hints to decide the next stage (e.g., forwarding to the **knowledge‑report authoring** subsystem or looping back for re‑analysis).
+3. **Orchestration Layer** – The orchestration engine (see `integrations/semantic-analysis/docs/architecture/README.md`) consumes agents via the generic contract.  It supplies `TInput` data, collects `TOutput` results, and aggregates the routing hints to decide the next stage (e.g., forwarding to the **knowledge‑report authoring** subsystem or looping back for re‑analysis).
 
 4. **Downstream Knowledge‑Report Authoring** – High‑confidence hints trigger the hand‑off to the report authoring stage.  The contract does not dictate the shape of the authoring payload; instead, the `TOutput` type of each agent can be mapped downstream as needed.
 
@@ -120,7 +120,7 @@ Because the contract lives in the **Insights** parent component, all Insight age
 - [Insights](./Insights.md) -- Insight agents implement BaseAgent<TInput, TOutput> with generateRouting() hints that direct high-confidence patterns to the knowledge report authoring stage and low-confidence ones back for re-analysis
 
 ### Siblings
-- [ConfidenceBasedRoutingHints](./ConfidenceBasedRoutingHints.md) -- As described in the Insights sub-component contract and documented under `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, `generateRouting()` returns hints rather than hard directives, allowing downstream orchestration to aggregate multiple signals before committing a pattern to the report authoring stage.
+- [ConfidenceBasedRoutingHints](./ConfidenceBasedRoutingHints.md) -- As described in the Insights sub-component contract and documented under `integrations/semantic-analysis/docs/architecture/agents.md`, `generateRouting()` returns hints rather than hard directives, allowing downstream orchestration to aggregate multiple signals before committing a pattern to the report authoring stage.
 
 
 ---

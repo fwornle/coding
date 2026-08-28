@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-The project documentation tree shows dedicated architecture directories (e.g., integrations/mcp-server-semantic-analysis/docs/architecture/) with files such as agents.md, integration.md, and tools.md — indicating that diagrams are intended to complement layered, topic-scoped written documentation rather than replace it
+The project documentation tree shows dedicated architecture directories (e.g., integrations/semantic-analysis/docs/architecture/) with files such as agents.md, integration.md, and tools.md — indicating that diagrams are intended to complement layered, topic-scoped written documentation rather than replace it
 
 # PumlArchitecturalSpec
 
@@ -14,7 +14,7 @@ As a child of `DiagramAsDocumentation`, `PumlArchitecturalSpec` provides the con
 
 ## Architecture and Design
 
-The architectural approach evident from the observations is one of **separation of concerns within documentation itself**. Visual specifications (PlantUML sources) are physically segregated into `docs/puml/`, while narrative architectural documentation lives in dedicated subdirectories such as `integrations/mcp-server-semantic-analysis/docs/architecture/`, which contains topic-scoped files like `agents.md`, `integration.md`, and `tools.md`. This split intentionally treats diagrams as complementary artifacts rather than substitutes for written explanation — diagrams answer "what does the structure look like?" while prose markdown answers "why does it work this way, and how do I use it?"
+The architectural approach evident from the observations is one of **separation of concerns within documentation itself**. Visual specifications (PlantUML sources) are physically segregated into `docs/puml/`, while narrative architectural documentation lives in dedicated subdirectories such as `integrations/semantic-analysis/docs/architecture/`, which contains topic-scoped files like `agents.md`, `integration.md`, and `tools.md`. This split intentionally treats diagrams as complementary artifacts rather than substitutes for written explanation — diagrams answer "what does the structure look like?" while prose markdown answers "why does it work this way, and how do I use it?"
 
 The decision to canonicalize PlantUML — a textual, declarative diagram format — rather than exported PNG or SVG binaries reflects a deeper architectural commitment: **diagrams should be reviewable artifacts, not opaque assets**. Because `.puml` files are plain text, they produce meaningful diffs in version control. A reviewer examining a pull request can read the structural changes to an architecture diagram the same way they read code changes: line by line, with context, in a familiar diff view. This makes architectural evolution traceable through the same review process as functional changes.
 
@@ -28,7 +28,7 @@ Implementation of `PumlArchitecturalSpec` is convention-based rather than code-b
 
 2. **Format canonicalization**: The diagram source format is PlantUML, not exported image formats. This means contributors author `.puml` files directly; rendered images, if needed for embedding in markdown, are generated from these sources rather than checked in as the primary artifact.
 
-3. **Complementary relationship with markdown documentation**: Diagrams under `docs/puml/` are designed to pair with the prose documentation in directories like `integrations/mcp-server-semantic-analysis/docs/architecture/`. The files `agents.md`, `integration.md`, and `tools.md` represent the topic-scoped, layered prose that PlantUML diagrams visually augment.
+3. **Complementary relationship with markdown documentation**: Diagrams under `docs/puml/` are designed to pair with the prose documentation in directories like `integrations/semantic-analysis/docs/architecture/`. The files `agents.md`, `integration.md`, and `tools.md` represent the topic-scoped, layered prose that PlantUML diagrams visually augment.
 
 The mechanics are deliberately minimal: a developer creates a new `.puml` file in `docs/puml/`, references it conceptually (or via rendered output) from the relevant `.md` file in the appropriate `docs/architecture/` location, and commits both. The system relies on convention enforced through code review rather than tooling-level validation.
 
@@ -36,7 +36,7 @@ The mechanics are deliberately minimal: a developer creates a new `.puml` file i
 
 `PumlArchitecturalSpec` integrates with the broader documentation ecosystem along two axes. First, it nests within the `DiagramAsDocumentation` parent concept — every PlantUML spec authored under `docs/puml/` is an instance of treating diagrams as first-class architectural documentation, capturing decisions in a versioned, reviewable form.
 
-Second, it integrates with the markdown documentation tree through topical correspondence. The architecture directories scattered through the project — exemplified by `integrations/mcp-server-semantic-analysis/docs/architecture/` and its `agents.md`, `integration.md`, and `tools.md` files — provide the prose context that PlantUML diagrams illustrate. The integration is conceptual and editorial rather than mechanical: there is no enforced linking between a `.puml` source and a specific markdown file, but the practice expects diagrams to support the layered topics described in those markdown files.
+Second, it integrates with the markdown documentation tree through topical correspondence. The architecture directories scattered through the project — exemplified by `integrations/semantic-analysis/docs/architecture/` and its `agents.md`, `integration.md`, and `tools.md` files — provide the prose context that PlantUML diagrams illustrate. The integration is conceptual and editorial rather than mechanical: there is no enforced linking between a `.puml` source and a specific markdown file, but the practice expects diagrams to support the layered topics described in those markdown files.
 
 Version control is the third integration point and arguably the most consequential. Because PlantUML is text, `docs/puml/` participates fully in Git's diff, blame, and review workflows. Architectural changes become reviewable artifacts in pull requests, and the history of a system's structure can be reconstructed by walking the commit history of its `.puml` files.
 
@@ -46,7 +46,7 @@ When adding or modifying architectural diagrams, developers should observe the f
 
 - **Always author diagrams as PlantUML sources placed in `docs/puml/`.** Do not commit PNG, SVG, or other rendered binary formats as the primary artifact. Rendered images may be generated and embedded in markdown, but the `.puml` source is canonical.
 
-- **Treat diagrams as complementary, not substitutive.** A diagram should accompany prose documentation in the appropriate `docs/architecture/` directory (such as `integrations/mcp-server-semantic-analysis/docs/architecture/`), not replace it. Use diagrams to convey structure and relationships; use markdown files like `agents.md`, `integration.md`, and `tools.md` to convey rationale, usage, and detail.
+- **Treat diagrams as complementary, not substitutive.** A diagram should accompany prose documentation in the appropriate `docs/architecture/` directory (such as `integrations/semantic-analysis/docs/architecture/`), not replace it. Use diagrams to convey structure and relationships; use markdown files like `agents.md`, `integration.md`, and `tools.md` to convey rationale, usage, and detail.
 
 - **Review diagram changes like code changes.** Because `.puml` files are diffable, architectural changes warrant the same scrutiny as functional changes. Pull request reviewers should examine `.puml` diffs to understand structural evolution.
 

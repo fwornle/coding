@@ -2,13 +2,13 @@
 
 **Type:** SubComponent
 
-The LoggingManager might be configured using environment variables or configurations similar to those described in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
+The LoggingManager might be configured using environment variables or configurations similar to those described in integrations/constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
 LoggingManager is the **sub‑component responsible for collecting, formatting, persisting, and rotating log data** for the wider LiveLoggingSystem and the Trajectory component. The concrete implementation lives alongside the integration documentation under the **`integrations/copi/`** family of files – most notably `integrations/copi/README.md`, `integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md`, and `integrations/copi/docs/hooks.md`. These files describe the logging requirements, the status‑line protocol, and hook definitions that LoggingManager obeys.  
 
-In addition to the Copi‑specific guidance, LoggingManager draws on other integration assets: the browser‑log access patterns described in `integrations/browser-access/README.md`, the environment‑driven configuration model from `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, and the persistent storage approach outlined in `integrations/code-graph-rag/README.md`. The component is therefore a **centralised logger** that adapts its behaviour to the needs of several integrations while remaining encapsulated within the Trajectory hierarchy.
+In addition to the Copi‑specific guidance, LoggingManager draws on other integration assets: the browser‑log access patterns described in `integrations/browser-access/README.md`, the environment‑driven configuration model from `integrations/constraint-monitor/docs/constraint-configuration.md`, and the persistent storage approach outlined in `integrations/code-graph-rag/README.md`. The component is therefore a **centralised logger** that adapts its behaviour to the needs of several integrations while remaining encapsulated within the Trajectory hierarchy.
 
 ---
 
@@ -28,7 +28,7 @@ Finally, the reliance on environment variables and configuration files (`constra
 
 Although the source tree reports “0 code symbols found,” the documentation provides enough clues to reconstruct the implementation skeleton:
 
-1. **LogConfigurationLoader** reads the logging schema from `integrations/copi/README.md` (and possibly from `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`). It parses environment variables, validates required fields (log level, destination, rotation policy), and produces a configuration object that the manager consumes at startup.
+1. **LogConfigurationLoader** reads the logging schema from `integrations/copi/README.md` (and possibly from `integrations/constraint-monitor/docs/constraint-configuration.md`). It parses environment variables, validates required fields (log level, destination, rotation policy), and produces a configuration object that the manager consumes at startup.
 
 2. **LoggingManager** instantiates the configuration object, then wires up the **hook pipeline** described in `integrations/copi/docs/hooks.md`. Hooks are likely registered via a simple registration API (`registerHook(name, fn)`) and invoked in the order defined by the documentation. The status‑line protocol (`STATUS-LINE-QUICK-REFERENCE.md`) is implemented as one of those hooks, translating internal log events into the concise status‑line format required by the Copi integration.
 
@@ -52,7 +52,7 @@ LoggingManager sits at the nexus of several integration pathways:
 
 * **Browser Access** – Through the adapter described in `integrations/browser-access/README.md`, browser console logs are funneled into LoggingManager, allowing developers to correlate front‑end activity with back‑end events.
 
-* **Constraint Monitor** – Configuration values (e.g., log level thresholds) are drawn from `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Additionally, the dashboard README (`integrations/mcp-constraint-monitor/dashboard/README.md`) may expose an API endpoint that the logger calls to push aggregated metrics.
+* **Constraint Monitor** – Configuration values (e.g., log level thresholds) are drawn from `integrations/constraint-monitor/docs/constraint-configuration.md`. Additionally, the dashboard README (`integrations/constraint-monitor/dashboard/README.md`) may expose an API endpoint that the logger calls to push aggregated metrics.
 
 * **Code‑Graph‑RAG Storage** – After rotation, LoggingManager may invoke the storage client documented in `integrations/code-graph-rag/README.md` to persist logs for retrieval by the RAG (Retrieval‑Augmented Generation) subsystem.
 

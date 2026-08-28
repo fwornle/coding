@@ -6,13 +6,13 @@ The LoggerImplementation is a key aspect of the LoggingModule, enabling it to lo
 
 ## What It Is  
 
-`LoggerImplementation` lives inside the **LoggingModule** and is the concrete piece that actually performs logging for the system. The implementation is built on top of the `createLogger` factory function that resides in **`../logging/Logger.js`**. Whenever the **LoggingModule** needs to record an event, error, or diagnostic message it delegates that work to the `LoggerImplementation`, which in turn invokes the logger created by `createLogger`. Because the parent **LoggingModule** also contains a queue‑based buffering mechanism (see `integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts`), `LoggerImplementation` is the bridge between the high‑level buffering strategy and the low‑level logger that writes to the chosen transport (console, file, remote service, etc.). In short, `LoggerImplementation` is the “glue” that turns a generic logger factory into a module‑specific, buffered logging capability.
+`LoggerImplementation` lives inside the **LoggingModule** and is the concrete piece that actually performs logging for the system. The implementation is built on top of the `createLogger` factory function that resides in **`../logging/Logger.js`**. Whenever the **LoggingModule** needs to record an event, error, or diagnostic message it delegates that work to the `LoggerImplementation`, which in turn invokes the logger created by `createLogger`. Because the parent **LoggingModule** also contains a queue‑based buffering mechanism (see `integrations/semantic-analysis/src/modules/logging-module.ts`), `LoggerImplementation` is the bridge between the high‑level buffering strategy and the low‑level logger that writes to the chosen transport (console, file, remote service, etc.). In short, `LoggerImplementation` is the “glue” that turns a generic logger factory into a module‑specific, buffered logging capability.
 
 ## Architecture and Design  
 
 The architecture follows a **facade‑wrapper** style. The low‑level `createLogger` function provides a generic logger object, while `LoggerImplementation` wraps that object and exposes a simplified API that matches the expectations of the **LoggingModule**. This separation keeps the module’s public contract stable even if the underlying logger implementation changes (e.g., swapping Winston for Bunyan).  
 
-The **LoggingModule** itself is organized around a **queue‑based buffering** pattern, as indicated by the source file `integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts`. Log entries are first enqueued, allowing asynchronous flushing and back‑pressure handling. `LoggerImplementation` is the consumer of this queue: when the buffer is flushed, it pulls the pending entries and forwards them to the concrete logger created by `createLogger`. The interaction can be visualized as:
+The **LoggingModule** itself is organized around a **queue‑based buffering** pattern, as indicated by the source file `integrations/semantic-analysis/src/modules/logging-module.ts`. Log entries are first enqueued, allowing asynchronous flushing and back‑pressure handling. `LoggerImplementation` is the consumer of this queue: when the buffer is flushed, it pulls the pending entries and forwards them to the concrete logger created by `createLogger`. The interaction can be visualized as:
 
 ```
 [LoggingModule] → (enqueue) → [Log Queue] → (dequeue) → [LoggerImplementation] → (uses) → createLogger()
@@ -28,7 +28,7 @@ Given the queue‑based buffering, `LoggerImplementation` may also expose a `flu
 
 ## Integration Points  
 
-- **Parent:** `LoggingModule` (found in `integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts`) – supplies the log queue, decides when to flush, and calls into `LoggerImplementation` to actually emit logs.  
+- **Parent:** `LoggingModule` (found in `integrations/semantic-analysis/src/modules/logging-module.ts`) – supplies the log queue, decides when to flush, and calls into `LoggerImplementation` to actually emit logs.  
 - **Sibling/Shared Dependency:** The generic logger factory `createLogger` from `../logging/Logger.js`. Any other module that needs a logger could also import `createLogger`, but within the **LoggingModule** the concrete usage is encapsulated by `LoggerImplementation`.  
 - **External Interfaces:** The logger produced by `createLogger` may be configured with transports, formatters, or level settings that are defined elsewhere (e.g., a config file). `LoggerImplementation` does not expose those details; it simply forwards calls, preserving a clean separation between configuration and usage.  
 
@@ -67,7 +67,7 @@ Because the only explicit dependency is the relative import of `../logging/Logge
 ## Hierarchy Context
 
 ### Parent
-- [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts file.
+- [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/semantic-analysis/src/modules/logging-module.ts file.
 
 ---
 

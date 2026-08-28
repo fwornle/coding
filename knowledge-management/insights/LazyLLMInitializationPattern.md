@@ -2,15 +2,15 @@
 
 **Type:** SubComponent
 
-The deferred initialization solves a concrete boot-ordering problem: agents may be instantiated during application startup in integrations/mcp-server-semantic-analysis before environment variables (LLM provider credentials, endpoint URLs) are fully resolved
+The deferred initialization solves a concrete boot-ordering problem: agents may be instantiated during application startup in integrations/semantic-analysis before environment variables (LLM provider credentials, endpoint URLs) are fully resolved
 
 # LazyLLMInitializationPattern — Technical Insight Document
 
 ## What It Is
 
-The `LazyLLMInitializationPattern` is a structural convention implemented in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`, which serves as the authoritative source defining `ensureLLMInitialized()` as the single sanctioned entry point for LLM client acquisition across all concrete agent subclasses. Rather than instantiating LLM clients at object construction time, agents defer this work until the moment a method actually requires a live LLM connection.
+The `LazyLLMInitializationPattern` is a structural convention implemented in `integrations/semantic-analysis/src/agents/base-agent.ts`, which serves as the authoritative source defining `ensureLLMInitialized()` as the single sanctioned entry point for LLM client acquisition across all concrete agent subclasses. Rather than instantiating LLM clients at object construction time, agents defer this work until the moment a method actually requires a live LLM connection.
 
-As a child of the `CodingPatterns` component, this pattern represents one of several deliberate architectural constraints enforced across the `mcp-server-semantic-analysis` codebase. It sits alongside its sibling `DynamicImportGuardPattern`, which solves an analogous problem for optional external services like Memgraph by probing availability before importing client libraries — both patterns share the underlying philosophy of decoupling object construction from I/O-bound resource acquisition.
+As a child of the `CodingPatterns` component, this pattern represents one of several deliberate architectural constraints enforced across the `semantic-analysis` codebase. It sits alongside its sibling `DynamicImportGuardPattern`, which solves an analogous problem for optional external services like Memgraph by probing availability before importing client libraries — both patterns share the underlying philosophy of decoupling object construction from I/O-bound resource acquisition.
 
 The pattern decomposes into two child concerns: the `EnsureLLMInitializedGate` (the centralised gating logic in `base-agent.ts`) and the `MockInjectionSeam` (the implicit testability hook exposed by that same gate). Together these define both the runtime mechanics and the test-time affordances of the pattern.
 
@@ -18,7 +18,7 @@ The pattern decomposes into two child concerns: the `EnsureLLMInitializedGate` (
 
 ## Architecture and Design
 
-The architectural approach is a **two-phase construction pattern** combined with an **idempotent initialization guard**. Phase one — synchronous object graph construction — happens in agent constructors and is required to be free of LLM-related I/O. Phase two — resource acquisition — happens lazily at method-entry points via `ensureLLMInitialized()`. This split solves a concrete boot-ordering problem: agents in `integrations/mcp-server-semantic-analysis` may be instantiated during application startup before environment variables (LLM provider credentials, endpoint URLs) are fully resolved.
+The architectural approach is a **two-phase construction pattern** combined with an **idempotent initialization guard**. Phase one — synchronous object graph construction — happens in agent constructors and is required to be free of LLM-related I/O. Phase two — resource acquisition — happens lazily at method-entry points via `ensureLLMInitialized()`. This split solves a concrete boot-ordering problem: agents in `integrations/semantic-analysis` may be instantiated during application startup before environment variables (LLM provider credentials, endpoint URLs) are fully resolved.
 
 The design is enforced at the base-class level. Because all concrete agents extend `base-agent.ts`, the prohibition on constructor-level LLM instantiation is a **structural invariant** across the entire agent layer rather than a per-class convention that could drift. This top-down enforcement strategy mirrors how the `EnsureLLMInitializedGate` child component is described: no concrete subclass may bypass or duplicate the initialization logic, because the method is the sole sanctioned path to a live LLM client.
 
@@ -36,7 +36,7 @@ The `MockInjectionSeam` child entity describes the test-time exploitation of thi
 
 ## Integration Points
 
-The pattern integrates with the agent layer of `mcp-server-semantic-analysis` via inheritance: every concrete agent under `integrations/mcp-server-semantic-analysis/src/agents/` is bound by the contract defined in `base-agent.ts`. The connection is structural rather than registered — there is no plugin system or service locator; the integration is the class hierarchy itself.
+The pattern integrates with the agent layer of `semantic-analysis` via inheritance: every concrete agent under `integrations/semantic-analysis/src/agents/` is bound by the contract defined in `base-agent.ts`. The connection is structural rather than registered — there is no plugin system or service locator; the integration is the class hierarchy itself.
 
 Downstream, the pattern interfaces with whichever LLM client library is used inside `ensureLLMInitialized()`. Because all client construction is centralised in one method, swapping providers, adding retry logic, or layering observability around client acquisition becomes a single-file change. This integration shape echoes the `DynamicImportGuardPattern` sibling, which similarly centralises external-service probing for systems like Memgraph — both patterns funnel external-resource concerns through narrow, well-defined gates.
 
@@ -60,16 +60,16 @@ For testing, the integration point is the `MockInjectionSeam`: unit tests constr
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The lazy LLM initialization pattern enforced in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts` represents a deliberate architectural constraint: constructors across all agent classes are prohibited from instantiating LLM clients directly. Instead, a deferred `ensureLLMInitialized()` method is invoked at the beginning of any method that requires an active LLM connection. This two-phase construction approach solves a concrete problem in environments where LLM provider credentials, network availability, or configuration may not be ready at object construction time — for example, when agents are instantiated during application boot before environment variables are fully resolved.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The lazy LLM initialization pattern enforced in `integrations/semantic-analysis/src/agents/base-agent.ts` represents a deliberate architectural constraint: constructors across all agent classes are prohibited from instantiating LLM clients directly. Instead, a deferred `ensureLLMInitialized()` method is invoked at the beginning of any method that requires an active LLM connection. This two-phase construction approach solves a concrete problem in environments where LLM provider credentials, network availability, or configuration may not be ready at object construction time — for example, when agents are instantiated during application boot before environment variables are fully resolved.
 
-This pattern also has a secondary benefit for testability: unit tests can construct agent instances without triggering any outbound LLM calls or credential validation, and can inject mock clients by controlling when and how `ensureLLMInitialized()` resolves. A new developer working in this codebase should treat the base-agent convention as a hard rule — placing LLM client construction in a constructor is an anti-pattern that would break offline startup, degrade test isolation, and violate the separation between object graph initialization and I/O-bound resource acquisition. The pattern propagates to all concrete agents that extend `base-agent.ts`, making it a structural invariant across the entire agent layer of `mcp-server-semantic-analysis`.
+This pattern also has a secondary benefit for testability: unit tests can construct agent instances without triggering any outbound LLM calls or credential validation, and can inject mock clients by controlling when and how `ensureLLMInitialized()` resolves. A new developer working in this codebase should treat the base-agent convention as a hard rule — placing LLM client construction in a constructor is an anti-pattern that would break offline startup, degrade test isolation, and violate the separation between object graph initialization and I/O-bound resource acquisition. The pattern propagates to all concrete agents that extend `base-agent.ts`, making it a structural invariant across the entire agent layer of `semantic-analysis`.
 
 ### Children
-- [EnsureLLMInitializedGate](./EnsureLLMInitializedGate.md) -- `base-agent.ts` in `integrations/mcp-server-semantic-analysis/src/agents/` centralises LLM client acquisition in `ensureLLMInitialized()`, meaning no concrete subclass may bypass or duplicate this logic — the method is the sole sanctioned path to a live LLM client.
+- [EnsureLLMInitializedGate](./EnsureLLMInitializedGate.md) -- `base-agent.ts` in `integrations/semantic-analysis/src/agents/` centralises LLM client acquisition in `ensureLLMInitialized()`, meaning no concrete subclass may bypass or duplicate this logic — the method is the sole sanctioned path to a live LLM client.
 - [MockInjectionSeam](./MockInjectionSeam.md) -- The lazy gate in `base-agent.ts` acts as an implicit injection point: a test that pre-populates the internal LLM client field before calling `ensureLLMInitialized()` will cause the guard to skip real initialisation, giving tests full control over the client without environment credentials.
 
 ### Siblings
-- [DynamicImportGuardPattern](./DynamicImportGuardPattern.md) -- The pattern appears in integrations/mcp-server-semantic-analysis where optional external services (e.g., Memgraph, external analysis servers) may or may not be running, requiring a probe before importing or invoking their client libraries
+- [DynamicImportGuardPattern](./DynamicImportGuardPattern.md) -- The pattern appears in integrations/semantic-analysis where optional external services (e.g., Memgraph, external analysis servers) may or may not be running, requiring a probe before importing or invoking their client libraries
 
 
 ---

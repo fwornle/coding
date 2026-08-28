@@ -18,8 +18,8 @@ Each integration component:
 
 ### MCP Servers
 
-#### MCP Semantic Analysis Server
-**Location**: `integrations/mcp-server-semantic-analysis/`
+#### Semantic Analysis Server
+**Location**: `integrations/semantic-analysis/`
 
 **What it provides:**
 - 14 specialized AI agents for code analysis (including code graph and ontology classification)
@@ -30,10 +30,10 @@ Each integration component:
 - Knowledge base synchronization
 - Comprehensive semantic analysis workflows
 
-**Documentation**: [mcp-semantic-analysis.md](mcp-semantic-analysis.md) | [Full README](https://github.com/fwornle/mcp-server-semantic-analysis/blob/main/README.md)
+**Documentation**: [semantic-analysis.md](semantic-analysis.md) | [Full README](https://github.com/fwornle/semantic-analysis/blob/main/README.md)
 
-#### MCP Constraint Monitor
-**Location**: `integrations/mcp-constraint-monitor/`
+#### Constraint Monitor
+**Location**: `integrations/constraint-monitor/`
 
 **What it provides:**
 - Real-time constraint enforcement via PreToolUse hooks
@@ -42,7 +42,7 @@ Each integration component:
 - Compliance scoring and violation tracking
 - Interactive and automated testing frameworks
 
-**Documentation**: [mcp-constraint-monitor.md](mcp-constraint-monitor.md) | [Full README](https://github.com/fwornle/mcp-constraint-monitor/blob/main/README.md)
+**Documentation**: [constraint-monitor.md](constraint-monitor.md) | [Full README](https://github.com/fwornle/constraint-monitor/blob/main/README.md)
 
 ### Code Analysis
 
@@ -85,12 +85,12 @@ The core systems communicate with integrations through different protocols:
 
 **LSL System**:
 - Uses fast LLM providers (Groq/OpenAI) for Layer 4 semantic classification
-- Does NOT use the 14-agent MCP Semantic Analysis server (that's for deep analysis)
+- Does NOT use the 14-agent Semantic Analysis server (that's for deep analysis)
 - Classification happens in milliseconds with budget-conscious models
 
 **Constraint Monitoring**:
 - Uses PreToolUse hooks to intercept tool calls before execution
-- MCP Constraint Monitor provides dashboard and API (ports 3030/3031)
+- Constraint Monitor provides dashboard and API (ports 3030/3031)
 
 ### Communication Protocols
 
@@ -128,8 +128,8 @@ cd ~/Agentic/coding
 ./install.sh
 
 # This installs:
-# ✓ MCP Semantic Analysis Server
-# ✓ MCP Constraint Monitor
+# ✓ Semantic Analysis Server
+# ✓ Constraint Monitor
 # ✓ VSCode CoPilot Extension (optional)
 ```
 
@@ -156,11 +156,11 @@ MCP servers are configured in Claude Code's config:
   "mcpServers": {
     "semantic-analysis": {
       "command": "node",
-      "args": ["/path/to/coding/integrations/mcp-server-semantic-analysis/build/index.js"]
+      "args": ["/path/to/coding/integrations/semantic-analysis/build/index.js"]
     },
     "constraint-monitor": {
       "command": "node",
-      "args": ["/path/to/coding/integrations/mcp-constraint-monitor/src/mcp-server.js"]
+      "args": ["/path/to/coding/integrations/constraint-monitor/src/mcp-server.js"]
     },
     "graphify": {
       "type": "http",
@@ -230,7 +230,7 @@ ls ~/.claude/logs/mcp*.log
 tail ~/.claude/logs/mcp-semantic-analysis.log
 
 # Test server directly
-node integrations/mcp-server-semantic-analysis/build/index.js
+node integrations/semantic-analysis/build/index.js
 ```
 
 ### Integration Not Working

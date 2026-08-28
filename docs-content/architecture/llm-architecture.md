@@ -44,7 +44,7 @@ The [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unifi
 
 The unified layer serves three primary consumers:
 
-1. **SemanticAnalyzer** (`integrations/mcp-server-semantic-analysis/`)
+1. **SemanticAnalyzer** (`integrations/semantic-analysis/`)
    - Batch analysis workflows
    - Git history analysis
    - Ontology classification
@@ -53,7 +53,7 @@ The unified layer serves three primary consumers:
    - General-purpose LLM inference
    - Multi-provider support
 
-3. **SemanticValidator** (`integrations/mcp-constraint-monitor/`)
+3. **SemanticValidator** (`integrations/constraint-monitor/`)
    - Constraint violation detection
    - Semantic code analysis
 

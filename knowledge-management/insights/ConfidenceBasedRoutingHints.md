@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-As described in the Insights sub-component contract and documented under `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, `generateRouting()` returns hints rather than hard directives, allowing downstream orchestration to aggregate multiple signals before committing a pattern to the report authoring stage.
+As described in the Insights sub-component contract and documented under `integrations/semantic-analysis/docs/architecture/agents.md`, `generateRouting()` returns hints rather than hard directives, allowing downstream orchestration to aggregate multiple signals before committing a pattern to the report authoring stage.
 
 ## What It Is  
 
 **ConfidenceBasedRoutingHints** is the routing‑signal mechanism used by Insight agents to steer the flow of extracted patterns through the **SemanticAnalysis** pipeline. The contract for this mechanism lives in the documentation under  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
+integrations/semantic-analysis/docs/architecture/agents.md
 ```  
 
 where the `generateRouting()` method of each `BaseAgent<TInput,TOutput>` is described. Rather than issuing a hard decision, `generateRouting()` produces a **hint** that encodes the confidence level of the agent’s output. High‑confidence hints direct the pattern straight to the **knowledge‑report authoring** stage, while low‑confidence hints feed the pattern back into the SemanticAnalysis pipeline for another pass. The hints therefore act as a lightweight, declarative signal that downstream consumers interpret to decide the next processing step.
@@ -101,7 +101,7 @@ The clear separation between extraction and flow control, combined with the gene
 - [Insights](./Insights.md) -- Insight agents implement BaseAgent<TInput, TOutput> with generateRouting() hints that direct high-confidence patterns to the knowledge report authoring stage and low-confidence ones back for re-analysis
 
 ### Siblings
-- [BaseAgentGenericContract](./BaseAgentGenericContract.md) -- Referenced explicitly in the Insights sub-component description and elaborated in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, `BaseAgent<TInput, TOutput>` uses TypeScript generics to enforce distinct data shapes at ingestion (`TInput`) and emission (`TOutput`) without coupling individual agents to a common payload schema.
+- [BaseAgentGenericContract](./BaseAgentGenericContract.md) -- Referenced explicitly in the Insights sub-component description and elaborated in `integrations/semantic-analysis/docs/architecture/agents.md`, `BaseAgent<TInput, TOutput>` uses TypeScript generics to enforce distinct data shapes at ingestion (`TInput`) and emission (`TOutput`) without coupling individual agents to a common payload schema.
 
 
 ---

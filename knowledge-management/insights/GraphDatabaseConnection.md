@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The presence of integrations/mcp-constraint-monitor/docs/constraint-configuration.md implies that the GraphDatabaseAdapter may be involved in constraint configuration, which could affect how data is stored and queried in the graph database.
+The presence of integrations/constraint-monitor/docs/constraint-configuration.md implies that the GraphDatabaseAdapter may be involved in constraint configuration, which could affect how data is stored and queried in the graph database.
 
 ## What It Is  
 
-`GraphDatabaseConnection` is the low‑level connectivity layer that lives inside the **GraphDatabaseAdapter** component.  It is referenced throughout the project documentation (e.g., the `MEMGRAPH_BATCH_SIZE` constant and the `CODE_GRAPH_RAG_PORT` setting) and is the concrete implementation that opens, configures, and maintains the session with the underlying Memgraph (or compatible) graph database.  The only concrete file path that directly mentions a related concern is **`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`**, which describes how constraints are declared and applied – a process that ultimately relies on the connection to push those definitions into the database.  In short, `GraphDatabaseConnection` is the bridge between the higher‑level **GraphDatabaseAdapter** (which models entities, relationships, and constraints) and the external graph store, handling connection parameters, batching semantics, and any special ports used for downstream services such as the Code‑Graph RAG system.
+`GraphDatabaseConnection` is the low‑level connectivity layer that lives inside the **GraphDatabaseAdapter** component.  It is referenced throughout the project documentation (e.g., the `MEMGRAPH_BATCH_SIZE` constant and the `CODE_GRAPH_RAG_PORT` setting) and is the concrete implementation that opens, configures, and maintains the session with the underlying Memgraph (or compatible) graph database.  The only concrete file path that directly mentions a related concern is **`integrations/constraint-monitor/docs/constraint-configuration.md`**, which describes how constraints are declared and applied – a process that ultimately relies on the connection to push those definitions into the database.  In short, `GraphDatabaseConnection` is the bridge between the higher‑level **GraphDatabaseAdapter** (which models entities, relationships, and constraints) and the external graph store, handling connection parameters, batching semantics, and any special ports used for downstream services such as the Code‑Graph RAG system.
 
 ## Architecture and Design  
 
@@ -20,7 +20,7 @@ Although no concrete symbols were discovered in the source snapshot, the documen
 
 1. **`MEMGRAPH_BATCH_SIZE`** – defined in the project’s configuration files, this integer controls the maximum number of write statements that `GraphDatabaseConnection` will accumulate before issuing a bulk transaction.  The connection likely maintains an internal buffer (e.g., a list of Cypher statements) and triggers a commit when the buffer length reaches this threshold or when a flush is explicitly requested.
 
-2. **Constraint handling** – the file **`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`** outlines the schema for constraints (uniqueness, existence, etc.).  `GraphDatabaseConnection` must translate those declarative specifications into Cypher `CREATE CONSTRAINT` commands, executing them during initialization or on‑demand.  This suggests the presence of a helper routine such as `apply_constraints(constraint_spec)` that iterates over the parsed markdown or JSON representation and runs the appropriate DDL statements.
+2. **Constraint handling** – the file **`integrations/constraint-monitor/docs/constraint-configuration.md`** outlines the schema for constraints (uniqueness, existence, etc.).  `GraphDatabaseConnection` must translate those declarative specifications into Cypher `CREATE CONSTRAINT` commands, executing them during initialization or on‑demand.  This suggests the presence of a helper routine such as `apply_constraints(constraint_spec)` that iterates over the parsed markdown or JSON representation and runs the appropriate DDL statements.
 
 3. **`CODE_GRAPH_RAG_PORT`** – this setting exposes a network endpoint that other services (the Code‑Graph RAG pipeline) can reach to request graph snapshots or incremental updates.  The connection likely runs a lightweight server (e.g., using `aiohttp` or a similar async framework) that listens on the configured port, marshals incoming requests into Cypher queries via the shared `GraphDatabaseConnection`, and streams results back in a format consumable by the RAG component.
 
@@ -42,7 +42,7 @@ Together, these mechanisms give `GraphDatabaseConnection` the ability to **batch
 
 1. **Respect the batch size** – When performing bulk inserts or updates, developers should align their operation granularity with `MEMGRAPH_BATCH_SIZE`.  Sub‑batching smaller than the configured size can lead to unnecessary round‑trips, while exceeding it without explicit flushing may cause memory pressure.  The recommended pattern is to accumulate statements until the threshold is met, then call the connection’s `flush()` method (or its equivalent).
 
-2. **Define constraints centrally** – All graph constraints must be authored in the format described by `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  After adding or modifying a constraint, invoke the connection’s constraint‑application routine (often exposed as `apply_constraints()`) before loading data, ensuring that the database schema remains consistent.
+2. **Define constraints centrally** – All graph constraints must be authored in the format described by `integrations/constraint-monitor/docs/constraint-configuration.md`.  After adding or modifying a constraint, invoke the connection’s constraint‑application routine (often exposed as `apply_constraints()`) before loading data, ensuring that the database schema remains consistent.
 
 3. **Do not embed RAG logic** – The `CODE_GRAPH_RAG_PORT` is intended solely for external services.  Internal code should avoid making direct HTTP or socket calls to this port; instead, expose higher‑level APIs on the adapter if the application itself needs RAG‑related data.
 

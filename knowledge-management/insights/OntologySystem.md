@@ -55,7 +55,7 @@ The component does not expose any public functions beyond the classes listed; de
 
 ## Integration Points  
 
-* **Parent – LiveLoggingSystem** – LiveLoggingSystem embeds OntologySystem and leverages it through the **OntologyClassificationAgent** (found at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`). The agent consumes the validated ontology model to map live observations to ontology concepts, making OntologySystem the knowledge base for classification.  
+* **Parent – LiveLoggingSystem** – LiveLoggingSystem embeds OntologySystem and leverages it through the **OntologyClassificationAgent** (found at `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`). The agent consumes the validated ontology model to map live observations to ontology concepts, making OntologySystem the knowledge base for classification.  
 * **Sibling Components** –  
   * **TranscriptProcessor** uses its own `TranscriptNormalizer` but may later feed normalized transcripts to the ClassificationEngine, which in turn calls the OntologyClassificationAgent. Thus, OntologySystem indirectly supports transcript‑driven classification.  
   * **ClassificationEngine** directly depends on the OntologyClassificationAgent, meaning any change in OntologySystem’s API could affect the engine’s classification pipeline.  
@@ -105,7 +105,7 @@ The component’s high cohesion and low coupling make it **highly maintainable**
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This agent plays a crucial role in the system's architecture, enabling the classification of observations based on predefined ontologies. The classification process involves the agent analyzing the observations and mapping them to specific concepts within the ontology system. This mapping is essential for providing a structured representation of the observations, facilitating their storage, retrieval, and analysis. The OntologyClassificationAgent's functionality is critical to the overall operation of the LiveLoggingSystem, as it enables the system to organize and make sense of the vast amounts of data generated during live sessions.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This agent plays a crucial role in the system's architecture, enabling the classification of observations based on predefined ontologies. The classification process involves the agent analyzing the observations and mapping them to specific concepts within the ontology system. This mapping is essential for providing a structured representation of the observations, facilitating their storage, retrieval, and analysis. The OntologyClassificationAgent's functionality is critical to the overall operation of the LiveLoggingSystem, as it enables the system to organize and make sense of the vast amounts of data generated during live sessions.
 
 ### Siblings
 - [TranscriptProcessor](./TranscriptProcessor.md) -- TranscriptProcessor uses the TranscriptNormalizer class in transcript-processor.ts to normalize transcript formats

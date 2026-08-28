@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-ObservationDerivation could involve the use of semantic constraint detection, as seen in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
+ObservationDerivation could involve the use of semantic constraint detection, as seen in integrations/constraint-monitor/docs/semantic-constraint-detection.md
 
 ## What It Is  
 
-**ObservationDerivation** is a *SubComponent* that lives inside the **KnowledgeManagement** component.  The code that drives its core behavior is not yet exposed as concrete symbols, but the surrounding documentation makes clear where the implementation lives and how it is expected to operate.  The sub‑component is described in the project’s integration material – most notably the **Code Graph RAG** description at `integrations/code-graph-rag/README.md` and the **MCP Constraint Monitor** material at `integrations/mcp-constraint-monitor/README.md`.  In practice, ObservationDerivation is the engine that takes raw signals (e.g., code‑level graphs, manually created entities, or ontology‑derived typings) and produces *derived observations* that are later persisted by the **EntityPersistence** sub‑component.
+**ObservationDerivation** is a *SubComponent* that lives inside the **KnowledgeManagement** component.  The code that drives its core behavior is not yet exposed as concrete symbols, but the surrounding documentation makes clear where the implementation lives and how it is expected to operate.  The sub‑component is described in the project’s integration material – most notably the **Code Graph RAG** description at `integrations/code-graph-rag/README.md` and the **MCP Constraint Monitor** material at `integrations/constraint-monitor/README.md`.  In practice, ObservationDerivation is the engine that takes raw signals (e.g., code‑level graphs, manually created entities, or ontology‑derived typings) and produces *derived observations* that are later persisted by the **EntityPersistence** sub‑component.
 
 The component sits alongside a set of peers – **ManualLearning**, **OnlineLearning**, **EntityPersistence**, **OntologyClassification**, **UKBTraceReporting**, **BrowserAccess**, and **CodeGraphRAG** – all of which share the same high‑level goal of turning heterogeneous knowledge sources into structured, queryable artifacts.  Its child, **GraphCodeRagIntegration**, implements the graph‑based retrieval‑augmented generation (RAG) logic that ObservationDerivation can call into when a code‑graph perspective is required.
 
@@ -14,7 +14,7 @@ The component sits alongside a set of peers – **ManualLearning**, **OnlineLear
 
 The architecture that emerges from the observations is **co‑operating sub‑components organized around a shared concurrency primitive**.  The parent **KnowledgeManagement** component already employs a *lazy LLM initialization* pattern (see `ensureLLMInitialized()`) and a *work‑stealing concurrency* model that is driven by a **shared atomic index counter** in `wave-controller.ts` (line 489, `runWithConcurrency()`).  ObservationDerivation re‑uses this same concurrency scaffold, allowing multiple derivation tasks (e.g., processing a batch of manual entities, running a semantic constraint check, or invoking the Code Graph RAG pipeline) to be scheduled on a pool of worker “waves”.  The atomic counter guarantees that each worker atomically claims the next unit of work, minimizing idle time and avoiding contention.
 
-Design‑wise, ObservationDerivation follows a **pipeline‑oriented composition**: input entities are first typed using the *entity typing system* that can draw from *multiple ontology sources* (as hinted in the project documentation).  The typed entities then flow through optional enrichment stages – for example, the **MCP Constraint Monitor** (`integrations/mcp-constraint-monitor/README.md`) can apply *semantic constraint detection* (`integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`) to flag inconsistencies.  When a code‑centric view is needed, the pipeline delegates to its child **GraphCodeRagIntegration**, which implements the graph‑based RAG approach described in `integrations/code-graph-rag/README.md`.  Finally, the resulting observations are handed off to **EntityPersistence** for durable storage.
+Design‑wise, ObservationDerivation follows a **pipeline‑oriented composition**: input entities are first typed using the *entity typing system* that can draw from *multiple ontology sources* (as hinted in the project documentation).  The typed entities then flow through optional enrichment stages – for example, the **MCP Constraint Monitor** (`integrations/constraint-monitor/README.md`) can apply *semantic constraint detection* (`integrations/constraint-monitor/docs/semantic-constraint-detection.md`) to flag inconsistencies.  When a code‑centric view is needed, the pipeline delegates to its child **GraphCodeRagIntegration**, which implements the graph‑based RAG approach described in `integrations/code-graph-rag/README.md`.  Finally, the resulting observations are handed off to **EntityPersistence** for durable storage.
 
 Because the component does not own its own LLM instances, it relies on the parent’s lazy‑loading mechanism, keeping memory footprints low.  The overall pattern is therefore a **shared‑resource, concurrency‑driven pipeline** that stitches together existing sub‑systems rather than introducing a monolithic new service.
 
@@ -68,7 +68,7 @@ processDerivationTask(workIndex);
 | **Pipeline Composition** | ObservationDerivation chains entity typing → constraint monitoring → optional GraphCodeRAG → persistence. |
 | **Lazy Initialization (Resource Guard)** | Parent KnowledgeManagement’s `ensureLLMInitialized()` defers LLM loading until needed. |
 | **Facade/Adapter for Sub‑Component Integration** | Child **GraphCodeRagIntegration** acts as a façade for the graph‑based RAG logic. |
-| **Rule‑Engine for Semantic Constraints** | `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` describes constraint detection applied to derived observations. |
+| **Rule‑Engine for Semantic Constraints** | `integrations/constraint-monitor/docs/semantic-constraint-detection.md` describes constraint detection applied to derived observations. |
 
 ## Design Decisions and Trade‑offs  
 
@@ -113,8 +113,8 @@ Overall, ObservationDerivation exhibits a **well‑structured, pipeline‑centri
 - [ManualLearning](./ManualLearning.md) -- ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
 - [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 

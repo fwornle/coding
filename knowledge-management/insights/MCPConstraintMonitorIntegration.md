@@ -2,17 +2,17 @@
 
 **Type:** SubComponent
 
-integrations/mcp-constraint-monitor/dashboard/README.md indicates the integration also surfaces violation data to a dashboard layer, implying a persistent violation history store is managed through this integration
+integrations/constraint-monitor/dashboard/README.md indicates the integration also surfaces violation data to a dashboard layer, implying a persistent violation history store is managed through this integration
 
 # MCPConstraintMonitorIntegration
 
 ## What It Is
 
-MCPConstraintMonitorIntegration is implemented as a dedicated integration package located at `integrations/mcp-constraint-monitor/`, documented in `integrations/mcp-constraint-monitor/README.md`. It wraps the constraint monitoring functionality as an MCP-compatible (Model Context Protocol) server component, exposing it to the broader Claude Code ecosystem through a standardized protocol surface.
+MCPConstraintMonitorIntegration is implemented as a dedicated integration package located at `integrations/constraint-monitor/`, documented in `integrations/constraint-monitor/README.md`. It wraps the constraint monitoring functionality as an MCP-compatible (Model Context Protocol) server component, exposing it to the broader Claude Code ecosystem through a standardized protocol surface.
 
 As a SubComponent of the `ConstraintSystem`, this integration serves as the protocol translation and persistence layer that sits between raw Claude Code hooks and the visualization dashboard. Where its parent `ConstraintSystem` provides the overall constraint monitoring and enforcement capability — validating code actions and file operations against configured rules during Claude Code sessions — this integration is specifically responsible for making those capabilities accessible via MCP and for surfacing violation data to downstream consumers.
 
-The integration also incorporates a dashboard layer, evidenced by `integrations/mcp-constraint-monitor/dashboard/README.md`, which implies that a persistent violation history store is managed through this integration. This makes MCPConstraintMonitorIntegration the bridge between live session activity (received via hooks) and persistent violation history storage (rendered through the dashboard).
+The integration also incorporates a dashboard layer, evidenced by `integrations/constraint-monitor/dashboard/README.md`, which implies that a persistent violation history store is managed through this integration. This makes MCPConstraintMonitorIntegration the bridge between live session activity (received via hooks) and persistent violation history storage (rendered through the dashboard).
 
 ## Architecture and Design
 
@@ -20,13 +20,13 @@ The architectural approach evident from the observations is a **layered adapter 
 
 ![MCPConstraintMonitorIntegration — Architecture](images/mcpconstraint-monitor-integration-architecture.png)
 
-The integration decomposes into two child components that handle distinct architectural concerns. `ClaudeCodeHookReceiver`, documented at `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, defines a well-formed ingestion interface accepting structured payloads from Claude Code's pre-tool and post-tool events. `SemanticConstraintDetection`, documented at `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md`, encapsulates the more sophisticated semantic-level detection subsystem — the existence of a dedicated design document signals this is a non-trivial subsystem with its own architectural rationale, distinct from straightforward pattern-based rule matching.
+The integration decomposes into two child components that handle distinct architectural concerns. `ClaudeCodeHookReceiver`, documented at `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, defines a well-formed ingestion interface accepting structured payloads from Claude Code's pre-tool and post-tool events. `SemanticConstraintDetection`, documented at `integrations/constraint-monitor/docs/semantic-detection-design.md`, encapsulates the more sophisticated semantic-level detection subsystem — the existence of a dedicated design document signals this is a non-trivial subsystem with its own architectural rationale, distinct from straightforward pattern-based rule matching.
 
 The design separation between siblings is also instructive: while `HookInterceptor` (per `CLAUDE-CODE-HOOK-FORMAT.md`) governs the wire format and interception mechanism, and `ConstraintRuleEngine` (per `constraint-configuration.md`) governs rule definitions, scopes, and enforcement modes, the MCPConstraintMonitorIntegration brings these together under an MCP-compatible server boundary. This composition allows each concern to evolve independently while presenting a unified MCP surface to clients.
 
 ## Implementation Details
 
-The integration is packaged under `integrations/mcp-constraint-monitor/` with a clear internal layout. The top-level `README.md` describes the MCP server wrapping, the `dashboard/` subdirectory contains the dashboard layer for visualizing violation data, and the `docs/` subdirectory houses formal specifications including `CLAUDE-CODE-HOOK-FORMAT.md`, `constraint-configuration.md`, and `semantic-detection-design.md`.
+The integration is packaged under `integrations/constraint-monitor/` with a clear internal layout. The top-level `README.md` describes the MCP server wrapping, the `dashboard/` subdirectory contains the dashboard layer for visualizing violation data, and the `docs/` subdirectory houses formal specifications including `CLAUDE-CODE-HOOK-FORMAT.md`, `constraint-configuration.md`, and `semantic-detection-design.md`.
 
 `ClaudeCodeHookReceiver` implements ingestion against the payload structure formalized in `CLAUDE-CODE-HOOK-FORMAT.md`. This document defines the exact wire format for pre-tool and post-tool events emitted by Claude Code, meaning the receiver is bound to a stable contract and can validate or reject malformed payloads against that schema. Because the format is dedicated to a single document, the implementation can rely on a single source of truth when parsing incoming events.
 
@@ -46,7 +46,7 @@ Downstream, the integration exposes two interfaces. First, it presents an MCP-co
 
 ## Usage Guidelines
 
-When extending or maintaining this integration, treat the documents in `integrations/mcp-constraint-monitor/docs/` as authoritative contracts. Any changes to inbound hook handling must remain consistent with `CLAUDE-CODE-HOOK-FORMAT.md`, since Claude Code itself produces payloads against that schema — diverging from this format risks dropping or misinterpreting events from upstream `HookInterceptor`.
+When extending or maintaining this integration, treat the documents in `integrations/constraint-monitor/docs/` as authoritative contracts. Any changes to inbound hook handling must remain consistent with `CLAUDE-CODE-HOOK-FORMAT.md`, since Claude Code itself produces payloads against that schema — diverging from this format risks dropping or misinterpreting events from upstream `HookInterceptor`.
 
 Rule configuration changes should be coordinated with `constraint-configuration.md`, which is the schema reference for the sibling `ConstraintRuleEngine`. Because MCPConstraintMonitorIntegration evaluates ingested events against rules defined under this schema, changes to rule types, scopes, or enforcement modes need to propagate consistently across the integration's evaluation paths.
 
@@ -60,15 +60,15 @@ Finally, when adding new MCP-exposed capabilities, ensure they are surfaced thro
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions. It operates primarily through a hook-based architecture where hooks intercept agent tool calls (pre-tool, post-tool events) and evaluate them against constraint rules, capturing any violations for persistence and dashboard display. The system integrates with the MCP (Model Context Protocol) infrastructure via the mcp-constraint-monitor integration, and bridges live session activity with persistent violation history storage.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions. It operates primarily through a hook-based architecture where hooks intercept agent tool calls (pre-tool, post-tool events) and evaluate them against constraint rules, capturing any violations for persistence and dashboard display. The system integrates with the MCP (Model Context Protocol) infrastructure via the constraint-monitor integration, and bridges live session activity with persistent violation history storage.
 
 ### Children
-- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- integrations/mcp-constraint-monitor/docs/semantic-detection-design.md ('Semantic Constraint Detection - Design Document') describes the architectural design decisions behind semantic-level detection, suggesting this is a non-trivial subsystem with its own design rationale
-- [ClaudeCodeHookReceiver](./ClaudeCodeHookReceiver.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format') is a dedicated document describing the exact payload structure expected from Claude Code hooks, indicating a well-defined ingestion interface
+- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- integrations/constraint-monitor/docs/semantic-detection-design.md ('Semantic Constraint Detection - Design Document') describes the architectural design decisions behind semantic-level detection, suggesting this is a non-trivial subsystem with its own design rationale
+- [ClaudeCodeHookReceiver](./ClaudeCodeHookReceiver.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format') is a dedicated document describing the exact payload structure expected from Claude Code hooks, indicating a well-defined ingestion interface
 
 ### Siblings
-- [HookInterceptor](./HookInterceptor.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md defines the wire format for hook payloads exchanged between Claude Code and the constraint monitor, covering pre-tool and post-tool event structures
-- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/mcp-constraint-monitor/docs/constraint-configuration.md provides the full configuration schema for defining constraint rules, including rule types, scopes, and enforcement modes
+- [HookInterceptor](./HookInterceptor.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md defines the wire format for hook payloads exchanged between Claude Code and the constraint monitor, covering pre-tool and post-tool event structures
+- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/constraint-monitor/docs/constraint-configuration.md provides the full configuration schema for defining constraint rules, including rule types, scopes, and enforcement modes
 
 
 ---

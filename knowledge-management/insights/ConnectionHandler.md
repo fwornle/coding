@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The ConnectionHandler might be configured using environment variables or configurations similar to those described in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
+The ConnectionHandler might be configured using environment variables or configurations similar to those described in integrations/constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
@@ -16,7 +16,7 @@ Within the ConnectionHandler hierarchy, the **ConnectionEstablisher** child comp
 
 The architecture that emerges from the observations is a **adapter‑centric, layered connectivity model**.  At the top level, Trajectory delegates connection concerns to ConnectionHandler, which in turn delegates the concrete transport details to the **SpecstoryAdapter** (`lib/integrations/specstory-adapter.js`).  This mirrors the classic **Adapter pattern**: ConnectionHandler defines a stable interface for the rest of Trajectory, while the underlying adapter knows how to speak HTTP, IPC, or file‑watch protocols.
 
-A second, implicit pattern is the **Facade** provided by ConnectionHandler.  It aggregates several integration concerns – Copi hook handling (`integrations/copi/docs/hooks.md`), browser access (`integrations/browser-access/README.md`), and constraint configuration (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) – behind a single, cohesive API.  By doing so, it shields Trajectory and its siblings from the heterogeneity of those integrations.
+A second, implicit pattern is the **Facade** provided by ConnectionHandler.  It aggregates several integration concerns – Copi hook handling (`integrations/copi/docs/hooks.md`), browser access (`integrations/browser-access/README.md`), and constraint configuration (`integrations/constraint-monitor/docs/constraint-configuration.md`) – behind a single, cohesive API.  By doing so, it shields Trajectory and its siblings from the heterogeneity of those integrations.
 
 Interaction flow is straightforward:  
 1. Trajectory invokes ConnectionHandler to request a connection.  
@@ -25,7 +25,7 @@ Interaction flow is straightforward:
 4. Once a channel is alive, ConnectionHandler may store connection metadata using the storage approach outlined in `integrations/code‑graph‑rag/README.md`.  
 5. Other components (LoggingManager, DataAdapter) consume the established channel via the public ConnectionHandler API.
 
-Because the design relies on well‑documented integration readmes, the system remains **declarative** about configuration – environment variables and constraint files (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) drive runtime behavior rather than hard‑coded values.
+Because the design relies on well‑documented integration readmes, the system remains **declarative** about configuration – environment variables and constraint files (`integrations/constraint-monitor/docs/constraint-configuration.md`) drive runtime behavior rather than hard‑coded values.
 
 ---
 
@@ -33,13 +33,13 @@ Because the design relies on well‑documented integration readmes, the system r
 
 * **File locations** – The core transport logic lives in `lib/integrations/specstory-adapter.js`.  That file defines methods such as `connectViaHTTP`, `connectViaIPC`, and `watchFileForSocket`, each trying a distinct connection strategy.  ConnectionHandler does not duplicate these methods; instead, it composes the adapter and invokes the appropriate entry point based on runtime conditions.
 
-* **ConnectionEstablisher** – As a child of ConnectionHandler, this class encapsulates the step‑by‑step protocol described in `integrations/copi/README.md`.  It likely reads the Copi hook definitions from `integrations/copi/docs/hooks.md` to know which callbacks to register once a connection is live.  The establisher also interprets constraint settings from `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, ensuring that connections respect any resource limits or security policies.
+* **ConnectionEstablisher** – As a child of ConnectionHandler, this class encapsulates the step‑by‑step protocol described in `integrations/copi/README.md`.  It likely reads the Copi hook definitions from `integrations/copi/docs/hooks.md` to know which callbacks to register once a connection is live.  The establisher also interprets constraint settings from `integrations/constraint-monitor/docs/constraint-configuration.md`, ensuring that connections respect any resource limits or security policies.
 
 * **Metadata storage** – When a connection is successfully opened, ConnectionHandler may persist connection descriptors (e.g., socket paths, port numbers, timestamps) using the data‑store conventions from `integrations/code‑graph‑rag/README.md`.  This storage enables later retrieval for diagnostics or reconnection logic.
 
 * **Browser access** – If the connection target is a browser‑based service, ConnectionHandler can fall back to the helper described in `integrations/browser-access/README.md`.  That helper abstracts away Chrome DevTools Protocol (CDP) or WebSocket details, allowing ConnectionHandler to treat a browser session as just another transport endpoint.
 
-* **Dashboard exposure** – The integration described in `integrations/mcp-constraint-monitor/dashboard/README.md` suggests that ConnectionHandler may expose health or status endpoints that feed into a monitoring dashboard.  This would be achieved by publishing connection state (alive, retrying, failed) to the dashboard API.
+* **Dashboard exposure** – The integration described in `integrations/constraint-monitor/dashboard/README.md` suggests that ConnectionHandler may expose health or status endpoints that feed into a monitoring dashboard.  This would be achieved by publishing connection state (alive, retrying, failed) to the dashboard API.
 
 Overall, the implementation follows a **composition‑over‑inheritance** stance: ConnectionHandler assembles reusable adapters and helpers rather than embedding all logic directly.
 
@@ -53,11 +53,11 @@ Overall, the implementation follows a **composition‑over‑inheritance** stanc
 
 3. **Browser Access (`integrations/browser-access/README.md`)** – Optional module used when the external service is a browser instance; ConnectionHandler delegates to this module for CDP or WebSocket handling.  
 
-4. **Constraint Configuration (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`)** – Supplies environment‑variable‑driven limits (e.g., max concurrent connections) that ConnectionHandler validates before establishing a new link.  
+4. **Constraint Configuration (`integrations/constraint-monitor/docs/constraint-configuration.md`)** – Supplies environment‑variable‑driven limits (e.g., max concurrent connections) that ConnectionHandler validates before establishing a new link.  
 
 5. **Metadata Store (`integrations/code-graph-rag/README.md`)** – Used to persist connection metadata, supporting reconnection and audit trails.  
 
-6. **Monitoring Dashboard (`integrations/mcp-constraint-monitor/dashboard/README.md`)** – Receives status updates from ConnectionHandler, allowing operators to view connection health in real time.  
+6. **Monitoring Dashboard (`integrations/constraint-monitor/dashboard/README.md`)** – Receives status updates from ConnectionHandler, allowing operators to view connection health in real time.  
 
 7. **Sibling Components** – **LoggingManager** and **DataAdapter** both rely on the same Copi integration readme, meaning they share configuration conventions and may read connection state from the same metadata store.  This creates a cohesive ecosystem where each sibling consumes the same connection channel established by ConnectionHandler.
 
@@ -67,13 +67,13 @@ Overall, the implementation follows a **composition‑over‑inheritance** stanc
 
 * **Prefer the high‑level API** – Call ConnectionHandler’s public methods (e.g., `establish()`, `close()`) rather than invoking SpecstoryAdapter directly.  This ensures that all ancillary steps—hook registration, constraint checks, and metadata persistence—are executed.  
 
-* **Configure via environment variables** – Follow the conventions in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  Typical variables include `MAX_CONNECTIONS`, `SPECSTORY_HTTP_PORTS`, and `IPC_SOCKET_PATH`.  Changing these values does not require code changes.  
+* **Configure via environment variables** – Follow the conventions in `integrations/constraint-monitor/docs/constraint-configuration.md`.  Typical variables include `MAX_CONNECTIONS`, `SPECSTORY_HTTP_PORTS`, and `IPC_SOCKET_PATH`.  Changing these values does not require code changes.  
 
 * **Handle retries gracefully** – ConnectionHandler already attempts multiple transports (HTTP → IPC → file watch).  When integrating, developers should listen for the `connectionFailed` event and allow the handler to retry rather than aborting the entire workflow.  
 
 * **Persist and query metadata** – Use the storage utilities described in `integrations/code-graph-rag/README.md` to retrieve connection details for debugging or for rebuilding a lost session.  
 
-* **Monitor via the dashboard** – Expose the connection health endpoint (as defined in `integrations/mcp-constraint-monitor/dashboard/README.md`) so that ops teams can see live status and trigger manual reconnections if needed.  
+* **Monitor via the dashboard** – Expose the connection health endpoint (as defined in `integrations/constraint-monitor/dashboard/README.md`) so that ops teams can see live status and trigger manual reconnections if needed.  
 
 * **Do not duplicate hook logic** – Copi hook definitions reside in `integrations/copi/docs/hooks.md`.  Register them through ConnectionEstablisher; manual registration can cause duplicate callbacks and inconsistent state.  
 

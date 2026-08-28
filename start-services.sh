@@ -84,30 +84,30 @@ CODING_DIR="$SCRIPT_DIR"
 CONSTRAINT_MONITOR_STATUS="❌ NOT RUNNING"
 CONSTRAINT_MONITOR_WARNING=""
 
-# Check if mcp-constraint-monitor exists in integrations, if not clone it
-if [ ! -d "$CODING_DIR/integrations/mcp-constraint-monitor" ]; then
+# Check if constraint-monitor exists in integrations, if not clone it
+if [ ! -d "$CODING_DIR/integrations/constraint-monitor" ]; then
     echo "📦 Installing MCP Constraint Monitor..."
     cd "$CODING_DIR/integrations"
     
     # Check if we have local development version to copy
-    if [ -d "$CODING_DIR/mcp-constraint-monitor" ]; then
+    if [ -d "$CODING_DIR/constraint-monitor" ]; then
         echo "   📁 Copying local development version..."
-        cp -r "$CODING_DIR/mcp-constraint-monitor" "./mcp-constraint-monitor"
-        cd mcp-constraint-monitor
+        cp -r "$CODING_DIR/constraint-monitor" "./constraint-monitor"
+        cd constraint-monitor
         echo "   📦 Installing dependencies..."
         npm install --production 2>/dev/null || echo "   ⚠️ npm install failed, continuing..."
         echo "   ✅ Local MCP Constraint Monitor installed"
     else
         echo "   🌐 Cloning from repository..."
-        if git clone https://github.com/fwornle/mcp-server-constraint-monitor.git mcp-constraint-monitor 2>/dev/null; then
-            cd mcp-constraint-monitor
+        if git clone https://github.com/fwornle/constraint-monitor.git constraint-monitor 2>/dev/null; then
+            cd constraint-monitor
             echo "   📦 Installing dependencies..."
             npm install --production 2>/dev/null || echo "   ⚠️ npm install failed, continuing..."
             echo "   ✅ MCP Constraint Monitor installed from GitHub"
         else
             echo "   ⚠️ Failed to clone repository"
             echo "   💡 Ensure internet connection and GitHub access"
-            echo "   💡 Manual install: git clone https://github.com/fwornle/mcp-server-constraint-monitor.git mcp-constraint-monitor"
+            echo "   💡 Manual install: git clone https://github.com/fwornle/constraint-monitor.git constraint-monitor"
         fi
     fi
     cd "$CODING_DIR"
@@ -117,7 +117,7 @@ if check_docker; then
     echo "🐳 Docker is running. Starting Constraint Monitor databases..."
     
     # Use constraint monitor in integrations directory
-    CONSTRAINT_DIR="$CODING_DIR/integrations/mcp-constraint-monitor"
+    CONSTRAINT_DIR="$CODING_DIR/integrations/constraint-monitor"
     
     if [ -d "$CONSTRAINT_DIR" ]; then
         cd "$CONSTRAINT_DIR"
@@ -214,7 +214,7 @@ if check_docker; then
 
                     # Start constraint monitor web services
                     echo "🚀 Starting constraint monitor web services..."
-                    cd "$CODING_DIR/integrations/mcp-constraint-monitor"
+                    cd "$CODING_DIR/integrations/constraint-monitor"
 
                     # Start dashboard on port 3030 in background
                     PORT=3030 npm run dashboard > /dev/null 2>&1 &
@@ -400,7 +400,7 @@ node scripts/psm-register.js vkb-server $VKB_PID global lib/vkb-server/cli.js
 
 # Start Semantic Analysis MCP Server
 echo "🟢 Starting Semantic Analysis MCP Server (Standard MCP)..."
-cd "$CODING_DIR/integrations/mcp-server-semantic-analysis"
+cd "$CODING_DIR/integrations/semantic-analysis"
 # Note: Standard MCP server uses stdio transport, not HTTP
 # It will be started by Claude Code when needed
 echo "ℹ️  Semantic Analysis MCP Server configured for stdio transport"
@@ -483,13 +483,13 @@ else
 fi
 
 # Check if semantic analysis server is configured (stdio transport)
-if [ -f "$CODING_DIR/integrations/mcp-server-semantic-analysis/dist/index.js" ]; then
+if [ -f "$CODING_DIR/integrations/semantic-analysis/dist/index.js" ]; then
     echo "✅ Semantic Analysis MCP Server configured (stdio transport)"
     services_running=$((services_running + 1))
     
     # Show Node.js executable verification for the MCP server
     echo "📦 MCP Server Node.js Verification:"
-    cd "$CODING_DIR/integrations/mcp-server-semantic-analysis"
+    cd "$CODING_DIR/integrations/semantic-analysis"
     node -e "
 const path = require('path');
 const fs = require('fs');

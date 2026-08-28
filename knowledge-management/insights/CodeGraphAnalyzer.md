@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-CodeGraphAnalyzer uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
+CodeGraphAnalyzer uses the semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
 
 **Technical Insight Document – CodeGraphAnalyzer (SubComponent)**  
 
@@ -102,14 +102,14 @@ The clear separation of concerns, explicit Docker Compose definitions, and envir
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code graph analysis. This is evident in the separate Docker Compose files, such as integrations/code-graph-rag/docker-compose.yaml, which defines the services and their dependencies. For instance, the mcp-server-semantic-analysis service is defined with its own Docker image and environment variables, demonstrating a clear separation of concerns. The use of environment variables, such as CODING_REPO and CONSTRAINT_DIR, in scripts like api-service.js and dashboard-service.js, further supports this modular design.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with separate services for semantic analysis, constraint monitoring, and code graph analysis. This is evident in the separate Docker Compose files, such as integrations/code-graph-rag/docker-compose.yaml, which defines the services and their dependencies. For instance, the semantic-analysis service is defined with its own Docker image and environment variables, demonstrating a clear separation of concerns. The use of environment variables, such as CODING_REPO and CONSTRAINT_DIR, in scripts like api-service.js and dashboard-service.js, further supports this modular design.
 
 ### Children
-- [GraphAnalyzer](./GraphAnalyzer.md) -- The CodeGraphAnalyzer sub-component uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
+- [GraphAnalyzer](./GraphAnalyzer.md) -- The CodeGraphAnalyzer sub-component uses the semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
 
 ### Siblings
-- [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze constraints
-- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to perform semantic analysis
+- [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses the semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze constraints
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService uses the semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to perform semantic analysis
 
 ---
 

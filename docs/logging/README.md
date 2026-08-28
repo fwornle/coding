@@ -186,8 +186,8 @@ Files requiring Logger migration are prioritized as follows:
 - `scripts/process-state-manager.js` - PSM
 
 ### Phase 2: MCP Servers
-- `integrations/mcp-server-semantic-analysis/` - Semantic analysis
-- `integrations/mcp-constraint-monitor/` - Constraint system
+- `integrations/semantic-analysis/` - Semantic analysis
+- `integrations/constraint-monitor/` - Constraint system
 
 ### Phase 3: Knowledge Management
 - `src/knowledge-management/` - UKB services

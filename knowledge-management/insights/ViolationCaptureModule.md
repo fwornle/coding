@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-ViolationCaptureModule relies on the integrations/mcp-constraint-monitor/dashboard/README.md file for dashboard configuration.
+ViolationCaptureModule relies on the integrations/constraint-monitor/dashboard/README.md file for dashboard configuration.
 
 ## What It Is  
 
-The **ViolationCaptureModule** is a dedicated sub‑component of the **ConstraintSystem** that monitors interactions with tooling, detects any breaches of defined constraints, and persists those breaches for later analysis.  All of its configuration is driven from the dashboard definition found in `integrations/mcp-constraint-monitor/dashboard/README.md`, which supplies the visual layout and filtering rules used when the captured violations are displayed to operators.  Once a violation is detected, the module hands the record off to its child component **ConstraintViolationStorage**, which in turn writes the information into the system’s database layer.  In short, ViolationCaptureModule is the “eyes and ears” of the constraint enforcement stack, turning raw tool‑level events into durable, queryable violation records.
+The **ViolationCaptureModule** is a dedicated sub‑component of the **ConstraintSystem** that monitors interactions with tooling, detects any breaches of defined constraints, and persists those breaches for later analysis.  All of its configuration is driven from the dashboard definition found in `integrations/constraint-monitor/dashboard/README.md`, which supplies the visual layout and filtering rules used when the captured violations are displayed to operators.  Once a violation is detected, the module hands the record off to its child component **ConstraintViolationStorage**, which in turn writes the information into the system’s database layer.  In short, ViolationCaptureModule is the “eyes and ears” of the constraint enforcement stack, turning raw tool‑level events into durable, queryable violation records.
 
 ---
 
@@ -16,7 +16,7 @@ The design of ViolationCaptureModule follows a classic **separation‑of‑conce
 
 Interaction with the rest of the system is anchored through two primary pathways:
 
-1. **Dashboard configuration** – The module reads `integrations/mcp-constraint-monitor/dashboard/README.md` to learn how violations should be visualized.  This file acts as a declarative contract between the capture layer and the UI layer, ensuring that any change to the dashboard layout is automatically reflected in what the module records.
+1. **Dashboard configuration** – The module reads `integrations/constraint-monitor/dashboard/README.md` to learn how violations should be visualized.  This file acts as a declarative contract between the capture layer and the UI layer, ensuring that any change to the dashboard layout is automatically reflected in what the module records.
 
 2. **Database persistence** – Although ViolationCaptureModule does not contain direct database code, it relies on its parent **ConstraintSystem** which, as documented, uses a `GraphDatabaseAdapter` (found in `storage/graph-database-adapter.ts`) for all graph‑oriented persistence.  By delegating to the parent’s adapter, the capture module inherits the same scalability and consistency guarantees provided by the graph database stack.
 
@@ -38,7 +38,7 @@ Although the source repository does not expose concrete class names for Violatio
 
 * **Database write‑through** – Through the parent **ConstraintSystem**, the storage component ultimately invokes the `GraphDatabaseAdapter` (implemented in `storage/graph-database-adapter.ts`).  This adapter abstracts the low‑level LevelDB operations and ensures that each violation is persisted atomically, with automatic JSON export sync as described for the broader system.
 
-* **Dashboard exposure** – Once stored, violations become queryable by the dashboard UI.  Because the dashboard configuration lives in `integrations/mcp-constraint-monitor/dashboard/README.md`, any UI component that renders violation lists or charts pulls its display rules directly from that file, guaranteeing a one‑to‑one mapping between what is captured and what is shown.
+* **Dashboard exposure** – Once stored, violations become queryable by the dashboard UI.  Because the dashboard configuration lives in `integrations/constraint-monitor/dashboard/README.md`, any UI component that renders violation lists or charts pulls its display rules directly from that file, guaranteeing a one‑to‑one mapping between what is captured and what is shown.
 
 Overall, the implementation follows a **pipeline** model: *event → detection → object creation → storage → UI*.  Each stage is isolated, which aids both testing and future extension.
 
@@ -52,9 +52,9 @@ ViolationCaptureModule is a hub of several integration pathways:
 
 * **Sibling components** – It aligns with **ConstraintConfigurationManager** (which supplies the rule definitions that the module enforces) and **HookManager** (which may provide additional event hooks that trigger violation checks).  The shared configuration‑driven approach across these siblings reduces duplication and encourages consistent error handling.
 
-* **Dashboard configuration** – The module reads `integrations/mcp-constraint-monitor/dashboard/README.md` to know which fields to expose and how to group violations.  This file acts as a contract between the back‑end capture logic and the front‑end monitoring UI.
+* **Dashboard configuration** – The module reads `integrations/constraint-monitor/dashboard/README.md` to know which fields to expose and how to group violations.  This file acts as a contract between the back‑end capture logic and the front‑end monitoring UI.
 
-* **ConstraintViolationStorage** – As the direct child, this storage component abstracts the persistence details.  It may also interact with the `integrations/mcp-constraint-monitor/README.md` file, which the observations note as a possible source of storage‑related metadata.
+* **ConstraintViolationStorage** – As the direct child, this storage component abstracts the persistence details.  It may also interact with the `integrations/constraint-monitor/README.md` file, which the observations note as a possible source of storage‑related metadata.
 
 * **External tooling** – While not explicitly listed, the module’s purpose of “capturing constraint violations from tool interactions” implies that any external tool that integrates with the ConstraintSystem can trigger violation events, making ViolationCaptureModule a central point for cross‑tool observability.
 
@@ -68,7 +68,7 @@ The relationship diagram below visualizes these connections, highlighting the fl
 
 1. **Define constraints centrally** – All rule definitions should be maintained by **ConstraintConfigurationManager**.  Adding or modifying a rule without updating the configuration manager can lead to silent capture failures.
 
-2. **Keep the dashboard README in sync** – Whenever a new violation field is introduced (e.g., a new metadata attribute), update `integrations/mcp-constraint-monitor/dashboard/README.md` accordingly.  This ensures that the UI can render the new data without additional code changes.
+2. **Keep the dashboard README in sync** – Whenever a new violation field is introduced (e.g., a new metadata attribute), update `integrations/constraint-monitor/dashboard/README.md` accordingly.  This ensures that the UI can render the new data without additional code changes.
 
 3. **Leverage the storage abstraction** – Developers should interact with violations only through the public API exposed by **ConstraintViolationStorage**.  Direct database calls bypass the GraphDatabaseAdapter’s consistency guarantees and should be avoided.
 
@@ -96,7 +96,7 @@ By adhering to the guidelines above and respecting the documented integration po
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
 
 ### Children
-- [ConstraintViolationStorage](./ConstraintViolationStorage.md) -- The integrations/mcp-constraint-monitor/README.md file mentions the MCP Constraint Monitor, which could be related to the storage of constraint violations.
+- [ConstraintViolationStorage](./ConstraintViolationStorage.md) -- The integrations/constraint-monitor/README.md file mentions the MCP Constraint Monitor, which could be related to the storage of constraint violations.
 
 ### Siblings
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to manage graph database operations.

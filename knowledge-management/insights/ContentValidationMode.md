@@ -6,7 +6,7 @@ The presence of 'constraint-configuration.md' and 'semantic-constraint-detection
 
 ## What It Is  
 
-`ContentValidationMode` is the enumerated or configurable set of behaviours that drives how the **ContentValidationAgent** validates incoming content and produces validation reports. The only concrete references to this concept live in the documentation under `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` and the companion `constraint-configuration.md`. Both files stress that the agent can operate in **multiple validation modes**, each tuned for a particular use‑case (e.g., strict schema enforcement, relaxed semantic checks, or performance‑oriented quick scans). Because the documentation is the sole source of truth, we understand `ContentValidationMode` as a *configuration artifact* that the agent reads at start‑up and that subsequently governs the validation pipeline it executes.
+`ContentValidationMode` is the enumerated or configurable set of behaviours that drives how the **ContentValidationAgent** validates incoming content and produces validation reports. The only concrete references to this concept live in the documentation under `integrations/constraint-monitor/docs/semantic-constraint-detection.md` and the companion `constraint-configuration.md`. Both files stress that the agent can operate in **multiple validation modes**, each tuned for a particular use‑case (e.g., strict schema enforcement, relaxed semantic checks, or performance‑oriented quick scans). Because the documentation is the sole source of truth, we understand `ContentValidationMode` as a *configuration artifact* that the agent reads at start‑up and that subsequently governs the validation pipeline it executes.
 
 The parent component, **ContentValidationAgent**, is described as “using various modes to validate content and provide validation reports.” This phrasing makes clear that the mode is not a peripheral flag but a core driver of the agent’s runtime behaviour. No source‑code symbols were discovered, which means the actual implementation (whether an enum, class hierarchy, or external configuration file) is abstracted away from the public repository and is likely defined in a language‑specific module that the documentation assumes developers will already be familiar with.
 
@@ -30,8 +30,8 @@ No explicit code paths are provided, so we cannot point to concrete class names 
 
 The only concrete artefacts we can reference are the two markdown files:
 
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – describes the purpose of validation modes and how they affect the detection of semantic constraints.
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – outlines the configuration format that specifies which `ContentValidationMode` the **ContentValidationAgent** should run.
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – describes the purpose of validation modes and how they affect the detection of semantic constraints.
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – outlines the configuration format that specifies which `ContentValidationMode` the **ContentValidationAgent** should run.
 
 From these, we infer the following implementation scaffolding:
 

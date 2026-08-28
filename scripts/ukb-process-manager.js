@@ -165,7 +165,7 @@ class UKBProcessManager {
     appendFileSync(logFile, `${'='.repeat(50)}\n\n`);
 
     // Spawn the workflow process
-    const mcpServerPath = join(codingRoot, 'integrations', 'mcp-server-semantic-analysis', 'dist', 'cli.js');
+    const mcpServerPath = join(codingRoot, 'integrations', 'semantic-analysis', 'dist', 'cli.js');
 
     // Create a wrapper script that calls the MCP tool
     // Note: Both executeWorkflow() and executeBatchWorkflow() handle initialization internally via initializeAgents()
@@ -174,7 +174,7 @@ class UKBProcessManager {
     const isBatchWorkflow = batchWorkflows.includes(workflowName);
 
     const wrapperScript = `
-      import { CoordinatorAgent } from '${join(codingRoot, 'integrations', 'mcp-server-semantic-analysis', 'dist', 'agents', 'coordinator.js')}';
+      import { CoordinatorAgent } from '${join(codingRoot, 'integrations', 'semantic-analysis', 'dist', 'agents', 'coordinator.js')}';
 
       const coordinator = new CoordinatorAgent('${repositoryPath}', '${team}');
       // Use executeBatchWorkflow for batch workflows, executeWorkflow for standard workflows

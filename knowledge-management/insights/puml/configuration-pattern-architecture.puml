@@ -34,7 +34,7 @@ package "Configuration" {
 package "Directories" {
     folder "src/knowledge-management"
     folder "lib/ukb-unified"
-    folder "integrations/mcp-server-semantic-analysis/src"
+    folder "integrations/semantic-analysis/src"
 }
 
 [GraphDatabaseService] --> [Graphology]

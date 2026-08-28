@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-OntologyModule relies on the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve ontology data.
+OntologyModule relies on the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve ontology data.
 
 ## What It Is  
 
-**OntologyModule** is a sub‑component that lives inside the **KnowledgeManagement** component.  Its primary responsibility is to expose a *unified interface* for all interactions with the system‑wide ontology.  It receives raw entities from other sub‑components, runs them through the **OntologyClassifier**, persists the resulting classifications in the graph store via the **GraphDatabaseAdapter** (found at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`), and keeps the ontology up‑to‑date when changes occur.  In addition, the module supplies downstream consumers—most notably **InsightGenerationModule** and **TraceReportModule**—with the classified ontology data they need to generate recommendations and detailed workflow trace reports.
+**OntologyModule** is a sub‑component that lives inside the **KnowledgeManagement** component.  Its primary responsibility is to expose a *unified interface* for all interactions with the system‑wide ontology.  It receives raw entities from other sub‑components, runs them through the **OntologyClassifier**, persists the resulting classifications in the graph store via the **GraphDatabaseAdapter** (found at `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`), and keeps the ontology up‑to‑date when changes occur.  In addition, the module supplies downstream consumers—most notably **InsightGenerationModule** and **TraceReportModule**—with the classified ontology data they need to generate recommendations and detailed workflow trace reports.
 
 The module therefore acts as the “gatekeeper” for ontology data: it shields the rest of the system from the low‑level storage details while guaranteeing that every entity is correctly classified and linked to the current version of the ontology.
 
@@ -16,7 +16,7 @@ The module therefore acts as the “gatekeeper” for ontology data: it shields 
 
 The design of **OntologyModule** follows a *modular, adapter‑based* architecture.  The key design elements that emerge from the observations are:
 
-1. **Adapter Pattern** – The module does **not** interact directly with the underlying graph database.  Instead it delegates all persistence concerns to **GraphDatabaseAdapter**, a concrete adapter located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`.  This isolates the ontology logic from storage implementation details (e.g., Graphology, LevelDB) and makes it possible to swap the storage backend without touching the classification code.
+1. **Adapter Pattern** – The module does **not** interact directly with the underlying graph database.  Instead it delegates all persistence concerns to **GraphDatabaseAdapter**, a concrete adapter located at `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`.  This isolates the ontology logic from storage implementation details (e.g., Graphology, LevelDB) and makes it possible to swap the storage backend without touching the classification code.
 
 2. **Facade / Unified Interface** – By providing a single, well‑defined API for “accessing and updating ontology data”, OntologyModule acts as a façade for the rest of the KnowledgeManagement ecosystem.  Other sub‑components (e.g., **InsightGenerationModule**, **TraceReportModule**, **ManualLearning**, **CodeGraphModule**) call into this façade rather than dealing with the classifier or the graph adapter themselves.
 
@@ -39,7 +39,7 @@ Because the parent **KnowledgeManagement** component already uses the same **Gra
 | Symbol | Location / Role |
 |--------|-----------------|
 | **OntologyClassifier** | Not directly referenced by a file path, but it is the classification engine invoked by OntologyModule. |
-| **GraphDatabaseAdapter** | `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` – provides `saveNode`, `getNode`, `updateNode`, and query utilities for the underlying graph store. |
+| **GraphDatabaseAdapter** | `integrations/semantic-analysis/src/storage/graph-database-adapter.ts` – provides `saveNode`, `getNode`, `updateNode`, and query utilities for the underlying graph store. |
 | **InsightGenerationModule** | Consumes ontology data; its own implementation is outside the scope of the current observations but it is a sibling that calls OntologyModule’s read API. |
 | **TraceReportModule** | Generates trace reports; similarly consumes OntologyModule’s read API. |
 
@@ -64,7 +64,7 @@ These functions hide the adapter and classifier internals, presenting a clean co
 
 ## Integration Points  
 
-1. **GraphDatabaseAdapter** – The sole persistence dependency.  All read/write operations funnel through the adapter located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`.  Because other siblings (e.g., **CodeGraphModule**, **ManualLearning**) also rely on this adapter, OntologyModule benefits from a shared transaction model and consistent data‑export behavior.
+1. **GraphDatabaseAdapter** – The sole persistence dependency.  All read/write operations funnel through the adapter located at `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`.  Because other siblings (e.g., **CodeGraphModule**, **ManualLearning**) also rely on this adapter, OntologyModule benefits from a shared transaction model and consistent data‑export behavior.
 
 2. **OntologyClassifier** – The classification engine is an internal collaborator.  Its implementation details are not exposed, but it is the only place where ontology‑specific heuristics live, keeping the rest of the system agnostic of classification rules.
 
@@ -122,13 +122,13 @@ These functions hide the adapter and classifier internals, presenting a clean co
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) enables seamless integration with Graphology and LevelDB for graph data persistence. This allows for efficient storage and querying of the knowledge graph, with automatic JSON export sync ensuring data consistency across the system. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) plays a crucial role in constructing the code knowledge graph, leveraging AST-based analysis for semantic code search capabilities. Furthermore, the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) handles entity persistence, including ontology classification and content validation, ensuring that the knowledge graph remains accurate and up-to-date.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) enables seamless integration with Graphology and LevelDB for graph data persistence. This allows for efficient storage and querying of the knowledge graph, with automatic JSON export sync ensuring data consistency across the system. The CodeGraphAgent (integrations/semantic-analysis/src/agents/code-graph-agent.ts) plays a crucial role in constructing the code knowledge graph, leveraging AST-based analysis for semantic code search capabilities. Furthermore, the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) handles entity persistence, including ontology classification and content validation, ensuring that the knowledge graph remains accurate and up-to-date.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve user-created entities.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve user-created entities.
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
-- [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve the code knowledge graph.
-- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence.
+- [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule uses the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) to store and retrieve the code knowledge graph.
+- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence.
 - [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule uses the CodeGraphModule to access the code knowledge graph and generate insights.
 - [TraceReportModule](./TraceReportModule.md) -- TraceReportModule uses the CodeGraphModule to access the code knowledge graph and generate trace reports.
 

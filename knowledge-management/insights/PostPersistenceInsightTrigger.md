@@ -8,7 +8,7 @@ Consuming already-written KG data (rather than raw pipeline input) implies Insig
 
 ## What It Is
 
-The `PostPersistenceInsightTrigger` is a design boundary documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` that defines *when* and *against what data* insight generation activates within the system. Rather than being a mid-pipeline interceptor or transformer, it explicitly marks insight generation as a **post-persistence concern** — meaning the trigger fires only after Knowledge Graph (KG) writes have been fully committed to durable storage.
+The `PostPersistenceInsightTrigger` is a design boundary documented in `integrations/semantic-analysis/docs/architecture/agents.md` that defines *when* and *against what data* insight generation activates within the system. Rather than being a mid-pipeline interceptor or transformer, it explicitly marks insight generation as a **post-persistence concern** — meaning the trigger fires only after Knowledge Graph (KG) writes have been fully committed to durable storage.
 
 As a child of the `Insights` parent component, this trigger establishes the operational contract under which all insight-generating agents run: they consume already-written KG data rather than raw pipeline input. This positions Insights agents in a strictly read-only relationship with the Knowledge Graph, operating against a stable, committed snapshot of the graph state rather than volatile in-flight data flowing through ingestion.
 
@@ -24,7 +24,7 @@ The pattern also reflects an **eventual-analysis** model rather than a synchrono
 
 ## Implementation Details
 
-The observations do not surface specific code symbols — there are 0 code symbols indexed and no key files beyond the architecture documentation itself. The trigger is therefore best understood as a **policy boundary** documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` rather than a single class or function. Its enforcement is distributed: ingestion code does not call into insight code, and insight code only reads from the persisted KG.
+The observations do not surface specific code symbols — there are 0 code symbols indexed and no key files beyond the architecture documentation itself. The trigger is therefore best understood as a **policy boundary** documented in `integrations/semantic-analysis/docs/architecture/agents.md` rather than a single class or function. Its enforcement is distributed: ingestion code does not call into insight code, and insight code only reads from the persisted KG.
 
 Mechanically, this means insight generation operates over a **committed graph state**. Because the KG has already absorbed the writes by the time the trigger condition is satisfied, Insights agents can perform graph <USER_ID_REDACTED>, traversals, or pattern-matching operations with the confidence that the underlying data is stable and complete with respect to whatever write batch preceded the trigger. There is no need for read-locks against an in-flight pipeline buffer or for snapshot isolation against partially-applied changes.
 
@@ -56,13 +56,13 @@ Finally, when adding new insight capabilities under the `Insights` parent, devel
 2. **Design decisions and trade-offs:** Trades off real-time insight availability for fault isolation and durability of the write path. Accepts a latency gap between ingestion and insight visibility in exchange for ingestion robustness and idempotent reprocessing.
 3. **System structure insights:** The KG itself serves as the integration medium between ingestion and analysis; there is no direct coupling between the two subsystems. The `Insights` parent contains this trigger as the gating boundary for all its agents.
 4. **Scalability considerations:** Because Insights agents operate read-only against committed state, they can be scaled, parallelized, retried, or rescheduled independently of ingestion throughput. Insight workloads cannot back-pressure or stall the write path.
-5. **Maintainability assessment:** The clear policy boundary documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` makes the contract explicit and enforceable by convention. Idempotent regeneration simplifies operational recovery, and the lack of mid-pipeline coupling means insight logic can evolve without risk to ingestion correctness.
+5. **Maintainability assessment:** The clear policy boundary documented in `integrations/semantic-analysis/docs/architecture/agents.md` makes the contract explicit and enforceable by convention. Idempotent regeneration simplifies operational recovery, and the lack of mid-pipeline coupling means insight logic can evolve without risk to ingestion correctness.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Insights](./Insights.md) -- Insight generation operates as a post-persistence concern, consuming already-written KG data rather than raw pipeline input, as described in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
+- [Insights](./Insights.md) -- Insight generation operates as a post-persistence concern, consuming already-written KG data rather than raw pipeline input, as described in integrations/semantic-analysis/docs/architecture/agents.md
 
 
 ---

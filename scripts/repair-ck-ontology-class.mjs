@@ -2,7 +2,7 @@
 /**
  * Phase 60 Plan 04 — One-shot CollectiveKnowledge `ontologyClass` repair
  * (D-13). Sister-script to Phase 60 D-14's writer-side hard-root guard in
- * `integrations/mcp-server-semantic-analysis/src/agents/
+ * `integrations/semantic-analysis/src/agents/
  * ontology-classification-agent.ts`.
  *
  * # What this does

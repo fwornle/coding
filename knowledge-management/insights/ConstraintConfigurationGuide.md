@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The presence of integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md alongside the constraint-configuration.md suggests a relationship between constraint configuration and semantic constraint detection.
+The presence of integrations/constraint-monitor/docs/semantic-constraint-detection.md alongside the constraint-configuration.md suggests a relationship between constraint configuration and semantic constraint detection.
 
 ## What It Is  
 
 The **ConstraintConfigurationGuide** lives in the repository under the path  
 
 ```
-integrations/mcp-constraint-monitor/docs/constraint-configuration.md
+integrations/constraint-monitor/docs/constraint-configuration.md
 ```  
 
 It is a markdown‑based technical guide that explains how to configure the **ConstraintConfiguration** sub‑component of the *mcp‑constraint‑monitor* integration. The guide is the primary source of truth for anyone who needs to understand the available configuration knobs, their meanings, and the steps required to apply them in a running MCP (Managed Cloud Platform) environment. The guide is directly tied to its parent entity **ConstraintConfiguration**, which is described in the same documentation directory, and it is positioned alongside a sibling document, **semantic-constraint-detection.md**, indicating that constraint configuration is closely related to the detection of semantic constraints.
@@ -20,7 +20,7 @@ Because the only artifacts we have are documentation files, the **ConstraintConf
 
 ## Architecture and Design  
 
-The architecture surrounding **ConstraintConfigurationGuide** follows a **documentation‑driven configuration model**. The presence of a dedicated markdown file in `integrations/mcp-constraint-monitor/docs/` suggests that the system treats configuration as a first‑class artifact that is versioned alongside the codebase. This design encourages a **single source of truth** approach: any change to how constraints are expressed or interpreted is first captured in the guide, then reflected in the implementation of the **ConstraintConfiguration** component.
+The architecture surrounding **ConstraintConfigurationGuide** follows a **documentation‑driven configuration model**. The presence of a dedicated markdown file in `integrations/constraint-monitor/docs/` suggests that the system treats configuration as a first‑class artifact that is versioned alongside the codebase. This design encourages a **single source of truth** approach: any change to how constraints are expressed or interpreted is first captured in the guide, then reflected in the implementation of the **ConstraintConfiguration** component.
 
 The co‑location of `semantic-constraint-detection.md` signals a **tight coupling** between configuration and detection logic. Rather than being a loose, loosely‑typed key‑value store, the configuration appears to be structured in a way that directly drives the behavior of the semantic constraint detection engine. This implies a **configuration‑to‑behavior mapping pattern**, where the guide defines a schema (e.g., enabled constraint types, thresholds, rule priority) that the runtime reads and translates into concrete detection pipelines.
 
@@ -60,7 +60,7 @@ No external libraries, services, or APIs are mentioned in the observations, so w
 
 ## Usage Guidelines  
 
-1. **Treat the Guide as Authoritative** – When adding, removing, or modifying constraint rules, always start by updating `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. This ensures that the documentation stays in sync with the runtime expectations.
+1. **Treat the Guide as Authoritative** – When adding, removing, or modifying constraint rules, always start by updating `integrations/constraint-monitor/docs/constraint-configuration.md`. This ensures that the documentation stays in sync with the runtime expectations.
 
 2. **Maintain Schema Consistency** – The guide likely defines a schema (e.g., required fields, allowed values). Developers must keep the actual configuration files (YAML/JSON) consistent with that schema; otherwise, the **ConstraintConfiguration** loader may reject the configuration at start‑up.
 
@@ -76,14 +76,14 @@ No external libraries, services, or APIs are mentioned in the observations, so w
 
 1. **Architectural patterns identified** – Documentation‑driven configuration, configuration‑to‑behavior mapping.  
 2. **Design decisions and trade‑offs** – Prioritizing a single source of truth (the markdown guide) improves clarity and operator confidence but introduces a manual step of translating documentation into machine‑readable config, which can be error‑prone if not automated.  
-3. **System structure insights** – The guide sits under `integrations/mcp-constraint-monitor/docs/`, acting as the top‑level reference for the **ConstraintConfiguration** component and tightly linked to the semantic detection subsystem.  
+3. **System structure insights** – The guide sits under `integrations/constraint-monitor/docs/`, acting as the top‑level reference for the **ConstraintConfiguration** component and tightly linked to the semantic detection subsystem.  
 4. **Scalability considerations** – Because configuration is externalized and documented, scaling the system to more constraints simply involves extending the guide and the corresponding schema; the runtime can ingest larger rule sets without code changes, assuming the parser is designed for generic schema handling.  
 5. **Maintainability assessment** – High maintainability is achieved through the explicit documentation path; however, maintainability hinges on disciplined updates to both the guide and the configuration files. Automated validation tools (e.g., schema validators) would further strengthen this aspect.
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The ConstraintConfiguration is likely defined in the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation.
+- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The ConstraintConfiguration is likely defined in the integrations/constraint-monitor/docs/constraint-configuration.md documentation.
 
 ---
 

@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file suggests that constraint configuration is a key aspect of content validation, implying the presence of rules-based validation.
+The integrations/constraint-monitor/docs/constraint-configuration.md file suggests that constraint configuration is a key aspect of content validation, implying the presence of rules-based validation.
 
 ## What It Is  
 
 **ContentValidationRules** lives inside the **ContentValidation** sub‑system and embodies the rule‑based logic that drives content validation across the platform. The primary artefacts that hint at its implementation are found under the *integrations* folder:
 
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – describes how constraints are configured, which is the declarative source for the rules that **ContentValidationRules** will enforce.  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – explains the detection of semantic constraints, a class of rules that go beyond simple schema checks and require deeper analysis of the content’s meaning.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – describes how constraints are configured, which is the declarative source for the rules that **ContentValidationRules** will enforce.  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – explains the detection of semantic constraints, a class of rules that go beyond simple schema checks and require deeper analysis of the content’s meaning.  
 * `integrations/browser-access/README.md` – notes that the broader **ContentValidation** component adopts a *rules‑based* approach, implying that **ContentValidationRules** follows the same paradigm.
 
 Together, these documents make it clear that **ContentValidationRules** is not a monolithic validator but a collection of configurable, rule‑driven checks that are applied to incoming or stored content to guarantee system integrity.
@@ -66,7 +66,7 @@ Because the observations are limited to documentation, the exact class names rem
 **ContentValidationRules** sits at the heart of the validation pipeline and interacts with several neighboring subsystems:
 
 * **ContentValidation (parent)** – Calls into **ContentValidationRules** to perform the actual rule evaluation. The parent likely provides the raw content payload and receives a `ValidationResult` that it aggregates with other health checks.  
-* **MCP Constraint Monitor** – The documentation under `integrations/mcp-constraint-monitor` suggests that the monitor consumes the same constraint definitions. It may act as an external observer that records constraint violations, feeds metrics to dashboards, or triggers alerts.  
+* **MCP Constraint Monitor** – The documentation under `integrations/constraint-monitor` suggests that the monitor consumes the same constraint definitions. It may act as an external observer that records constraint violations, feeds metrics to dashboards, or triggers alerts.  
 * **Browser Access Integration** – The `integrations/browser-access/README.md` indicates that UI components (e.g., admin consoles) may expose the rule configuration UI, allowing operators to view or edit constraints. This UI would read/write the same markdown files, ensuring a single source of truth.  
 * **Semantic Analysis Services** – For semantic constraints, the rule engine may depend on external NLP services or libraries (e.g., spaCy, OpenNLP). These services are invoked by the **SemanticValidator** component described earlier.  
 

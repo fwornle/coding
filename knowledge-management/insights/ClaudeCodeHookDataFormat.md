@@ -2,23 +2,23 @@
 
 **Type:** Detail
 
-The coexistence of `CLAUDE-CODE-HOOK-FORMAT.md` (event ingestion) and `integrations/mcp-constraint-monitor/docs/status-line-integration.md` (UI feedback) reveals a two-stage pipeline: raw hook payloads are received, constraint evaluation occurs, and results are surfaced to developers via status line output.
+The coexistence of `CLAUDE-CODE-HOOK-FORMAT.md` (event ingestion) and `integrations/constraint-monitor/docs/status-line-integration.md` (UI feedback) reveals a two-stage pipeline: raw hook payloads are received, constraint evaluation occurs, and results are surfaced to developers via status line output.
 
 # ClaudeCodeHookDataFormat
 
 ## What It Is
 
-The `ClaudeCodeHookDataFormat` is a specification document located at `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` that defines the payload schema emitted by Claude Code when invoking the constraint monitor as a downstream hook consumer. It establishes the contract for the primary ingestion boundary of the `MCPConstraintMonitor` system, codifying exactly what data structure flows across the integration seam between Claude Code and the constraint enforcement pipeline.
+The `ClaudeCodeHookDataFormat` is a specification document located at `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` that defines the payload schema emitted by Claude Code when invoking the constraint monitor as a downstream hook consumer. It establishes the contract for the primary ingestion boundary of the `MCPConstraintMonitor` system, codifying exactly what data structure flows across the integration seam between Claude Code and the constraint enforcement pipeline.
 
 As a Detail-type artifact under the `MCPConstraintMonitor` parent component, this format specification is foundational rather than operational — it does not execute logic itself but rather governs the shape of every interaction that downstream constraint-evaluation logic must handle. Without this schema being honored, no constraint can be evaluated, because the monitor would have no reliable way to parse what Claude Code has sent.
 
-The document sits alongside other integration documentation in the `integrations/mcp-constraint-monitor/docs/` directory, where it forms one half of a coherent integration story: defining what comes in, while companion documents like `status-line-integration.md` define what goes out.
+The document sits alongside other integration documentation in the `integrations/constraint-monitor/docs/` directory, where it forms one half of a coherent integration story: defining what comes in, while companion documents like `status-line-integration.md` define what goes out.
 
 ## Architecture and Design
 
-The presence of `ClaudeCodeHookDataFormat` reveals a fundamentally **reactive, event-driven architectural model**. The constraint monitor does not poll Claude Code or proactively inspect its state; instead, Claude Code pushes structured payloads to the monitor when relevant events occur. This hook-based integration pattern, which aligns with the component-level event-driven design described in `integrations/mcp-constraint-monitor/README.md`, decouples the monitor's execution lifecycle from Claude Code's internal operation while ensuring the monitor sees every event of interest in real time.
+The presence of `ClaudeCodeHookDataFormat` reveals a fundamentally **reactive, event-driven architectural model**. The constraint monitor does not poll Claude Code or proactively inspect its state; instead, Claude Code pushes structured payloads to the monitor when relevant events occur. This hook-based integration pattern, which aligns with the component-level event-driven design described in `integrations/constraint-monitor/README.md`, decouples the monitor's execution lifecycle from Claude Code's internal operation while ensuring the monitor sees every event of interest in real time.
 
-The coexistence of `CLAUDE-CODE-HOOK-FORMAT.md` (ingestion) and `integrations/mcp-constraint-monitor/docs/status-line-integration.md` (UI feedback) reveals a clear **two-stage pipeline architecture**:
+The coexistence of `CLAUDE-CODE-HOOK-FORMAT.md` (ingestion) and `integrations/constraint-monitor/docs/status-line-integration.md` (UI feedback) reveals a clear **two-stage pipeline architecture**:
 
 1. **Ingestion stage**: Raw hook payloads conforming to `ClaudeCodeHookDataFormat` are received from Claude Code.
 2. **Evaluation and surfacing stage**: Constraint evaluation occurs on the parsed payload, and results are surfaced to developers via status line output.
@@ -27,7 +27,7 @@ This pipeline separation reflects a classic **boundary-isolation pattern**: by f
 
 ## Implementation Details
 
-The `ClaudeCodeHookDataFormat` itself is a specification rather than executable code, so its implementation is the schema definition contained in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This document establishes the field-level structure that Claude Code commits to emitting and that the constraint monitor commits to accepting.
+The `ClaudeCodeHookDataFormat` itself is a specification rather than executable code, so its implementation is the schema definition contained in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This document establishes the field-level structure that Claude Code commits to emitting and that the constraint monitor commits to accepting.
 
 Mechanically, this schema serves as the deserialization target for hook invocations. When Claude Code triggers the monitor as a downstream hook consumer, the payload arrives in the format prescribed here, and the monitor's ingestion layer parses it into in-memory structures suitable for constraint evaluation. Because the format is documented separately from the consuming code, it functions as a stable interface artifact: changes to the schema require explicit document updates, providing a deliberate friction point that helps prevent silent contract drift.
 
@@ -39,7 +39,7 @@ The most significant integration point is the boundary with **Claude Code itself
 
 Within the `MCPConstraintMonitor` parent module, the format feeds directly into the constraint-evaluation pipeline. The sibling component `SemanticConstraintDetection` — which has both an operational guide (`semantic-constraint-detection.md`) and a separate design rationale (`semantic-detection-design.md`) — consumes the parsed representation of these payloads when performing its semantic analysis work. The format therefore acts as the upstream contract that semantic detection depends upon.
 
-On the output side, the pipeline terminates in the status line integration described in `integrations/mcp-constraint-monitor/docs/status-line-integration.md`. Although `ClaudeCodeHookDataFormat` does not directly interact with the status line, it is the originating data source whose evaluation outcomes ultimately drive that feedback channel. Any field present in the hook payload may influence what developers see in their status line.
+On the output side, the pipeline terminates in the status line integration described in `integrations/constraint-monitor/docs/status-line-integration.md`. Although `ClaudeCodeHookDataFormat` does not directly interact with the status line, it is the originating data source whose evaluation outcomes ultimately drive that feedback channel. Any field present in the hook payload may influence what developers see in their status line.
 
 ## Usage Guidelines
 
@@ -63,10 +63,10 @@ Finally, given the reactive, push-based nature of the integration, developers sh
 ## Hierarchy Context
 
 ### Parent
-- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/mcp-constraint-monitor/README.md monitors and enforces constraints
+- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/constraint-monitor/README.md monitors and enforces constraints
 
 ### Siblings
-- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- Documented across two distinct files — `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` and `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md` — indicating this feature is complex enough to require both an operational guide and a separate design rationale document.
+- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- Documented across two distinct files — `integrations/constraint-monitor/docs/semantic-constraint-detection.md` and `integrations/constraint-monitor/docs/semantic-detection-design.md` — indicating this feature is complex enough to require both an operational guide and a separate design rationale document.
 
 
 ---

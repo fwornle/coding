@@ -64,8 +64,8 @@ const EXPECTED_MCP_SERVERS = [...STATIC_MCP_SERVERS, CODE_GRAPH_SERVER];
 // launched through `docker exec` have no such dir, which is why this is a lookup
 // with an explicit "no dir expected" case rather than an unconditional deref.
 const SERVER_INTEGRATION_DIRS = {
-  'semantic-analysis': 'integrations/mcp-server-semantic-analysis',
-  'constraint-monitor': 'integrations/mcp-constraint-monitor',
+  'semantic-analysis': 'integrations/semantic-analysis',
+  'constraint-monitor': 'integrations/constraint-monitor',
 };
 
 const readText = (rel) => readFileSync(path.join(REPO, rel), 'utf8');

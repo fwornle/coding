@@ -123,7 +123,7 @@ note right of ComprehensiveSemanticAnalysis
   Distributed across multiple modules:
   - src/knowledge-management
   - lib/ukb-unified  
-  - integrations/mcp-server-semantic-analysis
+  - integrations/semantic-analysis
 end note
 
 note bottom of DataPath

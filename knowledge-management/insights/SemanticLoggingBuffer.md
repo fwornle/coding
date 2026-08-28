@@ -2,13 +2,13 @@
 
 **Type:** SubComponent
 
-SemanticLoggingBuffer resides in integrations/mcp-server-semantic-analysis/src/logging.ts and serves as the primary write path for normalized LSL log entries produced during Claude Code sessions.
+SemanticLoggingBuffer resides in integrations/semantic-analysis/src/logging.ts and serves as the primary write path for normalized LSL log entries produced during Claude Code sessions.
 
 # SemanticLoggingBuffer — Technical Reference
 
 ## What It Is
 
-`SemanticLoggingBuffer` is implemented in `integrations/mcp-server-semantic-analysis/src/logging.ts` and serves as the primary write path for normalized LSL log entries produced during Claude Code sessions. Within the LiveLoggingSystem, it occupies the final stage of the capture pipeline: after raw agent transcripts have been normalized into LSL format, the buffer is responsible for accumulating those entries in memory and persisting them to disk in a controlled, non-blocking manner.
+`SemanticLoggingBuffer` is implemented in `integrations/semantic-analysis/src/logging.ts` and serves as the primary write path for normalized LSL log entries produced during Claude Code sessions. Within the LiveLoggingSystem, it occupies the final stage of the capture pipeline: after raw agent transcripts have been normalized into LSL format, the buffer is responsible for accumulating those entries in memory and persisting them to disk in a controlled, non-blocking manner.
 
 Its core responsibility is deceptively narrow — accept a log entry, hold it briefly, write it out — but the design choices surrounding that responsibility reflect a careful awareness of the operational context: an MCP server that must remain responsive to Claude Code clients regardless of what the logging subsystem is doing.
 
@@ -36,7 +36,7 @@ File routing follows a convention established by the parent LiveLoggingSystem: l
 
 `SemanticLoggingBuffer` integrates with its parent, LiveLoggingSystem, as the terminal write stage in the capture pipeline. LiveLoggingSystem is responsible for session windowing logic, user hash generation, and producing normalized LSL entries; the buffer consumes those outputs and handles persistence. The interface between them is essentially a push model: the parent pushes normalized entries into the buffer, and the buffer manages the rest.
 
-The buffer's output — files in `.data/logs/` — is the primary input for `OntologyClassificationAgent`, which lives in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`. Crucially, `OntologyClassificationAgent` operates as a post-capture enrichment step: it reads already-persisted LSL files rather than intercepting entries in flight. This means the buffer's file format, naming conventions, and rotation behavior are effectively part of its contract with the classification agent. Any change to how the buffer names or structures files is a breaking change for downstream consumers.
+The buffer's output — files in `.data/logs/` — is the primary input for `OntologyClassificationAgent`, which lives in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`. Crucially, `OntologyClassificationAgent` operates as a post-capture enrichment step: it reads already-persisted LSL files rather than intercepting entries in flight. This means the buffer's file format, naming conventions, and rotation behavior are effectively part of its contract with the classification agent. Any change to how the buffer names or structures files is a breaking change for downstream consumers.
 
 ## Usage Guidelines
 
@@ -57,7 +57,7 @@ The buffer's output — files in `.data/logs/` — is the primary input for `Ont
 - [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem (LSL) is a session logging infrastructure that captures, classifies, and persists AI agent conversations—primarily from Claude Code—into a unified format. It handles session windowing (time-window identifiers like '0800-0900'), multi-user support via SHA-256 user hashing, file routing with rotation thresholds, and transcript capture from agent-native formats. The system bridges raw agent transcripts to a normalized LSL format used downstream by semantic analysis and knowledge management pipelines.
 
 ### Siblings
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent lives in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and operates as a post-capture enrichment step, consuming already-persisted LSL entries rather than intercepting them during capture.
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent lives in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts and operates as a post-capture enrichment step, consuming already-persisted LSL entries rather than intercepting them during capture.
 
 
 ---

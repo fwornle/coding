@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The module in mcp-server-semantic-analysis/src/mock/ supports three distinct modes (mock/local/public), each likely mapping to a different LLM backend or fixture source to allow offline development inside containers
+The module in semantic-analysis/src/mock/ supports three distinct modes (mock/local/public), each likely mapping to a different LLM backend or fixture source to allow offline development inside containers
 
 ## What It Is
 
-DockerLLMModeControl is a SubComponent of DockerizedServices, implemented within `mcp-server-semantic-analysis/src/mock/`, specifically centered on `llm-mock-service.ts`. Its purpose is to govern which LLM backend a containerized service instance communicates with at runtime, supporting three distinct operational modes: **mock**, **local**, and **public**. This trimodal design allows the same Docker image to serve CI pipelines, local developer workflows, and production deployments without requiring separate builds or image variants. The component is deliberately isolated in the `src/mock/` subdirectory, a structural choice that communicates its role as a seam between real LLM infrastructure and controlled test/development execution environments.
+DockerLLMModeControl is a SubComponent of DockerizedServices, implemented within `semantic-analysis/src/mock/`, specifically centered on `llm-mock-service.ts`. Its purpose is to govern which LLM backend a containerized service instance communicates with at runtime, supporting three distinct operational modes: **mock**, **local**, and **public**. This trimodal design allows the same Docker image to serve CI pipelines, local developer workflows, and production deployments without requiring separate builds or image variants. The component is deliberately isolated in the `src/mock/` subdirectory, a structural choice that communicates its role as a seam between real LLM infrastructure and controlled test/development execution environments.
 
 ---
 
@@ -42,7 +42,7 @@ DockerLLMModeControl sits inside DockerizedServices and must coexist peacefully 
 
 The `CODING_ROOT` environment variable is the primary external interface for configuring mode behavior. Container orchestration configuration (Docker Compose files, CI pipeline environment blocks) is responsible for injecting this variable correctly, making those configuration files implicit integration points even if they are not code artifacts of this component directly.
 
-The `src/mock/` module likely exposes an interface consumed by the broader `mcp-server-semantic-analysis` service, meaning callers within that service are insulated from knowing which LLM backend is active — they call through DockerLLMModeControl and receive responses regardless of whether those responses came from a fixture file or a live API. This is the classic seam pattern: the rest of the application remains unchanged across deployment modes.
+The `src/mock/` module likely exposes an interface consumed by the broader `semantic-analysis` service, meaning callers within that service are insulated from knowing which LLM backend is active — they call through DockerLLMModeControl and receive responses regardless of whether those responses came from a fixture file or a live API. This is the classic seam pattern: the rest of the application remains unchanged across deployment modes.
 
 ---
 

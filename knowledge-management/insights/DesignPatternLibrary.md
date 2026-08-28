@@ -8,7 +8,7 @@ The CONTRIBUTING.md file in integrations/code-graph-rag/CONTRIBUTING.md might in
 
 **DesignPatternLibrary** is a logical sub‑component of the broader **CodingPatterns** ecosystem.  Although the repository does not contain any source files that directly implement this library, the surrounding documentation and component hierarchy make its purpose clear: it is the curated collection of reusable design‑pattern definitions that other parts of the system can reference.  The library lives conceptually alongside the sibling sub‑components **CodeAnalysisPatterns**, **BestPracticeRepository**, **AntiPatternIdentification**, and **GraphCodeRAG**, and it is the parent of the **DesignPatternRegistry** child component, which is expected to provide the runtime lookup and management facilities for the patterns.
 
-The parent **CodingPatterns** component is anchored in the graph‑based analysis pipeline described in `integrations/code-graph-rag/README.md` and the batch‑processing logic in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  Within that context, **DesignPatternLibrary** supplies the “catalog” of pattern knowledge that the analysis agents can draw upon when classifying code structures or recommending refactorings.
+The parent **CodingPatterns** component is anchored in the graph‑based analysis pipeline described in `integrations/code-graph-rag/README.md` and the batch‑processing logic in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`.  Within that context, **DesignPatternLibrary** supplies the “catalog” of pattern knowledge that the analysis agents can draw upon when classifying code structures or recommending refactorings.
 
 > **Note:** No concrete file paths (e.g., `.ts` or `.js` files) were found that declare the library itself, which means the current source snapshot treats the library as an abstract data‑driven asset rather than a code‑level module.
 
@@ -26,7 +26,7 @@ The overall system is organized as a hierarchy of loosely coupled sub‑componen
 
 1. **Registry Pattern** – implied by the **DesignPatternRegistry** child; centralizes pattern definitions for easy lookup.  
 2. **Modular Component Architecture** – the parent‑child‑sibling layout isolates responsibilities and enables independent evolution of each knowledge domain.  
-3. **Batch Processing Integration** – the ontology‑classification agent (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) processes large codebases in batches, indicating that pattern look‑ups are likely performed at scale rather than per‑request.  
+3. **Batch Processing Integration** – the ontology‑classification agent (`integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`) processes large codebases in batches, indicating that pattern look‑ups are likely performed at scale rather than per‑request.  
 
 ---
 
@@ -40,7 +40,7 @@ Because the source snapshot contains **zero code symbols** for the library, the 
 
 * **Integration with Graph‑Code RAG** – The **GraphCodeRAG** README (`integrations/code-graph-rag/README.md`) describes a graph‑based code analysis pipeline.  When a sub‑graph matches a known pattern shape, the registry can provide the semantic label, enabling downstream reasoning (e.g., “this sub‑graph implements the Strategy pattern”).
 
-* **Validation Workflow** – The `EntityValidator` class inside `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` validates entities against a schema.  It is plausible that pattern definitions in **DesignPatternLibrary** are also validated by this component, ensuring that pattern metadata remains consistent across releases.
+* **Validation Workflow** – The `EntityValidator` class inside `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts` validates entities against a schema.  It is plausible that pattern definitions in **DesignPatternLibrary** are also validated by this component, ensuring that pattern metadata remains consistent across releases.
 
 * **Contribution Process** – Although the `integrations/code-graph-rag/CONTRIBUTING.md` file is aimed at the Graph‑Code RAG system, its contribution guidelines (pull‑request workflow, review checklist) are likely reused for adding new design patterns to the library, preserving a uniform quality gate.
 
@@ -52,7 +52,7 @@ The **DesignPatternLibrary** sits at the nexus of several critical flows:
 
 1. **Graph‑Code RAG** – When the RAG system constructs a code graph, it queries the **DesignPatternRegistry** to annotate sub‑graphs with pattern identifiers.  This enriches the graph with higher‑level semantics that downstream agents can exploit.
 
-2. **Ontology Classification Agent** – The batch processing pipeline (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) consumes pattern metadata to classify code entities, using the `EntityValidator` to ensure that pattern descriptors conform to the ontology schema.
+2. **Ontology Classification Agent** – The batch processing pipeline (`integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`) consumes pattern metadata to classify code entities, using the `EntityValidator` to ensure that pattern descriptors conform to the ontology schema.
 
 3. **Contribution Workflow** – Developers adding new patterns follow the contribution guidelines outlined in `integrations/code-graph-rag/CONTRIBUTING.md`.  This ensures that the library evolves in lockstep with the rest of the **CodingPatterns** suite.
 
@@ -87,7 +87,7 @@ The **DesignPatternLibrary** sits at the nexus of several critical flows:
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
 
 ### Children
 - [DesignPatternRegistry](./DesignPatternRegistry.md) -- Although no direct source code is available, the parent context suggests a structured approach to coding patterns, implying the existence of a registry or similar mechanism for managing design patterns.

@@ -8,7 +8,7 @@ The local mode in llm-mock-service.ts targets a locally running LLM (possibly vi
 
 ## What It Is
 
-LLMMockService is implemented in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` as a three-mode LLM routing abstraction scoped specifically to the semantic analysis MCP integration. Its placement under the `mock/` subdirectory signals an intentional design boundary: this is not a shared infrastructure utility but a testing and environment-adaptation concern belonging exclusively to the semantic analysis MCP. Within the broader DockerizedServices deployment — which packages the semantic analysis MCP alongside services like code-graph-rag, Memgraph, and Redis under `docker/docker-compose.yml` — LLMMockService provides the seam that allows the semantic analysis component to operate across radically different runtime environments without code changes.
+LLMMockService is implemented in `integrations/semantic-analysis/src/mock/llm-mock-service.ts` as a three-mode LLM routing abstraction scoped specifically to the semantic analysis MCP integration. Its placement under the `mock/` subdirectory signals an intentional design boundary: this is not a shared infrastructure utility but a testing and environment-adaptation concern belonging exclusively to the semantic analysis MCP. Within the broader DockerizedServices deployment — which packages the semantic analysis MCP alongside services like code-graph-rag, Memgraph, and Redis under `docker/docker-compose.yml` — LLMMockService provides the seam that allows the semantic analysis component to operate across radically different runtime environments without code changes.
 
 ## Architecture and Design
 
@@ -40,7 +40,7 @@ Developers working on the semantic analysis MCP should default to **mock mode** 
 
 When introducing changes that affect LLM path resolution or mode selection, the Docker path resolution logic inside `llm-mock-service.ts` must be tested both inside and outside the container environment. Because the same file handles both contexts, a change that fixes a local path issue can silently break the containerized deployment managed by `docker/docker-compose.yml` if not validated end-to-end.
 
-LLMMockService should not be promoted to a shared utility across other integrations without deliberate architectural review. Its current scoping to `integrations/mcp-server-semantic-analysis/src/mock/` is a correct boundary decision — other integrations may have different LLM routing needs, and centralizing this logic prematurely would create unwanted coupling across services that DockerizedServices currently keeps independent.
+LLMMockService should not be promoted to a shared utility across other integrations without deliberate architectural review. Its current scoping to `integrations/semantic-analysis/src/mock/` is a correct boundary decision — other integrations may have different LLM routing needs, and centralizing this logic prematurely would create unwanted coupling across services that DockerizedServices currently keeps independent.
 
 
 ## Hierarchy Context

@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md (titled 'CRITICAL Architecture Issues - RESOLVED') documents resolved architectural concerns, indicating the boundary between pipeline persistence and downstream insight generation was a subject of explicit architectural scrutiny.
+integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md (titled 'CRITICAL Architecture Issues - RESOLVED') documents resolved architectural concerns, indicating the boundary between pipeline persistence and downstream insight generation was a subject of explicit architectural scrutiny.
 
 ## What It Is  
 
 **CommittedKGInsightConsumer** is the concrete implementation that powers the *Insights* sub‑system’s ability to generate semantic observations from a fully‑committed knowledge graph (KG). It lives inside the **integrations/mcp‑server‑semantic‑analysis** repository and is documented in two key artefacts:  
 
-* `integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` – a resolved‑issues record that explicitly calls out the boundary between the pipeline’s persistence stage and downstream insight generation.  
-* `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md` – the “Integration Patterns” guide that defines the contract the consumer must obey when reading the KG.  
+* `integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` – a resolved‑issues record that explicitly calls out the boundary between the pipeline’s persistence stage and downstream insight generation.  
+* `integrations/semantic-analysis/docs/architecture/integration.md` – the “Integration Patterns” guide that defines the contract the consumer must obey when reading the KG.  
 
 The component is **architecturally downstream of the pipeline’s persistence stage**, meaning it never sees raw agent output; it only operates on the *committed* graph snapshot that contains the definitive relationship types **DEFINES**, **DEPENDS_ON_EXTERNAL**, **CONTAINS_FILE**, and **CONTAINS_MODULE**. By consuming only this stable, immutable view of the KG, the consumer can safely run heavyweight semantic analyses without risking race conditions or partial data.
 

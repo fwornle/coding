@@ -8,7 +8,7 @@ Classification output includes explicit ontology metadata fields (entityType, me
 
 ## What It Is
 
-`OntologyClassificationAgent` is implemented at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` and functions as a **post-capture enrichment layer** within the LiveLoggingSystem. Rather than intercepting log entries as they are written, it operates asynchronously against already-persisted LSL entries, reading from the `.data/logs/` directory that SemanticLoggingBuffer populates during live Claude Code sessions. Its primary responsibility is to invoke an LLM to assign structured ontology class labels and confidence scores to each LSL observation, lifting raw transcript content into the typed ontology vocabulary consumed by downstream knowledge management pipelines.
+`OntologyClassificationAgent` is implemented at `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts` and functions as a **post-capture enrichment layer** within the LiveLoggingSystem. Rather than intercepting log entries as they are written, it operates asynchronously against already-persisted LSL entries, reading from the `.data/logs/` directory that SemanticLoggingBuffer populates during live Claude Code sessions. Its primary responsibility is to invoke an LLM to assign structured ontology class labels and confidence scores to each LSL observation, lifting raw transcript content into the typed ontology vocabulary consumed by downstream knowledge management pipelines.
 
 Within the LiveLoggingSystem hierarchy, the agent represents the classification tier — the semantic enrichment step that transforms what SemanticLoggingBuffer writes into something that graph-aware consumers like `GraphKMStore` can reason over with confidence.
 
@@ -59,7 +59,7 @@ The agent's conformance to `docs/architecture/agent-abstraction-api.md` means it
 - [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem (LSL) is a session logging infrastructure that captures, classifies, and persists AI agent conversations—primarily from Claude Code—into a unified format. It handles session windowing (time-window identifiers like '0800-0900'), multi-user support via SHA-256 user hashing, file routing with rotation thresholds, and transcript capture from agent-native formats. The system bridges raw agent transcripts to a normalized LSL format used downstream by semantic analysis and knowledge management pipelines.
 
 ### Siblings
-- [SemanticLoggingBuffer](./SemanticLoggingBuffer.md) -- SemanticLoggingBuffer resides in integrations/mcp-server-semantic-analysis/src/logging.ts and serves as the primary write path for normalized LSL log entries produced during Claude Code sessions.
+- [SemanticLoggingBuffer](./SemanticLoggingBuffer.md) -- SemanticLoggingBuffer resides in integrations/semantic-analysis/src/logging.ts and serves as the primary write path for normalized LSL log entries produced during Claude Code sessions.
 
 
 ---

@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The architecture overview at integrations/mcp-server-semantic-analysis/docs/architecture/README.md contextualizes AgentResponse as the integration boundary for the MCP server, meaning external callers never interact with intermediate stage outputs—only the final envelope.
+The architecture overview at integrations/semantic-analysis/docs/architecture/README.md contextualizes AgentResponse as the integration boundary for the MCP server, meaning external callers never interact with intermediate stage outputs—only the final envelope.
 
 ## What It Is  
 
 **AgentResponseEnvelope** is the concrete data contract that travels from the **Pipeline** component to any downstream consumer, including the MCP (Model‑Centric Platform) server tooling.  The envelope is defined in the integration boundary documented at  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/architecture/README.md
+integrations/semantic-analysis/docs/architecture/README.md
 ```  
 
 and is the only object that external callers ever see – intermediate stage results are never exposed.  The envelope aggregates the structured metadata emitted by every lifecycle stage of the pipeline ( `process`, `calculateConfidence`, `detectIssues`, `generateRouting`, `applyCorrections` ) and, because `applyCorrections` is the final stage, the payload already reflects any post‑analysis corrections.  In short, **AgentResponseEnvelope** is the canonical, post‑correction representation of a pipeline execution, guaranteeing that all required metadata is present and that consumers can treat the contents as final, production‑ready output.
@@ -37,7 +37,7 @@ AgentResponseEnvelope –‑► Populated step‑by‑step
 MCP Server (consumer) –‑► Receives final envelope only
 ```
 
-> **Diagram** (from `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`)
+> **Diagram** (from `integrations/semantic-analysis/docs/architecture/README.md`)
 
 ```
 +-------------------+      +-------------------+      +----------------------+

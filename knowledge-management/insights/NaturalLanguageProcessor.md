@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md file discusses semantic constraint detection, which is likely related to the NaturalLanguageProcessor's functionality.
+The integrations/constraint-monitor/docs/semantic-constraint-detection.md file discusses semantic constraint detection, which is likely related to the NaturalLanguageProcessor's functionality.
 
 ## What It Is  
 
 The **NaturalLanguageProcessor** lives inside the **SemanticAnalyzer** sub‑component of the repository. Its existence is explicitly referenced in two documentation files:  
 
 * `integrations/code-graph-rag/README.md` – this README notes that the solution “uses natural language processing techniques,” which is the first concrete indication that a NaturalLanguageProcessor implementation is present.  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – this document describes *semantic constraint detection*, a capability that “relies on the NaturalLanguageProcessor” to understand the meaning of entity content.  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – this document describes *semantic constraint detection*, a capability that “relies on the NaturalLanguageProcessor” to understand the meaning of entity content.  
 
 Together these observations make it clear that the NaturalLanguageProcessor is a dedicated module whose purpose is to apply NLP techniques (tokenisation, parsing, semantic analysis, etc.) to the raw textual data that the **SemanticAnalyzer** receives. It is therefore a core child component of **SemanticAnalyzer**, enabling the parent to transform free‑form text into structured semantic representations that downstream checks—such as the constraint‑monitor—can evaluate.
 

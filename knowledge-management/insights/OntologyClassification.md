@@ -2,17 +2,17 @@
 
 **Type:** SubComponent
 
-OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 
 ## What It Is  
 
 **OntologyClassification** is a sub‑component of the **KnowledgeManagement** domain that is responsible for assigning semantic categories (ontologies) to entities discovered throughout the system.  The implementation lives in the *integrations* folder and is tightly coupled to a set of documented contracts:
 
-* **ClaudeCodeHookDataFormat** – the data exchange schema defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  
-* **Constraint configuration** – rules for how ontological constraints are expressed, described in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  
-* **Semantic‑constraint detection** – the algorithmic description in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`.  
+* **ClaudeCodeHookDataFormat** – the data exchange schema defined in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  
+* **Constraint configuration** – rules for how ontological constraints are expressed, described in `integrations/constraint-monitor/docs/constraint-configuration.md`.  
+* **Semantic‑constraint detection** – the algorithmic description in `integrations/constraint-monitor/docs/semantic-constraint-detection.md`.  
 
-In practice, OntologyClassification consumes the Claude‑style payloads, applies the semantic‑constraint logic, and persists the resulting typed entities via the **EntityPersistence** sibling component.  When deeper code‑level reasoning is required, it forwards the relevant code graph to the **Code Graph RAG** system (see `integrations/code-graph-rag/README.md`).  The component also registers itself with the **MCP Constraint Monitor** (`integrations/mcp-constraint-monitor/README.md`) so that any violations of ontology‑based constraints are surfaced to the broader monitoring infrastructure.
+In practice, OntologyClassification consumes the Claude‑style payloads, applies the semantic‑constraint logic, and persists the resulting typed entities via the **EntityPersistence** sibling component.  When deeper code‑level reasoning is required, it forwards the relevant code graph to the **Code Graph RAG** system (see `integrations/code-graph-rag/README.md`).  The component also registers itself with the **MCP Constraint Monitor** (`integrations/constraint-monitor/README.md`) so that any violations of ontology‑based constraints are surfaced to the broader monitoring infrastructure.
 
 ---
 
@@ -22,7 +22,7 @@ The architecture of OntologyClassification follows a **modular, contract‑drive
 
 1. **Data‑format contract** – The Claude code‑hook format provides a stable JSON‑ish schema that all upstream producers (e.g., the **UKBTraceReporting** sibling) must adhere to.  By anchoring on this file‑level contract, OntologyClassification can evolve its internal processing without breaking callers.  
 
-2. **Constraint‑monitor integration** – The component registers its ontological rules with the MCP Constraint Monitor (documented in `integrations/mcp-constraint-monitor/README.md`).  This mirrors the *observer* pattern: the monitor watches for constraint violations emitted by OntologyClassification and raises alerts downstream.  
+2. **Constraint‑monitor integration** – The component registers its ontological rules with the MCP Constraint Monitor (documented in `integrations/constraint-monitor/README.md`).  This mirrors the *observer* pattern: the monitor watches for constraint violations emitted by OntologyClassification and raises alerts downstream.  
 
 3. **Semantic detection pipeline** – The detection logic described in `semantic-constraint-detection.md` is invoked as a pure‑function pipeline that receives the Claude payload, enriches it with inferred semantic relationships, and emits a set of ontology tags.  This pipeline is stateless, which supports easy unit testing and parallel execution.  
 
@@ -38,7 +38,7 @@ The parent **KnowledgeManagement** component employs lazy LLM initialization (se
 
 Even though no concrete class definitions appear in the current source snapshot, the documentation outlines the concrete steps that OntologyClassification follows:
 
-1. **Payload ingestion** – A request arrives containing the Claude‑style data structure.  The format is strictly defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, which enumerates fields such as `codeSnippet`, `metadata`, and `hookId`.  The component parses this payload into an internal `ClaudeHookPayload` object.
+1. **Payload ingestion** – A request arrives containing the Claude‑style data structure.  The format is strictly defined in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, which enumerates fields such as `codeSnippet`, `metadata`, and `hookId`.  The component parses this payload into an internal `ClaudeHookPayload` object.
 
 2. **Constraint configuration lookup** – Using the rules described in `constraint-configuration.md`, OntologyClassification selects the appropriate ontology constraint set based on the `hookId` and any supplied metadata.  This lookup is typically a map lookup (`constraintMap[hookId]`) that yields a `ConstraintSpec`.
 
@@ -62,10 +62,10 @@ All of these steps are orchestrated in a single, async workflow that respects th
 
 | Integration Target | Path / Document | Interaction Pattern | Key Artifacts |
 |--------------------|-----------------|---------------------|---------------|
-| **ClaudeCodeHookDataFormat** | `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | Input schema contract | `ClaudeHookPayload` JSON |
-| **MCP Constraint Monitor** | `integrations/mcp-constraint-monitor/README.md` | Observer / event emitter | `ConstraintEvent` objects |
-| **Constraint Configuration** | `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` | Rule lookup service | `ConstraintSpec` map |
-| **Semantic‑Constraint Detection** | `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` | Pure‑function pipeline | `candidateTags`, `assignedTags` |
+| **ClaudeCodeHookDataFormat** | `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | Input schema contract | `ClaudeHookPayload` JSON |
+| **MCP Constraint Monitor** | `integrations/constraint-monitor/README.md` | Observer / event emitter | `ConstraintEvent` objects |
+| **Constraint Configuration** | `integrations/constraint-monitor/docs/constraint-configuration.md` | Rule lookup service | `ConstraintSpec` map |
+| **Semantic‑Constraint Detection** | `integrations/constraint-monitor/docs/semantic-constraint-detection.md` | Pure‑function pipeline | `candidateTags`, `assignedTags` |
 | **EntityPersistence** | (sibling component) | Persistence interface | `EntityPersistence.saveTypedEntity()` |
 | **Code Graph RAG** | `integrations/code-graph-rag/README.md` | Request‑response RPC | `CodeGraphRequest`, `CodeGraphResponse` |
 | **Parent KnowledgeManagement** | `wave-controller.ts:489` (lazy LLM init) | Deferred initialization | Shared atomic index, `ensureLLMInitialized()` |
@@ -141,7 +141,7 @@ Overall, OntologyClassification exhibits a well‑structured, contract‑centric
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
 - [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
 - [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
-- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [UKBTraceReporting](./UKBTraceReporting.md) -- UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 

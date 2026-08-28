@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file suggests that the InsightGenerationModule may utilize specific data formats for processing the UKB trace report.
+The integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file suggests that the InsightGenerationModule may utilize specific data formats for processing the UKB trace report.
 
 ## What It Is  
 
 `UkbTraceReportProcessor` lives inside the **InsightGenerationModule** – the part of the system that turns raw UKB (University Knowledge Base) trace reports into higher‑level insights.  The only concrete location we can point to is the *parent* module’s source tree; the observations do not list a dedicated file for the processor, which implies that the implementation is embedded in one of the InsightGenerationModule’s internal classes or packages.  The processor’s sole responsibility is to ingest the UKB trace report (produced by the **UtilitiesModule**) and transform it into the data structures expected by the rest of the InsightGenerationModule’s pipeline.  The format it expects is hinted at by the file  
 
 ```
-integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 ```  
 
 which documents the exact shape of the trace‑report payloads that the processor must understand.

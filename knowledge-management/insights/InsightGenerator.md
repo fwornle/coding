@@ -6,7 +6,7 @@ The InsightGenerator is a key component of the SemanticAnalysis system, and its 
 
 ## What It Is  
 
-The **InsightGenerator** lives in the file `integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts`, which is part of the **mcp‑server‑semantic‑analysis** module.  It is the concrete implementation that drives the *SemanticAnalysis* capability of the platform.  By invoking the **CodeAnalyzer** (exposed through the `CodeAnalyzerIntegration` child component), the InsightGenerator parses source‑code files and walks the Git history to produce structured “insights” that other parts of the system can consume.  Its parent in the component hierarchy is the **Insights** container, and it is also listed as a child of **SemanticAnalysis**, indicating that it sits at the intersection of code‑level analysis and higher‑level semantic services.
+The **InsightGenerator** lives in the file `integrations/semantic-analysis/src/agents/insight-generator.ts`, which is part of the **mcp‑server‑semantic‑analysis** module.  It is the concrete implementation that drives the *SemanticAnalysis* capability of the platform.  By invoking the **CodeAnalyzer** (exposed through the `CodeAnalyzerIntegration` child component), the InsightGenerator parses source‑code files and walks the Git history to produce structured “insights” that other parts of the system can consume.  Its parent in the component hierarchy is the **Insights** container, and it is also listed as a child of **SemanticAnalysis**, indicating that it sits at the intersection of code‑level analysis and higher‑level semantic services.
 
 ---
 
@@ -22,7 +22,7 @@ Because the InsightGenerator is a key component of the **SemanticAnalysis** syst
 
 ## Implementation Details  
 
-The only concrete artifact we have is the file path `integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts`.  Inside this TypeScript module we can anticipate the following structure based on the naming conventions:
+The only concrete artifact we have is the file path `integrations/semantic-analysis/src/agents/insight-generator.ts`.  Inside this TypeScript module we can anticipate the following structure based on the naming conventions:
 
 1. **Class / Function Declaration** – a top‑level `InsightGenerator` class (or exported function) that exposes a public method such as `generateInsights(projectPath: string): Insight[]`.  
 2. **Dependency Injection** – the constructor likely receives an instance of `CodeAnalyzerIntegration`, enabling the InsightGenerator to call methods like `analyzeFiles()` or `extractGitHistory()`.  This injection makes the relationship explicit and testable.  
@@ -90,10 +90,10 @@ Because the exact implementation of **CodeAnalyzer** is not supplied, we treat i
 ## Hierarchy Context
 
 ### Parent
-- [Insights](./Insights.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
+- [Insights](./Insights.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/semantic-analysis/src/agents/insight-generator.ts file.
 
 ### Children
-- [CodeAnalyzerIntegration](./CodeAnalyzerIntegration.md) -- The InsightGenerator utilizes the CodeAnalyzer as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file, indicating a tight integration between the two components.
+- [CodeAnalyzerIntegration](./CodeAnalyzerIntegration.md) -- The InsightGenerator utilizes the CodeAnalyzer as referenced in the integrations/semantic-analysis/src/agents/insight-generator.ts file, indicating a tight integration between the two components.
 
 ---
 

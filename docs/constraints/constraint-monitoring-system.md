@@ -36,7 +36,7 @@ The system uses **two hook types** working together:
         "matcher": "*",
         "hooks": [{
           "type": "command",
-          "command": "node /path/to/coding/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+          "command": "node /path/to/coding/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
         }]
       }
     ],
@@ -56,7 +56,7 @@ The system uses **two hook types** working together:
 ### System Components
 
 ```
-integrations/mcp-constraint-monitor/
+integrations/constraint-monitor/
 ├── src/
 │   ├── hooks/
 │   │   ├── pre-tool-hook-wrapper.js        # PreToolUse entry point
@@ -283,7 +283,7 @@ All override usage is logged for audit purposes:
 Calls hook functions directly with test data to validate detection and blocking:
 
 ```bash
-cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
 node test-all-constraints-comprehensive.js
 ```
 
@@ -342,7 +342,7 @@ node collect-test-results.js
 
 **Start Dashboard**:
 ```bash
-cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
 PORT=3030 npm run dashboard
 ```
 
@@ -358,7 +358,7 @@ PORT=3030 npm run dashboard
 
 **Start API**:
 ```bash
-cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
 PORT=3031 npm run api
 ```
 
@@ -470,7 +470,7 @@ nano ~/.claude/settings.json
         "matcher": "*",
         "hooks": [{
           "type": "command",
-          "command": "node /absolute/path/to/coding/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+          "command": "node /absolute/path/to/coding/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
         }]
       }
     ],
@@ -684,7 +684,7 @@ lsof -i :3031
 **Solutions**:
 ```bash
 # Start API server
-cd integrations/mcp-constraint-monitor
+cd integrations/constraint-monitor
 PORT=3031 npm run api
 
 # Start dashboard
@@ -763,8 +763,8 @@ disabled_constraints:
 
 - **[Live Session Logging System](live-session-logging.md)** - LSL integration details
 - **[Constraint Monitor Effectiveness Report](constraint-monitor-effectiveness-report.md)** - Real-world testing results
-- **[Test Report](../integrations/mcp-constraint-monitor/comprehensive-constraint-test-report.md)** - Latest test results
-- **[Interactive Test Guide](../integrations/mcp-constraint-monitor/INTERACTIVE-TESTING-GUIDE.md)** - Manual testing procedures
+- **[Test Report](../integrations/constraint-monitor/comprehensive-constraint-test-report.md)** - Latest test results
+- **[Interactive Test Guide](../integrations/constraint-monitor/INTERACTIVE-TESTING-GUIDE.md)** - Manual testing procedures
 - **[Claude Code Hooks Documentation](https://docs.claude.com/en/docs/claude-code/hooks)** - Official hooks reference
 
 ---

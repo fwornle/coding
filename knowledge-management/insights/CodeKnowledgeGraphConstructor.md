@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-CodeKnowledgeGraphConstructor utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) for AST-based code knowledge graph construction.
+CodeKnowledgeGraphConstructor utilizes the CodeGraphAgent (integrations/semantic-analysis/src/agents/code-graph-agent.ts) for AST-based code knowledge graph construction.
 
 ## What It Is  
 
 **CodeKnowledgeGraphConstructor** is the concrete sub‑component that builds a *code‑centric knowledge graph* from raw source files. The implementation lives inside the **KnowledgeManagement** domain and relies on the **CodeGraphAgent** located at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts
+integrations/semantic-analysis/src/agents/code-graph-agent.ts
 ```  
 
 to perform an AST‑based traversal of the supplied code. The constructor extracts semantic artefacts (functions, classes, imports, type relationships, etc.) and encodes them as graph entities that can be queried efficiently. It is the engine that powers the automatic knowledge extraction step used by **OnlineLearning**, and it also supplies the “intelligent routing” capability that decides where each piece of knowledge should be persisted or retrieved from the underlying graph store.
@@ -22,7 +22,7 @@ The overall design follows an **agent‑centric composition** pattern. The **Cod
 
 Within the **KnowledgeManagement** hierarchy, the constructor sits alongside sibling components such as **ManualLearning**, **OnlineLearning**, **GraphDatabaseManager**, **EntityPersistenceManager**, and **IntelligentRoutingManager**. All of them share two core services:
 
-* **PersistenceAgent** – `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` – responsible for persisting graph updates.  
+* **PersistenceAgent** – `integrations/semantic-analysis/src/agents/persistence-agent.ts` – responsible for persisting graph updates.  
 * **GraphDatabaseAdapter** – `storage/graph-database-adapter.ts` – abstracts the underlying graph database (e.g., Neo4j, JanusGraph) and provides query‑optimised access.
 
 The constructor therefore follows a **pipeline architecture**:
@@ -120,13 +120,13 @@ All interactions are synchronous or promise‑based (typical of TypeScript servi
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence, which enables efficient querying capabilities and handles large amounts of data. This is evident in the way the component employs the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates. The GraphDatabaseAdapter's automatic JSON export sync ensures data consistency, which is crucial for maintaining the integrity of the knowledge graphs. Furthermore, the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is used for AST-based code knowledge graph construction and semantic code search, demonstrating the component's ability to handle complex data structures and provide intelligent routing for data storage and retrieval.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence, which enables efficient querying capabilities and handles large amounts of data. This is evident in the way the component employs the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates. The GraphDatabaseAdapter's automatic JSON export sync ensures data consistency, which is crucial for maintaining the integrity of the knowledge graphs. Furthermore, the CodeGraphAgent (integrations/semantic-analysis/src/agents/code-graph-agent.ts) is used for AST-based code knowledge graph construction and semantic code search, demonstrating the component's ability to handle complex data structures and provide intelligent routing for data storage and retrieval.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates.
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning leverages the batch analysis pipeline for automatic knowledge extraction from various data sources.
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for managing the graph database connection.
-- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates.
+- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) for entity persistence and knowledge graph updates.
 - [IntelligentRoutingManager](./IntelligentRoutingManager.md) -- IntelligentRoutingManager utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for managing intelligent routing.
 
 ---

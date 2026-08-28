@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 // `dirname(__filename)` at test runtime resolves under dist/ontology/.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-// Walk up 3 levels: dist/ontology -> dist -> mcp-server-semantic-analysis ->
+// Walk up 3 levels: dist/ontology -> dist -> semantic-analysis ->
 // integrations -> coding. Plus `.data/ontologies`.
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..');
 const ONTOLOGY_DIR = join(REPO_ROOT, '.data', 'ontologies');

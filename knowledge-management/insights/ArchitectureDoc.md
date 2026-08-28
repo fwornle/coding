@@ -2,13 +2,13 @@
 
 **Type:** Detail
 
-integrations/mcp-server-semantic-analysis/docs/architecture/ contains three focused documents: agents.md ('Agent Architecture'), tools.md ('Tool Extensions'), and integration.md ('Integration Patterns'), separating concerns across agent design, tool extension points, and integration behavior.
+integrations/semantic-analysis/docs/architecture/ contains three focused documents: agents.md ('Agent Architecture'), tools.md ('Tool Extensions'), and integration.md ('Integration Patterns'), separating concerns across agent design, tool extension points, and integration behavior.
 
 # ArchitectureDoc — Technical Insight Document
 
 ## What It Is
 
-`ArchitectureDoc` represents the structured architecture documentation layer within the `integrations/mcp-server-semantic-analysis` integration. It is physically implemented as a dedicated subdirectory at `integrations/mcp-server-semantic-analysis/docs/architecture/`, containing four files that together form a self-contained architectural reference:
+`ArchitectureDoc` represents the structured architecture documentation layer within the `integrations/semantic-analysis` integration. It is physically implemented as a dedicated subdirectory at `integrations/semantic-analysis/docs/architecture/`, containing four files that together form a self-contained architectural reference:
 
 - `README.md` — a navigational index titled *"Architecture Documentation - MCP Server Semantic Analysis"*
 - `agents.md` — focused on *Agent Architecture*
@@ -16,7 +16,7 @@ integrations/mcp-server-semantic-analysis/docs/architecture/ contains three focu
 - `integration.md` — focused on *Integration Patterns*
 - `CRITICAL-ARCHITECTURE-ISSUES.md` (at the integration root) — a living record of resolved design issues, titled *"CRITICAL Architecture Issues - RESOLVED"*
 
-This documentation set is scoped entirely to the `mcp-server-semantic-analysis` integration and sits within the broader `MCPServerPattern` parent component, which governs how integrations present their tool interfaces through top-level `README.md` entry points.
+This documentation set is scoped entirely to the `semantic-analysis` integration and sits within the broader `MCPServerPattern` parent component, which governs how integrations present their tool interfaces through top-level `README.md` entry points.
 
 ---
 
@@ -34,7 +34,7 @@ The overall structure reflects a **documentation-as-architecture** philosophy: t
 
 ## Implementation Details
 
-The three core documents carve up the architectural surface area of `mcp-server-semantic-analysis` along functional boundaries. `agents.md` addresses the agent tier — likely covering agent lifecycle, responsibilities, and behavioral contracts. `tools.md` addresses the extension surface — the points at which new tooling can be introduced or existing tools modified, which is especially significant in an MCP (Model Context Protocol) context where tool definitions are first-class citizens. `integration.md` addresses the behavioral contracts between this integration and its external consumers or dependencies — the observable patterns at the integration boundary.
+The three core documents carve up the architectural surface area of `semantic-analysis` along functional boundaries. `agents.md` addresses the agent tier — likely covering agent lifecycle, responsibilities, and behavioral contracts. `tools.md` addresses the extension surface — the points at which new tooling can be introduced or existing tools modified, which is especially significant in an MCP (Model Context Protocol) context where tool definitions are first-class citizens. `integration.md` addresses the behavioral contracts between this integration and its external consumers or dependencies — the observable patterns at the integration boundary.
 
 The `README.md` index acts as a **discoverability mechanism**. In a subdirectory that could otherwise require developers to open each file speculatively, the index pre-communicates the contents and purpose of each document, reducing the time-to-orientation for any developer approaching this integration for the first time.
 
@@ -44,9 +44,9 @@ The `CRITICAL-ARCHITECTURE-ISSUES.md` file warrants particular attention. Its ti
 
 ## Integration Points
 
-`ArchitectureDoc` exists within `MCPServerPattern`, which establishes the convention that each integration maintains a top-level `README.md` as its primary tool description entry point. The `ArchitectureDoc` subdirectory at `docs/architecture/` is a layer *below* that top-level entry point — it is reachable from `integrations/mcp-server-semantic-analysis/README.md` but serves a different audience: developers working *on* the integration, rather than consumers working *with* it.
+`ArchitectureDoc` exists within `MCPServerPattern`, which establishes the convention that each integration maintains a top-level `README.md` as its primary tool description entry point. The `ArchitectureDoc` subdirectory at `docs/architecture/` is a layer *below* that top-level entry point — it is reachable from `integrations/semantic-analysis/README.md` but serves a different audience: developers working *on* the integration, rather than consumers working *with* it.
 
-The sibling entity `IntegrationOnboarding`, instantiated in `integrations/code-graph-rag/CONTRIBUTING.md`, demonstrates a parallel pattern: contribution-specific guidance scoped to a single integration, separate from any project-wide documentation. `ArchitectureDoc` and `IntegrationOnboarding` together represent the two primary documentation concerns for any integration — *how it is designed* and *how to contribute to it*. That `mcp-server-semantic-analysis` has formalized the architecture side while `code-graph-rag` has formalized the contribution side suggests these documentation types are independently emergent based on each integration's maturity and complexity.
+The sibling entity `IntegrationOnboarding`, instantiated in `integrations/code-graph-rag/CONTRIBUTING.md`, demonstrates a parallel pattern: contribution-specific guidance scoped to a single integration, separate from any project-wide documentation. `ArchitectureDoc` and `IntegrationOnboarding` together represent the two primary documentation concerns for any integration — *how it is designed* and *how to contribute to it*. That `semantic-analysis` has formalized the architecture side while `code-graph-rag` has formalized the contribution side suggests these documentation types are independently emergent based on each integration's maturity and complexity.
 
 The `CRITICAL-ARCHITECTURE-ISSUES.md` file implicitly integrates with whatever issue-tracking or decision-making process the team uses — it represents the handoff point between that process and the codebase, serving as a permanent anchor for decisions that originated outside the repository.
 
@@ -54,7 +54,7 @@ The `CRITICAL-ARCHITECTURE-ISSUES.md` file implicitly integrates with whatever i
 
 ## Usage Guidelines
 
-Developers approaching `mcp-server-semantic-analysis` for architectural understanding should begin at `integrations/mcp-server-semantic-analysis/docs/architecture/README.md` and use it as the canonical navigation starting point. Skipping the index and opening individual documents directly risks missing the intended reading sequence and the contextual framing the index provides.
+Developers approaching `semantic-analysis` for architectural understanding should begin at `integrations/semantic-analysis/docs/architecture/README.md` and use it as the canonical navigation starting point. Skipping the index and opening individual documents directly risks missing the intended reading sequence and the contextual framing the index provides.
 
 The three-document structure (`agents.md`, `tools.md`, `integration.md`) should be treated as **bounded scopes** — changes to agent behavior belong in `agents.md`, changes to tool extension points belong in `tools.md`, and changes to integration-level contracts belong in `integration.md`. Allowing concerns to bleed across documents would erode the separation-of-concerns design and degrade the documentation's navigability over time.
 
@@ -75,7 +75,7 @@ When adding new documentation to this subdirectory, the `README.md` index should
 
 **Key Trade-off:** The three-document decomposition improves navigability and scoped editability but introduces a risk of cross-cutting concerns (e.g., an agent behavior that is also an integration pattern) falling ambiguously between documents. The index `README.md` partially mitigates this by providing a <COMPANY_NAME_REDACTED>-level view, but the team should establish a clear triage convention for cross-cutting topics.
 
-**Scalability Consideration:** The current structure scales well for a single integration of moderate complexity. If `mcp-server-semantic-analysis` grows significantly, `agents.md` or `tools.md` may need to be further decomposed into subdirectories following the same pattern — the `README.md`-as-index convention is composable and can be applied recursively.
+**Scalability Consideration:** The current structure scales well for a single integration of moderate complexity. If `semantic-analysis` grows significantly, `agents.md` or `tools.md` may need to be further decomposed into subdirectories following the same pattern — the `README.md`-as-index convention is composable and can be applied recursively.
 
 **Maintainability Assessment:** High. The separation of concerns, explicit indexing, and living-record approach for critical issues all contribute to a documentation architecture that is straightforward to update incrementally, easy to navigate, and resistant to the "documentation rot" that affects monolithic docs. The primary maintenance risk is index drift — the `README.md` becoming stale relative to the actual files present — which should be addressed through code review conventions.
 
@@ -83,7 +83,7 @@ When adding new documentation to this subdirectory, the `README.md` index should
 ## Hierarchy Context
 
 ### Parent
-- [MCPServerPattern](./MCPServerPattern.md) -- Each integration maintains a top-level README.md describing the tool interface: integrations/mcp-constraint-monitor/README.md ('MCP Constraint Monitor'), integrations/mcp-server-semantic-analysis/README.md ('MCP Server - Semantic Analysis'), and integrations/code-graph-rag/README.md each serve as the primary tool description entry point.
+- [MCPServerPattern](./MCPServerPattern.md) -- Each integration maintains a top-level README.md describing the tool interface: integrations/constraint-monitor/README.md ('MCP Constraint Monitor'), integrations/semantic-analysis/README.md ('MCP Server - Semantic Analysis'), and integrations/code-graph-rag/README.md each serve as the primary tool description entry point.
 
 ### Siblings
 - [IntegrationOnboarding](./IntegrationOnboarding.md) -- integrations/code-graph-rag/CONTRIBUTING.md ('Contributing to Code Graph RAG') provides contribution-specific guidance scoped to the code-graph-rag integration, separate from any top-level project CONTRIBUTING.md.

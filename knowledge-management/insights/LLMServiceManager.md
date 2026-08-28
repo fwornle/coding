@@ -6,7 +6,7 @@ LlmServiceManager likely interacts with other components for LLM-related tasks, 
 
 ## What It Is  
 
-**LlmServiceManager** is a sub‑component of the **KnowledgeManagement** module. Although the source tree does not expose a concrete file path for the manager itself, its placement is implied by the hierarchical description: *KnowledgeManagement → LlmServiceManager → LlmInterface*. The manager therefore lives inside the KnowledgeManagement package (e.g., `integrations/mcp-server-semantic-analysis/src/knowledge-management/llm-service-manager.ts` would be a plausible location, but the exact path is not listed in the observations).  
+**LlmServiceManager** is a sub‑component of the **KnowledgeManagement** module. Although the source tree does not expose a concrete file path for the manager itself, its placement is implied by the hierarchical description: *KnowledgeManagement → LlmServiceManager → LlmInterface*. The manager therefore lives inside the KnowledgeManagement package (e.g., `integrations/semantic-analysis/src/knowledge-management/llm-service-manager.ts` would be a plausible location, but the exact path is not listed in the observations).  
 
 Its primary responsibility is to provide a **standardized façade for all Large Language Model (LLM) interactions** required by the system. It mediates between higher‑level agents such as **WaveAgentController** and lower‑level persistence or API layers like **GraphDatabaseAdapter**, **VkbApiClientManager**, and the **GraphDatabaseManager**. By centralising LLM calls, it enables the rest of the code base to treat LLM usage as a service rather than a scattered set of ad‑hoc calls.
 
@@ -14,7 +14,7 @@ Its primary responsibility is to provide a **standardized façade for all Large 
 
 The architecture surrounding LlmServiceManager follows a **service‑oriented façade pattern**. The manager sits at the intersection of three functional domains:
 
-1. **Knowledge persistence** – via the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) which stores LLM‑derived entities in a Graphology + LevelDB‑backed graph database.  
+1. **Knowledge persistence** – via the **GraphDatabaseAdapter** (`integrations/semantic-analysis/src/storage/graph-database-adapter.ts`) which stores LLM‑derived entities in a Graphology + LevelDB‑backed graph database.  
 2. **External API interaction** – via the **VkbApiClientManager**, which abstracts the VKB API used for LLM‑related operations (e.g., model licensing, usage metering).  
 3. **Agent orchestration** – via **WaveAgentController**, which initiates LLM calls for tasks such as prompt generation, response handling, and trace reporting.
 
@@ -37,7 +37,7 @@ Even though the source symbols for LlmServiceManager are not enumerated, the sur
 
 * **LlmInterface** – the child component that likely defines the public contract (methods such as `generateText(prompt)`, `embedDocument(text)`, `batchGenerate(prompts[])`). The README for `integrations/copi` mentions a GitHub Copilot CLI wrapper, suggesting that the interface may support multiple back‑ends (Copilot, OpenAI, local models).  
 
-* **GraphDatabaseAdapter** – located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`. This adapter provides CRUD operations on the knowledge graph. LlmServiceManager would call into this adapter to persist generated entities (e.g., new concepts, relationships) or to retrieve context for prompt augmentation.  
+* **GraphDatabaseAdapter** – located at `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`. This adapter provides CRUD operations on the knowledge graph. LlmServiceManager would call into this adapter to persist generated entities (e.g., new concepts, relationships) or to retrieve context for prompt augmentation.  
 
 * **VkbApiClientManager** – while no file path is listed, its role is to encapsulate VKB API calls. The manager would delegate authentication, quota checks, and model selection to this client before issuing a generation request.  
 
@@ -111,7 +111,7 @@ The façade‑adapter composition yields **high modularity**: changes to the und
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
 
 ### Children
 - [LlmInterface](./LlmInterface.md) -- The integrations/copi/README.md file mentions Copi, a GitHub Copilot CLI wrapper, which may interact with the LlmInterface.

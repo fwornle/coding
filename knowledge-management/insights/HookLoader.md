@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file describes the Claude Code Hook Data Format, suggesting a structured approach to loading hook events.
+The integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file describes the Claude Code Hook Data Format, suggesting a structured approach to loading hook events.
 
 ## What It Is  
 
-**HookLoader** is the concrete component responsible for ingesting, parsing, and materialising hook definitions that drive extensibility throughout the platform. The implementation lives under the **integrations** namespace – the documentation that describes the hook contract is found in `integrations/copi/docs/hooks.md`, while the precise payload schema for Claude‑generated code hooks is defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. These two files together make clear that hook loading is not an ad‑hoc activity; it follows a well‑defined data format and is a first‑class concern of the system.
+**HookLoader** is the concrete component responsible for ingesting, parsing, and materialising hook definitions that drive extensibility throughout the platform. The implementation lives under the **integrations** namespace – the documentation that describes the hook contract is found in `integrations/copi/docs/hooks.md`, while the precise payload schema for Claude‑generated code hooks is defined in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. These two files together make clear that hook loading is not an ad‑hoc activity; it follows a well‑defined data format and is a first‑class concern of the system.
 
 HookLoader is owned by **HookManager**, a higher‑level orchestrator that “loads hook events from a configuration file or database” (as described in the hierarchy context). In this relationship HookManager is the *parent* component that delegates the low‑level discovery and deserialization work to HookLoader. No sibling loaders are explicitly documented, but the presence of a dedicated manager suggests that HookLoader is the sole implementation for the current hook‑loading responsibility.
 
@@ -48,7 +48,7 @@ Although the source code itself is not present in the observations, the document
 
 1. **Hook Definition Reference (`integrations/copi/docs/hooks.md`)** – This markdown file enumerates the available hook functions, their signatures, and the contexts in which they fire. HookLoader must therefore contain a registry or lookup table that maps these textual identifiers to concrete handler classes or callbacks. The registry is probably built at startup by scanning the markdown or by loading a pre‑compiled manifest derived from it.
 
-2. **Claude Code Hook Data Format (`integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`)** – The format describes fields such as `hookId`, `payload`, `timestamp`, and possibly a `signature`. HookLoader’s parsing routine will read raw JSON (or another serialisation) from the configuration source, validate required fields against this schema, and instantiate a strongly‑typed `HookEvent` object. Validation may be performed with a lightweight schema validator rather than a full‑blown library, given the limited scope.
+2. **Claude Code Hook Data Format (`integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`)** – The format describes fields such as `hookId`, `payload`, `timestamp`, and possibly a `signature`. HookLoader’s parsing routine will read raw JSON (or another serialisation) from the configuration source, validate required fields against this schema, and instantiate a strongly‑typed `HookEvent` object. Validation may be performed with a lightweight schema validator rather than a full‑blown library, given the limited scope.
 
 3. **Parent‑Child Relationship** – HookManager contains an instance of HookLoader. The typical lifecycle is:
    * HookManager initialises, creates HookLoader.

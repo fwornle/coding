@@ -89,7 +89,7 @@ note right of csa
   Implementation spans:
   - src/knowledge-management
   - lib/ukb-unified
-  - integrations/mcp-server-semantic-analysis/src
+  - integrations/semantic-analysis/src
 end note
 
 @enduml

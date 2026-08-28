@@ -2,7 +2,7 @@
 /**
  * Phase 60 Plan 09 — One-shot L2 subsystem re-classification migration
  * (SC#5 / LOWERONTO-03). Sister-script to the writer-side deterministic
- * refinement in `integrations/mcp-server-semantic-analysis/src/agents/
+ * refinement in `integrations/semantic-analysis/src/agents/
  * ontology-classification-agent.ts` (Task 2) — BOTH import the SAME
  * `classifyL2` mapper from the submodule's built dist, so there is exactly
  * one mapping implementation and zero copy-paste drift.
@@ -79,7 +79,7 @@ import { GraphKMStore, isHierarchyRoot } from '@fwornle/km-core';
 // SHARED mapper — the one implementation also wired into the writer agent
 // (Task 2). Imported from the submodule's built dist so there is no copy of
 // the keyword table in this script.
-import { classifyL2 } from '../integrations/mcp-server-semantic-analysis/dist/agents/l2-subsystem-classifier.js';
+import { classifyL2 } from '../integrations/semantic-analysis/dist/agents/l2-subsystem-classifier.js';
 
 const REFINABLE_L1 = new Set(['Component', 'SubComponent', 'Detail']);
 

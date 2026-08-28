@@ -237,7 +237,7 @@ git submodule update --remote
 git submodule update --init --recursive
 
 # Update specific submodule
-git submodule update --remote integrations/mcp-server-semantic-analysis
+git submodule update --remote integrations/semantic-analysis
 ```
 
 ---

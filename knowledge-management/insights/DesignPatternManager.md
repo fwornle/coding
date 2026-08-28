@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-DesignPatternManager relies on the CodeAnalysisModule, which uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, to analyze code based on stored design patterns.
+DesignPatternManager relies on the CodeAnalysisModule, which uses the CodeGraphAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts, to analyze code based on stored design patterns.
 
 ## What It Is  
 
-DesignPatternManager is a **SubComponent** that lives inside the **CodingPatterns** component.  Its concrete implementation is spread across the graph‑database adapter (`storage/graph-database-adapter.ts`) and the semantic‑analysis integration (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`).  The manager’s primary responsibility is to **persist, retrieve, and apply design‑pattern knowledge**—including security standards and anti‑patterns—by treating each pattern as an entity in the underlying graph database.  It does this by invoking `GraphDatabaseAdapter.createEntity()` to store patterns and by exposing retrieval APIs that other modules (e.g., the CodeAnalysisModule, CodingConventionEnforcer, SecurityStandardsModule) can consume during code‑analysis workflows.
+DesignPatternManager is a **SubComponent** that lives inside the **CodingPatterns** component.  Its concrete implementation is spread across the graph‑database adapter (`storage/graph-database-adapter.ts`) and the semantic‑analysis integration (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`).  The manager’s primary responsibility is to **persist, retrieve, and apply design‑pattern knowledge**—including security standards and anti‑patterns—by treating each pattern as an entity in the underlying graph database.  It does this by invoking `GraphDatabaseAdapter.createEntity()` to store patterns and by exposing retrieval APIs that other modules (e.g., the CodeAnalysisModule, CodingConventionEnforcer, SecurityStandardsModule) can consume during code‑analysis workflows.
 
 ## Architecture and Design  
 
@@ -15,7 +15,7 @@ The observed architecture follows a **component‑centric, graph‑backed knowle
 Interaction between components is clearly **layered**:  
 1. **PatternStorage** (child) calls `GraphDatabaseAdapter.createEntity()` to materialize a design‑pattern node.  
 2. The **DesignPatternManager** aggregates these stored entities and provides lookup services to sibling components.  
-3. The **CodeAnalysisModule**, which depends on the **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`), pulls the stored patterns from DesignPatternManager to enrich its semantic analysis.  
+3. The **CodeAnalysisModule**, which depends on the **CodeGraphAgent** (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`), pulls the stored patterns from DesignPatternManager to enrich its semantic analysis.  
 
 The parent **CodingPatterns** component shares the same graph‑database adapter, reinforcing a **shared‑resource** pattern where multiple sub‑components rely on a common persistence layer.  Sibling components such as **CodingConventionEnforcer** and **SecurityStandardsModule** consume the same pattern data, illustrating a **publish‑subscribe** style of data reuse without tightly coupling the consumers to the storage implementation.
 
@@ -23,7 +23,7 @@ The parent **CodingPatterns** component shares the same graph‑database adapter
 
 At the heart of the implementation is the **GraphDatabaseAdapter** class located in `storage/graph-database-adapter.ts`.  Its `createEntity()` method receives a plain‑object representation of a design pattern (name, description, category, metadata) and translates it into a graph node, handling any necessary indexing or relationship wiring.  **PatternStorage**, a child of DesignPatternManager, encapsulates the call to `createEntity()`, providing a focused API such as `storePattern(patternDto)` that validates input before persisting.  
 
-DesignPatternManager exposes higher‑level operations like `getPatternById(id)`, `listAllPatterns()`, and `applyPatternsToCode(ast)`.  The latter delegates to the **CodeAnalysisModule**, which in turn uses the **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`).  The agent walks the code’s abstract syntax tree, queries the graph database for matching pattern entities, and annotates the AST with guidance (e.g., “replace this anti‑pattern with the recommended design pattern”).  
+DesignPatternManager exposes higher‑level operations like `getPatternById(id)`, `listAllPatterns()`, and `applyPatternsToCode(ast)`.  The latter delegates to the **CodeAnalysisModule**, which in turn uses the **CodeGraphAgent** (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`).  The agent walks the code’s abstract syntax tree, queries the graph database for matching pattern entities, and annotates the AST with guidance (e.g., “replace this anti‑pattern with the recommended design pattern”).  
 
 The **KnowledgeGraphManager** is another sibling that also uses `GraphDatabaseAdapter` to store broader knowledge‑graph data.  Because both managers rely on the same adapter, they benefit from a consistent transaction model and shared indexing strategy, reducing duplication of persistence logic.
 
@@ -33,7 +33,7 @@ DesignPatternManager sits at the nexus of several integration pathways:
 
 * **Storage Layer** – Directly depends on `GraphDatabaseAdapter.createEntity()` (and complementary read methods) in `storage/graph-database-adapter.ts`.  All pattern entities flow through this adapter, making it the sole persistence contract.  
 
-* **Code Analysis Stack** – Supplies stored patterns to the **CodeAnalysisModule**, which invokes the **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`).  The agent acts as the bridge between the graph store and the code‑analysis runtime, translating pattern nodes into actionable rules.  
+* **Code Analysis Stack** – Supplies stored patterns to the **CodeAnalysisModule**, which invokes the **CodeGraphAgent** (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`).  The agent acts as the bridge between the graph store and the code‑analysis runtime, translating pattern nodes into actionable rules.  
 
 * **Sibling Consumers** – **CodingConventionEnforcer** and **SecurityStandardsModule** request patterns via DesignPatternManager’s public APIs to enforce coding conventions and security policies, respectively.  This decouples enforcement logic from pattern storage.  
 
@@ -85,14 +85,14 @@ DesignPatternManager sits at the nexus of several integration pathways:
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter class, specifically the createEntity() method in storage/graph-database-adapter.ts, to store design patterns as entities in the graph database. This facilitates the persistence and retrieval of coding conventions. For instance, when storing security standards and anti-patterns as entities, the GraphDatabaseAdapter.createEntity() method is deployed. This enables comprehensive coding guidance and is a key aspect of the component's architecture. The CodeAnalysisModule, which uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, relies on these stored patterns to analyze code.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter class, specifically the createEntity() method in storage/graph-database-adapter.ts, to store design patterns as entities in the graph database. This facilitates the persistence and retrieval of coding conventions. For instance, when storing security standards and anti-patterns as entities, the GraphDatabaseAdapter.createEntity() method is deployed. This enables comprehensive coding guidance and is a key aspect of the component's architecture. The CodeAnalysisModule, which uses the CodeGraphAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts, relies on these stored patterns to analyze code.
 
 ### Children
 - [PatternStorage](./PatternStorage.md) -- The createEntity() method in storage/graph-database-adapter.ts is used to store design patterns as entities in the graph database, enabling pattern storage and retrieval.
 
 ### Siblings
 - [CodingConventionEnforcer](./CodingConventionEnforcer.md) -- CodingConventionEnforcer uses the DesignPatternManager to retrieve stored design patterns for validation.
-- [CodeAnalysisFramework](./CodeAnalysisFramework.md) -- CodeAnalysisFramework uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code based on stored design patterns.
+- [CodeAnalysisFramework](./CodeAnalysisFramework.md) -- CodeAnalysisFramework uses the CodeGraphAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts to analyze code based on stored design patterns.
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve knowledge graph data.
 - [SecurityStandardsModule](./SecurityStandardsModule.md) -- SecurityStandardsModule uses the DesignPatternManager to retrieve stored design patterns for security standard enforcement.
 - [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve code analysis data.

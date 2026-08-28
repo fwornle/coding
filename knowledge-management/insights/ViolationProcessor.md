@@ -16,7 +16,7 @@ In practice, the ViolationProcessor is invoked whenever the ContentValidator fin
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is **component‑centric** with clear separation of concerns.  The ViolationProcessor follows a **processor‑repository** pattern: the processor orchestrates the workflow while the ViolationStore acts as a repository for persisting violation records.  This mirrors the way the **ContentValidationAgent** (found at `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) isolates validation logic from its surrounding infrastructure.
+The architecture that emerges from the observations is **component‑centric** with clear separation of concerns.  The ViolationProcessor follows a **processor‑repository** pattern: the processor orchestrates the workflow while the ViolationStore acts as a repository for persisting violation records.  This mirrors the way the **ContentValidationAgent** (found at `integrations/semantic-analysis/src/agents/content-validation-agent.ts`) isolates validation logic from its surrounding infrastructure.
 
 Interaction between components is **synchronous** and **interface‑driven**.  The ContentValidator emits a collection of violation objects (likely plain TypeScript interfaces) that the ViolationProcessor consumes through a well‑defined method (e.g., `process(violations: Violation[])`).  The processor then calls into ViolationStore’s API (e.g., `save(violation: Violation)`) to persist each item.  Because the observations mention logging/auditing, the processor also routes messages to a shared logging facility, adhering to the **cross‑cutting concern** of observability.
 
@@ -33,7 +33,7 @@ No explicit event‑driven architecture is described for ViolationProcessor itse
 
 Although the source contains **zero concrete symbols**, the observations allow us to outline the expected implementation skeleton:
 
-1. **File location** – `src/constraint-system/violation-processor.ts` (or `error-handler.ts`).  This file is colocated with other ConstraintSystem sub‑components, mirroring the layout of `content-validation-agent.ts` in the parent’s `integrations/mcp-server-semantic-analysis/src/agents/` directory.  
+1. **File location** – `src/constraint-system/violation-processor.ts` (or `error-handler.ts`).  This file is colocated with other ConstraintSystem sub‑components, mirroring the layout of `content-validation-agent.ts` in the parent’s `integrations/semantic-analysis/src/agents/` directory.  
 
 2. **Primary class** – `ViolationProcessor`.  The class likely follows the same lifecycle pattern as its siblings: a constructor that receives a configuration object (e.g., DB connection details, logging settings), an `initialize()` method that creates the ViolationStore instance and prepares any required resources, and an `execute()` or `process()` method that accepts violations from the ContentValidator.
 
@@ -124,7 +124,7 @@ Overall, the ViolationProcessor appears to be a well‑encapsulated, fault‑awa
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's modular architecture is evident in its utilization of the ContentValidationAgent, which is defined in the file integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts. This agent is responsible for validating entity content against configured rules, and its implementation follows the constructor(config) + initialize() + execute(input) pattern, allowing for lazy initialization and execution. The ContentValidationAgent's constructor initializes the agent with a given configuration, while the initialize method sets up the necessary resources for validation. The execute method then takes an input and performs the actual validation against the configured rules.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's modular architecture is evident in its utilization of the ContentValidationAgent, which is defined in the file integrations/semantic-analysis/src/agents/content-validation-agent.ts. This agent is responsible for validating entity content against configured rules, and its implementation follows the constructor(config) + initialize() + execute(input) pattern, allowing for lazy initialization and execution. The ContentValidationAgent's constructor initializes the agent with a given configuration, while the initialize method sets up the necessary resources for validation. The execute method then takes an input and performs the actual validation against the configured rules.
 
 ### Children
 - [ViolationStore](./ViolationStore.md) -- The ViolationStore is likely to be a key component in the ViolationProcessor, given the parent context's emphasis on constraint violations and error management.

@@ -2,13 +2,13 @@
 
 **Type:** Detail
 
-The L2 parent context explicitly states that PersistenceAgent 'consumes [the ontologyClass field] to avoid re-classification', establishing a directional data dependency: OntologyClassificationAgent produces, PersistenceAgent guards — a pattern consistent with the integration patterns documented in integrations/mcp-server-semantic-analysis/docs/architecture/integration.md.
+The L2 parent context explicitly states that PersistenceAgent 'consumes [the ontologyClass field] to avoid re-classification', establishing a directional data dependency: OntologyClassificationAgent produces, PersistenceAgent guards — a pattern consistent with the integration patterns documented in integrations/semantic-analysis/docs/architecture/integration.md.
 
 ## What It Is  
 
-**OntologyClassReclassificationGuard** lives inside the **Ontology** sub‑system of the MCP‑Server semantic‑analysis stack.  Although the raw source files are not listed in the current observation set, the guard is conceptually defined alongside the other ontology‑related agents (e.g., `OntologyClassificationAgent`) and is referenced in the integration documentation under `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md`.  Its sole responsibility is to act as a gate‑keeper for the **PersistenceAgent**: it inspects the `ontologyClass` field that is emitted by `OntologyClassificationAgent` in the `AgentResponse`.  If that field is present, the guard signals that the entity has already been classified and therefore the PersistenceAgent can skip a second classification pass.  In effect, the `ontologyClass` attribute doubles as a **classification result** *and* a **presence flag** that drives the guard’s decision logic.
+**OntologyClassReclassificationGuard** lives inside the **Ontology** sub‑system of the MCP‑Server semantic‑analysis stack.  Although the raw source files are not listed in the current observation set, the guard is conceptually defined alongside the other ontology‑related agents (e.g., `OntologyClassificationAgent`) and is referenced in the integration documentation under `integrations/semantic-analysis/docs/architecture/integration.md`.  Its sole responsibility is to act as a gate‑keeper for the **PersistenceAgent**: it inspects the `ontologyClass` field that is emitted by `OntologyClassificationAgent` in the `AgentResponse`.  If that field is present, the guard signals that the entity has already been classified and therefore the PersistenceAgent can skip a second classification pass.  In effect, the `ontologyClass` attribute doubles as a **classification result** *and* a **presence flag** that drives the guard’s decision logic.
 
-The guard is not a separate caching layer; it works directly on the response payload that traverses the agent pipeline.  This design choice is highlighted in the observation that “the guard operates at the AgentResponse level rather than at a separate cache layer.”  Consequently, the guard’s logic is tightly coupled to the contract defined for all agents in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, where `BaseAgent` defines the five abstract methods that every concrete agent—including `OntologyClassificationAgent`—must implement.
+The guard is not a separate caching layer; it works directly on the response payload that traverses the agent pipeline.  This design choice is highlighted in the observation that “the guard operates at the AgentResponse level rather than at a separate cache layer.”  Consequently, the guard’s logic is tightly coupled to the contract defined for all agents in `integrations/semantic-analysis/docs/architecture/agents.md`, where `BaseAgent` defines the five abstract methods that every concrete agent—including `OntologyClassificationAgent`—must implement.
 
 > **Diagram – Guard Interaction**  
 > ![Guard Interaction Diagram](docs/diagrams/ontology-reclassification-guard.png)  
@@ -18,7 +18,7 @@ The guard is not a separate caching layer; it works directly on the response pay
 
 ## Architecture and Design  
 
-The architecture follows a **pipeline‑oriented agent model** in which each agent produces an `AgentResponse` that subsequent agents consume.  `OntologyClassificationAgent` is a concrete implementation of the `BaseAgent` contract and emits the `ontologyClass` field.  `OntologyClassReclassificationGuard` sits immediately downstream of this agent, acting as a **conditional filter** that decides whether the downstream `PersistenceAgent` should invoke the ontology sub‑component again.  This pattern aligns with the integration guidance in `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md`, which describes a **producer‑consumer relationship** between agents to avoid unnecessary work.
+The architecture follows a **pipeline‑oriented agent model** in which each agent produces an `AgentResponse` that subsequent agents consume.  `OntologyClassificationAgent` is a concrete implementation of the `BaseAgent` contract and emits the `ontologyClass` field.  `OntologyClassReclassificationGuard` sits immediately downstream of this agent, acting as a **conditional filter** that decides whether the downstream `PersistenceAgent` should invoke the ontology sub‑component again.  This pattern aligns with the integration guidance in `integrations/semantic-analysis/docs/architecture/integration.md`, which describes a **producer‑consumer relationship** between agents to avoid unnecessary work.
 
 The guard does not introduce a separate stateful cache; instead, it leverages **field‑presence signaling**.  By treating the existence of `ontologyClass` as a boolean “has‑already‑been‑classified” flag, the system eliminates the need for an external lookup or a dedicated cache service.  This design is particularly suited to the **graph‑based storage model** described in `integrations/code-graph-rag/README.md`, where repeated writes to the same node are expensive.  The guard therefore reduces write amplification and keeps the graph mutation rate low.
 
@@ -54,7 +54,7 @@ The data flow can be summarised as:
 2. **`OntologyClassReclassificationGuard`** → reads `ontologyClass` presence, returns a boolean flag.  
 3. **`PersistenceAgent`** → receives the flag; if `False`, bypasses re‑classification and writes directly; if `True`, triggers a fresh classification before persisting.
 
-The guard does **not** expose its own public API; instead, it is invoked implicitly as part of the agent pipeline defined in the integration architecture (`integrations/mcp-server-semantic-analysis/docs/architecture/integration.md`).  Consequently, any changes to the guard’s contract would require coordination with both the `OntologyClassificationAgent` (to ensure the field is always emitted) and the `PersistenceAgent` (to respect the guard’s decision).
+The guard does **not** expose its own public API; instead, it is invoked implicitly as part of the agent pipeline defined in the integration architecture (`integrations/semantic-analysis/docs/architecture/integration.md`).  Consequently, any changes to the guard’s contract would require coordination with both the `OntologyClassificationAgent` (to ensure the field is always emitted) and the `PersistenceAgent` (to respect the guard’s decision).
 
 ---
 
@@ -107,7 +107,7 @@ The guard does **not** expose its own public API; instead, it is invoked implici
 - [Ontology](./Ontology.md) -- OntologyClassificationAgent implements all five BaseAgent abstract methods, emitting an ontologyClass field in its AgentResponse output that PersistenceAgent consumes to avoid re-classification
 
 ### Siblings
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- Per the L2 parent context, OntologyClassificationAgent implements all five BaseAgent abstract methods — establishing it as a complete, non-partial concrete implementation of the agent contract described in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md (Agent Architecture documentation).
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- Per the L2 parent context, OntologyClassificationAgent implements all five BaseAgent abstract methods — establishing it as a complete, non-partial concrete implementation of the agent contract described in integrations/semantic-analysis/docs/architecture/agents.md (Agent Architecture documentation).
 
 
 ---

@@ -2,26 +2,26 @@
 
 **Type:** SubComponent
 
-The content validation process involves checking entity content against predefined rules, which are stored in a configuration file, such as constraint-configuration.md in integrations/mcp-constraint-monitor/docs/
+The content validation process involves checking entity content against predefined rules, which are stored in a configuration file, such as constraint-configuration.md in integrations/constraint-monitor/docs/
 
 ## What It Is  
 
 The **ContentValidationModule** is a sub‑component of the **ConstraintSystem** that lives primarily in the **integrations/mcp‑server‑semantic‑analysis** and **lib/agent‑api** code trees. Its core entry point is the **ContentValidationAgent** located at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+integrations/semantic-analysis/src/agents/content-validation-agent.ts
 ```  
 
 which drives the validation workflow. The module relies on a set of rule definitions stored in a human‑readable markdown file, for example **constraint-configuration.md** under  
 
 ```
-integrations/mcp-constraint-monitor/docs/
+integrations/constraint-monitor/docs/
 ```  
 
 and follows the semantic‑constraint‑detection approach described in  
 
 ```
-integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
+integrations/constraint-monitor/docs/semantic-constraint-detection.md
 ```  
 
 The module’s responsibilities are three‑fold: (1) load and merge hook configurations, (2) validate entity content against the loaded rules, and (3) persist any detected violations for later dashboard consumption via the **ViolationPersistenceService**.
@@ -128,15 +128,15 @@ The modular layout, explicit adapters, and externalized configurations make the 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
 
 ### Children
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis.
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis.
 
 ### Siblings
 - [HookConfigurationManager](./HookConfigurationManager.md) -- The HookConfigLoader in lib/agent-api/hooks/hook-config.js loads and merges hook configurations from user-level and project-level sources.
 - [ViolationPersistenceService](./ViolationPersistenceService.md) -- The ViolationPersistenceService interacts with the ContentValidationModule to store violation records.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts
 
 ---
 

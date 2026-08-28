@@ -11,7 +11,7 @@ The **Integrations** sub‑component lives under the `integrations/` directory o
 * `integrations/browser-access/README.md` – the **Browser Access MCP Server** example for Claude Code.  
 * `integrations/code-graph-rag/README.md` – a **graph‑code Retrieval‑Augmented Generation (RAG)** system.  
 * `integrations/copi/README.md` together with a rich set of supporting docs (`USAGE.md`, `docs/SEND‑VULNERABILITY‑EMAILS.md`, `docs/DELETE‑WORKSPACES‑README.md`, `docs/STATUS‑LINE‑QUICK‑REFERENCE.md`, `docs/hooks.md`).  
-* `integrations/mcp-constraint-monitor/README.md` – the **MCP constraint monitor** integration.
+* `integrations/constraint-monitor/README.md` – the **MCP constraint monitor** integration.
 
 These folders are concrete manifestations of the “Integrations” concept: self‑contained, documented, and runnable pieces of functionality that illustrate how the platform can be wired into other services, UI layers, or operational pipelines.  The sub‑component is itself a child of the **CodingPatterns** component, which houses a family of reusable patterns across the codebase.
 
@@ -50,7 +50,7 @@ The Copi folder is the most extensive, containing:
 Collectively these docs point to a multi‑faceted integration that touches notification pipelines, resource lifecycle management, and UI status reporting.  The presence of a dedicated `hooks.md` file confirms that Copi leverages the hook mechanism introduced by **CodingPatterns**, allowing it to react to platform events (e.g., “workspace created”, “vulnerability detected”).
 
 ### MCP Constraint Monitor  
-*Path:* `integrations/mcp-constraint-monitor/README.md`  
+*Path:* `integrations/constraint-monitor/README.md`  
 This integration monitors constraints within the MCP environment.  The README likely describes the metrics or rules being observed, the monitoring interval, and the alerting mechanisms (e.g., logs, webhook calls).  The implementation would involve a background process that queries MCP state and evaluates it against predefined constraints.
 
 ---

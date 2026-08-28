@@ -19,7 +19,7 @@
  *
  * Uses `node:test` + `node:assert/strict` per CLAUDE.md "no new deps" stance
  * and the existing in-repo test style for scripts (mirror
- * `integrations/mcp-server-semantic-analysis/scripts/augment-team-field-42.2.mjs`
+ * `integrations/semantic-analysis/scripts/augment-team-field-42.2.mjs`
  * conventions).
  *
  * Test strategy: spawn the script as a child process against an isolated fixture

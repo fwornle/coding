@@ -206,4 +206,4 @@ const counts = await queryEngine.aggregateByEntityClass('coding');
 - [Knowledge Management](./README.md) -- UKB integrates with ontology classification
 - [Workflows](./workflows.md) -- UKB analysis workflows use the classification pipeline
 - [Multi-Team Setup](./multi-team-setup.md) -- Team-specific lower ontologies
-- [MCP Semantic Analysis](./mcp-semantic-analysis.md) -- MCP tools for ontology operations
+- [Semantic Analysis](./semantic-analysis.md) -- MCP tools for ontology operations

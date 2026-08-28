@@ -9,7 +9,7 @@ The integration of the InsightGenerator agent with the SemanticAnalysis componen
 The **InsightGeneratorAgent** is realized by the `InsightGenerator` class that lives in the file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts
+integrations/semantic-analysis/src/agents/insight-generator.ts
 ```  
 
 This class is the concrete implementation that powers the *Insights* sub‑component. The observations tell us that the **Insights** component *utilizes* the InsightGenerator agent, and that the agent is *integrated* with a separate **SemanticAnalysis** component. In practice, InsightGenerator receives data that has already been processed semantically and produces higher‑level insights that are then exposed through the **Insights** API surface.
@@ -44,7 +44,7 @@ The only concrete implementation artifact is the `InsightGenerator` class define
 
 ## Integration Points  
 
-1. **SemanticAnalysis Component** – The primary upstream integration. InsightGenerator expects the semantic analysis results as input. This coupling is visible in the file path (`integrations/mcp-server-semantic-analysis/...`) and the observation that the agent “integrates with the SemanticAnalysis component.”  
+1. **SemanticAnalysis Component** – The primary upstream integration. InsightGenerator expects the semantic analysis results as input. This coupling is visible in the file path (`integrations/semantic-analysis/...`) and the observation that the agent “integrates with the SemanticAnalysis component.”  
 
 2. **Insights Sub‑component** – The downstream consumer. Insights imports the `InsightGenerator` class, instantiates it, and uses its output to fulfill its own responsibilities (e.g., exposing an API, storing insight data). This parent‑child relationship is explicitly mentioned in the hierarchy context.  
 
@@ -81,7 +81,7 @@ The only concrete implementation artifact is the `InsightGenerator` class define
 ### System Structure Insights  
 
 * The system is layered: raw data → semantic analysis (integration) → insight generation (agent) → public insights (sub‑component).  
-* All files related to this flow reside within the `integrations/mcp-server-semantic-analysis` tree, indicating a cohesive integration boundary.  
+* All files related to this flow reside within the `integrations/semantic-analysis` tree, indicating a cohesive integration boundary.  
 
 ### Scalability Considerations  
 
@@ -100,7 +100,7 @@ The only concrete implementation artifact is the `InsightGenerator` class define
 ## Hierarchy Context
 
 ### Parent
-- [Insights](./Insights.md) -- The Insights sub-component utilizes the InsightGenerator agent for generating insights from analyzed data, as seen in the InsightGenerator class (integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts).
+- [Insights](./Insights.md) -- The Insights sub-component utilizes the InsightGenerator agent for generating insights from analyzed data, as seen in the InsightGenerator class (integrations/semantic-analysis/src/agents/insight-generator.ts).
 
 ---
 

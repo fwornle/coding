@@ -2,17 +2,17 @@
 
 **Type:** Detail
 
-The constraint-configuration.md and semantic-constraint-detection.md files in the same integrations/mcp-constraint-monitor/docs/ directory depend downstream on this payload format — constraint rules and semantic detection logic both reference the fields that CLAUDE-CODE-HOOK-FORMAT.md defines, so changes to the payload schema have cascading effects across those modules.
+The constraint-configuration.md and semantic-constraint-detection.md files in the same integrations/constraint-monitor/docs/ directory depend downstream on this payload format — constraint rules and semantic detection logic both reference the fields that CLAUDE-CODE-HOOK-FORMAT.md defines, so changes to the payload schema have cascading effects across those modules.
 
 ## What It Is  
 
 **HookPayloadFormat** is the canonical JSON payload specification that underpins the *hook* mechanism of the **HookExtensionSystem**. The definitive definition lives in the file  
 
 ```
-integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 ```  
 
-and is referenced throughout the MCP Constraint Monitor documentation (e.g., `integrations/mcp-constraint-monitor/README.md`). This format is the *contract* between **agents** (the code‑generating side) and **monitors** (the constraint‑evaluation side). Every tool invocation emits a payload that conforms to this schema, and the monitor parses the payload to enforce constraints, collect metrics, and drive semantic‑detection logic.
+and is referenced throughout the MCP Constraint Monitor documentation (e.g., `integrations/constraint-monitor/README.md`). This format is the *contract* between **agents** (the code‑generating side) and **monitors** (the constraint‑evaluation side). Every tool invocation emits a payload that conforms to this schema, and the monitor parses the payload to enforce constraints, collect metrics, and drive semantic‑detection logic.
 
 The format is deliberately dual‑phased: for each tool call the system emits **two** payloads—one at *entry* (pre‑tool‑use) and one at *exit* (post‑tool‑use). The payload therefore either contains a discriminator field (e.g., `event_type: "entry"` / `"exit"`) or follows two closely‑related sub‑schemas. Down‑stream documentation files—`constraint-configuration.md` and `semantic-constraint-detection.md`—rely on the field definitions in this format, making it the single source of truth for any component that consumes hook data.
 
@@ -51,7 +51,7 @@ The repository does **not** contain code symbols that directly implement the pay
 
 * **Schema Definition** – The markdown file (`CLAUDE-CODE-HOOK-FORMAT.md`) enumerates each JSON field (e.g., `tool_name`, `arguments`, `timestamp`, `event_type`, `call_id`, `result`, `error`). Because no code symbols were found, developers are expected to manually map these fields to data structures in their language of choice (e.g., a TypeScript interface or a Python dataclass).
 
-* **Parsing Logic in the Monitor** – The MCP Constraint Monitor (`integrations/mcp-constraint-monitor/README.md`) parses incoming hook payloads according to the contract. The monitor likely uses a generic JSON deserializer followed by validation against the documented field list. Validation errors would surface as malformed‑payload warnings, ensuring that only compliant data proceeds to constraint evaluation.
+* **Parsing Logic in the Monitor** – The MCP Constraint Monitor (`integrations/constraint-monitor/README.md`) parses incoming hook payloads according to the contract. The monitor likely uses a generic JSON deserializer followed by validation against the documented field list. Validation errors would surface as malformed‑payload warnings, ensuring that only compliant data proceeds to constraint evaluation.
 
 * **Dual‑Event Handling** – The monitor must differentiate entry vs. exit payloads. The contract probably includes an `event_type` field (or similar) that the monitor checks to route the payload to the appropriate processing pipeline (pre‑execution checks vs. post‑execution analysis). Correlation between the two events is achieved via a shared identifier (`call_id`).
 
@@ -77,7 +77,7 @@ No other sibling components are mentioned, but the parent **HookExtensionSystem*
 
 ## Usage Guidelines  
 
-1. **Treat the Markdown as Source of Truth** – Always refer to `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` when creating or modifying hook payloads. Do not hard‑code field names elsewhere; instead, copy or import the definition to keep it in sync.
+1. **Treat the Markdown as Source of Truth** – Always refer to `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` when creating or modifying hook payloads. Do not hard‑code field names elsewhere; instead, copy or import the definition to keep it in sync.
 
 2. **Emit Both Entry and Exit Payloads** – For every tool invocation, produce two JSON messages: one with `event_type: "entry"` (or the equivalent discriminator) before the tool runs, and one with `event_type: "exit"` after completion. Include a stable `call_id` to allow the monitor to correlate the pair.
 
@@ -126,7 +126,7 @@ The **single‑source‑of‑truth** approach simplifies maintenance: any change
 ## Hierarchy Context
 
 ### Parent
-- [HookExtensionSystem](./HookExtensionSystem.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md specifies the exact JSON payload format that hooks emit on each tool call entry and exit, defining the contract between agents and monitors
+- [HookExtensionSystem](./HookExtensionSystem.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md specifies the exact JSON payload format that hooks emit on each tool call entry and exit, defining the contract between agents and monitors
 
 
 ---

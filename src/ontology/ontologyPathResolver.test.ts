@@ -9,12 +9,12 @@
  *   After ontologyPathResolver.ts is created, every test below passes.
  *
  * Run from the symlinked submodule (where the TS sources are compiled into dist/):
- *   cd integrations/mcp-server-semantic-analysis && npm run build && \
+ *   cd integrations/semantic-analysis && npm run build && \
  *     node --test dist/ontology/ontologyPathResolver.test.js
  *
  * The repo-root walk MUST be FOUR `..` segments because compiled tests live at
- * `integrations/mcp-server-semantic-analysis/dist/ontology/<file>.test.js`:
- *   dist/ontology -> dist -> mcp-server-semantic-analysis -> integrations -> coding
+ * `integrations/semantic-analysis/dist/ontology/<file>.test.js`:
+ *   dist/ontology -> dist -> semantic-analysis -> integrations -> coding
  * Two segments resolves to `dist/.data/ontologies` which does not exist (Phase 42.1.1
  * forensic-report lesson; replicates `registry-adoption.test.ts:29`).
  */

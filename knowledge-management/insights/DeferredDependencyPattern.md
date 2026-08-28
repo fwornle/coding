@@ -2,13 +2,13 @@
 
 **Type:** SubComponent
 
-The DeferredDependencyPattern is used throughout the codebase, with examples in integrations/mcp-server-semantic-analysis/docs/installation/README.md
+The DeferredDependencyPattern is used throughout the codebase, with examples in integrations/semantic-analysis/docs/installation/README.md
 
 # DeferredDependencyPattern
 
 ## What It Is
 
-The `DeferredDependencyPattern` is a SubComponent codified within the project's `CodingPatterns` parent collection, representing a deliberate strategy for loading modules on-demand rather than at process startup. Its canonical reference implementation lives in `lib/ukb-unified/core/VkbApiClient.js`, where the `VkbApiClient` module is loaded via dynamic-import rather than through a static `require` or ES module `import` statement. Documentation and usage examples for the pattern are surfaced in `integrations/mcp-server-semantic-analysis/docs/installation/README.md`, which provides developer-facing guidance on how the pattern is applied across the codebase.
+The `DeferredDependencyPattern` is a SubComponent codified within the project's `CodingPatterns` parent collection, representing a deliberate strategy for loading modules on-demand rather than at process startup. Its canonical reference implementation lives in `lib/ukb-unified/core/VkbApiClient.js`, where the `VkbApiClient` module is loaded via dynamic-import rather than through a static `require` or ES module `import` statement. Documentation and usage examples for the pattern are surfaced in `integrations/semantic-analysis/docs/installation/README.md`, which provides developer-facing guidance on how the pattern is applied across the codebase.
 
 ![DeferredDependencyPattern — Architecture](images/deferred-dependency-pattern-architecture.png)
 
@@ -20,7 +20,7 @@ Architecturally, the `DeferredDependencyPattern` sits alongside other foundation
 
 The pattern's primary design relationship is with `ServiceStartupPattern`, whose `startServiceWithRetry()` function in `lib/service-starter.js` wraps service startup with retry logic. By design, dynamic-import loading is intended to integrate with this startup machinery: deferring expensive or optional dependencies allows the retry-wrapped startup path to remain fast and resilient, since transient or missing dependencies do not prevent the service shell from coming online. A service can start, accept that some capabilities are not yet (or never) available, and surface those capabilities lazily as imports succeed.
 
-A second important architectural relationship is with `ClosedVocabularyPattern`. The `VkbApiClient` module — the canonical example of `DeferredDependencyPattern` — is used in conjunction with `ClosedVocabularyPattern` to prevent vocabulary drift, the same pattern whose canonical type sets are enforced by migration scripts referenced in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. This pairing demonstrates that deferred loading is not used to defer *semantics*; vocabulary contracts remain fixed and authoritative even when the modules that operationalize them are imported lazily.
+A second important architectural relationship is with `ClosedVocabularyPattern`. The `VkbApiClient` module — the canonical example of `DeferredDependencyPattern` — is used in conjunction with `ClosedVocabularyPattern` to prevent vocabulary drift, the same pattern whose canonical type sets are enforced by migration scripts referenced in `integrations/constraint-monitor/docs/constraint-configuration.md`. This pairing demonstrates that deferred loading is not used to defer *semantics*; vocabulary contracts remain fixed and authoritative even when the modules that operationalize them are imported lazily.
 
 ## Implementation Details
 
@@ -36,7 +36,7 @@ Although no explicit code symbols are surfaced in the structural index for this 
 
 The most concrete integration is with `lib/service-starter.js`, where `ServiceStartupPattern` provides the retry-wrapped startup harness. `DeferredDependencyPattern` is "designed to work with" that pattern, meaning services that adopt `startServiceWithRetry()` benefit most from deferring their non-critical dependencies: the retry loop becomes faster per attempt, and dependency-driven failures move out of the startup critical path into the operational request path where they can be handled per-request.
 
-The second integration is with `ClosedVocabularyPattern`, mediated through `VkbApiClient`. The dynamically imported client carries vocabulary obligations that are enforced by the closed-vocabulary discipline, ensuring that lazy loading does not create a loophole through which informal or drifted type names could enter the system. Documentation surfaces in `integrations/mcp-server-semantic-analysis/docs/installation/README.md` provide installation-time guidance that explains how these deferred dependencies are expected to be resolved in deployed environments.
+The second integration is with `ClosedVocabularyPattern`, mediated through `VkbApiClient`. The dynamically imported client carries vocabulary obligations that are enforced by the closed-vocabulary discipline, ensuring that lazy loading does not create a loophole through which informal or drifted type names could enter the system. Documentation surfaces in `integrations/semantic-analysis/docs/installation/README.md` provide installation-time guidance that explains how these deferred dependencies are expected to be resolved in deployed environments.
 
 More broadly, `DeferredDependencyPattern` interfaces with the project-wide singleton conventions documented for `CodingPatterns` and diagrammed in `docs/puml/psm-singleton-pattern.puml`. A dynamically imported module that exports a stateful manager should still honor the guard-and-return singleton idiom: the first `import()` resolves and constructs the singleton, and subsequent `import()` calls receive the same module namespace from the module cache, returning the already-constructed instance without re-running initialization.
 
@@ -48,7 +48,7 @@ Wrap the `await import()` call in error handling that distinguishes "module not 
 
 When integrating with `ServiceStartupPattern`, place the dynamic import *inside* the function passed to `startServiceWithRetry()` or invoked downstream of it, rather than at module top-level, so that the retry harness actually wraps the import attempt. This is the configuration in which the two patterns reinforce each other: startup remains lightweight, transient failures are retried, and missing dependencies fail in a localized, recoverable way.
 
-Finally, consult the documentation in `integrations/mcp-server-semantic-analysis/docs/installation/README.md` for worked examples before introducing new uses of the pattern, and treat sibling patterns — `AgentLifecyclePattern` for object lifecycle, `ServiceStartupPattern` for service bootstrapping, `ClosedVocabularyPattern` for type discipline, `StructuredEventEnvelopePattern` for event format compliance, and `DiagramAsDocumentation` for architectural recording — as the surrounding conventions within which `DeferredDependencyPattern` is expected to operate.
+Finally, consult the documentation in `integrations/semantic-analysis/docs/installation/README.md` for worked examples before introducing new uses of the pattern, and treat sibling patterns — `AgentLifecyclePattern` for object lifecycle, `ServiceStartupPattern` for service bootstrapping, `ClosedVocabularyPattern` for type discipline, `StructuredEventEnvelopePattern` for event format compliance, and `DiagramAsDocumentation` for architectural recording — as the surrounding conventions within which `DeferredDependencyPattern` is expected to operate.
 
 
 ## Hierarchy Context
@@ -62,11 +62,11 @@ Finally, consult the documentation in `integrations/mcp-server-semantic-analysis
 ### Siblings
 - [AgentLifecyclePattern](./AgentLifecyclePattern.md) -- The BaseAgent class in base-agent.ts defines the lifecycle methods init(), start(), stop(), pause(), and resume()
 - [ServiceStartupPattern](./ServiceStartupPattern.md) -- The startServiceWithRetry() function in lib/service-starter.js wraps the service startup with retry logic
-- [ClosedVocabularyPattern](./ClosedVocabularyPattern.md) -- The migration scripts in integrations/mcp-constraint-monitor/docs/constraint-configuration.md enforce fixed canonical type sets
+- [ClosedVocabularyPattern](./ClosedVocabularyPattern.md) -- The migration scripts in integrations/constraint-monitor/docs/constraint-configuration.md enforce fixed canonical type sets
 - [StructuredEventEnvelopePattern](./StructuredEventEnvelopePattern.md) -- The CLAUDE-CODE-HOOK-FORMAT.md document specifies the structured event envelope format
 - [DiagramAsDocumentation](./DiagramAsDocumentation.md) -- The PlantUML diagrams in docs/puml/ capture architectural decisions and provide visual specification
-- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/mcp-constraint-monitor/README.md monitors and enforces constraints
-- [MCPServerSemanticAnalysis](./MCPServerSemanticAnalysis.md) -- The MCPServerSemanticAnalysis module in integrations/mcp-server-semantic-analysis/README.md performs semantic analysis
+- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/constraint-monitor/README.md monitors and enforces constraints
+- [MCPServerSemanticAnalysis](./MCPServerSemanticAnalysis.md) -- The MCPServerSemanticAnalysis module in integrations/semantic-analysis/README.md performs semantic analysis
 
 
 ---

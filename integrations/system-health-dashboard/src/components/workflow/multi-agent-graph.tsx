@@ -315,7 +315,7 @@ export function MultiAgentGraph({
   const llmState = useSelector(selectLLMState)
 
   // WebSocket disabled - no server-side implementation exists yet
-  // TODO: Implement WebSocket server in mcp-server-semantic-analysis to enable real-time SSE events
+  // TODO: Implement WebSocket server in semantic-analysis to enable real-time SSE events
   // const { isConnected: wsConnected, error: wsError } = useWorkflowWebSocket()
 
   // Merge YAML-provided substep ID mappings with hardcoded fallback

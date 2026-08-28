@@ -8,7 +8,7 @@ Supports at minimum pre-tool and post-tool events plus startup/shutdown lifecycl
 
 ## What It Is
 
-The `HookEventRouter` is a SubComponent of the `ConstraintSystem`, residing within the `integrations/mcp-constraint-monitor/` integration. It functions as the central dispatch point that receives raw hook events emitted by Claude Code and routes them through the constraint monitoring pipeline. The contract it operates against — the shape of the incoming hook payloads — is formally specified in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` ("Claude Code Hook Data Format"), which serves as the authoritative schema document for every event the router handles.
+The `HookEventRouter` is a SubComponent of the `ConstraintSystem`, residing within the `integrations/constraint-monitor/` integration. It functions as the central dispatch point that receives raw hook events emitted by Claude Code and routes them through the constraint monitoring pipeline. The contract it operates against — the shape of the incoming hook payloads — is formally specified in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` ("Claude Code Hook Data Format"), which serves as the authoritative schema document for every event the router handles.
 
 At minimum, the router supports pre-tool and post-tool events as well as the startup and shutdown lifecycle hooks described in the parent `ConstraintSystem` component. These four event categories represent distinct points in the Claude Code session lifecycle: tool execution boundaries (pre/post) and session boundaries (startup/shutdown). The router is the single entry point that normalizes, classifies, and forwards these heterogeneous events to the appropriate downstream handlers.
 
@@ -26,7 +26,7 @@ The overall pattern is best characterized as a **front-controller dispatch** arc
 
 ## Implementation Details
 
-Operationally, the router executes a fixed sequence for each inbound event. First, the `HookEventEnvelopeParser` consumes the raw hook payload and produces a typed, validated representation according to the schema in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Any malformed envelope is rejected here, before any downstream component is invoked, ensuring detectors and persistence layers only ever see well-formed data.
+Operationally, the router executes a fixed sequence for each inbound event. First, the `HookEventEnvelopeParser` consumes the raw hook payload and produces a typed, validated representation according to the schema in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Any malformed envelope is rejected here, before any downstream component is invoked, ensuring detectors and persistence layers only ever see well-formed data.
 
 Second, the `HookTypeDispatcher` inspects the parsed event's type field and routes it to the corresponding handler chain. Pre-tool and post-tool events flow into the constraint detection pipeline, while startup and shutdown events invoke lifecycle handlers. The router connects the parsed event with two distinct detection mechanisms: **pattern-based detectors** (simple rule matching) and **semantic detectors** (more sophisticated analysis provided by the `SemanticConstraintDetector` sibling component, documented in `semantic-constraint-detection.md` and `semantic-detection-design.md`).
 
@@ -36,9 +36,9 @@ Third — and critically — when any detector reports a violation, the router p
 
 ![HookEventRouter — Relationship](images/hook-event-router-relationship.png)
 
-The router sits at the intersection of four collaborating entities. Upstream, it ingests events emitted by Claude Code, with the envelope contract specified in `CLAUDE-CODE-HOOK-FORMAT.md`. Configuration-wise, it consumes the merged ruleset produced by `HookConfigurationLoader`, inheriting the two-level precedence model (user-level then project-level `hooks.json` files) documented in `integrations/mcp-constraint-monitor/README.md`.
+The router sits at the intersection of four collaborating entities. Upstream, it ingests events emitted by Claude Code, with the envelope contract specified in `CLAUDE-CODE-HOOK-FORMAT.md`. Configuration-wise, it consumes the merged ruleset produced by `HookConfigurationLoader`, inheriting the two-level precedence model (user-level then project-level `hooks.json` files) documented in `integrations/constraint-monitor/README.md`.
 
-Downstream, the router fans out to two detector families: the pattern-based detectors (presumably co-located within the same integration) and the `SemanticConstraintDetector`, which performs more advanced constraint analysis. The router does not implement detection itself — it orchestrates these detectors and consolidates their outputs. After detection, the router writes violations into a durable store, and that store is the read source for the `ConstraintMonitorDashboard` sub-project (`integrations/mcp-constraint-monitor/dashboard/`), enabling the dashboard's live view.
+Downstream, the router fans out to two detector families: the pattern-based detectors (presumably co-located within the same integration) and the `SemanticConstraintDetector`, which performs more advanced constraint analysis. The router does not implement detection itself — it orchestrates these detectors and consolidates their outputs. After detection, the router writes violations into a durable store, and that store is the read source for the `ConstraintMonitorDashboard` sub-project (`integrations/constraint-monitor/dashboard/`), enabling the dashboard's live view.
 
 Internally, the router exposes its two children — `HookEventEnvelopeParser` and `HookTypeDispatcher` — as a natural seam: the parser interfaces with the Claude Code hook format spec, while the dispatcher interfaces with the per-type handler implementations. As a member of the `ConstraintSystem`, the router is the binding agent that makes the system's hook-based architecture coherent end-to-end.
 
@@ -73,13 +73,13 @@ Finally, configuration changes should always flow through `HookConfigurationLoad
 - [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a constraint monitoring and enforcement subsystem that validates code actions and file operations against configured rules during Claude Code sessions. It operates through a hook-based architecture where Claude Code's native hook events (pre-tool, post-tool, startup, shutdown, etc.) are intercepted and routed through a unified hook manager that loads configuration from both user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) sources. The system captures violations in real time, persists them for dashboard display, and supports semantic constraint detection beyond simple pattern matching.
 
 ### Children
-- [HookEventEnvelopeParser](./HookEventEnvelopeParser.md) -- The event envelope schema is formally specified in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format'), which serves as the authoritative contract this parser must implement.
+- [HookEventEnvelopeParser](./HookEventEnvelopeParser.md) -- The event envelope schema is formally specified in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format'), which serves as the authoritative contract this parser must implement.
 - [HookTypeDispatcher](./HookTypeDispatcher.md) -- The parent context explicitly describes HookEventRouter as handling 'each hook type,' confirming that multiple distinct hook types exist and must be dispatched separately — this multiplicity is the dispatcher's reason for existence.
 
 ### Siblings
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- Documented in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and semantic-detection-design.md, indicating the detection logic is substantial enough to warrant both a user-facing doc and an internal design doc
-- [ConstraintMonitorDashboard](./ConstraintMonitorDashboard.md) -- Lives in integrations/mcp-constraint-monitor/dashboard/ with its own README.md, indicating it is a self-contained UI sub-project within the broader mcp-constraint-monitor integration
-- [HookConfigurationLoader](./HookConfigurationLoader.md) -- The two-level configuration model (user-level and project-level hooks.json) is documented in integrations/mcp-constraint-monitor/README.md, establishing a clear precedence/merge strategy between global and per-project rules
+- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- Documented in integrations/constraint-monitor/docs/semantic-constraint-detection.md and semantic-detection-design.md, indicating the detection logic is substantial enough to warrant both a user-facing doc and an internal design doc
+- [ConstraintMonitorDashboard](./ConstraintMonitorDashboard.md) -- Lives in integrations/constraint-monitor/dashboard/ with its own README.md, indicating it is a self-contained UI sub-project within the broader constraint-monitor integration
+- [HookConfigurationLoader](./HookConfigurationLoader.md) -- The two-level configuration model (user-level and project-level hooks.json) is documented in integrations/constraint-monitor/README.md, establishing a clear precedence/merge strategy between global and per-project rules
 
 
 ---

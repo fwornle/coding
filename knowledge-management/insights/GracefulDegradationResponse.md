@@ -2,16 +2,16 @@
 
 **Type:** Detail
 
-integrations/mcp-server-semantic-analysis/docs/architecture/integration.md ('Integration Patterns') describes the integration layer between the MCP server and external services such as the Code Graph RAG SSE endpoint (CODE_GRAPH_RAG_SSE_PORT), establishing that the degradation response must include enough context for a client to distinguish 'service unavailable' from 'analysis failed'.
+integrations/semantic-analysis/docs/architecture/integration.md ('Integration Patterns') describes the integration layer between the MCP server and external services such as the Code Graph RAG SSE endpoint (CODE_GRAPH_RAG_SSE_PORT), establishing that the degradation response must include enough context for a client to distinguish 'service unavailable' from 'analysis failed'.
 
 ## What It Is  
 
 **GracefulDegradationResponse** is the concrete response object defined by the *tool‑level contract* in the MCP semantic‑analysis integration.  
-The contract lives in **`integrations/mcp-server-semantic-analysis/docs/architecture/tools.md`** under the “Tool Extensions” section.  Every tool that plugs into the MCP host must be able to produce a **GracefulDegradationResponse** when an optional external service (e.g., the Code Graph RAG SSE endpoint, Memgraph, or any other analysis server) cannot be reached or fails to load.  
+The contract lives in **`integrations/semantic-analysis/docs/architecture/tools.md`** under the “Tool Extensions” section.  Every tool that plugs into the MCP host must be able to produce a **GracefulDegradationResponse** when an optional external service (e.g., the Code Graph RAG SSE endpoint, Memgraph, or any other analysis server) cannot be reached or fails to load.  
 
-The response is a **well‑formed, serializable object** that the MCP server can forward to the client unchanged.  It contains enough metadata for the client to differentiate between a *service‑unavailable* condition and a genuine *analysis‑failed* condition, as mandated by the integration guidelines in **`integrations/mcp-server-semantic-analysis/docs/architecture/integration.md`**.  
+The response is a **well‑formed, serializable object** that the MCP server can forward to the client unchanged.  It contains enough metadata for the client to differentiate between a *service‑unavailable* condition and a genuine *analysis‑failed* condition, as mandated by the integration guidelines in **`integrations/semantic-analysis/docs/architecture/integration.md`**.  
 
-In practice the response is produced by the **DynamicImportGuardPattern**, which wraps the optional import of a service client.  When the guard detects that the service is missing or the import would raise an error, it returns a **GracefulDegradationResponse** instead of propagating the exception.  This design was codified as a fix in **`integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md`** to keep the MCP server operational even when a single tool’s dependency is unavailable.
+In practice the response is produced by the **DynamicImportGuardPattern**, which wraps the optional import of a service client.  When the guard detects that the service is missing or the import would raise an error, it returns a **GracefulDegradationResponse** instead of propagating the exception.  This design was codified as a fix in **`integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md`** to keep the MCP server operational even when a single tool’s dependency is unavailable.
 
 ---
 
@@ -61,7 +61,7 @@ Although no concrete code symbols were listed, the observations give a clear pic
   2. If the probe succeeds, perform a `importlib.import_module` (or equivalent) to load the optional client.
   3. If the import raises `ImportError` *or* the probe fails, instantiate and return a **GracefulDegradationResponse** instead of bubbling the exception.
 
-* **AvailabilityProbeFunction** – reads port constants from `integrations/mcp-server-semantic-analysis/docs/configuration.md` (`CODE_GRAPH_RAG_PORT`, `CODE_GRAPH_RAG_SSE_PORT`).  It performs a simple socket connection or HTTP HEAD request to verify reachability.  The function returns a boolean that the guard consumes.
+* **AvailabilityProbeFunction** – reads port constants from `integrations/semantic-analysis/docs/configuration.md` (`CODE_GRAPH_RAG_PORT`, `CODE_GRAPH_RAG_SSE_PORT`).  It performs a simple socket connection or HTTP HEAD request to verify reachability.  The function returns a boolean that the guard consumes.
 
 * The **tool‑level contract** in `tools.md` enforces that every tool’s entry point returns either a *successful analysis payload* **or** a **GracefulDegradationResponse**.  The MCP server’s request handler validates the shape of the response before serialising it to the client, guaranteeing a well‑formed envelope.
 
@@ -116,10 +116,10 @@ Although no concrete code symbols were listed, the observations give a clear pic
 ## Hierarchy Context
 
 ### Parent
-- [DynamicImportGuardPattern](./DynamicImportGuardPattern.md) -- The pattern appears in integrations/mcp-server-semantic-analysis where optional external services (e.g., Memgraph, external analysis servers) may or may not be running, requiring a probe before importing or invoking their client libraries
+- [DynamicImportGuardPattern](./DynamicImportGuardPattern.md) -- The pattern appears in integrations/semantic-analysis where optional external services (e.g., Memgraph, external analysis servers) may or may not be running, requiring a probe before importing or invoking their client libraries
 
 ### Siblings
-- [AvailabilityProbeFunction](./AvailabilityProbeFunction.md) -- The probe targets port-based services: integrations/mcp-server-semantic-analysis/docs/configuration.md documents both CODE_GRAPH_RAG_PORT and CODE_GRAPH_RAG_SSE_PORT as the reachability endpoints, indicating the probe performs a TCP or HTTP-level check against these configured ports before loading any client module.
+- [AvailabilityProbeFunction](./AvailabilityProbeFunction.md) -- The probe targets port-based services: integrations/semantic-analysis/docs/configuration.md documents both CODE_GRAPH_RAG_PORT and CODE_GRAPH_RAG_SSE_PORT as the reachability endpoints, indicating the probe performs a TCP or HTTP-level check against these configured ports before loading any client module.
 
 
 ---

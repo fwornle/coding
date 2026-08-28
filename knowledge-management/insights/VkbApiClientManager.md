@@ -11,7 +11,7 @@ VkbApiClientManager likely interacts with the GraphDatabaseManager for storing a
 The manager’s primary responsibilities include:
 
 * Translating client‑side VKB requests into calls that the **GraphDatabaseManager** can persist or retrieve.  
-* Leveraging the **GraphDatabaseAdapter** (found at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) for low‑level graph storage operations.  
+* Leveraging the **GraphDatabaseAdapter** (found at `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`) for low‑level graph storage operations.  
 * Coordinating with **LlmServiceManager** when language‑model‑driven enrichment of VKB data is required.  
 * Applying intelligent routing logic and, where possible, serverless access patterns to the underlying knowledge graph.  
 * Employing caching or other performance‑optimisation techniques to keep VKB‑related latency low.
@@ -28,7 +28,7 @@ The design of `VkbApiClientManager` follows a **layered orchestration** pattern.
 
 1. **Routing Layer** – Determines the optimal path for a request, possibly selecting a serverless function or a cached response. The mention of “intelligent routing” suggests a decision‑making component that evaluates request characteristics (e.g., read‑vs‑write, latency requirements) before forwarding.
 
-2. **Persistence Layer** – Calls into **GraphDatabaseManager**, which itself uses **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). This adapter provides Graphology + LevelDB persistence, enabling efficient graph storage and automatic JSON export synchronization. The manager therefore does not directly manipulate the graph; it relies on the manager‑adapter contract.
+2. **Persistence Layer** – Calls into **GraphDatabaseManager**, which itself uses **GraphDatabaseAdapter** (`integrations/semantic-analysis/src/storage/graph-database-adapter.ts`). This adapter provides Graphology + LevelDB persistence, enabling efficient graph storage and automatic JSON export synchronization. The manager therefore does not directly manipulate the graph; it relies on the manager‑adapter contract.
 
 3. **LLM Enrichment Layer** – When a VKB request requires natural‑language processing or knowledge synthesis, the manager invokes **LlmServiceManager**. This mirrors the pattern used by **WaveAgentController**, which also depends on the LLM service for initialization and inference.
 
@@ -52,7 +52,7 @@ While the concrete class names and methods are not listed, the implementation ca
 
 * **Entry Point** – A public method such as `handleVkbRequest(request: VkbRequest): Promise<VkbResponse>` would accept a structured request object, validate it, and forward it to the routing logic.  
 * **Routing Logic** – Likely encapsulated in a helper like `VkbRouter` that evaluates request metadata (e.g., operation type, required latency) and decides whether to serve from cache, invoke a serverless function, or go straight to the graph manager.  
-* **Graph Interaction** – The manager would call `GraphDatabaseManager.storeVkbEntity(entity)` or `GraphDatabaseManager.fetchVkbEntity(id)`. Under the hood, `GraphDatabaseManager` uses the **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) which abstracts Graphology operations and LevelDB persistence. This adapter also handles automatic JSON export, ensuring that VKB data is consistently serialized for downstream consumers.  
+* **Graph Interaction** – The manager would call `GraphDatabaseManager.storeVkbEntity(entity)` or `GraphDatabaseManager.fetchVkbEntity(id)`. Under the hood, `GraphDatabaseManager` uses the **GraphDatabaseAdapter** (`integrations/semantic-analysis/src/storage/graph-database-adapter.ts`) which abstracts Graphology operations and LevelDB persistence. This adapter also handles automatic JSON export, ensuring that VKB data is consistently serialized for downstream consumers.  
 * **LLM Integration** – When enrichment is required, the manager forwards the relevant payload to `LlmServiceManager.processVkbPayload(payload)`. The LLM service may return synthesized knowledge that the manager then merges back into the graph via the persistence layer.  
 * **Caching** – A cache client (e.g., Redis or an in‑process LRU cache) would be consulted before hitting the graph. Cache keys could be derived from VKB entity identifiers, and write‑through semantics would keep the cache coherent after updates.  
 
@@ -67,7 +67,7 @@ Because the component is part of **KnowledgeManagement**, it inherits the same e
 | Integration Target | Interaction Detail | Reason |
 |--------------------|--------------------|--------|
 | **GraphDatabaseManager** | Calls for persisting or retrieving VKB entities. | Centralised graph storage; leverages the adapter for low‑level operations. |
-| **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) | Indirectly used via the manager. | Provides Graphology + LevelDB persistence and automatic JSON export. |
+| **GraphDatabaseAdapter** (`integrations/semantic-analysis/src/storage/graph-database-adapter.ts`) | Indirectly used via the manager. | Provides Graphology + LevelDB persistence and automatic JSON export. |
 | **LlmServiceManager** | Invoked for language‑model‑driven enrichment or inference. | Mirrors the pattern used by **WaveAgentController**. |
 | **Caching Layer** (unspecified cache implementation) | Read‑through/write‑through cache checks before graph access. | Improves performance for hot VKB data. |
 | **Sibling Components** (ManualLearning, OnlineLearning, etc.) | Share the same persistence and LLM services; may call `VkbApiClientManager` for VKB‑specific operations. | Promotes consistency across knowledge‑related workflows. |
@@ -114,7 +114,7 @@ Overall, `VkbApiClientManager` embodies a well‑structured, service‑oriented 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
 
 ### Siblings
 - [ManualLearning](./ManualLearning.md) -- ManualLearning likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships.

@@ -50,6 +50,6 @@ mcpops --> extract
 
 note right of store : "Stored at .data/knowledge-graph\nusing Graphology + LevelDB"
 note right of export : "Auto-synced to .data/knowledge-export\nfrom GraphDB"
-note bottom of analyze : "Pattern extracted from:\nsrc/knowledge-management\nlib/ukb-unified\nintegrations/mcp-server-semantic-analysis/src"
+note bottom of analyze : "Pattern extracted from:\nsrc/knowledge-management\nlib/ukb-unified\nintegrations/semantic-analysis/src"
 
 @enduml

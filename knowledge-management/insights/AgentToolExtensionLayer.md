@@ -2,17 +2,17 @@
 
 **Type:** Detail
 
-integrations/mcp-server-semantic-analysis/docs/architecture/integration.md ('Integration Patterns') documents how this agent-tool layer connects outward to external systems, implying the extension layer exposes well-defined integration seams used by the broader MCP server infrastructure.
+integrations/semantic-analysis/docs/architecture/integration.md ('Integration Patterns') documents how this agent-tool layer connects outward to external systems, implying the extension layer exposes well-defined integration seams used by the broader MCP server infrastructure.
 
 # AgentToolExtensionLayer
 
 ## What It Is
 
-The `AgentToolExtensionLayer` is an architectural sub-component of `MCPServerSemanticAnalysis`, documented across a triad of dedicated architecture files under `integrations/mcp-server-semantic-analysis/docs/architecture/`. Specifically, its design is captured in three sibling documents: `agents.md` ("Agent Architecture"), `tools.md` ("Tool Extensions"), and `integration.md` ("Integration Patterns"). Together, these documents define a layered capability surface where autonomous agents and the composable tools they invoke are treated as distinct but coordinated concerns within the semantic analysis MCP server.
+The `AgentToolExtensionLayer` is an architectural sub-component of `MCPServerSemanticAnalysis`, documented across a triad of dedicated architecture files under `integrations/semantic-analysis/docs/architecture/`. Specifically, its design is captured in three sibling documents: `agents.md` ("Agent Architecture"), `tools.md` ("Tool Extensions"), and `integration.md` ("Integration Patterns"). Together, these documents define a layered capability surface where autonomous agents and the composable tools they invoke are treated as distinct but coordinated concerns within the semantic analysis MCP server.
 
 The layer is not a single class or module but rather a conceptual stratum that combines two first-class architectural primitives—agents and tool extensions—and exposes them through documented integration patterns. The deliberate decision to give agents their own architecture document signals that they carry lifecycle, role, and coordination semantics that go beyond simple utility functions. Similarly, treating tools as siblings (rather than embedding them inside agent definitions) reinforces the principle that capabilities should be composable and reusable across multiple agent contexts.
 
-Within the broader `MCPServerSemanticAnalysis` module (described in `integrations/mcp-server-semantic-analysis/README.md` as performing semantic analysis), this layer represents the extensibility and orchestration tier. It sits alongside its sibling `TieredModelSelector`, which handles model selection concerns documented in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. Where `TieredModelSelector` is concerned with *which* model performs work, `AgentToolExtensionLayer` is concerned with *what work* gets done and *how* agents coordinate to perform it.
+Within the broader `MCPServerSemanticAnalysis` module (described in `integrations/semantic-analysis/README.md` as performing semantic analysis), this layer represents the extensibility and orchestration tier. It sits alongside its sibling `TieredModelSelector`, which handles model selection concerns documented in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. Where `TieredModelSelector` is concerned with *which* model performs work, `AgentToolExtensionLayer` is concerned with *what work* gets done and *how* agents coordinate to perform it.
 
 ## Architecture and Design
 
@@ -24,7 +24,7 @@ This tripartite structure (agents + tools + integration patterns) is consistent 
 
 ## Implementation Details
 
-The current observations do not surface any concrete code symbols, classes, or functions for the `AgentToolExtensionLayer`—the discoverable artifacts are the three architecture documents under `integrations/mcp-server-semantic-analysis/docs/architecture/`. This suggests the layer is presently defined at the design and contract level, with implementation either pending, distributed across files not yet indexed, or deliberately abstracted behind the documented interfaces.
+The current observations do not surface any concrete code symbols, classes, or functions for the `AgentToolExtensionLayer`—the discoverable artifacts are the three architecture documents under `integrations/semantic-analysis/docs/architecture/`. This suggests the layer is presently defined at the design and contract level, with implementation either pending, distributed across files not yet indexed, or deliberately abstracted behind the documented interfaces.
 
 From the documentation structure, we can infer the following implementation principles. **Agents** (per `agents.md`) maintain their own lifecycle and coordination logic, meaning their implementation likely involves stateful constructs—initialization, role assignment, message exchange, and termination. They are not utility helpers but persistent or session-scoped actors. **Tools** (per `tools.md`) are composable units that agents invoke, implying a uniform invocation interface and likely some form of registry or discovery mechanism so that agents can locate and call them dynamically.
 
@@ -32,7 +32,7 @@ The **integration patterns** described in `integration.md` mediate between this 
 
 ## Integration Points
 
-The most explicit integration evidence comes from `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md`, which by name and placement establishes that the `AgentToolExtensionLayer` connects outward to external systems via documented patterns. This places it at the boundary between the internal semantic analysis capabilities of `MCPServerSemanticAnalysis` and whatever consumers (other MCP clients, host applications, or downstream services) need to leverage agent-driven analysis.
+The most explicit integration evidence comes from `integrations/semantic-analysis/docs/architecture/integration.md`, which by name and placement establishes that the `AgentToolExtensionLayer` connects outward to external systems via documented patterns. This places it at the boundary between the internal semantic analysis capabilities of `MCPServerSemanticAnalysis` and whatever consumers (other MCP clients, host applications, or downstream services) need to leverage agent-driven analysis.
 
 Internally, the layer integrates with its parent `MCPServerSemanticAnalysis` module, which provides the semantic analysis foundation. Agents within this layer presumably consume semantic analysis primitives offered by the parent module to perform their work. Laterally, the layer coexists with `TieredModelSelector`; while the observations do not explicitly state a direct call relationship, it is architecturally natural for agents to consult the `TieredModelSelector` when they need to invoke language models, ensuring that tool execution honors the tiered selection policy defined in `TIERED-MODEL-PROPOSAL.md`.
 
@@ -62,10 +62,10 @@ Finally, because the layer is currently documented more than it is codified (no 
 ## Hierarchy Context
 
 ### Parent
-- [MCPServerSemanticAnalysis](./MCPServerSemanticAnalysis.md) -- The MCPServerSemanticAnalysis module in integrations/mcp-server-semantic-analysis/README.md performs semantic analysis
+- [MCPServerSemanticAnalysis](./MCPServerSemanticAnalysis.md) -- The MCPServerSemanticAnalysis module in integrations/semantic-analysis/README.md performs semantic analysis
 
 ### Siblings
-- [TieredModelSelector](./TieredModelSelector.md) -- The mechanism is captured as a first-class proposal in integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered Model Selection Proposal'), indicating it was a deliberate architectural decision requiring justification rather than an ad-hoc implementation.
+- [TieredModelSelector](./TieredModelSelector.md) -- The mechanism is captured as a first-class proposal in integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered Model Selection Proposal'), indicating it was a deliberate architectural decision requiring justification rather than an ad-hoc implementation.
 
 
 ---

@@ -1110,7 +1110,7 @@ class SystemHealthAPIServer {
                 health_dashboard_frontend: 'supervisorctl restart web-services:health-dashboard-frontend',
             } : {
                 vkb_server: `cd "${codingRoot}" && bin/vkb restart`,
-                constraint_monitor: `cd "${codingRoot}/integrations/mcp-constraint-monitor" && npm run restart`,
+                constraint_monitor: `cd "${codingRoot}/integrations/constraint-monitor" && npm run restart`,
                 dashboard_server: `cd "${codingRoot}/integrations/system-health-dashboard" && npm run restart`,
             };
 
@@ -3063,7 +3063,7 @@ class SystemHealthAPIServer {
     async handleGetBatchDAG(req, res) {
         try {
             // Load model-tiers.yaml for operator tier information
-            const configDir = join(codingRoot, 'integrations/mcp-server-semantic-analysis/config');
+            const configDir = join(codingRoot, 'integrations/semantic-analysis/config');
             const modelTiersPath = join(configDir, 'model-tiers.yaml');
 
             let operatorTiers = {};
@@ -4708,7 +4708,7 @@ class SystemHealthAPIServer {
      */
     async handleGetWorkflowDefinitions(req, res) {
         try {
-            const configDir = join(codingRoot, 'integrations/mcp-server-semantic-analysis/config');
+            const configDir = join(codingRoot, 'integrations/semantic-analysis/config');
 
             // Load agents.yaml
             const agentsPath = join(configDir, 'agents.yaml');
@@ -4764,7 +4764,7 @@ class SystemHealthAPIServer {
     async handleGetWorkflowDefinition(req, res) {
         try {
             const { workflowName } = req.params;
-            const configDir = join(codingRoot, 'integrations/mcp-server-semantic-analysis/config');
+            const configDir = join(codingRoot, 'integrations/semantic-analysis/config');
 
             // Load agents.yaml for context
             const agentsPath = join(configDir, 'agents.yaml');

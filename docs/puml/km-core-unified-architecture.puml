@@ -14,7 +14,7 @@ package "System A — Online Learning\n(coding repo, host process)" as sysA #E8F
   component "Reproject CLI\nscripts/reproject-online.mjs" as reproject <<cli>>
 }
 
-package "System B — UKB / semantic-analysis\n(integrations/mcp-server-semantic-analysis)" as sysB #E0E7FF {
+package "System B — UKB / semantic-analysis\n(integrations/semantic-analysis)" as sysB #E0E7FF {
   component "MCP / SSE server\nport 3848" as mcp <<api>>
   component "WaveController\n+ 14 agents" as wave <<agent>>
 }

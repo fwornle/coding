@@ -8,7 +8,7 @@ Knowledge report authoring produces structured documents summarizing batch analy
 
 ## What It Is
 
-Insights is a SubComponent of SemanticAnalysis — the multi-agent MCP server hosted in `integrations/mcp-server-semantic-analysis` — responsible for LLM-driven analysis of already-classified knowledge entities. It operates as a downstream stage in the semantic analysis pipeline, receiving entities that have passed through ontology classification and producing structured analytical artifacts: pattern catalogs and knowledge reports. Its behavior is directly governed by token budget constraints managed by OntologyConfigManager, making its operational depth a configurable, budget-aware property of each batch run rather than a fixed capability.
+Insights is a SubComponent of SemanticAnalysis — the multi-agent MCP server hosted in `integrations/semantic-analysis` — responsible for LLM-driven analysis of already-classified knowledge entities. It operates as a downstream stage in the semantic analysis pipeline, receiving entities that have passed through ontology classification and producing structured analytical artifacts: pattern catalogs and knowledge reports. Its behavior is directly governed by token budget constraints managed by OntologyConfigManager, making its operational depth a configurable, budget-aware property of each batch run rather than a fixed capability.
 
 ![Insights — Architecture](images/insights-architecture.png)
 
@@ -66,13 +66,13 @@ Outbound integration points include the Token Usage Dashboard (`docs/architectur
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
 
 ### Children
 - [TokenBudgetConstrainedInsightDepth](./TokenBudgetConstrainedInsightDepth.md) -- Per parent context, OntologyConfigManager governs token budget allocation per batch run, directly throttling how many tokens the Insights sub-component can consume during LLM-driven analysis.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/mcp-server-semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
+- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
 - [Ontology](./Ontology.md) -- The system maintains a two-level ontology hierarchy (upper/lower) with separate definition files, paths to which are managed by OntologyConfigManager, allowing the classification tier to be reconfigured without code changes
 - [OntologyConfigManager](./OntologyConfigManager.md) -- Implemented as a singleton to ensure all pipeline agents share identical ontology configuration throughout a batch run, preventing mid-run config drift between classifier and validator instances
 - [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- Wraps km-core's OntologyRegistry behind a legacy-compatible interface, isolating the migration boundary so that OntologyValidator and OntologyClassifier continue to function without modification during Phase 42-03

@@ -2,11 +2,11 @@
 
 **Type:** GraphDatabase
 
-ArchitecturalEvolutionPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+ArchitecturalEvolutionPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/semantic-analysis/src
 
 ## What It Is
 
-- ArchitecturalEvolutionPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+- ArchitecturalEvolutionPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/semantic-analysis/src
 
 - shared-memory.json has been REMOVED from the codebase
 

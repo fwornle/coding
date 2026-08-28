@@ -8,7 +8,7 @@ The parent component analysis notes that tier labels map to 'specific provider+m
 
 ## What It Is
 
-The `TierRoutingTable` is a routing/lookup component contained within the `TierRouter`, with its authoritative design captured in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. It functions as the mapping layer that translates abstract tier labels (such as `powerful`, or other tier identifiers defined by the tiered-model strategy) into concrete `provider+model` pairs that are themselves declared in `llm-providers.yaml`.
+The `TierRoutingTable` is a routing/lookup component contained within the `TierRouter`, with its authoritative design captured in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. It functions as the mapping layer that translates abstract tier labels (such as `powerful`, or other tier identifiers defined by the tiered-model strategy) into concrete `provider+model` pairs that are themselves declared in `llm-providers.yaml`.
 
 In essence, the `TierRoutingTable` is the data-driven dispatch table that backs the tier abstraction. It does not itself decide *which* tier a request should use — that responsibility lives upstream in classification logic and is mediated by sibling components like `AgentTierPolicy`. Instead, it answers the narrower question: "Given that the caller has asked for tier X, which configured provider and model entry from `llm-providers.yaml` should be invoked?"
 
@@ -26,7 +26,7 @@ The component fits cleanly into its parent `TierRouter`. The `TierRouter` is the
 
 Concretely, the `TierRoutingTable` is the structure that holds entries keyed by tier label, with each entry resolving to a specific provider+model combination declared in `llm-providers.yaml`. The mechanics of the lookup are intentionally simple: a tier label comes in, a structured entry comes out, and that entry is what the calling code (via `TierRouter`) uses to instantiate or select the appropriate provider client.
 
-The design document `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` is the canonical reference for how tier names are defined and what semantic guarantees each tier carries (e.g., what a tier like `powerful` is intended to convey about cost, latency, or capability). Any implementation work on `TierRoutingTable` should treat that proposal as the source of truth for which tiers must exist and what their general intent is, while the actual provider+model bindings live in `llm-providers.yaml`.
+The design document `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` is the canonical reference for how tier names are defined and what semantic guarantees each tier carries (e.g., what a tier like `powerful` is intended to convey about cost, latency, or capability). Any implementation work on `TierRoutingTable` should treat that proposal as the source of truth for which tiers must exist and what their general intent is, while the actual provider+model bindings live in `llm-providers.yaml`.
 
 Because the table itself is configuration-driven (entries derive from `llm-providers.yaml` provider declarations), the implementation avoids hard-coding provider names or model identifiers into routing logic. This keeps the runtime structure of `TierRoutingTable` consistent with the broader `LLMAbstraction` layer's pattern of declarative provider configuration.
 
@@ -42,7 +42,7 @@ The component also integrates implicitly with the broader `LLMAbstraction` layer
 
 When working with `TierRoutingTable`, developers should observe a few important conventions. First, **never bypass the tier abstraction** by hard-coding a provider+model pair at a call site that already has a meaningful tier available; doing so defeats the entire purpose of the two-layer indirection and creates exactly the kind of coupling the design was built to avoid. Request a tier, let `TierRouter` consult the `TierRoutingTable`, and let the table resolve to the current preferred provider.
 
-Second, when **changing a model assignment**, prefer updating the `TierRoutingTable` entry rather than introducing a new tier or modifying upstream classification logic. The design explicitly supports re-pointing tiers (e.g., moving `powerful` to a different model) as a single-point change. Introducing a new tier should be a deliberate design action — ideally reflected in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` — not a workaround for a configuration tweak.
+Second, when **changing a model assignment**, prefer updating the `TierRoutingTable` entry rather than introducing a new tier or modifying upstream classification logic. The design explicitly supports re-pointing tiers (e.g., moving `powerful` to a different model) as a single-point change. Introducing a new tier should be a deliberate design action — ideally reflected in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` — not a workaround for a configuration tweak.
 
 Third, **respect the separation between routing and policy**. `AgentTierPolicy` is the correct place for override hooks and contextual tier selection adjustments; the `TierRoutingTable` should remain a pure label-to-provider mapping. Mixing policy logic into the table erodes the clean layering that makes the tier system maintainable.
 
@@ -72,10 +72,10 @@ Maintainability is the explicit strength of this design. The two-layer indirecti
 ## Hierarchy Context
 
 ### Parent
-- [TierRouter](./TierRouter.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md is the authoritative design document for tier selection strategy, making it the first place to read when understanding why a request lands on a specific model
+- [TierRouter](./TierRouter.md) -- integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md is the authoritative design document for tier selection strategy, making it the first place to read when understanding why a request lands on a specific model
 
 ### Siblings
-- [AgentTierPolicy](./AgentTierPolicy.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md describes the tier selection strategy that this policy layer sits atop of, providing the override hooks referenced in the parent component's characterization of TierRouter.
+- [AgentTierPolicy](./AgentTierPolicy.md) -- integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md describes the tier selection strategy that this policy layer sits atop of, providing the override hooks referenced in the parent component's characterization of TierRouter.
 
 
 ---

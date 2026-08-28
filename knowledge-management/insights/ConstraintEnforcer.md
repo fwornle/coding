@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The ConstraintEnforcer collaborates with the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content and detect staleness, ensuring data freshness and accuracy.
+The ConstraintEnforcer collaborates with the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content and detect staleness, ensuring data freshness and accuracy.
 
 ## What It Is  
 
@@ -41,7 +41,7 @@ Overall, the design can be described as a **layered, event‑centric subsystem**
 |------|----------------|------|
 | `lib/agent-api/hooks/hook-manager.js` | **UnifiedHookManager** | Central hub that registers, deregisters, and dispatches hook callbacks. It receives merged configurations from HookConfigLoader and notifies interested parties (including ConstraintEnforcer). |
 | `lib/agent-api/hooks/hook-config.js` | **HookConfigLoader** | Reads hook definitions from various sources (e.g., JSON files, remote services), merges them, and produces a single configuration object. The merge logic ensures that later sources can override earlier ones while preserving a deterministic order. |
-| `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts` | **ContentValidationAgent** | Inspects entity payloads, checks for schema violations, and flags stale content. It emits events such as `entityStale` or `validationFailed`, which ConstraintEnforcer listens to for constraint enforcement. |
+| `integrations/semantic-analysis/src/agents/content-validation-agent.ts` | **ContentValidationAgent** | Inspects entity payloads, checks for schema violations, and flags stale content. It emits events such as `entityStale` or `validationFailed`, which ConstraintEnforcer listens to for constraint enforcement. |
 | `storage/graph-database-adapter.ts` | **GraphDatabaseAdapter** | Provides CRUD operations against the underlying graph database (e.g., Neo4j, JanusGraph). It abstracts query construction, transaction handling, and synchronization mechanisms that keep constraint metadata in sync with the rest of the graph. |
 
 ### Data Flow  
@@ -132,11 +132,11 @@ Overall, ConstraintEnforcer is a well‑encapsulated, event‑centric sub‑comp
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) playing a central role in hook orchestration. This is evident in the way it handles hook configurations loaded by the HookConfigLoader (lib/agent-api/hooks/hook-config.js), which merges configurations from multiple sources. The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is then used to validate entity content and detect staleness, leveraging the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions and data synchronization.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) playing a central role in hook orchestration. This is evident in the way it handles hook configurations loaded by the HookConfigLoader (lib/agent-api/hooks/hook-config.js), which merges configurations from multiple sources. The ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) is then used to validate entity content and detect staleness, leveraging the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions and data synchronization.
 
 ### Siblings
 - [HookConfigurationManager](./HookConfigurationManager.md) -- HookConfigurationManager utilizes the HookConfigLoader (lib/agent-api/hooks/hook-config.js) to load hook configurations from multiple sources, providing a unified and comprehensive configuration management mechanism.
-- [ContentValidationModule](./ContentValidationModule.md) -- ContentValidationModule utilizes the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content and detect staleness, providing a robust content validation mechanism.
+- [ContentValidationModule](./ContentValidationModule.md) -- ContentValidationModule utilizes the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content and detect staleness, providing a robust content validation mechanism.
 
 ---
 

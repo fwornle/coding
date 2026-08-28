@@ -156,7 +156,7 @@ byte-identical, and `.logs/etm.log` shows no `[STALL-DETECT]`.
   `scripts/lsl-dedupe.mjs`, `scripts/split-lsl-files.cjs`,
   `scripts/classification-logger.js`, `scripts/batch-lsl-processor.js`,
   `src/live-logging/SpecstoryBatchConverter.js`,
-  `integrations/mcp-server-semantic-analysis/src/agents/vibe-history-agent.ts`,
+  `integrations/semantic-analysis/src/agents/vibe-history-agent.ts`,
   and the `/sl` skill.
 - `LSLFileManager.isValueableLSLFile()` currently judges markdown; it needs a
   JSONL notion of "valuable" (entry count / has ≥1 user message).

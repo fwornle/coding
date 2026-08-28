@@ -62,24 +62,24 @@ if [[ -d "$CODING_REPO/integrations/memory-visualizer" ]]; then
 fi
 
 # Clean semantic analysis MCP server (git submodule - preserve source)
-if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis" ]]; then
+if [[ -d "$CODING_REPO/integrations/semantic-analysis" ]]; then
     echo "  Cleaning semantic analysis MCP server (git submodule)..."
 
     # Remove node_modules
-    if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis/node_modules" ]]; then
-        rm -rf "$CODING_REPO/integrations/mcp-server-semantic-analysis/node_modules"
+    if [[ -d "$CODING_REPO/integrations/semantic-analysis/node_modules" ]]; then
+        rm -rf "$CODING_REPO/integrations/semantic-analysis/node_modules"
         echo "    Removed Node.js dependencies"
     fi
 
     # Remove built dist directory
-    if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis/dist" ]]; then
-        rm -rf "$CODING_REPO/integrations/mcp-server-semantic-analysis/dist"
+    if [[ -d "$CODING_REPO/integrations/semantic-analysis/dist" ]]; then
+        rm -rf "$CODING_REPO/integrations/semantic-analysis/dist"
         echo "    Removed built TypeScript files"
     fi
 
     # Remove logs directory
-    if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis/logs" ]]; then
-        rm -rf "$CODING_REPO/integrations/mcp-server-semantic-analysis/logs"
+    if [[ -d "$CODING_REPO/integrations/semantic-analysis/logs" ]]; then
+        rm -rf "$CODING_REPO/integrations/semantic-analysis/logs"
         echo "    Removed semantic analysis logs"
     fi
 
@@ -279,7 +279,7 @@ if command -v node &> /dev/null; then
     ' 2>/dev/null && echo "  Untrusted $CODING_REPO in ~/.copilot/config.json"
 fi
 
-# Note: memory-visualizer and mcp-server-semantic-analysis are git submodules
+# Note: memory-visualizer and semantic-analysis are git submodules
 # and have already been cleaned above
 
 # Remove .coding-tools directory

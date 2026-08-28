@@ -6,7 +6,7 @@ This document describes the comprehensive architecture of the UKB (Update Knowle
 
 The UKB workflow system consists of:
 
-1. **Backend (MCP Semantic Analysis Server)** - Executes multi-agent workflows
+1. **Backend (Semantic Analysis Server)** - Executes multi-agent workflows
 2. **Frontend (System Health Dashboard)** - Visualizes and controls workflow execution
 3. **Progress File** - Central coordination point between frontend and backend
 
@@ -18,11 +18,11 @@ The UKB workflow system consists of:
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Workflow Runner | `mcp-server-semantic-analysis/src/workflow-runner.ts` | Standalone process for resilient execution |
-| Coordinator Agent | `mcp-server-semantic-analysis/src/agents/coordinator.ts` | Orchestrates 14+ specialized agents |
-| Smart Orchestrator | `mcp-server-semantic-analysis/src/orchestrator/smart-orchestrator.ts` | LLM-powered routing decisions |
-| Batch Scheduler | `mcp-server-semantic-analysis/src/agents/batch-scheduler.ts` | Plans chronological batches |
-| SSE Server | `mcp-server-semantic-analysis/src/sse-server.ts` | Real-time update streaming |
+| Workflow Runner | `semantic-analysis/src/workflow-runner.ts` | Standalone process for resilient execution |
+| Coordinator Agent | `semantic-analysis/src/agents/coordinator.ts` | Orchestrates 14+ specialized agents |
+| Smart Orchestrator | `semantic-analysis/src/orchestrator/smart-orchestrator.ts` | LLM-powered routing decisions |
+| Batch Scheduler | `semantic-analysis/src/agents/batch-scheduler.ts` | Plans chronological batches |
+| SSE Server | `semantic-analysis/src/sse-server.ts` | Real-time update streaming |
 
 ### Frontend Components
 
@@ -267,7 +267,7 @@ These enable more accurate ETA predictions on subsequent runs.
 
 ### Backend
 ```
-integrations/mcp-server-semantic-analysis/
+integrations/semantic-analysis/
 ├── src/
 │   ├── workflow-runner.ts       # Standalone runner
 │   ├── agents/coordinator.ts    # Main orchestrator

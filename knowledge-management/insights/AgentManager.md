@@ -6,7 +6,7 @@ AgentManager employs a modular approach, allowing for easier maintenance and upd
 
 ## What It Is  
 
-**AgentManager** is the central coordinating sub‑component that lives inside the **ConstraintSystem**. It is the hub through which the system’s various agents—most notably the **ContentValidationAgent** located at `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`—are registered, invoked, and monitored. AgentManager also mediates interactions with auxiliary services such as **ContentValidator**, **HookManager**, **Logger**, **ViolationCapture**, and **GraphDatabase**. In practice, AgentManager is the single point of truth for agent lifecycle management, validation orchestration, and logging, ensuring that each agent can be updated or swapped without destabilising the broader constraint‑checking pipeline.
+**AgentManager** is the central coordinating sub‑component that lives inside the **ConstraintSystem**. It is the hub through which the system’s various agents—most notably the **ContentValidationAgent** located at `integrations/semantic-analysis/src/agents/content-validation-agent.ts`—are registered, invoked, and monitored. AgentManager also mediates interactions with auxiliary services such as **ContentValidator**, **HookManager**, **Logger**, **ViolationCapture**, and **GraphDatabase**. In practice, AgentManager is the single point of truth for agent lifecycle management, validation orchestration, and logging, ensuring that each agent can be updated or swapped without destabilising the broader constraint‑checking pipeline.
 
 ---
 
@@ -27,7 +27,7 @@ No evidence of micro‑service boundaries, event‑sourcing, or other high‑lev
 AgentManager’s implementation revolves around three concrete responsibilities that emerge from the observations:
 
 1. **Agent Registration & Retrieval**  
-   - The manager imports the **ContentValidationAgent** from `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`.  
+   - The manager imports the **ContentValidationAgent** from `integrations/semantic-analysis/src/agents/content-validation-agent.ts`.  
    - It likely maintains an internal registry (e.g., a map keyed by agent name) that allows other components—such as **ContentValidator**—to request a specific agent instance for a validation task.
 
 2. **Validation Coordination**  
@@ -87,14 +87,14 @@ These insights are drawn directly from the provided observations and reflect the
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem employs a modular architecture, with each agent having its own file and responsibility. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for parsing entities and verifying references in the codebase. This modular approach allows for easier maintenance and updates, as each agent can be modified or replaced without affecting the entire system. Furthermore, the use of a separate file for each agent promotes code organization and readability, making it easier for new developers to understand the system's architecture.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem employs a modular architecture, with each agent having its own file and responsibility. For instance, the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) is responsible for parsing entities and verifying references in the codebase. This modular approach allows for easier maintenance and updates, as each agent can be modified or replaced without affecting the entire system. Furthermore, the use of a separate file for each agent promotes code organization and readability, making it easier for new developers to understand the system's architecture.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to parse entities and verify references.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts to parse entities and verify references.
 - [HookManager](./HookManager.md) -- HookManager utilizes a modular approach, allowing for easier maintenance and updates as each hook can be modified or replaced without affecting the entire system.
 - [ViolationCapture](./ViolationCapture.md) -- ViolationCapture utilizes the GraphDatabase to handle graph database persistence and querying, with automatic JSON export sync.
 - [Logger](./Logger.md) -- Logger utilizes the centralLog function as a simple logger wrapper to provide a logging mechanism for the system.
-- [GraphDatabase](./GraphDatabase.md) -- GraphDatabase utilizes the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts to handle graph database persistence and querying.
+- [GraphDatabase](./GraphDatabase.md) -- GraphDatabase utilizes the integrations/semantic-analysis/src/agents/content-validation-agent.ts to handle graph database persistence and querying.
 
 ---
 

@@ -6,7 +6,7 @@ WaveAgentController probably relies on specific modules or files for managing Wa
 
 ## What It Is  
 
-**WaveAgentController** is a sub‑component that lives inside the **KnowledgeManagement** module. Although no concrete source files are listed in the current observation set, the surrounding hierarchy makes its location clear: it is part of the same package tree that contains the `GraphDatabaseAdapter` (found at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). WaveAgentController is responsible for orchestrating the lifecycle of a *Wave* agent – from initialization through execution – and for tying that lifecycle to the broader knowledge‑graph infrastructure used throughout the platform.
+**WaveAgentController** is a sub‑component that lives inside the **KnowledgeManagement** module. Although no concrete source files are listed in the current observation set, the surrounding hierarchy makes its location clear: it is part of the same package tree that contains the `GraphDatabaseAdapter` (found at `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`). WaveAgentController is responsible for orchestrating the lifecycle of a *Wave* agent – from initialization through execution – and for tying that lifecycle to the broader knowledge‑graph infrastructure used throughout the platform.
 
 The controller sits directly above **WaveAgentInitialization**, its child component, and works side‑by‑side with sibling services such as **LlmServiceManager**, **GraphDatabaseManager**, **VkbApiClientManager**, **UkbTraceReportGenerator**, **ManualLearning**, and **OnlineLearning**. Its primary purpose is to coordinate these services so that a Wave agent can request LLM‑driven reasoning, persist intermediate results in the graph database, and emit trace reports for downstream analysis.
 
@@ -34,7 +34,7 @@ Even though the source symbols for WaveAgentController are not listed, the surro
 
 2. **WaveAgentInitialization** – As a child component, this module likely encapsulates the steps required to spin up a new Wave agent (e.g., allocating a unique identifier, preparing a runtime context, and registering callbacks). WaveAgentController would invoke an `initialize()` method on this child, passing in configuration derived from the LLM service or incoming request payload.
 
-3. **Graph Persistence** – When the agent produces intermediate knowledge artifacts (entities, relationships, or reasoning steps), WaveAgentController forwards them to the **GraphDatabaseManager**, which in turn uses the `GraphDatabaseAdapter` (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`). The adapter abstracts LevelDB storage, automatically synchronizing JSON exports, ensuring that the knowledge graph stays consistent across agent runs.
+3. **Graph Persistence** – When the agent produces intermediate knowledge artifacts (entities, relationships, or reasoning steps), WaveAgentController forwards them to the **GraphDatabaseManager**, which in turn uses the `GraphDatabaseAdapter` (`integrations/semantic-analysis/src/storage/graph-database-adapter.ts`). The adapter abstracts LevelDB storage, automatically synchronizing JSON exports, ensuring that the knowledge graph stays consistent across agent runs.
 
 4. **LLM Interaction** – Calls to the **LlmServiceManager** are likely wrapped in async methods such as `runPrompt(prompt: string): Promise<LlmResponse>`. The controller would handle retries, token limits, and response parsing before feeding results back into the graph.
 
@@ -54,7 +54,7 @@ WaveAgentController is a nexus of several system boundaries:
 |--------------------|---------|---------------------|
 | **LlmServiceManager** | Executes LLM prompts for reasoning | “interacts with … for LLM operations and initialization” |
 | **GraphDatabaseManager** | Persists agent state and knowledge artifacts | “utilizes … for storing and retrieving data related to Wave agent execution” |
-| **GraphDatabaseAdapter** | Low‑level graph storage (LevelDB) | Path: `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` |
+| **GraphDatabaseAdapter** | Low‑level graph storage (LevelDB) | Path: `integrations/semantic-analysis/src/storage/graph-database-adapter.ts` |
 | **VkbApiClientManager** | Calls external VKB APIs during execution | “employs … for VKB API interactions” |
 | **UkbTraceReportGenerator** | Generates trace reports post‑execution | “involves … for generating trace reports” |
 | **WaveAgentInitialization** | Sets up agent runtime context | Child component; “interacts … implying a connection to WaveAgentInitialization” |
@@ -115,7 +115,7 @@ These integration points are all **explicitly mentioned** in the observations, a
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
 
 ### Children
 - [WaveAgentInitialization](./WaveAgentInitialization.md) -- The parent component analysis suggests that WaveAgentController interacts with the LlmServiceManager for LLM operations and initialization, implying a connection to WaveAgentInitialization.

@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The InsightGenerationAgent, located in the integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts file, uses a combination of natural language processing and machine learning algorithms to generate insights.
+The InsightGenerationAgent, located in the integrations/semantic-analysis/src/agents/insight-generation-agent.ts file, uses a combination of natural language processing and machine learning algorithms to generate insights.
 
 ## What It Is  
 
 The **InsightGenerationAgent** lives in the source tree at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts
+integrations/semantic-analysis/src/agents/insight-generation-agent.ts
 ```  
 
 and is the concrete implementation that powers the *InsightGeneration* capability inside the broader **Insights** component. According to the observations, this agent “uses a combination of natural language processing and machine learning algorithms to generate insights” and “focuses on graph‑based approaches to identify recurring patterns in the data.” In practice, the agent is the entry point for a multi‑stage pipeline that receives raw semantic data, runs NLP preprocessing, applies ML models, and finally extracts higher‑level insights that are surfaced through the **Insights** parent component.
@@ -73,7 +73,7 @@ Finally, any changes to the graph‑based pattern detection logic should be acco
 ## Hierarchy Context
 
 ### Parent
-- [Insights](./Insights.md) -- The InsightGenerationAgent, located in the integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts file, uses a combination of natural language processing and machine learning algorithms to generate insights.
+- [Insights](./Insights.md) -- The InsightGenerationAgent, located in the integrations/semantic-analysis/src/agents/insight-generation-agent.ts file, uses a combination of natural language processing and machine learning algorithms to generate insights.
 
 ---
 

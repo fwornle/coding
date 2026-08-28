@@ -8,7 +8,7 @@ The coordinator agent drives the batch-analysis workflow by sequencing downstrea
 
 ## What It Is
 
-Pipeline is a sub-component of SemanticAnalysis, hosted within `integrations/mcp-server-semantic-analysis`. It represents the orchestration backbone of the multi-agent batch-analysis workflow — a directed, dependency-ordered sequence of specialized agents that collectively transform raw git history and LSL session logs into enriched, classified, and persisted knowledge entities. Rather than exposing pipeline logic as an internal library, Pipeline surfaces its control interface outward through McpToolEndpointExposure, making pipeline execution callable by orchestrating agents via the MCP (Model Context Protocol) tool endpoint pattern.
+Pipeline is a sub-component of SemanticAnalysis, hosted within `integrations/semantic-analysis`. It represents the orchestration backbone of the multi-agent batch-analysis workflow — a directed, dependency-ordered sequence of specialized agents that collectively transform raw git history and LSL session logs into enriched, classified, and persisted knowledge entities. Rather than exposing pipeline logic as an internal library, Pipeline surfaces its control interface outward through McpToolEndpointExposure, making pipeline execution callable by orchestrating agents via the MCP (Model Context Protocol) tool endpoint pattern.
 
 The Pipeline does not itself perform semantic analysis — it coordinates agents that do. Its value is structural: it defines the order, the handoffs, and the contracts between the observation layer, the graph construction layer, the deduplication layer, and the persistence layer.
 
@@ -24,7 +24,7 @@ The coordinator agent sits at the top of this DAG, driving the sequencing of fou
 
 ![Pipeline — Relationship](images/pipeline-relationship.png)
 
-The decision to host Pipeline inside an MCP server (`integrations/mcp-server-semantic-analysis`) rather than as a directly invoked library is architecturally significant. It means pipeline execution is mediated through McpToolEndpointExposure, which wraps pipeline control logic as callable tools. This creates a clean boundary between the orchestrating agent (which drives the workflow) and the pipeline implementation (which executes it), allowing the pipeline to be invoked remotely, tested independently, and versioned without coupling to the caller's deployment.
+The decision to host Pipeline inside an MCP server (`integrations/semantic-analysis`) rather than as a directly invoked library is architecturally significant. It means pipeline execution is mediated through McpToolEndpointExposure, which wraps pipeline control logic as callable tools. This creates a clean boundary between the orchestrating agent (which drives the workflow) and the pipeline implementation (which executes it), allowing the pipeline to be invoked remotely, tested independently, and versioned without coupling to the caller's deployment.
 
 Siblings such as OntologyConfigManager reinforce the pipeline's consistency guarantees: by operating as a singleton, OntologyConfigManager ensures that the classifier and validator agents running within the pipeline share identical ontology configuration throughout a single batch run, eliminating the risk of mid-run config drift that would corrupt entity classification across stages.
 
@@ -86,10 +86,10 @@ GraphKMStore is the terminal dependency — all pipeline work ultimately lands t
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
 
 ### Children
-- [McpToolEndpointExposure](./McpToolEndpointExposure.md) -- Based on parent context, the sub-component is hosted in `integrations/mcp-server-semantic-analysis`, establishing it as an MCP server that wraps pipeline control logic as callable tools.
+- [McpToolEndpointExposure](./McpToolEndpointExposure.md) -- Based on parent context, the sub-component is hosted in `integrations/semantic-analysis`, establishing it as an MCP server that wraps pipeline control logic as callable tools.
 
 ### Siblings
 - [Ontology](./Ontology.md) -- The system maintains a two-level ontology hierarchy (upper/lower) with separate definition files, paths to which are managed by OntologyConfigManager, allowing the classification tier to be reconfigured without code changes

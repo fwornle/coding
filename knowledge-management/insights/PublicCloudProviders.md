@@ -22,7 +22,7 @@ Configuration is intentionally externalized. Endpoints, model catalogs, and cred
 
 ![PublicCloudProviders — Relationship](images/public-cloud-providers-relationship.png)
 
-The routing layer sits above the adapters. The sibling `TierRouter` consults the tier strategy described in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` and dispatches each call to whichever provider/model pair matches the task's complexity. For this to work, every adapter under `PublicCloudProviders` must surface **model-tier metadata** that `TierRouter` can read uniformly — meaning each adapter declares not just *which* models it can call, but *what tier* each model belongs to.
+The routing layer sits above the adapters. The sibling `TierRouter` consults the tier strategy described in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` and dispatches each call to whichever provider/model pair matches the task's complexity. For this to work, every adapter under `PublicCloudProviders` must surface **model-tier metadata** that `TierRouter` can read uniformly — meaning each adapter declares not just *which* models it can call, but *what tier* each model belongs to.
 
 ## Implementation Details
 
@@ -38,7 +38,7 @@ Because adapters coexist with the `DMR` provider in `src/providers/`, the direct
 
 - **Parent `LLMAbstraction`** invokes this sub-component whenever `getLLMMode()` resolves to `'public'`. The parent owns mode resolution; this sub-component owns the actual remote calls.
 - **`LLMProviderConfig`** (sibling) supplies the canonical provider registry via `config/llm-providers.yaml`. Each adapter is a *consumer* of this registry. A provider entry must exist in the YAML before any adapter code can successfully initialize.
-- **`TierRouter`** (sibling) is the primary upstream caller. It picks a provider+model based on task complexity using the strategy in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. The contract here is bidirectional: adapters expose tier metadata, and `TierRouter` reads it to route.
+- **`TierRouter`** (sibling) is the primary upstream caller. It picks a provider+model based on task complexity using the strategy in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. The contract here is bidirectional: adapters expose tier metadata, and `TierRouter` reads it to route.
 - **`MockLLMService`** (sibling) is *not* called in `'public'` mode, but it owns the `LLMMode` type definition that determines whether this sub-component is invoked at all. This is a type-level dependency rather than a runtime one.
 
 The single child component, `AnthropicAdapter`, is one of several concrete adapter implementations grouped here. Adding OpenAI, Groq, or any future provider follows the same shape: a module in `src/providers/`, a YAML entry in `config/llm-providers.yaml`, and conformance to the shared adapter interface so `TierRouter` can dispatch to it.
@@ -78,7 +78,7 @@ Finally, when debugging unexpected provider selection, follow the chain in order
 
 ### Siblings
 - [LLMProviderConfig](./LLMProviderConfig.md) -- config/llm-providers.yaml serves as the canonical registry of provider definitions, meaning adding a new provider requires an entry here before any adapter code is wired up
-- [TierRouter](./TierRouter.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md is the authoritative design document for tier selection strategy, making it the first place to read when understanding why a request lands on a specific model
+- [TierRouter](./TierRouter.md) -- integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md is the authoritative design document for tier selection strategy, making it the first place to read when understanding why a request lands on a specific model
 - [MockLLMService](./MockLLMService.md) -- src/mock/llm-mock-service.ts is the single source of truth for LLMMode ('mock' | 'local' | 'public') and LLMState, despite its filename implying it is only a test utility — new developers should treat it as a core types file
 
 

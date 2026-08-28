@@ -4,7 +4,7 @@
 
 ## Observations
 
-- ContentValidationService utilizes the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to persist and validate entity content, ensuring data consistency.
+- ContentValidationService utilizes the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) to persist and validate entity content, ensuring data consistency.
 - The module integrates with the GraphDatabaseManagerInterface to manage interactions with the graph database, storing and retrieving validated content.
 - ContentValidationService leverages the CodeGraphAgent to construct AST-based code knowledge graphs, facilitating code analysis and understanding.
 - The module employs the OntologyManagementSystem to classify and provide metadata for entities, enhancing knowledge discovery and retrieval.

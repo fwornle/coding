@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The ontology classification agent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts uses a hierarchical classification model to resolve entity types, indicating a hierarchical structure for entity classification.
+The ontology classification agent in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts uses a hierarchical classification model to resolve entity types, indicating a hierarchical structure for entity classification.
 
 ## What It Is  
 
 The **HierarchicalClassificationModel** lives inside the **Ontology** sub‑component of the semantic‑analysis service.  The only concrete location we know of it is its usage in the *ontology classification agent* found at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
 Within that agent the model is invoked to **resolve entity types**.  The wording in the observation tells us that the model supplies a *hierarchical* view of entity types – i.e., each type is positioned in a tree where a child inherits or refines the meaning of its parent.  Because the model is a “key component” of the Ontology sub‑component, it is the mechanism that turns raw semantic tokens into a structured taxonomy that downstream analysis can rely on.
@@ -100,7 +100,7 @@ Overall, the **HierarchicalClassificationModel** serves as a well‑encapsulated
 ## Hierarchy Context
 
 ### Parent
-- [Ontology](./Ontology.md) -- The ontology classification agent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts utilizes a hierarchical classification model to resolve entity types
+- [Ontology](./Ontology.md) -- The ontology classification agent in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts utilizes a hierarchical classification model to resolve entity types
 
 ---
 

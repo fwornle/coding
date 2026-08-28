@@ -6,7 +6,7 @@ The ConstraintConfigurator is implied to be a key component in the ConstraintMon
 
 ## What It Is  
 
-The **ConstraintConfigurator** lives at the heart of the *ConstraintMonitoringService* and is responsible for turning the declarative specifications found in **`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`** into runtime‑ready constraint objects.  The documentation file describes each constraint, its parameters, and the relationships among them, and the configurator reads this information during service start‑up.  Because the *ConstraintMonitoringService* explicitly references the same markdown file, the configurator acts as the bridge between static configuration (the markdown) and dynamic execution (the monitoring logic).  
+The **ConstraintConfigurator** lives at the heart of the *ConstraintMonitoringService* and is responsible for turning the declarative specifications found in **`integrations/constraint-monitor/docs/constraint-configuration.md`** into runtime‑ready constraint objects.  The documentation file describes each constraint, its parameters, and the relationships among them, and the configurator reads this information during service start‑up.  Because the *ConstraintMonitoringService* explicitly references the same markdown file, the configurator acts as the bridge between static configuration (the markdown) and dynamic execution (the monitoring logic).  
 
 In addition to interpreting the markdown, the configurator respects the **`MEMGRAPH_BATCH_SIZE`** environment variable.  This variable controls how many records are sent to the Memgraph graph database in a single write operation, allowing operators to tune performance without touching code.  Thus, the configurator is both a **configuration parser** and a **runtime tuner** for the graph‑persistence layer.  
 
@@ -28,7 +28,7 @@ Interaction between components is straightforward: *ConstraintMonitoringService*
 
 While the source code does not expose concrete symbols, the naming and file locations give a clear picture of the implementation flow:
 
-1. **Configuration Parsing** – The configurator likely reads `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` using a markdown parser or a simple line‑by‑line scanner.  Each constraint definition is transformed into an in‑memory object (e.g., `ConstraintDefinition`) that captures its name, thresholds, and dependency graph.  
+1. **Configuration Parsing** – The configurator likely reads `integrations/constraint-monitor/docs/constraint-configuration.md` using a markdown parser or a simple line‑by‑line scanner.  Each constraint definition is transformed into an in‑memory object (e.g., `ConstraintDefinition`) that captures its name, thresholds, and dependency graph.  
 
 2. **Environment Variable Consumption** – At start‑up the configurator queries the process environment for `MEMGRAPH_BATCH_SIZE`.  If the variable is absent, a sensible default is probably applied; otherwise, the string value is parsed into an integer that dictates the size of write batches to Memgraph.  
 
@@ -44,7 +44,7 @@ While the source code does not expose concrete symbols, the naming and file loca
 
 The **ConstraintConfigurator** sits at the nexus of three distinct integration surfaces:
 
-* **Documentation → Service** – The markdown file (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) is the primary source of truth for constraint definitions.  Any updates to constraints are made here, and the configurator consumes this file directly.  
+* **Documentation → Service** – The markdown file (`integrations/constraint-monitor/docs/constraint-configuration.md`) is the primary source of truth for constraint definitions.  Any updates to constraints are made here, and the configurator consumes this file directly.  
 
 * **Environment → Runtime** – The `MEMGRAPH_BATCH_SIZE` environment variable provides a lightweight hook for operators to influence the persistence layer without modifying code.  The configurator reads this variable and forwards the value to the Memgraph writer component.  
 
@@ -56,7 +56,7 @@ Because the configurator is a child of *ConstraintMonitoringService*, it does no
 
 ## Usage Guidelines  
 
-1. **Maintain the Markdown Source** – All constraint definitions must be kept up‑to‑date in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  When adding, removing, or altering a constraint, edit this file and verify the syntax matches existing entries.  A malformed markdown section will cause the configurator to reject the configuration at start‑up.  
+1. **Maintain the Markdown Source** – All constraint definitions must be kept up‑to‑date in `integrations/constraint-monitor/docs/constraint-configuration.md`.  When adding, removing, or altering a constraint, edit this file and verify the syntax matches existing entries.  A malformed markdown section will cause the configurator to reject the configuration at start‑up.  
 
 2. **Validate Environment Settings** – Set `MEMGRAPH_BATCH_SIZE` to a positive integer that reflects the capacity of the Memgraph instance and the expected monitoring throughput.  Values that are too low will increase write latency; values that are too high may overwhelm Memgraph or cause memory pressure.  If the variable is omitted, rely on the default defined by the configurator (documented elsewhere).  
 
@@ -98,7 +98,7 @@ Overall, the **ConstraintConfigurator** exemplifies a pragmatic, configuration�
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService uses the integrations/mcp-constraint-monitor/docs/constraint-configuration.md file to configure the constraints and their dependencies.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService uses the integrations/constraint-monitor/docs/constraint-configuration.md file to configure the constraints and their dependencies.
 
 ---
 

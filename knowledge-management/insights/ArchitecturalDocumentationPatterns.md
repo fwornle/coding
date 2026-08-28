@@ -2,13 +2,13 @@
 
 **Type:** SubComponent
 
-integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md follows a named pattern of flagging and then resolving architectural deviations in a tracked document rather than inline comments
+integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md follows a named pattern of flagging and then resolving architectural deviations in a tracked document rather than inline comments
 
 # ArchitecturalDocumentationPatterns
 
 ## What It Is
 
-ArchitecturalDocumentationPatterns is a SubComponent of CodingPatterns that codifies how architecture decisions, diagrams, proposals, and issue tracking are organized across integrations. Its conventions are most clearly visible in `integrations/mcp-server-semantic-analysis/`, which contains the richest documentation structure in the project: a `docs/architecture/` subdirectory with dedicated files (`agents.md`, `tools.md`, `integration.md`), an index entry point at `docs/architecture/README.md`, a proposal document at `docs/TIERED-MODEL-PROPOSAL.md`, and a tracked issues file at `CRITICAL-ARCHITECTURE-ISSUES.md`. PlantUML diagrams have a canonical home in `docs/puml/`, establishing a physical separation between visual and prose documentation. Together these conventions form a repeatable, integration-scoped documentation standard rather than a centralized monolithic architecture repository.
+ArchitecturalDocumentationPatterns is a SubComponent of CodingPatterns that codifies how architecture decisions, diagrams, proposals, and issue tracking are organized across integrations. Its conventions are most clearly visible in `integrations/semantic-analysis/`, which contains the richest documentation structure in the project: a `docs/architecture/` subdirectory with dedicated files (`agents.md`, `tools.md`, `integration.md`), an index entry point at `docs/architecture/README.md`, a proposal document at `docs/TIERED-MODEL-PROPOSAL.md`, and a tracked issues file at `CRITICAL-ARCHITECTURE-ISSUES.md`. PlantUML diagrams have a canonical home in `docs/puml/`, establishing a physical separation between visual and prose documentation. Together these conventions form a repeatable, integration-scoped documentation standard rather than a centralized monolithic architecture repository.
 
 ![ArchitecturalDocumentationPatterns — Architecture](images/architectural-documentation-patterns-architecture.png)
 
@@ -20,7 +20,7 @@ The subdoc structure within `docs/architecture/` is not arbitrary — it directl
 
 ![ArchitecturalDocumentationPatterns — Relationship](images/architectural-documentation-patterns-relationship.png)
 
-A notable design decision is the deliberate choice to keep architectural documentation integration-local rather than centralized. `docs/TIERED-MODEL-PROPOSAL.md` lives inside `integrations/mcp-server-semantic-analysis/` rather than in a central ADR (Architecture Decision Record) directory. This is a trade-off: integration-local docs travel with the code and remain contextually accurate, but cross-integration discoverability requires navigating each integration independently rather than consulting a single registry.
+A notable design decision is the deliberate choice to keep architectural documentation integration-local rather than centralized. `docs/TIERED-MODEL-PROPOSAL.md` lives inside `integrations/semantic-analysis/` rather than in a central ADR (Architecture Decision Record) directory. This is a trade-off: integration-local docs travel with the code and remain contextually accurate, but cross-integration discoverability requires navigating each integration independently rather than consulting a single registry.
 
 ## Implementation Details
 
@@ -38,7 +38,7 @@ The `docs/architecture/README.md` index convention also creates an integration p
 
 ## Usage Guidelines
 
-Every integration is expected to maintain its own `docs/architecture/README.md` as a navigation entry point — this is not optional decoration but a structural contract implied by the `mcp-server-semantic-analysis` reference implementation. When creating a new integration, the first documentation act should be establishing this index before adding subdocs, so that the entry point exists before the content it navigates.
+Every integration is expected to maintain its own `docs/architecture/README.md` as a navigation entry point — this is not optional decoration but a structural contract implied by the `semantic-analysis` reference implementation. When creating a new integration, the first documentation act should be establishing this index before adding subdocs, so that the entry point exists before the content it navigates.
 
 Architectural proposals should be stored as versioned documents within the relevant integration (following `docs/TIERED-MODEL-PROPOSAL.md`) rather than in any central ADR directory. This keeps proposals co-located with the code they affect, but developers should be aware of the discoverability trade-off: cross-integration architectural patterns will not surface automatically and require active cross-integration documentation review.
 
@@ -50,7 +50,7 @@ PlantUML source files belong in `docs/puml/` and nowhere else. Embedding diagram
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The project enforces a strict layered architecture within each integration, most visibly in integrations/code-graph-rag/codebase_rag/ which separates concerns into parsers/, providers/, services/, tools/, and utils/ subdirectories. This mirrors a classic hexagonal/ports-and-adapters style: parsers handle raw source ingestion, providers abstract data sources, services contain business logic, tools expose callable capabilities (likely as MCP tools), and utils hold shared helpers. A new developer adding a language parser would add only to parsers/, while a new MCP-exposed capability would live in tools/ — the structure enforces that each concern has exactly one home. This same pattern repeats in integrations/mcp-server-semantic-analysis/ and integrations/mcp-constraint-monitor/, suggesting the project treats this directory layout as a project-wide architectural standard rather than an incidental choice.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The project enforces a strict layered architecture within each integration, most visibly in integrations/code-graph-rag/codebase_rag/ which separates concerns into parsers/, providers/, services/, tools/, and utils/ subdirectories. This mirrors a classic hexagonal/ports-and-adapters style: parsers handle raw source ingestion, providers abstract data sources, services contain business logic, tools expose callable capabilities (likely as MCP tools), and utils hold shared helpers. A new developer adding a language parser would add only to parsers/, while a new MCP-exposed capability would live in tools/ — the structure enforces that each concern has exactly one home. This same pattern repeats in integrations/semantic-analysis/ and integrations/constraint-monitor/, suggesting the project treats this directory layout as a project-wide architectural standard rather than an incidental choice.
 
 ### Siblings
 - [GraphOntologyPatterns](./GraphOntologyPatterns.md) -- The relationship types CONTAINS_PACKAGE, CONTAINS_FOLDER, CONTAINS_FILE, CONTAINS_MODULE form a strict containment hierarchy in config/graph-database-config.json, encoding filesystem and module nesting as first-class graph edges

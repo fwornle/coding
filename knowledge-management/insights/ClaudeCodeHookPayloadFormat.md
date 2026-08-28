@@ -2,20 +2,20 @@
 
 **Type:** Detail
 
-Because McpConstraintMonitor operates as a downstream endpoint rather than inline with Claude Code (per `integrations/mcp-constraint-monitor/README.md`), this format document is the primary integration seam — producers (UnifiedHookManager) and the consumer (this server) are decoupled by this payload schema.
+Because McpConstraintMonitor operates as a downstream endpoint rather than inline with Claude Code (per `integrations/constraint-monitor/README.md`), this format document is the primary integration seam — producers (UnifiedHookManager) and the consumer (this server) are decoupled by this payload schema.
 
 ## What It Is  
 
 `ClaudeCodeHookPayloadFormat` is the **canonical data contract** that defines the shape of the JSON payloads sent by the **UnifiedHookManager** and received by the **McpConstraintMonitor** server. The full specification lives in the markdown file  
 
 ```
-integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 ```  
 
 and is referenced from the integration‑level README at  
 
 ```
-integrations/mcp-constraint-monitor/README.md
+integrations/constraint-monitor/README.md
 ```  
 
 Because the monitor runs **downstream** of Claude Code (it is not inlined with the Claude execution engine), this format file is the *single source of truth* for any component that wishes to emit a Claude‑code hook. In practice, it is the **integration seam** that decouples the producer (UnifiedHookManager) from the consumer (the monitor) and guarantees that both sides speak the same language without needing to share implementation code.
@@ -30,7 +30,7 @@ The overall architecture follows a **payload‑driven integration pattern**. The
 
 * **Decoupling via schema** – By externalising the payload definition, the system avoids compile‑time coupling. Producers can be written in any language that can serialise the described JSON shape, while the monitor only needs to deserialise and validate the incoming payload.  
 * **Version‑stable contract** – The separate documentation suggests an intentional versioning strategy (e.g., `v1`, `v2` sections inside the markdown). This enables backward‑compatible evolution: the monitor can reject unknown versions while older producers continue to operate.  
-* **Downstream wiring** – The monitor is wired into the **UnifiedHookManager** dispatch chain as a *listener* rather than a *inline* processor. This is explicitly called out in `integrations/mcp-constraint-monitor/README.md`, meaning the monitor does not interfere with the primary Claude execution flow and can scale independently.  
+* **Downstream wiring** – The monitor is wired into the **UnifiedHookManager** dispatch chain as a *listener* rather than a *inline* processor. This is explicitly called out in `integrations/constraint-monitor/README.md`, meaning the monitor does not interfere with the primary Claude execution flow and can scale independently.  
 
 The sibling component **SemanticConstraintDetector** (documented in `semantic-constraint-detection.md` and `semantic-detection-design.md`) follows a similar pattern: a well‑designed algorithmic module that consumes data produced elsewhere. Both components illustrate a **modular, feature‑oriented design** where each integration point is clearly documented and isolated.
 
@@ -78,7 +78,7 @@ Because the contract is defined in a markdown document, the monitor’s codebase
 
 ## Usage Guidelines  
 
-* **Treat the markdown spec as the API contract.** Never infer field names or types from existing code; always copy the definitions from `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  
+* **Treat the markdown spec as the API contract.** Never infer field names or types from existing code; always copy the definitions from `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  
 * **Validate before sending.** Producers should run the same JSON‑schema validation locally to catch errors early, reducing load on the monitor.  
 * **Respect versioning.** When introducing a breaking change to the payload, increment the `version` field and update the spec file accordingly. The monitor will reject unknown versions, so coordinated deployment is required.  
 * **Keep payloads minimal.** Include only required fields; optional diagnostic data should be added only when needed, as larger payloads increase network overhead and processing time.  
@@ -126,10 +126,10 @@ Because the contract is defined in a markdown document, the monitor’s codebase
 ## Hierarchy Context
 
 ### Parent
-- [McpConstraintMonitor](./McpConstraintMonitor.md) -- integrations/mcp-constraint-monitor/README.md documents the server's role as a hook payload receiver, meaning it is wired into the UnifiedHookManager dispatch chain as a downstream endpoint rather than running inline with Claude Code
+- [McpConstraintMonitor](./McpConstraintMonitor.md) -- integrations/constraint-monitor/README.md documents the server's role as a hook payload receiver, meaning it is wired into the UnifiedHookManager dispatch chain as a downstream endpoint rather than running inline with Claude Code
 
 ### Siblings
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` ('Semantic Constraint Detection') and `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md` ('Semantic Constraint Detection - Design Document') together indicate this feature underwent explicit architectural planning before implementation — a pattern typical of non-trivial algorithmic components.
+- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- `integrations/constraint-monitor/docs/semantic-constraint-detection.md` ('Semantic Constraint Detection') and `integrations/constraint-monitor/docs/semantic-detection-design.md` ('Semantic Constraint Detection - Design Document') together indicate this feature underwent explicit architectural planning before implementation — a pattern typical of non-trivial algorithmic components.
 
 
 ---

@@ -28,7 +28,7 @@ Although the source tree does not expose concrete class definitions for the modu
 
 2. **UKB Trace Report Integration** – The module consumes the UKB trace output, probably via a parser or loader routine referenced in the agent development guide.  This data is transformed into a format consumable by the **InsightGenerationModule**, which expects a structured trace to generate actionable insights.
 
-3. **GraphDatabaseModule Interaction** – Calls to the graph layer are performed through the existing `GraphDatabaseAdapter` (implemented in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`).  Utility entities are stored using methods such as `upsertNode(entity)` or `queryEdges(criteria)`, enabling later retrieval by analytics or agent components.
+3. **GraphDatabaseModule Interaction** – Calls to the graph layer are performed through the existing `GraphDatabaseAdapter` (implemented in `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`).  Utility entities are stored using methods such as `upsertNode(entity)` or `queryEdges(criteria)`, enabling later retrieval by analytics or agent components.
 
 4. **Hook Integration** – The file `integrations/copi/docs/hooks.md` documents the hooks that expose utility functions to external agents.  These hooks likely register callbacks or RPC endpoints that agents can invoke, ensuring that utility logic is reusable across the platform.
 
@@ -93,7 +93,7 @@ UtilitiesModule benefits from high modularity: each concern (checkpointing, trac
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
 
 ### Children
 - [CheckpointSystem](./CheckpointSystem.md) -- The checkpoint system is mentioned in the context of the UtilitiesModule, implying its importance in the module's operation.

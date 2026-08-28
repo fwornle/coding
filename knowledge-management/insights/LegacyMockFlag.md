@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-`getLLMMode()` in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` consults `mockLLM` only after both the per-agent store and `llmState.globalMode` are found unset, placing it third in a four-level chain that bottoms out at the hardcoded `'public'` string fallback.
+`getLLMMode()` in `integrations/semantic-analysis/src/mock/llm-mock-service.ts` consults `mockLLM` only after both the per-agent store and `llmState.globalMode` are found unset, placing it third in a four-level chain that bottoms out at the hardcoded `'public'` string fallback.
 
 ## What It Is  
 
 **LegacyMockFlag** is the historic boolean flag that toggles a mock LLM backend for the **LLMModeController** subsystem. It lives in the file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts
+integrations/semantic-analysis/src/mock/llm-mock-service.ts
 ```  
 
 and is consulted by the `getLLMMode()` function. The flag is evaluated only after two higher‑priority configuration sources are examined: a per‑agent override stored in `llmState` (keyed by agent ID) and the global mode stored in `llmState.globalMode`. If neither of those sources yields a value, `getLLMMode()` falls back to the legacy `mockLLM` boolean, and finally to the hard‑coded string `'public'`.  
@@ -142,10 +142,10 @@ All interactions are **in‑process**; there are no external service calls or me
 ## Hierarchy Context
 
 ### Parent
-- [LLMModeController](./LLMModeController.md) -- `getLLMMode()` in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` implements a four-level priority chain: per-agent override in `llmState` keyed by agent ID, then `llmState.globalMode`, then legacy `mockLLM` boolean, then hardcoded `'public'` fallback
+- [LLMModeController](./LLMModeController.md) -- `getLLMMode()` in `integrations/semantic-analysis/src/mock/llm-mock-service.ts` implements a four-level priority chain: per-agent override in `llmState` keyed by agent ID, then `llmState.globalMode`, then legacy `mockLLM` boolean, then hardcoded `'public'` fallback
 
 ### Siblings
-- [AgentModeOverrideStore](./AgentModeOverrideStore.md) -- `getLLMMode()` in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` checks this agent-keyed section of `llmState` at priority level 1 (the highest), meaning a per-agent assignment always wins over global or legacy settings.
+- [AgentModeOverrideStore](./AgentModeOverrideStore.md) -- `getLLMMode()` in `integrations/semantic-analysis/src/mock/llm-mock-service.ts` checks this agent-keyed section of `llmState` at priority level 1 (the highest), meaning a per-agent assignment always wins over global or legacy settings.
 
 
 ---

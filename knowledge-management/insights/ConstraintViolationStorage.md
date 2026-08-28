@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides a guide for constraint configuration, which might be relevant to the storage of constraint violations.
+The integrations/constraint-monitor/docs/constraint-configuration.md file provides a guide for constraint configuration, which might be relevant to the storage of constraint violations.
 
 ## What It Is  
 
 **ConstraintViolationStorage** is the persistence layer that lives inside the **ViolationCaptureModule**.  The only concrete locations that mention this component are the documentation files under the *integrations* folder:  
 
-* `integrations/mcp-constraint-monitor/README.md` – introduces the MCP Constraint Monitor, a subsystem that consumes constraint‑violation data.  
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – describes how constraints are configured for the monitor, implying that the monitor expects a store of violations to query.  
+* `integrations/constraint-monitor/README.md` – introduces the MCP Constraint Monitor, a subsystem that consumes constraint‑violation data.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – describes how constraints are configured for the monitor, implying that the monitor expects a store of violations to query.  
 * `integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md` – talks about the Copi Status Line Integration, which can surface constraint‑violation information on a user‑facing status line.  
 
 From the hierarchy note we know that **ViolationCaptureModule** “captures constraint violations from tool interactions and stores them in a database.”  Therefore, **ConstraintViolationStorage** is the concrete implementation that writes those captured violations to that database and makes them queryable for downstream consumers such as the MCP Constraint Monitor and the Copi status line.  No source files or class definitions are listed in the current snapshot, but the naming and placement strongly suggest a dedicated storage abstraction (e.g., a repository or DAO) that hides the underlying DB technology from its callers.
@@ -25,7 +25,7 @@ Interaction flows can be inferred from the documentation hierarchy:
 1. **Tool integrations** emit raw constraint‑violation events.  
 2. **ViolationCaptureModule** receives those events, performs any necessary enrichment (e.g., adding timestamps, source identifiers), and forwards the enriched objects to **ConstraintViolationStorage**.  
 3. **ConstraintViolationStorage** writes the records into a database (the exact DB is not disclosed).  
-4. Consumers such as the **MCP Constraint Monitor** (documented in `integrations/mcp-constraint-monitor/README.md`) and the **Copi Status Line Integration** (`integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md`) query the storage to display or act on violations.
+4. Consumers such as the **MCP Constraint Monitor** (documented in `integrations/constraint-monitor/README.md`) and the **Copi Status Line Integration** (`integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md`) query the storage to display or act on violations.
 
 Because the only concrete artefacts are markdown files, we cannot point to a specific implementation pattern (e.g., ORM, NoSQL driver).  However, the presence of a dedicated storage component indicates an intention to keep persistence concerns isolated, which eases substitution of the underlying store and supports testability via mock implementations.
 
@@ -45,7 +45,7 @@ Because the MCP Constraint Monitor reads configuration from the same `constraint
 
 ## Integration Points  
 
-1. **MCP Constraint Monitor** – The README (`integrations/mcp-constraint-monitor/README.md`) positions the monitor as a consumer of constraint‑violation data.  The monitor will call into **ConstraintViolationStorage** (or a service that wraps it) to retrieve violations that match the configured constraints.  The `constraint-configuration.md` file is the shared source of truth for which constraints are monitored, meaning that any change in configuration directly influences the queries issued against the storage layer.
+1. **MCP Constraint Monitor** – The README (`integrations/constraint-monitor/README.md`) positions the monitor as a consumer of constraint‑violation data.  The monitor will call into **ConstraintViolationStorage** (or a service that wraps it) to retrieve violations that match the configured constraints.  The `constraint-configuration.md` file is the shared source of truth for which constraints are monitored, meaning that any change in configuration directly influences the queries issued against the storage layer.
 
 2. **Copi Status Line Integration** – The quick‑reference guide (`integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md`) indicates that Copi can surface violation information on a status line.  This integration likely performs a read‑only query against **ConstraintViolationStorage**, perhaps using a cached view to keep UI latency low.  The status line’s “quick reference” nature suggests that the integration only needs a subset of fields (e.g., constraint name and severity).
 
@@ -57,7 +57,7 @@ No other sibling components are mentioned, but any future module that needs hist
 
 ## Usage Guidelines  
 
-* **Configure constraints centrally** – All consumers rely on the `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` file.  Keep this file up‑to‑date; adding or removing a constraint there automatically changes what the monitor and any UI integrations will see.  Do not duplicate constraint definitions elsewhere.
+* **Configure constraints centrally** – All consumers rely on the `integrations/constraint-monitor/docs/constraint-configuration.md` file.  Keep this file up‑to‑date; adding or removing a constraint there automatically changes what the monitor and any UI integrations will see.  Do not duplicate constraint definitions elsewhere.
 
 * **Write‑through via ViolationCaptureModule** – Direct calls to **ConstraintViolationStorage** should be avoided by application code.  All writes must pass through the **ViolationCaptureModule** so that validation, enrichment, and logging occur consistently.  This also guarantees that any future business rules (e.g., de‑duplication, throttling) are applied uniformly.
 

@@ -8,12 +8,12 @@ The existence of both semantic-constraint-detection.md and semantic-detection-de
 
 ## What It Is
 
-`SemanticConstraintEvaluator` is a component residing within the `ConstraintRuleEngine` subsystem, documented across two files in the `integrations/mcp-constraint-monitor/` integration layer:
+`SemanticConstraintEvaluator` is a component residing within the `ConstraintRuleEngine` subsystem, documented across two files in the `integrations/constraint-monitor/` integration layer:
 
-- **`integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`** — the operational reference describing deployed behavior
-- **`integrations/mcp-constraint-monitor/docs/semantic-detection-design.md`** — the design specification capturing architectural intent
+- **`integrations/constraint-monitor/docs/semantic-constraint-detection.md`** — the operational reference describing deployed behavior
+- **`integrations/constraint-monitor/docs/semantic-detection-design.md`** — the design specification capturing architectural intent
 
-Together, these documents describe an evaluator that detects constraint violations using **meaning-aware matching** rather than literal string or pattern comparison. This distinguishes it fundamentally from its sibling, `PatternConstraintEvaluator`, which operates on explicit structural rules sourced from `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Where `PatternConstraintEvaluator` asks "does this invocation match this rule's structure?", `SemanticConstraintEvaluator` asks "does this invocation carry the meaning or intent that this constraint is designed to prevent?"
+Together, these documents describe an evaluator that detects constraint violations using **meaning-aware matching** rather than literal string or pattern comparison. This distinguishes it fundamentally from its sibling, `PatternConstraintEvaluator`, which operates on explicit structural rules sourced from `integrations/constraint-monitor/docs/constraint-configuration.md`. Where `PatternConstraintEvaluator` asks "does this invocation match this rule's structure?", `SemanticConstraintEvaluator` asks "does this invocation carry the meaning or intent that this constraint is designed to prevent?"
 
 ---
 
@@ -67,10 +67,10 @@ The two-document structure (`*-design.md` + `*-detection.md`) should be preserve
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md describes a semantic layer for detecting constraint violations that uses meaning-aware matching rather than literal rule comparison
+- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/constraint-monitor/docs/semantic-constraint-detection.md describes a semantic layer for detecting constraint violations that uses meaning-aware matching rather than literal rule comparison
 
 ### Siblings
-- [PatternConstraintEvaluator](./PatternConstraintEvaluator.md) -- integrations/mcp-constraint-monitor/docs/constraint-configuration.md serves as the rule source for this evaluator, defining the structure of constraints that get matched against tool invocations.
+- [PatternConstraintEvaluator](./PatternConstraintEvaluator.md) -- integrations/constraint-monitor/docs/constraint-configuration.md serves as the rule source for this evaluator, defining the structure of constraints that get matched against tool invocations.
 
 
 ---

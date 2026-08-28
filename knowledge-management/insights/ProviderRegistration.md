@@ -8,7 +8,7 @@ The ProviderRegistration sub-component provides a method for registering new pro
 
 The **ProviderRegistration** sub‑component lives inside the **CodingPatterns** component and is the entry point for adding new provider implementations to the system. Its core logic is implemented through the `ProviderRegistry` class, which can be found in the code base wherever the provider‑registration logic is referenced (the exact file path is not listed, but the class is documented in *integrations/copi/docs/USAGE.md*).  
 
-ProviderRegistration’s responsibility is to expose a **method for registering new providers**. This method is invoked by higher‑level consumers such as the **CodeGraphConstructor** (see `integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`). By funneling every new provider through a single registry, the system gains a consistent, searchable catalogue of providers that can be queried or iterated over by other components.
+ProviderRegistration’s responsibility is to expose a **method for registering new providers**. This method is invoked by higher‑level consumers such as the **CodeGraphConstructor** (see `integrations/semantic-analysis/src/agent/code-graph-agent.ts`). By funneling every new provider through a single registry, the system gains a consistent, searchable catalogue of providers that can be queried or iterated over by other components.
 
 > ![ProviderRegistration — Architecture](images/provider-registration-architecture.png)
 
@@ -51,7 +51,7 @@ The class is deliberately **flexible**: the descriptor can contain arbitrary met
 - By abstracting these operations, `ProviderRegistry` stays agnostic of storage details, allowing future swaps (e.g., moving from LevelDB to another KV store) with minimal impact.
 
 ### Consumer – `CodeGraphConstructor`  
-*Location:* `integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`.  
+*Location:* `integrations/semantic-analysis/src/agent/code-graph-agent.ts`.  
 - Calls the ProviderRegistration API during the code‑graph build phase to ensure that any newly discovered provider implementations are recorded before the graph analysis begins.  
 - This tight integration guarantees that provider‑related constraints are considered early in the pipeline.
 
@@ -99,11 +99,11 @@ By grounding the analysis in the observed classes, file paths, and documented us
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's architecture is heavily influenced by the GraphDatabaseAdapter class in storage/graph-database-adapter.ts, which provides methods for creating, reading, and manipulating graph data. This class utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval. The CodeGraphConstructor sub-component, as seen in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts, relies on the GraphDatabaseAdapter for constructing and analyzing code graphs. This tightly coupled relationship between the GraphDatabaseAdapter and CodeGraphConstructor enables the efficient creation and analysis of code graphs.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's architecture is heavily influenced by the GraphDatabaseAdapter class in storage/graph-database-adapter.ts, which provides methods for creating, reading, and manipulating graph data. This class utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval. The CodeGraphConstructor sub-component, as seen in integrations/semantic-analysis/src/agent/code-graph-agent.ts, relies on the GraphDatabaseAdapter for constructing and analyzing code graphs. This tightly coupled relationship between the GraphDatabaseAdapter and CodeGraphConstructor enables the efficient creation and analysis of code graphs.
 
 ### Siblings
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseAdapter in storage/graph-database-adapter.ts utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval.
-- [CodeGraphAnalysis](./CodeGraphAnalysis.md) -- The CodeGraphConstructor in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts relies on the GraphDatabaseAdapter for constructing and analyzing code graphs.
+- [CodeGraphAnalysis](./CodeGraphAnalysis.md) -- The CodeGraphConstructor in integrations/semantic-analysis/src/agent/code-graph-agent.ts relies on the GraphDatabaseAdapter for constructing and analyzing code graphs.
 - [ConstraintDetection](./ConstraintDetection.md) -- The ConstraintDetection sub-component uses the execute(input, context) pattern for detecting and monitoring constraints.
 - [LoggingAndMonitoring](./LoggingAndMonitoring.md) -- The LoggingAndMonitoring sub-component uses async log buffering and flushing for logging and monitoring.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG sub-component is a graph-based RAG system for any codebases, as seen in integrations/code-graph-rag/README.md.

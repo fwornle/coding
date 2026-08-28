@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The ConstraintMonitoringService provides a dashboard server, as defined in the integrations/mcp-constraint-monitor/dashboard/README.md file, to visualize the constraints and their dependencies.
+The ConstraintMonitoringService provides a dashboard server, as defined in the integrations/constraint-monitor/dashboard/README.md file, to visualize the constraints and their dependencies.
 
 ## What It Is  
 
-The **ConstraintMonitoringService** is a sub‑component that lives inside the *DockerizedServices* suite. Its primary artefacts are located under the `integrations/mcp-constraint-monitor/` directory. The service’s configuration is driven by the markdown file `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, which defines the set of constraints to be monitored and the relationships among them. In addition, the service ships a dedicated dashboard server whose instructions are documented in `integrations/mcp-constraint-monitor/dashboard/README.md`. The dashboard visualises the constraints and their dependencies for operators.  
+The **ConstraintMonitoringService** is a sub‑component that lives inside the *DockerizedServices* suite. Its primary artefacts are located under the `integrations/constraint-monitor/` directory. The service’s configuration is driven by the markdown file `integrations/constraint-monitor/docs/constraint-configuration.md`, which defines the set of constraints to be monitored and the relationships among them. In addition, the service ships a dedicated dashboard server whose instructions are documented in `integrations/constraint-monitor/dashboard/README.md`. The dashboard visualises the constraints and their dependencies for operators.  
 
 Operationally the service runs in its own Docker container (as defined in the shared `docker‑compose.yaml` of the parent *DockerizedServices* component). It consumes a number of environment variables—`CODE_GRAPH_RAG_SSE_PORT`, `CODE_GRAPH_RAG_PORT`, `MEMGRAPH_BATCH_SIZE`, `ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`, `BROWSER_ACCESS_PORT`, and `BROWSER_ACCESS_SSE_URL`—to wire up external services such as the Code Graph RAG service, a Memgraph database, and a browser‑access layer. The service also leverages the semantic‑constraint‑detection logic described in `semantic-constraint-detection.md` to recognise higher‑level, semantic constraints in the code base.
 
@@ -28,11 +28,11 @@ Security credentials (`ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`) are injected v
 
 Although no concrete code symbols were discovered, the file‑level artefacts reveal the key implementation pieces:
 
-1. **Constraint Configuration** – `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` provides a declarative schema (likely YAML or JSON embedded in markdown) that lists constraint identifiers, thresholds, and dependency graphs. The service parses this document at startup to build an in‑memory model of the monitoring landscape.
+1. **Constraint Configuration** – `integrations/constraint-monitor/docs/constraint-configuration.md` provides a declarative schema (likely YAML or JSON embedded in markdown) that lists constraint identifiers, thresholds, and dependency graphs. The service parses this document at startup to build an in‑memory model of the monitoring landscape.
 
 2. **Semantic Constraint Detection** – The `semantic-constraint-detection.md` document describes the algorithms or heuristics used to infer semantic constraints from source artefacts. The service probably loads this logic as a library or script that analyses code symbols, then maps the results onto the constraint model defined above.
 
-3. **Dashboard Server** – `integrations/mcp-constraint-monitor/dashboard/README.md` outlines how the dashboard is packaged (likely a Node.js or static‑site server) and how it consumes the service’s internal state via a REST or SSE endpoint. The dashboard visualises the constraint graph, highlighting violations and dependency chains.
+3. **Dashboard Server** – `integrations/constraint-monitor/dashboard/README.md` outlines how the dashboard is packaged (likely a Node.js or static‑site server) and how it consumes the service’s internal state via a REST or SSE endpoint. The dashboard visualises the constraint graph, highlighting violations and dependency chains.
 
 4. **Environment‑Driven Wiring** – The service reads the following variables at runtime:
    - `CODE_GRAPH_RAG_SSE_PORT` / `CODE_GRAPH_RAG_PORT`: address the Code Graph RAG service for graph queries and streaming updates.
@@ -64,7 +64,7 @@ All of these integrations are declaratively wired through environment variables,
 
 ## Usage Guidelines  
 
-1. **Configuration First** – Before launching the service, edit `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` to enumerate the constraints relevant to your code base. Validate the file using the ConstraintConfigurator’s validation endpoint (if exposed) to catch syntax errors early.
+1. **Configuration First** – Before launching the service, edit `integrations/constraint-monitor/docs/constraint-configuration.md` to enumerate the constraints relevant to your code base. Validate the file using the ConstraintConfigurator’s validation endpoint (if exposed) to catch syntax errors early.
 
 2. **Environment Variable Management** – Store all required secrets (`ANTHROPIC_API_KEY`, `BROWSERBASE_API_KEY`) in a secure secret manager and inject them at container start‑up. Avoid hard‑coding values in Dockerfiles or source code.
 
@@ -72,7 +72,7 @@ All of these integrations are declaratively wired through environment variables,
 
 4. **Batch Size Tuning** – Adjust `MEMGRAPH_BATCH_SIZE` based on the expected event rate. Larger batches improve throughput but increase latency for constraint violation detection. Start with the default and monitor Memgraph write latency.
 
-5. **Dashboard Access** – Run the dashboard server as defined in `integrations/mcp-constraint-monitor/dashboard/README.md`. Access it via the host‑mapped port to visualise constraint health. Use the dashboard for troubleshooting and for confirming that constraint dependencies are correctly represented.
+5. **Dashboard Access** – Run the dashboard server as defined in `integrations/constraint-monitor/dashboard/README.md`. Access it via the host‑mapped port to visualise constraint health. Use the dashboard for troubleshooting and for confirming that constraint dependencies are correctly represented.
 
 6. **Observability** – Leverage the SSE endpoints (`BROWSER_ACCESS_SSE_URL`) to stream live updates to monitoring tools or log aggregators. This provides immediate feedback when constraints are breached.
 
@@ -121,7 +121,7 @@ The heavy reliance on declarative markdown files and environment variables makes
 - [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component employs a modular architecture, with each service running in its own container. This is evident in the docker-compose.yaml file, where separate services such as the constraint monitoring API server and the dashboard server are defined. The use of Docker Compose for container orchestration allows for efficient resource utilization and easy maintenance. For instance, the constraint monitoring API server is defined in the scripts/api-service.js file, which utilizes environment variables and configuration files for customizable settings.
 
 ### Children
-- [ConstraintConfigurator](./ConstraintConfigurator.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides a guide for configuring the constraints and their dependencies.
+- [ConstraintConfigurator](./ConstraintConfigurator.md) -- The integrations/constraint-monitor/docs/constraint-configuration.md file provides a guide for configuring the constraints and their dependencies.
 
 ### Siblings
 - [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator likely utilizes the docker-compose.yaml file to define and manage the services, as seen in the use of environment variables and configuration files for customizable settings.

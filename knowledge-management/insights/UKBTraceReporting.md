@@ -2,16 +2,16 @@
 
 **Type:** SubComponent
 
-UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+UKBTraceReporting may utilize a similar approach to the Claude Code Hook Data Format, as described in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 
 ## What It Is  
 
 **UKBTraceReporting** is a sub‑component of the **KnowledgeManagement** domain that is responsible for producing trace‑level reports about the state of the system’s knowledge assets.  The implementation lives inside the *integrations/mcp-constraint‑monitor* and *integrations/code‑graph‑rag* documentation trees, most notably in the files  
 
-* `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`  
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`  
-* `integrations/mcp-constraint-monitor/README.md`  
+* `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`  
+* `integrations/constraint-monitor/docs/constraint-configuration.md`  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md`  
+* `integrations/constraint-monitor/README.md`  
 * `integrations/code-graph-rag/README.md`  
 
 These documents describe the data format, configuration, and semantic detection mechanisms that UKBTraceReporting consumes and emits.  The sub‑component also declares a child documentation artifact – **ClaudeCodeHookDataFormat** – which formalises the payload structure used when UKBTraceReporting communicates with the MCP Constraint Monitor.  In practice, UKBTraceReporting gathers persisted entity information from the sibling **EntityPersistence**, enriches it with graph‑based insights from the sibling **CodeGraphRAG**, and applies constraint‑monitoring rules defined in the MCP constraint suite to generate human‑readable or machine‑consumable trace reports.
@@ -77,7 +77,7 @@ These integration points are all documented via markdown files; no code‑level 
 
 ## Usage Guidelines  
 
-1. **Respect the ClaudeCodeHookDataFormat schema** – any custom extensions to the payload must be added as optional fields, otherwise downstream consumers (MCP Constraint Monitor, OntologyClassification) may reject the report.  Refer to `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` for the authoritative field list.
+1. **Respect the ClaudeCodeHookDataFormat schema** – any custom extensions to the payload must be added as optional fields, otherwise downstream consumers (MCP Constraint Monitor, OntologyClassification) may reject the report.  Refer to `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` for the authoritative field list.
 
 2. **Maintain constraint configuration versioning** – updates to `constraint-configuration.md` should be version‑controlled and accompanied by a changelog.  Because UKBTraceReporting loads this file at runtime, a mismatched version between the configuration and the detection logic can lead to false‑positive or missed violations.
 
@@ -131,13 +131,13 @@ Overall, UKBTraceReporting is a well‑structured, documentation‑centric repor
 - [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component employs a lazy loading approach for LLM initialization, as seen in the constructor-based pattern for wave agents. This is evident in the ensureLLMInitialized() method, which suggests that the component defers the initialization of Large Language Models (LLMs) until they are actually needed. This design decision helps to reduce memory consumption and improve system responsiveness, especially when dealing with multiple LLMs. The use of a shared atomic index counter for work-stealing concurrency in the runWithConcurrency() method (wave-controller.ts:489) further enhances the component's efficiency by allowing it to dynamically adjust its workload and minimize idle time.
 
 ### Children
-- [ClaudeCodeHookDataFormat](./ClaudeCodeHookDataFormat.md) -- The CLAUDE-CODE-HOOK-FORMAT.md documentation in integrations/mcp-constraint-monitor/docs provides insight into the data format used by the UKBTraceReporting sub-component.
+- [ClaudeCodeHookDataFormat](./ClaudeCodeHookDataFormat.md) -- The CLAUDE-CODE-HOOK-FORMAT.md documentation in integrations/constraint-monitor/docs provides insight into the data format used by the UKBTraceReporting sub-component.
 
 ### Siblings
 - [ManualLearning](./ManualLearning.md) -- ManualLearning may utilize a similar approach to Claude Code Setup for Graph-Code MCP Server as described in integrations/browser-access/README.md
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the batch analysis pipeline to extract knowledge from git history, as hinted in the project documentation
 - [EntityPersistence](./EntityPersistence.md) -- EntityPersistence may use a graph database to store entities, as hinted in the project documentation
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification may utilize a similar approach to Claude Code Hook Data Format, as described in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 - [ObservationDerivation](./ObservationDerivation.md) -- ObservationDerivation may utilize a similar approach to the Code Graph RAG system, as described in integrations/code-graph-rag/README.md
 - [BrowserAccess](./BrowserAccess.md) -- BrowserAccess may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md
 - [CodeGraphRAG](./CodeGraphRAG.md) -- CodeGraphRAG may utilize a similar approach to the Claude Code Setup for Graph-Code MCP Server, as described in integrations/browser-access/README.md

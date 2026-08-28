@@ -100,7 +100,7 @@ Overall, the CodeGraphRAGService presents a well‑encapsulated, configurable, a
 
 ### Siblings
 - [ServiceOrchestrator](./ServiceOrchestrator.md) -- The ServiceOrchestrator likely utilizes the docker-compose.yaml file to define and manage the services, as seen in the use of environment variables and configuration files for customizable settings.
-- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService uses the integrations/mcp-constraint-monitor/docs/constraint-configuration.md file to configure the constraints and their dependencies.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- The ConstraintMonitoringService uses the integrations/constraint-monitor/docs/constraint-configuration.md file to configure the constraints and their dependencies.
 
 ---
 

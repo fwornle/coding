@@ -2,19 +2,19 @@
 
 **Type:** Detail
 
-integrations/mcp-constraint-monitor/docs/constraint-configuration.md likely defines how extracted fields (tool name, file paths, session context) map to constraint check inputs, connecting the parser output to the constraint evaluation pipeline
+integrations/constraint-monitor/docs/constraint-configuration.md likely defines how extracted fields (tool name, file paths, session context) map to constraint check inputs, connecting the parser output to the constraint evaluation pipeline
 
 # HookPayloadParser — Technical Insight Document
 
 ## What It Is
 
-`HookPayloadParser` is a component residing within the `HookConfigurationLayer`, responsible for deserializing and normalizing the JSON payloads that Claude Code emits at hook lifecycle points. The authoritative contract for these payloads is documented in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, which defines the exact JSON schemas emitted at each hook lifecycle point (at minimum pre- and post-tool invocation). The parser sits at the boundary between raw hook events and the constraint evaluation pipeline, extracting structured fields — tool name, file paths, session context — that downstream components can act upon.
+`HookPayloadParser` is a component residing within the `HookConfigurationLayer`, responsible for deserializing and normalizing the JSON payloads that Claude Code emits at hook lifecycle points. The authoritative contract for these payloads is documented in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, which defines the exact JSON schemas emitted at each hook lifecycle point (at minimum pre- and post-tool invocation). The parser sits at the boundary between raw hook events and the constraint evaluation pipeline, extracting structured fields — tool name, file paths, session context — that downstream components can act upon.
 
 ## Architecture and Design
 
 **Boundary Role within HookConfigurationLayer**
 
-`HookPayloadParser` occupies a narrow, well-defined role as the inbound data translator inside `HookConfigurationLayer`. Its parent component's responsibility, as grounded in the observations, is to both configure hook behavior and parse incoming hook data; the parser specifically handles the latter concern. This separation suggests the `HookConfigurationLayer` follows a parsing-then-dispatch pattern: raw JSON arrives, `HookPayloadParser` normalizes it into a typed structure, and that structure is forwarded to the constraint evaluation pipeline whose inputs are defined in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.
+`HookPayloadParser` occupies a narrow, well-defined role as the inbound data translator inside `HookConfigurationLayer`. Its parent component's responsibility, as grounded in the observations, is to both configure hook behavior and parse incoming hook data; the parser specifically handles the latter concern. This separation suggests the `HookConfigurationLayer` follows a parsing-then-dispatch pattern: raw JSON arrives, `HookPayloadParser` normalizes it into a typed structure, and that structure is forwarded to the constraint evaluation pipeline whose inputs are defined in `integrations/constraint-monitor/docs/constraint-configuration.md`.
 
 **Schema Multiplicity as a Core Design Challenge**
 
@@ -44,9 +44,9 @@ Because the hook format documentation specifies different shapes per lifecycle p
 
 ## Integration Points
 
-The primary upstream dependency is the Claude Code hook emission mechanism, whose contract is fully specified in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Any change to the JSON schema Claude Code emits must be reflected in this parser; the format document is therefore a critical change-coupling point.
+The primary upstream dependency is the Claude Code hook emission mechanism, whose contract is fully specified in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Any change to the JSON schema Claude Code emits must be reflected in this parser; the format document is therefore a critical change-coupling point.
 
-The primary downstream consumer is the constraint evaluation pipeline, whose input expectations are described in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. The parser's output schema must satisfy whatever field contract the constraint evaluator requires — meaning these two documents together (`CLAUDE-CODE-HOOK-FORMAT.md` and `constraint-configuration.md`) bracket the parser's full interface contract: one defines what comes in, the other defines what must come out.
+The primary downstream consumer is the constraint evaluation pipeline, whose input expectations are described in `integrations/constraint-monitor/docs/constraint-configuration.md`. The parser's output schema must satisfy whatever field contract the constraint evaluator requires — meaning these two documents together (`CLAUDE-CODE-HOOK-FORMAT.md` and `constraint-configuration.md`) bracket the parser's full interface contract: one defines what comes in, the other defines what must come out.
 
 Within the `HookConfigurationLayer`, the parser is a subordinate component. The configuration layer presumably manages hook registration and routing in addition to parsing, so the parser's output is consumed internally before any external dispatch occurs.
 
@@ -64,7 +64,7 @@ Within the `HookConfigurationLayer`, the parser is a subordinate component. The 
 ## Hierarchy Context
 
 ### Parent
-- [HookConfigurationLayer](./HookConfigurationLayer.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md documents the exact JSON schema Claude Code emits at each hook lifecycle point, which the configuration layer must parse to extract tool name, file paths, and session context
+- [HookConfigurationLayer](./HookConfigurationLayer.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md documents the exact JSON schema Claude Code emits at each hook lifecycle point, which the configuration layer must parse to extract tool name, file paths, and session context
 
 
 ---

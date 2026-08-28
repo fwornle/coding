@@ -10,7 +10,7 @@ top to bottom direction
 ' ============================================================
 package "Consumer Systems" as consumers #FAFAFA {
   [coding\n(obs-api, ObservationWriter)] as sysA <<external>>
-  [mcp-server-semantic-analysis\n(wave-analysis, agents)] as sysB <<external>>
+  [semantic-analysis\n(wave-analysis, agents)] as sysB <<external>>
   [operational-knowledge-management\n(RaaS / KPI-FW / business)] as sysC <<external>>
 }
 

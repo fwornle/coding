@@ -10,7 +10,7 @@ The **LoggingAndMonitoring** sub‑component lives inside the *CodingPatterns* f
 
 In practice, LoggingAndMonitoring acts as the entry point for any code that needs to record a log entry or emit a monitoring signal. It buffers these records asynchronously, periodically flushing them to persistent storage that is backed by the **`GraphDatabaseAdapter`** (implemented in **`storage/graph-database-adapter.ts`**). This design enables both low‑overhead logging during normal operation and rich, graph‑oriented queries for later diagnostics.  
 
-The sub‑component also supplies the **AsyncLogBuffering** child, which encapsulates the buffering mechanics, and it is referenced directly by the **CodeGraphConstructor** (see **`integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`**) when constructing and analysing code graphs.  
+The sub‑component also supplies the **AsyncLogBuffering** child, which encapsulates the buffering mechanics, and it is referenced directly by the **CodeGraphConstructor** (see **`integrations/semantic-analysis/src/agent/code-graph-agent.ts`**) when constructing and analysing code graphs.  
 
 ![LoggingAndMonitoring — Architecture](images/logging-and-monitoring-architecture.png)
 
@@ -49,7 +49,7 @@ The buffering logic is deliberately lightweight to keep the critical path fast; 
 Implemented in **`storage/graph-database-adapter.ts`**, this adapter offers CRUD operations over a Graphology‑based graph persisted with LevelDB. For logging, it provides a method such as `createLogNode(payload)` that creates a node with properties (`timestamp`, `level`, `message`, `context`). Because the graph model is already used by **CodeGraphConstructor**, the same adjacency queries can later retrieve logs that are directly linked to code entities (e.g., “function X emitted an error at runtime”).
 
 ### Integration with CodeGraphConstructor  
-The **CodeGraphConstructor** (in **`integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`**) calls LoggingAndMonitoring to annotate the graph with runtime observations. For example, after parsing a source file, the constructor may log “module loaded” and later, when an exception occurs, it logs an error node that is linked to the offending function node. This creates a unified graph that blends static structure with dynamic behavior.
+The **CodeGraphConstructor** (in **`integrations/semantic-analysis/src/agent/code-graph-agent.ts`**) calls LoggingAndMonitoring to annotate the graph with runtime observations. For example, after parsing a source file, the constructor may log “module loaded” and later, when an exception occurs, it logs an error node that is linked to the offending function node. This creates a unified graph that blends static structure with dynamic behavior.
 
 ### Configuration & Extensibility  
 The markdown specifications (`STATUS-LINE-QUICK-REFERENCE.md` and `hooks.md`) act as a declarative contract for how log levels, buffering thresholds, and flush intervals are set. Because the pattern is described in documentation rather than hard‑coded, developers can adjust these parameters without recompiling the code, supporting flexible deployment scenarios.
@@ -111,14 +111,14 @@ The reliance on well‑documented markdown specifications and a single adapter c
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's architecture is heavily influenced by the GraphDatabaseAdapter class in storage/graph-database-adapter.ts, which provides methods for creating, reading, and manipulating graph data. This class utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval. The CodeGraphConstructor sub-component, as seen in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts, relies on the GraphDatabaseAdapter for constructing and analyzing code graphs. This tightly coupled relationship between the GraphDatabaseAdapter and CodeGraphConstructor enables the efficient creation and analysis of code graphs.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's architecture is heavily influenced by the GraphDatabaseAdapter class in storage/graph-database-adapter.ts, which provides methods for creating, reading, and manipulating graph data. This class utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval. The CodeGraphConstructor sub-component, as seen in integrations/semantic-analysis/src/agent/code-graph-agent.ts, relies on the GraphDatabaseAdapter for constructing and analyzing code graphs. This tightly coupled relationship between the GraphDatabaseAdapter and CodeGraphConstructor enables the efficient creation and analysis of code graphs.
 
 ### Children
 - AsyncLogBuffering -- The integrations/copi/README.md file mentions 'Logging & Tmux Integration', indicating the importance of logging in the system.
 
 ### Siblings
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseAdapter in storage/graph-database-adapter.ts utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval.
-- [CodeGraphAnalysis](./CodeGraphAnalysis.md) -- The CodeGraphConstructor in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts relies on the GraphDatabaseAdapter for constructing and analyzing code graphs.
+- [CodeGraphAnalysis](./CodeGraphAnalysis.md) -- The CodeGraphConstructor in integrations/semantic-analysis/src/agent/code-graph-agent.ts relies on the GraphDatabaseAdapter for constructing and analyzing code graphs.
 - [ConstraintDetection](./ConstraintDetection.md) -- The ConstraintDetection sub-component uses the execute(input, context) pattern for detecting and monitoring constraints.
 - [ProviderRegistration](./ProviderRegistration.md) -- The ProviderRegistration sub-component uses the ProviderRegistry class for registering new providers.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG sub-component is a graph-based RAG system for any codebases, as seen in integrations/code-graph-rag/README.md.

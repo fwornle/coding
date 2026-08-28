@@ -62,7 +62,7 @@ Since ServiceStarter relies entirely on ServiceProbe for health sensing, any new
 
 ### Siblings
 - [ServiceProbe](./ServiceProbe.md) -- ServiceProbe in lib/utils/service-probe.js implements two distinct probe mechanisms: HTTP endpoint checks and TCP port checks, allowing different services to be monitored via their most appropriate protocol
-- [LLMMockService](./LLMMockService.md) -- LLMMockService in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts implements a three-mode switcher (mock/local/public) allowing the semantic analysis MCP to operate without external LLM dependencies during development or testing
+- [LLMMockService](./LLMMockService.md) -- LLMMockService in integrations/semantic-analysis/src/mock/llm-mock-service.ts implements a three-mode switcher (mock/local/public) allowing the semantic analysis MCP to operate without external LLM dependencies during development or testing
 
 
 ---

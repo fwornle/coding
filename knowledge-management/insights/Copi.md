@@ -10,7 +10,7 @@ The **Copi** sub‑component lives under the path `integrations/copi` and is del
 
 Copi’s responsibilities are three‑fold:  
 
-1. **Logging** – every command execution, result payload, and error condition is routed through the unified logging interface supplied by the sibling **Logger** component (`integrations/mcp-server-semantic-analysis/src/logging.ts`).  
+1. **Logging** – every command execution, result payload, and error condition is routed through the unified logging interface supplied by the sibling **Logger** component (`integrations/semantic-analysis/src/logging.ts`).  
 2. **Configuration** – the component reads its runtime options (e.g., whether to enable Tmux, log verbosity, output destinations) from the central configuration validator (`scripts/LSLConfigValidator`).  
 3. **Result validation** – after the Copilot CLI returns a response, Copi validates the payload to guarantee that downstream consumers receive reliable data.
 
@@ -44,7 +44,7 @@ Although the source scan did not expose concrete symbols, the observations give 
 
 * **`integrations/copi/README.md`** – documents the purpose of Copi as a “GitHub Copilot CLI Wrapper with Logging & Tmux Integration”. This file also hints at the existence of a wrapper class that orchestrates CLI calls.  
 * **`CopiWrapper`** – the child component referenced in the hierarchy. It likely implements methods such as `runCommand(command: string, args: string[]): Promise<Result>` and `validateResult(raw: any): ValidatedResult`. These methods encapsulate process spawning, Tmux session management, and result verification.  
-* **Logging integration** – every interaction funnels through the unified logger (`integrations/mcp-server-semantic-analysis/src/logging.ts`). The wrapper probably calls methods like `logger.info()`, `logger.error()`, and `logger.debug()` with structured metadata (e.g., command name, timestamps, exit codes).  
+* **Logging integration** – every interaction funnels through the unified logger (`integrations/semantic-analysis/src/logging.ts`). The wrapper probably calls methods like `logger.info()`, `logger.error()`, and `logger.debug()` with structured metadata (e.g., command name, timestamps, exit codes).  
 * **Configuration validation** – before any CLI call, Copi queries the **ConfigurationValidator** (implemented by `scripts/LSLConfigValidator`). This step ensures that options such as `enableTmux`, `logLevel`, and `maxConcurrentCalls` conform to the expected schema, preventing runtime misconfiguration.  
 * **Error handling** – the observations explicitly mention that Copi logs errors and exceptions via the Logger. This suggests try‑catch blocks around process execution, with detailed error objects passed to `logger.error()` for traceability.  
 * **Result validation** – after the CLI finishes, Copi runs a validation routine (perhaps a simple schema check or more sophisticated sanity tests) to guarantee that the returned suggestions are well‑formed before they are handed to downstream components like the **TranscriptProcessor**.
@@ -57,7 +57,7 @@ Because the component is meant to handle “high volumes of Copilot CLI interact
 
 Copi sits at a nexus of three sibling services:
 
-1. **Logger** – provides the only logging API Copi uses. By delegating all log statements to `integrations/mcp-server-semantic-analysis/src/logging.ts`, Copi inherits the system‑wide log formatting, routing (e.g., to files, stdout, or remote collectors), and log level controls.  
+1. **Logger** – provides the only logging API Copi uses. By delegating all log statements to `integrations/semantic-analysis/src/logging.ts`, Copi inherits the system‑wide log formatting, routing (e.g., to files, stdout, or remote collectors), and log level controls.  
 2. **ConfigurationValidator** – supplies a validated configuration object that Copi reads at startup or on‑the‑fly. The validator lives in the `scripts` folder and is invoked via the `LSLConfigValidator` script, ensuring that any configuration drift is caught early.  
 3. **LiveLoggingSystem (parent)** – orchestrates the overall flow. When a higher‑level feature (e.g., a live transcript enrichment) needs a Copilot suggestion, it calls the `CopiWrapper` API exposed by Copi. The parent also aggregates the logs emitted by Copi into its broader telemetry stream.
 
@@ -96,14 +96,14 @@ Following these conventions ensures that Copi remains a reliable, observable, an
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/mcp-server-semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
 
 ### Children
 - [CopiWrapper](./CopiWrapper.md) -- The integrations/copi/README.md file describes Copi as a 'GitHub Copilot CLI Wrapper with Logging & Tmux Integration', indicating the presence of a wrapper class.
 
 ### Siblings
 - [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses the TranscriptAdapter abstract base class in 'lib/agent-api' to read and convert transcripts from various agent formats.
-- [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
+- [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/semantic-analysis/src/logging.ts', providing a unified logging interface.
 - [ConfigurationValidator](./ConfigurationValidator.md) -- The ConfigurationValidator is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
 

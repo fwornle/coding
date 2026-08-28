@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The lazy initialization approach is used in the OntologyClassificationAgent, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, to initialize LLM services on demand.
+The lazy initialization approach is used in the OntologyClassificationAgent, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file, to initialize LLM services on demand.
 
 ## What It Is  
 
-`LLMServiceInitializer` is a dedicated helper class that lives inside **`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`**. Its sole responsibility is to create and configure the large‑language‑model (LLM) service instances that the **`OntologyClassificationAgent`** needs to perform semantic analysis. The initializer follows a *lazy* strategy: the actual LLM service objects are not instantiated when the agent is constructed, but only the first time the agent requests them via the `initializeService` method. This on‑demand creation reduces start‑up cost and prevents the allocation of heavyweight resources (e.g., network connections, model loading) when the agent never ends up using a particular LLM backend.
+`LLMServiceInitializer` is a dedicated helper class that lives inside **`integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`**. Its sole responsibility is to create and configure the large‑language‑model (LLM) service instances that the **`OntologyClassificationAgent`** needs to perform semantic analysis. The initializer follows a *lazy* strategy: the actual LLM service objects are not instantiated when the agent is constructed, but only the first time the agent requests them via the `initializeService` method. This on‑demand creation reduces start‑up cost and prevents the allocation of heavyweight resources (e.g., network connections, model loading) when the agent never ends up using a particular LLM backend.
 
 The design is deliberately lightweight: the `LLMServiceInitializer` does not expose a full service‑registry or dependency‑injection container; instead, it offers a single public entry point (`initializeService`) that returns a ready‑to‑use LLM client. Because the initializer is scoped to the **`OntologyClassificationAgent`**, the rest of the codebase interacts with the LLM only through the agent’s public API, keeping the coupling tight but well‑contained.
 
@@ -36,7 +36,7 @@ The class likely encapsulates error handling around the creation process—e.g.,
 
 `LLMServiceInitializer` is tightly integrated with **`OntologyClassificationAgent`**, which is its only consumer according to the observations. The agent calls `initializeService` at the point where it needs to invoke an LLM for ontology classification. No other modules are reported to depend on the initializer directly, so its public surface is effectively limited to the one method used by its parent.  
 
-From a dependency perspective, the initializer likely imports the LLM client library (e.g., OpenAI SDK, Cohere, or a custom wrapper) and any configuration utilities used across the `integrations/mcp-server-semantic-analysis` package. Because the initializer is co‑located with the agent, any changes to the LLM client version or configuration schema can be made in a single place without rippling through the broader codebase.  
+From a dependency perspective, the initializer likely imports the LLM client library (e.g., OpenAI SDK, Cohere, or a custom wrapper) and any configuration utilities used across the `integrations/semantic-analysis` package. Because the initializer is co‑located with the agent, any changes to the LLM client version or configuration schema can be made in a single place without rippling through the broader codebase.  
 
 If future agents require similar lazy LLM initialization, they could reuse the same pattern by extracting `LLMServiceInitializer` into a shared utility module. However, the current design intentionally keeps it private to the ontology classification domain, reducing accidental cross‑agent coupling.
 
@@ -80,7 +80,7 @@ If future agents require similar lazy LLM initialization, they could reuse the s
 ## Hierarchy Context
 
 ### Parent
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent uses a lazy initialization approach for LLM services, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent uses a lazy initialization approach for LLM services, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file.
 
 ---
 

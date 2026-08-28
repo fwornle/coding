@@ -161,7 +161,7 @@ export class ObservationSanitizer {
     }
 
     // Pass 3: when the fragment carries a path tail like
-    // "ns/mcp-constraint-monitor/src/...", treat it as a mid-segment
+    // "ns/constraint-monitor/src/...", treat it as a mid-segment
     // tail. Find repo paths whose tail ends with `<rest-of-frag>` where
     // the first segment of the fragment is allowed to be a partial
     // identifier match (the leading "tio" of "integrations" got eaten).

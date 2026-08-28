@@ -2,27 +2,27 @@
 
 **Type:** SubComponent
 
-integrations/mcp-server-semantic-analysis/docs/configuration.md specifies that LLM provider credentials are resolved inside ensureLLMInitialized() by reading config/llm-providers.yaml, decoupling agent construction from environment state
+integrations/semantic-analysis/docs/configuration.md specifies that LLM provider credentials are resolved inside ensureLLMInitialized() by reading config/llm-providers.yaml, decoupling agent construction from environment state
 
 # AgentConstructionPattern — Technical Insight Document
 
 ## What It Is
 
-The `AgentConstructionPattern` is a SubComponent documented primarily in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, with supporting design rationale captured in `integrations/mcp-server-semantic-analysis/docs/architecture/README.md` and `integrations/mcp-server-semantic-analysis/docs/configuration.md`. It defines the canonical three-phase lifecycle that every agent in the semantic analysis MCP server follows: **constructor → lazy-init → execute()**. This pattern deliberately replaces eager initialization at import time, ensuring that constructing an agent is a cheap, side-effect-free operation that does not require an active LLM connection or environment configuration to succeed.
+The `AgentConstructionPattern` is a SubComponent documented primarily in `integrations/semantic-analysis/docs/architecture/agents.md`, with supporting design rationale captured in `integrations/semantic-analysis/docs/architecture/README.md` and `integrations/semantic-analysis/docs/configuration.md`. It defines the canonical three-phase lifecycle that every agent in the semantic analysis MCP server follows: **constructor → lazy-init → execute()**. This pattern deliberately replaces eager initialization at import time, ensuring that constructing an agent is a cheap, side-effect-free operation that does not require an active LLM connection or environment configuration to succeed.
 
 As a child of the broader `CodingPatterns` aggregate, `AgentConstructionPattern` is one of several codified conventions (alongside siblings like `ConfigDrivenBehavior`, `HookExtensionSystem`, `MCPToolExposurePattern`, `DiagramFirstDocumentation`, and `TieredLLMRouting`) that together establish the project's architectural discipline. Where `ConfigDrivenBehavior` externalizes behavioral parameters into JSON/YAML files, this pattern externalizes *initialization timing*, deferring expensive provider setup until the moment it is actually needed.
 
 ![AgentConstructionPattern — Architecture](images/agent-construction-pattern-architecture.png)
 
-The pattern's centrality is underscored by `integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` (now marked RESOLVED), which previously documented that bypassing `ensureLLMInitialized()` caused runtime failures. That history confirms `ensureLLMInitialized()` as the **single gate** through which provider readiness must flow.
+The pattern's centrality is underscored by `integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` (now marked RESOLVED), which previously documented that bypassing `ensureLLMInitialized()` caused runtime failures. That history confirms `ensureLLMInitialized()` as the **single gate** through which provider readiness must flow.
 
 ## Architecture and Design
 
-The architectural approach is best characterized as a **deferred initialization (lazy) pattern** layered over a **template method lifecycle**. The constructor establishes only the structural identity of an agent — its configuration handles, references to dependencies, and internal state placeholders — without reaching out to external systems. The lazy-init phase, gated by `ensureLLMInitialized()`, performs the heavyweight work of resolving credentials and binding to an LLM provider. Finally, `execute()` represents the actual operational interface, which is documented as the child SubComponent `ExecuteOrchestration` in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.
+The architectural approach is best characterized as a **deferred initialization (lazy) pattern** layered over a **template method lifecycle**. The constructor establishes only the structural identity of an agent — its configuration handles, references to dependencies, and internal state placeholders — without reaching out to external systems. The lazy-init phase, gated by `ensureLLMInitialized()`, performs the heavyweight work of resolving credentials and binding to an LLM provider. Finally, `execute()` represents the actual operational interface, which is documented as the child SubComponent `ExecuteOrchestration` in `integrations/semantic-analysis/docs/architecture/agents.md`.
 
-This separation is more than stylistic: it reflects a deliberate decoupling of *agent identity* from *agent runtime readiness*. Because `ensureLLMInitialized()` reads `config/llm-providers.yaml` only at the moment it is called (as specified in `integrations/mcp-server-semantic-analysis/docs/configuration.md`), construction is fully decoupled from environment state. An agent can therefore be instantiated in environments where no LLM credentials exist — a property that `integrations/mcp-server-semantic-analysis/docs/architecture/README.md` explicitly cites as enabling unit testing and dry-run modes.
+This separation is more than stylistic: it reflects a deliberate decoupling of *agent identity* from *agent runtime readiness*. Because `ensureLLMInitialized()` reads `config/llm-providers.yaml` only at the moment it is called (as specified in `integrations/semantic-analysis/docs/configuration.md`), construction is fully decoupled from environment state. An agent can therefore be instantiated in environments where no LLM credentials exist — a property that `integrations/semantic-analysis/docs/architecture/README.md` explicitly cites as enabling unit testing and dry-run modes.
 
-The pattern also functions as an **extension contract**. According to `integrations/mcp-server-semantic-analysis/docs/architecture/tools.md`, Tool Extensions plug into the `execute()` phase, which means the lifecycle's third stage is not just a method but a documented integration seam for instrumentation, monitoring, and capability augmentation. This dovetails with the sibling `HookExtensionSystem`, which similarly intercepts tool-call boundaries.
+The pattern also functions as an **extension contract**. According to `integrations/semantic-analysis/docs/architecture/tools.md`, Tool Extensions plug into the `execute()` phase, which means the lifecycle's third stage is not just a method but a documented integration seam for instrumentation, monitoring, and capability augmentation. This dovetails with the sibling `HookExtensionSystem`, which similarly intercepts tool-call boundaries.
 
 ## Implementation Details
 
@@ -42,13 +42,13 @@ The pattern intentionally avoids spreading initialization logic across multiple 
 
 `AgentConstructionPattern` integrates with several adjacent subsystems. Most directly, it consumes `config/llm-providers.yaml`, which connects it to the sibling `ConfigDrivenBehavior` pattern — the same externalized-configuration philosophy that the parent `CodingPatterns` aggregate enforces project-wide. It also interacts with `TieredLLMRouting` (also a sibling under `CodingPatterns`), because the provider/model selection performed inside `ensureLLMInitialized()` is the point at which tiered routing decisions take effect for a given agent instance.
 
-The `execute()` phase, embodied by the child `ExecuteOrchestration`, is the integration surface for Tool Extensions described in `integrations/mcp-server-semantic-analysis/docs/architecture/tools.md`. This means instrumentation, observability, and capability layers do not modify the agent itself — they attach to the lifecycle's third phase. This is conceptually parallel to how `HookExtensionSystem` (described in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) intercepts tool-call boundaries via a structured JSON payload contract.
+The `execute()` phase, embodied by the child `ExecuteOrchestration`, is the integration surface for Tool Extensions described in `integrations/semantic-analysis/docs/architecture/tools.md`. This means instrumentation, observability, and capability layers do not modify the agent itself — they attach to the lifecycle's third phase. This is conceptually parallel to how `HookExtensionSystem` (described in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) intercepts tool-call boundaries via a structured JSON payload contract.
 
 Finally, the pattern enables unit testing and dry-run modes as a first-class integration point. Because construction does not require an LLM connection, test harnesses can instantiate agents directly and either mock `ensureLLMInitialized()` or skip it entirely, depending on whether the test exercises real provider behavior.
 
 ## Usage Guidelines
 
-Developers extending or working with agents in `integrations/mcp-server-semantic-analysis/` should observe the following conventions:
+Developers extending or working with agents in `integrations/semantic-analysis/` should observe the following conventions:
 
 - **Never perform I/O in an agent constructor.** Constructors must remain cheap and deterministic. Any code that needs network access, file reads of credentials, or provider connections belongs inside `ensureLLMInitialized()`.
 - **Always route provider readiness through `ensureLLMInitialized()`.** As confirmed by the RESOLVED `CRITICAL-ARCHITECTURE-ISSUES.md`, bypassing this gate causes runtime failures. There is no supported alternative path to provider initialization.
@@ -78,14 +78,14 @@ Developers extending or working with agents in `integrations/mcp-server-semantic
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] **Externalized Configuration as Runtime Behavior Control**: The project enforces a strict separation between behavior and code through a suite of JSON/YAML configuration files under config/. Files such as config/agent-profiles.json, config/health-verification-rules.json, config/llm-providers.yaml, config/knowledge-management.json, and config/hooks-config.json collectively replace what would otherwise be scattered hard-coded logic. A new developer should understand that adding a new agent profile, adjusting an LLM provider's model tier, or modifying a health rule does not require touching TypeScript or Python source files — only the relevant config file. This pattern means that operational changes (e.g., switching a task class from a lightweight to a heavyweight model, or disabling a health rule during an incident) are achievable at runtime or deploy time without code review cycles. The convention also implies that any new subsystem added to the project is expected to declare its configurable parameters in a corresponding config file rather than using environment variables alone or embedding defaults in source.
 
 ### Children
-- [ExecuteOrchestration](./ExecuteOrchestration.md) -- Documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md, `execute()` is the third phase of the agent lifecycle (after constructor and lazy-init), representing the standard interface all agents expose for triggering their analysis or processing work.
+- [ExecuteOrchestration](./ExecuteOrchestration.md) -- Documented in integrations/semantic-analysis/docs/architecture/agents.md, `execute()` is the third phase of the agent lifecycle (after constructor and lazy-init), representing the standard interface all agents expose for triggering their analysis or processing work.
 
 ### Siblings
 - [ConfigDrivenBehavior](./ConfigDrivenBehavior.md) -- config/agent-profiles.json defines per-agent behavioral parameters (e.g., which LLM tier to use, concurrency limits) so adding a new agent type requires only a new JSON entry, not a code change
-- [HookExtensionSystem](./HookExtensionSystem.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md specifies the exact JSON payload format that hooks emit on each tool call entry and exit, defining the contract between agents and monitors
+- [HookExtensionSystem](./HookExtensionSystem.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md specifies the exact JSON payload format that hooks emit on each tool call entry and exit, defining the contract between agents and monitors
 - [MCPToolExposurePattern](./MCPToolExposurePattern.md) -- integrations/code-graph-rag/README.md describes the code-graph-rag system exposing its graph query capabilities as MCP tools, not as a Python library import or REST API
 - [DiagramFirstDocumentation](./DiagramFirstDocumentation.md) -- docs/puml/_standard-style.puml provides shared color palette, font, and stereotype definitions imported by all other diagrams, ensuring visual consistency across subsystem diagrams
-- [TieredLLMRouting](./TieredLLMRouting.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md formally proposes and documents the tiered model selection approach, classifying tasks into complexity buckets before provider assignment
+- [TieredLLMRouting](./TieredLLMRouting.md) -- integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md formally proposes and documents the tiered model selection approach, classifying tasks into complexity buckets before provider assignment
 
 
 ---

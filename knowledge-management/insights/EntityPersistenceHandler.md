@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The PersistenceModule uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence, indicating a clear separation of concerns between the module and the agent.
+The PersistenceModule uses the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence, indicating a clear separation of concerns between the module and the agent.
 
 ## What It Is  
 
-**EntityPersistenceHandler** is the core component that carries out the actual persistence of domain entities inside the **PersistenceModule**. The only concrete location referenced in the observations is the `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` file, which houses the **PersistenceAgent**. The **PersistenceModule** delegates all entity‑persistence responsibilities to this agent, and the **EntityPersistenceHandler** lives conceptually inside that agent. In practice, the handler is the implementation detail that knows how to translate in‑memory entity representations into the storage format required by the broader system (e.g., a database, a message queue, or a remote service). Because the source file for the handler itself is not exposed, the documentation treats the handler as the logical “child” of **PersistenceAgent**, which in turn is the “child” of the **PersistenceModule**.
+**EntityPersistenceHandler** is the core component that carries out the actual persistence of domain entities inside the **PersistenceModule**. The only concrete location referenced in the observations is the `integrations/semantic-analysis/src/agents/persistence-agent.ts` file, which houses the **PersistenceAgent**. The **PersistenceModule** delegates all entity‑persistence responsibilities to this agent, and the **EntityPersistenceHandler** lives conceptually inside that agent. In practice, the handler is the implementation detail that knows how to translate in‑memory entity representations into the storage format required by the broader system (e.g., a database, a message queue, or a remote service). Because the source file for the handler itself is not exposed, the documentation treats the handler as the logical “child” of **PersistenceAgent**, which in turn is the “child” of the **PersistenceModule**.
 
 ---
 
@@ -15,7 +15,7 @@ The PersistenceModule uses the PersistenceAgent (integrations/mcp-server-semanti
 The observations reveal a **clear separation of concerns** between three layers:
 
 1. **PersistenceModule** – the high‑level façade that other parts of the application import when they need to persist an entity.  
-2. **PersistenceAgent** (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`) – the integration point that encapsulates the mechanics of communicating with the underlying storage system.  
+2. **PersistenceAgent** (`integrations/semantic-analysis/src/agents/persistence-agent.ts`) – the integration point that encapsulates the mechanics of communicating with the underlying storage system.  
 3. **EntityPersistenceHandler** – the concrete handler that implements the entity‑specific logic required by the agent.
 
 This hierarchy follows a **handler/agent pattern**: the module exposes a simple API, the agent acts as a thin orchestration layer, and the handler performs the domain‑specific work. The pattern is evident from the phrasing “PersistenceModule uses the PersistenceAgent … to handle entity persistence,” which implies that the module does not contain persistence logic itself but delegates to an agent that, in turn, relies on a handler.
@@ -30,7 +30,7 @@ No explicit mention of micro‑services, event‑driven pipelines, or other arch
 
 While the source for **EntityPersistenceHandler** is not directly available, the surrounding context gives us several concrete clues:
 
-* **File Path** – The only concrete path is `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`. This file defines the **PersistenceAgent**, which is the immediate container for the handler.  
+* **File Path** – The only concrete path is `integrations/semantic-analysis/src/agents/persistence-agent.ts`. This file defines the **PersistenceAgent**, which is the immediate container for the handler.  
 * **Naming** – The term *Handler* suggests a class or object with a single responsibility: converting an entity into a persistable payload and invoking the storage client.  
 * **Interaction Flow** – A typical call chain inferred from the observations would be:
   1. A consumer calls a method on **PersistenceModule** (e.g., `saveEntity(entity)`).
@@ -46,7 +46,7 @@ Because the handler resides within the agent, it likely receives the raw entity 
 
 * **Parent – PersistenceModule**: All external callers interact with the **PersistenceModule**. The module’s public API is the only contract developers need to know; it abstracts away the agent and handler internals.  
 * **Sibling – Other Handlers**: If the **PersistenceAgent** supports multiple entity types, each would have its own handler (e.g., `UserPersistenceHandler`, `OrderPersistenceHandler`). All handlers share the same agent infrastructure, ensuring consistent error handling and logging.  
-* **Child – PersistenceAgent** (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`): The agent is the immediate consumer of the handler. It likely exposes methods like `persist(entityType, entity)` that internally resolve the correct handler based on `entityType`.  
+* **Child – PersistenceAgent** (`integrations/semantic-analysis/src/agents/persistence-agent.ts`): The agent is the immediate consumer of the handler. It likely exposes methods like `persist(entityType, entity)` that internally resolve the correct handler based on `entityType`.  
 * **External Dependencies**: The agent (and therefore the handler) must depend on whatever storage client the system uses (SQL driver, NoSQL client, etc.). Because the module delegates to the agent, those dependencies are isolated from the rest of the codebase, simplifying upgrades or swaps of the persistence technology.
 
 ---
@@ -72,7 +72,7 @@ Because the handler resides within the agent, it likely receives the raw entity 
 ## Hierarchy Context
 
 ### Parent
-- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence.
+- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule uses the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) to handle entity persistence.
 
 ---
 

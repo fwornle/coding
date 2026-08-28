@@ -1,6 +1,6 @@
-# MCP Semantic Analysis Integration
+# Semantic Analysis Integration
 
-**Component**: [mcp-server-semantic-analysis](../../integrations/mcp-server-semantic-analysis/)
+**Component**: [semantic-analysis](../../integrations/semantic-analysis/)
 **Type**: MCP Server (Node.js)
 **Purpose**: AI-powered code analysis with 13 specialized agents, code graph analysis, and Graphology+LevelDB persistence
 
@@ -8,7 +8,7 @@
 
 ## What It Provides
 
-The MCP Semantic Analysis Server is a standalone Node.js application that provides comprehensive AI-powered code analysis through the Model Context Protocol.
+The Semantic Analysis Server is a standalone Node.js application that provides comprehensive AI-powered code analysis through the Model Context Protocol.
 
 ### 14 Intelligent Agents
 
@@ -112,7 +112,7 @@ Configured in `~/.config/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "semantic-analysis": {
       "command": "node",
-      "args": ["/Users/<username>/Agentic/coding/integrations/mcp-server-semantic-analysis/build/index.js"],
+      "args": ["/Users/<username>/Agentic/coding/integrations/semantic-analysis/build/index.js"],
       "env": {
         "ANTHROPIC_API_KEY": "your-key-here",
         "OPENAI_API_KEY": "optional-fallback"
@@ -187,7 +187,7 @@ The QA agent implements intelligent quality loops that ensure high-value knowled
 
 For complete documentation, see:
 
-**[integrations/mcp-server-semantic-analysis/README.md](https://github.com/fwornle/mcp-server-semantic-analysis/blob/main/README.md)**
+**[integrations/semantic-analysis/README.md](https://github.com/fwornle/semantic-analysis/blob/main/README.md)**
 
 Topics covered:
 

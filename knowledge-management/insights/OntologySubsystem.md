@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md (marked RESOLVED) implies the ontology subsystem was a prior source of architectural coupling that was refactored, likely the motivation for separating OntologyConfigManager from inline agent configuration
+The integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md (marked RESOLVED) implies the ontology subsystem was a prior source of architectural coupling that was refactored, likely the motivation for separating OntologyConfigManager from inline agent configuration
 
 # OntologySubsystem — Technical Insight Document
 
@@ -18,7 +18,7 @@ Architecturally, the subsystem sits *behind* the pipeline rather than *inside* i
 
 The dominant architectural pattern here is **separation of concerns through delegation**. `OntologyClassificationAgent` participates in the rigid five-method `BaseAgent` lifecycle (`process()`, `calculateConfidence()`, `detectIssues()`, `generateRouting()`, `applyCorrections()`), but it does not contain classification logic itself — it delegates to `OntologyClassifier`. Similarly, the agent's `detectIssues()` slot invokes `OntologyValidator` rather than performing validation inline. This keeps the ontology domain code free of pipeline orchestration concerns and free to evolve independently of `AgentResponse` envelope conventions.
 
-A second clear pattern is the **centralized configuration entry point**. `OntologyConfigManager` is the sole loader of ontology configuration, ensuring that changes to entity type hierarchies flow through a single managed module instead of being scattered across individual agent files. This design is reinforced by the parent-child containment relationship: `OntologySubsystem contains OntologyConfigManager`, making the manager the canonical interface for any code needing to consult the ontology. The historical motivation for this centralization is recorded in `integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` (marked RESOLVED), which indicates that an earlier architecture coupled ontology configuration directly into agents and was refactored out.
+A second clear pattern is the **centralized configuration entry point**. `OntologyConfigManager` is the sole loader of ontology configuration, ensuring that changes to entity type hierarchies flow through a single managed module instead of being scattered across individual agent files. This design is reinforced by the parent-child containment relationship: `OntologySubsystem contains OntologyConfigManager`, making the manager the canonical interface for any code needing to consult the ontology. The historical motivation for this centralization is recorded in `integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` (marked RESOLVED), which indicates that an earlier architecture coupled ontology configuration directly into agents and was refactored out.
 
 A third pattern is the **tiered classification strategy**. Heuristic, rule-based classifiers act as a fast path that supplements LLM-based classification — for relationships like `CONTAINS_FILE` and `DEFINES_METHOD` whose types can be determined structurally, heuristics resolve the classification without invoking the model. This composition pattern reduces cost and latency while preserving LLM fallback for ambiguous cases. It also fits naturally with the sibling `Ontology` component's two-tier upper/lower ontology structure: heuristics tend to map cleanly onto lower-ontology concrete types, while LLM classification handles upper-ontology abstract categorization.
 
@@ -44,7 +44,7 @@ A second integration is with the sibling `Ontology` component, which defines the
 
 The subsystem also integrates indirectly with the `Insights` sibling. Because insights operate as a post-persistence concern, consuming already-written knowledge graph data, the <USER_ID_REDACTED> of classifications and the integrity of validation results produced by `OntologySubsystem` directly affect what insights can be derived later. Any classification error or unvalidated entity that reaches persistence becomes a defect that the insights stage must work around.
 
-Externally, the `integrations/mcp-server-semantic-analysis/` directory references the subsystem in its architecture documentation, including the resolved critical-issues note that motivated the current separation between `OntologyConfigManager` and inline agent configuration.
+Externally, the `integrations/semantic-analysis/` directory references the subsystem in its architecture documentation, including the resolved critical-issues note that motivated the current separation between `OntologyConfigManager` and inline agent configuration.
 
 ## Usage Guidelines
 
@@ -80,7 +80,7 @@ Finally, treat `OntologyValidator` issues as first-class signals. Because valida
 ### Siblings
 - [Pipeline](./Pipeline.md) -- The pipeline coordinator sequences agents in a fixed order defined in batch-analysis.yaml, with each step declaring explicit depends_on edges for DAG-based execution
 - [Ontology](./Ontology.md) -- The upper ontology defines broad abstract categories while lower ontology definitions provide concrete entity types, creating a two-tier classification hierarchy referenced by OntologyClassificationAgent
-- [Insights](./Insights.md) -- Insight generation operates as a post-persistence concern, consuming already-written KG data rather than raw pipeline input, as described in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
+- [Insights](./Insights.md) -- Insight generation operates as a post-persistence concern, consuming already-written KG data rather than raw pipeline input, as described in integrations/semantic-analysis/docs/architecture/agents.md
 
 
 ---

@@ -1036,7 +1036,7 @@ cat ~/.claude.json | jq '.mcpServers."semantic-analysis".args'
 ```bash
 # The stdio proxy should connect to the SSE server
 # Test manually:
-SEMANTIC_ANALYSIS_SSE_URL=http://localhost:3848 node integrations/mcp-server-semantic-analysis/dist/stdio-proxy.js
+SEMANTIC_ANALYSIS_SSE_URL=http://localhost:3848 node integrations/semantic-analysis/dist/stdio-proxy.js
 ```
 
 ### 3. Port Mapping Problems

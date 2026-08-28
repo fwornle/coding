@@ -12,9 +12,9 @@ The ConstraintConfigurationLoader is a SubComponent of the broader ConstraintSys
 
 ![ConstraintConfigurationLoader — Architecture](images/constraint-configuration-loader-architecture.png)
 
-Configuration sources are split between a fixed user-level file at `~/.coding-tools/hooks.json` — which acts as a global default applying across all of a developer's projects — and a project-level file at `.coding/hooks.json` resolved relative to the provided `projectPath`. The user-facing reference for which keys participate in this loader's behavior is documented in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, which complements (rather than duplicates) the programmatic merge logic embedded in the hook manager.
+Configuration sources are split between a fixed user-level file at `~/.coding-tools/hooks.json` — which acts as a global default applying across all of a developer's projects — and a project-level file at `.coding/hooks.json` resolved relative to the provided `projectPath`. The user-facing reference for which keys participate in this loader's behavior is documented in `integrations/constraint-monitor/docs/constraint-configuration.md`, which complements (rather than duplicates) the programmatic merge logic embedded in the hook manager.
 
-Within the ConstraintSystem hierarchy, ConstraintConfigurationLoader is the sub-component that resolves *how* constraints will behave at runtime, while sibling components handle *what* constraints to detect and surface: SemanticConstraintDetector performs conversation-level inference over message context, and McpConstraintMonitor (documented in `integrations/mcp-constraint-monitor/README.md`) provides the runtime monitoring surface that consumes detection results.
+Within the ConstraintSystem hierarchy, ConstraintConfigurationLoader is the sub-component that resolves *how* constraints will behave at runtime, while sibling components handle *what* constraints to detect and surface: SemanticConstraintDetector performs conversation-level inference over message context, and McpConstraintMonitor (documented in `integrations/constraint-monitor/README.md`) provides the runtime monitoring surface that consumes detection results.
 
 ## Architecture and Design
 
@@ -32,7 +32,7 @@ The mechanics center on `UnifiedHookManager.initialize(projectPath)`. When calle
 
 The fixed location of `~/.coding-tools/hooks.json` is significant: because it is not parameterized, it serves as a single source of personal defaults across every project a developer works on. This makes user-level preferences cheap to set once and reuse, but it also means changes propagate globally and may be silently overridden in any project that ships its own `.coding/hooks.json`. The `projectPath` parameter on `initialize()` is the only knob that varies the project-level lookup, so the loader's behavior is fully determined by the developer's home directory and the working project root.
 
-The split between programmatic merge logic in `lib/agent-api/hooks/hook-manager.js` and human-readable documentation in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` reflects a separation of concerns: the code enforces the merge mechanics, while the documentation tells developers which keys they can meaningfully set in each tier. Keeping these aligned is an ongoing maintenance responsibility — changes to the override scalar set must be mirrored in the documentation.
+The split between programmatic merge logic in `lib/agent-api/hooks/hook-manager.js` and human-readable documentation in `integrations/constraint-monitor/docs/constraint-configuration.md` reflects a separation of concerns: the code enforces the merge mechanics, while the documentation tells developers which keys they can meaningfully set in each tier. Keeping these aligned is an ongoing maintenance responsibility — changes to the override scalar set must be mirrored in the documentation.
 
 ## Integration Points
 
@@ -48,7 +48,7 @@ When troubleshooting unexpected constraint behavior, developers must inspect **b
 
 Developers should treat `~/.coding-tools/hooks.json` as personal defaults and accept that those defaults may be overridden in compliance-sensitive repositories. If a project enforces `enableLogging: true`, that decision was made deliberately by repository maintainers and cannot be reversed from the user-level file. Conversely, project maintainers should use `.coding/hooks.json` sparingly and only for the three scalar flags that actually participate in the override logic — setting structured or list-type keys at the project level will not produce the override effect they might expect, since those are outside the merge scope.
 
-When extending the loader, contributors should preserve the narrow scalar-override contract. Adding new keys to the override set requires updating both the merge logic in `lib/agent-api/hooks/hook-manager.js` and the user-facing documentation in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Broadening the merge to include structured types would change the design's complexity profile significantly and should be approached cautiously.
+When extending the loader, contributors should preserve the narrow scalar-override contract. Adding new keys to the override set requires updating both the merge logic in `lib/agent-api/hooks/hook-manager.js` and the user-facing documentation in `integrations/constraint-monitor/docs/constraint-configuration.md`. Broadening the merge to include structured types would change the design's complexity profile significantly and should be approached cautiously.
 
 ---
 
@@ -73,7 +73,7 @@ The loader is a focused sub-component within ConstraintSystem, cleanly separated
 The design scales well for the intended use case (per-developer, per-project configuration) because both file reads are local and bounded. There is no obvious scalability ceiling on the number of projects or developers. The fixed user-level path could become a friction point for developers who want different defaults per project context, but that scenario is explicitly the role of `.coding/hooks.json`.
 
 **5. Maintainability assessment**
-Maintainability is strong due to the small, well-defined surface area: one entry point, two file paths, three override keys. The primary maintenance risk is drift between `lib/agent-api/hooks/hook-manager.js` and `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` — any change to the override scalar set must be reflected in both. Debugging is somewhat more complex than a single-file configuration system would be, but the two-file inspection habit is teachable and consistent.
+Maintainability is strong due to the small, well-defined surface area: one entry point, two file paths, three override keys. The primary maintenance risk is drift between `lib/agent-api/hooks/hook-manager.js` and `integrations/constraint-monitor/docs/constraint-configuration.md` — any change to the override scalar set must be reflected in both. Debugging is somewhat more complex than a single-file configuration system would be, but the two-file inspection habit is teachable and consistent.
 
 
 ## Hierarchy Context
@@ -82,8 +82,8 @@ Maintainability is strong due to the small, well-defined surface area: one entry
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem employs a two-tier configuration merge strategy implemented in `lib/agent-api/hooks/hook-manager.js` (`UnifiedHookManager.initialize(projectPath)`). During initialization, the manager first reads user-level defaults from `~/.coding-tools/hooks.json`, then loads project-level overrides from `.coding/hooks.json` relative to the provided `projectPath`. For scalar behavioral flags — specifically `enableLogging`, `stopOnError`, and `timeout` — the project-level value wins on conflict, giving repository maintainers authority to enforce stricter or more permissive settings than user defaults. This design means a developer who has disabled logging in their personal config can have it forcibly re-enabled by a project's `.coding/hooks.json`, which is important for compliance-sensitive codebases. New developers should be aware that the effective runtime configuration is never purely one source; debugging unexpected constraint behavior requires inspecting both config files and understanding which keys are subject to override.
 
 ### Siblings
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- According to integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md, the detector operates at conversation-level inference, meaning it analyzes intent and meaning across message context rather than matching surface-level text patterns.
-- [McpConstraintMonitor](./McpConstraintMonitor.md) -- integrations/mcp-constraint-monitor/README.md defines the top-level purpose of this integration, positioning it as the runtime monitoring surface for constraints detected by the underlying system.
+- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- According to integrations/constraint-monitor/docs/semantic-constraint-detection.md, the detector operates at conversation-level inference, meaning it analyzes intent and meaning across message context rather than matching surface-level text patterns.
+- [McpConstraintMonitor](./McpConstraintMonitor.md) -- integrations/constraint-monitor/README.md defines the top-level purpose of this integration, positioning it as the runtime monitoring surface for constraints detected by the underlying system.
 
 
 ---

@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The project documentation, such as integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, hints at the importance of managing LLM services, which aligns with the expected behavior of LLMConnectionManager.
+The project documentation, such as integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, hints at the importance of managing LLM services, which aligns with the expected behavior of LLMConnectionManager.
 
 ## What It Is  
 
-`LLMConnectionManager` is a core class inside the **LLMService** sub‑component.  The only concrete grounding we have is the parent‑child relationship described in the observations: **LLMService** “contains `LLMConnectionManager`”, and the sibling **ProviderManager** also lives under the same service.  Although no concrete file path is listed in the source observations, the surrounding documentation (e.g., *integrations/mcp-constraint-monitor/docs/CLAUDE‑CODE‑HOOK‑FORMAT.md*) repeatedly stresses the need for a reliable mechanism that orchestrates connections to large‑language‑model (LLM) providers.  From that context we can safely conclude that `LLMConnectionManager` is the dedicated orchestrator that creates, configures, and maintains the runtime connections to the various LLM provider implementations (such as `DMRProvider`, `AnthropicProvider`, etc.) that `LLMService` instantiates.
+`LLMConnectionManager` is a core class inside the **LLMService** sub‑component.  The only concrete grounding we have is the parent‑child relationship described in the observations: **LLMService** “contains `LLMConnectionManager`”, and the sibling **ProviderManager** also lives under the same service.  Although no concrete file path is listed in the source observations, the surrounding documentation (e.g., *integrations/constraint-monitor/docs/CLAUDE‑CODE‑HOOK‑FORMAT.md*) repeatedly stresses the need for a reliable mechanism that orchestrates connections to large‑language‑model (LLM) providers.  From that context we can safely conclude that `LLMConnectionManager` is the dedicated orchestrator that creates, configures, and maintains the runtime connections to the various LLM provider implementations (such as `DMRProvider`, `AnthropicProvider`, etc.) that `LLMService` instantiates.
 
 In short, `LLMConnectionManager` is the **manager** that abstracts the low‑level connection details (authentication, endpoint selection, session lifecycle) away from the rest of the system, presenting a uniform interface for the higher‑level service logic to invoke LLM calls without worrying about provider‑specific plumbing.
 

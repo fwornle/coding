@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The AgentFramework sub-component uses the classify method in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts as an example of an agent's specific task
+The AgentFramework sub-component uses the classify method in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts as an example of an agent's specific task
 
 ## What It Is  
 
-The **AgentFramework** sub‑component lives inside the **SemanticAnalysis** module and is implemented under the `integrations/mcp-server-semantic-analysis/src/agents/` directory. Its core abstraction is the `BaseAgent` abstract class defined in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. Every concrete agent—such as the `OntologyClassificationAgent` (`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`)—inherits from `BaseAgent` and supplies a task‑specific method (e.g., `classify`). The framework therefore provides a reusable scaffold for building agents that can be plugged into the larger **Pipeline** execution engine.  
+The **AgentFramework** sub‑component lives inside the **SemanticAnalysis** module and is implemented under the `integrations/semantic-analysis/src/agents/` directory. Its core abstraction is the `BaseAgent` abstract class defined in `integrations/semantic-analysis/src/agents/base-agent.ts`. Every concrete agent—such as the `OntologyClassificationAgent` (`integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`)—inherits from `BaseAgent` and supplies a task‑specific method (e.g., `classify`). The framework therefore provides a reusable scaffold for building agents that can be plugged into the larger **Pipeline** execution engine.  
 
 ## Architecture and Design  
 
@@ -18,9 +18,9 @@ Interaction with other system parts is explicit. Agents are **children of Semant
 
 ## Implementation Details  
 
-1. **`BaseAgent` (abstract)** – Located in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. It declares the `initialize` method (line 20) that receives a dependency container and stores references such as persistence services, ontology clients, or logging utilities. Because it is abstract, it cannot be instantiated directly; instead, it forces concrete agents to implement their own public methods (e.g., `classify`).  
+1. **`BaseAgent` (abstract)** – Located in `integrations/semantic-analysis/src/agents/base-agent.ts`. It declares the `initialize` method (line 20) that receives a dependency container and stores references such as persistence services, ontology clients, or logging utilities. Because it is abstract, it cannot be instantiated directly; instead, it forces concrete agents to implement their own public methods (e.g., `classify`).  
 
-2. **`OntologyClassificationAgent`** – Implemented in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`. This class extends `BaseAgent` and provides a `classify` method (starting around line 35). The method accepts raw observation data, invokes the ontology client (injected during `initialize`), and returns a classification result that aligns the observation with the system’s ontology schema.  
+2. **`OntologyClassificationAgent`** – Implemented in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`. This class extends `BaseAgent` and provides a `classify` method (starting around line 35). The method accepts raw observation data, invokes the ontology client (injected during `initialize`), and returns a classification result that aligns the observation with the system’s ontology schema.  
 
 3. **Task‑Specific Agents** – While only the OntologyClassificationAgent is explicitly mentioned, the observations note the existence of a `PersistenceAgent` that uses ontology metadata fields. By inheriting from `BaseAgent`, it also benefits from the shared initialization logic, ensuring that all agents have a uniform way to access required services.  
 
@@ -74,12 +74,12 @@ Interaction with other system parts is explicit. Agents are **children of Semant
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, allowing for flexibility and scalability in the system's architecture. This is evident in the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts), which is designed to classify observations against the ontology system. The agent's classify method (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts:35) demonstrates this modularity, as it takes in observation data and returns a classified result. Furthermore, the use of the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) abstract class provides common functionality for all agents, such as the initialize method (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts:20), which sets up the agent's dependencies.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, allowing for flexibility and scalability in the system's architecture. This is evident in the OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts), which is designed to classify observations against the ontology system. The agent's classify method (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts:35) demonstrates this modularity, as it takes in observation data and returns a classified result. Furthermore, the use of the BaseAgent (integrations/semantic-analysis/src/agents/base-agent.ts) abstract class provides common functionality for all agents, such as the initialize method (integrations/semantic-analysis/src/agents/base-agent.ts:20), which sets up the agent's dependencies.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in the Ontology sub-component uses the classify method in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to classify observations against the ontology system
-- [Insights](./Insights.md) -- The Insights sub-component uses the generateInsights method in a hypothetical integrations/mcp-server-semantic-analysis/src/agents/insights-agent.ts to generate insights from the processed data
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent in the Ontology sub-component uses the classify method in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts to classify observations against the ontology system
+- [Insights](./Insights.md) -- The Insights sub-component uses the generateInsights method in a hypothetical integrations/semantic-analysis/src/agents/insights-agent.ts to generate insights from the processed data
 
 ---
 

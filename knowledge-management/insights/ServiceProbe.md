@@ -58,7 +58,7 @@ LLMMockService, the other sibling, is unrelated to probe mechanics — it operat
 
 ### Siblings
 - [ServiceStarter](./ServiceStarter.md) -- ServiceStarter in lib/service-starter.js implements a retry-with-backoff pattern for service startup, meaning each failed health check attempt waits an increasing delay before retrying rather than polling at a fixed interval
-- [LLMMockService](./LLMMockService.md) -- LLMMockService in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts implements a three-mode switcher (mock/local/public) allowing the semantic analysis MCP to operate without external LLM dependencies during development or testing
+- [LLMMockService](./LLMMockService.md) -- LLMMockService in integrations/semantic-analysis/src/mock/llm-mock-service.ts implements a three-mode switcher (mock/local/public) allowing the semantic analysis MCP to operate without external LLM dependencies during development or testing
 
 
 ---

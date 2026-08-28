@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The ObservationClassifier likely utilizes the OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to perform classification tasks
+The ObservationClassifier likely utilizes the OntologyClassificationAgent in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts to perform classification tasks
 
 **ObservationClassifier – Technical Insight Document**  
 
@@ -13,7 +13,7 @@ The ObservationClassifier likely utilizes the OntologyClassificationAgent in int
 The **ObservationClassifier** is a sub‑component that lives inside the **LiveLoggingSystem**.  Its implementation is not exposed as a dedicated source file in the current snapshot, but the surrounding code base makes its role and collaborators clear.  The classifier is the logical piece that receives raw observation data, applies a semantic classification routine (most likely delegated to the **OntologyClassificationAgent** found at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
 ) and then produces a structured classification that downstream parts of the system can consume.  Because it sits under the **LiveLoggingSystem**, it participates in the same modular architecture that powers the logging pipeline, sharing configuration validation (via **LSLConfigValidator** in  
@@ -40,7 +40,7 @@ The parent **LiveLoggingSystem** is described as “modular, with each component
 
 ### Agent‑Based Delegation  
 
-The classifier does **not** embed the ontology logic directly.  Instead, it invokes the **OntologyClassificationAgent** (the agent located at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`).  This agent‑based delegation is a form of the *Strategy* pattern: the classifier can swap the underlying classification strategy (decision tree, clustering, rule‑based) by configuring a different agent implementation without changing its own code.
+The classifier does **not** embed the ontology logic directly.  Instead, it invokes the **OntologyClassificationAgent** (the agent located at `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`).  This agent‑based delegation is a form of the *Strategy* pattern: the classifier can swap the underlying classification strategy (decision tree, clustering, rule‑based) by configuring a different agent implementation without changing its own code.
 
 ### Configuration Validation  
 
@@ -92,7 +92,7 @@ Because no concrete source file for ObservationClassifier exists in the current 
 
 | Integration Target | Path / Module | Interaction Mode | Purpose |
 |--------------------|---------------|------------------|---------|
-| **OntologyClassificationAgent** | `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` | Direct method calls (`classify`) | Performs semantic labeling of observations |
+| **OntologyClassificationAgent** | `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts` | Direct method calls (`classify`) | Performs semantic labeling of observations |
 | **LSLConfigValidator** | `scripts/validate-lsl-config.js` | Validation function (`validate`) | Guarantees configuration integrity before classification |
 | **TranscriptAPI** | `lib/agent-api/transcript-api.js` | Data retrieval (`read`, `convert`) | Supplies normalized observation payloads |
 | **GraphDatabaseManager** | (sibling component) | Persistence (`addNode`, `updateEdge`) | Stores classified observations in the graph store |
@@ -131,7 +131,7 @@ Following these conventions keeps the classification pipeline reliable, reproduc
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component employs a modular design, with each component having a specific role and interacting with others through well-defined interfaces, as seen in the use of the OntologyClassificationAgent in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts. This allows for flexibility and scalability, enabling the system to adapt to changing requirements and accommodate new features and components as needed. For instance, the LSLConfigValidator in scripts/validate-lsl-config.js provides comprehensive validation, repair, and optimization of LSL system configuration, demonstrating the system's ability to maintain consistency and accuracy. Furthermore, the TranscriptAPI in lib/agent-api/transcript-api.js provides a unified abstraction of transcript reading and conversion from different agent formats to LSL, highlighting the system's capacity for accommodating diverse data formats.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component employs a modular design, with each component having a specific role and interacting with others through well-defined interfaces, as seen in the use of the OntologyClassificationAgent in the file integrations/semantic-analysis/src/agents/ontology-classification-agent.ts. This allows for flexibility and scalability, enabling the system to adapt to changing requirements and accommodate new features and components as needed. For instance, the LSLConfigValidator in scripts/validate-lsl-config.js provides comprehensive validation, repair, and optimization of LSL system configuration, demonstrating the system's ability to maintain consistency and accuracy. Furthermore, the TranscriptAPI in lib/agent-api/transcript-api.js provides a unified abstraction of transcript reading and conversion from different agent formats to LSL, highlighting the system's capacity for accommodating diverse data formats.
 
 ### Siblings
 - [TranscriptConverter](./TranscriptConverter.md) -- The TranscriptConverter uses the TranscriptAPI in lib/agent-api/transcript-api.js to access and convert transcript data

@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
+The Logger component is implemented in 'integrations/semantic-analysis/src/logging.ts', providing a unified logging interface.
 
 ## What It Is  
 
-The **Logger** sub‑component lives in the file `integrations/mcp-server-semantic-analysis/src/logging.ts`.  It supplies a **unified logging interface** that the rest of the LiveLoggingSystem can call to record diagnostic information, errors, and operational events.  By exposing a single entry point for all log activity, the Logger guarantees that every message emitted by the system adheres to a **standardized logging format** and can be filtered, routed, or persisted in a consistent way.
+The **Logger** sub‑component lives in the file `integrations/semantic-analysis/src/logging.ts`.  It supplies a **unified logging interface** that the rest of the LiveLoggingSystem can call to record diagnostic information, errors, and operational events.  By exposing a single entry point for all log activity, the Logger guarantees that every message emitted by the system adheres to a **standardized logging format** and can be filtered, routed, or persisted in a consistent way.
 
 The component is deliberately **modular**: new logging mechanisms (e.g., console, file, remote telemetry) can be added without touching the core interface.  Developers can also adjust which categories of logs are captured through built‑in **log filtering** capabilities, and the overall behaviour is driven by the **ConfigurationValidator** component that validates runtime settings.
 
@@ -29,7 +29,7 @@ The component also follows a **configuration‑driven pattern**.  All logging se
 
 ## Implementation Details  
 
-At its core, the file `integrations/mcp-server-semantic-analysis/src/logging.ts` exports a **unified logging API**.  The API provides methods such as:
+At its core, the file `integrations/semantic-analysis/src/logging.ts` exports a **unified logging API**.  The API provides methods such as:
 
 * `logInfo(message: string, meta?: object)` – general informational messages.  
 * `logError(error: Error, context?: object)` – captures stack traces and contextual data for exceptions.  
@@ -98,10 +98,10 @@ The relationship diagram below visualizes these connections:
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/mcp-server-semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
 
 ### Children
-- [LogFormatter](./LogFormatter.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', which suggests that log formatting is a crucial aspect of this component.
+- [LogFormatter](./LogFormatter.md) -- The Logger component is implemented in 'integrations/semantic-analysis/src/logging.ts', which suggests that log formatting is a crucial aspect of this component.
 
 ### Siblings
 - [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses the TranscriptAdapter abstract base class in 'lib/agent-api' to read and convert transcripts from various agent formats.

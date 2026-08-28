@@ -1052,24 +1052,24 @@ else
 fi
 
 print_check "Semantic analysis MCP server (git submodule)"
-if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
+if dir_exists "$CODING_ROOT/integrations/semantic-analysis"; then
     print_pass "Semantic analysis MCP server submodule found"
 
     print_check "Semantic analysis dependencies"
-    if [ -d "$CODING_ROOT/integrations/mcp-server-semantic-analysis/node_modules" ]; then
+    if [ -d "$CODING_ROOT/integrations/semantic-analysis/node_modules" ]; then
         print_pass "Semantic analysis dependencies installed"
     else
         print_repair "Installing semantic analysis dependencies..."
-        cd "$CODING_ROOT/integrations/mcp-server-semantic-analysis" && npm install
+        cd "$CODING_ROOT/integrations/semantic-analysis" && npm install
         print_fixed "Semantic analysis dependencies installed"
     fi
 
     print_check "Semantic analysis build"
-    if [ -d "$CODING_ROOT/integrations/mcp-server-semantic-analysis/dist" ]; then
+    if [ -d "$CODING_ROOT/integrations/semantic-analysis/dist" ]; then
         print_pass "Semantic analysis server built"
 
         print_check "Semantic analysis server test"
-        cd "$CODING_ROOT/integrations/mcp-server-semantic-analysis"
+        cd "$CODING_ROOT/integrations/semantic-analysis"
 
         # Set environment variables for test
         export KNOWLEDGE_BASE_PATH="${KNOWLEDGE_BASE_PATH:-$CODING_ROOT}"
@@ -1098,15 +1098,15 @@ if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
         fi
     else
         print_repair "Building semantic analysis server..."
-        cd "$CODING_ROOT/integrations/mcp-server-semantic-analysis" && npm run build
+        cd "$CODING_ROOT/integrations/semantic-analysis" && npm run build
         print_fixed "Semantic analysis server built"
     fi
 else
     print_fail "Semantic analysis MCP server submodule not found"
     print_repair "Initializing semantic analysis submodule..."
     cd "$CODING_ROOT"
-    git submodule update --init --recursive integrations/mcp-server-semantic-analysis
-    cd integrations/mcp-server-semantic-analysis && npm install && npm run build
+    git submodule update --init --recursive integrations/semantic-analysis
+    cd integrations/semantic-analysis && npm install && npm run build
     print_fixed "Semantic analysis submodule initialized and built"
 fi
 
@@ -1207,7 +1207,7 @@ else
 fi
 
 print_check "MCP Constraint Monitor with Professional Dashboard"
-CONSTRAINT_MONITOR_DIR="$CODING_ROOT/integrations/mcp-constraint-monitor"
+CONSTRAINT_MONITOR_DIR="$CODING_ROOT/integrations/constraint-monitor"
 if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     print_pass "MCP Constraint Monitor found (with professional dashboard)"
     
@@ -1651,9 +1651,9 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     
 else
     print_fail "MCP Constraint Monitor not found"
-    print_info "Should be located at integrations/mcp-constraint-monitor"
+    print_info "Should be located at integrations/constraint-monitor"
     print_info "Professional dashboard requires constraint monitor"
-    print_info "Install with: git clone [constraint-monitor-repo] integrations/mcp-constraint-monitor"
+    print_info "Install with: git clone [constraint-monitor-repo] integrations/constraint-monitor"
     print_info "Then setup professional dashboard: cd dashboard && npm install"
 fi
 
@@ -2493,7 +2493,7 @@ echo -e "  ${CYAN}claude-mcp${NC}             # Start Claude with MCP (if availa
 echo -e "  ${CYAN}coding --copilot${NC}       # Start fallback services for CoPilot"
 echo -e ""
 echo -e "${BOLD}Professional Dashboard Commands:${NC}"
-echo -e "  ${CYAN}cd integrations/mcp-constraint-monitor${NC}"
+echo -e "  ${CYAN}cd integrations/constraint-monitor${NC}"
 echo -e "  ${CYAN}npm run api${NC}            # Start constraint monitor API server (port 3001)"
 echo -e "  ${CYAN}cd dashboard && npm run dev${NC}  # Start professional dashboard (port 3030)"
 echo -e "  ${CYAN}open http://localhost:3030${NC}      # Access professional constraint monitor"
@@ -2515,7 +2515,7 @@ fi
 echo -e "  • Run ${CYAN}ukb --interactive${NC} to add your first knowledge pattern"
 echo -e "  • Run ${CYAN}vkb${NC} to explore the knowledge graph visualization"
 echo -e "  • Access professional constraint monitor at ${CYAN}http://localhost:3030${NC}"
-echo -e "  • Configure constraint groups in ${CYAN}integrations/mcp-constraint-monitor/constraints.yaml${NC}"
+echo -e "  • Configure constraint groups in ${CYAN}integrations/constraint-monitor/constraints.yaml${NC}"
 echo -e "  • See docs/README.md for comprehensive documentation"
 
 echo -e "\n${BOLD}Professional Dashboard Features:${NC}"
@@ -2557,7 +2557,7 @@ fi
 print_header "ENHANCED FEATURES VALIDATION SUMMARY"
 
 echo -e "\n${BOLD}Professional Dashboard System Status:${NC}"
-if [ -d "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard" ] && [ -f "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/package.json" ]; then
+if [ -d "$CODING_ROOT/integrations/constraint-monitor/dashboard" ] && [ -f "$CODING_ROOT/integrations/constraint-monitor/dashboard/package.json" ]; then
     echo -e "  ${GREEN}✅ Next.js Professional Dashboard${NC} - Available"
 else
     echo -e "  ${RED}❌ Next.js Professional Dashboard${NC} - Missing"
@@ -2571,8 +2571,8 @@ else
     echo -e "  ${YELLOW}⚠️  Health Coordinator${NC} - Limited Monitoring (coordinator unreachable or no projects)"
 fi
 
-if [ -f "$CODING_ROOT/integrations/mcp-constraint-monitor/constraints.yaml" ]; then
-    CONSTRAINT_COUNT=$(grep -c "^  - id:" "$CODING_ROOT/integrations/mcp-constraint-monitor/constraints.yaml" 2>/dev/null || echo "0")
+if [ -f "$CODING_ROOT/integrations/constraint-monitor/constraints.yaml" ]; then
+    CONSTRAINT_COUNT=$(grep -c "^  - id:" "$CODING_ROOT/integrations/constraint-monitor/constraints.yaml" 2>/dev/null || echo "0")
     if [ "$CONSTRAINT_COUNT" -gt 15 ]; then
         echo -e "  ${GREEN}✅ Enhanced Constraint Rules${NC} - $CONSTRAINT_COUNT constraints configured"
     else
@@ -2585,26 +2585,26 @@ fi
 echo -e "\n${BOLD}Integration Status:${NC}"
 
 # Check if professional dashboard is properly integrated
-if [ -f "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" ]; then
+if [ -f "$CODING_ROOT/integrations/constraint-monitor/dashboard/components/constraint-dashboard.tsx" ]; then
     INTEGRATION_SCORE=0
     
     # Check for shadcn/ui integration
-    if grep -q "@radix-ui" "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
+    if grep -q "@radix-ui" "$CODING_ROOT/integrations/constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
         INTEGRATION_SCORE=$((INTEGRATION_SCORE + 1))
     fi
     
     # Check for project selector
-    if grep -q "project.*select\|Select.*project" "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
+    if grep -q "project.*select\|Select.*project" "$CODING_ROOT/integrations/constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
         INTEGRATION_SCORE=$((INTEGRATION_SCORE + 1))
     fi
     
     # Check for constraint grouping
-    if grep -q "accordion\|group" "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
+    if grep -q "accordion\|group" "$CODING_ROOT/integrations/constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
         INTEGRATION_SCORE=$((INTEGRATION_SCORE + 1))
     fi
     
     # Check for interactive toggles
-    if grep -q "toggle\|enable.*disable" "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
+    if grep -q "toggle\|enable.*disable" "$CODING_ROOT/integrations/constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
         INTEGRATION_SCORE=$((INTEGRATION_SCORE + 1))
     fi
     

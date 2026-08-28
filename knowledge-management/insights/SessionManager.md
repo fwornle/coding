@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-SessionManager uses the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) to classify observations and entities against the ontology system.
+SessionManager uses the OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) to classify observations and entities against the ontology system.
 
 ## What It Is  
 
@@ -37,7 +37,7 @@ Interaction between components is explicit and file‑path based. SessionManager
    Before any classification begins, SessionManager optionally invokes `scripts/validate-lsl-config.js`. This script checks the syntax, required fields, and possibly cross‑references against the ontology schema. If validation fails, SessionManager aborts the session start, preventing downstream errors. The use of a separate validator script keeps validation logic isolated from the main processing code, adhering to the **single‑responsibility principle**.
 
 3. **Classification Flow with OntologyClassificationAgent**  
-   For each incoming observation or entity, SessionManager calls into the `OntologyClassificationAgent` (found at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`). The agent receives the raw payload and the applicable rule set, performs a lookup against the ontology service, and returns enriched metadata (e.g., `ontologyId`, `confidenceScore`). SessionManager then attaches this metadata to the entity before persisting it, satisfying the observation that “classification process adds ontology metadata to entities before persistence.”
+   For each incoming observation or entity, SessionManager calls into the `OntologyClassificationAgent` (found at `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`). The agent receives the raw payload and the applicable rule set, performs a lookup against the ontology service, and returns enriched metadata (e.g., `ontologyId`, `confidenceScore`). SessionManager then attaches this metadata to the entity before persisting it, satisfying the observation that “classification process adds ontology metadata to entities before persistence.”
 
 4. **Windowing and Routing**  
    While the exact implementation is not disclosed, SessionManager’s “windowing” likely partitions the continuous stream into fixed‑size or sliding windows. Each window is then routed to a persistence adapter (database, file store) or a downstream analytics pipeline. Because the architecture is described as modular, the windowing logic is probably encapsulated in its own class or function, making it replaceable without touching classification or validation code.
@@ -50,7 +50,7 @@ Interaction between components is explicit and file‑path based. SessionManager
 ## Integration Points  
 
 * **Parent – LiveLoggingSystem**: SessionManager is a child of LiveLoggingSystem and inherits the system‑wide modular philosophy. Any system‑level configuration (e.g., logging level, global ontology cache) propagates down to SessionManager.  
-* **Sibling – OntologyClassificationAgent**: Directly imported from `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`. SessionManager passes raw observations and the shared classification config to this agent and receives enriched entities.  
+* **Sibling – OntologyClassificationAgent**: Directly imported from `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`. SessionManager passes raw observations and the shared classification config to this agent and receives enriched entities.  
 * **Sibling – LSLConfigValidator**: Executed via the Node.js script `scripts/validate-lsl-config.js`. SessionManager may invoke this validator synchronously during initialization or asynchronously when configuration files are hot‑reloaded.  
 * **Sibling – TranscriptProcessor**: Provides the pre‑processed transcript stream. SessionManager subscribes to the output events (e.g., `onTranscriptChunk`) and treats them as input for classification.  
 * **External – Ontology Service**: Though not listed as a sibling, the OntologyClassificationAgent likely communicates with an external ontology service (REST or gRPC) to resolve concept identifiers. SessionManager indirectly depends on this service through the agent.  
@@ -109,7 +109,7 @@ Overall, SessionManager exemplifies a well‑structured, configuration‑centric
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component employs a modular architecture, with classes such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) and the LSLConfigValidator (scripts/validate-lsl-config.js) working together to provide a unified abstraction for reading and converting transcripts from different agent formats into the Live Session Logging (LSL) format. This modular approach allows for easier maintenance and updates, as individual modules can be modified or replaced without affecting the entire system. For example, the OntologyClassificationAgent uses a configuration file to classify observations and entities against the ontology system, adding ontology metadata to entities before persistence. The use of a configuration file allows for easy modification of the classification rules without requiring changes to the code.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component employs a modular architecture, with classes such as the OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) and the LSLConfigValidator (scripts/validate-lsl-config.js) working together to provide a unified abstraction for reading and converting transcripts from different agent formats into the Live Session Logging (LSL) format. This modular approach allows for easier maintenance and updates, as individual modules can be modified or replaced without affecting the entire system. For example, the OntologyClassificationAgent uses a configuration file to classify observations and entities against the ontology system, adding ontology metadata to entities before persistence. The use of a configuration file allows for easy modification of the classification rules without requiring changes to the code.
 
 ### Siblings
 - [TranscriptProcessor](./TranscriptProcessor.md) -- TranscriptProcessor uses the LSLConfigValidator (scripts/validate-lsl-config.js) to validate configuration files before processing transcripts.

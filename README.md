@@ -101,19 +101,19 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 
 The `coding` system (this repo) is one of three sibling consumers of the shared [`@fwornle/km-core`](lib/km-core/README.md) core. The four standard configuration slots are owned here as follows:
 
-- **Ontology:** `.data/ontologies/coding-ontology.json` — coding-domain class declarations (`Component`, `SubComponent`, `Detail`, `LiveLoggingSystem`-attached SubComponents, etc.). This ontology is also READ by `mcp-server-semantic-analysis` for wave-analysis classification, but it is OWNED here.
+- **Ontology:** `.data/ontologies/coding-ontology.json` — coding-domain class declarations (`Component`, `SubComponent`, `Detail`, `LiveLoggingSystem`-attached SubComponents, etc.). This ontology is also READ by `semantic-analysis` for wave-analysis classification, but it is OWNED here.
 - **LLM providers:** `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` (host-side launchd-managed proxy on port 12435 routing through Claude Code, GitHub Copilot, Groq, Anthropic, OpenAI, Gemini, GitHub Models, DMR, Ollama) + `scripts/configure-wave-analysis-routing.sh` (per-process `processOverrides` — routes `wave-analysis-*` through `copilot`, keeps `health-coordinator` / `observation-writer` on `claude-code`).
 - **Ingest adapters:** `src/live-logging/` — `ObservationWriter`, ETM (spawned per project by the health coordinator), the in-process `LslObservationResolver` (30-min sweep inside obs-api), `sub-agent-live-{claude,copilot,opencode}`. All host-side observation writers ingest into the obs-api at `http://localhost:12436` (km-core REST router).
 - **Domain dedup:** `src/live-logging/ObservationWriter.js` — Jaccard text similarity at 0.45, containment threshold 0.7, 4-keyword floor (per the dedup rules in `MEMORY.md > ObservationWriter`).
 - **Redaction:** `src/live-logging/redaction-patterns.json` — PII redaction patterns applied at ingest before any observation is persisted (the 98.3% security-effectiveness surface).
 
-The `coding` system does NOT own per-agent prompts (that's `mcp-server-semantic-analysis`'s `config/agents/*.json`) and does NOT own RaaS / KPI-FW / business lower ontologies (those are owned by [`operational-knowledge-management`](https://bmw.ghe.com/adpnext-apps/operational-knowledge-management)).
+The `coding` system does NOT own per-agent prompts (that's `semantic-analysis`'s `config/agents/*.json`) and does NOT own RaaS / KPI-FW / business lower ontologies (those are owned by [`operational-knowledge-management`](https://bmw.ghe.com/adpnext-apps/operational-knowledge-management)).
 
 ## Architecture
 
 ![Coding system architecture](docs/images/coding-system-architecture.png)
 
-The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`) plus a three-container Docker stack (`coding-services`, Qdrant, Redis) supervised by supervisord — code-graph analysis is served by graphify, a file-based `graph.json` inside `coding-services`. Live conversations land in `.specstory/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `mcp-server-semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
+The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`) plus a three-container Docker stack (`coding-services`, Qdrant, Redis) supervised by supervisord — code-graph analysis is served by graphify, a file-based `graph.json` inside `coding-services`. Live conversations land in `.specstory/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
 
 ## Where to Edit
 
@@ -131,7 +131,7 @@ Every row gives a path AND a verification command — this table is the SC-1 (5-
 ## Related Systems
 
 - [KM-Core](lib/km-core/README.md) — shared `Entity` / `Relation` / `Layer` / `ProvenanceStamp` types, `GraphKMStore`, ontology registry, ingest pipeline, REST router (`/api/v1/`), git-tag snapshot manager. The `coding` system consumes km-core as the canonical persistence + REST contract.
-- [mcp-server-semantic-analysis](integrations/mcp-server-semantic-analysis/README.md) — sister consumer; drives the 14-agent wave-analysis workflow on SSE port `3848`, writing into the same km-core core. Submodule under `integrations/`.
+- [semantic-analysis](integrations/semantic-analysis/README.md) — sister consumer; drives the 14-agent wave-analysis workflow on SSE port `3848`, writing into the same km-core core. Submodule under `integrations/`.
 - [operational-knowledge-management](https://bmw.ghe.com/adpnext-apps/operational-knowledge-management) — sister consumer (external BMW GHE repo, "OKM" for short); owns RaaS / KPI-FW / business lower ontologies and the operational-incident ingest adapters. Consumes the same km-core core for storage + REST.
 
 ## Tests / Verify
@@ -257,8 +257,8 @@ Real-time per-exchange observations from live coding sessions, inspired by the o
 ### Integration Components
 
 - **[System Health Dashboard](integrations/system-health-dashboard/)** - Real-time health visualization
-- **[MCP Constraint Monitor](integrations/mcp-constraint-monitor/)** - PreToolUse hook enforcement
-- **[MCP Semantic Analysis](integrations/mcp-semantic-analysis/)** - 11-agent AI analysis system
+- **[Constraint Monitor](integrations/constraint-monitor/)** - PreToolUse hook enforcement
+- **[Semantic Analysis](integrations/mcp-semantic-analysis/)** - 11-agent AI analysis system
 - **[VKB Visualizer](integrations/vkb-visualizer/)** - Knowledge graph visualization
 - **[All Integrations](integrations/)** - Complete integration list
 
@@ -361,7 +361,7 @@ graph-sync sync        # Full bidirectional sync
 
 ```bash
 # Start dashboard (automatic with install)
-cd integrations/mcp-constraint-monitor
+cd integrations/constraint-monitor
 npm run dashboard  # http://localhost:3030
 
 # API access
@@ -435,10 +435,10 @@ See [Getting Started](docs/getting-started.md) for:
 ./scripts/test-coding.sh --auto-repair
 
 # Check MCP servers
-cd integrations/mcp-server-semantic-analysis && npm test
+cd integrations/semantic-analysis && npm test
 
 # Check constraint monitor
-cd integrations/mcp-constraint-monitor && npm test
+cd integrations/constraint-monitor && npm test
 ```
 
 **Note**: The test script defaults to `--check-only` mode and will NEVER auto-install system packages.

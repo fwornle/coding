@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-The CodeGraphAgent class in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts utilizes the ensureLLMInitialized() method to ensure proper LLM service initialization.
+The CodeGraphAgent class in integrations/semantic-analysis/src/agent/code-graph-agent.ts utilizes the ensureLLMInitialized() method to ensure proper LLM service initialization.
 
 ## What It Is  
 
 The **LLMIntegration** sub‑component lives inside the broader **CodingPatterns** component and is the dedicated module that brings external large‑language‑model (LLM) services into the code‑analysis pipeline. Its concrete entry point is the `ensureLLMInitialized()` method defined in `base-agent.ts`. Every agent that needs an LLM – for example the `CodeGraphAgent` located at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts
+integrations/semantic-analysis/src/agent/code-graph-agent.ts
 ```  
 
 calls this method (typically from its constructor) to guarantee that the LLM service has been instantiated before any analysis work begins.  The sub‑component also owns the configuration surface for the LLM providers, exposing environment variables such as `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` that are read at initialization time.  Its primary responsibility, therefore, is **lazy, on‑demand initialization** of the LLM client and the safe propagation of that client to any consuming agent.
@@ -36,7 +36,7 @@ The presence of the two environment variables (`ANTHROPIC_API_KEY`, `BROWSERBASE
    - Based on which key is present, it constructs the appropriate LLM client (Anthropic, BrowserBase, etc.).  
    - Stores the client in a shared location (static field, singleton service, or module‑level variable) so subsequent calls become no‑ops.  
 
-2. **Agent Consumption – `CodeGraphAgent` (integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts)**  
+2. **Agent Consumption – `CodeGraphAgent` (integrations/semantic-analysis/src/agent/code-graph-agent.ts)**  
    - Extends a base agent class that already includes the guard.  
    - In its constructor (or early lifecycle hook) it invokes `ensureLLMInitialized()`.  
    - After the guard returns, the agent can safely call methods on the LLM client, for example to generate code‑graph embeddings or perform semantic queries.  
@@ -114,12 +114,12 @@ The presence of the two environment variables (`ANTHROPIC_API_KEY`, `BROWSERBASE
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method within the base-agent.ts file. This method ensures that the LLM service is only initialized when it is actually needed, thus optimizing resource usage and improving performance. Furthermore, the use of lazy initialization allows for more flexibility in the component's design, as it enables the creation of agents that can be used with or without LLM services. The ensureLLMInitialized() method is typically called within the constructor of the agent classes, such as the CodeGraphAgent class in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts, to guarantee that the LLM service is properly initialized before the agent's execution.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method within the base-agent.ts file. This method ensures that the LLM service is only initialized when it is actually needed, thus optimizing resource usage and improving performance. Furthermore, the use of lazy initialization allows for more flexibility in the component's design, as it enables the creation of agents that can be used with or without LLM services. The ensureLLMInitialized() method is typically called within the constructor of the agent classes, such as the CodeGraphAgent class in integrations/semantic-analysis/src/agent/code-graph-agent.ts, to guarantee that the LLM service is properly initialized before the agent's execution.
 
 ### Siblings
 - [CodeAnalysis](./CodeAnalysis.md) -- The ensureLLMInitialized() method in base-agent.ts guarantees the LLM service is initialized before code analysis execution.
 - [DatabaseManagement](./DatabaseManagement.md) -- The MEMGRAPH_BATCH_SIZE variable is used to configure the batch size for database interactions.
-- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
+- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
 - [ConcurrencyManagement](./ConcurrencyManagement.md) -- The WaveController.runWithConcurrency() method implements work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately.
 - [BrowserAccess](./BrowserAccess.md) -- The BROWSER_ACCESS_SSE_URL variable is used to configure the browser access SSE URL.
 

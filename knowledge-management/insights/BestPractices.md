@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, implying the use of best practices for data validation and testing.
+The constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, implying the use of best practices for data validation and testing.
 
 ## What It Is  
 
@@ -41,7 +41,7 @@ The implementation of **BestPractices** is purely declarative, relying on Markdo
 | `integrations/copi/MIGRATION.md` | Backwards compatibility | Version‑by‑version migration matrix, deprecation warnings, required data‑migration scripts, and testing strategy for migration. |
 | `integrations/copi/STATUS.md` | Monitoring & logging conventions | Recommended log levels, health‑check endpoints, and CI badge conventions to surface status in PRs. |
 | `integrations/copi/USAGE.md` & `copi/USAGE.md` | User documentation & CI integration | Example command invocations, environment‑variable conventions, and snippets for embedding the CLI in CI pipelines (e.g., GitHub Actions). |
-| `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | Data validation | JSON schema for hook payloads, required fields, type constraints, and examples of valid/invalid payloads. |
+| `constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | Data validation | JSON schema for hook payloads, required fields, type constraints, and examples of valid/invalid payloads. |
 
 All files follow a **uniform heading hierarchy** (`#`, `##`, `###`) and include **code fences** (` ``` `) that make them machine‑parsable.  The `CLAUDE-CODE-HOOK-FORMAT.md` file, for instance, defines a JSON schema that can be imported by runtime validators in the **ConstraintMonitoring** sibling component, ensuring that the documented format is enforced programmatically.
 
@@ -75,7 +75,7 @@ Developers interacting with the repository should treat the **BestPractices** ar
 
 * **During a version upgrade** – Follow the step‑by‑step migration plan in `integrations/copi/MIGRATION.md`.  The guide specifies which configuration files must be updated, which deprecated flags need removal, and which integration tests must be rerun.  Skipping this step can break backward compatibility, a risk the guide explicitly calls out.
 
-* **When emitting constraint‑monitor hooks** – Serialize payloads according to the JSON schema in `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  Validation failures will be logged by the monitoring service and cause the associated CI job to fail, protecting downstream consumers.
+* **When emitting constraint‑monitor hooks** – Serialize payloads according to the JSON schema in `constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.  Validation failures will be logged by the monitoring service and cause the associated CI job to fail, protecting downstream consumers.
 
 * **For status reporting** – Use the logging conventions described in `integrations/copi/STATUS.md`.  Emit logs at the prescribed levels (`info`, `warn`, `error`) and expose the health‑check endpoint so that the monitoring dashboard can surface the component’s health in real time.
 
@@ -125,7 +125,7 @@ Overall, **BestPractices** provides a well‑structured, documentation‑driven 
 - [DesignPatterns](./DesignPatterns.md) -- The GraphDatabaseAdapter class in storage/graph-database-adapter.ts utilizes the singleton pattern to provide a single instance of the graph database across the application.
 - [CodingConventions](./CodingConventions.md) -- The integrations/code-graph-rag/README.md file follows a consistent naming convention, indicating adherence to coding standards.
 - [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
-- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
+- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
 
 ---
 

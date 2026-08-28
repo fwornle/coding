@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-The RetryManager is implemented in the file integrations/mcp-server-semantic-analysis/src/utils/retry-manager.ts, responsible for handling retry mechanisms
+The RetryManager is implemented in the file integrations/semantic-analysis/src/utils/retry-manager.ts, responsible for handling retry mechanisms
 
 ## What It Is  
 
 The **RetryManager** is a sub‑component of the **SemanticAnalysis** module and lives in the file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/utils/retry-manager.ts
+integrations/semantic-analysis/src/utils/retry-manager.ts
 ```  
 
 It is the dedicated utility that supplies a robust retry mechanism for operations that can fail during semantic analysis.  The manager implements an **exponential back‑off** strategy, maintains a **cache of retry history**, exposes a **dashboard** for visual monitoring, and drives a **notification system** that alerts users when retries ultimately fail.  By centralising these concerns, RetryManager decouples retry logic from the rest of the pipeline while still being tightly integrated with the **Pipeline** component that orchestrates the overall analysis workflow.
@@ -91,14 +91,14 @@ The utility‑centric design keeps the retry logic in a single, easily discovera
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's architecture is designed to facilitate modular and concurrent processing, allowing for efficient analysis of large codebases. This is evident in the use of multiple agents, such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, each with its own file and responsibilities. For instance, the OntologyClassificationAgent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, and is responsible for classifying observations against the ontology system. The use of a modular architecture facilitates maintainability and scalability, as each agent can be updated or modified independently without affecting the overall system.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's architecture is designed to facilitate modular and concurrent processing, allowing for efficient analysis of large codebases. This is evident in the use of multiple agents, such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, each with its own file and responsibilities. For instance, the OntologyClassificationAgent is implemented in the file integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, and is responsible for classifying observations against the ontology system. The use of a modular architecture facilitates maintainability and scalability, as each agent can be updated or modified independently without affecting the overall system.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, responsible for classifying observations against the ontology system
-- [Insights](./Insights.md) -- The InsightGenerator is implemented in the file integrations/mcp-server-semantic-analysis/src/insights/insight-generator.ts, responsible for generating insights from processed data
-- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The SemanticInsightGenerator is implemented in the file integrations/mcp-server-semantic-analysis/src/insights/semantic-insight-generator.ts, responsible for generating semantic insights
-- [CodeGraphAgent](./CodeGraphAgent.md) -- The CodeGraphAgent is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, responsible for generating code graphs
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent is implemented in the file integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, responsible for classifying observations against the ontology system
+- [Insights](./Insights.md) -- The InsightGenerator is implemented in the file integrations/semantic-analysis/src/insights/insight-generator.ts, responsible for generating insights from processed data
+- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The SemanticInsightGenerator is implemented in the file integrations/semantic-analysis/src/insights/semantic-insight-generator.ts, responsible for generating semantic insights
+- [CodeGraphAgent](./CodeGraphAgent.md) -- The CodeGraphAgent is implemented in the file integrations/semantic-analysis/src/agents/code-graph-agent.ts, responsible for generating code graphs
 
 ---
 

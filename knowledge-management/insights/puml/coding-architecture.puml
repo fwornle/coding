@@ -6,7 +6,7 @@ title Coding Project Architecture
 package "Core Implementation" {
     component "knowledge-management" as km <<core>>
     component "ukb-unified" as ukb <<core>>
-    component "mcp-server-semantic-analysis" as mcp <<api>>
+    component "semantic-analysis" as mcp <<api>>
 }
 
 package "Storage Layer" {
@@ -35,7 +35,7 @@ sync --> export : generates\n.data/knowledge-export
 ' Implementation paths
 note top of km : "src/knowledge-management"
 note top of ukb : "lib/ukb-unified" 
-note top of mcp : "integrations/mcp-server-semantic-analysis/src"
+note top of mcp : "integrations/semantic-analysis/src"
 
 note bottom of kgdb : "shared-memory.json REMOVED\nfrom codebase"
 

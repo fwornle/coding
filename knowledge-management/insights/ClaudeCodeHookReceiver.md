@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format') is a dedicated document describing the exact payload structure expected from Claude Code hooks, indicating a well-defined ingestion interface
+integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format') is a dedicated document describing the exact payload structure expected from Claude Code hooks, indicating a well-defined ingestion interface
 
 ## What It Is  
 
 **ClaudeCodeHookReceiver** is the concrete ingestion component that accepts events emitted by the *Claude Code* agent and translates them into the internal representation used by the **MCPConstraintMonitorIntegration** package. The receiver lives under the integration’s source tree (the exact implementation files are not listed in the current snapshot, but the component is documented in the following files):
 
-* `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – the authoritative specification of the JSON payload that the receiver must parse.  
-* `integrations/mcp-constraint-monitor/docs/status-line-integration.md` – describes how the same payload is also surfaced in the status‑line UI.  
+* `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – the authoritative specification of the JSON payload that the receiver must parse.  
+* `integrations/constraint-monitor/docs/status-line-integration.md` – describes how the same payload is also surfaced in the status‑line UI.  
 
 Because the **ClaudeCodeHookReceiver** is a child of **MCPConstraintMonitorIntegration**, it acts as the bridge between the external Claude Code hook contract and the internal violation‑tracking pipeline that ultimately feeds the dashboard (`dashboard/README.md`). In other words, it is the *gateway* that turns raw Claude Code events into structured constraint‑violation records and UI notifications.
 
@@ -62,7 +62,7 @@ From these artifacts we can infer the following implementation mechanics:
 
 ## Usage Guidelines  
 
-* **Strict Adherence to the Payload Spec** – When extending or testing Claude Code hooks, always validate against `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Missing or miss‑typed fields will cause the receiver to reject the request.  
+* **Strict Adherence to the Payload Spec** – When extending or testing Claude Code hooks, always validate against `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Missing or miss‑typed fields will cause the receiver to reject the request.  
 * **Idempotency Considerations** – The payload includes a `violationId`. Downstream consumers (storage and UI) assume this identifier is globally unique; re‑sending the same hook should not create duplicate records. Implement callers should generate stable IDs (e.g., UUID v5 derived from rule + file + line).  
 * **Performance‑Sensitive Path** – Because the receiver also updates the status line, keep the payload lightweight. Avoid embedding large code diffs or heavy metadata; those belong in separate storage, not in the hook payload.  
 * **Error Reporting** – The receiver returns standard HTTP error codes. Clients should treat 4xx responses as unrecoverable (payload issue) and 5xx as transient (server overload). Implement exponential back‑off for retrying 5xx responses.  
@@ -108,10 +108,10 @@ From these artifacts we can infer the following implementation mechanics:
 ## Hierarchy Context
 
 ### Parent
-- [MCPConstraintMonitorIntegration](./MCPConstraintMonitorIntegration.md) -- integrations/mcp-constraint-monitor/README.md describes the integration package that wraps constraint monitoring as an MCP-compatible server component
+- [MCPConstraintMonitorIntegration](./MCPConstraintMonitorIntegration.md) -- integrations/constraint-monitor/README.md describes the integration package that wraps constraint monitoring as an MCP-compatible server component
 
 ### Siblings
-- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- integrations/mcp-constraint-monitor/docs/semantic-detection-design.md ('Semantic Constraint Detection - Design Document') describes the architectural design decisions behind semantic-level detection, suggesting this is a non-trivial subsystem with its own design rationale
+- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- integrations/constraint-monitor/docs/semantic-detection-design.md ('Semantic Constraint Detection - Design Document') describes the architectural design decisions behind semantic-level detection, suggesting this is a non-trivial subsystem with its own design rationale
 
 
 ---

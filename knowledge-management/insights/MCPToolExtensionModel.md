@@ -9,7 +9,7 @@ The MCPToolExtensionModel pattern, documented in docs/architecture/tools.md, def
 The **MCPToolExtensionModel** is the canonical schema that describes every discrete capability offered by the MCP semantic‑analysis server. It lives in the architecture documentation under the integration repository at  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/architecture/tools.md
+integrations/semantic-analysis/docs/architecture/tools.md
 ```  
 
 and is referenced from the parent conventions component **MCPIntegrationConventions** (the top‑level integration definition that houses the model). The model treats each capability as a **named “tool”** with a well‑defined JSON‑compatible structure.  Clients read this schema to discover what tools are available, the parameters each expects, and the shape of the results they will receive, allowing a uniform “discover‑and‑invoke” workflow across the server’s feature set.
@@ -94,10 +94,10 @@ These insights capture the current state of the **MCPToolExtensionModel** as doc
 ## Hierarchy Context
 
 ### Parent
-- [MCPIntegrationConventions](./MCPIntegrationConventions.md) -- integrations/mcp-server-semantic-analysis/ follows the canonical MCP integration directory structure with subdirectories docs/architecture/, docs/api/, docs/installation/, and docs/configuration.md, establishing the expected layout new integrations must mirror
+- [MCPIntegrationConventions](./MCPIntegrationConventions.md) -- integrations/semantic-analysis/ follows the canonical MCP integration directory structure with subdirectories docs/architecture/, docs/api/, docs/installation/, and docs/configuration.md, establishing the expected layout new integrations must mirror
 
 ### Siblings
-- [MCPDirectoryLayout](./MCPDirectoryLayout.md) -- integrations/mcp-server-semantic-analysis/docs/architecture/README.md, agents.md, integration.md, and tools.md confirm a dedicated architecture subdirectory with multiple focused documents rather than a single monolithic file
+- [MCPDirectoryLayout](./MCPDirectoryLayout.md) -- integrations/semantic-analysis/docs/architecture/README.md, agents.md, integration.md, and tools.md confirm a dedicated architecture subdirectory with multiple focused documents rather than a single monolithic file
 
 
 ---

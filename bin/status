@@ -26,7 +26,7 @@ async function showDetailedStatus() {
     console.log(`\n📊 Current Status: ${output.trim()}`);
     
     // Get constraint details
-    const constraintOutput = execSync('node ./integrations/mcp-constraint-monitor/src/status/constraint-status-line.js', {
+    const constraintOutput = execSync('node ./integrations/constraint-monitor/src/status/constraint-status-line.js', {
       encoding: 'utf8',
       timeout: 5000,
       cwd: rootDir
@@ -44,7 +44,7 @@ async function showDetailedStatus() {
     
     // Auto-open dashboard
     console.log('\n🚀 Opening dashboard...');
-    execSync(`"${join(rootDir, 'integrations/mcp-constraint-monitor/bin/dashboard')}"`, {
+    execSync(`"${join(rootDir, 'integrations/constraint-monitor/bin/dashboard')}"`, {
       stdio: 'inherit',
       timeout: 10000,
       cwd: rootDir

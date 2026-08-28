@@ -22,9 +22,9 @@
 
 The Continuous Learning Knowledge System is an agent-agnostic framework that extracts, stores, and retrieves knowledge from coding sessions. It learns from your development conversations and makes that knowledge available for future sessions.
 
-**Important**: This system **complements** the [MCP Semantic Analysis Server](../integrations/mcp-semantic-analysis.md) (14-agent system). They are **NOT parallel implementations** but work together:
+**Important**: This system **complements** the [Semantic Analysis Server](../integrations/semantic-analysis.md) (14-agent system). They are **NOT parallel implementations** but work together:
 
-- **MCP Semantic Analysis**: Deep, on-demand code analysis with 14 specialized agents
+- **Semantic Analysis**: Deep, on-demand code analysis with 14 specialized agents
 - **Continuous Learning**: Real-time session learning with budget control and privacy-first architecture
 
 See [System Comparison](system-comparison.md) for detailed comparison and how they work together.
@@ -40,7 +40,7 @@ See [System Comparison](system-comparison.md) for detailed comparison and how th
 
 ### System Components
 
-**Note**: This is a **complementary system** to the [MCP Semantic Analysis Server](../integrations/mcp-semantic-analysis.md). See [System Comparison](system-comparison.md) for details on how they work together.
+**Note**: This is a **complementary system** to the [Semantic Analysis Server](../integrations/semantic-analysis.md). See [System Comparison](system-comparison.md) for details on how they work together.
 
 ![Continuous Learning System Architecture](../images/continuous-learning-architecture.png)
 

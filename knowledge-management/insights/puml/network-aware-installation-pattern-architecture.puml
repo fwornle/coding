@@ -25,7 +25,7 @@ package "NetworkAwareInstallationPattern Architecture" {
     package "Source Components" {
         component "src/knowledge-management" <<core>> as SrcKM
         component "lib/ukb-unified" <<core>> as LibUKB
-        component "integrations/mcp-server-semantic-analysis/src" <<core>> as IntMCP
+        component "integrations/semantic-analysis/src" <<core>> as IntMCP
     }
     
     ' Relationships

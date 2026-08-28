@@ -6,7 +6,7 @@ The GitHistoryAnalyzer class uses the BaseAgent pattern from base-agent.ts to st
 
 ## What It Is  
 
-The **GitHistoryAnalyzer** is a sub‑component that lives inside the *SemanticAnalysis* module of the codebase. Its implementation can be found in the files that import the `GitHistory` class from `integrations/mcp-server-semantic-analysis/src/git-history.ts` and the `BaseAgent` utilities from `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. At a high level, the analyzer consumes raw Git commit data, enriches the resulting observations with entity‑level metadata, classifies those observations against the shared ontology, and finally flags any entities that have become stale. By pre‑populating metadata fields and using a shared `nextIndex` counter, the component is able to hand off work to idle workers instantly, keeping the overall pipeline responsive.
+The **GitHistoryAnalyzer** is a sub‑component that lives inside the *SemanticAnalysis* module of the codebase. Its implementation can be found in the files that import the `GitHistory` class from `integrations/semantic-analysis/src/git-history.ts` and the `BaseAgent` utilities from `integrations/semantic-analysis/src/agents/base-agent.ts`. At a high level, the analyzer consumes raw Git commit data, enriches the resulting observations with entity‑level metadata, classifies those observations against the shared ontology, and finally flags any entities that have become stale. By pre‑populating metadata fields and using a shared `nextIndex` counter, the component is able to hand off work to idle workers instantly, keeping the overall pipeline responsive.
 
 ## Architecture and Design  
 
@@ -35,7 +35,7 @@ Before any heavy processing begins, the analyzer **pre‑populates entity metada
 * **Entity Staleness Detection** – Results from the staleness algorithm feed into the `KnowledgeGraph` component, which may prune or de‑prioritize stale nodes.  
 * **Pipeline DAG** – Though not directly mentioned in the observations, sibling components such as `Pipeline` use a DAG‑based execution model. The analyzer’s tasks, identified by the `nextIndex` counter, become nodes in that DAG, allowing the pipeline to respect explicit `depends_on` relationships defined in `batch-analysis.yaml`.
 
-All imports are relative to the `integrations/mcp-server-semantic-analysis/src/` directory, ensuring that the analyzer remains tightly coupled to the semantic‑analysis codebase while still being modular enough to be swapped out or extended.
+All imports are relative to the `integrations/semantic-analysis/src/` directory, ensuring that the analyzer remains tightly coupled to the semantic‑analysis codebase while still being modular enough to be swapped out or extended.
 
 ## Usage Guidelines  
 
@@ -78,7 +78,7 @@ By adhering to these practices, developers preserve the consistency that the Bas
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a multi-agent system architecture, which allows for the integration of various agents, each with its own specific responsibilities. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is responsible for classifying observations against the ontology system. This agent follows the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) pattern, which standardizes agent behavior and response envelope creation. The use of this pattern ensures consistency across all agents, making it easier for new developers to understand and contribute to the codebase.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a multi-agent system architecture, which allows for the integration of various agents, each with its own specific responsibilities. For instance, the OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) is responsible for classifying observations against the ontology system. This agent follows the BaseAgent (integrations/semantic-analysis/src/agents/base-agent.ts) pattern, which standardizes agent behavior and response envelope creation. The use of this pattern ensures consistency across all agents, making it easier for new developers to understand and contribute to the codebase.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges

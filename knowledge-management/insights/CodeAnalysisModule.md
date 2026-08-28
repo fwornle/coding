@@ -40,7 +40,7 @@ All of these steps are orchestrated synchronously inside `parseCodeRepository`, 
 
 - **Child – GraphDatabaseAdapter** – The adapter is the only direct child of the CodeAnalysisModule.  It abstracts away the specifics of Graphology and LevelDB, presenting a simple `saveGraph(data: GraphJSON)` method.  This encapsulation allows the CodeAnalysisModule to remain agnostic of the underlying storage technology.  
 
-- **External Consumers** – Downstream agents such as `CodeGraphAgent` (found in `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) read the persisted graphs to provide semantic analysis services to external clients.  Because the graph format is standardised across the system, these agents can query code entities, ontology relationships, and NLP‑derived annotations without bespoke adapters.  
+- **External Consumers** – Downstream agents such as `CodeGraphAgent` (found in `integrations/semantic-analysis/src/agents/code-graph-agent.ts`) read the persisted graphs to provide semantic analysis services to external clients.  Because the graph format is standardised across the system, these agents can query code entities, ontology relationships, and NLP‑derived annotations without bespoke adapters.  
 
 ## Usage Guidelines  
 
@@ -84,7 +84,7 @@ All of these steps are orchestrated synchronously inside `parseCodeRepository`, 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence, which allows for automatic JSON export sync with Graphology and LevelDB. This design choice enables efficient storage and retrieval of graph data, facilitating the construction of knowledge graphs. For instance, the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) leverages this adapter to store and retrieve code analysis results, which are then used to construct the knowledge graph. Furthermore, the use of Graphology and LevelDB provides a robust and scalable storage solution, allowing the KnowledgeManagement component to handle large amounts of data.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence, which allows for automatic JSON export sync with Graphology and LevelDB. This design choice enables efficient storage and retrieval of graph data, facilitating the construction of knowledge graphs. For instance, the CodeGraphAgent (integrations/semantic-analysis/src/agents/code-graph-agent.ts) leverages this adapter to store and retrieve code analysis results, which are then used to construct the knowledge graph. Furthermore, the use of Graphology and LevelDB provides a robust and scalable storage solution, allowing the KnowledgeManagement component to handle large amounts of data.
 
 ### Children
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The CodeAnalysisModule utilizes the GraphDatabaseAdapter to store and retrieve code analysis results in the graph database, as mentioned in the parent context.

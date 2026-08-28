@@ -8,7 +8,7 @@ llm-mock-service.ts maintains backward compatibility by reading a legacy boolean
 
 ## What It Is
 
-LLMStateManager is a SubComponent implemented within `llm-mock-service.ts`, residing under the `LLMAbstraction` parent component in the broader `integrations/mcp-server-semantic-analysis/` codebase. It is responsible for resolving and persisting the operational mode that determines how LLM calls are routed across the three supported modes (mock, local, public). Rather than holding state in memory or environment variables, it externalizes state to a JSON file at `.data/workflow-progress.json`, which it reads at invocation time on every call to `getLLMState()`.
+LLMStateManager is a SubComponent implemented within `llm-mock-service.ts`, residing under the `LLMAbstraction` parent component in the broader `integrations/semantic-analysis/` codebase. It is responsible for resolving and persisting the operational mode that determines how LLM calls are routed across the three supported modes (mock, local, public). Rather than holding state in memory or environment variables, it externalizes state to a JSON file at `.data/workflow-progress.json`, which it reads at invocation time on every call to `getLLMState()`.
 
 The component exposes a small, focused API surface centered on three functions in `llm-mock-service.ts`: `getLLMState()` for resolution, `setAgentLLMMode()` for per-agent overrides, and `setGlobalLLMMode()` for project-wide defaults. Together these implement a layered priority system where per-agent overrides win over global mode, which in turn overrides a hardcoded fallback of `'public'`. This makes the LLMStateManager the authoritative source of truth for "which mode is active right now, for this caller" within the LLMAbstraction layer.
 
@@ -34,9 +34,9 @@ The `setGlobalLLMMode()` function writes the project-wide default into a single 
 
 ## Integration Points
 
-LLMStateManager is contained by `LLMAbstraction`, which uses it to make routing decisions before dispatching LLM calls to one of its provider adapters. Among LLMStateManager's siblings, `PublicProviderAdapter` (located under `integrations/mcp-server-semantic-analysis/src/providers/`) represents one of the concrete provider implementations whose selection depends entirely on the mode resolved here. The relationship is unidirectional: LLMStateManager produces a mode value, and adapters like `PublicProviderAdapter` are activated as a consequence.
+LLMStateManager is contained by `LLMAbstraction`, which uses it to make routing decisions before dispatching LLM calls to one of its provider adapters. Among LLMStateManager's siblings, `PublicProviderAdapter` (located under `integrations/semantic-analysis/src/providers/`) represents one of the concrete provider implementations whose selection depends entirely on the mode resolved here. The relationship is unidirectional: LLMStateManager produces a mode value, and adapters like `PublicProviderAdapter` are activated as a consequence.
 
-The other sibling, `TierRouter` (documented in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`), operates on an orthogonal axis — it selects model tiers based on task complexity, whereas LLMStateManager selects modes based on agent/global configuration. The two compose cleanly: a caller first consults LLMStateManager to know which mode (mock/local/public) is active, then consults `TierRouter` to know which model tier within that mode to target.
+The other sibling, `TierRouter` (documented in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`), operates on an orthogonal axis — it selects model tiers based on task complexity, whereas LLMStateManager selects modes based on agent/global configuration. The two compose cleanly: a caller first consults LLMStateManager to know which mode (mock/local/public) is active, then consults `TierRouter` to know which model tier within that mode to target.
 
 LLMStateManager's two children, `ModeResolutionChain` and `AgentModeOverrideStore`, are the internal building blocks rather than external integration points. `ModeResolutionChain` encodes the read-side traversal logic of `getLLMState()`, while `AgentModeOverrideStore` encodes the write-side semantics of `setAgentLLMMode()`. Both are anchored in the same `.data/workflow-progress.json` file, which is the de facto integration contract: any tool or process that wants to influence LLM routing simply writes to this file using the agreed-upon schema.
 
@@ -61,8 +61,8 @@ Finally, recognize that the file-based persistence model means every call to `ge
 - [AgentModeOverrideStore](./AgentModeOverrideStore.md) -- setAgentLLMMode writes a keyed entry into .data/workflow-progress.json whose key identifies the agent and whose value is the chosen mode; getLLMState in llm-mock-service.ts looks up this key before consulting the global mode field, establishing agent entries as the highest-priority tier.
 
 ### Siblings
-- [PublicProviderAdapter](./PublicProviderAdapter.md) -- Provider implementations are located under integrations/mcp-server-semantic-analysis/src/providers/, one adapter per cloud provider as implied by the three-mode architecture
-- [TierRouter](./TierRouter.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md defines the tiered model selection strategy, distinguishing tiers by task complexity so that lightweight tasks avoid expensive frontier models
+- [PublicProviderAdapter](./PublicProviderAdapter.md) -- Provider implementations are located under integrations/semantic-analysis/src/providers/, one adapter per cloud provider as implied by the three-mode architecture
+- [TierRouter](./TierRouter.md) -- integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md defines the tiered model selection strategy, distinguishing tiers by task complexity so that lightweight tasks avoid expensive frontier models
 
 
 ---

@@ -9,7 +9,7 @@ The presence of the GraphDatabaseAdapter in the ContentValidationAgent suggests 
 The **ContentValidationAgentIntegration** lives at the intersection of two concrete code artifacts in the repository: the **ContentValidationAgent** implementation located in  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+integrations/semantic-analysis/src/agents/content-validation-agent.ts
 ```  
 
 and the **GraphDatabaseAdapter**, which is referenced from that file. The observation that *“The GraphDatabaseAdapter is used by the ContentValidationAgent”* tells us that the integration is not a loose, optional plug‑in but a deliberately wired component that enables the agent to query or mutate a graph database as part of its validation workflow. In other words, **ContentValidationAgentIntegration** is the logical coupling that allows the validation logic to reach out to the underlying graph store through the adapter abstraction.
@@ -81,7 +81,7 @@ The **ContentValidationAgentIntegration** sits between the **ContentValidationAg
 ## Hierarchy Context
 
 ### Parent
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts
 
 ---
 

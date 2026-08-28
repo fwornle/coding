@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
+The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/semantic-analysis/src/agents/entity-validator.ts file.
 
 ## What It Is  
 
 **EntityValidationRules** is the concrete collection of validation logic that powers the **EntityValidator**. The validator lives in the **SemanticAnalysis** subsystem of the MCP server and is implemented in the file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts
+integrations/semantic-analysis/src/agents/entity-validator.ts
 ```  
 
 Within that file the **EntityValidator** holds a reference to **EntityValidationRules**, which encapsulate the “pre‑defined rules” used to inspect and certify the structural and semantic integrity of an entity’s content. Although the source of `entity-validator.ts` is not provided in full, the observation that the validator “utilizes a set of predefined rules” makes it clear that **EntityValidationRules** is the rule‑engine component that the validator invokes during its processing pipeline.
@@ -101,7 +101,7 @@ The diagram above illustrates the parent‑child relationship and the direction 
 ## Hierarchy Context
 
 ### Parent
-- [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
+- [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/semantic-analysis/src/agents/entity-validator.ts file.
 
 ---
 

@@ -6,7 +6,7 @@ The use of Graphology and LevelDB provides a scalable and efficient knowledge st
 
 ## What It Is
 
-- CollectiveKnowledge is implemented across src/knowledge-management, lib/ukb-unified, and integrations/mcp-server-semantic-analysis/src
+- CollectiveKnowledge is implemented across src/knowledge-management, lib/ukb-unified, and integrations/semantic-analysis/src
 
 - Available commands include vkb for visualization and graph-sync for data synchronization
 

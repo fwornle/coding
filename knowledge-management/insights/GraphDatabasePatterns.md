@@ -9,5 +9,5 @@
 - The integrations/copi/docs/DELETE-WORKSPACES-README.md file uses environment variables for configuring the deletion script.
 - The integrations/copi/docs/SEND-VULNERABILITY-EMAILS.md file uses environment variables for configuring email notifications.
 - The integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md file uses environment variables for configuring the status line.
-- The integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md file uses graph database patterns for constraint detection.
-- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file uses graph database patterns for constraint configuration.
+- The integrations/constraint-monitor/docs/semantic-constraint-detection.md file uses graph database patterns for constraint detection.
+- The integrations/constraint-monitor/docs/constraint-configuration.md file uses graph database patterns for constraint configuration.

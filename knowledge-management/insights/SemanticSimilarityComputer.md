@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-`integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` and `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md` both document semantic constraint detection workflows that rely on similarity scoring, showing that downstream consumers depend on a stable, centralized similarity API matching what `src/agents/semantic-analyzer.ts` provides
+`integrations/constraint-monitor/docs/semantic-constraint-detection.md` and `integrations/constraint-monitor/docs/semantic-detection-design.md` both document semantic constraint detection workflows that rely on similarity scoring, showing that downstream consumers depend on a stable, centralized similarity API matching what `src/agents/semantic-analyzer.ts` provides
 
 ## What It Is  
 
@@ -14,8 +14,8 @@ src/agents/semantic-analyzer.ts
 
 The same file also hosts the embedding generation and token‑ization logic, making similarity a first‑class responsibility of the analyzer rather than an after‑thought utility. Down‑stream services – for example the **MCP Constraint Monitor** – rely on the similarity scores produced here, as documented in  
 
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`  
-* `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md`  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md`  
+* `integrations/constraint-monitor/docs/semantic-detection-design.md`  
 
 These documents describe workflows that call a stable, centralized similarity API, confirming that **SemanticSimilarityComputer** is the single source of truth for all vector‑space distance calculations across the platform.
 

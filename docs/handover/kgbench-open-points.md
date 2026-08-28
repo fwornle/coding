@@ -362,7 +362,7 @@ not done. Revisit only if the floor starts climbing.
 cannot be answered in the run tree. Its subject code lives in the `graphify` git submodule,
 and `git worktree add` — how `createRunTree` builds the sandbox — does not populate
 submodules. A fresh worktree has **0 entries** in `integrations/graphify`,
-`integrations/mcp-server-semantic-analysis` and `lib/km-core`.
+`integrations/semantic-analysis` and `lib/km-core`.
 
 L1 asks which file defines `_corpus_signature`. It is at
 `integrations/graphify/graphify/detect.py:1252` in the live repo and appears NOWHERE in the

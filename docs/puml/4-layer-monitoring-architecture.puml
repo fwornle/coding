@@ -26,7 +26,7 @@ package "Layer 3: Monitoring Verifier" as Layer3 #E6FFE6 {
 
 package "Layer 4: Service-Level Self-Monitoring" as Layer4 #FFF0E6 {
   component [Enhanced Transcript Monitor] as ETM
-  component [MCP Constraint Monitor] as MCM
+  component [Constraint Monitor] as MCM
   component [Health Files] as HealthFiles
   note right of ETM : Individual Service Health\n• Health file generation\n• Self-restart capabilities\n• Real-time metrics
 }

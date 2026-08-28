@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-Each agent has its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts.
+Each agent has its own file, such as integrations/semantic-analysis/src/agents/ontology-classification-agent.ts.
 
 ## What It Is  
 
 The **Agents** sub‑component lives under the **SemanticAnalysis** module of the MCP server.  All source files are located in the directory  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/
+integrations/semantic-analysis/src/agents/
 ```  
 
 The cornerstone of this sub‑component is the `BaseAgent` class defined in `base‑agent.ts`.  Every concrete agent – for example `OntologyClassificationAgent` (`ontology‑classification‑agent.ts`), `InsightGenerationAgent` (`insight‑generation‑agent.ts`), and `SemanticAnalysisAgent` (`semantic‑analysis‑agent.ts`) – extends this base class.  The agents are therefore grouped together in a single folder, each with its own file, and they share common functionality supplied by `BaseAgent`, such as the creation of response envelopes and the calculation of confidence levels.
@@ -24,7 +24,7 @@ No other patterns (e.g., micro‑services, event‑driven messaging) are mention
 
 ## Implementation Details  
 
-`BaseAgent` (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`) encapsulates two core responsibilities:
+`BaseAgent` (`integrations/semantic-analysis/src/agents/base-agent.ts`) encapsulates two core responsibilities:
 
 1. **Response Envelope Creation** – a helper method (name not supplied but referenced) that builds the standardized wrapper object returned to callers.  By centralising this logic, every derived agent returns data in a uniform shape, simplifying downstream processing.
 
@@ -32,7 +32,7 @@ No other patterns (e.g., micro‑services, event‑driven messaging) are mention
 
 Concrete agents such as `OntologyClassificationAgent` (`ontology‑classification‑agent.ts`) and `InsightGenerationAgent` (`insight‑generation‑agent.ts`) extend `BaseAgent`.  Each file contains the agent’s specific business logic – for example, ontology classification or insight extraction – while relying on the inherited utilities for envelope construction and confidence scoring.  Because the agents share the same parent, they inherit any future enhancements made to `BaseAgent` automatically, ensuring consistent behavior across the sub‑component.
 
-The **agents directory** (`integrations/mcp-server-semantic-analysis/src/agents/`) therefore acts as a self‑contained package: it houses the abstract `BaseAgent` and all concrete implementations, making the codebase straightforward to explore and modify.
+The **agents directory** (`integrations/semantic-analysis/src/agents/`) therefore acts as a self‑contained package: it houses the abstract `BaseAgent` and all concrete implementations, making the codebase straightforward to explore and modify.
 
 ## Integration Points  
 
@@ -40,13 +40,13 @@ Agents are integrated into the broader **SemanticAnalysis** component, which orc
 
 Because each agent inherits from `BaseAgent`, they expose a common interface that the **SemanticAnalysis** parent can rely on.  This interface likely includes methods such as `run` or `process` (not explicitly named in the observations) together with the envelope‑creation and confidence utilities.  The agents therefore act as plug‑in modules: swapping one agent for another or adding a new one simply requires placing a new file in the `agents` folder that extends `BaseAgent`.
 
-No external libraries or services are mentioned, so the integration points are limited to internal imports within the `integrations/mcp-server-semantic-analysis` code tree.  The agents do not appear to depend on external APIs; they operate on data supplied by the pipeline or other components of **SemanticAnalysis**.
+No external libraries or services are mentioned, so the integration points are limited to internal imports within the `integrations/semantic-analysis` code tree.  The agents do not appear to depend on external APIs; they operate on data supplied by the pipeline or other components of **SemanticAnalysis**.
 
 ## Usage Guidelines  
 
 1. **Extend `BaseAgent`** – When creating a new agent, always subclass `BaseAgent`.  This guarantees that the new agent can generate response envelopes and compute confidence levels in the same manner as existing agents.
 
-2. **One File per Agent** – Follow the established convention of placing each concrete agent in its own file inside `integrations/mcp-server-semantic-analysis/src/agents/`.  Naming should mirror the existing pattern (`<purpose>-agent.ts`) to keep the directory discoverable.
+2. **One File per Agent** – Follow the established convention of placing each concrete agent in its own file inside `integrations/semantic-analysis/src/agents/`.  Naming should mirror the existing pattern (`<purpose>-agent.ts`) to keep the directory discoverable.
 
 3. **Leverage Shared Helpers** – Use the envelope‑creation utilities and `calculateConfidenceLevel` provided by `BaseAgent` rather than re‑implementing them.  If a specialized confidence algorithm is needed, override `calculateConfidenceLevel` while still calling `super` where appropriate.
 
@@ -87,12 +87,12 @@ No external libraries or services are mentioned, so the integration points are l
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component follows a modular architecture, with each agent, such as the OntologyClassificationAgent and SemanticAnalysisAgent, responsible for a specific task. This modularity is reflected in the code organization, with each agent having its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent class, defined in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, provides a standard way for all agents to create response envelopes and calculate confidence levels.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component follows a modular architecture, with each agent, such as the OntologyClassificationAgent and SemanticAnalysisAgent, responsible for a specific task. This modularity is reflected in the code organization, with each agent having its own file, such as integrations/semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent class, defined in integrations/semantic-analysis/src/agents/base-agent.ts, provides a standard way for all agents to create response envelopes and calculate confidence levels.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The batch processing pipeline uses a modular architecture, with each agent having its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file to classify ontologies.
-- [Insights](./Insights.md) -- The InsightGenerationAgent uses the integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts file to generate insights.
+- [Pipeline](./Pipeline.md) -- The batch processing pipeline uses a modular architecture, with each agent having its own file, such as integrations/semantic-analysis/src/agents/ontology-classification-agent.ts.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file to classify ontologies.
+- [Insights](./Insights.md) -- The InsightGenerationAgent uses the integrations/semantic-analysis/src/agents/insight-generation-agent.ts file to generate insights.
 
 ---
 

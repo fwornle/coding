@@ -270,7 +270,7 @@
       "label": "runCypherQuery caller query",
       "retired": {
         "on": "2026-08-05",
-        "why": "The question's premise is false, so there is no correct answer to grade. It asserts the Cypher path is gone; runCypherQuery still exists and still builds literal Cypher strings — integrations/mcp-server-semantic-analysis/src/services/cgr-query-cache.ts:233 constructs `MATCH (e)-[:CALLS]->(callee) ... RETURN DISTINCT callee.name`. Arms that produced that query were RIGHT and were scored 0; the arm that abstained was scored 1. Retired rather than deleted so the defect stays visible, and retired for a false premise — not for scoring badly, which would be selection. If reinstated it belongs in the lookup class, with the shim as the expected answer.",
+        "why": "The question's premise is false, so there is no correct answer to grade. It asserts the Cypher path is gone; runCypherQuery still exists and still builds literal Cypher strings — integrations/semantic-analysis/src/services/cgr-query-cache.ts:233 constructs `MATCH (e)-[:CALLS]->(callee) ... RETURN DISTINCT callee.name`. Arms that produced that query were RIGHT and were scored 0; the arm that abstained was scored 1. Retired rather than deleted so the defect stays visible, and retired for a false premise — not for scoring badly, which would be selection. If reinstated it belongs in the lookup class, with the shim as the expected answer.",
         "found_by": "T2 answers in run coding-v1-VOID-tool-escape"
       },
       "prompt": "What Cypher query does runCypherQuery execute to find callers of a symbol? Reply with the query, or state clearly that this no longer exists.",

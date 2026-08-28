@@ -2,20 +2,20 @@
 
 **Type:** Detail
 
-The document lives alongside architecture and configuration references in integrations/mcp-server-semantic-analysis/docs/, suggesting it is a design-phase artifact intended to guide both the YAML schema and the agent initialization sequence described in docs/architecture/agents.md.
+The document lives alongside architecture and configuration references in integrations/semantic-analysis/docs/, suggesting it is a design-phase artifact intended to guide both the YAML schema and the agent initialization sequence described in docs/architecture/agents.md.
 
 ## What It Is  
 
 **TieredModelProposal** is the formal design artifact that defines how the MCP‑Server’s semantic‑analysis service selects an LLM provider based on a *tier rank*. The proposal lives in the source tree at  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md
+integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md
 ```  
 
 and is paired with the runtime configuration file  
 
 ```
-integrations/mcp-server-semantic-analysis/llm-providers.yaml
+integrations/semantic-analysis/llm-providers.yaml
 ```  
 
 The markdown document captures the *escalation criteria*—the conditions that cause the routing layer to move a request from a lower‑cost tier (e.g., a fast, inexpensive model) to a higher‑capability tier (e.g., a more accurate but costlier model). The proposal is a child of the **LLMTierRoutingPattern** component, which orchestrates the tier‑based routing logic across the server. The design outlined in the proposal also informs the agent‑initialization sequence described in `docs/architecture/agents.md`, ensuring that agents are instantiated with the appropriate provider according to the tier decision.
@@ -45,7 +45,7 @@ Because the design is documented alongside other architecture artifacts (`docs/a
    * `capabilities` – flags (e.g., `supports_function_calls`, `max_context`) that the routing layer can query.  
 
 2. **LLMTierRoutingPattern**  
-   The routing pattern is realized by a class (or set of functions) named **LLMTierRouter** located in the server’s routing package (e.g., `integrations/mcp-server-semantic-analysis/src/router/llm_tier_router.py`). Its responsibilities include:
+   The routing pattern is realized by a class (or set of functions) named **LLMTierRouter** located in the server’s routing package (e.g., `integrations/semantic-analysis/src/router/llm_tier_router.py`). Its responsibilities include:
    * Loading `llm-providers.yaml` at initialization.  
    * Building a sorted list of tier objects based on the `tier` rank.  
    * Exposing a method `select_provider(request)` that:
@@ -76,7 +76,7 @@ Because the design is documented alongside other architecture artifacts (`docs/a
 
 * **Observability** – Metrics collection (e.g., `tier_selection_counter`, `escalation_latency_histogram`) is hooked into the router to surface how often escalations occur and which tiers are most frequently used. These metrics feed back into the design loop for adjusting tier thresholds.
 
-* **Testing Harness** – Integration tests located under `integrations/mcp-server-semantic-analysis/tests/` mock `llm-providers.yaml` with multiple tier scenarios and assert that the router respects the escalation predicates defined in the proposal.
+* **Testing Harness** – Integration tests located under `integrations/semantic-analysis/tests/` mock `llm-providers.yaml` with multiple tier scenarios and assert that the router respects the escalation predicates defined in the proposal.
 
 ---
 
@@ -124,7 +124,7 @@ Because the design is documented alongside other architecture artifacts (`docs/a
 
 The design is **highly maintainable** because:
 
-* **Documentation‑code alignment** – The markdown proposal, YAML schema, and router implementation are co‑located in the same `integrations/mcp-server-semantic-analysis/docs/` directory, encouraging synchronous updates.  
+* **Documentation‑code alignment** – The markdown proposal, YAML schema, and router implementation are co‑located in the same `integrations/semantic-analysis/docs/` directory, encouraging synchronous updates.  
 * **Clear contract** – Escalation criteria are expressed as named predicates, making it straightforward to add, remove, or modify rules.  
 * **Testability** – The router’s deterministic nature and isolated predicate functions lend themselves to unit and integration testing.  
 
@@ -134,7 +134,7 @@ Potential maintenance risk lies in **schema drift** between the proposal and `ll
 ## Hierarchy Context
 
 ### Parent
-- [LLMTierRoutingPattern](./LLMTierRoutingPattern.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md documents the formal proposal for tiered model selection, establishing the rationale and design that llm-providers.yaml implements
+- [LLMTierRoutingPattern](./LLMTierRoutingPattern.md) -- integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md documents the formal proposal for tiered model selection, establishing the rationale and design that llm-providers.yaml implements
 
 
 ---

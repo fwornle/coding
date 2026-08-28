@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file indicates that the CodingConventionEnforcer may leverage constraint configuration for enforcing coding conventions.
+The integrations/constraint-monitor/docs/constraint-configuration.md file indicates that the CodingConventionEnforcer may leverage constraint configuration for enforcing coding conventions.
 
 ## What It Is  
 
@@ -16,7 +16,7 @@ Key source‑level artifacts that define the enforcer’s behavior are:
 * `integrations/copi/STATUS.md` – describes the status‑reporting format emitted after a run.  
 * `integrations/copi/hooks.md` – documents the hook extension mechanism that lets projects plug in custom convention checks.  
 * `integrations/copi/MIGRATION.md` – guides users moving from legacy “custom hooks” to the newer “native hooks” model.  
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – reveals that the enforcer can consume the same constraint‑configuration format used by the sibling **ConstraintMonitor** component.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – reveals that the enforcer can consume the same constraint‑configuration format used by the sibling **ConstraintMonitor** component.  
 
 Together these files paint a picture of a command‑line utility that is configurable, extensible, and tightly coupled to the Copilot AI service for sophisticated code analysis.
 
@@ -28,7 +28,7 @@ The observations point to a **modular, plug‑in architecture**. The core enforc
 
 1. **Analysis/Formatting** – performed by the **GitHubCopilotIntegration** child component (see `integrations/copi/INSTALL.md`). This separation isolates the AI‑driven logic from the rest of the enforcer, making it possible to replace or disable Copilot without breaking the command‑line interface.  
 
-2. **Constraint Evaluation** – driven by the same constraint‑configuration schema used by the sibling **ConstraintMonitor** (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`). By re‑using this schema, the enforcer follows a **shared‑contract pattern**, ensuring that both components speak the same language when describing coding rules.
+2. **Constraint Evaluation** – driven by the same constraint‑configuration schema used by the sibling **ConstraintMonitor** (`integrations/constraint-monitor/docs/constraint-configuration.md`). By re‑using this schema, the enforcer follows a **shared‑contract pattern**, ensuring that both components speak the same language when describing coding rules.
 
 The **hook system** described in `integrations/copi/hooks.md` is an explicit **extension point**. Hooks are small scripts or modules that the enforcer calls at predefined stages (e.g., before analysis, after formatting). The presence of a migration guide (`MIGRATION.md`) indicates a **versioned API** for hooks: older “custom hooks” are being superseded by a more standardized “native hooks” interface, a classic **deprecation‑and‑migration pattern**.
 
@@ -124,14 +124,14 @@ The documentation‑first approach (rich markdown files) makes the enforcer’s 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a modular architecture, with separate modules for different coding patterns, as seen in the integrations/mcp-server-semantic-analysis/src/ directory. This modular structure allows for easier maintenance and updates of individual coding patterns without affecting the entire component. For example, the OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/ is responsible for ontology-based classification, and its implementation can be modified or extended without impacting other parts of the component. The use of a modular architecture also enables the component to scale more efficiently, as new coding patterns can be added or removed as needed.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a modular architecture, with separate modules for different coding patterns, as seen in the integrations/semantic-analysis/src/ directory. This modular structure allows for easier maintenance and updates of individual coding patterns without affecting the entire component. For example, the OntologyClassificationAgent in integrations/semantic-analysis/src/ is responsible for ontology-based classification, and its implementation can be modified or extended without impacting other parts of the component. The use of a modular architecture also enables the component to scale more efficiently, as new coding patterns can be added or removed as needed.
 
 ### Children
 - [GitHubCopilotIntegration](./GitHubCopilotIntegration.md) -- The integrations/copi/INSTALL.md file suggests the use of GitHub Copilot for code analysis and formatting, indicating a potential integration point.
 
 ### Siblings
 - [BestPracticeRepository](./BestPracticeRepository.md) -- The integrations/browser-access/README.md file suggests that the BestPracticeRepository may be used in conjunction with the Browser Access MCP Server.
-- [ConstraintMonitor](./ConstraintMonitor.md) -- The integrations/mcp-constraint-monitor/README.md file suggests that the ConstraintMonitor is responsible for monitoring and enforcing constraints.
+- [ConstraintMonitor](./ConstraintMonitor.md) -- The integrations/constraint-monitor/README.md file suggests that the ConstraintMonitor is responsible for monitoring and enforcing constraints.
 
 ---
 

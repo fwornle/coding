@@ -1,12 +1,12 @@
-[submodule "integrations/mcp-constraint-monitor"]
-	path = integrations/mcp-constraint-monitor
-	url = git@github.com:fwornle/mcp-constraint-monitor.git
+[submodule "integrations/constraint-monitor"]
+	path = integrations/constraint-monitor
+	url = git@github.com:fwornle/constraint-monitor.git
 [submodule "integrations/memory-visualizer"]
 	path = integrations/memory-visualizer
 	url = git@github.com:fwornle/memory-visualizer.git
-[submodule "integrations/mcp-server-semantic-analysis"]
-	path = integrations/mcp-server-semantic-analysis
-	url = git@github.com:fwornle/mcp-server-semantic-analysis.git
+[submodule "integrations/semantic-analysis"]
+	path = integrations/semantic-analysis
+	url = git@github.com:fwornle/semantic-analysis.git
 [submodule "integrations/serena"]
 	path = integrations/serena
 	url = https://github.com/oraios/serena.git

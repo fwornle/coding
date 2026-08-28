@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-Documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md, BaseAgent<TInput, TOutput> is described as a generic abstract class parameterized on input and output types, enforcing compile-time type safety across agents that handle different data shapes.
+Documented in integrations/semantic-analysis/docs/architecture/agents.md, BaseAgent<TInput, TOutput> is described as a generic abstract class parameterized on input and output types, enforcing compile-time type safety across agents that handle different data shapes.
 
 ## What It Is  
 
 **TypedAgentContract** is the compile‑time contract that underpins every concrete agent in the MCP Server semantic‑analysis subsystem. The contract lives inside the generic abstract class **`BaseAgent<TInput, TOutput>`**, which is documented in the architecture guide at  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
+integrations/semantic-analysis/docs/architecture/agents.md
 ```  
 
 By parameterising the base class with two type arguments—`TInput` for the data the agent consumes and `TOutput` for the data it produces—TypedAgentContract guarantees that each agent declares an explicit, type‑safe “in‑out” contract. The result is a heterogeneous agent pipeline where stages can operate on completely different data shapes while still sharing the common behaviour supplied by `BaseAgent`.

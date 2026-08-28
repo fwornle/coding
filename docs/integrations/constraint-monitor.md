@@ -1,6 +1,6 @@
-# MCP Constraint Monitor Integration
+# Constraint Monitor Integration
 
-**Component**: [mcp-constraint-monitor](../../integrations/mcp-constraint-monitor/)
+**Component**: [constraint-monitor](../../integrations/constraint-monitor/)
 **Type**: MCP Server + Dashboard + PreToolUse Hooks
 **Purpose**: Real-time code quality enforcement
 
@@ -26,7 +26,7 @@ Claude attempts tool call
          ↓
 PreToolUse Hook intercepts
          ↓
-Constraint Monitor evaluates (integrations/mcp-constraint-monitor)
+Constraint Monitor evaluates (integrations/constraint-monitor)
          ↓
     Violation? → YES → Block + error message
          ↓
@@ -50,7 +50,7 @@ Configured in `~/.claude/settings.json`:
       "matcher": "*",
       "hooks": [{
         "type": "command",
-        "command": "node /path/to/coding/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+        "command": "node /path/to/coding/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
       }]
     }]
   }
@@ -83,7 +83,7 @@ Constraints are enforced automatically on every tool call. No explicit usage req
 **Dashboard Access:**
 ```bash
 # Start dashboard (automatic with install)
-cd integrations/mcp-constraint-monitor
+cd integrations/constraint-monitor
 npm run dashboard  # Opens http://localhost:3030
 ```
 
@@ -134,7 +134,7 @@ curl http://localhost:3031/api/violations
 
 **Automated Testing:**
 ```bash
-cd integrations/mcp-constraint-monitor
+cd integrations/constraint-monitor
 node test-all-constraints-comprehensive.js
 ```
 
@@ -152,7 +152,7 @@ node collect-test-results.js  # Extracts evidence from LSL files
 
 For complete documentation, see:
 
-**[integrations/mcp-constraint-monitor/README.md](https://github.com/fwornle/mcp-constraint-monitor/blob/main/README.md)**
+**[integrations/constraint-monitor/README.md](https://github.com/fwornle/constraint-monitor/blob/main/README.md)**
 
 Topics covered:
 - Complete constraint definitions

@@ -2,12 +2,12 @@
 
 **Type:** Detail
 
-The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', which suggests that log formatting is a crucial aspect of this component.
+The Logger component is implemented in 'integrations/semantic-analysis/src/logging.ts', which suggests that log formatting is a crucial aspect of this component.
 
 ## What It Is  
 
 `LogFormatter` lives inside the **Logger** component whose implementation resides in  
-`integrations/mcp-server-semantic-analysis/src/logging.ts`.  The file name alone tells us that the **Logger** is the central place where all application‑level logging is performed, and that a dedicated formatter is bundled with it.  The purpose of `LogFormatter` is therefore to take raw log data—messages, timestamps, severity levels, and any contextual payload—and turn it into a consistent, human‑readable (or machine‑parseable) string before the data leaves the `Logger`.  Because the surrounding code mentions a **unified logging interface**, we can infer that every consumer of the logging subsystem receives log entries that have already been processed by `LogFormatter`, guaranteeing a single, predictable shape for all logs emitted from the MCP‑Server semantic‑analysis integration.
+`integrations/semantic-analysis/src/logging.ts`.  The file name alone tells us that the **Logger** is the central place where all application‑level logging is performed, and that a dedicated formatter is bundled with it.  The purpose of `LogFormatter` is therefore to take raw log data—messages, timestamps, severity levels, and any contextual payload—and turn it into a consistent, human‑readable (or machine‑parseable) string before the data leaves the `Logger`.  Because the surrounding code mentions a **unified logging interface**, we can infer that every consumer of the logging subsystem receives log entries that have already been processed by `LogFormatter`, guaranteeing a single, predictable shape for all logs emitted from the MCP‑Server semantic‑analysis integration.
 
 ## Architecture and Design  
 
@@ -27,7 +27,7 @@ Interaction is straightforward: a consumer calls a method on `Logger` (e.g., `lo
 
 ## Implementation Details  
 
-The only concrete implementation artifact we have is the file path `integrations/mcp-server-semantic-analysis/src/logging.ts`.  Inside this module we can expect to find at least two exported members:
+The only concrete implementation artifact we have is the file path `integrations/semantic-analysis/src/logging.ts`.  Inside this module we can expect to find at least two exported members:
 
 1. **`Logger`** – the public class or object exposing methods such as `debug`, `info`, `warn`, `error`.  
 2. **`LogFormatter`** – either a class, a static utility, or a set of functions that the `Logger` imports and invokes.
@@ -73,7 +73,7 @@ The `Logger` itself likely depends on lower‑level transport libraries (Node’
 ## Hierarchy Context
 
 ### Parent
-- [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
+- [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/semantic-analysis/src/logging.ts', providing a unified logging interface.
 
 ---
 

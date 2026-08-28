@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The ConstraintManager could be related to the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, which relies on the GraphDatabaseAdapter.
+The ConstraintManager could be related to the ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts, which relies on the GraphDatabaseAdapter.
 
 ## What It Is  
 
-The **ConstraintManager** is the core sub‑component of the **ConstraintSystem** that orchestrates the definition, storage, and evaluation of constraints applied to entity content. Although the exact source file is not listed, the observations point to a likely implementation file named `constraint-manager.ts`. Its primary responsibilities are to persist constraint definitions using the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) and to validate incoming data against those definitions, a role that mirrors the behavior of the **ContentValidationAgent** found in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`. By residing under the **ConstraintSystem**, the manager inherits the system‑wide persistence strategy (Graphology + LevelDB) and collaborates closely with sibling components such as **ViolationLogger** (which records any rule breaches) and **HookOrchestrator** (which may trigger additional processing when constraints change).
+The **ConstraintManager** is the core sub‑component of the **ConstraintSystem** that orchestrates the definition, storage, and evaluation of constraints applied to entity content. Although the exact source file is not listed, the observations point to a likely implementation file named `constraint-manager.ts`. Its primary responsibilities are to persist constraint definitions using the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) and to validate incoming data against those definitions, a role that mirrors the behavior of the **ContentValidationAgent** found in `integrations/semantic-analysis/src/agents/content-validation-agent.ts`. By residing under the **ConstraintSystem**, the manager inherits the system‑wide persistence strategy (Graphology + LevelDB) and collaborates closely with sibling components such as **ViolationLogger** (which records any rule breaches) and **HookOrchestrator** (which may trigger additional processing when constraints change).
 
 ![ConstraintManager — Architecture](images/constraint-manager-architecture.png)
 
@@ -42,7 +42,7 @@ A **separation‑of‑concerns** pattern is evident. Persistence logic lives exc
 
 1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – The sole persistence gateway. All CRUD operations for constraints flow through this adapter, guaranteeing that the underlying Graphology + LevelDB stack remains consistent.  
 
-2. **ContentValidationAgent (`integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`)** – Consumes the same constraint graph to validate incoming entity payloads. The manager and the agent share the adapter, ensuring that validation always reflects the latest persisted rules.  
+2. **ContentValidationAgent (`integrations/semantic-analysis/src/agents/content-validation-agent.ts`)** – Consumes the same constraint graph to validate incoming entity payloads. The manager and the agent share the adapter, ensuring that validation always reflects the latest persisted rules.  
 
 3. **ViolationLogger** – Receives violation payloads from the manager. By centralizing logging, the system can aggregate, filter, and route constraint breaches uniformly across the platform.  
 
@@ -92,7 +92,7 @@ A **separation‑of‑concerns** pattern is evident. Persistence logic lives exc
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and manage constraints in a graph database, utilizing Graphology and LevelDB for efficient data storage and retrieval. The adapter also features automatic JSON export sync, allowing for seamless data exchange between the graph database and other components. For example, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, relies on the GraphDatabaseAdapter to retrieve and validate entity content against configured rules.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and manage constraints in a graph database, utilizing Graphology and LevelDB for efficient data storage and retrieval. The adapter also features automatic JSON export sync, allowing for seamless data exchange between the graph database and other components. For example, the ContentValidationAgent, located in integrations/semantic-analysis/src/agents/content-validation-agent.ts, relies on the GraphDatabaseAdapter to retrieve and validate entity content against configured rules.
 
 ### Siblings
 - [HookOrchestrator](./HookOrchestrator.md) -- The HookOrchestrator might be related to the Copi project in integrations/copi, which has documentation on hook functions and usage.

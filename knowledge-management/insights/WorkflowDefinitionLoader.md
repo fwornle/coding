@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file suggests the presence of constraint configuration, which might be related to workflow definitions.
+The integrations/constraint-monitor/docs/constraint-configuration.md file suggests the presence of constraint configuration, which might be related to workflow definitions.
 
 ## What It Is  
 
 **WorkflowDefinitionLoader** is the component responsible for bringing workflow definitions into the system so that they can be executed by the **WorkflowManager**. According to the hierarchy context, the loader lives inside the *WorkflowManager* package and is invoked whenever the manager needs to initialise or refresh its catalogue of workflows. The only concrete location that references a related concern is the markdown file  
 
 ```
-integrations/mcp-constraint-monitor/docs/constraint-configuration.md
+integrations/constraint-monitor/docs/constraint-configuration.md
 ```  
 
 which documents constraint‑configuration settings that are likely consumed by the loader when it parses a definition file or queries a database. No concrete source files (e.g., `WorkflowDefinitionLoader.java` or `workflow_definition_loader.py`) were found in the supplied snapshot, but the surrounding documentation makes it clear that the loader is the bridge between raw definition artefacts (YAML/JSON files, DB rows, etc.) and the in‑memory representation used by **WorkflowManager**.
@@ -47,7 +47,7 @@ Although no concrete symbols were discovered, the surrounding documentation allo
 
 2. **Parser / Deserializer** – given the raw payload (YAML, JSON, or a DB record), this component transforms the data into the internal **WorkflowDefinition** model. The parser would be tightly coupled to the schema expected by the manager, ensuring that required fields (id, steps, transitions) are present.  
 
-3. **Constraint Engine** – leveraging the information in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, the loader would invoke a validation step that checks each definition against the declared constraints (e.g., mandatory step ordering, prohibited transitions). Errors detected here would be surfaced as loader‑time exceptions, preventing malformed workflows from entering the system.  
+3. **Constraint Engine** – leveraging the information in `integrations/constraint-monitor/docs/constraint-configuration.md`, the loader would invoke a validation step that checks each definition against the declared constraints (e.g., mandatory step ordering, prohibited transitions). Errors detected here would be surfaced as loader‑time exceptions, preventing malformed workflows from entering the system.  
 
 4. **Registry Updater** – once a definition passes validation, it is handed back to the **WorkflowManager**, which stores it in an internal map keyed by workflow identifier. This map is then used at runtime to instantiate workflow instances.  
 
@@ -62,7 +62,7 @@ The loader sits at the intersection of three system concerns:
 | Integration | Direction | Evidence |
 |-------------|-----------|----------|
 | **WorkflowManager** (parent) | Calls loader to obtain definitions; receives populated workflow catalogue | “WorkflowManager contains WorkflowDefinitionLoader” |
-| **Constraint‑monitor** (sibling) | Reads constraint rules from `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` to validate definitions | Presence of constraint‑configuration markdown |
+| **Constraint‑monitor** (sibling) | Reads constraint rules from `integrations/constraint-monitor/docs/constraint-configuration.md` to validate definitions | Presence of constraint‑configuration markdown |
 | **Configuration / Persistence Layer** (external) | Pulls raw definition artefacts from files or a database as dictated by the manager’s configuration | “loads workflow definitions from a configuration file or database” |
 
 No explicit APIs are listed, but we can safely assume that the loader exposes at least one public method such as `loadDefinitions()` or `refresh()` that returns a collection of `WorkflowDefinition` objects or throws a `DefinitionLoadException` on failure. The manager likely invokes this during its own initialization sequence.

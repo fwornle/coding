@@ -8,7 +8,7 @@ The existence of this guard is architecturally coupled to the execute(input) ent
 
 ## What It Is
 
-`EnsureLLMInitializedGuard` describes the `ensureLLMInitialized()` method documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, which serves as the deferred LLM client allocation point for `BaseAgent` subclasses. It is a guard method that enforces the architectural mandate prohibiting LLM client instantiation in constructors, providing instead a controlled, idempotent pathway for resource acquisition.
+`EnsureLLMInitializedGuard` describes the `ensureLLMInitialized()` method documented in `integrations/semantic-analysis/docs/architecture/agents.md`, which serves as the deferred LLM client allocation point for `BaseAgent` subclasses. It is a guard method that enforces the architectural mandate prohibiting LLM client instantiation in constructors, providing instead a controlled, idempotent pathway for resource acquisition.
 
 As a child element of `AgentLifecyclePatterns`, this guard represents the second of two well-defined phases in the agent lifecycle. Where its sibling `BaseAgentConstructorContract` governs the configuration-capture phase (accepting only `repoPath` and `team`), `EnsureLLMInitializedGuard` governs the runtime resource-allocation phase that occurs lazily on first substantive use.
 
@@ -31,7 +31,7 @@ The core mechanic is the idempotency check at the top of `ensureLLMInitialized()
 
 The guard is architecturally coupled to the `execute(input)` entry point of `BaseAgent` subclasses. Since `execute()` implicitly depends on LLM readiness, `ensureLLMInitialized()` functions as a prerequisite that must be invoked — either directly at the start of `execute()` or indirectly through any LLM-backed helper — before any LLM operation can proceed. This means every implementation path that ultimately touches the LLM must traverse the guard.
 
-Because no code symbols are surfaced for this entity, the contract is documentary rather than enforced by interface signatures. The behavioral contract — "must check, then allocate if needed, then mark initialized" — is established in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` and must be honored by each `BaseAgent` subclass implementer.
+Because no code symbols are surfaced for this entity, the contract is documentary rather than enforced by interface signatures. The behavioral contract — "must check, then allocate if needed, then mark initialized" — is established in `integrations/semantic-analysis/docs/architecture/agents.md` and must be honored by each `BaseAgent` subclass implementer.
 
 ## Integration Points
 
@@ -41,7 +41,7 @@ Because no code symbols are surfaced for this entity, the contract is documentar
 - **`execute(input)` entry point**: This is the de facto invocation site for the guard. The execute method is the public surface through which substantive agent work begins, and its implicit dependency on LLM readiness makes `ensureLLMInitialized()` a mandatory prerequisite.
 - **`AgentLifecyclePatterns` (parent)**: The guard is one of the canonical patterns documented under this umbrella in `agents.md`, alongside the constructor contract.
 
-The integration is enforced through convention and documentation rather than through compile-time interface constraints, so adherence depends on developers respecting the patterns described in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.
+The integration is enforced through convention and documentation rather than through compile-time interface constraints, so adherence depends on developers respecting the patterns described in `integrations/semantic-analysis/docs/architecture/agents.md`.
 
 ## Usage Guidelines
 
@@ -58,16 +58,16 @@ The lazy allocation pattern is particularly beneficial in scenarios with large n
 
 ### Maintainability Assessment
 
-Because the contract is enforced documentarily rather than through type-system constraints, the long-term maintainability of this pattern depends on developer discipline and on `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` remaining the authoritative reference. The clear two-phase lifecycle — cheap construction, lazy initialization — is easy to reason about and review, but new subclass implementations should be audited to confirm they honor both the constructor contract and the guard invocation discipline. Centralizing allocation in `ensureLLMInitialized()` reduces the surface area where lifecycle violations can occur, making code review tractable.
+Because the contract is enforced documentarily rather than through type-system constraints, the long-term maintainability of this pattern depends on developer discipline and on `integrations/semantic-analysis/docs/architecture/agents.md` remaining the authoritative reference. The clear two-phase lifecycle — cheap construction, lazy initialization — is easy to reason about and review, but new subclass implementations should be audited to confirm they honor both the constructor contract and the guard invocation discipline. Centralizing allocation in `ensureLLMInitialized()` reduces the surface area where lifecycle violations can occur, making code review tractable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [AgentLifecyclePatterns](./AgentLifecyclePatterns.md) -- BaseAgent subclasses documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md all follow a constructor(repoPath, team) signature that captures only configuration context, explicitly forbidding any LLM client instantiation at this stage.
+- [AgentLifecyclePatterns](./AgentLifecyclePatterns.md) -- BaseAgent subclasses documented in integrations/semantic-analysis/docs/architecture/agents.md all follow a constructor(repoPath, team) signature that captures only configuration context, explicitly forbidding any LLM client instantiation at this stage.
 
 ### Siblings
-- [BaseAgentConstructorContract](./BaseAgentConstructorContract.md) -- As documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md, every BaseAgent subclass must accept exactly two constructor parameters — repoPath and team — establishing a uniform configuration-capture interface across all agent implementations.
+- [BaseAgentConstructorContract](./BaseAgentConstructorContract.md) -- As documented in integrations/semantic-analysis/docs/architecture/agents.md, every BaseAgent subclass must accept exactly two constructor parameters — repoPath and team — establishing a uniform configuration-capture interface across all agent implementations.
 
 
 ---

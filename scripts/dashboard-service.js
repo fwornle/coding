@@ -16,7 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const CODING_REPO = process.env.CODING_REPO || join(__dirname, '..');
-const DASHBOARD_DIR = join(CODING_REPO, 'integrations/mcp-constraint-monitor/dashboard');
+const DASHBOARD_DIR = join(CODING_REPO, 'integrations/constraint-monitor/dashboard');
 const PORT = process.env.CONSTRAINT_DASHBOARD_PORT || 3030;
 
 console.log(`[Dashboard Service] Starting on port ${PORT}...`);

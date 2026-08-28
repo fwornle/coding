@@ -2,16 +2,16 @@
 
 **Type:** SubComponent
 
-The execute(input, context) pattern provides a flexible and extensible way for detecting and monitoring constraints, as seen in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
+The execute(input, context) pattern provides a flexible and extensible way for detecting and monitoring constraints, as seen in integrations/constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
 **ConstraintDetection** is the sub‑component that lives inside the **CodingPatterns** hierarchy and is responsible for *detecting* and *monitoring* code‑level constraints. Its implementation is documented in the Markdown files under the **mcp‑constraint‑monitor** integration:
 
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – describes the `execute(input, context)` entry point used for constraint detection.  
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – details how constraints are configured and how the same `execute` pattern is applied for flexible monitoring.
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – describes the `execute(input, context)` entry point used for constraint detection.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – details how constraints are configured and how the same `execute` pattern is applied for flexible monitoring.
 
-The sub‑component consumes graph data via the **GraphDatabaseAdapter** (found in `storage/graph-database-adapter.ts`) and collaborates with the **CodeGraphConstructor** (see `integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`). When a constraint violation is identified, it emits alerts and notifications, giving downstream tooling a concise view of the code‑base’s constraint health.
+The sub‑component consumes graph data via the **GraphDatabaseAdapter** (found in `storage/graph-database-adapter.ts`) and collaborates with the **CodeGraphConstructor** (see `integrations/semantic-analysis/src/agent/code-graph-agent.ts`). When a constraint violation is identified, it emits alerts and notifications, giving downstream tooling a concise view of the code‑base’s constraint health.
 
 ![ConstraintDetection — Architecture](images/constraint-detection-architecture.png)
 
@@ -49,10 +49,10 @@ The public API is a single function, likely exported as `execute(input, context)
 Inside `execute`, the component calls into **GraphDatabaseAdapter** (implemented in `storage/graph-database-adapter.ts`). This adapter supplies methods such as `getNode(id)`, `getNeighbors(node)`, and transactional read/write helpers. By leveraging Graphology’s in‑memory graph model together with LevelDB persistence, the detection logic can perform fast traversals over code relationships (e.g., inheritance, imports, API contracts).
 
 ### Constraint Evaluation  
-The concrete rules live in the **ConstraintConfiguration** child. The configuration file (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) defines which constraints are active, their severity, and any thresholds. During execution, the detector iterates over the configuration, queries the graph for the relevant patterns, and evaluates each rule. When a rule fails, an alert object is constructed and handed off to the **LoggingAndMonitoring** sibling (which buffers and flushes logs asynchronously, per its description).
+The concrete rules live in the **ConstraintConfiguration** child. The configuration file (`integrations/constraint-monitor/docs/constraint-configuration.md`) defines which constraints are active, their severity, and any thresholds. During execution, the detector iterates over the configuration, queries the graph for the relevant patterns, and evaluates each rule. When a rule fails, an alert object is constructed and handed off to the **LoggingAndMonitoring** sibling (which buffers and flushes logs asynchronously, per its description).
 
 ### Collaboration with CodeGraphConstructor  
-The **CodeGraphConstructor** (in `integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts`) builds the underlying code graph that **ConstraintDetection** later queries. The constructor invokes **ConstraintDetection** after the graph is materialized, ensuring that constraints are checked against the latest representation of the codebase.
+The **CodeGraphConstructor** (in `integrations/semantic-analysis/src/agent/code-graph-agent.ts`) builds the underlying code graph that **ConstraintDetection** later queries. The constructor invokes **ConstraintDetection** after the graph is materialized, ensuring that constraints are checked against the latest representation of the codebase.
 
 ---
 
@@ -78,7 +78,7 @@ All interactions are mediated through well‑defined interfaces (the `execute` f
 
 1. **Invoke via the `execute` method** – Always pass a fully‑formed `input` object that includes the target code entity identifiers and any supplemental metadata required by the constraints. The `context` should contain a logger instance and, if needed, a cancellation token for long‑running scans.  
 
-2. **Configure constraints declaratively** – Edit the files described in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` to add, remove, or adjust constraint rules. Because the configuration is read at runtime, no recompilation is necessary.  
+2. **Configure constraints declaratively** – Edit the files described in `integrations/constraint-monitor/docs/constraint-configuration.md` to add, remove, or adjust constraint rules. Because the configuration is read at runtime, no recompilation is necessary.  
 
 3. **Ensure the graph is up‑to‑date** – Run the **CodeGraphConstructor** (or the associated pipeline in the **CodeGraphAnalysis** sibling) before calling `execute`. Stale graph data will lead to false positives or missed violations.  
 
@@ -124,14 +124,14 @@ Potential maintenance challenges include the risk of the `execute` function beco
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's architecture is heavily influenced by the GraphDatabaseAdapter class in storage/graph-database-adapter.ts, which provides methods for creating, reading, and manipulating graph data. This class utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval. The CodeGraphConstructor sub-component, as seen in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts, relies on the GraphDatabaseAdapter for constructing and analyzing code graphs. This tightly coupled relationship between the GraphDatabaseAdapter and CodeGraphConstructor enables the efficient creation and analysis of code graphs.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component's architecture is heavily influenced by the GraphDatabaseAdapter class in storage/graph-database-adapter.ts, which provides methods for creating, reading, and manipulating graph data. This class utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval. The CodeGraphConstructor sub-component, as seen in integrations/semantic-analysis/src/agent/code-graph-agent.ts, relies on the GraphDatabaseAdapter for constructing and analyzing code graphs. This tightly coupled relationship between the GraphDatabaseAdapter and CodeGraphConstructor enables the efficient creation and analysis of code graphs.
 
 ### Children
-- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file outlines the constraint configuration guide, providing insight into how constraints are set up and monitored.
+- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/constraint-monitor/docs/constraint-configuration.md file outlines the constraint configuration guide, providing insight into how constraints are set up and monitored.
 
 ### Siblings
 - [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseAdapter in storage/graph-database-adapter.ts utilizes Graphology and LevelDB for persistence, ensuring efficient data storage and retrieval.
-- [CodeGraphAnalysis](./CodeGraphAnalysis.md) -- The CodeGraphConstructor in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts relies on the GraphDatabaseAdapter for constructing and analyzing code graphs.
+- [CodeGraphAnalysis](./CodeGraphAnalysis.md) -- The CodeGraphConstructor in integrations/semantic-analysis/src/agent/code-graph-agent.ts relies on the GraphDatabaseAdapter for constructing and analyzing code graphs.
 - [LoggingAndMonitoring](./LoggingAndMonitoring.md) -- The LoggingAndMonitoring sub-component uses async log buffering and flushing for logging and monitoring.
 - [ProviderRegistration](./ProviderRegistration.md) -- The ProviderRegistration sub-component uses the ProviderRegistry class for registering new providers.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG sub-component is a graph-based RAG system for any codebases, as seen in integrations/code-graph-rag/README.md.

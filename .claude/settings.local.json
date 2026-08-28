@@ -505,7 +505,7 @@
       "Bash(cp /tmp/55-coding-parity/unified-entity-detail.png tests/e2e/unified-viewer/55-fixtures/expected-vokb-screenshots/unified-coding-entity-detail-2026-06-10b.png)",
       "Bash(/usr/bin/cat .data/knowledge-graph/exports/coding.json)",
       "Bash(/usr/bin/grep -n -E \"general\\\\.json|coding\\\\.json|exportToGraphology|graphology|relations\" scripts/observations-api-server.mjs)",
-      "Bash(/usr/bin/grep -rn \"api/v1/relations\\\\|'/relations'\\\\|\\\\\"relations\\\\\"\" scripts/observations-api-server.mjs integrations/mcp-server-semantic-analysis/dist scripts/)",
+      "Bash(/usr/bin/grep -rn \"api/v1/relations\\\\|'/relations'\\\\|\\\\\"relations\\\\\"\" scripts/observations-api-server.mjs integrations/semantic-analysis/dist scripts/)",
       "Bash(/usr/bin/grep -rln \"12436\\\\|OBS_API_PORT\" scripts/ launchd/ ~/Library/LaunchAgents/com.coding.obs-api.plist)",
       "Bash(/usr/bin/awk '/observations|obs-api/ && !/awk|grep/')",
       "Bash(/usr/bin/grep -i \"obs-api\\\\|coding\")",
@@ -514,7 +514,7 @@
       "Bash(/usr/bin/grep -n \"general\\\\.json\\\\|coding\\\\.json\\\\|exports/\" scripts/observations-api-server.mjs)",
       "Bash(/usr/bin/grep -rln \"v1/relations\\\\|api/v1/entities\" scripts/)",
       "Bash(/usr/bin/grep -n -E \"GraphKMStore|km-core|resolveEntities|loadGraph|LevelDB|leveldb|graph\\\\.|store\\\\.|kmStore\" scripts/observations-api-server.mjs)",
-      "Bash(/usr/bin/grep -rn \"relations\\\\|relationships\\\\|/api/v1\" integrations/mcp-server-semantic-analysis/dist/km-core/)",
+      "Bash(/usr/bin/grep -rn \"relations\\\\|relationships\\\\|/api/v1\" integrations/semantic-analysis/dist/km-core/)",
       "Bash(/usr/bin/find . -name \"km-core\" -type d)",
       "Bash(/usr/bin/grep -rn \"listRelations\\\\|getRelations\\\\|getEdges\\\\|relations\\\\\\(\\\\\\)\\\\|forEachEdge\" lib/km-core/dist/)",
       "Bash(/usr/bin/grep -n \"class GraphKMStore\\\\|async list\\\\|async get\\\\|async forEach\\\\|async query\" lib/km-core/dist/GraphKMStore.js)",
@@ -609,7 +609,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
+            "command": "node /Users/Q284340/Agentic/coding/integrations/constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
           }
         ]
       }
@@ -619,7 +619,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /Users/Q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+            "command": "node /Users/Q284340/Agentic/coding/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
           }
         ]
       }

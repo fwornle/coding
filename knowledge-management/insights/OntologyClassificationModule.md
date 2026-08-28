@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-OntologyClassificationModule relies on the constraint configuration guide in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
+OntologyClassificationModule relies on the constraint configuration guide in integrations/constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
-The **OntologyClassificationModule** lives inside the **KnowledgeManagement** component and is the engine that assigns semantic classifications to incoming entities. It draws on the central **OntologySystem** to evaluate an entity’s declared type and its associated properties, producing a structured classification that downstream services can consume. The module’s behavior is governed by the constraint definitions found in the **integrations/mcp-constraint-monitor/docs/constraint-configuration.md** file, ensuring that only entities meeting the prescribed rules are accepted into the knowledge graph. Once classified, the module hands the results off to the **GraphDatabaseModule** for persistence and later retrieval, and it also supplies the classified payload to the **InsightGenerationModule**, which turns the raw classifications into higher‑level insights. Throughout this pipeline the **UtilitiesModule** provides the UKB trace report, a diagnostic artifact that records each processing step for auditability.
+The **OntologyClassificationModule** lives inside the **KnowledgeManagement** component and is the engine that assigns semantic classifications to incoming entities. It draws on the central **OntologySystem** to evaluate an entity’s declared type and its associated properties, producing a structured classification that downstream services can consume. The module’s behavior is governed by the constraint definitions found in the **integrations/constraint-monitor/docs/constraint-configuration.md** file, ensuring that only entities meeting the prescribed rules are accepted into the knowledge graph. Once classified, the module hands the results off to the **GraphDatabaseModule** for persistence and later retrieval, and it also supplies the classified payload to the **InsightGenerationModule**, which turns the raw classifications into higher‑level insights. Throughout this pipeline the **UtilitiesModule** provides the UKB trace report, a diagnostic artifact that records each processing step for auditability.
 
 ---
 
@@ -15,7 +15,7 @@ The **OntologyClassificationModule** lives inside the **KnowledgeManagement** co
 OntologyClassificationModule is built as a **modular, pipeline‑oriented component** that sits between raw data ingestion and downstream knowledge‑graph services.  Its design follows a clear **separation‑of‑concerns** strategy:
 
 1. **Classification Layer** – leverages the OntologySystem to map entity types and properties to ontology concepts.  
-2. **Constraint Layer** – consults the constraint‑configuration guide ( `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` ) to enforce business rules before an entity is admitted.  
+2. **Constraint Layer** – consults the constraint‑configuration guide ( `integrations/constraint-monitor/docs/constraint-configuration.md` ) to enforce business rules before an entity is admitted.  
 3. **Persistence Layer** – delegates storage and query responsibilities to the GraphDatabaseModule, which itself uses the GraphDatabaseAdapter described in the KnowledgeManagement parent component.  
 4. **Insight Layer** – forwards classified data to InsightGenerationModule, which enriches it with actionable observations.  
 
@@ -41,7 +41,7 @@ Although the source repository does not expose concrete class or function names 
 
 * **Constraint configuration** – before persisting a classification, the module reads the **constraint‑configuration.md** document. The file enumerates allowed type‑property combinations, required fields, and any business‑logic limits. By parsing this markdown at startup (or on‑demand), the module can enforce rules without recompilation.  
 
-* **GraphDatabaseModule interaction** – once an entity passes validation, the module invokes GraphDatabaseModule’s storage APIs. Because GraphDatabaseModule relies on the **GraphDatabaseAdapter** (implemented in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`), OntologyClassificationModule indirectly benefits from the adapter’s automatic JSON export sync and LevelDB/Graphology consistency guarantees.  
+* **GraphDatabaseModule interaction** – once an entity passes validation, the module invokes GraphDatabaseModule’s storage APIs. Because GraphDatabaseModule relies on the **GraphDatabaseAdapter** (implemented in `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`), OntologyClassificationModule indirectly benefits from the adapter’s automatic JSON export sync and LevelDB/Graphology consistency guarantees.  
 
 * **InsightGenerationModule hand‑off** – the classified entity payload is forwarded to InsightGenerationModule, which uses the same UKB trace report (from UtilitiesModule) to enrich its output with provenance data.  
 
@@ -71,7 +71,7 @@ Developers integrating new entity sources should ensure that those sources produ
 
 ## Usage Guidelines  
 
-* **Keep the constraint configuration up‑to‑date** – before deploying new entity types, edit `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` to reflect the allowed property sets. This avoids runtime rejections and keeps validation logic transparent to non‑engineers.  
+* **Keep the constraint configuration up‑to‑date** – before deploying new entity types, edit `integrations/constraint-monitor/docs/constraint-configuration.md` to reflect the allowed property sets. This avoids runtime rejections and keeps validation logic transparent to non‑engineers.  
 
 * **Leverage the UKB trace report** – when debugging classification failures, consult the trace attached to the entity. It pinpoints whether the failure occurred during ontology lookup, constraint validation, or persistence.  
 
@@ -98,7 +98,7 @@ By adhering to the guidelines above and respecting the documented integration co
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
 
 ### Siblings
 - [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the migrateGraphDatabase script in scripts/migrate-graph-db-entity-types.js to update entity types in the live LevelDB/Graphology database.

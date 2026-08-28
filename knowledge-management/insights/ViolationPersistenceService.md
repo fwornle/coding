@@ -2,16 +2,16 @@
 
 **Type:** SubComponent
 
-The ViolationPersistenceService follows a semantic constraint detection approach, as described in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
+The ViolationPersistenceService follows a semantic constraint detection approach, as described in integrations/constraint-monitor/docs/semantic-constraint-detection.md
 
 ## What It Is  
 
 The **ViolationPersistenceService** is a sub‑component of the `ConstraintSystem` that is responsible for persisting, formatting, and presenting violation records produced by the semantic constraint detection pipeline. Its implementation lives inside the *mcp‑constraint‑monitor* integration – the primary documentation for the service is found in the following paths:  
 
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – describes the graph‑database persistence mechanism it employs.  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – outlines the semantic detection approach that generates the violations it stores.  
-* `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – defines the exact record format and the batch‑processing strategy used when writing to the store.  
-* `integrations/mcp-constraint-monitor/dashboard/README.md` – details the dashboard UI that visualises the stored violations.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – describes the graph‑database persistence mechanism it employs.  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – outlines the semantic detection approach that generates the violations it stores.  
+* `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – defines the exact record format and the batch‑processing strategy used when writing to the store.  
+* `integrations/constraint-monitor/dashboard/README.md` – details the dashboard UI that visualises the stored violations.  
 
 In the component hierarchy, `ConstraintSystem` **contains** the `ViolationPersistenceService`, and the service **contains** a child component called `ViolationStorage` that encapsulates the low‑level data‑access logic.
 
@@ -23,9 +23,9 @@ The architecture of `ViolationPersistenceService` is deliberately aligned with t
 
 Two architectural approaches are evident from the observations:
 
-1. **Graph‑Database Persistence** – The service writes violation records into a graph database, as described in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. This choice enables rich relationship modeling between violations, constraints, and the content artifacts they reference, facilitating downstream queries and impact analysis.
+1. **Graph‑Database Persistence** – The service writes violation records into a graph database, as described in `integrations/constraint-monitor/docs/constraint-configuration.md`. This choice enables rich relationship modeling between violations, constraints, and the content artifacts they reference, facilitating downstream queries and impact analysis.
 
-2. **Batch Processing** – Violation records are accumulated and persisted in batches, a technique documented in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Batching reduces the number of write transactions against the graph store, improving throughput and minimizing contention under high‑volume validation runs.
+2. **Batch Processing** – Violation records are accumulated and persisted in batches, a technique documented in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Batching reduces the number of write transactions against the graph store, improving throughput and minimizing contention under high‑volume validation runs.
 
 The service also adopts a **semantic constraint detection** model (`semantic-constraint-detection.md`) that produces violations based on meaning‑level analysis rather than simple syntactic checks. This higher‑level detection feeds richer violation data into the persistence pipeline, which the dashboard (`dashboard/README.md`) then renders for operators.
 
@@ -55,7 +55,7 @@ Although the source repository does not expose explicit class or function names 
 
 3. **HookConfigurationManager** – The `HookConfigLoader` (`lib/agent-api/hooks/hook-config.js`) merges hook configurations that may include parameters governing the batch size, persistence toggles, or format versions for the CLAUDE‑CODE‑HOOK. These configuration values flow into the `ViolationPersistenceService` at start‑up, influencing how it processes and stores violations.
 
-4. **Dashboard** – The UI component located under `integrations/mcp-constraint-monitor/dashboard/` reads from the same graph store. It expects violation records to conform to the CLAUDE‑CODE‑HOOK format, allowing it to render tables, graphs, and drill‑down views without additional transformation.
+4. **Dashboard** – The UI component located under `integrations/constraint-monitor/dashboard/` reads from the same graph store. It expects violation records to conform to the CLAUDE‑CODE‑HOOK format, allowing it to render tables, graphs, and drill‑down views without additional transformation.
 
 5. **ConstraintSystem (Parent)** – As the container, `ConstraintSystem` orchestrates the lifecycle of `ViolationPersistenceService`. It likely initializes the service during system boot, injects the required configuration, and may expose health‑check endpoints that monitor the service’s ability to write to the graph database.
 
@@ -116,15 +116,15 @@ Overall, the **ViolationPersistenceService** exemplifies a focused, well‑docum
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
 
 ### Children
 - [ViolationStorage](./ViolationStorage.md) -- The ViolationPersistenceService is mentioned in the context of the ConstraintSystem, implying a tight integration with the system's core functionality.
 
 ### Siblings
-- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis.
+- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis.
 - [HookConfigurationManager](./HookConfigurationManager.md) -- The HookConfigLoader in lib/agent-api/hooks/hook-config.js loads and merges hook configurations from user-level and project-level sources.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts
 
 ---
 
