@@ -314,6 +314,39 @@ The proxy logs the same string on every request:
 4. **Read the log line.** `fallbackFrom` in the response body and the `[<failure_class>]` tag
    in the log say exactly why the chain advanced.
 
+### After the fact: what routing actually did
+
+`/resolve` answers what routing *would* do. For what it *did*, every `token_usage` row
+carries the decision that produced it — `route_key`, `route_band`, `route_step`,
+`offloaded_from`, `chain_position` (0 = the route's own provider served it, >0 = that many
+fallback hops in) and `attempt_trail`, a JSON record of the candidates that failed or were
+never tried. The trail stores error *classes*, never messages.
+
+```bash
+curl -s 'localhost:12435/api/llm/routing/behaviour?hours=24' | jq
+```
+
+It returns per-route call/token counts split by the provider that actually served, the
+fallback edges that were really taken with their error classes, the skipped candidates
+separated into `config` (fix by editing a YAML file) and `runtime` (fix by a login or a
+VPN), and the reasons the semantic offload declined to move work.
+
+The dashboard renders all of it at **Token Usage → Routing** — configuration and observed
+behaviour side by side, with a per-call table whose rows expand into the full trail. That
+tab is read-only; editing stays in **Token Usage → Settings**.
+
+Two things to know when reading those numbers:
+
+- **`routing_source`.** `live` was observed at dispatch. `backfill` was reconstructed
+  afterwards by `scripts/backfill-routing-decisions.mjs`, which resolves against *today's*
+  config and is therefore wrong wherever routing has since changed. Reconstructed rows are
+  badged in the UI and only ever carry `route_key`/`route_band`/`route_step` — the
+  fallback and offload fields are genuinely unrecoverable and are left empty rather than
+  filled with a plausible zero.
+- **`unrecorded_calls`.** Rows predating the columns entirely. They are excluded from every
+  figure rather than counted as "went to plan", and the count is reported so you can see
+  what share of the window the percentages actually cover.
+
 ---
 
 ## What this replaced

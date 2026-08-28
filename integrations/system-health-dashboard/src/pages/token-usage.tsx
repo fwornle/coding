@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { RefreshCw, Zap, TrendingUp, Clock, ArrowUpDown, Settings } from 'lucide-react'
 import { TokenUsageSettingsDialog } from './token-usage-settings-dialog'
+import { TokenUsageRoutingTab } from './token-usage-routing-tab'
 import { normalizeProvider, getProviderColor } from '@/lib/providers'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -670,6 +671,7 @@ export function TokenUsagePage() {
           <TabsTrigger value="evolution">Evolution</TabsTrigger>
           <TabsTrigger value="cost">Cost</TabsTrigger>
           <TabsTrigger value="recent">Recent Calls</TabsTrigger>
+          <TabsTrigger value="routing">Routing</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab - Treemap + Provider pie */}
@@ -1010,6 +1012,13 @@ export function TokenUsagePage() {
         {/* Cost Tab - €/$ cost, budgets, burn-rate, optimization controls */}
         <TabsContent value="cost">
           <CostTab proxyBase={PROXY_BASE} />
+        </TabsContent>
+
+        {/* Routing Tab — configuration AND observed behaviour, read-only.
+            Editing stays in the Settings dialog: this is where you find out what
+            the system is doing, that is where you change it. */}
+        <TabsContent value="routing" className="mt-4">
+          <TokenUsageRoutingTab proxyBase={PROXY_BASE} hours={hoursWindow} />
         </TabsContent>
 
         {/* Recent Calls Tab */}
