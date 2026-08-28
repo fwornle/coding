@@ -62,11 +62,26 @@ interface FallbackCandidate {
   when: { network?: string[] } | null
 }
 
+/**
+ * The offload policy. When enabled, work whose resolved band is in offloadBands
+ * is served by localProvider instead of the provider its route names — so it
+ * silently changes which provider answers a large share of calls, which is
+ * exactly why it needs to be visible and switchable here rather than only in
+ * the YAML.
+ */
+interface SemanticRouting {
+  enabled: boolean
+  localProvider: string | null
+  offloadBands: string[]
+  requireNetwork: string | null
+}
+
 interface RoutingData {
   paths: { routing: string; fallback: string }
   providers: ProviderInfo[]
   routes: Record<string, RouteEntry>
   defaults: Record<string, RouteEntry>
+  semanticRouting: SemanticRouting
   fallback: {
     chains: Record<string, FallbackCandidate[]>
     retryOn: string[]
@@ -104,6 +119,7 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
   const [routeDraft, setRouteDraft] = useState<Record<string, RouteEntry>>({})
   const [defaultDraft, setDefaultDraft] = useState<Record<string, RouteEntry>>({})
   const [fallbackDraft, setFallbackDraft] = useState<RoutingData['fallback'] | null>(null)
+  const [semanticDraft, setSemanticDraft] = useState<SemanticRouting | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -121,6 +137,11 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
         setRouteDraft({ ...d.routes })
         setDefaultDraft({ ...d.defaults })
         setFallbackDraft(JSON.parse(JSON.stringify(d.fallback)))
+        // Tolerate a proxy that predates the semanticRouting field rather than
+        // rendering an empty panel from `undefined`.
+        setSemanticDraft(d.semanticRouting
+          ? { ...d.semanticRouting }
+          : { enabled: false, localProvider: null, offloadBands: [], requireNetwork: null })
       })
       .catch(e => setError(`Failed to load routing config: ${e.message}`))
       .finally(() => setLoading(false))
@@ -161,9 +182,16 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
     [data, fallbackDraft],
   )
 
+  const semanticChanged = useMemo(
+    () => !!data && !!semanticDraft
+      && JSON.stringify(data.semanticRouting ?? null) !== JSON.stringify(semanticDraft),
+    [data, semanticDraft],
+  )
+
   const dirty = Object.keys(changedRoutes).length > 0
     || Object.keys(changedDefaults).length > 0
     || fallbackChanged
+    || semanticChanged
 
   const save = async () => {
     if (!data || !fallbackDraft) return
@@ -177,6 +205,7 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
           ...(Object.keys(changedRoutes).length ? { routes: changedRoutes } : {}),
           ...(Object.keys(changedDefaults).length ? { defaults: changedDefaults } : {}),
           ...(fallbackChanged ? { fallback: fallbackDraft } : {}),
+          ...(semanticChanged ? { semanticRouting: semanticDraft } : {}),
         }),
       })
       if (!res.ok) {
@@ -327,6 +356,77 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
                   )
                 })}
               </div>
+
+              {/* Semantic offload. Placed ABOVE the route tables because it
+                  overrides them: when it is on, the provider column below is not
+                  what answers a small-band call. Reading the tables without
+                  knowing this switch's state gives you the wrong answer. */}
+              {semanticDraft && (
+                <div className={`rounded border px-3 py-2.5 space-y-2 ${semanticChanged ? 'bg-amber-500/10 border-amber-500/40' : 'bg-muted/30'}`}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="accent-primary"
+                        checked={semanticDraft.enabled}
+                        onChange={e => setSemanticDraft(s => s && ({ ...s, enabled: e.target.checked }))}
+                      />
+                      Semantic offload
+                    </label>
+                    {semanticDraft.localProvider && (
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        → {semanticDraft.localProvider}
+                      </Badge>
+                    )}
+                    {semanticDraft.requireNetwork && (
+                      <Badge
+                        variant={data.runtime.network === semanticDraft.requireNetwork ? 'default' : 'outline'}
+                        className="text-[10px]"
+                        title={
+                          data.runtime.network === semanticDraft.requireNetwork
+                            ? 'The live network sensor satisfies the guard — offload is in force.'
+                            : `Guard not satisfied: this policy only applies on the ${semanticDraft.requireNetwork} network, and the sensor currently reads ${data.runtime.network}.`
+                        }
+                      >
+                        {semanticDraft.requireNetwork} only
+                        {data.runtime.network !== semanticDraft.requireNetwork && ' — not active now'}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Serves work in the selected bands from{' '}
+                    <span className="font-mono">{semanticDraft.localProvider || 'the local provider'}</span>{' '}
+                    instead of the provider each route names below, inserting that route's own
+                    provider as the first fallback. Routes marked <span className="font-mono">offload: false</span>{' '}
+                    — where the model that answers <em>is</em> the measurement — never move.
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap text-xs">
+                    <span className="text-muted-foreground">Bands:</span>
+                    {BANDS.map(b => (
+                      <label key={b} className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="accent-primary"
+                          checked={semanticDraft.offloadBands.includes(b)}
+                          disabled={!semanticDraft.enabled}
+                          onChange={e => setSemanticDraft(s => s && ({
+                            ...s,
+                            offloadBands: e.target.checked
+                              ? [...s.offloadBands, b]
+                              // Keep the file's own order rather than click order,
+                              // so toggling a band twice is a no-op in the diff.
+                              : s.offloadBands.filter(x => x !== b),
+                          }))}
+                        />
+                        <span className={semanticDraft.enabled ? 'font-mono' : 'font-mono opacity-50'}>{b}</span>
+                        <span className="text-muted-foreground">
+                          ({modelFor(providers, semanticDraft.localProvider || '', b)})
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <RouteTable
                 title="Foreground — your conversation with a coding agent"
