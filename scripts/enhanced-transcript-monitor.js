@@ -4562,7 +4562,7 @@ ORDER BY m.time_created ASC;`;
           // be treated as "intentional stop" and leave the project unmonitored.)
           if (this.intervalId) clearInterval(this.intervalId);
           if (this.healthIntervalId) clearInterval(this.healthIntervalId);
-          await this.stop({ setStopMarker: false, announceStop: false });
+          await this.stop({ setStopMarker: false, announceStop: false, reason: 'idle-timeout' });
           process.exit(ETM_EXIT_RELAUNCH);
         }
       }
@@ -4693,8 +4693,8 @@ ORDER BY m.time_created ASC;`;
     }, this.config.checkInterval);
 
     // Graceful shutdown
-    const shutdown = async () => {
-      console.log('\n🛑 Stopping enhanced transcript monitor...');
+    const shutdown = async (signalName = 'unknown') => {
+      console.log(`\n🛑 Stopping enhanced transcript monitor (${signalName})...`);
       
       // Complete any pending user prompt set
       if (this.currentUserPromptSet.length > 0) {
@@ -4719,17 +4719,23 @@ ORDER BY m.time_created ASC;`;
       // These happen when tmux sessions are killed, machine sleeps, Docker restarts, etc.
       // The coordinator should be free to restart the monitor for active sessions.
       // Only explicit user-initiated stops (coding --stop) should set the marker.
-      await this.stop({ setStopMarker: false });
+      await this.stop({ setStopMarker: false, reason: `signal:${signalName}` });
       process.exit(0);
     };
 
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
+    // Bind the signal name so the stop reason names the actual signal rather
+    // than being inferred later from an ambiguous log line.
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
   }
 
   /**
    * Stop monitoring
    * @param {Object} [options]
+   * @param {string} [options.reason='unspecified'] - Why we are stopping, logged
+   *   verbatim. Callers MUST pass one: the setStopMarker:false branch is shared by
+   *   idle-timeout, signal and auto-restart shutdowns, which are indistinguishable
+   *   in the log without it.
    * @param {boolean} [options.setStopMarker=true] - Whether to set stop marker in PSM.
    *   Set to false for idle timeout exits so PSM can restart the monitor.
    *   Set to true for intentional stops (SIGINT/SIGTERM) to prevent restart loops.
@@ -4753,7 +4759,7 @@ ORDER BY m.time_created ASC;`;
    *   here (a signal means the tmux session closed; an idle exit does not).
    */
   async stop(options = {}) {
-    const { setStopMarker = true, announceStop = true } = options;
+    const { setStopMarker = true, announceStop = true, reason = 'unspecified' } = options;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -4783,7 +4789,17 @@ ORDER BY m.time_created ASC;`;
         this.debug(`Failed to set stop marker: ${error.message}`);
       }
     } else if (!setStopMarker) {
-      this.debug('⏰ Idle timeout exit — skipping stop marker so PSM can restart');
+      // `reason` is REQUIRED reading before trusting this line. It used to read
+      // "⏰ Idle timeout exit" unconditionally, but this branch is taken by every
+      // setStopMarker:false caller — idle timeout, SIGTERM/SIGINT, and the
+      // auto-restart-on-code-change watcher. A SIGTERM shutdown therefore logged
+      // an idle timeout that never happened, and the genuine idle path's own
+      // "Idle timeout reached: no transcript activity" line (written to stderr
+      // just before it calls stop) is the only way to tell them apart. That cost
+      // real time during the 2026-08-27 crash-loop investigation: the log said
+      // "idle", launchd said "exit code 0", and the two only reconcile once you
+      // notice the idle path exits 70, not 0.
+      this.debug(`⏸ Stop (${reason}) — skipping stop marker so PSM can restart`);
     }
 
     // Unregister service from Process State Manager
@@ -5007,6 +5023,16 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
     
     console.log('🔄 Starting historical transcript reprocessing...');
     console.log(`📁 Target project: ${targetProject}`);
+
+    // Declared HERE, not inside the DISABLED block below. Both of these used to
+    // live inside that /* ... */ comment, while the summary code at the end of
+    // this function still referenced them — so `--reprocess` / `--batch` threw
+    // `ReferenceError: historyDir is not defined` before printing its summary.
+    // Commenting out a span silently takes its declarations with it; eslint
+    // no-undef is what catches it (the daemon path never touches this function,
+    // so nothing else would).
+    const historyDir = path.join(targetProject, '.specstory', 'history');
+    const codingPath = HOST_CODING_PATH;
     
     // CRITICAL FIX: NEVER delete existing LSL files from CLOSED sessions!
     // LSL files are immutable historical records once the session window closes.
@@ -5026,7 +5052,7 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
 
     /* DISABLED - DANGEROUS CODE THAT VIOLATED IMMUTABILITY:
     // Clear existing session files for clean regeneration
-    const historyDir = path.join(targetProject, '.specstory', 'history');
+    // (historyDir / codingPath are declared live above)
     if (fs.existsSync(historyDir)) {
       const sessionFiles = fs.readdirSync(historyDir).filter(file =>
         file.includes('-session') && file.endsWith('.md')
@@ -5039,7 +5065,6 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
     }
 
     // Also clear redirected session files in coding project if different
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
     if (targetProject !== codingPath) {
       const codingHistoryDir = path.join(codingPath, '.specstory', 'history');
       if (fs.existsSync(codingHistoryDir)) {
@@ -5188,7 +5213,7 @@ async function main() {
         './timezone-utils.js',
         './classification-logger.js'
       ],
-      cleanupFn: () => monitor.stop({ setStopMarker: false, announceStop: false }),
+      cleanupFn: () => monitor.stop({ setStopMarker: false, announceStop: false, reason: 'auto-restart:code-change' }),
       logger: (msg) => monitor.debug(msg)
     });
   } catch (error) {
