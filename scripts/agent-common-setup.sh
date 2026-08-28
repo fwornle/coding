@@ -469,75 +469,48 @@ start_transcript_monitoring() {
   # ETM (enhanced-transcript-monitor.js, reduced to a reporter in 33-04) POSTs
   # lsl_heartbeat signals to the coordinator on every poll cycle.
 
-  # Phase 54: if com.coding.etm launchd label is loaded, prefer kickstart (auto-respawn).
-  # Otherwise fall back to nohup spawn for backward compat.
+  # ETM is spawned here directly, and the host coordinator (:3034,
+  # ensureEtmForActiveProjects) re-spawns it within 30s if it dies. There is no
+  # longer a launchd branch: com.coding.etm was retired because it made `coding`
+  # the ONLY project with two independent spawners. That duplication produced a
+  # steady churn of singleton defers, and on 2026-08-27 it hid a 183-iteration
+  # respawn loop for 1h47m — the coordinator's children logged nowhere, and the
+  # launchd instance (which owned the only log file) was not the one looping.
+  # One spawner per project, one log per project.
   #
-  # The launchd job is hardcoded to the coding repo (ProgramArguments in
-  # ~/Library/LaunchAgents/com.coding.etm.plist end with "$CODING_REPO"), so it
-  # can only ever monitor that one tree. Taking this branch for ANY other project
-  # kickstarted the coding ETM and returned, leaving the project that was actually
-  # being launched with no monitor at all — a permanent [LSL🔴] badge, with the
-  # working nohup path below unreachable as dead code (found 2026-08-09).
-  # Gate on identity: launchd owns the coding repo, nohup owns everything else.
-  local uid_gui="gui/$(id -u)"
-  local project_real coding_real
+  # Resolve the physical path once: pkill and the spawn below must agree on the
+  # exact argv string, and a symlinked project_dir would make them differ.
+  local project_real
   project_real=$(cd "$project_dir" 2>/dev/null && pwd -P) || project_real="$project_dir"
-  coding_real=$(cd "$coding_repo" 2>/dev/null && pwd -P) || coding_real="$coding_repo"
-  if [ "$project_real" = "$coding_real" ] && launchctl print "${uid_gui}/com.coding.etm" >/dev/null 2>&1; then
-    # Kill any orphan manually-spawned ETM for THIS (coding) project that might
-    # still hold the transcript file. Scope the match to ETMs whose project-path
-    # ARGUMENT is the coding repo — the com.coding.etm singleton is coding-only.
-    # NOTE: the ETM script itself lives under "$coding_repo/scripts/", so a bare
-    # "coding" substring would false-match a per-project ETM for another project
-    # (e.g. the coordinator-spawned rapid-automations ETM). Anchor on the arg
-    # after ".js " so only "…enhanced-transcript-monitor.js <coding_repo>" hits.
-    local orphan_pids
-    orphan_pids=$(pgrep -f "enhanced-transcript-monitor\.js ${coding_repo}" 2>/dev/null | xargs -I{} sh -c 'launchctl print "'${uid_gui}'/com.coding.etm" 2>/dev/null | grep -q "pid = {}" || echo {}' || true)
-    if [ -n "$orphan_pids" ]; then
-      log "Killing orphan manual ETM(s) before kickstart: $orphan_pids"
-      echo "$orphan_pids" | xargs kill -TERM 2>/dev/null || true
-      sleep 1
-    fi
-    log "ETM managed by launchd (com.coding.etm) — kickstarting"
-    launchctl kickstart -k "${uid_gui}/com.coding.etm" >/dev/null 2>&1
-    sleep 1
-    local etm_pid
-    etm_pid=$(launchctl print "${uid_gui}/com.coding.etm" 2>/dev/null | sed -n 's/^	pid = \([0-9]*\)$/\1/p' | head -1)
-    if [ -n "$etm_pid" ] && kill -0 "$etm_pid" 2>/dev/null; then
-      log "Transcript monitoring kickstarted (launchd PID: $etm_pid)"
-    else
-      log "Warning: launchd kickstart did not produce a running ETM PID"
-    fi
+
+  # Match on the project-path ARGUMENT, not basename. A basename match is both
+  # too broad (the script path itself contains "coding", so basename=coding
+  # killed every ETM on the box) and too loose (a project named "rec" matches
+  # "rec", "recorder", …). Anchor on the exact argv the spawn below uses.
+  pkill -f "enhanced-transcript-monitor\.js ${project_real}\$" 2>/dev/null || true
+
+  # Log outside the project: dropping transcript-monitor.log into the user's
+  # working tree is litter they never asked for. Same path the coordinator's
+  # auto-spawner writes to, so a project has ONE log across both spawn paths.
+  mkdir -p "$coding_repo/.logs"
+  local etm_log="$coding_repo/.logs/etm-$(basename "$project_dir").log"
+
+  cd "$project_dir"
+  # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd().
+  # Env mirrors what the coordinator's auto-spawner sets (health-coordinator.js
+  # ensureEtmForActiveProjects) so both spawn paths produce identical ETMs.
+  CODING_AGENT="${CODING_AGENT:-claude}" \
+  CODING_REPO="$coding_repo" \
+  CODING_TOOLS_PATH="$coding_repo" \
+  TRANSCRIPT_SOURCE_PROJECT="$project_real" \
+    nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_real" > "$etm_log" 2>&1 &
+  local new_pid=$!
+
+  sleep 1
+  if kill -0 "$new_pid" 2>/dev/null; then
+    log "Transcript monitoring started (PID: $new_pid)"
   else
-    # Match on the project-path ARGUMENT, not basename. A basename match is both
-    # too broad (the script path itself contains "coding", so basename=coding
-    # killed every ETM on the box) and too loose (a project named "rec" matches
-    # "rec", "recorder", …). Anchor on the exact argv the spawn below uses.
-    pkill -f "enhanced-transcript-monitor\.js ${project_real}\$" 2>/dev/null || true
-
-    # Log outside the project: this fallback now runs for every non-coding
-    # project, and dropping transcript-monitor.log into the user's working tree
-    # is litter they never asked for.
-    mkdir -p "$coding_repo/.logs"
-    local etm_log="$coding_repo/.logs/etm-$(basename "$project_dir").log"
-
-    cd "$project_dir"
-    # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd().
-    # Env mirrors what the coordinator's auto-spawner sets (health-coordinator.js
-    # ensureEtmForActiveProjects) so both spawn paths produce identical ETMs.
-    CODING_AGENT="${CODING_AGENT:-claude}" \
-    CODING_REPO="$coding_repo" \
-    CODING_TOOLS_PATH="$coding_repo" \
-    TRANSCRIPT_SOURCE_PROJECT="$project_real" \
-      nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_real" > "$etm_log" 2>&1 &
-    local new_pid=$!
-
-    sleep 1
-    if kill -0 "$new_pid" 2>/dev/null; then
-      log "Transcript monitoring started (PID: $new_pid, nohup fallback)"
-    else
-      log "Error: Transcript monitoring failed to start"
-    fi
+    log "Error: Transcript monitoring failed to start"
   fi
 }
 
