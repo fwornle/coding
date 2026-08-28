@@ -154,7 +154,7 @@ The `/health/state` report endpoint includes `proxy` and `semantic_readiness` vi
 
 - Pulls `/health/state` once per render.
 - Maps `lsl_by_project[*]` rollup → 3-state (healthy/degraded/stopped).
-- For each `healthy` project, reads the newest timestamped record in the corresponding `lsl[*].transcriptPath` (bounded tail read — NOT the file mtime, which timestamp-less bookkeeping records keep artificially fresh on any open session) to compute user-activity age and bucket into the lifecycle (🟢 → 🟠 → 🟤 → ⚫ → 💤).
+- For each `healthy` project, reads the newest timestamped record in the corresponding `lsl[*].transcriptPath` (bounded tail read — NOT the file mtime, which timestamp-less bookkeeping records keep artificially fresh on any open session) to compute user-activity age and bucket into the lifecycle (bright green → mid green → dark green → very dark green → grey).
 - Synthesizes "verifier-shape" fields for the `[🏥...]` badge from coordinator services + databases + container healthcheck — no `.health/verification-status.json` read.
 
 ### Dashboard (`integrations/system-health-dashboard`)
@@ -172,17 +172,19 @@ The `/health/state` report endpoint includes `proxy` and `semantic_readiness` vi
 
 ## Session activity lifecycle
 
-The graduated cooling icons in the statusline come from per-project transcript mtime, not heartbeat freshness:
+The graduated cooling scale is a **single-cell `●` tinted along a green ramp**, defined as `LIFECYCLE_ICONS` in `scripts/combined-status-line.js`. It is NOT an emoji ladder: an earlier 🟢/🟠/🟤/⚫/💤 set was retired because only one green emoji exists, and the multi-byte icons made tmux and the terminal renderer disagree on cell width, leaving trailing residue at the right edge of `status-right`.
 
-| Icon | Status | Time since last activity |
-|------|--------|--------------------------|
-| 🟢 | Active | < 5 min |
-| ● mid green (`colour34`) | Cooling | 5 – 30 min |
-| ● dark green (`colour28`) | Fading | 30 min – 6 h |
-| ⚫ | Inactive | 6 – 24 h |
-| 💤 | Sleeping | ≥ 24 h |
+| Glyph | tmux colour | Status | Time since last activity |
+|-------|-------------|--------|--------------------------|
+| ● bright green | `colour41` | Active | < 5 min |
+| ● mid green | `colour34` | Cooling | 5 – 30 min |
+| ● dark green | `colour28` | Fading | 30 min – 6 h |
+| ● very dark green | `colour22` | Inactive | 6 – 24 h |
+| ● grey | `colour238` | Sleeping | ≥ 24 h |
 
-The thresholds match `docs/health-system/status-line.md`. The user-activity age is computed client-side by stat-ing `lsl[*].transcriptPath`, since the coordinator's 3-state `lsl_by_project` rollup is binary-ish (healthy/degraded/stopped) and doesn't surface mtime.
+A project idle for more than a day therefore renders as a **grey dot — visibly off the green ramp**, not as a `💤` glyph.
+
+The thresholds match [the status-line guide](../guides/status-line.md). The user-activity age is computed client-side from the newest *timestamped* record in `lsl[*].transcriptPath` — deliberately not the file mtime, which timestamp-less bookkeeping records keep artificially fresh on any open session — since the coordinator's 3-state `lsl_by_project` rollup (healthy/degraded/stopped) does not surface age at all.
 
 ## Bind-mount staleness supervision
 
