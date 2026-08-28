@@ -166,6 +166,69 @@ If you see a sticky `Observations API unreachable` banner *and* a row of snowfla
 
 ---
 
+## Sessions tab
+
+Sits immediately before **Observations** and renders LSL transcripts verbatim, so
+you can read what an agent actually did rather than the classified summary of it.
+
+![Sessions tab](../images/lsl-sessions-viewer.png)
+
+**A row is a chain, not a file.** An hourly tranche plus its rotation parts is one
+session: a legacy `-N_` markdown part is a headerless fragment split mid-token and
+is meaningless alone, and a pi-format part is chained to its predecessor via
+`parentSession`. Listing files would show fragments. A 12-part tranche therefore
+presents as one session of 48 prompt sets and 991 tool calls, not twelve rows.
+
+**Both formats are served.** A `.md` chain is converted *in memory* by the same
+parser and writer the backfill uses, which makes the tab a live preview of the
+conversion rather than merely a reader — that is what let the conversion be
+inspected before rewriting 22.5k files. The badge on each row says which path
+produced it. After a completed backfill every row reads `pi`.
+
+**Rendering reuses pi's own exported HTML shell** rather than a hand-written
+renderer, so tool calls, diffs and thinking blocks look exactly as `pi --export`
+draws them and do not rot as pi evolves. The shell is vendored by
+`scripts/vendor-pi-export-shell.mjs`, because `pi` is a host tool and is not
+installed in the container that serves the dashboard.
+
+The default selection skips to the newest session **with content**: the newest
+tranche is often mid-flush, and the monitor removes a prompt set before
+re-appending it, so a file read in that window is briefly header-only.
+
+### Theming
+
+pi's exported shell is dark-only. The light palette is injected at render time
+from `assets/pi-light-theme.css` rather than edited into the shell, which the
+vendor script overwrites wholesale on every pi upgrade. The theme is stamped onto
+`<html>` server-side so the first paint is already correct; an iframe is a
+separate document and cannot inherit the theme through CSS, so the page
+re-requests the transcript when the toggle flips.
+
+![Sessions tab in dark mode](../images/lsl-sessions-viewer-dark.png)
+
+### Endpoints
+
+| Route | Returns |
+|-------|---------|
+| `GET /api/lsl/projects` | Projects with an LSL history tree |
+| `GET /api/lsl/sessions` | Chains, newest first (`project`, `limit`, `months`) |
+| `GET /api/lsl/sessions/:id` | Parsed entries for one chain |
+| `GET /api/lsl/sessions/:id/export.html?theme=` | Full-fidelity render (`light` \| `dark`) |
+| `GET /api/lsl/promptset/:psId` | Every slice of one prompt set, across tranches and projects |
+
+The last one is the query markdown could only answer with `grep -l ps_X *.md`: a
+set spanning tranches or rotation parts carries the same `promptSetId` in each, so
+the fragments can be stitched back into one conversation.
+
+!!! note "If the viewer reports `pi export shell missing`"
+    The container is serving a stale bind mount — switching branches can delete
+    and recreate `assets/`, and the FUSE cache keeps the deleted state. Compare
+    `ls` on the host with `docker exec coding-services ls` on the same path; if
+    they disagree, run a full `docker-compose restart coding-services`.
+    `supervisorctl restart` re-reads the same stale cache.
+
+---
+
 ## UKB Workflow Monitor
 
 The dashboard includes a dedicated UKB Workflow Monitor that provides visual tracking of knowledge base update workflows:

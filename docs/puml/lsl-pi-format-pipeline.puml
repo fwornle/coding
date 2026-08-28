@@ -1,0 +1,60 @@
+@startuml lsl-pi-format-pipeline
+!include _standard-style.puml
+
+title LSL pi Session Format - Write Path, Backfill and Viewer
+
+top to bottom direction
+
+package "Sources" {
+  [Agent transcript\n(Claude / Copilot / OpenCode)] as Src <<external>>
+  database "Legacy markdown\n3 dialects, 22.5k files" as MD <<storage>>
+}
+
+package "Conversion" {
+  [ConfigurableRedactor] as Redactor <<util>>
+  [LslMarkdownParser] as Parser <<core>>
+  [backfill-lsl-to-pi.mjs] as Backfill <<cli>>
+  [PiSessionWriter] as Writer <<core>>
+}
+
+package "Corpus" {
+  database "pi session JSONL\nYYYY/MM tranches" as JL <<storage>>
+  database "quarantine/\n+ chain-map.json" as QT <<storage>>
+}
+
+package "Read path" {
+  [lsl-sessions.mjs] as Api <<api>>
+  [pi export shell\n+ light palette] as Shell <<util>>
+  [Sessions tab] as Tab <<api>>
+}
+
+Src --> Redactor : every exchange
+Redactor --> Writer : sanitized
+MD --> Backfill : one CHAIN at a time
+Backfill --> Parser
+Parser --> Writer : shared entry emitter
+Writer DATA_LINE JL
+Backfill OPTIONAL_LINE QT : unconvertible —\nmarkdown kept
+JL --> Api
+Api --> Shell
+Shell --> Tab
+
+note right of Redactor
+  Runs on EVERY exchange, on the main
+  thread — a backtracking pattern here
+  wedges the ETM while it stays alive.
+end note
+
+note right of Backfill
+  The unit of work is a CHAIN, not a file:
+  rotation splits MID-TOKEN, so a part
+  cannot be parsed on its own. Every chain
+  is verified BEFORE its markdown is removed.
+end note
+
+note right of Writer
+  One emitter for both paths, so live and
+  backfilled output cannot diverge.
+end note
+
+@enduml

@@ -4,6 +4,44 @@ Highlights since the v6.0 Knowledge Context Injection milestone (commit `0fdb766
 
 ---
 
+## LSL — pi session format, a Sessions tab, and two redaction defects (2026-08-28)
+
+The LSL corpus now stores tranches as **pi session JSONL** instead of the ETM's
+bespoke markdown. Only the serialization changed: hourly files, the filename
+structure, the 5-layer classification, rotation and redirect handling are
+untouched by design.
+
+- **One emitter, two paths.** `PiSessionWriter` is shared by the live monitor and
+  the backfill, so live and converted output cannot diverge.
+- **Backfill run across all 7 history repos.** 22,543 markdown parts → 20,186
+  session files. The unit of work is a *chain*, because rotation splits mid-token
+  and a part cannot be parsed alone. Every repo carries a pushed `pre-pi-format`
+  tag; markdown was deleted only where git could restore it; 12 chains in
+  unrecognised formats are quarantined with their markdown intact.
+- **Sessions tab** (before Observations) renders transcripts through pi's own
+  export shell, in light and dark. See the
+  [Health Dashboard guide](guides/health-dashboard.md#sessions-tab).
+
+Measuring the conversion against ground truth — rather than trusting it — caught
+five silent, data-losing bugs, three of them in the backfill itself and all
+before any write:
+
+| Defect | Effect |
+|--------|--------|
+| Chains with no anchor and no prompt-set heading | Produced nothing while their markdown was deleted (256 chains, 6,747 tool calls) |
+| Blocks before the first anchor | Discarded (17 chains, 21,037 blocks) — one 34 MB chain carries its only anchor 23.5 MB in |
+| A chain converting to nothing | Passed verification vacuously, then had every part unlinked |
+| `aws_secret_truncated` backtracking | Pinned the monitor at ~100% CPU — **alive**, so health checks passed, but silent for over an hour |
+| `aws_secret_standalone` matching any 40-char token | Every git SHA written as `<AWS_SECRET_REDACTED>` |
+
+The last two had been corrupting the corpus at *write* time for as long as they
+existed. Both redaction defects are now guarded — the backtracking one by a time
+bound rather than a pattern assertion, so it keeps covering patterns added later.
+
+See [LSL — Session format](core-systems/lsl.md#session-format).
+
+---
+
 ## Measurement & Experiments — cross-agent runner, live KB axis, grouped dashboard (2026-07-23)
 
 The v7.3 cross-agent experiment harness became a genuine measurement instrument:
