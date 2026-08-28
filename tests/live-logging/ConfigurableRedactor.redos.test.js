@@ -75,21 +75,26 @@ describe('ConfigurableRedactor — backtracking safety', () => {
   });
 
   /**
-   * KNOWN DEFECT, left failing deliberately rather than asserted away.
-   *
-   * `aws_secret_standalone` is (?<![A-Za-z0-9+/])[A-Za-z0-9+/]{40}(?![A-Za-z0-9+/])
+   * `aws_secret_standalone` was (?<![A-Za-z0-9+/])[A-Za-z0-9+/]{40}(?![A-Za-z0-9+/])
    * — ANY 40-character token. A git SHA is exactly 40 hex characters, so every
-   * commit id in the corpus is rewritten to <AWS_SECRET_REDACTED>; the LSL for
-   * this repo has `<AWS_SECRET_REDACTED>\trefs/heads/main` where an ls-remote
-   * result used to be. That is history destroyed at write time, not display
-   * time, and it is unrelated to the backtracking fix above.
+   * commit id in the corpus was rewritten to <AWS_SECRET_REDACTED> at WRITE
+   * time; this repo's LSL still contains `<AWS_SECRET_REDACTED>\trefs/heads/main`
+   * where an ls-remote result used to be.
    *
-   * A candidate narrowing is to exclude pure lowercase hex, which no AWS secret
-   * key is in practice. Left as `todo` because changing WHAT gets redacted is a
-   * separate decision from making redaction terminate.
+   * Narrowed by excluding pure lowercase hex, which is what git emits. An AWS
+   * secret key is 40 base64 characters, so the odds of a real one being all
+   * lowercase hex are (16/62)^40 — the exclusion costs no realistic coverage.
+   * Uppercase hex is deliberately still redacted: git does not produce it.
    */
-  it('does not redact a plain git SHA', { todo: 'aws_secret_standalone matches any 40-char token' }, () => {
+  it('does not redact a plain git SHA', () => {
     const sha = '3d579b5c512f41bf8ce4806d4e57e69454b0a50e';
     assert.ok(redactor.redact(`commit ${sha}`).includes(sha), 'false positive on a git SHA');
+  });
+
+  it('still redacts a 40-char AWS secret key', () => {
+    for (const key of ['wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEYab',
+      'wJal+XUtnFEMI/K7MDENGbPxRfiCYEXAMPLEKEYa']) {
+      assert.ok(!redactor.redact(`key=${key}`).includes(key), `secret survived: ${key}`);
+    }
   });
 });
