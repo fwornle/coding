@@ -154,9 +154,9 @@ The badge reflects the freshness of the **observation → digest → insight** p
 | Unreachable | `[📚●]` red | obs_api unreachable, returning non-OK, or returning unparseable JSON |
 
 !!! note "Red is reserved for pipeline failure"
-    🔴 is shown **only** when `obs_api` is unreachable (confirmed pipeline failure). Time-based staleness uses a graduated fading scheme (🟢 → 🟠 → 🟤 → ⚫ → 💤) — red is never used for age alone.
+    🔴 is shown **only** when `obs_api` is unreachable (confirmed pipeline failure). Time-based staleness uses a graduated fading scheme — a single `●` tinted from bright green down to grey (`colour41` → `colour34` → `colour28` → `colour22` → `colour238`) — and red is never used for age alone.
 
-**Idle suppression** is applied via `CombinedStatusLine.isUserActive()`, which checks `state.lsl` for any session whose `lastBeat` is within 5 min. When no session is heartbeating, the freshness-derived icons collapse to a single `⚫` (idle). True error states (`disabled`, `unknown`, `unreachable`) are NOT suppressed.
+**Idle suppression** is applied via `CombinedStatusLine.isUserActive()`, which checks `state.lsl` for any session whose `lastBeat` is within 5 min. When no session is heartbeating, the freshness-derived icons collapse to a single grey `●` (idle, `colour238`). True error states (`disabled`, `unknown`, `unreachable`) are NOT suppressed.
 
 Tooltip details (visible in the verbose status output) include observation/digest/insight ages, totals, and any in-flight consolidation.
 
@@ -300,7 +300,7 @@ The supervision architecture includes guards to prevent runaway process spawning
 - Coordinator reachable + ≥1 service `degraded` / GCM warning → Warning (🟡)
 - Coordinator reachable + critical failure (downed service, unhealthy DB, container probe fail) → Critical (❌)
 - Coordinator `generated_at` >3 min old → Stale (⏰)
-- Coordinator unreachable → Offline (💤)
+- Coordinator unreachable → Offline (grey `●`, `colour238`)
 
 **Session States** (graduated cooling scheme):
 - Driven by the newest timestamped record in `transcriptPath` (not its mtime), bucketed: colour41 (<5 m) → colour34 (<30 m) → colour28 (<6 h) → colour22 (<24 h) → colour238 (≥24 h)
