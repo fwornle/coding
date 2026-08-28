@@ -93,7 +93,11 @@ A long-running agent turn (one prompt that takes 25 minutes) writes nothing to t
 ```
 
 !!! note "Color choice rationale"
-    The lifecycle stays inside a single green ramp so that "older" is a smooth luminance change rather than a hue jump. Project-level alarms (🟡 warning / 🔴 critical, emitted when the ETM itself is degraded or stopped) stay **emoji** on purpose: an alarm must *break* the pattern, not read as one more point on the fade scale.
+    The lifecycle stays inside a single green ramp so that "older" is a smooth luminance change rather than a hue jump. Project-level alarms (warning / critical, emitted when the ETM itself is degraded or stopped) are `ALARM_DOTS` — the same one-cell `●`, rendered **bold** on the brightest amber (`colour214`) or red (`colour196`).
+
+    Alarms used to stay emoji on purpose, the argument being that an alarm must *break* the pattern rather than read as one more point on the fade scale. That requirement still holds; bold is what now satisfies it. Every ramp shade is dim and un-bolded, so a bold pure-red `●` is the only high-intensity mark on the line — it breaks the pattern in one cell instead of two, and needs no `codepoint-widths` override.
+
+    `ALARM_DOTS` is kept distinct from `STATE_DOTS.WARN`/`CRIT` (used by `[🔒]` and `[🏥]`): those mark a badge's own severity, where the dot stands alone and is salient for free. `ALARM_DOTS` sit *inside* a row of other dots — the per-project session list — where salience has to be won.
 
     The ramp used to detour through 🟠 (orange) and 🟤 (brown) for its middle rungs, because Unicode contains exactly **one** green circle emoji (🟢 U+1F7E2) — a green fade is simply not expressible in emoji. Those hue swings read as distinct *states* rather than as a fading signal. Switching to a tmux-tinted `●` gives a real luminance ramp, and as a side benefit removes the emoji-width hazard: `●` (U+25CF) is one cell in both tmux and the terminal, so it needs no `codepoint-widths` override to stay aligned.
 
@@ -188,7 +192,7 @@ The ETM (`enhanced-transcript-monitor.js`) detects **broken transcript discovery
 
 - **Detection**: ETM heartbeat reports `transcriptPath: null` while uptime exceeds the discovery grace period
 - **Remediation**: ETM exits with non-zero status; the launcher / supervisor restarts it
-- **Display**: Project rolls up as `degraded`, surfaces as `🟡` in the sessions block
+- **Display**: Project rolls up as `degraded`, surfaces as a bold amber `●` (`ALARM_DOTS.WARN`) in the sessions block
 - **Path encoding**: Claude Code replaces both `/` and `_` with `-` (e.g. `/_work/` → `--work-`)
 
 ---
@@ -241,7 +245,7 @@ The renderer now exposes a single `getCoordinatorState()` method memoized on the
 
 The recurring trailing-digit residue at the right edge (`07:538`, `12:411`, `07:158`) traces to disagreement between the script's `visibleCellWidth()`, tmux's wcwidth, and the rendered font glyph. The fix is to only emit codepoints where all three measurements agree:
 
-- **Warning states use `🟡` (U+1F7E1, EAW=Wide), not `⚠️` (U+26A0 + U+FE0F, EAW=Ambiguous).** Earlier attempts to "promote" `⚠️` to 2 cells via a VS16 lookahead in `visibleCellWidth()` matched the font glyph width but disagreed with tmux's wcwidth (which doesn't honor VS16 for Ambiguous codepoints in non-CJK locales). The disagreement left 1 cell of the previous render exposed on every transition that involved `⚠️`, and the font glyph visibly overlapped the closing `]`. The VS16 lookahead logic is retained for the `⚠️ SYS:TIMEOUT` / `SYS:ERR` fallback markers — error visibility there outweighs cell-perfect padding.
+- **Warning and error states are `●` (U+25CF), which is unambiguously ONE cell in both tmux and the terminal** — so they contribute no width disagreement at all. This supersedes two earlier rounds: `⚠️` (U+26A0 + U+FE0F, EAW=Ambiguous) was replaced by `🟡` (U+1F7E1, EAW=Wide) because promoting `⚠️` to 2 cells via a VS16 lookahead in `visibleCellWidth()` matched the font glyph but disagreed with tmux's wcwidth (which doesn't honour VS16 for Ambiguous codepoints in non-CJK locales), leaving 1 cell of the previous render exposed on every transition. `🟡` in turn became a bold `●`. The `SYS:TIMEOUT` / `SYS:ERR` fallback markers now use the same dot; the VS16 lookahead stays in `visibleCellWidth()` because emoji remain in the *labels* (`🏥🔒📚🧠📋`).
 - Padding is **leading-spaces only** to TMUX_PANE_WIDTH (or 200 if unset). Trailing characters get stripped by tmux's `#(shell-cmd)` substitution, so any trailing terminator (NBSP, space, etc.) doesn't survive the round-trip.
 - The earlier NBSP-terminator + 220-codepoint approach has been retired in favour of correct per-codepoint cell counting.
 
@@ -296,9 +300,9 @@ The supervision architecture includes guards to prevent runaway process spawning
 ### State Transitions
 
 **Health States** (for `[🏥...]` indicator):
-- Coordinator reachable + 0 critical issues → Healthy (✅)
-- Coordinator reachable + ≥1 service `degraded` / GCM warning → Warning (🟡)
-- Coordinator reachable + critical failure (downed service, unhealthy DB, container probe fail) → Critical (❌)
+- Coordinator reachable + 0 critical issues → Healthy (green `●`, `STATE_DOTS.OK`)
+- Coordinator reachable + ≥1 service `degraded` / GCM warning → Warning (amber `●`, `STATE_DOTS.WARN`)
+- Coordinator reachable + critical failure (downed service, unhealthy DB, container probe fail) → Critical (red `●`, `STATE_DOTS.CRIT`)
 - Coordinator `generated_at` >3 min old → Stale (⏰)
 - Coordinator unreachable → Offline (grey `●`, `colour238`)
 
@@ -391,17 +395,38 @@ After editing, run `tmux source-file ~/.tmux.conf`. New tmux sessions inherit it
 |---|---|---|---|
 | `U+26A0=2` | ⚠ | Misc Symbols (Unicode 4) | EAW=Ambiguous — tmux counts 1, terminals render 2 |
 | `U+FE0F=0` | (VS16) | Variation Selectors | Variation selector; tmux counts 1, renderer treats as part of the previous codepoint |
-| `U+1F7E0=2` | 🟠 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table |
-| `U+1F7E1=2` | 🟡 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table |
-| `U+1F7E2=2` | 🟢 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table |
-| `U+1F7E4=2` | 🟤 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table |
+| `U+1F7E0=2` | 🟠 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table — **no longer emitted** |
+| `U+1F7E1=2` | 🟡 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table — **no longer rendered** |
+| `U+1F7E2=2` | 🟢 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table — **no longer emitted** |
+| `U+1F7E4=2` | 🟤 | Geometric Shapes Ext (Unicode 12) | Predates tmux's wcwidth table — **no longer emitted** |
 | `U+1F9E0=2` | 🧠 | Supplemental Symbols (Unicode 10) | Predates tmux's wcwidth table |
-| `U+1F9EE=2` | 🧮 | Supplemental Symbols (Unicode 11) | Predates tmux's wcwidth table |
-| `U+1F976=2` | 🥶 | Supplemental Symbols (Unicode 11) | Predates tmux's wcwidth table |
+| `U+1F9EE=2` | 🧮 | Supplemental Symbols (Unicode 11) | Predates tmux's wcwidth table — **no longer emitted** |
+| `U+1F976=2` | 🥶 | Supplemental Symbols (Unicode 11) | Predates tmux's wcwidth table — **no longer emitted** |
+
+!!! note "Rows marked *no longer emitted* are harmless, keep them"
+    The lifecycle ramp and the alarm states are now `●` (U+25CF), so the coloured-circle rows and 🥶 describe glyphs the statusline no longer produces. `🟡` survives only in an internal sentinel and in the fast path's legacy-cache regex — neither reaches the status bar.
+
+    They are left in place deliberately: an override for a codepoint that never appears costs nothing, whereas removing one and later reintroducing the glyph brings the residue bug back silently. Verify the live set before pruning — the emoji still genuinely rendered are the badge **labels** (`🏥 🔒 📚 🧠 📋`) plus the non-severity pictograms (`⏰ ⏳ 🔇 ❓ 🚫`):
+
+    ```bash
+    node --input-type=module -e "
+    import fs from 'node:fs';
+    const code = fs.readFileSync('scripts/combined-status-line.js','utf8').split('\n')
+      .map(l => l.replace(/\/\/.*\$/, ''))
+      .filter(l => { const t = l.trim(); return t && !t.startsWith('*') && !t.startsWith('/*'); })
+      .filter(l => !l.includes('lines.push'));   // verbose tooltip is plain text, not the bar
+    const seen = new Set();
+    for (const l of code) for (const ch of [...l]) {
+      const cp = ch.codePointAt(0);
+      if (cp > 0x2190) seen.add(ch + '  U+' + cp.toString(16).toUpperCase());
+    }
+    console.log([...seen].sort().join('\n'));
+    "
+    ```
 
 **Why fix in tmux, not the script.** Several earlier attempts modified `visibleCellWidth()` in `scripts/combined-status-line.js` to compensate for the disagreement and introduced new disagreements each time. The script's count is correct for the codepoints it currently handles — the issue is downstream in tmux's wcwidth table, fixable only via `codepoint-widths`. **Do not touch the script's width math.** If a new Ambiguous emoji enters the statusline repertoire and residue returns, probe its tmux-vs-terminal width with the snippet in [Troubleshooting → Right-edge residue](#right-edge-shows-residual-chars-eg-12411-130656) and append it to the override.
 
-**Retired lifecycle emojis.** `🌲` (Unicode 6, OK), `🫒` (U+1FAD2, Unicode 13), and `🪨` (U+1FAA8, Unicode 13) used to sit in the cooling/fading/dormant tiers. The Unicode-13 codepoints were too new for tmux's wcwidth table to know about even with `codepoint-widths` overrides (tmux 3.4 silently ignores codepoints it can't normalize). They have been replaced by the colored circles (🟠/🟤) listed above, which are all on stable Geometric-Shapes-Ext blocks that every renderer agrees about.
+**Retired lifecycle emojis.** `🌲` (Unicode 6, OK), `🫒` (U+1FAD2, Unicode 13), and `🪨` (U+1FAA8, Unicode 13) used to sit in the cooling/fading/dormant tiers. The Unicode-13 codepoints were too new for tmux's wcwidth table to know about even with `codepoint-widths` overrides (tmux 3.4 silently ignores codepoints it can't normalize). They were first replaced by the coloured circles (🟠/🟤) on stable Geometric-Shapes-Ext blocks, and those in turn by the tinted `●` ramp described above — which sidesteps the whole class of problem, since U+25CF needs no `codepoint-widths` entry to begin with.
 
 ---
 

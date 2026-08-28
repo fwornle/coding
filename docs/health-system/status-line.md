@@ -71,7 +71,7 @@ The statusline-health-monitor writes detailed health to `.logs/statusline-health
 | `VKB` | 8080 | Knowledge Visualization | Graph visualization server |
 | `Dash` | 3032/3033 | System Health Dashboard | UI and API for health monitoring |
 
-**Icons**: ✅ healthy, 🟡 warning (with reason), 🔴 unhealthy (with reason), ❓ unknown
+**Icons**: all states are a one-cell `●` tinted by tmux — green healthy (`colour41`), **bold** amber warning (`colour214,bold`, with reason), **bold** red unhealthy (`colour196,bold`, with reason). `❓` unknown stays a pictogram: it says *why* there is no verdict, which a severity colour cannot express.
 
 ### Docker Mode Indicator
 
@@ -145,18 +145,18 @@ The statusline-health-monitor detects **broken transcript monitors** — monitor
 
 **Remediation**: The broken monitor is killed via `SIGTERM`. The Global Process Supervisor automatically restarts it, picking up any fixes to the transcript discovery logic.
 
-**Status Line**: Affected sessions show `🟡` (warning) with "Transcript discovery failed — restarting monitor" instead of silently disappearing.
+**Status Line**: Affected sessions show a bold amber `●` (`ALARM_DOTS.WARN`) with "Transcript discovery failed — restarting monitor" instead of silently disappearing.
 
 **Path Encoding**: Claude Code encodes project paths by replacing both `/` and `_` with `-`. For example, `/Users/foo/Agentic/_work/my-project` becomes `-Users-foo-Agentic--work-my-project`. The transcript monitor's `getProjectDirName()` must match this encoding exactly.
 
 ### LSL Status Indicators
 
-**Color Coding**:
-- 🟢 Green - Session window open (>1 hour remaining)
-- 🟠 Orange - Window closing soon (<1 hour)
-- 🔴 Red - Window closed or expired
+**Color Coding** (thresholds are MINUTES, not hours — `calculateTimeRemaining()`):
+- *no dot* - Window open, more than 5 minutes remaining (the common case; the badge is just the range)
+- ● bold amber - Window closing soon, 5 minutes or less remaining (`ALARM_DOTS.WARN`)
+- ● bold red - Window closed or expired (`ALARM_DOTS.CRIT`)
 
-**Format**: `🟢HHMM-HHMM(Xmin)` where:
+**Format**: `HHMM-HHMM`, gaining a leading dot and `(Xmin)` only in the closing window:
 - `HHMM-HHMM` - Session time window
 - `(Xmin)` - Minutes since last activity
 - `→project` - Project with activity
@@ -183,9 +183,9 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 
 **Sessions are only removed** when the agent process has exited (session closed). A running agent does NOT pin the session to Active — that was a bug (the file mtime is bumped by timestamp-less bookkeeping records on a merely-open session), fixed by bucketing on the newest timestamped record. Regardless of transcript age.
 
-**No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings (e.g. stale health data). Normal session inactivity is shown through the graduated cooling sequence.
+**No amber for idleness**: the system intentionally avoids the amber alarm dot for session *inactivity*. Amber is reserved for actual warnings (e.g. stale health data). Normal inactivity is shown through the graduated green cooling ramp, which ends in grey — never in an alarm colour.
 
-**Agent Age Cap**: When an agent process (claude, copilot, opencode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant. The session starts as 🟢 and naturally progresses through the cooling scheme based on how long the current session has been idle.
+**Agent Age Cap**: When an agent process (claude, copilot, opencode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant. The session starts on the brightest green `●` and naturally progresses through the cooling ramp based on how long the current session has been idle.
 
 **Not-Found Transcript Guard**: Agents that don't produce Claude-compatible transcripts (e.g., OpenCode) have `transcriptInfo.status: 'not_found'` with `ageMs: 0`. The age cap logic skips these sessions — they correctly display as ⚫ inactive instead of falsely showing as 🟢 active.
 
@@ -258,8 +258,10 @@ The system uses multiple discovery methods to find all active sessions:
 
 **Example**:
 - `[C🟢 UT🟢]` - coding and ui-template both active
-- `[C🟢 CA🟠]` - coding active, curriculum-alignment cooling
-- `[C🟢 UT🟤 CA🟤]` - coding active, ui-template fading, curriculum-alignment dormant
+- `[C● CA●]` - coding active (bright green), curriculum-alignment cooling (mid green)
+- `[C● UT● CA●]` - coding active, ui-template fading (dark green), curriculum-alignment dormant (very dark green)
+
+The distinction is luminance within one hue, so it does not survive being quoted as plain text here — see the ramp table in [the status-line guide](../../docs-content/guides/status-line.md) for the exact `colour` values.
 - Sessions only removed when agent process exits (never hidden while running)
 
 ### Smart Abbreviation Engine

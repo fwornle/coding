@@ -80,7 +80,7 @@ POST /signals
 }
 ```
 
-`status: 'degraded'` is set when `isSuspiciousActivity` fires (0 exchanges processed in >30 min uptime — pipeline alive but stalled). Statusline maps this to `🟡` (`[LSL🟡]`).
+`status: 'degraded'` is set when `isSuspiciousActivity` fires (0 exchanges processed in >30 min uptime — pipeline alive but stalled). Statusline maps this to a bold amber `●` (`ALARM_DOTS.WARN`), rendered as `[LSL●]`; a stopped ETM gives the bold red `[LSL●]` (`ALARM_DOTS.CRIT`).
 
 The ETM also writes per-project LSL files to `.specstory/history/YYYY/MM/YYYY-MM-DD_HHMM-HHMM_<hash>.md` and posts observation summaries to the proxy.
 
@@ -183,6 +183,17 @@ The graduated cooling scale is a **single-cell `●` tinted along a green ramp**
 | ● grey | `colour238` | Sleeping | ≥ 24 h |
 
 A project idle for more than a day therefore renders as a **grey dot — visibly off the green ramp**, not as a `💤` glyph.
+
+Unhealthy states are NOT on this ramp at all. They are `ALARM_DOTS` — the same one-cell `●`, but **bold**:
+
+| Glyph | tmux style | Meaning |
+|-------|-----------|---------|
+| ● bold amber | `colour214,bold` | ETM degraded / stale (`ALARM_DOTS.WARN`) |
+| ● bold red | `colour196,bold` | ETM stopped or unreachable (`ALARM_DOTS.CRIT`) |
+
+Bold is load-bearing, not decoration: every ramp shade is dim and un-bolded, so a bold dot is the only high-intensity mark on a line of eight dots. That is what preserves the "an alarm must break the pattern" property after the alarms stopped being emoji.
+
+A session's status is derived from the coordinator rollup and the alarm dot chosen from it — never the reverse. Inferring status by comparing the rendered glyph back against a literal (`icon === '🟡'`) made the glyph the source of truth, so a presentation change silently reclassified every session as healthy.
 
 The thresholds match [the status-line guide](../guides/status-line.md). The user-activity age is computed client-side from the newest *timestamped* record in `lsl[*].transcriptPath` — deliberately not the file mtime, which timestamp-less bookkeeping records keep artificially fresh on any open session — since the coordinator's 3-state `lsl_by_project` rollup (healthy/degraded/stopped) does not surface age at all.
 
