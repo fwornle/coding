@@ -407,7 +407,7 @@ the answer, checked mechanically rather than by impression.
 
 Written as an abstain probe on the assumption the Cypher path was gone. **It is not.**
 `runCypherQuery` still builds literal Cypher at
-`integrations/mcp-server-semantic-analysis/src/services/cgr-query-cache.ts:233`. Arms that
+`integrations/semantic-analysis/src/services/cgr-query-cache.ts:233`. Arms that
 produced the query were *right* and scored 0; the arm that abstained scored 1.
 
 Retired for a **false premise**, not for scoring badly — dropping questions because results

@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file defines the hierarchical structure of the ontology system.
+The integrations/semantic-analysis/src/agents/ontology-manager.ts file defines the hierarchical structure of the ontology system.
 
 ## What It Is  
 
 The **HierarchicalOntologyStructure** is the core data model that describes how ontology definitions are organized in a tree‑like fashion – with *upper* (parent) and *lower* (child) ontology definitions. The definition of this structure lives in the source file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts
+integrations/semantic-analysis/src/agents/ontology-manager.ts
 ```  
 
 Within that file the `OntologyManager` class consumes the hierarchical model to load, query, and maintain the relationships among the various ontology fragments that make up the overall **Ontology** component. In other words, `HierarchicalOntologyStructure` is the blueprint that the `OntologyManager` follows to keep the ontology consistent, searchable, and extensible.
@@ -44,7 +44,7 @@ Ontology
 ## Implementation Details  
 
 ### Core Class – `OntologyManager`  
-Located in `integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts`, `OntologyManager` is the entry point for any code that needs to work with the ontology hierarchy. Although the exact method signatures are not enumerated, the manager is known to:
+Located in `integrations/semantic-analysis/src/agents/ontology-manager.ts`, `OntologyManager` is the entry point for any code that needs to work with the ontology hierarchy. Although the exact method signatures are not enumerated, the manager is known to:
 
 * **Load** the hierarchical definition (likely from a JSON/YAML source or a database).  
 * **Expose** navigation helpers that return an *upper* (parent) ontology definition or the collection of *lower* (child) definitions for a given node.  
@@ -127,7 +127,7 @@ Sibling ontology definitions share the same immediate upper definition. Because 
 ## Hierarchy Context
 
 ### Parent
-- [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
+- [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/semantic-analysis/src/agents/ontology-manager.ts file.
 
 ---
 

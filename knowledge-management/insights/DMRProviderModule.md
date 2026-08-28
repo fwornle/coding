@@ -25,7 +25,7 @@ Within the broader **LLMAbstraction** component, the DMRProviderModule is one of
 The DMRProviderModule follows a **layered, responsibility‑segregated** architecture. Each concern—loading, caching, validation, logging, fallback, and resilience—is isolated in its own file, making the module easy to reason about and test. The design leans heavily on well‑known patterns that are explicitly present in the code base:
 
 * **Factory Pattern** – The sibling ProviderRegistryModule uses a factory (`provider-registry-module.ts`) to create the DMRProviderModule instance, allowing the system to swap providers (e.g., MockServiceModule) without touching the consumer code.  
-* **Dependency Injection (DI)** – The LLMServiceModule injects the provider (DMRProviderModule) and also injects the functions that resolve the current LLM mode. This decouples the provider from the mode‑resolution logic and enables per‑agent overrides defined in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`.  
+* **Dependency Injection (DI)** – The LLMServiceModule injects the provider (DMRProviderModule) and also injects the functions that resolve the current LLM mode. This decouples the provider from the mode‑resolution logic and enables per‑agent overrides defined in `integrations/semantic-analysis/src/mock/llm-mock-service.ts`.  
 * **Circuit Breaker** – Implemented in `dmr-circuit-breaker.ts`, this pattern protects the rest of the system from cascading failures when the Docker‑based Model Runner becomes unhealthy. The breaker tracks failure counts and opens the circuit, causing subsequent requests to short‑circuit to the fallback path.  
 * **Cache‑Aside** – The `dmr-model-cache.ts` file follows a cache‑aside strategy: the loader first checks the cache, and on a miss it loads the model from the repository and then populates the cache. This reduces repeated I/O and speeds up inference warm‑starts.  
 * **Fallback Strategy** – Defined in `dmr-model-fallback.ts`, the module can automatically switch to an alternate model (or a mock) when the primary model is unavailable, ensuring graceful degradation.  
@@ -60,7 +60,7 @@ All of the above components read their operational parameters (cache TTL, circui
 * **Parent – LLMAbstraction** – The abstraction layer treats DMRProviderModule as one concrete provider among others. It relies on the provider exposing a uniform interface (`loadModel`, `runInference`) so that the higher‑level **LLMService** can remain agnostic of the underlying execution environment.  
 * **Sibling – ProviderRegistryModule** – The registry’s factory method (`createProvider`) decides at runtime whether to instantiate `DMRProviderModule` or `MockServiceModule` based on configuration flags or feature toggles. This decouples the selection logic from the service consumer.  
 * **Sibling – MockServiceModule** – Provides a lightweight alternative used when the fallback mechanism in `dmr-model-fallback.ts` selects a mock response. The mock module shares the same validation and logging contracts, ensuring consistent observability.  
-* **Sibling – LLMServiceModule** – Performs dependency injection (`LLMService` constructor) to inject the chosen provider. It also injects the mode‑resolution function (e.g., `getLLMMode` from `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`) which determines whether the request should be routed to DMRProviderModule or another provider.  
+* **Sibling – LLMServiceModule** – Performs dependency injection (`LLMService` constructor) to inject the chosen provider. It also injects the mode‑resolution function (e.g., `getLLMMode` from `integrations/semantic-analysis/src/mock/llm-mock-service.ts`) which determines whether the request should be routed to DMRProviderModule or another provider.  
 * **Child – ModelRunnerClient** – Directly communicates with Docker through the official Docker SDK. The client is the only piece that knows about container lifecycle; everything else interacts with it via a clean, promise‑based API.  
 
 All integration points are defined by TypeScript interfaces (not shown in the observations but implied by the DI usage), which enforce compile‑time compatibility between modules.
@@ -114,14 +114,14 @@ The module’s **single‑responsibility** split across dedicated files makes th
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a high-level facade, LLMService, which is defined in the file lib/llm/llm-service.ts. This facade is responsible for handling mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback. The LLMService class employs dependency injection to set functions that resolve the current LLM mode, allowing for flexibility in determining the mode. For instance, the getLLMMode function in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts is used to determine the LLM mode for a specific agent, considering global mode, per-agent overrides, and legacy mock flags.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a high-level facade, LLMService, which is defined in the file lib/llm/llm-service.ts. This facade is responsible for handling mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback. The LLMService class employs dependency injection to set functions that resolve the current LLM mode, allowing for flexibility in determining the mode. For instance, the getLLMMode function in integrations/semantic-analysis/src/mock/llm-mock-service.ts is used to determine the LLM mode for a specific agent, considering global mode, per-agent overrides, and legacy mock flags.
 
 ### Children
 - [ModelRunnerClient](./ModelRunnerClient.md) -- The DMRProviderModule uses a Docker API client to interact with the Model Runner, as implied by the parent context.
 
 ### Siblings
 - [ProviderRegistryModule](./ProviderRegistryModule.md) -- The ProviderRegistryModule uses a factory pattern in lib/llm/provider-registry-module.ts to create instances of different LLM providers, such as the DMRProviderModule and MockServiceModule.
-- [MockServiceModule](./MockServiceModule.md) -- The MockServiceModule uses a mocking library to generate mock LLM responses, as seen in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts.
+- [MockServiceModule](./MockServiceModule.md) -- The MockServiceModule uses a mocking library to generate mock LLM responses, as seen in integrations/semantic-analysis/src/mock/llm-mock-service.ts.
 - [LLMServiceModule](./LLMServiceModule.md) -- The LLMServiceModule uses a dependency injection mechanism to resolve the current LLM provider, as seen in lib/llm/llm-service.ts.
 
 ---

@@ -8,7 +8,7 @@ The system maintains a two-level ontology hierarchy (upper/lower) with separate 
 
 ## What It Is
 
-The Ontology subsystem is a structured classification engine embedded within the SemanticAnalysis component (`integrations/mcp-server-semantic-analysis`). Its responsibility is to take raw observation categories produced earlier in the pipeline and resolve them into well-defined ontology classes, enriching entities with typed metadata before they flow downstream to persistence and querying layers. It was introduced as a major architectural addition, documented under *Release 2.0 - Ontology Integration System* in `docs/RELEASE-2.0.md`, signaling that ontology-awareness was a deliberate, bounded upgrade rather than an organic growth of the codebase.
+The Ontology subsystem is a structured classification engine embedded within the SemanticAnalysis component (`integrations/semantic-analysis`). Its responsibility is to take raw observation categories produced earlier in the pipeline and resolve them into well-defined ontology classes, enriching entities with typed metadata before they flow downstream to persistence and querying layers. It was introduced as a major architectural addition, documented under *Release 2.0 - Ontology Integration System* in `docs/RELEASE-2.0.md`, signaling that ontology-awareness was a deliberate, bounded upgrade rather than an organic growth of the codebase.
 
 The subsystem owns two direct child components — OntologyConfigManager and TwoLevelOntologyHierarchy — and operates alongside siblings Pipeline, Insights, and LegacyOntologyAdapter within SemanticAnalysis. Its outputs (structured `entityType` and `ontologyClass` metadata attached to entities) are the contract that makes the entire SemanticAnalysis pipeline ontology-aware.
 
@@ -56,14 +56,14 @@ New ontology tiers or structural changes to the two-level hierarchy should be re
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
 
 ### Children
 - [OntologyConfigManager](./OntologyConfigManager.md) -- Referenced in the Ontology sub-component description as the mechanism that decouples ontology file paths from code, allowing runtime reconfiguration of both upper and lower ontology tiers.
 - [TwoLevelOntologyHierarchy](./TwoLevelOntologyHierarchy.md) -- The parent sub-component description explicitly states 'upper/lower' as the two tiers, with separate definition files for each, indicating a deliberate separation of broad categorical concepts from domain-specific ones.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/mcp-server-semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
+- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
 - [Insights](./Insights.md) -- Insight generation is LLM-driven, operating within the LLM budget constraints configured in OntologyConfigManager, meaning insight depth scales with available token budget per batch run
 - [OntologyConfigManager](./OntologyConfigManager.md) -- Implemented as a singleton to ensure all pipeline agents share identical ontology configuration throughout a batch run, preventing mid-run config drift between classifier and validator instances
 - [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- Wraps km-core's OntologyRegistry behind a legacy-compatible interface, isolating the migration boundary so that OntologyValidator and OntologyClassifier continue to function without modification during Phase 42-03

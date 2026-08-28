@@ -85,7 +85,7 @@ dist/
 # Python virtual environments
 venv/
 **/venv/
-integrations/mcp-server-semantic-analysis/venv/
+integrations/semantic-analysis/venv/
 
 # MCP configuration (contains processed paths and secrets)
 claude-code-mcp.json.bak

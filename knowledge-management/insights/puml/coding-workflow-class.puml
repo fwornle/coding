@@ -112,7 +112,7 @@ AnalysisStep <|-- InsightGenerationStep : extends
 
 SemanticAnalyzer --> AnalysisStep : creates
 
-note right of CodingWorkflow : "Distributed across:\n- src/knowledge-management\n- lib/ukb-unified\n- integrations/mcp-server-semantic-analysis"
+note right of CodingWorkflow : "Distributed across:\n- src/knowledge-management\n- lib/ukb-unified\n- integrations/semantic-analysis"
 
 note bottom of KnowledgeGraph : "Replaces removed\nshared-memory.json"
 

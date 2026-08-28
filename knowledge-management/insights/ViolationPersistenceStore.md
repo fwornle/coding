@@ -12,7 +12,7 @@ ViolationPersistenceStore class in `violation-persistence-store.ts` exposes a `q
 
 `ViolationPersistenceStore` is implemented in `violation-persistence-store.ts` and lives within the broader **ConstraintSystem**, which contains it as a dedicated persistence subsystem. Its core responsibility is to durably record constraint violations that are detected during hook execution, making those records available to consumers — dashboards and status-line integrations — well beyond the transient lifetime of the in-memory process that originally detected the violation.
 
-The class sits at the boundary between two fundamentally different execution contexts: the ephemeral, event-driven world of hook execution (where violations are first discovered) and the persistent, query-oriented world of monitoring consumers (dashboards, status lines) that need stable, historical access to violation state. As documented in `integrations/mcp-constraint-monitor/README.md`, violations are expected to survive hook execution and surface to dashboards, which is the founding rationale for this store's existence as a separate architectural artifact rather than a simple in-memory buffer.
+The class sits at the boundary between two fundamentally different execution contexts: the ephemeral, event-driven world of hook execution (where violations are first discovered) and the persistent, query-oriented world of monitoring consumers (dashboards, status lines) that need stable, historical access to violation state. As documented in `integrations/constraint-monitor/README.md`, violations are expected to survive hook execution and surface to dashboards, which is the founding rationale for this store's existence as a separate architectural artifact rather than a simple in-memory buffer.
 
 ---
 
@@ -20,13 +20,13 @@ The class sits at the boundary between two fundamentally different execution con
 
 ### Separation of Write Path and Read Path
 
-The most significant design decision evident from the observations is a deliberate **segregation of the write path from the read path**. The rule engine — which detects violations during hook execution — constitutes the write path. `ViolationPersistenceStore` then serves as the stable substrate that decouples that write path from all consumers. `integrations/mcp-constraint-monitor/docs/status-line-integration.md` explicitly confirms that status-line consumers read violation state through an interface that is distinct from the write path triggered by the rule engine. This is a classic **CQRS-adjacent** separation: the mechanism that produces violation records is architecturally isolated from the mechanism that <USER_ID_REDACTED> them.
+The most significant design decision evident from the observations is a deliberate **segregation of the write path from the read path**. The rule engine — which detects violations during hook execution — constitutes the write path. `ViolationPersistenceStore` then serves as the stable substrate that decouples that write path from all consumers. `integrations/constraint-monitor/docs/status-line-integration.md` explicitly confirms that status-line consumers read violation state through an interface that is distinct from the write path triggered by the rule engine. This is a classic **CQRS-adjacent** separation: the mechanism that produces violation records is architecturally isolated from the mechanism that <USER_ID_REDACTED> them.
 
 This design decision carries meaningful trade-offs. By separating concerns, the store allows consumers to evolve independently — a status-line integration can be added, removed, or modified without touching the rule engine's violation-emission logic. The cost is the coordination overhead of ensuring writes from the rule engine are faithfully reflected in the store before consumers read. Whether the store provides synchronous write guarantees or eventual consistency is not directly observable from the provided sources, but the architecture implies the store must handle this boundary robustly.
 
 ### Durable Store vs. Transient Hook State
 
-The `integrations/mcp-constraint-monitor/README.md` observation draws an explicit contrast between the durable store and "transient hook execution state." This implies the architectural decision that hook execution state is intentionally not the source of truth for violations — it is only the detection mechanism. The store is the source of truth. This pattern protects against data loss when hook processes terminate, restart, or are restarted mid-session, which is a realistic operational concern in a constraint monitoring integration context.
+The `integrations/constraint-monitor/README.md` observation draws an explicit contrast between the durable store and "transient hook execution state." This implies the architectural decision that hook execution state is intentionally not the source of truth for violations — it is only the detection mechanism. The store is the source of truth. This pattern protects against data loss when hook processes terminate, restart, or are restarted mid-session, which is a realistic operational concern in a constraint monitoring integration context.
 
 ---
 
@@ -52,11 +52,11 @@ The hierarchy context notes a somewhat recursive relationship where `ViolationPe
 
 ### Dashboard Consumers
 
-As described in `integrations/mcp-constraint-monitor/README.md`, dashboards read from the store to surface persisted violation state. These consumers depend on `queryViolations()` as their data access layer and have no direct coupling to hook execution internals.
+As described in `integrations/constraint-monitor/README.md`, dashboards read from the store to surface persisted violation state. These consumers depend on `queryViolations()` as their data access layer and have no direct coupling to hook execution internals.
 
 ### Status-Line Integration
 
-`integrations/mcp-constraint-monitor/docs/status-line-integration.md` describes status-line consumers as a distinct reader class. Their read interface is explicitly noted as separate from the write path, confirming that `ViolationPersistenceStore` serves as the integration contract between the constraint detection engine and lightweight UI surfaces like status lines.
+`integrations/constraint-monitor/docs/status-line-integration.md` describes status-line consumers as a distinct reader class. Their read interface is explicitly noted as separate from the write path, confirming that `ViolationPersistenceStore` serves as the integration contract between the constraint detection engine and lightweight UI surfaces like status lines.
 
 ### Rule Engine (Write Path)
 
@@ -97,10 +97,10 @@ Maintainability is well-served by the clean separation between detection (rule e
 ## Hierarchy Context
 
 ### Parent
-- [ViolationPersistenceStore](./ViolationPersistenceStore.md) -- integrations/mcp-constraint-monitor/README.md describes violations being persisted and surfaced to dashboards, implying a durable store separate from in-memory hook execution state
+- [ViolationPersistenceStore](./ViolationPersistenceStore.md) -- integrations/constraint-monitor/README.md describes violations being persisted and surfaced to dashboards, implying a durable store separate from in-memory hook execution state
 
 ### Children
-- [ViolationPersistenceStore](./ViolationPersistenceStore.md) -- integrations/mcp-constraint-monitor/README.md describes violations being persisted and surfaced to dashboards, implying a store separate from transient hook execution state
+- [ViolationPersistenceStore](./ViolationPersistenceStore.md) -- integrations/constraint-monitor/README.md describes violations being persisted and surfaced to dashboards, implying a store separate from transient hook execution state
 
 
 ---

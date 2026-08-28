@@ -73,7 +73,7 @@ package "Coding Project" {
     class CodingProject <<entity>> {
         -srcPath: "src/knowledge-management"
         -libPath: "lib/ukb-unified"
-        -mcpPath: "integrations/mcp-server-semantic-analysis/src"
+        -mcpPath: "integrations/semantic-analysis/src"
         +analyze(): Promise<ProjectAnalysis>
         +buildKnowledgeBase(): Promise<void>
     }

@@ -2351,7 +2351,7 @@ app.get('/api/coding/insights', async (_req, res) => {
 //
 // `req.on('close')` releases the listener slot — verified by the Plan 55-06
 // integration test (`obs-api.coding-observations-stream.test.js`).
-// SSE handler reference: integrations/mcp-server-semantic-analysis/src/sse-server.ts:136.
+// SSE handler reference: integrations/semantic-analysis/src/sse-server.ts:136.
 app.get('/api/coding/observations/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');

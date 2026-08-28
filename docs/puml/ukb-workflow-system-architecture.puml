@@ -22,7 +22,7 @@ package "Frontend (System Health Dashboard)" <<infra>> {
   }
 }
 
-package "Backend (MCP Semantic Analysis)" <<infra>> {
+package "Backend (Semantic Analysis)" <<infra>> {
   component "Workflow Runner" as runner <<core>> {
     component "Signal Handlers" as signals
     component "Watchdog Timer" as watchdog

@@ -2,7 +2,7 @@
 
 **Type:** MCPAgent
 
-SemanticAnalysisAgentSystemImplementation is implemented across: src/knowledge-management, integrations/mcp-server-semantic-analysis/src
+SemanticAnalysisAgentSystemImplementation is implemented across: src/knowledge-management, integrations/semantic-analysis/src
 
 ## Introduction to SemanticAnalysisAgentSystemImplementation
 The SemanticAnalysisAgentSystemImplementation is a knowledge entity designed to provide a robust and modular system for managing and analyzing knowledge graphs. At its core, this entity is about enabling the efficient storage, export, and analysis of complex knowledge structures. The system's primary purpose is to facilitate the creation, management, and utilization of knowledge graphs, which are essential for various applications, including artificial intelligence, natural language processing, and decision support systems.

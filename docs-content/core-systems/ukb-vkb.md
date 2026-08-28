@@ -9,7 +9,7 @@ UKB is one of three knowledge systems built on the shared **@fwornle/km-core** k
 | System | Where it lives | Entrypoint | Storage path |
 |--------|----------------|------------|--------------|
 | **System A** — Online learning (observations/digests/insights) | `scripts/observations-api-server.mjs` (host) | Observations API, port 12436 | `.data/knowledge-graph/` (GraphKMStore — sole runtime store; legacy `.observations/observations.db` SQLite archived 2026-06-05 under Phase 44 Plan 18) |
-| **System B** — UKB / semantic-analysis | `integrations/mcp-server-semantic-analysis` (Docker) | MCP/SSE on port 3848 | `.data/knowledge-graph-migrated/` (GraphKMStore canonical) + `.data/knowledge-export/{team}.json` |
+| **System B** — UKB / semantic-analysis | `integrations/semantic-analysis` (Docker) | MCP/SSE on port 3848 | `.data/knowledge-graph-migrated/` (GraphKMStore canonical) + `.data/knowledge-export/{team}.json` |
 | **System C** — OKB / OKM | `_work/rapid-automations/integrations/operational-knowledge-management` (cross-repo) | OKB API on port 8090, VOKB viewer on port 3002 | `.data/leveldb-kmcore/` (GraphKMStore canonical) |
 
 All three call the same library — identical storage schema, dedup pipeline (`LayeredDeduplicator`: Jaccard → Cosine → LLM), ontology registry, and v7-strict ID minting. The shared `createKMRouter()` REST surface is mounted by **System A only** (at `/api/km/` on the observations API); System B exposes MCP/SSE, and System C wraps km-core inside its own REST API.
@@ -135,8 +135,8 @@ vkb
 
 **UKB (System B)**:
 
-- `integrations/mcp-server-semantic-analysis/src/agents/wave-controller.ts` — orchestrates wave-analysis; calls `persistWithKmCore()` on the shared km-core store
-- `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` — delegates writes to km-core's `GraphKMStore`
+- `integrations/semantic-analysis/src/agents/wave-controller.ts` — orchestrates wave-analysis; calls `persistWithKmCore()` on the shared km-core store
+- `integrations/semantic-analysis/src/agents/persistence-agent.ts` — delegates writes to km-core's `GraphKMStore`
 - `@fwornle/km-core` — shared kernel: `GraphKMStore`, `OntologyRegistry`, `LayeredDeduplicator`, `maintenance` (resolveEntities/mergeEntities), `adapters/online`, `createKMRouter`
 - `.data/knowledge-graph-migrated/` — km-core canonical store
 - `.data/knowledge-export/` — git-tracked JSON exports

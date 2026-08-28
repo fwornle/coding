@@ -6,7 +6,7 @@ The integrations/code-graph-rag/docs/claude-code-setup.md file provides setup in
 
 ## What It Is  
 
-The **DesignPatterns** sub‑component lives at the intersection of several concrete modules inside the broader **CodingPatterns** component.  Its most visible artefacts are the `GraphDatabaseAdapter` class in `storage/graph-database-adapter.ts`, the CodeGraph RAG documentation in `integrations/code-graph-rag/README.md`, and a handful of usage and configuration guides (e.g., `copi/USAGE.md`, `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK‑FORMAT.md`).  Together these files describe how the system organises its core logic around reusable architectural idioms –‑ singleton for the graph store, graph‑oriented data structures for code‑base navigation, and a collection of higher‑level patterns (factory, observer, builder, decorator, strategy) that shape how developers extend or configure the platform.  In short, **DesignPatterns** is the documented catalogue of the recurring structural and behavioural solutions that the rest of the **CodingPatterns** ecosystem relies on.
+The **DesignPatterns** sub‑component lives at the intersection of several concrete modules inside the broader **CodingPatterns** component.  Its most visible artefacts are the `GraphDatabaseAdapter` class in `storage/graph-database-adapter.ts`, the CodeGraph RAG documentation in `integrations/code-graph-rag/README.md`, and a handful of usage and configuration guides (e.g., `copi/USAGE.md`, `constraint-monitor/docs/CLAUDE-CODE-HOOK‑FORMAT.md`).  Together these files describe how the system organises its core logic around reusable architectural idioms –‑ singleton for the graph store, graph‑oriented data structures for code‑base navigation, and a collection of higher‑level patterns (factory, observer, builder, decorator, strategy) that shape how developers extend or configure the platform.  In short, **DesignPatterns** is the documented catalogue of the recurring structural and behavioural solutions that the rest of the **CodingPatterns** ecosystem relies on.
 
 ## Architecture and Design  
 
@@ -94,7 +94,7 @@ The heavy reliance on **well‑known design patterns** (singleton, factory, obse
 - [CodingConventions](./CodingConventions.md) -- The integrations/code-graph-rag/README.md file follows a consistent naming convention, indicating adherence to coding standards.
 - [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
 - [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
-- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
+- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
 
 ---
 

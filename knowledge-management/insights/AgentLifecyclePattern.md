@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The AgentLifecyclePattern is referenced in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md, highlighting its importance in the overall architecture
+The AgentLifecyclePattern is referenced in integrations/semantic-analysis/docs/architecture/agents.md, highlighting its importance in the overall architecture
 
 # AgentLifecyclePattern — Technical Insight Document
 
@@ -12,7 +12,7 @@ The `AgentLifecyclePattern` is a structural coding pattern implemented primarily
 
 ![AgentLifecyclePattern — Architecture](images/agent-lifecycle-pattern-architecture.png)
 
-The pattern is formally referenced in the architectural documentation at `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, which highlights its central role in the agent subsystem. As a SubComponent under the broader `CodingPatterns` parent, it sits alongside other systemic patterns such as `ServiceStartupPattern`, `ClosedVocabularyPattern`, `StructuredEventEnvelopePattern`, `DeferredDependencyPattern`, and `DiagramAsDocumentation`. Within its own scope, it organizes two child concerns: `BaseAgent` (the lifecycle contract itself) and `LLMInitialization` (a lazy initialization gate for language-model resources).
+The pattern is formally referenced in the architectural documentation at `integrations/semantic-analysis/docs/architecture/agents.md`, which highlights its central role in the agent subsystem. As a SubComponent under the broader `CodingPatterns` parent, it sits alongside other systemic patterns such as `ServiceStartupPattern`, `ClosedVocabularyPattern`, `StructuredEventEnvelopePattern`, `DeferredDependencyPattern`, and `DiagramAsDocumentation`. Within its own scope, it organizes two child concerns: `BaseAgent` (the lifecycle contract itself) and `LLMInitialization` (a lazy initialization gate for language-model resources).
 
 ## Architecture and Design
 
@@ -20,7 +20,7 @@ The architecture follows a **template method** style of design: `BaseAgent` decl
 
 A second key design decision is the **lazy initialization gate** embodied by `ensureLLMInitialized()` in `base-agent.ts`. Rather than eagerly constructing language-model resources during `init()`, the gate defers LLM setup until the first call site actually needs it, and then guards subsequent calls to prevent redundant LLM re-classification. This is the responsibility of the `LLMInitialization` child component, which centralizes the deferred setup logic in the base class so that concrete subclasses do not each have to reimplement on-demand construction. This is conceptually aligned with the singleton guard idiom described in the parent `CodingPatterns` documentation (and visualized in `docs/puml/psm-singleton-pattern.puml`), in that it uses a guard-and-return check to avoid duplicate construction of a costly stateful resource.
 
-The lifecycle methods are also designed to interoperate with the sibling `StructuredEventEnvelopePattern`, as documented in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This means that lifecycle transitions are expected to emit or consume events in the canonical envelope format, allowing external observers (such as constraint monitors and hooks) to react to agent state changes uniformly.
+The lifecycle methods are also designed to interoperate with the sibling `StructuredEventEnvelopePattern`, as documented in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This means that lifecycle transitions are expected to emit or consume events in the canonical envelope format, allowing external observers (such as constraint monitors and hooks) to react to agent state changes uniformly.
 
 ## Implementation Details
 
@@ -40,9 +40,9 @@ Concrete agents such as `MyAgent.ts` demonstrate the canonical usage: they exten
 
 ## Integration Points
 
-The most significant integration is with the `StructuredEventEnvelopePattern` sibling. Per `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, the lifecycle methods are designed to work with the structured event envelope format, meaning lifecycle transitions can be surfaced as canonical events consumable by hook-based tooling such as the MCP constraint monitor. This makes lifecycle state changes observable across the system in a uniform way.
+The most significant integration is with the `StructuredEventEnvelopePattern` sibling. Per `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, the lifecycle methods are designed to work with the structured event envelope format, meaning lifecycle transitions can be surfaced as canonical events consumable by hook-based tooling such as the MCP constraint monitor. This makes lifecycle state changes observable across the system in a uniform way.
 
-The pattern is also referenced from `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, which positions `AgentLifecyclePattern` within the broader semantic analysis MCP server architecture, and from `integrations/mcp-server-semantic-analysis/docs/installation/README.md`, which uses the `BaseAgent` contract as a touchstone for explaining how concrete agents are wired into the system. These two documents together establish the pattern as both an architectural primitive and a practical extension point for integrators.
+The pattern is also referenced from `integrations/semantic-analysis/docs/architecture/agents.md`, which positions `AgentLifecyclePattern` within the broader semantic analysis MCP server architecture, and from `integrations/semantic-analysis/docs/installation/README.md`, which uses the `BaseAgent` contract as a touchstone for explaining how concrete agents are wired into the system. These two documents together establish the pattern as both an architectural primitive and a practical extension point for integrators.
 
 Internally, the pattern depends on its two children: `BaseAgent`, which supplies the lifecycle surface, and `LLMInitialization`, which supplies the deferred LLM bootstrapping mechanic. Externally, any agent module that imports from `base-agent.ts` becomes a participant in the pattern.
 
@@ -52,7 +52,7 @@ When implementing a new agent, always extend `BaseAgent` from `base-agent.ts` ra
 
 For any LLM-related setup, do not roll your own initialization logic in subclasses. Route through `ensureLLMInitialized()` so the lazy gate can do its job of preventing redundant LLM re-classification. This both saves cost and keeps LLM state consistent across the agent's lifetime. This guidance mirrors the broader singleton-guard discipline described at the `CodingPatterns` parent level: stateful, expensive resources should be acquired through guarded accessors, never constructed directly at arbitrary call sites.
 
-When designing lifecycle transitions, remember that they are expected to be observable via the `StructuredEventEnvelopePattern`. Emit or accept events in the canonical envelope format described in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` so downstream monitors and hooks can react consistently. Finally, consult `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` before introducing structural changes to the pattern — it is the authoritative architectural reference for how agents fit into the wider system.
+When designing lifecycle transitions, remember that they are expected to be observable via the `StructuredEventEnvelopePattern`. Emit or accept events in the canonical envelope format described in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` so downstream monitors and hooks can react consistently. Finally, consult `integrations/semantic-analysis/docs/architecture/agents.md` before introducing structural changes to the pattern — it is the authoritative architectural reference for how agents fit into the wider system.
 
 ---
 
@@ -62,7 +62,7 @@ When designing lifecycle transitions, remember that they are expected to be obse
 2. **Design decisions and trade-offs**: Making the lifecycle explicit (five named phases) trades a small amount of subclass boilerplate for uniform orchestration and observability. Deferring LLM initialization trades a one-time first-use latency for avoided redundant re-classification and lower steady-state cost.
 3. **System structure insights**: The pattern is composed of two children (`BaseAgent`, `LLMInitialization`) and participates in a sibling ecosystem of patterns under `CodingPatterns`. Concrete agents like `MyAgent.ts` are the leaf consumers.
 4. **Scalability considerations**: The lazy initialization gate is the primary scalability lever — it prevents repeated heavy LLM setup. Uniform lifecycle phases also let an orchestrator scale agent counts without per-type special-casing.
-5. **Maintainability assessment**: High. Centralizing the lifecycle in `base-agent.ts` and the LLM gate in `ensureLLMInitialized()` keeps cross-cutting concerns out of subclasses, and the explicit phase names make agent code self-documenting. Authoritative documentation in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` provides a single point of reference for future contributors.
+5. **Maintainability assessment**: High. Centralizing the lifecycle in `base-agent.ts` and the LLM gate in `ensureLLMInitialized()` keeps cross-cutting concerns out of subclasses, and the explicit phase names make agent code self-documenting. Authoritative documentation in `integrations/semantic-analysis/docs/architecture/agents.md` provides a single point of reference for future contributors.
 
 
 ## Hierarchy Context
@@ -76,12 +76,12 @@ When designing lifecycle transitions, remember that they are expected to be obse
 
 ### Siblings
 - [ServiceStartupPattern](./ServiceStartupPattern.md) -- The startServiceWithRetry() function in lib/service-starter.js wraps the service startup with retry logic
-- [ClosedVocabularyPattern](./ClosedVocabularyPattern.md) -- The migration scripts in integrations/mcp-constraint-monitor/docs/constraint-configuration.md enforce fixed canonical type sets
+- [ClosedVocabularyPattern](./ClosedVocabularyPattern.md) -- The migration scripts in integrations/constraint-monitor/docs/constraint-configuration.md enforce fixed canonical type sets
 - [StructuredEventEnvelopePattern](./StructuredEventEnvelopePattern.md) -- The CLAUDE-CODE-HOOK-FORMAT.md document specifies the structured event envelope format
 - [DeferredDependencyPattern](./DeferredDependencyPattern.md) -- The VkbApiClient module in lib/ukb-unified/core/VkbApiClient.js is loaded dynamically using dynamic-import
 - [DiagramAsDocumentation](./DiagramAsDocumentation.md) -- The PlantUML diagrams in docs/puml/ capture architectural decisions and provide visual specification
-- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/mcp-constraint-monitor/README.md monitors and enforces constraints
-- [MCPServerSemanticAnalysis](./MCPServerSemanticAnalysis.md) -- The MCPServerSemanticAnalysis module in integrations/mcp-server-semantic-analysis/README.md performs semantic analysis
+- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/constraint-monitor/README.md monitors and enforces constraints
+- [MCPServerSemanticAnalysis](./MCPServerSemanticAnalysis.md) -- The MCPServerSemanticAnalysis module in integrations/semantic-analysis/README.md performs semantic analysis
 
 
 ---

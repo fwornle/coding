@@ -30,7 +30,7 @@ The system uses **two hook types** working together:
 
 **Directory Structure**:
 ```
-integrations/mcp-constraint-monitor/
+integrations/constraint-monitor/
   src/
     hooks/
       pre-tool-hook-wrapper.js        # PreToolUse entry point
@@ -56,7 +56,7 @@ integrations/mcp-constraint-monitor/
         "matcher": "*",
         "hooks": [{
           "type": "command",
-          "command": "node /path/to/coding/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+          "command": "node /path/to/coding/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
         }]
       }
     ],
@@ -205,7 +205,7 @@ LOGGED TO DASHBOARD [coding]: no-console-log (warning)
 
 **Start Dashboard**:
 ```bash
-cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
 PORT=3030 npm run dashboard
 ```
 
@@ -223,7 +223,7 @@ PORT=3030 npm run dashboard
 
 **Start API**:
 ```bash
-cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
 PORT=3031 npm run api
 ```
 
@@ -256,7 +256,7 @@ curl http://localhost:3031/api/violations?project=coding
 Tests all 18 constraints by calling hook functions directly:
 
 ```bash
-cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
 node test-all-constraints-comprehensive.js
 ```
 
@@ -315,7 +315,7 @@ cd /Users/q284340/Agentic/coding
 
 ### Constraint Definitions
 
-**File**: `integrations/mcp-constraint-monitor/constraints.yaml`
+**File**: `integrations/constraint-monitor/constraints.yaml`
 
 **Example Constraint**:
 ```yaml
@@ -340,18 +340,18 @@ Edit `constraints.yaml` and set `enabled: false` for any constraint:
 ## Key Files
 
 **Core System**:
-- `integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js` - PreToolUse hook entry
-- `integrations/mcp-constraint-monitor/src/enforcement/ConstraintEnforcer.js` - Enforcement engine
-- `integrations/mcp-constraint-monitor/constraints.yaml` - Constraint definitions
+- `integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js` - PreToolUse hook entry
+- `integrations/constraint-monitor/src/enforcement/ConstraintEnforcer.js` - Enforcement engine
+- `integrations/constraint-monitor/constraints.yaml` - Constraint definitions
 
 **Dashboard**:
-- `integrations/mcp-constraint-monitor/src/dashboard/api/` - REST API (port 3031)
-- `integrations/mcp-constraint-monitor/src/dashboard/ui/` - Next.js UI (port 3030)
+- `integrations/constraint-monitor/src/dashboard/api/` - REST API (port 3031)
+- `integrations/constraint-monitor/src/dashboard/ui/` - Next.js UI (port 3030)
 
 **Testing**:
-- `integrations/mcp-constraint-monitor/test-all-constraints-comprehensive.js` - Automated tests
-- `integrations/mcp-constraint-monitor/INTERACTIVE-TEST-PROMPTS.md` - Manual test scenarios
-- `integrations/mcp-constraint-monitor/collect-test-results.js` - LSL evidence collector
+- `integrations/constraint-monitor/test-all-constraints-comprehensive.js` - Automated tests
+- `integrations/constraint-monitor/INTERACTIVE-TEST-PROMPTS.md` - Manual test scenarios
+- `integrations/constraint-monitor/collect-test-results.js` - LSL evidence collector
 
 ## Integration
 
@@ -366,5 +366,5 @@ Example: `[🔒94%]` shows 94% constraint compliance; `[🔒75%●4]` shows 75% 
 ## See Also
 
 - [Unified Logging System](../logging/) - Backend and frontend Logger usage, migration guide
-- [MCP Constraint Monitor Integration](../../integrations/mcp-constraint-monitor/README.md) - Integration details
-- [Testing Guide](../../integrations/mcp-constraint-monitor/TESTING.md) - Complete testing documentation
+- [Constraint Monitor Integration](../../integrations/constraint-monitor/README.md) - Integration details
+- [Testing Guide](../../integrations/constraint-monitor/TESTING.md) - Complete testing documentation

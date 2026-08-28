@@ -8,7 +8,7 @@ The parent context suggests that the PersistenceAgentIntegration is responsible 
 
 **PersistenceAgentIntegration** is the concrete glue that enables the **EntityPersistenceModule** to persist domain entities and manage their relationships. The integration lives in the source tree at  
 
-* `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` – the **PersistenceAgent** implementation, and  
+* `integrations/semantic-analysis/src/agents/persistence-agent.ts` – the **PersistenceAgent** implementation, and  
 * `entity-persistence-module.ts` (the file that defines the **EntityPersistenceModule** and references the integration at line 15).  
 
 Within `entity-persistence-module.ts` the module creates or invokes an instance of the **PersistenceAgent** class (defined at line 5 of `persistence-agent.ts`). The integration therefore consists of a thin, purpose‑specific layer that forwards calls from the EntityPersistenceModule to the PersistenceAgent, delegating all actual storage and relationship‑handling logic to that agent.
@@ -21,7 +21,7 @@ The observed code reveals a **direct integration pattern**: the parent component
 
 From a design‑pattern perspective the integration resembles a **Facade**: the EntityPersistenceModule exposes a higher‑level API for the rest of the system, while the PersistenceAgent hides the low‑level details of entity storage, relationship graph construction, and any underlying database interactions. The Facade is implemented by the **PersistenceAgentIntegration** detail entity, which lives inside the EntityPersistenceModule (the parent).  
 
-Because the integration is declared in the same source tree (`integrations/mcp-server-semantic-analysis/src/agents`), the architecture favours **co‑location** of related concerns, simplifying navigation and reducing the cognitive load when tracing persistence flows. The design choice to keep the integration code minimal (no additional abstraction layers are mentioned) suggests a priority on **performance and simplicity** over extensibility.
+Because the integration is declared in the same source tree (`integrations/semantic-analysis/src/agents`), the architecture favours **co‑location** of related concerns, simplifying navigation and reducing the cognitive load when tracing persistence flows. The design choice to keep the integration code minimal (no additional abstraction layers are mentioned) suggests a priority on **performance and simplicity** over extensibility.
 
 ---
 
@@ -93,7 +93,7 @@ The implementation therefore follows a **composition** relationship: the EntityP
 ## Hierarchy Context
 
 ### Parent
-- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts for entity persistence and relationship management.
+- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/semantic-analysis/src/agents/persistence-agent.ts for entity persistence and relationship management.
 
 ---
 

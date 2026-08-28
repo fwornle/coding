@@ -10,7 +10,7 @@ The coding infrastructure uses two complementary knowledge management systems:
 
 | System | Purpose | Trigger | Storage |
 |--------|---------|---------|---------|
-| **MCP Semantic Analysis** | Deep, on-demand code analysis with 14 specialized agents | Type "ukb" in Claude chat | GraphDB to LevelDB to JSON |
+| **Semantic Analysis** | Deep, on-demand code analysis with 14 specialized agents | Type "ukb" in Claude chat | GraphDB to LevelDB to JSON |
 | **Continuous Learning** | Real-time session learning with budget control | Automatic during sessions | Qdrant + SQLite |
 
 ---

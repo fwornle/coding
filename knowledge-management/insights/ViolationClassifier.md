@@ -7,9 +7,9 @@ Positioned at the output boundary of SemanticConstraintDetector, ViolationClassi
 ## What It Is  
 
 **ViolationClassifier** lives inside the *constraint‑monitor* integration at the path  
-`integrations/mcp-constraint-monitor/` – it is referenced as a child of **SemanticConstraintDetector** in the design documentation (`semantic-detection-design.md`). Its sole responsibility is to take the raw results produced by the *semantic* detection pipeline and translate them into a **typed, display‑ready violation object**.  
+`integrations/constraint-monitor/` – it is referenced as a child of **SemanticConstraintDetector** in the design documentation (`semantic-detection-design.md`). Its sole responsibility is to take the raw results produced by the *semantic* detection pipeline and translate them into a **typed, display‑ready violation object**.  
 
-The downstream consumer of this object is the dashboard component described in `integrations/mcp-constraint-monitor/dashboard/README.md`. The dashboard expects each violation to carry a **severity** (e.g., high, medium, low) and a **category** that can be filtered or grouped for visualisation. Because the *Constraint Configuration Guide* (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) states that violations are configurable, the classifier does not hard‑code these values; instead it maps detector outcomes to the severity/category definitions supplied by the user configuration.
+The downstream consumer of this object is the dashboard component described in `integrations/constraint-monitor/dashboard/README.md`. The dashboard expects each violation to carry a **severity** (e.g., high, medium, low) and a **category** that can be filtered or grouped for visualisation. Because the *Constraint Configuration Guide* (`integrations/constraint-monitor/docs/constraint-configuration.md`) states that violations are configurable, the classifier does not hard‑code these values; instead it maps detector outcomes to the severity/category definitions supplied by the user configuration.
 
 In short, **ViolationClassifier** is the normalization layer that bridges the detection engine (**SemanticConstraintDetector**) to persistence layers and UI components, guaranteeing a stable schema for all downstream users.
 
@@ -109,10 +109,10 @@ Overall, **ViolationClassifier** sits at a clear **boundary interface**: it tran
 ## Hierarchy Context
 
 ### Parent
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- Documented in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and semantic-detection-design.md, indicating the detection logic is substantial enough to warrant both a user-facing doc and an internal design doc
+- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- Documented in integrations/constraint-monitor/docs/semantic-constraint-detection.md and semantic-detection-design.md, indicating the detection logic is substantial enough to warrant both a user-facing doc and an internal design doc
 
 ### Siblings
-- [SemanticRuleEvaluator](./SemanticRuleEvaluator.md) -- The existence of both a user-facing doc (integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md, titled 'Semantic Constraint Detection') and a separate internal design doc (integrations/mcp-constraint-monitor/docs/semantic-detection-design.md, titled 'Semantic Constraint Detection - Design Document') strongly implies that rule evaluation logic is architecturally complex enough to require distinct documentation for consumers and maintainers.
+- [SemanticRuleEvaluator](./SemanticRuleEvaluator.md) -- The existence of both a user-facing doc (integrations/constraint-monitor/docs/semantic-constraint-detection.md, titled 'Semantic Constraint Detection') and a separate internal design doc (integrations/constraint-monitor/docs/semantic-detection-design.md, titled 'Semantic Constraint Detection - Design Document') strongly implies that rule evaluation logic is architecturally complex enough to require distinct documentation for consumers and maintainers.
 
 
 ---

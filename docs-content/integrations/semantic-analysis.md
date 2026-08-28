@@ -8,7 +8,7 @@
 
 | Property | Value |
 |----------|-------|
-| Component | `mcp-server-semantic-analysis` |
+| Component | `semantic-analysis` |
 | Type | MCP Server (Node.js) |
 | Port (Docker) | 3848 |
 | Startup Time | ~2s |
@@ -126,7 +126,7 @@ The host-side Claude/Copilot CLI talks to the containerized semantic-analysis se
   "mcpServers": {
     "semantic-analysis": {
       "command": "node",
-      "args": ["/path/to/mcp-server-semantic-analysis/dist/stdio-proxy.js"],
+      "args": ["/path/to/semantic-analysis/dist/stdio-proxy.js"],
       "env": {
         "SEMANTIC_ANALYSIS_SSE_URL": "http://localhost:3848"
       }

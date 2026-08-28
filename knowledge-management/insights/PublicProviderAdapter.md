@@ -14,7 +14,7 @@ The design follows a per-provider file convention where each cloud LLM vendor ge
 
 ![PublicProviderAdapter — Architecture](images/public-provider-adapter-architecture.png)
 
-PublicProviderAdapter contains TieredModelSelector, meaning each provider adapter doesn't target a single fixed model but resolves which tier (as documented in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`) to invoke per request. This makes the adapter a composition of routing logic (which model tier) atop transport logic (which API endpoint).
+PublicProviderAdapter contains TieredModelSelector, meaning each provider adapter doesn't target a single fixed model but resolves which tier (as documented in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`) to invoke per request. This makes the adapter a composition of routing logic (which model tier) atop transport logic (which API endpoint).
 
 Its sibling TierRouter likely determines *when* public mode is selected, while LLMProviderConfig supplies credentials and endpoint configuration. PublicProviderAdapter consumes both to execute the actual cloud call.
 
@@ -43,12 +43,12 @@ Developers should never directly instantiate provider adapters — all access fl
 ### Parent
 - [LLMAbstraction](./LLMAbstraction.md) -- [LLM] **Three-Tier Mode System and Runtime Switchability**
 
-The `LLMAbstraction` component defines a `LLMMode` type (`'mock' | 'local' | 'public'`) in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` that maps to three fundamentally different execution paths: deterministic mock responses (zero-cost, no network), local Docker Model Runner inference (offline-capable, GPU-optional), and cloud API calls to Anthropic/OpenAI/Groq. These are not environment-level flags but a first-class runtime concept — the mode can be changed mid-session without restarting any process.
+The `LLMAbstraction` component defines a `LLMMode` type (`'mock' | 'local' | 'public'`) in `integrations/semantic-analysis/src/mock/llm-mock-service.ts` that maps to three fundamentally different execution paths: deterministic mock responses (zero-cost, no network), local Docker Model Runner inference (offline-capable, GPU-optional), and cloud API calls to Anthropic/OpenAI/Groq. These are not environment-level flags but a first-class runtime concept — the mode can be changed mid-session without restarting any process.
 
 This design directly solves a pain point common in LLM-integrated systems: the inability to cheaply validate agent orchestration logic without burning API tokens or requiring network access. By making 'mock' a first-class mode rather than a test-only stub, developers can run full multi-agent workflows during CI, iterate on prompt logic locally, and only graduate to 'public' when cloud validation is needed. The architectural implication is that every agent must be mode-agnostic — none may directly instantiate an LLM client; all must go through the abstraction layer's `getLLMMode()` query and receive a normalized response structure regardless of provider.
 
 ### Children
-- [TieredModelSelector](./TieredModelSelector.md) -- The project-level document integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered Model Selection Proposal') explicitly documents a tiered model strategy, indicating the LLMAbstraction layer — and by extension PublicProviderAdapter — must resolve which public provider tier to invoke rather than targeting a single fixed model.
+- [TieredModelSelector](./TieredModelSelector.md) -- The project-level document integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered Model Selection Proposal') explicitly documents a tiered model strategy, indicating the LLMAbstraction layer — and by extension PublicProviderAdapter — must resolve which public provider tier to invoke rather than targeting a single fixed model.
 
 ### Siblings
 - [LLMProviderConfig](./LLMProviderConfig.md) -- LLMProviderConfig is a sub-component of LLMAbstraction

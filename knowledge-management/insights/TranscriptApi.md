@@ -16,7 +16,7 @@ In practice, `TranscriptApi` acts as the façade through which external clients 
 
 The observations reveal a **modular architecture** built around clear separation of concerns.  The parent component, **LiveLoggingSystem**, orchestrates three independent modules:
 
-* **LoggingModule** – located in `integrations/mcp-server-semantic-analysis/src/logging.ts`
+* **LoggingModule** – located in `integrations/semantic-analysis/src/logging.ts`
 * **TranscriptApi** – located in `lib/agent-api/transcript-api.js`
 * **LslConverter** – located in `lib/agent-api/transcripts/lsl-converter.js`
 
@@ -47,7 +47,7 @@ The file organization—one top‑level JavaScript file for the API and distinct
 * **Dependency injection** – providing any shared services such as authentication middleware, configuration objects, or a logger instance that `TranscriptApi` may use indirectly.  
 * **Routing composition** – mounting the API’s endpoints onto the LiveLoggingSystem’s HTTP server (e.g., Express or a similar framework).  
 
-Sibling modules interact with `TranscriptApi` only at the data‑exchange level.  For example, a downstream workflow might retrieve a transcript via `getTranscript()`, then hand the raw transcript to the **LslConverter** (`lib/agent-api/transcripts/lsl-converter.js`) to produce an LSL document.  Conversely, the **LoggingModule** (`integrations/mcp-server-semantic-analysis/src/logging.ts`) may log request metadata or errors that originate in the API, but it does not embed any logging code inside `transcript-api.js`.  
+Sibling modules interact with `TranscriptApi` only at the data‑exchange level.  For example, a downstream workflow might retrieve a transcript via `getTranscript()`, then hand the raw transcript to the **LslConverter** (`lib/agent-api/transcripts/lsl-converter.js`) to produce an LSL document.  Conversely, the **LoggingModule** (`integrations/semantic-analysis/src/logging.ts`) may log request metadata or errors that originate in the API, but it does not embed any logging code inside `transcript-api.js`.  
 
 No direct file‑level imports between `transcript-api.js` and the sibling modules are mentioned, reinforcing the intentional isolation.  The only visible contract is the HTTP interface exposed by `TranscriptApi`, which other components can consume using standard HTTP clients or internal request wrappers.
 
@@ -74,7 +74,7 @@ When integrating with the **LslConverter**, callers must fetch the transcript vi
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for logging, transcript processing, and LSL conversion. This is evident in the code organization, where the logging module is implemented in integrations/mcp-server-semantic-analysis/src/logging.ts, the transcript API is defined in lib/agent-api/transcript-api.js, and the LSL converter is located in lib/agent-api/transcripts/lsl-converter.js. This modularity allows for easier maintenance and updates to individual components without affecting the entire system. For example, the logging module provides a unified logging interface, which can be easily extended or modified without impacting the transcript processing or LSL conversion functionality.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular design, with separate modules for logging, transcript processing, and LSL conversion. This is evident in the code organization, where the logging module is implemented in integrations/semantic-analysis/src/logging.ts, the transcript API is defined in lib/agent-api/transcript-api.js, and the LSL converter is located in lib/agent-api/transcripts/lsl-converter.js. This modularity allows for easier maintenance and updates to individual components without affecting the entire system. For example, the logging module provides a unified logging interface, which can be easily extended or modified without impacting the transcript processing or LSL conversion functionality.
 
 ### Siblings
 - [LoggingModule](./LoggingModule.md) -- LoggingModule uses a modular design, allowing for easier maintenance and updates without affecting the entire system.

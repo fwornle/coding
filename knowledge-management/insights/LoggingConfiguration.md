@@ -11,7 +11,7 @@ The LoggingConfiguration sub-component utilizes the logging-config.json file in 
 * the **`config/logging-config.json`** file, which resides under the top‑level `config/` directory, and  
 * the **`LoggingManager`** class (the exact path is not listed, but it is the component that parses the JSON file and applies the settings).  
 
-Together these pieces give the project a single source of truth for logging levels, output destinations, and environment‑specific tweaks. The `LoggingConfiguration` sub‑component does not contain executable code itself; rather, it supplies the data and the parsing logic that other runtime classes (for example, the `LLMService` class in `integrations/mcp-server-semantic-analysis/src/`) consume to configure their own loggers.  
+Together these pieces give the project a single source of truth for logging levels, output destinations, and environment‑specific tweaks. The `LoggingConfiguration` sub‑component does not contain executable code itself; rather, it supplies the data and the parsing logic that other runtime classes (for example, the `LLMService` class in `integrations/semantic-analysis/src/`) consume to configure their own loggers.  
 
 In short, `LoggingConfiguration` is the **centralized, file‑driven definition of how the entire system should emit logs**, and it is referenced by the parent `CodingPatterns` component to enforce a consistent logging policy across all modules.
 
@@ -39,7 +39,7 @@ No explicit design patterns beyond the obvious **Configuration File** and **Faca
   3. **Instantiate** logger objects or configure the underlying logging framework with the parsed values.  
   4. **Expose** a method such as `getLogger(String name)` that returns a logger already configured per the JSON rules.  
 
-* **`LLMService` (integrations/mcp-server-semantic-analysis/src/LLMService)** – This class “demonstrates a focus on logging,” implying that it obtains its logger from `LoggingManager` rather than hard‑coding log levels. For example, it might contain code akin to:  
+* **`LLMService` (integrations/semantic-analysis/src/LLMService)** – This class “demonstrates a focus on logging,” implying that it obtains its logger from `LoggingManager` rather than hard‑coding log levels. For example, it might contain code akin to:  
   ```java
   private static final Logger LOG = LoggingManager.getInstance().getLogger(LLMService.class);
   ```  
@@ -57,7 +57,7 @@ Overall, the implementation revolves around a **single source of truth (JSON)**,
 
 * **Sibling – CodeGraphConstruction**: Both components rely on `LoggingManager` for their logging needs. While `CodeGraphConstruction` focuses on AST parsing, it can still plug into the same logging pipeline, allowing developers to correlate parsing logs with AI service logs when troubleshooting end‑to‑end flows.  
 
-* **Consumer – LLMService**: The integration is explicit; `LLMService` lives under `integrations/mcp-server-semantic-analysis/src/` and pulls its logger from `LoggingManager`. This demonstrates a **dependency on the LoggingConfiguration sub‑component** for runtime behaviour.  
+* **Consumer – LLMService**: The integration is explicit; `LLMService` lives under `integrations/semantic-analysis/src/` and pulls its logger from `LoggingManager`. This demonstrates a **dependency on the LoggingConfiguration sub‑component** for runtime behaviour.  
 
 * **External Dependencies**: The only external artefact referenced is the JSON parsing library used by `LoggingManager`. No other third‑party services are mentioned, so the integration surface is minimal: read a file, parse JSON, configure the logging framework.  
 
@@ -96,7 +96,7 @@ By adhering to the guidelines above and respecting the observed structure, devel
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component exhibits a strong emphasis on centralized logging configuration, as evident from the presence of a logging-config.json file in the config/ directory. This suggests that logging is a critical aspect of the project, and the configuration is designed to be flexible and adaptable to different environments. The LLMService class in integrations/mcp-server-semantic-analysis/src/ also demonstrates a focus on logging, with the potential to inform coding patterns related to AI and machine learning integration. For instance, the logging-config.json file could be used to configure logging levels and output destinations for the LLMService class, ensuring that logging is consistent across the project. Furthermore, the CodeGraphConstructor class utilizes Tree-sitter AST parsing to construct the knowledge graph, which could be influenced by the logging configuration to provide more detailed and informative logs.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component exhibits a strong emphasis on centralized logging configuration, as evident from the presence of a logging-config.json file in the config/ directory. This suggests that logging is a critical aspect of the project, and the configuration is designed to be flexible and adaptable to different environments. The LLMService class in integrations/semantic-analysis/src/ also demonstrates a focus on logging, with the potential to inform coding patterns related to AI and machine learning integration. For instance, the logging-config.json file could be used to configure logging levels and output destinations for the LLMService class, ensuring that logging is consistent across the project. Furthermore, the CodeGraphConstructor class utilizes Tree-sitter AST parsing to construct the knowledge graph, which could be influenced by the logging configuration to provide more detailed and informative logs.
 
 ### Siblings
 - [CodeGraphConstruction](./CodeGraphConstruction.md) -- The CodeGraphConstructor class utilizes Tree-sitter AST parsing to construct the knowledge graph.

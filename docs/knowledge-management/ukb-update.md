@@ -12,7 +12,7 @@
 
 ---
 
-## Current System: MCP Semantic Analysis
+## Current System: Semantic Analysis
 
 **When you type "ukb" in Claude chat**, Claude detects your intent and calls the MCP semantic-analysis server to execute a comprehensive 14-agent workflow with SmartOrchestrator semantic coordination.
 
@@ -27,7 +27,7 @@ User: "ukb"
 ```
 
 **For full documentation, see:**
-- **[MCP Semantic Analysis Documentation](./mcp-semantic-analysis.md)** - Complete guide to current system
+- **[Semantic Analysis Documentation](./semantic-analysis.md)** - Complete guide to current system
 - **[Cross-Project Knowledge System](../architecture/cross-project-knowledge.md)** - Architecture overview
 
 ---
@@ -222,7 +222,7 @@ If you were using the old UKB CLI system:
 ## Complete Documentation
 
 **Primary Documentation (Current System)**:
-- [MCP Semantic Analysis](./mcp-semantic-analysis.md) - Complete MCP integration guide
+- [Semantic Analysis](./semantic-analysis.md) - Complete MCP integration guide
 - [Cross-Project Knowledge System](../architecture/cross-project-knowledge.md) - Architecture overview
 - [Continuous Learning System](./continuous-learning-system.md) - Automatic knowledge capture
 
@@ -243,4 +243,4 @@ The migration from CLI to MCP integration with SmartOrchestrator provides:
 
 ---
 
-*For questions about the current MCP-based system, see [mcp-semantic-analysis.md](./mcp-semantic-analysis.md)*
+*For questions about the current MCP-based system, see [semantic-analysis.md](./semantic-analysis.md)*

@@ -2,7 +2,7 @@
 
 **Type:** MCPAgent
 
-CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified, integrations/semantic-analysis/src
 
 ## What It Is
 
@@ -15,7 +15,7 @@ CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified,
 
 ## How It Works
 
-- CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+- CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified, integrations/semantic-analysis/src
 
 - Workflow is triggered via MCP tools (execute_workflow) or automatic incremental analysis
 

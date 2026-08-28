@@ -40,7 +40,7 @@ const home = homedir();
 
 /** The hooks this project contributes. Single source of truth for both scopes. */
 function codingHooks(repoPath) {
-  const preTool = `node ${repoPath}/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js`;
+  const preTool = `node ${repoPath}/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js`;
   const postTool = `node ${repoPath}/scripts/tool-interaction-hook-wrapper.js`;
   const prompt = `node ${repoPath}/scripts/health-prompt-hook.js`;
   return {
@@ -52,19 +52,31 @@ function codingHooks(repoPath) {
 
 /**
  * Merge our hooks into the user's, per event, WITHOUT dropping theirs.
- * Entries are matched by the command string so re-running is idempotent and
- * never accumulates duplicates.
+ *
+ * Entries are matched by the hook SCRIPT NAME, not the full command string, so
+ * that re-running is idempotent even when the path has moved. Matching on the
+ * whole command was a latent bug: any relocation of a wrapper (the
+ * `integrations/mcp-constraint-monitor` -> `integrations/constraint-monitor`
+ * rename being the case that surfaced it) left the stale entry in place and
+ * appended the new one, so the hook ran twice per tool call. `install.sh` has
+ * always stripped by script name for the same reason; this matches it.
  */
+function hookScriptName(command) {
+  const match = /([\w.-]+\.(?:js|mjs|cjs))\b/.exec(command || '');
+  return match ? match[1] : command;
+}
+
 function mergeHooks(userHooks = {}, ours) {
   const out = { ...userHooks };
   for (const [event, ourEntries] of Object.entries(ours)) {
     const theirs = Array.isArray(out[event]) ? out[event] : [];
-    const ourCommands = new Set(
-      ourEntries.flatMap((e) => (e.hooks || []).map((h) => h.command)),
+    const ourScripts = new Set(
+      ourEntries.flatMap((e) => (e.hooks || []).map((h) => hookScriptName(h.command))),
     );
-    // Drop any previous copy of OUR hooks (identified by command), keep theirs.
+    // Drop any previous copy of OUR hooks (identified by script name, so old
+    // paths are replaced rather than duplicated), keep theirs.
     const kept = theirs.filter(
-      (entry) => !(entry.hooks || []).some((h) => ourCommands.has(h.command)),
+      (entry) => !(entry.hooks || []).some((h) => ourScripts.has(hookScriptName(h.command))),
     );
     out[event] = [...kept, ...ourEntries];
   }

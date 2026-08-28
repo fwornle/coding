@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-CodeGraphAnalysisModule uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to perform code graph analysis.
+CodeGraphAnalysisModule uses the CodeGraphAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts to perform code graph analysis.
 
 ## What It Is  
 
 The **CodeGraphAnalysisModule** is the core sub‑component that turns raw source‑code artefacts into a structured knowledge graph. Its implementation lives primarily in the **CodeGraphAgent** found at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts
+integrations/semantic-analysis/src/agents/code-graph-agent.ts
 ```  
 
 The module is invoked by the **OnlineLearning** pipeline to extract knowledge from code‑analysis runs, and it collaborates with the surrounding KnowledgeManagement ecosystem (parent = KnowledgeManagement) to persist, validate, classify and report the resulting graph entities. In practice the module orchestrates three downstream services:  
@@ -52,8 +52,8 @@ The design deliberately isolates each responsibility, making the system easier t
 ### Core workflow  
 
 1. **Invocation** – OnlineLearning triggers the CodeGraphAnalysisModule as part of its batch analysis pipeline.  
-2. **Graph construction** – The module calls `CodeGraphAgent` (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`). This agent parses source files, resolves symbols, and creates a **code knowledge graph** consisting of nodes (e.g., classes, functions) and edges (e.g., calls, inheritance).  
-3. **Entity validation** – The freshly built graph is handed to **EntityPersistenceModule**, which uses the `PersistenceAgent` (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`) to run validation rules and classify entities (e.g., “library”, “application component”).  
+2. **Graph construction** – The module calls `CodeGraphAgent` (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`). This agent parses source files, resolves symbols, and creates a **code knowledge graph** consisting of nodes (e.g., classes, functions) and edges (e.g., calls, inheritance).  
+3. **Entity validation** – The freshly built graph is handed to **EntityPersistenceModule**, which uses the `PersistenceAgent` (`integrations/semantic-analysis/src/agents/persistence-agent.ts`) to run validation rules and classify entities (e.g., “library”, “application component”).  
 4. **Persistence** – Validated observations are stored via the **GraphDatabaseModule**. The module relies on the `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`) to translate the in‑memory graph representation into the underlying graph‑DB commands (e.g., Cypher for Neo4j).  
 5. **Reporting** – After persistence, the module invokes **UKBTraceReportModule**, which uses the `UKBTraceReportAgent` to generate a detailed execution report (including timestamps, processed entity counts, and any validation warnings).  
 
@@ -61,8 +61,8 @@ The design deliberately isolates each responsibility, making the system easier t
 
 | Path | Likely class / function | Role |
 |------|------------------------|------|
-| `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` | `CodeGraphAgent` (e.g., `analyzeRepository()`) | Parses code and builds the graph. |
-| `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` | `PersistenceAgent` (e.g., `validateAndClassify()`) | Applies validation rules to graph entities. |
+| `integrations/semantic-analysis/src/agents/code-graph-agent.ts` | `CodeGraphAgent` (e.g., `analyzeRepository()`) | Parses code and builds the graph. |
+| `integrations/semantic-analysis/src/agents/persistence-agent.ts` | `PersistenceAgent` (e.g., `validateAndClassify()`) | Applies validation rules to graph entities. |
 | `storage/graph-database-adapter.ts` | `GraphDatabaseAdapter` (e.g., `saveGraph()`) | Abstracts DB operations for the GraphDatabaseModule. |
 | `UKBTraceReportModule` (path not listed) | `UKBTraceReportAgent` (e.g., `generateReport()`) | Emits traceable reports for analysis runs. |
 
@@ -140,13 +140,13 @@ All interactions are mediated through well‑defined interfaces (agents and adap
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and knowledge decay tracking, as seen in the storage/graph-database-adapter.ts file which implements the GraphDatabaseAdapter. This modular approach allows for easier maintenance and updates of individual components without affecting the entire system. For instance, the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts can be modified or extended without impacting the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database storage, entity persistence, and knowledge decay tracking, as seen in the storage/graph-database-adapter.ts file which implements the GraphDatabaseAdapter. This modular approach allows for easier maintenance and updates of individual components without affecting the entire system. For instance, the CodeGraphAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts can be modified or extended without impacting the PersistenceAgent in integrations/semantic-analysis/src/agents/persistence-agent.ts.
 
 ### Siblings
 - [ManualLearning](./ManualLearning.md) -- ManualLearning relies on the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store manually curated knowledge.
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
 - [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the graph database.
-- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts to persist entities.
+- [EntityPersistenceModule](./EntityPersistenceModule.md) -- EntityPersistenceModule uses the PersistenceAgent in integrations/semantic-analysis/src/agents/persistence-agent.ts to persist entities.
 - [UKBTraceReportModule](./UKBTraceReportModule.md) -- UKBTraceReportModule uses the UKBTraceReportAgent to generate detailed reports of UKB workflow runs.
 
 ---

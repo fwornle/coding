@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The tiered model selection pattern referenced in integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md aligns with agent-profiles.json fields that map agents to LLM tier classifications.
+The tiered model selection pattern referenced in integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md aligns with agent-profiles.json fields that map agents to LLM tier classifications.
 
 ## What It Is  
 
-**AgentProfileSchema** is the declarative contract that defines the shape of each entry in `config/agent‑profiles.json`.  The file lives at the root of the repository under `config/agent‑profiles.json` and is the primary source of truth for runtime‑behaviour configuration of every agent type in the system.  Each JSON object described by the schema specifies, for a given agent, the LLM tier that should be used (e.g., *standard*, *premium*, *experimental*) and operational limits such as maximum concurrent requests.  Because the schema is consumed by the **ConfigDrivenBehavior** component, adding a new agent or adjusting its limits never requires a code change—only a new JSON entry that conforms to the schema.  The formal definition of the schema is documented in the architecture guide at `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, and the tier‑selection semantics are elaborated in `integrations/mcp-server-semantic-analysis/docs/TIERED‑MODEL‑PROPOSAL.md`.
+**AgentProfileSchema** is the declarative contract that defines the shape of each entry in `config/agent‑profiles.json`.  The file lives at the root of the repository under `config/agent‑profiles.json` and is the primary source of truth for runtime‑behaviour configuration of every agent type in the system.  Each JSON object described by the schema specifies, for a given agent, the LLM tier that should be used (e.g., *standard*, *premium*, *experimental*) and operational limits such as maximum concurrent requests.  Because the schema is consumed by the **ConfigDrivenBehavior** component, adding a new agent or adjusting its limits never requires a code change—only a new JSON entry that conforms to the schema.  The formal definition of the schema is documented in the architecture guide at `integrations/semantic-analysis/docs/architecture/agents.md`, and the tier‑selection semantics are elaborated in `integrations/semantic-analysis/docs/TIERED‑MODEL‑PROPOSAL.md`.
 
 ---
 

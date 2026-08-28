@@ -188,3 +188,40 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   border-color: var(--md-primary-fg-color--light);
 }
+
+/* ── Status-line state dots ───────────────────────────────────────────────
+ * The status line renders its state glyph as a single tmux-tinted `●`, so the
+ * docs must tint it too — a bare bullet inherits body text colour and every
+ * swatch renders black, which makes the colour tables meaningless.
+ *
+ * Values are the exact xterm-256 colours the bar uses, so the page and the
+ * terminal agree. The `colourNN` code stays in its own table column as the
+ * authoritative value; these are just its rendering.
+ */
+.dot {
+  font-size: 1.1em;
+  line-height: 1;
+  /* Keep the darkest ramp shades from disappearing into the page. */
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.dot-green       { color: #00d75f; } /* colour41  — healthy / active        */
+.dot-green-mid   { color: #00af00; } /* colour34  — cooling                 */
+.dot-green-dark  { color: #008700; } /* colour28  — fading                  */
+.dot-green-vdark { color: #005f00; } /* colour22  — inactive                */
+.dot-amber       { color: #ffaf00; } /* colour214 — warning                 */
+.dot-red         { color: #ff0000; } /* colour196 — critical                */
+.dot-grey        { color: #444444; } /* colour238 — idle / offline          */
+
+/* Alarm dots are rendered bold in the bar; mirror that here. */
+.dot-amber,
+.dot-red { font-weight: 700; }
+
+/* On the dark scheme the two darkest greens and the grey sit almost on top of
+ * the background, so lift exactly those three by one ramp step. Everything
+ * else keeps its terminal-accurate value.
+ */
+[data-md-color-scheme="slate"] .dot-green-dark  { color: #00af00; }
+[data-md-color-scheme="slate"] .dot-green-vdark { color: #008700; }
+[data-md-color-scheme="slate"] .dot-grey        { color: #8a8a8a; }
+[data-md-color-scheme="slate"] .dot { text-shadow: none; }

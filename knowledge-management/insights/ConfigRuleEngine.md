@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file implements the rule-based approach for validating LSL configurations.
+The integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file implements the rule-based approach for validating LSL configurations.
 
 ## What It Is  
 
-**ConfigRuleEngine** is the core rule‑based component that drives validation of LSL (Learning Service Language) configurations. The implementation lives in the **`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`** file, where the rule engine logic is applied to incoming configuration data. Within the broader validation stack, **`LSLConfigValidator`** holds an instance of **ConfigRuleEngine**, delegating the actual rule evaluation to it. The design purpose of the engine is to provide a flexible, maintainable way to express and enforce validation constraints on LSL configuration objects, ensuring that they conform to the expected semantic model before they are accepted by downstream services.
+**ConfigRuleEngine** is the core rule‑based component that drives validation of LSL (Learning Service Language) configurations. The implementation lives in the **`integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`** file, where the rule engine logic is applied to incoming configuration data. Within the broader validation stack, **`LSLConfigValidator`** holds an instance of **ConfigRuleEngine**, delegating the actual rule evaluation to it. The design purpose of the engine is to provide a flexible, maintainable way to express and enforce validation constraints on LSL configuration objects, ensuring that they conform to the expected semantic model before they are accepted by downstream services.
 
 ---
 
@@ -22,7 +22,7 @@ Interaction between components is straightforward: the validator forwards the ra
 
 ## Implementation Details  
 
-The rule‑based logic resides in **`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`**. Although the source file does not expose explicit symbols in the observation dump, the naming indicates that the file defines an **agent** responsible for classifying ontology elements and, as part of that work, validates configuration objects against a set of rules.  
+The rule‑based logic resides in **`integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`**. Although the source file does not expose explicit symbols in the observation dump, the naming indicates that the file defines an **agent** responsible for classifying ontology elements and, as part of that work, validates configuration objects against a set of rules.  
 
 Key implementation concepts that can be inferred:
 
@@ -64,7 +64,7 @@ No sibling components are identified in the observations, so the focus remains o
 ## Hierarchy Context
 
 ### Parent
-- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a rule-based approach to validate LSL configuration, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a rule-based approach to validate LSL configuration, as implemented in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
 
 ---
 

@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The probe targets port-based services: integrations/mcp-server-semantic-analysis/docs/configuration.md documents both CODE_GRAPH_RAG_PORT and CODE_GRAPH_RAG_SSE_PORT as the reachability endpoints, indicating the probe performs a TCP or HTTP-level check against these configured ports before loading any client module.
+The probe targets port-based services: integrations/semantic-analysis/docs/configuration.md documents both CODE_GRAPH_RAG_PORT and CODE_GRAPH_RAG_SSE_PORT as the reachability endpoints, indicating the probe performs a TCP or HTTP-level check against these configured ports before loading any client module.
 
 ## What It Is  
 
 **AvailabilityProbeFunction** lives inside the *MCP‑Server‑Semantic‑Analysis* integration.  The only concrete locations that mention it are the documentation files under  
 
-* `integrations/mcp-server-semantic-analysis/docs/configuration.md` – which lists the ports **CODE_GRAPH_RAG_PORT** and **CODE_GRAPH_RAG_SSE_PORT** as the endpoints the probe checks, and  
-* `integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` – which records the “probe‑before‑import” fix that was applied to avoid crashes when optional services are missing.  
+* `integrations/semantic-analysis/docs/configuration.md` – which lists the ports **CODE_GRAPH_RAG_PORT** and **CODE_GRAPH_RAG_SSE_PORT** as the endpoints the probe checks, and  
+* `integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` – which records the “probe‑before‑import” fix that was applied to avoid crashes when optional services are missing.  
 
 The function itself is not exposed as a public class or module in the source tree (the “0 code symbols found” observation confirms there is no direct source‑code reference).  Instead, it is a logical component of the **DynamicImportGuardPattern** – the parent pattern that wraps optional external services (e.g., Memgraph, external analysis servers) with a runtime availability check before any client library is imported or any request is sent.  Its sibling, **GracefulDegradationResponse**, defines the contract that the MCP host must receive a well‑formed response even when the probe fails.
 
@@ -49,7 +49,7 @@ The interaction diagram (conceptual, not provided in source) would show:
 
 Although the source repository does not expose a concrete class, the implementation can be inferred from the documentation:
 
-* **Port Configuration** – `integrations/mcp-server-semantic-analysis/docs/configuration.md` defines two constants, **CODE_GRAPH_RAG_PORT** and **CODE_GRAPH_RAG_SSE_PORT**.  The probe reads these values at runtime, likely via a configuration loader used throughout the MCP server.  
+* **Port Configuration** – `integrations/semantic-analysis/docs/configuration.md` defines two constants, **CODE_GRAPH_RAG_PORT** and **CODE_GRAPH_RAG_SSE_PORT**.  The probe reads these values at runtime, likely via a configuration loader used throughout the MCP server.  
 * **Network Check** – The probe attempts a socket connection (or an HTTP HEAD request) against each configured port.  The choice of TCP vs. HTTP is not spelled out, but the wording “TCP or HTTP‑level check” suggests the implementation abstracts the protocol behind a small helper (e.g., `isPortOpen(host, port)` or `httpHealthCheck(url)`).  
 * **Dynamic Import Guard** – The parent **DynamicImportGuardPattern** wraps the import statement in a conditional block.  Pseudo‑code, derived from the pattern description, would look like:
 
@@ -81,7 +81,7 @@ Overall, **AvailabilityProbeFunction** sits at the intersection of configuration
 
 ## Usage Guidelines  
 
-1. **Never hard‑code service endpoints** – Always rely on the values defined in `integrations/mcp-server-semantic-analysis/docs/configuration.md`.  Changing a port without updating the config file will cause the probe to fail silently and trigger degradation.  
+1. **Never hard‑code service endpoints** – Always rely on the values defined in `integrations/semantic-analysis/docs/configuration.md`.  Changing a port without updating the config file will cause the probe to fail silently and trigger degradation.  
 2. **Add new optional services through the DynamicImportGuardPattern** – When introducing a new external dependency, declare its port(s) in the configuration file, implement a small probe call (reusing the existing helper if possible), and wrap the import in the guard.  Follow the same fallback path that **GracefulDegradationResponse** provides.  
 3. **Respect the probe result** – Code that performs batch operations or any service‑specific logic must first verify that the probe succeeded.  The pattern already guarantees this ordering, but developers should avoid calling client APIs outside the guarded block.  
 4. **Maintain the contract in `tools.md`** – Any change to the shape of the fallback response must be reflected in the “tool‑level contract” so that the MCP host can continue to parse responses uniformly.  
@@ -123,10 +123,10 @@ The main maintenance burden is ensuring the configuration stays in sync with the
 ## Hierarchy Context
 
 ### Parent
-- [DynamicImportGuardPattern](./DynamicImportGuardPattern.md) -- The pattern appears in integrations/mcp-server-semantic-analysis where optional external services (e.g., Memgraph, external analysis servers) may or may not be running, requiring a probe before importing or invoking their client libraries
+- [DynamicImportGuardPattern](./DynamicImportGuardPattern.md) -- The pattern appears in integrations/semantic-analysis where optional external services (e.g., Memgraph, external analysis servers) may or may not be running, requiring a probe before importing or invoking their client libraries
 
 ### Siblings
-- [GracefulDegradationResponse](./GracefulDegradationResponse.md) -- integrations/mcp-server-semantic-analysis/docs/architecture/tools.md ('Tool Extensions') defines the tool-level contract that each tool must satisfy; graceful degradation is a required part of that contract so that the MCP host receives a well-formed response object regardless of optional-service state.
+- [GracefulDegradationResponse](./GracefulDegradationResponse.md) -- integrations/semantic-analysis/docs/architecture/tools.md ('Tool Extensions') defines the tool-level contract that each tool must satisfy; graceful degradation is a required part of that contract so that the MCP host receives a well-formed response object regardless of optional-service state.
 
 
 ---

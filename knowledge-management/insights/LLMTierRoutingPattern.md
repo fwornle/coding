@@ -2,13 +2,13 @@
 
 **Type:** SubComponent
 
-integrations/mcp-server-semantic-analysis/docs/architecture/agents.md references the agent's dependency on the LLM provider layer, implying agents consume the tier-routing abstraction rather than addressing specific providers directly
+integrations/semantic-analysis/docs/architecture/agents.md references the agent's dependency on the LLM provider layer, implying agents consume the tier-routing abstraction rather than addressing specific providers directly
 
 # LLMTierRoutingPattern — Technical Insight Document
 
 ## What It Is
 
-LLMTierRoutingPattern is a SubComponent of CodingPatterns that formalizes how agents in the Coding project select and route requests to LLM providers based on a tiered ranking system. Its authoritative artifacts live in two related locations: the formal design proposal at `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` (captured as the child entity TieredModelProposal) and the runtime configuration at `llm-providers.yaml`, which the proposal directly motivates. Supporting configuration semantics are documented in `integrations/mcp-server-semantic-analysis/docs/configuration.md`, and the agent-side consumption contract is described in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.
+LLMTierRoutingPattern is a SubComponent of CodingPatterns that formalizes how agents in the Coding project select and route requests to LLM providers based on a tiered ranking system. Its authoritative artifacts live in two related locations: the formal design proposal at `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` (captured as the child entity TieredModelProposal) and the runtime configuration at `llm-providers.yaml`, which the proposal directly motivates. Supporting configuration semantics are documented in `integrations/semantic-analysis/docs/configuration.md`, and the agent-side consumption contract is described in `integrations/semantic-analysis/docs/architecture/agents.md`.
 
 ![LLMTierRoutingPattern — Architecture](images/llmtier-routing-pattern-architecture.png)
 
@@ -28,7 +28,7 @@ The implementation is split across three coordinated artifacts. First, `TIERED-M
 
 Second, `llm-providers.yaml` is the runtime expression of that proposal. It serves as the declarative registry of provider tiers, fallback order, and routing rules. Agents do not parse provider lists themselves; they read this YAML file (or consume it through a configuration layer described in `configuration.md`) and treat its contents as authoritative. Because it is declarative, modifying provider preferences requires only editing this file, not touching agent code.
 
-Third, the consumption contract is in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, which documents the agent's dependency on the LLM provider layer. Agents reference the tier-routing abstraction rather than addressing specific providers directly. The lazy-initialization idiom from AgentAbstractionPatterns provides the mechanical hook: when `initialize()` runs, the agent resolves its tier against `llm-providers.yaml` and binds to a concrete provider at that moment. This means construction is cheap and routing decisions reflect the configuration state at first use rather than at import time.
+Third, the consumption contract is in `integrations/semantic-analysis/docs/architecture/agents.md`, which documents the agent's dependency on the LLM provider layer. Agents reference the tier-routing abstraction rather than addressing specific providers directly. The lazy-initialization idiom from AgentAbstractionPatterns provides the mechanical hook: when `initialize()` runs, the agent resolves its tier against `llm-providers.yaml` and binds to a concrete provider at that moment. This means construction is cheap and routing decisions reflect the configuration state at first use rather than at import time.
 
 ## Integration Points
 
@@ -36,7 +36,7 @@ Third, the consumption contract is in `integrations/mcp-server-semantic-analysis
 
 The most important integration is with AgentAbstractionPatterns: the constructor/initialize() lifecycle contract enforced there is precisely where tier resolution is plugged in. An agent that follows the base interface gets tier routing essentially for free — it inherits the initialization hook and the convention that LLM setup happens there. Violating the lazy-initialization rule would not only break startup performance assumptions (as noted in CodingPatterns) but also bypass the tier-routing resolution step, since that resolution is anchored to `initialize()`.
 
-The pattern also integrates with the MCPIntegrationConventions sibling through directory placement: the proposal and configuration documents live under `integrations/mcp-server-semantic-analysis/docs/`, conforming to the canonical MCP integration layout (`docs/architecture/`, `docs/api/`, `docs/installation/`, `docs/configuration.md`). New MCP integrations that need their own tier routing should mirror this structure so that the configuration documentation is discoverable in the expected location.
+The pattern also integrates with the MCPIntegrationConventions sibling through directory placement: the proposal and configuration documents live under `integrations/semantic-analysis/docs/`, conforming to the canonical MCP integration layout (`docs/architecture/`, `docs/api/`, `docs/installation/`, `docs/configuration.md`). New MCP integrations that need their own tier routing should mirror this structure so that the configuration documentation is discoverable in the expected location.
 
 The child TieredModelProposal entity provides the design-time integration point: changes to tier semantics flow from that document into `llm-providers.yaml`. The relationship is one-directional in terms of authority — the proposal defines what the YAML expresses. The HookExtensionPattern sibling is orthogonal: it governs the Claude Code hook contract rather than LLM routing, but both share the CodingPatterns lineage of externalizing contracts into documented files rather than hardcoding them.
 
@@ -71,8 +71,8 @@ Finally, new MCP integrations that need tier-aware LLM access should place their
 
 ### Siblings
 - [AgentAbstractionPatterns](./AgentAbstractionPatterns.md) -- docs/puml/agent-abstraction-architecture.puml documents the base agent interface enforcing the constructor/initialize() split, ensuring all concrete agent types adhere to the same lifecycle contract
-- [MCPIntegrationConventions](./MCPIntegrationConventions.md) -- integrations/mcp-server-semantic-analysis/ follows the canonical MCP integration directory structure with subdirectories docs/architecture/, docs/api/, docs/installation/, and docs/configuration.md, establishing the expected layout new integrations must mirror
-- [HookExtensionPattern](./HookExtensionPattern.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md documents the data format Claude Code emits at hook points, defining the contract between the hook producer and constraint-monitor consumer
+- [MCPIntegrationConventions](./MCPIntegrationConventions.md) -- integrations/semantic-analysis/ follows the canonical MCP integration directory structure with subdirectories docs/architecture/, docs/api/, docs/installation/, and docs/configuration.md, establishing the expected layout new integrations must mirror
+- [HookExtensionPattern](./HookExtensionPattern.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md documents the data format Claude Code emits at hook points, defining the contract between the hook producer and constraint-monitor consumer
 
 
 ---

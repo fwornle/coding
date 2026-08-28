@@ -8,7 +8,7 @@ The MCP server pattern, referenced in docs/agent-integration-guide.md and docs/a
 
 ## What It Is
 
-`McpToolEndpointExposure` is a design detail contained within the Pipeline component, which itself is hosted inside `integrations/mcp-server-semantic-analysis`. It represents the specific mechanism by which pipeline control logic is surfaced as discrete, callable MCP (Model Context Protocol) tool endpoints — making pipeline stages accessible to orchestrating agents through a standardized tool-invocation interface rather than through direct programmatic coupling.
+`McpToolEndpointExposure` is a design detail contained within the Pipeline component, which itself is hosted inside `integrations/semantic-analysis`. It represents the specific mechanism by which pipeline control logic is surfaced as discrete, callable MCP (Model Context Protocol) tool endpoints — making pipeline stages accessible to orchestrating agents through a standardized tool-invocation interface rather than through direct programmatic coupling.
 
 This is not a standalone service or module but rather a structural characteristic of how the Pipeline is exposed within the MCP server boundary. The "exposure" in the name is precise: the concern here is the act of wrapping and presenting pipeline functionality as tool endpoints that external agents can discover and invoke.
 
@@ -22,15 +22,15 @@ The trade-off inherent in this approach is a degree of indirection and serializa
 
 ## Implementation Details
 
-Within `integrations/mcp-server-semantic-analysis`, the Pipeline component hosts `McpToolEndpointExposure` as the detail responsible for registering pipeline control actions as MCP tools. The MCP server framework provides the scaffolding for tool registration, schema declaration, and dispatch — `McpToolEndpointExposure` is the point where pipeline-specific logic is bound into that framework.
+Within `integrations/semantic-analysis`, the Pipeline component hosts `McpToolEndpointExposure` as the detail responsible for registering pipeline control actions as MCP tools. The MCP server framework provides the scaffolding for tool registration, schema declaration, and dispatch — `McpToolEndpointExposure` is the point where pipeline-specific logic is bound into that framework.
 
 Concretely, this means pipeline stages are wrapped such that their inputs and outputs conform to whatever schema the MCP tool protocol requires. An orchestrating agent invoking a tool endpoint triggers the corresponding pipeline control logic through this wrapper, receiving results in a protocol-normalized form. The pipeline itself remains agnostic to the MCP layer; the exposure detail owns the translation.
 
-The observations do not specify individual class names or function signatures within this component, so the precise registration mechanics cannot be detailed here. However, the structural location within `integrations/mcp-server-semantic-analysis` confirms this is an integration-layer concern, not a core pipeline concern.
+The observations do not specify individual class names or function signatures within this component, so the precise registration mechanics cannot be detailed here. However, the structural location within `integrations/semantic-analysis` confirms this is an integration-layer concern, not a core pipeline concern.
 
 ## Integration Points
 
-`McpToolEndpointExposure` sits at the intersection of two systems: the semantic analysis Pipeline (its parent) and the orchestrating agents that consume it. The Pipeline provides the logic being exposed; the MCP server infrastructure (`integrations/mcp-server-semantic-analysis`) provides the transport and protocol layer. `McpToolEndpointExposure` is the seam between them.
+`McpToolEndpointExposure` sits at the intersection of two systems: the semantic analysis Pipeline (its parent) and the orchestrating agents that consume it. The Pipeline provides the logic being exposed; the MCP server infrastructure (`integrations/semantic-analysis`) provides the transport and protocol layer. `McpToolEndpointExposure` is the seam between them.
 
 Agents onboarded per `docs/architecture/adding-new-agent.md` are the primary consumers of the endpoints this detail creates. The agent integration guide (`docs/agent-integration-guide.md`) and system overview (`docs/architecture/system-overview.md`) together define the contract that agents rely on — any change to how endpoints are exposed here has downstream implications for all agents using those tools.
 
@@ -58,7 +58,7 @@ Changes to the endpoint surface — renaming tools, altering schemas, removing e
 ## Hierarchy Context
 
 ### Parent
-- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/mcp-server-semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
+- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
 
 
 ---

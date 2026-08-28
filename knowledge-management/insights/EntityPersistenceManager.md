@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-The PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to store entities in the graph database.
+The PersistenceAgent's storeEntity function (integrations/semantic-analysis/src/agents/persistence-agent.ts) uses the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) to store entities in the graph database.
 
 ## What It Is  
 
 **EntityPersistenceManager** is a sub‑component that lives inside the **KnowledgeManagement** module of the MCP server semantic‑analysis stack. Its concrete implementation is spread across the following source files that appear in the observations:
 
-* `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` – the **PersistenceAgent** provides the `storeEntity` and `retrieveEntity` functions that **EntityPersistenceManager** invokes.  
-* `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` – the **GraphDatabaseAdapter** supplies a type‑safe façade for direct interaction with the underlying graph database.
+* `integrations/semantic-analysis/src/agents/persistence-agent.ts` – the **PersistenceAgent** provides the `storeEntity` and `retrieveEntity` functions that **EntityPersistenceManager** invokes.  
+* `integrations/semantic-analysis/src/storage/graph-database-adapter.ts` – the **GraphDatabaseAdapter** supplies a type‑safe façade for direct interaction with the underlying graph database.
 
 In practice, **EntityPersistenceManager** orchestrates the life‑cycle of domain entities: when a new entity is created (or updated) it hands the entity to `PersistenceAgent.storeEntity`, which in turn delegates the actual write operation to the `GraphDatabaseAdapter`. The reverse flow occurs for reads: `EntityPersistenceManager` calls `PersistenceAgent.retrieveEntity`, which again uses the same adapter to fetch the entity from the graph store. This positioning makes **EntityPersistenceManager** the logical “gateway” for any component that needs persistent graph‑based knowledge within the KnowledgeManagement domain.
 
@@ -49,8 +49,8 @@ The **KnowledgeManagement** parent component coordinates several sibling agents 
 
 | Path | Exported Symbol | Role |
 |------|----------------|------|
-| `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` | `PersistenceAgent` (functions `storeEntity`, `retrieveEntity`) | Service‑layer façade that hides direct adapter usage. |
-| `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` | `GraphDatabaseAdapter` | Infrastructure adapter offering a type‑safe API for CRUD operations on the graph database. |
+| `integrations/semantic-analysis/src/agents/persistence-agent.ts` | `PersistenceAgent` (functions `storeEntity`, `retrieveEntity`) | Service‑layer façade that hides direct adapter usage. |
+| `integrations/semantic-analysis/src/storage/graph-database-adapter.ts` | `GraphDatabaseAdapter` | Infrastructure adapter offering a type‑safe API for CRUD operations on the graph database. |
 | (implicit) | `EntityPersistenceManager` | Orchestrator that decides *when* and *what* to persist or retrieve, delegating the heavy lifting to the two modules above. |
 
 No additional symbols were discovered in the supplied observations, but the described flow is sufficient to understand the mechanics: the manager does **no** direct database calls; it simply coordinates the higher‑level persistence contract.
@@ -124,15 +124,15 @@ Overall, **EntityPersistenceManager** sits at a well‑architected intersection 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to construct a code knowledge graph based on Abstract Syntax Trees (ASTs). This allows for efficient semantic code search capabilities. The CodeGraphAgent is designed to work in conjunction with the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) to store and retrieve entities from the graph database. The GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) provides a type-safe interface for interacting with the graph database, ensuring seamless data persistence and retrieval. For instance, the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) takes an AST as input and returns a constructed code graph, which is then stored in the graph database via the PersistenceAgent's storeEntity function (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts).
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the CodeGraphAgent (integrations/semantic-analysis/src/agents/code-graph-agent.ts) to construct a code knowledge graph based on Abstract Syntax Trees (ASTs). This allows for efficient semantic code search capabilities. The CodeGraphAgent is designed to work in conjunction with the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) to store and retrieve entities from the graph database. The GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) provides a type-safe interface for interacting with the graph database, ensuring seamless data persistence and retrieval. For instance, the CodeGraphAgent's constructCodeGraph function (integrations/semantic-analysis/src/agents/code-graph-agent.ts) takes an AST as input and returns a constructed code graph, which is then stored in the graph database via the PersistenceAgent's storeEntity function (integrations/semantic-analysis/src/agents/persistence-agent.ts).
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from manually authored entities.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from automatically extracted entities.
-- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the CodeGraphAgent's constructCodeGraph function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from an AST.
-- [GraphDatabaseService](./GraphDatabaseService.md) -- GraphDatabaseService uses the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) to provide a type-safe interface for interacting with the graph database.
-- [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator uses the CodeGraphAgent's generateReport function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to generate reports.
-- [OntologyClassificationSystem](./OntologyClassificationSystem.md) -- OntologyClassificationSystem uses the CodeGraphAgent's classifyEntity function (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) to classify entities.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from manually authored entities.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the CodeGraphAgent's constructCodeGraph function (integrations/semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from automatically extracted entities.
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the CodeGraphAgent's constructCodeGraph function (integrations/semantic-analysis/src/agents/code-graph-agent.ts) to create a code graph from an AST.
+- [GraphDatabaseService](./GraphDatabaseService.md) -- GraphDatabaseService uses the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) to provide a type-safe interface for interacting with the graph database.
+- [UKBTraceReportGenerator](./UKBTraceReportGenerator.md) -- UKBTraceReportGenerator uses the CodeGraphAgent's generateReport function (integrations/semantic-analysis/src/agents/code-graph-agent.ts) to generate reports.
+- [OntologyClassificationSystem](./OntologyClassificationSystem.md) -- OntologyClassificationSystem uses the CodeGraphAgent's classifyEntity function (integrations/semantic-analysis/src/agents/code-graph-agent.ts) to classify entities.
 
 ---
 

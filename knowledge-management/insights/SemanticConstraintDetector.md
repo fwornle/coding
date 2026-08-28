@@ -2,15 +2,15 @@
 
 **Type:** SubComponent
 
-SemanticConstraintDetector is documented across two dedicated files—integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and docs/semantic-detection-design.md—indicating the detection strategy is complex enough to warrant both a user-facing guide and an internal design document
+SemanticConstraintDetector is documented across two dedicated files—integrations/constraint-monitor/docs/semantic-constraint-detection.md and docs/semantic-detection-design.md—indicating the detection strategy is complex enough to warrant both a user-facing guide and an internal design document
 
 # SemanticConstraintDetector — Technical Reference
 
 ## What It Is
 
-SemanticConstraintDetector is a SubComponent of ConstraintSystem, housed within the `mcp-constraint-monitor` integration rather than `mcp-server-semantic-analysis`. Its documentation spans two dedicated files: `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` (user-facing guide) and `docs/semantic-detection-design.md` (internal design rationale). The existence of both a public guide and a design document signals that this component carries enough conceptual complexity to require separate treatment for operators configuring it and engineers maintaining it. Additional configuration guidance appears in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, confirming that detection behavior is driven by externalized parameters rather than hardcoded logic.
+SemanticConstraintDetector is a SubComponent of ConstraintSystem, housed within the `constraint-monitor` integration rather than `semantic-analysis`. Its documentation spans two dedicated files: `integrations/constraint-monitor/docs/semantic-constraint-detection.md` (user-facing guide) and `docs/semantic-detection-design.md` (internal design rationale). The existence of both a public guide and a design document signals that this component carries enough conceptual complexity to require separate treatment for operators configuring it and engineers maintaining it. Additional configuration guidance appears in `integrations/constraint-monitor/docs/constraint-configuration.md`, confirming that detection behavior is driven by externalized parameters rather than hardcoded logic.
 
-Its placement in `mcp-constraint-monitor` is a deliberate architectural statement: this component *consumes* semantic analysis capabilities provided elsewhere; it does not produce them. Constraint evaluation logic therefore travels with the monitoring integration, keeping domain concerns co-located and avoiding a dependency inversion where the monitoring layer would need to reach into `mcp-server-semantic-analysis` internals.
+Its placement in `constraint-monitor` is a deliberate architectural statement: this component *consumes* semantic analysis capabilities provided elsewhere; it does not produce them. Constraint evaluation logic therefore travels with the monitoring integration, keeping domain concerns co-located and avoiding a dependency inversion where the monitoring layer would need to reach into `semantic-analysis` internals.
 
 ## Architecture and Design
 
@@ -30,7 +30,7 @@ The dual-documentation approach (`semantic-constraint-detection.md` for users, `
 
 ## Integration Points
 
-SemanticConstraintDetector connects to the rest of ConstraintSystem at two boundaries. Upstream, it consumes semantic analysis capabilities from `mcp-server-semantic-analysis` — though it is not *part* of that package, it depends on what that package exposes, making that interface a key stability dependency. Any breaking change in the semantic analysis API would directly affect this component. Downstream, it feeds violations into ViolationCaptureService's dual-store pipeline, identical in contract to the hook handler producers. This means ConstraintMonitorDashboard, which reads `.mcp-sync/violation-history.json`, will surface SemanticConstraintDetector violations alongside hook-handler violations with no distinction in rendering — they are peers in the history store.
+SemanticConstraintDetector connects to the rest of ConstraintSystem at two boundaries. Upstream, it consumes semantic analysis capabilities from `semantic-analysis` — though it is not *part* of that package, it depends on what that package exposes, making that interface a key stability dependency. Any breaking change in the semantic analysis API would directly affect this component. Downstream, it feeds violations into ViolationCaptureService's dual-store pipeline, identical in contract to the hook handler producers. This means ConstraintMonitorDashboard, which reads `.mcp-sync/violation-history.json`, will surface SemanticConstraintDetector violations alongside hook-handler violations with no distinction in rendering — they are peers in the history store.
 
 The configuration surface described in `constraint-configuration.md` represents a third integration point: the operator or deployment environment that supplies detection parameters. This makes SemanticConstraintDetector sensitive to its runtime configuration in a way that pure hook handlers may not be, and it implies that deployment pipelines or setup documentation should treat constraint configuration as a first-class concern rather than an afterthought.
 
@@ -40,7 +40,7 @@ Because detection thresholds are externalized, developers modifying or deploying
 
 When violations produced by SemanticConstraintDetector appear in the ViolationCaptureService stores, they share the 1000-entry cap on `.mcp-sync/violation-history.json`. Under high semantic violation rates, this cap will evict older entries through full-array rewrites — a write hotspot that ConstraintSystem's parent documentation explicitly flags. If semantic detection is expected to be high-frequency (e.g., firing on every LLM response), the cap behavior should be accounted for in operational planning, and consumers relying on historical completeness should prefer the unbounded `.mcp-sync/session-violations.jsonl` JSONL log instead of the history JSON.
 
-Since SemanticConstraintDetector is architecturally a *consumer* of semantic analysis rather than a provider, engineers should resist the temptation to push constraint logic into `mcp-server-semantic-analysis` for reuse. The design intent captured in `semantic-detection-design.md` places constraint evaluation firmly in the monitoring integration layer. Crossing that boundary would erode the separation that makes each layer independently evolvable. New constraint types should be defined through the configuration mechanism and evaluated within this component, not by extending the upstream semantic analysis package.
+Since SemanticConstraintDetector is architecturally a *consumer* of semantic analysis rather than a provider, engineers should resist the temptation to push constraint logic into `semantic-analysis` for reuse. The design intent captured in `semantic-detection-design.md` places constraint evaluation firmly in the monitoring integration layer. Crossing that boundary would erode the separation that makes each layer independently evolvable. New constraint types should be defined through the configuration mechanism and evaluated within this component, not by extending the upstream semantic analysis package.
 
 
 ## Hierarchy Context

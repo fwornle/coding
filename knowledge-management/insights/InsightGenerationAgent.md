@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-The agent architecture documentation (integrations/mcp-server-semantic-analysis/docs/architecture/agents.md) defines agent roles with distinct responsibilities, suggesting insight generation is isolated from data collection concerns
+The agent architecture documentation (integrations/semantic-analysis/docs/architecture/agents.md) defines agent roles with distinct responsibilities, suggesting insight generation is isolated from data collection concerns
 
 ## What It Is  
 
@@ -12,11 +12,11 @@ The **InsightGenerationAgent** is the dedicated component that author‑writes s
 
 The agent is not a stand‑alone service; it is **hosted inside the `mcp‑server‑semantic‑analysis` integration**. The integration’s own architecture is described in  
 
-* `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`  
+* `integrations/semantic-analysis/docs/architecture/README.md`  
 
 and the detailed agent role breakdown is captured in  
 
-* `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`.  
+* `integrations/semantic-analysis/docs/architecture/agents.md`.  
 
 Within the *Insights* domain, the **InsightGenerationAgent** is a child of the **Insights** component (as noted in the high‑level agents overview) and works alongside sibling agents that handle data collection, preprocessing, and other analysis tasks. Its sole responsibility is to transform the collected semantic signals into consumable, human‑readable insight documents.
 
@@ -26,7 +26,7 @@ Within the *Insights* domain, the **InsightGenerationAgent** is a child of the *
 
 ### Agent‑Centric Modularity  
 
-The documentation makes it clear that the system adopts an **agent‑centric modular architecture**. Each agent is assigned a distinct responsibility, and the *InsightGenerationAgent* is explicitly isolated from data‑collection concerns. This separation is articulated in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, where the agent roles are delineated. By confining insight authoring to a single agent, the design enforces **separation of concerns**, allowing other agents to evolve (e.g., data harvesters, signal aggregators) without impacting the report‑generation logic.
+The documentation makes it clear that the system adopts an **agent‑centric modular architecture**. Each agent is assigned a distinct responsibility, and the *InsightGenerationAgent* is explicitly isolated from data‑collection concerns. This separation is articulated in `integrations/semantic-analysis/docs/architecture/agents.md`, where the agent roles are delineated. By confining insight authoring to a single agent, the design enforces **separation of concerns**, allowing other agents to evolve (e.g., data harvesters, signal aggregators) without impacting the report‑generation logic.
 
 ### Pipeline‑Style Interaction  
 
@@ -52,7 +52,7 @@ The observations do not mention micro‑services, event‑driven messaging, or o
 
 The source observations contain **no concrete code symbols**, so the implementation description must be derived from the documentation hierarchy.
 
-* **Location** – The agent’s logical definition resides under the `integrations/mcp-server-semantic-analysis` umbrella, indicating that its runtime is likely instantiated as part of the semantic‑analysis server process.  
+* **Location** – The agent’s logical definition resides under the `integrations/semantic-analysis` umbrella, indicating that its runtime is likely instantiated as part of the semantic‑analysis server process.  
 
 * **Responsibility** – As per `docs/architecture/agents.md`, the agent’s primary function is to **author structured knowledge reports**. This suggests the presence of internal components such as:
   * **ReportBuilder** – a class or module that assembles the final document format (e.g., Markdown, JSON).  
@@ -74,7 +74,7 @@ Because no concrete classes or functions are listed, the above components are in
 
 ### Upstream: Semantic Analysis Integration  
 
-The **InsightGenerationAgent** depends on the **`mcp‑server‑semantic‑analysis`** integration. This integration performs static and semantic analysis on the codebase and provides the **aggregated signals** that the agent consumes. The contract between them is documented in `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`, which outlines the semantic analysis capabilities (e.g., type inference, call‑graph generation). The agent therefore registers as a **consumer** of the analysis results, likely via a function call or a shared data structure within the same process.
+The **InsightGenerationAgent** depends on the **`mcp‑server‑semantic‑analysis`** integration. This integration performs static and semantic analysis on the codebase and provides the **aggregated signals** that the agent consumes. The contract between them is documented in `integrations/semantic-analysis/docs/architecture/README.md`, which outlines the semantic analysis capabilities (e.g., type inference, call‑graph generation). The agent therefore registers as a **consumer** of the analysis results, likely via a function call or a shared data structure within the same process.
 
 ### Parent Component: Insights  
 
@@ -82,7 +82,7 @@ Within the broader **Insights** domain, the agent is a child component. The pare
 
 ### Sibling Agents  
 
-Other agents defined in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` (e.g., data‑collection agents, preprocessing agents) act as siblings. They share the same integration environment but have **non‑overlapping responsibilities**. The isolation of the InsightGenerationAgent from these siblings reduces coupling and allows each agent to be developed, tested, and scaled independently.
+Other agents defined in `integrations/semantic-analysis/docs/architecture/agents.md` (e.g., data‑collection agents, preprocessing agents) act as siblings. They share the same integration environment but have **non‑overlapping responsibilities**. The isolation of the InsightGenerationAgent from these siblings reduces coupling and allows each agent to be developed, tested, and scaled independently.
 
 ### Downstream Consumers  
 

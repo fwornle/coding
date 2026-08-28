@@ -111,14 +111,14 @@ The **parent component LiveLoggingSystem** provides the overall orchestration an
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a graph database for storing and retrieving knowledge entities, as seen in the Graph-Code system (integrations/code-graph-rag/README.md). This allows for efficient querying and retrieval of entities, which is crucial for the system's classification layers. The OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) plays a key role in this process, as it classifies observations against the ontology system. The agent's constructor and the ensureLLMInitialized method demonstrate a lazy initialization approach for LLM services, which helps prevent unnecessary computations and improves overall system performance.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a graph database for storing and retrieving knowledge entities, as seen in the Graph-Code system (integrations/code-graph-rag/README.md). This allows for efficient querying and retrieval of entities, which is crucial for the system's classification layers. The OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) plays a key role in this process, as it classifies observations against the ontology system. The agent's constructor and the ensureLLMInitialized method demonstrate a lazy initialization approach for LLM services, which helps prevent unnecessary computations and improves overall system performance.
 
 ### Children
 - [TranscriptDataStore](./TranscriptDataStore.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file mentions the use of a data storage solution, such as a database or file system, to store transcript data.
 
 ### Siblings
 - [LoggingManager](./LoggingManager.md) -- The LoggingManager likely utilizes a logging framework, such as a rotating file handler, to manage log files, as seen in the integrations/copi/INSTALL.md file.
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent uses a lazy initialization approach for LLM services, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent uses a lazy initialization approach for LLM services, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file.
 
 ---
 

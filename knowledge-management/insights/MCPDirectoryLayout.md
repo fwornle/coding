@@ -2,19 +2,19 @@
 
 **Type:** Detail
 
-integrations/mcp-server-semantic-analysis/docs/architecture/README.md, agents.md, integration.md, and tools.md confirm a dedicated architecture subdirectory with multiple focused documents rather than a single monolithic file
+integrations/semantic-analysis/docs/architecture/README.md, agents.md, integration.md, and tools.md confirm a dedicated architecture subdirectory with multiple focused documents rather than a single monolithic file
 
 ## What It Is  
 
 **MCPDirectoryLayout** is the canonical file‑system layout that defines how a *MCP* integration repository is organised. The layout lives under the root of each integration – in the concrete case of the **MCP Server Semantic Analysis** integration it is materialised by the following paths:
 
-* `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`  
-* `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`  
-* `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md`  
-* `integrations/mcp-server-semantic-analysis/docs/architecture/tools.md`  
-* `integrations/mcp-server-semantic-analysis/docs/api/README.md`  
-* `integrations/mcp-server-semantic-analysis/docs/installation/README.md`  
-* `integrations/mcp-server-semantic-analysis/docs/configuration.md`
+* `integrations/semantic-analysis/docs/architecture/README.md`  
+* `integrations/semantic-analysis/docs/architecture/agents.md`  
+* `integrations/semantic-analysis/docs/architecture/integration.md`  
+* `integrations/semantic-analysis/docs/architecture/tools.md`  
+* `integrations/semantic-analysis/docs/api/README.md`  
+* `integrations/semantic-analysis/docs/installation/README.md`  
+* `integrations/semantic-analysis/docs/configuration.md`
 
 These files collectively embody the **MCPDirectoryLayout** specification that is owned by the parent component **MCPIntegrationConventions**. Any new integration added to the MCP ecosystem is expected to mirror this structure, thereby providing a predictable, discoverable set of documentation entry points for architects, API consumers, installers, and configurators.
 
@@ -128,10 +128,10 @@ Overall, **MCPDirectoryLayout** offers a lightweight, convention‑driven approa
 ## Hierarchy Context
 
 ### Parent
-- [MCPIntegrationConventions](./MCPIntegrationConventions.md) -- integrations/mcp-server-semantic-analysis/ follows the canonical MCP integration directory structure with subdirectories docs/architecture/, docs/api/, docs/installation/, and docs/configuration.md, establishing the expected layout new integrations must mirror
+- [MCPIntegrationConventions](./MCPIntegrationConventions.md) -- integrations/semantic-analysis/ follows the canonical MCP integration directory structure with subdirectories docs/architecture/, docs/api/, docs/installation/, and docs/configuration.md, establishing the expected layout new integrations must mirror
 
 ### Siblings
-- [MCPToolExtensionModel](./MCPToolExtensionModel.md) -- integrations/mcp-server-semantic-analysis/docs/architecture/tools.md is titled 'Tool Extensions', indicating tools are treated as extension points rather than core server logic
+- [MCPToolExtensionModel](./MCPToolExtensionModel.md) -- integrations/semantic-analysis/docs/architecture/tools.md is titled 'Tool Extensions', indicating tools are treated as extension points rather than core server logic
 
 
 ---

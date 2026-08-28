@@ -2,21 +2,21 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file implements the mapping-based approach used by the LSLConverter.
+The integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file implements the mapping-based approach used by the LSLConverter.
 
 ## What It Is  
 
 **FormatMapper** is the core conversion engine inside the **LSLConverter** that translates transcript data from one format to another. The mapping‑based strategy that drives this conversion is implemented in the file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
 as part of the *ontology‑classification‑agent* logic. In the broader LSLConverter component, FormatMapper is the dedicated sub‑module that holds the format‑to‑format translation tables and the logic that applies them. Its purpose is purely functional – it does not contain business rules or external service calls – and it exists to keep the conversion process deterministic and easy to extend when new transcript schemas appear.
 
 ## Architecture and Design  
 
-The observations point to a **mapping‑based architectural approach**. Rather than writing procedural code for each source‑target pair, the system stores a declarative map that describes how fields in one transcript format correspond to fields in another. The **ontology‑classification‑agent** (located at `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) demonstrates this approach: it reads a predefined map and applies it to incoming data, effectively acting as a thin adapter.  
+The observations point to a **mapping‑based architectural approach**. Rather than writing procedural code for each source‑target pair, the system stores a declarative map that describes how fields in one transcript format correspond to fields in another. The **ontology‑classification‑agent** (located at `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`) demonstrates this approach: it reads a predefined map and applies it to incoming data, effectively acting as a thin adapter.  
 
 Within the LSLConverter hierarchy, **FormatMapper** is a child component that encapsulates this map and the algorithm that walks it. The parent, **LSLConverter**, delegates all format‑translation responsibilities to FormatMapper, keeping the higher‑level conversion workflow (e.g., orchestration, error handling, logging) separate from the low‑level field mapping. This separation mirrors a classic **Adapter** pattern, where FormatMapper adapts one data contract to another without exposing the internal mapping mechanics to its callers.
 
@@ -79,7 +79,7 @@ The mapping tables themselves act as a contract between FormatMapper and any con
 ## Hierarchy Context
 
 ### Parent
-- [LSLConverter](./LSLConverter.md) -- LSLConverter uses a mapping-based approach to convert between transcript formats, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [LSLConverter](./LSLConverter.md) -- LSLConverter uses a mapping-based approach to convert between transcript formats, as implemented in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
 
 ---
 

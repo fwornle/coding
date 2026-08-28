@@ -6,7 +6,7 @@ Given the lack of direct source code, the ConstraintLoader's behavior and implem
 
 ## What It Is  
 
-**ConstraintLoader** is the low‑level component responsible for bringing constraint definitions into the running system.  It lives inside the **ConstraintConfigurationManager**, which itself is a core part of the **ConstraintSystem**.  The only concrete location we can point to is the documentation file `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  That markdown page describes the format and lifecycle of constraint configuration, which tells us that a dedicated loader exists to parse those files (or the equivalent database representation) and hand the resulting objects to the manager.  In practice, **ConstraintLoader** is the bridge between static configuration artifacts—whether JSON/YAML files, property bundles, or DB rows—and the in‑memory model that the rest of the constraint engine consumes.
+**ConstraintLoader** is the low‑level component responsible for bringing constraint definitions into the running system.  It lives inside the **ConstraintConfigurationManager**, which itself is a core part of the **ConstraintSystem**.  The only concrete location we can point to is the documentation file `integrations/constraint-monitor/docs/constraint-configuration.md`.  That markdown page describes the format and lifecycle of constraint configuration, which tells us that a dedicated loader exists to parse those files (or the equivalent database representation) and hand the resulting objects to the manager.  In practice, **ConstraintLoader** is the bridge between static configuration artifacts—whether JSON/YAML files, property bundles, or DB rows—and the in‑memory model that the rest of the constraint engine consumes.
 
 ## Architecture and Design  
 
@@ -18,7 +18,7 @@ ConstraintSystem
       └─ ConstraintLoader   ← reads config source, builds objects
 ```
 
-Because the loader is isolated, the manager can focus on higher‑level concerns such as caching, validation, and exposing an API to other subsystems (e.g., the monitoring component referenced in `mcp-constraint-monitor`).  The documentation file indicates that constraint configuration is a first‑class, versioned artifact, which implies that **ConstraintLoader** is designed to be deterministic and repeatable: given the same source file or database snapshot, it will always produce the same in‑memory representation.  No other design patterns (e.g., event‑driven pipelines or micro‑services) are mentioned, so the system appears to be a monolithic, module‑level implementation that relies on straightforward procedural loading.
+Because the loader is isolated, the manager can focus on higher‑level concerns such as caching, validation, and exposing an API to other subsystems (e.g., the monitoring component referenced in `constraint-monitor`).  The documentation file indicates that constraint configuration is a first‑class, versioned artifact, which implies that **ConstraintLoader** is designed to be deterministic and repeatable: given the same source file or database snapshot, it will always produce the same in‑memory representation.  No other design patterns (e.g., event‑driven pipelines or micro‑services) are mentioned, so the system appears to be a monolithic, module‑level implementation that relies on straightforward procedural loading.
 
 ## Implementation Details  
 
@@ -26,13 +26,13 @@ Although the source code is not present, the observations let us infer the key r
 
 1. **Source Selection** – The loader must decide whether to read from a configuration file (as suggested by the markdown documentation) or from a database (as hinted by the manager’s description).  This decision is likely driven by a configuration flag in the manager or by the presence of a file at a known path.
 
-2. **Parsing & Validation** – The loader parses the raw configuration (JSON, YAML, or a proprietary schema) and validates it against the constraint model.  Validation errors would be reported back to the **ConstraintConfigurationManager**, which can then surface them to the monitoring UI described in `mcp-constraint-monitor`.
+2. **Parsing & Validation** – The loader parses the raw configuration (JSON, YAML, or a proprietary schema) and validates it against the constraint model.  Validation errors would be reported back to the **ConstraintConfigurationManager**, which can then surface them to the monitoring UI described in `constraint-monitor`.
 
 3. **Object Construction** – After successful parsing, the loader instantiates concrete constraint objects (e.g., range checks, regex validators, relational rules) and registers them with the manager’s internal registry.  Because the manager “loads constraint configurations from a configuration file or database,” the loader’s output is the definitive source of truth for the constraint graph.
 
 4. **Error Handling & Reporting** – Any I/O, parsing, or validation failure is likely wrapped in a domain‑specific exception that propagates up to the manager, enabling the monitoring component to flag misconfigurations.
 
-The only concrete file reference we have is the documentation at `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  That file probably contains examples of the configuration format, default locations, and required fields, all of which guide the loader’s implementation.
+The only concrete file reference we have is the documentation at `integrations/constraint-monitor/docs/constraint-configuration.md`.  That file probably contains examples of the configuration format, default locations, and required fields, all of which guide the loader’s implementation.
 
 ## Integration Points  
 
@@ -50,7 +50,7 @@ No sibling components are explicitly named, but any other loaders (e.g., for pol
 
 1. **Do not invoke the loader directly** – All loading should be performed through the **ConstraintConfigurationManager**.  This guarantees that any post‑load validation, caching, and monitoring hooks are executed.
 
-2. **Configuration location** – Keep the constraint definition file in the path documented in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  Changing the location requires updating the manager’s configuration, not the loader’s code.
+2. **Configuration location** – Keep the constraint definition file in the path documented in `integrations/constraint-monitor/docs/constraint-configuration.md`.  Changing the location requires updating the manager’s configuration, not the loader’s code.
 
 3. **Schema stability** – Because the loader builds objects based on a fixed schema, any change to the constraint definition format must be coordinated with the documentation and, if necessary, with versioned migration scripts in the database.
 

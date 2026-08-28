@@ -6,7 +6,7 @@ CodeGraphConstructor may leverage the automatic JSON export sync feature provide
 
 ## What It Is  
 
-`CodeGraphConstructor` lives inside the **KnowledgeManagement** component and is the core engine that transforms raw code artifacts into a navigable graph representation. The implementation is anchored in the `integrations/code-graph-rag/` directory (e.g., the README and supporting docs such as `claude-code-setup.md`), and its primary public façade is the **CodeGraphBuilder** sub‑component. The constructor does not operate in isolation; it leans on the shared **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) for persistence, the **EntityPersistenceModule** for fine‑grained entity handling, and the **OntologyManagementSystem** for semantic classification and inference. Together these pieces enable downstream agents—most notably `integrations/mcp-server-semantic-analysis/src/agents/code‑graph‑agent.ts`—to retrieve and reason over the generated code graph.
+`CodeGraphConstructor` lives inside the **KnowledgeManagement** component and is the core engine that transforms raw code artifacts into a navigable graph representation. The implementation is anchored in the `integrations/code-graph-rag/` directory (e.g., the README and supporting docs such as `claude-code-setup.md`), and its primary public façade is the **CodeGraphBuilder** sub‑component. The constructor does not operate in isolation; it leans on the shared **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) for persistence, the **EntityPersistenceModule** for fine‑grained entity handling, and the **OntologyManagementSystem** for semantic classification and inference. Together these pieces enable downstream agents—most notably `integrations/semantic-analysis/src/agents/code‑graph‑agent.ts`—to retrieve and reason over the generated code graph.
 
 The component’s responsibility can be summed up as:  
 
@@ -37,13 +37,13 @@ Although the source tree reports “0 code symbols found,” the surrounding doc
 
 * **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – Implements CRUD operations on a Graphology graph backed by LevelDB. It also watches for mutation events and automatically writes a JSON snapshot, which downstream tools (e.g., RAG services) can pull without additional code.  
 
-* **CodeGraphAgent (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`)** – Consumes the persisted graph. It queries the adapter for nodes representing functions, classes, or modules and feeds the results into semantic analysis pipelines.  
+* **CodeGraphAgent (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`)** – Consumes the persisted graph. It queries the adapter for nodes representing functions, classes, or modules and feeds the results into semantic analysis pipelines.  
 
 * **OntologyManagementSystem** – Provides APIs such as `inferRelations(node)` and `classifyNode(node)`. `CodeGraphConstructor` invokes these during graph enrichment to attach type information, dependency semantics, and higher‑level concepts (e.g., “service”, “utility”).  
 
 * **EntityPersistenceModule** – Handles the lifecycle of individual graph entities. When the builder creates a new node, it hands the raw payload to this module, which may apply validation, versioning, or additional metadata before delegating to the adapter.  
 
-* **Configuration Docs** – The files `integrations/code-graph-rag/docs/claude-code-setup.md` and `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` describe how the constructor is wired into Claude‑based RAG pipelines and constraint‑monitoring workflows. They specify environment variables, JSON schema for constraints, and the entry‑point scripts that instantiate the constructor.  
+* **Configuration Docs** – The files `integrations/code-graph-rag/docs/claude-code-setup.md` and `integrations/constraint-monitor/docs/constraint-configuration.md` describe how the constructor is wired into Claude‑based RAG pipelines and constraint‑monitoring workflows. They specify environment variables, JSON schema for constraints, and the entry‑point scripts that instantiate the constructor.  
 
 The constructor’s internal algorithm can be inferred as follows:  
 
@@ -113,7 +113,7 @@ The clear separation between construction, enrichment, and storage, combined wit
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component's utilization of the GraphDatabaseAdapter for persistence is a notable architectural aspect. This adapter, located in storage/graph-database-adapter.ts, enables the use of Graphology and LevelDB for storing and querying the knowledge graph. The automatic JSON export sync feature provided by this adapter simplifies the process of exporting graph data in JSON format, which can be beneficial for further analysis or integration with other components. For instance, the CodeGraphAgent, found in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, can leverage this adapter to store and retrieve code analysis results, thereby facilitating the management of entities and relationships within the knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component's utilization of the GraphDatabaseAdapter for persistence is a notable architectural aspect. This adapter, located in storage/graph-database-adapter.ts, enables the use of Graphology and LevelDB for storing and querying the knowledge graph. The automatic JSON export sync feature provided by this adapter simplifies the process of exporting graph data in JSON format, which can be beneficial for further analysis or integration with other components. For instance, the CodeGraphAgent, found in integrations/semantic-analysis/src/agents/code-graph-agent.ts, can leverage this adapter to store and retrieve code analysis results, thereby facilitating the management of entities and relationships within the knowledge graph.
 
 ### Children
 - CodeGraphBuilder -- The presence of integrations/code-graph-rag/README.md suggests a graph-based system, which is likely utilized by the CodeGraphBuilder.

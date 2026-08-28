@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The ConstraintValidator utilizes the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to parse entity content and verify references against the codebase.
+The ConstraintValidator utilizes the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) to parse entity content and verify references against the codebase.
 
 ## What It Is  
 
-The **ConstraintValidator** lives inside the *ConstraintSystem* and is the core engine that evaluates whether a piece of entity content satisfies the set of configured constraints. Its implementation is tightly coupled with two concrete modules that appear in the codebase: the **ContentValidationAgent** located at `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts` and the **HookManager** found in `lib/agent-api/hooks/hook-manager.js`. The validator is also wired to the **GraphDatabaseManager**, which persists validation metadata, and it collaborates with the **ViolationLogger** to surface detailed feedback. In practice, when a developer or an automated process submits code (or any structured content) to the system, the ConstraintValidator orchestrates parsing, rule‑checking, hook execution, and result recording, returning error messages and corrective suggestions.
+The **ConstraintValidator** lives inside the *ConstraintSystem* and is the core engine that evaluates whether a piece of entity content satisfies the set of configured constraints. Its implementation is tightly coupled with two concrete modules that appear in the codebase: the **ContentValidationAgent** located at `integrations/semantic-analysis/src/agents/content-validation-agent.ts` and the **HookManager** found in `lib/agent-api/hooks/hook-manager.js`. The validator is also wired to the **GraphDatabaseManager**, which persists validation metadata, and it collaborates with the **ViolationLogger** to surface detailed feedback. In practice, when a developer or an automated process submits code (or any structured content) to the system, the ConstraintValidator orchestrates parsing, rule‑checking, hook execution, and result recording, returning error messages and corrective suggestions.
 
 ---
 
@@ -24,7 +24,7 @@ Overall, the design can be described as a **layered module composition**: the Co
 
 ## Implementation Details  
 
-* **ContentValidationAgent (`integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`)** – This TypeScript agent parses incoming entity content (e.g., source files, configuration blobs) and validates that any references it contains exist in the codebase. The agent returns a structured representation (likely an AST or a domain‑specific model) that the ConstraintValidator can consume.  
+* **ContentValidationAgent (`integrations/semantic-analysis/src/agents/content-validation-agent.ts`)** – This TypeScript agent parses incoming entity content (e.g., source files, configuration blobs) and validates that any references it contains exist in the codebase. The agent returns a structured representation (likely an AST or a domain‑specific model) that the ConstraintValidator can consume.  
 
 * **ConstraintValidator** – Though no concrete symbols are listed, its behavior can be inferred from the observations: it receives the parsed model from the agent, iterates over the active constraint rules, and evaluates each rule against the model. The validator’s rule set is **flexible**; rules can be added or removed at runtime, suggesting an internal registry (perhaps a map of rule identifiers to predicate functions).  
 
@@ -98,7 +98,7 @@ The modular decomposition yields high maintainability: each component can be uni
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem's modular architecture is evident in its separation of concerns, with distinct modules for content validation, hook management, and violation capture. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is responsible for parsing entity content and verifying references against the codebase, while the HookManager (lib/agent-api/hooks/hook-manager.js) handles unified hook management across different agents and events. This modularity enables easier maintenance and updates, as changes to one module do not affect the others. Furthermore, this design decision allows for greater flexibility, as new modules can be added or removed as needed, without disrupting the overall system.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem's modular architecture is evident in its separation of concerns, with distinct modules for content validation, hook management, and violation capture. For instance, the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) is responsible for parsing entity content and verifying references against the codebase, while the HookManager (lib/agent-api/hooks/hook-manager.js) handles unified hook management across different agents and events. This modularity enables easier maintenance and updates, as changes to one module do not affect the others. Furthermore, this design decision allows for greater flexibility, as new modules can be added or removed as needed, without disrupting the overall system.
 
 ### Siblings
 - [HookOrchestrator](./HookOrchestrator.md) -- The HookOrchestrator utilizes the HookManager (lib/agent-api/hooks/hook-manager.js) to handle unified hook management across different agents and events.

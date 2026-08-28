@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines a commenting practice for hook data format, implying a coding convention.
+The constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines a commenting practice for hook data format, implying a coding convention.
 
 ## What It Is  
 
@@ -11,7 +11,7 @@ The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines a commen
 * `integrations/code-graph-rag/README.md` – a top‑level README that follows a strict naming and section‑ordering rule set.  
 * `integrations/copi/USAGE.md`, `integrations/copi/INSTALL.md`, `integrations/copi/MIGRATION.md`, `integrations/copi/STATUS.md` – a family of Markdown files that share a common formatting style (heading hierarchy, fenced code blocks, bullet‑point syntax).  
 * `copi/USAGE.md` – an additional usage guide that mirrors the same style as the integration‑level docs.  
-* `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – a specification of the comment‑based hook data format, i.e. a concrete commenting convention that developers must embed in source code.
+* `constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – a specification of the comment‑based hook data format, i.e. a concrete commenting convention that developers must embed in source code.
 
 Together these files form the *observable surface* of the CodingConventions sub‑component: they demonstrate a consistent naming convention for files, a repeatable Markdown layout, and a prescribed comment syntax for hook data.  The conventions are not an abstract policy; they are embodied in the concrete paths and file names listed above, making them directly discoverable and enforceable.
 
@@ -27,7 +27,7 @@ From the observations we can infer three design patterns:
 
 2. **Comment‑Based Hook Specification** – the `CLAUDE-CODE-HOOK-FORMAT.md` file defines a *comment syntax* that developers embed directly in source files.  This is a classic **Domain‑Specific Language (DSL) in comments** pattern: the comment acts as a declarative hook descriptor that downstream tooling (e.g., the constraint monitor) can parse.  
 
-3. **Naming‑Convention Enforcement** – the consistent use of kebab‑case for directories (`code-graph-rag`, `mcp-constraint-monitor`) and upper‑case for markdown extensions (`README.md`, `USAGE.md`) reflects a **Naming Convention** pattern that reduces ambiguity when new integrations are added.
+3. **Naming‑Convention Enforcement** – the consistent use of kebab‑case for directories (`code-graph-rag`, `constraint-monitor`) and upper‑case for markdown extensions (`README.md`, `USAGE.md`) reflects a **Naming Convention** pattern that reduces ambiguity when new integrations are added.
 
 Interaction among components is therefore *static*: the conventions are read by developers, CI linters, and any automated documentation generators.  There is no runtime coupling, but the conventions provide a *contract* that sibling components (e.g., **GraphDatabase**’s `storage/graph-database-adapter.ts`) implicitly respect when they reference documentation or embed hook comments.
 
@@ -42,7 +42,7 @@ Interaction among components is therefore *static*: the conventions are read by 
 | `integrations/code-graph-rag/README.md` | **Naming & Section Order** | Title line, feature list, architecture diagram placeholder, usage example in fenced code block, “License” footer. |
 | `integrations/copi/USAGE.md` (and sibling docs) | **Markdown Styling** | Level‑2 headings (`## Installation`, `## Migration`), bullet lists with leading hyphens, code fences labelled with language (` ```bash `, ` ```ts `). |
 | `copi/USAGE.md` | **Consistent Formatting** | Mirrors the integration‑level USAGE file – same heading hierarchy, same code‑block style, same emphasis on command‑line examples. |
-| `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | **Comment DSL** | Defines a block comment syntax such as `/* @hook: { "type": "validation", "severity": "high" } */`.  The format is JSON‑compatible, enabling straightforward parsing by monitoring tools. |
+| `constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` | **Comment DSL** | Defines a block comment syntax such as `/* @hook: { "type": "validation", "severity": "high" } */`.  The format is JSON‑compatible, enabling straightforward parsing by monitoring tools. |
 
 ### Comment DSL Mechanics  
 
@@ -146,7 +146,7 @@ Overall, the design promotes a consistent developer experience, eases onboarding
 - [DesignPatterns](./DesignPatterns.md) -- The GraphDatabaseAdapter class in storage/graph-database-adapter.ts utilizes the singleton pattern to provide a single instance of the graph database across the application.
 - [BestPractices](./BestPractices.md) -- The integrations/code-graph-rag/CONTRIBUTING.md file outlines contribution guidelines, indicating a focus on best practices for code review and testing.
 - [GraphDatabase](./GraphDatabase.md) -- The storage/graph-database-adapter.ts file provides a graph database adapter, indicating the use of a graph database.
-- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
+- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
 
 ---
 

@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file likely contains the implementation details of the Memgraph connection, although the exact code is not available.
+The integrations/semantic-analysis/src/agents/knowledge-graph-constructor.ts file likely contains the implementation details of the Memgraph connection, although the exact code is not available.
 
 ## What It Is  
 
 **MemgraphConnection** is the low‑level component that enables the **KnowledgeGraphConstructor** to persist and query a knowledge graph in a Memgraph database. The concrete implementation lives in the source file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts
+integrations/semantic-analysis/src/agents/knowledge-graph-constructor.ts
 ```  
 
 as part of the *mcp‑server‑semantic‑analysis* integration.  The connection is driven by a configuration constant named **MEMGRAPH_BATCH_SIZE**, which determines how many graph mutation statements are grouped together before being sent to Memgraph.  This batching mechanism is the primary performance‑tuning knob for the component.
@@ -114,7 +114,7 @@ Because no code symbols were discovered, the exact class names (e.g., `MemgraphC
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
+- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
 
 ---
 

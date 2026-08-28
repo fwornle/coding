@@ -6,7 +6,7 @@ ContentValidation ensures that the system operates within defined boundaries, pr
 
 ## What It Is  
 
-ContentValidation is a **sub‑component** that lives inside the **CodingPatterns** component.  Its purpose, as described in the observations, is to *validate content* using a **rules‑based approach**.  By applying explicit validation rules, the sub‑component guarantees that the system operates within defined boundaries, preventing errors and inconsistencies while allowing the broader system to handle complex content with ease.  The only concrete location that references the rules themselves is the child component **ContentValidationRules**, whose definition is documented in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  Because ContentValidation is part of the CodingPatterns hierarchy, it inherits the same overall architectural context (e.g., the use of `storage/graph-database-adapter.ts` for persistence in the parent component) while focusing specifically on content integrity.
+ContentValidation is a **sub‑component** that lives inside the **CodingPatterns** component.  Its purpose, as described in the observations, is to *validate content* using a **rules‑based approach**.  By applying explicit validation rules, the sub‑component guarantees that the system operates within defined boundaries, preventing errors and inconsistencies while allowing the broader system to handle complex content with ease.  The only concrete location that references the rules themselves is the child component **ContentValidationRules**, whose definition is documented in `integrations/constraint-monitor/docs/constraint-configuration.md`.  Because ContentValidation is part of the CodingPatterns hierarchy, it inherits the same overall architectural context (e.g., the use of `storage/graph-database-adapter.ts` for persistence in the parent component) while focusing specifically on content integrity.
 
 ## Architecture and Design  
 
@@ -28,7 +28,7 @@ The relationship diagram further clarifies how ContentValidation connects to its
 
 Although the source snapshot contains **zero code symbols**, the observations give us enough to infer the implementation scaffolding:
 
-1. **Rule definition storage** – The child component **ContentValidationRules** is documented in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  This markdown file likely enumerates rule identifiers, conditions, and expected outcomes in a structured format (e.g., JSON or YAML).  
+1. **Rule definition storage** – The child component **ContentValidationRules** is documented in `integrations/constraint-monitor/docs/constraint-configuration.md`.  This markdown file likely enumerates rule identifiers, conditions, and expected outcomes in a structured format (e.g., JSON or YAML).  
 
 2. **Validation engine** – ContentValidation probably exposes a function such as `validateContent(content: any): ValidationResult` that iterates over the loaded rules, evaluates each against the incoming content, and aggregates any violations.  Because the approach “simplifies the validation process,” the engine is expected to be lightweight, avoiding complex branching logic in favour of rule iteration.
 
@@ -46,7 +46,7 @@ ContentValidation interacts with several parts of the system:
 
 * **Sibling – GraphManagement, LLMInitialization, CodeGraphConstruction, BrowserAccess, CodeGraphRag** – While these siblings address different concerns (graph storage, lazy LLM loading, graph construction, UI access, retrieval‑augmented generation), they all depend on the system’s integrity.  ContentValidation therefore acts as a gatekeeper before data flows into these modules, ensuring that only well‑formed content reaches the graph layer or LLM pipelines.
 
-* **Child – ContentValidationRules** – The rule definitions are the primary data source for the validator.  Any change to `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` directly influences validation behaviour, making this file a critical integration point.
+* **Child – ContentValidationRules** – The rule definitions are the primary data source for the validator.  Any change to `integrations/constraint-monitor/docs/constraint-configuration.md` directly influences validation behaviour, making this file a critical integration point.
 
 ## Usage Guidelines  
 
@@ -85,7 +85,7 @@ The rules‑based design enhances maintainability: updates to validation logic a
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence, allowing for automatic JSON export sync. This design decision enables seamless data synchronization and provides a robust foundation for the project's data management. The GraphDatabaseAdapter class is responsible for handling graph data storage and retrieval, making it a critical component of the project's architecture. By using this adapter, the CodingPatterns component can focus on its primary functionality, leaving data management to the GraphDatabaseAdapter.
 
 ### Children
-- [ContentValidationRules](./ContentValidationRules.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file suggests that constraint configuration is a key aspect of content validation, implying the presence of rules-based validation.
+- [ContentValidationRules](./ContentValidationRules.md) -- The integrations/constraint-monitor/docs/constraint-configuration.md file suggests that constraint configuration is a key aspect of content validation, implying the presence of rules-based validation.
 
 ### Siblings
 - [GraphManagement](./GraphManagement.md) -- GraphDatabaseAdapter handles graph data storage and retrieval, making it a critical component of the project's architecture.

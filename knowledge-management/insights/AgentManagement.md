@@ -7,7 +7,7 @@ The AgentManager utilizes the WaveController.runWithConcurrency() function to im
 ## What It Is  
 
 The **AgentManagement** sub‑component lives inside the **SemanticAnalysis** module of the MCP server. Its core implementation is anchored in the file  
-`integrations/mcp-server-semantic-analysis/src/agents/agent-manager.ts`.  The `AgentManager` class defined there is responsible for orchestrating the lifecycle of individual agents (e.g., *OntologyClassificationAgent*, *InsightGenerationAgent*) that each have their own configuration files under the same `src/agents` folder.  The sub‑component supplies a single, well‑defined entry point – the `execute` method – that every concrete agent inherits from the base class located at `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`.  By pulling in ontology metadata that the `PersistenceAgent` pre‑populates, the manager can make informed decisions about which agents to run and in what order.
+`integrations/semantic-analysis/src/agents/agent-manager.ts`.  The `AgentManager` class defined there is responsible for orchestrating the lifecycle of individual agents (e.g., *OntologyClassificationAgent*, *InsightGenerationAgent*) that each have their own configuration files under the same `src/agents` folder.  The sub‑component supplies a single, well‑defined entry point – the `execute` method – that every concrete agent inherits from the base class located at `integrations/semantic-analysis/src/agents/base-agent.ts`.  By pulling in ontology metadata that the `PersistenceAgent` pre‑populates, the manager can make informed decisions about which agents to run and in what order.
 
 ## Architecture and Design  
 
@@ -23,7 +23,7 @@ Together, these mechanisms give AgentManagement a clear separation of concerns: 
 
 ## Implementation Details  
 
-The central class, `AgentManager`, resides in `integrations/mcp-server-semantic-analysis/src/agents/agent-manager.ts`.  Its public `execute` method is the canonical entry point for all agents.  Internally, `execute` performs the following steps:
+The central class, `AgentManager`, resides in `integrations/semantic-analysis/src/agents/agent-manager.ts`.  Its public `execute` method is the canonical entry point for all agents.  Internally, `execute` performs the following steps:
 
 1. **Metadata ingestion** – It reads ontology metadata fields that the `PersistenceAgent` has already populated.  This metadata drives selection and configuration of downstream agents (observation 4).
 
@@ -94,12 +94,12 @@ The modular configuration files and the unified `execute` contract make the code
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular approach to agent development, with each agent having its own configuration and initialization logic. For instance, the OntologyClassificationAgent has its own configuration file (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) that defines its behavior and dependencies. This modular approach allows for easier maintenance and extension of the agents, as each agent can be developed and tested independently. The execute method in the base-agent.ts file (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serves as the entry point for each agent's execution, providing a standardized interface for agent interactions.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular approach to agent development, with each agent having its own configuration and initialization logic. For instance, the OntologyClassificationAgent has its own configuration file (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) that defines its behavior and dependencies. This modular approach allows for easier maintenance and extension of the agents, as each agent can be developed and tested independently. The execute method in the base-agent.ts file (integrations/semantic-analysis/src/agents/base-agent.ts) serves as the entry point for each agent's execution, providing a standardized interface for agent interactions.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- The Pipeline's batch processing is orchestrated by the coordinator agent, which utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to define its behavior and dependencies.
-- [Insights](./Insights.md) -- The InsightGenerationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent utilizes a configuration file in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts to define its behavior and dependencies.
+- [Insights](./Insights.md) -- The InsightGenerationAgent utilizes a configuration file in integrations/semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies.
 
 ---
 

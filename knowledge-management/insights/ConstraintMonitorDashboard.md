@@ -8,7 +8,7 @@ ConstraintMonitorDashboard consumes .mcp-sync/violation-history.json (a capped 1
 
 ## What It Is
 
-ConstraintMonitorDashboard is a self-contained SubComponent residing at `integrations/mcp-constraint-monitor/dashboard/`, documented via `dashboard/README.md`. It is the visualization and reporting surface of the broader ConstraintSystem, responsible for presenting violation history to developers without coupling itself to the live data production pipeline. Its integration contract is documented in `integrations/mcp-constraint-monitor/docs/status-line-integration.md`, indicating it has at least one outbound display channel beyond simple file reads.
+ConstraintMonitorDashboard is a self-contained SubComponent residing at `integrations/constraint-monitor/dashboard/`, documented via `dashboard/README.md`. It is the visualization and reporting surface of the broader ConstraintSystem, responsible for presenting violation history to developers without coupling itself to the live data production pipeline. Its integration contract is documented in `integrations/constraint-monitor/docs/status-line-integration.md`, indicating it has at least one outbound display channel beyond simple file reads.
 
 ## Architecture and Design
 
@@ -24,7 +24,7 @@ The tradeoff is explicit recency loss. Once the cap is active, the oldest violat
 
 ## Implementation Details
 
-No code symbols were resolved for this component, so implementation mechanics must be inferred from the observations and the file-system layout. The dashboard is self-contained within its subdirectory, with `dashboard/README.md` serving as the authoritative integration surface document. The status-line integration documented in `integrations/mcp-constraint-monitor/docs/status-line-integration.md` implies the dashboard has an outbound rendering contract — likely a formatted summary line suitable for embedding in a terminal status bar or editor status area — meaning it is not purely a passive file reader but also a formatted output producer.
+No code symbols were resolved for this component, so implementation mechanics must be inferred from the observations and the file-system layout. The dashboard is self-contained within its subdirectory, with `dashboard/README.md` serving as the authoritative integration surface document. The status-line integration documented in `integrations/constraint-monitor/docs/status-line-integration.md` implies the dashboard has an outbound rendering contract — likely a formatted summary line suitable for embedding in a terminal status bar or editor status area — meaning it is not purely a passive file reader but also a formatted output producer.
 
 The consumption of `.mcp-sync/violation-history.json` is straightforward in mechanical terms: the file is a standard JSON array, parseable in a single read without streaming logic. The 1000-entry cap means the parse cost is bounded regardless of session length, which is the point of the dual-store architecture. The dashboard never needs to implement line-by-line JSONL parsing, seek offsets, or handle partial writes — all of that complexity is absorbed by ViolationCaptureService.
 
@@ -42,7 +42,7 @@ Developers working with or extending ConstraintMonitorDashboard should treat `.m
 
 The 1000-entry cap is a system-level constant set by ViolationCaptureService, not by the dashboard. If the window size needs adjustment, that change belongs in `scripts/violation-capture-service.js`, not in dashboard code. Dashboard logic should treat the array length as variable up to the cap, not hardcode assumptions about entry count.
 
-The status-line integration contract documented in `integrations/mcp-constraint-monitor/docs/status-line-integration.md` should be consulted before adding new outbound display formats. The dashboard's value is its stable, bounded read performance and clean output contract — extensions that introduce unbounded processing or tight coupling to the production pipeline would undermine both.
+The status-line integration contract documented in `integrations/constraint-monitor/docs/status-line-integration.md` should be consulted before adding new outbound display formats. The dashboard's value is its stable, bounded read performance and clean output contract — extensions that introduce unbounded processing or tight coupling to the production pipeline would undermine both.
 
 
 ## Hierarchy Context
@@ -51,7 +51,7 @@ The status-line integration contract documented in `integrations/mcp-constraint-
 - [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem employs a dual-store persistence strategy in ViolationCaptureService (scripts/violation-capture-service.js) that separates concerns between live streaming and historical querying. Violations are written to two distinct files: a JSONL append-log at .mcp-sync/session-violations.jsonl where each line is a JSON-serialized violation event suitable for tail-following and real-time consumption, and a capped JSON array at .mcp-sync/violation-history.json that never exceeds 1000 entries and is intended for dashboard reads. This design means producers (the hook handlers) never block on dashboard consumers, and the dashboard never needs to parse an unbounded stream. The tradeoff is that the history file requires a full rewrite on each append once the cap is active, since the oldest entry must be evicted and the array re-serialized, which can become a write hotspot under high violation rates.
 
 ### Siblings
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- SemanticConstraintDetector is documented across two dedicated files—integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and docs/semantic-detection-design.md—indicating the detection strategy is complex enough to warrant both a user-facing guide and an internal design document
+- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- SemanticConstraintDetector is documented across two dedicated files—integrations/constraint-monitor/docs/semantic-constraint-detection.md and docs/semantic-detection-design.md—indicating the detection strategy is complex enough to warrant both a user-facing guide and an internal design document
 - [ViolationCaptureService](./ViolationCaptureService.md) -- scripts/violation-capture-service.js implements a dual-store write strategy: each violation is appended as a single JSON line to .mcp-sync/session-violations.jsonl and also inserted into .mcp-sync/violation-history.json
 
 

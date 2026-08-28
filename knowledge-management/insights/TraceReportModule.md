@@ -2,16 +2,16 @@
 
 **Type:** SubComponent
 
-The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) can be used to construct code knowledge graphs, which can be utilized in the TraceReportModule.
+The CodeGraphAgent (integrations/semantic-analysis/src/agents/code-graph-agent.ts) can be used to construct code knowledge graphs, which can be utilized in the TraceReportModule.
 
 ## What It Is  
 
 The **TraceReportModule** lives inside the *KnowledgeManagement* sub‑tree of the MCP server semantic‑analysis codebase. Its implementation can be traced to a handful of concrete files:
 
-* `integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts` – a utility that knows how to compose a detailed trace report for a UKB workflow run.  
-* `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` – the **PersistenceAgent** that mediates all reads/writes to the underlying graph store.  
-* `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` – the **GraphDatabaseAdapter** that abstracts the low‑level graph‑database client.  
-* `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` – the **CodeGraphAgent** that can materialise a code‑knowledge graph, which the TraceReportModule may consume when enriching its reports.
+* `integrations/semantic-analysis/src/utils/ukb-trace-report.ts` – a utility that knows how to compose a detailed trace report for a UKB workflow run.  
+* `integrations/semantic-analysis/src/agents/persistence-agent.ts` – the **PersistenceAgent** that mediates all reads/writes to the underlying graph store.  
+* `integrations/semantic-analysis/src/storage/graph-database-adapter.ts` – the **GraphDatabaseAdapter** that abstracts the low‑level graph‑database client.  
+* `integrations/semantic-analysis/src/agents/code-graph-agent.ts` – the **CodeGraphAgent** that can materialise a code‑knowledge graph, which the TraceReportModule may consume when enriching its reports.
 
 Together these pieces enable the TraceReportModule to **retrieve** data from the graph database, **assemble** a comprehensive trace of a UKB workflow execution, and then **persist** the resulting report back into the same graph store. The module is a child of the broader **KnowledgeManagement** component, and it shares its persistence and graph‑adapter infrastructure with sibling modules such as **ManualLearning** and **Persistence**.
 
@@ -131,12 +131,12 @@ The modular, agent‑based design yields **high maintainability**: each concern 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a modular architecture, with separate modules for graph database adaptation, persistence, and semantic analysis. This is evident in the way the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) is used for persistence, and the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification. The CodeGraphAgent (integrations/semantic-analysis/src/agents/code-graph-agent.ts) is also used for constructing code knowledge graphs and providing semantic code search capabilities. The ukb-trace-report (integrations/semantic-analysis/src/utils/ukb-trace-report.ts) is used for generating detailed trace reports of UKB workflow runs. This modular design allows for flexibility and maintainability of the component.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for managing entity persistence and ontology classification.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning utilizes the PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) for managing entity persistence and ontology classification.
 - [OnlineLearning](./OnlineLearning.md) -- OnlineLearning utilizes the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis.
-- [Persistence](./Persistence.md) -- The PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification.
+- [Persistence](./Persistence.md) -- The PersistenceAgent (integrations/semantic-analysis/src/agents/persistence-agent.ts) is used for managing entity persistence and ontology classification.
 
 ---
 

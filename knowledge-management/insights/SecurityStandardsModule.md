@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-SecurityStandardsModule uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code and enforce security standards.
+SecurityStandardsModule uses the CodeGraphAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts to analyze code and enforce security standards.
 
 ## What It Is  
 
-The **SecurityStandardsModule** lives inside the *CodingPatterns* sub‑tree and is the dedicated component that stores, retrieves, and enforces security‑related coding standards. Its core logic is spread across a handful of concrete files that are referenced throughout the observations: it works with the **DesignPatternManager** to pull pre‑registered security patterns, it calls the **GraphDatabaseAdapter** (implemented in `storage/graph-database-adapter.ts`) for persisting and reading security‑standard entities, and it leverages the **CodeGraphAgent** located at `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` to analyse source code. In addition, the module collaborates with the **CodingConventionEnforcer**, the **KnowledgeGraphManager**, and the broader **CodeAnalysisFramework** to ensure that security standards are treated as first‑class citizens within the overall coding‑convention enforcement pipeline.
+The **SecurityStandardsModule** lives inside the *CodingPatterns* sub‑tree and is the dedicated component that stores, retrieves, and enforces security‑related coding standards. Its core logic is spread across a handful of concrete files that are referenced throughout the observations: it works with the **DesignPatternManager** to pull pre‑registered security patterns, it calls the **GraphDatabaseAdapter** (implemented in `storage/graph-database-adapter.ts`) for persisting and reading security‑standard entities, and it leverages the **CodeGraphAgent** located at `integrations/semantic-analysis/src/agents/code-graph-agent.ts` to analyse source code. In addition, the module collaborates with the **CodingConventionEnforcer**, the **KnowledgeGraphManager**, and the broader **CodeAnalysisFramework** to ensure that security standards are treated as first‑class citizens within the overall coding‑convention enforcement pipeline.
 
 In practice, SecurityStandardsModule acts as the bridge between declarative security standards (stored as graph entities) and the runtime code‑analysis engine that validates those standards against developer code. By being a child of the **CodingPatterns** component, it inherits the same graph‑database‑centric persistence strategy and contributes its own “security‑standard” entity type to the shared knowledge graph.
 
@@ -28,7 +28,7 @@ At the heart of the implementation is the **GraphDatabaseAdapter** (`storage/gra
 
 SecurityStandardsModule obtains the concrete security patterns by calling into **DesignPatternManager**. This manager maintains a catalogue of design‑pattern entities—including security‑specific ones—by also using the GraphDatabaseAdapter. The manager likely exposes a method like `getPatternById()` or `listPatternsByCategory('security')`, which SecurityStandardsModule consumes to build its enforcement rule set.
 
-For runtime enforcement, the module hands the relevant patterns to the **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`). The agent parses source files, constructs a code graph, and traverses it while checking each node against the supplied security rules. Results (violations, compliance scores) are written back into the graph database via the same adapter, enabling later queries by the **KnowledgeGraphManager** or reporting tools.
+For runtime enforcement, the module hands the relevant patterns to the **CodeGraphAgent** (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`). The agent parses source files, constructs a code graph, and traverses it while checking each node against the supplied security rules. Results (violations, compliance scores) are written back into the graph database via the same adapter, enabling later queries by the **KnowledgeGraphManager** or reporting tools.
 
 Finally, the **CodingConventionEnforcer** acts as the orchestrator that triggers SecurityStandardsModule during a code‑commit or pull‑request workflow. It invokes the module’s enforcement API, receives the analysis outcome, and decides whether to block the change or surface warnings. The **CodeAnalysisFramework** provides the surrounding scaffolding (e.g., plugin registration, execution pipelines) and invokes the CodeGraphAgent, which in turn depends on SecurityStandardsModule for the security‑specific rule set.
 
@@ -40,7 +40,7 @@ SecurityStandardsModule is tightly coupled to several first‑level services:
 
 1. **DesignPatternManager** – the source of stored security patterns; SecurityStandardsModule calls this manager to retrieve the rule definitions it will enforce.  
 2. **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) – the persistence gateway; all create, read, update, and delete operations for security‑standard entities flow through this adapter.  
-3. **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) – the analysis engine; receives the security rule set from the module and writes analysis results back to the graph.  
+3. **CodeGraphAgent** (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`) – the analysis engine; receives the security rule set from the module and writes analysis results back to the graph.  
 4. **CodingConventionEnforcer** – the enforcement orchestrator; triggers the module during CI/CD or IDE‑based linting runs.  
 5. **KnowledgeGraphManager** – updates the broader knowledge graph with the outcomes of security analysis, allowing downstream consumers (dashboards, audit tools) to query compliance status.  
 6. **CodeAnalysisFramework** – the host framework that wires the CodeGraphAgent into the overall analysis pipeline; it indirectly depends on SecurityStandardsModule because the agent’s rule set is populated by the module.
@@ -93,12 +93,12 @@ Following these practices will keep the SecurityStandardsModule aligned with the
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter class, specifically the createEntity() method in storage/graph-database-adapter.ts, to store design patterns as entities in the graph database. This facilitates the persistence and retrieval of coding conventions. For instance, when storing security standards and anti-patterns as entities, the GraphDatabaseAdapter.createEntity() method is deployed. This enables comprehensive coding guidance and is a key aspect of the component's architecture. The CodeAnalysisModule, which uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, relies on these stored patterns to analyze code.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter class, specifically the createEntity() method in storage/graph-database-adapter.ts, to store design patterns as entities in the graph database. This facilitates the persistence and retrieval of coding conventions. For instance, when storing security standards and anti-patterns as entities, the GraphDatabaseAdapter.createEntity() method is deployed. This enables comprehensive coding guidance and is a key aspect of the component's architecture. The CodeAnalysisModule, which uses the CodeGraphAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts, relies on these stored patterns to analyze code.
 
 ### Siblings
 - [DesignPatternManager](./DesignPatternManager.md) -- DesignPatternManager uses the createEntity() method in storage/graph-database-adapter.ts to store design patterns as entities in the graph database.
 - [CodingConventionEnforcer](./CodingConventionEnforcer.md) -- CodingConventionEnforcer uses the DesignPatternManager to retrieve stored design patterns for validation.
-- [CodeAnalysisFramework](./CodeAnalysisFramework.md) -- CodeAnalysisFramework uses the CodeGraphAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code based on stored design patterns.
+- [CodeAnalysisFramework](./CodeAnalysisFramework.md) -- CodeAnalysisFramework uses the CodeGraphAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts to analyze code based on stored design patterns.
 - [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve knowledge graph data.
 - [CodeGraphAgent](./CodeGraphAgent.md) -- CodeGraphAgent uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to store and retrieve code analysis data.
 

@@ -6,7 +6,7 @@ The git history agent relies on the semantic-analysis-agent.ts to perform compre
 
 ## What It Is  
 
-The **GitHistoryAgent** lives in `integrations/mcp-server-semantic-analysis/src/agents/git-history-agent.ts`.  Its sole responsibility is to walk a repository’s commit history, pull out the raw artefacts that are useful for downstream semantic processing, and hand those artefacts to the **SemanticAnalysisAgent** (implemented in `semantic-analysis-agent.ts`).  The agent therefore acts as the “data‑collector” layer for the broader **SemanticAnalysis** subsystem, turning low‑level Git metadata—commit messages, file‑change lists, timestamps—into a structured payload that the semantic‑analysis pipeline can consume.
+The **GitHistoryAgent** lives in `integrations/semantic-analysis/src/agents/git-history-agent.ts`.  Its sole responsibility is to walk a repository’s commit history, pull out the raw artefacts that are useful for downstream semantic processing, and hand those artefacts to the **SemanticAnalysisAgent** (implemented in `semantic-analysis-agent.ts`).  The agent therefore acts as the “data‑collector” layer for the broader **SemanticAnalysis** subsystem, turning low‑level Git metadata—commit messages, file‑change lists, timestamps—into a structured payload that the semantic‑analysis pipeline can consume.
 
 ## Architecture and Design  
 
@@ -73,10 +73,10 @@ Overall, the GitHistoryAgent exemplifies a well‑structured, agent‑centric de
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system to process git history and LSL sessions, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent working together to extract and persist structured knowledge entities. This is evident in the integrations/mcp-server-semantic-analysis/src/agents directory, where each agent has its own TypeScript file, such as ontology-classification-agent.ts, semantic-analysis-agent.ts, and code-graph-agent.ts. The BaseAgent class, defined in base-agent.ts, serves as an abstract base class for all agents in the system, providing a foundation for their implementation. For instance, the SemanticAnalysisAgent, which performs comprehensive semantic analysis of code files and git history, extends the BaseAgent class and overrides its execute method to perform the actual analysis.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a multi-agent system to process git history and LSL sessions, with agents such as OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent working together to extract and persist structured knowledge entities. This is evident in the integrations/semantic-analysis/src/agents directory, where each agent has its own TypeScript file, such as ontology-classification-agent.ts, semantic-analysis-agent.ts, and code-graph-agent.ts. The BaseAgent class, defined in base-agent.ts, serves as an abstract base class for all agents in the system, providing a foundation for their implementation. For instance, the SemanticAnalysisAgent, which performs comprehensive semantic analysis of code files and git history, extends the BaseAgent class and overrides its execute method to perform the actual analysis.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline utilizes a coordinator to manage the batch processing workflow, as seen in the integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts file.
+- [Pipeline](./Pipeline.md) -- The Pipeline utilizes a coordinator to manage the batch processing workflow, as seen in the integrations/semantic-analysis/src/agents/coordinator.ts file.
 - [Ontology](./Ontology.md) -- The ontology classification system relies on the BaseAgent class in base-agent.ts to provide a foundation for the implementation of ontology-related agents.
 - [Insights](./Insights.md) -- The InsightGenerationAgent in insight-generation-agent.ts generates semantic insights using LLM and code graph context.
 - [OntologyManager](./OntologyManager.md) -- The OntologyManager in ontology-manager.ts manages the ontology system and provides metadata to entities.

@@ -2,16 +2,16 @@
 
 **Type:** Detail
 
-The existence of both a user-facing doc (integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md, titled 'Semantic Constraint Detection') and a separate internal design doc (integrations/mcp-constraint-monitor/docs/semantic-detection-design.md, titled 'Semantic Constraint Detection - Design Document') strongly implies that rule evaluation logic is architecturally complex enough to require distinct documentation for consumers and maintainers.
+The existence of both a user-facing doc (integrations/constraint-monitor/docs/semantic-constraint-detection.md, titled 'Semantic Constraint Detection') and a separate internal design doc (integrations/constraint-monitor/docs/semantic-detection-design.md, titled 'Semantic Constraint Detection - Design Document') strongly implies that rule evaluation logic is architecturally complex enough to require distinct documentation for consumers and maintainers.
 
 ## What It Is  
 
 **SemanticRuleEvaluator** is the core rule‑evaluation engine that lives inside the **SemanticConstraintDetector** component of the *mcp‑constraint‑monitor* integration. Its source code is not listed directly in the supplied observations, but its logical location is implicit in the documentation hierarchy:
 
-* **User‑facing description** – `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` (titled *Semantic Constraint Detection*).  
-* **Internal design specification** – `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md` (titled *Semantic Constraint Detection – Design Document*).  
+* **User‑facing description** – `integrations/constraint-monitor/docs/semantic-constraint-detection.md` (titled *Semantic Constraint Detection*).  
+* **Internal design specification** – `integrations/constraint-monitor/docs/semantic-detection-design.md` (titled *Semantic Constraint Detection – Design Document*).  
 
-These two documents together describe a component that “operates on intercepted tool events” and that “applies higher‑order intent analysis” rather than simple pattern matching. The evaluator therefore consumes the structured payload emitted by the **Claude Code hook** (`integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) and produces a typed violation object that downstream consumers—most notably the **ViolationClassifier** and the dashboard (`integrations/mcp-constraint-monitor/dashboard/README.md`)—can render.
+These two documents together describe a component that “operates on intercepted tool events” and that “applies higher‑order intent analysis” rather than simple pattern matching. The evaluator therefore consumes the structured payload emitted by the **Claude Code hook** (`integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) and produces a typed violation object that downstream consumers—most notably the **ViolationClassifier** and the dashboard (`integrations/constraint-monitor/dashboard/README.md`)—can render.
 
 In short, **SemanticRuleEvaluator** is the semantic‑reasoning layer that interprets each incoming event against a catalog of declarative rules, deciding whether a rule is satisfied, violated, or requires further classification.
 
@@ -53,7 +53,7 @@ No explicit micro‑service or event‑bus terminology appears in the observatio
 
 Although the source code symbols are not enumerated, the documentation points to the concrete artefacts that shape the implementation:
 
-* **Input Format** – Defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This file specifies the JSON schema of the intercepted tool event, including fields such as `tool_name`, `action`, `metadata`, and the LLM‑generated `intent` payload. **SemanticRuleEvaluator** reads this schema directly, extracting the semantic intent rather than merely matching textual patterns.  
+* **Input Format** – Defined in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This file specifies the JSON schema of the intercepted tool event, including fields such as `tool_name`, `action`, `metadata`, and the LLM‑generated `intent` payload. **SemanticRuleEvaluator** reads this schema directly, extracting the semantic intent rather than merely matching textual patterns.  
 
 * **Rule Representation** – While not listed as a file, the design doc (`semantic-detection-design.md`) describes rules as *structured* objects that encode intent expectations (e.g., “must not delete production resources”, “should only modify files within `src/`”). These rule objects are likely deserialized from a configuration file or database and passed to the evaluator.  
 
@@ -61,7 +61,7 @@ Although the source code symbols are not enumerated, the documentation points to
 
 * **Result Production** – The outcome of the evaluation is a **raw violation record** (e.g., `{ ruleId, matched, confidence, details }`). This record is handed off to the **ViolationClassifier**, which adds classification metadata required by the dashboard (severity, category, UI‑friendly message).  
 
-* **No Direct Code Symbols** – The observation “0 code symbols found” suggests that the evaluator’s implementation resides in files not captured by the current extraction, but its logical location is within the same `integrations/mcp-constraint-monitor` tree, likely alongside other detection components.
+* **No Direct Code Symbols** – The observation “0 code symbols found” suggests that the evaluator’s implementation resides in files not captured by the current extraction, but its logical location is within the same `integrations/constraint-monitor` tree, likely alongside other detection components.
 
 ---
 
@@ -77,7 +77,7 @@ Although the source code symbols are not enumerated, the documentation points to
    Receives the raw evaluation result, enriches it, and forwards it to the dashboard. The contract between evaluator and classifier is therefore a **typed violation object** with at least `ruleId`, `status`, and `confidence`.  
 
 4. **Downstream – Dashboard**  
-   Documented in `integrations/mcp-constraint-monitor/dashboard/README.md`. The dashboard expects violations grouped by severity and category; therefore the evaluator indirectly influences UI performance and clarity through the fidelity of its semantic matches.  
+   Documented in `integrations/constraint-monitor/dashboard/README.md`. The dashboard expects violations grouped by severity and category; therefore the evaluator indirectly influences UI performance and clarity through the fidelity of its semantic matches.  
 
 5. **Configuration / Rule Store**  
    Though not explicitly listed, the design doc implies a rule repository that the evaluator reads. This repository is a critical integration point; versioning or hot‑reloading of rules will affect evaluation latency and correctness.
@@ -140,10 +140,10 @@ Although the source code symbols are not enumerated, the documentation points to
 ## Hierarchy Context
 
 ### Parent
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- Documented in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and semantic-detection-design.md, indicating the detection logic is substantial enough to warrant both a user-facing doc and an internal design doc
+- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- Documented in integrations/constraint-monitor/docs/semantic-constraint-detection.md and semantic-detection-design.md, indicating the detection logic is substantial enough to warrant both a user-facing doc and an internal design doc
 
 ### Siblings
-- [ViolationClassifier](./ViolationClassifier.md) -- The integrations/mcp-constraint-monitor/dashboard/README.md confirms a dashboard component exists as a downstream consumer of violation data, implying ViolationClassifier must produce a typed, displayable violation structure that the dashboard can render by severity or category.
+- [ViolationClassifier](./ViolationClassifier.md) -- The integrations/constraint-monitor/dashboard/README.md confirms a dashboard component exists as a downstream consumer of violation data, implying ViolationClassifier must produce a typed, displayable violation structure that the dashboard can render by severity or category.
 
 
 ---

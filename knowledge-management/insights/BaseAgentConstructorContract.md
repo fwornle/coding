@@ -2,13 +2,13 @@
 
 **Type:** Detail
 
-As documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md, every BaseAgent subclass must accept exactly two constructor parameters — repoPath and team — establishing a uniform configuration-capture interface across all agent implementations.
+As documented in integrations/semantic-analysis/docs/architecture/agents.md, every BaseAgent subclass must accept exactly two constructor parameters — repoPath and team — establishing a uniform configuration-capture interface across all agent implementations.
 
 # BaseAgentConstructorContract
 
 ## What It Is
 
-The `BaseAgentConstructorContract` is an architectural contract documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` that governs how every `BaseAgent` subclass is constructed. It mandates a uniform constructor signature — `constructor(repoPath, team)` — accepting exactly two parameters and restricting constructor behavior to capturing these configuration values. The contract is not merely a coding convention; it is a named architectural guarantee that explicitly forbids the allocation of any LLM client during object construction.
+The `BaseAgentConstructorContract` is an architectural contract documented in `integrations/semantic-analysis/docs/architecture/agents.md` that governs how every `BaseAgent` subclass is constructed. It mandates a uniform constructor signature — `constructor(repoPath, team)` — accepting exactly two parameters and restricting constructor behavior to capturing these configuration values. The contract is not merely a coding convention; it is a named architectural guarantee that explicitly forbids the allocation of any LLM client during object construction.
 
 As a `Detail` under the parent component `AgentLifecyclePatterns`, this contract defines the first stage of an agent's lifecycle: the lightweight, side-effect-free instantiation phase. It works in deliberate complement to its sibling component, `EnsureLLMInitializedGuard`, which handles the deferred LLM client allocation that this contract explicitly prohibits at construction time.
 
@@ -36,7 +36,7 @@ The contract integrates primarily with two adjacent concerns. First, it integrat
 
 Second, the contract integrates with any system or framework code that instantiates agents — including registries, factory functions, test harnesses, and dependency injection contexts. Because instantiation is guaranteed to be lightweight and side-effect-free, these integration points can construct agents freely without needing to manage LLM connectivity, credentials, or asynchronous setup at the construction boundary.
 
-The reference documentation lives at `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, which serves as the canonical specification both for this contract and for the broader `AgentLifecyclePatterns` parent that contains it. Any new agent introduced to the system must be checked against this documentation to verify constructor signature conformance and the absence of LLM allocation in its constructor body.
+The reference documentation lives at `integrations/semantic-analysis/docs/architecture/agents.md`, which serves as the canonical specification both for this contract and for the broader `AgentLifecyclePatterns` parent that contains it. Any new agent introduced to the system must be checked against this documentation to verify constructor signature conformance and the absence of LLM allocation in its constructor body.
 
 ## Usage Guidelines
 
@@ -64,7 +64,7 @@ Maintainers reviewing pull requests that touch agent constructors should treat a
 ## Hierarchy Context
 
 ### Parent
-- [AgentLifecyclePatterns](./AgentLifecyclePatterns.md) -- BaseAgent subclasses documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md all follow a constructor(repoPath, team) signature that captures only configuration context, explicitly forbidding any LLM client instantiation at this stage.
+- [AgentLifecyclePatterns](./AgentLifecyclePatterns.md) -- BaseAgent subclasses documented in integrations/semantic-analysis/docs/architecture/agents.md all follow a constructor(repoPath, team) signature that captures only configuration context, explicitly forbidding any LLM client instantiation at this stage.
 
 ### Siblings
 - [EnsureLLMInitializedGuard](./EnsureLLMInitializedGuard.md) -- Because agents.md mandates that constructors never instantiate LLM clients, the architecture requires a separate initialization pathway; the parent component analysis identifies ensureLLMInitialized() in agents.md as that deferred allocation point.

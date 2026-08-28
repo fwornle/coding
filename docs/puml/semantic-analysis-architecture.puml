@@ -1,7 +1,7 @@
-@startuml mcp-server-semantic-analysis-architecture
+@startuml semantic-analysis-architecture
 !include _standard-style.puml
 
-title mcp-server-semantic-analysis — 14 Agents Grouped by Role
+title semantic-analysis — 14 Agents Grouped by Role
 
 top to bottom direction
 

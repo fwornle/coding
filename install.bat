@@ -610,7 +610,7 @@ echo Creating .claude/settings.local.json...
     echo         "hooks": [
     echo           {
     echo             "type": "command",
-    echo             "command": "node %CODING_REPO%\\integrations\\mcp-constraint-monitor\\src\\hooks\\pre-prompt-hook-wrapper.js"
+    echo             "command": "node %CODING_REPO%\\integrations\\constraint-monitor\\src\\hooks\\pre-prompt-hook-wrapper.js"
     echo           }
     echo         ]
     echo       }
@@ -620,7 +620,7 @@ echo Creating .claude/settings.local.json...
     echo         "hooks": [
     echo           {
     echo             "type": "command",
-    echo             "command": "node %CODING_REPO%\\integrations\\mcp-constraint-monitor\\src\\hooks\\pre-tool-hook-wrapper.js"
+    echo             "command": "node %CODING_REPO%\\integrations\\constraint-monitor\\src\\hooks\\pre-tool-hook-wrapper.js"
     echo           }
     echo         ]
     echo       }

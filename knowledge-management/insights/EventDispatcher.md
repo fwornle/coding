@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The EventDispatcher sub-component interacts with other sub-components, such as the HookManager, to retrieve event handlers and dispatch events to them, as implied by the presence of event-related files in the integrations/mcp-server-semantic-analysis/src directory.
+The EventDispatcher sub-component interacts with other sub-components, such as the HookManager, to retrieve event handlers and dispatch events to them, as implied by the presence of event-related files in the integrations/semantic-analysis/src directory.
 
 ## What It Is  
 
@@ -34,7 +34,7 @@ Although the source code is not listed verbatim, the observations give us enough
 
 2. **Unified Dispatch Interface** – A top‑level entry point such as `dispatch(eventName, payload)` lives in `lib/agent-api/event/dispatcher.js`.  The function performs a lookup in the registry, then iterates over the associated handler set, invoking each handler with the supplied payload.  Because the component may “utilize additional dispatching mechanisms, such as event queues”, the dispatcher likely checks whether a handler is synchronous or asynchronous and, when appropriate, pushes the payload onto a queue (e.g., a `p-queue` or `bull` instance declared in `package.json`).
 
-3. **Interaction with HookManager** – The sibling `HookManager` (`lib/agent-api/hooks/hook-manager.js`) maintains a higher‑level catalog of *hook* definitions.  When an agent (e.g., `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) needs to fire a hook, it calls `HookManager.triggerHook(name, data)`.  Inside that method, HookManager delegates to EventDispatcher, asking it to *dispatch* the hook event.  This delegation keeps the hook semantics separate from the low‑level dispatch mechanics.
+3. **Interaction with HookManager** – The sibling `HookManager` (`lib/agent-api/hooks/hook-manager.js`) maintains a higher‑level catalog of *hook* definitions.  When an agent (e.g., `integrations/semantic-analysis/src/agents/content-validation-agent.ts`) needs to fire a hook, it calls `HookManager.triggerHook(name, data)`.  Inside that method, HookManager delegates to EventDispatcher, asking it to *dispatch* the hook event.  This delegation keeps the hook semantics separate from the low‑level dispatch mechanics.
 
 4. **Extensibility Hooks** – The modular split (registration vs. dispatch vs. queue) means new capabilities—such as priority handling, throttling, or persistence—can be added by plugging in additional modules without touching the core registry logic.  The observations explicitly mention “design patterns enable easy extension and customization”.
 
@@ -52,7 +52,7 @@ EventDispatcher sits at the crossroads of several other sub‑components:
 
 * **ContentValidator & ConstraintEngine (siblings)** – Both of these modules register handlers for specific events (e.g., “content‑validated”, “constraint‑failed”) using the dispatcher’s registration API.  When an agent such as `content‑validation‑agent.ts` finishes its work, it emits an event that is routed through EventDispatcher to the appropriate validator or engine.
 
-* **External Agents (e.g., in `integrations/mcp-server-semantic-analysis/src/agents`)** – These agents import the dispatcher directly (`import { dispatch } from 'lib/agent-api/event/dispatcher'`) and use it to broadcast domain‑specific events.  Because the dispatcher abstracts away the underlying queue, agents remain agnostic to whether the event will be processed synchronously or asynchronously.
+* **External Agents (e.g., in `integrations/semantic-analysis/src/agents`)** – These agents import the dispatcher directly (`import { dispatch } from 'lib/agent-api/event/dispatcher'`) and use it to broadcast domain‑specific events.  Because the dispatcher abstracts away the underlying queue, agents remain agnostic to whether the event will be processed synchronously or asynchronously.
 
 * **Package.json dependencies** – The dispatcher’s optional queue layer pulls in third‑party libraries declared in `package.json`.  This makes the dispatcher a *pluggable* component: if a project removes the queue dependency, the dispatcher gracefully degrades to a simple in‑process emitter.
 
@@ -84,7 +84,7 @@ Following these conventions helps maintain the clean modularity that the origina
 |--------|-------------------------------------|
 | **Architectural patterns identified** | Modular registry‑based design, Observer pattern (via parent ConstraintSystem and HookManager), optional Queue/Transport pattern (suggested by `package.json` dependencies). |
 | **Design decisions & trade‑offs** | *Decision*: Separate registration and dispatch modules to keep concerns isolated. *Trade‑off*: Slight runtime overhead for lookup indirection, but gains in extensibility and testability. *Decision*: Allow pluggable queuing; *Trade‑off*: Adds dependency weight and complexity when scaling to distributed queues. |
-| **System structure insights** | EventDispatcher lives under `lib/agent-api/event/`, is a child of ConstraintSystem, and collaborates tightly with sibling HookManager.  Siblings register handlers; agents in `integrations/mcp-server-semantic-analysis/src` emit events. |
+| **System structure insights** | EventDispatcher lives under `lib/agent-api/event/`, is a child of ConstraintSystem, and collaborates tightly with sibling HookManager.  Siblings register handlers; agents in `integrations/semantic-analysis/src` emit events. |
 | **Scalability considerations** | The optional queue layer enables horizontal scaling—events can be off‑loaded to a durable broker without changing callers.  The in‑memory registry is fast for low‑traffic scenarios but would need sharding or a distributed registry for massive event volumes. |
 | **Maintainability assessment** | High maintainability due to clear separation of concerns, a single public API, and reliance on well‑known patterns (observer, registry).  The lack of tightly coupled code (no direct imports between siblings) means new handlers or new event types can be added with minimal impact.  Potential risk: if the internal registry implementation changes, all registration calls must be audited; however, the unified API mitigates this risk. |
 
@@ -93,7 +93,7 @@ These observations collectively paint a picture of **EventDispatcher** as a deli
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's utilization of the observer pattern for event handling is a key architectural aspect that enables efficient management of complex constraint relationships. This is evident in the use of hook configurations and the unified hook manager, as seen in the lib/agent-api/hooks/hook-manager.js file. The hook manager acts as a central orchestrator for hook events, allowing for customizable event handling and enabling the component to respond to various scenarios that may arise during code sessions. For instance, the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts employs the hook manager to handle content validation events, demonstrating the component's ability to adapt to different scenarios. Furthermore, the use of design patterns such as the observer pattern facilitates the component's modular design, allowing for separate modules to handle different aspects of constraint monitoring and enforcement.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's utilization of the observer pattern for event handling is a key architectural aspect that enables efficient management of complex constraint relationships. This is evident in the use of hook configurations and the unified hook manager, as seen in the lib/agent-api/hooks/hook-manager.js file. The hook manager acts as a central orchestrator for hook events, allowing for customizable event handling and enabling the component to respond to various scenarios that may arise during code sessions. For instance, the ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts employs the hook manager to handle content validation events, demonstrating the component's ability to adapt to different scenarios. Furthermore, the use of design patterns such as the observer pattern facilitates the component's modular design, allowing for separate modules to handle different aspects of constraint monitoring and enforcement.
 
 ### Siblings
 - [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the hook manager in lib/agent-api/hooks/hook-manager.js to handle content validation events, allowing for customizable event handling and adaptability to different scenarios.

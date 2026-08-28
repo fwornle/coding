@@ -2,13 +2,13 @@
 
 **Type:** SubComponent
 
-integrations/mcp-server-semantic-analysis/docs/architecture/README.md references PlantUML diagrams as the primary architecture artifacts, with prose documentation as secondary explanation
+integrations/semantic-analysis/docs/architecture/README.md references PlantUML diagrams as the primary architecture artifacts, with prose documentation as secondary explanation
 
 # DiagramFirstDocumentation
 
 ## What It Is
 
-DiagramFirstDocumentation is a documentation convention implemented primarily through the `docs/puml/` directory tree and reinforced by per-subsystem architecture references such as `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`. Under this convention, PlantUML diagrams are treated as the **primary architecture artifact**, while prose documentation plays a secondary, explanatory role. Rather than letting written specifications drift from runtime behavior, the project anchors its design intent in visual `.puml` files that are version-controlled alongside the code they describe.
+DiagramFirstDocumentation is a documentation convention implemented primarily through the `docs/puml/` directory tree and reinforced by per-subsystem architecture references such as `integrations/semantic-analysis/docs/architecture/README.md`. Under this convention, PlantUML diagrams are treated as the **primary architecture artifact**, while prose documentation plays a secondary, explanatory role. Rather than letting written specifications drift from runtime behavior, the project anchors its design intent in visual `.puml` files that are version-controlled alongside the code they describe.
 
 ![DiagramFirstDocumentation — Architecture](images/diagram-first-documentation-architecture.png)
 
@@ -24,7 +24,7 @@ The third design decision is **diagram-precedes-implementation ordering**. As de
 
 ## Implementation Details
 
-The mechanical implementation rests on three concrete artifacts. First, `docs/puml/_standard-style.puml` defines reusable style primitives that downstream `.puml` files consume via PlantUML's `!include` or `!import` directive, rather than duplicating color codes and font settings. Second, individual diagram files (e.g., `llm-tier-routing.puml`) live in directories that parallel their subject subsystems. Third, per-subsystem `README.md` files — such as `integrations/mcp-server-semantic-analysis/docs/architecture/README.md` — explicitly reference these diagrams as the primary architectural source, ensuring readers are pointed at the diagrams first.
+The mechanical implementation rests on three concrete artifacts. First, `docs/puml/_standard-style.puml` defines reusable style primitives that downstream `.puml` files consume via PlantUML's `!include` or `!import` directive, rather than duplicating color codes and font settings. Second, individual diagram files (e.g., `llm-tier-routing.puml`) live in directories that parallel their subject subsystems. Third, per-subsystem `README.md` files — such as `integrations/semantic-analysis/docs/architecture/README.md` — explicitly reference these diagrams as the primary architectural source, ensuring readers are pointed at the diagrams first.
 
 ![DiagramFirstDocumentation — Relationship](images/diagram-first-documentation-relationship.png)
 
@@ -34,9 +34,9 @@ The relationship with the SharedPlantUmlStylePalette child is technical and dire
 
 ## Integration Points
 
-DiagramFirstDocumentation integrates tightly with several sibling patterns under CodingPatterns. With TieredLLMRouting, the integration is exemplary: `llm-tier-routing.puml` documents the routing topology before `config/llm-providers.yaml` encodes it operationally, and `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` provides the prose narrative. The diagram, the proposal document, and the YAML form a three-layer specification stack.
+DiagramFirstDocumentation integrates tightly with several sibling patterns under CodingPatterns. With TieredLLMRouting, the integration is exemplary: `llm-tier-routing.puml` documents the routing topology before `config/llm-providers.yaml` encodes it operationally, and `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` provides the prose narrative. The diagram, the proposal document, and the YAML form a three-layer specification stack.
 
-With ConfigDrivenBehavior, the integration is conceptual: configuration files like `config/agent-profiles.json` define *what* the system does, while diagrams in `docs/puml/` define *how* those configurations interact structurally. With AgentConstructionPattern, diagrams provide the visual counterpart to the textual lifecycle description in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. With HookExtensionSystem and MCPToolExposurePattern, diagrams serve as the canonical depiction of integration contracts that are otherwise scattered across JSON payload specifications and README files.
+With ConfigDrivenBehavior, the integration is conceptual: configuration files like `config/agent-profiles.json` define *what* the system does, while diagrams in `docs/puml/` define *how* those configurations interact structurally. With AgentConstructionPattern, diagrams provide the visual counterpart to the textual lifecycle description in `integrations/semantic-analysis/docs/architecture/agents.md`. With HookExtensionSystem and MCPToolExposurePattern, diagrams serve as the canonical depiction of integration contracts that are otherwise scattered across JSON payload specifications and README files.
 
 The contribution workflow in `integrations/code-graph-rag/CONTRIBUTING.md` is the operational integration point that binds all of these together — it is the gate that ensures diagrams stay synchronized with code, configuration, and prose documentation.
 
@@ -46,7 +46,7 @@ When adding a new subsystem, create its `.puml` diagram in the corresponding loc
 
 Always include `docs/puml/_standard-style.puml` at the top of new `.puml` files via `!include` rather than copying style declarations. Duplicating styles defeats the purpose of the SharedPlantUmlStylePalette and creates drift that is difficult to detect. If a new stereotype or color is needed across multiple diagrams, add it to `_standard-style.puml` rather than defining it locally.
 
-When making changes that affect architecture — adding an agent, changing routing logic, modifying a hook contract — update the relevant `.puml` diagram in the same pull request. The contribution guidelines in `integrations/code-graph-rag/CONTRIBUTING.md` formalize this expectation, and reviewers should treat a missing diagram update as a blocking issue. The per-subsystem `README.md` (modeled on `integrations/mcp-server-semantic-analysis/docs/architecture/README.md`) should always link to its diagrams as the primary architecture artifact, with prose serving only to elaborate on what the diagram shows.
+When making changes that affect architecture — adding an agent, changing routing logic, modifying a hook contract — update the relevant `.puml` diagram in the same pull request. The contribution guidelines in `integrations/code-graph-rag/CONTRIBUTING.md` formalize this expectation, and reviewers should treat a missing diagram update as a blocking issue. The per-subsystem `README.md` (modeled on `integrations/semantic-analysis/docs/architecture/README.md`) should always link to its diagrams as the primary architecture artifact, with prose serving only to elaborate on what the diagram shows.
 
 Finally, preserve the directory mirror between `docs/puml/` and the codebase. If you create `integrations/new-subsystem/`, create the corresponding `docs/puml/new-subsystem/` (or equivalent) at the same time. The navigability of the diagram tree depends on this symmetry, and breaking it imposes hidden cognitive cost on every future developer.
 
@@ -74,11 +74,11 @@ Finally, preserve the directory mirror between `docs/puml/` and the codebase. If
 - [SharedPlantUmlStylePalette](./SharedPlantUmlStylePalette.md) -- `docs/puml/_standard-style.puml` is explicitly described in the parent sub-component as the single source of shared color palette, font, and stereotype definitions, meaning all other `.puml` files depend on it via an `!include` or `!import` directive rather than duplicating style rules.
 
 ### Siblings
-- [AgentConstructionPattern](./AgentConstructionPattern.md) -- integrations/mcp-server-semantic-analysis/docs/architecture/agents.md documents the agent architecture showing each agent follows a constructor + lazy-init + execute() lifecycle rather than eager initialization at import time
+- [AgentConstructionPattern](./AgentConstructionPattern.md) -- integrations/semantic-analysis/docs/architecture/agents.md documents the agent architecture showing each agent follows a constructor + lazy-init + execute() lifecycle rather than eager initialization at import time
 - [ConfigDrivenBehavior](./ConfigDrivenBehavior.md) -- config/agent-profiles.json defines per-agent behavioral parameters (e.g., which LLM tier to use, concurrency limits) so adding a new agent type requires only a new JSON entry, not a code change
-- [HookExtensionSystem](./HookExtensionSystem.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md specifies the exact JSON payload format that hooks emit on each tool call entry and exit, defining the contract between agents and monitors
+- [HookExtensionSystem](./HookExtensionSystem.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md specifies the exact JSON payload format that hooks emit on each tool call entry and exit, defining the contract between agents and monitors
 - [MCPToolExposurePattern](./MCPToolExposurePattern.md) -- integrations/code-graph-rag/README.md describes the code-graph-rag system exposing its graph query capabilities as MCP tools, not as a Python library import or REST API
-- [TieredLLMRouting](./TieredLLMRouting.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md formally proposes and documents the tiered model selection approach, classifying tasks into complexity buckets before provider assignment
+- [TieredLLMRouting](./TieredLLMRouting.md) -- integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md formally proposes and documents the tiered model selection approach, classifying tasks into complexity buckets before provider assignment
 
 
 ---

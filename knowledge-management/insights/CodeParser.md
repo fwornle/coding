@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file contains the implementation of the CodeAnalyzer, which likely includes the CodeParser.
+The integrations/semantic-analysis/src/agents/code-analyzer.ts file contains the implementation of the CodeAnalyzer, which likely includes the CodeParser.
 
 ## What It Is  
 
 **CodeParser** is the core parsing component that enables the **CodeAnalyzer** to read, interpret, and extract insights from source‑code files. Its implementation lives inside the **CodeAnalyzer** agent, specifically in the file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts
+integrations/semantic-analysis/src/agents/code-analyzer.ts
 ```  
 
 The observation that “The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as seen in the parent context” tells us that the parser is tightly coupled to the analyzer – the analyzer delegates the low‑level syntactic work to the CodeParser and then builds higher‑level semantic insights on top of the parsed representation.
@@ -37,7 +37,7 @@ Because the only concrete path we have is the `code-analyzer.ts` file, we can in
 The concrete implementation resides in  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts
+integrations/semantic-analysis/src/agents/code-analyzer.ts
 ```  
 
 Within this file, the **CodeParser** is most likely defined as:
@@ -120,7 +120,7 @@ Potential external dependencies (e.g., a third‑party TypeScript parser library
 ## Hierarchy Context
 
 ### Parent
-- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts file.
+- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as implemented in the integrations/semantic-analysis/src/agents/code-analyzer.ts file.
 
 ---
 

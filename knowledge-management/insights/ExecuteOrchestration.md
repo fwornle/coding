@@ -68,7 +68,7 @@ The diagram illustrates the flow from construction through lazy‑initialization
 
 * **Tool Interfaces** – Within `execute()`, agents call various **tool** components (e.g., semantic analysers, data fetchers). These tools are invoked in a deterministic order defined by the agent’s implementation. The agents act as the glue that passes data from one tool to the next.  
 
-* **Documentation & Reference** – The architecture is documented in **`integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`**, which describes the lifecycle and the role of `execute()`. This file serves as the primary reference for developers extending or customizing agents.  
+* **Documentation & Reference** – The architecture is documented in **`integrations/semantic-analysis/docs/architecture/agents.md`**, which describes the lifecycle and the role of `execute()`. This file serves as the primary reference for developers extending or customizing agents.  
 
 * **Sibling Agents** – All agents share the same three‑phase lifecycle, so any new agent added to the system must implement its own `execute()` method that follows the same pattern (lazy init + orchestration). This ensures seamless integration with the existing server logic.
 
@@ -132,7 +132,7 @@ The diagram illustrates the flow from construction through lazy‑initialization
 ## Hierarchy Context
 
 ### Parent
-- [AgentConstructionPattern](./AgentConstructionPattern.md) -- integrations/mcp-server-semantic-analysis/docs/architecture/agents.md documents the agent architecture showing each agent follows a constructor + lazy-init + execute() lifecycle rather than eager initialization at import time
+- [AgentConstructionPattern](./AgentConstructionPattern.md) -- integrations/semantic-analysis/docs/architecture/agents.md documents the agent architecture showing each agent follows a constructor + lazy-init + execute() lifecycle rather than eager initialization at import time
 
 
 ---

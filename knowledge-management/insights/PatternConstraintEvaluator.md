@@ -8,7 +8,7 @@ The separation of constraint-configuration.md (pattern rules) from semantic-cons
 
 ## What It Is
 
-`PatternConstraintEvaluator` is a rule evaluation component housed within the `ConstraintRuleEngine`, located in the `integrations/mcp-constraint-monitor` integration. It operates as the **pattern-based evaluation strategy** responsible for matching incoming tool invocations against explicitly defined constraint rules. Its rule source is `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, which defines the structure and syntax of constraints. Its input data contract — the shape of the hook payload it receives — is formally documented in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.
+`PatternConstraintEvaluator` is a rule evaluation component housed within the `ConstraintRuleEngine`, located in the `integrations/constraint-monitor` integration. It operates as the **pattern-based evaluation strategy** responsible for matching incoming tool invocations against explicitly defined constraint rules. Its rule source is `integrations/constraint-monitor/docs/constraint-configuration.md`, which defines the structure and syntax of constraints. Its input data contract — the shape of the hook payload it receives — is formally documented in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`.
 
 The evaluator sits at the intersection of two documents that together define its complete operational contract: one describes *what it matches against* (constraint configuration), and the other describes *what it receives as input* (hook payload schema). This clean separation of concerns is deliberate and architecturally significant.
 
@@ -51,11 +51,11 @@ By separating these into two evaluators rather than a single hybrid, the archite
 
 ### Input: The Hook Payload
 
-The evaluator's input is governed by `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This document defines the data contract — the precise schema of the payload that arrives when a Claude Code hook fires. Every field the `PatternConstraintEvaluator` inspects during rule matching must exist within this schema. This means the hook format document is effectively a **stability contract**: changes to the hook payload schema have direct consequences for which constraint patterns can be expressed and evaluated.
+The evaluator's input is governed by `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. This document defines the data contract — the precise schema of the payload that arrives when a Claude Code hook fires. Every field the `PatternConstraintEvaluator` inspects during rule matching must exist within this schema. This means the hook format document is effectively a **stability contract**: changes to the hook payload schema have direct consequences for which constraint patterns can be expressed and evaluated.
 
 ### Rules: Constraint Configuration
 
-The evaluator's rule definitions live in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. This document defines:
+The evaluator's rule definitions live in `integrations/constraint-monitor/docs/constraint-configuration.md`. This document defines:
 
 - How constraints are structured (fields, operators, values)
 - What aspects of a tool invocation can be constrained (tool name, parameters, etc.)
@@ -77,7 +77,7 @@ It is worth noting that no concrete code symbols (class definitions, function si
 
 ### Sibling: SemanticConstraintEvaluator
 
-The relationship with `SemanticConstraintEvaluator` is architecturally complementary. Where `PatternConstraintEvaluator` enforces rules that can be expressed as explicit structural patterns, `SemanticConstraintEvaluator` (documented in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`) handles constraint violations that require understanding *meaning* rather than structure. Developers authoring constraint rules must decide which evaluator is the right vehicle for a given constraint — a decision that has implications for rule expressiveness, false-positive rates, and auditability.
+The relationship with `SemanticConstraintEvaluator` is architecturally complementary. Where `PatternConstraintEvaluator` enforces rules that can be expressed as explicit structural patterns, `SemanticConstraintEvaluator` (documented in `integrations/constraint-monitor/docs/semantic-constraint-detection.md`) handles constraint violations that require understanding *meaning* rather than structure. Developers authoring constraint rules must decide which evaluator is the right vehicle for a given constraint — a decision that has implications for rule expressiveness, false-positive rates, and auditability.
 
 ### Hook Integration Layer
 
@@ -123,10 +123,10 @@ The architecture is **well-structured for maintainability** given its clear sepa
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md describes a semantic layer for detecting constraint violations that uses meaning-aware matching rather than literal rule comparison
+- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/constraint-monitor/docs/semantic-constraint-detection.md describes a semantic layer for detecting constraint violations that uses meaning-aware matching rather than literal rule comparison
 
 ### Siblings
-- [SemanticConstraintEvaluator](./SemanticConstraintEvaluator.md) -- integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md describes a semantic layer that uses meaning-aware matching rather than literal rule comparison, distinguishing it architecturally from pattern-based evaluation.
+- [SemanticConstraintEvaluator](./SemanticConstraintEvaluator.md) -- integrations/constraint-monitor/docs/semantic-constraint-detection.md describes a semantic layer that uses meaning-aware matching rather than literal rule comparison, distinguishing it architecturally from pattern-based evaluation.
 
 
 ---

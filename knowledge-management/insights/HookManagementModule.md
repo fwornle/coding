@@ -116,16 +116,16 @@ Because the module isolates its concerns, code changes are localized. Documentat
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component employs a modular architecture, with separate modules for different aspects of constraint monitoring. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis. This design decision allows for efficient and reliable operation, as each module can be developed, tested, and maintained independently. The use of graph database persistence enables the system to efficiently store and query complex relationships between code entities, while semantic analysis enables the system to understand the meaning and context of code actions and file operations.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component employs a modular architecture, with separate modules for different aspects of constraint monitoring. For instance, the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis. This design decision allows for efficient and reliable operation, as each module can be developed, tested, and maintained independently. The use of graph database persistence enables the system to efficiently store and query complex relationships between code entities, while semantic analysis enables the system to understand the meaning and context of code actions and file operations.
 
 ### Children
 - [HookFunctionsReference](./HookFunctionsReference.md) -- The integrations/copi/docs/hooks.md file provides a detailed reference for hook functions, which is utilized by the HookManagementModule.
 
 ### Siblings
-- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis.
-- [ViolationCaptureModule](./ViolationCaptureModule.md) -- The ViolationCaptureModule utilizes the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation to provide a guide for constraint configuration.
+- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis.
+- [ViolationCaptureModule](./ViolationCaptureModule.md) -- The ViolationCaptureModule utilizes the integrations/constraint-monitor/docs/constraint-configuration.md documentation to provide a guide for constraint configuration.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationModule to pre-populate ontology metadata fields and prevent redundant LLM re-classification.
-- [SemanticAnalysisModule](./SemanticAnalysisModule.md) -- The SemanticAnalysisModule utilizes the integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documentation to provide a guide for semantic constraint detection.
+- [SemanticAnalysisModule](./SemanticAnalysisModule.md) -- The SemanticAnalysisModule utilizes the integrations/constraint-monitor/docs/semantic-constraint-detection.md documentation to provide a guide for semantic constraint detection.
 
 ---
 

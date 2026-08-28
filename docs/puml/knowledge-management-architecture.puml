@@ -7,7 +7,7 @@ title Knowledge Flow: MCP → GraphDB → Git Storage
 
 actor Developer
 participant "Claude Code" as CLAUDE
-participant "MCP Semantic Analysis" as MCP
+participant "Semantic Analysis" as MCP
 participant "GraphDB" as GRAPHDB
 participant "coding.json" as JSON
 participant "Git Repository" as GIT

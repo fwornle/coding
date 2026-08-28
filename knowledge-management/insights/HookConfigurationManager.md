@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The manager uses a specific format for hook configurations, as described in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+The manager uses a specific format for hook configurations, as described in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 
 ## What It Is  
 
-The **HookConfigurationManager** is a sub‑component that lives inside the **ConstraintSystem** package. Its implementation is anchored in the repository under the path `lib/agent-api/hooks/` where it composes the **HookConfigLoader** (found in `lib/agent-api/hooks/hook-config.js`). The manager’s primary responsibility is to take the raw hook definitions that are loaded by the loader, apply any project‑level overrides, and expose a final, validated configuration that downstream modules—most notably the **ContentValidationModule**—can consume when processing entity content. The configuration format it expects is documented in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, and the overall configuration‑management philosophy it follows is described in `integrations/copi/docs/hooks.md`.  
+The **HookConfigurationManager** is a sub‑component that lives inside the **ConstraintSystem** package. Its implementation is anchored in the repository under the path `lib/agent-api/hooks/` where it composes the **HookConfigLoader** (found in `lib/agent-api/hooks/hook-config.js`). The manager’s primary responsibility is to take the raw hook definitions that are loaded by the loader, apply any project‑level overrides, and expose a final, validated configuration that downstream modules—most notably the **ContentValidationModule**—can consume when processing entity content. The configuration format it expects is documented in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, and the overall configuration‑management philosophy it follows is described in `integrations/copi/docs/hooks.md`.  
 
 In practice, the manager acts as the “brain” that decides which hooks are active, how they are parameterised, and how they should behave for a given project, while delegating the low‑level file‑system merging logic to its child **HookConfigLoader**.
 
@@ -30,7 +30,7 @@ The interaction with the **ContentValidationModule** is another instance of a cl
   1. Instantiate or import **HookConfigLoader**.  
   2. Invoke the loader to obtain the merged raw configuration.  
   3. Apply additional **project config overrides** (these may come from a separate project‑specific JSON/YAML file or an in‑memory object supplied at runtime).  
-  4. Validate the resulting configuration against the schema defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK‑FORMAT.md`.  
+  4. Validate the resulting configuration against the schema defined in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK‑FORMAT.md`.  
   5. Expose the final configuration through a public API (e.g., `getHooks()`, `getHookByName(name)`) that the **ContentValidationModule** consumes.  
 
 * **Configuration Format** – The manager enforces a strict format (as per the CLAUDE‑CODE‑HOOK‑FORMAT doc). This guarantees that downstream consumers receive a predictable structure, reducing runtime errors and simplifying the validation logic in the **ContentValidationModule**.  
@@ -49,7 +49,7 @@ The interaction with the **ContentValidationModule** is another instance of a cl
 
 4. **Documentation‑Driven Contracts** – The manager’s behaviour is governed by two external docs:  
    * `integrations/copi/docs/hooks.md` – outlines the overall configuration‑management approach, indicating that the manager must respect a hierarchy of overrides.  
-   * `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK‑FORMAT.md` – defines the schema that the manager validates against before exposing the config.  
+   * `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK‑FORMAT.md` – defines the schema that the manager validates against before exposing the config.  
 
 These docs act as *interface contracts* that ensure consistency across the system, even though they are not code artifacts.
 
@@ -97,15 +97,15 @@ The clear separation between loading (HookConfigLoader) and management (HookConf
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component's modular architecture allows for a clear separation of concerns, with each sub-component interacting through well-defined interfaces. For instance, the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis. This modular design enables easier maintenance and updates to individual components without affecting the overall system. Furthermore, the HookConfigLoader (lib/agent-api/hooks/hook-config.js) loads and merges hook configurations from user-level and project-level sources, applying project config overrides. This design decision allows for flexible configuration management and customization of hook behaviors.
 
 ### Children
 - [HookConfigLoader](./HookConfigLoader.md) -- The HookConfigLoader is mentioned in the parent context as being located in lib/agent-api/hooks/hook-config.js, indicating its importance in loading and merging hook configurations.
 
 ### Siblings
-- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis.
+- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts interacts with the GraphDatabaseAdapter for graph database persistence and semantic analysis.
 - [ViolationPersistenceService](./ViolationPersistenceService.md) -- The ViolationPersistenceService interacts with the ContentValidationModule to store violation records.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts
 
 ---
 

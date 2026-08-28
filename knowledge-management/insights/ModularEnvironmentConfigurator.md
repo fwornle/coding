@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-The mcp-constraint-monitor module in the integrations directory provides a constraint monitor for MCP, with a dashboard and documentation on constraint configuration and semantic constraint detection.
+The constraint-monitor module in the integrations directory provides a constraint monitor for MCP, with a dashboard and documentation on constraint configuration and semantic constraint detection.
 
 ## What It Is  
 
@@ -25,7 +25,7 @@ Although the source snapshot does not expose concrete classes or functions, the 
 * **`integrations/browser-access/README.md`** – describes a module that configures browser‑based access credentials (e.g., proxy settings, headless flags).  
 * **`integrations/code-graph-rag/README.md`** – explains a module that sets up Retrieval‑Augmented Generation (RAG) parameters for a code‑graph service, likely exposing variables such as `CODE_GRAPH_ENDPOINT` and authentication tokens.  
 * **`integrations/cop i/README.md`** – provides a wrapper around the GitHub Copilot CLI, adding **logging** and **Tmux** integration.  This suggests that the module contains a small script or wrapper binary that intercepts Copilot commands, writes structured logs, and optionally launches the CLI inside a Tmux pane for session persistence.  
-* **`integrations/mcp-constraint-monitor/README.md`** – details a constraint‑monitoring dashboard for MCP (presumably “Model‑Control‑Plane”).  The README mentions **semantic constraint detection** and a **dashboard**, implying the presence of a lightweight web UI or CLI that reads configuration files, validates constraints, and presents results.
+* **`integrations/constraint-monitor/README.md`** – details a constraint‑monitoring dashboard for MCP (presumably “Model‑Control‑Plane”).  The README mentions **semantic constraint detection** and a **dashboard**, implying the presence of a lightweight web UI or CLI that reads configuration files, validates constraints, and presents results.
 
 The **ModularEnvironmentConfigurator** likely implements a discovery routine that scans the `integrations/` directory, parses each README (or accompanying `*.json`/`*.yaml` files if present), and registers the variables defined therein.  Validation logic would enforce that required variables are present and correctly typed before the application proceeds.  Because the modules are self‑documenting, the configurator can also surface helpful error messages that reference the exact README path, guiding developers to the right place for remediation.
 

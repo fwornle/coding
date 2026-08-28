@@ -9,7 +9,7 @@ Per the Pipeline sub-component description, BaseAgent exposes exactly five abstr
 `BaseAgentLifecycleContract` lives at the heart of the **Pipeline** component and is defined in the architectural documentation located at  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
+integrations/semantic-analysis/docs/architecture/agents.md
 ```  
 
 It is an abstract contract that declares **exactly five** lifecycle hooks that every concrete coordinator‑agent must implement:

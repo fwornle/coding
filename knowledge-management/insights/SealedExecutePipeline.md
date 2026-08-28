@@ -8,11 +8,11 @@ The pipeline unconditionally sequences `process()` → `calculateConfidence()` �
 
 ## What It Is
 
-`SealedExecutePipeline` refers to the sealed `execute()` method defined on `BaseAgent<TInput, TOutput>` in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. It is the top-level, immutable control flow that governs every agent invocation within the semantic analysis subsystem. By being sealed, `execute()` cannot be overridden, extended, or bypassed by any concrete subclass of `BaseAgent`, ensuring that the orchestration of agent stages remains consistent across every implementation.
+`SealedExecutePipeline` refers to the sealed `execute()` method defined on `BaseAgent<TInput, TOutput>` in `integrations/semantic-analysis/src/agents/base-agent.ts`. It is the top-level, immutable control flow that governs every agent invocation within the semantic analysis subsystem. By being sealed, `execute()` cannot be overridden, extended, or bypassed by any concrete subclass of `BaseAgent`, ensuring that the orchestration of agent stages remains consistent across every implementation.
 
 The pipeline unconditionally sequences five abstract operations in a fixed order: `process()` → `calculateConfidence()` → `detectIssues()` → `generateRouting()` → `applyCorrections()`. There is no conditional branching, no early termination, and no reordering between these stages. This guarantees that every agent invocation always emits a complete result envelope consisting of processed output, a confidence score, an issue list, routing metadata, and a corrections payload — regardless of the input or the specific agent subclass involved.
 
-This component is documented under Agent Architecture in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, which describes the sealed design as the mechanism for centralizing cross-cutting concerns while delegating domain logic to subclasses.
+This component is documented under Agent Architecture in `integrations/semantic-analysis/docs/architecture/agents.md`, which describes the sealed design as the mechanism for centralizing cross-cutting concerns while delegating domain logic to subclasses.
 
 ## Architecture and Design
 
@@ -26,7 +26,7 @@ The sealed design also centralizes **cross-cutting concerns** — error handling
 
 ## Implementation Details
 
-The mechanics are concentrated in `BaseAgent<TInput, TOutput>` within `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. The generic type parameters `TInput` and `TOutput` allow each concrete agent to specialize the pipeline for its own input and output shapes while preserving the sealed orchestration. The `execute()` method is the entry point that consumers call; it is not meant to be replaced.
+The mechanics are concentrated in `BaseAgent<TInput, TOutput>` within `integrations/semantic-analysis/src/agents/base-agent.ts`. The generic type parameters `TInput` and `TOutput` allow each concrete agent to specialize the pipeline for its own input and output shapes while preserving the sealed orchestration. The `execute()` method is the entry point that consumers call; it is not meant to be replaced.
 
 Internally, `execute()` calls the five abstract methods in strict sequence. The first call, `process(input)`, performs the agent's primary data transformation. The result feeds into `calculateConfidence()`, which produces a <USER_ID_REDACTED> score. Next, `detectIssues()` runs fault detection on the processed output. Then `generateRouting()` produces dispatch metadata indicating where the result should flow next. Finally, `applyCorrections()` runs self-healing logic — and critically, it runs even when `detectIssues()` returns an empty list. This means concrete implementations of `applyCorrections()` must be written defensively to handle the no-issue case as a valid, safe no-op rather than as an error or an unexpected state.
 
@@ -34,9 +34,9 @@ Cross-cutting concerns surrounding the five stages — such as wrapping exceptio
 
 ## Integration Points
 
-`SealedExecutePipeline` integrates with the rest of the system through its parent `AgentBase` and its sibling `FiveStageAbstractContract`. Every concrete agent in `integrations/mcp-server-semantic-analysis/src/agents/` that extends `BaseAgent<TInput, TOutput>` is automatically subject to this pipeline. Consumers of agents — orchestrators, dispatchers, and higher-level workflow components — interact only with the public `execute()` method, never with the individual stages directly.
+`SealedExecutePipeline` integrates with the rest of the system through its parent `AgentBase` and its sibling `FiveStageAbstractContract`. Every concrete agent in `integrations/semantic-analysis/src/agents/` that extends `BaseAgent<TInput, TOutput>` is automatically subject to this pipeline. Consumers of agents — orchestrators, dispatchers, and higher-level workflow components — interact only with the public `execute()` method, never with the individual stages directly.
 
-The architectural rationale and the contract between `SealedExecutePipeline` and `FiveStageAbstractContract` are documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` under the Agent Architecture section. This document is the canonical reference for understanding how the sealed control flow interacts with the abstract stage contract.
+The architectural rationale and the contract between `SealedExecutePipeline` and `FiveStageAbstractContract` are documented in `integrations/semantic-analysis/docs/architecture/agents.md` under the Agent Architecture section. This document is the canonical reference for understanding how the sealed control flow interacts with the abstract stage contract.
 
 Because `generateRouting()` produces dispatch metadata as part of every execution, `SealedExecutePipeline` is implicitly an integration point with whatever downstream routing or workflow system consumes that metadata. Similarly, the always-present confidence score and issue list create a uniform integration surface for any monitoring, <USER_ID_REDACTED>-gating, or feedback mechanism that wraps agent execution.
 
@@ -54,10 +54,10 @@ From a maintainability standpoint, the sealed pipeline makes agent behavior high
 ## Hierarchy Context
 
 ### Parent
-- [AgentBase](./AgentBase.md) -- BaseAgent<TInput, TOutput> in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts uses a template-method pattern where execute() is sealed and unconditionally calls all five abstract methods: process(), calculateConfidence(), detectIssues(), generateRouting(), and applyCorrections()
+- [AgentBase](./AgentBase.md) -- BaseAgent<TInput, TOutput> in integrations/semantic-analysis/src/agents/base-agent.ts uses a template-method pattern where execute() is sealed and unconditionally calls all five abstract methods: process(), calculateConfidence(), detectIssues(), generateRouting(), and applyCorrections()
 
 ### Siblings
-- [FiveStageAbstractContract](./FiveStageAbstractContract.md) -- Declared in `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`, the five abstract methods partition agent behavior into typed semantic stages: data transformation (`process`), <USER_ID_REDACTED> scoring (`calculateConfidence`), fault detection (`detectIssues`), dispatch logic (`generateRouting`), and self-healing (`applyCorrections`).
+- [FiveStageAbstractContract](./FiveStageAbstractContract.md) -- Declared in `integrations/semantic-analysis/src/agents/base-agent.ts`, the five abstract methods partition agent behavior into typed semantic stages: data transformation (`process`), <USER_ID_REDACTED> scoring (`calculateConfidence`), fault detection (`detectIssues`), dispatch logic (`generateRouting`), and self-healing (`applyCorrections`).
 
 
 ---

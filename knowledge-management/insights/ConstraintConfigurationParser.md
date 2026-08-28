@@ -2,15 +2,15 @@
 
 **Type:** Detail
 
-The presence of semantic-constraint-detection.md in the integrations/mcp-constraint-monitor/docs directory suggests that semantic constraint detection is a notable aspect of the ConstraintMonitoring sub-component, possibly relying on the parsed constraint configuration.
+The presence of semantic-constraint-detection.md in the integrations/constraint-monitor/docs directory suggests that semantic constraint detection is a notable aspect of the ConstraintMonitoring sub-component, possibly relying on the parsed constraint configuration.
 
 ## What It Is  
 
 **ConstraintConfigurationParser** lives inside the **ConstraintMonitoring** sub‑component of the *mcp‑constraint‑monitor* repository.  The only concrete artefacts that mention it are the documentation files located under the repository’s `docs` hierarchy:
 
-* `mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – defines the Claude code‑hook payload format, which can embed constraint specifications.  
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – a “Constraint Configuration Guide” that explains how users should author constraint definitions that the monitoring system will consume.  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – describes the semantic‑constraint‑detection workflow, which is predicated on a parsed representation of the configuration.
+* `constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – defines the Claude code‑hook payload format, which can embed constraint specifications.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – a “Constraint Configuration Guide” that explains how users should author constraint definitions that the monitoring system will consume.  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – describes the semantic‑constraint‑detection workflow, which is predicated on a parsed representation of the configuration.
 
 Taken together, these sources make it clear that **ConstraintConfigurationParser** is the dedicated parser that ingests the textual configuration (as described in the two Markdown guides) and produces an in‑memory model that the rest of **ConstraintMonitoring** – especially the semantic‑constraint‑detection logic – can query.  It is therefore a *detail* entity whose sole responsibility is to translate the declarative constraint language (defined in the documentation) into a programmatic structure for downstream processing.
 
@@ -75,7 +75,7 @@ External dependencies are limited to **standard parsing libraries** (JSON/YAML) 
 
 ## Usage Guidelines  
 
-* **Author Configurations Against the Docs** – All constraint definitions must strictly follow the syntax and semantics outlined in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Deviations will cause the parser to reject the payload with validation errors.  
+* **Author Configurations Against the Docs** – All constraint definitions must strictly follow the syntax and semantics outlined in `integrations/constraint-monitor/docs/constraint-configuration.md`. Deviations will cause the parser to reject the payload with validation errors.  
 
 * **Treat Parsed Output as Read‑Only** – Once `ConstraintConfigurationParser` returns a `ConstraintSet`, downstream components (especially the semantic detection engine) should not mutate it. If a change is required, submit a new Claude code‑hook payload and let the parser produce a fresh model.  
 
@@ -122,7 +122,7 @@ Overall, **ConstraintConfigurationParser** embodies a well‑scoped, documentati
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
+- [ConstraintMonitoring](./ConstraintMonitoring.md) -- The constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file defines the hook data format, potentially including constraints.
 
 ---
 

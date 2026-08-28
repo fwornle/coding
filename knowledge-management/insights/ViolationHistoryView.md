@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The dashboard sub-project lives in integrations/mcp-constraint-monitor/dashboard/ with its own README.md, indicating it is a self-contained UI component focused on surfacing monitor data to users.
+The dashboard sub-project lives in integrations/constraint-monitor/dashboard/ with its own README.md, indicating it is a self-contained UI component focused on surfacing monitor data to users.
 
 ## What It Is  
 
-**ViolationHistoryView** is a UI component that lives inside the *Constraint Monitor* dashboard. Its source code resides in the **integrations/mcp-constraint-monitor/dashboard/** directory, alongside the parent component **ConstraintMonitorDashboard** and a dedicated `README.md` that frames the dashboard as a self‑contained UI sub‑project. The view’s primary responsibility is to render a chronological list of constraint‑violation records that have been captured by the MCP Constraint Monitor integration.  
+**ViolationHistoryView** is a UI component that lives inside the *Constraint Monitor* dashboard. Its source code resides in the **integrations/constraint-monitor/dashboard/** directory, alongside the parent component **ConstraintMonitorDashboard** and a dedicated `README.md` that frames the dashboard as a self‑contained UI sub‑project. The view’s primary responsibility is to render a chronological list of constraint‑violation records that have been captured by the MCP Constraint Monitor integration.  
 
 The data displayed by **ViolationHistoryView** originates from the hook payload format described in **docs/CLAUDE-CODE-HOOK-FORMAT.md**. That document defines a structured JSON payload that the monitor emits whenever a constraint is breached. **ViolationHistoryView** consumes these payloads, extracts the relevant fields (e.g., violation timestamp, affected resource, rule identifier, severity), and presents them in a readable log for end‑users. Because the component is embedded in **ConstraintMonitorDashboard**, it is rendered as one of the main panels on the dashboard screen, alongside any sibling views that may show aggregate statistics or real‑time alerts.
 
@@ -16,7 +16,7 @@ In short, **ViolationHistoryView** is the *detail* view of the dashboard that su
 
 ## Architecture and Design  
 
-The architecture of the dashboard follows a **component‑centric UI composition** model. The top‑level **ConstraintMonitorDashboard** acts as a container that assembles several child views, one of which is **ViolationHistoryView**. This hierarchy is reflected in the file system: both the parent and its children live under the same `integrations/mcp-constraint-monitor/dashboard/` path, indicating a tight coupling of UI concerns within a single module.  
+The architecture of the dashboard follows a **component‑centric UI composition** model. The top‑level **ConstraintMonitorDashboard** acts as a container that assembles several child views, one of which is **ViolationHistoryView**. This hierarchy is reflected in the file system: both the parent and its children live under the same `integrations/constraint-monitor/dashboard/` path, indicating a tight coupling of UI concerns within a single module.  
 
 The design leverages a **data‑driven rendering pattern**. Hook events are serialized according to the format in `CLAUDE-CODE-HOOK-FORMAT.md`. Those events are likely ingested by a service or a client‑side data store that normalizes them into a collection of violation objects. **ViolationHistoryView** then subscribes to that collection (e.g., via props, context, or a state‑management hook) and renders the list. This separation of *data acquisition* from *presentation* enables the view to remain focused on UI concerns while delegating parsing and validation to the upstream data layer.  
 
@@ -44,7 +44,7 @@ While the source snapshot contains no explicit symbols, the surrounding document
 
 1. **Hook Ingestion Layer** – The monitor emits violation events using the format prescribed in `docs/CLAUDE-CODE-HOOK-FORMAT.md`. A downstream service (perhaps a webhook receiver or a message queue consumer) captures those events and forwards them to the dashboard’s data store. The view depends on this pipeline to receive a timely and correctly‑structured stream of violations.
 
-2. **Dashboard Data Store** – Within `integrations/mcp-constraint-monitor/dashboard/`, there is likely a state container (e.g., Redux store, MobX observable, or a simple in‑memory array) that holds the current list of violations. **ViolationHistoryView** reads from this store, either directly or through props supplied by **ConstraintMonitorDashboard**. Any changes to the store (new violations, deletions, or updates) trigger a re‑render of the view.
+2. **Dashboard Data Store** – Within `integrations/constraint-monitor/dashboard/`, there is likely a state container (e.g., Redux store, MobX observable, or a simple in‑memory array) that holds the current list of violations. **ViolationHistoryView** reads from this store, either directly or through props supplied by **ConstraintMonitorDashboard**. Any changes to the store (new violations, deletions, or updates) trigger a re‑render of the view.
 
 3. **Parent Component Interface** – **ConstraintMonitorDashboard** acts as the orchestrator, passing down configuration flags (such as `maxEntries`, `showSeverityLegend`, or `refreshInterval`) and the violation data itself. The view must respect this contract, avoiding assumptions about data sourcing and delegating navigation actions (e.g., clicking a row to open a detailed modal) back to the parent when appropriate.
 
@@ -96,7 +96,7 @@ The current organization—isolated dashboard folder with its own README and a c
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintMonitorDashboard](./ConstraintMonitorDashboard.md) -- Lives in integrations/mcp-constraint-monitor/dashboard/ with its own README.md, indicating it is a self-contained UI sub-project within the broader mcp-constraint-monitor integration
+- [ConstraintMonitorDashboard](./ConstraintMonitorDashboard.md) -- Lives in integrations/constraint-monitor/dashboard/ with its own README.md, indicating it is a self-contained UI sub-project within the broader constraint-monitor integration
 
 
 ---

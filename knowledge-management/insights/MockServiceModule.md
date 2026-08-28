@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The MockServiceModule uses a validation mechanism to ensure mock responses conform to expected formats, as implemented in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-validator.ts.
+The MockServiceModule uses a validation mechanism to ensure mock responses conform to expected formats, as implemented in integrations/semantic-analysis/src/mock/llm-mock-validator.ts.
 
 ## What It Is  
 
-The **MockServiceModule** is the concrete mock implementation of the `LLMService` interface that lives inside the *LLMAbstraction* hierarchy. All of its source files are located under the `integrations/mcp-server-semantic-analysis/src/mock/` directory:
+The **MockServiceModule** is the concrete mock implementation of the `LLMService` interface that lives inside the *LLMAbstraction* hierarchy. All of its source files are located under the `integrations/semantic-analysis/src/mock/` directory:
 
 | File | Purpose |
 |------|---------|
@@ -128,7 +128,7 @@ The reset module exposes a function that clears any in‑memory caches or mutabl
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a high-level facade, LLMService, which is defined in the file lib/llm/llm-service.ts. This facade is responsible for handling mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback. The LLMService class employs dependency injection to set functions that resolve the current LLM mode, allowing for flexibility in determining the mode. For instance, the getLLMMode function in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts is used to determine the LLM mode for a specific agent, considering global mode, per-agent overrides, and legacy mock flags.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a high-level facade, LLMService, which is defined in the file lib/llm/llm-service.ts. This facade is responsible for handling mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback. The LLMService class employs dependency injection to set functions that resolve the current LLM mode, allowing for flexibility in determining the mode. For instance, the getLLMMode function in integrations/semantic-analysis/src/mock/llm-mock-service.ts is used to determine the LLM mode for a specific agent, considering global mode, per-agent overrides, and legacy mock flags.
 
 ### Siblings
 - [ProviderRegistryModule](./ProviderRegistryModule.md) -- The ProviderRegistryModule uses a factory pattern in lib/llm/provider-registry-module.ts to create instances of different LLM providers, such as the DMRProviderModule and MockServiceModule.

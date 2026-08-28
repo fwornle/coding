@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-The architecture docs in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md describe agent patterns where agents consume shared services rather than performing direct I/O, consistent with this loader acting as a single read point for ontology config.
+The architecture docs in integrations/semantic-analysis/docs/architecture/agents.md describe agent patterns where agents consume shared services rather than performing direct I/O, consistent with this loader acting as a single read point for ontology config.
 
 # OntologyConfigLoader: Technical Insight Document
 
@@ -14,7 +14,7 @@ Functionally, it acts as a single read point for ontology configuration files, e
 
 ## Architecture and Design
 
-The architectural approach reflected by `OntologyConfigLoader` follows a clear **separation of concerns** pattern, where I/O responsibilities are extracted from agent logic and consolidated into a shared service. This aligns with the agent patterns documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, which describe agents as consumers of shared services rather than direct file system clients. The loader thus serves as one of these shared services upon which agents depend.
+The architectural approach reflected by `OntologyConfigLoader` follows a clear **separation of concerns** pattern, where I/O responsibilities are extracted from agent logic and consolidated into a shared service. This aligns with the agent patterns documented in `integrations/semantic-analysis/docs/architecture/agents.md`, which describe agents as consumers of shared services rather than direct file system clients. The loader thus serves as one of these shared services upon which agents depend.
 
 By being contained within `OntologyEngine`, the loader participates in a **hierarchical composition pattern**: the engine encapsulates the overall ontology behavior while delegating the specific concern of configuration loading to this dedicated child. Its sibling-level relationship with `OntologyConfigManager` (also in `src/ontology/`) indicates a layered design — the loader handles the mechanics of reading configurations, while the manager orchestrates lifecycle and availability of ontology definitions to consumers.
 
@@ -32,13 +32,13 @@ Within the broader `OntologyEngine`, the loader operates as an internal collabor
 
 The most prominent integration point for `OntologyConfigLoader` is its parent component `OntologyEngine`, which contains it and integrates its output into the engine's overall ontology management workflow. The closely related `OntologyConfigManager` in `src/ontology/` is the immediate consumer of the loader's outputs, using them to make ontology definitions available to agents without requiring direct file I/O in each agent.
 
-Downstream, the loader indirectly serves the agents described in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. These agents are designed to consume shared services rather than perform direct file system access, so the loader is part of the infrastructure that makes the agent pattern viable. The integration is unidirectional: agents read ontology data through the engine/manager stack, and the loader feeds that stack from disk.
+Downstream, the loader indirectly serves the agents described in `integrations/semantic-analysis/docs/architecture/agents.md`. These agents are designed to consume shared services rather than perform direct file system access, so the loader is part of the infrastructure that makes the agent pattern viable. The integration is unidirectional: agents read ontology data through the engine/manager stack, and the loader feeds that stack from disk.
 
 Externally, the loader depends on the file system layout of the SemanticAnalysis MCP server, particularly wherever ontology configuration files are stored. Any reorganization of those configuration paths is a concern localized to this loader rather than spread across agent code.
 
 ## Usage Guidelines
 
-Developers working within the SemanticAnalysis MCP server should treat `OntologyConfigLoader` as the canonical entry point for ontology configuration reads. **Do not bypass it by performing direct file system access from agents or other components** — doing so violates the design intent articulated in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` and reintroduces the coupling this architecture is designed to eliminate.
+Developers working within the SemanticAnalysis MCP server should treat `OntologyConfigLoader` as the canonical entry point for ontology configuration reads. **Do not bypass it by performing direct file system access from agents or other components** — doing so violates the design intent articulated in `integrations/semantic-analysis/docs/architecture/agents.md` and reintroduces the coupling this architecture is designed to eliminate.
 
 When ontology schema definitions need to be updated, the changes should be made at the configuration source. The loader's decoupling allows such updates to propagate without modifications to agent implementations. This is a key maintainability property: ontology evolution and agent evolution proceed independently.
 

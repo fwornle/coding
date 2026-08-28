@@ -2,12 +2,12 @@
 
 **Type:** SubComponent
 
-The LSLConverter provides a configurable conversion pipeline, allowing for flexible conversion workflows, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+The LSLConverter provides a configurable conversion pipeline, allowing for flexible conversion workflows, as defined in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
 
 ## What It Is  
 
 The **LSLConverter** is a sub‑component that lives inside the **LiveLoggingSystem** and is implemented in the file  
-`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  Within this file the converter is realized as a set of classes and functions that together provide a **format‑mapping based conversion engine** for transcript data.  It is responsible for taking agent‑specific transcript payloads—currently JSON and XML representations—and producing a canonical form that downstream components (e.g., the **TranscriptAdapter** or the **OntologyClassificationAgent**) can consume.  The converter also embeds a validation step to guarantee the integrity of the transformed transcript and employs a lightweight cache to avoid redundant work.  Its behaviour is exposed through a **configurable conversion pipeline**, allowing callers to enable, reorder, or skip individual stages as required.
+`integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`.  Within this file the converter is realized as a set of classes and functions that together provide a **format‑mapping based conversion engine** for transcript data.  It is responsible for taking agent‑specific transcript payloads—currently JSON and XML representations—and producing a canonical form that downstream components (e.g., the **TranscriptAdapter** or the **OntologyClassificationAgent**) can consume.  The converter also embeds a validation step to guarantee the integrity of the transformed transcript and employs a lightweight cache to avoid redundant work.  Its behaviour is exposed through a **configurable conversion pipeline**, allowing callers to enable, reorder, or skip individual stages as required.
 
 ---
 
@@ -27,7 +27,7 @@ Interaction between components is straightforward: the **LiveLoggingSystem** own
 
 ## Implementation Details  
 
-All observable implementation lives in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  The file defines the **OntologyClassificationAgent** class, which orchestrates the conversion workflow.  Within this class (or a closely associated helper), the **LSLConverter** is instantiated and configured.  
+All observable implementation lives in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`.  The file defines the **OntologyClassificationAgent** class, which orchestrates the conversion workflow.  Within this class (or a closely associated helper), the **LSLConverter** is instantiated and configured.  
 
 * **FormatMapper** – This child component encapsulates the mapping tables that translate source fields (from JSON or XML) to the internal transcript schema.  The mappings are likely expressed as plain JavaScript/TypeScript objects keyed by source field names, enabling rapid lookup during conversion.  
 
@@ -47,7 +47,7 @@ Because the observations do not expose concrete function signatures, the descrip
 
 **LSLConverter** sits at the heart of the **LiveLoggingSystem**.  The parent component creates or injects the converter when initializing the logging subsystem.  Downstream, the **TranscriptAdapter** consumes the canonical transcript produced by the converter, providing a uniform API for other agents such as **OntologyClassificationAgent**.  Conversely, upstream sources—agents that generate raw logs in JSON or XML—hand their payloads to the converter via a public method (e.g., `convert(rawTranscript)`).
 
-The sibling **LSLConfigValidator** shares the validation philosophy; it may expose reusable rule definitions that the converter’s validation stage reuses, ensuring consistency across configuration and transcript validation.  The **LoggingMechanism** (found in `integrations/mcp-server-semantic-analysis/src/logging.ts`) operates independently but benefits from the converter’s guarantee that only well‑formed transcripts are written to log files, thus avoiding I/O errors.
+The sibling **LSLConfigValidator** shares the validation philosophy; it may expose reusable rule definitions that the converter’s validation stage reuses, ensuring consistency across configuration and transcript validation.  The **LoggingMechanism** (found in `integrations/semantic-analysis/src/logging.ts`) operates independently but benefits from the converter’s guarantee that only well‑formed transcripts are written to log files, thus avoiding I/O errors.
 
 The **OntologyManager** sibling employs lazy loading, a pattern also used by the **OntologyClassificationAgent**.  While not directly coupled, both agents rely on the converter to supply clean data, illustrating a common contract: *“If the transcript passes through LSLConverter, it is safe for ontology processing.”*  
 
@@ -109,17 +109,17 @@ Finally, the **FormatMapper** child is the only internal integration point; any 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes lazy LLM initialization, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file, which defines the OntologyClassificationAgent class. This approach enables the system to handle diverse log data and ensures data consistency. The use of lazy initialization allows for more efficient resource allocation and improves the overall performance of the system. Furthermore, the LoggingMechanism in integrations/semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking, ensuring that the logging process does not interfere with other system operations.
 
 ### Children
-- [FormatMapper](./FormatMapper.md) -- The integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file implements the mapping-based approach used by the LSLConverter.
+- [FormatMapper](./FormatMapper.md) -- The integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file implements the mapping-based approach used by the LSLConverter.
 
 ### Siblings
-- [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism in integrations/mcp-server-semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking
-- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter provides a standardized interface for transcript processing, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses a lazy initialization approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a rule-based approach to validate LSL configuration, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
-- [OntologyManager](./OntologyManager.md) -- OntologyManager uses a lazy loading approach to improve performance, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism in integrations/semantic-analysis/src/logging.ts employs async buffering and non-blocking file I/O to prevent event loop blocking
+- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter provides a standardized interface for transcript processing, as defined in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- OntologyClassificationAgent uses a lazy initialization approach to improve performance, as implemented in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses a rule-based approach to validate LSL configuration, as implemented in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [OntologyManager](./OntologyManager.md) -- OntologyManager uses a lazy loading approach to improve performance, as implemented in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
 
 ---
 

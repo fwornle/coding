@@ -1,8 +1,8 @@
-# MCP Semantic Analysis - Knowledge Base Updates
+# Semantic Analysis - Knowledge Base Updates
 
 ## Overview
 
-The **MCP Semantic Analysis** system provides automated knowledge base updates through a **14-agent multi-agent system** with **semantic orchestration**. Users trigger updates by typing **"ukb"** in Claude chat, which causes Claude to call the MCP semantic-analysis server.
+The **Semantic Analysis** system provides automated knowledge base updates through a **14-agent multi-agent system** with **semantic orchestration**. Users trigger updates by typing **"ukb"** in Claude chat, which causes Claude to call the MCP semantic-analysis server.
 
 **IMPORTANT**: `ukb` is **NOT a shell command**. It's a keyword that triggers Claude to execute the semantic analysis workflow via MCP tools.
 
@@ -431,7 +431,7 @@ curl -s -X POST localhost:3848/tool/execute_workflow \
 
 ### Custom Workflows
 
-The semantic-analysis server supports custom workflow definitions. See `integrations/mcp-server-semantic-analysis/workflows/` for examples.
+The semantic-analysis server supports custom workflow definitions. See `integrations/semantic-analysis/workflows/` for examples.
 
 ## Related Documentation
 

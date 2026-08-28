@@ -9,7 +9,7 @@ The absence of explicit source files limits the scope of observations, but the p
 **GraphDatabaseAdapterIntegration** is the concrete integration layer that ties the **ContentValidator** sub‑component of the **ConstraintSystem** to the underlying graph persistence layer. The integration lives in the same repository as the rest of the semantic‑analysis services and is instantiated by the `ContentValidator` (see the parent‑child relationship in the hierarchy). The core class that the integration relies on is **GraphDatabaseAdapter**, which is defined in  
 
 ```
-integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js
+integrations/semantic-analysis/src/storage/graph-database-adapter.js
 ```  
 
 The `ContentValidator` calls into this adapter to fetch entity relationships from the graph database and then applies constraint rules to ensure the model’s semantic integrity. In other words, **GraphDatabaseAdapterIntegration** is the glue that enables the validator to treat the graph store as a first‑class source of truth for relationship‑based constraints.
@@ -109,7 +109,7 @@ No other sibling components are mentioned, but because `ContentValidator` is par
 ## Hierarchy Context
 
 ### Parent
-- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
 
 ---
 

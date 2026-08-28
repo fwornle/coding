@@ -3,7 +3,7 @@
 // Phase 44 Wave 0 — RED test stub.
 // Asserts cross-system /api/v1 shape parity across the three systems:
 //   A = coding host-side obs-api on :12436 (scripts/observations-api-server.mjs)
-//   B = mcp-server-semantic-analysis SSE/REST on :3848
+//   B = semantic-analysis SSE/REST on :3848
 //   C = OKM on :3002
 //
 // EXPECTED FAILURE MODE (RED today):

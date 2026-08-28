@@ -16,4 +16,4 @@ if [[ -z "${CODING_REPO:-}" ]]; then
     export CODING_REPO
 fi
 
-exec node "$CODING_REPO/integrations/mcp-constraint-monitor/src/cli.js" "$@"
+exec node "$CODING_REPO/integrations/constraint-monitor/src/cli.js" "$@"

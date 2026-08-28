@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-integrations/mcp-constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide') defines the full configuration schema this loader must validate against, including rule types, scopes, and enforcement modes
+integrations/constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide') defines the full configuration schema this loader must validate against, including rule types, scopes, and enforcement modes
 
 ## What It Is  
 
-**RuleConfigLoader** is the concrete entry point that bridges the static, declarative constraint configuration files with the runtime **ConstraintRuleEngine**. It lives in the *mcp‑constraint‑monitor* integration and is the component that reads the rule definitions supplied by users, validates them against the authoritative schema defined in **integrations/mcp-constraint-monitor/docs/constraint-configuration.md**, and hands the resulting, well‑formed objects to the engine for execution. The loader therefore acts as the *enforcement boundary* for malformed or incomplete rule definitions, guaranteeing that only compliant rule specifications ever reach the engine. Its primary responsibilities are:
+**RuleConfigLoader** is the concrete entry point that bridges the static, declarative constraint configuration files with the runtime **ConstraintRuleEngine**. It lives in the *mcp‑constraint‑monitor* integration and is the component that reads the rule definitions supplied by users, validates them against the authoritative schema defined in **integrations/constraint-monitor/docs/constraint-configuration.md**, and hands the resulting, well‑formed objects to the engine for execution. The loader therefore acts as the *enforcement boundary* for malformed or incomplete rule definitions, guaranteeing that only compliant rule specifications ever reach the engine. Its primary responsibilities are:
 
 1. **Parsing** the configuration artefacts (e.g., YAML or JSON files) located in the integration’s configuration directory.  
 2. **Schema validation** against the contract described in the *Constraint Configuration Guide* (the same guide referenced from the integration’s top‑level README).  
@@ -18,7 +18,7 @@ Because the loader sits directly under **ConstraintRuleEngine**, any change to t
 
 ## Architecture and Design  
 
-The design of **RuleConfigLoader** follows a *validation‑gateway* pattern. The configuration schema, documented in **integrations/mcp-constraint-monitor/docs/constraint-configuration.md**, is treated as the *single source of truth* for rule authors. By centralising validation in the loader, the system achieves a clear separation of concerns:
+The design of **RuleConfigLoader** follows a *validation‑gateway* pattern. The configuration schema, documented in **integrations/constraint-monitor/docs/constraint-configuration.md**, is treated as the *single source of truth* for rule authors. By centralising validation in the loader, the system achieves a clear separation of concerns:
 
 * **ConstraintRuleEngine** – focuses solely on rule evaluation, assuming that every rule it receives conforms to the schema.  
 * **RuleConfigLoader** – owns all parsing and validation responsibilities, insulating the engine from malformed input.
@@ -65,7 +65,7 @@ External dependencies are minimal: the loader primarily depends on a parsing lib
 
 * **Never bypass the loader** – All rule definitions must be processed through **RuleConfigLoader** before being supplied to **ConstraintRuleEngine** or **SemanticConstraintDetector**. Directly constructing rule objects bypasses schema enforcement and can lead to runtime failures.  
 
-* **Keep the configuration schema up‑to‑date** – When introducing new rule types, scopes, or enforcement modes, modify the schema in **integrations/mcp-constraint-monitor/docs/constraint-configuration.md** first, then adjust the loader’s validation logic accordingly. This ensures that the contract remains the single source of truth.  
+* **Keep the configuration schema up‑to‑date** – When introducing new rule types, scopes, or enforcement modes, modify the schema in **integrations/constraint-monitor/docs/constraint-configuration.md** first, then adjust the loader’s validation logic accordingly. This ensures that the contract remains the single source of truth.  
 
 * **Validate locally before deployment** – Run the loader in a CI step to catch schema violations early. Because the loader fails fast on malformed input, early validation prevents broken configurations from reaching production.  
 
@@ -108,10 +108,10 @@ External dependencies are minimal: the loader primarily depends on a parsing lib
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/mcp-constraint-monitor/docs/constraint-configuration.md provides the full configuration schema for defining constraint rules, including rule types, scopes, and enforcement modes
+- [ConstraintRuleEngine](./ConstraintRuleEngine.md) -- integrations/constraint-monitor/docs/constraint-configuration.md provides the full configuration schema for defining constraint rules, including rule types, scopes, and enforcement modes
 
 ### Siblings
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- integrations/mcp-constraint-monitor/docs/semantic-detection-design.md describes the design for LLM-assisted semantic matching of tool calls against constraint rules
+- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- integrations/constraint-monitor/docs/semantic-detection-design.md describes the design for LLM-assisted semantic matching of tool calls against constraint rules
 
 
 ---

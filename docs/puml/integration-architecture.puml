@@ -49,7 +49,7 @@ end note
 note right of constraints
   **Deep Semantic Analysis**
   Constraint Monitoring delegates
-  to MCP Semantic Analysis for
+  to Semantic Analysis for
   cross-file architectural pattern
   detection beyond per-event rules.
 end note

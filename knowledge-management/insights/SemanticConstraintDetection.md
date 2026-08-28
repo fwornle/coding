@@ -2,15 +2,15 @@
 
 **Type:** Detail
 
-integrations/mcp-constraint-monitor/docs/semantic-detection-design.md ('Semantic Constraint Detection - Design Document') describes the architectural design decisions behind semantic-level detection, suggesting this is a non-trivial subsystem with its own design rationale
+integrations/constraint-monitor/docs/semantic-detection-design.md ('Semantic Constraint Detection - Design Document') describes the architectural design decisions behind semantic-level detection, suggesting this is a non-trivial subsystem with its own design rationale
 
 ## What It Is  
 
 **SemanticConstraintDetection** is the semantic‑level analysis engine that lives inside the **MCPConstraintMonitorIntegration** package.  All of its source‑level artefacts are housed under the integration’s documentation tree:
 
-* `integrations/mcp-constraint-monitor/docs/semantic-detection-design.md` – the primary design‑document that explains the rationale, high‑level flow, and responsibilities of the detection subsystem.  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – a user‑oriented overview that treats semantic detection as a distinct capability of the monitor.  
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – the configuration guide that describes how constraint definitions are supplied to the detection pipeline.
+* `integrations/constraint-monitor/docs/semantic-detection-design.md` – the primary design‑document that explains the rationale, high‑level flow, and responsibilities of the detection subsystem.  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – a user‑oriented overview that treats semantic detection as a distinct capability of the monitor.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – the configuration guide that describes how constraint definitions are supplied to the detection pipeline.
 
 Together these files make clear that **SemanticConstraintDetection** is not a trivial helper routine; it is a self‑contained subsystem whose purpose is to ingest constraint specifications, apply them to incoming data, and emit semantic‑level validation results.  It is referenced directly from the parent component **MCPConstraintMonitorIntegration**, which wraps the whole monitor as an MCP‑compatible server, and it sits alongside sibling artefacts such as **ClaudeCodeHookReceiver**, which handles the ingestion of Claude‑generated code‑hook payloads.
 
@@ -38,7 +38,7 @@ Although the repository contains **zero code symbols** directly in the observed 
 
 4. **Result Reporter** – a component that formats the aggregated outcomes into the response format expected by downstream consumers (e.g., the MCP server or a monitoring dashboard).  While not explicitly named, the existence of a separate documentation artifact for “semantic‑constraint‑detection” implies a well‑defined output contract.
 
-Because the subsystem is described as a **non‑trivial** piece of the monitor, it is reasonable to infer that the implementation follows **modular packaging** within the `integrations/mcp-constraint-monitor` directory, keeping the detection code isolated from the transport and hook‑handling code of its sibling **ClaudeCodeHookReceiver**.
+Because the subsystem is described as a **non‑trivial** piece of the monitor, it is reasonable to infer that the implementation follows **modular packaging** within the `integrations/constraint-monitor` directory, keeping the detection code isolated from the transport and hook‑handling code of its sibling **ClaudeCodeHookReceiver**.
 
 ---
 
@@ -101,10 +101,10 @@ Finally, because the design emphasizes **stateless evaluators**, avoid introduci
 ## Hierarchy Context
 
 ### Parent
-- [MCPConstraintMonitorIntegration](./MCPConstraintMonitorIntegration.md) -- integrations/mcp-constraint-monitor/README.md describes the integration package that wraps constraint monitoring as an MCP-compatible server component
+- [MCPConstraintMonitorIntegration](./MCPConstraintMonitorIntegration.md) -- integrations/constraint-monitor/README.md describes the integration package that wraps constraint monitoring as an MCP-compatible server component
 
 ### Siblings
-- [ClaudeCodeHookReceiver](./ClaudeCodeHookReceiver.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format') is a dedicated document describing the exact payload structure expected from Claude Code hooks, indicating a well-defined ingestion interface
+- [ClaudeCodeHookReceiver](./ClaudeCodeHookReceiver.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format') is a dedicated document describing the exact payload structure expected from Claude Code hooks, indicating a well-defined ingestion interface
 
 
 ---

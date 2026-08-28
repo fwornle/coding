@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file is referenced as the definition point for the AgentSpecificAdapter, suggesting its implementation details are contained within.
+The integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file is referenced as the definition point for the AgentSpecificAdapter, suggesting its implementation details are contained within.
 
 ## What It Is  
 
 The **AgentSpecificAdapter** is a concrete adapter that lives inside the **TranscriptAdapter** sub‑component. Its definition can be found in the file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
 According to the observations, this adapter is responsible for handling transcript data that is specific to a particular agent (for example, an “ontology‑classification” agent). It is invoked by the higher‑level **TranscriptAdapter**, which presents a standardized interface for transcript processing across the LiveLoggingSystem. The adapter works together with other transcript‑related services such as **TranscriptValidator** and **TranscriptCache** to deliver a full processing pipeline.
@@ -31,7 +31,7 @@ Because the adapter is defined in a TypeScript source file (`ontology-classifica
 The only concrete implementation location disclosed is  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
 Within that file, the **AgentSpecificAdapter** is expected to implement the methods required by **TranscriptAdapter** (e.g., a `process(transcript)` or `adapt(rawData)` function). While the observations do not enumerate the exact class members, the file name *ontology‑classification‑agent* suggests the adapter’s purpose is to transform raw transcript text into a representation suitable for ontology classification downstream.
@@ -58,7 +58,7 @@ These integration points are all part of the **LiveLoggingSystem**, which orches
 
 Developers adding or modifying an **AgentSpecificAdapter** should follow these conventions:
 
-* **Locate the implementation** in the `integrations/mcp-server-semantic-analysis/src/agents/` directory, mirroring the naming scheme of the agent (e.g., `ontology-classification-agent.ts` for an ontology classification adapter).  
+* **Locate the implementation** in the `integrations/semantic-analysis/src/agents/` directory, mirroring the naming scheme of the agent (e.g., `ontology-classification-agent.ts` for an ontology classification adapter).  
 * **Implement the exact interface** expected by **TranscriptAdapter**; any deviation will break the downstream validation and caching steps.  
 * **Keep logic agent‑specific** – avoid embedding generic transcript handling that belongs in the parent **TranscriptAdapter**. This maintains the clean separation of concerns that the architecture relies on.  
 * **Write unit tests** that exercise the adapter’s transformation logic and verify that the output passes **TranscriptValidator** checks.  
@@ -91,7 +91,7 @@ The clear boundary between generic and agent‑specific code aids maintainabilit
 ## Hierarchy Context
 
 ### Parent
-- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter provides a standardized interface for transcript processing, as defined in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file
+- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter provides a standardized interface for transcript processing, as defined in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file
 
 ---
 

@@ -6,7 +6,7 @@ Routing suggestions in the envelope allow agents to self-report that their outpu
 
 ## What It Is
 
-BaseAgent<TInput, TOutput> is a generic abstract class documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. It serves as the foundational contract for all specialized agents within the SemanticAnalysis pipeline, enforcing compile-time type safety across agents that handle heterogeneous data shapes. Its child component TypedAgentContract formalizes this generic parameterization.
+BaseAgent<TInput, TOutput> is a generic abstract class documented in `integrations/semantic-analysis/docs/architecture/agents.md`. It serves as the foundational contract for all specialized agents within the SemanticAnalysis pipeline, enforcing compile-time type safety across agents that handle heterogeneous data shapes. Its child component TypedAgentContract formalizes this generic parameterization.
 
 ## Architecture and Design
 
@@ -41,10 +41,10 @@ When implementing a new agent: parameterize TInput/TOutput explicitly, always po
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a multi-agent pipeline in `integrations/mcp-server-semantic-analysis/` that processes git history, LSL/vibe sessions, and AST-parsed code graphs to extract and persist structured knowledge entities. The system orchestrates several specialized agents—covering git history ingestion, code graph construction, semantic insight generation, ontology classification, content validation, and persistence—coordinated through a batch-analysis workflow. Each agent extends a common `BaseAgent<TInput, TOutput>` abstract class that enforces a standard response envelope with confidence scoring, issue detection, routing suggestions, and corrections, enabling robust retry and <USER_ID_REDACTED>-gating across pipeline steps.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- SemanticAnalysis is a multi-agent pipeline in `integrations/semantic-analysis/` that processes git history, LSL/vibe sessions, and AST-parsed code graphs to extract and persist structured knowledge entities. The system orchestrates several specialized agents—covering git history ingestion, code graph construction, semantic insight generation, ontology classification, content validation, and persistence—coordinated through a batch-analysis workflow. Each agent extends a common `BaseAgent<TInput, TOutput>` abstract class that enforces a standard response envelope with confidence scoring, issue detection, routing suggestions, and corrections, enabling robust retry and <USER_ID_REDACTED>-gating across pipeline steps.
 
 ### Children
-- [TypedAgentContract](./TypedAgentContract.md) -- Documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md, BaseAgent<TInput, TOutput> is described as a generic abstract class parameterized on input and output types, enforcing compile-time type safety across agents that handle different data shapes.
+- [TypedAgentContract](./TypedAgentContract.md) -- Documented in integrations/semantic-analysis/docs/architecture/agents.md, BaseAgent<TInput, TOutput> is described as a generic abstract class parameterized on input and output types, enforcing compile-time type safety across agents that handle different data shapes.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- batch-analysis.yaml defines the pipeline as a DAG of steps with explicit depends_on edges, enabling topological execution order across coordinator, observation, KG, dedup, and persistence agents

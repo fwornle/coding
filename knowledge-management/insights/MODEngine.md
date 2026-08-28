@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-The integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts file shows how the MODEngine sub-component can be used to manage and execute LLM operations in a specific mode, highlighting its versatility and reusability.
+The integrations/semantic-analysis/src/mock/llm-mock-service.ts file shows how the MODEngine sub-component can be used to manage and execute LLM operations in a specific mode, highlighting its versatility and reusability.
 
 **## What It Is**  
 
 The **MODEngine** sub‑component lives primarily in two locations in the code base:  
 
 * `lib/llm/llm-service.ts` – the central façade that exposes a mode‑agnostic API for all LLM‑related work.  
-* `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts` – a concrete implementation that demonstrates how a specific *mock* mode is wired into the engine.
+* `integrations/semantic-analysis/src/mock/llm-mock-service.ts` – a concrete implementation that demonstrates how a specific *mock* mode is wired into the engine.
 
 MODEngine is the runtime orchestrator that decides **which mode** (e.g., real provider, mock provider, future custom providers) should handle a given LLM request, executes the request, and returns a unified response. It is a child of the higher‑level **LLMAbstraction** component, which itself uses the same façade to keep the rest of the system provider‑agnostic. The sub‑component is also a sibling to **BudgetTracker**, **SensitivityClassifier**, and **ProviderManager**, all of which consume the façade exposed by `lib/llm/llm-service.ts` for their own concerns (budget, sensitivity, provider registration).
 
@@ -36,7 +36,7 @@ Interaction flow: a consumer (e.g., BudgetTracker) calls the façade in `lib/llm
   * Internally creates a singleton instance of **MODEngine** and delegates all calls to it.  
   * Implements the façade by translating generic request objects into the shape expected by the currently active mode.
 
-* **`integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`**  
+* **`integrations/semantic-analysis/src/mock/llm-mock-service.ts`**  
   * Declares a class (e.g., `MockLLMEngine` or `MODEngine`) that implements the state‑machine interface required by the façade.  
   * Defines the *mock* mode’s behavior: deterministic responses, no external network calls, and optional logging for test verification.  
   * Demonstrates how a new mode can be introduced: the class registers itself with the central MODEngine, provides a `handle(request)` method, and specifies allowed state transitions.
@@ -81,7 +81,7 @@ Interaction flow: a consumer (e.g., BudgetTracker) calls the façade in `lib/llm
 * **Always go through the façade** (`lib/llm/llm-service.ts`) when invoking any LLM operation. Directly instantiating a provider or a mode implementation bypasses the state‑machine and cache, leading to inconsistent behavior.  
 * **Switch modes explicitly** using the provided `setMode(modeId)` function. Implicit mode changes are not supported; the state machine will reject any request that arrives during an undefined transition.  
 * **Cache awareness** – When deploying a new provider or changing credentials, invoke a cache‑refresh (often part of `setMode`) to avoid stale metadata.  
-* **Testing** – Leverage the mock mode by pointing the engine to `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`. The mock service returns deterministic payloads, making it safe for CI pipelines and local debugging.  
+* **Testing** – Leverage the mock mode by pointing the engine to `integrations/semantic-analysis/src/mock/llm-mock-service.ts`. The mock service returns deterministic payloads, making it safe for CI pipelines and local debugging.  
 * **Extending MODEngine** – To add a new mode, implement a class that adheres to the same interface used by the mock service (e.g., a `handle(request)` method) and register the mode identifier with the façade. No changes are required in BudgetTracker, SensitivityClassifier, or ProviderManager because they all rely on the façade.
 
 ---
@@ -115,7 +115,7 @@ Interaction flow: a consumer (e.g., BudgetTracker) calls the façade in `lib/llm
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes the facade pattern, as seen in the lib/llm/llm-service.ts file, which provides a unified interface for all LLM operations. This design decision allows for provider-agnostic model calls, enabling the addition or removal of providers without affecting the rest of the system. For instance, the Anthropic provider (lib/llm/providers/anthropic-provider.ts) and the DMR provider (lib/llm/providers/dmr-provider.ts) can be easily integrated or removed without modifying the core component. The facade pattern also enables the component to support multiple modes, including the mock provider (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) for testing purposes.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes the facade pattern, as seen in the lib/llm/llm-service.ts file, which provides a unified interface for all LLM operations. This design decision allows for provider-agnostic model calls, enabling the addition or removal of providers without affecting the rest of the system. For instance, the Anthropic provider (lib/llm/providers/anthropic-provider.ts) and the DMR provider (lib/llm/providers/dmr-provider.ts) can be easily integrated or removed without modifying the core component. The facade pattern also enables the component to support multiple modes, including the mock provider (integrations/semantic-analysis/src/mock/llm-mock-service.ts) for testing purposes.
 
 ### Siblings
 - [BudgetTracker](./BudgetTracker.md) -- BudgetTracker utilizes the lib/llm/llm-service.ts file to fetch the current budget for LLM operations, enabling provider-agnostic budget management.

@@ -9,7 +9,7 @@ ViolationCapture works closely with the ContentValidator sub-component to captur
 **ViolationCapture** is a sub‑component of the **ConstraintSystem** that records every constraint‑validation failure detected by the system.  The implementation lives inside the ConstraintSystem package (the exact source file is not listed in the observations, but all interactions are mediated through the shared **GraphDatabaseAdapter** found at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js
+integrations/semantic-analysis/src/storage/graph-database-adapter.js
 ```  
 
 ViolationCapture receives failure reports from **ContentValidator**, enriches them with data from **SemanticAnalyzer**, persists the violation objects as graph nodes/edges via the adapter, and then pushes notifications to the appropriate stakeholders.  The sub‑component follows a single, canonical data model for “constraint violations,” which guarantees that every consumer—whether a reporting UI, an analytics pipeline, or an audit service—sees a uniform representation.
@@ -70,7 +70,7 @@ ViolationCapture sits at the nexus of three major collaborators:
 |-------------|-----------|------------------------|
 | **ContentValidator** | Input | Receives raw validation failures; both components use the same `GraphDatabaseAdapter` for reading entity relationships. |
 | **SemanticAnalyzer** | Enrichment | Calls into NLP‑driven analysis to augment violation records with semantic context (e.g., extracted keywords, sentiment). |
-| **GraphDatabaseAdapter** | Persistence & Query | All create, read, update, and delete operations on violation data are performed through the adapter located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js`. |
+| **GraphDatabaseAdapter** | Persistence & Query | All create, read, update, and delete operations on violation data are performed through the adapter located at `integrations/semantic-analysis/src/storage/graph-database-adapter.js`. |
 | **Stakeholder Notification Channels** | Output | Emits events after a violation is stored; exact channel (message bus, webhook, etc.) is not specified but is abstracted behind the “notification mechanism.” |
 | **ConstraintSystem (parent)** | Ownership | ViolationCapture is a child of ConstraintSystem; the parent component orchestrates overall constraint evaluation and delegates capture responsibilities to this sub‑component. |
 
@@ -125,10 +125,10 @@ By adhering to the guidelines above, developers can extend ViolationCapture safe
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to store and retrieve knowledge in a graph-based structure, which enables efficient querying and analysis of entity relationships. This choice of data storage allows for flexible and scalable management of complex constraints. Furthermore, the GraphDatabaseAdapter class provides methods for adding, removing, and updating graph nodes and edges, facilitating dynamic modifications to the knowledge graph.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.js) to store and retrieve knowledge in a graph-based structure, which enables efficient querying and analysis of entity relationships. This choice of data storage allows for flexible and scalable management of complex constraints. Furthermore, the GraphDatabaseAdapter class provides methods for adding, removing, and updating graph nodes and edges, facilitating dynamic modifications to the knowledge graph.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
+- [ContentValidator](./ContentValidator.md) -- ContentValidator utilizes the GraphDatabaseAdapter class (integrations/semantic-analysis/src/storage/graph-database-adapter.js) to retrieve and validate entity relationships.
 - [SemanticAnalyzer](./SemanticAnalyzer.md) -- SemanticAnalyzer leverages natural language processing (NLP) techniques to parse and understand entity content.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter implements a standardized data model for representing entities, relationships, and constraints in the graph database.
 

@@ -6,7 +6,7 @@ The ConcurrencyManager provides an API for querying and controlling the concurre
 
 ## What It Is  
 
-The **Concurrency** sub‑component lives inside the **SemanticAnalysis** module (see the description of `integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts`).  It is realised by three tightly‑coupled classes – **WaveController**, **TaskScheduler**, and **ConcurrencyManager** – that together provide a lightweight, work‑stealing execution engine for the analysis pipeline.  
+The **Concurrency** sub‑component lives inside the **SemanticAnalysis** module (see the description of `integrations/semantic-analysis/src/agents/semantic-analysis-agent.ts`).  It is realised by three tightly‑coupled classes – **WaveController**, **TaskScheduler**, and **ConcurrencyManager** – that together provide a lightweight, work‑stealing execution engine for the analysis pipeline.  
 
 * **WaveController** is the runtime driver that distributes work‑units (“waves”) to a pool of worker threads.  It uses a shared `nextIndex` counter so that any idle worker can atomically claim the next pending task, achieving *work‑stealing* without a central dispatcher.  
 * **TaskScheduler** sits in front of the WaveController and decides **when** a wave should be executed.  It maintains a priority queue so that higher‑priority waves are dispatched first, and it also embeds a retry loop that re‑queues a wave when the underlying task throws an exception.  
@@ -109,7 +109,7 @@ The component’s **modular boundaries** (manager, scheduler, controller) keep t
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular architecture, with each module responsible for a specific aspect of the analysis pipeline. For instance, the ontology management module is handled by the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts), which classifies observations against the ontology system. This modular design enables flexible and scalable analysis, as seen in the use of lazy LLM initialization and work-stealing concurrency. The codebase organization is evident in the separation of concerns, such as code graph construction (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) and insight generation (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts).
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular architecture, with each module responsible for a specific aspect of the analysis pipeline. For instance, the ontology management module is handled by the OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts), which classifies observations against the ontology system. This modular design enables flexible and scalable analysis, as seen in the use of lazy LLM initialization and work-stealing concurrency. The codebase organization is evident in the separation of concerns, such as code graph construction (integrations/semantic-analysis/src/agents/code-graph-agent.ts) and insight generation (integrations/semantic-analysis/src/agents/semantic-analysis-agent.ts).
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges

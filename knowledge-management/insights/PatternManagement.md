@@ -43,7 +43,7 @@ Finally, PatternManagement leverages **shared‑memory pre‑population** via `P
    - The result is a lightweight “cached classification” that speeds up subsequent validation calls in **ContentValidationAgent**.
 
 5. **Validation Integration**  
-   - Once a pattern is stored, PatternManagement can hand the entity to **ContentValidationAgent** (located at `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`). The agent uses the same GraphDatabaseAdapter to retrieve validation rules and applies them to the newly persisted pattern, guaranteeing consistency across the system.
+   - Once a pattern is stored, PatternManagement can hand the entity to **ContentValidationAgent** (located at `integrations/semantic-analysis/src/agents/base-agent.ts`). The agent uses the same GraphDatabaseAdapter to retrieve validation rules and applies them to the newly persisted pattern, guaranteeing consistency across the system.
 
 ---
 
@@ -55,7 +55,7 @@ Finally, PatternManagement leverages **shared‑memory pre‑population** via `P
 
 - **Sibling – PatternAnalysis**: PatternAnalysis consumes the query capabilities of the GraphDatabaseAdapter that PatternManagement also uses. After PatternManagement has persisted a pattern, PatternAnalysis can immediately query it for analytics or reporting.  
 
-- **ContentValidationAgent** (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`): PatternManagement feeds newly stored patterns into this agent for rule‑based validation. The agent reads validation patterns from the same graph store, ensuring a single source of truth.  
+- **ContentValidationAgent** (`integrations/semantic-analysis/src/agents/base-agent.ts`): PatternManagement feeds newly stored patterns into this agent for rule‑based validation. The agent reads validation patterns from the same graph store, ensuring a single source of truth.  
 
 - **PersistenceAgent**: The `mapEntityToSharedMemory()` call is a cross‑cutting concern that PatternManagement adopts to minimise LLM re‑classification overhead.  
 
@@ -112,7 +112,7 @@ The component’s heavy reuse of shared adapters and utilities reduces code dupl
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter, as seen in storage/graph-database-adapter.ts, to store and manage design patterns, best practices, and coding conventions. This is evident in the way it employs the storePattern method of the GraphDatabaseAdapter to save new patterns, similar to the CodeAnalysis, AntiPatterns, BestPractices, and CodingConventions components. For instance, in the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, the GraphDatabaseAdapter is used to store and retrieve validation patterns.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter, as seen in storage/graph-database-adapter.ts, to store and manage design patterns, best practices, and coding conventions. This is evident in the way it employs the storePattern method of the GraphDatabaseAdapter to save new patterns, similar to the CodeAnalysis, AntiPatterns, BestPractices, and CodingConventions components. For instance, in the ContentValidationAgent, located in integrations/semantic-analysis/src/agents/base-agent.ts, the GraphDatabaseAdapter is used to store and retrieve validation patterns.
 
 ### Siblings
 - [PatternStorage](./PatternStorage.md) -- PatternStorage uses the GraphDatabaseAdapter to store and manage design patterns, best practices, and coding conventions.

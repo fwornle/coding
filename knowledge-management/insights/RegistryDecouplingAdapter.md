@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-By sitting between pipeline agents and the registry, this component follows the integration patterns described in integrations/mcp-server-semantic-analysis/docs/architecture/integration.md, preventing direct dependency on the registry's concrete API surface.
+By sitting between pipeline agents and the registry, this component follows the integration patterns described in integrations/semantic-analysis/docs/architecture/integration.md, preventing direct dependency on the registry's concrete API surface.
 
 ## What It Is  
 
 **RegistryDecouplingAdapter** is a thin integration layer that lives in the *semantic‑analysis* integration of the MCP server. Its source‑level location is documented in the architecture repository under  
 
 ```
-integrations/mcp-server-semantic-analysis/
+integrations/semantic-analysis/
 │   CRITICAL-ARCHITECTURE-ISSUES.md
 │
 └── docs/architecture/

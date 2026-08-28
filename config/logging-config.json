@@ -64,7 +64,7 @@
     "documentation": "See docs/logging/README.md for full usage guide and migration instructions",
     "backend": "For Node.js code, use: import { createLogger } from '../lib/logging/Logger.js'",
     "frontend": "For React code, use: import { Logger } from '../utils/logging/Logger'",
-    "constraints": "Enforced by no-console-log, no-console-error, no-console-warn in integrations/mcp-constraint-monitor/constraints.yaml",
+    "constraints": "Enforced by no-console-log, no-console-error, no-console-warn in integrations/constraint-monitor/constraints.yaml",
     "categories": "Add new categories here with level overrides. Categories: health, billing, transcript, knowledge, workflow, database, api, mcp"
   }
 }

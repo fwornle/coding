@@ -370,7 +370,7 @@ vkb
 - [Ontology](./ontology.md) - 4-layer classification system documentation
 
 **Related Tools**:
-- [MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md) - Deep code analysis (separate from knowledge management)
+- [Semantic Analysis](../integrations/semantic-analysis.md) - Deep code analysis (separate from knowledge management)
 
 ## See Also
 

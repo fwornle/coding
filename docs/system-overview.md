@@ -64,7 +64,7 @@ Coding is an intelligent development infrastructure that:
 
 The system is built on **self-contained integration components**, each with its own repository and documentation:
 
-### MCP Semantic Analysis Server
+### Semantic Analysis Server
 
 **14-agent AI analysis system for deep code understanding**
 
@@ -73,9 +73,9 @@ The system is built on **self-contained integration components**, each with its 
 - WebSearchAgent, InsightGenerationAgent (uses LLM), ObservationGenerationAgent
 - QualityAssuranceAgent (uses LLM), PersistenceAgent, DeduplicationAgent
 
-**Documentation:** [integrations/mcp-server-semantic-analysis/](../integrations/mcp-server-semantic-analysis/)
+**Documentation:** [integrations/semantic-analysis/](../integrations/semantic-analysis/)
 
-### MCP Constraint Monitor
+### Constraint Monitor
 
 **Real-time constraint enforcement with dashboard**
 
@@ -84,7 +84,7 @@ The system is built on **self-contained integration components**, each with its 
 - REST API (port 3031) and Next.js Dashboard (port 3030)
 - Compliance scoring and violation tracking
 
-**Documentation:** [integrations/mcp-constraint-monitor/](../integrations/mcp-constraint-monitor/)
+**Documentation:** [integrations/constraint-monitor/](../integrations/constraint-monitor/)
 
 ### LLM Provider Layer (`@rapid/llm-proxy`)
 

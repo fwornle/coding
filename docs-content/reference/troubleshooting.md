@@ -201,7 +201,7 @@ lsof -i :3030
 lsof -i :3031
 
 # Start dashboard
-cd integrations/mcp-constraint-monitor
+cd integrations/constraint-monitor
 PORT=3030 npm run dashboard
 ```
 
@@ -212,7 +212,7 @@ PORT=3030 npm run dashboard
 cat ~/.claude/settings.json | jq '.hooks'
 
 # Verify hook script exists
-ls -la integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js
+ls -la integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js
 ```
 
 ## Performance Issues

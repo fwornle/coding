@@ -41,7 +41,7 @@ vkb  # Opens browser automatically
 **Start**:
 
 ```bash
-cd integrations/mcp-constraint-monitor
+cd integrations/constraint-monitor
 PORT=3030 npm run dashboard
 ```
 
@@ -133,7 +133,7 @@ npm run build
 ### Constraint Monitor Dashboard
 
 ```bash
-cd integrations/mcp-constraint-monitor
+cd integrations/constraint-monitor
 npm run build
 ```
 

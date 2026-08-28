@@ -21,7 +21,7 @@ These markdown files are not source code, but they act as the authoritative spec
 
 LoggingMechanism follows a **modular, composition‑based architecture**.  It is a child of **LiveLoggingSystem**, which aggregates multiple logging‑related sub‑components (e.g., the sibling **TranscriptProcessing** and **KnowledgeGraphManager**).  The design leans on two explicit patterns that are evident from the observations:
 
-1. **Async Non‑Blocking Log Buffer** – The component uses a non‑blocking asynchronous buffer as described in `integrations/mcp-constraint-monitor/README.md`.  Log events are queued quickly without waiting for I/O, and a background worker flushes the buffer to the appropriate sink.  This pattern isolates the latency of external services (browser‑access APIs, graph‑code RAG endpoints) from the main execution path.
+1. **Async Non‑Blocking Log Buffer** – The component uses a non‑blocking asynchronous buffer as described in `integrations/constraint-monitor/README.md`.  Log events are queued quickly without waiting for I/O, and a background worker flushes the buffer to the appropriate sink.  This pattern isolates the latency of external services (browser‑access APIs, graph‑code RAG endpoints) from the main execution path.
 
 2. **Environment‑Driven Configuration** – All tunable aspects (ports, SSE URLs, batch sizes, filtering flags) are read from environment variables such as `BROWSER_ACCESS_PORT`, `CODE_GRAPH_RAG_SSE_PORT`, `MEMGRAPH_BATCH_SIZE`, and `CONTAINS_PACKAGE`.  This makes the LoggingMechanism portable across development, CI, and production environments without code changes.
 

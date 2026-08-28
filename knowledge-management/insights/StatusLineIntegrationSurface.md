@@ -2,19 +2,19 @@
 
 **Type:** Detail
 
-The existence of a separate doc (`integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) titled 'Claude Code Hook Data Format' alongside the status line doc suggests the dashboard ingests structured hook-format events and projects a summarized status outward — the status line being one such projection
+The existence of a separate doc (`integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) titled 'Claude Code Hook Data Format' alongside the status line doc suggests the dashboard ingests structured hook-format events and projects a summarized status outward — the status line being one such projection
 
 ## What It Is  
 
 **StatusLineIntegrationSurface** is the formalised “status‑line” output channel of the **MCP Constraint Monitor** integration.  Its definition lives in the repository under  
 
 ```
-integrations/mcp-constraint-monitor/docs/status-line-integration.md
+integrations/constraint-monitor/docs/status-line-integration.md
 ```  
 
-The presence of a dedicated markdown file (rather than an inline comment or a throw‑away script) tells us that the status line is a first‑class artifact, deliberately exposed to other components.  The surface is conceptually a *projection* of the structured constraint‑monitoring events (defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) onto a concise, human‑readable status line that can be consumed by any UI or logging sink.  
+The presence of a dedicated markdown file (rather than an inline comment or a throw‑away script) tells us that the status line is a first‑class artifact, deliberately exposed to other components.  The surface is conceptually a *projection* of the structured constraint‑monitoring events (defined in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) onto a concise, human‑readable status line that can be consumed by any UI or logging sink.  
 
-The surface sits **one level below** the `ConstraintDashboard` component (see `integrations/mcp-constraint-monitor/dashboard/README.md`) and is **shared** with the decoupled dashboard deployable (`DecoupledDeployableUnit`).  In other words, the status line is not owned by the dashboard alone; it is part of a common integration contract that both the monitor server and the dashboard respect.
+The surface sits **one level below** the `ConstraintDashboard` component (see `integrations/constraint-monitor/dashboard/README.md`) and is **shared** with the decoupled dashboard deployable (`DecoupledDeployableUnit`).  In other words, the status line is not owned by the dashboard alone; it is part of a common integration contract that both the monitor server and the dashboard respect.
 
 ---
 
@@ -26,7 +26,7 @@ The documentation layout and the naming conventions reveal a **modular, publish/
 
 2. **Integration surface – StatusLineIntegrationSurface** – This surface consumes the hook events, aggregates the relevant fields, and formats a succinct line (e.g., “✅ 12 checks passed, ⚠️ 3 warnings”).  Because the surface is described in a *shared* `docs/` folder, the contract is independent of any particular runtime (the monitor server, the dashboard, or any future consumer).
 
-3. **Consumer side – ConstraintDashboard** – The dashboard, packaged as a **DecoupledDeployableUnit** under `integrations/mcp-constraint-monitor/dashboard/`, subscribes to the status‑line feed.  It can render the line in its UI, forward it to external monitoring tools, or expose it via an HTTP endpoint.  
+3. **Consumer side – ConstraintDashboard** – The dashboard, packaged as a **DecoupledDeployableUnit** under `integrations/constraint-monitor/dashboard/`, subscribes to the status‑line feed.  It can render the line in its UI, forward it to external monitoring tools, or expose it via an HTTP endpoint.  
 
 The overall pattern resembles a **contract‑first integration**: the data format is defined first (`CLAUDE-CODE-HOOK-FORMAT.md`), the projection (status line) is defined next (`status-line-integration.md`), and the consuming services (dashboard) are built to read that projection.  This encourages loose coupling and independent deployment cycles.
 
@@ -117,10 +117,10 @@ The **MCP Constraint Monitor** is organized as a parent component that houses bo
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintDashboard](./ConstraintDashboard.md) -- integrations/mcp-constraint-monitor/dashboard/README.md documents the dashboard as a separate deployable under the dashboard/ subdirectory, indicating it is architecturally decoupled from the MCP server process
+- [ConstraintDashboard](./ConstraintDashboard.md) -- integrations/constraint-monitor/dashboard/README.md documents the dashboard as a separate deployable under the dashboard/ subdirectory, indicating it is architecturally decoupled from the MCP server process
 
 ### Siblings
-- [DecoupledDeployableUnit](./DecoupledDeployableUnit.md) -- `integrations/mcp-constraint-monitor/dashboard/README.md` serves as the dedicated documentation entrypoint for the dashboard as its own deployable, signaling that it has a distinct lifecycle from the parent MCP Constraint Monitor server
+- [DecoupledDeployableUnit](./DecoupledDeployableUnit.md) -- `integrations/constraint-monitor/dashboard/README.md` serves as the dedicated documentation entrypoint for the dashboard as its own deployable, signaling that it has a distinct lifecycle from the parent MCP Constraint Monitor server
 
 
 ---

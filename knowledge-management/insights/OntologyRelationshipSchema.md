@@ -8,7 +8,7 @@ The project documentation's 'Key documented components' section enumerates the o
 
 ## What It Is
 
-OntologyRelationshipSchema is the formal vocabulary of edge types that defines how entities in the codebase ontology relate to one another. It is documented as part of the project's ontology specification and serves as the classification target set for the `OntologyClassificationAgent` located at `integrations/mcp-server-semantic-analysis/src/agents/`. The schema enumerates seven distinct relationship types: `CONTAINS_PACKAGE`, `CONTAINS_FOLDER`, `CONTAINS_FILE`, `CONTAINS_MODULE`, `DEFINES`, `DEFINES_METHOD`, and `DEPENDS_ON_EXTERNAL`.
+OntologyRelationshipSchema is the formal vocabulary of edge types that defines how entities in the codebase ontology relate to one another. It is documented as part of the project's ontology specification and serves as the classification target set for the `OntologyClassificationAgent` located at `integrations/semantic-analysis/src/agents/`. The schema enumerates seven distinct relationship types: `CONTAINS_PACKAGE`, `CONTAINS_FOLDER`, `CONTAINS_FILE`, `CONTAINS_MODULE`, `DEFINES`, `DEFINES_METHOD`, and `DEPENDS_ON_EXTERNAL`.
 
 As a child component of the parent `Ontology` entity, OntologyRelationshipSchema provides the relational grammar that complements whatever node/entity vocabulary the broader Ontology defines. Where the Ontology describes *what* kinds of things exist in the modeled graph, OntologyRelationshipSchema describes *how* those things connect. This distinction is operationally important: the `OntologyClassificationAgent` consumes this schema as a closed set of valid classification outcomes when it resolves entity-to-entity relationships during semantic analysis.
 
@@ -30,13 +30,13 @@ This stratification gives the agent four mutually exclusive classification outco
 
 OntologyRelationshipSchema is implementation-light — it has zero associated code symbols and no listed key files in the present observations, which indicates it functions as a **specification artifact** rather than executable code. Its presence is documented in the project's "Key documented components" section as a normative reference enumerating the relationship vocabulary.
 
-The mechanics of how the schema is *enforced* live in the consumer, `OntologyClassificationAgent` at `integrations/mcp-server-semantic-analysis/src/agents/`. This agent implements all five abstract methods of `BaseAgent` — the contract captured by the sibling component `BaseAgentFiveMethodContract` — and uses the schema's seven values as its classification labels. The containment relationships (`CONTAINS_PACKAGE` → `CONTAINS_FOLDER` → `CONTAINS_FILE` → `CONTAINS_MODULE`) are arranged to express ownership chains that mirror real codebase layout: a package owns folders, folders own files, files own modules. This ordering allows the agent to produce a strictly hierarchical containment subgraph.
+The mechanics of how the schema is *enforced* live in the consumer, `OntologyClassificationAgent` at `integrations/semantic-analysis/src/agents/`. This agent implements all five abstract methods of `BaseAgent` — the contract captured by the sibling component `BaseAgentFiveMethodContract` — and uses the schema's seven values as its classification labels. The containment relationships (`CONTAINS_PACKAGE` → `CONTAINS_FOLDER` → `CONTAINS_FILE` → `CONTAINS_MODULE`) are arranged to express ownership chains that mirror real codebase layout: a package owns folders, folders own files, files own modules. This ordering allows the agent to produce a strictly hierarchical containment subgraph.
 
 The definition relationships isolate symbolic declaration from structural ownership. `DEFINES` covers the general case of a container declaring a symbol, while `DEFINES_METHOD` is a specialization for method-level definitions — likely chosen because method definition is the most frequent and analytically distinct authoring relationship in object-oriented or modular code. `DEPENDS_ON_EXTERNAL` is implemented as a deliberately singular edge type for *all* outbound dependencies that exit the ontology's known graph; this collapses the entire external dependency space into one classification, simplifying agent decision logic while preserving the boundary signal.
 
 ## Integration Points
 
-The primary integration point is the consumption relationship with `OntologyClassificationAgent` in `integrations/mcp-server-semantic-analysis/src/agents/`. The agent uses the schema as its label set when classifying detected relationships between entities. Because the parent `Ontology` is implemented through `OntologyClassificationAgent`, the schema is effectively the contract between the ontology specification and the agent's runtime output.
+The primary integration point is the consumption relationship with `OntologyClassificationAgent` in `integrations/semantic-analysis/src/agents/`. The agent uses the schema as its label set when classifying detected relationships between entities. Because the parent `Ontology` is implemented through `OntologyClassificationAgent`, the schema is effectively the contract between the ontology specification and the agent's runtime output.
 
 Through its sibling `BaseAgentFiveMethodContract`, the schema participates in the broader `BaseAgent` framework: the five abstract methods implemented by `OntologyClassificationAgent` form the structural shell, and OntologyRelationshipSchema fills that shell with domain-specific output values. Any system that consumes the ontology graph downstream (search, traversal, dependency analysis) must understand these seven relationship types as the complete edge vocabulary.
 
@@ -44,7 +44,7 @@ The `DEPENDS_ON_EXTERNAL` edge type acts as a graph-boundary marker, signaling i
 
 ## Usage Guidelines
 
-When extending or modifying the system, developers should treat OntologyRelationshipSchema as a **closed enumeration**: any new edge type added here must be supported in `OntologyClassificationAgent`, and removing or renaming a type is a breaking change for downstream graph consumers. Because the schema lives at the parent `Ontology` level and the agent at `integrations/mcp-server-semantic-analysis/src/agents/` depends on it, changes should be coordinated across both locations.
+When extending or modifying the system, developers should treat OntologyRelationshipSchema as a **closed enumeration**: any new edge type added here must be supported in `OntologyClassificationAgent`, and removing or renaming a type is a breaking change for downstream graph consumers. Because the schema lives at the parent `Ontology` level and the agent at `integrations/semantic-analysis/src/agents/` depends on it, changes should be coordinated across both locations.
 
 Developers classifying relationships should respect the semantic tiers:
 
@@ -64,10 +64,10 @@ Maintainability is strong because the schema is small, well-stratified, and exte
 ## Hierarchy Context
 
 ### Parent
-- [Ontology](./Ontology.md) -- OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ implements all five BaseAgent abstract methods to classify entities against the defined ontology schema
+- [Ontology](./Ontology.md) -- OntologyClassificationAgent in integrations/semantic-analysis/src/agents/ implements all five BaseAgent abstract methods to classify entities against the defined ontology schema
 
 ### Siblings
-- [BaseAgentFiveMethodContract](./BaseAgentFiveMethodContract.md) -- The L2 context explicitly states that OntologyClassificationAgent in integrations/mcp-server-semantic-analysis/src/agents/ 'implements all five BaseAgent abstract methods,' indicating a strict abstract class contract rather than an optional interface.
+- [BaseAgentFiveMethodContract](./BaseAgentFiveMethodContract.md) -- The L2 context explicitly states that OntologyClassificationAgent in integrations/semantic-analysis/src/agents/ 'implements all five BaseAgent abstract methods,' indicating a strict abstract class contract rather than an optional interface.
 
 
 ---

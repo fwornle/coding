@@ -9,7 +9,7 @@ The integrations/copi/docs/SEND-VULNERABILITY-EMAILS.md file provides guidelines
 The **DevelopmentPractices** sub‑component lives inside the `integrations/` tree and is realized through a collection of markdown‑based artefacts that capture concrete development‑level guidance. The primary artefacts are located at:  
 
 * `integrations/copi/docs/hooks.md` – the authoritative **HookFunctionsReference** that enumerates every supported hook, its signature and usage patterns.  
-* `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – the formal **hook data format** definition that all hook payloads must obey.  
+* `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md` – the formal **hook data format** definition that all hook payloads must obey.  
 * `integrations/copi/EXAMPLES.md` – a set of **hook usage examples** that illustrate real‑world invocation scenarios.  
 * `integrations/copi/docs/SEND-VULNERABILITY-EMAILS.md`, `DELETE‑WORKSPACES‑README.md`, and `STATUS‑LINE‑QUICK‑REFERENCE.md` – concrete **development practice guides** that describe operational procedures (email notifications, workspace lifecycle, status‑line integration).  
 * `integrations/code-graph-rag/README.md` – a concrete **graph‑based Retrieval‑Augmented Generation (RAG) practice** that demonstrates how a development team can embed a knowledge graph into their workflow.
@@ -20,7 +20,7 @@ Collectively, these files constitute a living handbook for developers working in
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is a **modular hook‑centric design**. The parent component **CodingPatterns** supplies the runtime machinery (`HookConfigLoader`, `ensureLLMInitialized()` in `base-agent.ts`) that discovers, validates, and merges hook configurations at start‑up. This runtime expects hook definitions to conform to the **CLAUDE‑CODE‑HOOK‑FORMAT** documented in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. By externalising the contract into a markdown file, the system decouples the static contract from the code that enforces it, enabling non‑code stakeholders (e.g., technical writers) to evolve the format without touching the loader logic.
+The architecture that emerges from the observations is a **modular hook‑centric design**. The parent component **CodingPatterns** supplies the runtime machinery (`HookConfigLoader`, `ensureLLMInitialized()` in `base-agent.ts`) that discovers, validates, and merges hook configurations at start‑up. This runtime expects hook definitions to conform to the **CLAUDE‑CODE‑HOOK‑FORMAT** documented in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. By externalising the contract into a markdown file, the system decouples the static contract from the code that enforces it, enabling non‑code stakeholders (e.g., technical writers) to evolve the format without touching the loader logic.
 
 The **DevelopmentPractices** sub‑component itself is a *knowledge‑artifact layer* that lives alongside the executable code. Its design follows a **documentation‑as‑code** pattern: each practice (e.g., “send vulnerability emails”) is captured in a dedicated markdown file under `integrations/copi/docs/`. The sibling **DesignPatterns** component re‑uses the same hook‑loading infrastructure, showing a **shared‑service** approach where multiple higher‑level concerns converge on a single hook configuration pipeline.
 
@@ -41,7 +41,7 @@ Although the observations do not surface concrete source code for the Developmen
 
 * **Hook Function Reference (`integrations/copi/docs/hooks.md`)** – lists each hook name (e.g., `onVulnerabilityFound`, `onWorkspaceDeleted`) together with required arguments, return type, and typical execution context. The file also provides short snippets that map directly to the example implementations in `integrations/copi/EXAMPLES.md`.
 
-* **Hook Data Format (`integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`)** – specifies a JSON schema (fields like `hookId`, `payload`, `timestamp`, `metadata`). The schema is the authoritative source for validation performed by `HookConfigLoader`.
+* **Hook Data Format (`integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`)** – specifies a JSON schema (fields like `hookId`, `payload`, `timestamp`, `metadata`). The schema is the authoritative source for validation performed by `HookConfigLoader`.
 
 * **Example Implementations (`integrations/copi/EXAMPLES.md`)** – contain runnable pseudo‑code or script fragments that demonstrate how to read the payload, perform business logic, and optionally return a response. For instance, the “send vulnerability emails” practice shows a function that extracts vulnerability details from the payload, formats an email, and calls an internal mailer service.
 
@@ -85,7 +85,7 @@ All integration points rely on the **shared hook identifier namespace** defined 
 Developers should treat the markdown artefacts as the **single source of truth** for any new or modified hook. When adding a hook:
 
 1. **Define the contract** in `integrations/copi/docs/hooks.md`, following the existing syntax (name, arguments, description).  
-2. **Add a schema entry** to the JSON schema described in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Keep the schema minimal to avoid validation overhead.  
+2. **Add a schema entry** to the JSON schema described in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`. Keep the schema minimal to avoid validation overhead.  
 3. **Provide an example** in `integrations/copi/EXAMPLES.md` that demonstrates a minimal, testable implementation.  
 4. **Document the operational impact** in a dedicated guide (e.g., `SEND‑VULNERABILITY‑EMAILS.md`) if the hook triggers side‑effects such as external communications or resource cleanup.  
 5. **Validate locally** by running the hook loader in a test harness; any schema violations will be reported before code is merged.  

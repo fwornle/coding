@@ -24,7 +24,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import type { AgentDefinition, EdgeDefinition } from './types'
-import { PROCESS_TAGS } from '../../../../mcp-server-semantic-analysis/dist/agents/process-tags.js'
+import { PROCESS_TAGS } from '../../../../semantic-analysis/dist/agents/process-tags.js'
 import { WORKFLOW_COLORS } from '../../lib/colors'
 
 // Phase 52: `llmModel` literals are now D-03 fallback hints (empty-bucket display).

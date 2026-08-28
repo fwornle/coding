@@ -14,7 +14,7 @@
  *
  *   PORT DISCIPLINE (load-bearing — see CONTEXT.md D-04 / D-05): Phase 59
  *   targets the km-core REST view at `:3848` served by
- *   `integrations/mcp-server-semantic-analysis/src/sse-server.ts:46-103`.
+ *   `integrations/semantic-analysis/src/sse-server.ts:46-103`.
  *   This is the same graph the writer (consolidator) emits into and the
  *   same graph the unified-viewer reads. The analog script
  *   `scripts/purge-kmcore-orphans.mjs` defaults to the obs-api daemon's

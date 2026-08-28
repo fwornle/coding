@@ -2,26 +2,26 @@
 
 **Type:** Detail
 
-As documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md ('Agent Architecture'), the pipeline explicitly sequences all four agents in a defined order, establishing handoff points between semantic analysis, ontology classification, code graph construction, and content validation stages rather than running them concurrently.
+As documented in integrations/semantic-analysis/docs/architecture/agents.md ('Agent Architecture'), the pipeline explicitly sequences all four agents in a defined order, establishing handoff points between semantic analysis, ontology classification, code graph construction, and content validation stages rather than running them concurrently.
 
 ## What It Is  
 
 **SequentialAgentOrchestration** is the coordination mechanism that drives the core processing pipeline of the **MCP server semantic‑analysis** integration. It lives inside the *Pipeline* component (the pipeline coordinator) and is responsible for invoking the four agents—**SemanticAnalysisAgent**, **OntologyClassificationAgent**, **CodeGraphAgent**, and **ContentValidationAgent**—in a strict, pre‑defined order. The definition of this ordering is documented in the architecture guide located at  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
+integrations/semantic-analysis/docs/architecture/agents.md
 ```  
 
 The same file explains that each agent produces an intermediate artefact that becomes the input for the next stage, creating a hand‑off chain rather than a concurrent execution model. The orchestration pattern was deliberately chosen to resolve earlier architectural conflicts, a decision recorded in  
 
 ```
-integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md
+integrations/semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md
 ```  
 
 Finally, the broader interaction of this sequential pipeline with the rest of the MCP server is described in  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/architecture/integration.md
+integrations/semantic-analysis/docs/architecture/integration.md
 ```  
 
 Together these sources define **SequentialAgentOrchestration** as a *deterministic, linear pipeline* that enforces explicit integration contracts at each boundary.
@@ -121,7 +121,7 @@ Although the repository does not expose concrete code symbols, the documentation
 ## Hierarchy Context
 
 ### Parent
-- [Pipeline](./Pipeline.md) -- The pipeline coordinator sequences SemanticAnalysisAgent, OntologyClassificationAgent, CodeGraphAgent, and ContentValidationAgent as documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md
+- [Pipeline](./Pipeline.md) -- The pipeline coordinator sequences SemanticAnalysisAgent, OntologyClassificationAgent, CodeGraphAgent, and ContentValidationAgent as documented in integrations/semantic-analysis/docs/architecture/agents.md
 
 
 ---

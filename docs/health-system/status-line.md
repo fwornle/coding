@@ -637,7 +637,7 @@ ps -eo pid,tty,comm | grep claude
 **Integration**:
 
 - `scripts/health-prompt-hook.js` - Triggers status line updates
-- `integrations/mcp-constraint-monitor/` - Provides compliance data
+- `integrations/constraint-monitor/` - Provides compliance data
 
 ## Related Documentation
 

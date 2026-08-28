@@ -21,7 +21,7 @@ docs/puml/llm-provider-architecture.puml
 The design intent behind each tier – what capability, latency, or cost envelope it represents – is documented in the sibling specification  
 
 ```
-integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md
+integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md
 ```  
 
 Together, these artifacts define a clear separation: callers request a tier, TierModelMap resolves it to a concrete model, and the resolved model is then handed to the downstream provider pipeline.
@@ -148,7 +148,7 @@ Because the map is defined **outside** the generic provider configuration, chang
 - [TierRouter](./TierRouter.md) -- `docs/puml/llm-tier-routing.puml` diagrams the tier-to-model mapping, indicating that tier assignment happens before provider selection and feeds into the broader provider architecture shown in `docs/puml/llm-provider-architecture.puml`
 
 ### Siblings
-- [TierProposalSpec](./TierProposalSpec.md) -- `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` (titled 'Tiered Model Selection Proposal') is the authoritative source for why specific tiers exist and what capability or cost tradeoff each tier is intended to represent, providing the design intent behind the tier identifiers used in `docs/puml/llm-tier-routing.puml`.
+- [TierProposalSpec](./TierProposalSpec.md) -- `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` (titled 'Tiered Model Selection Proposal') is the authoritative source for why specific tiers exist and what capability or cost tradeoff each tier is intended to represent, providing the design intent behind the tier identifiers used in `docs/puml/llm-tier-routing.puml`.
 
 
 ---

@@ -2894,7 +2894,7 @@ export class ObservationConsolidator {
     // `mode` or `state` as basenames.
     const FILE_BASENAME_RX = /^[A-Za-z0-9_-]+\.[A-Za-z0-9]{1,8}$/;
     // DIR_BASENAME: kebab-case identifier with at least 2 segments — used
-    // for project/submodule/service names like `mcp-server-semantic-analysis`,
+    // for project/submodule/service names like `semantic-analysis`,
     // `code-graph-rag`, `constraint-monitor`, `rapid-llm-proxy`. Single-word
     // kebab tokens (`tools`, `system`) are still excluded. Prose like
     // `pull-request` or `error-handling` will technically match here but
@@ -3076,7 +3076,7 @@ export class ObservationConsolidator {
   /**
    * Does any tracked file in `root` contain `dirname` as a directory
    * segment? Backs DIR_BASENAME verification for project/submodule/service
-   * names like `code-graph-rag` or `mcp-server-semantic-analysis`.
+   * names like `code-graph-rag` or `semantic-analysis`.
    */
   _gitDirBasenameExists(root, dirname) {
     const d = String(dirname || '').trim();

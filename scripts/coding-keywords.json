@@ -4,7 +4,7 @@
   "classification_version": "2.3-false-positive-fix",
   "keywords": {
     "primary": [
-      "mcp-constraint-monitor", "semantic-analysis-system", "coding infrastructure",
+      "constraint-monitor", "mcp-constraint-monitor", "semantic-analysis-system", "coding infrastructure",
       "ReliableCodingClassifier", "PathAnalyzer", "KeywordMatcher", "SemanticAnalyzer",
       "enhanced-transcript-monitor", "generate-proper-lsl-from-transcripts",
       "post-session-logger", "UKB", "VKB", "CKB",
@@ -24,7 +24,8 @@
     ],
     "file_patterns": [
       "enhanced-transcript-monitor", "post-session-logger",
-      "reliable-coding-classifier", "semantic-analysis", "mcp-constraint-monitor",
+      "reliable-coding-classifier", "semantic-analysis", "constraint-monitor",
+      "mcp-server-semantic-analysis", "mcp-constraint-monitor",
       "coding-keywords.json", "session-index.json", "ukb-cli.js", "vkb-cli.js"
     ],
     "path_patterns": [

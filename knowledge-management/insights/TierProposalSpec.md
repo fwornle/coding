@@ -2,16 +2,16 @@
 
 **Type:** Detail
 
-`integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` (titled 'Tiered Model Selection Proposal') is the authoritative source for why specific tiers exist and what capability or cost tradeoff each tier is intended to represent, providing the design intent behind the tier identifiers used in `docs/puml/llm-tier-routing.puml`.
+`integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` (titled 'Tiered Model Selection Proposal') is the authoritative source for why specific tiers exist and what capability or cost tradeoff each tier is intended to represent, providing the design intent behind the tier identifiers used in `docs/puml/llm-tier-routing.puml`.
 
 ## What It Is  
 
-**TierProposalSpec** is the formal *semantic contract* that describes the meaning of each LLM‑tier identifier used throughout the routing layer of the MCP server. The specification lives alongside the routing implementation inside the **TierRouter** component (see the `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` file for the full text).  
+**TierProposalSpec** is the formal *semantic contract* that describes the meaning of each LLM‑tier identifier used throughout the routing layer of the MCP server. The specification lives alongside the routing implementation inside the **TierRouter** component (see the `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` file for the full text).  
 
 The spec predates the concrete routing diagram (`docs/puml/llm-tier-routing.puml`) and therefore defines *why* a tier exists—what capability, performance, or cost characteristic it represents—while the diagram shows *how* those tiers are mapped to concrete model providers. Because the spec is deliberately independent of any implementation detail, it is the single source of truth that all tier‑assignment logic, including entries in **TierModelMap**, must be validated against whenever a new model or provider is added.
 
 > **Location** – the authoritative description is in  
-> `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`  
+> `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`  
 > The mechanical mapping that consumes the spec is visualised in  
 > `docs/puml/llm-tier-routing.puml`  
 
@@ -64,7 +64,7 @@ The only explicit dependency shown is the *ordering* of operations: tier assignm
 
 ## Usage Guidelines  
 
-1. **Read the Spec First** – Before writing any code that references a tier, consult `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. The document explains the intended capability/cost trade‑off; using a tier without this context can lead to mismatched expectations.  
+1. **Read the Spec First** – Before writing any code that references a tier, consult `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. The document explains the intended capability/cost trade‑off; using a tier without this context can lead to mismatched expectations.  
 
 2. **Never Hard‑Code Tier Semantics** – The router must obtain tier meanings from `TierProposalSpec`. If you need to adjust a tier’s behavior, modify the spec and the router’s validation logic, not the static mapping in **TierModelMap**.  
 

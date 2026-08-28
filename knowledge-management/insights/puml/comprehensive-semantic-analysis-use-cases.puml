@@ -65,7 +65,7 @@ end note
 
 note top of handle
   Implemented in integrations/
-  mcp-server-semantic-analysis/src
+  semantic-analysis/src
 end note
 
 note left of manage

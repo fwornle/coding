@@ -10,4 +10,4 @@
 - The ReportingModule relies on the EntityPersistenceAgent to manage entity persistence and relationships.
 - The ReportingModule interacts with the OntologySystem to classify entities and manage ontology metadata.
 - ReportingModule uses the integrations/browser-access/README.md to access browser-based reporting tools.
-- The ReportingModule uses the integrations/mcp-constraint-monitor/docs/constraint-configuration.md to configure constraints for reporting.
+- The ReportingModule uses the integrations/constraint-monitor/docs/constraint-configuration.md to configure constraints for reporting.

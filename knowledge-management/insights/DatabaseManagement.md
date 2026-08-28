@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration, which is related to database management.
+The integrations/constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration, which is related to database management.
 
 ## What It Is  
 
@@ -50,7 +50,7 @@ DatabaseManagement interacts with several other parts of the system:
 
 * **Parent – CodingPatterns**: The parent component provides the overarching configuration loading mechanism (e.g., reading environment variables) and may invoke `ensureLLMInitialized()` for LLM‑related sub‑components.  DatabaseManagement likely follows the same pattern, initializing its connection only when required.
 
-* **Sibling – ConstraintConfiguration**: The `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` file documents constraints that may be enforced at the database layer.  DatabaseManagement must respect these constraints, possibly by validating data against the rules defined in that documentation before persisting.
+* **Sibling – ConstraintConfiguration**: The `integrations/constraint-monitor/docs/constraint-configuration.md` file documents constraints that may be enforced at the database layer.  DatabaseManagement must respect these constraints, possibly by validating data against the rules defined in that documentation before persisting.
 
 * **Sibling – ConcurrencyManagement**: The `WaveController.runWithConcurrency()` method implements work‑stealing for parallel tasks.  When bulk operations are executed, DatabaseManagement can benefit from this concurrency model by processing multiple batches in parallel, provided that `MEMGRAPH_BATCH_SIZE` is chosen to avoid contention on the Memgraph server.
 
@@ -97,7 +97,7 @@ These insights are derived directly from the supplied observations and reflect t
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method within the base-agent.ts file. This method ensures that the LLM service is only initialized when it is actually needed, thus optimizing resource usage and improving performance. Furthermore, the use of lazy initialization allows for more flexibility in the component's design, as it enables the creation of agents that can be used with or without LLM services. The ensureLLMInitialized() method is typically called within the constructor of the agent classes, such as the CodeGraphAgent class in integrations/mcp-server-semantic-analysis/src/agent/code-graph-agent.ts, to guarantee that the LLM service is properly initialized before the agent's execution.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a lazy initialization approach for LLM services, which is evident in the ensureLLMInitialized() method within the base-agent.ts file. This method ensures that the LLM service is only initialized when it is actually needed, thus optimizing resource usage and improving performance. Furthermore, the use of lazy initialization allows for more flexibility in the component's design, as it enables the creation of agents that can be used with or without LLM services. The ensureLLMInitialized() method is typically called within the constructor of the agent classes, such as the CodeGraphAgent class in integrations/semantic-analysis/src/agent/code-graph-agent.ts, to guarantee that the LLM service is properly initialized before the agent's execution.
 
 ### Children
 - [MemgraphConnection](./MemgraphConnection.md) -- The MEMGRAPH_BATCH_SIZE variable is used to configure the batch size for database interactions, as mentioned in the parent context.
@@ -105,7 +105,7 @@ These insights are derived directly from the supplied observations and reflect t
 ### Siblings
 - [CodeAnalysis](./CodeAnalysis.md) -- The ensureLLMInitialized() method in base-agent.ts guarantees the LLM service is initialized before code analysis execution.
 - [LLMIntegration](./LLMIntegration.md) -- The ensureLLMInitialized() method in base-agent.ts guarantees the LLM service is initialized before data analysis execution.
-- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
+- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/constraint-monitor/docs/constraint-configuration.md file provides information on constraint configuration.
 - [ConcurrencyManagement](./ConcurrencyManagement.md) -- The WaveController.runWithConcurrency() method implements work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately.
 - [BrowserAccess](./BrowserAccess.md) -- The BROWSER_ACCESS_SSE_URL variable is used to configure the browser access SSE URL.
 

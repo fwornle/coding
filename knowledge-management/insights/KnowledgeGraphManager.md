@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The KnowledgeGraphManager sub-component may be implemented using the GraphDatabaseAdapter class, as described in the integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
+The KnowledgeGraphManager sub-component may be implemented using the GraphDatabaseAdapter class, as described in the integrations/constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
-The **KnowledgeGraphManager** sub‑component lives inside the *LiveLoggingSystem* repository and is responsible for persisting, classifying, and querying the system’s knowledge graph. Its implementation draws on the **Graph‑Code** system documented in `integrations/code-graph-rag/README.md`, which supplies the underlying graph‑based storage and retrieval capabilities. The manager is wired to the **GraphDatabaseAdapter** class (see `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) that abstracts the concrete graph database (e.g., Memgraph) behind a uniform API.  
+The **KnowledgeGraphManager** sub‑component lives inside the *LiveLoggingSystem* repository and is responsible for persisting, classifying, and querying the system’s knowledge graph. Its implementation draws on the **Graph‑Code** system documented in `integrations/code-graph-rag/README.md`, which supplies the underlying graph‑based storage and retrieval capabilities. The manager is wired to the **GraphDatabaseAdapter** class (see `integrations/constraint-monitor/docs/constraint-configuration.md`) that abstracts the concrete graph database (e.g., Memgraph) behind a uniform API.  
 
 Operationally, KnowledgeGraphManager relies on several environment variables to locate and configure its external services: `ANTHROPIC_API_KEY` and `BROWSERBASE_API_KEY` for API‑level interactions, `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` for communicating with the Graph‑Code RAG service, and `MEMGRAPH_BATCH_SIZE` to tune batch‑write performance. Classification of ontology concepts is delegated to the **OntologyClassificationAgent** class, while all graph‑related events are emitted through the **LoggingMechanism** sub‑component, ensuring a consistent audit trail across the LiveLoggingSystem.  
 
@@ -30,7 +30,7 @@ The **OntologyClassificationAgent** provides an *ontology‑driven* classificati
 
 ## Implementation Details  
 
-1. **GraphDatabaseAdapter** – Defined in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`, this class encapsulates all low‑level graph operations (create, read, update, delete). It likely exposes methods such as `executeQuery`, `batchInsert`, and `applyConstraints`, translating generic calls into the dialect required by the configured graph store. The `MEMGRAPH_BATCH_SIZE` environment variable is read at startup to size the internal batch buffers, balancing throughput against memory pressure.  
+1. **GraphDatabaseAdapter** – Defined in `integrations/constraint-monitor/docs/constraint-configuration.md`, this class encapsulates all low‑level graph operations (create, read, update, delete). It likely exposes methods such as `executeQuery`, `batchInsert`, and `applyConstraints`, translating generic calls into the dialect required by the configured graph store. The `MEMGRAPH_BATCH_SIZE` environment variable is read at startup to size the internal batch buffers, balancing throughput against memory pressure.  
 
 2. **OntologyClassificationAgent** – Though the exact file path is not listed, the class name signals a dedicated agent that consumes node attributes and returns ontology labels. It probably implements an interface like `classify(node): OntologyLabel[]`, allowing KnowledgeGraphManager to enrich graph entities immediately after insertion.  
 
@@ -50,7 +50,7 @@ Because no concrete code symbols were discovered in the repository snapshot, the
 
 - **Sibling – LoggingMechanism** – The manager delegates all event‑level logging to LoggingMechanism, sharing the same hooks and format used by *TranscriptProcessing* and *TranscriptAdapterFactory*. This tight coupling ensures that any change to logging conventions propagates uniformly.  
 
-- **Child – GraphDatabaseAdapter** – The adapter is the concrete bridge to the graph database. Any updates to constraint definitions (e.g., in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) automatically affect KnowledgeGraphManager’s behavior without code changes.  
+- **Child – GraphDatabaseAdapter** – The adapter is the concrete bridge to the graph database. Any updates to constraint definitions (e.g., in `integrations/constraint-monitor/docs/constraint-configuration.md`) automatically affect KnowledgeGraphManager’s behavior without code changes.  
 
 - **External Services** –  
   * **Graph‑Code RAG** (`integrations/code-graph-rag/README.md`) – accessed via the ports mentioned above.  

@@ -2,21 +2,21 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file contains the implementation of the pattern-based approach for generating insights.
+The integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file contains the implementation of the pattern-based approach for generating insights.
 
 ## What It Is  
 
 The **PatternBasedInsightGeneration** capability lives in the source file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
 This file houses the concrete implementation that powers the **Insights** sub‑component. The implementation follows a *pattern‑based* approach: it examines the semantic data supplied by the **SemanticAnalysis** parent context and, using a set of predefined ontology patterns, derives higher‑level insights that are then exposed through the **Insights** component. In practice, the agent reads the classification results produced upstream, matches them against the ontology‑driven patterns, and emits insight objects that downstream consumers (e.g., UI dashboards, recommendation engines) can consume. The pattern‑based method is therefore the engine that turns raw semantic classifications into actionable knowledge.
 
 ## Architecture and Design  
 
-From the observations we can infer a **layered** architecture in which **SemanticAnalysis** serves as the lower layer that produces raw classification data, while **Insights** sits above it and adds value through pattern‑based processing. The **ontology‑classification‑agent.ts** file acts as the bridge between these layers. Its placement under `integrations/mcp-server-semantic-analysis/src/agents/` signals an *agent* role – a self‑contained unit that encapsulates a specific processing strategy (here, pattern matching against an ontology).  
+From the observations we can infer a **layered** architecture in which **SemanticAnalysis** serves as the lower layer that produces raw classification data, while **Insights** sits above it and adds value through pattern‑based processing. The **ontology‑classification‑agent.ts** file acts as the bridge between these layers. Its placement under `integrations/semantic-analysis/src/agents/` signals an *agent* role – a self‑contained unit that encapsulates a specific processing strategy (here, pattern matching against an ontology).  
 
 The design embraces the **Strategy** pattern implicitly: the agent can be swapped out or extended with alternative pattern sets without disturbing the surrounding infrastructure, because the surrounding code interacts with the agent through a stable interface exposed by the **Insights** sub‑component. Moreover, the relationship between **Insights** and its parent **SemanticAnalysis** reflects a **Composition** relationship – **Insights** composes the results of **SemanticAnalysis** and augments them, rather than re‑implementing classification logic. This separation of concerns keeps the classification logic isolated from the insight‑generation logic, making each piece easier to evolve.
 
@@ -34,7 +34,7 @@ The **PatternBasedInsightGeneration** logic is tightly coupled to two surroundin
 
 2. **Insights (child component)** – Consumes the insights emitted by the agent. The **Insights** sub‑component likely exposes an API (e.g., `getInsights()` or an event stream) that downstream modules such as UI widgets, reporting services, or recommendation engines subscribe to.  
 
-Because the agent lives under `integrations/mcp-server-semantic-analysis`, it is also part of the broader integration layer that connects the semantic analysis service to the rest of the MCP (Managed Cloud Platform) ecosystem. Any external service that wishes to leverage pattern‑based insights must route its requests through the **SemanticAnalysis** → **OntologyClassificationAgent** → **Insights** pipeline.
+Because the agent lives under `integrations/semantic-analysis`, it is also part of the broader integration layer that connects the semantic analysis service to the rest of the MCP (Managed Cloud Platform) ecosystem. Any external service that wishes to leverage pattern‑based insights must route its requests through the **SemanticAnalysis** → **OntologyClassificationAgent** → **Insights** pipeline.
 
 ## Usage Guidelines  
 
@@ -76,7 +76,7 @@ Developers who need to extend or maintain the pattern‑based insight generation
 ## Hierarchy Context
 
 ### Parent
-- [Insights](./Insights.md) -- The Insights sub-component uses a pattern-based approach to generate insights, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
+- [Insights](./Insights.md) -- The Insights sub-component uses a pattern-based approach to generate insights, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file.
 
 ---
 

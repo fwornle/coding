@@ -12,7 +12,7 @@ The **ConfigurationValidator** lives in the `scripts` directory of the repos
 
 The overall design follows a **modular architecture** that is explicitly described in the parent component’s documentation.  Each major concern—logging, transcript processing, ontology classification, and configuration validation—is isolated in its own folder and exposed through well‑defined interfaces.  Within this modular scheme, the ConfigurationValidator is **composed** into the LiveLoggingSystem (`LiveLoggingSystem → ConfigurationValidator → ConfigValidator`).  This composition enables the parent system to invoke validation as a discrete step without coupling to the internal validation logic.
 
-The validator adopts a **configuration‑driven strategy**: validation rules and optimization heuristics are supplied via external settings, allowing the same LSLConfigValidator script to be reused across environments with different performance goals.  The reliance on the **unified logging interface** (`integrations/mcp-server-semantic-analysis/src/logging.ts`) demonstrates a **cross‑cutting concern** implementation—logging is factored out of the validator and injected via the Logger component, keeping the validation code focused on its domain.
+The validator adopts a **configuration‑driven strategy**: validation rules and optimization heuristics are supplied via external settings, allowing the same LSLConfigValidator script to be reused across environments with different performance goals.  The reliance on the **unified logging interface** (`integrations/semantic-analysis/src/logging.ts`) demonstrates a **cross‑cutting concern** implementation—logging is factored out of the validator and injected via the Logger component, keeping the validation code focused on its domain.
 
 ![ConfigurationValidator — Architecture](images/configuration-validator-architecture.png)
 
@@ -26,7 +26,7 @@ When an issue is discovered, the validator logs the event through the **Logger**
 
 * **Parent – LiveLoggingSystem**: The LiveLoggingSystem incorporates the ConfigurationValidator as a distinct module.  During system startup or configuration reload, LiveLoggingSystem invokes the validator to guarantee that the environment is correctly set up before any logging or transcript processing begins.  
 
-* **Sibling – Logger**: All validation output is routed through the Logger component (`integrations/mcp-server-semantic-analysis/src/logging.ts`).  This shared logging facility guarantees consistent formatting, log levels, and destination handling across the entire platform.  
+* **Sibling – Logger**: All validation output is routed through the Logger component (`integrations/semantic-analysis/src/logging.ts`).  This shared logging facility guarantees consistent formatting, log levels, and destination handling across the entire platform.  
 
 * **Sibling – TranscriptProcessor & OntologyClassifier**: While these components do not directly call the validator, they depend on a correctly configured system.  Validation failures therefore act as a gatekeeper, preventing downstream processing from operating on malformed or sub‑optimal configurations.  
 
@@ -77,14 +77,14 @@ When an issue is discovered, the validator logs the event through the **Logger**
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/mcp-server-semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
 
 ### Children
 - [ConfigValidator](./ConfigValidator.md) -- The ConfigurationValidator sub-component is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 
 ### Siblings
 - [TranscriptProcessor](./TranscriptProcessor.md) -- The TranscriptProcessor uses the TranscriptAdapter abstract base class in 'lib/agent-api' to read and convert transcripts from various agent formats.
-- [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
+- [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/semantic-analysis/src/logging.ts', providing a unified logging interface.
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
 - [Copi](./Copi.md) -- The Copi component is implemented in the 'integrations/copi' folder, providing a GitHub Copilot CLI wrapper with logging and Tmux integration.
 

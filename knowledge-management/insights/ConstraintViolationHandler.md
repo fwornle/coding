@@ -2,15 +2,15 @@
 
 **Type:** Detail
 
-The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file suggests that constraint configuration is a critical aspect of the system, implying that the ViolationLogger must handle various types of constraint violations.
+The integrations/constraint-monitor/docs/constraint-configuration.md file suggests that constraint configuration is a critical aspect of the system, implying that the ViolationLogger must handle various types of constraint violations.
 
 ## What It Is  
 
-**ConstraintViolationHandler** lives inside the **ViolationLogger** component that is part of the *MCP Constraint Monitor* integration. The only concrete locations that reference this handler are the documentation files under the `integrations/mcp-constraint-monitor` tree:
+**ConstraintViolationHandler** lives inside the **ViolationLogger** component that is part of the *MCP Constraint Monitor* integration. The only concrete locations that reference this handler are the documentation files under the `integrations/constraint-monitor` tree:
 
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – describes the shape of constraint configuration that the monitor expects.  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – explains how semantic constraints are detected and reported.  
-* `integrations/mcp-constraint-monitor/README.md` – gives an overview of the whole MCP Constraint Monitor subsystem and its responsibilities.
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – describes the shape of constraint configuration that the monitor expects.  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – explains how semantic constraints are detected and reported.  
+* `integrations/constraint-monitor/README.md` – gives an overview of the whole MCP Constraint Monitor subsystem and its responsibilities.
 
 From the observations we know that **ViolationLogger** *contains* a **ConstraintViolationHandler**. In the hierarchy, **ViolationLogger** is the parent component, while a higher‑level **ConstraintManager** (alluded to in the README) likely orchestrates the overall lifecycle of constraints and forwards violations to the logger. The handler’s purpose is therefore to receive, classify, and possibly persist or forward constraint‑violation events that originate from the semantic‑constraint‑detection pipeline.
 
@@ -58,7 +58,7 @@ Because the handler lives inside **ViolationLogger**, it likely has direct acces
 * **ViolationLogger** – As the parent, the logger provides the output channel (file, console, remote logging service). The handler may also interact with other sibling components of the logger (e.g., a `MetricsCollector` if one exists) to publish violation statistics.  
 * **ConstraintManager (inferred)** – Though not directly documented, the README hints at a broader manager that coordinates configuration, detection, and handling. The handler likely registers itself with this manager during initialization so that the manager can route violations correctly.
 
-No external libraries or third‑party services are explicitly mentioned, so the integration surface appears limited to internal modules within the `integrations/mcp-constraint-monitor` package.
+No external libraries or third‑party services are explicitly mentioned, so the integration surface appears limited to internal modules within the `integrations/constraint-monitor` package.
 
 ---
 

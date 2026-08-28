@@ -15,7 +15,7 @@ UkbTraceReportGenerator is a **sub‑component** of the **KnowledgeManagement** 
 The design of UkbTraceReportGenerator follows a **coordinator‑orchestrator** pattern. Rather than embedding data‑access or LLM logic directly, it delegates those concerns to dedicated managers:
 
 * **GraphDatabaseManager** – supplies raw knowledge graph entities and relationships.  
-* **GraphDatabaseAdapter** – the concrete persistence layer used by the manager, located at `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`. This adapter couples Graphology with LevelDB, offering scalable, fast graph storage that the report generator can query without worrying about underlying I/O details.  
+* **GraphDatabaseAdapter** – the concrete persistence layer used by the manager, located at `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`. This adapter couples Graphology with LevelDB, offering scalable, fast graph storage that the report generator can query without worrying about underlying I/O details.  
 * **LlmServiceManager** – provides LLM‑driven summarisation, explanation, or insight generation that enriches the trace data.  
 * **VkbApiClientManager** – optionally fetches external VKB resources that may be referenced in the trace.  
 * **WaveAgentController** – contributes execution metadata (e.g., workflow steps, agent status) that contextualises the trace.
@@ -39,7 +39,7 @@ The component’s **stateless** nature—relying exclusively on manager services
 
 UkbTraceReportGenerator sits at the nexus of several core services:
 
-* **GraphDatabaseManager ↔ GraphDatabaseAdapter** – The adapter (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`) is the low‑level bridge to the LevelDB‑backed graph store. Any change in storage technology would ripple through the manager but leave the report generator untouched.  
+* **GraphDatabaseManager ↔ GraphDatabaseAdapter** – The adapter (`integrations/semantic-analysis/src/storage/graph-database-adapter.ts`) is the low‑level bridge to the LevelDB‑backed graph store. Any change in storage technology would ripple through the manager but leave the report generator untouched.  
 * **LlmServiceManager** – Provides an interface for LLM operations; the generator must adhere to the manager’s contract (e.g., `generateInsight(prompt: string): Promise<string>`). This coupling enables swapping out the underlying model (OpenAI, Anthropic, etc.) without modifying report logic.  
 * **VkbApiClientManager** – Exposes API calls to the VKB service. The generator likely passes identifiers extracted from the trace to this client and incorporates the returned payloads.  
 * **WaveAgentController** – Supplies execution context. Because the controller also interacts with **LlmServiceManager**, there is a shared dependency that could be leveraged for coordinated logging or tracing.  
@@ -82,7 +82,7 @@ The clear separation between UkbTraceReportGenerator and its managers yields hig
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes the GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.ts) for persisting data in a graph database with automatic JSON export synchronization. This design decision enables efficient storage and retrieval of knowledge entities and relationships, which is crucial for the system's overall goals of knowledge discovery and insight generation. Furthermore, the use of Graphology+LevelDB persistence ensures a scalable and performant solution for managing the knowledge graph.
 
 ### Siblings
 - [ManualLearning](./ManualLearning.md) -- ManualLearning likely interacts with the GraphDatabaseManager to store and retrieve manually created knowledge entities and relationships.

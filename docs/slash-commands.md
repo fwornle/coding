@@ -350,13 +350,13 @@ ls -la .specstory/history/
 
 2. Start the dashboard manually:
    ```bash
-   cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+   cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
    npm run dashboard
    ```
 
 3. Check constraint monitor installation:
    ```bash
-   ls -la /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/
+   ls -la /Users/q284340/Agentic/coding/integrations/constraint-monitor/
    ```
 
 ### Commands Not Available

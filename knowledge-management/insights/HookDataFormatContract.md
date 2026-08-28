@@ -2,21 +2,21 @@
 
 **Type:** Detail
 
-This contract is referenced by the semantic detection pipeline documented in integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md and integrations/mcp-constraint-monitor/docs/semantic-detection-design.md
+This contract is referenced by the semantic detection pipeline documented in integrations/constraint-monitor/docs/semantic-constraint-detection.md and integrations/constraint-monitor/docs/semantic-detection-design.md
 
 ## What It Is  
 
 **HookDataFormatContract** is the formal contract that defines the JSON payload emitted by Claude Code at each *hook point* and consumed by the **constraint‑monitor** integration. The authoritative specification lives in the markdown file  
 
 ```
-integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 ```  
 
 This document describes every field, required vs. optional attributes, and the expected data types. It is the single source of truth for both the **hook producer** (Claude Code) and the **hook consumer** (the constraint‑monitor pipeline). The contract is a child of the broader **HookExtensionPattern** (documented alongside it in the same markdown file) and is referenced by the semantic detection components documented in  
 
 ```
-integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
-integrations/mcp-constraint-monitor/docs/semantic-detection-design.md
+integrations/constraint-monitor/docs/semantic-constraint-detection.md
+integrations/constraint-monitor/docs/semantic-detection-design.md
 ```  
 
 In practice, any component that wishes to emit a Claude Code hook must serialize its data to match this contract, and any component that wishes to evaluate architectural constraints must deserialize the same structure.
@@ -53,7 +53,7 @@ Although the repository contains **zero code symbols** directly referencing the 
 * **Nested structures** – complex data such as an abstract‑syntax‑tree (AST) snapshot is described as a nested JSON object with its own sub‑schema.  
 * **Versioning hints** – the spec includes a `contractVersion` field, allowing future extensions while preserving backward compatibility.  
 
-The **constraint‑monitor** integration (see `integrations/mcp-constraint-monitor/README.md`) implements the consumer side. It reads the raw HTTP POST body, parses the JSON, and runs a **schema validation step** (likely using a JSON‑schema validator or a custom validator derived from the markdown). After validation, the data is handed to the **semantic detection pipeline** (documented in `semantic-constraint-detection.md` and `semantic-detection-design.md`). Those pipelines treat the payload as a read‑only data source; they do not mutate it, reinforcing immutability.
+The **constraint‑monitor** integration (see `integrations/constraint-monitor/README.md`) implements the consumer side. It reads the raw HTTP POST body, parses the JSON, and runs a **schema validation step** (likely using a JSON‑schema validator or a custom validator derived from the markdown). After validation, the data is handed to the **semantic detection pipeline** (documented in `semantic-constraint-detection.md` and `semantic-detection-design.md`). Those pipelines treat the payload as a read‑only data source; they do not mutate it, reinforcing immutability.
 
 Because there are no concrete classes or functions listed, the contract’s “implementation” is effectively **declarative**: developers must manually keep their serialization logic aligned with the markdown. The absence of generated code means the contract is language‑agnostic and can be consumed by any runtime capable of JSON parsing.
 
@@ -63,7 +63,7 @@ Because there are no concrete classes or functions listed, the contract’s “i
 
 1. **Claude Code Hook Producer** – any module that emits a Claude Code hook must import the specification from `CLAUDE-CODE-HOOK-FORMAT.md` and ensure its output matches the defined schema. This is the *upstream* integration point.  
 
-2. **Constraint‑Monitor Consumer** – the `integrations/mcp-constraint-monitor/README.md` describes how the monitor subscribes to hook events (typically via an HTTP endpoint). It validates incoming payloads against the contract before invoking downstream analysis.  
+2. **Constraint‑Monitor Consumer** – the `integrations/constraint-monitor/README.md` describes how the monitor subscribes to hook events (typically via an HTTP endpoint). It validates incoming payloads against the contract before invoking downstream analysis.  
 
 3. **SemanticConstraintHook** – documented alongside the contract, this sibling component consumes the same payload to perform **semantic constraint detection**. It relies on the same field names and structures, allowing the two consumers to operate in parallel without duplication of parsing logic.  
 
@@ -117,10 +117,10 @@ Maintainability is high for teams disciplined about keeping the markdown contrac
 ## Hierarchy Context
 
 ### Parent
-- [HookExtensionPattern](./HookExtensionPattern.md) -- integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md documents the data format Claude Code emits at hook points, defining the contract between the hook producer and constraint-monitor consumer
+- [HookExtensionPattern](./HookExtensionPattern.md) -- integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md documents the data format Claude Code emits at hook points, defining the contract between the hook producer and constraint-monitor consumer
 
 ### Siblings
-- [SemanticConstraintHook](./SemanticConstraintHook.md) -- integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documents the semantic detection hook behavior and its role in evaluating constraints at hook points
+- [SemanticConstraintHook](./SemanticConstraintHook.md) -- integrations/constraint-monitor/docs/semantic-constraint-detection.md documents the semantic detection hook behavior and its role in evaluating constraints at hook points
 
 
 ---

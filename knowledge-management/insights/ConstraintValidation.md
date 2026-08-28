@@ -6,7 +6,7 @@ ConstraintValidation ensures that the system operates within defined boundaries,
 
 ## What It Is  
 
-ConstraintValidation is a **sub‑component** of the **CodingPatterns** module that is dedicated to monitoring and enforcing system‑wide constraints. It operates by applying a **rules‑based approach** to verify that the application stays within its defined boundaries, thereby preventing errors, inconsistencies, and violations of business logic. Although the observations do not list concrete source‑file locations for the implementation, the component lives conceptually under the `CodingPatterns` hierarchy and works closely with its child entity **ConstraintConfiguration**, whose documentation resides at `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`.  
+ConstraintValidation is a **sub‑component** of the **CodingPatterns** module that is dedicated to monitoring and enforcing system‑wide constraints. It operates by applying a **rules‑based approach** to verify that the application stays within its defined boundaries, thereby preventing errors, inconsistencies, and violations of business logic. Although the observations do not list concrete source‑file locations for the implementation, the component lives conceptually under the `CodingPatterns` hierarchy and works closely with its child entity **ConstraintConfiguration**, whose documentation resides at `integrations/constraint-monitor/docs/constraint-configuration.md`.  
 
 The primary purpose of ConstraintValidation is to give the system the ability to **handle complex constraints with ease**. By centralising validation logic, it ensures that all higher‑level features—such as graph construction, LLM initialization, and content validation—operate on a sound, consistent foundation.
 
@@ -38,7 +38,7 @@ Even though the source repository does not expose concrete symbols for Constrain
 | Element | Role |
 |---------|------|
 | **Rule Engine** | A loop or dispatcher that receives a collection of constraint rules (likely objects or functions) and evaluates each against the current system state. |
-| **ConstraintConfiguration** | Provides the declarative definition of each rule—its type, thresholds, and any conditional logic. The markdown guide (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) outlines the expected schema, suggesting that the engine parses this configuration at startup or on‑demand. |
+| **ConstraintConfiguration** | Provides the declarative definition of each rule—its type, thresholds, and any conditional logic. The markdown guide (`integrations/constraint-monitor/docs/constraint-configuration.md`) outlines the expected schema, suggesting that the engine parses this configuration at startup or on‑demand. |
 | **Violation Reporter** | Generates structured reports (e.g., error codes, messages) when a rule fails, allowing calling components to react appropriately. |
 | **Integration Hooks** | Points in the system (such as after a graph mutation or before an LLM query) where ConstraintValidation is invoked. These hooks are likely implemented in the sibling components (e.g., **GraphManagement**, **LLMInitialization**) to ensure constraints are respected throughout the workflow. |
 
@@ -107,7 +107,7 @@ By adhering to the guidelines above and respecting the documented relationships,
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts for persistence, allowing for automatic JSON export sync. This design decision enables seamless data synchronization and provides a robust foundation for the project's data management. The GraphDatabaseAdapter class is responsible for handling graph data storage and retrieval, making it a critical component of the project's architecture. By using this adapter, the CodingPatterns component can focus on its primary functionality, leaving data management to the GraphDatabaseAdapter.
 
 ### Children
-- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file provides a guide on constraint configuration, indicating the importance of this aspect in the ConstraintValidation sub-component.
+- [ConstraintConfiguration](./ConstraintConfiguration.md) -- The integrations/constraint-monitor/docs/constraint-configuration.md file provides a guide on constraint configuration, indicating the importance of this aspect in the ConstraintValidation sub-component.
 
 ### Siblings
 - [GraphManagement](./GraphManagement.md) -- GraphDatabaseAdapter handles graph data storage and retrieval, making it a critical component of the project's architecture.

@@ -2,13 +2,13 @@
 
 **Type:** Detail
 
-The agent architecture documented in integrations/mcp-server-semantic-analysis/docs/architecture/agents.md establishes OntologyClassificationAgent and CodeGraphAgent as the two upstream producers whose enriched outputs feed into insight generation.
+The agent architecture documented in integrations/semantic-analysis/docs/architecture/agents.md establishes OntologyClassificationAgent and CodeGraphAgent as the two upstream producers whose enriched outputs feed into insight generation.
 
 # EnrichedPayloadSynthesis
 
 ## What It Is
 
-EnrichedPayloadSynthesis is a detail-level concept within the `Insights` component of the `mcp-server-semantic-analysis` integration, documented across `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md` and `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`. It describes the synthesis mechanism by which enriched `AgentResponse` payloads — produced by upstream classification and graph-analysis agents — are combined into higher-level insight outputs.
+EnrichedPayloadSynthesis is a detail-level concept within the `Insights` component of the `semantic-analysis` integration, documented across `integrations/semantic-analysis/docs/architecture/integration.md` and `integrations/semantic-analysis/docs/architecture/agents.md`. It describes the synthesis mechanism by which enriched `AgentResponse` payloads — produced by upstream classification and graph-analysis agents — are combined into higher-level insight outputs.
 
 At its core, EnrichedPayloadSynthesis represents the contract and process whereby the `Insights` layer consumes the outputs of two upstream agents (`OntologyClassificationAgent` and `CodeGraphAgent`) and merges their enriched payloads into a unified, semantically richer representation. It is a downstream synthesis step, meaning it cannot execute until both upstream agents have completed and emitted their `AgentResponse` payloads.
 
@@ -18,13 +18,13 @@ This entity is not a standalone runtime component with its own code symbols; rat
 
 The architecture evident from the observations follows a **pipeline pattern** with explicit fan-in semantics. The `Insights` layer acts as a join point in the agent pipeline: two upstream producers (`OntologyClassificationAgent` and `CodeGraphAgent`) feed their outputs into a single downstream consumer. EnrichedPayloadSynthesis encapsulates the logic at that join, where multiple `AgentResponse` payloads converge and are combined into a coherent insight.
 
-The use of `AgentResponse` as the primary data contract — as documented in `integrations/mcp-server-semantic-analysis/docs/architecture/integration.md` — reflects a deliberate **uniform interface design decision**. Rather than each upstream agent emitting bespoke payload shapes, all agents conform to a shared `AgentResponse` envelope. This allows EnrichedPayloadSynthesis to treat its inputs polymorphically, applying consistent extraction and merging strategies regardless of which upstream agent produced a given payload.
+The use of `AgentResponse` as the primary data contract — as documented in `integrations/semantic-analysis/docs/architecture/integration.md` — reflects a deliberate **uniform interface design decision**. Rather than each upstream agent emitting bespoke payload shapes, all agents conform to a shared `AgentResponse` envelope. This allows EnrichedPayloadSynthesis to treat its inputs polymorphically, applying consistent extraction and merging strategies regardless of which upstream agent produced a given payload.
 
 The dependency relationship — Insights operating downstream of classification — also reflects a **staged enrichment pattern**. Each agent enriches the payload with its domain-specific perspective (ontological classification from `OntologyClassificationAgent`, structural code-graph information from `CodeGraphAgent`), and EnrichedPayloadSynthesis is the stage where these orthogonal enrichments are unified. This separation of concerns keeps each upstream agent focused while allowing the synthesis step to reason across multiple enriched views.
 
 ## Implementation Details
 
-Because the source observations do not surface concrete code symbols for EnrichedPayloadSynthesis (0 code symbols, no key files), the implementation details must be understood at the architectural-contract level rather than the function-level. The synthesis mechanism is defined conceptually in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` and `integration.md`, which together describe the data flow and contracts.
+Because the source observations do not surface concrete code symbols for EnrichedPayloadSynthesis (0 code symbols, no key files), the implementation details must be understood at the architectural-contract level rather than the function-level. The synthesis mechanism is defined conceptually in `integrations/semantic-analysis/docs/architecture/agents.md` and `integration.md`, which together describe the data flow and contracts.
 
 The mechanics, as implied by the observations, operate as follows: `OntologyClassificationAgent` produces an enriched `AgentResponse` containing classification metadata, while `CodeGraphAgent` produces an enriched `AgentResponse` containing code-graph relationships and structural data. The `Insights` layer ingests both payloads, validates that the upstream stages have completed, and then performs the synthesis — extracting and correlating fields across the two payloads to produce a higher-level insight.
 
@@ -32,7 +32,7 @@ The absence of dedicated code symbols suggests EnrichedPayloadSynthesis is reali
 
 ## Integration Points
 
-The integration surface for EnrichedPayloadSynthesis is defined entirely through the `AgentResponse` data contract. Its upstream dependencies are the two producer agents documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`:
+The integration surface for EnrichedPayloadSynthesis is defined entirely through the `AgentResponse` data contract. Its upstream dependencies are the two producer agents documented in `integrations/semantic-analysis/docs/architecture/agents.md`:
 
 - **`OntologyClassificationAgent`** — provides the classification-oriented enrichments that EnrichedPayloadSynthesis consumes as one input branch.
 - **`CodeGraphAgent`** — provides the code-structure enrichments that form the second input branch.
@@ -51,7 +51,7 @@ When working with or extending EnrichedPayloadSynthesis, developers should respe
 
 3. **Keep enrichment concerns in the producers.** EnrichedPayloadSynthesis should focus on combining and correlating already-enriched payloads, not on performing primary classification or graph analysis. Pushing enrichment logic into the synthesis step blurs the separation of concerns documented in `agents.md`.
 
-4. **Document new synthesis patterns in the same architecture files.** Because EnrichedPayloadSynthesis is documented as a detail under `Insights` in `integrations/mcp-server-semantic-analysis/docs/architecture/`, future changes to fusion behavior should be reflected there to keep the architectural record authoritative.
+4. **Document new synthesis patterns in the same architecture files.** Because EnrichedPayloadSynthesis is documented as a detail under `Insights` in `integrations/semantic-analysis/docs/architecture/`, future changes to fusion behavior should be reflected there to keep the architectural record authoritative.
 
 ---
 

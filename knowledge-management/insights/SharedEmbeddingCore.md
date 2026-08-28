@@ -2,11 +2,11 @@
 
 **Type:** Detail
 
-The architecture documentation at `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` covers agent architecture that depends on shared semantic analysis capabilities, corroborating that embedding is a cross-cutting concern deliberately extracted into this shared file rather than duplicated per agent
+The architecture documentation at `integrations/semantic-analysis/docs/architecture/agents.md` covers agent architecture that depends on shared semantic analysis capabilities, corroborating that embedding is a cross-cutting concern deliberately extracted into this shared file rather than duplicated per agent
 
 ## What It Is  
 
-**SharedEmbeddingCore** is the reusable embedding engine that lives inside the **SemanticAnalyzer** component defined at `src/agents/semantic-analyzer.ts`. The file `semantic-analyzer.ts` is explicitly documented as *“the single point of change for common embedding, similarity, or tokenization logic”* and is shared by all four concrete agent subclasses in the system. Consequently, any configuration or algorithmic change made to **SharedEmbeddingCore**—such as swapping the underlying vector model, adjusting dimensionality, or altering a normalization step—automatically propagates to every agent that relies on semantic analysis. In the architecture documentation (`integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`) the embedding capability is listed alongside similarity and tokenization as one of the three first‑class responsibilities of the Semantic Analyzer, confirming that **SharedEmbeddingCore** is a cross‑cutting, first‑order concern rather than a peripheral utility.
+**SharedEmbeddingCore** is the reusable embedding engine that lives inside the **SemanticAnalyzer** component defined at `src/agents/semantic-analyzer.ts`. The file `semantic-analyzer.ts` is explicitly documented as *“the single point of change for common embedding, similarity, or tokenization logic”* and is shared by all four concrete agent subclasses in the system. Consequently, any configuration or algorithmic change made to **SharedEmbeddingCore**—such as swapping the underlying vector model, adjusting dimensionality, or altering a normalization step—automatically propagates to every agent that relies on semantic analysis. In the architecture documentation (`integrations/semantic-analysis/docs/architecture/agents.md`) the embedding capability is listed alongside similarity and tokenization as one of the three first‑class responsibilities of the Semantic Analyzer, confirming that **SharedEmbeddingCore** is a cross‑cutting, first‑order concern rather than a peripheral utility.
 
 ## Architecture and Design  
 

@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The interaction with the ContentValidationModule suggests that the ViolationStorage mechanism must adhere to specific data formats and validation rules as outlined in the project's documentation, such as the constraint configuration guide found in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
+The interaction with the ContentValidationModule suggests that the ViolationStorage mechanism must adhere to specific data formats and validation rules as outlined in the project's documentation, such as the constraint configuration guide found in integrations/constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
-**ViolationStorage** is the concrete storage mechanism used by the **ViolationPersistenceService** to record constraint‑violation events that are discovered during content validation. The only concrete locations that mention this component are the high‑level design documents under the *integrations/mcp-constraint-monitor* folder, specifically  
+**ViolationStorage** is the concrete storage mechanism used by the **ViolationPersistenceService** to record constraint‑violation events that are discovered during content validation. The only concrete locations that mention this component are the high‑level design documents under the *integrations/constraint-monitor* folder, specifically  
 
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – which defines the data format and configuration rules that any violation record must obey, and  
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – which describes the semantic‑constraint detection process whose output is persisted by ViolationStorage.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – which defines the data format and configuration rules that any violation record must obey, and  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – which describes the semantic‑constraint detection process whose output is persisted by ViolationStorage.  
 
 Although no source files are listed, the documentation makes it clear that **ViolationStorage** lives inside the *ConstraintSystem* boundary and is a child of **ViolationPersistenceService**. Its purpose is to provide a reliable, format‑compliant repository for violation payloads that the **ContentValidationModule** produces.
 
@@ -55,7 +55,7 @@ The hierarchy is simple: **ViolationPersistenceService** → **ViolationStorage*
 ## Usage Guidelines  
 
 * **Always pass validated objects** – Developers should let the **ContentValidationModule** produce the violation payload and rely on its internal validation before invoking the `ViolationPersistenceService`. Direct calls to **ViolationStorage** should be avoided unless the caller can guarantee schema compliance.  
-* **Respect the constraint schema** – Any custom extensions to the violation record must first be reflected in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`. Failing to keep the documentation and the storage implementation in sync will cause runtime validation errors.  
+* **Respect the constraint schema** – Any custom extensions to the violation record must first be reflected in `integrations/constraint-monitor/docs/constraint-configuration.md`. Failing to keep the documentation and the storage implementation in sync will cause runtime validation errors.  
 * **Handle persistence errors gracefully** – Because the storage component may reject malformed payloads or encounter backend failures, callers should catch the specific exceptions thrown by `ViolationPersistenceService.saveViolation` (or the equivalent method) and implement retry or fallback logic as appropriate.  
 * **Do not bypass the service layer** – The composition relationship (`ViolationPersistenceService` contains `ViolationStorage`) is intentional; it centralizes transaction handling and logging. Direct access to the storage backend circumvents these concerns and is discouraged.  
 

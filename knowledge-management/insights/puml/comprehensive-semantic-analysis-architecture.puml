@@ -23,7 +23,7 @@ package "Storage Layer" {
 package "Source Locations" {
     folder "src/knowledge-management" as SrcKM
     folder "lib/ukb-unified" as LibUKB
-    folder "integrations/mcp-server-semantic-analysis/src" as IntegrationSrc
+    folder "integrations/semantic-analysis/src" as IntegrationSrc
 }
 
 ' Relationships

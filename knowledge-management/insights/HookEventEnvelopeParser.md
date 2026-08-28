@@ -9,7 +9,7 @@ The parent context states the document defines 'the event envelope the router mu
 **HookEventEnvelopeParser** is the dedicated parsing component that interprets the *event envelope* defined in the contract file  
 
 ```
-integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
+integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md
 ```  
 
 The markdown document – titled **“Claude Code Hook Data Format”** – is the authoritative schema that describes the JSON (or similar) wrapper surrounding every hook payload that the **HookEventRouter** receives.  The parser lives conceptually inside the router (the parent component) and is the first step in the processing pipeline: it extracts the common envelope fields (e.g., `hookId`, `timestamp`, `type`, `payload`) and produces a normalized in‑memory representation that downstream components (most notably **HookTypeDispatcher**) can work with.  
@@ -67,7 +67,7 @@ While no source symbols are listed, the implementation can be inferred from the 
 
 3. **External Event Sources** – The parser ultimately consumes data that originates from external systems (e.g., Claude Code webhook callbacks, message bus events).  Its contract ensures that any upstream changes to the envelope format must be reflected in the markdown spec, otherwise parsing will fail.
 
-4. **Logging / Monitoring** – Although not explicitly mentioned, the parser’s validation step is a natural place to emit metrics (e.g., “envelope parse failures”) that feed into the broader observability stack of the **mcp-constraint-monitor** integration.
+4. **Logging / Monitoring** – Although not explicitly mentioned, the parser’s validation step is a natural place to emit metrics (e.g., “envelope parse failures”) that feed into the broader observability stack of the **constraint-monitor** integration.
 
 ---
 
@@ -120,7 +120,7 @@ While no source symbols are listed, the implementation can be inferred from the 
 ## Hierarchy Context
 
 ### Parent
-- [HookEventRouter](./HookEventRouter.md) -- Claude Code hook data format is documented in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, defining the event envelope the router must parse for each hook type
+- [HookEventRouter](./HookEventRouter.md) -- Claude Code hook data format is documented in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, defining the event envelope the router must parse for each hook type
 
 ### Siblings
 - [HookTypeDispatcher](./HookTypeDispatcher.md) -- The parent context explicitly describes HookEventRouter as handling 'each hook type,' confirming that multiple distinct hook types exist and must be dispatched separately — this multiplicity is the dispatcher's reason for existence.

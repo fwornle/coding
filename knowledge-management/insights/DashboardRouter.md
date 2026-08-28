@@ -6,7 +6,7 @@ The lack of specific code files in the source files section implies that the Das
 
 ## What It Is  
 
-**DashboardRouter** is the routing component that underpins the web‑based dashboard used by the **MCP Constraint Monitor**. The only concrete artefacts that mention it live in the `integrations/mcp-constraint-monitor/dashboard/README.md` file, which describes a “dashboard routing mechanism”, and the higher‑level `integrations/mcp-constraint-monitor/README.md` that introduces the MCP Constraint Monitor itself. The hierarchical context tells us that **DashboardRouter** is owned by **DashboardService** (“DashboardService contains DashboardRouter”). No source files containing concrete class or function definitions are listed in the observations, so the router’s implementation details are not directly visible, but its purpose can be inferred: it maps incoming HTTP (or internal) requests to the appropriate dashboard handlers, enabling users to start, view, and manage constraint‑monitoring activities from a single UI surface.
+**DashboardRouter** is the routing component that underpins the web‑based dashboard used by the **MCP Constraint Monitor**. The only concrete artefacts that mention it live in the `integrations/constraint-monitor/dashboard/README.md` file, which describes a “dashboard routing mechanism”, and the higher‑level `integrations/constraint-monitor/README.md` that introduces the MCP Constraint Monitor itself. The hierarchical context tells us that **DashboardRouter** is owned by **DashboardService** (“DashboardService contains DashboardRouter”). No source files containing concrete class or function definitions are listed in the observations, so the router’s implementation details are not directly visible, but its purpose can be inferred: it maps incoming HTTP (or internal) requests to the appropriate dashboard handlers, enabling users to start, view, and manage constraint‑monitoring activities from a single UI surface.
 
 ---
 
@@ -37,7 +37,7 @@ Because no source symbols are listed, the exact language‑specific constructs (
 
 **DashboardRouter** sits at the intersection of three major system areas:
 
-1. **MCP Constraint Monitor Core** – The higher‑level `integrations/mcp-constraint-monitor/README.md` indicates that the monitor interacts with the dashboard. The router therefore must expose endpoints that the monitor’s backend can call to retrieve status, push alerts, or receive configuration changes.  
+1. **MCP Constraint Monitor Core** – The higher‑level `integrations/constraint-monitor/README.md` indicates that the monitor interacts with the dashboard. The router therefore must expose endpoints that the monitor’s backend can call to retrieve status, push alerts, or receive configuration changes.  
 2. **DashboardService** – As its parent, the router directly invokes service methods. Any change in the service API (e.g., a new method to fetch constraint violations) will require a corresponding route registration.  
 3. **External UI / Clients** – Users or automated tools will issue HTTP (or RPC) requests against the router’s endpoints. The router therefore defines the public contract of the dashboard, and its README likely enumerates the available URLs, request/response schemas, and any required authentication tokens.  
 
@@ -48,7 +48,7 @@ No explicit dependency files are listed, but the router is expected to depend on
 ## Usage Guidelines  
 
 * **Initialize via DashboardService** – Developers should never instantiate `DashboardRouter` directly; instead, obtain it through the `DashboardService` constructor or factory method to guarantee that all required dependencies (e.g., data repositories, logging) are wired correctly.  
-* **Route Registration Discipline** – When adding a new dashboard page, follow the pattern described in `integrations/mcp-constraint-monitor/dashboard/README.md`: register the path, bind it to a handler that delegates to a clearly named service method, and document the endpoint in the README. This keeps the router’s surface area predictable.  
+* **Route Registration Discipline** – When adding a new dashboard page, follow the pattern described in `integrations/constraint-monitor/dashboard/README.md`: register the path, bind it to a handler that delegates to a clearly named service method, and document the endpoint in the README. This keeps the router’s surface area predictable.  
 * **Keep Handlers Thin** – Handlers should only translate request parameters and forward them to `DashboardService`. Business logic belongs in the service layer, preserving the router’s role as a thin dispatcher.  
 * **Guard Sensitive Routes** – If the dashboard exposes operations that can alter monitoring behaviour (e.g., start/stop constraints), ensure that the router enforces authentication/authorization checks as outlined in the README.  
 * **Version the API** – Although not explicitly mentioned, the router’s public endpoints form an API. When breaking changes are required, introduce a versioned path prefix (e.g., `/v2/constraints`) to avoid disrupting existing clients.

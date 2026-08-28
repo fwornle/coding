@@ -89,7 +89,7 @@ semantic workflow run incremental-analysis --team coding
 - ✅ Deliberate, high-quality capture
 - ✅ 14-agent semantic analysis workflow
 
-**See**: [MCP Semantic Analysis Documentation](../knowledge-management/mcp-semantic-analysis.md)
+**See**: [Semantic Analysis Documentation](../knowledge-management/semantic-analysis.md)
 
 #### Why Both Systems?
 

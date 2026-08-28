@@ -465,5 +465,5 @@ curl http://localhost:8765/health
 
 - [UKB - Update Knowledge Base](./ukb-update.md)
 - [VKB - Visualize Knowledge Base](./vkb-visualize.md)
-- [MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)
+- [Semantic Analysis](../integrations/semantic-analysis.md)
 - [Knowledge Management Overview](./README.md)

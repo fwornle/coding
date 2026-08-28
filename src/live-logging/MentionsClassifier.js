@@ -212,7 +212,7 @@ async function callProxy(body) {
 /**
  * Escape a string for safe inclusion in a RegExp pattern.
  *
- * Copied verbatim from `integrations/mcp-server-semantic-analysis/src/agents/
+ * Copied verbatim from `integrations/semantic-analysis/src/agents/
  * ontology-classification-agent.ts` line 146 — same Phase 57-04 escape
  * surface so the closed-set regex behaves identically across the two
  * classifier modules.

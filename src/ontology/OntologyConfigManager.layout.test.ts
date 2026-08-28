@@ -13,7 +13,7 @@
  *   .data/ontologies/ flat layout.
  *
  * Run from the symlinked submodule:
- *   cd integrations/mcp-server-semantic-analysis && npm run build && \
+ *   cd integrations/semantic-analysis && npm run build && \
  *     node --test dist/ontology/OntologyConfigManager.layout.test.js
  *
  * The 4-level repo-root walk is REQUIRED — see ontologyPathResolver.test.ts

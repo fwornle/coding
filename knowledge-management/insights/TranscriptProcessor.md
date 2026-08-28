@@ -8,7 +8,7 @@ The TranscriptProcessor uses the TranscriptAdapter abstract base class in 'lib/a
 
 The **TranscriptProcessor** lives inside the **LiveLoggingSystem** and is the core sub‑component responsible for ingesting, validating, and normalising transcript data that originates from a variety of agent formats. Its implementation relies on the abstract base class **TranscriptAdapter** found in `lib/agent-api/TranscriptAdapter.ts` (or the equivalent file under `lib/agent-api`). By delegating the format‑specific parsing to concrete adapters that inherit from this base class, the processor can treat every incoming transcript as a uniform internal representation.  
 
-The processor is built for high‑throughput scenarios: it operates on **batches** of transcripts, which reduces per‑item overhead and enables downstream components to work with sizable chunks of data rather than a stream of single records. Configuration of its behaviour—such as batch size, validation rules, and error‑handling policies—is driven by the **ConfigurationValidator** component (implemented in the `scripts` folder via the `LSLConfigValidator` script). All operational events, warnings, and failures are emitted through the unified logging interface supplied by the **Logger** component (`integrations/mcp-server-semantic-analysis/src/logging.ts`).  
+The processor is built for high‑throughput scenarios: it operates on **batches** of transcripts, which reduces per‑item overhead and enables downstream components to work with sizable chunks of data rather than a stream of single records. Configuration of its behaviour—such as batch size, validation rules, and error‑handling policies—is driven by the **ConfigurationValidator** component (implemented in the `scripts` folder via the `LSLConfigValidator` script). All operational events, warnings, and failures are emitted through the unified logging interface supplied by the **Logger** component (`integrations/semantic-analysis/src/logging.ts`).  
 
 Together, these pieces make the TranscriptProcessor a configurable, extensible, and observable gateway for transcript data within the broader LiveLoggingSystem architecture.  
 
@@ -22,7 +22,7 @@ The design of the TranscriptProcessor follows a **modular, layered architecture*
 
 Batch handling introduces a **Batch Processing pattern**, where the processor accumulates incoming transcripts up to a configurable threshold before invoking the adapter pipeline. This reduces the frequency of I/O and validation calls, yielding better CPU cache utilisation and lower latency per transcript when the system is under heavy load.  
 
-Error handling and observability are centralised through the **Logger** component. By funneling all log statements through `integrations/mcp-server-semantic-analysis/src/logging.ts`, the system achieves a **single source of truth for logging**, making it straightforward to route logs to files, consoles, or external monitoring services.  
+Error handling and observability are centralised through the **Logger** component. By funneling all log statements through `integrations/semantic-analysis/src/logging.ts`, the system achieves a **single source of truth for logging**, making it straightforward to route logs to files, consoles, or external monitoring services.  
 
 Configuration validation is performed by the **ConfigurationValidator** sibling, which runs the `LSLConfigValidator` script from the `scripts` folder. This reflects a **validation‑before‑execution** approach: the processor refuses to start with malformed or out‑of‑range settings, preventing runtime failures and providing early feedback to developers.  
 
@@ -42,7 +42,7 @@ The primary class, **TranscriptProcessor**, orchestrates three key collaborators
    * **Validating** the resulting model against schema rules (e.g., required fields, timestamp formats).  
    Concrete subclasses (e.g., `ChromeAgentAdapter`, `CopilotAdapter`) reside in the same folder and implement these methods.
 
-2. **Logger** – Implemented in `integrations/mcp-server-semantic-analysis/src/logging.ts`. The processor obtains a logger instance (typically via dependency injection or a static accessor) and logs:
+2. **Logger** – Implemented in `integrations/semantic-analysis/src/logging.ts`. The processor obtains a logger instance (typically via dependency injection or a static accessor) and logs:
    * Batch start/end markers.
    * Validation failures per transcript.
    * Unexpected exceptions that bubble up from adapters.
@@ -87,7 +87,7 @@ No external services or databases are explicitly referenced, so integration is c
 
 3. **Respect Validation Rules** – The adapter’s `validate` method enforces schema constraints. Developers should extend these rules only when absolutely necessary, as stricter validation reduces the risk of downstream errors but may increase the number of rejected transcripts.  
 
-4. **Leverage the Unified Logger** – All diagnostic messages must be emitted through the `Logger` component (`integrations/mcp-server-semantic-analysis/src/logging.ts`). Use appropriate log levels (`info` for batch start/end, `warn` for recoverable validation issues, `error` for unexpected exceptions). This ensures consistency with other siblings and facilitates centralized monitoring.  
+4. **Leverage the Unified Logger** – All diagnostic messages must be emitted through the `Logger` component (`integrations/semantic-analysis/src/logging.ts`). Use appropriate log levels (`info` for batch start/end, `warn` for recoverable validation issues, `error` for unexpected exceptions). This ensures consistency with other siblings and facilitates centralized monitoring.  
 
 5. **Run Configuration Validation Before Deployment** – Never start the processor without first executing the `LSLConfigValidator` script. Automated CI pipelines should include this step to catch misconfigurations early.  
 
@@ -124,13 +124,13 @@ No external services or databases are explicitly referenced, so integration is c
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/mcp-server-semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component utilizes a modular architecture, with separate components for logging, transcript processing, and configuration validation. This is evident in the directory structure, where the 'integrations' folder contains subfolders for 'browser-access', 'code-graph-rag', and 'copi', each representing a distinct aspect of the system. For instance, the 'copi' subfolder contains files such as 'INSTALL.md' and 'USAGE.md', which provide installation and usage guidelines for the Copi component. The 'lib/agent-api' folder contains the TranscriptAdapter abstract base class, which is responsible for reading and converting transcripts from different agent formats. The 'scripts' folder contains the LSLConfigValidator, which is used for validating and optimizing LSL configuration. The logging module, located in 'integrations/semantic-analysis/src/logging.ts', provides a unified logging interface and is used throughout the system.
 
 ### Children
 - [TranscriptAdapter](./TranscriptAdapter.md) -- The TranscriptProcessor uses the TranscriptAdapter abstract base class in 'lib/agent-api' to read and convert transcripts from various agent formats, as indicated by the hierarchy context.
 
 ### Siblings
-- [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/mcp-server-semantic-analysis/src/logging.ts', providing a unified logging interface.
+- [Logger](./Logger.md) -- The Logger component is implemented in 'integrations/semantic-analysis/src/logging.ts', providing a unified logging interface.
 - [ConfigurationValidator](./ConfigurationValidator.md) -- The ConfigurationValidator is implemented in the 'scripts' folder, using the LSLConfigValidator script to validate and optimize configuration.
 - [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier uses a modular design, allowing for easy integration of new ontology systems and classification mechanisms.
 - [Copi](./Copi.md) -- The Copi component is implemented in the 'integrations/copi' folder, providing a GitHub Copilot CLI wrapper with logging and Tmux integration.

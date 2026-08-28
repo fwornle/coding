@@ -18,7 +18,7 @@ package "Knowledge Management" {
 }
 
 package "MCP Server Integration" {
-  component [mcp-server-semantic-analysis] <<api>>
+  component [semantic-analysis] <<api>>
 }
 
 package "Storage Layer" {
@@ -41,7 +41,7 @@ package "Export & Sync" {
 [CodingWorkflow Agent] --> [Semantic Analysis Engine] : processes
 [Semantic Analysis Engine] --> [src/knowledge-management] : uses
 [src/knowledge-management] --> [lib/ukb-unified] : leverages
-[mcp-server-semantic-analysis] --> [CodingWorkflow Agent] : integrates
+[semantic-analysis] --> [CodingWorkflow Agent] : integrates
 
 ' Storage interactions
 [Semantic Analysis Engine] --> [Graphology Engine] : stores knowledge

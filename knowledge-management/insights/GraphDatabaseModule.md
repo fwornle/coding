@@ -6,7 +6,7 @@ GraphDatabaseModule relies on the migrateGraphDatabase script in scripts/migrate
 
 ## What It Is  
 
-The **GraphDatabaseModule** lives inside the **KnowledgeManagement** component and is the primary façade for all interactions with the central knowledge graph. Its concrete implementation resides in the repository under the path **`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`**, where the **`GraphDatabaseAdapter`** class is defined. The module does not contain its own storage logic; instead, it delegates every persistence and query operation to this adapter, which in turn talks to a **Graphology**‑based graph layered on top of **LevelDB**.  
+The **GraphDatabaseModule** lives inside the **KnowledgeManagement** component and is the primary façade for all interactions with the central knowledge graph. Its concrete implementation resides in the repository under the path **`integrations/semantic-analysis/src/storage/graph-database-adapter.ts`**, where the **`GraphDatabaseAdapter`** class is defined. The module does not contain its own storage logic; instead, it delegates every persistence and query operation to this adapter, which in turn talks to a **Graphology**‑based graph layered on top of **LevelDB**.  
 
 In addition to the adapter, the module depends on a migration utility located at **`scripts/migrate-graph-db-entity-types.js`**. This script is invoked whenever the schema of the graph changes – for example, when new entity types are introduced – and it updates the live LevelDB/Graphology database to keep the stored data consistent with the current type definitions.  
 
@@ -40,7 +40,7 @@ These decisions collectively produce a modular, testable subsystem that can be e
 
 ### Core Classes and Files  
 
-* **`GraphDatabaseAdapter`** – defined in `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts`. This class implements methods for **storage** (e.g., `addNode`, `addEdge`, `removeEntity`) and **query** (e.g., `findByType`, `traverseNeighbors`). Internally it opens a LevelDB instance, wraps it with Graphology’s in‑memory graph, and registers listeners that trigger the JSON export sync on every write operation.  
+* **`GraphDatabaseAdapter`** – defined in `integrations/semantic-analysis/src/storage/graph-database-adapter.ts`. This class implements methods for **storage** (e.g., `addNode`, `addEdge`, `removeEntity`) and **query** (e.g., `findByType`, `traverseNeighbors`). Internally it opens a LevelDB instance, wraps it with Graphology’s in‑memory graph, and registers listeners that trigger the JSON export sync on every write operation.  
 
 * **`migrateGraphDatabase` script** – located at `scripts/migrate-graph-db-entity-types.js`. The script reads the current entity‑type definitions from the codebase, compares them with the live LevelDB schema, and performs incremental updates (adding new node types, renaming properties, etc.). It is invoked manually during deployment or automatically as part of CI/CD pipelines that bump the knowledge graph version.  
 
@@ -112,7 +112,7 @@ The clear separation of concerns and the single migration script simplify mainte
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the file integrations/semantic-analysis/src/storage/graph-database-adapter.ts. This adapter provides an interface for agents to interact with the central Graphology + LevelDB knowledge graph. The adapter also includes automatic JSON export sync, ensuring that the knowledge graph remains up-to-date. Furthermore, the migrateGraphDatabase script, located in scripts/migrate-graph-db-entity-types.js, is used to update entity types in the live LevelDB/Graphology database, demonstrating a clear focus on data consistency and integrity.
 
 ### Children
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseModule uses the GraphDatabaseAdapter to interact with the Graphology + LevelDB knowledge graph, as mentioned in the parent context.

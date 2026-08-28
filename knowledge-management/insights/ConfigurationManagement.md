@@ -62,7 +62,7 @@ All classes are co‑located in the same logical package, which simplifies impor
 
 ## Integration Points  
 
-* **Parent – SemanticAnalysis** – The `ConfigurationAgent` is instantiated by the SemanticAnalysis component (see the `OntologyClassificationAgent` in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`). The agent supplies the ontology system with configuration values such as the ontology definition file location, classification thresholds, and external service endpoints. This direct coupling ensures that any change in configuration instantly propagates to the analysis workflow.
+* **Parent – SemanticAnalysis** – The `ConfigurationAgent` is instantiated by the SemanticAnalysis component (see the `OntologyClassificationAgent` in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`). The agent supplies the ontology system with configuration values such as the ontology definition file location, classification thresholds, and external service endpoints. This direct coupling ensures that any change in configuration instantly propagates to the analysis workflow.
 
 * **Sibling – Pipeline** – The **Pipeline** component defines processing steps in `batch-analysis.yaml`. Although not a code dependency, the pipeline may reference configuration keys (e.g., paths to models) that are resolved through `ConfigurationProvider`. This mirrors the pipeline‑style processing seen inside ConfigurationManagement itself (load → validate → manage).
 
@@ -130,7 +130,7 @@ Potential maintenance risks stem from the centralised mutable state in `Configur
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, utilizes a configuration file to initialize the ontology system. This configuration file is crucial for the agent's functionality, as it provides the necessary information for classifying observations against the ontology. The agent's reliance on this configuration file highlights the importance of proper configuration management in the SemanticAnalysis component. Furthermore, the use of a configuration file allows for flexibility and ease of modification, as changes to the ontology system can be made by updating the configuration file without requiring modifications to the agent's code.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The OntologyClassificationAgent, located in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, utilizes a configuration file to initialize the ontology system. This configuration file is crucial for the agent's functionality, as it provides the necessary information for classifying observations against the ontology. The agent's reliance on this configuration file highlights the importance of proper configuration management in the SemanticAnalysis component. Furthermore, the use of a configuration file allows for flexibility and ease of modification, as changes to the ontology system can be made by updating the configuration file without requiring modifications to the agent's code.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- The batch processing pipeline is defined in the batch-analysis.yaml file, which declares the steps and their dependencies using the depends_on edges.

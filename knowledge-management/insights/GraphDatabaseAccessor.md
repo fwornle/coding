@@ -9,7 +9,7 @@ The GraphDatabaseAccessor works in conjunction with other sub-components, such a
 The **GraphDatabaseAccessor** is a sub‑component that lives inside the **ConstraintSystem** module of the MCP‑Server‑Semantic‑Analysis code‑base.  Its concrete implementation is tied to the storage layer found at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js
+integrations/semantic-analysis/src/storage/graph-database-adapter.js
 ```  
 
 and is referenced throughout the ConstraintSystem to provide a *unified* way of reading and writing graph‑structured data.  In practice the accessor acts as the gateway through which higher‑level modules—such as **ContentValidator**, **ViolationCaptureHandler**, and the broader **ConstraintSystem**—obtain the graph information required for content validation, rule enforcement, and violation persistence.  By abstracting the underlying storage details, the GraphDatabaseAccessor enables the system to plug‑in different graph databases without changing the business logic that consumes the data.
@@ -32,7 +32,7 @@ Because the accessor sits directly under the ConstraintSystem, all sibling modul
 
 ## Implementation Details  
 
-Although the source snapshot contains no explicit symbols for the accessor itself, the surrounding context clarifies its mechanics.  The **GraphDatabaseAdapter** (`integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js`) encapsulates the low‑level driver calls (e.g., Neo4j, JanusGraph, or an in‑memory graph).  It exposes methods such as `connect()`, `runQuery()`, and `close()`.  The **GraphDatabaseAccessor** builds on top of this adapter, offering higher‑level operations that are *graph‑centric* rather than driver‑centric:
+Although the source snapshot contains no explicit symbols for the accessor itself, the surrounding context clarifies its mechanics.  The **GraphDatabaseAdapter** (`integrations/semantic-analysis/src/storage/graph-database-adapter.js`) encapsulates the low‑level driver calls (e.g., Neo4j, JanusGraph, or an in‑memory graph).  It exposes methods such as `connect()`, `runQuery()`, and `close()`.  The **GraphDatabaseAccessor** builds on top of this adapter, offering higher‑level operations that are *graph‑centric* rather than driver‑centric:
 
 * **Unified Access Mechanism** – All graph CRUD actions funnel through a single set of accessor methods, reducing duplication and simplifying error handling.  
 * **Transaction Management** – The accessor likely begins a transaction before a series of reads/writes and commits or rolls back based on success, ensuring atomicity for constraint checks.  
@@ -46,7 +46,7 @@ The accessor is tightly coupled with the **ConstraintSystem** container, which o
 
 * **ConstraintSystem (Parent)** – The accessor is a core service registered inside the ConstraintSystem’s dependency graph.  The ConstraintSystem relies on it for any operation that needs persistent graph state, making the accessor a shared resource among all sub‑components.  
 
-* **ContentValidator (Sibling)** – When the ContentValidationAgent (found in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) validates a piece of content, it queries the graph through the accessor to resolve references, relationships, and existing constraints.  
+* **ContentValidator (Sibling)** – When the ContentValidationAgent (found in `integrations/semantic-analysis/src/agents/content-validation-agent.ts`) validates a piece of content, it queries the graph through the accessor to resolve references, relationships, and existing constraints.  
 
 * **ViolationCaptureHandler (Sibling)** – Upon detection of a rule breach, this handler uses the accessor to write a new violation node or edge, thereby updating the graph’s state for later reporting or remediation.  
 
@@ -96,10 +96,10 @@ The modular layout, clear separation via the adapter/facade, and dependency‑in
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with separate modules for different functionalities such as content validation, hook configuration, and violation capture, as seen in the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) and HookManager (lib/agent-api/hooks/hook-manager.js). This modular approach allows for easier maintenance and updates, as each module can be modified or extended without affecting the overall system. For example, the ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file. The GraphDatabaseAdapter (integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.js) is used for graph data storage and retrieval, demonstrating the system's ability to integrate with various data storage solutions.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a modular architecture, with separate modules for different functionalities such as content validation, hook configuration, and violation capture, as seen in the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) and HookManager (lib/agent-api/hooks/hook-manager.js). This modular approach allows for easier maintenance and updates, as each module can be modified or extended without affecting the overall system. For example, the ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/semantic-analysis/src/agents/content-validation-agent.ts file. The GraphDatabaseAdapter (integrations/semantic-analysis/src/storage/graph-database-adapter.js) is used for graph data storage and retrieval, demonstrating the system's ability to integrate with various data storage solutions.
 
 ### Siblings
-- [ContentValidator](./ContentValidator.md) -- ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts file.
+- [ContentValidator](./ContentValidator.md) -- ContentValidationAgent uses specific file paths and command patterns for reference extraction, which can be modified or extended in the integrations/semantic-analysis/src/agents/content-validation-agent.ts file.
 - [HookConfigurationLoader](./HookConfigurationLoader.md) -- HookManager loads and merges hook configurations from multiple sources, providing a unified hook registration and execution mechanism.
 - [ViolationCaptureHandler](./ViolationCaptureHandler.md) -- ViolationCaptureHandler captures and persists constraint violations, ensuring that the system remains accurate and up-to-date.
 - [HookManager](./HookManager.md) -- HookManager manages unified hook registration and execution, providing a critical function in the ConstraintSystem.

@@ -141,8 +141,8 @@ recoverable.
    - `vkb` - View Knowledge Base (web visualization)
 
 2. **Integration Components**
-   - MCP Semantic Analysis Server (14 agents)
-   - MCP Constraint Monitor
+   - Semantic Analysis Server (14 agents)
+   - Constraint Monitor
    - Memory Visualizer (web UI)
 
 3. **Shell Integration**
@@ -181,13 +181,13 @@ git submodule update --remote integrations/memory-visualizer
 git submodule update --init --recursive
 
 # Or initialize a specific submodule
-git submodule update --init integrations/mcp-server-semantic-analysis
+git submodule update --init integrations/semantic-analysis
 ```
 
 **Submodule Structure:**
-- `integrations/mcp-constraint-monitor` (Own repo - SSH)
+- `integrations/constraint-monitor` (Own repo - SSH)
 - `integrations/memory-visualizer` (Own repo - SSH)
-- `integrations/mcp-server-semantic-analysis` (Own repo - SSH)
+- `integrations/semantic-analysis` (Own repo - SSH)
 
 ---
 

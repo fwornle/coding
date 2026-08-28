@@ -34,7 +34,7 @@ MEMORY_VISUALIZER_REPO_SSH=""
 MEMORY_VISUALIZER_REPO_HTTPS=""
 MEMORY_VISUALIZER_DIR="$CODING_REPO/integrations/memory-visualizer"
 
-SEMANTIC_ANALYSIS_DIR="$CODING_REPO/integrations/mcp-server-semantic-analysis"
+SEMANTIC_ANALYSIS_DIR="$CODING_REPO/integrations/semantic-analysis"
 
 # Installation status tracking
 INSIDE_CN=false
@@ -282,20 +282,17 @@ confirm_system_change() {
     esac
 }
 
-# Repository URLs by network location
-# Only memory-visualizer has a CN mirror, others always use public repos
-
-# Memory Visualizer (HAS CN MIRROR)
-MEMORY_VISUALIZER_CN_SSH="git@cc-github.bmwgroup.net:frankwoernle/memory-visualizer.git"
-MEMORY_VISUALIZER_CN_HTTPS="https://cc-github.bmwgroup.net/frankwoernle/memory-visualizer.git"
-MEMORY_VISUALIZER_PUBLIC_SSH="git@github.com:fwornle/memory-visualizer.git"
-MEMORY_VISUALIZER_PUBLIC_HTTPS="https://github.com/fwornle/memory-visualizer.git"
-
-# Semantic Analysis MCP Server (HAS CN MIRROR)
-SEMANTIC_ANALYSIS_CN_SSH="git@cc-github.bmwgroup.net:frankwoernle/mcp-server-semantic-analysis.git"
-SEMANTIC_ANALYSIS_CN_HTTPS="https://cc-github.bmwgroup.net/frankwoernle/mcp-server-semantic-analysis.git"
-SEMANTIC_ANALYSIS_PUBLIC_SSH="git@github.com:fwornle/mcp-server-semantic-analysis.git"
-SEMANTIC_ANALYSIS_PUBLIC_HTTPS="https://github.com/fwornle/mcp-server-semantic-analysis.git"
+# Repository URLs
+#
+# There is no per-network repo selection any more: every submodule is cloned
+# from its public github.com URL, which `git submodule update --init` reads
+# straight out of .gitmodules. The eight MEMORY_VISUALIZER_*/SEMANTIC_ANALYSIS_*
+# {CN,PUBLIC}_{SSH,HTTPS} variables that used to live here were dead code --
+# declared, never referenced by anything in this script -- and the CN mirrors
+# they named (cc-github.bmwgroup.net/frankwoernle/...) are retired.
+#
+# Note that cc-github.bmwgroup.net still appears in scripts/detect-network.sh:
+# that is a DNS probe used as a corporate-network sentinel, unrelated to git.
 
 # Platform detection
 PLATFORM=""
@@ -1099,15 +1096,15 @@ install_semantic_analysis() {
 
     # Check for both .git directory and .git file (for submodules)
     if [[ -d "$SEMANTIC_ANALYSIS_DIR/.git" ]] || [[ -f "$SEMANTIC_ANALYSIS_DIR/.git" ]]; then
-        info "mcp-server-semantic-analysis submodule already exists, updating..."
+        info "semantic-analysis submodule already exists, updating..."
         cd "$SEMANTIC_ANALYSIS_DIR"
         if run_with_timeout 10 git pull origin main 2>/dev/null; then
-            success "mcp-server-semantic-analysis updated"
+            success "semantic-analysis updated"
         else
-            info "Could not update mcp-server-semantic-analysis (may be on specific commit)"
+            info "Could not update semantic-analysis (may be on specific commit)"
         fi
     else
-        info "Initializing mcp-server-semantic-analysis submodule..."
+        info "Initializing semantic-analysis submodule..."
         # Same reasoning as memory-visualizer above: on a machine that cannot
         # reach the private remote this is missing infra, and --ci promises to
         # downgrade that class. It stays FATAL for a real install, because a
@@ -1118,11 +1115,11 @@ install_semantic_analysis() {
         # name one: a CI runner has the git checkout but no SSH key for
         # git@github.com, while the Docker install harness builds from a tar of
         # tracked files and so has no .git at all ("not a git repository").
-        if ! git submodule update --init --recursive integrations/mcp-server-semantic-analysis; then
+        if ! git submodule update --init --recursive integrations/semantic-analysis; then
             if [[ "$CI_LITE" == "true" ]]; then
                 warning "Could not initialize the semantic-analysis submodule"
                 info "  → the semantic-analysis MCP server will be unavailable."
-                info "  → fix later with: git submodule update --init --recursive integrations/mcp-server-semantic-analysis && ./install.sh"
+                info "  → fix later with: git submodule update --init --recursive integrations/semantic-analysis && ./install.sh"
                 INSTALLATION_FAILURES+=("semantic-analysis submodule unavailable (MCP server not built)")
                 return 0
             fi
@@ -1208,23 +1205,23 @@ install_constraint_monitor() {
 
     cd "$CODING_REPO"
 
-    local constraint_monitor_dir="$CODING_REPO/integrations/mcp-constraint-monitor"
+    local constraint_monitor_dir="$CODING_REPO/integrations/constraint-monitor"
 
     # Initialize or update submodule (check for both .git directory and .git file)
     if [[ -d "$constraint_monitor_dir/.git" ]] || [[ -f "$constraint_monitor_dir/.git" ]]; then
-        info "mcp-constraint-monitor submodule already exists, updating..."
+        info "constraint-monitor submodule already exists, updating..."
         cd "$constraint_monitor_dir"
         if run_with_timeout 10 git pull origin main 2>/dev/null; then
-            success "mcp-constraint-monitor updated"
+            success "constraint-monitor updated"
         else
-            info "Could not update mcp-constraint-monitor (may be on specific commit)"
+            info "Could not update constraint-monitor (may be on specific commit)"
         fi
     else
-        info "Initializing mcp-constraint-monitor submodule..."
-        git submodule update --init --recursive integrations/mcp-constraint-monitor || {
-            warning "Failed to initialize mcp-constraint-monitor submodule"
-            info "You can manually clone: git clone https://github.com/fwornle/mcp-constraint-monitor.git integrations/mcp-constraint-monitor"
-            INSTALLATION_WARNINGS+=("mcp-constraint-monitor: Failed to initialize submodule")
+        info "Initializing constraint-monitor submodule..."
+        git submodule update --init --recursive integrations/constraint-monitor || {
+            warning "Failed to initialize constraint-monitor submodule"
+            info "You can manually clone: git clone https://github.com/fwornle/constraint-monitor.git integrations/constraint-monitor"
+            INSTALLATION_WARNINGS+=("constraint-monitor: Failed to initialize submodule")
             return 1
         }
     fi
@@ -1277,7 +1274,7 @@ install_constraint_monitor() {
         # the prebuilt binary may well be correct already.
         if [[ -d "node_modules/better-sqlite3" ]]; then
             npm rebuild better-sqlite3 >/dev/null 2>&1 \
-                || warning "mcp-constraint-monitor: failed to rebuild better-sqlite3 for the active Node version"
+                || warning "constraint-monitor: failed to rebuild better-sqlite3 for the active Node version"
         fi
 
         success "MCP Constraint Monitor with Professional Dashboard installed"
@@ -1285,7 +1282,7 @@ install_constraint_monitor() {
         info "Hooks will be configured in the main installation process"
     else
         warning "Constraint monitor package.json not found"
-        INSTALLATION_WARNINGS+=("mcp-constraint-monitor: Missing package.json")
+        INSTALLATION_WARNINGS+=("constraint-monitor: Missing package.json")
     fi
 
     cd "$CODING_REPO"
@@ -2137,9 +2134,9 @@ verify_installation() {
     fi
     
     # Check Constraint Monitor with Professional Dashboard
-    if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
+    if [[ -d "$CODING_REPO/integrations/constraint-monitor" ]]; then
         success "MCP Constraint Monitor (standalone) configured"
-        if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor/dashboard" ]]; then
+        if [[ -d "$CODING_REPO/integrations/constraint-monitor/dashboard" ]]; then
             success "Professional Dashboard (port 3030) installed"
         else
             warning "Professional Dashboard not found"
@@ -2160,7 +2157,7 @@ verify_installation() {
     fi
     
     # Check Semantic Analysis MCP server
-    if [[ -f "$CODING_REPO/integrations/mcp-server-semantic-analysis/dist/index.js" ]]; then
+    if [[ -f "$CODING_REPO/integrations/semantic-analysis/dist/index.js" ]]; then
         success "Semantic Analysis MCP server is built"
     else
         warning "Semantic Analysis MCP server not built"
@@ -4609,7 +4606,7 @@ create_project_local_settings() {
         "hooks": [
           {
             "type": "command",
-            "command": "node CODING_REPO_PLACEHOLDER/integrations/mcp-constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
+            "command": "node CODING_REPO_PLACEHOLDER/integrations/constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
           }
         ]
       }
@@ -4619,7 +4616,7 @@ create_project_local_settings() {
         "hooks": [
           {
             "type": "command",
-            "command": "node CODING_REPO_PLACEHOLDER/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+            "command": "node CODING_REPO_PLACEHOLDER/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
           }
         ]
       }
@@ -4750,7 +4747,7 @@ install_constraint_monitor_hooks() {
     success "Node.js health check passed"
 
     local settings_file="$HOME/.claude/settings.json"
-    local pre_hook_cmd="node $CODING_REPO/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+    local pre_hook_cmd="node $CODING_REPO/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
     local post_hook_cmd="node $CODING_REPO/scripts/tool-interaction-hook-wrapper.js"
     local prompt_hook_cmd="node $CODING_REPO/scripts/health-prompt-hook.js"
     local status_line_cmd="node $CODING_REPO/scripts/combined-status-line-wrapper.js"

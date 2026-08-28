@@ -33,7 +33,7 @@ activate SA
 loop codebase analysis
     SA -> SA: extractPatterns(src/knowledge-management)
     SA -> SA: extractPatterns(lib/ukb-unified)
-    SA -> SA: extractPatterns(integrations/mcp-server-semantic-analysis/src)
+    SA -> SA: extractPatterns(integrations/semantic-analysis/src)
 end
 
 SA -> KM: storePattern(NetworkAwareInstallationPattern)

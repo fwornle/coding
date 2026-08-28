@@ -16,7 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const CODING_REPO = process.env.CODING_REPO || join(__dirname, '..');
-const CONSTRAINT_DIR = join(CODING_REPO, 'integrations/mcp-constraint-monitor');
+const CONSTRAINT_DIR = join(CODING_REPO, 'integrations/constraint-monitor');
 const API_SERVER_PATH = join(CONSTRAINT_DIR, 'src/dashboard-server.js');
 const PORT = process.env.CONSTRAINT_API_PORT || 3031;
 

@@ -54,7 +54,7 @@ The component also appears to support **filtering and prioritization**.  Observa
 
 The ViolationLogger sits at the intersection of several system layers:  
 
-1. **Upstream – ConstraintManager** – When a rule defined in the constraint configuration (see `integrations/mcp-constraint-monitor/docs/constraint-configuration.md`) fails, the **ConstraintManager** creates a `ConstraintViolation` object and calls `ViolationLogger.logViolation`.  This direct method call constitutes the primary integration surface.  
+1. **Upstream – ConstraintManager** – When a rule defined in the constraint configuration (see `integrations/constraint-monitor/docs/constraint-configuration.md`) fails, the **ConstraintManager** creates a `ConstraintViolation` object and calls `ViolationLogger.logViolation`.  This direct method call constitutes the primary integration surface.  
 
 2. **Persistence – GraphDatabaseAdapter** – The logger’s repository is expected to reuse the same persistence stack as the rest of the **ConstraintSystem**.  By delegating to the `storage/graph-database-adapter.ts` module, the logger ensures that violation data lives in the same graph database that stores constraint definitions, enabling powerful cross‑entity queries (e.g., “which constraints on entity X have the most high‑severity violations?”).  
 
@@ -109,10 +109,10 @@ The clear separation between **ViolationLogger**, **ConstraintViolationHandler**
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and manage constraints in a graph database, utilizing Graphology and LevelDB for efficient data storage and retrieval. The adapter also features automatic JSON export sync, allowing for seamless data exchange between the graph database and other components. For example, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, relies on the GraphDatabaseAdapter to retrieve and validate entity content against configured rules.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes the GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and manage constraints in a graph database, utilizing Graphology and LevelDB for efficient data storage and retrieval. The adapter also features automatic JSON export sync, allowing for seamless data exchange between the graph database and other components. For example, the ContentValidationAgent, located in integrations/semantic-analysis/src/agents/content-validation-agent.ts, relies on the GraphDatabaseAdapter to retrieve and validate entity content against configured rules.
 
 ### Children
-- [ConstraintViolationHandler](./ConstraintViolationHandler.md) -- The integrations/mcp-constraint-monitor/docs/constraint-configuration.md file suggests that constraint configuration is a critical aspect of the system, implying that the ViolationLogger must handle various types of constraint violations.
+- [ConstraintViolationHandler](./ConstraintViolationHandler.md) -- The integrations/constraint-monitor/docs/constraint-configuration.md file suggests that constraint configuration is a critical aspect of the system, implying that the ViolationLogger must handle various types of constraint violations.
 
 ### Siblings
 - [ConstraintManager](./ConstraintManager.md) -- The ConstraintManager likely interacts with the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and manage constraints.

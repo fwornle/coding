@@ -2,13 +2,13 @@
 
 **Type:** Detail
 
-Integration with the broader ConstraintSystem (L1) is implied by the sub-component's placement: the dispatcher's output feeds constraint evaluation logic documented elsewhere in integrations/mcp-constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide').
+Integration with the broader ConstraintSystem (L1) is implied by the sub-component's placement: the dispatcher's output feeds constraint evaluation logic documented elsewhere in integrations/constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide').
 
 ## What It Is  
 
-**HookTypeDispatcher** is the core dispatching component that lives inside the **HookEventRouter** sub‑tree of the *mcp‑constraint‑monitor* integration. Its source resides alongside the router implementation (the exact file is not listed in the observations, but it is co‑located with the router under the `integrations/mcp-constraint-monitor/` hierarchy). The dispatcher’s sole responsibility is to examine the **hook‑type discriminator** that is embedded in the Claude‑Code hook envelope (defined in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) and to route the incoming event to the appropriate handling branch. Because the system must support *multiple distinct hook types*—each with its own payload shape and downstream constraint‑evaluation logic—HookTypeDispatcher exists as the centralized decision point that guarantees each hook is processed by the correct downstream component.
+**HookTypeDispatcher** is the core dispatching component that lives inside the **HookEventRouter** sub‑tree of the *mcp‑constraint‑monitor* integration. Its source resides alongside the router implementation (the exact file is not listed in the observations, but it is co‑located with the router under the `integrations/constraint-monitor/` hierarchy). The dispatcher’s sole responsibility is to examine the **hook‑type discriminator** that is embedded in the Claude‑Code hook envelope (defined in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) and to route the incoming event to the appropriate handling branch. Because the system must support *multiple distinct hook types*—each with its own payload shape and downstream constraint‑evaluation logic—HookTypeDispatcher exists as the centralized decision point that guarantees each hook is processed by the correct downstream component.
 
-The dispatcher’s output is fed directly into the **ConstraintSystem (L1)**, as described in the “Constraint Configuration Guide” (`integrations/mcp-constraint-monitor/docs/constraint-configuration.md`). In other words, HookTypeDispatcher translates raw hook events into the canonical form expected by the constraint‑evaluation pipeline.
+The dispatcher’s output is fed directly into the **ConstraintSystem (L1)**, as described in the “Constraint Configuration Guide” (`integrations/constraint-monitor/docs/constraint-configuration.md`). In other words, HookTypeDispatcher translates raw hook events into the canonical form expected by the constraint‑evaluation pipeline.
 
 ---
 
@@ -110,10 +110,10 @@ Although the source code was not enumerated in the observations, the design can 
 ## Hierarchy Context
 
 ### Parent
-- [HookEventRouter](./HookEventRouter.md) -- Claude Code hook data format is documented in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, defining the event envelope the router must parse for each hook type
+- [HookEventRouter](./HookEventRouter.md) -- Claude Code hook data format is documented in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, defining the event envelope the router must parse for each hook type
 
 ### Siblings
-- [HookEventEnvelopeParser](./HookEventEnvelopeParser.md) -- The event envelope schema is formally specified in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format'), which serves as the authoritative contract this parser must implement.
+- [HookEventEnvelopeParser](./HookEventEnvelopeParser.md) -- The event envelope schema is formally specified in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format'), which serves as the authoritative contract this parser must implement.
 
 
 ---

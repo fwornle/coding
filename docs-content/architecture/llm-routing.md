@@ -330,7 +330,7 @@ confusion came from the ones that *looked* authoritative and weren't:
 | `scripts/launch-agent-common.sh` | Yes — two *different* hardcoded models for the same agent |
 | `lib/experiments/agent-routing.mjs` | Yes, for experiment cells |
 | `~/.config/opencode/opencode.json` | Yes — opencode's own default |
-| `integrations/mcp-server-semantic-analysis/config/model-tiers.yaml` | **No** — dead since a merge |
+| `integrations/semantic-analysis/config/model-tiers.yaml` | **No** — dead since a merge |
 
 Five mechanisms inside `server.mjs` decided routing invisibly: a network-dependent
 `preferenceOrder`, a hardcoded `{ copilot: true }` capability map, a `CLAUDE_FAMILY` set that

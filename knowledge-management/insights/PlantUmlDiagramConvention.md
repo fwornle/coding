@@ -2,13 +2,13 @@
 
 **Type:** Detail
 
-The directory integrations/mcp-server-semantic-analysis/docs/architecture/ contains multiple dedicated Markdown files (agents.md, integration.md, tools.md) that, per the L2 description, each reference PlantUML sources — indicating a one-Markdown-per-diagram-topic pattern.
+The directory integrations/semantic-analysis/docs/architecture/ contains multiple dedicated Markdown files (agents.md, integration.md, tools.md) that, per the L2 description, each reference PlantUML sources — indicating a one-Markdown-per-diagram-topic pattern.
 
 # PlantUmlDiagramConvention
 
 ## What It Is
 
-The `PlantUmlDiagramConvention` is a project-wide documentation standard that mandates all architecture diagrams be authored and stored as `.puml` (PlantUML) source files under `docs/puml/` directories. This convention is evidenced concretely in the `integrations/mcp-server-semantic-analysis/docs/architecture/` directory, where multiple dedicated Markdown files — `agents.md`, `integration.md`, and `tools.md` — each reference PlantUML sources to render their respective diagrams. The convention establishes "diagrams as code" as the canonical approach for visual architectural documentation across the codebase.
+The `PlantUmlDiagramConvention` is a project-wide documentation standard that mandates all architecture diagrams be authored and stored as `.puml` (PlantUML) source files under `docs/puml/` directories. This convention is evidenced concretely in the `integrations/semantic-analysis/docs/architecture/` directory, where multiple dedicated Markdown files — `agents.md`, `integration.md`, and `tools.md` — each reference PlantUML sources to render their respective diagrams. The convention establishes "diagrams as code" as the canonical approach for visual architectural documentation across the codebase.
 
 As a child of `DocumentationConventions`, this convention crystallizes one specific rule within the broader family of documentation standards governing the project. While its sibling `LayeredDocsSubdirectoryStructure` defines *where* documentation lives (in named subdirectories like `architecture/`, `api/`, and `installation/`), `PlantUmlDiagramConvention` defines *how* the visual content within those documentation areas is authored and versioned.
 
@@ -22,7 +22,7 @@ The "one Markdown per diagram topic" pattern is a deliberate organizational choi
 
 ## Implementation Details
 
-Implementation of the convention is realized through a consistent directory and file layout rather than through code. The canonical evidence is the structure under `integrations/mcp-server-semantic-analysis/docs/architecture/`:
+Implementation of the convention is realized through a consistent directory and file layout rather than through code. The canonical evidence is the structure under `integrations/semantic-analysis/docs/architecture/`:
 
 - `README.md` — the architecture index document ("Architecture Documentation - MCP Server Semantic Analysis")
 - `agents.md` — topic-specific documentation referencing PlantUML sources for agent diagrams
@@ -61,10 +61,10 @@ By treating diagrams as code and maintaining the separation between source, narr
 ## Hierarchy Context
 
 ### Parent
-- [DocumentationConventions](./DocumentationConventions.md) -- All architecture diagrams are stored as .puml files under docs/puml/ directories, as evidenced by the documentation listing showing integrations/mcp-server-semantic-analysis/docs/architecture/ containing multiple .md files that reference PlantUML sources.
+- [DocumentationConventions](./DocumentationConventions.md) -- All architecture diagrams are stored as .puml files under docs/puml/ directories, as evidenced by the documentation listing showing integrations/semantic-analysis/docs/architecture/ containing multiple .md files that reference PlantUML sources.
 
 ### Siblings
-- [LayeredDocsSubdirectoryStructure](./LayeredDocsSubdirectoryStructure.md) -- The integrations/mcp-server-semantic-analysis/docs/ tree contains at least three named subdirectories — architecture/, api/, and installation/ — each with its own README.md (e.g., 'Architecture Documentation - MCP Server Semantic Analysis', 'API Reference - MCP Server Semantic Analysis', 'Installation Guide - MCP Server Semantic Analysis'), making the subdirectory purpose self-describing.
+- [LayeredDocsSubdirectoryStructure](./LayeredDocsSubdirectoryStructure.md) -- The integrations/semantic-analysis/docs/ tree contains at least three named subdirectories — architecture/, api/, and installation/ — each with its own README.md (e.g., 'Architecture Documentation - MCP Server Semantic Analysis', 'API Reference - MCP Server Semantic Analysis', 'Installation Guide - MCP Server Semantic Analysis'), making the subdirectory purpose self-describing.
 
 
 ---

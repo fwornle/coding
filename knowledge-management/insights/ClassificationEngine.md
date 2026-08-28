@@ -6,7 +6,7 @@ ClassificationEngine utilizes the OntologyClassificationAgent class in ontology-
 
 ## What It Is  
 
-The **ClassificationEngine** lives inside the *LiveLoggingSystem* code‑base and is implemented across a handful of tightly‑scoped source files. Its core logic resides in the files `classification-engine-config.ts`, `classification-models.ts`, and the runtime helpers that live alongside them (e.g., `classificationErrorHandler`, `classificationResults`). The engine’s primary responsibility is to turn raw observations and textual entities produced by the logging pipeline into structured ontology‑based classifications. It does this by delegating the heavy‑lifting to the **OntologyClassificationAgent** class, which is defined in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  
+The **ClassificationEngine** lives inside the *LiveLoggingSystem* code‑base and is implemented across a handful of tightly‑scoped source files. Its core logic resides in the files `classification-engine-config.ts`, `classification-models.ts`, and the runtime helpers that live alongside them (e.g., `classificationErrorHandler`, `classificationResults`). The engine’s primary responsibility is to turn raw observations and textual entities produced by the logging pipeline into structured ontology‑based classifications. It does this by delegating the heavy‑lifting to the **OntologyClassificationAgent** class, which is defined in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`.  
 
 In practice, the engine exposes three functional entry points that are repeatedly referenced by the surrounding modules:  
 
@@ -50,7 +50,7 @@ Interaction with sibling components is implicit but clear. The **LoggingModule**
 
 ### OntologyClassificationAgent  
 
-Implemented in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`, this agent receives the entity set from `entityRecognizer` and resolves each entity against the system’s ontology graph. It returns enriched classifications (e.g., hierarchical categories, semantic relationships) that are merged into the `classificationResults`. The agent’s isolation allows the LiveLoggingSystem to keep the ontology codebase independent of the rest of the logging pipeline.  
+Implemented in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`, this agent receives the entity set from `entityRecognizer` and resolves each entity against the system’s ontology graph. It returns enriched classifications (e.g., hierarchical categories, semantic relationships) that are merged into the `classificationResults`. The agent’s isolation allows the LiveLoggingSystem to keep the ontology codebase independent of the rest of the logging pipeline.  
 
 ---
 
@@ -116,13 +116,13 @@ Implemented in `integrations/mcp-server-semantic-analysis/src/agents/ontology-cl
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging process. For instance, the OntologyClassificationAgent class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is used for classifying observations and entities against the ontology system. This modularity allows for easier maintenance and updates to the system, as individual modules can be modified without affecting the entire system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging process. For instance, the OntologyClassificationAgent class in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts is used for classifying observations and entities against the ontology system. This modularity allows for easier maintenance and updates to the system, as individual modules can be modified without affecting the entire system.
 
 ### Children
 - [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The ClassificationEngine sub-component utilizes the OntologyClassificationAgent class for classification purposes, as mentioned in the parent context.
 
 ### Siblings
-- [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts file.
+- [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/semantic-analysis/src/modules/logging-module.ts file.
 - [TranscriptManager](./TranscriptManager.md) -- TranscriptManager utilizes the transcriptConverter function in transcript-manager.ts to convert transcripts between different formats.
 - [SessionWindowingModule](./SessionWindowingModule.md) -- SessionWindowingModule utilizes the sessionWindowManager class in session-windowing-module.ts for managing session windows.
 

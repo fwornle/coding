@@ -126,12 +126,12 @@ services:
       # with `does not provide an export named 'isProject'` after any image
       # rebuild. Mount over the inner path so both resolution targets see
       # the live host km-core (Phase 57 single-source-of-truth principle).
-      - ${CODING_REPO:-.}/lib/km-core:/coding/integrations/mcp-server-semantic-analysis/node_modules/@fwornle/km-core:ro
+      - ${CODING_REPO:-.}/lib/km-core:/coding/integrations/semantic-analysis/node_modules/@fwornle/km-core:ro
       # Config files (live-mounted to avoid staleness)
       - ${CODING_REPO:-.}/.env:/coding/.env:ro
-      - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:rw
+      - ${CODING_REPO:-.}/integrations/semantic-analysis/config:/coding/integrations/semantic-analysis/config:rw
       # Semantic analysis dist (live-mounted to avoid Docker rebuild for TS changes)
-      - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/dist:/coding/integrations/mcp-server-semantic-analysis/dist:ro
+      - ${CODING_REPO:-.}/integrations/semantic-analysis/dist:/coding/integrations/semantic-analysis/dist:ro
       # PlantUML standard styles (needed for diagram generation)
       - ${CODING_REPO:-.}/docs/puml:/coding/docs/puml:ro
       # Dashboard build (live-mounted for development)
@@ -157,7 +157,7 @@ services:
       - ${CODING_REPO:-.}/scripts/graphify-reindex.sh:/coding/scripts/graphify-reindex.sh:ro
       # Constraint monitor source (live-mounted so dashboard-server changes
       # don't require an image rebuild).
-      - ${CODING_REPO:-.}/integrations/mcp-constraint-monitor/src:/coding/integrations/mcp-constraint-monitor/src:ro
+      - ${CODING_REPO:-.}/integrations/constraint-monitor/src:/coding/integrations/constraint-monitor/src:ro
       # Canonical constraint config — single source of truth shared between
       # host hooks and the in-container dashboard. Without this, the dashboard
       # silently loaded a different (stale) constraint set than the host hooks.

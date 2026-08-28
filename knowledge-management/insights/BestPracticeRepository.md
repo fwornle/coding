@@ -16,7 +16,7 @@ Because the component is referenced only at the architectural level, its impleme
 
 ## Architecture and Design  
 
-The architectural picture of **BestPracticeRepository** can be understood only by looking at its parent, **CodingPatterns**, and the shared infrastructure that the sibling components rely on.  **CodingPatterns** employs a *graph‑based* approach for code analysis, as described in `integrations/code-graph-rag/README.md`.  The graph‑code RAG system builds a knowledge graph of code entities, and an `EntityValidator` class in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` validates those entities against an ontology.  
+The architectural picture of **BestPracticeRepository** can be understood only by looking at its parent, **CodingPatterns**, and the shared infrastructure that the sibling components rely on.  **CodingPatterns** employs a *graph‑based* approach for code analysis, as described in `integrations/code-graph-rag/README.md`.  The graph‑code RAG system builds a knowledge graph of code entities, and an `EntityValidator` class in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts` validates those entities against an ontology.  
 
 In this context, **BestPracticeRepository** is positioned as a *data source* that feeds curated best‑practice nodes into the same graph.  The repository does not introduce its own runtime behaviour; instead, it supplies static knowledge that the graph‑processing pipeline can query.  This design keeps the repository lightweight and decoupled from the processing engine, allowing the graph layer to evolve independently.  
 
@@ -51,7 +51,7 @@ Because the observations report **0 code symbols** and no explicit file paths fo
 
 2. **Copi Integration** – The `integrations/copi/README.md` file illustrates how developers can invoke Copi (a GitHub Copilot CLI wrapper) with best‑practice hints.  Although Copi itself does not import the repository, the README demonstrates a *usage contract*: developers should consult the best‑practice guidance before running Copi commands, ensuring that generated code aligns with organizational standards.
 
-3. **Ontology Validation** – The `EntityValidator` in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` validates any new code entities against the best‑practice ontology.  When a developer submits code that violates a documented practice, the validator can flag the issue, feeding back into the CI pipeline.
+3. **Ontology Validation** – The `EntityValidator` in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts` validates any new code entities against the best‑practice ontology.  When a developer submits code that violates a documented practice, the validator can flag the issue, feeding back into the CI pipeline.
 
 4. **Sibling Consumption** – Components such as **DesignPatternLibrary** and **AntiPatternIdentification** may reference the same underlying markdown artefacts to enrich their own knowledge graphs.  This shared consumption reinforces consistency across the **CodingPatterns** family.
 
@@ -88,7 +88,7 @@ Given the lack of concrete implementation code, the practical guidance for devel
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component utilizes a graph-based approach for code analysis, as seen in the integrations/code-graph-rag/README.md file, which describes the Graph-Code RAG system. This system is used for graph-based code analysis and implies the use of graph structures and algorithms within the CodingPatterns component. The entity validation is performed by the EntityValidator class in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, suggesting a structured approach to validating entities within the coding patterns. Furthermore, the batch processing pipeline is defined in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts, indicating that the CodingPatterns component may leverage batch processing for efficient handling of coding pattern analysis.
 
 ### Siblings
 - [CodeAnalysisPatterns](./CodeAnalysisPatterns.md) -- CodeAnalysisPatterns utilizes the Graph-Code RAG system described in integrations/code-graph-rag/README.md for graph-based code analysis.

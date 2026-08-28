@@ -6,7 +6,7 @@ EntityPersistenceModule may leverage the automatic JSON export sync feature prov
 
 ## What It Is  
 
-The **EntityPersistenceModule** lives inside the **KnowledgeManagement** component and is the concrete sub‑component responsible for persisting the entities and relationships that make up the system’s knowledge graph. Its implementation is anchored by the `GraphDatabaseAccessor` child component, which in turn relies on the shared **GraphDatabaseAdapter** (found at `storage/graph-database-adapter.ts`).  The module’s primary duty is to translate in‑memory representations of entities—produced by agents such as the **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`)—into durable graph structures stored via Graphology and LevelDB.  Because the adapter supplies an automatic JSON‑export sync capability, the EntityPersistenceModule can also keep a JSON snapshot of the graph up‑to‑date without additional plumbing.
+The **EntityPersistenceModule** lives inside the **KnowledgeManagement** component and is the concrete sub‑component responsible for persisting the entities and relationships that make up the system’s knowledge graph. Its implementation is anchored by the `GraphDatabaseAccessor` child component, which in turn relies on the shared **GraphDatabaseAdapter** (found at `storage/graph-database-adapter.ts`).  The module’s primary duty is to translate in‑memory representations of entities—produced by agents such as the **CodeGraphAgent** (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`)—into durable graph structures stored via Graphology and LevelDB.  Because the adapter supplies an automatic JSON‑export sync capability, the EntityPersistenceModule can also keep a JSON snapshot of the graph up‑to‑date without additional plumbing.
 
 ## Architecture and Design  
 
@@ -22,13 +22,13 @@ At its core, the EntityPersistenceModule delegates every graph operation to **Gr
 
 The **automatic JSON export sync** feature of the adapter is leveraged by the module to maintain an up‑to‑date JSON representation of the graph.  Whenever the accessor commits a mutation, the adapter triggers a background job that serializes the current graph state to JSON and writes it to a predefined location, enabling downstream tools (e.g., visualization dashboards or external analytics pipelines) to consume a lightweight snapshot without directly querying LevelDB.
 
-Configuration hooks are defined in `integrations/copi/docs/hooks.md`, allowing developers to plug in custom logging, monitoring, or tmux‑based session management around persistence events.  Similarly, constraint definitions found in `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` can be loaded by the module to enforce semantic constraints (e.g., type consistency, relationship cardinality) before committing changes, ensuring data integrity across the knowledge graph.
+Configuration hooks are defined in `integrations/copi/docs/hooks.md`, allowing developers to plug in custom logging, monitoring, or tmux‑based session management around persistence events.  Similarly, constraint definitions found in `integrations/constraint-monitor/docs/constraint-configuration.md` can be loaded by the module to enforce semantic constraints (e.g., type consistency, relationship cardinality) before committing changes, ensuring data integrity across the knowledge graph.
 
 ## Integration Points  
 
 The EntityPersistenceModule is tightly coupled with several peers:
 
-* **CodeGraphAgent** (`integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts`) – feeds code‑analysis entities and relationships into the module for storage.  
+* **CodeGraphAgent** (`integrations/semantic-analysis/src/agents/code-graph-agent.ts`) – feeds code‑analysis entities and relationships into the module for storage.  
 * **OntologyManagementSystem** – supplies classification metadata that the module persists alongside code entities, enabling inference queries.  
 * **ManualLearning** and **OnlineLearning** – both invoke the module to record manually curated knowledge or batch‑extracted insights, respectively.  
 * **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) – the foundational storage layer that the module’s accessor calls into.  
@@ -41,7 +41,7 @@ Hooks and constraint files (`hooks.md` and `constraint-configuration.md`) serve 
 
 1. **Always route graph mutations through GraphDatabaseAccessor.** Direct calls to the GraphDatabaseAdapter bypass validation hooks and constraint checks, risking data inconsistency.  
 2. **Leverage the JSON export sync** by ensuring that any bulk import or batch update triggers the accessor’s `commit` method, which in turn activates the adapter’s background serialization.  
-3. **Configure hooks and constraints early** in the project’s initialization phase.  Adding entries to `integrations/copi/docs/hooks.md` (e.g., logging before `saveEntity`) and to `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` (e.g., forbidding circular dependencies) guarantees they are applied to all subsequent persistence operations.  
+3. **Configure hooks and constraints early** in the project’s initialization phase.  Adding entries to `integrations/copi/docs/hooks.md` (e.g., logging before `saveEntity`) and to `integrations/constraint-monitor/docs/constraint-configuration.md` (e.g., forbidding circular dependencies) guarantees they are applied to all subsequent persistence operations.  
 4. **Respect the shared storage contract** with sibling components.  When extending the schema (adding new vertex or edge types), coordinate with ManualLearning, OnlineLearning, and OntologyManagementSystem to keep the graph model coherent.  
 5. **Monitor LevelDB health** via the adapter’s health‑check utilities.  Since the entire KnowledgeManagement stack depends on this storage layer, periodic verification prevents cascading failures.
 
@@ -71,7 +71,7 @@ Hooks and constraint files (`hooks.md` and `constraint-configuration.md`) serve 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component's utilization of the GraphDatabaseAdapter for persistence is a notable architectural aspect. This adapter, located in storage/graph-database-adapter.ts, enables the use of Graphology and LevelDB for storing and querying the knowledge graph. The automatic JSON export sync feature provided by this adapter simplifies the process of exporting graph data in JSON format, which can be beneficial for further analysis or integration with other components. For instance, the CodeGraphAgent, found in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, can leverage this adapter to store and retrieve code analysis results, thereby facilitating the management of entities and relationships within the knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component's utilization of the GraphDatabaseAdapter for persistence is a notable architectural aspect. This adapter, located in storage/graph-database-adapter.ts, enables the use of Graphology and LevelDB for storing and querying the knowledge graph. The automatic JSON export sync feature provided by this adapter simplifies the process of exporting graph data in JSON format, which can be beneficial for further analysis or integration with other components. For instance, the CodeGraphAgent, found in integrations/semantic-analysis/src/agents/code-graph-agent.ts, can leverage this adapter to store and retrieve code analysis results, thereby facilitating the management of entities and relationships within the knowledge graph.
 
 ### Children
 - [GraphDatabaseAccessor](./GraphDatabaseAccessor.md) -- The parent analysis suggests the existence of a GraphDatabaseAccessor, which is likely utilized by the EntityPersistenceModule.

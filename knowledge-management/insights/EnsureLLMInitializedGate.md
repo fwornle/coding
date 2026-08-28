@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The agent architecture documentation at `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` establishes that `ensureLLMInitialized()` is a lifecycle contract: all LLM-dependent methods in any subclass must call it as their first statement, making the guard a cross-cutting pre-condition rather than an inline concern.
+The agent architecture documentation at `integrations/semantic-analysis/docs/architecture/agents.md` establishes that `ensureLLMInitialized()` is a lifecycle contract: all LLM-dependent methods in any subclass must call it as their first statement, making the guard a cross-cutting pre-condition rather than an inline concern.
 
 ## What It Is  
 
 **EnsureLLMInitializedGate** is the logical “gate” that guarantees a live LLM (Large Language Model) client before any LLM‑dependent operation is executed. The gate lives in the file  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts
+integrations/semantic-analysis/src/agents/base-agent.ts
 ```  
 
 where the abstract class (or base‑agent implementation) defines the method `ensureLLMInitialized()`. This method is the *sole* sanctioned entry point for acquiring an LLM client; every concrete agent subclass is required to invoke it as the first statement of any LLM‑using routine. The gate therefore acts as a cross‑cutting lifecycle contract rather than an ad‑hoc check scattered throughout the codebase.
@@ -22,7 +22,7 @@ In the documentation hierarchy, **EnsureLLMInitializedGate** is a child of the p
 
 ## Architecture and Design  
 
-The architecture follows a **lazy‑initialisation** pattern combined with a **gatekeeper (guard) contract**. The gate is defined once in `base-agent.ts` and enforced by convention (documented in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`). This creates a *single source of truth* for LLM client acquisition, eliminating duplication across the many concrete agents that extend the base class.
+The architecture follows a **lazy‑initialisation** pattern combined with a **gatekeeper (guard) contract**. The gate is defined once in `base-agent.ts` and enforced by convention (documented in `integrations/semantic-analysis/docs/architecture/agents.md`). This creates a *single source of truth* for LLM client acquisition, eliminating duplication across the many concrete agents that extend the base class.
 
 The design also embodies an **implicit dependency‑injection seam**. By exposing a mutable internal field that holds the LLM client, tests can pre‑populate that field before invoking `ensureLLMInitialized()`. The gate then detects the presence of a ready client and skips real initialization, giving the test full control. This seam is described under the sibling **MockInjectionSeam** and provides a clean, low‑overhead way to substitute implementations without a full IoC container.
 
@@ -104,7 +104,7 @@ The gate’s centralisation yields high maintainability: any change to authentic
 ## Hierarchy Context
 
 ### Parent
-- [LazyLLMInitializationPattern](./LazyLLMInitializationPattern.md) -- base-agent.ts in integrations/mcp-server-semantic-analysis/src/agents/ is the authoritative source of the pattern, defining ensureLLMInitialized() as the single entry point for LLM client acquisition across all concrete agent subclasses
+- [LazyLLMInitializationPattern](./LazyLLMInitializationPattern.md) -- base-agent.ts in integrations/semantic-analysis/src/agents/ is the authoritative source of the pattern, defining ensureLLMInitialized() as the single entry point for LLM client acquisition across all concrete agent subclasses
 
 ### Siblings
 - [MockInjectionSeam](./MockInjectionSeam.md) -- The lazy gate in `base-agent.ts` acts as an implicit injection point: a test that pre-populates the internal LLM client field before calling `ensureLLMInitialized()` will cause the guard to skip real initialisation, giving tests full control over the client without environment credentials.

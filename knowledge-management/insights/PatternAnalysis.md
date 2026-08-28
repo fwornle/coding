@@ -70,7 +70,7 @@ The component follows clear separation of concerns, making it relatively easy to
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter, as seen in storage/graph-database-adapter.ts, to store and manage design patterns, best practices, and coding conventions. This is evident in the way it employs the storePattern method of the GraphDatabaseAdapter to save new patterns, similar to the CodeAnalysis, AntiPatterns, BestPractices, and CodingConventions components. For instance, in the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, the GraphDatabaseAdapter is used to store and retrieve validation patterns.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter, as seen in storage/graph-database-adapter.ts, to store and manage design patterns, best practices, and coding conventions. This is evident in the way it employs the storePattern method of the GraphDatabaseAdapter to save new patterns, similar to the CodeAnalysis, AntiPatterns, BestPractices, and CodingConventions components. For instance, in the ContentValidationAgent, located in integrations/semantic-analysis/src/agents/base-agent.ts, the GraphDatabaseAdapter is used to store and retrieve validation patterns.
 
 ### Siblings
 - [PatternManagement](./PatternManagement.md) -- PatternManagement uses the storePattern method of the GraphDatabaseAdapter to save new patterns, similar to the CodeAnalysis, AntiPatterns, BestPractices, and CodingConventions components.

@@ -6,7 +6,7 @@ Based on parent context, insight generation is explicitly sequenced after Ontolo
 
 ## What It Is
 
-`AgentResponseInsightConsumer` is a component within the **Insights** sub-system, which itself resides inside the SemanticAnalysis MCP server located at `integrations/mcp-server-semantic-analysis`. As documented in `docs/architecture/agents.md` and `docs/architecture/README.md`, it functions as a **downstream consumer stage** in a structured agent pipeline — specifically, the stage responsible for generating insights from already-classified agent response envelopes.
+`AgentResponseInsightConsumer` is a component within the **Insights** sub-system, which itself resides inside the SemanticAnalysis MCP server located at `integrations/semantic-analysis`. As documented in `docs/architecture/agents.md` and `docs/architecture/README.md`, it functions as a **downstream consumer stage** in a structured agent pipeline — specifically, the stage responsible for generating insights from already-classified agent response envelopes.
 
 Its position in the hierarchy is precise: it is contained within **Insights**, which is itself a stage that executes only after `OntologyClassificationAgent` has completed its work. This means `AgentResponseInsightConsumer` never operates on raw or unclassified data — by design, every envelope it processes carries both `entityType` and `ontologyClass` fields already populated.
 
@@ -30,13 +30,13 @@ The parent component **Insights** defines the execution context: insight generat
 
 The primary integration dependency is **OntologyClassificationAgent** — the upstream producer whose output envelopes are the direct input to `AgentResponseInsightConsumer`. The `entityType` and `ontologyClass` fields on the envelope are the formal contract between these two pipeline stages. Any change to how `OntologyClassificationAgent` populates those fields has direct downstream implications for this consumer.
 
-The broader integration context is the `integrations/mcp-server-semantic-analysis` server, which hosts the entire SemanticAnalysis capability including the Insights sub-system. Consumers of insight output — whether other agents, external tools, or presentation layers — interact with the results produced here, though those downstream consumers are not detailed in the current observations.
+The broader integration context is the `integrations/semantic-analysis` server, which hosts the entire SemanticAnalysis capability including the Insights sub-system. Consumers of insight output — whether other agents, external tools, or presentation layers — interact with the results produced here, though those downstream consumers are not detailed in the current observations.
 
 ## Usage Guidelines
 
 **Developers working with `AgentResponseInsightConsumer` should treat the pre-classified envelope as a prerequisite, not an assumption to validate defensively at runtime.** The pipeline architecture explicitly guarantees that envelopes arriving at this stage are classified. Designing logic that re-validates or re-classifies incoming envelopes would violate the architectural contract and duplicate work already owned by `OntologyClassificationAgent`.
 
-When extending or modifying insight generation logic, changes should be scoped to the **Insights** parent component within `integrations/mcp-server-semantic-analysis`, not pushed upstream into classification. The pipeline boundary is intentional — blurring it degrades the separation of concerns that makes each stage independently maintainable.
+When extending or modifying insight generation logic, changes should be scoped to the **Insights** parent component within `integrations/semantic-analysis`, not pushed upstream into classification. The pipeline boundary is intentional — blurring it degrades the separation of concerns that makes each stage independently maintainable.
 
 Because no code symbols are currently indexed, developers should prioritize establishing that reference baseline — identifying the concrete class definition, its input/output types, and the mechanism (queue, direct call, stream subscription) by which it receives envelopes. This will be essential for any scalability or fault-tolerance analysis, as the consumer pattern's robustness depends heavily on how envelope delivery is managed.
 

@@ -17,7 +17,7 @@ Uses multi-agent architecture: GitHistoryAgent, VibeHistoryAgent, ObservationGen
 
 ## How It Works
 
-- SemanticAnalysisWorkflowIssue is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+- SemanticAnalysisWorkflowIssue is implemented across: src/knowledge-management, lib/ukb-unified, integrations/semantic-analysis/src
 
 
 ---

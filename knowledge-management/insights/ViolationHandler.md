@@ -6,7 +6,7 @@ ViolationHandler's storeViolation() function pre-populates ontology metadata fie
 
 ## What It Is  
 
-`ViolationHandler` is a **SubComponent** that lives under the **ConstraintSystem** façade.  All interactions with it are routed through the `ConstraintSystem` component, which abstracts away the concrete validation providers.  The concrete implementation is referenced from the same code‑base that contains `ContentValidationAgent` (see `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`).  In practice, `ViolationHandler` receives validation results from the various providers that the `ConstraintSystem` façade aggregates, persists those results, and supplies them on demand to the dashboard and reporting layers.
+`ViolationHandler` is a **SubComponent** that lives under the **ConstraintSystem** façade.  All interactions with it are routed through the `ConstraintSystem` component, which abstracts away the concrete validation providers.  The concrete implementation is referenced from the same code‑base that contains `ContentValidationAgent` (see `integrations/semantic-analysis/src/agents/content-validation-agent.ts`).  In practice, `ViolationHandler` receives validation results from the various providers that the `ConstraintSystem` façade aggregates, persists those results, and supplies them on demand to the dashboard and reporting layers.
 
 The sub‑component exposes three primary public methods:
 
@@ -52,7 +52,7 @@ Both `getViolations()` and any concurrent processing in the system rely on atomi
 
 1. **ConstraintSystem façade** – All validation providers funnel their results through `ConstraintSystem`, which then forwards violations to `ViolationHandler`.  The façade shields `ViolationHandler` from provider‑specific details, allowing the sub‑component to focus solely on storage and dispatch.
 
-2. **ContentValidationAgent** – The primary caller of `storeViolation()` and `handleViolation()`.  The agent’s path (`integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) demonstrates the direct coupling: the agent validates entity content using NLP/ML algorithms and immediately reports any constraint breaches to `ViolationHandler`.
+2. **ContentValidationAgent** – The primary caller of `storeViolation()` and `handleViolation()`.  The agent’s path (`integrations/semantic-analysis/src/agents/content-validation-agent.ts`) demonstrates the direct coupling: the agent validates entity content using NLP/ML algorithms and immediately reports any constraint breaches to `ViolationHandler`.
 
 3. **Persistence layer (GraphDatabaseManager sibling)** – While `GraphDatabaseManager` persists graph entities, `ViolationHandler` persists violation records.  Both share a similar repository pattern and likely reuse common database connection utilities, ensuring consistent transaction handling across the subsystem.
 
@@ -99,7 +99,7 @@ The clear separation of concerns—facade for provider interaction, repository f
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component employs the facade pattern to enable provider-agnostic model calls, as seen in the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts). This allows the system to abstract away the underlying complexity of entity content validation, making it easier to switch between different validation providers. The ContentValidationAgent uses a combination of natural language processing and machine learning algorithms to validate entity content, and it also supports automatic refresh reports. This is particularly useful in the context of Claude Code sessions, where the system needs to validate code actions and file operations in real-time.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component employs the facade pattern to enable provider-agnostic model calls, as seen in the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts). This allows the system to abstract away the underlying complexity of entity content validation, making it easier to switch between different validation providers. The ContentValidationAgent uses a combination of natural language processing and machine learning algorithms to validate entity content, and it also supports automatic refresh reports. This is particularly useful in the context of Claude Code sessions, where the system needs to validate code actions and file operations in real-time.
 
 ### Siblings
 - [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter to perform CRUD operations on the graph database, as seen in the GraphDatabaseManager class

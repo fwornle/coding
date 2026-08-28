@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The CodeAnalyzer employs a set of predefined rules to validate code content and detect staleness in observations and insights, as seen in the integrations/mcp-server-semantic-analysis/src/agents/code-validator.ts file.
+The CodeAnalyzer employs a set of predefined rules to validate code content and detect staleness in observations and insights, as seen in the integrations/semantic-analysis/src/agents/code-validator.ts file.
 
 ## What It Is  
 
-The **CodeAnalyzer** lives inside the `integrations/mcp-server-semantic-analysis/src/agents/` directory and is realised primarily by the `code-analyzer.ts` file. It is a sub‑component of the larger **SemanticAnalysis** component and acts as the dedicated agent for extracting, validating, and serving insights about source‑code artifacts. Its responsibilities are split across several collaborating agents:  
+The **CodeAnalyzer** lives inside the `integrations/semantic-analysis/src/agents/` directory and is realised primarily by the `code-analyzer.ts` file. It is a sub‑component of the larger **SemanticAnalysis** component and acts as the dedicated agent for extracting, validating, and serving insights about source‑code artifacts. Its responsibilities are split across several collaborating agents:  
 
 * **Parsing** – `code-analyzer.ts` delegates the raw‑text to a **CodeParser** (its child component) to produce an abstract syntax representation.  
 * **Validation** – `code-validator.ts` houses a collection of predefined rules that flag syntactic or semantic problems and detect stale observations.  
@@ -110,19 +110,19 @@ Overall, the **CodeAnalyzer** demonstrates a disciplined, agent‑centric design
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component employs a multi-agent architecture, utilizing agents such as the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as code analysis, ontology classification, and insight generation. The OntologyClassificationAgent, for instance, is implemented in the file integrations/semantic-analysis/src/agents/ontology-classification-agent.ts and is responsible for classifying observations against the ontology system. This agent-based approach allows for a modular and scalable design, enabling the component to handle large-scale codebases and provide meaningful insights.
 
 ### Children
 - [CodeParser](./CodeParser.md) -- The CodeAnalyzer utilizes a parsing mechanism to extract insights from code files, as seen in the parent context.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis steps, each step declaring explicit depends_on edges, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file.
-- [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
-- [Insights](./Insights.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
-- [OntologyManager](./OntologyManager.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-manager.ts file.
-- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts file.
-- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
-- [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/mcp-server-semantic-analysis/src/agents/entity-validator.ts file.
+- [Pipeline](./Pipeline.md) -- The Pipeline coordinator uses a DAG-based execution model with topological sort in batch-analysis steps, each step declaring explicit depends_on edges, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file.
+- [Ontology](./Ontology.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/semantic-analysis/src/agents/ontology-manager.ts file.
+- [Insights](./Insights.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/semantic-analysis/src/agents/insight-generator.ts file.
+- [OntologyManager](./OntologyManager.md) -- The OntologyManager uses a hierarchical structure to organize the ontology system, with upper and lower ontology definitions, as seen in the integrations/semantic-analysis/src/agents/ontology-manager.ts file.
+- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator utilizes the CodeAnalyzer to extract meaningful insights from code files and git history, as referenced in the integrations/semantic-analysis/src/agents/insight-generator.ts file.
+- [KnowledgeGraphConstructor](./KnowledgeGraphConstructor.md) -- The KnowledgeGraphConstructor utilizes Memgraph to store and manage the knowledge graph, as implemented in the integrations/semantic-analysis/src/agents/knowledge-graph-constructor.ts file.
+- [EntityValidator](./EntityValidator.md) -- The EntityValidator utilizes a set of predefined rules to validate entity content, as implemented in the integrations/semantic-analysis/src/agents/entity-validator.ts file.
 - [CodeGraphRAG](./CodeGraphRAG.md) -- The CodeGraphRAG utilizes a graph database to store and manage the code graph, as implemented in the integrations/code-graph-rag/README.md file.
 
 ---

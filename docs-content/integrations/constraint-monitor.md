@@ -8,7 +8,7 @@ Real-time code quality enforcement via MCP and PreToolUse hooks.
 
 | Property | Value |
 |----------|-------|
-| Component | `mcp-constraint-monitor` |
+| Component | `constraint-monitor` |
 | Type | MCP Server + Hooks |
 | Port (Docker) | 3849 (SSE), 3030 (Dashboard), 3031 (API) |
 | Dashboard | http://localhost:3030 (Next.js, runs in Docker) |
@@ -82,7 +82,7 @@ The constraint monitor uses **PreToolUse hooks** to intercept tool calls before 
 
 ## Configuration
 
-**Constraints File**: `integrations/mcp-constraint-monitor/constraints.yaml`
+**Constraints File**: `integrations/constraint-monitor/constraints.yaml`
 
 ```yaml
 - id: no-hardcoded-secrets
@@ -148,7 +148,7 @@ Score clamped between 0 and 10.
 ### Automated
 
 ```bash
-cd integrations/mcp-constraint-monitor
+cd integrations/constraint-monitor
 node test-all-constraints-comprehensive.js
 ```
 

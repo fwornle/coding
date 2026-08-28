@@ -9,4 +9,4 @@
 - The integrations/copi/docs/STATUS-LINE-QUICK-REFERENCE.md may provide insight into the status line integration with the BrowserAccessService.
 - The service may use the LOCAL_CDP_URL environment variable to interact with the local CDP service.
 - The BrowserAccessService may be used in conjunction with the SemanticAnalysisService to provide insights and understanding of the data being analyzed.
-- The integrations/mcp-constraint-monitor/README.md may provide information on how to use the BrowserAccessService with the MCP Constraint Monitor.
+- The integrations/constraint-monitor/README.md may provide information on how to use the BrowserAccessService with the MCP Constraint Monitor.

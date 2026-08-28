@@ -15,11 +15,11 @@ MCP Agent Development with 15 occurrences
 Analysis of 762 commits.
 
 ### Architectural Decisions
-- Refactoring: fix: update mcp-constraint-monitor for MCP stdio stability
-- Refactoring: fix: update mcp-constraint-monitor for MCP stdio stability
+- Refactoring: fix: update constraint-monitor for MCP stdio stability
+- Refactoring: fix: update constraint-monitor for MCP stdio stability
 - Refactoring: fix: update semantic-analysis MCP submodule for stdin/stdout stability
 - Refactoring: fix: update MCP server submodules for stdio stability
-- Refactoring: chore: update mcp-server-semantic-analysis submodule
+- Refactoring: chore: update semantic-analysis submodule
 
 ## Conversation Insights
 Analysis of 815 development sessions.

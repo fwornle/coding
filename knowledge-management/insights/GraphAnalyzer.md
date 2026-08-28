@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-The CodeGraphAnalyzer sub-component uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
+The CodeGraphAnalyzer sub-component uses the semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
 
 ## What It Is  
 
@@ -55,11 +55,11 @@ There are no sibling components mentioned, but the overall system may include ot
 
 ## Usage Guidelines  
 
-1. **Ensure the service is running** – Before using GraphAnalyzer, start the Docker composition defined at `integrations/code-graph-rag/docker-compose.yaml`.  Verify that the container `mcp-server-semantic-analysis` is healthy and listening on the expected port.  
+1. **Ensure the service is running** – Before using GraphAnalyzer, start the Docker composition defined at `integrations/code-graph-rag/docker-compose.yaml`.  Verify that the container `semantic-analysis` is healthy and listening on the expected port.  
 2. **Configure the endpoint** – Populate the environment variable (e.g., `SEMANTIC_ANALYSIS_URL`) or configuration key that GraphAnalyzer reads.  Keeping this configurable allows the service to be relocated without code changes.  
 3. **Respect payload limits** – The remote service may impose size or rate limits.  Chunk large codebases into smaller requests or implement client‑side throttling to avoid HTTP 429 responses.  
 4. **Handle failures gracefully** – Wrap GraphAnalyzer calls in try/catch blocks, log the error, and consider retrying with exponential back‑off.  Because the analysis runs in a separate container, transient network glitches are possible.  
-5. **Version compatibility** – If the `mcp-server-semantic-analysis` container is upgraded, confirm that the request/response schema has not changed.  Align the GraphAnalyzer client version with the service version to prevent breaking changes.
+5. **Version compatibility** – If the `semantic-analysis` container is upgraded, confirm that the request/response schema has not changed.  Align the GraphAnalyzer client version with the service version to prevent breaking changes.
 
 ---
 
@@ -67,14 +67,14 @@ There are no sibling components mentioned, but the overall system may include ot
 
 1. **Architectural patterns identified** – Service‑oriented architecture with container‑based decoupling; infrastructure‑as‑code via Docker‑Compose; thin client wrapper pattern.  
 2. **Design decisions and trade‑offs** – Off‑loading heavy semantic analysis to an external service improves modularity and keeps the main codebase lightweight, at the cost of added network latency and the need for reliable service orchestration.  
-3. **System structure insights** – GraphAnalyzer is a child of CodeGraphAnalyzer, acting as a façade to the `mcp-server-semantic-analysis` service; the service is defined centrally in `integrations/code-graph-rag/docker-compose.yaml`.  
+3. **System structure insights** – GraphAnalyzer is a child of CodeGraphAnalyzer, acting as a façade to the `semantic-analysis` service; the service is defined centrally in `integrations/code-graph-rag/docker-compose.yaml`.  
 4. **Scalability considerations** – The Docker‑Compose service can be horizontally scaled (multiple container instances) and potentially moved to a more robust orchestrator; GraphAnalyzer’s stateless nature makes it easy to run in parallel across multiple callers.  
 5. **Maintainability assessment** – Clear separation of concerns aids maintainability; however, the lack of visible source code for GraphAnalyzer limits deep static analysis.  Maintaining alignment between client expectations and service API contracts will be the primary maintenance burden.
 
 ## Hierarchy Context
 
 ### Parent
-- [CodeGraphAnalyzer](./CodeGraphAnalyzer.md) -- CodeGraphAnalyzer uses the mcp-server-semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
+- [CodeGraphAnalyzer](./CodeGraphAnalyzer.md) -- CodeGraphAnalyzer uses the semantic-analysis service defined in integrations/code-graph-rag/docker-compose.yaml to analyze code graphs
 
 ---
 

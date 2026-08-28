@@ -10,7 +10,7 @@ The ServiceStartupPattern is designed to work with the DeferredDependencyPattern
 
 The `ServiceStartupPattern` is a SubComponent codified primarily in `lib/service-starter.js`, which serves as the canonical module for spinning up services in this codebase. It is one of several formal coding patterns grouped under the parent `CodingPatterns` collection, and it exists to standardize how child processes and dependent services are launched, retried on failure, and tracked for ownership. Rather than allowing each consumer to implement ad-hoc startup-and-retry logic, the pattern consolidates this behavior into two exported abstractions: `startServiceWithRetry()` and `registerService()`.
 
-The pattern decomposes into two child sub-elements: `StartServiceWithRetry`, which represents the wrapping function itself and enforces a consistent retry contract at the module boundary, and `RetryLogic`, which captures the fact that retry semantics are treated as a first-class responsibility of this module rather than a cross-cutting concern delegated to callers or to a higher orchestration layer. Working examples and adoption guidance for the pattern are documented in `integrations/mcp-constraint-monitor/README.md`.
+The pattern decomposes into two child sub-elements: `StartServiceWithRetry`, which represents the wrapping function itself and enforces a consistent retry contract at the module boundary, and `RetryLogic`, which captures the fact that retry semantics are treated as a first-class responsibility of this module rather than a cross-cutting concern delegated to callers or to a higher orchestration layer. Working examples and adoption guidance for the pattern are documented in `integrations/constraint-monitor/README.md`.
 
 ![ServiceStartupPattern — Architecture](images/service-startup-pattern-architecture.png)
 
@@ -36,9 +36,9 @@ The child element `StartServiceWithRetry` represents the single exported abstrac
 
 The clearest integration point is with `DeferredDependencyPattern`. In `lib/ukb-unified/core/VkbApiClient.js`, the `VkbApiClient` module is loaded dynamically via `dynamic-import`, and `ServiceStartupPattern` is the natural counterpart that handles the eventual startup of the deferred resource. The combination allows the system to defer both the loading and the activation of dependencies, with retries absorbing transient timing issues that deferred resolution can introduce.
 
-A second integration is with `ClosedVocabularyPattern`. The migration scripts referenced under `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` enforce fixed canonical type sets, and `startServiceWithRetry()` is used in conjunction with this pattern to prevent vocabulary drift — ensuring that the services responsible for vocabulary enforcement come online reliably so that no consumer ends up operating against an unconstrained or partially-initialized vocabulary surface.
+A second integration is with `ClosedVocabularyPattern`. The migration scripts referenced under `integrations/constraint-monitor/docs/constraint-configuration.md` enforce fixed canonical type sets, and `startServiceWithRetry()` is used in conjunction with this pattern to prevent vocabulary drift — ensuring that the services responsible for vocabulary enforcement come online reliably so that no consumer ends up operating against an unconstrained or partially-initialized vocabulary surface.
 
-The pattern is documented and exemplified in `integrations/mcp-constraint-monitor/README.md`, which acts as the reference site for new adopters. Through `registerService()`, the pattern also implicitly integrates with whatever process-supervision context owns the lifecycle of the Node.js parent — child cleanup depends on the ownership records that `registerService()` maintains.
+The pattern is documented and exemplified in `integrations/constraint-monitor/README.md`, which acts as the reference site for new adopters. Through `registerService()`, the pattern also implicitly integrates with whatever process-supervision context owns the lifecycle of the Node.js parent — child cleanup depends on the ownership records that `registerService()` maintains.
 
 ## Usage Guidelines
 
@@ -46,7 +46,7 @@ Developers should always call `startServiceWithRetry()` from `lib/service-starte
 
 When introducing a new service that has dependencies which may not be available at module-load time, combine `ServiceStartupPattern` with `DeferredDependencyPattern` following the `lib/ukb-unified/core/VkbApiClient.js` template. The retry wrapper is specifically designed to tolerate the kinds of transient unavailability that deferred loading introduces. Similarly, any service that participates in a closed vocabulary regime should be started via `startServiceWithRetry()` so that downstream `ClosedVocabularyPattern` enforcement is not undermined by a service that failed to come up on the first attempt.
 
-For new code, consult `integrations/mcp-constraint-monitor/README.md` for canonical usage examples before introducing local startup logic. As with the singleton guard idiom that the parent `CodingPatterns` collection codifies elsewhere, the value of `ServiceStartupPattern` comes from uniform adoption — every consumer that goes through the centralized abstractions reinforces the guarantees (reliable startup, owned cleanup, consistent retry behavior) that the pattern was designed to provide, and every consumer that bypasses them weakens those guarantees system-wide.
+For new code, consult `integrations/constraint-monitor/README.md` for canonical usage examples before introducing local startup logic. As with the singleton guard idiom that the parent `CodingPatterns` collection codifies elsewhere, the value of `ServiceStartupPattern` comes from uniform adoption — every consumer that goes through the centralized abstractions reinforces the guarantees (reliable startup, owned cleanup, consistent retry behavior) that the pattern was designed to provide, and every consumer that bypasses them weakens those guarantees system-wide.
 
 ---
 
@@ -56,7 +56,7 @@ For new code, consult `integrations/mcp-constraint-monitor/README.md` for canoni
 2. **Design decisions and trade-offs**: Retry logic is deliberately a first-class module responsibility rather than a caller concern, trading caller flexibility for system-wide consistency. Ownership tracking is coupled to startup, ensuring no spawned process escapes lifecycle management — at the cost of requiring callers to use the paired API correctly.
 3. **System structure insights**: The pattern sits at the infrastructure tier of `CodingPatterns`, complementing `AgentLifecyclePattern` (single-agent state) and explicitly composing with `DeferredDependencyPattern` and `ClosedVocabularyPattern`.
 4. **Scalability considerations**: Centralized retry logic scales adoption across many consumers without re-implementation; ownership tracking prevents orphaned-process accumulation as the number of services grows.
-5. **Maintainability assessment**: Strong — the pattern's two responsibilities are localized in `lib/service-starter.js`, documented in `integrations/mcp-constraint-monitor/README.md`, and decomposed into clearly-named child elements (`StartServiceWithRetry`, `RetryLogic`) that make the contract discoverable to new developers.
+5. **Maintainability assessment**: Strong — the pattern's two responsibilities are localized in `lib/service-starter.js`, documented in `integrations/constraint-monitor/README.md`, and decomposed into clearly-named child elements (`StartServiceWithRetry`, `RetryLogic`) that make the contract discoverable to new developers.
 
 
 ## Hierarchy Context
@@ -70,12 +70,12 @@ For new code, consult `integrations/mcp-constraint-monitor/README.md` for canoni
 
 ### Siblings
 - [AgentLifecyclePattern](./AgentLifecyclePattern.md) -- The BaseAgent class in base-agent.ts defines the lifecycle methods init(), start(), stop(), pause(), and resume()
-- [ClosedVocabularyPattern](./ClosedVocabularyPattern.md) -- The migration scripts in integrations/mcp-constraint-monitor/docs/constraint-configuration.md enforce fixed canonical type sets
+- [ClosedVocabularyPattern](./ClosedVocabularyPattern.md) -- The migration scripts in integrations/constraint-monitor/docs/constraint-configuration.md enforce fixed canonical type sets
 - [StructuredEventEnvelopePattern](./StructuredEventEnvelopePattern.md) -- The CLAUDE-CODE-HOOK-FORMAT.md document specifies the structured event envelope format
 - [DeferredDependencyPattern](./DeferredDependencyPattern.md) -- The VkbApiClient module in lib/ukb-unified/core/VkbApiClient.js is loaded dynamically using dynamic-import
 - [DiagramAsDocumentation](./DiagramAsDocumentation.md) -- The PlantUML diagrams in docs/puml/ capture architectural decisions and provide visual specification
-- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/mcp-constraint-monitor/README.md monitors and enforces constraints
-- [MCPServerSemanticAnalysis](./MCPServerSemanticAnalysis.md) -- The MCPServerSemanticAnalysis module in integrations/mcp-server-semantic-analysis/README.md performs semantic analysis
+- [MCPConstraintMonitor](./MCPConstraintMonitor.md) -- The MCPConstraintMonitor module in integrations/constraint-monitor/README.md monitors and enforces constraints
+- [MCPServerSemanticAnalysis](./MCPServerSemanticAnalysis.md) -- The MCPServerSemanticAnalysis module in integrations/semantic-analysis/README.md performs semantic analysis
 
 
 ---

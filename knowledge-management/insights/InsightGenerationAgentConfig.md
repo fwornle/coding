@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The InsightGenerationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies, indicating a modular design approach.
+The InsightGenerationAgent utilizes a configuration file in integrations/semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies, indicating a modular design approach.
 
 ## What It Is  
 
 The **InsightGenerationAgentConfig** is the configuration artifact that drives the behavior of the *InsightGenerationAgent* used within the **Insights** domain. It lives in the source tree at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts
+integrations/semantic-analysis/src/agents/insight-generation-agent.ts
 ```  
 
 This TypeScript file holds the settings that the agent reads at runtime – things such as which data sources to query, processing parameters to apply, and thresholds that trigger notifications. Because the configuration is external to the agent’s core logic, the agent can be tuned or re‑wired simply by editing this file, without touching the implementation of the agent itself. The **Insights** component lists *InsightGenerationAgentConfig* as one of its child entities, indicating that the configuration is a first‑class part of the overall insights‑generation pipeline.
@@ -20,7 +20,7 @@ This TypeScript file holds the settings that the agent reads at runtime – thin
 
 The observations point to a **configuration‑driven modular architecture**. By separating the agent’s operational parameters into a dedicated file, the system follows a **loosely‑coupled** design: the agent code depends on a well‑defined contract (the shape of the config object) but not on the concrete values. This separation enables independent evolution of the configuration and the agent logic.  
 
-The path `integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts` suggests that the agent resides in an *integrations* layer, likely acting as a bridge between raw semantic data and the higher‑level Insights domain. The fact that the configuration resides next to the agent implementation (same directory) reinforces a **co‑location** pattern for related concerns, making it easy for developers to locate and modify the settings that affect the agent.  
+The path `integrations/semantic-analysis/src/agents/insight-generation-agent.ts` suggests that the agent resides in an *integrations* layer, likely acting as a bridge between raw semantic data and the higher‑level Insights domain. The fact that the configuration resides next to the agent implementation (same directory) reinforces a **co‑location** pattern for related concerns, making it easy for developers to locate and modify the settings that affect the agent.  
 
 No other design patterns (e.g., event‑driven, micro‑service) are mentioned, so the only concrete pattern we can assert is the **configuration‑as‑code** approach that underpins the modularity and extensibility of the InsightGenerationAgent.
 
@@ -30,7 +30,7 @@ No other design patterns (e.g., event‑driven, micro‑service) are mentioned, 
 
 The implementation hinges on a single TypeScript file:  
 
-* **`integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts`**  
+* **`integrations/semantic-analysis/src/agents/insight-generation-agent.ts`**  
 
 Within this file, the *InsightGenerationAgent* likely imports a configuration object (or reads a JSON/YAML representation) that defines:
 
@@ -74,7 +74,7 @@ Because no concrete symbols were listed, we can infer that the file exports a co
 |--------|---------------------------|
 | **Architectural pattern** | Configuration‑as‑code, modular, loosely‑coupled |
 | **Design decision** | Separate config file to enable runtime tuning without code changes |
-| **System structure** | Agent lives in `integrations/mcp-server-semantic-analysis/src/agents/`; config is co‑located; parent is **Insights** |
+| **System structure** | Agent lives in `integrations/semantic-analysis/src/agents/`; config is co‑located; parent is **Insights** |
 | **Scalability** | Adding new data sources or thresholds is a matter of extending the config, not refactoring agent logic |
 | **Maintainability** | High, due to clear separation of concerns; changes are localized to the config file, reducing regression risk |
 
@@ -83,7 +83,7 @@ All statements above are directly grounded in the supplied observations; no unsu
 ## Hierarchy Context
 
 ### Parent
-- [Insights](./Insights.md) -- The InsightGenerationAgent utilizes a configuration file in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies.
+- [Insights](./Insights.md) -- The InsightGenerationAgent utilizes a configuration file in integrations/semantic-analysis/src/agents/insight-generation-agent.ts to define its behavior and dependencies.
 
 ---
 

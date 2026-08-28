@@ -2,17 +2,17 @@
 
 **Type:** Detail
 
-The integrations/mcp-constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide') elaborates the schema for specifying per-project constraint rules, indicating the loader must understand both file locations and how their fields combine or supersede each other.
+The integrations/constraint-monitor/docs/constraint-configuration.md ('Constraint Configuration Guide') elaborates the schema for specifying per-project constraint rules, indicating the loader must understand both file locations and how their fields combine or supersede each other.
 
 ## What It Is  
 
 **UserProjectPrecedenceMergeStrategy** is the concrete merge‑engine that powers the two‑level hook‑configuration model used by the *MCP Constraint Monitor* integration. The strategy lives inside the **HookConfigurationLoader** component (the loader that reads and materialises hook definitions) and is described in the documentation under  
 
-* `integrations/mcp-constraint-monitor/README.md` – explains that a *user‑level* `hooks.json` provides a global baseline, while a *project‑level* `hooks.json` may override or extend those settings.  
+* `integrations/constraint-monitor/README.md` – explains that a *user‑level* `hooks.json` provides a global baseline, while a *project‑level* `hooks.json` may override or extend those settings.  
 
-* `integrations/mcp-constraint-monitor/docs/constraint-configuration.md` – details the schema for per‑project constraint rules and clarifies how the loader must combine the two files.  
+* `integrations/constraint-monitor/docs/constraint-configuration.md` – details the schema for per‑project constraint rules and clarifies how the loader must combine the two files.  
 
-In practice, a developer adds a new project by supplying only the delta rules in a project‑specific `hooks.json`; the **UserProjectPrecedenceMergeStrategy** merges those delta rules with the global defaults, guaranteeing that *project‑level* entries win wherever a conflict exists. The sibling component **ClaudeCodeHookDataFormat** (documented in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) defines the shape of the hook payloads that the loader ultimately produces.
+In practice, a developer adds a new project by supplying only the delta rules in a project‑specific `hooks.json`; the **UserProjectPrecedenceMergeStrategy** merges those delta rules with the global defaults, guaranteeing that *project‑level* entries win wherever a conflict exists. The sibling component **ClaudeCodeHookDataFormat** (documented in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`) defines the shape of the hook payloads that the loader ultimately produces.
 
 ---
 
@@ -113,10 +113,10 @@ Because the strategy is encapsulated inside the loader, callers of **HookConfigu
 ## Hierarchy Context
 
 ### Parent
-- [HookConfigurationLoader](./HookConfigurationLoader.md) -- The two-level configuration model (user-level and project-level hooks.json) is documented in integrations/mcp-constraint-monitor/README.md, establishing a clear precedence/merge strategy between global and per-project rules
+- [HookConfigurationLoader](./HookConfigurationLoader.md) -- The two-level configuration model (user-level and project-level hooks.json) is documented in integrations/constraint-monitor/README.md, establishing a clear precedence/merge strategy between global and per-project rules
 
 ### Siblings
-- [ClaudeCodeHookDataFormat](./ClaudeCodeHookDataFormat.md) -- The format is fully documented in integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format'), making it the authoritative schema reference the loader uses to interpret incoming hook payloads.
+- [ClaudeCodeHookDataFormat](./ClaudeCodeHookDataFormat.md) -- The format is fully documented in integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md ('Claude Code Hook Data Format'), making it the authoritative schema reference the loader uses to interpret incoming hook payloads.
 
 
 ---

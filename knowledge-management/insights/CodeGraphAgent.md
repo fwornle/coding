@@ -2,14 +2,14 @@
 
 **Type:** Detail
 
-The CodeGraphAgent is mentioned in the context of integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts, indicating its role in code analysis.
+The CodeGraphAgent is mentioned in the context of integrations/semantic-analysis/src/agents/code-graph-agent.ts, indicating its role in code analysis.
 
 ## What It Is  
 
 The **CodeGraphAgent** lives in the source tree at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts
+integrations/semantic-analysis/src/agents/code-graph-agent.ts
 ```  
 
 and is the concrete implementation that performs code‑graph analysis for the broader **OnlineLearning** capability.  In the surrounding documentation the agent is repeatedly referenced together with two environment variables – `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` – which indicate that the agent either exposes or consumes a service that follows a Retrieval‑Augmented Generation (RAG) pattern.  Within the **OnlineLearning** hierarchy the agent is listed as a child component, meaning that the learning pipelines can call into it to transform raw repository contents into structured knowledge entities (e.g., symbols, dependencies, call graphs).  
@@ -65,7 +65,7 @@ Because no additional symbols were discovered, the above implementation details 
 
 3. **Configuration Layer** – The two port variables are injected via the environment, meaning that deployment scripts (Docker Compose, Kubernetes manifests, or CI pipelines) must set them consistently.  Changing a port value requires a restart of the CodeGraphAgent process, but the rest of the system can remain untouched as long as the contract is honored.
 
-4. **Potential Sibling Agents** – While not enumerated, any other agents under `integrations/mcp-server-semantic-analysis/src/agents/` would share the same server bootstrap logic and could be co‑hosted on the same process, reusing the port configuration pattern.
+4. **Potential Sibling Agents** – While not enumerated, any other agents under `integrations/semantic-analysis/src/agents/` would share the same server bootstrap logic and could be co‑hosted on the same process, reusing the port configuration pattern.
 
 ---
 
@@ -112,7 +112,7 @@ The agent’s **clear separation of concerns** (analysis logic vs. transport lay
 ## Hierarchy Context
 
 ### Parent
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the CodeAnalysisAgent in integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts to analyze code repositories and extract insights
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the CodeAnalysisAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts to analyze code repositories and extract insights
 
 ---
 

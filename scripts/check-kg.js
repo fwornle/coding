@@ -1,4 +1,4 @@
-const { GraphDatabaseAdapter } = require("/coding/integrations/mcp-server-semantic-analysis/dist/storage/graph-database-adapter.js");
+const { GraphDatabaseAdapter } = require("/coding/integrations/semantic-analysis/dist/storage/graph-database-adapter.js");
 (async () => {
   const gda = new GraphDatabaseAdapter();
   await gda.initialize();

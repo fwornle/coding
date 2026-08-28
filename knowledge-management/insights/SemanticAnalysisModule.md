@@ -2,14 +2,14 @@
 
 **Type:** SubComponent
 
-The SemanticAnalysisModule utilizes the integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documentation to provide a guide for semantic constraint detection.
+The SemanticAnalysisModule utilizes the integrations/constraint-monitor/docs/semantic-constraint-detection.md documentation to provide a guide for semantic constraint detection.
 
 ## What It Is  
 
-The **SemanticAnalysisModule** is a sub‑component that lives inside the **ConstraintSystem**.  Its primary source files are the documentation assets under `integrations/mcp-constraint-monitor/`, most notably  
+The **SemanticAnalysisModule** is a sub‑component that lives inside the **ConstraintSystem**.  Its primary source files are the documentation assets under `integrations/constraint-monitor/`, most notably  
 
-* `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` – the detailed guide that drives the semantic‑constraint detection logic, and  
-* `integrations/mcp-constraint-monitor/README.md` – the overview that describes the module’s purpose and high‑level operation.  
+* `integrations/constraint-monitor/docs/semantic-constraint-detection.md` – the detailed guide that drives the semantic‑constraint detection logic, and  
+* `integrations/constraint-monitor/README.md` – the overview that describes the module’s purpose and high‑level operation.  
 
 The module’s responsibility is to **analyze code actions and file‑operation events**, extract semantic meaning, and surface insights or recommendations that downstream components (e.g., the **ViolationCaptureModule** or **ContentValidationModule**) can act upon.  It does this by orchestrating a directed‑acyclic‑graph (DAG) of analysis steps defined in `batch-analysis.yaml`, which are executed in topological order.
 
@@ -27,7 +27,7 @@ Another design element is the **shared ontology metadata field**.  The module wr
 
 ## Implementation Details  
 
-* **Documentation‑driven logic** – The heart of the detection algorithm is described in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`.  The module reads this spec at build or runtime to configure the set of semantic constraints it must enforce.  Because the observations list *no source code symbols*, the implementation likely relies on a configuration‑driven engine rather than hard‑coded rule classes.  
+* **Documentation‑driven logic** – The heart of the detection algorithm is described in `integrations/constraint-monitor/docs/semantic-constraint-detection.md`.  The module reads this spec at build or runtime to configure the set of semantic constraints it must enforce.  Because the observations list *no source code symbols*, the implementation likely relies on a configuration‑driven engine rather than hard‑coded rule classes.  
 
 * **DAG orchestration** – The `batch-analysis.yaml` file enumerates steps such as “collect‑code‑actions”, “resolve‑file‑paths”, “apply‑semantic‑rules”, and “emit‑recommendations”.  Each step lists its dependencies, enabling the runtime to construct a DAG.  A topological sort algorithm then produces an execution plan that respects those dependencies while exposing opportunities for concurrency.  
 
@@ -35,7 +35,7 @@ Another design element is the **shared ontology metadata field**.  The module wr
 
 * **Child component – SemanticConstraintDetector** – This detector is responsible for the concrete rule evaluation defined in the documentation.  It likely implements a simple pipeline: ingest the normalized code‑action payload, match against the constraint definitions, and emit any violations or suggestions.  Because the parent module already handles DAG scheduling and metadata persistence, the detector can stay focused on rule logic.  
 
-* **Interaction with siblings** – The **ContentValidationModule** (via its `ContentValidationAgent` in `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) consumes the ontology metadata produced by the **SemanticAnalysisModule** to perform deeper validation.  The **ViolationCaptureModule** reads the recommendations emitted by the analysis step to record constraint breaches.  The **HookManagementModule** does not directly interact with the analysis logic but provides hook documentation that may be used to trigger the analysis pipeline on repository events.
+* **Interaction with siblings** – The **ContentValidationModule** (via its `ContentValidationAgent` in `integrations/semantic-analysis/src/agents/content-validation-agent.ts`) consumes the ontology metadata produced by the **SemanticAnalysisModule** to perform deeper validation.  The **ViolationCaptureModule** reads the recommendations emitted by the analysis step to record constraint breaches.  The **HookManagementModule** does not directly interact with the analysis logic but provides hook documentation that may be used to trigger the analysis pipeline on repository events.
 
 ---
 
@@ -45,7 +45,7 @@ Another design element is the **shared ontology metadata field**.  The module wr
 
 2. **Sibling – GraphDatabaseAdapter** – This adapter reads the **shared ontology metadata field** populated by the module.  By pre‑populating graph nodes, it avoids duplicate LLM calls, establishing a performance‑optimizing contract.  
 
-3. **Sibling – ContentValidationModule** – The `ContentValidationAgent` (found at `integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts`) pulls the semantic tags generated by the analysis module to enrich its validation checks.  
+3. **Sibling – ContentValidationModule** – The `ContentValidationAgent` (found at `integrations/semantic-analysis/src/agents/content-validation-agent.ts`) pulls the semantic tags generated by the analysis module to enrich its validation checks.  
 
 4. **Sibling – ViolationCaptureModule** – Consumes the “insights and recommendations” output by the analysis DAG to log or act upon constraint violations.  
 
@@ -53,7 +53,7 @@ Another design element is the **shared ontology metadata field**.  The module wr
 
 6. **Configuration – batch-analysis.yaml** – The DAG definition itself is an integration artifact; any change to step ordering or addition of new analysis phases is performed by editing this YAML file, without touching code.  
 
-7. **Documentation – README & Docs** – Both `integrations/mcp-constraint-monitor/README.md` and the markdown docs provide the contract surface for developers and for any automated tooling that may generate the analysis pipeline.
+7. **Documentation – README & Docs** – Both `integrations/constraint-monitor/README.md` and the markdown docs provide the contract surface for developers and for any automated tooling that may generate the analysis pipeline.
 
 ---
 
@@ -95,15 +95,15 @@ Another design element is the **shared ontology metadata field**.  The module wr
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component employs a modular architecture, with separate modules for different aspects of constraint monitoring. For instance, the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis. This design decision allows for efficient and reliable operation, as each module can be developed, tested, and maintained independently. The use of graph database persistence enables the system to efficiently store and query complex relationships between code entities, while semantic analysis enables the system to understand the meaning and context of code actions and file operations.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component employs a modular architecture, with separate modules for different aspects of constraint monitoring. For instance, the ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis. This design decision allows for efficient and reliable operation, as each module can be developed, tested, and maintained independently. The use of graph database persistence enables the system to efficiently store and query complex relationships between code entities, while semantic analysis enables the system to understand the meaning and context of code actions and file operations.
 
 ### Children
-- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- The integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md documentation outlines the process for detecting semantic constraints.
+- [SemanticConstraintDetector](./SemanticConstraintDetector.md) -- The integrations/constraint-monitor/docs/semantic-constraint-detection.md documentation outlines the process for detecting semantic constraints.
 
 ### Siblings
-- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis.
+- [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationAgent in integrations/semantic-analysis/src/agents/content-validation-agent.ts utilizes the GraphDatabaseAdapter for graph database persistence and semantic analysis.
 - [HookManagementModule](./HookManagementModule.md) -- The HookManagementModule utilizes the integrations/copi/docs/hooks.md documentation to provide a reference for hook functions.
-- [ViolationCaptureModule](./ViolationCaptureModule.md) -- The ViolationCaptureModule utilizes the integrations/mcp-constraint-monitor/docs/constraint-configuration.md documentation to provide a guide for constraint configuration.
+- [ViolationCaptureModule](./ViolationCaptureModule.md) -- The ViolationCaptureModule utilizes the integrations/constraint-monitor/docs/constraint-configuration.md documentation to provide a guide for constraint configuration.
 - [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The GraphDatabaseAdapter is used by the ContentValidationModule to pre-populate ontology metadata fields and prevent redundant LLM re-classification.
 
 ---

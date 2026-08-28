@@ -67,6 +67,6 @@ note right of graph : "Uses Graphology + LevelDB\nat .data/knowledge-graph"
 
 note bottom of json_sync : "Auto-synced exports at\n.data/knowledge-export"
 
-note top of mcp_serve : "Located in:\nintegrations/mcp-server-semantic-analysis"
+note top of mcp_serve : "Located in:\nintegrations/semantic-analysis"
 
 @enduml

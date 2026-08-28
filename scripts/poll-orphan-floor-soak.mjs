@@ -11,7 +11,7 @@
 //
 // PORT DISCIPLINE — anchored to CONTEXT.md D-04 / D-05 / canonical_refs:
 //   KMCORE_REST_BASE defaults to http://localhost:3848 (km-core REST view,
-//   served by integrations/mcp-server-semantic-analysis/src/sse-server.ts:46-103)
+//   served by integrations/semantic-analysis/src/sse-server.ts:46-103)
 //   — the SAME graph the writer (ObservationConsolidator), the unified-viewer,
 //   AND Plan 59-04's repair script all target. The script does NOT fall back
 //   to the obs-api daemon's port (an OBS-API daemon view is a DIFFERENT graph).

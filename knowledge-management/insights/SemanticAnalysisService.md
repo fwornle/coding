@@ -6,7 +6,7 @@ The SemanticAnalysisService sub-component uses the GraphDatabaseAdapter to store
 
 **SemanticAnalysisService – Technical Insight Document**  
 
-*Sub‑component of **SemanticAnalysis** (implemented in the `integrations/mcp-server-semantic-analysis`* codebase).  
+*Sub‑component of **SemanticAnalysis** (implemented in the `integrations/semantic-analysis`* codebase).  
 
 ---
 
@@ -15,7 +15,7 @@ The SemanticAnalysisService sub-component uses the GraphDatabaseAdapter to store
 SemanticAnalysisService is the core execution engine that turns raw input data into semantically enriched knowledge. The service lives inside the **SemanticAnalysis** component and is wired through the `semantic-analysis-configuration.yaml` file. Its responsibilities are three‑fold:  
 
 1. **Invoke LLM services** – it forwards the incoming payload to the language‑model layer (the LLMIntegration sibling) to obtain natural‑language‑level interpretations.  
-2. **Enrich and persist the result** – the service hands the LLM output to the **OntologyClassificationAgent** and **CodeGraphAgent** (both built on top of `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`) to map entities onto the system ontology and to construct a code‑structure graph. The enriched graph is then stored via the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  
+2. **Enrich and persist the result** – the service hands the LLM output to the **OntologyClassificationAgent** and **CodeGraphAgent** (both built on top of `integrations/semantic-analysis/src/agents/base-agent.ts`) to map entities onto the system ontology and to construct a code‑structure graph. The enriched graph is then stored via the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  
 3. **Trigger downstream insight generation** – once the graph is persisted, the service calls the **Insights** sub‑component, which consumes the pipeline and ontology results to produce actionable insights.  
 
 All of these steps are orchestrated under the configuration defined in `semantic-analysis-configuration.yaml`, allowing operators to enable/disable agents, choose LLM providers, or point the service at different graph‑database instances.
@@ -24,7 +24,7 @@ All of these steps are orchestrated under the configuration defined in `semantic
 
 ## Architecture and Design  
 
-The architecture is **modular** and **agent‑centric**. A lightweight **BaseAgent** (`integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`) provides common plumbing (logging, error handling, lifecycle hooks). Both the **OntologyClassificationAgent** (`.../ontology-classification-agent.ts`) and the **CodeGraphAgent** (`.../code-graph-agent.ts`) inherit from this base, exemplifying an **inheritance‑based reuse pattern** that keeps agent implementations focused on domain logic while sharing cross‑cutting concerns.
+The architecture is **modular** and **agent‑centric**. A lightweight **BaseAgent** (`integrations/semantic-analysis/src/agents/base-agent.ts`) provides common plumbing (logging, error handling, lifecycle hooks). Both the **OntologyClassificationAgent** (`.../ontology-classification-agent.ts`) and the **CodeGraphAgent** (`.../code-graph-agent.ts`) inherit from this base, exemplifying an **inheritance‑based reuse pattern** that keeps agent implementations focused on domain logic while sharing cross‑cutting concerns.
 
 Communication between the service and the graph store is mediated by the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`). The adapter implements an **Observer pattern**: it publishes change events (e.g., “nodeCreated”, “relationshipAdded”) that other components—such as the **Insights** sub‑component—can subscribe to without tight coupling. This decoupling supports scalability and eases future extensions (e.g., adding a monitoring agent).
 
@@ -37,7 +37,7 @@ Overall, the service sits at the intersection of several sibling modules:
 * **OntologyManagement** – also consumes OntologyClassificationAgent, illustrating a **shared‑service** model.  
 * **LLMIntegration** – supplies the underlying language‑model calls that SemanticAnalysisService orchestrates.  
 
-The child component **SemanticConstraintDetection** (documented in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md`) plugs into the service’s output graph to enforce domain‑specific constraints, reinforcing a **pipeline‑extension** design.
+The child component **SemanticConstraintDetection** (documented in `integrations/constraint-monitor/docs/semantic-constraint-detection.md`) plugs into the service’s output graph to enforce domain‑specific constraints, reinforcing a **pipeline‑extension** design.
 
 ---
 
@@ -67,11 +67,11 @@ No additional code symbols were listed in the observations, but the described fl
 |-------------|------------------|------|
 | **LLMIntegration** | sibling module (e.g., `integrations/mcp-server-llm-integration`) | Provides `LLMClient.analyze` – the primary NLP service used by SemanticAnalysisService. |
 | **GraphDatabaseAdapter** | `storage/graph-database-adapter.ts` | Persists enriched graph data; implements Observer notifications consumed by Insights and other observers. |
-| **OntologyClassificationAgent** | `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts` | Maps LLM‑extracted entities to ontology nodes; shares logic with OntologyManagement. |
-| **CodeGraphAgent** | `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` | Generates code‑structure graph elements from source snippets. |
+| **OntologyClassificationAgent** | `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts` | Maps LLM‑extracted entities to ontology nodes; shares logic with OntologyManagement. |
+| **CodeGraphAgent** | `integrations/semantic-analysis/src/agents/code-graph-agent.ts` | Generates code‑structure graph elements from source snippets. |
 | **Insights** | sibling sub‑component (path not listed) | Subscribes to GraphDatabaseAdapter events to produce business‑level insights. |
 | **OntologyManagement** | sibling sub‑component (path not listed) | Supplies ontology definitions that ClassificationAgent relies on. |
-| **SemanticConstraintDetection** | documented in `integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md` | Validates the persisted graph against domain constraints. |
+| **SemanticConstraintDetection** | documented in `integrations/constraint-monitor/docs/semantic-constraint-detection.md` | Validates the persisted graph against domain constraints. |
 | **Configuration** | `semantic-analysis-configuration.yaml` | External YAML file that drives which agents are active and how external services are addressed. |
 
 All these integrations are **loose‑coupled** via interfaces (e.g., the adapter’s observer callbacks) and configuration‑driven wiring, which keeps the service replaceable and testable.
@@ -134,14 +134,14 @@ All these integrations are **loose‑coupled** via interfaces (e.g., the adapter
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents. This design pattern promotes code reuse and maintainability, allowing developers to easily add or modify agents without affecting the overall system. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) and the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) are built on top of the BaseAgent, demonstrating the effectiveness of this modular approach. The use of design patterns such as the Observer pattern for handling notifications and updates, as observed in the GraphDatabaseAdapter (storage/graph-database-adapter.ts), further enhances the system's maintainability and scalability.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The SemanticAnalysis component utilizes a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents. This design pattern promotes code reuse and maintainability, allowing developers to easily add or modify agents without affecting the overall system. For instance, the OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) and the CodeGraphAgent (integrations/semantic-analysis/src/agents/code-graph-agent.ts) are built on top of the BaseAgent, demonstrating the effectiveness of this modular approach. The use of design patterns such as the Observer pattern for handling notifications and updates, as observed in the GraphDatabaseAdapter (storage/graph-database-adapter.ts), further enhances the system's maintainability and scalability.
 
 ### Children
-- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- The integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md file provides documentation on semantic constraint detection, indicating its importance in the SemanticAnalysisService.
+- [SemanticConstraintDetection](./SemanticConstraintDetection.md) -- The integrations/constraint-monitor/docs/semantic-constraint-detection.md file provides documentation on semantic constraint detection, indicating its importance in the SemanticAnalysisService.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents.
-- [Ontology](./Ontology.md) -- The OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is responsible for classifying entities into the ontology.
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a modular architecture, with separate modules for different agents and services, as seen in the BaseAgent (integrations/semantic-analysis/src/agents/base-agent.ts) serving as a foundation for other agents.
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) is responsible for classifying entities into the ontology.
 - [Insights](./Insights.md) -- The Insights sub-component uses the results of the Pipeline and Ontology sub-components to generate insights.
 - [OntologyManagement](./OntologyManagement.md) -- The OntologyManagement sub-component uses the OntologyClassificationAgent to classify entities into the ontology.
 - [ContentValidationModule](./ContentValidationModule.md) -- The ContentValidationModule sub-component uses the validation.ts module to validate the input data.

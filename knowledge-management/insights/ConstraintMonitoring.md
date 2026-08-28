@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The mcp-constraint-monitor/docs/semantic-constraint-detection.md file describes semantic constraint detection, potentially employing constraint monitoring.
+The constraint-monitor/docs/semantic-constraint-detection.md file describes semantic constraint detection, potentially employing constraint monitoring.
 
 ## What It Is  
 
-**ConstraintMonitoring** is a sub‑component that lives under the **CodingPatterns** umbrella and is responsible for detecting, parsing, and enforcing constraints that are expressed in the Claude code‑hook data format.  The primary artefacts that define its behaviour are located in the `mcp-constraint-monitor/docs/` directory:
+**ConstraintMonitoring** is a sub‑component that lives under the **CodingPatterns** umbrella and is responsible for detecting, parsing, and enforcing constraints that are expressed in the Claude code‑hook data format.  The primary artefacts that define its behaviour are located in the `constraint-monitor/docs/` directory:
 
 * `CLAUDE-CODE-HOOK-FORMAT.md` – the canonical specification of the hook payload that may contain constraint definitions.  
 * `constraint-configuration.md` – the user‑facing guide that explains how constraints are configured and mapped to the monitoring engine.  
@@ -80,7 +80,7 @@ Developers who need to enforce constraints should follow these best‑practice s
 
 1. **Install the Copi CLI** – Follow the step‑by‑step instructions in `integrations/copi/INSTALL.md`.  Ensure the CLI version matches the constraint‑monitoring documentation version to avoid incompatibilities.
 
-2. **Define Constraints Declaratively** – Use the template in `mcp-constraint-monitor/docs/constraint-configuration.md` to author constraint definitions.  Stick to the field names and types described in `CLAUDE-CODE-HOOK-FORMAT.md`; extra fields should be placed under the optional `metadata` section to preserve forward compatibility.
+2. **Define Constraints Declaratively** – Use the template in `constraint-monitor/docs/constraint-configuration.md` to author constraint definitions.  Stick to the field names and types described in `CLAUDE-CODE-HOOK-FORMAT.md`; extra fields should be placed under the optional `metadata` section to preserve forward compatibility.
 
 3. **Validate Hook Payloads Early** – Before committing, run `copi monitor --hook <payload>` locally to confirm that the parser accepts the payload and that the semantic detection engine reports no unexpected violations.  The `STATUS.md` file explains the meaning of each exit code, enabling automated checks in CI.
 
@@ -127,7 +127,7 @@ By grounding the analysis in the observed documentation files and the explicit r
 - [CodingPatterns](./CodingPatterns.md) -- [LLM] The CodingPatterns component demonstrates a strong emphasis on data consistency and integrity, as reflected in the GraphDatabaseAdapter (storage/graph-database-adapter.ts) which utilizes Graphology+LevelDB persistence with automatic JSON export sync. This approach ensures that data remains consistent across the application, and the use of automatic JSON export sync enables seamless data exchange between components. The GraphDatabaseAdapter class, for instance, exports a function to get the graph database instance, which can be used to perform various graph-related operations. Furthermore, the CodeGraphRAG system (integrations/code-graph-rag/README.md) is designed as a graph-based RAG system for any codebases, highlighting the project's focus on graph-based data structures and algorithms. The system's README file provides a detailed overview of its features and capabilities, including its ability to handle large codebases and provide efficient query performance.
 
 ### Children
-- [ConstraintConfigurationParser](./ConstraintConfigurationParser.md) -- The Claude Code Hook Data Format is defined in the mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file, which potentially includes constraints.
+- [ConstraintConfigurationParser](./ConstraintConfigurationParser.md) -- The Claude Code Hook Data Format is defined in the constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md file, which potentially includes constraints.
 
 ### Siblings
 - [DesignPatterns](./DesignPatterns.md) -- The GraphDatabaseAdapter class in storage/graph-database-adapter.ts utilizes the singleton pattern to provide a single instance of the graph database across the application.

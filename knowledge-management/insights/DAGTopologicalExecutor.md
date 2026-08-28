@@ -9,7 +9,7 @@ Relationship types DEFINES, DEPENDS_ON_EXTERNAL, CONTAINS_FILE documented in pro
 **DAGTopologicalExecutor** is the runtime engine that drives the *Pipeline* defined in **`batch-analysis.yaml`**.  
 The YAML file describes the entire batch‑analysis workflow as a **directed acyclic graph (DAG)** whose vertices are the individual *agents* (coordinator, observation, KG, dedup, persistence, …) and whose edges are expressed with explicit `depends_on` statements.  At start‑up the executor parses this file, builds an in‑memory representation of the graph, and then walks the graph in **topological order** so that each agent runs only after all of its declared predecessors have completed successfully.  
 
-The executor lives under the logical parent component **Pipeline** and is the only component that enforces the *agent sequencing pattern* documented in **`integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`**.  By doing so it guarantees that relationship types such as **`DEFINES`**, **`DEPENDS_ON_EXTERNAL`**, and **`CONTAINS_FILE`**—which are emitted by the KG‑stage agents—are produced **after** the observation‑stage agents, satisfying the domain‑level data‑dependency contracts.
+The executor lives under the logical parent component **Pipeline** and is the only component that enforces the *agent sequencing pattern* documented in **`integrations/semantic-analysis/docs/architecture/agents.md`**.  By doing so it guarantees that relationship types such as **`DEFINES`**, **`DEPENDS_ON_EXTERNAL`**, and **`CONTAINS_FILE`**—which are emitted by the KG‑stage agents—are produced **after** the observation‑stage agents, satisfying the domain‑level data‑dependency contracts.
 
 ---
 

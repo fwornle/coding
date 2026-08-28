@@ -2,7 +2,7 @@
 
 **Type:** SubComponent
 
-The DataAdapter might be configured using environment variables or configurations similar to those described in integrations/mcp-constraint-monitor/docs/constraint-configuration.md.
+The DataAdapter might be configured using environment variables or configurations similar to those described in integrations/constraint-monitor/docs/constraint-configuration.md.
 
 ## What It Is  
 
@@ -15,9 +15,9 @@ The DataAdapter might be configured using environment variables or configuration
 In addition, the adapter is hinted to draw on several other integration‑level resources:
 
 * `integrations/browser-access/README.md` – a library for pulling data out of a browser context.  
-* `integrations/mcp-constraint-monitor/docs/constraint‑configuration.md` – a set of environment‑variable‑driven configuration knobs.  
+* `integrations/constraint-monitor/docs/constraint‑configuration.md` – a set of environment‑variable‑driven configuration knobs.  
 * `integrations/code‑graph‑rag/README.md` – a storage‑back‑end used for persisting transformed artefacts.  
-* `integrations/mcp-constraint-monitor/dashboard/README.md` – an API surface that the adapter may call to publish its results.
+* `integrations/constraint-monitor/dashboard/README.md` – an API surface that the adapter may call to publish its results.
 
 The **DataAdapter** also owns a child component, **DataMapper**, which is the concrete implementation that applies the mapping rules defined in the Copi documentation.  
 

@@ -182,7 +182,7 @@ vkb-cli data export --format json --output kb-export.json
 ```bash
 # Knowledge capture happens via:
 # 1. Continuous Learning (automatic during coding)
-# 2. MCP Semantic Analysis (type "ukb" in Claude chat)
+# 2. Semantic Analysis (type "ukb" in Claude chat)
 
 # Refresh visualization after knowledge updates
 vkb-cli data refresh

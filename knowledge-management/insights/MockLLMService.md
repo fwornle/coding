@@ -20,7 +20,7 @@ The architectural centerpiece of `MockLLMService` is a **four-level priority cha
 
 The presence of level 3 — the legacy `mockLLM` boolean — is a deliberate backward-compatibility seam. It signals that the codebase has migrated from a simpler binary "mock or not" flag toward the richer three-valued `LLMMode` enum, while retaining the older interface so existing callers continue to function. The trade-off here is clear: simplicity of the new API is sacrificed slightly to avoid a breaking change, and the cost is a subtly more complex resolution chain that developers must hold in their heads.
 
-A second notable design decision is the **co-location of canonical types with mock infrastructure**. `LLMState` and `LLMMode` live alongside what the filename suggests is a test utility. This is unconventional — most codebases would isolate such types in a shared `types/` module — and it creates an import dependency from production code into a file named `mock`. The sibling components `PublicCloudProviders`, `LLMProviderConfig`, and `TierRouter` all ultimately depend on the `LLMMode` produced here, even though provider registries live in `config/llm-providers.yaml` and tier strategy is documented in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`.
+A second notable design decision is the **co-location of canonical types with mock infrastructure**. `LLMState` and `LLMMode` live alongside what the filename suggests is a test utility. This is unconventional — most codebases would isolate such types in a shared `types/` module — and it creates an import dependency from production code into a file named `mock`. The sibling components `PublicCloudProviders`, `LLMProviderConfig`, and `TierRouter` all ultimately depend on the `LLMMode` produced here, even though provider registries live in `config/llm-providers.yaml` and tier strategy is documented in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`.
 
 ## Implementation Details
 
@@ -39,7 +39,7 @@ Notably, the `'local'` mode's resolution lives in this same mock service file, m
 
 ## Integration Points
 
-`MockLLMService` sits inside `LLMAbstraction` and is the type-providing peer to its siblings. `LLMProviderConfig` reads provider definitions from `config/llm-providers.yaml`, but the *selection* between those providers is gated by the `LLMMode` value this service produces. `TierRouter`, whose design rationale is captured in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`, performs tier-based model selection only *after* `getLLMMode()` has determined the mode bucket. `PublicCloudProviders` is the default destination when no override or global mode is set — the fourth-level fallback of `'public'` exists specifically to route to it.
+`MockLLMService` sits inside `LLMAbstraction` and is the type-providing peer to its siblings. `LLMProviderConfig` reads provider definitions from `config/llm-providers.yaml`, but the *selection* between those providers is gated by the `LLMMode` value this service produces. `TierRouter`, whose design rationale is captured in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`, performs tier-based model selection only *after* `getLLMMode()` has determined the mode bucket. `PublicCloudProviders` is the default destination when no override or global mode is set — the fourth-level fallback of `'public'` exists specifically to route to it.
 
 Because the canonical types are exported from `src/mock/llm-mock-service.ts`, every file that imports `LLMMode` or `LLMState` creates a dependency edge pointing into a file whose name suggests test-only scope. This is an **unconventional import topology** that can mislead new contributors using directory-based heuristics to navigate the codebase. The two child components, `LLMModeResolver` and `LLMStateStore`, are not separate files but logical groupings within this single source — `LLMModeResolver` corresponds to the `getLLMMode()` function and `LLMStateStore` corresponds to the persisted `LLMState` structure.
 
@@ -55,7 +55,7 @@ The persistence layer (the progress file storing `llmState`) is another integrat
 
 **Do not duplicate mode-resolution logic elsewhere.** The `LLMModeResolver` child description is explicit: `getLLMMode()` is the single authoritative resolver, and no other location should make this decision independently. Branching agent behavior on a locally-derived `LLMMode` value risks divergence from the canonical chain.
 
-**When adding a new provider tier**, remember that the workflow spans multiple sibling components: register the provider in `config/llm-providers.yaml` (`LLMProviderConfig`), consult the tier strategy in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` (`TierRouter`), and — if a new mode value is needed — extend the `LLMMode` union here in `src/mock/llm-mock-service.ts`. The legacy `mockLLM` boolean fallback should not be extended; it exists solely for backward compatibility with the pre-enum interface.
+**When adding a new provider tier**, remember that the workflow spans multiple sibling components: register the provider in `config/llm-providers.yaml` (`LLMProviderConfig`), consult the tier strategy in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` (`TierRouter`), and — if a new mode value is needed — extend the `LLMMode` union here in `src/mock/llm-mock-service.ts`. The legacy `mockLLM` boolean fallback should not be extended; it exists solely for backward compatibility with the pre-enum interface.
 
 ---
 
@@ -80,7 +80,7 @@ The persistence layer (the progress file storing `llmState`) is another integrat
 ### Siblings
 - [PublicCloudProviders](./PublicCloudProviders.md) -- The parent component description references a 'public' LLMMode value, indicating cloud providers are the default fallback when no override or global mode is set in getLLMMode()
 - [LLMProviderConfig](./LLMProviderConfig.md) -- config/llm-providers.yaml serves as the canonical registry of provider definitions, meaning adding a new provider requires an entry here before any adapter code is wired up
-- [TierRouter](./TierRouter.md) -- integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md is the authoritative design document for tier selection strategy, making it the first place to read when understanding why a request lands on a specific model
+- [TierRouter](./TierRouter.md) -- integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md is the authoritative design document for tier selection strategy, making it the first place to read when understanding why a request lands on a specific model
 
 
 ---

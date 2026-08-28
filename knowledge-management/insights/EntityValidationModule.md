@@ -2,11 +2,11 @@
 
 **Type:** SubComponent
 
-The entity validation agent in integrations/mcp-server-semantic-analysis/src/entity-validation-module/entity-validation-agent.ts handles errors and exceptions by logging them to a file and notifying the development team
+The entity validation agent in integrations/semantic-analysis/src/entity-validation-module/entity-validation-agent.ts handles errors and exceptions by logging them to a file and notifying the development team
 
 ## What It Is  
 
-The **EntityValidationModule** lives under the `integrations/mcp-server-semantic-analysis/src/entity-validation-module/` directory. Its core files are  
+The **EntityValidationModule** lives under the `integrations/semantic-analysis/src/entity-validation-module/` directory. Its core files are  
 
 * `entity-validation-agent.ts` – the rule‑based validator that receives entities, applies validation rules, logs errors, and notifies the development team.  
 * `staleness-detection-agent.ts` – watches the same streams for signs that an entity has become stale and, when it does, emits a refresh request.  
@@ -109,16 +109,16 @@ All three agents inherit common behavior from the system‑wide `BaseAgent` (as 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, such as the OntologyClassificationAgent for ontology-based classification, and the SemanticAnalysisAgent for analyzing git and vibe data. This is evident in the file structure, where each agent has its own file, such as integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent abstract class, as seen in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, standardizes the responses and confidence calculations across all agents, promoting consistency and maintainability.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a modular design, with each agent responsible for a specific task, such as the OntologyClassificationAgent for ontology-based classification, and the SemanticAnalysisAgent for analyzing git and vibe data. This is evident in the file structure, where each agent has its own file, such as integrations/semantic-analysis/src/agents/ontology-classification-agent.ts and integrations/semantic-analysis/src/agents/semantic-analysis-agent.ts. The use of a BaseAgent abstract class, as seen in integrations/semantic-analysis/src/agents/base-agent.ts, standardizes the responses and confidence calculations across all agents, promoting consistency and maintainability.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The coordinator agent in integrations/mcp-server-semantic-analysis/src/agents/coordinator-agent.ts utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- The ontology classification agent in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts utilizes a hierarchical classification model to resolve entity types
-- [Insights](./Insights.md) -- The insight generation agent in integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts utilizes a machine learning model to identify patterns in the data
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- The code knowledge graph constructor in integrations/mcp-server-semantic-analysis/src/code-knowledge-graph/code-knowledge-graph-constructor.ts utilizes an AST parser to parse the code and extract entities
-- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The semantic insight generator agent in integrations/mcp-server-semantic-analysis/src/semantic-insight-generator/semantic-insight-generator-agent.ts utilizes a machine learning model to identify patterns in the code and entity relationships
-- [LLMIntegrationModule](./LLMIntegrationModule.md) -- The LLM integration agent in integrations/mcp-server-semantic-analysis/src/llm-integration-module/llm-integration-agent.ts initializes the LLM service and handles interactions
-- [BaseAgent](./BaseAgent.md) -- The BaseAgent class in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts provides a base class for all agents
+- [Pipeline](./Pipeline.md) -- The coordinator agent in integrations/semantic-analysis/src/agents/coordinator-agent.ts utilizes a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- The ontology classification agent in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts utilizes a hierarchical classification model to resolve entity types
+- [Insights](./Insights.md) -- The insight generation agent in integrations/semantic-analysis/src/agents/insight-generation-agent.ts utilizes a machine learning model to identify patterns in the data
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- The code knowledge graph constructor in integrations/semantic-analysis/src/code-knowledge-graph/code-knowledge-graph-constructor.ts utilizes an AST parser to parse the code and extract entities
+- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The semantic insight generator agent in integrations/semantic-analysis/src/semantic-insight-generator/semantic-insight-generator-agent.ts utilizes a machine learning model to identify patterns in the code and entity relationships
+- [LLMIntegrationModule](./LLMIntegrationModule.md) -- The LLM integration agent in integrations/semantic-analysis/src/llm-integration-module/llm-integration-agent.ts initializes the LLM service and handles interactions
+- [BaseAgent](./BaseAgent.md) -- The BaseAgent class in integrations/semantic-analysis/src/agents/base-agent.ts provides a base class for all agents
 
 ---
 

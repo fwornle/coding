@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-The integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file suggests that agents are a key part of the WorkflowOrchestrator's functionality.
+The integrations/semantic-analysis/src/agents/base-agent.ts file suggests that agents are a key part of the WorkflowOrchestrator's functionality.
 
 ## What It Is  
 
@@ -24,7 +24,7 @@ The only explicit design pattern mentioned is the **workflow‑based approach**;
 
 Although the source for *AgentExecutionManager* is not directly available, the surrounding code gives us clear clues about its internals:
 
-1. **Agent Resolution** – The manager must import the `BaseAgent` definition from `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`.  It likely uses a registry or a factory pattern to map workflow step identifiers to concrete agent classes that extend `BaseAgent`.
+1. **Agent Resolution** – The manager must import the `BaseAgent` definition from `integrations/semantic-analysis/src/agents/base-agent.ts`.  It likely uses a registry or a factory pattern to map workflow step identifiers to concrete agent classes that extend `BaseAgent`.
 
 2. **Life‑Cycle Control** – For each workflow node, the manager probably invokes a standard set of lifecycle hooks defined on `BaseAgent` (e.g., `setup()`, `run()`, `teardown()`).  This uniform contract enables the manager to treat all agents generically, regardless of their internal implementation details.
 
@@ -68,7 +68,7 @@ Other peripheral integration points may include logging facilities, configuratio
 
 ### System structure insights  
 * The system is layered: *WorkflowOrchestrator* (high‑level workflow definition) → **AgentExecutionManager** (execution engine) → *Agents* (concrete work units).  
-* All agent code lives under `integrations/mcp-server-semantic-analysis/src/agents/`, anchored by `base‑agent.ts`.  
+* All agent code lives under `integrations/semantic-analysis/src/agents/`, anchored by `base‑agent.ts`.  
 
 ### Scalability considerations  
 * Because the manager processes agents sequentially per workflow path, scaling horizontally (running multiple workflows in parallel) is straightforward—each workflow can be instantiated in its own manager instance or thread pool.  
@@ -82,7 +82,7 @@ Other peripheral integration points may include logging facilities, configuratio
 ## Hierarchy Context
 
 ### Parent
-- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- The WorkflowOrchestrator sub-component uses a workflow-based approach to manage the execution of agents, as seen in the integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts file.
+- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- The WorkflowOrchestrator sub-component uses a workflow-based approach to manage the execution of agents, as seen in the integrations/semantic-analysis/src/agents/base-agent.ts file.
 
 ---
 

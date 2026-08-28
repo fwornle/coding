@@ -10,7 +10,7 @@ The adapter's existence is explicitly scoped to the Phase 42-03 migration period
 
 ## What It Is
 
-`LegacyOntologyAdapter` is a deliberately scoped migration component residing within the `SemanticAnalysis` system (`integrations/mcp-server-semantic-analysis`). It functions as a compatibility shim between the legacy ontology interface consumed by `OntologyValidator` and `OntologyClassifier` and the modern `OntologyRegistry` API exposed by `km-core`. Its existence is formally documented in `docs/RELEASE-2.0.md` as part of the ontology integration system rollout, underscoring that it is a purposeful architectural decision rather than an incidental abstraction that accumulated over time.
+`LegacyOntologyAdapter` is a deliberately scoped migration component residing within the `SemanticAnalysis` system (`integrations/semantic-analysis`). It functions as a compatibility shim between the legacy ontology interface consumed by `OntologyValidator` and `OntologyClassifier` and the modern `OntologyRegistry` API exposed by `km-core`. Its existence is formally documented in `docs/RELEASE-2.0.md` as part of the ontology integration system rollout, underscoring that it is a purposeful architectural decision rather than an incidental abstraction that accumulated over time.
 
 The adapter sits inside the `SemanticAnalysis` parent component, which orchestrates a pipeline of specialized agents that extract, classify, validate, and persist structured knowledge from git history and LSL sessions. Within that broader pipeline, `LegacyOntologyAdapter` occupies a narrow but critical position: it guards the boundary between the new `km-core`-backed ontology registry and the downstream classification and validation agents that have not yet been migrated to consume `OntologyRegistry` directly. Its scope is explicitly tied to the Phase 42-03 migration period, after which it carries a planned deprecation.
 
@@ -79,13 +79,13 @@ The component's maintainability risk is low in the short term and high if neglec
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/mcp-server-semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
 
 ### Children
 - [LegacyInterfaceCompatibilityLayer](./LegacyInterfaceCompatibilityLayer.md) -- Since no source files are available, the component's purpose as described in the parent context implies translation logic that maps legacy ontology lookup and classification calls to km-core OntologyRegistry equivalents without touching downstream consumers.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/mcp-server-semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
+- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
 - [Ontology](./Ontology.md) -- The system maintains a two-level ontology hierarchy (upper/lower) with separate definition files, paths to which are managed by OntologyConfigManager, allowing the classification tier to be reconfigured without code changes
 - [Insights](./Insights.md) -- Insight generation is LLM-driven, operating within the LLM budget constraints configured in OntologyConfigManager, meaning insight depth scales with available token budget per batch run
 - [OntologyConfigManager](./OntologyConfigManager.md) -- Implemented as a singleton to ensure all pipeline agents share identical ontology configuration throughout a batch run, preventing mid-run config drift between classifier and validator instances

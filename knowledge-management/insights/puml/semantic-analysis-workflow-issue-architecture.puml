@@ -6,7 +6,7 @@ package "SemanticAnalysisWorkflowIssue - MCPAgent Architecture" {
   package "Core Implementation" {
     component [src/knowledge-management] as km <<core>>
     component [lib/ukb-unified] as ukb <<core>>
-    component [integrations/mcp-server-semantic-analysis/src] as mcp <<api>>
+    component [integrations/semantic-analysis/src] as mcp <<api>>
   }
 
   package "Storage Layer" {

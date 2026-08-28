@@ -41,7 +41,7 @@ Interaction flow (simplified): **LLMService** asks the DI container for a provid
 The registry is a plain TypeScript object (or `Map`) keyed by a provider name (e.g., `"dmr"`, `"mock"`). Each entry contains metadata such as the factory function, health check hooks, and optional priority for fallback ordering. The module exposes `registerProvider(name, descriptor)` and `unregisterProvider(name)` APIs, enabling runtime extensibility.
 
 ### Factory (`lib/llm/provider-registry-module.ts` → **ProviderFactory**)  
-The factory reads the descriptor from the registry and invokes the concrete constructor. For the DMR provider, it calls `new DMRProviderModule(dockerClient, config)`. For the mock provider, it creates an instance of the mock service defined in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`. The factory also respects configuration flags (e.g., a global “useMock” switch) passed down from **LLMService**.
+The factory reads the descriptor from the registry and invokes the concrete constructor. For the DMR provider, it calls `new DMRProviderModule(dockerClient, config)`. For the mock provider, it creates an instance of the mock service defined in `integrations/semantic-analysis/src/mock/llm-mock-service.ts`. The factory also respects configuration flags (e.g., a global “useMock” switch) passed down from **LLMService**.
 
 ### Caching (`lib/llm/provider-cache.ts`)  
 A singleton cache stores provider instances keyed by the same identifier used in the registry. The cache implements a lazy‑initialisation pattern: the first request for a provider triggers factory creation; subsequent requests return the cached instance. Cache eviction policies are not described in the observations, so the current implementation likely retains the instance for the lifetime of the process.
@@ -83,7 +83,7 @@ All registration (`registerProvider`), initialization (`factory.create`), cache 
 
 * **Register Early, Unregister Sparingly** – Providers should be registered during application bootstrap (e.g., in `main.ts`). Removing a provider at runtime is supported but may cause in‑flight requests to fail if the provider is currently cached.  
 
-* **Prefer Configuration‑Driven Mode Selection** – Use the `getLLMMode` resolver pattern demonstrated in `integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`. Centralising mode logic ensures that fallback and circuit‑breaker behaviours are consistently applied.  
+* **Prefer Configuration‑Driven Mode Selection** – Use the `getLLMMode` resolver pattern demonstrated in `integrations/semantic-analysis/src/mock/llm-mock-service.ts`. Centralising mode logic ensures that fallback and circuit‑breaker behaviours are consistently applied.  
 
 * **Leverage the Cache** – The caching layer is transparent; however, if a provider’s internal state must be refreshed (e.g., after a Docker container restart), explicitly clear the cache via `ProviderCache.clear(name)` before the next request.  
 
@@ -128,13 +128,13 @@ The separation of concerns (registry, factory, cache, fallback, circuit breaker,
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a high-level facade, LLMService, which is defined in the file lib/llm/llm-service.ts. This facade is responsible for handling mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback. The LLMService class employs dependency injection to set functions that resolve the current LLM mode, allowing for flexibility in determining the mode. For instance, the getLLMMode function in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts is used to determine the LLM mode for a specific agent, considering global mode, per-agent overrides, and legacy mock flags.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a high-level facade, LLMService, which is defined in the file lib/llm/llm-service.ts. This facade is responsible for handling mode routing, caching, circuit breaking, budget/sensitivity checks, and provider fallback. The LLMService class employs dependency injection to set functions that resolve the current LLM mode, allowing for flexibility in determining the mode. For instance, the getLLMMode function in integrations/semantic-analysis/src/mock/llm-mock-service.ts is used to determine the LLM mode for a specific agent, considering global mode, per-agent overrides, and legacy mock flags.
 
 ### Children
 - [ProviderFactory](./ProviderFactory.md) -- The ProviderRegistryModule uses a factory pattern to create instances of different LLM providers, such as the DMRProviderModule and MockServiceModule, as indicated by the parent context.
 
 ### Siblings
-- [MockServiceModule](./MockServiceModule.md) -- The MockServiceModule uses a mocking library to generate mock LLM responses, as seen in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts.
+- [MockServiceModule](./MockServiceModule.md) -- The MockServiceModule uses a mocking library to generate mock LLM responses, as seen in integrations/semantic-analysis/src/mock/llm-mock-service.ts.
 - [DMRProviderModule](./DMRProviderModule.md) -- The DMRProviderModule uses a Docker API client to interact with the Model Runner, as seen in lib/llm/dmr-provider-module.ts.
 - [LLMServiceModule](./LLMServiceModule.md) -- The LLMServiceModule uses a dependency injection mechanism to resolve the current LLM provider, as seen in lib/llm/llm-service.ts.
 

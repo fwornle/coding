@@ -50,7 +50,7 @@ When an agent (e.g., the `OntologyClassificationAgent` inside **SemanticAnalysis
 
 * **OntologyConfigManager (sibling)** – Loads the static ontology configuration (`ontology-config.yaml`). The loaded configuration seeds the initial state of the **OntologyDatabase**, meaning that any changes to the config must be reflected in the repository’s persistence layer.  
 
-* **OntologyClassificationAgent** – Located in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`, this agent uses **OntologyRepository** (via the repository façade) to fetch definitions and validate them before classifying observations.  
+* **OntologyClassificationAgent** – Located in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`, this agent uses **OntologyRepository** (via the repository façade) to fetch definitions and validate them before classifying observations.  
 
 * **Pipeline, Insights, CodeGraphConstructor, SemanticInsightGenerator, LLMServiceManager, KnowledgeGraph (other siblings)** – While they do not directly call the repository, they share the same execution DAG and may depend on ontology‑derived insights (e.g., `InsightGenerator` may enrich generated insights with ontology labels).  
 
@@ -109,11 +109,11 @@ Overall, **OntologyRepository** exhibits a clean, modular design that aligns wit
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and LSL sessions. This is evident in the OntologyClassificationAgent, which leverages the OntologyConfigManager, OntologyManager, and OntologyValidator classes to classify observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. The topological sort ensures that the agents are executed in a specific order, preventing any potential circular dependencies or inconsistencies in the knowledge entities extraction process.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and LSL sessions. This is evident in the OntologyClassificationAgent, which leverages the OntologyConfigManager, OntologyManager, and OntologyValidator classes to classify observations against the ontology system, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file. The topological sort ensures that the agents are executed in a specific order, preventing any potential circular dependencies or inconsistencies in the knowledge entities extraction process.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- PipelineAgent uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/mcp-server-semantic-analysis/src/config directory
+- [Ontology](./Ontology.md) -- OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/semantic-analysis/src/config directory
 - [Insights](./Insights.md) -- InsightGenerator generates insights from the processed observations using the InsightGenerator class in insights/generator.ts
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the ASTParser class in code-graph/parser.ts to parse the abstract syntax tree of the code
 - [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- SemanticInsightGenerator uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts to process the natural language text

@@ -18,7 +18,7 @@ The design of **TranscriptProcessing** follows a classic **Adapter** pattern, ex
 
 Complementing the adapter is a **Factory** pattern embodied by `TranscriptAdapterFactory`.  The factory inspects metadata (e.g., a `format` identifier) and instantiates the correct adapter, ensuring that the rest of the system interacts with a single entry point.  This two‑layer pattern (Factory → Adapter) is reflected in the hierarchy diagram and reinforces the modularity highlighted in the parent component description.  
 
-Interaction flows are orchestrated through the **LiveLoggingSystem**.  When a new transcript arrives—whether from a Copilot CLI run (referenced in `integrations/copi/USAGE.md` and `integrations/copi/docs/hooks.md`) or a Claude Code execution (see `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`)—the LiveLoggingSystem forwards the payload to **TranscriptProcessing**.  The factory selects the appropriate adapter, which then normalises the data and hands it back to the logging pipeline.  
+Interaction flows are orchestrated through the **LiveLoggingSystem**.  When a new transcript arrives—whether from a Copilot CLI run (referenced in `integrations/copi/USAGE.md` and `integrations/copi/docs/hooks.md`) or a Claude Code execution (see `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`)—the LiveLoggingSystem forwards the payload to **TranscriptProcessing**.  The factory selects the appropriate adapter, which then normalises the data and hands it back to the logging pipeline.  
 
 ![TranscriptProcessing — Architecture](images/transcript-processing-architecture.png)
 
@@ -28,7 +28,7 @@ Interaction flows are orchestrated through the **LiveLoggingSystem**.  When a ne
 
 At the heart of the implementation is the **`TranscriptAdapter`** abstract class defined in `lib/agent-api/transcript-api.js`.  Although the source code isn’t directly listed, the observations indicate it provides key methods such as `convertTranscript()` and `parseTranscript()`.  Concrete subclasses override these hooks to handle agent‑specific quirks.  
 
-The **`ClaudeCodeTranscriptAdapter`** (`lib/agent-api/transcripts/claudia-transcript-adapter.js`) extends `TranscriptAdapter` and implements the parsing rules required for Claude Code’s hook format.  It likely consumes the format description in `integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, extracting fields such as code snippets, execution metadata, and LLM responses, then re‑structures them into the LLS schema.  
+The **`ClaudeCodeTranscriptAdapter`** (`lib/agent-api/transcripts/claudia-transcript-adapter.js`) extends `TranscriptAdapter` and implements the parsing rules required for Claude Code’s hook format.  It likely consumes the format description in `integrations/constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md`, extracting fields such as code snippets, execution metadata, and LLM responses, then re‑structures them into the LLS schema.  
 
 The **`TranscriptAdapterFactory`**, also located in `lib/agent-api/transcript-api.js`, acts as a registry of available adapters.  When the LiveLoggingSystem supplies a transcript with a known `type` (e.g., `"claude-code"` or `"copilot-cli"`), the factory returns an instantiated adapter ready to process the payload.  This lazy‑instantiation approach reduces upfront coupling and keeps the memory footprint modest.  
 

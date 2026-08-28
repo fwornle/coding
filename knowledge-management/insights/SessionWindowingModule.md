@@ -107,10 +107,10 @@ The clear naming, strict separation of responsibilities, and centralized error h
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging process. For instance, the OntologyClassificationAgent class in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts is used for classifying observations and entities against the ontology system. This modularity allows for easier maintenance and updates to the system, as individual modules can be modified without affecting the entire system.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem component's modular architecture is evident in its use of separate modules for handling different aspects of the logging process. For instance, the OntologyClassificationAgent class in integrations/semantic-analysis/src/agents/ontology-classification-agent.ts is used for classifying observations and entities against the ontology system. This modularity allows for easier maintenance and updates to the system, as individual modules can be modified without affecting the entire system.
 
 ### Siblings
-- [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/mcp-server-semantic-analysis/src/modules/logging-module.ts file.
+- [LoggingModule](./LoggingModule.md) -- LoggingModule utilizes a queue-based system for log buffering, as seen in the integrations/semantic-analysis/src/modules/logging-module.ts file.
 - [TranscriptManager](./TranscriptManager.md) -- TranscriptManager utilizes the transcriptConverter function in transcript-manager.ts to convert transcripts between different formats.
 - [ClassificationEngine](./ClassificationEngine.md) -- ClassificationEngine utilizes the OntologyClassificationAgent class in ontology-classification-agent.ts for classifying observations and entities against the ontology system.
 

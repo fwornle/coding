@@ -49,7 +49,7 @@ Together, these three classes form a thin, well‑defined API surface: validatio
 ## Integration Points  
 
 **Parent – SemanticAnalysis**  
-SemanticAnalysis contains KnowledgeGraph, meaning that the graph is the canonical store for entities extracted during semantic processing (e.g., code symbols, natural‑language concepts). Agents such as `OntologyClassificationAgent` (found in `integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`) likely query the KnowledgeGraph to resolve ontology terms or to verify classification results. The DAG‑based execution model described for SemanticAnalysis ensures that KnowledgeGraph operations occur at deterministic points in the pipeline, preventing race conditions.
+SemanticAnalysis contains KnowledgeGraph, meaning that the graph is the canonical store for entities extracted during semantic processing (e.g., code symbols, natural‑language concepts). Agents such as `OntologyClassificationAgent` (found in `integrations/semantic-analysis/src/agents/ontology-classification-agent.ts`) likely query the KnowledgeGraph to resolve ontology terms or to verify classification results. The DAG‑based execution model described for SemanticAnalysis ensures that KnowledgeGraph operations occur at deterministic points in the pipeline, preventing race conditions.
 
 **Sibling Components**  
 - **Pipeline**: Uses a DAG with topological sorting to orchestrate steps; KnowledgeGraph may be queried as part of a pipeline stage that needs relational context.  
@@ -99,11 +99,11 @@ The clear modular split makes the sub‑component highly maintainable. Changes t
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and LSL sessions. This is evident in the OntologyClassificationAgent, which leverages the OntologyConfigManager, OntologyManager, and OntologyValidator classes to classify observations against the ontology system, as seen in the integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts file. The topological sort ensures that the agents are executed in a specific order, preventing any potential circular dependencies or inconsistencies in the knowledge entities extraction process.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component's utilization of a DAG-based execution model with topological sort allows for efficient processing of git history and LSL sessions. This is evident in the OntologyClassificationAgent, which leverages the OntologyConfigManager, OntologyManager, and OntologyValidator classes to classify observations against the ontology system, as seen in the integrations/semantic-analysis/src/agents/ontology-classification-agent.ts file. The topological sort ensures that the agents are executed in a specific order, preventing any potential circular dependencies or inconsistencies in the knowledge entities extraction process.
 
 ### Siblings
 - [Pipeline](./Pipeline.md) -- PipelineAgent uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/mcp-server-semantic-analysis/src/config directory
+- [Ontology](./Ontology.md) -- OntologyConfigManager loads the ontology configuration from the ontology-config.yaml file in the integrations/semantic-analysis/src/config directory
 - [Insights](./Insights.md) -- InsightGenerator generates insights from the processed observations using the InsightGenerator class in insights/generator.ts
 - [CodeGraphConstructor](./CodeGraphConstructor.md) -- CodeGraphConstructor uses the ASTParser class in code-graph/parser.ts to parse the abstract syntax tree of the code
 - [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- SemanticInsightGenerator uses the NLPProcessor class in semantic-insight-generator/nlp-processor.ts to process the natural language text

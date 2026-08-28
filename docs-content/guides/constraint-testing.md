@@ -120,7 +120,7 @@ The system uses **two hook types** working together:
         "matcher": "*",
         "hooks": [{
           "type": "command",
-          "command": "node /path/to/coding/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+          "command": "node /path/to/coding/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
         }]
       }
     ],
@@ -224,10 +224,10 @@ Your actual task description goes here...
 
 ### Test Script
 
-**Location:** `integrations/mcp-constraint-monitor/test-all-constraints-comprehensive.js`
+**Location:** `integrations/constraint-monitor/test-all-constraints-comprehensive.js`
 
 ```bash
-cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
 node test-all-constraints-comprehensive.js
 ```
 
@@ -265,7 +265,7 @@ Pattern fixes needed: 10
 
 ### Guide
 
-**Location:** `integrations/mcp-constraint-monitor/INTERACTIVE-TEST-PROMPTS.md`
+**Location:** `integrations/constraint-monitor/INTERACTIVE-TEST-PROMPTS.md`
 
 ### Procedure
 
@@ -298,7 +298,7 @@ node collect-test-results.js
 **Start Dashboard:**
 
 ```bash
-cd /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor
+cd /Users/q284340/Agentic/coding/integrations/constraint-monitor
 PORT=3030 npm run dashboard
 ```
 
@@ -335,7 +335,7 @@ curl http://localhost:3031/api/violations?project=coding
 
 The constraint monitor is organized into these directories:
 
-**integrations/mcp-constraint-monitor/**
+**integrations/constraint-monitor/**
 
 - **src/hooks/** - Hook entry points (pre-tool, pre-prompt, real-time constraint)
 - **src/enforcement/** - Core logic (ConstraintEnforcer, PatternMatcher, ComplianceCalculator)

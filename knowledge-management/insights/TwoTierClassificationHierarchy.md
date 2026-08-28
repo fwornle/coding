@@ -8,7 +8,7 @@ The L2 sub-component description explicitly defines the two tiers: 'upper ontolo
 
 ## What It Is
 
-The TwoTierClassificationHierarchy is a structural classification contract defined within the broader Ontology component of the semantic analysis system. It is documented and contextualized across two primary locations: the architecture reference at `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` (under the "Agent Architecture" section), and the system overview at `integrations/mcp-server-semantic-analysis/README.md` (under "MCP Server - Semantic Analysis").
+The TwoTierClassificationHierarchy is a structural classification contract defined within the broader Ontology component of the semantic analysis system. It is documented and contextualized across two primary locations: the architecture reference at `integrations/semantic-analysis/docs/architecture/agents.md` (under the "Agent Architecture" section), and the system overview at `integrations/semantic-analysis/README.md` (under "MCP Server - Semantic Analysis").
 
 At its core, the hierarchy enforces a two-level taxonomy: an **upper ontology** that defines broad abstract categories, and a **lower ontology** that provides concrete entity type definitions. This structural contract is what the OntologyClassificationAgent depends on when making entity tagging decisions for nodes in the code graph. Rather than treating classification as a flat list of labels, the hierarchy imposes a deliberate stratification between stable abstractions and extensible concrete types.
 
@@ -28,13 +28,13 @@ Because no code symbols are surfaced for this entity directly, the hierarchy is 
 
 The OntologyClassificationAgent operationalizes this contract during classification of code graph nodes. When tagging a node, the agent traverses the hierarchy — consulting concrete lower-tier definitions to identify what an entity is, and resolving upward to associate that entity with its broader abstract category. This traversal pattern is the mechanism by which the two-tier structure produces meaningful classifications rather than isolated tags.
 
-The architecture documentation in `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md` is the canonical reference describing how this traversal works in the agent's decision flow. Developers wanting to understand the precise mechanics of how the OntologyClassificationAgent walks from concrete-to-abstract (or vice versa) should treat that file as the authoritative source.
+The architecture documentation in `integrations/semantic-analysis/docs/architecture/agents.md` is the canonical reference describing how this traversal works in the agent's decision flow. Developers wanting to understand the precise mechanics of how the OntologyClassificationAgent walks from concrete-to-abstract (or vice versa) should treat that file as the authoritative source.
 
 ## Integration Points
 
 The TwoTierClassificationHierarchy is contained by its parent, the Ontology component, and serves as the structural backbone that the Ontology exposes to consumers. Its primary downstream consumer is the OntologyClassificationAgent, which depends on the hierarchy's contract for every entity tagging operation it performs on code graph nodes.
 
-Upstream, the hierarchy integrates with the broader semantic analysis server documented in `integrations/mcp-server-semantic-analysis/README.md`. The README contextualizes the hierarchy as a defining characteristic of the server's approach, meaning the two-tier model is essentially part of the server's external promise — anyone integrating with the MCP semantic analysis server is implicitly relying on this stratified classification model.
+Upstream, the hierarchy integrates with the broader semantic analysis server documented in `integrations/semantic-analysis/README.md`. The README contextualizes the hierarchy as a defining characteristic of the server's approach, meaning the two-tier model is essentially part of the server's external promise — anyone integrating with the MCP semantic analysis server is implicitly relying on this stratified classification model.
 
 The dependency direction is unidirectional and clean: lower-tier definitions depend on the upper-tier contract, but the upper tier knows nothing about specific lower-tier extensions. This makes the upper ontology a stable interface, and the lower ontology an extension surface.
 
@@ -44,7 +44,7 @@ When extending the ontology, new entity types should almost always be added at t
 
 Developers introducing language-specific or domain-specific constructs (for example, new framework entity types, new language constructs, or codebase-specific concepts) should map them into existing upper-tier categories rather than inventing new abstract categories. This preserves the cross-codebase portability that the two-tier design was created to provide.
 
-When reasoning about classification behavior or debugging unexpected tagging by the OntologyClassificationAgent, the first reference should be `integrations/mcp-server-semantic-analysis/docs/architecture/agents.md`, since this document describes how the agent traverses the hierarchy. Treat the hierarchy as a contract: any change to the upper-tier categories must be considered a breaking change to the agent's classification semantics, while lower-tier additions should be backward compatible by design.
+When reasoning about classification behavior or debugging unexpected tagging by the OntologyClassificationAgent, the first reference should be `integrations/semantic-analysis/docs/architecture/agents.md`, since this document describes how the agent traverses the hierarchy. Treat the hierarchy as a contract: any change to the upper-tier categories must be considered a breaking change to the agent's classification semantics, while lower-tier additions should be backward compatible by design.
 
 Finally, avoid collapsing the hierarchy into a flat classification scheme in any consumer code. The two-tier separation is the explicit design distinction called out in the README, and flattening it would erode both the stability guarantees of the upper ontology and the extensibility benefits of the lower ontology.
 

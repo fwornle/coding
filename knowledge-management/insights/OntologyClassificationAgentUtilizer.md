@@ -9,7 +9,7 @@ The use of the OntologyClassificationAgent class implies a design decision to le
 **OntologyClassificationAgentUtilizer** is a sub‑component that lives inside the **AgentAdapter** package. Its purpose is to orchestrate the use of the **OntologyClassificationAgent** – a concrete agent defined at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
 The utilizer acts as the bridge between the generic adapter logic in *AgentAdapter* and the ontology‑driven classification capabilities supplied by the *OntologyClassificationAgent*. By delegating classification work to this agent, the utilizer enables the broader system to extract entities and analyse conversations with a semantic, ontology‑based understanding.
@@ -38,10 +38,10 @@ No evidence of cross‑process communication, event‑driven messaging, or micro
 The only concrete implementation artifact mentioned is the **OntologyClassificationAgent** class located at  
 
 ```
-integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts
+integrations/semantic-analysis/src/agents/ontology-classification-agent.ts
 ```  
 
-While the source code is not provided, the file path indicates a clear separation of concerns: all semantic‑analysis agents reside under `integrations/mcp-server-semantic-analysis/src/agents`. The *OntologyClassificationAgent* likely implements a common interface expected by *AgentAdapter* (e.g., `classify(observation): ClassificationResult`).  
+While the source code is not provided, the file path indicates a clear separation of concerns: all semantic‑analysis agents reside under `integrations/semantic-analysis/src/agents`. The *OntologyClassificationAgent* likely implements a common interface expected by *AgentAdapter* (e.g., `classify(observation): ClassificationResult`).  
 
 *OntologyClassificationAgentUtilizer* itself is not directly observed, but its role can be deduced:
 
@@ -97,7 +97,7 @@ The modular placement of the agent class suggests that additional agents (e.g., 
 
 ### System Structure Insights  
 
-* The **integrations/mcp-server-semantic-analysis** module houses all semantic analysis agents, indicating a clear boundary between core business logic and semantic processing.  
+* The **integrations/semantic-analysis** module houses all semantic analysis agents, indicating a clear boundary between core business logic and semantic processing.  
 * **AgentAdapter** acts as the façade for classification services, exposing a uniform API while delegating to specialized utilizers like *OntologyClassificationAgentUtilizer*.  
 * The hierarchy suggests a **vertical slice** where each functional slice (e.g., classification) contains its own adapter, utilizer, and concrete agent.
 
@@ -118,7 +118,7 @@ Overall, **OntologyClassificationAgentUtilizer** embodies a well‑structured, m
 ## Hierarchy Context
 
 ### Parent
-- [AgentAdapter](./AgentAdapter.md) -- AgentAdapter utilizes the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for ontology-based classification of observations and entities.
+- [AgentAdapter](./AgentAdapter.md) -- AgentAdapter utilizes the OntologyClassificationAgent class (integrations/semantic-analysis/src/agents/ontology-classification-agent.ts) for ontology-based classification of observations and entities.
 
 ---
 

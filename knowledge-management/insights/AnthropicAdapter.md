@@ -2,7 +2,7 @@
 
 **Type:** Detail
 
-integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered Model Selection Proposal') documents a tiered model selection design, suggesting AnthropicAdapter must expose Claude variants (e.g., Haiku vs. Sonnet vs. Opus) at distinct cost/<USER_ID_REDACTED> tiers consumable by the TierRouter without knowing provider internals
+integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered Model Selection Proposal') documents a tiered model selection design, suggesting AnthropicAdapter must expose Claude variants (e.g., Haiku vs. Sonnet vs. Opus) at distinct cost/<USER_ID_REDACTED> tiers consumable by the TierRouter without knowing provider internals
 
 # AnthropicAdapter — Technical Insight Document
 
@@ -10,7 +10,7 @@ integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md ('Tiered
 
 `AnthropicAdapter` is a concrete provider adapter implementation that sits within the `PublicCloudProviders` sub-component of the broader `LLMAbstraction` layer. While the source observations do not pin down a specific file path for the adapter class itself, its role is well-defined by its parent context: it is one of at least three concrete public cloud provider adapters (alongside OpenAI and Groq adapters) that normalize provider-specific behavior to a shared interface contract. Given that the project is built on Anthropic's Claude SDK, `AnthropicAdapter` is the most likely primary adapter in the default execution path.
 
-Functionally, the adapter encapsulates all Anthropic-specific concerns — authentication headers, request/response schemas, message formatting, and model selection — so that upstream callers in the `LLMAbstraction` layer interact with Anthropic's Claude API through the same uniform interface used for OpenAI or Groq. The tiered model selection design documented at `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` further constrains the adapter's surface: it must expose Claude variants (Haiku, Sonnet, Opus) at distinct cost/<USER_ID_REDACTED> tiers consumable by the `TierRouter`.
+Functionally, the adapter encapsulates all Anthropic-specific concerns — authentication headers, request/response schemas, message formatting, and model selection — so that upstream callers in the `LLMAbstraction` layer interact with Anthropic's Claude API through the same uniform interface used for OpenAI or Groq. The tiered model selection design documented at `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md` further constrains the adapter's surface: it must expose Claude variants (Haiku, Sonnet, Opus) at distinct cost/<USER_ID_REDACTED> tiers consumable by the `TierRouter`.
 
 This entity is part of the default fallback path: when `getLLMMode()` resolves to `'public'` (i.e., no local override or alternative mode is set), `PublicCloudProviders` is selected, and `AnthropicAdapter` becomes available as the routing target.
 
@@ -28,7 +28,7 @@ The provided observations do not include direct code symbols (`0 code symbols fo
 
 The adapter must implement the shared interface contract used by all `PublicCloudProviders` adapters. This means it provides normalized methods for at least the core LLM operations (e.g., completion or message generation), accepts a normalized request shape, and returns a normalized response shape regardless of how Anthropic's wire protocol differs from OpenAI's or Groq's. Anthropic-specific elements — including the message array structure with `role`/`content` blocks, the dedicated `system` parameter, header authentication, and API version pinning — are localized inside this adapter and never leak out.
 
-For tier exposure, the adapter must surface Claude model variants in a form the `TierRouter` can consume according to the design in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. This implies a mapping table or declarative registration whereby Claude Haiku, Sonnet, and Opus models are associated with their respective cost/<USER_ID_REDACTED> tiers. The adapter, not the router, owns the knowledge of which Claude model serves which tier — a critical separation of concerns.
+For tier exposure, the adapter must surface Claude model variants in a form the `TierRouter` can consume according to the design in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. This implies a mapping table or declarative registration whereby Claude Haiku, Sonnet, and Opus models are associated with their respective cost/<USER_ID_REDACTED> tiers. The adapter, not the router, owns the knowledge of which Claude model serves which tier — a critical separation of concerns.
 
 ## Integration Points
 
@@ -42,7 +42,7 @@ A further integration point is the `TierRouter` described in `TIERED-MODEL-PROPO
 
 Developers extending or maintaining `AnthropicAdapter` should respect the encapsulation boundary it establishes. Provider-specific behavior — Anthropic header schemes, message formatting, error code mappings, rate limit semantics — must remain inside the adapter. Leaking Anthropic types or identifiers into the broader `LLMAbstraction` layer would undermine the entire purpose of having sibling adapters for OpenAI and Groq.
 
-When adding new Claude model variants, update the adapter's tier mapping so the new model becomes available to the `TierRouter` through the abstraction defined in `integrations/mcp-server-semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. Avoid hardcoding Claude model IDs anywhere outside this adapter; consumers should always request by tier or via the normalized interface.
+When adding new Claude model variants, update the adapter's tier mapping so the new model becomes available to the `TierRouter` through the abstraction defined in `integrations/semantic-analysis/docs/TIERED-MODEL-PROPOSAL.md`. Avoid hardcoding Claude model IDs anywhere outside this adapter; consumers should always request by tier or via the normalized interface.
 
 Because `AnthropicAdapter` is on the default fallback path (engaged whenever `getLLMMode()` resolves to `'public'`), it is the most likely adapter to be exercised in standard operation. This makes its reliability, error handling, and observability disproportionately important. Failures here will be the most visible to end users, so defensive coding around Anthropic API errors, retries, and clear error normalization to the shared interface is essential.
 
