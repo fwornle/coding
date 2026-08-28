@@ -76,7 +76,8 @@ function reunderline(text, targetAbbrev) {
 // glyph of a different cell width changes the payload width after CSL already
 // left-padded it, which reintroduces trailing residue.
 //
-// Health icons (🟡 / 🔴) are excluded — those reflect ETM health, not idle age,
+// Health/alarm dots (ALARM_DOTS in CSL — bold amber/red ●) are excluded: they
+// reflect ETM health, not idle age,
 // and must come from the full CSL.
 const LIFECYCLE_ICONS = [
   '#[fg=colour41]●#[fg=default]',   // Active
@@ -122,8 +123,10 @@ function normalizeMappingEntry(v) {
 }
 
 // Patch each project's lifecycle icon in `text` based on its current
-// transcript mtime. Only replaces lifecycle glyphs — leaves 🟡 / 🔴
-// alone so health-degraded sessions keep their warning icon. Returns
+// transcript mtime. Only replaces lifecycle glyphs — the alternation below is
+// an EXACT-string list of the five ramp shades, so an alarm dot (bold, and
+// carrying a `,bold]`/`,nobold]` tag the ramp shades never have) can never be
+// matched and overwritten, and a health-degraded session keeps its alarm. Returns
 // { text, anyTranscriptNewerThanCache } so the caller can decide
 // whether to also force a background refresh.
 // Newest timestamped record at the tail of a transcript .jsonl, or 0.
@@ -387,11 +390,17 @@ child.on('exit', (code, signal) => {
   // surfacing them to the user. The user explicitly does not want to see
   // "SYS:TIMEOUT" / "SYS:ERR" in the statusline — those are diagnostic
   // markers, not user-facing content.
-  // Match both the legacy ⚠️ form and the current 🟡 form. ⚠️ (U+26A0+VS16)
-  // was swapped out because its tmux/terminal cell-width mismatch leaked
-  // trailing chars into the statusline; kept here defensively so stale
-  // caches written by older CSL builds are still recognised as markers.
-  const isMarkerOnly = /^\s*(?:⚠️?|🟡)\s*SYS:(TIMEOUT|ERR)\b/.test(result.trimStart());
+  // Glyph-AGNOSTIC by construction: strip tmux format sequences first, then
+  // allow any of the marker glyphs this has ever used. Matching the glyph
+  // literally is what made this fragile — the marker has now been ⚠️, then 🟡,
+  // and is now a bold red ● (ALARM_DOTS.CRIT in combined-status-line.js, which
+  // arrives wrapped in #[fg=...] so a literal-glyph regex cannot even see it).
+  // Every one of those changes would silently un-match here and start showing
+  // "SYS:ERR" to the user, which the comment above says must never happen.
+  // The ⚠️/🟡 alternatives are kept so stale caches written by older CSL builds
+  // are still recognised.
+  const markerProbe = result.trimStart().replace(/#\[[^\]]*\]/g, '').trimStart();
+  const isMarkerOnly = /^\s*(?:⚠️?|🟡|●)\s*SYS:(TIMEOUT|ERR)\b/.test(markerProbe);
 
   if (code === 0 && result.trimEnd() && !isMarkerOnly) {
     process.stdout.write(result + '\n');
