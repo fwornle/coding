@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { normalizeProvider } from '@/lib/providers'
 import { FlowTab } from './token-usage-flow-tab'
 
 /**
@@ -133,7 +134,16 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         setBehaviour(b)
         setConfig(c)
         // Only rows that carry a decision — the rest have nothing to show here.
-        setRecent((rec.data ?? []).filter((r: RecentRow) => r.routing_source))
+        //
+        // The provider is folded onto its ACCOUNT id on the way in. History holds
+        // several spellings for one account (`claude-code` and `claude-code-max`
+        // are the same Max subscription), and rendering them side by side makes a
+        // route look as though it served two providers — which this view would
+        // then present as a divergence, i.e. a fallback that never happened. The
+        // behaviour endpoint folds the same way, so both halves of the tab agree.
+        setRecent((rec.data ?? [])
+          .filter((r: RecentRow) => r.routing_source)
+          .map((r: RecentRow) => ({ ...r, provider: normalizeProvider(r.provider) })))
       })
       .catch(e => { if (!cancelled) setError(String(e.message || e)) })
     return () => { cancelled = true }
@@ -257,6 +267,20 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
             <div key={i} className="text-amber-600 dark:text-amber-500">⚠ {w}</div>
           ))}
           <div className="font-mono text-[10px] text-muted-foreground pt-1">{config.paths.routing}</div>
+        </CardContent>
+      </Card>
+
+      {/* ── The config as a picture ──
+          Sits directly under the Configured summary, so the shape of the routing
+          is the first thing you see and everything below it is observed data.
+          Same component the Settings dialog uses, so the diagram cannot drift
+          between the two places it appears. */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Configured flow</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FlowTab data={config as any} proxyBase={proxyBase} hours={Number(hours) || 24} />
         </CardContent>
       </Card>
 
@@ -477,18 +501,6 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         </CardContent>
       </Card>
 
-      {/* ── The config as a picture ──
-          Same component the Settings dialog uses, so the diagram cannot drift
-          between the two places it appears. Here it is purely a reading aid:
-          the tables above carry the observed numbers. */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Configured flow</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FlowTab data={config as any} proxyBase={proxyBase} hours={Number(hours) || 24} />
-        </CardContent>
-      </Card>
     </div>
   )
 }

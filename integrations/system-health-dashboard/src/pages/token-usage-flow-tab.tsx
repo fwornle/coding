@@ -19,9 +19,19 @@ import { normalizeModel } from '@/components/performance/models'
  *              token_usage. Edge thickness and the per-account token counts.
  *
  * A thick edge to a provider the config does not name means traffic is arriving
- * by fallback, not by route — which is exactly the state the system has been in
- * while Copilot's quota is exhausted, and which no table on the other two tabs
- * makes visible.
+ * somewhere the routes do not send it — the state the system is in whenever
+ * Copilot's quota is exhausted, and which the route tables cannot show.
+ *
+ * WHAT THIS DIAGRAM CANNOT DO, and used to imply it could: the traffic behind an
+ * edge is a per-ACCOUNT total, so it says where calls landed, never why. It
+ * cannot attribute a call to the route that produced it, cannot separate a
+ * fallback from a route change, and cannot distinguish a provider the config
+ * never offered from one it offered that was unreachable. Those are recorded per
+ * call now — Token Usage → Routing reads them back. Keep this as the shape of
+ * the config; go there for what actually happened.
+ *
+ * Rendered in two places (the Settings dialog and the Routing tab) so the
+ * picture cannot drift between them.
  */
 
 // ── Shapes ───────────────────────────────────────────────────────────────────
@@ -225,10 +235,12 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        The same routing config as the other two tabs, drawn as flow. <strong>Solid</strong> edges are
+        The routing config drawn as flow. <strong>Solid</strong> edges are
         declared routes; <strong>dashed</strong> are fallback chains. Edge thickness and the token
-        counts are real traffic from the last {hours}h — so a thick dashed edge means work is landing
-        somewhere the config never sent it.
+        counts are real traffic from the last {hours}h, aggregated per ACCOUNT — so a thick dashed
+        edge means work is landing on a provider this config does not route to. Which route sent it,
+        and whether it arrived by fallback, is recorded per call on the Routing tab; this diagram
+        cannot tell you that.
         {usageError && (
           <span className="block mt-1 text-amber-600 dark:text-amber-500">
             Traffic unavailable ({usageError}) — showing configuration only.
