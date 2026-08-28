@@ -183,6 +183,22 @@ export function parseTimestamp(timestamp, timezone = null) {
 }
 
 /**
+ * LSL file extensions.
+ *
+ * `.jsonl` is the pi session format the writer now emits; `.md` is the legacy
+ * markdown corpus. Readers must accept BOTH — the backfill converts the corpus
+ * in batches, so mixed directories are a normal steady state, not a transient.
+ */
+export const LSL_EXTENSION = '.jsonl';
+export const LSL_LEGACY_EXTENSION = '.md';
+export const LSL_EXTENSIONS = [LSL_EXTENSION, LSL_LEGACY_EXTENSION];
+
+/** True for any LSL transcript file, current format or legacy. */
+export function isLslFile(name) {
+  return LSL_EXTENSIONS.some((e) => name.endsWith(e));
+}
+
+/**
  * Generate LSL filename with new format: YYYY-MM-DD_HHMM-HHMM_hash_from-project.md
  * Replaces old format that included "session" word
  * @param {Date|number} timestamp - UTC timestamp
@@ -211,14 +227,20 @@ export function generateLSLFilename(timestamp, projectName, targetProject, sourc
   const baseName = `${year}-${month}-${day}_${timeWindow}${partSuffix}_${userHash}`;
   
   // Determine if this is a local file or redirected file
+  // Extension is a parameter so the reader/backfill can still build legacy
+  // `.md` names while the writer emits `.jsonl`. Only the extension changed in
+  // the pi-format migration; the basename grammar is unchanged and load-bearing
+  // (LslMarkdownParser.groupChains parses part numbers out of it).
+  const ext = options.extension || LSL_EXTENSION;
+
   if (!sourceProject || targetProject === sourceProject) {
     // Local project - no "from-project" suffix
-    return `${baseName}.md`;
+    return `${baseName}${ext}`;
   } else {
     // Redirected to coding project - add "from-project" suffix
     // Extract actual project name from source path
     const sourceProjectName = sourceProject.split('/').pop();
-    return `${baseName}_from-${sourceProjectName}.md`;
+    return `${baseName}_from-${sourceProjectName}${ext}`;
   }
 }
 

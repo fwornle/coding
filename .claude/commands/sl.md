@@ -63,13 +63,32 @@ two `ls` forms plus `Read`.
    `.specstory/history/*.md` finds nothing.
 2. `ls -1r .specstory/history/<YYYY>/<MM>` for that tranche — newest first.
    **This orders by filename, NOT by modification time**, which is what you want: filenames
-   are date-encoded (`YYYY-MM-DD_HHMM-HHMM-<hash>.md`) and are the only reliable ordering. A
-   `git checkout`, clone, or submodule update rewrites mtimes wholesale and would surface
+   are date-encoded (`YYYY-MM-DD_HHMM-HHMM-<hash>.<ext>`) and are the only reliable ordering.
+   A `git checkout`, clone, or submodule update rewrites mtimes wholesale and would surface
    months-old files as "most recent".
-   Suffixed siblings (`…-1_<hash>.md`, `…-2_<hash>.md`) are continuations of the same time
+   Suffixed siblings (`…-1_<hash>`, `…-2_<hash>`) are continuations of the same time
    tranche — treat them as one session, newest suffix last.
    If the newest tranche has too few files, repeat for the preceding month.
+
+   **Two formats coexist.** Current files are `.jsonl` (pi session format); older ones are
+   `.md`. The backfill converts in batches, so a mixed directory is normal — read whichever
+   is there, and do not assume an extension when globbing.
 3. **Read** the most recent file.
+
+   For a `.jsonl` file, each line is one entry. What you care about:
+   - `{"type":"custom","customType":"lsl.tranche"}` — the header: window, agent, project,
+     and whether the session was redirected from another project.
+   - `{"type":"custom","customType":"lsl.promptSet"}` — one per prompt set; `data.promptSetId`
+     is the `ps_<ms>` id that used to be an `<a name>` anchor.
+   - `{"type":"message"}` — `message.role` is `user`, `assistant` or `toolResult`. User prompts
+     are the `text` blocks under a `user` message; tool calls are `toolCall` blocks under an
+     `assistant` message, paired to a `toolResult` by `toolCallId`.
+   - `{"type":"session","parentSession":"…"}` — the previous rotation part. Follow it backwards
+     when a session spans several files.
+
+   Skim by grepping for user turns rather than reading every line of a large file:
+   `grep -o '"role":"user".\{0,300\}' <file>`.
+
 4. Judge length from what `Read` returned:
    - **Short** (a few hundred lines, or the content is one aborted/trivial exchange) → also
      Read the next 1-2 files back

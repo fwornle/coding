@@ -2,6 +2,7 @@ import { Provider } from 'react-redux'
 import { store } from './store'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import SystemHealthDashboard from './components/system-health-dashboard'
+import { LslSessionsPage } from './pages/lsl-sessions'
 import { ObservationsPage } from './pages/observations'
 import { DigestsPage } from './pages/digests'
 import { InsightsPage } from './pages/insights'
@@ -26,6 +27,7 @@ function AppContent() {
       <NavBar />
       <Routes>
         <Route path="/" element={<SystemHealthDashboard />} />
+        <Route path="/sessions" element={<LslSessionsPage />} />
         <Route path="/observations" element={<ObservationsPage />} />
         <Route path="/digests" element={<DigestsPage />} />
         <Route path="/insights" element={<InsightsPage />} />

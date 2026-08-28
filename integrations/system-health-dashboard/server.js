@@ -30,6 +30,16 @@ const require_cjs = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_REPO || join(__dirname, '../..');
 
+// LSL Sessions tab — see lsl-sessions.mjs for why a "session" is a CHAIN and
+// why rendering reuses pi's exported shell instead of shelling out to `pi`.
+import {
+    listSessions as lslListSessions,
+    readSession as lslReadSession,
+    renderSessionHtml as lslRenderSessionHtml,
+    findPromptSet as lslFindPromptSet,
+    discoverProjects as lslDiscoverProjects,
+} from './lsl-sessions.mjs';
+
 // ---------------------------------------------------------------------------
 // Code Graph VIEWER — in-memory graphify index (see /api/cgr/graph* handlers).
 //
@@ -530,6 +540,12 @@ class SystemHealthAPIServer {
         this.app.get('/api/observations/projects', this.handleGetObservationProjects.bind(this));
 
         // Digests & Insights API (observation consolidation)
+        // LSL Sessions (verbatim transcripts, pi format + legacy markdown)
+        this.app.get('/api/lsl/projects', this.handleGetLslProjects.bind(this));
+        this.app.get('/api/lsl/sessions', this.handleGetLslSessions.bind(this));
+        this.app.get('/api/lsl/promptset/:psId', this.handleGetLslPromptSet.bind(this));
+        this.app.get('/api/lsl/sessions/:id(*)/export.html', this.handleGetLslSessionHtml.bind(this));
+        this.app.get('/api/lsl/sessions/:id(*)', this.handleGetLslSession.bind(this));
         this.app.get('/api/digests', this.handleGetDigests.bind(this));
         this.app.get('/api/digests/projects', this.handleGetDigestProjects.bind(this));
         this.app.get('/api/insights', this.handleGetInsights.bind(this));
@@ -5083,6 +5099,77 @@ class SystemHealthAPIServer {
      */
     handleGetAllProjects(req, res) {
         return this._forwardObsApi(req, res, '/api/projects');
+    }
+
+    /**
+     * GET /api/lsl/projects — projects that have an LSL history tree.
+     */
+    handleGetLslProjects(req, res) {
+        try {
+            res.json({ projects: lslDiscoverProjects(codingRoot).map((p) => p.project) });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * GET /api/lsl/sessions — chains, newest first.
+     * Reads only each chain's head, so it stays cheap over ~20k files.
+     */
+    handleGetLslSessions(req, res) {
+        try {
+            const limit = Math.min(Number(req.query.limit) || 100, 500);
+            const months = Math.min(Number(req.query.months) || 2, 24);
+            const project = req.query.project || undefined;
+            res.json({ sessions: lslListSessions(codingRoot, { project, limit, months }) });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * GET /api/lsl/sessions/:id — parsed entries for one chain.
+     * A legacy markdown chain is converted IN MEMORY by the same parser and
+     * writer the backfill uses, so this doubles as a preview of the conversion.
+     */
+    handleGetLslSession(req, res) {
+        try {
+            const data = lslReadSession(codingRoot, req.params.id);
+            if (!data) return res.status(404).json({ error: 'session not found' });
+            res.json(data);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * GET /api/lsl/sessions/:id/export.html — full-fidelity transcript render.
+     */
+    handleGetLslSessionHtml(req, res) {
+        try {
+            // The transcript is an iframe inside a themed dashboard, so it has
+            // to be told which theme to paint. Anything but an explicit 'light'
+            // falls back to pi's own dark shell.
+            const theme = req.query.theme === 'light' ? 'light' : 'dark';
+            const html = lslRenderSessionHtml(codingRoot, req.params.id, { theme });
+            if (!html) return res.status(404).send('session not found');
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.send(html);
+        } catch (error) {
+            res.status(500).send(`<pre>${error.message}</pre>`);
+        }
+    }
+
+    /**
+     * GET /api/lsl/promptset/:psId — every slice of one prompt set.
+     * The query markdown could only answer with `grep -l ps_X *.md`.
+     */
+    handleGetLslPromptSet(req, res) {
+        try {
+            res.json({ promptSetId: req.params.psId, hits: lslFindPromptSet(codingRoot, req.params.psId) });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
     }
 
     /**

@@ -115,6 +115,37 @@ export function budgetProvider(provider: string): BudgetProvider {
   if (p.includes('copilot') || p === 'github') return 'copilot'
   return 'claude-max' // anthropic, claude-code, max-oauth-passthrough
 }
+
+// ---- Wire protocol → input-token semantics -------------------------------
+// The proxy taps two wire protocols with DIFFERENT cache-accounting semantics
+// (see rapid-llm-proxy/src/usage-cache.ts):
+//
+//   - Anthropic wire (claude-code-max / anthropic): usage.input_tokens EXCLUDES
+//     cached tokens — cache_read_input_tokens / cache_creation_input_tokens are
+//     genuinely separate counters alongside it.
+//   - OpenAI wire (copilot / gh-copilot / opencode / pi-via-copilot):
+//     usage.prompt_tokens_details.cached_tokens is a SUBSET of usage.prompt_tokens
+//     — cache reads are already included in input_tokens, not additive.
+//
+// cellCostUsd's server-recorded row shape doesn't carry which wire produced it,
+// only `provider`, so we infer it the same way budgetProvider() already does:
+// copilot-family providers are OpenAI wire, everything else (claude-code-max,
+// anthropic) is Anthropic wire. Pricing input_tokens + cache_read_tokens at
+// full rates for an OpenAI-wire row double-bills the cached portion — this is
+// the bug flagged 2026-08-28 (dashboard overstating cost for copilot/opencode/pi
+// rows, confirmed live: `pi` process row had cache_read_tokens at 90% of
+// input_tokens, i.e. billed twice for 90% of its tokens at full input price).
+function isOpenAIWireProvider(provider: string): boolean {
+  const p = (provider || '').toLowerCase()
+  return p.includes('copilot') || p === 'github' || p === 'opencode'
+}
+// Input tokens NOT already covered by cache_read_tokens — i.e. the portion
+// that should be billed at the full (non-cached) input rate. For Anthropic-wire
+// rows, input_tokens already excludes cache reads, so this is a no-op.
+export function freshInputTokens(r: CostRow): number {
+  if (!isOpenAIWireProvider(r.provider)) return r.input_tokens
+  return Math.max(0, r.input_tokens - r.cache_read_tokens)
+}
 export const BUDGET_PROVIDER_LABEL: Record<BudgetProvider, string> = {
   copilot: 'GitHub Copilot',
   'claude-max': 'Claude Max',
@@ -124,8 +155,13 @@ export const BUDGET_PROVIDER_LABEL: Record<BudgetProvider, string> = {
 export function cellCostUsd(r: CostRow, cfg: CostConfig): number {
   const { price } = priceForModel(r.model, cfg.modelPrices)
   const scale = cfg.providerScale?.[budgetProvider(r.provider)] ?? 1
+  // freshInputTokens excludes the cache_read_tokens portion for OpenAI-wire
+  // rows (copilot/opencode/pi-via-copilot), where input_tokens already
+  // INCLUDES cached tokens — pricing both at full rate double-bills the
+  // cached share. Anthropic-wire rows are unaffected (input_tokens there
+  // already excludes cache reads), so freshInputTokens is a no-op for them.
   const usd = (
-    (r.input_tokens / 1e6) * price.in +
+    (freshInputTokens(r) / 1e6) * price.in +
     (r.output_tokens / 1e6) * price.out +
     (r.cache_read_tokens / 1e6) * price.cacheRead +
     (r.cache_write_tokens / 1e6) * price.cacheWrite
@@ -274,7 +310,7 @@ export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string
     const fam = modelFamily(r.model)
     if (fam === 'haiku') continue // already cheap
     const curEur = usdToEur(cellCostUsd(r, cfg), cfg)
-    const haikuUsd = (r.input_tokens / 1e6) * haiku.in + (r.output_tokens / 1e6) * haiku.out +
+    const haikuUsd = (freshInputTokens(r) / 1e6) * haiku.in + (r.output_tokens / 1e6) * haiku.out +
       (r.cache_read_tokens / 1e6) * haiku.cacheRead + (r.cache_write_tokens / 1e6) * haiku.cacheWrite
     const haikuEur = usdToEur(haikuUsd, cfg)
     const key = r.process

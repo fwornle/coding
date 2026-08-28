@@ -2,6 +2,15 @@
 /**
  * Split oversized LSL history files into numbered parts.
  * Splits at "## Prompt Set" boundaries, respecting max file size.
+ *
+ * MARKDOWN ONLY, deliberately. The `.md` filter below is a guard, not an
+ * oversight: pi-format `.jsonl` tranches cannot be split by slicing text,
+ * because each part needs its own `session` header and `lsl.tranche` spine,
+ * and every prompt set must be re-parented to the spine of the part it lands
+ * in. Emitting raw slices would produce headerless fragments — exactly the
+ * orphan-part problem the pi format was adopted to remove. The live writer
+ * already rotates on size via getActiveSessionFilePath(); this script exists
+ * only to repair the legacy corpus.
  * 
  * Usage: node scripts/split-lsl-files.js [--dry-run] [--max-kb=200] [--dir=.specstory/history]
  */
@@ -120,7 +129,7 @@ let grandTotalParts = 0;
 
 while (true) {
   iteration++;
-  const files = fs.readdirSync(HISTORY_DIR).filter(f => f.endsWith('.md'));
+  const files = fs.readdirSync(HISTORY_DIR).filter(f => f.endsWith('.md')); // see header: .jsonl is intentionally excluded
   let totalSplit = 0;
   let totalParts = 0;
 

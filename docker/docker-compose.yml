@@ -142,6 +142,16 @@ services:
       # added /api/* reverse-proxy and we need host edits to take effect without
       # a Docker image rebuild — same pattern as server.js above).
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/static-server.js:/coding/integrations/system-health-dashboard/static-server.js:ro
+      # Sessions tab: the LSL session model, and pi's vendored export shell.
+      # Same live-mount rationale as server.js — these are plain .mjs/.html with
+      # no build step, and the tab is iterated on frequently.
+      - ${CODING_REPO:-.}/integrations/system-health-dashboard/lsl-sessions.mjs:/coding/integrations/system-health-dashboard/lsl-sessions.mjs:ro
+      - ${CODING_REPO:-.}/integrations/system-health-dashboard/assets:/coding/integrations/system-health-dashboard/assets:ro
+      # src/live-logging holds the LSL parser + pi writer that lsl-sessions.mjs
+      # imports. The image bakes a copy, but it predates these modules, so a
+      # baked-only path leaves the Sessions tab importing files that do not
+      # exist. Mounted so host edits to the format take effect without a rebuild.
+      - ${CODING_REPO:-.}/src/live-logging:/coding/src/live-logging:ro
       # Graphify re-index script (spawned by the dashboard Re-index button);
       # live-mounted so host edits take effect without an image rebuild.
       - ${CODING_REPO:-.}/scripts/graphify-reindex.sh:/coding/scripts/graphify-reindex.sh:ro

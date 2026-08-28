@@ -48,6 +48,7 @@ export function NavBar() {
 
   const tabs = [
     { label: 'Health', path: '/' },
+    { label: 'Sessions', path: '/sessions', testId: 'sessions-tab' },
     { label: 'Observations', path: '/observations', count: obsCount },
     { label: 'Digests', path: '/digests', count: digestCount },
     { label: 'Insights', path: '/insights', count: insightCount },

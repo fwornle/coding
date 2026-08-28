@@ -1,0 +1,101 @@
+/*
+ * Light palette for pi's session-export shell.
+ *
+ * WHY THIS IS A SEPARATE FILE AND NOT AN EDIT TO THE SHELL: the shell is
+ * captured verbatim from `pi --export` by scripts/vendor-pi-export-shell.mjs
+ * and is overwritten wholesale on every re-vendor. A hand-edit there survives
+ * exactly until the next pi upgrade. This file is injected at render time
+ * instead, so it outlives the shell it themes.
+ *
+ * WHY AN OVERRIDE BLOCK RATHER THAN A FORK OF THE CSS: the shell's stylesheet
+ * is entirely token-driven — every colour resolves through a custom property
+ * on :root, and the only literals are neutral greys and a modal scrim, which
+ * read correctly in both themes. Redefining the tokens therefore re-themes the
+ * whole renderer without touching a single rule.
+ *
+ * The values are the Tomorrow light palette (the published light counterpart
+ * of the Tomorrow Night colours pi ships), with syntax colours from VS Code
+ * Light+ since the shell's dark syntax set is Dark+. Using the paired variants
+ * keeps hue relationships intact across the toggle rather than inventing a
+ * second, unrelated colour story.
+ */
+
+:root[data-theme="light"] {
+  /* Darker than Tomorrow-light's #3e999f: the shell uses --accent as a text
+     colour (3.35:1 on white at that value, against 8.0:1 in the dark theme)
+     as well as a button fill paired with --body-bg. #2b7a80 clears 4.5:1 in
+     both directions. */
+  --accent: #2b7a80;
+  --border: #4271ae;
+  --borderAccent: #0086b3;
+  --borderMuted: #d0d0d0;
+  --success: #5b7100;
+  --error: #c82829;
+  /* Dark uses pure #ffff00 — 15.4:1 on its panel. On white the same hue is
+     unreadable, so the light counterpart is a darkened amber chosen to clear
+     4.5:1 (the shell uses --warning as a text colour). */
+  --warning: #8a6200;
+  --muted: #6b6b6b;
+  --dim: #8e908c;
+  --text: #2f2f2e;
+  --thinkingText: #6b6b6b;
+  --selectedBg: #dfe6f2;
+  --scrollbarThumb: #c4c4c4;
+  --searchMatchBg: #fff3a3;
+  --searchMatchText: #2f2f2e;
+  --userMessageBg: #eef1f6;
+  --userMessageText: #2f2f2e;
+  --customMessageBg: #f1ecfa;
+  --customMessageText: #2f2f2e;
+  --customMessageLabel: #6b4fa8;
+  --toolPendingBg: #f2f2f5;
+  --toolSuccessBg: #eef5ea;
+  --toolErrorBg: #fbecec;
+  --toolTitle: #2f2f2e;
+  --toolOutput: #5f5f5f;
+  --mdHeading: #8f5a00;
+  --mdLink: #4271ae;
+  --mdLinkUrl: #8e908c;
+  --mdCode: #2b7a80;
+  --mdCodeBlock: #5b7100;
+  --mdCodeBlockBorder: #d4d4d4;
+  --mdQuote: #6b6b6b;
+  --mdQuoteBorder: #c4c4c4;
+  --mdHr: #d4d4d4;
+  --mdListBullet: #2b7a80;
+  --toolDiffAdded: #2f7d32;
+  --toolDiffRemoved: #c82829;
+  --toolDiffContext: #6b6b6b;
+  --syntaxComment: #008000;
+  --syntaxKeyword: #0000ff;
+  --syntaxFunction: #795e26;
+  --syntaxVariable: #001080;
+  --syntaxString: #a31515;
+  --syntaxNumber: #098658;
+  --syntaxType: #267f99;
+  --syntaxOperator: #2f2f2e;
+  --syntaxPunctuation: #2f2f2e;
+  /* The thinking-effort ramp is ordered, not decorative — it has to stay
+     monotonic in intensity after the flip, or the reader loses the ordering. */
+  --thinkingOff: #b0b0b0;
+  --thinkingMinimal: #8e908c;
+  --thinkingLow: #4271ae;
+  --thinkingMedium: #2f6f9f;
+  --thinkingHigh: #8959a8;
+  --thinkingXhigh: #a13bbf;
+  --thinkingMax: #c026d3;
+  --bashMode: #5b7100;
+  --exportPageBg: #f5f5f7;
+  --exportCardBg: #ffffff;
+  --exportInfoBg: #fff8e1;
+  --body-bg: #f5f5f7;
+  --container-bg: #ffffff;
+  --info-bg: #fff8e1;
+  /* Native scrollbars and form controls inside the iframe follow this, not the
+     custom properties above. */
+  color-scheme: light;
+}
+
+:root:not([data-theme="light"]) {
+  color-scheme: dark;
+}

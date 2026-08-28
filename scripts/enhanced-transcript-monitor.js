@@ -38,7 +38,18 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import readline from 'readline';
-import { parseTimestamp, formatTimestamp, getTimeWindow, getTimezone, utcToLocalTime, generateLSLFilename } from './timezone-utils.js';
+import { parseTimestamp, formatTimestamp, getTimeWindow, getTimezone, utcToLocalTime, generateLSLFilename, LSL_EXTENSION, isLslFile } from './timezone-utils.js';
+import {
+  sessionHeader as piSessionHeader,
+  buildTrancheEntries,
+  buildPromptSetEntries,
+  exchangesToBlocks,
+  removePromptSet,
+  serialize as piSerialize,
+  entryId as piEntryId,
+  makeIdGen,
+  uuidFrom,
+} from '../src/live-logging/PiSessionWriter.js';
 import { lslWritePath, resolveLslPath, lslListAll } from './lsl-paths.js';
 import AdaptiveExchangeExtractor from '../src/live-logging/AdaptiveExchangeExtractor.js';
 // SemanticAnalyzer removed — called APIs directly without proxy support, hanging on VPN
@@ -3412,7 +3423,7 @@ ORDER BY m.time_created ASC;`;
 
     // Base file is too large — find the highest existing part number
     const dir = path.dirname(baseFile);
-    const baseName = path.basename(baseFile, '.md');
+    const baseName = path.basename(baseFile, LSL_EXTENSION);
 
     const currentProjectName = path.basename(this.config.projectPath);
     const resolvedTarget = path.resolve(targetProject);
@@ -3463,6 +3474,66 @@ ORDER BY m.time_created ASC;`;
   /**
    * Create session file with initial content (no longer creates empty files)
    */
+  /**
+   * Deterministic spine id for a tranche file.
+   *
+   * Derived from the basename rather than read back out of the file, so an
+   * append never has to parse what it is appending to, and a re-flush of the
+   * same prompt set reproduces byte-identical entries (removePromptSet +
+   * re-append is then a true no-op rather than an id churn).
+   */
+  trancheSpineId(sessionFile) {
+    return piEntryId(`${path.basename(sessionFile)}:spine`);
+  }
+
+  /**
+   * Build the JSONL header lines for a new tranche file: pi `session` header,
+   * `session_info` title, and the `lsl.tranche` spine that every prompt set
+   * parents off.
+   */
+  buildTrancheHeaderJsonl({ sessionFile, tranche, targetProject, isRedirected,
+                            currentProjectName, agentDisplayName, sessionTimestamp }) {
+    const base = path.basename(sessionFile);
+    const iso = sessionTimestamp.toISOString();
+    const partMatch = base.match(/-(\d+)_[^_.]+/);
+
+    // Chain this part to its predecessor so rotation is navigable. Markdown
+    // had no way to express this at all: a `-N_` part was an orphan fragment
+    // that could not even be parsed on its own.
+    const partNumber = partMatch ? Number(partMatch[1]) : null;
+    let parentSession = null;
+    if (partNumber && partNumber > 1) {
+      const prev = base.replace(/-(\d+)_/, `-${partNumber - 1}_`);
+      if (fs.existsSync(path.join(path.dirname(sessionFile), prev))) parentSession = prev;
+    }
+
+    const header = piSessionHeader({
+      id: uuidFrom(base), timestamp: iso, cwd: targetProject,
+      ...(parentSession ? { parentSession } : {}),
+    });
+
+    const meta = {
+      timeWindow: tranche.timeString,
+      date: tranche.date,
+      part: partNumber,
+      agent: agentDisplayName,
+      focus: isRedirected ? `Coding activities from ${currentProjectName}` : 'Live session logging',
+      redirected: isRedirected,
+      fromProject: isRedirected ? currentProjectName : null,
+      sourceProject: isRedirected ? this.config.projectPath : null,
+      generated: iso,
+    };
+
+    // Force the ids to the deterministic pair so trancheSpineId() matches.
+    const spineId = this.trancheSpineId(sessionFile);
+    const infoId = piEntryId(`${base}:info`);
+    let idx = 0;
+    const fixedGen = () => (idx++ === 0 ? infoId : spineId);
+    const { entries } = buildTrancheEntries(meta, fixedGen, iso);
+
+    return piSerialize([header, ...entries]);
+  }
+
   async createSessionFileWithContent(targetProject, tranche, initialContent, explicitFilePath = null) {
     const sessionFile = explicitFilePath || this.getSessionFilePath(targetProject, tranche);
     
@@ -3499,18 +3570,15 @@ ORDER BY m.time_created ASC;`;
       const agentDisplayName = this.agentType === 'pi' ? 'Pi' :
         this.agentType === 'copilot' ? 'GitHub Copilot' :
         this.agentType === 'opencode' ? 'OpenCode' : 'Claude Code';
-      const agentLine = `**Agent:** ${agentDisplayName}\n`;
 
-      const sessionHeader = `# WORK SESSION (${tranche.timeString})${isRedirected ? ` - From ${currentProjectName}` : ''}\n\n` +
-        `**Generated:** ${sessionTimestamp.toISOString()}\n` +
-        `**Work Period:** ${tranche.timeString}\n` +
-        agentLine +
-        `**Focus:** ${isRedirected ? `Coding activities from ${currentProjectName}` : 'Live session logging'}\n` +
-        `**Duration:** ~60 minutes\n` +
-        `${isRedirected ? `**Source Project:** ${this.config.projectPath}\n` : ''}` +
-        `\n---\n\n## Session Overview\n\n` +
-        `This session captures ${isRedirected ? 'coding-related activities redirected from ' + currentProjectName : 'real-time tool interactions and exchanges'}.\n\n` +
-        `---\n\n## Key Activities\n\n`;
+      // pi session header + `session_info` + the `lsl.tranche` spine, replacing
+      // the markdown `# WORK SESSION` block. Every field the markdown header
+      // carried survives in the spine's `data`, where it is machine-readable
+      // instead of needing a regex to get back out.
+      const sessionHeader = this.buildTrancheHeaderJsonl({
+        sessionFile, tranche, targetProject, isRedirected,
+        currentProjectName, agentDisplayName, sessionTimestamp,
+      });
 
         // TRACING: Log file creation with timestamp details
         console.log(`📝 Creating LSL file: ${path.basename(sessionFile)}`);
@@ -3659,38 +3727,28 @@ ORDER BY m.time_created ASC;`;
         return;
       }
       const candidates = dirEntries
-        .filter(name => name.startsWith(datePrefix) && name.endsWith('.md'))
+        .filter(name => name.startsWith(datePrefix) && name.endsWith(LSL_EXTENSION))
         .map(name => path.join(dir, name));
 
-      const anchor = `<a name="${promptSetId}"></a>`;
-      const nextAnchorPattern = '<a name="ps_';
-
+      // JSONL replacement for the old regex block surgery.
+      //
+      // The markdown version cut from `<a name="ps_X"></a>` to the next anchor
+      // — a byte-range guess that had to be re-derived on every format tweak,
+      // and that could not see a block whose anchor rotation had split from its
+      // heading. Because a prompt set is now a subtree rooted at its
+      // `lsl.promptSet` entry, removal is a reachability filter instead: drop
+      // that entry and everything transitively parented to it. Nothing outside
+      // the set can be caught, and a set split across parts is handled by
+      // running the same filter over every candidate file.
       for (const file of candidates) {
         if (!fs.existsSync(file)) continue;
-        let content = fs.readFileSync(file, 'utf8');
-        // Quick existence check before doing any string manipulation
-        if (content.indexOf(anchor) < 0) continue;
+        const content = fs.readFileSync(file, 'utf8');
+        if (content.indexOf(promptSetId) < 0) continue; // cheap pre-check
 
-        let totalRemoved = 0;
-        let occurrences = 0;
-
-        // Loop to remove ALL duplicates of this ps_id (defense against
-        // pre-existing duplicates left by an earlier buggy run).
-        while (true) {
-          const start = content.indexOf(anchor);
-          if (start < 0) break;
-          // Block ends at next prompt-set anchor (any ps_id) or EOF
-          const after = start + anchor.length;
-          const nextStart = content.indexOf(nextAnchorPattern, after);
-          const blockEnd = nextStart >= 0 ? nextStart : content.length;
-          totalRemoved += (blockEnd - start);
-          occurrences++;
-          content = content.slice(0, start) + content.slice(blockEnd);
-        }
-
-        if (occurrences > 0) {
-          fs.writeFileSync(file, content);
-          this.debug(`🗑️ Removed ${occurrences} existing block(s) for ${promptSetId} from ${path.basename(file)} (${totalRemoved} bytes)`);
+        const { text, removed } = removePromptSet(content, promptSetId);
+        if (removed > 0) {
+          fs.writeFileSync(file, text);
+          this.debug(`🗑️ Removed ${removed} entr(ies) for ${promptSetId} from ${path.basename(file)}`);
         }
       }
     } catch (error) {
@@ -3836,17 +3894,6 @@ ORDER BY m.time_created ASC;`;
 
         // Build the slice block. Use the SAME ps_id anchor across slices so they're
         // discoverable as parts of the same prompt set (grep -l).
-        // NOTE: sessionFile is picked AFTER sessionContent is built so the
-        // picker can advance to the next part if appending this slice would
-        // push the current file over the size limit (rotation fix 2026-05-27).
-        let sessionContent = '';
-        sessionContent += `<a name="${promptSetId}"></a>\n`;
-        if (totalSlices > 1) {
-          sessionContent += `## Prompt Set (${promptSetId}) — slice ${sliceIdx + 1}/${totalSlices}\n\n`;
-        } else {
-          sessionContent += `## Prompt Set (${promptSetId})\n\n`;
-        }
-
         const sliceFirst = sliceExchanges[0];
         const sliceLast = sliceExchanges[sliceExchanges.length - 1];
         const sliceStart = new Date(sliceFirst.timestamp || Date.now());
@@ -3854,20 +3901,66 @@ ORDER BY m.time_created ASC;`;
         const sliceDuration = sliceEnd.getTime() - sliceStart.getTime();
         const sliceToolCalls = sliceExchanges.reduce((sum, ex) => sum + (ex.toolCalls?.length || 0), 0);
 
-        sessionContent += `**Time:** ${sliceStart.toISOString()}\n`;
-        sessionContent += `**Duration:** ${sliceDuration}ms\n`;
-        sessionContent += `**Tool Calls:** ${sliceToolCalls}\n`;
-        if (totalSlices > 1) {
-          sessionContent += `**Slice:** ${sliceIdx + 1}/${totalSlices} (window ${sliceTranche.timeString})\n`;
-          sessionContent += `**Set Total:** ${meaningfulExchanges.length} exchanges, ${setToolCallCount} tool calls, ${setDuration}ms over ${totalSlices} window(s) — find all slices via \`grep -l "${promptSetId}" *.md\`\n`;
-        }
-        sessionContent += '\n';
+        // Build the prompt-set subtree as pi entries. Everything the markdown
+        // block encoded is preserved: the `<a name>` anchor and `## Prompt Set`
+        // heading become the `lsl.promptSet` custom entry (whose promptSetId is
+        // what removePromptSet keys on), and the slice bookkeeping becomes
+        // fields on it rather than a `**Set Total:**` sentence telling you to
+        // run grep.
+        //
+        // Ids are seeded per (file, promptSetId), so re-flushing a set after
+        // removePromptSet reproduces byte-identical entries instead of churning
+        // ids on every ETM tick.
+        const sliceIsRedirected = targetProject !== this.config.projectPath;
+        const blocks = exchangesToBlocks(sliceExchanges, {
+          formatTime: (ts) => formatTimestamp(ts).lslFormat,
+        });
 
-        for (const exchange of sliceExchanges) {
-          sessionContent += await this.formatExchangeForLogging(exchange, targetProject !== this.config.projectPath);
+        // SECURITY: redaction moves from "before markdown interpolation" to
+        // "before JSON serialization" — same coverage, and JSON escaping also
+        // removes the old hazard of tool output containing ``` and breaking
+        // out of its fence.
+        for (const b of blocks) {
+          if (b.userText) b.userText = await redactSecrets(b.userText);
+          if (b.assistantText) b.assistantText = await redactSecrets(b.assistantText);
+          if (b.output) b.output = await redactSecrets(b.output);
+          if (b.input != null) {
+            const asText = typeof b.input === 'string' ? b.input : JSON.stringify(b.input);
+            const clean = await redactSecrets(asText);
+            try { b.input = JSON.parse(clean); } catch { b.input = { _raw: clean }; }
+          }
         }
 
-        sessionContent += `---\n\n`;
+        // The file is picked BEFORE the entries are built (unlike the markdown
+        // path, which built content first) because the spine id is derived from
+        // the filename. Rotation semantics are unchanged: same size test, same
+        // part advance, still no intendedWriteSize (see the note on
+        // getActiveSessionFilePath).
+        const sessionFile = this.getActiveSessionFilePath(targetProject, sliceTranche);
+
+        const psEntries = buildPromptSetEntries({
+          promptSetId,
+          blocks,
+          spineId: this.trancheSpineId(sessionFile),
+          idGen: makeIdGen(`${path.basename(sessionFile)}:${promptSetId}`),
+          fallbackIso: sliceStart.toISOString(),
+          meta: {
+            time: sliceStart.toISOString(),
+            durationMs: sliceDuration,
+            toolCalls: sliceToolCalls,
+            agent: this.agentType || 'unknown',
+            redirected: sliceIsRedirected,
+            ...(totalSlices > 1 ? {
+              sliceIdx: sliceIdx + 1,
+              totalSlices,
+              sliceWindow: sliceTranche.timeString,
+              setExchanges: meaningfulExchanges.length,
+              setToolCalls: setToolCallCount,
+              setDurationMs: setDuration,
+            } : {}),
+          },
+        });
+        const sessionContent = piSerialize(psEntries);
 
         // NOTE: the size-aware rotation attempt (passing sessionContent.length
         // as intendedWriteSize) was reverted 2026-05-27 — it caused a
@@ -3875,15 +3968,21 @@ ORDER BY m.time_created ASC;`;
         // not know about the new (advanced) target part. Falling back to
         // the original pre-write size check, which can produce oversized
         // single-slice parts but does NOT explode file counts on re-flushes.
-        const sessionFile = this.getActiveSessionFilePath(targetProject, sliceTranche);
-
         if (!fs.existsSync(sessionFile)) {
           await this.createSessionFileWithContent(targetProject, sliceTranche, sessionContent, sessionFile);
         } else {
           const rotationCheck = await this.fileManager.checkFileRotation(sessionFile);
           if (rotationCheck.needsRotation) {
             this.debug(`File rotated: ${path.basename(sessionFile)} (${this.fileManager.formatBytes(rotationCheck.currentSize)})`);
-            await this.createSessionFileWithContent(targetProject, sliceTranche, sessionContent);
+            // PRE-EXISTING DATA-LOSS PATH (not introduced by the pi-format
+            // change, and deliberately not fixed here — rotation policy is out
+            // of scope): createSessionFileWithContent() writes only when the
+            // target does NOT exist, and we are inside the `else` of an
+            // existence check, so this call writes nothing and the slice is
+            // dropped. Passing sessionFile explicitly keeps that outcome
+            // identical while ensuring that IF it ever does write, the entries
+            // land in the same file whose spine id they were built against.
+            await this.createSessionFileWithContent(targetProject, sliceTranche, sessionContent, sessionFile);
           } else {
             try {
               fs.appendFileSync(sessionFile, sessionContent);
@@ -3949,263 +4048,7 @@ ORDER BY m.time_created ASC;`;
     return true;  // Successfully written
   }
 
-  /**
-   * Format exchange content for logging (returns formatted string instead of writing to file)
-   */
-  async formatExchangeForLogging(exchange, isRedirected) {
-    const timestamp = formatTimestamp(exchange.timestamp);
-    const exchangeTime = timestamp.lslFormat;
-    
-    if (exchange.toolCalls && exchange.toolCalls.length > 0) {
-      // Format tool calls
-      let content = '';
-      for (const toolCall of exchange.toolCalls) {
-        const result = exchange.toolResults.find(r => r.tool_use_id === toolCall.id);
-        content += await this.formatToolCallContent(exchange, toolCall, result, exchangeTime, isRedirected);
-      }
-      return content;
-    } else {
-      // Format text-only exchange
-      return this.formatTextOnlyContent(exchange, exchangeTime, isRedirected);
-    }
-  }
-
-  /**
-   * Format tool call content
-   */
-  async formatToolCallContent(exchange, toolCall, result, exchangeTime, isRedirected) {
-    const toolSuccess = result && !result.is_error;
-
-    // Handle both old and new tool call formats
-    const toolName = toolCall.function?.name || toolCall.name || 'Unknown Tool';
-    const toolArgs = toolCall.function?.arguments || toolCall.input || toolCall.parameters || {};
-
-    let content = `### ${toolName} - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-
-    // Handle both undefined and empty string cases
-    const userMessage = (exchange.userMessage && exchange.userMessage.trim()) ||
-                       (exchange.humanMessage && exchange.humanMessage.trim());
-
-    if (userMessage) {
-      // Handle Promise objects that might be from redactSecrets calls
-      const userMessageStr = userMessage && typeof userMessage === 'object' && userMessage.then ?
-        await userMessage :
-        (typeof userMessage === 'string' ? userMessage : JSON.stringify(userMessage));
-      // SECURITY: Redact user message
-      content += `**User Request:** ${await redactSecrets(userMessageStr)}\n\n`;
-    } else {
-      // This is an automatic execution (hook, system-initiated, etc.)
-      content += `**System Action:** (Initiated automatically)\n\n`;
-    }
-
-    content += `**Tool:** ${toolName}\n`;
-    // SECURITY: Redact tool inputs (may contain API keys, passwords, etc.)
-    content += `**Input:** \`\`\`json\n${await redactSecrets(JSON.stringify(toolArgs, null, 2))}\n\`\`\`\n\n`;
-
-    const status = toolSuccess ? '✅ Success' : '❌ Error';
-    content += `**Result:** ${status}\n`;
-
-    // SECURITY: Redact tool outputs (may contain secrets in responses)
-    if (result?.content) {
-      const output = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
-      content += `**Output:** \`\`\`\n${await redactSecrets(output.slice(0, 500))}${output.length > 500 ? '\n...[truncated]' : ''}\n\`\`\`\n\n`;
-    }
-
-    if (result) {
-      const analysis = this.analyzeExchangeContent(exchange);
-      if (analysis.categories.length > 0) {
-        content += `**AI Analysis:** ${analysis.categories.join(', ')} - routing: ${isRedirected ? 'coding project' : 'local project'}\n`;
-      }
-    }
-
-    content += `\n---\n\n`;
-    return content;
-  }
-
-  /**
-   * Format text-only exchange content
-   */
-  async formatTextOnlyContent(exchange, exchangeTime, isRedirected) {
-    let content = `### Text Exchange - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-
-    const userMsg = exchange.userMessage || '';
-    const assistantResp = exchange.assistantResponse || exchange.claudeResponse || '';
-
-    // Ensure userMsg and assistantResp are strings
-    const userMsgStr = typeof userMsg === 'string' ? userMsg : JSON.stringify(userMsg);
-    const assistantRespStr = typeof assistantResp === 'string' ? assistantResp : JSON.stringify(assistantResp);
-
-    // Only show sections that have content
-    if (userMsgStr && userMsgStr.trim()) {
-      // SECURITY: Redact user messages (may contain API keys in examples, etc.)
-      const truncated = userMsgStr.slice(0, 500);
-      content += `**User Message:** ${await redactSecrets(truncated)}${userMsgStr.length > 500 ? '...' : ''}\n\n`;
-    }
-
-    if (assistantRespStr && assistantRespStr.trim()) {
-      // SECURITY: Redact assistant responses (may echo back secrets from user)
-      const truncated = assistantRespStr.slice(0, 500);
-      content += `**Assistant Response:** ${await redactSecrets(truncated)}${assistantRespStr.length > 500 ? '...' : ''}\n\n`;
-    }
-
-    content += `**Type:** Text-only exchange (no tool calls)\n\n---\n\n`;
-
-    return content;
-  }
-
-  /**
-   * Log exchange to session file
-   */
-  async logExchangeToSession(exchange, sessionFile, targetProject) {
-    const isRedirected = targetProject !== this.config.projectPath;
-    this.debug(`📝 LOGGING TO SESSION: ${sessionFile} (redirected: ${isRedirected})`);
-    
-    // Skip exchanges with no meaningful content (no user message AND no tool calls)
-    if ((!exchange.userMessage || (typeof exchange.userMessage === 'string' && exchange.userMessage.trim().length === 0)) && 
-        (!exchange.toolCalls || exchange.toolCalls.length === 0)) {
-      this.debug(`Skipping exchange with no meaningful content (no user message and no tool calls)`);
-      return;
-    }
-
-    // Skip /sl commands only, process all other exchanges regardless of tool calls
-    if (exchange.userMessage && this.isSlCommand(exchange.userMessage)) {
-      this.debug(`Skipping /sl command: ${exchange.userMessage.substring(0, 50)}...`);
-      return;
-    }
-    
-    
-    this.debug(`Processing exchange: tools=${exchange.toolCalls ? exchange.toolCalls.length : 0}`);
-    
-    // Log tool calls if present, otherwise log text-only exchange
-    if (exchange.toolCalls && exchange.toolCalls.length > 0) {
-      // Log each tool call individually with detailed format (like original monitor)
-      for (const toolCall of exchange.toolCalls) {
-        const result = exchange.toolResults.find(r => r.tool_use_id === toolCall.id);
-        await this.logDetailedToolCall(exchange, toolCall, result, sessionFile, isRedirected);
-      }
-    } else {
-      // Log text-only exchange (no tool calls)
-      await this.logTextOnlyExchange(exchange, sessionFile, isRedirected);
-    }
-  }
-
-  /**
-   * Log text-only exchange (no tool calls)
-   */
-  async logTextOnlyExchange(exchange, sessionFile, isRedirected) {
-    const timestamp = formatTimestamp(exchange.timestamp);
-    const exchangeTime = timestamp.lslFormat;
-
-    // Build exchange entry
-    const exchangeEntry = {
-      timestamp: exchangeTime,
-      user_message: exchange.userMessage,
-      assistant_response: exchange.assistantResponse || exchange.claudeResponse,
-      type: 'text_exchange',
-      has_tool_calls: false
-    };
-
-    // Add routing information if redirected
-    if (isRedirected) {
-      exchangeEntry.routing_info = {
-        original_project: this.config.projectPath,
-        redirected_to: 'coding',
-        reason: 'coding_content_detected'
-      };
-    }
-
-    // Format and append to session file
-    let content = `### Text Exchange - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-
-    const userMsg = exchange.userMessage || '(No user message)';
-    const assistantResp = exchange.assistantResponse || exchange.claudeResponse || '(No response)';
-
-    // Ensure userMsg and assistantResp are strings
-    const userMsgStr = typeof userMsg === 'string' ? userMsg : JSON.stringify(userMsg);
-    const assistantRespStr = typeof assistantResp === 'string' ? assistantResp : JSON.stringify(assistantResp);
-
-    content += `**User Message:** ${userMsgStr}\n\n`;
-
-    if (assistantRespStr && assistantRespStr !== '(No response)' && assistantRespStr.trim()) {
-      content += `**Claude Response:** ${assistantRespStr}\n\n`;
-    }
-
-    content += `---\n\n`;
-    
-    try {
-      this.debug(`📝 WRITING TEXT CONTENT: ${content.length} chars to ${sessionFile}`);
-      fs.appendFileSync(sessionFile, content);
-      
-      // CRITICAL FIX: Verify content was actually written
-      if (fs.existsSync(sessionFile)) {
-        this.debug(`✅ TEXT WRITE COMPLETE`);
-      } else {
-        throw new Error(`File disappeared after write: ${sessionFile}`);
-      }
-    } catch (error) {
-      console.error(`🚨 TEXT CONTENT WRITE FAILED: ${sessionFile}`);
-      console.error(`Error: ${error.message}`);
-      this.logHealthError(`Text content write failed: ${sessionFile} - ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Log individual tool call with detailed JSON input/output (original monitor format)
-   */
-  async logDetailedToolCall(exchange, toolCall, result, sessionFile, isRedirected) {
-    const timestamp = formatTimestamp(exchange.timestamp);
-    const exchangeTime = timestamp.lslFormat;
-    const toolSuccess = result && !result.is_error;
-    
-    // Use built-in fast semantic analysis for routing info (not MCP server)
-    const routingAnalysis = this.analyzeForRouting(exchange, toolCall, result);
-    
-    let content = `### ${toolCall.name} - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-    
-    const userMsg = (exchange.userMessage && exchange.userMessage.trim()) || 
-                    (exchange.humanMessage && exchange.humanMessage.trim());
-    
-    if (userMsg) {
-      // Handle Promise objects that might be from redactSecrets calls
-      const resolvedUserMsg = userMsg && typeof userMsg === 'object' && userMsg.then ? 
-        await userMsg : userMsg;
-      // Ensure userMsg is a string before using slice
-      const userMsgStr = typeof resolvedUserMsg === 'string' ? resolvedUserMsg : JSON.stringify(resolvedUserMsg);
-      content += `**User Request:** ${await redactSecrets(userMsgStr.slice(0, 200))}${userMsgStr.length > 200 ? '...' : ''}\n\n`;
-    } else {
-      // This is an automatic execution (hook, system-initiated, etc.)
-      content += `**System Action:** (Initiated automatically)\n\n`;
-    }
-    content += `**Tool:** ${toolCall.name}\n`;
-    content += `**Input:** \`\`\`json\n${await redactSecrets(JSON.stringify(toolCall.input, null, 2))}\n\`\`\`\n\n`;
-    content += `**Result:** ${toolSuccess ? '✅ Success' : '❌ Error'}\n`;
-    
-    if (result?.content) {
-      const output = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
-      content += `**Output:** \`\`\`\n${await redactSecrets(output.slice(0, 500))}${output.length > 500 ? '\n...[truncated]' : ''}\n\`\`\`\n\n`;
-    }
-    
-    content += `**AI Analysis:** ${routingAnalysis}\n\n---\n\n`;
-    try {
-      this.debug(`📝 WRITING TOOL CONTENT: ${content.length} chars to ${sessionFile}`);
-      fs.appendFileSync(sessionFile, content);
-      
-      // CRITICAL FIX: Verify content was actually written
-      if (fs.existsSync(sessionFile)) {
-        this.debug(`✅ TOOL WRITE COMPLETE`);
-      } else {
-        throw new Error(`File disappeared after write: ${sessionFile}`);
-      }
-    } catch (error) {
-      console.error(`🚨 TOOL CONTENT WRITE FAILED: ${sessionFile}`);
-      console.error(`Error: ${error.message}`);
-      this.logHealthError(`Tool content write failed: ${sessionFile} - ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
+              /**
    * Fast built-in semantic analysis for routing decisions (not MCP server)
    */
   analyzeForRouting(exchange, toolCall, result) {
@@ -5255,7 +5098,7 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
     // Show summary of created files (recurse YYYY/MM subdirs)
     if (fs.existsSync(historyDir)) {
       const newFiles = lslListAll(historyDir, (name) =>
-        name.includes('-session') && name.endsWith('.md')
+        name.includes('-session') && isLslFile(name)
       );
       process.stderr.write(`📁 Created ${newFiles.length} session files in ${path.basename(targetProject)}\n`);
     }
@@ -5264,7 +5107,7 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
       const projectBase = path.basename(targetProject);
       const codingFiles = lslListAll(
         path.join(codingPath, '.specstory', 'history'),
-        (name) => name.includes('from-' + projectBase) && name.endsWith('.md')
+        (name) => name.includes('from-' + projectBase) && isLslFile(name)
       );
       process.stderr.write(`📁 Created ${codingFiles.length} redirected session files in coding project\n`);
     }

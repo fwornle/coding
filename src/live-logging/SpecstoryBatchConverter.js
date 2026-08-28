@@ -67,9 +67,12 @@ export class SpecstoryBatchConverter {
       throw new Error(`Not a valid directory: ${resolvedDir}`);
     }
 
-    // Scan and sort .md files alphabetically (chronological per YYYY-MM-DD_HHMM filename pattern)
+    // Scan and sort LSL files alphabetically (chronological per the
+    // YYYY-MM-DD_HHMM filename pattern). Both extensions are accepted: the
+    // backfill converts the corpus in batches, so a mixed directory is a
+    // normal steady state. parseSpecstory() dispatches on content.
     const files = fs.readdirSync(resolvedDir)
-      .filter(f => f.endsWith('.md'))
+      .filter(f => f.endsWith('.jsonl') || f.endsWith('.md'))
       .sort()
       .map(f => path.join(resolvedDir, f));
 
