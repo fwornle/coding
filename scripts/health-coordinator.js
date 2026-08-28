@@ -1918,6 +1918,36 @@ function openCodeFreshProjects(now) {
 }
 
 /**
+ * Per-project log file for a coordinator-spawned ETM, opened for append and
+ * rotated when it exceeds ETM_CHILD_LOG_MAX_BYTES.
+ *
+ * Returns a raw fd for `spawn`'s stdio, or null when the file cannot be opened
+ * (in which case the caller falls back to 'ignore' — losing the log is bad, but
+ * not spawning the monitor at all is worse).
+ *
+ * Rotation happens here rather than in the child because the ETM inherits the
+ * fd: a rename from inside the child would not give it a new file, and every
+ * ETM for a project appends to the same path across restarts.
+ */
+const ETM_CHILD_LOG_MAX_BYTES = 20 * 1024 * 1024;
+
+function openEtmChildLog(projectName) {
+  try {
+    const logPath = path.join(REPO_ROOT, '.logs', `etm-${projectName}.log`);
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    try {
+      if (fs.statSync(logPath).size > ETM_CHILD_LOG_MAX_BYTES) {
+        fs.renameSync(logPath, logPath + '.1');
+      }
+    } catch { /* missing file on first spawn is the normal case */ }
+    return fs.openSync(logPath, 'a');
+  } catch (err) {
+    log(`could not open ETM child log for ${projectName}: ${err.message}`, 'ERROR');
+    return null;
+  }
+}
+
+/**
  * Ensure an enhanced-transcript-monitor is running for every project with an
  * actively-written Claude transcript. Skips projects that already have a
  * running heartbeat in currentState.lsl (set by ETM heartbeats; staleness
@@ -2017,10 +2047,19 @@ function ensureEtmForActiveProjects() {
     }
 
     log(`spawning ETM for active project ${projectName} (${projectPath})`, 'INFO');
+    const childLog = openEtmChildLog(projectName);
     try {
+      // stdio MUST NOT be 'ignore'. A spawned ETM that dies on startup — the
+      // singleton defer, a wedged holder it could not reclaim, an unhandled
+      // throw — used to do so with its entire output discarded. That is how a
+      // 183-iteration respawn loop (2026-08-27 17:00-18:47, a ReDoS in the
+      // redactor wedging the holder's event loop) ran for 1h47m while leaving
+      // nothing whatsoever in any log: the only ETM that wrote anywhere was the
+      // launchd one, and it was not in the loop. Per-project append fd instead,
+      // rotated at spawn time so a loop cannot fill the disk.
       const child = spawn('node', [monitorScript, projectPath], {
         detached: true,
-        stdio: 'ignore',
+        stdio: childLog === null ? 'ignore' : ['ignore', childLog, childLog],
         env: {
           ...process.env,
           CODING_REPO: REPO_ROOT,
@@ -2032,6 +2071,12 @@ function ensureEtmForActiveProjects() {
       child.unref();
     } catch (err) {
       log(`failed to spawn ETM for ${projectName}: ${err.message}`, 'ERROR');
+    } finally {
+      // The child holds its own dup of the fd, so ours is dead weight the moment
+      // spawn returns. In `finally` because a spawn that THROWS would otherwise
+      // leak one fd per attempt — and the caller is a 30s loop, so a persistent
+      // spawn failure would walk straight into EMFILE.
+      if (childLog !== null) { try { fs.closeSync(childLog); } catch { /* already closed */ } }
     }
   }
 }
