@@ -10,8 +10,9 @@
  *   2. Hook wiring            — each agent's hooks expressed in ITS OWN native
  *                               schema, with every referenced script resolvable
  *                               and (for copilot) actually executable
- *   3. MCP servers            — exactly the 3 expected (semantic-analysis,
- *                               constraint-monitor, graphify)
+ *   3. MCP servers            — exactly the expected set (graphify only;
+ *                               semantic-analysis/constraint-monitor are now
+ *                               CLIs, not MCP servers)
  *   4. Constraints            — .constraint-monitor.yaml parses, non-empty
  *   5. Online learning        — observations → digests → insights pipeline has
  *                               data (export files; obs-api as a live soft-check)
@@ -41,10 +42,14 @@ const REPO = path.resolve(__dirname, '..', '..');
 
 const AGENTS = ['claude', 'copilot', 'opencode', 'pi'];
 
-// The two always-present stdio servers, plus whichever code-graph backend the
-// registry says is active. Derived rather than frozen: pinning the literal set
-// meant every backend switch broke this test for the wrong reason.
-const STATIC_MCP_SERVERS = ['semantic-analysis', 'constraint-monitor'];
+// semantic-analysis and constraint-monitor were removed as MCP servers (see
+// claude-code-mcp.json's _comment): they are now CLIs (bin/semantic,
+// bin/constraints) with /semantic and /constraints skills, not MCP tool
+// schemas. graphify remains the one MCP server, whichever code-graph backend
+// the registry says is active. Derived rather than frozen: pinning the
+// literal set meant every backend switch broke this test for the wrong
+// reason.
+const STATIC_MCP_SERVERS = [];
 const CODE_GRAPH_SERVER = (() => {
   try {
     const reg = JSON.parse(readFileSync(path.join(REPO, 'config/code-graph.json'), 'utf8'));
@@ -313,10 +318,10 @@ describe('Hook wiring — opencode (live pipe capture)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. MCP servers — exactly the 3 expected
+// 3. MCP servers — exactly the expected set (graphify only)
 // ---------------------------------------------------------------------------
-describe('MCP servers — expected set of 3', () => {
-  it('claude-code-mcp.json declares exactly the 3 expected servers', () => {
+describe('MCP servers — expected set', () => {
+  it('claude-code-mcp.json declares exactly the expected servers', () => {
     const servers = readJson('claude-code-mcp.json').mcpServers;
     expect(Object.keys(servers).sort()).toEqual([...EXPECTED_MCP_SERVERS].sort());
   });
@@ -325,6 +330,7 @@ describe('MCP servers — expected set of 3', () => {
     const servers = readJson('claude-code-mcp.json').mcpServers;
     for (const name of EXPECTED_MCP_SERVERS) {
       const s = servers[name];
+      expect(s).toBeDefined();
       if (s.type === 'http') {
         // Served over HTTP from the coding-services container: url, no command.
         expect(typeof s.url).toBe('string');
@@ -363,8 +369,9 @@ describe('Constraints — .constraint-monitor.yaml', () => {
     expect(cfg.constraints.length).toBeGreaterThan(0);
   });
 
-  it('the constraint engine ships as the constraint-monitor MCP server', () => {
-    expect(EXPECTED_MCP_SERVERS).toContain('constraint-monitor');
+  it('the constraint engine ships as the constraints CLI (bin/constraints), not an MCP server', () => {
+    expect(existsSync(path.join(REPO, 'bin/constraints'))).toBe(true);
+    expect(EXPECTED_MCP_SERVERS).not.toContain('constraint-monitor');
   });
 });
 
