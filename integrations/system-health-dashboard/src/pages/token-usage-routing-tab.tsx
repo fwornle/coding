@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { normalizeProvider } from '@/lib/providers'
 import { FlowTab } from './token-usage-flow-tab'
+import { OffloadDecision } from '@/components/llm-routing/offload-decision'
 
 /**
  * Routing — how the system is configured, and what it actually did.
@@ -22,11 +23,20 @@ import { FlowTab } from './token-usage-flow-tab'
  * was skipped first). This tab reads that back. Everything below is a recorded
  * fact except where it is explicitly badged as reconstructed.
  *
- * ── Read-only on purpose ─────────────────────────────────────────────────────
- * Editing stays in the Settings dialog. This is where you find out what the
- * system is doing; that is where you change it. Mixing the two is how you end
- * up reading a number and a draft edit off the same screen and not knowing
+ * ── Read-only, with one deliberate exception ─────────────────────────────────
+ * Editing stays in the Settings dialog: this is where you find out what the
+ * system is doing, that is where you change it, and mixing the two is how you
+ * end up reading a number and a draft edit off the same screen without knowing
  * which one is live.
+ *
+ * The offload policy is the exception, and only because the alternative is
+ * worse. Its whole question is counterfactual — "would this work move if the
+ * laptop target were on?" — and answering it through the Settings dialog means
+ * switching the target on for real, on this machine, for every caller, and then
+ * coming back here to look. So the Decision card below edits it in place and
+ * pays the cost the rule exists to prevent by making it loud: an unsaved policy
+ * badges every number it produced `preview · unsaved`, and says in words that
+ * the proxy is still running the saved one.
  */
 
 // ── Server shapes ────────────────────────────────────────────────────────────
@@ -69,9 +79,19 @@ interface Behaviour {
 /** Trimmed from GET /api/llm/routing — the config half. */
 interface RoutingConfig {
   paths: { routing: string; fallback: string }
-  providers: Array<{ id: string; account: string; enabled: boolean; tools: boolean }>
-  routes: Record<string, { provider: string; complexity: string }>
-  defaults: Record<string, { provider: string; complexity: string }>
+  /**
+   * `fgCapable` is `!!fg_transport` on the provider — the one fact the offload
+   * ladder's last gate cannot derive from the policy. On the wire since the
+   * routing endpoint was written; simply never declared here.
+   */
+  providers: Array<{ id: string; account: string; enabled: boolean; tools: boolean; fgCapable?: boolean }>
+  /**
+   * `offload: false` pins a route to its declared provider, for the cases where
+   * the model that answers IS the measurement (the kgbench judge, the kb-ab
+   * probes). Also already on the wire.
+   */
+  routes: Record<string, { provider: string; complexity: string; offload?: boolean }>
+  defaults: Record<string, { provider: string; complexity: string; offload?: boolean }>
   semanticRouting: {
     enabled: boolean
     /**
@@ -131,6 +151,10 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
   const [recent, setRecent] = useState<RecentRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  // Bumped when the offload policy is saved. Every figure on this tab is
+  // downstream of the routing config, so a policy write invalidates all of them,
+  // not just the card that made it.
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -159,7 +183,7 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
       })
       .catch(e => { if (!cancelled) setError(String(e.message || e)) })
     return () => { cancelled = true }
-  }, [proxyBase, hours])
+  }, [proxyBase, hours, reloadNonce])
 
   // Routes whose traffic did NOT all land on the provider the config names.
   // This is the list the old dashboard could not produce at all.
@@ -325,6 +349,23 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
           <div className="font-mono text-[10px] text-muted-foreground pt-1">{config.paths.routing}</div>
         </CardContent>
       </Card>
+
+      {/* ── The decision ──
+          Sits above the picture because it answers the question the picture
+          only ever implied: the flow diagram draws one box labelled
+          `rapid-llm-proxy` between the callers and the accounts, and every gate
+          worth asking about happens inside it. */}
+      <OffloadDecision
+        proxyBase={proxyBase}
+        hours={hours}
+        routes={config.routes}
+        defaults={config.defaults}
+        providers={config.providers}
+        offloadSkips={behaviour.offloadSkips}
+        offloadedCalls={behaviour.totals.offloaded_calls}
+        windowHours={behaviour.window.hours}
+        onSaved={() => setReloadNonce(n => n + 1)}
+      />
 
       {/* ── The config as a picture ──
           Sits directly under the Configured summary, so the shape of the routing

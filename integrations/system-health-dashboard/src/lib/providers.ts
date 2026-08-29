@@ -33,10 +33,56 @@ export function normalizeProvider(provider: string | null | undefined): string {
 export const PROVIDER_COLORS: Record<string, string> = {
   'gh-copilot': '#2563eb',       // corporate GitHub Copilot contract
   'claude-code-max': '#d97706',  // personal Claude Max subscription
-  'anthropic-api': '#b45309',    // metered Anthropic key — deliberately distinct from Max
+  'anthropic-api': '#be185d',    // metered Anthropic key — deliberately distinct from Max
   'groq': '#7c3aed',
   'openai': '#059669',
   'gaia': '#64748b',
+  'qwen-local': '#0891b2',       // on-prem V100 cluster — unmetered
+  'qwen-laptop': '#c026d3',      // llama.cpp on this machine — unmetered
+}
+
+/**
+ * PROVIDER COLOUR IS REINFORCEMENT, NEVER IDENTITY.
+ *
+ * Eight accounts cannot be told apart by hue reliably — checked, and no ordering
+ * of eight clears adjacent-pair contrast for normal vision, let alone for colour
+ * blindness. So every surface that paints a provider must ALSO print its id;
+ * nothing may require distinguishing two accounts by colour alone.
+ *
+ * `anthropic-api` moved off `#b45309` on 2026-08-29 for that reason: against
+ * `claude-code-max`'s `#d97706` it measured ΔE 11.4 — the two hardest accounts in
+ * the system to confuse safely, since one is metered per token and the other is
+ * flat-rate, and this file's own comment above says they must never be collapsed.
+ *
+ * `qwen-local` and `qwen-laptop` had NO entry at all and fell through to grey, in
+ * a diagram whose entire subject is whether work reaches them.
+ */
+
+/**
+ * What HAPPENED to a call — a separate channel from who got billed, and the one
+ * that carries edges.
+ *
+ * Three values, not eight, which is what makes them safely distinguishable. Each
+ * is also carried by a shape (solid / dotted / dashed + ✕) and a word, so the hue
+ * is never the only signal.
+ */
+export const OUTCOME_COLORS = {
+  light: {
+    routed: '#2a78d6',    // served by the account the route named
+    offloaded: '#128f63', // served by the local, unmetered target
+    failed: '#c23a2b',    // attempted and did not answer
+  },
+  dark: {
+    routed: '#5b9ceb',
+    offloaded: '#35b98a',
+    failed: '#e9736a',
+  },
+} as const
+
+export type OutcomeKind = keyof typeof OUTCOME_COLORS['light']
+
+export function getOutcomeColor(kind: OutcomeKind, isDark: boolean): string {
+  return OUTCOME_COLORS[isDark ? 'dark' : 'light'][kind]
 }
 
 export function getProviderColor(provider: string | null | undefined): string {
