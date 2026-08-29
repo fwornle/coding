@@ -369,3 +369,126 @@ describe('backfill-insight-mentions — failure budget', () => {
     assert.ok(ok3 && ok3.errors.length === 0, 'i-3 should succeed with no errors');
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// Classification ledger — the gate for Insights that match NOTHING
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Run the script for REAL (no --dry-run) against a throwaway LevelDB under the
+ * fixture dir. The ledger is only written on a real run — a dry run must stay a
+ * pure read — so the behaviour these tests exist for is invisible to the
+ * dry-run helper above.
+ */
+function runBackfillLive(sourcePath, logDir, extraArgs = [], classifierStub = null, classifierThrow = null) {
+  const args = [SCRIPT_PATH, `--source=${sourcePath}`, `--log-dir=${logDir}`, ...extraArgs];
+  const env = { ...process.env };
+  env.BACKFILL_TEST_CLASSIFIER_STUB = JSON.stringify(classifierStub || {});
+  if (classifierThrow) env.BACKFILL_TEST_CLASSIFIER_THROW = JSON.stringify(classifierThrow);
+  const result = spawnSync('node', args, { encoding: 'utf-8', timeout: 60_000, env });
+  // The one line that reports the gate, e.g. "... ledgerSkipped=3 toClassify=1"
+  const m = /unmentioned=(\d+) ledgerSkipped=(\d+)[^\n]*? toClassify=(\d+)/.exec(result.stderr || '');
+  return {
+    status: result.status,
+    stderr: result.stderr,
+    unmentioned: m ? Number(m[1]) : null,
+    ledgerSkipped: m ? Number(m[2]) : null,
+    toClassify: m ? Number(m[3]) : null,
+  };
+}
+
+describe('backfill-insight-mentions — ledger helpers', () => {
+  it('fingerprints the SUMMARY, not the id — an edited Insight must be re-asked', async () => {
+    const { summaryFingerprint } = await importScript();
+    assert.equal(summaryFingerprint('abc'), summaryFingerprint('abc'), 'stable for equal text');
+    assert.notEqual(summaryFingerprint('abc'), summaryFingerprint('abd'), 'differs when the text differs');
+    assert.equal(summaryFingerprint(''), summaryFingerprint(null), 'null and empty are the same absent summary');
+  });
+
+  it('treats a missing, corrupt or wrong-version ledger as empty rather than failing', async () => {
+    // It is a cache. Failing to read one must cost work, never correctness — a
+    // throw here would take out the whole backfill for a truncated JSON file.
+    const { readLedger, writeLedger, ledgerPath } = await importScript();
+    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'ledger-'));
+    assert.deepEqual(readLedger(dir), {}, 'missing file -> {}');
+    await fsp.writeFile(ledgerPath(dir), '{not json');
+    assert.deepEqual(readLedger(dir), {}, 'corrupt file -> {}');
+    await fsp.writeFile(ledgerPath(dir), JSON.stringify({ version: 999, entries: { a: 1 } }));
+    assert.deepEqual(readLedger(dir), {}, 'wrong version -> {}');
+    writeLedger(dir, { a: { summaryFingerprint: 'x' } });
+    assert.deepEqual(readLedger(dir), { a: { summaryFingerprint: 'x' } }, 'round-trips');
+  });
+
+  it('ledgerHit is true for a RECORDED EMPTY answer — the case the edge scan cannot see', async () => {
+    const { ledgerHit, summaryFingerprint } = await importScript();
+    const entries = { 'i-1': { summaryFingerprint: summaryFingerprint('same text'), targets: 0 } };
+    assert.equal(ledgerHit(entries, 'i-1', 'same text'), true, 'targets:0 still counts as answered');
+    assert.equal(ledgerHit(entries, 'i-1', 'different text'), false, 'summary changed -> re-ask');
+    assert.equal(ledgerHit(entries, 'i-2', 'same text'), false, 'unknown id -> re-ask');
+    assert.equal(ledgerHit({}, 'i-1', 'same text'), false, 'empty ledger -> re-ask');
+  });
+});
+
+describe('backfill-insight-mentions — the re-classification leak', () => {
+  const nodes = [
+    { id: 'i-1', entityType: 'Insight', name: 'I1', description: 'first insight text' },
+    { id: 'i-2', entityType: 'Insight', name: 'I2', description: 'second insight text' },
+    { id: 'i-3', entityType: 'Insight', name: 'I3', description: 'third insight text' },
+    { id: 'c-1', entityType: 'Component', name: 'C1', description: 'a component' },
+  ];
+
+  it('does not re-classify an Insight the classifier already answered "none" for', async () => {
+    // THE REGRESSION. The original gate skipped only Insights carrying a
+    // `mentions` edge, so an empty answer — 94% of real answers, measured over
+    // 2181 calls on 2026-08-29 — wrote no edge and came back on every run.
+    const { sourcePath, logDir } = await setupFixtureDir({ nodes, edges: [] });
+    const first = runBackfillLive(sourcePath, logDir, [], {}); // {} => every answer is []
+    assert.equal(first.status, 0, `first run should exit 0; stderr=${first.stderr.slice(0, 600)}`);
+    assert.equal(first.toClassify, 3, 'first run classifies all three');
+
+    const second = runBackfillLive(sourcePath, logDir, [], {});
+    assert.equal(second.status, 0, `second run should exit 0; stderr=${second.stderr.slice(0, 600)}`);
+    assert.equal(second.unmentioned, 3, 'all three still carry no mentions edge — the old gate still sees them');
+    assert.equal(second.ledgerSkipped, 3, 'and the ledger is what stops them being re-asked');
+    assert.equal(second.toClassify, 0, 'ZERO LLM calls on the second run');
+  });
+
+  it('--force re-asks everything, for when the CATALOGUE changed', async () => {
+    // A new Component makes previous "no match" answers stale in a way no
+    // per-Insight fingerprint can detect, so there has to be a way to say so.
+    const { sourcePath, logDir } = await setupFixtureDir({ nodes, edges: [] });
+    runBackfillLive(sourcePath, logDir, [], {});
+    const forced = runBackfillLive(sourcePath, logDir, ['--force'], {});
+    assert.equal(forced.ledgerSkipped, 0, '--force ignores the ledger');
+    assert.equal(forced.toClassify, 3, 'and re-asks all three');
+  });
+
+  it('re-asks exactly the Insight whose summary changed', async () => {
+    const { sourcePath, logDir } = await setupFixtureDir({ nodes, edges: [] });
+    runBackfillLive(sourcePath, logDir, [], {});
+    const doc = JSON.parse(await fsp.readFile(sourcePath, 'utf-8'));
+    for (const n of doc.nodes) {
+      if (n.attributes.id === 'i-2') n.attributes.description = 'REWRITTEN second insight text';
+    }
+    await fsp.writeFile(sourcePath, JSON.stringify(doc, null, 2));
+    const after = runBackfillLive(sourcePath, logDir, [], {});
+    assert.equal(after.toClassify, 1, 'only the edited Insight is re-asked');
+    assert.equal(after.ledgerSkipped, 2, 'the other two stay answered');
+  });
+
+  it('does NOT record an Insight whose classifier call THREW — one blip must not be a permanent skip', async () => {
+    const { sourcePath, logDir } = await setupFixtureDir({ nodes, edges: [] });
+    const first = runBackfillLive(sourcePath, logDir, [], {}, { 'i-2': true });
+    assert.equal(first.toClassify, 3, 'all three attempted');
+    const second = runBackfillLive(sourcePath, logDir, [], {});
+    assert.equal(second.toClassify, 1, 'only the one that failed is retried');
+    assert.equal(second.ledgerSkipped, 2, 'the two that answered cleanly stay answered');
+  });
+
+  it('a dry run records nothing — it must stay a pure read', async () => {
+    const { readLedger } = await importScript();
+    const { sourcePath, logDir } = await setupFixtureDir({ nodes, edges: [] });
+    runBackfill(sourcePath, logDir, [], {});
+    assert.deepEqual(readLedger(logDir), {}, 'dry run must not write a ledger');
+  });
+});
