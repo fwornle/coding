@@ -58,7 +58,11 @@ interface FlowData {
   runtime: { network: string; availableImpls: string[] }
 }
 
-interface UsageRow { provider: string; model: string; calls: number; total_tokens: number }
+interface UsageRow {
+  provider: string; model: string; calls: number; total_tokens: number
+  /** Optional: absent on a proxy that predates the cache columns, and 0 there. */
+  cache_read_tokens?: number; cache_write_tokens?: number
+}
 
 interface Props {
   data: FlowData
@@ -126,12 +130,17 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
     const byPair = new Map<string, number>()
     for (const r of usage ?? []) {
       const id = r.provider ? normalizeProvider(r.provider) : 'unknown'
+      // Consumption, cache included. Edge thickness here is meant to show where
+      // the volume actually goes; on total_tokens alone the account serving the
+      // foreground work drew as a hairline against a background classifier,
+      // because an Anthropic-wire prompt arrives almost entirely as cache reads.
+      const rowTokens = (r.total_tokens || 0) + (r.cache_read_tokens || 0) + (r.cache_write_tokens || 0)
       const cur = byProvider.get(id) ?? { tokens: 0, calls: 0 }
-      cur.tokens += r.total_tokens || 0
+      cur.tokens += rowTokens
       cur.calls += r.calls || 0
       byProvider.set(id, cur)
       const model = normalizeModel(r.model) || r.model
-      byPair.set(`${id}/${model}`, (byPair.get(`${id}/${model}`) ?? 0) + (r.total_tokens || 0))
+      byPair.set(`${id}/${model}`, (byPair.get(`${id}/${model}`) ?? 0) + rowTokens)
     }
     const max = Math.max(1, ...[...byProvider.values()].map(v => v.tokens))
     return { byProvider, byPair, max }

@@ -222,8 +222,8 @@ function ParentRow({
             <TierBadge tier={String(row.granularity_tier)} />
             {isEstimated(row) && <span className="text-sm text-muted-foreground">estimated</span>}
           </div>
-          <span className="font-mono text-sm" title="Full turn tokens (input + output; thinking is folded into output).">
-            {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
+          <span className="font-mono text-sm" title={turnTokensTitle(row)}>
+            {tokens(turnTokens(row))} <span className="text-muted-foreground">turn total</span>
           </span>
         </div>
         <TurnActivity row={row} />
@@ -241,8 +241,8 @@ function ParentRow({
           <TierBadge tier={String(row.granularity_tier)} />
           {isEstimated(row) && <span className="text-sm text-muted-foreground">estimated</span>}
         </CollapsibleTrigger>
-        <span className="font-mono text-sm" title="Full turn tokens (input + output; thinking is folded into output).">
-          {tokens(row.total_tokens)} <span className="text-muted-foreground">turn total</span>
+        <span className="font-mono text-sm" title={turnTokensTitle(row)}>
+          {tokens(turnTokens(row))} <span className="text-muted-foreground">turn total</span>
         </span>
       </div>
       <TurnActivity row={row} />
@@ -322,10 +322,30 @@ function linkDigestsToRun(
 // is NOT attributed to it (empty/foreign task_id). Honest, read-only surfacing of
 // knowledge-capture + infrastructure token spend that the task_id-exact role stats
 // (summarizeByRole) deliberately exclude. Never a claim of causation — just "this
+/**
+ * Everything a turn or row consumed, prompt cache included.
+ *
+ * `total_tokens` is fresh input + output. Labelling that "turn total" is
+ * misleading for a foreground agent, where the prompt arrives almost entirely
+ * as cache reads — a measured Opus-5 turn recorded 2 input + 824 output against
+ * 470,512 cache reads, so the honest turn total is ~471K, not 826.
+ */
+function turnTokens(r: { total_tokens?: number | null; cache_read_tokens?: number | null; cache_write_tokens?: number | null }): number {
+  return Number(r.total_tokens ?? 0) + Number(r.cache_read_tokens ?? 0) + Number(r.cache_write_tokens ?? 0)
+}
+
+/** Tooltip that says how a turn total splits, so the bigger number is legible. */
+function turnTokensTitle(r: { total_tokens?: number | null; cache_read_tokens?: number | null; cache_write_tokens?: number | null }): string {
+  const cache = Number(r.cache_read_tokens ?? 0) + Number(r.cache_write_tokens ?? 0)
+  return cache > 0
+    ? `Full turn tokens: ${Number(r.total_tokens ?? 0).toLocaleString()} fresh (input + output, thinking folded into output) + ${cache.toLocaleString()} prompt cache.`
+    : 'Full turn tokens (input + output; thinking is folded into output).'
+}
+
 // was happening at the same time".
 function AmbientActivity({ rows, note }: { rows: AmbientRow[]; note?: string }) {
   if (!rows.length) return null
-  const total = rows.reduce((a, r) => a + (r.total_tokens ?? 0), 0)
+  const total = rows.reduce((a, r) => a + turnTokens(r), 0)
   return (
     <details className="mb-3 rounded-md border border-dashed px-3 py-2" data-testid="timeline-ambient">
       <summary className="cursor-pointer text-sm text-muted-foreground">
@@ -359,7 +379,7 @@ function AmbientActivity({ rows, note }: { rows: AmbientRow[]; note?: string }) 
                   {rm.label}
                 </td>
                 <td className="py-0.5 pr-3 text-right">{r.calls.toLocaleString()}</td>
-                <td className="py-0.5 pr-3 text-right">{(r.total_tokens ?? 0).toLocaleString()}</td>
+                <td className="py-0.5 pr-3 text-right">{turnTokens(r).toLocaleString()}</td>
                 <td className="max-w-[16rem] truncate py-0.5 text-muted-foreground" title={r.models.join(', ')}>
                   {r.models.length ? r.models.join(', ') : '—'}
                 </td>
