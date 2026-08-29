@@ -87,6 +87,13 @@ _pi_write_models_json() {
   local cfg_dir="$1"
   local models_file="$cfg_dir/models.json"
   local port="${LLM_CLI_PROXY_PORT:-12435}"
+  # Same env var and same default rapid-llm-proxy reads for its own `qwen-laptop`
+  # provider (proxy-bridge/server.mjs, qwenLaptopBaseUrl). Read from ONE name so
+  # moving the llama.cpp server does not leave pi dialling the old port while the
+  # proxy dials the new one — the class of split-brain that had `qwen-local`
+  # meaning the laptop in opencode's config and the on-prem cluster in the
+  # proxy's, on two different networks, at the same time.
+  local _pi_qwen_laptop_url="${QWEN_LAPTOP_API_BASE_URL:-http://127.0.0.1:8081/v1}"
 
   mkdir -p "$cfg_dir"
 
@@ -104,10 +111,19 @@ _pi_write_models_json() {
   # localhost and holds the real provider credentials itself. Same arrangement
   # copilot's BYOK seam already uses.
   #
-  # ONE model entry, deliberately. The proxy replaces body.model with whatever
-  # (provider, complexity) resolves to in llm-routing.yaml, so a longer list
-  # would offer a choice that Ctrl+P appears to make and routing then silently
-  # discards. fg-chat/pi is the real control; edit it there.
+  # ONE model entry on the PROXY provider, deliberately. The proxy replaces
+  # body.model with whatever (provider, complexity) resolves to in
+  # llm-routing.yaml, so a longer list there would offer a choice that Ctrl+P
+  # appears to make and routing then silently discards. fg-chat/pi is the real
+  # control; edit it there.
+  #
+  # The second provider below, `qwen-laptop`, is the exception that proves the
+  # rule: it is the one model you can genuinely PICK, because picking it is the
+  # only way to reach it. The proxy routes by job and band, never by the model a
+  # caller asks for (body.provider was removed as a soft pin precisely so a
+  # caller could not move spend), so there is no request pi can make through
+  # rapid-proxy-pi that lands on the laptop by choice — only the semantic
+  # offload puts work there, and only when it decides to.
   #
   # thinkingLevelMap is what makes pi's per-turn effort selector reach routing.
   #
@@ -198,11 +214,25 @@ _pi_write_models_json() {
           }
         }
       ]
+    },
+    "qwen-laptop": {
+      "api": "openai-completions",
+      "baseUrl": "${_pi_qwen_laptop_url}",
+      "apiKey": "local-no-auth-placeholder",
+      "models": [
+        {
+          "id": "qwen3.8-27b-local",
+          "name": "Qwen3.8-27B (this laptop, llama.cpp / Metal)",
+          "input": ["text"],
+          "contextWindow": 32768,
+          "reasoning": false
+        }
+      ]
     }
   }
 }
 JSON
-  _agent_log "Wrote pi provider config: $models_file"
+  _agent_log "Wrote pi provider config: $models_file (rapid-proxy-pi + qwen-laptop)"
 }
 
 # Merge our provider/model pins into pi's settings.json, preserving keys pi owns.
@@ -228,8 +258,16 @@ except (OSError, ValueError):
 settings["defaultProvider"] = "rapid-proxy-pi"
 settings["defaultModel"] = "claude-sonnet-5"
 # Keep the Ctrl+P picker honest: the proxy decides the real model, so offering
-# other ids here would advertise a choice that routing discards.
-settings["enabledModels"] = ["claude-sonnet-5"]
+# other PROXY ids here would advertise a choice that routing discards.
+#
+# qwen3.8-27b-local is the one exception, and for the opposite reason — it is
+# offered BECAUSE the proxy will not route to it on request. The laptop server is
+# loopback, unmetered and holds no credential, so selecting it spends nothing and
+# sends nothing off the machine; what it does cost is a token_usage row, since a
+# direct dial does not pass the proxy's tap. That is an acceptable trade for a
+# model you have to deliberately pick, and it is NOT the default: the default
+# stays on the proxy, so a launch that touches nothing behaves exactly as before.
+settings["enabledModels"] = ["claude-sonnet-5", "qwen3.8-27b-local"]
 
 tmp = path + ".tmp"
 with io.open(tmp, "w", encoding="utf-8") as fh:
