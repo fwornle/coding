@@ -74,9 +74,13 @@ interface RoutingConfig {
   defaults: Record<string, { provider: string; complexity: string }>
   semanticRouting: {
     enabled: boolean
-    localProvider: string | null
+    /**
+     * Ordered; the first ENABLED entry whose requireNetwork matches the live
+     * network serves the offload. A target defaults to disabled — declaring one
+     * says where an offload could go, `enabled` says send work there.
+     */
+    targets: Array<{ provider: string; requireNetwork: string | null; enabled: boolean }>
     offloadBands: string[]
-    requireNetwork: string | null
   } | null
   fallback: { chains: Record<string, Array<{ provider: string; when: unknown }>> }
   runtime: { network: string; availableImpls: string[] }
@@ -194,6 +198,15 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
 
   const t = behaviour.totals
   const sr = config.semanticRouting
+  // Which target actually serves this machine right now. Same first-match rule
+  // the proxy applies (pickOffloadTarget in routing-config.mjs) — an unguarded
+  // entry matches every network. Showing the whole list without saying which one
+  // is live is how "the offload is on" and "the offload can fire here" get read
+  // as the same statement; off-VPN with a corporate-only target they are not.
+  const activeTarget = sr?.enabled
+    ? (sr.targets.find(x => x.enabled !== false
+        && (!x.requireNetwork || x.requireNetwork === config.runtime.network)) ?? null)
+    : null
 
   return (
     <div className="space-y-4">
@@ -209,7 +222,11 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         <Stat
           label="Offloaded"
           value={`${fmt(t.offloaded_calls)} · ${pct(t.offloaded_calls, t.calls)}`}
-          sub={sr?.enabled ? `policy on → ${sr.localProvider}` : 'policy off'}
+          sub={sr?.enabled
+            ? (activeTarget
+              ? `policy on → ${activeTarget.provider}`
+              : `policy on · no target for ${config.runtime.network}`)
+            : 'policy off'}
         />
         <Stat
           label="Reconstructed"
@@ -251,13 +268,37 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
             <span className="text-muted-foreground">Semantic offload: </span>
             {sr?.enabled ? (
               <>
-                <span className="font-mono">{sr.localProvider}</span> for band
-                {sr.offloadBands.length === 1 ? ' ' : 's '}
+                band{sr.offloadBands.length === 1 ? ' ' : 's '}
                 <span className="font-mono">{sr.offloadBands.join(', ')}</span>
-                {sr.requireNetwork && (
-                  <span className={config.runtime.network === sr.requireNetwork ? '' : 'text-muted-foreground'}>
-                    {' '}· {sr.requireNetwork} only
-                    {config.runtime.network !== sr.requireNetwork && ' — guard not satisfied now'}
+                {' → '}
+                {sr.targets.length === 0
+                  ? <span className="text-muted-foreground">no targets declared</span>
+                  : sr.targets.map((tgt, i) => (
+                    <span
+                      key={tgt.provider}
+                      className={tgt === activeTarget ? '' : 'text-muted-foreground'}
+                      title={tgt.enabled === false
+                        ? `${tgt.provider} is declared but switched off, so no work goes to it. Turn it on in Settings → Routing.`
+                        : undefined}
+                    >
+                      {i > 0 && ' · '}
+                      <span className={tgt.enabled === false ? 'font-mono line-through' : 'font-mono'}>{tgt.provider}</span>
+                      {tgt.requireNetwork ? ` (${tgt.requireNetwork})` : ' (any network)'}
+                      {/* An off target reads as a target unless it says otherwise —
+                          which is how the laptop endpoint served a day of traffic
+                          nobody had asked it to serve. */}
+                      {tgt.enabled === false && ' — off'}
+                      {tgt === activeTarget && ' ← live'}
+                    </span>
+                  ))}
+                {!activeTarget && (
+                  <span className="text-amber-600 dark:text-amber-500">
+                    {' '}— {sr.targets.some(x => x.enabled !== false
+                      && (!x.requireNetwork || x.requireNetwork === config.runtime.network))
+                      ? `no target serves ${config.runtime.network}`
+                      : sr.targets.some(x => !x.requireNetwork || x.requireNetwork === config.runtime.network)
+                        ? `the ${config.runtime.network} target is switched off`
+                        : `no target serves ${config.runtime.network}`}, so nothing offloads here
                   </span>
                 )}
               </>
