@@ -216,6 +216,9 @@ interface TokenSummary {
     calls: number
     input_tokens: number
     output_tokens: number
+    /** Optional: absent on a proxy that predates per-bucket cache columns. */
+    cache_read_tokens?: number
+    cache_write_tokens?: number
   }>
   // New in Phase 36 follow-up: pivoted stacked series for the Evolution tab.
   // Each row is one time bucket; each non-`hour` key is a process/model name
@@ -569,12 +572,24 @@ export function TokenUsagePage() {
     evoGroupBy === 'process' ? (summary.process_keys || [])
     : evoGroupBy === 'model' ? (summary.model_keys || [])
     : evoGroupBy === 'provider' ? (summary.provider_keys || [])
-    : ['input', 'output']
+    // Three series, not two. Prompt-cache reads are the overwhelming majority
+    // of what a foreground turn sends — 197M of a 205M window — and they are
+    // billed, at a discount. Showing only input/output made the chart describe
+    // a rounding error and said nothing about what the spend actually consists
+    // of. Split out rather than folded into `input` because the three are
+    // priced differently: cache reads ~10% of the input rate, cache writes ~125%.
+    : ['input', 'output', 'cached', 'cacheWrite']
   const evoSeriesSrc: Array<Record<string, any>> =
     evoGroupBy === 'process' ? (summary.by_process_hour || [])
     : evoGroupBy === 'model' ? (summary.by_model_hour || [])
     : evoGroupBy === 'provider' ? (summary.by_provider_hour || [])
-    : (summary.by_hour || []).map(h => ({ hour: h.hour, input: h.input_tokens, output: h.output_tokens }))
+    : (summary.by_hour || []).map(h => ({
+      hour: h.hour,
+      input: h.input_tokens,
+      output: h.output_tokens,
+      cached: h.cache_read_tokens ?? 0,
+      cacheWrite: h.cache_write_tokens ?? 0,
+    }))
   // Canonicalize the Evolution series exactly like the Overview By Provider/By
   // Model breakdowns: provider aliases (copilot/github-copilot → github) and
   // model punctuation variants (claude-opus-4-8 → claude-opus-4.8) collapse into
@@ -610,8 +625,19 @@ export function TokenUsagePage() {
     evoKeyTotals.set(k, t)
   }
   const evoKeys = evoKeysRaw
-    .filter(k => (evoKeyTotals.get(k) || 0) / evoGrandTotal >= MAIN_CONSUMER_THRESHOLD)
-    .sort((a, b) => (evoKeyTotals.get(b) || 0) - (evoKeyTotals.get(a) || 0))
+    // The "main consumer" threshold exists to keep a legend of PROCESSES or
+    // MODELS focused — there are dozens of them and the long tail is noise.
+    // Input/output/cache is not a ranked list, it is the composition of one
+    // total, and dropping a part of it because the part is small defeats the
+    // view: fresh input is 0.4% of a cache-dominated window and is precisely
+    // what a reader comparing it against the cache needs to see.
+    .filter(k => evoGroupBy === 'tokens'
+      || (evoKeyTotals.get(k) || 0) / evoGrandTotal >= MAIN_CONSUMER_THRESHOLD)
+    // Composition keeps its natural reading order (what we sent, what came
+    // back, what was cached); everything else ranks by size.
+    .sort((a, b) => (evoGroupBy === 'tokens'
+      ? ['input', 'output', 'cached', 'cacheWrite'].indexOf(a) - ['input', 'output', 'cached', 'cacheWrite'].indexOf(b)
+      : (evoKeyTotals.get(b) || 0) - (evoKeyTotals.get(a) || 0)))
   // Bucket label format adapts to window width — short windows show HH:MM,
   // multi-day windows show MM/DD HH:MM so the X-axis stays readable.
   const isMultiDay = (summary.hours ?? 24) > 36
@@ -636,6 +662,10 @@ export function TokenUsagePage() {
     if (evoGroupBy === 'tokens') {
       if (key === 'input')  return '#3b82f6'   // blue (matches former Timeline tab)
       if (key === 'output') return '#10b981'   // emerald
+      // Violet, matching the "cached" figure in the Total Tokens card, so the
+      // headline and the chart name the same quantity the same way.
+      if (key === 'cached') return '#8b5cf6'
+      if (key === 'cacheWrite') return '#c4b5fd' // paler violet — same family, smaller share
     }
     if (evoGroupBy === 'process') {
       const canonical = PROCESS_COLORS[key]
@@ -954,7 +984,7 @@ export function TokenUsagePage() {
                       <SelectItem value="process">By Process</SelectItem>
                       <SelectItem value="model">By Model</SelectItem>
                       <SelectItem value="provider">By Provider</SelectItem>
-                      <SelectItem value="tokens">Input/Output</SelectItem>
+                      <SelectItem value="tokens">Input / Output / Cache</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
