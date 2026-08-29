@@ -1,0 +1,104 @@
+{
+  "runId": "kgpilot-excl",
+  "set": "replication",
+  "reps": 1,
+  "commit": "d918e7e9f",
+  "dirty": true,
+  "arms": [
+    {
+      "id": "grep",
+      "label": "Agentic grep (baseline)",
+      "model": "claude-sonnet-5",
+      "allowedTools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "backend": null
+    }
+  ],
+  "agents": [
+    "claude"
+  ],
+  "models": [
+    null
+  ],
+  "continuationBudget": 2,
+  "combinations": [
+    {
+      "arm": "grep",
+      "agent": "claude",
+      "model": "claude-sonnet-5",
+      "elicitation": "stream-json",
+      "enforcement": {
+        "mcp_servers": "enforced",
+        "builtins": "enforced",
+        "verified_by": "deny-list plus post-hoc audit of executed tools"
+      }
+    }
+  ],
+  "questions": [
+    "L1"
+  ],
+  "sandbox": {
+    "mode": "worktree",
+    "tree_commit": "d918e7e9fe67f5c3fee7636b7810bd912b4887da",
+    "excluded": [
+      "config/kgbench/questions",
+      "lib/kgbench/graders.mjs",
+      "lib/kgbench/sandbox.mjs",
+      "lib/kgbench/agents.mjs",
+      "lib/kgbench/judge.mjs",
+      "scripts/kgbench-regrade.mjs",
+      "scripts/kgbench-supervise.sh",
+      "scripts/analysis",
+      "tests/integration/kgbench-agents.test.js",
+      "tests/integration/kgbench-continuation.test.js",
+      "tests/integration/kgbench-dashboard-control.test.js",
+      "tests/integration/kgbench-graders.test.js",
+      "tests/integration/kgbench-publish-guard.test.js",
+      "tests/integration/kgbench-report-provenance.test.js",
+      "tests/integration/kgbench-sandbox.test.js",
+      "tests/integration/kgbench-tokens.test.js",
+      "tests/integration/kgbench-tool-arg-errors.test.js",
+      "tests/integration/kgbench-tool-enforcement.test.js",
+      "tests/integration/kgbench-tool-telemetry.test.js",
+      "docs/measurement/kgbench-experimental-design.md",
+      "docs/measurement/kgbench-guide.md",
+      "docs/measurement/kgbench-tutorial.md",
+      "docs/measurement/kgbench.md",
+      "docs-content/measurement/kgbench-experimental-design.md",
+      "docs-content/measurement/kgbench-guide.md",
+      "docs-content/measurement/kgbench-tutorial.md",
+      "docs-content/measurement/kgbench.md",
+      "docs/benchmarks/coding-v1",
+      "docs/benchmarks/graphify-vs-grep",
+      ".data",
+      ".specstory",
+      "CLAUDE.md",
+      ".claude",
+      ".github/copilot-instructions.md"
+    ],
+    "verified": true,
+    "code_graph_index": null,
+    "pinned_via_flag": false
+  },
+  "baselines": {
+    "grep|claude|claude-sonnet-5": 22707
+  },
+  "baselineSource": {
+    "grep|claude|claude-sonnet-5": "stream-json"
+  },
+  "schemaTax": {
+    "grep|claude|claude-sonnet-5": 0
+  },
+  "judge": {
+    "requested": {
+      "provider": "copilot",
+      "model": "claude-sonnet-5"
+    },
+    "served": null,
+    "enabled": true
+  },
+  "startedAt": "2026-08-19T07:33:00.629Z"
+}
