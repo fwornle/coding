@@ -79,7 +79,13 @@ interface RoutingConfig {
      * network serves the offload. A target defaults to disabled — declaring one
      * says where an offload could go, `enabled` says send work there.
      */
-    targets: Array<{ provider: string; requireNetwork: string | null; enabled: boolean }>
+    /**
+     * `scope` is which KIND of work the target may serve — foreground
+     * conversation, background service, or both. Optional on the wire: a proxy
+     * that predates the field sends none, and the reader below treats that as
+     * both, exactly as the loader does.
+     */
+    targets: Array<{ provider: string; requireNetwork: string | null; enabled: boolean; scope?: string[] }>
     offloadBands: string[]
   } | null
   fallback: { chains: Record<string, Array<{ provider: string; when: unknown }>> }
@@ -285,7 +291,14 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                     >
                       {i > 0 && ' · '}
                       <span className={tgt.enabled === false ? 'font-mono line-through' : 'font-mono'}>{tgt.provider}</span>
-                      {tgt.requireNetwork ? ` (${tgt.requireNetwork})` : ' (any network)'}
+                      {tgt.requireNetwork ? ` (${tgt.requireNetwork}` : ' (any network'}
+                      {/* Scope is shown only when it NARROWS, because the default
+                          is both and printing "fg+bg" beside every target would
+                          bury the one that is restricted. The laptop endpoint is
+                          fg-only, and a reader who cannot see that reads "off" as
+                          the only thing standing between it and the background
+                          services it swamped on 2026-08-29. */}
+                      {tgt.scope && tgt.scope.length === 1 ? `, ${tgt.scope[0]} only)` : ')'}
                       {/* An off target reads as a target unless it says otherwise —
                           which is how the laptop endpoint served a day of traffic
                           nobody had asked it to serve. */}

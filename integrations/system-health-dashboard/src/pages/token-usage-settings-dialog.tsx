@@ -82,7 +82,14 @@ interface FallbackCandidate {
  */
 interface SemanticRouting {
   enabled: boolean
-  targets: Array<{ provider: string; requireNetwork: string | null; enabled: boolean }>
+  /**
+   * `scope` — which KIND of work this target may serve (`fg`, `bg`, or both).
+   * Declared in the type so the draft carries it through a save: the PATCH's
+   * reorder path rebuilds each entry from what it is sent, and a field missing
+   * from the body would be replaced by the loader's default (both). Optional,
+   * because a proxy that predates the field sends none.
+   */
+  targets: Array<{ provider: string; requireNetwork: string | null; enabled: boolean; scope?: string[] }>
   offloadBands: string[]
 }
 
@@ -425,6 +432,15 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
                             serves
                               ? `The live network sensor reads ${data.runtime.network}, which this target serves.`
                               : `Only on the ${tgt.requireNetwork} network; the sensor currently reads ${data.runtime.network}.`,
+                            // Scope decides what switching this ON actually
+                            // turns on, so it belongs in the same tooltip as the
+                            // switch rather than somewhere the operator has to
+                            // go and look for it.
+                            tgt.scope && tgt.scope.length === 1
+                              ? tgt.scope[0] === 'fg'
+                                ? 'Foreground only: interactive turns can go here, background services cannot.'
+                                : 'Background only: services can go here, interactive turns cannot.'
+                              : 'Serves both foreground turns and background services.',
                           ].join(' ')}
                         >
                           <input
@@ -438,7 +454,8 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
                                 i === idx ? { ...t, enabled: e.target.checked } : t)),
                             }))}
                           />
-                          → {tgt.provider} ({tgt.requireNetwork || 'any'})
+                          → {tgt.provider} ({tgt.requireNetwork || 'any'}
+                          {tgt.scope && tgt.scope.length === 1 ? `, ${tgt.scope[0]} only` : ''})
                           {on && serves && ' ← live'}
                         </label>
                       )

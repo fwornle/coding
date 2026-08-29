@@ -184,14 +184,32 @@ semantic_routing:
     - provider: qwen-local     # the on-prem V100 cluster, 10/8
       require_network: corporate
       enabled: true
+      scope: [ fg, bg ]        # fast enough for both
     - provider: qwen-laptop    # llama.cpp on this laptop, 127.0.0.1:8081
       require_network: public
       enabled: false           # last resort — see the latency note below
+      scope: [ fg ]            # never background — see the same note
 ```
 
 Ordered; the first **enabled** entry whose network matches wins; an entry with no
 `require_network` matches everywhere. Two entries claiming one network is refused at boot —
 the second could never be reached, and whoever wrote it believes it can.
+
+**`scope` defaults to `[ fg, bg ]`** — foreground conversation, background service, or both.
+`offload_bands` says how *hard* a call may be to qualify; `scope` says *who may be waiting on
+it*. The band alone cannot express "cheap, but only when someone is watching", and that gap is
+what made the laptop target all-or-nothing: enabled for the sake of interactive turns, it took
+`bg-observation-writer` and `bg-auto-measure-title` — the two highest-volume services on the
+machine — with it.
+
+It is declared per target rather than globally because it is a property of the **endpoint**,
+not of the policy: how much latency a box adds is the thing that decides what it may serve. A
+V100 rack is quick enough that a `small` foreground turn served there is not a worse
+conversation. A laptop generating at 3-6 tok/s is not, for anything unattended.
+
+A call skipped on scope says so specifically — `target "qwen-laptop" serves scope [fg] and
+this is bg work` — rather than reusing "no offload target for this network". The two have
+opposite fixes: one wants a target declared, the other wants an existing one widened.
 
 **`enabled` defaults to `false`.** Declaring a target says where an offload *could* go;
 enabling it says work should actually be sent there. Keeping those apart is the point:
@@ -222,6 +240,13 @@ name rather than half-honoured.
 from every chain while unreachable, so a stopped `llama-server` or an off-VPN cluster costs
 nothing beyond falling back to the provider the route named.
 
+A target is **not probed at all on a network it does not serve**. The routing guard already
+refuses to send work to `qwen-local` off corporate, so a probe there could only produce a
+`false` the router is contractually going to ignore — and it would open a connection to a
+private-range address, carrying the corporate bearer token, on whatever network the laptop
+happens to be on. `10.143.241.223` is not ours at a cafe, and something there may well answer.
+The endpoint is marked unavailable without being touched, which is the honest state anyway.
+
 > **Why `qwen-laptop` ships switched off.** Reachability is not usability, and the probe
 > above can only establish the first: the laptop answers `/models` on loopback in
 > milliseconds and then generates an order of magnitude slower than the account it
@@ -234,13 +259,25 @@ nothing beyond falling back to the provider the route named.
 >
 > Worse, the 48 calls that gave up (`Qwen laptop API timed out after 120000ms`) paid **92s on
 > average before the real provider was even tried** — the offload made those calls slower
-> than not having it. `offload_bands` is global, so all of this landed on the highest-volume
-> background services (`bg-observation-writer`, `bg-auto-measure-title`), not only on
-> interactive turns, and a 50s call sits uncomfortably close to the ETM's 60s `isProcessing`
-> watchdog.
+> than not having it. `offload_bands` was global and `scope` did not exist, so all of this
+> landed on the highest-volume background services (`bg-observation-writer`,
+> `bg-auto-measure-title`), not only on interactive turns, and a 50s call sits uncomfortably
+> close to the ETM's 60s `isProcessing` watchdog.
+>
+> `scope: [ fg ]` is what makes turning it back **on** safe: switching the target off stopped
+> the damage by stopping everything, which is a blunt instrument for a problem that was
+> entirely on one side of the fg/bg line. Foreground is the case that survives the latency —
+> you are sitting there, you can see it working, and you chose the trade when you enabled it.
+> Nothing chose it on behalf of the background services.
 >
 > Free is not the only axis. Turn it on for a session where cost genuinely beats latency —
 > an unmetered laptop doing bulk cheap work off-VPN is a real case — and turn it back off.
+>
+> **Know before you enable it:** off-VPN the foreground agent is `coding --claude`, and
+> `fg-chat/claude` can never be offloaded — it arrives on the Anthropic wire protocol at
+> `/v1/messages`, and no local provider carries `fg_transport`. With claude this target is
+> therefore reachable only from a `coding --opencode` / `--pi` / `--copilot` session run
+> off-VPN.
 
 ---
 
