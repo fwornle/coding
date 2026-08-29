@@ -163,6 +163,80 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
                     <span className="text-muted-foreground">warn</span>
                   </label>
                 </div>
+                {/* Per-month overrides. A cap is not a constant: this one went
+                    300 -> 600 -> 1000 during 2026-08 as extensions were approved,
+                    and without a history a single number would retroactively
+                    re-judge every past month against a budget it never had. The
+                    standing value above applies to any month with no entry here. */}
+                <div className="pl-2 border-l-2 border-muted ml-1 space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    Per-month overrides — for months where an extension was approved. Months not
+                    listed use the standing budget above.
+                  </div>
+                  {Object.entries(draft.budgets.copilot.monthlyEurByMonth ?? {})
+                    .sort(([a], [b]) => b.localeCompare(a))
+                    .map(([month, eur]) => (
+                      <div key={month} className="flex items-center gap-2 text-sm">
+                        <Input
+                          className="w-28 h-8 font-mono"
+                          value={month}
+                          placeholder="YYYY-MM"
+                          onChange={e => setDraft(d => {
+                            const next = { ...(d.budgets.copilot.monthlyEurByMonth ?? {}) }
+                            delete next[month]
+                            next[e.target.value] = eur
+                            return { ...d, budgets: { ...d.budgets, copilot: { ...d.budgets.copilot, monthlyEurByMonth: next } } }
+                          })} />
+                        <Input
+                          type="number" step="10" className="w-28 h-8"
+                          value={eur ?? ''}
+                          placeholder="no cap"
+                          onChange={e => setDraft(d => ({
+                            ...d,
+                            budgets: {
+                              ...d.budgets,
+                              copilot: {
+                                ...d.budgets.copilot,
+                                monthlyEurByMonth: {
+                                  ...(d.budgets.copilot.monthlyEurByMonth ?? {}),
+                                  [month]: e.target.value === '' ? null : num(e.target.value, 0),
+                                },
+                              },
+                            },
+                          }))} />
+                        <Button
+                          variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground"
+                          onClick={() => setDraft(d => {
+                            const next = { ...(d.budgets.copilot.monthlyEurByMonth ?? {}) }
+                            delete next[month]
+                            return { ...d, budgets: { ...d.budgets, copilot: { ...d.budgets.copilot, monthlyEurByMonth: next } } }
+                          })}
+                        >remove</Button>
+                      </div>
+                    ))}
+                  <Button
+                    variant="outline" size="sm" className="h-8"
+                    onClick={() => setDraft(d => {
+                      const now = new Date()
+                      const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                      const cur = d.budgets.copilot.monthlyEurByMonth ?? {}
+                      // Defaults to the CURRENT month and the standing value —
+                      // the overwhelmingly common case is "this month got raised".
+                      if (Object.prototype.hasOwnProperty.call(cur, key)) return d
+                      return {
+                        ...d,
+                        budgets: {
+                          ...d.budgets,
+                          copilot: {
+                            ...d.budgets.copilot,
+                            monthlyEurByMonth: { ...cur, [key]: d.budgets.copilot.monthlyEur ?? 0 },
+                          },
+                        },
+                      }
+                    })}
+                  >+ add month</Button>
+                </div>
+
                 {/* Claude Max budget */}
                 <div className="flex flex-wrap items-center gap-3 text-sm">
                   <span className="w-28 font-medium">Claude Max</span>

@@ -15,6 +15,13 @@ export interface CostRow {
   model: string
   process: string
   subscription: string
+  /**
+   * Which side of the foreground/background split this row is on, derived
+   * server-side from user_hash (see FOREGROUND_USER_HASHES in the proxy).
+   * Optional so a proxy that predates it degrades to "unattributed" rather
+   * than silently counting everything as one side.
+   */
+  scope?: 'fg' | 'bg'
   calls: number
   input_tokens: number
   output_tokens: number
@@ -30,7 +37,41 @@ export interface CostConfig {
   modelPrices: Record<string, ModelPrice>
   providerScale: Record<string, number>
   copilot: { plan: string; includedCreditsUsd: number; creditUsd: number; overagePrices: string }
-  budgets: Record<string, { monthlyEur: number | null; enforce: boolean; budgetBasis: string }>
+  budgets: Record<string, BudgetConfig>
+}
+
+/**
+ * A subscription's budget.
+ *
+ * `monthlyEur` is the standing cap. `monthlyEurByMonth` overrides it for named
+ * months ('YYYY-MM' -> euros), because a cap is not a constant: this one went
+ * 300 -> 600 -> 1000 during 2026-08 as extensions were approved. Without the
+ * history a single editable number would retroactively re-judge every past
+ * month against a budget it never had — reporting July as "over" on a cap that
+ * did not exist yet, which is worse than not showing a verdict at all.
+ *
+ * In-month changes are deliberately NOT modelled: the tab's unit is the
+ * calendar month, and the number that matters for "did we stay inside it" is
+ * the cap in force at month end. A mid-month raise is recorded by setting that
+ * month's entry to the new value.
+ */
+export interface BudgetConfig {
+  monthlyEur: number | null
+  monthlyEurByMonth?: Record<string, number | null>
+  enforce: boolean
+  budgetBasis: string
+}
+
+/**
+ * The budget in force for a given month: the month's own override if it has
+ * one, otherwise the standing cap. An explicit `null` override is honoured — it
+ * means "no cap that month", which is different from "not recorded".
+ */
+export function budgetForMonth(b: BudgetConfig | undefined, month: string): number | null {
+  if (!b) return null
+  const byMonth = b.monthlyEurByMonth
+  if (byMonth && Object.prototype.hasOwnProperty.call(byMonth, month)) return byMonth[month] ?? null
+  return b.monthlyEur ?? null
 }
 
 export const DEFAULT_COST_CONFIG: CostConfig = {
@@ -47,7 +88,7 @@ export const DEFAULT_COST_CONFIG: CostConfig = {
   providerScale: { copilot: 1.0, 'claude-max': 1.0 },
   copilot: { plan: 'business', includedCreditsUsd: 19, creditUsd: 0.01, overagePrices: 'sameAsModelPrices' },
   budgets: {
-    copilot:      { monthlyEur: 300,  enforce: true,  budgetBasis: 'gross' },
+    copilot:      { monthlyEur: 300,  monthlyEurByMonth: { '2026-08': 1000 }, enforce: true,  budgetBasis: 'gross' },
     'claude-max': { monthlyEur: null, enforce: false, budgetBasis: 'gross' },
   },
 }
@@ -127,24 +168,34 @@ export function budgetProvider(provider: string): BudgetProvider {
 //     usage.prompt_tokens_details.cached_tokens is a SUBSET of usage.prompt_tokens
 //     — cache reads are already included in input_tokens, not additive.
 //
-// cellCostUsd's server-recorded row shape doesn't carry which wire produced it,
-// only `provider`, so we infer it the same way budgetProvider() already does:
-// copilot-family providers are OpenAI wire, everything else (claude-code-max,
-// anthropic) is Anthropic wire. Pricing input_tokens + cache_read_tokens at
-// full rates for an OpenAI-wire row double-bills the cached portion — this is
-// the bug flagged 2026-08-28 (dashboard overstating cost for copilot/opencode/pi
-// rows, confirmed live: `pi` process row had cache_read_tokens at 90% of
-// input_tokens, i.e. billed twice for 90% of its tokens at full input price).
-function isOpenAIWireProvider(provider: string): boolean {
+// Which wire a provider speaks. No longer needed for pricing — the row shape is
+// uniform now (see freshInputTokens) — but kept because the distinction is real
+// and the next person to need it should not re-derive it from provider strings.
+export function isOpenAIWireProvider(provider: string): boolean {
   const p = (provider || '').toLowerCase()
   return p.includes('copilot') || p === 'github' || p === 'opencode'
 }
-// Input tokens NOT already covered by cache_read_tokens — i.e. the portion
-// that should be billed at the full (non-cached) input rate. For Anthropic-wire
-// rows, input_tokens already excludes cache reads, so this is a no-op.
+/**
+ * Input tokens to bill at the full (non-cached) rate.
+ *
+ * Now the identity — `input_tokens` is fresh input on every provider, and this
+ * function is kept as the single named place that says so.
+ *
+ * It used to subtract `cache_read_tokens` for OpenAI-wire rows, correctly:
+ * `prompt_tokens` there INCLUDED cache hits, so pricing all of it at the full
+ * input rate double-billed the cached share. That compensation is now WRONG,
+ * because the proxy subtracts at the parse boundary (openAIFreshInputTokens)
+ * and scripts/backfill-openai-wire-cache-split.mjs corrected the historical
+ * rows. Subtracting a second time zeroes the fresh input of exactly the rows
+ * the fix repaired — a real corrected row reads input=135, cache_read=23,264,
+ * and the old expression returned max(0, 135 - 23264) = 0.
+ *
+ * A compensation for a defect must be removed when the defect is; leaving it in
+ * is how one fix becomes two bugs. If a provider ever reports the nested shape
+ * again, fix it at the parse boundary, not here.
+ */
 export function freshInputTokens(r: CostRow): number {
-  if (!isOpenAIWireProvider(r.provider)) return r.input_tokens
-  return Math.max(0, r.input_tokens - r.cache_read_tokens)
+  return r.input_tokens
 }
 export const BUDGET_PROVIDER_LABEL: Record<BudgetProvider, string> = {
   copilot: 'GitHub Copilot',
@@ -350,4 +401,97 @@ export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string
   }
 
   return suggestions.sort((a, b) => b.estSavingsEur - a.estSavingsEur)
+}
+
+// ---- Foreground / background split --------------------------------------
+
+/**
+ * Split a set of rows' cost into the half a human was waiting on and the half
+ * that ran on its own.
+ *
+ * The distinction is the one operational question this page cannot otherwise
+ * answer: background work is discretionary — it can be re-routed, re-banded,
+ * cached or switched off without anyone noticing — while foreground spend is
+ * the cost of the work itself. A single euro figure hides which lever exists.
+ *
+ * Rows from a proxy that predates the `scope` column count as `unattributed`
+ * rather than being assigned to a side. Guessing would make the split look
+ * complete when it is not, and the whole point is to decide where to act.
+ */
+export interface ScopeSplit { fgEur: number; bgEur: number; unattributedEur: number; totalEur: number }
+
+export function splitByScope(rows: CostRow[], cfg: CostConfig): ScopeSplit {
+  let fgEur = 0; let bgEur = 0; let unattributedEur = 0
+  for (const r of rows) {
+    if (isSynthetic(r)) continue
+    const eur = usdToEur(cellCostUsd(r, cfg), cfg)
+    if (r.scope === 'fg') fgEur += eur
+    else if (r.scope === 'bg') bgEur += eur
+    else unattributedEur += eur
+  }
+  return { fgEur, bgEur, unattributedEur, totalEur: fgEur + bgEur + unattributedEur }
+}
+
+// ---- Local-hardware savings ---------------------------------------------
+
+/**
+ * Providers that cost nothing per token because the hardware is ours: the
+ * on-prem cluster and the laptop. Distinct from a flat subscription like Claude
+ * Max, which has a real (if notional per-token) price.
+ */
+const ZERO_COST_PROVIDERS = new Set(['qwen-local', 'qwen-laptop'])
+
+export function isZeroCostProvider(provider: string): boolean {
+  return ZERO_COST_PROVIDERS.has((provider || '').toLowerCase())
+}
+
+/**
+ * What the work served by our own hardware WOULD have cost on GitHub Copilot.
+ *
+ * Priced with the Copilot model at the band the work actually used, because
+ * that is the counterfactual: semantic offload displaces a `gh-copilot` call,
+ * and the route's own provider is what sits first in its fallback chain. Using
+ * the local model's own (zero) price would say nothing, and using the most
+ * expensive model would flatter the number.
+ *
+ * `model` maps through the same family fallback as everything else, so a local
+ * `qwen3.8-27b-local` serving the `small` band is priced against the Copilot
+ * model that band would otherwise have used — passed in by the caller rather
+ * than guessed here, since the band-to-model mapping lives in llm-routing.yaml
+ * and this module must not grow a second copy of it.
+ *
+ * Returns zero, not a negative or a NaN, when nothing ran locally — an honest
+ * "no savings yet" rather than an absent tile.
+ */
+export interface LocalSavings {
+  eur: number
+  calls: number
+  tokens: number
+  /** Rows that produced it, so the UI can say WHICH work was displaced. */
+  byProcess: Array<{ process: string; eur: number; calls: number }>
+}
+
+export function localSavings(
+  rows: CostRow[],
+  cfg: CostConfig,
+  counterfactualModel: string,
+): LocalSavings {
+  const byProcess = new Map<string, { process: string; eur: number; calls: number }>()
+  let eur = 0; let calls = 0; let tokens = 0
+  for (const r of rows) {
+    if (isSynthetic(r) || !isZeroCostProvider(r.provider)) continue
+    // Same row, priced as if gh-copilot had served it.
+    const asCopilot: CostRow = { ...r, provider: 'gh-copilot', model: counterfactualModel }
+    const rowEur = usdToEur(cellCostUsd(asCopilot, cfg), cfg)
+    eur += rowEur
+    calls += r.calls
+    tokens += r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_write_tokens
+    const cur = byProcess.get(r.process)
+    if (cur) { cur.eur += rowEur; cur.calls += r.calls }
+    else byProcess.set(r.process, { process: r.process, eur: rowEur, calls: r.calls })
+  }
+  return {
+    eur, calls, tokens,
+    byProcess: Array.from(byProcess.values()).sort((a, b) => b.eur - a.eur),
+  }
 }
