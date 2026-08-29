@@ -64,16 +64,26 @@ interface FallbackCandidate {
 
 /**
  * The offload policy. When enabled, work whose resolved band is in offloadBands
- * is served by localProvider instead of the provider its route names — so it
+ * is served by a local endpoint instead of the provider its route names — so it
  * silently changes which provider answers a large share of calls, which is
  * exactly why it needs to be visible and switchable here rather than only in
  * the YAML.
+ *
+ * `targets` is a LIST because "the local model" is not one machine: the on-prem
+ * cluster answers only on the corporate network, the laptop server only off it.
+ * Ordered, first ENABLED network match wins, an entry with no requireNetwork
+ * matches everywhere.
+ *
+ * Each target carries its own `enabled`, defaulting to off in the loader. That
+ * is the switch this dialog exists to offer: an unmetered endpoint is not
+ * therefore a cheap one, and the cost it does carry — latency — is invisible to
+ * the reachability probe that gates it. The laptop target ships off for exactly
+ * that reason and is turned on per session, here.
  */
 interface SemanticRouting {
   enabled: boolean
-  localProvider: string | null
+  targets: Array<{ provider: string; requireNetwork: string | null; enabled: boolean }>
   offloadBands: string[]
-  requireNetwork: string | null
 }
 
 interface RoutingData {
@@ -138,10 +148,16 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
         setDefaultDraft({ ...d.defaults })
         setFallbackDraft(JSON.parse(JSON.stringify(d.fallback)))
         // Tolerate a proxy that predates the semanticRouting field rather than
-        // rendering an empty panel from `undefined`.
+        // rendering an empty panel from `undefined`. A target from a proxy that
+        // predates per-target `enabled` normalises to OFF, matching the loader's
+        // default: showing an unknown state as on is the direction that costs
+        // latency, and one that is wrongly off is one visible click from right.
         setSemanticDraft(d.semanticRouting
-          ? { ...d.semanticRouting }
-          : { enabled: false, localProvider: null, offloadBands: [], requireNetwork: null })
+          ? {
+            ...d.semanticRouting,
+            targets: (d.semanticRouting.targets ?? []).map(t => ({ ...t, enabled: t.enabled === true })),
+          }
+          : { enabled: false, targets: [], offloadBands: [] })
       })
       .catch(e => setError(`Failed to load routing config: ${e.message}`))
       .finally(() => setLoading(false))
@@ -185,6 +201,20 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
   const semanticChanged = useMemo(
     () => !!data && !!semanticDraft
       && JSON.stringify(data.semanticRouting ?? null) !== JSON.stringify(semanticDraft),
+    [data, semanticDraft],
+  )
+
+  // The target that would actually serve this machine, under the DRAFT policy.
+  // Same first-match rule the proxy applies (pickOffloadTarget in
+  // routing-config.mjs): an entry with no requireNetwork matches every network.
+  // Editing the policy without seeing which target is live is how "offload is
+  // enabled" gets read as "offload can fire here" — off-VPN, with only a
+  // corporate target declared, those are different statements.
+  const activeTarget = useMemo(
+    () => (data && semanticDraft?.enabled
+      ? (semanticDraft.targets.find(t => t.enabled !== false
+          && (!t.requireNetwork || t.requireNetwork === data.runtime.network)) ?? null)
+      : null),
     [data, semanticDraft],
   )
 
@@ -373,31 +403,65 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
                       />
                       Semantic offload
                     </label>
-                    {semanticDraft.localProvider && (
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        → {semanticDraft.localProvider}
-                      </Badge>
-                    )}
-                    {semanticDraft.requireNetwork && (
-                      <Badge
-                        variant={data.runtime.network === semanticDraft.requireNetwork ? 'default' : 'outline'}
-                        className="text-[10px]"
-                        title={
-                          data.runtime.network === semanticDraft.requireNetwork
-                            ? 'The live network sensor satisfies the guard — offload is in force.'
-                            : `Guard not satisfied: this policy only applies on the ${semanticDraft.requireNetwork} network, and the sensor currently reads ${data.runtime.network}.`
-                        }
-                      >
-                        {semanticDraft.requireNetwork} only
-                        {data.runtime.network !== semanticDraft.requireNetwork && ' — not active now'}
+                    {/* Per-target on/off. The badges these replace were
+                        read-only, which made a target's mere presence the thing
+                        that decided whether work went to it — and adding one was
+                        then enough to start serving from it. Each target now
+                        needs saying yes to, and says so on the wire. */}
+                    {semanticDraft.targets.map((tgt, idx) => {
+                      const serves = !tgt.requireNetwork || tgt.requireNetwork === data.runtime.network
+                      const on = tgt.enabled !== false
+                      return (
+                        <label
+                          key={tgt.provider}
+                          className={`flex items-center gap-1.5 rounded border px-2 py-1 text-[10px] font-mono cursor-pointer ${
+                            on && serves
+                              ? 'border-primary/50 bg-primary/10'
+                              : 'border-border bg-transparent text-muted-foreground'
+                          }`}
+                          title={[
+                            on ? 'Switched on: work in the selected bands can go here.'
+                               : 'Switched off: declared, but nothing is sent to it.',
+                            serves
+                              ? `The live network sensor reads ${data.runtime.network}, which this target serves.`
+                              : `Only on the ${tgt.requireNetwork} network; the sensor currently reads ${data.runtime.network}.`,
+                          ].join(' ')}
+                        >
+                          <input
+                            type="checkbox"
+                            className="accent-primary"
+                            checked={on}
+                            disabled={!semanticDraft.enabled}
+                            onChange={e => setSemanticDraft(sd => sd && ({
+                              ...sd,
+                              targets: sd.targets.map((t, i) => (
+                                i === idx ? { ...t, enabled: e.target.checked } : t)),
+                            }))}
+                          />
+                          → {tgt.provider} ({tgt.requireNetwork || 'any'})
+                          {on && serves && ' ← live'}
+                        </label>
+                      )
+                    })}
+                    {semanticDraft.enabled && !activeTarget && (
+                      <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-500">
+                        {semanticDraft.targets.some(t => !t.requireNetwork || t.requireNetwork === data.runtime.network)
+                          ? `the ${data.runtime.network} target is switched off — nothing offloads here`
+                          : `no target for ${data.runtime.network} — nothing offloads here`}
                       </Badge>
                     )}
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-snug">
                     Serves work in the selected bands from{' '}
-                    <span className="font-mono">{semanticDraft.localProvider || 'the local provider'}</span>{' '}
+                    <span className="font-mono">{activeTarget?.provider || 'a local endpoint'}</span>{' '}
                     instead of the provider each route names below, inserting that route's own
-                    provider as the first fallback. Routes marked <span className="font-mono">offload: false</span>{' '}
+                    provider as the first fallback. Targets are network-scoped and tried in order —
+                    the on-prem cluster answers only on corporate, the laptop server only off it —
+                    so which one is live depends on where this machine is, and on which of them you
+                    have switched on above. Each target is off until you say otherwise: an unmetered
+                    endpoint still costs latency, and these bands carry the highest-volume
+                    background services, not just interactive turns. Routes marked{' '}
+                    <span className="font-mono">offload: false</span>{' '}
                     — where the model that answers <em>is</em> the measurement — never move.
                   </p>
                   <div className="flex items-center gap-3 flex-wrap text-xs">
@@ -420,7 +484,11 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
                         />
                         <span className={semanticDraft.enabled ? 'font-mono' : 'font-mono opacity-50'}>{b}</span>
                         <span className="text-muted-foreground">
-                          ({modelFor(providers, semanticDraft.localProvider || '', b)})
+                          {/* The model the LIVE target would serve for this band.
+                              Naming a band's model from a target that cannot be
+                              reached from here would describe a call that cannot
+                              happen. */}
+                          ({modelFor(providers, activeTarget?.provider || '', b)})
                         </span>
                       </label>
                     ))}

@@ -49,6 +49,7 @@
 
 import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
+import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import * as process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -108,11 +109,16 @@ export function parseArgs(argv) {
     logDir: path.resolve(process.cwd(), '.data'),
     limit: null,
     dryRun: false,
+    force: false,
     help: false,
   };
   for (const a of argv) {
     if (a === '--help' || a === '-h') args.help = true;
     else if (a === '--dry-run') args.dryRun = true;
+    // Ignore the ledger and re-classify everything. For when the CATALOGUE
+    // changed rather than the Insights — a new Component makes previous "no
+    // match" answers stale in a way no per-Insight fingerprint can detect.
+    else if (a === '--force') args.force = true;
     else if (a.startsWith('--source=')) args.source = path.resolve(a.slice('--source='.length));
     else if (a.startsWith('--log-dir=')) args.logDir = path.resolve(a.slice('--log-dir='.length));
     else if (a.startsWith('--limit=')) {
@@ -135,6 +141,7 @@ function printUsage() {
       '  --log-dir=<dir>    Where to write the summary JSON (default .data/)',
       '  --limit=<N>        Process at most N un-mentioned Insights',
       '  --dry-run          Scan + classify + summary only, NO kmStore writes',
+      '  --force            Re-classify even Insights the ledger has already answered for',
       '  --help, -h         Show this usage and exit 0',
       '',
       'Operator runbook for live execution — see PLAN §Task 3.',
@@ -219,6 +226,102 @@ async function readExport(sourcePath) {
  * @param {object} insight
  * @returns {string}
  */
+// ────────────────────────────────────────────────────────────────────────────
+// Classification ledger — the idempotency gate for insights that match NOTHING
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Filename of the ledger, kept beside the graph data it describes.
+ *
+ * WHY THIS EXISTS. The original idempotency gate (D-05) is "skip any Insight
+ * that already has an outgoing `mentions` edge". That is correct for every
+ * Insight the classifier finds a match for, and silently wrong for every one it
+ * does not: an empty answer writes no edge, so the Insight stays in the
+ * `unmentioned` set and is re-classified on the NEXT run, and the one after
+ * that, forever. Nothing converges, because a negative result was never
+ * recorded anywhere.
+ *
+ * Measured on 2026-08-29 over 24h: 2181 classifier calls for 193 distinct
+ * Insights — 11x redundancy — and 2040 of those calls (94%) returned the
+ * literal `[]`. At ~23.8K prompt tokens each that is ~49M tokens spent
+ * re-deriving the same nothing, on a model picked by a route that said
+ * `medium`.
+ *
+ * WHY A SIDECAR AND NOT THE GRAPH. "We asked and the answer was none" is a fact
+ * about processing state, not about the domain — it says nothing about the
+ * Insight itself, and materialising it as a node attribute or a marker edge
+ * would put bookkeeping into the knowledge graph and into every export that
+ * reads it. It also keeps this script's write surface exactly as it was
+ * (addRelation only), which matters because km-core's LevelDB is single-owner.
+ *
+ * The ledger is a cache, not a system of record: deleting it costs one
+ * re-classification pass and nothing else.
+ */
+const LEDGER_BASENAME = 'mentions-classified.json';
+
+/** Ledger schema version. A mismatch is treated as an empty ledger, not an error. */
+const LEDGER_VERSION = 1;
+
+/**
+ * Fingerprint of the text the classifier was actually shown.
+ *
+ * Keyed on the summary rather than on the Insight id so that an EDITED Insight
+ * is re-classified — its old answer was about different text. Without this the
+ * ledger would be a permanent veto, and "never re-ask" is as wrong as "always
+ * re-ask", just cheaper.
+ */
+export function summaryFingerprint(summary) {
+  return crypto.createHash('sha256').update(String(summary ?? ''), 'utf8').digest('hex').slice(0, 16);
+}
+
+/** Absolute path of the ledger for a given data dir. */
+export function ledgerPath(dataDir) {
+  return path.join(dataDir, LEDGER_BASENAME);
+}
+
+/**
+ * Read the ledger. A missing, unreadable, malformed or stale-version file all
+ * yield an empty ledger: this is a cache, and failing to read a cache must cost
+ * work, never correctness.
+ */
+export function readLedger(dataDir) {
+  try {
+    const raw = fs.readFileSync(ledgerPath(dataDir), 'utf8');
+    const doc = JSON.parse(raw);
+    if (!doc || doc.version !== LEDGER_VERSION || !doc.entries || typeof doc.entries !== 'object') {
+      return {};
+    }
+    return doc.entries;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Write the ledger. Atomic via write-to-temp + rename, so a run killed mid-write
+ * leaves the previous ledger intact rather than a truncated JSON file that the
+ * next run would discard — turning one interrupted run into a full re-classify.
+ */
+export function writeLedger(dataDir, entries) {
+  const target = ledgerPath(dataDir);
+  const tmp = `${target}.tmp`;
+  const doc = { version: LEDGER_VERSION, updatedAt: new Date().toISOString(), entries };
+  fs.writeFileSync(tmp, `${JSON.stringify(doc, null, 2)}\n`, 'utf8');
+  fs.renameSync(tmp, target);
+}
+
+/**
+ * Has this exact summary already been classified?
+ *
+ * Note it deliberately does NOT care whether the previous answer was empty. A
+ * recorded empty answer is the whole point — that is the case the edge-scan gate
+ * cannot see.
+ */
+export function ledgerHit(entries, insightId, summary) {
+  const rec = entries?.[insightId];
+  return !!rec && rec.summaryFingerprint === summaryFingerprint(summary);
+}
+
 function deriveInsightSummary(insight) {
   if (!insight || typeof insight !== 'object') return '';
   if (Array.isArray(insight.descriptionSegments) && insight.descriptionSegments.length > 0) {
@@ -450,16 +553,34 @@ async function main() {
     .map((n) => n.attributes); // hoist attributes to Entity shape
   const unmentioned = insightNodes.filter((e) => !insightsWithMentions.has(e.id));
 
+  // SECOND idempotency gate. The edge scan above sees only Insights the
+  // classifier found matches for; the ledger remembers the ones it answered
+  // "none" for, which the edge scan structurally cannot. Without it those
+  // Insights are re-classified on every run for ever — 94% of this script's
+  // LLM spend, measured. See the ledger module above.
+  // The ledger lives in --log-dir (default `.data`), the directory this script
+  // already owns for its own output. Deriving it from --source by walking up
+  // two levels assumed the production layout
+  // `.data/knowledge-graph/exports/general.json`; given any other source path
+  // it climbs somewhere unrelated — for a fixture in a tmpdir, straight into the
+  // shared system temp directory, where every run would share one ledger.
+  const ledgerDir = args.logDir;
+  const ledger = args.force ? {} : readLedger(ledgerDir);
+  const pending = unmentioned.filter((e) => !ledgerHit(ledger, e.id, deriveInsightSummary(e)));
+  const ledgerSkipped = unmentioned.length - pending.length;
+
   process.stderr.write(
     `[backfill-58-03] Insight total=${insightNodes.length} `
     + `alreadyMentioned=${insightNodes.length - unmentioned.length} `
-    + `unmentioned=${unmentioned.length}\n`,
+    + `unmentioned=${unmentioned.length} `
+    + `ledgerSkipped=${ledgerSkipped}${args.force ? ' (--force: ledger ignored)' : ''} `
+    + `toClassify=${pending.length}\n`,
   );
 
   // Apply --limit slicing (after the universe is counted).
-  const sliceEnd = args.limit != null ? Math.min(args.limit, unmentioned.length) : unmentioned.length;
-  const working = unmentioned.slice(0, sliceEnd);
-  const limitSkipped = unmentioned.length - working.length;
+  const sliceEnd = args.limit != null ? Math.min(args.limit, pending.length) : pending.length;
+  const working = pending.slice(0, sliceEnd);
+  const limitSkipped = pending.length - working.length;
 
   // Open the live kmStore only when NOT dry-run.
   let store = null;
@@ -537,11 +658,39 @@ async function main() {
       edgesWritten += record.mentionsAdded;
       if (record.errors.length > 0) errors += 1;
 
+      // Record the answer — INCLUDING an empty one, which is the case the edge
+      // scan cannot represent and the reason this ledger exists. Only on a clean
+      // classify: an Insight whose classifier call ERRORED has not been answered,
+      // and writing it here would turn one proxy blip into a permanent skip.
+      // Dry-run records nothing, so `--dry-run` stays a pure read.
+      if (!args.dryRun && !record.errors.some((e) => String(e).startsWith('classifier:'))) {
+        ledger[insight.id] = {
+          summaryFingerprint: summaryFingerprint(deriveInsightSummary(insight)),
+          classifiedAt: new Date().toISOString(),
+          targets: record.classifierTargets.length,
+        };
+      }
+
       if ((i + 1) % PROGRESS_EVERY === 0) {
         process.stderr.write(
           `[backfill-58-03] progress: ${i + 1}/${working.length} `
           + `edgesWritten=${edgesWritten} errors=${errors}\n`,
         );
+      }
+    }
+
+    // Persist the ledger before the export flush. Written even on a partial run
+    // (--limit, or an abort partway) so the work already paid for is not paid
+    // for again; that is the whole point of recording it per Insight rather than
+    // declaring the whole pass done at the end.
+    if (!args.dryRun) {
+      try {
+        writeLedger(ledgerDir, ledger);
+        process.stderr.write(`[backfill-58-03] ledger: ${Object.keys(ledger).length} classified Insights recorded at ${ledgerPath(ledgerDir)}\n`);
+      } catch (e) {
+        // Non-fatal: a ledger that cannot be written costs a re-classification
+        // next run, which is exactly the pre-ledger behaviour.
+        process.stderr.write(`[backfill-58-03] ledger write failed (non-fatal): ${e.message}\n`);
       }
     }
 
@@ -574,7 +723,8 @@ async function main() {
     dryRun: args.dryRun,
     totalInsights: insightNodes.length,
     alreadyMentioned: insightNodes.length - unmentioned.length,
-    skipped: (insightNodes.length - unmentioned.length) + limitSkipped,
+    ledgerSkipped,
+    skipped: (insightNodes.length - unmentioned.length) + ledgerSkipped + limitSkipped,
     classified,
     edgesWritten,
     errors,

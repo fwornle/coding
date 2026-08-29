@@ -126,9 +126,187 @@ the agentic loop, haiku for titles — and flattening that to a single band woul
 cheap call expensive. The caller supplies the band; if it sends none, the class default
 applies. **The provider is still ours to decide.**
 
+Two routes use it: `fg-chat/opencode` and `fg-chat/pi`.
+
 This is the *only* caller input to routing. `body.provider` and `body.subscription` are
 deliberately ignored: a caller that can re-route itself is a caller that can quietly move
 spend onto a different account.
+
+#### How a caller spells the band
+
+`proxy-bridge/caller-complexity.mjs` accepts three spellings, strongest first:
+
+| Signal | Who sends it |
+|---|---|
+| `complexity` on the body | every background service, and the internal `/api/complete` callers |
+| `x-complexity` request header | a client that can set headers but not body fields |
+| `reasoning_effort` on the body | any OpenAI-shaped client — this is how **pi** does it |
+
+The third is the one that made `fg-chat/pi` work. pi has no `complexity` field and no way to
+add one per turn, so it sent nothing, every turn fell to `defaults.fg-chat` (**high**), and
+nothing pi did was ever eligible for the semantic offload — "how many r's in strawberry" was
+answered by `gh-copilot/claude-sonnet-5` while the local Qwen sat idle (2026-08-28).
+
+pi *does* put its per-turn thinking level on the wire as OpenAI's `reasoning_effort`.
+`config/agents/pi.sh` gives its model a `thinkingLevelMap` that maps pi's level names onto
+band names, so the value that arrives **is** the band and neither side keeps a private table
+that can drift:
+
+| pi thinking level | band | effect |
+|---|---|---|
+| `off` / `minimal` / `low` | `small` | eligible for the offload → free local model |
+| `medium` | `medium` | stays on the route's provider |
+| `high` | `high` | stays on the route's provider |
+| `xhigh` / `max` | *(hidden)* | no band above `high` exists to map them to |
+
+So **lowering pi's thinking level is what routes a cheap turn to the local model.** The raw
+OpenAI words (`low`, `minimal`, `xhigh`, …) are accepted too, for a client with no such map.
+
+This is deliberately **not** a classifier. Nothing reads prompt content; every input is a
+field the caller set on purpose, and `GET /api/llm/routing/resolve?…&complexity=<band>`
+reproduces the decision exactly.
+
+---
+
+## Semantic offload: network-scoped, and opt-in per target
+
+`semantic_routing` moves any call whose resolved band is in `offload_bands` to a **local,
+unmetered** endpoint, inserting the route's own provider as the first fallback.
+
+There are **two** such endpoints, because there is no one machine that is always reachable —
+and each carries its own switch:
+
+```yaml
+semantic_routing:
+  enabled: true
+  offload_bands: [ small ]
+  targets:
+    - provider: qwen-local     # the on-prem V100 cluster, 10/8
+      require_network: corporate
+      enabled: true
+    - provider: qwen-laptop    # llama.cpp on this laptop, 127.0.0.1:8081
+      require_network: public
+      enabled: false           # last resort — see the latency note below
+```
+
+Ordered; the first **enabled** entry whose network matches wins; an entry with no
+`require_network` matches everywhere. Two entries claiming one network is refused at boot —
+the second could never be reached, and whoever wrote it believes it can.
+
+**`enabled` defaults to `false`.** Declaring a target says where an offload *could* go;
+enabling it says work should actually be sent there. Keeping those apart is the point:
+adding a target used to be sufficient to start serving traffic from it, which is how the
+laptop endpoint took a day of background work nobody had asked it to take. An off target is
+kept in the parsed config rather than dropped, so the dashboard can list it and switch it
+back on, and `offloadSkipped` names it as `(off)` — "no target for this network" and "the
+target for this network is switched off" are different operator errors.
+
+Switch a target on or off in **Token Usage → Settings → Routing** (a checkbox beside each
+target) or in the YAML directly. The dashboard's PATCH writes the `enabled` field
+surgically when the target list is otherwise unchanged, so the prose explaining *why* a
+target is set the way it is survives the save; only adding, removing or reordering targets
+rewrites the sequence and drops their inline notes.
+
+`enabled: true` with no target enabled is a **warning, not a boot failure**. Switching the
+last one off is a single click, and a click must never leave the proxy unable to start;
+everything simply routes by the pre-offload rules and says so on every resolve.
+
+Until 2026-08-28 this block held a single `local_provider` with a single `require_network:
+corporate`. Off the VPN there was therefore no local target *at all*, and every `small` call
+went back to a paid account — silently, because "the local provider is unreachable" and
+"there is no local provider here" produced the same non-event. `offloadSkipped` now says
+which of the two it was. The old `local_provider` / `require_network` keys are refused by
+name rather than half-honoured.
+
+**Both targets fail closed.** Each is re-probed every 60s (`/models`, no tokens) and dropped
+from every chain while unreachable, so a stopped `llama-server` or an off-VPN cluster costs
+nothing beyond falling back to the provider the route named.
+
+> **Why `qwen-laptop` ships switched off.** Reachability is not usability, and the probe
+> above can only establish the first: the laptop answers `/models` on loopback in
+> milliseconds and then generates an order of magnitude slower than the account it
+> displaces. Measured 2026-08-29 over the 66 calls it served:
+>
+> | | calls | mean latency | worst |
+> |---|---|---|---|
+> | `qwen-laptop` | 66 | **47.0s** | **932s** (a 59-token `bg-observation-writer` call) |
+> | `gh-copilot` | 3045 | 5.4s | — |
+>
+> Worse, the 48 calls that gave up (`Qwen laptop API timed out after 120000ms`) paid **92s on
+> average before the real provider was even tried** — the offload made those calls slower
+> than not having it. `offload_bands` is global, so all of this landed on the highest-volume
+> background services (`bg-observation-writer`, `bg-auto-measure-title`), not only on
+> interactive turns, and a 50s call sits uncomfortably close to the ETM's 60s `isProcessing`
+> watchdog.
+>
+> Free is not the only axis. Turn it on for a session where cost genuinely beats latency —
+> an unmetered laptop doing bulk cheap work off-VPN is a real case — and turn it back off.
+
+---
+
+## Per-provider timeouts
+
+`providers.<id>.timeout_ms` caps how long the dispatcher waits for that endpoint
+before the fallback chain takes over. Omitted means the 120s default.
+
+```yaml
+providers:
+  qwen-laptop:
+    impl: qwen-laptop
+    timeout_ms: 20000
+```
+
+It is a property of the **endpoint**, not of the request. 120s is a reasonable
+ceiling for a metered account working on a hard prompt. It is the wrong ceiling
+for a semantic-offload target, where three things are true at once: the call was
+sent there *because* it was small and cheap, the provider its route names is
+sitting first in the fallback chain answering in ~5s, and the endpoint is a
+single local process that can wedge. Waiting two minutes to discover that makes
+the offload strictly worse than never having offloaded — measured on 2026-08-29,
+48 such calls hit the ceiling and averaged **92s before the real provider was
+even tried**, against a 5.4s direct call.
+
+A value below 1000 is refused at boot on the assumption it was meant as seconds:
+`timeout_ms: 20` would abort after 20ms and take the endpoint offline in a way
+that reads as "the endpoint is broken".
+
+---
+
+## What `total_tokens` counts
+
+`input_tokens` is **fresh (uncached) prompt tokens** and `total_tokens` is
+`input + output`, on every provider. Prompt-cache traffic lives in
+`cache_read_tokens` / `cache_write_tokens` and is **additive** to those.
+
+This has to be stated because the two wires disagree and the column cannot
+express both:
+
+| | fresh prompt | cache reads |
+|---|---|---|
+| Anthropic | `usage.input_tokens` | `cache_read_input_tokens` — a separate, additive counter |
+| OpenAI | — | `prompt_tokens` already **contains** them; `cached_tokens` is a breakdown |
+
+The proxy recorded each provider's number verbatim, so one column held two
+conventions and could not be summed across providers. `openAIFreshInputTokens()`
+in `src/usage-cache.ts` now subtracts `cached_tokens` from `prompt_tokens` at the
+parse boundary, making the OpenAI leg agree with the Anthropic one.
+
+> **What it cost before the fix.** Over 24h on 2026-08-29 the dashboard reported
+> intensively-used foreground Opus-5 at **726K** tokens — its 320.8M of cache
+> reads were excluded — while a background classifier reported **51.9M** with its
+> cache hits counted in full. A 450× understatement of the former, which inverted
+> which of the two dominated the day and made a background job look like the
+> largest consumer on the machine.
+
+Two consequences for anyone reading these rows:
+
+- **To display consumption, add the cache columns back.** `total_tokens` alone
+  answers "what did we newly send and receive", not "what did this cost us".
+  The dashboard's `allTokens()` helper is the canonical form.
+- **Historical rows were repaired** by `scripts/backfill-openai-wire-cache-split.mjs`,
+  which touches only providers served by the OpenAI HTTP leg and refuses to run
+  twice (the correction is not self-marking — 3.4% of corrected rows still match
+  the pattern that selected them, so re-running would subtract again).
 
 ---
 

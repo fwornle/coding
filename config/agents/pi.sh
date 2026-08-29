@@ -108,6 +108,28 @@ _pi_write_models_json() {
   # (provider, complexity) resolves to in llm-routing.yaml, so a longer list
   # would offer a choice that Ctrl+P appears to make and routing then silently
   # discards. fg-chat/pi is the real control; edit it there.
+  #
+  # thinkingLevelMap is what makes pi's per-turn effort selector reach routing.
+  #
+  # fg-chat/pi is `complexity: from-caller` — the route delegates the band to the
+  # caller — and pi sent no band, so every turn fell to defaults.fg-chat (high)
+  # and NOTHING pi did was ever eligible for the semantic offload. Observed
+  # 2026-08-28: "how many r's in strawberry" was answered by gh-copilot/sonnet-5
+  # while the local Qwen sat idle, and the router was not at fault; nobody had
+  # told it anything.
+  #
+  # pi already puts its thinking level on the wire as OpenAI's `reasoning_effort`
+  # (verified live: a headless `pi -p` turn carried reasoning_effort: "medium").
+  # thinkingLevelMap translates pi's level names into the proxy's band names, so
+  # the value that arrives IS the band and neither side keeps a private mapping
+  # table that can drift from the other's. proxy-bridge/caller-complexity.mjs
+  # also accepts the raw OpenAI words, so a client without this map still works.
+  #
+  # off/minimal/low → small is the one that matters: `small` is the only band in
+  # semantic_routing.offload_bands, so setting pi's thinking level to low or off
+  # is what routes a cheap turn to the free local model. xhigh/max are null —
+  # pi hides a level mapped to null, and the proxy has no band above `high`, so
+  # offering them would advertise a distinction routing cannot make.
   # x-task-id is emitted ONLY when this launch actually has a task to bind.
   #
   # pi's header interpolation is strict and has no default-value form
@@ -164,7 +186,16 @@ _pi_write_models_json() {
           "name": "Claude Sonnet 5 (routed by the coding proxy)",
           "input": ["text"],
           "contextWindow": 200000,
-          "reasoning": true
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "small",
+            "minimal": "small",
+            "low": "small",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          }
         }
       ]
     }
