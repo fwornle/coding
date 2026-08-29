@@ -159,6 +159,10 @@ integrations/mcp-server-browserbase/
 # cell, and is covered by a test that asserts a fact file cannot survive into a sandbox.
 # Do not track anything further here without confirming the strip still covers it.
 .data/kb-ab-sampler/*
+# Timestamped output of scripts/verify-semantic-offload.mjs. Run artifacts, not
+# source: each file records where one machine's agents routed on one network at
+# one moment. The shareable form is the report built from them, not the JSON.
+.data/routing-proof/*
 !.data/kb-ab-sampler/specs/
 !.data/kb-ab-sampler/mine-specs/
 !.data/kb-ab-sampler/facts/
