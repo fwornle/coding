@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { RefreshCw, Zap, TrendingUp, Clock, ArrowUpDown, Settings } from 'lucide-react'
 import { TokenUsageSettingsDialog } from './token-usage-settings-dialog'
 import { TokenUsageRoutingTab } from './token-usage-routing-tab'
-import { normalizeProvider, getProviderColor } from '@/lib/providers'
+import { normalizeProvider, getProviderColor, accountLabel } from '@/lib/providers'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -137,12 +137,6 @@ function hashKey(s: string): number {
 // "anthropic 100%" while telling you nothing about which account your tokens
 // actually came out of — the two have completely different cost consequences.
 
-const SUBSCRIPTION_LABELS: Record<string, string> = {
-  'copilot-subscription': 'GitHub Copilot',
-  'max-subscription': 'Claude Max',
-  'api-key': 'API Key',
-}
-
 interface TokenSummary {
   total_calls: number
   total_input: number
@@ -214,6 +208,8 @@ interface TokenSummary {
     subscription: string
     calls: number
     total_tokens: number
+    cache_read_tokens?: number
+    cache_write_tokens?: number
   }>
   by_hour: Array<{
     hour: string
@@ -465,6 +461,21 @@ export function TokenUsagePage() {
   // Time window for the summary endpoint. '24'/'48'/'168'/'720' are hour
   // counts; 'all' is a backend sentinel that picks every retained row.
   const [hoursWindow, setHoursWindow] = useState<string>('24')
+  /**
+   * Which side of the foreground/background split to show. Both by default —
+   * the page's job is to describe everything the machine spent.
+   *
+   * Applied SERVER-SIDE (`?scope=`), so the headline, the breakdowns and the
+   * stacked series always describe the same rows. Filtering only the chart would
+   * leave a total that disagrees with what is plotted under it, which is a
+   * worse failure than not offering the filter.
+   *
+   * Unchecking both is treated as `both` rather than showing an empty page:
+   * "show me nothing" is never the intent behind clearing two checkboxes.
+   */
+  const [showFg, setShowFg] = useState(true)
+  const [showBg, setShowBg] = useState(true)
+  const scopeParam = (showFg && showBg) || (!showFg && !showBg) ? 'both' : (showFg ? 'fg' : 'bg')
   // Evolution chart can stack tokens by process (purpose) or by model.
   const [evoGroupBy, setEvoGroupBy] = useState<'process' | 'model' | 'provider' | 'tokens'>('process')
   const [evoStackMode, setEvoStackMode] = useState<'stacked' | 'overlapping'>('stacked')
@@ -483,7 +494,7 @@ export function TokenUsagePage() {
     setError(null)
     try {
       const [sumRes, recRes] = await Promise.all([
-        fetch(`${PROXY_BASE}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}`),
+        fetch(`${PROXY_BASE}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}&scope=${scopeParam}`),
         fetch(`${PROXY_BASE}/api/token-usage/recent?limit=50`)
       ])
       if (!sumRes.ok || !recRes.ok) throw new Error(`HTTP ${sumRes.status}/${recRes.status}`)
@@ -496,7 +507,7 @@ export function TokenUsagePage() {
     } finally {
       setLoading(false)
     }
-  }, [hoursWindow])
+  }, [hoursWindow, scopeParam])
 
   useEffect(() => {
     fetchData()
@@ -583,7 +594,15 @@ export function TokenUsagePage() {
     }
     return out
   })
-  const evoGrandTotal = summary.total_tokens || 1
+  // Denominator for the "main consumer" threshold. The series it is compared
+  // against are cache-inclusive (the server folds cache into the hourly
+  // pivots), so this must be too — otherwise every share reads far above 100%
+  // and the threshold stops excluding anything.
+  const evoGrandTotal = allTokens({
+    total_tokens: summary.total_tokens,
+    cache_read_tokens: summary.total_cache_read,
+    cache_write_tokens: summary.total_cache_write,
+  }) || 1
   const evoKeyTotals = new Map<string, number>()
   for (const k of evoKeysRaw) {
     let t = 0
@@ -641,6 +660,23 @@ export function TokenUsagePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Foreground / background. Both on by default. The pair is the one
+              operational question the rest of the page cannot answer: background
+              work is discretionary — re-route it, re-band it, cache it, switch it
+              off — while foreground spend is the cost of the work itself. */}
+          <div className="flex items-center gap-3 rounded border px-2.5 h-9 text-xs">
+            <label className="flex items-center gap-1.5 cursor-pointer" title="Turns a human was waiting on: the coding agents (claude, pi, opencode, copilot).">
+              <input type="checkbox" className="accent-primary" checked={showFg} onChange={e => setShowFg(e.target.checked)} />
+              foreground
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer" title="Everything that runs on its own: consolidation, observation writing, titles, judges, health probes.">
+              <input type="checkbox" className="accent-primary" checked={showBg} onChange={e => setShowBg(e.target.checked)} />
+              background
+            </label>
+            {!showFg && !showBg && (
+              <span className="text-muted-foreground" title="Clearing both shows everything rather than nothing — 'show me no data' is not what clearing two checkboxes means.">showing both</span>
+            )}
+          </div>
           <Select value={hoursWindow} onValueChange={setHoursWindow}>
             <SelectTrigger className="w-[140px] h-9" title="Time window">
               <SelectValue />
@@ -735,12 +771,25 @@ export function TokenUsagePage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Subscription</CardDescription>
+            <CardDescription>Account</CardDescription>
+            {/* Grouped by ACCOUNT, not by the `subscription` column. That column
+                carries four spellings for Claude Max alone (max-oauth-passthrough,
+                max-subscription, anthropic-subscription, and blank) and maps
+                many-to-many to provider, so this card used to show one account as
+                several rows — the same double-counting the provider aliases exist
+                to prevent, in a column nobody had aliased. byProvider is already
+                normalized and merged, so this now agrees with the pie beside it. */}
             <CardTitle className="text-lg">
-              {summary.by_subscription.map(s => (
-                <div key={s.subscription} className="flex justify-between items-center">
-                  <span className="text-sm">{SUBSCRIPTION_LABELS[s.subscription] || s.subscription}</span>
-                  <Badge variant="secondary" className="text-xs">{formatTokens(s.total_tokens)}</Badge>
+              {byProvider.map(p => (
+                <div key={p.provider} className="flex justify-between items-center">
+                  <span className="text-sm flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getProviderColor(p.provider) }} />
+                    {accountLabel(p.provider)}
+                  </span>
+                  {/* Consumption, cache included. Fresh-only made the account
+                      carrying the foreground work — the largest consumer on the
+                      machine — read as the smallest line in this card. */}
+                  <Badge variant="secondary" className="text-xs">{formatTokens(allTokens(p))}</Badge>
                 </div>
               ))}
             </CardTitle>
@@ -1028,7 +1077,9 @@ export function TokenUsagePage() {
                       })
                       .sort((a, b) => b.total - a.total)
                       .map(({ key, total, color }) => {
-                        const grandTotal = summary.total_tokens || 1
+                        // Same denominator as the chart above it — the Top
+                        // Consumers shares are of the same cache-inclusive total.
+                        const grandTotal = evoGrandTotal
                         const pct = (total / grandTotal) * 100
                         const m = meta.get(key)
                         return (

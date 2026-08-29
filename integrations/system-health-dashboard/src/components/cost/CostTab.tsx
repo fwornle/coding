@@ -17,6 +17,7 @@ import {
   BUDGET_PROVIDER_LABEL, BudgetProvider, budgetProvider, isSynthetic, cellCostUsd, usdToEur,
   formatEur, monthlySeries, pivotForMonth, copilotBilling, projectBurn, budgetStatus,
   buildSuggestions, Suggestion,
+  budgetForMonth, splitByScope, ScopeSplit, localSavings, LocalSavings,
 } from './cost-model'
 
 interface Props { proxyBase: string }
@@ -99,6 +100,20 @@ export function CostTab({ proxyBase }: Props) {
   const pivot = useMemo(() => pivotForMonth(rows, cfg, pivotDim, activeMonth), [rows, cfg, pivotDim, activeMonth])
   const suggestions = useMemo(() => activeMonth ? buildSuggestions(rows, cfg, activeMonth) : [], [rows, cfg, activeMonth])
 
+  /**
+   * What our own hardware saved this month, priced on the GitHub Copilot model.
+   *
+   * The counterfactual is a Copilot call, not the most expensive model
+   * available: semantic offload displaces a `gh-copilot` call specifically, and
+   * that route's own provider is what sits first in its fallback chain. Priced
+   * at the haiku rate because `offload_bands` is `small` — the only band that
+   * offloads — so pricing it against sonnet or opus would flatter the figure.
+   */
+  const savings: LocalSavings = useMemo(
+    () => localSavings(rows.filter(r => r.month === activeMonth), cfg, 'claude-haiku-4.5'),
+    [rows, cfg, activeMonth],
+  )
+
   // Per-subscription budget tiles for the active month.
   const now = useMemo(() => new Date(), [])
   const isCurrentCalendarMonth = activeMonth === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -106,16 +121,25 @@ export function CostTab({ proxyBase }: Props) {
     const out: Array<{
       provider: BudgetProvider; label: string; spendEur: number; projectedEur: number;
       budgetEur: number | null; status: string; notional: boolean; copilot?: { includedEur: number; overageEur: number }
+      /** What a human waited on vs what ran on its own — the discretionary half. */
+      split: ScopeSplit
     }> = []
     for (const bp of ['copilot', 'claude-max'] as BudgetProvider[]) {
       let spendUsd = 0
+      const monthRows: CostRow[] = []
       for (const r of rows) {
         if (isSynthetic(r) || r.month !== activeMonth) continue
         if (budgetProvider(r.provider) !== bp) continue
         spendUsd += cellCostUsd(r, cfg)
+        monthRows.push(r)
       }
       const spendEur = usdToEur(spendUsd, cfg)
       const budget = cfg.budgets[bp]
+      // The cap IN FORCE THAT MONTH, not today's. This one went 300 -> 600 ->
+      // 1000 during 2026-08; judging July against 1000 would report a month as
+      // comfortably inside a budget that did not exist yet.
+      const budgetEur = budgetForMonth(budget, activeMonth || '')
+      const split = splitByScope(monthRows, cfg)
       // Only project forward for the live calendar month; past months are final.
       const proj = isCurrentCalendarMonth ? projectBurn(spendEur, now) : { projectedEur: spendEur } as any
       const basis = budget?.budgetBasis || 'gross'
@@ -125,10 +149,11 @@ export function CostTab({ proxyBase }: Props) {
         : proj.projectedEur
       out.push({
         provider: bp, label: BUDGET_PROVIDER_LABEL[bp], spendEur, projectedEur: proj.projectedEur,
-        budgetEur: budget?.monthlyEur ?? null,
-        status: budget?.enforce ? budgetStatus(compareVal, budget?.monthlyEur ?? null) : 'ok',
+        budgetEur,
+        status: budget?.enforce ? budgetStatus(compareVal, budgetEur) : 'ok',
         notional: bp === 'claude-max',
         copilot: cop,
+        split,
       })
     }
     return out
@@ -241,6 +266,32 @@ export function CostTab({ proxyBase }: Props) {
                     incl. allowance {formatEur(t.copilot.includedEur)} · overage {formatEur(t.copilot.overageEur)}
                   </div>
                 )}
+                {/* Foreground vs background. The only actionable split on this
+                    tile: background spend is discretionary — re-route it,
+                    re-band it, cache it, switch it off — while foreground spend
+                    is the cost of the work itself. A single euro figure says
+                    which month was expensive but not which lever exists. */}
+                {(t.split.fgEur > 0 || t.split.bgEur > 0 || t.split.unattributedEur > 0) && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs pt-1">
+                    <span title="Turns a human was waiting on.">
+                      <span className="inline-block w-2 h-2 rounded-full bg-sky-500 mr-1" />
+                      foreground <span className="font-medium text-foreground">{formatEur(t.split.fgEur)}</span>
+                    </span>
+                    <span title="Work that ran on its own: consolidation, observation writing, titles, judges. This is the half you can act on without anyone noticing.">
+                      <span className="inline-block w-2 h-2 rounded-full bg-violet-500 mr-1" />
+                      background <span className="font-medium text-foreground">{formatEur(t.split.bgEur)}</span>
+                      {t.split.totalEur > 0 && <span className="text-muted-foreground"> ({Math.round(100 * t.split.bgEur / t.split.totalEur)}%)</span>}
+                    </span>
+                    {t.split.unattributedEur > 0 && (
+                      <span
+                        className="text-muted-foreground"
+                        title="Rows written before the proxy recorded which side of the split they were on. Shown rather than folded into one side, because guessing would make the split look complete when it is not."
+                      >
+                        unattributed {formatEur(t.split.unattributedEur)}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {t.notional && (
                   <div className="text-xs text-muted-foreground pt-1">API-equivalent cost — Claude Max is a flat subscription, not metered.</div>
                 )}
@@ -249,6 +300,52 @@ export function CostTab({ proxyBase }: Props) {
           )
         })}
       </div>
+
+      {/* Own-hardware savings. Rendered even at zero: "the local model served
+          nothing this month" is a real answer, and an absent tile reads as a
+          missing feature rather than as an idle endpoint. */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Gauge className="h-4 w-4" />
+            Saved on own hardware
+          </CardTitle>
+          <CardDescription className="text-xs">
+            What the work served by the on-prem cluster and this laptop would have cost on GitHub
+            Copilot, priced at the <span className="font-mono">small</span>-band rate — the only band
+            the semantic offload moves, and the call it actually displaces.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {savings.calls === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              Nothing ran on local hardware in {activeMonth}. The laptop target ships switched off
+              (it is ~9× slower than the account it displaces); the on-prem cluster has no API key
+              set, so it is dropped from every chain even on VPN.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-500">{formatEur(savings.eur)}</span>
+                <span className="text-sm text-muted-foreground">
+                  avoided over {savings.calls.toLocaleString()} call{savings.calls === 1 ? '' : 's'}
+                  {' · '}{savings.tokens >= 1e6
+                    ? `${(savings.tokens / 1e6).toFixed(1)}M`
+                    : savings.tokens.toLocaleString()} tokens
+                </span>
+              </div>
+              <div className="space-y-0.5">
+                {savings.byProcess.slice(0, 6).map(p => (
+                  <div key={p.process} className="flex justify-between text-xs">
+                    <span className="font-mono text-muted-foreground">{p.process}</span>
+                    <span className="tabular-nums">{formatEur(p.eur)} <span className="text-muted-foreground">· {p.calls} calls</span></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Monthly cost chart */}
       <Card>

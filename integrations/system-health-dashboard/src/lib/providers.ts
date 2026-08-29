@@ -42,3 +42,33 @@ export const PROVIDER_COLORS: Record<string, string> = {
 export function getProviderColor(provider: string | null | undefined): string {
   return PROVIDER_COLORS[normalizeProvider(provider)] || '#6b7280'
 }
+
+/**
+ * Human name for an ACCOUNT id.
+ *
+ * The `subscription` column in token_usage is NOT a reliable second identity:
+ * it holds four spellings for the Claude Max account alone
+ * (`max-oauth-passthrough`, `max-subscription`, `anthropic-subscription`, and
+ * empty) and its mapping to provider is many-to-many in both directions. A
+ * surface that groups by it shows one account as several rows — which is the
+ * same double-counting the provider aliases above exist to prevent, in a column
+ * nobody thought to alias.
+ *
+ * So: group by normalizeProvider(row.provider), label with this. One identity
+ * system, not two.
+ */
+export const PROVIDER_ACCOUNT_LABEL: Record<string, string> = {
+  'gh-copilot': 'GitHub Copilot',
+  'claude-code-max': 'Claude Max',
+  'anthropic-api': 'Anthropic API (metered)',
+  'qwen-local': 'On-prem Qwen',
+  'qwen-laptop': 'This laptop',
+  'groq': 'Groq',
+  'openai': 'OpenAI',
+  'gaia': 'Gaia',
+}
+
+export function accountLabel(provider: string | null | undefined): string {
+  const id = normalizeProvider(provider)
+  return PROVIDER_ACCOUNT_LABEL[id] || id || 'unknown'
+}

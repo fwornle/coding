@@ -94,6 +94,8 @@ interface RecentRow {
   provider: string
   model: string
   total_tokens: number
+  cache_read_tokens?: number
+  cache_write_tokens?: number
   route_key: string
   route_band: string
   route_step: number
@@ -527,7 +529,15 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{fmt(r.total_tokens)}</td>
+                      {/* Consumption, cache included — a per-call figure of
+                          ~800 for a turn that sent ~470K is not the number a
+                          reader scanning this column is looking for. */}
+                      <td
+                        className="px-3 py-1.5 text-right tabular-nums"
+                        title={r.cache_read_tokens
+                          ? `${fmt(r.total_tokens)} fresh + ${fmt((r.cache_read_tokens || 0) + (r.cache_write_tokens || 0))} prompt cache`
+                          : undefined}
+                      >{fmt(r.total_tokens + (r.cache_read_tokens || 0) + (r.cache_write_tokens || 0))}</td>
                     </tr>
                   )
                 })}
