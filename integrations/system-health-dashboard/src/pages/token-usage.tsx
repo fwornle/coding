@@ -147,7 +147,20 @@ interface TokenSummary {
   total_calls: number
   total_input: number
   total_output: number
+  /**
+   * Fresh input + output only. NOT what a window cost.
+   *
+   * `input_tokens` counts uncached prompt tokens; everything served from a
+   * prompt cache lives in the two cache columns. For a foreground Claude Code
+   * turn that is almost the entire prompt — measured 2026-08-29, 320.8M cache
+   * reads against 57K of fresh input — so ranking or headlining on this field
+   * alone understated intensive Opus-5 work by ~450x and put a background
+   * classifier at the top of the treemap. Use `allTokens()` for anything the
+   * reader will interpret as "how much did this consume".
+   */
   total_tokens: number
+  total_cache_read?: number
+  total_cache_write?: number
   avg_latency_ms: number
   by_process: Array<{
     process: string
@@ -155,6 +168,8 @@ interface TokenSummary {
     input_tokens: number
     output_tokens: number
     total_tokens: number
+    cache_read_tokens?: number
+    cache_write_tokens?: number
     avg_latency: number
   }>
   by_provider: Array<{
@@ -163,6 +178,8 @@ interface TokenSummary {
     input_tokens: number
     output_tokens: number
     total_tokens: number
+    cache_read_tokens?: number
+    cache_write_tokens?: number
   }>
   // Same aggregate split by the ACCOUNT that served it. Present on proxies that
   // ship the (provider, model) grouping; absent on older ones, which is why the
@@ -172,12 +189,16 @@ interface TokenSummary {
     model: string
     calls: number
     total_tokens: number
+    cache_read_tokens?: number
+    cache_write_tokens?: number
     avg_latency?: number
   }>
   by_model: Array<{
     model: string
     calls: number
     total_tokens: number
+    cache_read_tokens?: number
+    cache_write_tokens?: number
     avg_latency?: number
     // Phase 66-01 piggyback: per-model median latency over the rolling 24h
     // window. Rides on the existing `summary` response — no new fetch needed.
@@ -293,6 +314,11 @@ function mergeByProvider(rows: TokenSummary['by_provider']): TokenSummary['by_pr
       cur.input_tokens += r.input_tokens
       cur.output_tokens += r.output_tokens
       cur.total_tokens += r.total_tokens
+      // Summed like every other counter. Dropping them here would reintroduce
+      // the undercount downstream of the alias merge only — the subtlest
+      // possible version of this bug.
+      cur.cache_read_tokens = (cur.cache_read_tokens || 0) + (r.cache_read_tokens || 0)
+      cur.cache_write_tokens = (cur.cache_write_tokens || 0) + (r.cache_write_tokens || 0)
     } else {
       acc.set(provider, { ...r, provider })
     }
@@ -316,11 +342,19 @@ function mergeByProvider(rows: TokenSummary['by_provider']): TokenSummary['by_pr
 // `by_provider_model`, in which case the provider reads "unknown" rather than
 // the table silently attributing tokens to an account that may not have served
 // them.
+type MergedModel = {
+  key: string; provider: string; model: string; calls: number;
+  total_tokens: number; cache_read_tokens: number; cache_write_tokens: number;
+}
+
 function mergeByModel(
   rows: TokenSummary['by_provider_model'] | TokenSummary['by_model']
-): Array<{ key: string; provider: string; model: string; calls: number; total_tokens: number }> {
-  const acc = new Map<string, { key: string; provider: string; model: string; calls: number; total_tokens: number }>()
-  for (const r of rows as Array<{ provider?: string; model: string; calls: number; total_tokens: number }>) {
+): MergedModel[] {
+  const acc = new Map<string, MergedModel>()
+  for (const r of rows as Array<{
+    provider?: string; model: string; calls: number; total_tokens: number;
+    cache_read_tokens?: number; cache_write_tokens?: number;
+  }>) {
     const model = normalizeModel(r.model) || r.model
     const provider = r.provider ? normalizeProvider(r.provider) : 'unknown'
     const key = `${provider}/${model}`
@@ -328,11 +362,46 @@ function mergeByModel(
     if (cur) {
       cur.calls += r.calls
       cur.total_tokens += r.total_tokens
+      cur.cache_read_tokens += r.cache_read_tokens || 0
+      cur.cache_write_tokens += r.cache_write_tokens || 0
     } else {
-      acc.set(key, { key, provider, model, calls: r.calls, total_tokens: r.total_tokens })
+      acc.set(key, {
+        key, provider, model, calls: r.calls, total_tokens: r.total_tokens,
+        cache_read_tokens: r.cache_read_tokens || 0,
+        cache_write_tokens: r.cache_write_tokens || 0,
+      })
     }
   }
-  return Array.from(acc.values()).sort((a, b) => b.total_tokens - a.total_tokens)
+  // Ranked by CONSUMPTION. Sorting on total_tokens put claude-opus-5 fourth in
+  // a window it dominated, because its prompt arrives as cache reads.
+  return Array.from(acc.values()).sort((a, b) => allTokens(b) - allTokens(a))
+}
+
+/**
+ * Everything a row consumed: fresh input + output + prompt-cache traffic.
+ *
+ * `total_tokens` is fresh input + output ONLY. That is the right number for
+ * "what did we newly send and receive", and the wrong one for every question a
+ * reader of this page is actually asking — which process dominates, which model
+ * is doing the work, how big was this window. Prompt-cache reads are real
+ * tokens: they are sent, they are charged (at a discount), and on the Anthropic
+ * wire they are nearly the whole prompt.
+ *
+ * Measured 2026-08-29 over 24h, the difference between the two readings:
+ *
+ *   token-adapter-claude (foreground Opus-5)  726K by total_tokens   331M with cache
+ *   consolidator-mentions (background)         1.4M by total_tokens    52M with cache
+ *
+ * Headlining `total_tokens` put a background classifier at the top of the
+ * treemap and made the day's dominant consumer — intensive foreground Claude
+ * Code — nearly invisible. Cache tokens are counted at full weight here because
+ * this axis is consumption, not cost; the Cost tab prices them separately.
+ *
+ * Tolerant of a proxy that predates the cache columns: absent fields read as 0
+ * and the result degrades to exactly the old number.
+ */
+function allTokens(row: { total_tokens: number; cache_read_tokens?: number; cache_write_tokens?: number }): number {
+  return (row.total_tokens || 0) + (row.cache_read_tokens || 0) + (row.cache_write_tokens || 0)
 }
 
 // Custom treemap content for process breakdown
@@ -463,11 +532,15 @@ export function TokenUsagePage() {
 
   // Prepare treemap data for process breakdown
   const treemapData = summary.by_process
-    .filter(p => p.total_tokens > 0)
-    .sort((a, b) => b.total_tokens - a.total_tokens)
+    .filter(p => allTokens(p) > 0)
+    .sort((a, b) => allTokens(b) - allTokens(a))
     .map(p => ({
       name: p.process,
-      value: p.total_tokens,
+      // Area is total CONSUMPTION, cache included — see allTokens(). Sizing on
+      // total_tokens alone made this chart say the opposite of the truth.
+      value: allTokens(p),
+      cacheRead: p.cache_read_tokens || 0,
+      cacheWrite: p.cache_write_tokens || 0,
       fill: getProcessColor(p.process),
       calls: p.calls,
       avgLatency: p.avg_latency,
@@ -612,12 +685,23 @@ export function TokenUsagePage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Tokens</CardDescription>
-            <CardTitle className="text-3xl">{formatTokens(summary.total_tokens)}</CardTitle>
+            <CardTitle className="text-3xl">
+              {formatTokens(summary.total_tokens + (summary.total_cache_read || 0) + (summary.total_cache_write || 0))}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xs text-muted-foreground flex gap-3">
+            {/* The split is shown because the headline is now dominated by cache
+                reads on any day with heavy foreground work, and a reader who
+                cannot see that will mistrust the number — rightly, since the
+                three parts are priced very differently. */}
+            <div className="text-xs text-muted-foreground flex gap-3 flex-wrap">
               <span className="text-blue-400">{formatTokens(summary.total_input)} in</span>
               <span className="text-emerald-400">{formatTokens(summary.total_output)} out</span>
+              {(summary.total_cache_read || 0) > 0 && (
+                <span className="text-violet-400" title="Prompt-cache reads — tokens sent and charged, at a discount. On the Anthropic wire this is most of a foreground turn.">
+                  {formatTokens(summary.total_cache_read || 0)} cached
+                </span>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -713,7 +797,11 @@ export function TokenUsagePage() {
                     <Pie
                       data={byProvider.map(p => ({
                         name: p.provider,
-                        value: p.total_tokens,
+                        // Consumption, cache included — see allTokens(). On
+                        // total_tokens alone the account carrying the foreground
+                        // Claude work rendered as a 2% sliver of a window it
+                        // actually dominated.
+                        value: allTokens(p),
                         fill: getProviderColor(p.provider)
                       }))}
                       dataKey="value"
@@ -733,8 +821,8 @@ export function TokenUsagePage() {
                       wrapperStyle={{ paddingTop: '12px' }}
                       formatter={(value, entry: any) => {
                         const item = byProvider.find(p => p.provider === value);
-                        const total = byProvider.reduce((s, p) => s + p.total_tokens, 0);
-                        const pct = item ? ((item.total_tokens / total) * 100).toFixed(0) : '0';
+                        const total = byProvider.reduce((s, p) => s + allTokens(p), 0);
+                        const pct = item && total ? ((allTokens(item) / total) * 100).toFixed(0) : '0';
                         return `${value} ${pct}%`;
                       }}
                     />
@@ -744,7 +832,11 @@ export function TokenUsagePage() {
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">By Provider / Model</h4>
                   {byModel
-                    .filter(m => (m.total_tokens / (summary.total_tokens || 1)) >= MAIN_CONSUMER_THRESHOLD)
+                    .filter(m => (allTokens(m) / (allTokens({
+                      total_tokens: summary.total_tokens,
+                      cache_read_tokens: summary.total_cache_read,
+                      cache_write_tokens: summary.total_cache_write,
+                    }) || 1)) >= MAIN_CONSUMER_THRESHOLD)
                     .map(m => (
                       <div key={m.key} className="flex justify-between items-center text-sm py-1">
                         {/* The account is what determines cost, so it leads. The same
@@ -757,7 +849,12 @@ export function TokenUsagePage() {
                           >{m.provider}</span>
                           <span className="text-muted-foreground">/{m.model}</span>
                         </span>
-                        <span className="font-mono text-xs">{formatTokens(m.total_tokens)}</span>
+                        <span
+                          className="font-mono text-xs"
+                          title={m.cache_read_tokens
+                            ? `${formatTokens(m.total_tokens)} fresh + ${formatTokens(m.cache_read_tokens + m.cache_write_tokens)} prompt cache`
+                            : undefined}
+                        >{formatTokens(allTokens(m))}</span>
                       </div>
                     ))}
                 </div>
