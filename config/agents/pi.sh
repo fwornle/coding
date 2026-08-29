@@ -330,10 +330,32 @@ agent_pre_launch() {
   # lockdown exists to prevent.
   #
   # Unsetting here (agent_pre_launch runs BEFORE the wrapper builds its env list,
-  # and the wrapper skips empty vars) means pi has no credential of its own and
-  # can only reach a model through the proxy. If the proxy is down pi fails
-  # loudly rather than quietly spending on a different account — the intended
-  # trade, and the same reason the claude launcher pins its base URL.
+  # and the wrapper skips empty vars) means pi holds no credential for any
+  # METERED account. If the proxy is down pi fails loudly rather than quietly
+  # spending on a different one — the intended trade, and the same reason the
+  # claude launcher pins its base URL.
+  #
+  # "Metered" is doing real work in that sentence since qwen-laptop joined
+  # models.json (2026-08-29). That provider carries an apiKey, so on the letter
+  # of the paragraph above it is an authenticated provider pi could prefer at
+  # startup. Two reasons it is not the same hazard, in order of how much they
+  # are worth relying on:
+  #
+  #   1. The settings.json pin below sets defaultProvider/defaultModel, which is
+  #      what actually decides the startup provider. The anthropic incident
+  #      predates that pin. VERIFIED, not assumed: a headless `pi -p` with both
+  #      providers declared produced one token_usage row against
+  #      gh-copilot/claude-sonnet-4.6 — through the proxy, band declared by
+  #      thinkingLevelMap — and nothing against the laptop.
+  #   2. Even if it were selected, the failure mode is absent rather than
+  #      merely smaller: the endpoint is llama.cpp on loopback with no auth, the
+  #      key is a non-secret placeholder that authenticates nothing, and there is
+  #      no account behind it to bill. A silent egress bypass needs egress.
+  #
+  # So the invariant this block protects is unchanged — no launch may quietly
+  # move spend to an account the proxy is not measuring — while "pi can only
+  # reach a model through the proxy" is no longer literally true, and the earlier
+  # wording said so. Reaching the laptop still takes a deliberate Ctrl+P.
   unset ANTHROPIC_API_KEY
 
   # Pin provider + model for this launch via settings.json.
