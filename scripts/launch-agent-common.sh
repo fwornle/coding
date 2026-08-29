@@ -527,8 +527,35 @@ configure_proxy_routing() {
       # inserts copadt aggregate rows when NO wire rows exist for the session (wire-presence guard).
       # WR-05 (dead URL) is covered by the /health gate above — same accepted risk as claude/opencode.
       # Opt-out: COPILOT_AMBIENT_ROUTE=0 restores the copadt-only interactive launch.
+      # CODING_COPILOT_BAND declares a complexity band for this whole copilot
+      # session. It exists because the Copilot CLI can declare one nowhere else:
+      # measured on the wire 2026-08-29, its BYOK body is exactly
+      # {model, stream, stream_options, tools} with only x-stainless-* headers —
+      # no reasoning_effort, and `effortLevel` in ~/.copilot/settings.json is not
+      # forwarded on this path. So `fg-chat/copilot` being `from-caller` had no
+      # caller, every turn fell to defaults.fg-chat (high), and no copilot work
+      # could ever reach the semantic offload while identical pi/opencode work
+      # could. The URL is copilot's only seam — it is already how task_id binds.
+      #
+      # SESSION-scoped, and that is the honest cost: the base URL is built once
+      # here. pi (--thinking) and opencode (x-complexity) declare per turn and
+      # remain strictly better. Unset = unchanged behaviour.
+      #
+      # Validated here as well as in the proxy so a typo fails at launch with a
+      # readable message, rather than becoming a URL the proxy declines to match.
+      local _copilot_band="${CODING_COPILOT_BAND:-}"
+      local _copilot_band_seg=""
+      if [ -n "$_copilot_band" ]; then
+        case "$_copilot_band" in
+          small|medium|high) _copilot_band_seg="/b/${_copilot_band}" ;;
+          *)
+            _agent_log "⚠️  CODING_COPILOT_BAND='${_copilot_band}' is not one of small|medium|high — ignoring it."
+            _copilot_band=""
+            ;;
+        esac
+      fi
       if [ -n "${TASK_ID:-}" ]; then
-        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot/t/${TASK_ID}"
+        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot${_copilot_band_seg}/t/${TASK_ID}"
         export COPILOT_PROVIDER_TYPE="openai"
         export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
         # The model comes from the `fg-chat/copilot` route in rapid-llm-proxy
@@ -543,7 +570,10 @@ configure_proxy_routing() {
         # left inherited rather than forced, since the launcher has no wire-name mapping.
         _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; measured span; token_usage agent='copilot'; model=${COPILOT_MODEL})"
       elif [ "${COPILOT_AMBIENT_ROUTE:-1}" != "0" ]; then
-        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot"
+        # Band-only form when there is no measured span. This is the one that
+        # actually runs day to day: an interactive `coding --copilot` has no
+        # TASK_ID.
+        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot${_copilot_band_seg}"
         export COPILOT_PROVIDER_TYPE="openai"
         export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
         # Same route as the measured path above — an interactive copilot session and
