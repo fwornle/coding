@@ -27,6 +27,23 @@ agent_check_requirements() {
 }
 
 # Configure OpenCode model based on network location
+# Prepend a JSON fragment (no surrounding braces) to OPENCODE_CONFIG_CONTENT.
+#
+# The two call sites used to inline `{${frag},${OPENCODE_CONFIG_CONTENT#\{}`,
+# which is correct only while the value is guaranteed to be a non-empty object —
+# a guarantee the network branches happened to provide. On `{}` that expression
+# yields `{frag,}`: a trailing comma, and invalid JSON. Handled once, here.
+_oc_splice_config() {
+  local _frag="$1"
+  local _cur="${OPENCODE_CONFIG_CONTENT:-}"
+  if [ "$_cur" = '{}' ] || [ -z "$_cur" ]; then
+    OPENCODE_CONFIG_CONTENT="{${_frag}}"
+  else
+    OPENCODE_CONFIG_CONTENT="{${_frag},${_cur#\{}"
+  fi
+  export OPENCODE_CONFIG_CONTENT
+}
+
 # Note: agent_pre_launch runs AFTER detect_network_and_configure_proxy,
 # so INSIDE_CN and PROXY_WORKING are already set.
 agent_pre_launch() {
@@ -56,22 +73,39 @@ agent_pre_launch() {
   # /v1/messages path) and let llm-routing.yaml decide. To reach it WITHOUT the
   # proxy, that is a bare `opencode` outside this wrapper, using your own
   # ~/.config/opencode/opencode.json — deliberately not something `coding` sets up.
+  # NO network branch here any more, and no model pin. Both are gone because both
+  # were dead, and one of them was a bypass:
+  #
+  #   INSIDE_CN pinned `github-copilot-enterprise/claude-opus-4.6`. `opencode
+  #   models` offers ZERO ids under that provider — it does not exist. Verified
+  #   2026-08-29.
+  #
+  #   Outside CN pinned `claude-opus-4-6` with disabled_providers:["copilot"] and
+  #   warned about ANTHROPIC_API_KEY — i.e. Anthropic DIRECT, which is the egress
+  #   bypass the T1-T4 lockdown closed and which the comment 20 lines above this
+  #   already argues against. `anthropic` also offers zero ids today, so it had
+  #   stopped working before it stopped being wrong.
+  #
+  # Nothing needs to replace them. opencode.json's own default is
+  # `rapid-proxy/claude-sonnet-5`, and from there llm-routing.yaml decides the
+  # provider and the model per call (fg-chat/opencode -> gh-copilot, band from
+  # the caller). A network-dependent pin here would be a SECOND routing
+  # mechanism that can disagree with the config files that are supposed to be
+  # the only place routing is decided — and it did: it named a corporate
+  # provider on VPN while routing was sending the same turns to gh-copilot
+  # regardless. It also made opencode the odd one out among the three corporate
+  # agents; pi and copilot have never had a network branch.
+  #
+  # `{}` rather than unset: both splices below prepend to this value, and an
+  # empty one produces invalid JSON. _oc_splice_config handles that.
+  export OPENCODE_CONFIG_CONTENT='{}'
   if [ -n "${CODING_OPENCODE_MODEL:-}" ]; then
     export OPENCODE_CONFIG_CONTENT="{\"model\":\"${CODING_OPENCODE_MODEL}\"}"
     _agent_log "📌 Model override → ${CODING_OPENCODE_MODEL}"
-  elif [ "$INSIDE_CN" = "true" ]; then
-    # VPN/Corporate Network: use GitHub Copilot via corporate subscription
-    export OPENCODE_CONFIG_CONTENT='{"model":"github-copilot-enterprise/claude-opus-4.6","disabled_providers":["anthropic"]}'
-    _agent_log "🏢 VPN → GitHub Copilot Enterprise (claude-opus-4.6)"
   else
-    # Outside VPN: use Anthropic directly
-    export OPENCODE_CONFIG_CONTENT='{"model":"claude-opus-4-6","disabled_providers":["copilot"]}'
-    _agent_log "🌐 Public → Anthropic direct (claude-opus-4.6)"
-
-    if [ -z "$ANTHROPIC_API_KEY" ]; then
-      _agent_log "⚠️  ANTHROPIC_API_KEY not set — opencode may prompt for auth"
-    fi
+    _agent_log "🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)"
   fi
+
 
   # OPT-IN (Phase 82, default OFF): anthropic-native provider entry that routes opencode's
   # @ai-sdk/anthropic path through the local rapid-llm-proxy /v1/messages, restoring prompt-cache
@@ -88,8 +122,7 @@ agent_pre_launch() {
     local _oc_proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
     local _oc_provider="\"provider\":{\"anthropic\":{\"options\":{\"baseURL\":\"http://127.0.0.1:${_oc_proxy_port}/v1\",\"headers\":{\"x-task-id\":\"${TASK_ID:-}\",\"x-agent\":\"opencode\"}}}}"
     # Splice the provider block in after the leading '{' of the chosen config JSON.
-    OPENCODE_CONFIG_CONTENT="{${_oc_provider},${OPENCODE_CONFIG_CONTENT#\{}"
-    export OPENCODE_CONFIG_CONTENT
+    _oc_splice_config "${_oc_provider}"
     _agent_log "🧪 opencode ANTHROPIC-NATIVE (opt-in) → proxy http://127.0.0.1:${_oc_proxy_port}/v1/messages (x-agent=opencode; x-task-id=${TASK_ID:-<ambient>})"
   fi
 
@@ -119,8 +152,7 @@ agent_pre_launch() {
       # compaction.reserved mirrors what the global installer wrote, so behaviour
       # through the wrapper is unchanged by the scope switch.
       local _oc_extra="\"plugin\":[${_oc_plugins}],\"compaction\":{\"reserved\":40000}"
-      OPENCODE_CONFIG_CONTENT="{${_oc_extra},${OPENCODE_CONFIG_CONTENT#\{}"
-      export OPENCODE_CONFIG_CONTENT
+      _oc_splice_config "${_oc_extra}"
       _agent_log "🔒 Wrapper-scoped: opencode plugins injected for this session only"
     fi
   fi
