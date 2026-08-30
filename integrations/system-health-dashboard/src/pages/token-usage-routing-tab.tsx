@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { normalizeProvider } from '@/lib/providers'
+import { localClock } from '@/lib/utils'
 import { OffloadDecision } from '@/components/llm-routing/offload-decision'
 import type { ProviderInfo } from './token-usage-flow-tab'
 
@@ -537,7 +538,7 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                       className={`border-b last:border-b-0 align-top ${clickable ? 'cursor-pointer hover:bg-muted/40' : ''}`}
                     >
                       <td className="px-3 py-1.5 font-mono text-muted-foreground whitespace-nowrap">
-                        {r.timestamp.slice(11, 19)}
+                        {localClock(r.timestamp)}
                       </td>
                       <td className="px-3 py-1.5 font-mono">
                         {r.route_key || <span className="text-muted-foreground">—</span>}

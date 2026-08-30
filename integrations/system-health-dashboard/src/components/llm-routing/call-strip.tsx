@@ -20,6 +20,7 @@
 import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { getOutcomeColor } from '@/lib/providers'
+import { localClock } from '@/lib/utils'
 import type { OutcomeKind } from '@/lib/providers'
 import { binRows, classifyCall, hourBoundaries, selectInteresting } from './recent-call'
 import type { CallOutcome, RecentCall } from './recent-call'
@@ -51,7 +52,7 @@ interface Props {
   windowHours: number
 }
 
-const hhmm = (ts: string) => ts.slice(11, 16)
+const hhmm = (ts: string) => localClock(ts, { seconds: false })
 
 export function CallStrip({
   rows, filter, onFilterChange, routeFilter, onRouteFilterChange,

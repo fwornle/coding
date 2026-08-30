@@ -14,6 +14,7 @@
  */
 
 import { Badge } from '@/components/ui/badge'
+import { localClock } from '@/lib/utils'
 import { GATES } from './offload-gates'
 import type { GateVerdict } from './offload-gates'
 import { parseTrail, rungOfCall } from './recent-call'
@@ -56,7 +57,7 @@ export function CallDetail({ call, replay = null }: Props) {
   return (
     <div className="text-[11px] border rounded p-3 space-y-2 font-mono">
       <div className="flex items-baseline gap-2 flex-wrap">
-        <span className="text-foreground">{call.timestamp.slice(11, 19)}</span>
+        <span className="text-foreground">{localClock(call.timestamp)}</span>
         <span className="text-muted-foreground">·</span>
         <span>{call.route_key || '—'}</span>
         {reconstructed && (
