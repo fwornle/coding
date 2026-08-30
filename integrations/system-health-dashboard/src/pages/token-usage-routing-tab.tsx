@@ -368,6 +368,7 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         fallback={config.fallback}
         runtime={config.runtime}
         offloadSkips={behaviour.offloadSkips}
+        perRoute={behaviour.perRoute}
         offloadedCalls={behaviour.totals.offloaded_calls}
         windowHours={behaviour.window.hours}
         recent={recent}
