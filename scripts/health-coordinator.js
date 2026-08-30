@@ -2360,26 +2360,33 @@ async function pollNetworkStatus() {
       //              still accepting, resolving and forwarding.
       // `--noproxy ''` is required on the internal probe: NO_PROXY contains
       // .bmwgroup.net, which would otherwise bypass the very path under test.
+      //
+      // CONCURRENT, and on a tight budget. pollNetworkStatus() has a 15s
+      // watchdog and has been tripping it since 2026-08-24 (4-68 times a day).
+      // Running these two sequentially at the same 8s budget as the functional
+      // probe above put the worst case at ~24s — and they only run in the
+      // FAILING branch, so they would blow the watchdog exactly when the
+      // coordinator is most needed. Measured: 82 timeouts in the hour that
+      // version ran, against 2 in the hour before. Same class of fault this
+      // whole change set out to fix, so: Promise.all, 3s each.
       const curlOk = async (args) => {
         try {
           const { stdout } = await execFileAsync('curl', [
-            '-s', '--connect-timeout', '3', '--max-time', '5',
+            '-s', '--connect-timeout', '2', '--max-time', '3',
             '-o', '/dev/null', '-w', '%{http_code}', ...args,
-          ], { timeout: 8000 });
+          ], { timeout: 4000 });
           return /^[23]\d\d$/.test(stdout.trim());
         } catch { return false; }
       };
       const probes = neededProbes({ portListening, proxiedExternalOk: proxyFunctional });
-      let directExternalOk = null;
-      let proxiedInternalOk = null;
-      if (probes.direct) {
-        directExternalOk = await curlOk(['--noproxy', '*', `https://${REACHABILITY_HOST}`]);
-      }
-      if (probes.internal) {
-        proxiedInternalOk = await curlOk([
-          '--noproxy', '', '-x', 'http://127.0.0.1:3128', `http://${PAC_HOST}/`,
-        ]);
-      }
+      const [directExternalOk, proxiedInternalOk] = await Promise.all([
+        probes.direct
+          ? curlOk(['--noproxy', '*', `https://${REACHABILITY_HOST}`])
+          : Promise.resolve(null),
+        probes.internal
+          ? curlOk(['--noproxy', '', '-x', 'http://127.0.0.1:3128', `http://${PAC_HOST}/`])
+          : Promise.resolve(null),
+      ]);
 
       // netState.location is the PREVIOUS poll's verdict — it is recomputed
       // further down this same function. That is deliberate and harmless: it
