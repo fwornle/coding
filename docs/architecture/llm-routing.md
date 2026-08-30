@@ -162,9 +162,53 @@ that can drift:
 So **lowering pi's thinking level is what routes a cheap turn to the local model.** The raw
 OpenAI words (`low`, `minimal`, `xhigh`, …) are accepted too, for a client with no such map.
 
-This is deliberately **not** a classifier. Nothing reads prompt content; every input is a
-field the caller set on purpose, and `GET /api/llm/routing/resolve?…&complexity=<band>`
-reproduces the decision exactly.
+Everything above is a field the caller set **on purpose** — no prompt content is involved, and
+`GET /api/llm/routing/resolve?…&complexity=<band>` reproduces the decision exactly.
+
+### OpenCode declares with `--variant`
+
+opencode has the same seam under a different name. `models.<id>.variants` entries are read off
+the **user message each turn**, and `reasoningEffort` reaches the wire as `reasoning_effort`:
+
+| opencode variant | wire | band |
+|---|---|---|
+| `--variant cheap` | `reasoning_effort: low` | `small` → offload-eligible |
+| `--variant standard` | `reasoning_effort: medium` | `medium` |
+| `--variant deep` | `reasoning_effort: high` | `high` |
+| *(none)* | *(no field sent)* | falls to `defaults.fg-chat` → `high` |
+
+Verified on a capture endpoint 2026-08-30, not inferred from the resulting band. Select with the
+`--variant` flag, the TUI variant picker / `variantCycle` keybinding, or the
+`provider/model/variant` model string. Older comments claiming opencode sends an `x-complexity`
+header were wrong — it has no `headers` key on its provider block and never sent one.
+
+### The prompt classifier (`classifier:`, ships OFF)
+
+`from-caller` only helps when the caller declares something *useful*, and measurement showed two
+of the three agents did not: over one session on 2026-08-30, pi sent `medium` on all 11 turns
+(its slider's resting position) and opencode declared nothing on all 22. "How many r's in
+strawberry" ran on `gh-copilot/claude-sonnet-4.6` for that reason and no other.
+
+So there **is** a classifier now, and it is constrained so the reproducibility argument above
+still holds:
+
+- **Downgrade-only** — it may lower a band, never raise one. The config's band stays a ceiling.
+- **Attributed** — a lowered band reports `complexitySource: 'classifier'`, never `'caller'`,
+  on the row and in `/resolve`.
+- **Reproducible** — `/api/llm/routing/resolve?…&classified=true` replays the decision from the
+  config alone, with no prompt.
+- **Scoped** — `from-caller` routes only. Background services choose their bands deliberately
+  and `fg-chat/claude` is a pinned-`high` passthrough, so neither is ever second-guessed.
+
+Cost is bounded by two free stages before any call: a turn already carrying tool results is
+never classified (74% of in-scope captured turns), then a cheap veto drops anything with code,
+paths or multi-step phrasing. `impl: http` is the injection point for your own service.
+
+**It is `enabled: false` and stays that way until `node scripts/eval-prompt-classifier.mjs`
+clears its gate.** The gate is *precision on `small`* — the only metric that matters, since
+downgrade-only means a wrong `medium`/`high` costs nothing and only a wrong `small` spends a
+real turn on a weaker model. As of 2026-08-30 the local-llm rubric measures **78% against a 90%
+bar**, so it is off.
 
 ---
 

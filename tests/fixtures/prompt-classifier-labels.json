@@ -1,0 +1,45 @@
+{
+  "_about": [
+    "Hand-labelled prompts for scripts/eval-prompt-classifier.mjs.",
+    "",
+    "These are MY labels, not ground truth handed down from anywhere — they encode",
+    "the rubric in server.mjs CLASSIFIER_RUBRIC and should be argued with rather",
+    "than trusted. Disagreeing with one is a reason to edit this file.",
+    "",
+    "The only metric that gates the rollout is PRECISION ON `small`: because the",
+    "classifier is downgrade-only, a wrong `medium` or `high` verdict changes",
+    "nothing at all, while a wrong `small` spends a real turn on a weaker model.",
+    "So a case labelled `small` that comes back `high` is a missed opportunity;",
+    "a case labelled `medium`/`high` that comes back `small` is a DEFECT.",
+    "",
+    "`source: corpus` entries are real prompts taken verbatim from",
+    ".data/measurements/*/context-turns.jsonl. `source: written` are constructed",
+    "to cover a boundary the corpus happens not to contain."
+  ],
+  "cases": [
+    { "text": "how many r's in strawberry", "label": "small", "source": "written", "note": "the request that motivated the whole feature" },
+    { "text": "what is 2+2", "label": "small", "source": "written" },
+    { "text": "say ok", "label": "small", "source": "corpus" },
+    { "text": "Reply with exactly one word: ok", "label": "small", "source": "corpus" },
+    { "text": "Reply exactly: OK", "label": "small", "source": "corpus" },
+    { "text": "What is the secret codeword?", "label": "small", "source": "corpus" },
+    { "text": "Generate a title for this conversation:", "label": "small", "source": "corpus", "note": "opencode's own internal call; already declares low effort itself" },
+    { "text": "what is the capital of France", "label": "small", "source": "written" },
+    { "text": "convert 30 celsius to fahrenheit", "label": "small", "source": "written" },
+    { "text": "what does the acronym TLS stand for", "label": "small", "source": "written" },
+
+    { "text": "write a python function that reverses a string", "label": "medium", "source": "written" },
+    { "text": "explain what a mutex is", "label": "medium", "source": "written" },
+    { "text": "add a --verbose flag to this script and print the config it resolved", "label": "medium", "source": "written" },
+    { "text": "what is the difference between a git rebase and a git merge, and when would I prefer each", "label": "medium", "source": "written" },
+    { "text": "write a regex that matches an ISO 8601 timestamp with an optional timezone offset", "label": "medium", "source": "written" },
+    { "text": "summarise what this function does and whether the early return is reachable", "label": "medium", "source": "written" },
+
+    { "text": "Refactor the routing chain builder in server.mjs so the offload decision is testable in isolation, then update every affected unit test", "label": "high", "source": "written" },
+    { "text": "why is my ETM crash-looping with ERR_MODULE_NOT_FOUND across two submodules", "label": "high", "source": "written" },
+    { "text": "Search the codebase thoroughly for the Enhanced Transcript Monitor (ETM) implementation files.", "label": "high", "source": "corpus" },
+    { "text": "Which HTTP route does the system-health dashboard expose to trigger a code-graph re-index, and in which file", "label": "high", "source": "corpus" },
+    { "text": "design a caching layer for the retrieval path that survives a process restart without serving stale entries", "label": "high", "source": "written" },
+    { "text": "the proxy pins a dead HTTPS_PROXY after the VPN drops and every provider call fails at once — find the root cause", "label": "high", "source": "written" }
+  ]
+}
