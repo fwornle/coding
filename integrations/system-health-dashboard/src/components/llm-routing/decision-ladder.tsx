@@ -23,6 +23,8 @@
  */
 
 import { GATES, RUNG_OFFLOADED } from './offload-gates'
+import { LADDER_HEADER } from './ladder-layout'
+import type { LadderLayout } from './ladder-layout'
 
 export interface LadderRung {
   /** How many routes (config) or calls (recorded) stopped at this gate. */
@@ -36,6 +38,11 @@ interface Props {
   y: number
   width: number
   rungs: LadderRung[]
+  /**
+   * Where each row sits. Computed by the caller, because the flow diagram has to
+   * attach edges to the same rows this draws — see ladder-layout.ts.
+   */
+  layout: LadderLayout
   /** 'routes' in Configuration mode, 'calls' in Recorded. Always rendered. */
   unit: 'routes' | 'calls'
   /** The rung a selected recorded call stopped at, if one is selected. */
@@ -44,26 +51,13 @@ interface Props {
   onSelectRung?: (rung: number | null) => void
   /** An `offloadSkips` reason the mirror could not place — shown, never folded away. */
   unclassified?: { count: number } | null
+  /** Runs the operator has opened, and the toggle. Keyed by the run's first rung. */
+  expandedRuns?: Set<number>
+  onToggleRun?: (runId: number) => void
 }
 
-export const RUNG_H = 34
-export const LADDER_HEADER = 30
-
-export function ladderHeight(): number {
-  return LADDER_HEADER + GATES.length * RUNG_H + 8
-}
-
-/**
- * Vertical centre of a rung, relative to the ladder's own y.
- *
- * Exported so the flow diagram can land a caller's edge on the rung that decided
- * it without copying RUNG_H. A second copy of that constant would drift silently:
- * the edges would still draw, just against the wrong rows, and nothing would say
- * so.
- */
-export function rungCenterY(i: number): number {
-  return LADDER_HEADER + i * RUNG_H + (RUNG_H - 2) / 2
-}
+export { LADDER_HEADER, RUNG_H, layoutLadder } from './ladder-layout'
+export type { LadderLayout, LadderRow } from './ladder-layout'
 
 /**
  * SVG text does not wrap and does not clip, so an over-long detail line does not
@@ -89,12 +83,17 @@ function fmt(n: number): string {
 }
 
 export function DecisionLadder({
-  x, y, width, rungs, unit, activeRung = null, selectedRung = null, onSelectRung, unclassified = null,
+  x, y, width, rungs, layout, unit, activeRung = null, selectedRung = null, onSelectRung,
+  unclassified = null, expandedRuns, onToggleRun,
 }: Props) {
+  const unitWord = (n: number) => (unit === 'routes'
+    ? (n === 1 ? 'route' : 'routes')
+    : (n === 1 ? 'call' : 'calls'))
+
   return (
     <g>
       <rect
-        x={x} y={y} width={width} height={ladderHeight()} rx={8}
+        x={x} y={y} width={width} height={layout.height} rx={8}
         className="fill-background stroke-border" strokeWidth={1}
       />
       <text x={x + 12} y={y + 19} className="fill-muted-foreground" fontSize={9.5}
@@ -102,8 +101,54 @@ export function DecisionLadder({
         Decision — does the offload move it?
       </text>
 
-      {GATES.map((gate, i) => {
-        const top = y + LADDER_HEADER + i * RUNG_H
+      {layout.rows.map(row => {
+        const top = y + row.top
+
+        // ── A folded run ──
+        // Deliberately still a row rather than nothing. "These gates exist and
+        // nothing reached them" and "these gates do not exist" are different
+        // facts, and the second one is not true — rungs 3-5 are the ones that
+        // explain both of the offload incidents this card was built after.
+        if (row.kind === 'collapsed') {
+          return (
+            <g key={`fold-${row.runId}`}
+              onClick={() => onToggleRun?.(row.runId!)}
+              style={{ cursor: onToggleRun ? 'pointer' : 'default' }}
+              opacity={0.55}
+            >
+              <title>{row.rungs.map(r => `${r} ${GATES[r].label}`).join('\n')}</title>
+              <rect x={x + 4} y={top} width={width - 8} height={row.height - 3} rx={4}
+                className="fill-muted/40" />
+              <text x={x + 12} y={top + 14} fontSize={9.5} className="fill-muted-foreground"
+                fontFamily="ui-monospace, monospace">
+                ⌄ {row.rungs.length} gates nothing reached
+              </text>
+              <text x={x + width - 12} y={top + 14} fontSize={9} textAnchor="end"
+                className="fill-muted-foreground" fontFamily="ui-monospace, monospace">
+                {row.rungs.join(', ')}
+              </text>
+            </g>
+          )
+        }
+
+        // ── The header that closes an opened run ──
+        // Costs 16 units, and only in the state the operator asked for.
+        if (row.kind === 'expanded-header') {
+          return (
+            <g key={`unfold-${row.runId}`}
+              onClick={() => onToggleRun?.(row.runId!)}
+              style={{ cursor: onToggleRun ? 'pointer' : 'default' }}
+            >
+              <text x={x + 12} y={top + 11} fontSize={9} className="fill-muted-foreground"
+                fontFamily="ui-monospace, monospace">
+                ⌃ {row.rungs.length} gates nothing reached — hide
+              </text>
+            </g>
+          )
+        }
+
+        const i = row.rungs[0]
+        const gate = GATES[i]
         const r = rungs[i] ?? { count: 0 }
         const isPass = i === RUNG_OFFLOADED
         const isActive = activeRung === i
@@ -121,7 +166,7 @@ export function DecisionLadder({
             opacity={dim ? 0.42 : 1}
           >
             {(isActive || isSelected) && (
-              <rect x={x + 4} y={top - 2} width={width - 8} height={RUNG_H - 2} rx={5}
+              <rect x={x + 4} y={top - 2} width={width - 8} height={row.height - 2} rx={5}
                 className={isActive ? 'fill-primary/10' : 'fill-muted'} />
             )}
             <text x={x + 12} y={top + 12} fontSize={9.5}
@@ -143,7 +188,7 @@ export function DecisionLadder({
             {/* Unit always printed — see the header note. */}
             <text x={x + width - 12} y={top + 12} fontSize={9.5} textAnchor="end"
               className="fill-muted-foreground" fontFamily="ui-monospace, monospace">
-              {fmt(r.count)} {unit === 'routes' ? (r.count === 1 ? 'route' : 'routes') : (r.count === 1 ? 'call' : 'calls')}
+              {fmt(r.count)} {unitWord(r.count)}
             </text>
           </g>
         )
@@ -153,7 +198,7 @@ export function DecisionLadder({
           newer proxy growing a new reason must surface as an unexplained bucket,
           never be rounded into a neighbouring gate. */}
       {unclassified && unclassified.count > 0 && (
-        <text x={x + 12} y={y + ladderHeight() - 2} fontSize={9}
+        <text x={x + 12} y={y + layout.height - 2} fontSize={9}
           className="fill-amber-600 dark:fill-amber-400" fontFamily="ui-monospace, monospace">
           ⚠ {fmt(unclassified.count)} {unit} stopped for a reason this view does not know
         </text>
