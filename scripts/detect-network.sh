@@ -188,37 +188,101 @@ ensure_proxydetox_up() {
     return 1
   fi
 
-  log "proxydetox on :3128 not functional — healing (launchd socket re-register)"
+  # ── Do not tear down a daemon that is not the problem (2026-08-30) ─────────
+  #
+  # The probe above is a PROXIED request to an EXTERNAL host, so it fails for
+  # two completely different reasons — proxydetox is broken, or the network
+  # behind it is unreachable — and only the first is fixable here. This function
+  # used to answer both with bootout + bootstrap + kickstart, three times, on
+  # every launch, with no debounce. On 2026-08-30 09:35 that ran on a healthy
+  # daemon whose socket was bound the whole time (see .logs/health-coordinator.log
+  # and lib/network/proxydetox-heal-decision.mjs), while the VPN was mid-
+  # transition, and three `coding --pi` launches failed inside the window.
+  #
+  # There are TWO healers: this one and the coordinator's pollNetworkStatus().
+  # The coordinator is the better-informed of the two — it debounces, it probes
+  # continuously, and it now classifies the cause — so it owns the heal and this
+  # function defers to it. That also ends the race where a launch tore the
+  # daemon down in the middle of the coordinator's own heal.
+  local bound=1
+  timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/3128' 2>/dev/null && bound=0
 
-  local attempt
-  for attempt in 1 2 3; do
-    if ! launchctl print "$uid_gui/$label" >/dev/null 2>&1; then
-      # Not loaded at all → plain bootstrap.
-      log "  proxydetox[$attempt]: not loaded — bootstrapping launchd job"
-      launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null \
-        || launchctl load "$plist" 2>/dev/null || true
-    else
-      # Loaded but socket dead → tear down and re-register so launchd rebinds
-      # :3128. bootout is async, so give it a beat before bootstrap.
-      log "  proxydetox[$attempt]: loaded but :3128 dead — bootout + bootstrap"
-      launchctl bootout "$uid_gui/$label" 2>/dev/null || true
-      sleep 1
-      launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null || true
-    fi
+  # A dead socket outranks the coordinator, and is NOT debounced. No network
+  # condition un-binds a local listener, so this is always the daemon — and the
+  # coordinator's verdict can be up to one poll (30s) stale, which is exactly
+  # long enough for it to still say `healthy` about a daemon that has just died.
+  # Same rule ordering as decideProxydetoxHeal(), for the same reason.
+  local cause=""
+  if [ "$bound" -eq 0 ]; then
+    cause=$(curl -s -m 3 http://localhost:3034/health/state 2>/dev/null \
+              | jq -r '.network.proxy_heal_cause // empty' 2>/dev/null) || cause=""
+  else
+    log "proxydetox: nothing bound on :3128 — unambiguously the daemon"
+  fi
 
-    # Force-spawn the socket-activated job, then a triggering request activates
-    # the launchd socket → proxydetox binds :3128 and serves the probe.
-    launchctl kickstart "$uid_gui/$label" 2>/dev/null || true
+  if [ -n "$cause" ]; then
+    case "$cause" in
+      healthy)
+        # The coordinator proved a request through :3128 worked, and our own
+        # probe above did not. One of the two is a transient miss, and tearing
+        # the daemon down on that basis is precisely the self-reinforcing
+        # kickstart the coordinator's hysteresis block exists to prevent.
+        log "proxydetox probe missed but the coordinator reports it healthy — keeping the pin"
+        return 0
+        ;;
+      upstream|offline)
+        # The daemon is forwarding fine; what is down is the network past it.
+        # The pin to :3128 stays VALID — proxydetox re-decides per request and
+        # is exactly what you want in force when the network comes back. This
+        # is why we return 0 here: the question this function answers is "is
+        # proxydetox up?", not "does the internet work?", and conflating the
+        # two is what un-pinned a working proxy during every VPN transition.
+        log "proxydetox is up but egress is failing (cause=${cause}) — keeping the pin, not healing"
+        return 0
+        ;;
+      indeterminate)
+        log "proxydetox probe failed but the cause is not yet attributable — deferring to the coordinator"
+        [ "$bound" -eq 0 ] && return 0
+        return 1
+        ;;
+    esac
+    log "proxydetox heal needed (cause=${cause}) — attempting one local kickstart"
+  elif [ "$bound" -eq 0 ]; then
+    # We asked and got nothing back. Only reachable when the socket IS bound —
+    # a dead socket skips the query above, and must not be reported as though
+    # the coordinator had been consulted and stayed silent.
+    log "health coordinator did not answer — one local heal attempt"
+  fi
+
+  # Coordinator unreachable, or it says the DAEMON is at fault. One attempt, and
+  # bootout only when nothing is bound: `kickstart -k` re-spawns a live job
+  # without dropping the listener, whereas bootout unregisters the socket and is
+  # only the right tool when the socket is already gone.
+  if [ "$bound" -ne 0 ] && ! launchctl print "$uid_gui/$label" >/dev/null 2>&1; then
+    log "  proxydetox: not loaded — bootstrapping launchd job"
+    launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null \
+      || launchctl load "$plist" 2>/dev/null || true
+  elif [ "$bound" -ne 0 ]; then
+    log "  proxydetox: loaded but :3128 not bound — bootout + bootstrap"
+    launchctl bootout "$uid_gui/$label" 2>/dev/null || true
     sleep 1
+    launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null || true
+  fi
+  launchctl kickstart -k "$uid_gui/$label" 2>/dev/null || true
+  sleep 1
 
-    if timeout 10 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${REACHABILITY_HOST}" 2>/dev/null; then
-      log "✅ proxydetox healed — :3128 functional (attempt $attempt)"
-      return 0
-    fi
-    sleep 1
-  done
+  if timeout 10 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${REACHABILITY_HOST}" 2>/dev/null; then
+    log "✅ proxydetox healed — :3128 functional"
+    return 0
+  fi
 
-  log "⚠️  proxydetox could not be brought up on :3128 after 3 heal attempts"
+  # Still nothing. If the socket is at least bound, the pin remains the right
+  # thing to have in force (see the upstream/offline case above).
+  timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/3128' 2>/dev/null && {
+    log "proxydetox listening on :3128 but egress still failing — keeping the pin"
+    return 0
+  }
+  log "⚠️  proxydetox could not be brought up on :3128"
   return 1
 }
 
