@@ -38,10 +38,17 @@ import { CallStrip, stripRows } from './call-strip'
 import type { StripFilter } from './call-strip'
 import { CallDetail } from './call-detail'
 import { rungOfCall } from './recent-call'
+import { replayRecorded, totalsByRoute } from './offload-replay'
 import type { RecentCall } from './recent-call'
 import { useIsDark } from '@/lib/colors'
 
 const BANDS = ['small', 'medium', 'high'] as const
+
+const fmt = (n: number): string => (
+  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K`
+      : String(n)
+)
 
 export interface OffloadDecisionProps {
   proxyBase: string
@@ -55,6 +62,8 @@ export interface OffloadDecisionProps {
   runtime: FlowData['runtime']
   /** `behaviour.offloadSkips` — the recorded reason strings and their counts. */
   offloadSkips: Array<{ reason: string; count: number }>
+  /** `behaviour.perRoute` — what the window's traffic did, per route and band. */
+  perRoute: Array<{ route_key: string; route_band: string; calls: number; tokens: number }>
   offloadedCalls: number
   windowHours: number
   /** The raw `/api/token-usage/recent` tail, newest first. Recorded mode only. */
@@ -102,7 +111,7 @@ async function pooled<T, R>(items: T[], width: number, fn: (t: T) => Promise<R>)
 
 export function OffloadDecision({
   proxyBase, routes, defaults, providers, flowProviders, fallback, runtime,
-  offloadSkips, offloadedCalls, windowHours, recent, onSaved,
+  offloadSkips, perRoute, offloadedCalls, windowHours, recent, onSaved,
 }: OffloadDecisionProps) {
   const policy = useOffloadPolicyDraft(proxyBase, onSaved)
   const isDark = useIsDark()
@@ -205,9 +214,28 @@ export function OffloadDecision({
     return { counts, unclassified }
   }, [offloadSkips, offloadedCalls])
 
+  /**
+   * The recorded window, replayed on the selected network.
+   *
+   * Only computed when the operator has actually asked a counterfactual — either
+   * a network other than the live one, or an unsaved policy. At the live network
+   * with the saved policy there is nothing to derive: `offloadSkips` is what the
+   * proxy itself recorded, and an observation beats a reconstruction of one.
+   */
+  const counterfactual = policy.dirty || (policy.networkOverride !== null
+    && policy.networkOverride !== policy.liveNetwork)
+
+  const replay = useMemo(() => {
+    if (!counterfactual) return null
+    return replayRecorded(
+      totalsByRoute(perRoute), routes, defaults, policy.draft, policy.network, fgCapable)
+  }, [counterfactual, perRoute, routes, defaults, policy.draft, policy.network, fgCapable])
+
   const p = policy.draft
   const rungs: LadderRung[] = useMemo(() => {
-    const counts = mode === 'config' ? (configRungs?.counts ?? new Array(GATES.length).fill(0)) : recorded.counts
+    const counts = mode === 'config'
+      ? (configRungs?.counts ?? new Array(GATES.length).fill(0))
+      : (replay?.callsByRung ?? recorded.counts)
     return GATES.map((_, i) => {
       const count = counts[i]
       let detail: string | undefined
@@ -228,7 +256,9 @@ export function OffloadDecision({
         // to" next to the calls that already moved, back when it was on. So the
         // recorded unit gets a statement about the calls, not about the config.
         if (mode === 'recorded') {
-          detail = count > 0 ? 'moved off the account their route named' : undefined
+          detail = replay
+            ? (replay.moved.to ? `would move to ${replay.moved.to}` : 'nothing to move it to')
+            : count > 0 ? 'moved off the account their route named' : undefined
         } else {
           const t = p.targets.find(x => x.enabled && (!x.requireNetwork || x.requireNetwork === policy.network))
           detail = t ? `→ ${t.provider}` : 'no target to move it to'
@@ -236,9 +266,9 @@ export function OffloadDecision({
       }
       return { count, detail }
     })
-  }, [mode, configRungs, recorded, p, policy.network])
+  }, [mode, configRungs, recorded, replay, p, policy.network])
 
-  const callsByRung = recorded.counts
+  const callsByRung = replay?.callsByRung ?? recorded.counts
 
   // The flow diagram reads the WORKING policy, not the saved one, so a preview
   // edit moves the caller edges and the account they land on at the same moment
@@ -249,9 +279,15 @@ export function OffloadDecision({
     routes,
     defaults,
     fallback,
-    runtime,
+    // The EFFECTIVE network, not the sensed one. The flow diagram re-decides
+    // every caller to place its edge, and it does that against
+    // `runtime.network` — so handing it the live value while the counts above
+    // used the override put the edges on rungs computed under a different
+    // network than the numbers beside them. It also labelled itself
+    // "network: public" while answering a question about corporate.
+    runtime: { ...runtime, network: policy.network },
     semanticRouting: p,
-  }), [flowProviders, routes, defaults, fallback, runtime, p])
+  }), [flowProviders, routes, defaults, fallback, runtime, policy.network, p])
 
   // The rows the strip is showing, in its order, so an index from the slider
   // means the same row here as it does there.
@@ -260,21 +296,61 @@ export function OffloadDecision({
     [recent, stripFilter, routeFilter],
   )
   const call = mode === 'recorded' && selectedCall != null ? shownCalls[selectedCall] ?? null : null
-  // Null when the row carries no verdict — a backfilled row, or one written
-  // before the decision was recorded. The ladder says so rather than lighting a
-  // rung it would have to guess.
-  const activeRung = call ? rungOfCall(call) : null
+
+  /**
+   * What this call would have done under the counterfactual — computed only when
+   * one is active, and never shown as though it were the recorded verdict.
+   */
+  const callReplay = useMemo(() => {
+    if (!call || !replay || !call.route_key || !call.route_band) return null
+    const entry = call.route_key.startsWith('defaults.')
+      ? defaults[call.route_key.slice('defaults.'.length)]
+      : routes[call.route_key]
+    if (!entry) return null
+    return evaluateOffload(
+      policy.draft, entry, call.route_key, call.route_band, policy.network, fgCapable)
+  }, [call, replay, routes, defaults, policy.draft, policy.network, fgCapable])
+
+  /**
+   * The rung the ladder lights for the selected call.
+   *
+   * Under a counterfactual this is the REPLAYED rung, not the recorded one. The
+   * counts beside it are replayed, and a highlight computed under a different
+   * rule than the numbers it sits in would point at a row whose figure does not
+   * describe it. Null when the row carries no verdict at all — a backfilled row,
+   * or one written before the decision was recorded — because the ladder says so
+   * rather than lighting a rung it would have to guess.
+   */
+  const activeRung = callReplay ? callReplay.rung : call ? rungOfCall(call) : null
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
           Decision — does the offload move it?
-          <div className="ml-auto flex items-center gap-1">
-            <Button size="sm" variant={mode === 'config' ? 'default' : 'ghost'} className="h-6 text-[11px] px-2"
-              onClick={() => setMode('config')}>Configuration</Button>
-            <Button size="sm" variant={mode === 'recorded' ? 'default' : 'ghost'} className="h-6 text-[11px] px-2"
-              onClick={() => setMode('recorded')}>Recorded · last {windowHours}h</Button>
+          <div className="ml-auto flex items-center gap-2">
+            {/* The network selector belongs to BOTH modes. In Configuration it
+                re-resolves the routes; in Recorded it replays the window. It is
+                the same question — "what about the other network" — and putting
+                it in the header rather than in the policy block says so. */}
+            <span className="flex items-center gap-1.5 text-[11px] font-normal">
+              <span className="text-muted-foreground">network:</span>
+              <select
+                className="bg-background border rounded px-1 py-0.5 font-mono text-[11px]"
+                value={policy.networkOverride ?? ''}
+                onChange={e => policy.setNetworkOverride(e.target.value || null)}
+              >
+                <option value="">{policy.liveNetwork} (live)</option>
+                <option value="public">public</option>
+                <option value="corporate">corporate</option>
+              </select>
+            </span>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant={mode === 'config' ? 'default' : 'ghost'} className="h-6 text-[11px] px-2"
+                onClick={() => setMode('config')}>Configuration</Button>
+              <Button size="sm" variant={mode === 'recorded' ? 'default' : 'ghost'} className="h-6 text-[11px] px-2"
+                onClick={() => setMode('recorded')}>Recorded · last {windowHours}h</Button>
+            </div>
           </div>
         </CardTitle>
       </CardHeader>
@@ -287,6 +363,46 @@ export function OffloadDecision({
           windowHours={windowHours}
           preview={policy.dirty}
         />
+
+        {/* ── The line between recorded and derived ──
+            Everything else in Recorded mode is a number the proxy wrote down.
+            These are not: they are today's config re-deciding yesterday's calls.
+            Saying so costs two lines and is the difference between a useful
+            counterfactual and a fabricated measurement. */}
+        {mode === 'recorded' && replay && (
+          <div className="text-[11px] border rounded px-2 py-1.5 space-y-1
+            border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400">
+            <div className="font-medium">
+              Counterfactual — not what happened.
+              {' '}These are the last {windowHours}h of traffic re-decided
+              {policy.networkOverride && policy.networkOverride !== policy.liveNetwork
+                ? ` as if this machine were on ${policy.network}`
+                : ' under the unsaved policy'}
+              , against <em>today&rsquo;s</em> routes.
+            </div>
+            <div className="text-muted-foreground">
+              {replay.moved.calls > 0
+                ? <>
+                    <span className="font-mono text-foreground">{fmt(replay.moved.calls)}</span> call
+                    {replay.moved.calls === 1 ? '' : 's'} ({fmt(replay.moved.tokens)} tokens) would have gone to{' '}
+                    <span className="font-mono">{replay.moved.to}</span> instead of a paid account —
+                    against <span className="font-mono">{fmt(offloadedCalls)}</span> that actually did.
+                  </>
+                : <>Nothing would have moved. {replay.moved.to
+                    ? <>The target <span className="font-mono">{replay.moved.to}</span> serves this network, so the traffic is stopped by a gate above it.</>
+                    : 'No enabled target serves that network.'}</>}
+              {' '}It says where calls would have been SENT, not what would have come back.
+            </div>
+            {replay.unmatched.calls > 0 && (
+              <div className="text-muted-foreground">
+                ⚠ {fmt(replay.unmatched.calls)} call{replay.unmatched.calls === 1 ? '' : 's'} could not be
+                replayed — their route is no longer in the config
+                ({replay.unmatched.keys.slice(0, 3).join(', ')}
+                {replay.unmatched.keys.length > 3 ? ', …' : ''}). Excluded from every figure above.
+              </div>
+            )}
+          </div>
+        )}
 
         {policy.error && (
           <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded px-2 py-1">
@@ -372,7 +488,10 @@ export function OffloadDecision({
                 isDark={isDark}
                 windowHours={windowHours}
               />
-              <CallDetail call={call} />
+              <CallDetail
+                call={call}
+                replay={callReplay && { network: policy.network, verdict: callReplay }}
+              />
             </div>
           </div>
         )}
@@ -399,18 +518,6 @@ export function OffloadDecision({
                 </label>
               ))}
 
-              <span className="ml-auto flex items-center gap-1.5">
-                <span className="text-muted-foreground">network:</span>
-                <select
-                  className="bg-background border rounded px-1 py-0.5 font-mono text-[11px]"
-                  value={policy.networkOverride ?? ''}
-                  onChange={e => policy.setNetworkOverride(e.target.value || null)}
-                >
-                  <option value="">{policy.liveNetwork} (live)</option>
-                  <option value="public">public</option>
-                  <option value="corporate">corporate</option>
-                </select>
-              </span>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">

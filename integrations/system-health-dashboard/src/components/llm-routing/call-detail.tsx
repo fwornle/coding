@@ -15,6 +15,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { GATES } from './offload-gates'
+import type { GateVerdict } from './offload-gates'
 import { parseTrail, rungOfCall } from './recent-call'
 import type { RecentCall } from './recent-call'
 
@@ -26,7 +27,20 @@ const fmt = (n: number): string => (
       : String(n)
 )
 
-export function CallDetail({ call }: { call: RecentCall | null }) {
+interface Props {
+  call: RecentCall | null
+  /**
+   * What this call WOULD have done on another network, when one is selected.
+   *
+   * Rendered under its own heading and never merged into the `offload` row
+   * above, which stays the proxy's verbatim record of what actually happened.
+   * One row saying both would be a paragraph the reader has to disentangle, and
+   * the whole reason this panel quotes the reason string is that it is a record.
+   */
+  replay?: { network: string; verdict: GateVerdict } | null
+}
+
+export function CallDetail({ call, replay = null }: Props) {
   if (!call) {
     return (
       <div className="text-[11px] text-muted-foreground border rounded p-3 h-full flex items-center">
@@ -80,6 +94,26 @@ export function CallDetail({ call }: { call: RecentCall | null }) {
           <span className="text-foreground">{rung}</span>
           <span className="text-muted-foreground"> · {GATES[rung].label}</span>
         </Row>
+      )}
+
+      {replay && (
+        <div className="border-t pt-1.5 space-y-0.5">
+          <div className="text-amber-700 dark:text-amber-400">
+            on {replay.network} — not what happened
+          </div>
+          <div className="pl-2">
+            {replay.verdict.offloadedFrom
+              ? <span className="text-emerald-600 dark:text-emerald-400">
+                  ✓ would move to {replay.verdict.provider}
+                </span>
+              : <span className="text-muted-foreground">
+                  ✗ {replay.verdict.reason ?? `stays on ${replay.verdict.provider}`}
+                </span>}
+          </div>
+          <div className="pl-2 text-muted-foreground">
+            rung {replay.verdict.rung} · {GATES[replay.verdict.rung].label}
+          </div>
+        </div>
       )}
 
       {!!trail?.attempts?.length && (
