@@ -46,11 +46,40 @@ interface Props {
   unclassified?: { count: number } | null
 }
 
-const RUNG_H = 34
+export const RUNG_H = 34
 export const LADDER_HEADER = 30
 
 export function ladderHeight(): number {
   return LADDER_HEADER + GATES.length * RUNG_H + 8
+}
+
+/**
+ * Vertical centre of a rung, relative to the ladder's own y.
+ *
+ * Exported so the flow diagram can land a caller's edge on the rung that decided
+ * it without copying RUNG_H. A second copy of that constant would drift silently:
+ * the edges would still draw, just against the wrong rows, and nothing would say
+ * so.
+ */
+export function rungCenterY(i: number): number {
+  return LADDER_HEADER + i * RUNG_H + (RUNG_H - 2) / 2
+}
+
+/**
+ * SVG text does not wrap and does not clip, so an over-long detail line does not
+ * overflow its box — it draws straight across whatever the next column is. The
+ * ladder is rendered at two quite different widths (inside the flow diagram, and
+ * wherever else it is embedded), so the budget is computed from the width it was
+ * actually given rather than assumed.
+ *
+ * 0.60em per character is the measured average for this mono face at 9px; it
+ * over-estimates slightly, which is the safe direction — a detail truncated one
+ * character early is invisible, one character late is a line through the account
+ * cards.
+ */
+function fitDetail(text: string, width: number): string {
+  const budget = Math.floor((width - 28 - 78) / (9 * 0.6))
+  return text.length <= budget ? text : `${text.slice(0, Math.max(budget - 1, 4))}…`
 }
 
 function fmt(n: number): string {
@@ -107,7 +136,9 @@ export function DecisionLadder({
             </text>
             <text x={x + 28} y={top + 24} fontSize={9} className="fill-muted-foreground"
               fontFamily="ui-monospace, monospace">
-              {r.detail ?? gate.hint}
+              {fitDetail(r.detail ?? gate.hint, width)}
+              {/* Full text on hover — truncation must never be the only copy. */}
+              <title>{r.detail ?? gate.hint}</title>
             </text>
             {/* Unit always printed — see the header note. */}
             <text x={x + width - 12} y={top + 12} fontSize={9.5} textAnchor="end"

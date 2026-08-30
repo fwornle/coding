@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getProviderColor, normalizeProvider } from '@/lib/providers'
 import { normalizeModel } from '@/components/performance/models'
+import {
+  DecisionLadder, LADDER_HEADER, ladderHeight, rungCenterY,
+} from '@/components/llm-routing/decision-ladder'
+import type { LadderRung } from '@/components/llm-routing/decision-ladder'
+import { GATES, RUNG_OFFLOADED, describeTargets, evaluateOffload } from '@/components/llm-routing/offload-gates'
+import type { OffloadPolicy } from '@/components/llm-routing/offload-gates'
 
 /**
  * Flow — the routing config drawn as the data flow it actually is.
@@ -36,7 +42,7 @@ import { normalizeModel } from '@/components/performance/models'
 
 // ── Shapes ───────────────────────────────────────────────────────────────────
 
-interface ProviderInfo {
+export interface ProviderInfo {
   id: string
   account: string
   description: string
@@ -47,15 +53,37 @@ interface ProviderInfo {
   models: Partial<Record<'small' | 'medium' | 'high', string>>
 }
 
-interface RouteEntry { provider: string; complexity: string }
+interface RouteEntry { provider: string; complexity: string; offload?: boolean }
 interface FallbackCandidate { provider: string; when: { network?: string[] } | null }
 
-interface FlowData {
+export interface FlowData {
   providers: ProviderInfo[]
   routes: Record<string, RouteEntry>
   defaults: Record<string, RouteEntry>
   fallback: { chains: Record<string, FallbackCandidate[]> }
   runtime: { network: string; availableImpls: string[] }
+  /**
+   * The offload policy the gate column evaluates. Optional so a caller that
+   * predates it still renders — the ladder then reports the policy as off, which
+   * is what a proxy without the block does anyway.
+   */
+  semanticRouting?: OffloadPolicy | null
+}
+
+/**
+ * Recorded counts and selection, supplied by a caller that has traffic.
+ *
+ * Absent, the ladder counts ROUTES from the config alone, which is all the
+ * settings dialog can know. The unit is carried alongside the numbers rather
+ * than inferred, because it is the thing that changes between the two.
+ */
+export interface GateOverlay {
+  rungs: LadderRung[]
+  unit: 'routes' | 'calls'
+  activeRung?: number | null
+  selectedRung?: number | null
+  onSelectRung?: (r: number | null) => void
+  unclassified?: { count: number } | null
 }
 
 interface UsageRow {
@@ -69,23 +97,53 @@ interface Props {
   proxyBase: string
   /** Hours of traffic to weight the edges by. Mirrors the page's own selector. */
   hours: number
+  /** Recorded counts and selection. Omitted, the ladder counts config routes. */
+  gates?: GateOverlay
 }
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
 
-// The canvas is wider than the account column ends (COL_ACCT + ACCT_W = 940)
-// because the fallback chains bow out to the RIGHT of the accounts; that gutter
-// is theirs. Shrink it and the chains clip at the viewBox edge.
-const W = 1030
-const COL_CALLER = 20
-const CALLER_W = 232
-const COL_HUB = 396
-const HUB_W = 150
-const COL_ACCT = 620
-const ACCT_W = 320
-const ROW_H = 46
-const NODE_H = 36
-const TOP = 56
+/**
+ * One table, so the columns are readable as a budget rather than as eight
+ * unrelated literals that have to be added up by hand to see they still fit.
+ *
+ *   caller    16 →  216     (200)
+ *   lane A   216 →  264     ( 48)   caller edge to the rung that decided it
+ *   gate     264 →  694     (430)
+ *   lane B   694 →  742     ( 48)   rung exit to the account that served it
+ *   account  742 → 1022     (280)
+ *   gutter  1022 → 1120     ( 98)   fallback chains bow out here
+ *
+ * ── How wide the gate column has to be, measured rather than budgeted ───────
+ * The gate column is carved out of the 368-unit dead band the decorative hub sat
+ * in (x=396..546, three lines of static text). That band was NOT enough on its
+ * own: the longest rung label is 55 characters at 10.5px (~300 units) and the
+ * longest detail line 57 at 9px mono (~308), which with the 28-unit rung indent
+ * and the ~70-unit count slot needs ~406. Given 276 the labels ran straight
+ * through the lane and into the account cards.
+ *
+ * So W grows — but by 90 units, not the ~290 a naive fit would take. That
+ * distinction is the whole point of the original constraint: the settings dialog
+ * has a ~1104px content box, so W=1030 renders at 1.07x and W=1320 would render
+ * at 0.84x, taking every 9.5px sub-label to an effective 7.9px. W=1120 renders
+ * at 0.99x — 9.5px stays 9.4px, which is not a legibility change at all. The
+ * caller and account columns give up 16 units each to keep the growth that
+ * small; both still fit their longest label at 11px.
+ */
+const GEOM = {
+  W: 1120,
+  COL_CALLER: 16,
+  CALLER_W: 200,
+  COL_GATE: 264,
+  GATE_W: 430,
+  COL_ACCT: 742,
+  ACCT_W: 280,
+  ROW_H: 46,
+  NODE_H: 36,
+  TOP: 56,
+} as const
+
+const { W, COL_CALLER, CALLER_W, COL_GATE, GATE_W, COL_ACCT, ACCT_W, ROW_H, NODE_H, TOP } = GEOM
 
 /** Model a (provider, band) pair resolves to — mirrors the proxy's resolveRoute(). */
 function modelFor(providers: ProviderInfo[], id: string, band: string): string {
@@ -105,7 +163,7 @@ function fmtTokens(n: number): string {
   return String(n)
 }
 
-export function FlowTab({ data, proxyBase, hours }: Props) {
+export function FlowTab({ data, proxyBase, hours, gates }: Props) {
   const [usage, setUsage] = useState<UsageRow[] | null>(null)
   const [usageError, setUsageError] = useState<string | null>(null)
   const [hover, setHover] = useState<string | null>(null)
@@ -146,11 +204,48 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
     return { byProvider, byPair, max }
   }, [usage])
 
+  // ── The offload verdict, per route ──
+  // The gate column is not decoration in place of decoration: it decides which
+  // account each caller actually reaches, so it has to be computed before the
+  // caller nodes are grouped.
+  const policy = data.semanticRouting ?? null
+
+  const fgCapable = useMemo(() => {
+    const set = new Set(data.providers.filter(p => p.fgCapable).map(p => p.id))
+    return (id: string) => set.has(id)
+  }, [data.providers])
+
+  /**
+   * The band a route resolves to.
+   *
+   * `from-caller` is not a band — it means the caller declares one per turn, and
+   * when it declares nothing the proxy falls to the class default. Treating the
+   * literal string as a band would put every from-caller route on the "band is
+   * eligible" rung for a band that does not exist.
+   */
+  const bandOf = useMemo(() => (entry: RouteEntry, key: string): string => {
+    if (entry.complexity !== 'from-caller') return entry.complexity
+    const cls = key.startsWith('fg-') ? 'fg-chat' : 'background'
+    return data.defaults[cls]?.complexity ?? 'high'
+  }, [data.defaults])
+
+  const verdictOf = useMemo(() => (key: string, entry: RouteEntry) =>
+    evaluateOffload(policy, entry, key, bandOf(entry, key), data.runtime.network, fgCapable),
+  [policy, bandOf, data.runtime.network, fgCapable])
+
   // ── Caller nodes ──
   // Foreground routes stay individual: there are four and the agent identity is
   // the whole point of the route key. Background routes are collapsed by their
-  // TARGET — 31 rows all pointing at three (provider, band) pairs is a fan-in,
-  // and drawing 31 near-identical nodes would hide that rather than show it.
+  // OUTCOME — 31 rows arriving at three destinations is a fan-in, and drawing 31
+  // near-identical nodes would hide that rather than show it.
+  //
+  // The collapse key is the resolved outcome (rung, final provider, band), NOT
+  // the declared (provider, complexity) pair it used to be. Once the gate column
+  // exists those two are different keys: `bg-kgbench-judge` and its neighbours
+  // declare the same provider and band and leave the ladder at different rungs,
+  // because `offload: false` pins the model that answers. Grouped by the declared
+  // pair they would share one node and one edge, and the diagram would show them
+  // exiting somewhere one of them does not.
   const callers = useMemo(() => {
     const fg = Object.keys(data.routes)
       .filter(k => k.startsWith('fg-'))
@@ -160,6 +255,7 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
         label: k,
         sub: 'foreground',
         entry: data.routes[k],
+        verdict: verdictOf(k, data.routes[k]),
         members: [k],
         kind: 'fg' as const,
       }))
@@ -167,19 +263,21 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
     const bgKeys = Object.keys(data.routes).filter(k => !k.startsWith('fg-')).sort()
     const groups = new Map<string, string[]>()
     for (const k of bgKeys) {
-      const e = data.routes[k]
-      const key = `${e.provider}|${e.complexity}`
+      const v = verdictOf(k, data.routes[k])
+      const key = `${v.rung}|${v.provider}|${data.routes[k].complexity}`
       groups.set(key, [...(groups.get(key) ?? []), k])
     }
     const bg = [...groups.entries()]
       .sort((a, b) => b[1].length - a[1].length)
       .map(([key, members]) => {
-        const [provider, complexity] = key.split('|')
+        const complexity = key.split('|')[2]
+        const entry = data.routes[members[0]]
         return {
           id: `bg:${key}`,
           label: `${members.length} background service${members.length === 1 ? '' : 's'}`,
           sub: complexity,
-          entry: { provider, complexity },
+          entry,
+          verdict: verdictOf(members[0], entry),
           members,
           kind: 'bg' as const,
         }
@@ -190,12 +288,13 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
       label: `default · ${cls}`,
       sub: 'anything not named',
       entry: data.defaults[cls],
+      verdict: verdictOf(`defaults.${cls}`, data.defaults[cls]),
       members: [],
       kind: 'default' as const,
     }))
 
     return [...fg, ...bg, ...defs]
-  }, [data])
+  }, [data, verdictOf])
 
   // ── Account nodes ──
   // Ordered subscriptions first, then metered keys, then disabled — the same
@@ -212,7 +311,7 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
 
   // ── Edge sets ──
   const routedProviders = useMemo(
-    () => new Set(callers.map(c => c.entry.provider)), [callers])
+    () => new Set(callers.map(c => c.verdict.provider)), [callers])
 
   // A provider is a fallback target if some chain names it. Drawn dashed, and
   // only from the chain head — a chain is flat, so B's own chain is not consulted.
@@ -226,8 +325,55 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
 
   const callerY = (i: number) => TOP + i * ROW_H
   const acctY = (i: number) => TOP + i * ROW_H
-  const height = Math.max(callers.length, accounts.length) * ROW_H + TOP + 40
-  const hubY = TOP + (Math.max(callers.length, accounts.length) - 1) * ROW_H / 2
+  // The ladder can now be the tallest element, so it is part of the height
+  // budget rather than something assumed to fit between the two columns.
+  const colH = Math.max(callers.length, accounts.length) * ROW_H
+  const height = Math.max(colH, ladderHeight() + 8) + TOP + 40
+  const ladderY = TOP + Math.max(0, (colH - ladderHeight())) / 2
+  /** Absolute y of a rung's centre — where its edges attach. */
+  const rungY = (i: number) => ladderY + rungCenterY(i)
+
+  // Config-mode rung counts are ROUTES, not nodes: a collapsed background node
+  // stands for however many route keys it holds, and counting nodes would report
+  // 3 where the config has 31.
+  const configRungs = useMemo<LadderRung[]>(() => {
+    const counts = new Array(GATES.length).fill(0)
+    for (const c of callers) counts[c.verdict.rung] += Math.max(c.members.length, 1)
+    return GATES.map((_, i) => {
+      let detail: string | undefined
+      if (i === 1) {
+        const pinned = callers.flatMap(c => (c.verdict.rung === 1 ? c.members : []))
+        detail = pinned.length ? pinned.join(', ') : undefined
+      } else if (i === 2 && policy) {
+        detail = `offload_bands: ${policy.offloadBands.join(', ') || 'none'}`
+      } else if (i === 3 && policy) {
+        detail = describeTargets(policy)
+      } else if (i === RUNG_OFFLOADED) {
+        const moved = callers.find(c => c.verdict.rung === RUNG_OFFLOADED)
+        detail = moved ? `→ ${moved.verdict.provider}` : undefined
+      }
+      return { count: counts[i], detail }
+    })
+  }, [callers, policy])
+
+  const ladderRungs = gates?.rungs ?? configRungs
+  const ladderUnit = gates?.unit ?? 'routes'
+
+  /**
+   * Rung exit → account, deduped by (rung, account) and weighted by traffic.
+   *
+   * Nine caller edges collapse to a handful of outgoing bundles this way. Drawing
+   * one per caller would put every crossing back that routing them through the
+   * ladder removed.
+   */
+  const exitEdges = useMemo(() => {
+    const seen = new Map<string, { rung: number; provider: string }>()
+    for (const c of callers) {
+      const k = `${c.verdict.rung}|${c.verdict.provider}`
+      if (!seen.has(k)) seen.set(k, { rung: c.verdict.rung, provider: c.verdict.provider })
+    }
+    return [...seen.values()]
+  }, [callers])
 
   const acctIndex = new Map(accounts.map((p, i) => [p.id, i]))
 
@@ -282,47 +428,57 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
           <text x={COL_CALLER} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>
             CALLERS — what asks for an LLM
           </text>
-          <text x={COL_HUB} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>
-            PROXY
+          <text x={COL_GATE} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>
+            rapid-llm-proxy — what it decides
           </text>
           <text x={COL_ACCT} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>
             ACCOUNTS — who gets billed
           </text>
 
-          {/* ── Edges: caller → hub ── */}
+          {/* ── Edges: caller → the rung that decided it ──
+              Not caller → one hub. Landing each edge on its own rung is what
+              makes "this caller's answer is this gate" a single saccade, and it
+              is the only thing the gate column adds over the box it replaced. */}
           {callers.map((c, i) => {
             const y = callerY(i) + NODE_H / 2
             const x1 = COL_CALLER + CALLER_W
-            const x2 = COL_HUB
+            const x2 = COL_GATE
             const mid = (x1 + x2) / 2
+            const ry = rungY(c.verdict.rung)
             return (
               <path
                 key={`e-in-${c.id}`}
-                d={`M ${x1} ${y} C ${mid} ${y}, ${mid} ${hubY + NODE_H / 2}, ${x2} ${hubY + NODE_H / 2}`}
+                d={`M ${x1} ${y} C ${mid} ${y}, ${mid} ${ry}, ${x2} ${ry}`}
                 fill="none"
-                stroke={getProviderColor(c.entry.provider)}
+                stroke={getProviderColor(c.verdict.provider)}
                 strokeWidth={1.25}
                 opacity={dim(c.id) ? 0.12 : 0.45}
               />
             )
           })}
 
-          {/* ── Edges: hub → account (declared routes) ── */}
-          {accounts.map((p, i) => {
-            if (!routedProviders.has(p.id)) return null
-            const y = acctY(i) + NODE_H / 2
-            const x1 = COL_HUB + HUB_W
+          {/* ── Edges: rung exit → account ── */}
+          {exitEdges.map(e => {
+            const ai = acctIndex.get(e.provider)
+            if (ai === undefined) return null
+            const y = acctY(ai) + NODE_H / 2
+            const x1 = COL_GATE + GATE_W
             const x2 = COL_ACCT
             const mid = (x1 + x2) / 2
-            const color = getProviderColor(p.id)
+            const ry = rungY(e.rung)
+            const color = getProviderColor(e.provider)
+            // The PASS rung is the only one that means the offload MOVED the
+            // call, so it is the only exit drawn as anything other than "stayed
+            // where the route said".
+            const moved = e.rung === RUNG_OFFLOADED
             return (
               <path
-                key={`e-out-${p.id}`}
-                d={`M ${x1} ${hubY + NODE_H / 2} C ${mid} ${hubY + NODE_H / 2}, ${mid} ${y}, ${x2} ${y}`}
+                key={`e-out-${e.rung}-${e.provider}`}
+                d={`M ${x1} ${ry} C ${mid} ${ry}, ${mid} ${y}, ${x2} ${y}`}
                 fill="none"
                 stroke={color}
-                strokeWidth={weight(p.id)}
-                opacity={dim(p.id) ? 0.15 : 0.9}
+                strokeWidth={moved ? Math.max(2, weight(e.provider)) : weight(e.provider)}
+                opacity={dim(e.provider) ? 0.15 : 0.9}
                 markerEnd="url(#flow-arrow)"
               />
             )
@@ -353,30 +509,35 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
             )
           })}
 
-          {/* ── Hub ── */}
-          <g>
-            <rect
-              x={COL_HUB} y={hubY} width={HUB_W} height={NODE_H + 26} rx={6}
-              className="fill-background stroke-border" strokeWidth={1.5}
-            />
-            <text x={COL_HUB + HUB_W / 2} y={hubY + 16} textAnchor="middle"
-              className="fill-foreground" fontSize={12} fontWeight={600}>
-              rapid-llm-proxy
-            </text>
-            <text x={COL_HUB + HUB_W / 2} y={hubY + 32} textAnchor="middle"
-              className="fill-muted-foreground" fontSize={9.5}>
-              route → band → model
-            </text>
-            <text x={COL_HUB + HUB_W / 2} y={hubY + 48} textAnchor="middle"
-              className="fill-muted-foreground" fontSize={9.5}>
-              network: {data.runtime.network}
-            </text>
-          </g>
+          {/* ── The gate column ──
+              This replaces a box that said `rapid-llm-proxy` over three lines of
+              static text. Every question worth asking happened inside it, and
+              none of them were drawn. Same component the standalone card uses, so
+              the ladder cannot say two different things in two places. */}
+          <DecisionLadder
+            x={COL_GATE} y={ladderY} width={GATE_W}
+            rungs={ladderRungs}
+            unit={ladderUnit}
+            activeRung={gates?.activeRung ?? null}
+            selectedRung={gates?.selectedRung ?? null}
+            onSelectRung={gates?.onSelectRung}
+            unclassified={gates?.unclassified ?? null}
+          />
+          {/* Right-aligned into the ladder's own header row. Centred under the
+              title it sat on top of it — the header is one line, not two. */}
+          <text x={COL_GATE + GATE_W - 12} y={ladderY + 19} textAnchor="end"
+            className="fill-muted-foreground" fontSize={9} fontFamily="ui-monospace, monospace">
+            network: {data.runtime.network}
+          </text>
 
           {/* ── Caller nodes ── */}
           {callers.map((c, i) => {
+            // Coloured by where the call ACTUALLY ends up. An offloaded route
+            // painted with the account it declared would put the stripe of a paid
+            // subscription on a node whose work is served free and locally.
             const y = callerY(i)
-            const color = getProviderColor(c.entry.provider)
+            const color = getProviderColor(c.verdict.provider)
+            const moved = c.verdict.offloadedFrom
             return (
               <g key={c.id}
                 onMouseEnter={() => setHover(c.id)}
@@ -385,9 +546,12 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
                 opacity={dim(c.id) ? 0.35 : 1}
               >
                 <title>
-                  {c.members.length > 1
-                    ? `${c.members.join('\n')}\n\n→ ${c.entry.provider} / ${c.entry.complexity}`
-                    : `${c.label} → ${c.entry.provider} / ${c.entry.complexity}`}
+                  {c.members.length > 1 ? `${c.members.join('\n')}\n\n` : ''}
+                  {`declared: ${c.entry.provider} / ${c.entry.complexity}`}
+                  {moved
+                    ? `\noffloaded: → ${c.verdict.provider} (${c.entry.provider} becomes the first fallback)`
+                    : `\ngate ${c.verdict.rung}: ${GATES[c.verdict.rung].label}`}
+                  {c.verdict.reason ? `\n${c.verdict.reason}` : ''}
                 </title>
                 <rect x={COL_CALLER} y={y} width={CALLER_W} height={NODE_H} rx={5}
                   className="fill-background stroke-border" strokeWidth={1} />
@@ -398,7 +562,7 @@ export function FlowTab({ data, proxyBase, hours }: Props) {
                   {c.label}
                 </text>
                 <text x={COL_CALLER + 10} y={y + 28} className="fill-muted-foreground" fontSize={9.5}>
-                  {c.sub} → {modelFor(data.providers, c.entry.provider, c.entry.complexity)}
+                  {c.sub} → {modelFor(data.providers, c.verdict.provider, c.entry.complexity)}
                 </text>
               </g>
             )
