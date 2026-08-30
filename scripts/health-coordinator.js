@@ -39,6 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
+import { reclassifyTimeoutAsUnknown, debounceDbStatus } from '../lib/network/probe-result-semantics.mjs';
 import { probeHttpHealth, probeTcpPort, PROBE_TIMEOUT_ERROR } from '../lib/utils/service-probe.js';
 import net from 'node:net';
 import http from 'node:http';
@@ -574,6 +575,13 @@ function reclassifyBusyService(name, result) {
   if (!obsApiBusyNow()) return result;
   return { ...result, status: 'busy' };
 }
+
+// reclassifyTimeoutAsUnknown lives in lib/network/probe-result-semantics.mjs —
+// pure, and therefore testable, which this file is not (it binds ports on
+// import, which is why the busy-window tests grep its source instead). It
+// generalises the reading the busy window above applies to obs_api: a TIMEOUT
+// is not evidence of death, for any service. Applied AFTER reclassifyBusyService
+// so obs_api's more specific 'busy' still wins inside its window.
 
 // ----- Proxy supervision constants (Phase 34 D-01 / D-02 / D-06) -----
 const PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:12435';
@@ -2974,10 +2982,38 @@ async function runAllChecks() {
       // Aggregate to a single status: healthy iff levelDB available + not locked + qdrant available.
       const levelDbOk = dbStatus?.levelDB?.available !== false && dbStatus?.levelDB?.locked !== true;
       const qdrantOk = dbStatus?.qdrant?.available === true;
-      const aggregate = (levelDbOk && qdrantOk) ? 'healthy' : 'degraded';
+
+      // ── Debounced, like proxy_functional above and for the same reason ──────
+      //
+      // The two halves are asymmetric ON PURPOSE, and the asymmetry is not the
+      // bug: levelDB uses `!== false` (a probe that could not determine the
+      // answer passes) while qdrant needs `=== true` (checkDatabaseHealth
+      // initialises it false and only a successful GET /readyz sets it true).
+      // The LOCK check reads a file that is normally absent, so "no answer"
+      // there genuinely means "not locked"; the qdrant check reads a network
+      // service, where "no answer" means nothing at all.
+      //
+      // What WAS the bug: a single failed sample was published as `degraded`
+      // with no retry. On 2026-08-30 a two-minute host network outage made one
+      // `fetch('http://localhost:6333/readyz')` fail and the prompt banner
+      // announced a degraded database — while the Qdrant container had zero
+      // restarts and had been up two days. A database that is genuinely down
+      // stays down across three ticks; a blip does not.
+      //
+      // Deliberately NOT applied to the levelDB lock half: a held lock is a
+      // filesystem fact read locally, not a network sample, so it is reported
+      // immediately as it always was.
+      const dbProbeOk = levelDbOk && qdrantOk;
+      const prevDb = currentState.databases || {};
+      const db = debounceDbStatus(dbProbeOk, prevDb.consecutive_probe_failures);
+      const { status: aggregate, failures: dbFails } = db;
+      if (!dbProbeOk && !db.confirmed) {
+        log(`db probe failed (${dbFails}/3) — levelDB=${levelDbOk} qdrant=${qdrantOk}; not calling it degraded yet`, 'DEBUG');
+      }
       currentState.databases = {
         ...(currentState.databases || {}),
         status: aggregate,
+        consecutive_probe_failures: dbFails,
         levelDB: dbStatus?.levelDB,
         qdrant: dbStatus?.qdrant,
         // Map PSM probe results to the rule-keyed sub-checks that the
@@ -3090,6 +3126,7 @@ async function runAllChecks() {
       }
       // A blocked-but-alive service reads as a timeout; don't report it dead.
       result = reclassifyBusyService(name, result);
+      result = reclassifyTimeoutAsUnknown(result, PROBE_TIMEOUT_ERROR);
       const idx = currentState.services.findIndex(s => s.name === name);
       const prevLastSeen = idx >= 0 ? currentState.services[idx].last_seen : null;
       const entry = {
