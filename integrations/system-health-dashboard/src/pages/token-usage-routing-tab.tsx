@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { normalizeProvider } from '@/lib/providers'
-import { FlowTab } from './token-usage-flow-tab'
 import { OffloadDecision } from '@/components/llm-routing/offload-decision'
+import type { ProviderInfo } from './token-usage-flow-tab'
 
 /**
  * Routing — how the system is configured, and what it actually did.
@@ -80,11 +80,13 @@ interface Behaviour {
 interface RoutingConfig {
   paths: { routing: string; fallback: string }
   /**
-   * `fgCapable` is `!!fg_transport` on the provider — the one fact the offload
-   * ladder's last gate cannot derive from the policy. On the wire since the
-   * routing endpoint was written; simply never declared here.
+   * The full provider payload, as the flow diagram declares it. This used to be
+   * a four-field subset, which is why every FlowTab call site cast the config to
+   * `any` — the endpoint has always returned the rest. `fgCapable` in particular
+   * (`!!fg_transport`) is the one fact the offload ladder's last gate cannot
+   * derive from the policy.
    */
-  providers: Array<{ id: string; account: string; enabled: boolean; tools: boolean; fgCapable?: boolean }>
+  providers: ProviderInfo[]
   /**
    * `offload: false` pins a route to its declared provider, for the cases where
    * the model that answers IS the measurement (the kgbench judge, the kb-ab
@@ -108,7 +110,8 @@ interface RoutingConfig {
     targets: Array<{ provider: string; requireNetwork: string | null; enabled: boolean; scope?: string[] }>
     offloadBands: string[]
   } | null
-  fallback: { chains: Record<string, Array<{ provider: string; when: unknown }>> }
+  /** Shaped as the flow diagram declares it; the `unknown` here needed a cast. */
+  fallback: { chains: Record<string, Array<{ provider: string; when: { network?: string[] } | null }>> }
   runtime: { network: string; availableImpls: string[] }
   warnings?: string[]
 }
@@ -361,26 +364,15 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         routes={config.routes}
         defaults={config.defaults}
         providers={config.providers}
+        flowProviders={config.providers}
+        fallback={config.fallback}
+        runtime={config.runtime}
         offloadSkips={behaviour.offloadSkips}
         offloadedCalls={behaviour.totals.offloaded_calls}
         windowHours={behaviour.window.hours}
         recent={recent}
         onSaved={() => setReloadNonce(n => n + 1)}
       />
-
-      {/* ── The config as a picture ──
-          Sits directly under the Configured summary, so the shape of the routing
-          is the first thing you see and everything below it is observed data.
-          Same component the Settings dialog uses, so the diagram cannot drift
-          between the two places it appears. */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Configured flow</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FlowTab data={config as any} proxyBase={proxyBase} hours={Number(hours) || 24} />
-        </CardContent>
-      </Card>
 
       {/* ── Observed per route ── */}
       <Card>

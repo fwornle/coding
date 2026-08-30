@@ -565,6 +565,11 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
                 defaults: defaultDraft,
                 fallback: { chains: fallbackDraft.chains },
                 runtime: data.runtime,
+                // The gate column reads the DRAFT policy like everything else
+                // here, so switching a target on redraws which callers reach it
+                // before Save is pressed — the same live-preview contract the
+                // route edges already had.
+                semanticRouting: semanticDraft,
               }}
             />
           )}

@@ -29,8 +29,9 @@ import {
   GATES, RUNG_OFFLOADED, describeTargets, evaluateOffload, jobClassOf, rungOfReason,
 } from './offload-gates'
 import type { RouteEntry } from './offload-gates'
-import { DecisionLadder, ladderHeight } from './decision-ladder'
 import type { LadderRung } from './decision-ladder'
+import { FlowTab } from '@/pages/token-usage-flow-tab'
+import type { FlowData } from '@/pages/token-usage-flow-tab'
 import { OffloadHeadline } from './offload-headline'
 import { useOffloadPolicyDraft } from './use-offload-policy-draft'
 import { CallStrip, stripRows } from './call-strip'
@@ -41,7 +42,6 @@ import type { RecentCall } from './recent-call'
 import { useIsDark } from '@/lib/colors'
 
 const BANDS = ['small', 'medium', 'high'] as const
-const LADDER_W = 640
 
 export interface OffloadDecisionProps {
   proxyBase: string
@@ -49,6 +49,10 @@ export interface OffloadDecisionProps {
   routes: Record<string, RouteEntry>
   defaults: Record<string, RouteEntry>
   providers: Array<{ id: string; fgCapable?: boolean }>
+  /** The full provider payload the flow diagram draws its account column from. */
+  flowProviders: FlowData['providers']
+  fallback: FlowData['fallback']
+  runtime: FlowData['runtime']
   /** `behaviour.offloadSkips` — the recorded reason strings and their counts. */
   offloadSkips: Array<{ reason: string; count: number }>
   offloadedCalls: number
@@ -97,8 +101,8 @@ async function pooled<T, R>(items: T[], width: number, fn: (t: T) => Promise<R>)
 }
 
 export function OffloadDecision({
-  proxyBase, routes, defaults, providers, offloadSkips, offloadedCalls, windowHours,
-  recent, onSaved,
+  proxyBase, routes, defaults, providers, flowProviders, fallback, runtime,
+  offloadSkips, offloadedCalls, windowHours, recent, onSaved,
 }: OffloadDecisionProps) {
   const policy = useOffloadPolicyDraft(proxyBase, onSaved)
   const isDark = useIsDark()
@@ -236,6 +240,19 @@ export function OffloadDecision({
 
   const callsByRung = recorded.counts
 
+  // The flow diagram reads the WORKING policy, not the saved one, so a preview
+  // edit moves the caller edges and the account they land on at the same moment
+  // it moves the rung counts. Two halves of one picture disagreeing about which
+  // policy they describe is the failure this whole card is arranged to avoid.
+  const flowData = useMemo(() => ({
+    providers: flowProviders,
+    routes,
+    defaults,
+    fallback,
+    runtime,
+    semanticRouting: p,
+  }), [flowProviders, routes, defaults, fallback, runtime, p])
+
   // The rows the strip is showing, in its order, so an index from the slider
   // means the same row here as it does there.
   const shownCalls = useMemo(
@@ -297,19 +314,26 @@ export function OffloadDecision({
           </div>
         )}
 
-        <svg viewBox={`0 0 ${LADDER_W} ${ladderHeight()}`} width="100%"
-          style={{ maxHeight: ladderHeight() }} role="img"
-          aria-label="Offload decision gates, in the order the proxy evaluates them">
-          <DecisionLadder
-            x={0} y={0} width={LADDER_W}
-            rungs={rungs}
-            unit={mode === 'config' ? 'routes' : 'calls'}
-            activeRung={activeRung}
-            selectedRung={selectedRung}
-            onSelectRung={setSelectedRung}
-            unclassified={mode === 'recorded' ? { count: recorded.unclassified } : null}
-          />
-        </svg>
+        {/* ── The picture ──
+            The ladder used to be a bare SVG here and the flow diagram was a
+            separate card below, which meant the gates were drawn twice: once
+            with counts and no context, once as a box labelled `rapid-llm-proxy`
+            standing in for all of them. They are one diagram now — the ladder IS
+            the proxy column, and each caller's edge lands on the gate that
+            decided it. */}
+        <FlowTab
+          data={flowData}
+          proxyBase={proxyBase}
+          hours={windowHours}
+          gates={{
+            rungs,
+            unit: mode === 'config' ? 'routes' : 'calls',
+            activeRung,
+            selectedRung,
+            onSelectRung: setSelectedRung,
+            unclassified: mode === 'recorded' ? { count: recorded.unclassified } : null,
+          }}
+        />
 
         {/* Which routes stopped where — full fidelity, on demand, off canvas. */}
         {mode === 'config' && selectedRung !== null && configRungs && (
