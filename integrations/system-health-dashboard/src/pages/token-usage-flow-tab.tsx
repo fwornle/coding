@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getProviderColor, normalizeProvider } from '@/lib/providers'
 import { normalizeModel } from '@/components/performance/models'
-import {
-  DecisionLadder, LADDER_HEADER, ladderHeight, rungCenterY,
-} from '@/components/llm-routing/decision-ladder'
+import { DecisionLadder, layoutLadder } from '@/components/llm-routing/decision-ladder'
 import type { LadderRung } from '@/components/llm-routing/decision-ladder'
 import { GATES, RUNG_OFFLOADED, describeTargets, evaluateOffload } from '@/components/llm-routing/offload-gates'
 import type { OffloadPolicy } from '@/components/llm-routing/offload-gates'
@@ -167,6 +165,8 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
   const [usage, setUsage] = useState<UsageRow[] | null>(null)
   const [usageError, setUsageError] = useState<string | null>(null)
   const [hover, setHover] = useState<string | null>(null)
+  // Folded runs the operator has opened, keyed by the run's first rung.
+  const [expandedRuns, setExpandedRuns] = useState<Set<number>>(new Set())
 
   // Traffic is fetched separately from config on purpose: if token_usage is
   // unreachable the graph still draws the configuration, just without weights.
@@ -325,13 +325,6 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
 
   const callerY = (i: number) => TOP + i * ROW_H
   const acctY = (i: number) => TOP + i * ROW_H
-  // The ladder can now be the tallest element, so it is part of the height
-  // budget rather than something assumed to fit between the two columns.
-  const colH = Math.max(callers.length, accounts.length) * ROW_H
-  const height = Math.max(colH, ladderHeight() + 8) + TOP + 40
-  const ladderY = TOP + Math.max(0, (colH - ladderHeight())) / 2
-  /** Absolute y of a rung's centre — where its edges attach. */
-  const rungY = (i: number) => ladderY + rungCenterY(i)
 
   // Config-mode rung counts are ROUTES, not nodes: a collapsed background node
   // stands for however many route keys it holds, and counting nodes would report
@@ -358,6 +351,49 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
 
   const ladderRungs = gates?.rungs ?? configRungs
   const ladderUnit = gates?.unit ?? 'routes'
+
+  /**
+   * Rows, folds and heights — one computation, shared by the ladder and by every
+   * edge that lands on it.
+   *
+   * The pinned set is the reason this is not internal to the ladder: a rung a
+   * selected call stopped at, or one the operator clicked, must keep its own row
+   * even at zero. Folding it would leave the highlight pointing at a row that is
+   * not on screen, which reads as a broken highlight rather than as a hidden row.
+   */
+  const layout = useMemo(() => layoutLadder(ladderRungs, {
+    pinned: [
+      // Every rung a caller actually routes into. In Recorded mode the counts
+      // are CALLS while the caller column is CONFIG, so a gate can read zero and
+      // still have routes arriving at it — three routes sit on `offload: false`
+      // whether or not any of them was called in the window. Without this the
+      // fold would swallow a gate with live edges pointing at it, and those edges
+      // would terminate on a row labelled "nothing reached".
+      ...callers.map(c => c.verdict.rung),
+      gates?.activeRung, gates?.selectedRung,
+    ].filter((r): r is number => r != null),
+    expanded: expandedRuns,
+  }), [ladderRungs, callers, gates?.activeRung, gates?.selectedRung, expandedRuns])
+
+  // The ladder can be the tallest element, so it is part of the height budget
+  // rather than something assumed to fit between the two columns.
+  const colH = Math.max(callers.length, accounts.length) * ROW_H
+  const height = Math.max(colH, layout.height + 8) + TOP + 40
+  const ladderY = TOP + Math.max(0, colH - layout.height) / 2
+  /**
+   * Absolute y where a rung's edges attach — the row that REPRESENTS it, which
+   * for a folded gate is the fold. An edge to a row that is not drawn is the one
+   * failure mode this whole indirection exists to prevent.
+   */
+  const rungY = (i: number) => ladderY + layout.centerFor(i)
+
+  const toggleRun = useCallback((runId: number) => {
+    setExpandedRuns(prev => {
+      const next = new Set(prev)
+      if (!next.delete(runId)) next.add(runId)
+      return next
+    })
+  }, [])
 
   /**
    * Rung exit → account, deduped by (rung, account) and weighted by traffic.
@@ -522,6 +558,9 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
             selectedRung={gates?.selectedRung ?? null}
             onSelectRung={gates?.onSelectRung}
             unclassified={gates?.unclassified ?? null}
+            layout={layout}
+            expandedRuns={expandedRuns}
+            onToggleRun={toggleRun}
           />
           {/* Right-aligned into the ladder's own header row. Centred under the
               title it sat on top of it — the header is one line, not two. */}
