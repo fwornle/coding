@@ -38,6 +38,7 @@ const execFileAsync = promisify(execFile);
 import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
+import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
 import { probeHttpHealth, probeTcpPort, PROBE_TIMEOUT_ERROR } from '../lib/utils/service-probe.js';
 import net from 'node:net';
 import http from 'node:http';
@@ -2220,6 +2221,12 @@ const NETWORK_PROBE_INTERVAL_MS = 15_000;
 // captive-portal check — fast, unauthenticated, and returns HTTP 200. Do NOT
 // use api.github.com here: it produces false "Internet Unreachable" errors in CN.
 const REACHABILITY_HOST = process.env.HEALTH_REACHABILITY_HOST || 'captive.apple.com';
+// The corporate host used to ask "is proxydetox still forwarding?" as opposed to
+// "can it reach the internet?" — the distinction the heal decision turns on.
+// Deliberately the SAME host the corporate-network detection below already dials
+// (dig at :2521, TCP latency at :2534): one name for one fact, so the two cannot
+// drift into disagreeing about which host means "corporate".
+const PAC_HOST = process.env.HEALTH_PAC_HOST || 'muc.proxy-pac.bmwgroup.net';
 
 // Sleep/wake detection: if time between ticks exceeds 3x TICK_MS, we likely woke from sleep
 let lastTickTimestamp = Date.now();
@@ -2335,15 +2342,67 @@ async function pollNetworkStatus() {
       functionalFailConfirmed =
         (netState.consecutive_functional_failures || 0) >= FUNCTIONAL_FAIL_THRESHOLD;
 
-      // Need kickstart if: port dead (hard signal) OR functional failure CONFIRMED
-      // over several consecutive probes (never on a single transient miss).
-      const needsKickstart = !portListening || (portListening && functionalFailConfirmed);
-      if (needsKickstart && portListening && functionalFailConfirmed) {
-        log(`network: proxy functional-probe failed ${netState.consecutive_functional_failures}x consecutively — treating as confirmed broken`, 'WARN');
+      // ── Cause classification (2026-08-30) ─────────────────────────────────
+      // The decision used to be `!portListening || functionalFailConfirmed`,
+      // i.e. made entirely from ONE signal: a proxied request to an external
+      // host. That signal is false whenever proxydetox is healthy and the
+      // network behind it is not — and the response, a kickstart, cannot fix a
+      // network-side cause. It logged `(network change?)`, and the `?` was the
+      // whole problem: on 2026-08-30 09:35 the socket was bound throughout,
+      // the daemon was never at fault, and three `coding --pi` launches failed
+      // during the heal window.
+      //
+      // Two extra probes run ONLY once the cheap signals have already failed
+      // (neededProbes), so the steady state costs nothing:
+      //   direct   — the same external host BYPASSING the proxy. Proves whether
+      //              the host has internet at all; valid on every network.
+      //   internal — a corporate host THROUGH the proxy. Proves the daemon is
+      //              still accepting, resolving and forwarding.
+      // `--noproxy ''` is required on the internal probe: NO_PROXY contains
+      // .bmwgroup.net, which would otherwise bypass the very path under test.
+      const curlOk = async (args) => {
+        try {
+          const { stdout } = await execFileAsync('curl', [
+            '-s', '--connect-timeout', '3', '--max-time', '5',
+            '-o', '/dev/null', '-w', '%{http_code}', ...args,
+          ], { timeout: 8000 });
+          return /^[23]\d\d$/.test(stdout.trim());
+        } catch { return false; }
+      };
+      const probes = neededProbes({ portListening, proxiedExternalOk: proxyFunctional });
+      let directExternalOk = null;
+      let proxiedInternalOk = null;
+      if (probes.direct) {
+        directExternalOk = await curlOk(['--noproxy', '*', `https://${REACHABILITY_HOST}`]);
+      }
+      if (probes.internal) {
+        proxiedInternalOk = await curlOk([
+          '--noproxy', '', '-x', 'http://127.0.0.1:3128', `http://${PAC_HOST}/`,
+        ]);
+      }
+
+      // netState.location is the PREVIOUS poll's verdict — it is recomputed
+      // further down this same function. That is deliberate and harmless: it
+      // only ever appears in the indeterminate log line, never in a heal/no-heal
+      // branch, so a stale value cannot change what we do.
+      const healVerdict = decideProxydetoxHeal({
+        portListening,
+        proxiedExternalOk: proxyFunctional,
+        directExternalOk,
+        proxiedInternalOk,
+        location: netState.location || null,
+        consecutiveFailures: netState.consecutive_functional_failures || 0,
+        failureThreshold: FUNCTIONAL_FAIL_THRESHOLD,
+      });
+      netState.proxy_heal_cause = healVerdict.cause;
+      netState.proxy_heal_reason = healVerdict.reason;
+
+      const needsKickstart = healVerdict.heal;
+      if (!needsKickstart && !proxyFunctional && portListening) {
+        log(`network: proxy probe failing but NOT healing — cause=${healVerdict.cause}: ${healVerdict.reason}`, 'WARN');
       }
       if (needsKickstart) {
-        const reason = !portListening ? 'port 3128 dead (stale socket)' : 'port alive but proxy not functional (network change?)';
-        log(`network: proxy intent=ON but ${reason} — kickstarting proxydetox`, 'WARN');
+        log(`network: kickstarting proxydetox — cause=${healVerdict.cause}: ${healVerdict.reason}`, 'WARN');
         try {
           // kickstart only works if the job is loaded; when the job was
           // unloaded (old px-off behavior did launchctl unload) fall back to

@@ -113,10 +113,29 @@ printf '%s' "$OPENCODE_CONFIG_CONTENT"
 // agent_pre_launch assigned before any splice ran.
 // ---------------------------------------------------------------------------
 
-test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE unset → OPENCODE_CONFIG_CONTENT is the bare empty object', () => {
-  const rendered = renderOpenCodeConfigContent({ INSIDE_CN: 'false' });
-  assert.equal(rendered, '{}',
-    'with no model override and no splices, the blob must be exactly {} — the value both splices prepend to');
+test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE unset → a provider block with band variants and nothing else', () => {
+  // RE-AIMED 2026-08-30. This asserted `rendered === '{}'`, which stopped being
+  // true when opencode gained a per-turn complexity band: `variants` on the
+  // rapid-proxy models is spliced UNCONDITIONALLY, because it is what lets
+  // `--variant cheap` reach routing as `reasoning_effort: low` -> band `small`.
+  // Before it existed, fg-chat/opencode was `from-caller` with no caller, so
+  // every turn fell to defaults.fg-chat (high) — 770 such rows since 2026-08-16.
+  //
+  // The guarantee worth keeping is NOT "the provider key never appears" but
+  // "the anthropic-native opt-in stays opt-in", which is asserted below and in
+  // the plugins case. The empty-object branch of _oc_splice_config is still
+  // exercised — it is the branch this very splice takes first.
+  const parsed = JSON.parse(renderOpenCodeConfigContent({ INSIDE_CN: 'false' }));
+  assert.deepEqual(Object.keys(parsed), ['provider'],
+    'with no model override and no plugins, the band variants must be the only content');
+  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy'],
+    'no anthropic entry may appear while OPENCODE_ANTHROPIC_NATIVE is unset');
+  for (const [id, model] of Object.entries(parsed.provider['rapid-proxy'].models)) {
+    assert.deepEqual(Object.keys(model.variants), ['cheap', 'standard', 'deep'],
+      `${id} must offer the three band variants`);
+    assert.equal(model.variants.cheap.reasoningEffort, 'low',
+      `${id}: cheap must map to the effort word EFFORT_TO_BAND reads as \`small\``);
+  }
 });
 
 test('opencode.sh: no network branch — INSIDE_CN true and false render identically', () => {
@@ -137,8 +156,15 @@ test('opencode.sh: CODING_OPENCODE_MODEL is the one way a model id reaches the b
     INSIDE_CN: 'false',
     CODING_OPENCODE_MODEL: 'rapid-proxy/claude-sonnet-5',
   });
-  assert.deepEqual(JSON.parse(rendered), { model: 'rapid-proxy/claude-sonnet-5' },
-    'the explicit override must be the whole blob when nothing else is spliced');
+  const parsed = JSON.parse(rendered);
+  assert.equal(parsed.model, 'rapid-proxy/claude-sonnet-5',
+    'the explicit override must survive the splices that run after it');
+  // RE-AIMED 2026-08-30 alongside the case above: the override is no longer the
+  // WHOLE blob, because the band variants are spliced unconditionally. What must
+  // still hold is that it is the only path by which a model id appears — a
+  // network branch reintroducing a pin is the regression this file defends.
+  assert.deepEqual(Object.keys(parsed).sort(), ['model', 'provider']);
+  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy']);
 });
 
 // ---------------------------------------------------------------------------
@@ -254,17 +280,23 @@ test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE=1 → LLM_CLI_PROXY_PORT respected;
 // them, while the five that named its pins went red.
 // ---------------------------------------------------------------------------
 
-test('opencode.sh: plugins spliced (CODING_REPO set) + flag unset → still no provider entry', () => {
+test('opencode.sh: plugins spliced (CODING_REPO set) + flag unset → still no anthropic provider entry', () => {
   const rendered = renderOpenCodeConfigContent({
     INSIDE_CN: 'false',
     CODING_REPO: REPO_ROOT,
   });
   const parsed = JSON.parse(rendered);
 
+  // RE-AIMED 2026-08-30: was `'provider' in parsed === false`. The unconditional
+  // band-variants splice puts a `provider` key there now, so the assertion moves
+  // to the property that actually encodes "the opt-in is still opt-in".
   assert.equal(
-    'provider' in parsed, false,
-    `no provider entry may be spliced while OPENCODE_ANTHROPIC_NATIVE is unset; got: ${rendered}`,
+    'anthropic' in (parsed.provider || {}), false,
+    `no anthropic provider entry may be spliced while OPENCODE_ANTHROPIC_NATIVE is unset; got: ${rendered}`,
   );
+  // Both splices ran and produced ONE valid object — the duplicate-"provider"-key
+  // bug this arrangement was restructured to avoid would show up right here.
+  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy']);
   // And the splice must actually have happened, or this test proves nothing.
   assert.ok(Array.isArray(parsed.plugin) && parsed.plugin.length > 0,
     'precondition: CODING_REPO set must splice the wrapper-scoped plugins');

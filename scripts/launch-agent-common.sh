@@ -538,8 +538,15 @@ configure_proxy_routing() {
       # could. The URL is copilot's only seam — it is already how task_id binds.
       #
       # SESSION-scoped, and that is the honest cost: the base URL is built once
-      # here. pi (--thinking) and opencode (x-complexity) declare per turn and
+      # here. pi (--thinking) and opencode (--variant) declare per turn and
       # remain strictly better. Unset = unchanged behaviour.
+      #
+      # This used to credit opencode with `x-complexity`. It never sent one: its
+      # rapid-proxy provider block has no `headers` key, and a provider-level
+      # header would be session-scoped anyway. The per-turn seam it actually has
+      # is `variants` — verified on a capture endpoint 2026-08-30, where
+      # `--variant cheap` put `reasoning_effort: "low"` on the wire and a bare
+      # run put no effort field at all. See config/agents/opencode.sh.
       #
       # Validated here as well as in the proxy so a typo fails at launch with a
       # readable message, rather than becoming a URL the proxy declines to match.
