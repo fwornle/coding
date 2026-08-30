@@ -162,7 +162,7 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
     Promise.all([
       fetch(`${proxyBase}/api/llm/routing/behaviour?hours=${encodeURIComponent(hours)}`).then(r => r.json()),
       fetch(`${proxyBase}/api/llm/routing`).then(r => r.json()),
-      fetch(`${proxyBase}/api/token-usage/recent?limit=200`).then(r => r.json()),
+      fetch(`${proxyBase}/api/token-usage/recent?limit=500`).then(r => r.json()),
     ])
       .then(([b, c, rec]) => {
         if (cancelled) return
@@ -364,6 +364,7 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         offloadSkips={behaviour.offloadSkips}
         offloadedCalls={behaviour.totals.offloaded_calls}
         windowHours={behaviour.window.hours}
+        recent={recent}
         onSaved={() => setReloadNonce(n => n + 1)}
       />
 

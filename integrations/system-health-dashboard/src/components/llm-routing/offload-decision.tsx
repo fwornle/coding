@@ -33,6 +33,12 @@ import { DecisionLadder, ladderHeight } from './decision-ladder'
 import type { LadderRung } from './decision-ladder'
 import { OffloadHeadline } from './offload-headline'
 import { useOffloadPolicyDraft } from './use-offload-policy-draft'
+import { CallStrip, stripRows } from './call-strip'
+import type { StripFilter } from './call-strip'
+import { CallDetail } from './call-detail'
+import { rungOfCall } from './recent-call'
+import type { RecentCall } from './recent-call'
+import { useIsDark } from '@/lib/colors'
 
 const BANDS = ['small', 'medium', 'high'] as const
 const LADDER_W = 640
@@ -47,6 +53,8 @@ export interface OffloadDecisionProps {
   offloadSkips: Array<{ reason: string; count: number }>
   offloadedCalls: number
   windowHours: number
+  /** The raw `/api/token-usage/recent` tail, newest first. Recorded mode only. */
+  recent: RecentCall[]
   /** Lets the page refetch its own halves once a save lands. */
   onSaved?: () => void
 }
@@ -89,10 +97,15 @@ async function pooled<T, R>(items: T[], width: number, fn: (t: T) => Promise<R>)
 }
 
 export function OffloadDecision({
-  proxyBase, routes, defaults, providers, offloadSkips, offloadedCalls, windowHours, onSaved,
+  proxyBase, routes, defaults, providers, offloadSkips, offloadedCalls, windowHours,
+  recent, onSaved,
 }: OffloadDecisionProps) {
   const policy = useOffloadPolicyDraft(proxyBase, onSaved)
+  const isDark = useIsDark()
   const [mode, setMode] = useState<'config' | 'recorded'>('config')
+  const [stripFilter, setStripFilter] = useState<StripFilter>('interesting')
+  const [routeFilter, setRouteFilter] = useState('all')
+  const [selectedCall, setSelectedCall] = useState<number | null>(null)
   const [resolved, setResolved] = useState<Record<string, Resolved> | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [selectedRung, setSelectedRung] = useState<number | null>(null)
@@ -223,6 +236,18 @@ export function OffloadDecision({
 
   const callsByRung = recorded.counts
 
+  // The rows the strip is showing, in its order, so an index from the slider
+  // means the same row here as it does there.
+  const shownCalls = useMemo(
+    () => stripRows(recent, stripFilter, routeFilter),
+    [recent, stripFilter, routeFilter],
+  )
+  const call = mode === 'recorded' && selectedCall != null ? shownCalls[selectedCall] ?? null : null
+  // Null when the row carries no verdict — a backfilled row, or one written
+  // before the decision was recorded. The ladder says so rather than lighting a
+  // rung it would have to guess.
+  const activeRung = call ? rungOfCall(call) : null
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -279,6 +304,7 @@ export function OffloadDecision({
             x={0} y={0} width={LADDER_W}
             rungs={rungs}
             unit={mode === 'config' ? 'routes' : 'calls'}
+            activeRung={activeRung}
             selectedRung={selectedRung}
             onSelectRung={setSelectedRung}
             unclassified={mode === 'recorded' ? { count: recorded.unclassified } : null}
@@ -294,6 +320,35 @@ export function OffloadDecision({
             </div>
             <div className="font-mono text-muted-foreground">
               {configRungs.members[selectedRung].join(', ') || '—'}
+            </div>
+          </div>
+        )}
+
+        {/* ── One call at a time ──
+            Recorded only: in Configuration there is no history to scrub, and the
+            ladder above is answering a question about routes rather than calls. */}
+        {mode === 'recorded' && (
+          <div className="border-t pt-2 space-y-2">
+            {call && activeRung === null && (
+              <div className="text-[11px] text-muted-foreground border-l-2 border-muted pl-2">
+                This call records no offload decision, so no rung is highlighted above — it was
+                written before the decision was recorded, or reconstructed afterwards. Inferring a
+                rung from today's config would describe today rather than the moment it was made.
+              </div>
+            )}
+            <div className="grid grid-cols-[1fr_320px] gap-3 items-start">
+              <CallStrip
+                rows={recent}
+                filter={stripFilter}
+                onFilterChange={setStripFilter}
+                routeFilter={routeFilter}
+                onRouteFilterChange={setRouteFilter}
+                selectedIndex={selectedCall}
+                onSelect={setSelectedCall}
+                isDark={isDark}
+                windowHours={windowHours}
+              />
+              <CallDetail call={call} />
             </div>
           </div>
         )}
