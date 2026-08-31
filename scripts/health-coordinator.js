@@ -39,7 +39,10 @@ import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
-import { reclassifyTimeoutAsUnknown, debounceDbStatus } from '../lib/network/probe-result-semantics.mjs';
+import {
+  reclassifyTimeoutAsUnknown, debounceDbStatus,
+  classifyProxyHttpFailure, isProxyRestartActionable,
+} from '../lib/network/probe-result-semantics.mjs';
 import { probeHttpHealth, probeTcpPort, PROBE_TIMEOUT_ERROR } from '../lib/utils/service-probe.js';
 import net from 'node:net';
 import http from 'node:http';
@@ -1183,8 +1186,8 @@ async function pollProxySemantic() {
     currentState.proxy.last_probe_end = probeEndedAt();
     if (!r.ok) {
       currentState.proxy.semantic_ok = false;
-      currentState.proxy.reason = `http_${r.status}`;
-      if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (http_${r.status})`, 'INFO');
+      currentState.proxy.reason = await classifyProxyErrorBody(r);
+      if (prevSemantic !== false) log(`proxy semantic_ok flip -> false (${currentState.proxy.reason})`, 'INFO');
       return;
     }
     let body;
@@ -1359,8 +1362,8 @@ async function pollProxySemanticStrong() {
     currentState.proxy.semantic_strong_last_probe_end = probeEndedAt();
     if (!r.ok) {
       currentState.proxy.semantic_strong_ok = false;
-      currentState.proxy.semantic_strong_reason = `http_${r.status}`;
-      if (prev !== false) log(`proxy semantic_strong_ok flip -> false (http_${r.status})`, 'INFO');
+      currentState.proxy.semantic_strong_reason = await classifyProxyErrorBody(r);
+      if (prev !== false) log(`proxy semantic_strong_ok flip -> false (${currentState.proxy.semantic_strong_reason})`, 'INFO');
       return;
     }
     let body;
@@ -1397,6 +1400,29 @@ async function pollProxySemanticStrong() {
   }
 }
 
+/**
+ * I/O half of classifyProxyHttpFailure: read the failed response's body, then
+ * let the pure classifier say what it is evidence of.
+ *
+ * Only 500s are read at all — every other status is already fully described by
+ * its code, and a body read on a 404 would be cost for nothing. The read is one
+ * small json() on a path that has already failed; an unparseable body arrives
+ * at the classifier as null and falls back to the plain http_<code>.
+ *
+ * @param {Response} r  a non-ok fetch Response
+ * @returns {Promise<string>} CONFIG_ERROR | 'http_<code>'
+ */
+async function classifyProxyErrorBody(r) {
+  if (r.status !== 500) return classifyProxyHttpFailure(r.status, null);
+  let body = null;
+  try {
+    body = await r.clone().json();
+  } catch {
+    // Not JSON, or already consumed. The classifier treats null as "unknown 500".
+  }
+  return classifyProxyHttpFailure(r.status, body);
+}
+
 // Recoverable-reason classifier shared between counter update + escalation.
 // network_*: DNS/fetch/socket failure — usually fixed by re-resolving env on
 //   restart. http_5xx: upstream/proxy temporary error — restart can clear
@@ -1405,6 +1431,9 @@ async function pollProxySemanticStrong() {
 //   'http_4xx' (rate limit / auth — upstream, restart won't help).
 function isStrongProbeReasonRecoverable(reason) {
   if (!reason) return false;
+  // The one 5xx a restart cannot fix. Checked BEFORE the 5xx rule below, which
+  // matches http_500 and would otherwise swallow it.
+  if (!isProxyRestartActionable(reason)) return false;
   if (reason.startsWith('network_')) return true;
   if (/^http_5\d\d$/.test(reason)) return true;
   return false;
@@ -1664,6 +1693,26 @@ function evaluateAutoHealFSM() {
   // NOT push to kickstart_timestamps (no cooldown debt) and do NOT dispatch.
    const reason = currentState.proxy.reason || '';
    const NON_ACTIONABLE_REASONS = new Set(['timeout', 'empty_content', 'oksub_missing']);
+   // The proxy is refusing every request because its routing YAML will not
+   // parse. Restarting cannot fix a syntax error, so a dispatch here is pure
+   // cost — see isProxyRestartActionable for the count.
+   //
+   // Checked BEFORE the recentProxyHeal override below, unlike the reasons in
+   // the set above: a stale socket after a network change is a plausible reason
+   // a timeout becomes actionable, and no reason at all for unparseable YAML to
+   // become parseable. There is no state of the machine in which this one is
+   // worth a kickstart.
+   //
+   // WARN, not INFO, because unlike the others this needs a human: nothing in
+   // the system will fix it, and until someone does, every LLM call on the
+   // machine is failing.
+   if (!isProxyRestartActionable(reason)) {
+     currentState.proxy.auto_heal_status = 'kickstart_pending';
+     log('proxy auto-heal: NOT kickstarting — the proxy is refusing every request because its '
+       + 'routing config will not parse. Restarting cannot fix that; fix the YAML. '
+       + `(consecutive_failures=${currentState.proxy.consecutive_failures})`, 'WARN');
+     return;
+   }
    const isHttpClientError = /^http_4\d\d$/.test(reason);
    // After a recent Proxydetox auto-heal (network change), the LLM proxy's HTTP
    // connections are stale. In that case, "timeout" / "empty_content" ARE actionable
