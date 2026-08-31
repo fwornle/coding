@@ -26,6 +26,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { OffloadPolicy } from './offload-gates'
 
+/**
+ * The `classifier` half of `GET /api/llm/routing`.
+ *
+ * Kept beside the offload policy rather than folded into it, because the two
+ * answer different questions and the gate ladder must not start depending on
+ * this one. The classifier decides WHICH BAND a turn is; the offload decides
+ * where a `small` band goes. They share a card because an operator reads them
+ * as one story — "cheap work runs on hardware we own" — and share a save
+ * because flipping one without the other is almost never what is meant.
+ */
+export interface ClassifierPolicy {
+  enabled: boolean
+  /** none | local-llm | http. `none` runs the free stages and downgrades nothing. */
+  impl: string
+  bands: string[]
+}
+
 /** The `semanticRouting` half of `GET /api/llm/routing`, as it arrives. */
 interface WireSemanticRouting {
   enabled: boolean
@@ -58,6 +75,12 @@ export interface OffloadPolicyDraft {
   setEnabled: (on: boolean) => void
   setTargetEnabled: (provider: string, on: boolean) => void
   setBandEligible: (band: string, on: boolean) => void
+
+  /** The classifier as the proxy has it, and as the operator is editing it. */
+  savedClassifier: ClassifierPolicy | null
+  classifier: ClassifierPolicy | null
+  setClassifierEnabled: (on: boolean) => void
+  setClassifierImpl: (impl: string) => void
 
   revert: () => void
   save: () => Promise<void>
@@ -92,6 +115,8 @@ function toPolicy(sr: WireSemanticRouting | null | undefined): OffloadPolicy | n
 export function useOffloadPolicyDraft(proxyBase: string, onSaved?: () => void): OffloadPolicyDraft {
   const [saved, setSaved] = useState<OffloadPolicy | null>(null)
   const [working, setWorking] = useState<OffloadPolicy | null>(null)
+  const [savedCls, setSavedCls] = useState<ClassifierPolicy | null>(null)
+  const [workingCls, setWorkingCls] = useState<ClassifierPolicy | null>(null)
   const [liveNetwork, setLiveNetwork] = useState<string>('public')
   const [networkOverride, setNetworkOverride] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -102,11 +127,25 @@ export function useOffloadPolicyDraft(proxyBase: string, onSaved?: () => void): 
     const d = await res.json()
     if (d.error) throw new Error(d.error)
     const policy = toPolicy(d.semanticRouting)
+    // A proxy that predates the classifier sends no such key. Treated as "off,
+    // no impl" rather than as an error: the card then renders the control
+    // disabled with an explanation, which is more use than a blank card.
+    const cls: ClassifierPolicy | null = d.classifier
+      ? {
+        enabled: d.classifier.enabled === true,
+        impl: String(d.classifier.impl ?? 'none'),
+        bands: [...(d.classifier.bands ?? [])],
+      }
+      : null
     setSaved(policy)
+    setSavedCls(cls)
     setLiveNetwork(d.runtime?.network ?? 'public')
     // A refetch must not throw away an edit in progress. Only the first load,
     // and an explicit revert, adopt the server's answer as the working copy.
-    if (adoptIntoWorkingCopy) setWorking(policy ? structuredClone(policy) : null)
+    if (adoptIntoWorkingCopy) {
+      setWorking(policy ? structuredClone(policy) : null)
+      setWorkingCls(cls ? structuredClone(cls) : null)
+    }
   }, [proxyBase])
 
   useEffect(() => {
@@ -116,9 +155,13 @@ export function useOffloadPolicyDraft(proxyBase: string, onSaved?: () => void): 
     return () => { cancelled = true }
   }, [load])
 
+  // One `dirty` across both halves, because there is one Save. A classifier
+  // edit that did not light up the preview badge would be saved by a button the
+  // operator pressed for a different reason.
   const dirty = useMemo(
-    () => !!saved && !!working && JSON.stringify(saved) !== JSON.stringify(working),
-    [saved, working],
+    () => (!!saved && !!working && JSON.stringify(saved) !== JSON.stringify(working))
+      || JSON.stringify(savedCls) !== JSON.stringify(workingCls),
+    [saved, working, savedCls, workingCls],
   )
 
   const edit = useCallback((fn: (p: OffloadPolicy) => OffloadPolicy) => {
@@ -144,10 +187,19 @@ export function useOffloadPolicyDraft(proxyBase: string, onSaved?: () => void): 
     }))
   }, [edit])
 
+  const setClassifierEnabled = useCallback((on: boolean) => {
+    setWorkingCls(c => (c ? { ...c, enabled: on } : c))
+  }, [])
+
+  const setClassifierImpl = useCallback((impl: string) => {
+    setWorkingCls(c => (c ? { ...c, impl } : c))
+  }, [])
+
   const revert = useCallback(() => {
     setWorking(saved ? structuredClone(saved) : null)
+    setWorkingCls(savedCls ? structuredClone(savedCls) : null)
     setError(null)
-  }, [saved])
+  }, [saved, savedCls])
 
   const save = useCallback(async () => {
     if (!working) return
@@ -159,7 +211,10 @@ export function useOffloadPolicyDraft(proxyBase: string, onSaved?: () => void): 
       const res = await fetch(`${proxyBase}/api/llm/routing`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ semanticRouting: working }),
+        // Both halves in one PATCH, so a rejected classifier cannot leave the
+        // offload half written: the proxy validates the whole candidate document
+        // before either file is touched.
+        body: JSON.stringify({ semanticRouting: working, ...(workingCls ? { classifier: workingCls } : {}) }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || body?.error) throw new Error(body?.error || `save failed (HTTP ${res.status})`)
@@ -172,7 +227,7 @@ export function useOffloadPolicyDraft(proxyBase: string, onSaved?: () => void): 
     } finally {
       setSaving(false)
     }
-  }, [proxyBase, working, load, onSaved])
+  }, [proxyBase, working, workingCls, load, onSaved])
 
   return {
     saved,
@@ -186,6 +241,10 @@ export function useOffloadPolicyDraft(proxyBase: string, onSaved?: () => void): 
     setEnabled,
     setTargetEnabled,
     setBandEligible,
+    savedClassifier: savedCls,
+    classifier: workingCls,
+    setClassifierEnabled,
+    setClassifierImpl,
     revert,
     save,
     saving,
