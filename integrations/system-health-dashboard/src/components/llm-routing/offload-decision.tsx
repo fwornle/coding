@@ -44,6 +44,18 @@ import { useIsDark } from '@/lib/colors'
 
 const BANDS = ['small', 'medium', 'high'] as const
 
+/**
+ * The stage-2 implementations the proxy knows. A hardcoded switch there, so a
+ * hardcoded list here — a dropdown that offered an impl the loader refuses
+ * would turn a typo into a rejected save with a YAML error message.
+ *
+ * `none` is not a disabled state. It runs the free structural gates and the
+ * cheap veto and then downgrades nothing, which is the honest first step when
+ * turning this on: you find out how much traffic is even eligible before any
+ * model is asked anything.
+ */
+const CLASSIFIER_IMPLS = ['none', 'local-llm', 'http']
+
 const fmt = (n: number): string => (
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
     : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K`
@@ -232,6 +244,10 @@ export function OffloadDecision({
   }, [counterfactual, perRoute, routes, defaults, policy.draft, policy.network, fgCapable])
 
   const p = policy.draft
+  // The classifier half of the same draft. Separate from `p` on purpose: the
+  // gate ladder below evaluates the offload policy and must not start reading
+  // this, or a classifier edit would silently redraw counts it does not govern.
+  const cls = policy.classifier
   const rungs: LadderRung[] = useMemo(() => {
     const counts = mode === 'config'
       ? (configRungs?.counts ?? new Array(GATES.length).fill(0))
@@ -501,6 +517,41 @@ export function OffloadDecision({
             control that silently reinterprets history is worse than no control. */}
         {mode === 'config' && p && (
           <div className="border-t pt-2 space-y-2 text-xs">
+            {/* ── Step 1: what band is this? ──
+                Above the offload controls because it runs first and because it
+                is the half that changes what "small work" MEANS here. The
+                offload can only move a band it is given; before the classifier
+                existed, that band came from whatever slider the agent happened
+                to be on — which is why pi's every turn arrived `medium` and was
+                ineligible no matter how trivial the question. */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-1.5"
+                title={cls ? undefined : 'this proxy build does not expose a classifier'}>
+                <input type="checkbox" className="accent-primary" disabled={!cls}
+                  checked={!!cls?.enabled}
+                  onChange={e => policy.setClassifierEnabled(e.target.checked)} />
+                <span>classify prompts</span>
+              </label>
+
+              <span className="text-muted-foreground">via:</span>
+              <select
+                className="bg-transparent border rounded px-1 py-0.5 font-mono text-[11px]"
+                disabled={!cls || !cls.enabled}
+                value={cls?.impl ?? 'none'}
+                onChange={e => policy.setClassifierImpl(e.target.value)}
+              >
+                {CLASSIFIER_IMPLS.map(i => <option key={i} value={i}>{i}</option>)}
+              </select>
+
+              <span className="text-muted-foreground">
+                {!cls?.enabled
+                  ? 'the caller\u2019s own band decides, as it did before'
+                  : cls.impl === 'none'
+                    ? 'on, but no judge \u2014 the free stages run and nothing is downgraded'
+                    : `may lower a band to [${cls.bands.join(', ')}], never raise one`}
+              </span>
+            </div>
+
             <div className="flex items-center gap-3 flex-wrap">
               <label className="flex items-center gap-1.5">
                 <input type="checkbox" className="accent-primary" checked={p.enabled}
