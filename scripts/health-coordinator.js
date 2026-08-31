@@ -254,6 +254,18 @@ const currentState = {
     failed: 0,                           // verdicts that errored (fail-open: band kept)
     last_poll: null,                     // ISO; null means never successfully polled
   },
+  // What actually ran on hardware we own. Deliberately NOT folded into
+  // `classifier` above: a turn the classifier downgraded usually still runs on
+  // a metered account (off-VPN, `small` resolves to gh-copilot/haiku), and the
+  // background services that DO reach a local box were never classified at all
+  // because their band is fixed in config. Different sets, different counters.
+  // Counted by the proxy against the provider that ANSWERED, so a failed
+  // offload that fell back to a paid account is not counted as local.
+  execution: {
+    completions: 0,                      // successful completions since proxy boot
+    local: 0,                            // of those, served by an on-device/on-prem account
+    last_poll: null,                     // ISO; null means never successfully polled
+  },
   proxy: {
     semantic_ok: null,                   // null until first probe; true|false after — cheap haiku/copilot probe (drives auto-heal FSM)
     last_round_trip_ms: null,            // int, last completion latency
@@ -1142,6 +1154,36 @@ async function pollClassifierStats() {
   } catch {
     // A proxy that is down is already reported by the semantic probe and the
     // service list. Reporting it a third time here would only add noise.
+  }
+}
+
+/**
+ * Read the proxy's local-execution counters.
+ *
+ * Its own GET rather than a field on the classifier's, for the same reason the
+ * proxy serves them separately: the classifier can be OFF while this still has
+ * something to report — a `small` band fixed in config offloads to a local box
+ * without any verdict being sought — and reading them together would hide that
+ * behind an `enabled: false`.
+ *
+ * Same failure contract as pollClassifierStats: a failed poll leaves the
+ * previous numbers and clears nothing, because the counters only ever grow
+ * between proxy restarts. A stale read undercounts; it cannot mislead.
+ */
+async function pollExecutionStats() {
+  try {
+    const r = await fetch(`${PROXY_URL}/api/llm/execution/stats`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!r.ok) return;
+    const j = await r.json();
+    currentState.execution = {
+      completions: Number(j.completions ?? 0),
+      local: Number(j.local ?? 0),
+      last_poll: new Date().toISOString(),
+    };
+  } catch {
+    // Covered by the semantic probe and the service list; see above.
   }
 }
 
@@ -2945,6 +2987,7 @@ async function runAllChecks() {
     // the semantic probe is being SKIPPED, which is exactly when real traffic is
     // flowing and the classifier is doing something.
     await pollClassifierStats();
+    await pollExecutionStats();
 
     let _realCallAgeMs = null;
     try {
