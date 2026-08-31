@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 
 import {
   reclassifyTimeoutAsUnknown, debounceDbStatus, TIMEOUT_ERROR,
+  classifyProxyHttpFailure, isProxyRestartActionable, CONFIG_ERROR,
 } from '../../lib/network/probe-result-semantics.mjs';
 
 const timedOut = { status: 'stopped', latency_ms: null, error: TIMEOUT_ERROR };
@@ -124,5 +125,74 @@ describe('the database status is debounced, like the proxy check next door', () 
   it('treats a missing previous count as zero rather than NaN', () => {
     assert.equal(debounceDbStatus(false, undefined).failures, 1);
     assert.equal(debounceDbStatus(false, null).failures, 1);
+  });
+});
+
+// ── The one 5xx a restart can never fix ──────────────────────────────────────
+//
+// On 2026-08-31 the proxy was left with an unparseable llm-routing.yaml. It did
+// what it is designed to do — refused to serve on a routing policy it cannot
+// read — and answered 500 ROUTING_CONFIG_ERROR to everything. The coordinator
+// read that as a sick proxy and dispatched a kickstart, which restarted a
+// process that re-read the same broken file and refused identically. Counted
+// over the coordinator's log: 158 such 500s across five distinct config
+// mistakes, every one of them remediated by an action that could not possibly
+// have worked.
+//
+// The cost was not only the wasted restart. Three probe paths (cheap, its retry,
+// and the strong-probe escalation) all fired off the same underlying failure and
+// spent the entire 3-kickstarts-per-300s budget in 68ms — so a GENUINE proxy
+// fault in the following five minutes would have found no remediation left.
+describe('a proxy that will not parse its config is not a proxy a restart can fix', () => {
+  const configErrBody = { error: 'routing config unusable: ...', type: 'ROUTING_CONFIG_ERROR' };
+
+  it('names the config error apart from every other 500', () => {
+    assert.equal(classifyProxyHttpFailure(500, configErrBody), CONFIG_ERROR);
+  });
+
+  it('and only that one is written off — an unlabelled 500 stays http_500', () => {
+    // The safe direction to be wrong in: an unrecognised 500 keeps its
+    // remediation rather than being silently dismissed as an author's typo.
+    assert.equal(classifyProxyHttpFailure(500, null), 'http_500');
+    assert.equal(classifyProxyHttpFailure(500, {}), 'http_500');
+    assert.equal(classifyProxyHttpFailure(500, { type: 'SOMETHING_ELSE' }), 'http_500');
+  });
+
+  it('a body that cannot be parsed arrives as null and keeps the status reason', () => {
+    // The caller passes null when json() throws. It must not be mistaken for a
+    // config error just because the status matched.
+    assert.equal(classifyProxyHttpFailure(500, undefined), 'http_500');
+  });
+
+  it('never claims a config error on a status that cannot carry one', () => {
+    // The proxy answers ROUTING_CONFIG_ERROR with 500 and nothing else. A body
+    // carrying that type on another status is not this fault, and treating it
+    // as one would disable remediation for a genuine 502/503.
+    for (const status of [400, 404, 429, 502, 503]) {
+      assert.equal(classifyProxyHttpFailure(status, configErrBody), `http_${status}`);
+    }
+  });
+
+  it('marks the config error non-actionable', () => {
+    assert.equal(isProxyRestartActionable(CONFIG_ERROR), false);
+  });
+
+  it('leaves every OTHER reason actionable — this narrows the set by exactly one', () => {
+    // The regression that matters in the other direction: a change here that
+    // over-reaches would stop the coordinator healing faults it currently fixes.
+    for (const reason of [
+      'http_500', 'http_502', 'http_503', 'http_429', 'http_401',
+      'network_fetch failed', 'timeout', 'empty_content', 'oksub_missing', '',
+    ]) {
+      assert.equal(isProxyRestartActionable(reason), true, `${reason} must stay actionable`);
+    }
+  });
+
+  it('the classify -> actionable path is closed end to end', () => {
+    // The property the coordinator actually depends on: a 500 whose body says
+    // ROUTING_CONFIG_ERROR must reach the FSM as something it will not restart
+    // on, and an identical 500 without that body must not.
+    assert.equal(isProxyRestartActionable(classifyProxyHttpFailure(500, configErrBody)), false);
+    assert.equal(isProxyRestartActionable(classifyProxyHttpFailure(500, null)), true);
   });
 });

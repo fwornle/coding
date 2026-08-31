@@ -1127,6 +1127,31 @@ class CombinedStatusLine {
     };
   }
 
+  /**
+   * Completions served on hardware we own, since the proxy started.
+   *
+   * No `enabled` gate, unlike getClassifierStatus: there is no switch for this.
+   * A machine that never routes anything local simply reports zero forever, and
+   * the caller hides the badge on zero.
+   *
+   * Reads the coordinator state the rest of this line already fetched, so it
+   * costs no extra request.
+   *
+   * @returns {Promise<{local: number, completions: number}|null>} null if the
+   *   coordinator is unreachable or has not polled the proxy yet.
+   */
+  async getExecutionStatus() {
+    const result = await this.getCoordinatorState();
+    if (!result.ok) return null;
+    const e = result.state.execution;
+    // last_poll null means the coordinator has never successfully read the
+    // proxy's counters — zeroes then are an absence of data, not a measurement
+    // of zero, and rendering them as one would be the same mistake [D:] was
+    // fixed for.
+    if (!e || !e.last_poll) return null;
+    return { local: Number(e.local || 0), completions: Number(e.completions || 0) };
+  }
+
   async getNetworkStatus() {
     // Network environment detection from health coordinator.
     // Drives [N:...] and [P:...] badges in the statusline.
@@ -2482,8 +2507,8 @@ class CombinedStatusLine {
     // reach qwen-local (observation-writer, health-coordinator) were never
     // classified — their band is fixed in config — so they are absent from this
     // count entirely. "How much ran on our own hardware" is a real and
-    // different question; it needs its own counter off the provider column,
-    // not this one wearing a misleading letter.
+    // different question, and it has its own counter and its own badge — [L:],
+    // added below off the provider that actually answered.
     //
     // Not `C` either — the project-letter badge already opens `[C` on this
     // machine, and two badges that start the same way are two badges nobody
@@ -2497,6 +2522,30 @@ class CombinedStatusLine {
     {
       const cls = await this.getClassifierStatus();
       if (cls) parts.push(`[D:${cls.downgraded}]`);
+    }
+
+    // Local execution: how many completions since the proxy started were served
+    // by hardware we run ourselves — qwen-laptop (this Mac, under llama.cpp) or
+    // qwen-local (the on-prem cluster). Both are unmetered and neither sends the
+    // prompt off our network, which is the property being counted; that one is
+    // this machine and the other a rack on the corporate LAN is not the
+    // distinction [L:] is drawing.
+    //
+    // This is the counter [D:] deliberately is not. It is read off the provider
+    // that ANSWERED, so an offload that timed out at 20s and fell back to
+    // gh-copilot does not appear here — the work ran on a paid account, whatever
+    // the route intended.
+    //
+    // Hidden at zero rather than shown as [L:0]. Off VPN with the laptop target
+    // off — the default — zero is the correct and permanent answer, and a badge
+    // that is always [L:0] is a line of noise on every render. When it is
+    // non-zero it is telling you something happened.
+    //
+    // Never colours the line, for the same reason [D:] does not: no local
+    // execution is not a fault. It usually means no eligible traffic.
+    {
+      const ex = await this.getExecutionStatus();
+      if (ex && ex.local > 0) parts.push(`[L:${ex.local}]`);
     }
 
     // Phase 34 (D-12): proxy semantic readiness drives [🧠] badge.
