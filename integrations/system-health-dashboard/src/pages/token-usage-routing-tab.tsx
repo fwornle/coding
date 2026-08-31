@@ -206,6 +206,24 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         const total = rows.reduce((s, r) => s + r.calls, 0)
         const offPlan = rows.filter(r => declared && r.provider !== declared)
           .reduce((s, r) => s + r.calls, 0)
+
+        // An offload has two possible endings and the raw `offloaded_calls`
+        // total cannot tell them apart — a route that moved 6 calls to the
+        // local box and one that tried 6 and got all 6 back both read "6".
+        // Which happened is decided by WHERE the offloaded call was finally
+        // served: on a provider the route does not declare, it landed; back on
+        // the declared one, it bounced.
+        const moved = rows.filter(r => declared && r.provider !== declared)
+          .reduce((s, r) => s + r.offloaded_calls, 0)
+        const bounced = rows.filter(r => !declared || r.provider === declared)
+          .reduce((s, r) => s + r.offloaded_calls, 0)
+        // Fallbacks a bounced offload does not account for: a provider that
+        // simply failed. Zero across the board today, which is worth being able
+        // to SEE rather than infer — it is what makes `moved + bounced` equal
+        // the old Offload column, and that identity is a coincidence of the
+        // window, not a property of the columns.
+        const fellBack = Math.max(0, rows.reduce((s, r) => s + r.fallback_calls, 0) - bounced)
+
         return {
           key,
           declared: declared ?? '—',
@@ -213,8 +231,14 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
           offPlan,
           rows: rows.sort((a, b) => b.calls - a.calls),
           tokens: rows.reduce((s, r) => s + r.tokens, 0),
-          fallbacks: rows.reduce((s, r) => s + r.fallback_calls, 0),
-          offloaded: rows.reduce((s, r) => s + r.offloaded_calls, 0),
+          moved,
+          bounced,
+          fellBack,
+          // Where the moved calls went. One target in practice, but the shape
+          // allows more and naming it beats making the reader scan the
+          // provider list to find out which local box answered.
+          movedTo: [...new Set(rows.filter(r => declared && r.provider !== declared && r.offloaded_calls > 0)
+            .map(r => r.provider))],
           reconstructed: rows.reduce((s, r) => s + r.reconstructed_calls, 0),
         }
       })
@@ -382,8 +406,11 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
           <CardTitle className="text-sm">
             Observed — what each route actually did
             <span className="block text-[11px] font-normal text-muted-foreground mt-0.5">
-              “Declared” is the provider the config names. A route with traffic on any other
-              provider took a fallback or an offload — recorded, not inferred.
+              “Declared” is the provider the config names. <b>Moved</b> — the offload placed the
+              call on a local box and it answered there. <b>Bounced</b> — it tried, the local box
+              failed, and the work came back to the declared account: the round-trip was spent and
+              nothing changed. <b>Fell back</b> — a provider failed for some other reason.
+              Recorded, not inferred.
             </span>
           </CardTitle>
         </CardHeader>
@@ -397,8 +424,9 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                   <th className="text-left px-3 py-1.5 font-medium">Actually served by</th>
                   <th className="text-right px-3 py-1.5 font-medium">Calls</th>
                   <th className="text-right px-3 py-1.5 font-medium">Tokens</th>
-                  <th className="text-right px-3 py-1.5 font-medium">Fallback</th>
-                  <th className="text-right px-3 py-1.5 font-medium">Offload</th>
+                  <th className="text-right px-3 py-1.5 font-medium">Moved</th>
+                  <th className="text-right px-3 py-1.5 font-medium">Bounced</th>
+                  <th className="text-right px-3 py-1.5 font-medium">Fell back</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,10 +452,22 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{fmt(r.total)}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{fmt(r.tokens)}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
-                      {r.fallbacks ? <span className="text-amber-600 dark:text-amber-500">{fmt(r.fallbacks)}</span> : '—'}
+                    <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
+                      {r.moved ? (
+                        <span className="text-emerald-600 dark:text-emerald-500">
+                          {fmt(r.moved)}
+                          <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                            → {r.movedTo.join(', ')}
+                          </span>
+                        </span>
+                      ) : '—'}
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{r.offloaded ? fmt(r.offloaded) : '—'}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {r.bounced ? <span className="text-amber-600 dark:text-amber-500">{fmt(r.bounced)}</span> : '—'}
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {r.fellBack ? <span className="text-amber-600 dark:text-amber-500">{fmt(r.fellBack)}</span> : '—'}
+                    </td>
                   </tr>
                 ))}
                 {divergent.length === 0 && (
