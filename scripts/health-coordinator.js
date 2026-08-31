@@ -237,6 +237,20 @@ const currentState = {
   // after a successful POST /api/complete round-trip with content containing
   // "OK". networkMode mirrors the proxy's published value (vpn|public|unknown).
   // auto_heal_status follows D-06 cooldown FSM (wired in Plan 34-03).
+  // Prompt-complexity classifier — what it has DONE, not whether it is
+  // configured. Polled from the proxy's own in-process counters, which reset
+  // when it restarts; that is deliberate (see the endpoint's comment), and it
+  // is what makes these safe to render on a surface that refreshes on its own
+  // schedule. `downgraded` only ever grows between restarts, so a stale read
+  // undercounts and can never show the wrong state.
+  classifier: {
+    enabled: false,                      // config says on AND impl is not 'none'
+    impl: 'none',                        // none | local-llm | service
+    downgraded: 0,                       // turns moved to a cheaper band since proxy boot
+    asked: 0,                            // turns a verdict was actually sought for
+    failed: 0,                           // verdicts that errored (fail-open: band kept)
+    last_poll: null,                     // ISO; null means never successfully polled
+  },
   proxy: {
     semantic_ok: null,                   // null until first probe; true|false after — cheap haiku/copilot probe (drives auto-heal FSM)
     last_round_trip_ms: null,            // int, last completion latency
@@ -1095,6 +1109,39 @@ function evaluateObsApiAutoHeal() {
  *   - HTTP 200 + content contains 'OK'     -> reason=null,              semantic_ok=true
  * NEVER silently 'healthy' on error (Pattern A); always sets last_probe_end.
  */
+/**
+ * Read the classifier's counters off the proxy.
+ *
+ * Its own tiny GET rather than a field on the semantic probe, because that
+ * probe deliberately does NOT run when recent real traffic already proves the
+ * proxy healthy — and the counters are most interesting exactly then. Cheap
+ * enough to run unconditionally: no disk, no model, no LLM call.
+ *
+ * Failure leaves the previous numbers and clears nothing. A proxy restart
+ * resets the counters at the source, which shows up here as the figure going
+ * DOWN — the one non-monotonic transition, and the one worth seeing.
+ */
+async function pollClassifierStats() {
+  try {
+    const r = await fetch(`${PROXY_URL}/api/llm/classifier/stats`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!r.ok) return;
+    const j = await r.json();
+    currentState.classifier = {
+      enabled: j.enabled === true,
+      impl: String(j.impl ?? 'none'),
+      downgraded: Number(j.downgraded ?? 0),
+      asked: Number(j.asked ?? 0),
+      failed: Number(j.failed ?? 0),
+      last_poll: new Date().toISOString(),
+    };
+  } catch {
+    // A proxy that is down is already reported by the semantic probe and the
+    // service list. Reporting it a third time here would only add noise.
+  }
+}
+
 async function pollProxySemantic() {
   try {
     const probeEndedAt = () => new Date().toISOString();
@@ -2845,6 +2892,11 @@ async function runAllChecks() {
     // proof of /api/complete liveness than a synthetic say-OK. Only when the
     // pipeline is quiet does the synthetic probe fire — which is exactly the
     // "ping every now and then" cadence the probe exists to provide.
+    // Unconditional and outside the branch below: the counters matter most when
+    // the semantic probe is being SKIPPED, which is exactly when real traffic is
+    // flowing and the classifier is doing something.
+    await pollClassifierStats();
+
     let _realCallAgeMs = null;
     try {
       _realCallAgeMs = await fetchLastRealProxyCallAge();

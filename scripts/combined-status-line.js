@@ -1099,6 +1099,34 @@ class CombinedStatusLine {
     };
   }
 
+  /**
+   * What the prompt classifier has DONE, from state.classifier at /health/state.
+   *
+   * Deliberately a cumulative count and not a "last call was downgraded" light.
+   * A downgrade is an EVENT; a status line is a surface that redraws on its own
+   * schedule, and an event indicator on it is stale the moment it renders and
+   * flickers in between. A counter is monotonic between proxy restarts, so a
+   * stale read UNDERCOUNTS — a completely different failure from showing the
+   * wrong state, and a harmless one.
+   *
+   * Returns null when there is nothing worth a badge: no coordinator, no slice,
+   * or a classifier that is switched off. The badge then disappears entirely
+   * rather than rendering a permanent zero, which keeps the line's scarce width
+   * for things that are actually happening.
+   */
+  async getClassifierStatus() {
+    const result = await this.getCoordinatorState();
+    if (!result.ok) return null;
+    const c = result.state.classifier;
+    if (!c || c.enabled !== true) return null;
+    return {
+      downgraded: Number(c.downgraded || 0),
+      asked: Number(c.asked || 0),
+      failed: Number(c.failed || 0),
+      impl: c.impl,
+    };
+  }
+
   async getNetworkStatus() {
     // Network environment detection from health coordinator.
     // Drives [N:...] and [P:...] badges in the statusline.
@@ -2440,6 +2468,24 @@ class CombinedStatusLine {
         // On CN/VPN without a working local proxy — external APIs unreachable
         if (overallColor === 'green') overallColor = 'yellow';
       }
+    }
+
+    // Prompt classifier: how many turns it has moved to a cheaper band since
+    // the proxy started. Absent entirely when the classifier is off, so this
+    // costs nothing on a machine that does not use it.
+    //
+    // `v` (for "verdicts"), not `C` — the project-letter badge already opens
+    // with `[C` on this machine and two badges that start the same way are two
+    // badges nobody reads. ASCII for the same reason [N:] and [P:] are: the
+    // arrow that would read better here is ambiguous-width and this line has
+    // lost a fight with wcwidth before.
+    //
+    // Never colours the line. A classifier that has downgraded nothing is not a
+    // fault — it may simply have seen no eligible traffic — and a badge that
+    // could turn the line yellow on an absence would cry wolf every quiet hour.
+    {
+      const cls = await this.getClassifierStatus();
+      if (cls) parts.push(`[v:${cls.downgraded}]`);
     }
 
     // Phase 34 (D-12): proxy semantic readiness drives [🧠] badge.

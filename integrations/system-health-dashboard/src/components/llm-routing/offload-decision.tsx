@@ -45,16 +45,40 @@ import { useIsDark } from '@/lib/colors'
 const BANDS = ['small', 'medium', 'high'] as const
 
 /**
- * The stage-2 implementations the proxy knows. A hardcoded switch there, so a
- * hardcoded list here — a dropdown that offered an impl the loader refuses
- * would turn a typo into a rejected save with a YAML error message.
+ * The stage-2 implementations the proxy knows, and what each one MEANS.
  *
- * `none` is not a disabled state. It runs the free structural gates and the
- * cheap veto and then downgrades nothing, which is the honest first step when
- * turning this on: you find out how much traffic is even eligible before any
- * model is asked anything.
+ * A hardcoded switch there, so a hardcoded list here — a dropdown offering an
+ * impl the loader refuses would turn a typo into a rejected save with a YAML
+ * parse error for a message.
+ *
+ * The axis is WHO OWNS THE RUBRIC, not how the bytes travel: both working impls
+ * speak HTTP to an OpenAI-ish endpoint, which is why the third was renamed from
+ * `http` (it named the one thing they have in common) to `service` on
+ * 2026-08-31. The proxy still accepts the old spelling with a warning, so a
+ * config written before the rename keeps working.
+ *
+ * The blurb is rendered beside the dropdown rather than hidden in a tooltip,
+ * because the difference between these three is a policy decision — where the
+ * judgement lives — and a reader who has to hover to find that out will pick by
+ * the name alone. Which is precisely how `http` got chosen for a year.
  */
-const CLASSIFIER_IMPLS = ['none', 'local-llm', 'http']
+const CLASSIFIER_IMPLS: Array<{ value: string; means: string }> = [
+  {
+    value: 'none',
+    means: 'no judge — the free gates run and nothing is ever downgraded. '
+      + 'Not the same as switching this off: it shows you how much traffic is eligible.',
+  },
+  {
+    value: 'local-llm',
+    means: 'the proxy judges — it holds the rubric and asks a model directly. '
+      + 'Fewest moving parts; changing the rubric means restarting the proxy.',
+  },
+  {
+    value: 'service',
+    means: 'a separate service judges — the proxy sends the text and takes the word back. '
+      + 'Rubric, model and what “small” means live at the other end.',
+  },
+]
 
 const fmt = (n: number): string => (
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
@@ -540,17 +564,23 @@ export function OffloadDecision({
                 value={cls?.impl ?? 'none'}
                 onChange={e => policy.setClassifierImpl(e.target.value)}
               >
-                {CLASSIFIER_IMPLS.map(i => <option key={i} value={i}>{i}</option>)}
+                {CLASSIFIER_IMPLS.map(i => <option key={i.value} value={i.value}>{i.value}</option>)}
               </select>
 
               <span className="text-muted-foreground">
                 {!cls?.enabled
                   ? 'the caller\u2019s own band decides, as it did before'
-                  : cls.impl === 'none'
-                    ? 'on, but no judge \u2014 the free stages run and nothing is downgraded'
-                    : `may lower a band to [${cls.bands.join(', ')}], never raise one`}
+                  : (CLASSIFIER_IMPLS.find(i => i.value === cls.impl)?.means
+                    ?? `unrecognised impl \u201c${cls.impl}\u201d`)}
               </span>
             </div>
+
+            {cls?.enabled && cls.impl !== 'none' && (
+              <div className="text-muted-foreground pl-[1.35rem]">
+                A verdict may only lower a band to [{cls.bands.join(', ')}] — never raise one, so
+                the caller’s own band stays a ceiling.
+              </div>
+            )}
 
             <div className="flex items-center gap-3 flex-wrap">
               <label className="flex items-center gap-1.5">
