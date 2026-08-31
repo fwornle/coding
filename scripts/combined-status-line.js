@@ -2474,18 +2474,29 @@ class CombinedStatusLine {
     // the proxy started. Absent entirely when the classifier is off, so this
     // costs nothing on a machine that does not use it.
     //
-    // `v` (for "verdicts"), not `C` — the project-letter badge already opens
-    // with `[C` on this machine and two badges that start the same way are two
-    // badges nobody reads. ASCII for the same reason [N:] and [P:] are: the
-    // arrow that would read better here is ambiguous-width and this line has
-    // lost a fight with wcwidth before.
+    // `D` for downgrades. NOT `L` for "local": the two are different sets, and
+    // labelling this one `L` would state something false. Off VPN with the
+    // laptop target switched off — the current default — a downgraded turn goes
+    // to gh-copilot/claude-haiku-4.5, a cheaper METERED model, and nothing runs
+    // locally at all. In the other direction, the background services that do
+    // reach qwen-local (observation-writer, health-coordinator) were never
+    // classified — their band is fixed in config — so they are absent from this
+    // count entirely. "How much ran on our own hardware" is a real and
+    // different question; it needs its own counter off the provider column,
+    // not this one wearing a misleading letter.
+    //
+    // Not `C` either — the project-letter badge already opens `[C` on this
+    // machine, and two badges that start the same way are two badges nobody
+    // reads. ASCII for the same reason [N:] and [P:] are: the arrow that would
+    // read better here is ambiguous-width and this line has lost a fight with
+    // wcwidth before.
     //
     // Never colours the line. A classifier that has downgraded nothing is not a
     // fault — it may simply have seen no eligible traffic — and a badge that
     // could turn the line yellow on an absence would cry wolf every quiet hour.
     {
       const cls = await this.getClassifierStatus();
-      if (cls) parts.push(`[v:${cls.downgraded}]`);
+      if (cls) parts.push(`[D:${cls.downgraded}]`);
     }
 
     // Phase 34 (D-12): proxy semantic readiness drives [🧠] badge.
