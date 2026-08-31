@@ -53,6 +53,26 @@ const BACKEND_KEY = process.env.CLASSIFIER_BACKEND_API_KEY || '';
  */
 const BACKEND_TIMEOUT_MS = parseInt(process.env.CLASSIFIER_BACKEND_TIMEOUT_MS || '15000', 10);
 const MAX_TEXT = parseInt(process.env.CLASSIFIER_MAX_TEXT || '4000', 10);
+/**
+ * How long the backend may sit idle before we ping it to keep its prefix cache
+ * alive. 0 disables.
+ *
+ * Warming at boot is not enough, and that was measured rather than assumed.
+ * llama.cpp drops the cached rubric prefix after a spell of inactivity, so the
+ * first classification after a quiet stretch pays the full prefill again — past
+ * the proxy's 2s budget, which fails open and keeps the caller's band. Observed
+ * 2026-08-31: an idle gap of roughly ten minutes, then `what does HTTP 429
+ * mean?` was NOT downgraded and the proxy recorded one classifier error; the
+ * identical request seconds later resolved to haiku, and asking this service
+ * directly returned `small` in 574ms.
+ *
+ * Nothing was broken in that sequence — fail-open did exactly its job — but the
+ * downgrade was lost silently, and on a laptop that idles between turns that is
+ * the common case rather than the rare one. Four minutes sits under the gap
+ * where the loss was seen, and a ping costs three tokens on an unmetered local
+ * model.
+ */
+const KEEPALIVE_MS = parseInt(process.env.CLASSIFIER_KEEPALIVE_MS || '240000', 10);
 
 const BANDS = ['small', 'medium', 'high'];
 
@@ -79,8 +99,10 @@ const RUBRIC = [
 
 const log = (...a) => process.stdout.write(`[prompt-classifier] ${a.join(' ')}\n`);
 
-const counts = { asked: 0, answered: 0, failed: 0, byBand: { small: 0, medium: 0, high: 0 } };
+const counts = { asked: 0, answered: 0, failed: 0, byBand: { small: 0, medium: 0, high: 0 }, keepalives: 0 };
 let warm = false;
+/** When the backend last completed anything, real request or ping. */
+let lastBackendOk = 0;
 
 /**
  * Ask the backend for a verdict.
@@ -145,10 +167,42 @@ async function warmUp() {
   try {
     await askBackend('ping');
     warm = true;
+    lastBackendOk = Date.now();
     log(`warmed in ${Date.now() - t0}ms — backend ${BACKEND_URL} model ${BACKEND_MODEL}`);
   } catch (e) {
     log(`warm-up failed: ${e?.message || e} (first real call will pay the prefill)`);
   }
+}
+
+/**
+ * Keep the backend's prefix cache alive across idle stretches.
+ *
+ * Skips the ping entirely when a real request has been served inside the
+ * window — traffic warms it better than we can, and a timer that fired anyway
+ * would just add queueing to a busy backend. `unref()` so this never holds the
+ * process open on its own.
+ */
+function startKeepalive() {
+  if (KEEPALIVE_MS <= 0) {
+    log('keepalive disabled — the first request after an idle spell will pay the prefill');
+    return;
+  }
+  const t = setInterval(async () => {
+    if (Date.now() - lastBackendOk < KEEPALIVE_MS) return;
+    try {
+      await askBackend('ping');
+      lastBackendOk = Date.now();
+      counts.keepalives += 1;
+      warm = true;
+    } catch {
+      // The backend being down is already visible as failed classifications and
+      // as warm=false on /health. Logging it once per interval would fill the
+      // log with a fact already reported.
+      warm = false;
+    }
+  }, Math.max(30_000, Math.floor(KEEPALIVE_MS / 2)));
+  t.unref();
+  log(`keepalive every ${Math.round(KEEPALIVE_MS / 1000)}s of idle`);
 }
 
 const send = (res, code, obj) => {
@@ -166,6 +220,11 @@ const server = http.createServer(async (req, res) => {
       backend: BACKEND_URL,
       model: BACKEND_MODEL,
       warm,
+      // How long since the backend last completed anything, and the window the
+      // keepalive enforces. Together these say whether a slow first
+      // classification is expected right now — which is otherwise invisible.
+      idleMs: lastBackendOk ? Date.now() - lastBackendOk : null,
+      keepaliveMs: KEEPALIVE_MS,
       bands: BANDS,
       counts,
     });
@@ -196,6 +255,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 502, { error: 'backend returned no recognisable band' });
       }
       warm = true;
+      lastBackendOk = Date.now();
       counts.answered += 1;
       counts.byBand[band] += 1;
       return send(res, 200, { band, latencyMs: Date.now() - t0, model: BACKEND_MODEL });
@@ -213,5 +273,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   log(`listening on http://127.0.0.1:${PORT} (POST /classify, GET /health)`);
-  warmUp();
+  warmUp().then(startKeepalive);
 });
