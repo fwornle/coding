@@ -8,6 +8,7 @@
 > - The right edge is anchored with codepoint-floor padding (≥220 codepoints, after stripping zero-width tmux markup) plus a non-breaking-space terminator (U+00A0) to survive tmux's `#(shell-cmd)` trailing-whitespace strip.
 > - The graduated cooling lifecycle (a single `●` ramped colour41 → colour34 → colour28 → colour22 → colour238) is preserved and is now driven by the newest timestamped record in `lsl[*].transcriptPath` — NOT its mtime, instead of in-memory monitor state.
 > - `[program:health-verifier]` and `[program:browser-access]` supervisord blocks are gone.
+> - Two routing counters were added, both read from the coordinator and neither colouring the bar: `[D:]` (turns the prompt classifier moved to a cheaper band) and `[L:]` (completions served on hardware we own, hidden at zero). They are **not** the same set — see the published guide.
 
 Real-time visual indicators of system health and development activity, rendered in the **tmux status bar** for all coding agents (Claude Code, CoPilot, and future agents).
 
