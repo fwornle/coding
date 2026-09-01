@@ -197,6 +197,35 @@ async function withTimeout(promise, ms, describe) {
   }
 }
 
+/**
+ * waitForAttach — block until the watcher has attached at least `n` tails.
+ *
+ * Replaces `await tick(150)` before an append. The append must land AFTER attach:
+ * tailEventsFile() records lastSize = st.size at attach and never replays what
+ * preceded it, so anything written earlier is classed as pre-existing and skipped
+ * forever. A fixed sleep expressed that ordering as a guess about scheduling —
+ * three scan intervals of margin on an unloaded laptop, unknown margin on a
+ * contended CI runner.
+ */
+async function waitForAttach(handle, n = 1) {
+  await waitFor(() => handle.getStats().watching_sessions >= n);
+}
+
+/**
+ * waitForNextScan — block until one further scan cycle has completed.
+ *
+ * For the NEGATIVE assertions (watching_sessions === 0), which cannot wait on the
+ * condition itself: it is already true at t=0, so waitFor would return immediately
+ * and prove nothing. What those tests need is "the watcher had a real chance to
+ * attach this session and still did not", and state.lastScanAt advancing is that
+ * chance — observed rather than assumed. ISO timestamps are ms-resolution and the
+ * scan interval is 50ms, so consecutive scans are always distinguishable.
+ */
+async function waitForNextScan(handle) {
+  const before = handle.getStats().last_scan_at;
+  await waitFor(() => handle.getStats().last_scan_at !== before);
+}
+
 const PROJECT_ROOT = '/Users/Q284340/Agentic/coding';
 
 describe('copilot-events-tail watcher contract', () => {
@@ -240,7 +269,7 @@ describe('copilot-events-tail watcher contract', () => {
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForAttach(handle);
       const stats = handle.getStats();
       expect(stats.watching_sessions).toBe(1);
     } finally {
@@ -263,9 +292,9 @@ describe('copilot-events-tail watcher contract', () => {
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForAttach(handle);
       fs.appendFileSync(eventsPath, startedEvent('toolu_vrtx_01ABCDEF') + '\n');
-      await tick(500);
+      await waitFor(() => registry.get('copilot', '01ABCDE'));
 
       const row = registry.get('copilot', '01ABCDE');
       expect(row).toBeDefined();
@@ -292,11 +321,11 @@ describe('copilot-events-tail watcher contract', () => {
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForAttach(handle);
       fs.appendFileSync(eventsPath, startedEvent('toolu_vrtx_01PAIRED1') + '\n');
-      await tick(400);
+      await waitFor(() => registry.get('copilot', '01PAIRE'));
       fs.appendFileSync(eventsPath, completedEvent('toolu_vrtx_01PAIRED1', '2026-05-26T12:31:53Z') + '\n');
-      await tick(500);
+      await waitFor(() => registry.get('copilot', '01PAIRE')?.status === 'completed');
 
       const row = registry.get('copilot', '01PAIRE');
       expect(row).toBeDefined();
@@ -320,11 +349,11 @@ describe('copilot-events-tail watcher contract', () => {
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForAttach(handle);
       fs.appendFileSync(eventsPath, startedEvent('toolu_vrtx_01FAILED2') + '\n');
-      await tick(400);
+      await waitFor(() => registry.get('copilot', '01FAILE'));
       fs.appendFileSync(eventsPath, failedEvent('toolu_vrtx_01FAILED2', 'context window exhausted') + '\n');
-      await tick(500);
+      await waitFor(() => registry.get('copilot', '01FAILE')?.agent_metadata?.completion_status === 'error');
 
       const row = registry.get('copilot', '01FAILE');
       expect(row).toBeDefined();
@@ -347,11 +376,11 @@ describe('copilot-events-tail watcher contract', () => {
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForAttach(handle);
       fs.appendFileSync(eventsPath, startedEvent('toolu_vrtx_01STUB001') + '\n');
-      await tick(300);
+      await waitFor(() => registry.get('copilot', '01STUB0'));
       fs.appendFileSync(eventsPath, completedEvent('toolu_vrtx_01STUB001') + '\n');
-      await tick(600);
+      await waitFor(() => writerCalls.length >= 1);
 
       expect(writerCalls.length).toBeGreaterThanOrEqual(1);
       const lastCall = writerCalls[writerCalls.length - 1];
@@ -381,13 +410,13 @@ describe('copilot-events-tail watcher contract', () => {
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForAttach(handle);
       fs.appendFileSync(eventsPath, startedEvent('toolu_vrtx_01GONE001') + '\n');
-      await tick(400);
+      await waitFor(() => registry.get('copilot', '01GONE0'));
 
       // Remove the lock file — simulates session crash/exit
       fs.unlinkSync(path.join(sessionDir, 'inuse.1234.lock'));
-      await tick(300);
+      await waitFor(() => registry.get('copilot', '01GONE0')?.agent_metadata?.completion_status === 'lock_gone');
 
       const row = registry.get('copilot', '01GONE0');
       expect(row).toBeDefined();
@@ -414,7 +443,7 @@ describe('copilot-events-tail watcher contract', () => {
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForNextScan(handle);
       expect(handle.getStats().watching_sessions).toBe(0);
     } finally {
       await handle.stop();
@@ -433,9 +462,9 @@ describe('copilot-events-tail watcher contract', () => {
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForAttach(handle);
       fs.appendFileSync(eventsPath, startedEvent('toolu_vrtx_01PROJ001') + '\n');
-      await tick(400);
+      await waitFor(() => registry.get('copilot', '01PROJ0'));
 
       const row = registry.get('copilot', '01PROJ0');
       expect(row.project).toBe('coding');
@@ -465,7 +494,7 @@ branch: main
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(200);
+      await waitForNextScan(handle);
       expect(handle.getStats().watching_sessions).toBe(0);
     } finally {
       await handle.stop();
@@ -499,27 +528,18 @@ branch: main
       projectRoot: PROJECT_ROOT,
       liveSessionScanIntervalMs: 50,
     });
-    // Wait for the tail to be ATTACHED, not merely for the events file to exist.
-    // The real precondition of this test is that the tail is attached BEFORE the
-    // append: tailEventsFile() records lastSize = st.size at attach and deliberately
-    // never replays what preceded it (copilot-events-tail.mjs — "strictly
-    // forward-looking"), so an earlier append would be classed as pre-existing and
-    // skipped forever. The old guard did not check that. makeSession() creates
-    // events.jsonl up front, so existsSync was already true before the watcher had
-    // done anything — it waited for nothing and returned on its first predicate call.
+    // See waitForAttach — the append must land after attach. The guard this replaced
+    // was fs.existsSync(eventsPath), which makeSession() had already made true, so it
+    // waited for nothing and returned on its first predicate call.
     //
-    // Today the ordering happens to hold anyway, because startCopilotWatcher awaits
-    // its initial scanLoop() before returning the handle (measured: watching_sessions
-    // is already 1 at t+0ms). This guard pins that invariant instead of depending on
-    // it silently, so reordering the watcher's startup fails here and not in a
-    // 15-second timeout somewhere else. getStats().watching_sessions is tails.size —
-    // the same signal Tests 8 and 10 assert on. tmpRoot is per-test and holds only
-    // uuid-11, so >= 1 can only be this session.
+    // Today the ordering holds anyway, because startCopilotWatcher awaits its initial
+    // scanLoop() before returning the handle (measured: watching_sessions is already 1
+    // at t+0ms). The guard pins that invariant rather than depending on it silently.
     //
     // NOTE: this is not a proven diagnosis of the 2026-09-01 CI hang (run
     // 33507727691), which passed unchanged on re-run and left no inner stack. The
     // withTimeout bounds below are what will name that one if it recurs.
-    await waitFor(() => handle.getStats().watching_sessions >= 1);
+    await waitForAttach(handle);
     fs.appendFileSync(
       eventsPath,
       startedEvent('toolu_vrtx_01DRAIN01') + '\n' +
@@ -548,7 +568,7 @@ branch: main
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(150);
+      await waitForNextScan(handle);
       const stats = handle.getStats();
       expect(stats).toHaveProperty('watching_sessions');
       expect(stats).toHaveProperty('tail_count');
@@ -591,7 +611,7 @@ branch: main
       liveSessionScanIntervalMs: 50,
     });
     try {
-      await tick(200);
+      await waitForNextScan(handle);
       expect(handle.getStats().watching_sessions).toBe(0);
       expect(stderrChunks.join('')).toMatch(/skipping non-owned/i);
     } finally {
