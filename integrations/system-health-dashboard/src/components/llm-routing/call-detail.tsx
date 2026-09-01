@@ -18,6 +18,7 @@ import { localClock } from '@/lib/utils'
 import { GATES } from './offload-gates'
 import type { GateVerdict } from './offload-gates'
 import { parseTrail, rungOfCall } from './recent-call'
+import { describeBandSource } from './turn-grouping'
 import type { RecentCall } from './recent-call'
 
 const HOPS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨']
@@ -51,6 +52,7 @@ export function CallDetail({ call, replay = null }: Props) {
   }
 
   const trail = parseTrail(call.attempt_trail)
+  const bandWhy = describeBandSource(call)
   const rung = rungOfCall(call)
   const reconstructed = call.routing_source === 'backfill'
 
@@ -69,6 +71,16 @@ export function CallDetail({ call, replay = null }: Props) {
       <Row label="band">
         {call.route_band || '—'}
         {call.route_step > 0 && <span className="text-muted-foreground"> · step {call.route_step}</span>}
+        {/* WHO decided it. The band alone is what made a two-call pi turn
+            unreadable: `small` then `medium` looks like a measurement of the
+            work, when in fact the caller declared `medium` both times and only
+            the first call was one the classifier was allowed to look at. The
+            classifier's note is quoted verbatim for the same reason the offload
+            row below is — it is a record, and a prettier restatement here would
+            be a second thing to keep in step with the proxy. */}
+        {bandWhy && (
+          <span className="block text-muted-foreground">{bandWhy}</span>
+        )}
       </Row>
       <Row label="tokens">
         {fmt(call.total_tokens + (call.cache_read_tokens || 0) + (call.cache_write_tokens || 0))}

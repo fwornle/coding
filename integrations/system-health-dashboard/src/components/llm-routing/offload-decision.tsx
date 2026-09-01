@@ -106,6 +106,16 @@ export interface OffloadDecisionProps {
   recent: RecentCall[]
   /** Lets the page refetch its own halves once a save lands. */
   onSaved?: () => void
+  /**
+   * Reports whether this card is holding an UNSAVED policy edit.
+   *
+   * The parent tab polls, and a poll that re-reads the routing config while an
+   * operator is mid-edit would swap the routes/providers this card computes its
+   * preview against. The tab therefore skips the config fetch while this is
+   * true. Reported upward rather than solved here because the fetch that would
+   * do the damage is the tab's, not this component's.
+   */
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 interface Resolved {
@@ -147,9 +157,11 @@ async function pooled<T, R>(items: T[], width: number, fn: (t: T) => Promise<R>)
 
 export function OffloadDecision({
   proxyBase, routes, defaults, providers, flowProviders, fallback, runtime,
-  offloadSkips, perRoute, offloadedCalls, windowHours, recent, onSaved,
+  offloadSkips, perRoute, offloadedCalls, windowHours, recent, onSaved, onDirtyChange,
 }: OffloadDecisionProps) {
   const policy = useOffloadPolicyDraft(proxyBase, onSaved)
+  // Tell the parent while an edit is open, so its poll leaves the config alone.
+  useEffect(() => { onDirtyChange?.(policy.dirty) }, [policy.dirty, onDirtyChange])
   const isDark = useIsDark()
   const [mode, setMode] = useState<'config' | 'recorded'>('config')
   const [stripFilter, setStripFilter] = useState<StripFilter>('interesting')
