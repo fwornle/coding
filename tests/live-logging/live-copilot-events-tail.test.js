@@ -175,6 +175,28 @@ async function waitFor(predicate, { timeoutMs = 5000, stepMs = 10 } = {}) {
   throw new Error(`waitFor: condition not met within ${timeoutMs}ms`);
 }
 
+/**
+ * withTimeout — bound one await with a diagnostic message.
+ *
+ * Jest's own per-test timeout reports nothing but the test declaration line, so a
+ * stall inside a test with several awaits is reported as "Exceeded timeout of
+ * 15000 ms" and a caret on `test(...)`. That cannot distinguish "the tail never
+ * observed the append" from "stop() never drained a pending write" — the two ways
+ * Test 11 can hang — which is how a red CI run arrived carrying no information
+ * about its own cause. Bounding each await separately makes the failure name itself.
+ */
+async function withTimeout(promise, ms, describe) {
+  let timer;
+  const guard = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`withTimeout(${ms}ms): ${describe()}`)), ms);
+  });
+  try {
+    return await Promise.race([promise, guard]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const PROJECT_ROOT = '/Users/Q284340/Agentic/coding';
 
 describe('copilot-events-tail watcher contract', () => {
@@ -477,17 +499,39 @@ branch: main
       projectRoot: PROJECT_ROOT,
       liveSessionScanIntervalMs: 50,
     });
-    // Wait for the watcher to be scanning, not for a guessed number of milliseconds.
-    await waitFor(() => fs.existsSync(eventsPath));
+    // Wait for the tail to be ATTACHED, not merely for the events file to exist.
+    // The real precondition of this test is that the tail is attached BEFORE the
+    // append: tailEventsFile() records lastSize = st.size at attach and deliberately
+    // never replays what preceded it (copilot-events-tail.mjs — "strictly
+    // forward-looking"), so an earlier append would be classed as pre-existing and
+    // skipped forever. The old guard did not check that. makeSession() creates
+    // events.jsonl up front, so existsSync was already true before the watcher had
+    // done anything — it waited for nothing and returned on its first predicate call.
+    //
+    // Today the ordering happens to hold anyway, because startCopilotWatcher awaits
+    // its initial scanLoop() before returning the handle (measured: watching_sessions
+    // is already 1 at t+0ms). This guard pins that invariant instead of depending on
+    // it silently, so reordering the watcher's startup fails here and not in a
+    // 15-second timeout somewhere else. getStats().watching_sessions is tails.size —
+    // the same signal Tests 8 and 10 assert on. tmpRoot is per-test and holds only
+    // uuid-11, so >= 1 can only be this session.
+    //
+    // NOTE: this is not a proven diagnosis of the 2026-09-01 CI hang (run
+    // 33507727691), which passed unchanged on re-run and left no inner stack. The
+    // withTimeout bounds below are what will name that one if it recurs.
+    await waitFor(() => handle.getStats().watching_sessions >= 1);
     fs.appendFileSync(
       eventsPath,
       startedEvent('toolu_vrtx_01DRAIN01') + '\n' +
       completedEvent('toolu_vrtx_01DRAIN01') + '\n',
     );
 
-    // stop() is now issued strictly INSIDE processMessages.
-    await entered;
-    await handle.stop();
+    // stop() is now issued strictly INSIDE processMessages. Both awaits are bounded
+    // so that whichever one stalls says so — see withTimeout above.
+    await withTimeout(entered, 5000, () =>
+      `processMessages never ran: the tail did not observe the append. stats=${JSON.stringify(handle.getStats())}`);
+    await withTimeout(handle.stop(), 5000, () =>
+      `handle.stop() never settled: an in-flight write did not drain. stats=${JSON.stringify(handle.getStats())}`);
 
     // After stop, the write should have been allowed to complete.
     const row = registry.get('copilot', '01DRAIN');
