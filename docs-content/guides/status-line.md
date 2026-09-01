@@ -1,6 +1,6 @@
 # Status Line Complete Guide
 
-Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions; `status-right` invokes `status-line-fast.cjs`, a CommonJS fast-path reader that serves a per-pane pre-rendered cache (~60 ms) and spawns the full `combined-status-line.js` (CSL) renderer only when the cache is stale. The renderer pulls live state from the **health coordinator at :3034** (Phase 33 single source of truth, replacing the retired host-side `health-verifier` daemon and `.health/verification-status.json` file). All five coordinator-derived badges share a single memoized probe per render — see [Architecture → Shared coordinator probe](#shared-coordinator-probe).
+Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions; `status-right` invokes `status-line-fast.cjs`, a CommonJS fast-path reader that serves a per-pane pre-rendered cache (~60 ms) and spawns the full `combined-status-line.js` (CSL) renderer only when the cache is stale. The renderer pulls live state from the **health coordinator at :3034** (Phase 33 single source of truth, replacing the retired host-side `health-verifier` daemon and `.health/verification-status.json` file). All coordinator-derived badges share a single memoized probe per render — see [Architecture → Shared coordinator probe](#shared-coordinator-probe).
 
 ![Status Line Display](../images/status-line-display.png)
 
@@ -24,6 +24,8 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | Knowledge Pipeline | `[📚●]` green | Observation/digest/insight pipeline freshness |
 | Network Location | `[N:VPN]` | Network environment: VPN / CN / OPEN / ?? |
 | Proxy Status | `[P:AUTO]` | Local proxy daemon (proxydetox): ON / AUTO / OFF |
+| Prompt Downgrades | `[D:12]` | Turns the prompt classifier moved to a cheaper band since proxy start — absent when the classifier is off |
+| Local Execution | `[L:3]` | Completions served by hardware we own — absent at zero |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
 
@@ -141,6 +143,59 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 
     Signals are evaluated in order; the first match wins.
 
+### Routing & Execution Indicators
+
+Two ASCII-only counters describing what the LLM proxy did with the traffic it was given. Both are read from the coordinator, which polls `rapid-llm-proxy` (`:12435`) on its own cheap GETs — `/api/llm/classifier/stats` and `/api/llm/execution/stats` — every coordinator tick. Neither costs a model call.
+
+Both count **since the proxy started**. A proxy restart resets them at the source, so the one non-monotonic transition you will see is the number going *down*; that is a restart, not a bug.
+
+| Display | Meaning | Action |
+|---------|---------|--------|
+| `[D:12]` | The prompt classifier has moved 12 turns to a cheaper band since proxy start | Informational |
+| `[D:0]` | Classifier is on and has downgraded nothing — it may simply have seen no eligible traffic | Informational |
+| *(absent)* | Classifier is off (`enabled !== true`), or the coordinator is unreachable | Expected on a machine that does not use it |
+
+| Display | Meaning | Action |
+|---------|---------|--------|
+| `[L:3]` | 3 completions were served by hardware we run ourselves | Informational |
+| *(absent)* | Either nothing ran locally (`local === 0`), or the coordinator has never successfully polled the proxy (`last_poll` null) | Expected off-VPN with the laptop target off |
+
+Neither badge ever colours the bar. A classifier that has downgraded nothing and a machine that has run nothing locally are both ordinary states, usually meaning "no eligible traffic" — a badge that turned the line yellow on an absence would cry wolf every quiet hour.
+
+!!! warning "`[D:]` is not `[L:]` — the two sets barely overlap"
+    It is tempting to read the downgrade counter as "how much ran locally". It is not, and labelling it `L` would state something false:
+
+    - **A downgrade need not be local.** Off VPN with the laptop target switched off — the current default — a downgraded turn goes to `gh-copilot/claude-haiku-4.5`: cheaper, still metered, still off-machine.
+    - **Local execution need not be classified.** The background services that do reach a local box (`bg-observation-writer`, `bg-health-coordinator`) declare their band in config and are never asked for a verdict, so they never appear in `[D:]` at all.
+
+    "How much did the classifier save" and "how much ran on our own hardware" are two real and different questions, so they get two counters. `[L:]` is read off the provider that **answered**, so an offload that timed out at 20 s and fell back to `gh-copilot` does not appear — that work ran on a paid account, whatever the route intended.
+
+!!! note "Why `[L:]` hides at zero but `[D:0]` renders"
+    Off VPN with `qwen-laptop` disabled, zero is the correct and *permanent* answer for `[L:]`, so a badge that always read `[L:0]` would be a line of noise on every render. `[D:0]`, by contrast, is a live figure that can change on the next turn, and the classifier's own `enabled` flag already suppresses the badge entirely on machines that do not use it.
+
+    Both distinguish **"measured zero"** from **"no data"**. `getExecutionStatus()` returns `null` unless `execution.last_poll` is set: zeroes from a coordinator that has never reached the proxy are an absence of data, not a measurement, and rendering them as one was the exact mistake `[D:]` was fixed for.
+
+!!! note "Diagnosing an absent `[L:]`"
+    An absent badge is usually correct, not broken. Confirm the chain rather than guessing:
+
+    ```bash
+    # 1. Is the proxy counting at all?
+    curl -s localhost:12435/api/llm/execution/stats
+    #    {"sinceBootMs":49358423,"completions":353,"local":0}
+
+    # 2. Did the coordinator read it? (last_poll present = real zero, not no-data)
+    curl -s localhost:3034/health/state | python3 -c \
+      "import sys,json; print(json.load(sys.stdin)['execution'])"
+
+    # 3. Why did nothing offload? The proxy names the reason itself.
+    curl -s 'localhost:12435/api/llm/routing/resolve?job=fg-chat/opencode&complexity=small' \
+      | python3 -c "import sys,json; print(json.load(sys.stdin)['route']['offloadSkipped'])"
+    #    no offload target for network=public
+    #    (targets: qwen-local[corporate/fg+bg], qwen-laptop[public/fg] (off))
+    ```
+
+    The common answers: the network has no eligible target (`qwen-local` is corporate-only, `qwen-laptop` public-only), the eligible target is `enabled: false` (the safe default), or the work is foreground `claude` — which can **never** offload on any network, because it arrives on the Anthropic wire at `/v1/messages` and no local provider carries `fg_transport`. See [LLM Routing → Semantic offload](../architecture/llm-routing.md#semantic-offload-network-scoped-and-opt-in-per-target).
+
 ### Knowledge Pipeline Indicators
 
 The badge reflects the freshness of the **observation → digest → insight** pipeline (the `obs_api` service backed by km-core `GraphKMStore` at `.data/knowledge-graph/`; the legacy `.observations/observations.db` SQLite store was archived 2026-06-05 under Phase 44 Plan 18). Verdict is driven by *observation* freshness only — digest and insight cadences are intentionally slower and don't gate the badge. Source: `state.knowledge_pipeline` at the coordinator's `/health/state` (populated by `pollKnowledgePipeline`, which calls `obs_api`'s `/api/consolidation/status`).
@@ -232,14 +287,14 @@ This replaces the previous approach of using agent-specific status bar APIs (e.g
 
 ### Shared coordinator probe
 
-Every render needs five different slices of `state` from the health coordinator (`knowledge_pipeline`, `proxy`, `services` rollup, `lsl_by_project`, generated_at staleness). Each was previously a separate synchronous probe via `execSync('curl …')`; five identical localhost HTTP calls per render added up to ~3 s under load and tripped the 8 s SYS:TIMEOUT during tmux refresh bursts.
+Every render needs seven different slices of `state` from the health coordinator (`knowledge_pipeline`, `proxy`, `network`, `classifier`, `execution`, `services` rollup + generated_at staleness, `lsl_by_project`). Each was previously a separate synchronous probe via `execSync('curl …')`; that many identical localhost HTTP calls per render added up to ~3 s under load and tripped the 8 s SYS:TIMEOUT during tmux refresh bursts.
 
 The renderer now exposes a single `getCoordinatorState()` method memoized on the `CombinedStatusLine` instance (one instance per render):
 
 - Uses native `fetch` instead of `execSync(curl)` to skip subprocess-spawn overhead
 - 1.5 s per-attempt budget with one retry (150 ms gap)
-- All five `getXxxStatus()` methods await the shared result; one HTTP call serves the whole render
-- A single transient slow response no longer cascades every coordinator-derived badge (`🏥` `LSL` `📚` `🧠`) to its unreachable state simultaneously
+- All seven `getXxxStatus()` methods await the shared result; one HTTP call serves the whole render — including `getClassifierStatus()` and `getExecutionStatus()`, so the `[D:]` and `[L:]` counters cost no extra request
+- A single transient slow response no longer cascades every coordinator-derived badge (`🏥` `LSL` `📚` `🧠` `[N:]` `[P:]` `[D:]` `[L:]`) to its unreachable state simultaneously
 
 ### Right-edge stability (cell-width consistency)
 

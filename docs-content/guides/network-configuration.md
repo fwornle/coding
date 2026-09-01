@@ -109,6 +109,57 @@ The LLM proxy (`rapid-llm-proxy`, port 12435) dynamically adapts to proxy availa
 
 This means `px off` on a hotspot (direct internet) works immediately — the LLM proxy stops trying to route through the dead proxy within 5 seconds.
 
+### Proxy Auto-Heal
+
+When the coordinator judges the LLM proxy unhealthy it can dispatch `launchctl kickstart`. Three rules constrain that, each added after an incident where the previous behaviour made things worse.
+
+#### A failed probe is not a failed service
+
+`probeHttpHealth`/`probeTcpPort` used to map every failure onto `stopped`, collapsing two facts that are not the same:
+
+| Probe outcome | Actually evidence of |
+|---|---|
+| `ECONNREFUSED` | Nobody is listening — real evidence of death |
+| `timeout` | Nothing at all — a slow target, a loaded machine, a saturated event loop, a network blip |
+
+`lib/network/probe-result-semantics.mjs` softens a timed-out probe to `unknown` rather than `stopped`. `unknown` rather than the previous value, because a failed probe must never *assert* health — and asserting death on no evidence is the same mistake pointed the other way.
+
+Observed twice before it was generalised: on 2026-08-09 the prompt hook reported "service obs_api stopped" about a service that never stopped, and on 2026-08-30 a two-minute host network outage produced `llm_cli_proxy stopped, obs_api stopped, db degraded` while all three were provably fine. Three simultaneous false negatives from one transient is a property of the probe semantics, not of any one service.
+
+#### A proxy that cannot parse its config is not one a restart fixes
+
+A config file that will not parse aborts proxy boot by design. Restarting it produces an identical failure, so the coordinator distinguishes this cause and does not spend a kickstart on it.
+
+#### One incident spends one kickstart, not three
+
+From the coordinator's own log on 2026-08-31:
+
+```
+07:02:52.046  proxy auto-heal: dispatching restart (consecutive_failures=1, kickstart_count=1)
+07:02:52.063  proxy auto-heal: dispatching restart (consecutive_failures=2, kickstart_count=2)
+07:02:52.114  proxy strong-probe escalation: dispatching restart  (kickstart_count=3)
+07:04:34      proxy auto-heal cooldown engaged — 3 kickstarts in last 300s
+```
+
+One underlying failure, three restarts in 68 ms, and the whole budget spent before the first restart had finished — a genuine fault arriving in the next five minutes would have found no remediation left. At 07:04:33 a kickstart errored outright because the service was still mid-restart.
+
+Two distinct faults produced that, and a debounce alone fixes only one:
+
+1. **The cheap-probe FSM counted invocations, not probe outcomes.** It is called from three places, one of them every tick from `/health/refresh`. Every call while `semantic_ok` was false incremented the counter and, past the 60 s sustained gate, dispatched — two of the three restarts above are one FSM firing twice, 17 ms apart, off a single probe result. `isFreshProbeOutcome()` supplies the missing edge detection, keyed on `last_probe_end`: a caller arriving with the same stamp as last time is re-reading one conclusion, not observing a second failure.
+2. **Five independent paths could each dispatch without knowing another just had** (cheap FSM, strong-probe escalation, passthrough frozen-502, `networkMode` flip, location mismatch). They shared a *count* cap and no *time* gate, so "3 in 5 minutes" was satisfiable in 68 ms. `decideKickstart()` is the shared gate.
+
+`lib/network/kickstart-gate.mjs` holds both, as pure functions:
+
+| Constant | Value | Why |
+|---|---|---|
+| `KICKSTART_MAX_IN_WINDOW` | 3 | Retry a genuine fault a few times |
+| `KICKSTART_WINDOW_MS` | 5 min | The budget window |
+| `KICKSTART_DEBOUNCE_MS` | 60 s | The cheap probe's interval, so consecutive dispatches are necessarily separated by at least one fresh observation of the restarted process |
+
+A restart takes 3–8 s to come back and a probe cycle to prove anything, so a second dispatch inside that window cannot be acting on evidence about the new process — it is responding to the old one, or to the gap the restart itself created.
+
+Both modules are pure (every input an argument; no env, no I/O, no clock) and live outside `health-coordinator.js`, which binds ports on import and therefore cannot be imported by a test. Covered by `tests/network/kickstart-gate.test.mjs`, which replays the 2026-08-31 cascade, and `tests/network/probe-result-semantics.test.mjs`.
+
 ### Inside VPN / Corporate Network
 
 The corporate proxy (proxydetox) runs on `127.0.0.1:3128`. The launcher:
