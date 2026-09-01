@@ -5,6 +5,8 @@ has its own triggers and its own failure meaning — and between them they cover
 the test suite, the egress policy, the published documentation, and the
 installer's portability.
 
+![The four workflows, their triggers, and what each one proves](../images/ci-workflows.png)
+
 All four run on GitHub-hosted `ubuntu-latest` runners except where a job
 explicitly asks for macOS or Windows. None of them has access to Docker, the
 agent CLIs, the private `integrations/*` submodules, or a corporate proxy; what

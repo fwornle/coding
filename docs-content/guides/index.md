@@ -2,7 +2,7 @@
 
 Comprehensive reference guides with detailed explanations, complete configurations, and visual walkthroughs.
 
-<div class="thumbnail-grid" markdown>
+<div class="thumbnail-grid">
 
 <a href="agent-integration/" class="thumbnail-card">
   <img src="../images/agent-integration-flow.png" alt="Agent Integration">
@@ -36,6 +36,14 @@ Comprehensive reference guides with detailed explanations, complete configuratio
   </div>
 </a>
 
+<a href="../ci/" class="thumbnail-card">
+  <img src="../images/ci-workflows.png" alt="Continuous Integration">
+  <div class="card-content">
+    <h3>Continuous Integration</h3>
+    <p>Four GitHub Actions workflows — what each one proves, and how to read a red run</p>
+  </div>
+</a>
+
 <a href="vkb-visualization/" class="thumbnail-card">
   <img src="../images/vkb-cli-architecture.png" alt="VKB Visualization">
   <div class="card-content">
@@ -58,7 +66,6 @@ Comprehensive reference guides with detailed explanations, complete configuratio
 
 Same depth as the cards above — these simply have no diagram to lead with.
 
-- [Continuous Integration](../ci/README.md) — the four GitHub Actions workflows: what each one proves, and how to read a red run
 - [Network Configuration](network-configuration.md) — corporate VPN, proxy detection, and agent-specific API routing
 - [LLM Providers](llm-providers.md) — configuring cloud and local providers for semantic analysis workflows
 
