@@ -54,6 +54,14 @@ Comprehensive reference guides with detailed explanations, complete configuratio
 
 </div>
 
+## More Guides
+
+Same depth as the cards above — these simply have no diagram to lead with.
+
+- [Continuous Integration](../ci/README.md) — the four GitHub Actions workflows: what each one proves, and how to read a red run
+- [Network Configuration](network-configuration.md) — corporate VPN, proxy detection, and agent-specific API routing
+- [LLM Providers](llm-providers.md) — configuring cloud and local providers for semantic analysis workflows
+
 ## When to Use These Guides
 
 | Guide | Use When... |
@@ -64,6 +72,9 @@ Comprehensive reference guides with detailed explanations, complete configuratio
 | **Constraint Testing** | Adding new constraints, debugging detection, or testing enforcement |
 | **VKB Visualization** | Exploring knowledge graphs or integrating VKB programmatically |
 | **Knowledge Workflows** | Understanding how knowledge is captured, processed, and stored |
+| **Continuous Integration** | A CI run went red, or you need to know what a green one actually proves |
+| **Network Configuration** | Working behind a corporate proxy or VPN, or routing an agent's API traffic |
+| **LLM Providers** | Adding, switching, or troubleshooting a cloud or local LLM provider |
 
 ## Quick Links
 
