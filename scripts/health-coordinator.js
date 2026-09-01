@@ -43,6 +43,9 @@ import {
   reclassifyTimeoutAsUnknown, debounceDbStatus,
   classifyProxyHttpFailure, isProxyRestartActionable,
 } from '../lib/network/probe-result-semantics.mjs';
+import {
+  decideKickstart, isFreshProbeOutcome, KICKSTART_DEBOUNCE_MS,
+} from '../lib/network/kickstart-gate.mjs';
 import { probeHttpHealth, probeTcpPort, PROBE_TIMEOUT_ERROR } from '../lib/utils/service-probe.js';
 import net from 'node:net';
 import http from 'node:http';
@@ -273,6 +276,16 @@ const currentState = {
     auto_heal_status: 'healthy',         // 'healthy'|'kickstart_pending'|'cooldown'|'disabled' (Plan 34-03 transitions)
     kickstart_count: 0,                  // running counter since coordinator boot (D-14 soak gate)
     kickstart_timestamps: [],            // sliding window for D-06 cooldown FSM
+    // Epoch ms of the last dispatch by ANY of the five restart paths, including
+    // the ones exempt from the cooldown cap. The cap alone was satisfiable in
+    // 68ms because it counts and does not measure time; this is what makes the
+    // paths aware of each other. See lib/network/kickstart-gate.mjs.
+    last_kickstart_dispatch_at: null,
+    // The probe outcome the auto-heal FSM has already acted on. The FSM is
+    // called from three places, one of them every tick, and used to count
+    // invocations rather than outcomes — so a single failed probe was counted
+    // as many failures as it had callers.
+    last_evaluated_probe_end: null,
     consecutive_failures: 0,             // resets on success
     last_probe_end: null,                // ISO timestamp of last semantic probe completion
     reason: null,                        // last failure classification: 'http_<code>'|'timeout'|'empty_content'|'oksub_missing'|null
@@ -1481,6 +1494,70 @@ function isStrongProbeReasonRecoverable(reason) {
   return false;
 }
 
+/**
+ * The ONE way the proxy gets restarted. Five callers, one gate.
+ *
+ * Before this, each path open-coded the sliding window and then dispatched.
+ * They shared a COUNT cap (3 per 5 minutes) and nothing else — no path could
+ * see that another had just fired. On 2026-08-31 three of them dispatched off
+ * one failure inside 68ms, exhausting the whole window before the first
+ * restart had finished, and a fourth kickstart then errored because the
+ * service was still coming up. A cap that counts but does not measure time is
+ * satisfiable instantly; the debounce in decideKickstart is what makes "3 in 5
+ * minutes" mean what it reads like.
+ *
+ * `countsTowardCap: false` preserves the networkMode-flip exemption: that one
+ * is a user action (the network changed), not a response to a proxy failure,
+ * so it must not consume the failure budget. It is still debounced — see the
+ * module comment.
+ *
+ * Bookkeeping is done HERE, before the async dispatch, so two synchronous
+ * callers in the same tick cannot both pass the gate while the first is still
+ * awaiting a dispatcher.
+ *
+ * @param {object} o
+ * @param {string} o.reason      passed to the remediation action
+ * @param {string} o.logPrefix   identifies the calling path in the log
+ * @param {string} [o.detail]    extra context for the dispatch log line
+ * @param {boolean} [o.countsTowardCap]
+ * @returns {boolean} whether a dispatch was made
+ */
+function dispatchProxyKickstart({ reason, logPrefix, detail = '', countsTowardCap = true }) {
+  const now = Date.now();
+  const decision = decideKickstart({
+    now,
+    timestamps: currentState.proxy.kickstart_timestamps,
+    lastDispatchAt: currentState.proxy.last_kickstart_dispatch_at,
+    countsTowardCap,
+  });
+  currentState.proxy.kickstart_timestamps = decision.recent;
+
+  if (!decision.allowed) {
+    if (decision.reason === 'debounced') {
+      // INFO, not WARN: this is the gate working. The proxy was restarted
+      // seconds ago and whatever this path saw, it saw through that restart.
+      log(`${logPrefix}: suppressed — a kickstart was dispatched ${Math.round((now - currentState.proxy.last_kickstart_dispatch_at) / 1000)}s ago `
+        + `(debounce ${KICKSTART_DEBOUNCE_MS / 1000}s, ${Math.ceil(decision.waitMs / 1000)}s remaining)`, 'INFO');
+    } else {
+      currentState.proxy.auto_heal_status = 'cooldown';
+      log(`${logPrefix}: suppressed — ${decision.recent.length} kickstarts in the last `
+        + `${Math.round(decision.waitMs / 1000)}s window did not fix it; a restart is not the remedy here`, 'WARN');
+    }
+    return false;
+  }
+
+  currentState.proxy.last_kickstart_dispatch_at = now;
+  if (countsTowardCap) {
+    currentState.proxy.kickstart_timestamps.push(now);
+    currentState.proxy.kickstart_count += 1;
+  }
+  log(`${logPrefix}: dispatching restart_llm_cli_proxy (${detail}${detail ? ', ' : ''}kickstart_count=${currentState.proxy.kickstart_count})`, 'INFO');
+  getRemediationDispatcher()
+    .then(d => d.executeAction('restart_llm_cli_proxy', { reason }))
+    .catch(err => log(`${logPrefix} kickstart failed: ${err.message}`, 'ERROR'));
+  return true;
+}
+
 // Strong-probe escalation FSM — runs once per pollProxySemanticStrong outcome
 // (via try/finally in the caller). Bridges the gap between the cheap-probe
 // auto-heal FSM (which can miss stale-env / pipeline-only outages because
@@ -1520,26 +1597,16 @@ function evaluateStrongProbeEscalation() {
     return;
   }
 
-  // Threshold reached — gate through the same cooldown window the cheap-probe
-  // FSM uses, so the two paths share kickstart-debt accounting.
-  const now = Date.now();
-  currentState.proxy.kickstart_timestamps = currentState.proxy.kickstart_timestamps
-    .filter(ts => (now - ts) < PROXY_KICKSTART_WINDOW_MS);
-  if (currentState.proxy.kickstart_timestamps.length >= PROXY_KICKSTART_MAX) {
-    log(`proxy strong-probe escalation suppressed — ${currentState.proxy.kickstart_timestamps.length} kickstarts in last ${PROXY_KICKSTART_WINDOW_MS/1000}s (cooldown)`, 'WARN');
-    return;
-  }
-
-  // Dispatch through the same remediation path as the cheap-probe FSM. Reset
-  // the counter on dispatch so we don't fire on every subsequent probe within
-  // the same outage — let the cooldown window govern repeats.
-  currentState.proxy.kickstart_timestamps.push(now);
-  currentState.proxy.kickstart_count += 1;
+  // Threshold reached. Reset the counter whether or not the gate lets this
+  // through: firing on every subsequent probe within the same outage is what
+  // the cooldown window exists to govern, and a suppressed attempt is still an
+  // attempt made.
   currentState.proxy.consecutive_strong_network_failures = 0;
-  log(`proxy strong-probe escalation: dispatching restart_llm_cli_proxy (consecutive_strong_failures=${count}, reason='${reason}', kickstart_count=${currentState.proxy.kickstart_count})`, 'INFO');
-  getRemediationDispatcher()
-    .then(d => d.executeAction('restart_llm_cli_proxy', { reason: `strong-probe ${reason}` }))
-    .catch(err => log(`proxy strong-probe escalation kickstart failed: ${err.message}`, 'ERROR'));
+  dispatchProxyKickstart({
+    reason: `strong-probe ${reason}`,
+    logPrefix: 'proxy strong-probe escalation',
+    detail: `consecutive_strong_failures=${count}, reason='${reason}'`,
+  });
 }
 
 /**
@@ -1650,20 +1717,12 @@ function evaluatePassthroughEscalation(count) {
     log(`proxy passthrough frozen-signature ${count}/${PROXY_PASSTHROUGH_ESCALATION_THRESHOLD} — not yet escalating`, 'INFO');
     return;
   }
-  const now = Date.now();
-  currentState.proxy.kickstart_timestamps = currentState.proxy.kickstart_timestamps
-    .filter(ts => (now - ts) < PROXY_KICKSTART_WINDOW_MS);
-  if (currentState.proxy.kickstart_timestamps.length >= PROXY_KICKSTART_MAX) {
-    log(`proxy passthrough escalation suppressed — ${currentState.proxy.kickstart_timestamps.length} kickstarts in last ${PROXY_KICKSTART_WINDOW_MS/1000}s (cooldown)`, 'WARN');
-    return;
-  }
-  currentState.proxy.kickstart_timestamps.push(now);
-  currentState.proxy.kickstart_count += 1;
   currentState.proxy.consecutive_passthrough_frozen = 0;
-  log(`proxy passthrough escalation: dispatching restart_llm_cli_proxy (frozen-dead-proxy signature x${count}, kickstart_count=${currentState.proxy.kickstart_count})`, 'INFO');
-  getRemediationDispatcher()
-    .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'passthrough frozen_proxy_502' }))
-    .catch(err => log(`proxy passthrough escalation kickstart failed: ${err.message}`, 'ERROR'));
+  dispatchProxyKickstart({
+    reason: 'passthrough frozen_proxy_502',
+    logPrefix: 'proxy passthrough escalation',
+    detail: `frozen-dead-proxy signature x${count}`,
+  });
 }
 
 /**
@@ -1697,7 +1756,28 @@ function evaluateAutoHealFSM() {
     return;
   }
 
-  // Failure path. Slide the kickstart window first.
+  // Failure path — but only ONCE per probe outcome.
+  //
+  // This function is called from three places: the end of pollProxySemantic,
+  // the real-traffic shortcut, and every /health/refresh tick. The tick call
+  // carried a comment claiming it was "safe here: the failure path only
+  // increments consecutive_failures when semantic_ok stayed false" — there was
+  // no edge detection behind that claim. Every call while semantic_ok was
+  // false incremented the counter and, past the 60s sustained gate below,
+  // dispatched. That is two of the three restarts in the 68ms cascade of
+  // 2026-08-31: one probe result, counted once per caller.
+  //
+  // last_probe_end identifies the outcome (every probe path stamps it), so a
+  // caller arriving with a stamp already acted on is re-reading a conclusion,
+  // not observing a second failure. It still falls through the disabled and
+  // success branches above, which is what the /health/refresh call is for —
+  // the kill-switch stays visible within one tick.
+  if (!isFreshProbeOutcome(currentState.proxy.last_evaluated_probe_end, currentState.proxy.last_probe_end)) {
+    return;
+  }
+  currentState.proxy.last_evaluated_probe_end = currentState.proxy.last_probe_end;
+
+  // Slide the kickstart window.
   const now = Date.now();
   currentState.proxy.kickstart_timestamps = currentState.proxy.kickstart_timestamps
     .filter(ts => (now - ts) < PROXY_KICKSTART_WINDOW_MS);
@@ -1772,13 +1852,12 @@ function evaluateAutoHealFSM() {
    }
 
   // Fire kickstart through the dispatcher (Pattern E — same code path as dashboard Restart button).
-  currentState.proxy.kickstart_timestamps.push(now);
-  currentState.proxy.kickstart_count += 1;
   currentState.proxy.auto_heal_status = 'kickstart_pending';
-  log(`proxy auto-heal: dispatching restart_llm_cli_proxy (consecutive_failures=${currentState.proxy.consecutive_failures}, kickstart_count=${currentState.proxy.kickstart_count}, reason=${reason || 'unknown'})`, 'INFO');
-  getRemediationDispatcher()
-    .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'semantic_ok=false sustained' }))
-    .catch(err => log(`proxy auto-heal kickstart failed: ${err.message}`, 'ERROR'));
+  dispatchProxyKickstart({
+    reason: 'semantic_ok=false sustained',
+    logPrefix: 'proxy auto-heal',
+    detail: `consecutive_failures=${currentState.proxy.consecutive_failures}, reason=${reason || 'unknown'}`,
+  });
 }
 
 // Hysteresis state for networkMode flip detection. The proxy's reported
@@ -1840,11 +1919,17 @@ async function pollProxyMode() {
       }
 
       if (pendingNetworkModeFlip.count >= NETWORK_MODE_FLIP_CONFIRM_TICKS) {
-        log(`proxy networkMode flip ${prevMode} -> ${newMode} confirmed (${pendingNetworkModeFlip.count} consecutive ticks), dispatching restart_llm_cli_proxy`, 'INFO');
         pendingNetworkModeFlip = null;
-        getRemediationDispatcher()
-          .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'networkMode-flip' }))
-          .catch(err => log(`networkMode-flip kickstart failed: ${err.message}`, 'ERROR'));
+        // countsTowardCap: false — a network change is a user action, not a
+        // proxy failure, so it must not spend the failure budget. It IS
+        // debounced: if something restarted the proxy seconds ago, the fresh
+        // network detection this flip wants has already happened.
+        dispatchProxyKickstart({
+          reason: 'networkMode-flip',
+          logPrefix: `proxy networkMode flip ${prevMode} -> ${newMode} confirmed`,
+          detail: `${NETWORK_MODE_FLIP_CONFIRM_TICKS} consecutive ticks`,
+          countsTowardCap: false,
+        });
       } else {
         log(`proxy networkMode flip ${prevMode} -> ${newMode} pending (${pendingNetworkModeFlip.count}/${NETWORK_MODE_FLIP_CONFIRM_TICKS})`, 'DEBUG');
       }
@@ -1922,11 +2007,18 @@ function evaluateProxyStaleness() {
     return;
   }
 
-  log(`proxy stale: host=${hostClass} but proxy frozen at ${proxyClass} for ${pendingProxyStaleMismatch.count} ticks — dispatching restart_llm_cli_proxy`, 'INFO');
+  const ticks = pendingProxyStaleMismatch.count;
   pendingProxyStaleMismatch = null;
-  getRemediationDispatcher()
-    .then(d => d.executeAction('restart_llm_cli_proxy', { reason: 'network-location-mismatch' }))
-    .catch(err => log(`proxy staleness kickstart failed: ${err.message}`, 'ERROR'));
+  // countsTowardCap: false, as before — a network change is a user action. But
+  // debounced now: the mismatch this reads is exactly what a just-dispatched
+  // restart is on its way to correcting, and re-dispatching mid-restart is how
+  // the 2026-08-31 cascade turned one event into a kickstart that errored.
+  dispatchProxyKickstart({
+    reason: 'network-location-mismatch',
+    logPrefix: `proxy stale: host=${hostClass} but proxy frozen at ${proxyClass}`,
+    detail: `${ticks} ticks`,
+    countsTowardCap: false,
+  });
 }
 
 // ETM spawn safety net (Phase 33 fills the gap left by removing the legacy
