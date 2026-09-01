@@ -12,6 +12,14 @@ Comprehensive reference guides with detailed explanations, complete configuratio
   </div>
 </a>
 
+<a href="network-configuration/" class="thumbnail-card">
+  <img src="../images/network-aware-agent-selection.png" alt="Network Configuration">
+  <div class="card-content">
+    <h3>Network Configuration</h3>
+    <p>Corporate VPN and proxy detection, and how each agent's API traffic is routed on either network</p>
+  </div>
+</a>
+
 <a href="status-line/" class="thumbnail-card">
   <img src="../images/status-line-display.png" alt="Status Line">
   <div class="card-content">
@@ -25,6 +33,14 @@ Comprehensive reference guides with detailed explanations, complete configuratio
   <div class="card-content">
     <h3>Health Dashboard</h3>
     <p>6-layer protection architecture, 9-class system design, and UKB workflow monitoring</p>
+  </div>
+</a>
+
+<a href="llm-providers/" class="thumbnail-card">
+  <img src="../images/llm-mode-control.png" alt="LLM Providers">
+  <div class="card-content">
+    <h3>LLM Providers</h3>
+    <p>Cloud and local providers for semantic analysis — mock/local/public modes, fallback, per-agent overrides</p>
   </div>
 </a>
 
@@ -61,13 +77,6 @@ Comprehensive reference guides with detailed explanations, complete configuratio
 </a>
 
 </div>
-
-## More Guides
-
-Same depth as the cards above — these simply have no diagram to lead with.
-
-- [Network Configuration](network-configuration.md) — corporate VPN, proxy detection, and agent-specific API routing
-- [LLM Providers](llm-providers.md) — configuring cloud and local providers for semantic analysis workflows
 
 ## When to Use These Guides
 
