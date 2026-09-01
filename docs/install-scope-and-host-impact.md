@@ -161,9 +161,9 @@ functions that used to write to them at default scope, hashes again, and asserts
 byte-identity. That check fails hard even under `--ci`: a global write is a real
 regression, not an unsatisfied environment precondition. CI additionally runs a
 real `./install.sh --ci` on Linux and re-checks the same invariant afterwards —
-see [Cross-platform CI](./ci/README.md).
+see [Continuous Integration → Cross-platform](./ci/README.md#cross-platform-installer-portability).
 
 ## Related
 
 - [Getting Started](./getting-started.md) — prerequisites and first run
-- [Cross-platform CI](./ci/README.md) — what is verified, and where
+- [Continuous Integration](./ci/README.md) — all four workflows: what each proves, and where the gaps are covered instead

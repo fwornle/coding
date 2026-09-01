@@ -119,6 +119,7 @@ nav:
     - Health Dashboard: guides/health-dashboard.md
     - LLM Providers: guides/llm-providers.md
     - Constraint Testing: guides/constraint-testing.md
+    - Continuous Integration: ci/README.md
     - VKB Visualization: guides/vkb-visualization.md
     - Knowledge Workflows: guides/knowledge-workflows.md
     - Skills System: guides/skills-system.md
