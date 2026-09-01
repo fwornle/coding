@@ -24,6 +24,28 @@ export interface RecentCall {
   chain_position: number
   attempt_trail: string
   routing_source: string
+  /**
+   * The opening user message of the conversation, truncated by the proxy. Not
+   * this call's own prompt — extractPromptPreview() takes the FIRST user
+   * message, so it is stable for a whole conversation. That is exactly what the
+   * turn header wants to show, and it is why no new content column was needed.
+   */
+  prompt_preview?: string
+  /**
+   * Turn identity. '' / 0 mean NOT RECORDED — every row written before the
+   * proxy grew these columns, plus any writer with no messages to key on.
+   * Never treat 0 as "turn zero"; the By-turn view buckets those separately
+   * rather than inventing a turn for them.
+   */
+  conversation_key?: string
+  turn_index?: number
+  /**
+   * Who decided `route_band`: 'caller' | 'classifier' | 'route <key>' |
+   * 'defaults.<cls> (...)'. The band alone cannot separate an agent asking for
+   * medium from the classifier saying medium from nobody saying anything, and
+   * those have different fixes.
+   */
+  band_source?: string
 }
 
 export interface AttemptTrail {
@@ -33,6 +55,14 @@ export interface AttemptTrail {
   skipped?: Array<{ provider: string; reason: string; kind: string }>
   /** The proxy's verbatim reason the offload declined. Also config-shaped. */
   offloadSkipped?: string | null
+  /**
+   * What the prompt classifier did, or why it did nothing — the proxy's own
+   * words, e.g. `classified medium -> small` or `conversation already contains
+   * tool results`. Recorded since the classifier shipped and never read here
+   * until now, which is why the UI could show that a band WAS `small` but never
+   * that the classifier is what made it so.
+   */
+  classifier?: string | null
 }
 
 /** Tolerant parse — one malformed trail must not blank the strip. */

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePolledFetch } from '@/hooks/usePolledFetch'
 import { Settings, TrendingUp, Lightbulb, ArrowRight, Gauge, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,8 +52,12 @@ export function CostTab({ proxyBase }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null)
+  const load = useCallback(async (isAuto = false) => {
+    // No spinner on an automatic refresh: the data is already on screen and
+    // replacing it with a loading state every 30s is worse than a brief stale
+    // frame. Same isAuto convention token-usage.tsx's fetchData uses.
+    if (!isAuto) setLoading(true)
+    setError(null)
     try {
       const [costRes, setRes] = await Promise.all([
         fetch(`${proxyBase}/api/token-usage/cost?months=${months}`),
@@ -72,7 +77,13 @@ export function CostTab({ proxyBase }: Props) {
     } finally { setLoading(false) }
   }, [proxyBase, months])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { void load(false) }, [load])
+
+  // Cost is a running total, so a tab left open under-reports indefinitely.
+  // Paused while the settings dialog is open: that dialog edits the very
+  // `cost` / `processOverrides` settings this fetch adopts from the server, and
+  // refreshing underneath it would revert an operator's half-finished edit.
+  usePolledFetch(load, { intervalMs: 30_000, enabled: !settingsOpen })
 
   // Months present, newest first; default the pivot/tiles to the newest.
   const monthsPresent = useMemo(() => {
@@ -213,7 +224,10 @@ export function CostTab({ proxyBase }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {toast && <span className="text-xs text-muted-foreground">{toast}</span>}
-          <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
+          {/* Wrapped, not passed directly: onClick hands the handler a
+              MouseEvent, which as `isAuto` is truthy and would suppress the
+              spinner on the one path that should always show it. */}
+          <Button variant="outline" size="sm" onClick={() => void load(false)}><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
           <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}><Settings className="h-4 w-4 mr-1" />Prices & Budgets</Button>
         </div>
       </div>

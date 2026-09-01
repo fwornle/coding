@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePolledFetch } from '@/hooks/usePolledFetch'
 import { getProviderColor, normalizeProvider } from '@/lib/providers'
 import { normalizeModel } from '@/components/performance/models'
 import { DecisionLadder, layoutLadder } from '@/components/llm-routing/decision-ladder'
@@ -172,15 +173,25 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
   // unreachable the graph still draws the configuration, just without weights.
   // A flow diagram that renders nothing because a metrics call failed would be
   // worse than one that renders the config alone.
-  useEffect(() => {
-    let cancelled = false
+  const loadUsage = useCallback(async () => {
     setUsageError(null)
-    fetch(`${proxyBase}/api/token-usage/summary?hours=${encodeURIComponent(hours)}`)
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then(j => { if (!cancelled) setUsage(j.by_provider_model ?? j.by_model ?? []) })
-      .catch(e => { if (!cancelled) { setUsage([]); setUsageError(e.message) } })
-    return () => { cancelled = true }
+    try {
+      const r = await fetch(`${proxyBase}/api/token-usage/summary?hours=${encodeURIComponent(hours)}`)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json()
+      setUsage(j.by_provider_model ?? j.by_model ?? [])
+    } catch (e) {
+      setUsage([])
+      setUsageError((e as Error).message)
+    }
   }, [proxyBase, hours])
+
+  useEffect(() => { void loadUsage() }, [loadUsage])
+
+  // Edge thickness is live traffic, so a diagram fetched once and left open
+  // draws last hour's shape over this hour's config. Paused while the tab is
+  // hidden — see usePolledFetch.
+  usePolledFetch(loadUsage, { intervalMs: 30_000 })
 
   // ── Traffic, folded onto account ids ──
   const traffic = useMemo(() => {

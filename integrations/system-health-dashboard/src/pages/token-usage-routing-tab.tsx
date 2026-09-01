@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { normalizeProvider } from '@/lib/providers'
 import { localClock } from '@/lib/utils'
 import { OffloadDecision } from '@/components/llm-routing/offload-decision'
+import { groupIntoTurns, describeBandSource } from '@/components/llm-routing/turn-grouping'
+import type { Turn } from '@/components/llm-routing/turn-grouping'
+import type { RecentCall } from '@/components/llm-routing/recent-call'
+import { usePolledFetch } from '@/hooks/usePolledFetch'
 import type { ProviderInfo } from './token-usage-flow-tab'
 
 /**
@@ -133,6 +137,15 @@ interface RecentRow {
   chain_position: number
   attempt_trail: string
   routing_source: string
+  /** Upstream request id. The row's identity, and so the table's React key. */
+  tool_call_id?: string
+  /** Opening user message of the conversation — what the turn header shows. */
+  prompt_preview?: string
+  /** Turn identity; '' / 0 mean not recorded. See turn-grouping.ts. */
+  conversation_key?: string
+  turn_index?: number
+  /** Who decided route_band: caller | classifier | route <key> | defaults.<cls> */
+  band_source?: string
 }
 
 interface Props {
@@ -140,6 +153,9 @@ interface Props {
   /** Traffic window; mirrors the page selector so every number shares one span. */
   hours: string
 }
+
+/** Matches token-usage.tsx's REFRESH_INTERVAL so every tab on the page agrees. */
+const REFRESH_INTERVAL_MS = 30_000
 
 const fmt = (n: number): string => (
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
@@ -155,24 +171,39 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
   const [recent, setRecent] = useState<RecentRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  // 'call' is the original flat tail; 'turn' groups by the proxy's recorded
+  // turn identity. Not a filter — the same rows, read at the altitude the
+  // question is actually asked at ("why did half my question run locally?").
+  const [view, setView] = useState<'call' | 'turn'>('call')
+  const [openTurn, setOpenTurn] = useState<string | null>(null)
   // Bumped when the offload policy is saved. Every figure on this tab is
   // downstream of the routing config, so a policy write invalidates all of them,
   // not just the card that made it.
   const [reloadNonce, setReloadNonce] = useState(0)
 
-  useEffect(() => {
-    let cancelled = false
+  // Whether the offload-policy card below is holding an unsaved edit. Lifted out
+  // of OffloadDecision purely so the poll can leave the CONFIG alone while a
+  // draft is open — see the fetch below.
+  const [draftDirty, setDraftDirty] = useState(false)
+
+  const load = useCallback(async (isAuto: boolean) => {
     setError(null)
-    Promise.all([
-      fetch(`${proxyBase}/api/llm/routing/behaviour?hours=${encodeURIComponent(hours)}`).then(r => r.json()),
-      fetch(`${proxyBase}/api/llm/routing`).then(r => r.json()),
-      fetch(`${proxyBase}/api/token-usage/recent?limit=500`).then(r => r.json()),
-    ])
-      .then(([b, c, rec]) => {
-        if (cancelled) return
+    try {
+      // Traffic always refreshes; the config is skipped while a draft is
+      // unsaved. useOffloadPolicyDraft owns its own copy and only re-reads it
+      // on mount or save, so this cannot clobber the draft directly — but the
+      // routes/providers this tab passes DOWN to that card would shift beneath
+      // an operator mid-edit, and a policy preview computed against
+      // half-swapped config is a number nobody can account for.
+      const skipConfig = isAuto && draftDirty
+      const [b, c, rec] = await Promise.all([
+        fetch(`${proxyBase}/api/llm/routing/behaviour?hours=${encodeURIComponent(hours)}`).then(r => r.json()),
+        skipConfig ? Promise.resolve(null) : fetch(`${proxyBase}/api/llm/routing`).then(r => r.json()),
+        fetch(`${proxyBase}/api/token-usage/recent?limit=500`).then(r => r.json()),
+      ])
         if (b.error) throw new Error(b.error)
         setBehaviour(b)
-        setConfig(c)
+        if (c) setConfig(c)
         // Only rows that carry a decision — the rest have nothing to show here.
         //
         // The provider is folded onto its ACCOUNT id on the way in. History holds
@@ -181,13 +212,25 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         // route look as though it served two providers — which this view would
         // then present as a divergence, i.e. a fallback that never happened. The
         // behaviour endpoint folds the same way, so both halves of the tab agree.
-        setRecent((rec.data ?? [])
-          .filter((r: RecentRow) => r.routing_source)
-          .map((r: RecentRow) => ({ ...r, provider: normalizeProvider(r.provider) })))
-      })
-      .catch(e => { if (!cancelled) setError(String(e.message || e)) })
-    return () => { cancelled = true }
-  }, [proxyBase, hours, reloadNonce])
+      setRecent((rec.data ?? [])
+        .filter((r: RecentRow) => r.routing_source)
+        .map((r: RecentRow) => ({ ...r, provider: normalizeProvider(r.provider) })))
+    } catch (e) {
+      setError(String((e as Error).message || e))
+    }
+  }, [proxyBase, hours, draftDirty])
+
+  // Mount + whenever the window or a policy save invalidates everything.
+  useEffect(() => { void load(false) }, [proxyBase, hours, reloadNonce])
+
+  // ...and on a timer thereafter. Everything on this tab is a record of what the
+  // router just did, so a tab left open on a once-fetched frame is the one
+  // failure mode it cannot afford. Paused while a policy draft is unsaved so an
+  // edit is never interrupted, and while the browser tab is hidden.
+  const { countdown, refreshNow } = usePolledFetch(load, {
+    intervalMs: REFRESH_INTERVAL_MS,
+    enabled: !draftDirty,
+  })
 
   // Routes whose traffic did NOT all land on the provider the config names.
   // This is the list the old dashboard could not produce at all.
@@ -244,6 +287,11 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
       })
       .sort((a, b) => b.tokens - a.tokens)
   }, [behaviour, config])
+
+  const turns = useMemo(
+    () => groupIntoTurns(recent as unknown as RecentCall[]),
+    [recent]
+  )
 
   if (error) {
     return (
@@ -385,6 +433,7 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
           worth asking about happens inside it. */}
       <OffloadDecision
         proxyBase={proxyBase}
+        onDirtyChange={setDraftDirty}
         hours={hours}
         routes={config.routes}
         defaults={config.defaults}
@@ -546,12 +595,42 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
       {/* ── Individual calls ── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">
-            Recent decisions
-            <span className="block text-[11px] font-normal text-muted-foreground mt-0.5">
-              One row per call. Click a row that took a fallback or skipped a candidate to see the trail.
-            </span>
-          </CardTitle>
+          <div className="flex items-start justify-between gap-3">
+            <CardTitle className="text-sm">
+              Recent decisions
+              <span className="block text-[11px] font-normal text-muted-foreground mt-0.5">
+                {view === 'call'
+                  ? 'One row per call. Click a row that took a fallback or skipped a candidate to see the trail.'
+                  : 'One row per TURN. An agentic turn is several calls, and they do not all route the same way — expand one to see each call, which band applied, and who decided it.'}
+              </span>
+            </CardTitle>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* The countdown is the same promise the health dashboard makes.
+                  It reads "paused" rather than counting while a policy draft is
+                  open, because silently not refreshing is the failure this
+                  whole block exists to remove. */}
+              <span className="text-[10px] text-muted-foreground tabular-nums">
+                {countdown === null
+                  ? (draftDirty ? 'paused — unsaved policy' : 'paused')
+                  : `Refreshing in ${countdown}s`}
+              </span>
+              <button
+                onClick={refreshNow}
+                className="text-[10px] px-2 py-0.5 rounded border hover:bg-muted/60"
+              >Refresh</button>
+              <div className="flex rounded border overflow-hidden">
+                {(['call', 'turn'] as const).map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setView(v)}
+                    className={`text-[10px] px-2 py-0.5 ${
+                      view === v ? 'bg-muted font-medium' : 'hover:bg-muted/60'
+                    }`}
+                  >{v === 'call' ? 'By call' : 'By turn'}</button>
+                ))}
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
@@ -567,8 +646,20 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {recent.map((r, i) => {
-                  const id = `${r.timestamp}-${i}`
+                {view === 'turn' && (
+                  <TurnRows
+                    turns={turns}
+                    open={openTurn}
+                    onToggle={id => setOpenTurn(openTurn === id ? null : id)}
+                  />
+                )}
+                {view === 'call' && recent.map((r) => {
+                  // Identity, NOT position. The index-based key this used to
+                  // carry was harmless while the table was fetched once; under
+                  // polling it re-binds the expanded row to whatever call lands
+                  // in that slot next, so an open trail silently becomes a
+                  // different call's trail.
+                  const id = `${r.timestamp}-${r.tool_call_id || r.route_key}`
                   const trail = r.attempt_trail ? safeParse(r.attempt_trail) : null
                   const clickable = !!trail
                   return (
@@ -642,6 +733,116 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
       </Card>
 
     </div>
+  )
+}
+
+/**
+ * The By-turn body: one row per turn, expanding to the calls that made it up.
+ *
+ * ── What this view is for ───────────────────────────────────────────────────
+ * A turn is not a call. Asking pi "what is this repo about?" produced two calls
+ * six seconds apart, on two different providers, and the flat tail shows them
+ * as two unrelated decisions between other processes' rows. The question people
+ * actually ask — "why did half of my question run on the local box?" — is a
+ * question about the turn, and could not be asked of this tab at all.
+ *
+ * ── Why the unrecorded bucket is rendered so differently ────────────────────
+ * Rows written before the proxy recorded turn identity have no turn, and there
+ * is no honest way to invent one: prompt_preview is the conversation's FIRST
+ * message, so it cannot separate turn 1 from turn 7. They are shown as a
+ * labelled bucket, collapsed, and explicitly not called a turn — the same rule
+ * the rest of this tab follows for reconstructed data.
+ */
+function TurnRows({ turns, open, onToggle }: {
+  turns: Turn[]
+  open: string | null
+  onToggle: (id: string) => void
+}) {
+  if (turns.length === 0) {
+    return (
+      <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+        No calls with a recorded decision yet.
+      </td></tr>
+    )
+  }
+  return (
+    <>
+      {turns.map(turn => {
+        const isOpen = open === turn.id
+        return (
+          <Fragment key={turn.id || 'unrecorded'}>
+            <tr
+              onClick={() => onToggle(turn.id)}
+              className="border-b cursor-pointer hover:bg-muted/40 align-top"
+            >
+              <td className="px-3 py-1.5 font-mono text-muted-foreground whitespace-nowrap">
+                <span className="inline-block w-3">{isOpen ? '▾' : '▸'}</span>{' '}
+                {turn.recorded ? localClock(turn.startedAt) : '—'}
+              </td>
+              <td className="px-3 py-1.5 font-mono">
+                {turn.recorded
+                  ? (turn.routeKey || <span className="text-muted-foreground">mixed</span>)
+                  : <span className="text-muted-foreground">no turn recorded</span>}
+                {turn.recorded && (
+                  <span className="text-muted-foreground"> · turn {turn.turnIndex}</span>
+                )}
+              </td>
+              <td className="px-3 py-1.5 text-muted-foreground" colSpan={2}>
+                {turn.recorded
+                  ? <span className="italic">{turn.prompt || '(no prompt recorded)'}</span>
+                  : 'background services and rows written before turn identity was recorded — shown ungrouped, not guessed at'}
+              </td>
+              <td className="px-3 py-1.5">
+                <span className="text-muted-foreground">
+                  {turn.calls.length} call{turn.calls.length === 1 ? '' : 's'}
+                </span>
+                {turn.recorded && turn.servedBy.map(sb => (
+                  <Badge key={sb.provider} variant="outline" className="ml-1 text-[9px] py-0">
+                    {sb.provider} ×{sb.calls}
+                  </Badge>
+                ))}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums">{fmt(turn.totalTokens)}</td>
+            </tr>
+
+            {isOpen && turn.calls.map((c, i) => {
+              const why = describeBandSource(c)
+              const trail = c.attempt_trail ? safeParse(c.attempt_trail) : null
+              return (
+                <tr key={`${turn.id}-${c.timestamp}-${i}`} className="border-b bg-muted/20 align-top">
+                  <td className="px-3 py-1 pl-8 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                    #{i + 1} {localClock(c.timestamp)}
+                  </td>
+                  <td className="px-3 py-1 font-mono text-[11px]">{c.route_key || '—'}</td>
+                  {/* Band AND who decided it. The band alone is what made this
+                      whole thing unanswerable: `small` and `medium` on two calls
+                      of one turn look like a measurement of the work, when in
+                      fact the caller declared `medium` both times and only the
+                      first was eligible for the classifier to look at. */}
+                  <td className="px-3 py-1 font-mono text-[11px]">
+                    {c.route_band || '—'}
+                    {why && <span className="block text-[10px] text-muted-foreground">{why}</span>}
+                  </td>
+                  <td className="px-3 py-1 font-mono text-[11px]">{c.provider}/{c.model}</td>
+                  <td className="px-3 py-1 text-[11px]">
+                    {c.offloaded_from
+                      ? <Badge variant="outline" className="text-[9px] py-0 text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
+                          offloaded from {c.offloaded_from}
+                        </Badge>
+                      : trail?.offloadSkipped
+                        ? <span className="text-muted-foreground">✗ {trail.offloadSkipped}</span>
+                        : <span className="text-muted-foreground">as routed</span>}
+                  </td>
+                  <td className="px-3 py-1 text-right tabular-nums text-[11px]">
+                    {fmt(c.total_tokens + (c.cache_read_tokens || 0) + (c.cache_write_tokens || 0))}
+                  </td>
+                </tr>
+              )
+            })}
+          </Fragment>
+        )
+      })}
+    </>
   )
 }
 
