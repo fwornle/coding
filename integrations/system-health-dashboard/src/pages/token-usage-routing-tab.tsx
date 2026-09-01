@@ -117,7 +117,28 @@ interface RoutingConfig {
   } | null
   /** Shaped as the flow diagram declares it; the `unknown` here needed a cast. */
   fallback: { chains: Record<string, Array<{ provider: string; when: { network?: string[] } | null }>> }
-  runtime: { network: string; availableImpls: string[] }
+  runtime: {
+    network: string
+    availableImpls: string[]
+    /**
+     * Whether outbound traffic currently has a proxy in force.
+     *
+     * `degraded` is the corporate-network-with-direct-egress pairing: routing
+     * still resolves, on-prem targets still answer, and everything that has to
+     * leave the building fails with `fetch failed`. Nothing else on this tab
+     * can show it — a route can look perfectly correct and be unreachable.
+     *
+     * Optional: a proxy predating the field sends none, which reads as
+     * "unknown" and renders nothing rather than a false all-clear.
+     */
+    egress?: {
+      proxy: string | null
+      network: 'corporate' | 'public' | null
+      degraded: boolean
+      reason: string
+      since: number | null
+    }
+  }
   warnings?: string[]
 }
 
@@ -344,6 +365,30 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         />
       </div>
 
+      {/* ── Egress, when it is the state that breaks everything off-prem ──
+          Deliberately above the numbers rather than beside them: while this is
+          true, every figure below describes calls that cannot leave the
+          machine, and reading them as routing behaviour is the mistake this
+          banner exists to prevent. Silent when healthy — a warning that shows
+          in the normal case is one nobody reads in the abnormal one. */}
+      {config.runtime.egress?.degraded && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 px-3 py-2 space-y-1">
+          <div className="font-medium text-destructive">
+            Egress is direct on a corporate network — off-prem providers are unreachable
+          </div>
+          <div className="text-[11px] text-muted-foreground font-mono break-words">
+            {config.runtime.egress.reason}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Every provider except the on-prem ones will fail with <code>fetch failed</code>, and
+            every hop of a fallback chain leaves through this same pin — so the chain dies as a
+            unit rather than recovering. The proxy re-probes every 30s; if it does not clear,
+            restart it <em>while on the corporate network</em> so the launcher can pin a verified
+            proxy: <code>launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy</code>
+          </div>
+        </div>
+      )}
+
       {/* Honesty about the denominator. A window that is mostly pre-instrumentation
           rows makes every percentage above a statement about a slice, and saying so
           costs one line. */}
@@ -362,6 +407,21 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
             Configured
             <Badge variant="outline" className="text-[10px] font-normal">read-only · edit in Settings</Badge>
             <Badge variant="outline" className="text-[10px] font-mono font-normal">network: {config.runtime.network}</Badge>
+            {/* The pin itself, always — not only when it is wrong. Half of what
+                made the 2026-09-01 outage hard was that nothing anywhere stated
+                which egress was in force, so "direct" and "via a proxy" looked
+                identical right up until every call failed. */}
+            {config.runtime.egress && (
+              <Badge
+                variant="outline"
+                className={`text-[10px] font-mono font-normal ${
+                  config.runtime.egress.degraded ? 'text-destructive border-destructive/40' : ''
+                }`}
+                title={config.runtime.egress.reason}
+              >
+                egress: {config.runtime.egress.proxy ?? 'direct'}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-xs">
