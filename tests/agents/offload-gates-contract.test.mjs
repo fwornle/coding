@@ -22,29 +22,30 @@
 
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { createRequire } from 'node:module';
+import { loadRoutingModules } from '../helpers/dashboard-ts.mjs';
 
-const require = createRequire(import.meta.url);
 const PORT = process.env.LLM_CLI_PROXY_PORT || '12435';
 const BASE = `http://127.0.0.1:${PORT}`;
-const SRC = path.resolve(
-  import.meta.dirname, '..', '..',
-  'integrations/system-health-dashboard/src/components/llm-routing/offload-gates.ts');
 
 let gates = null;
 let config = null;
 let reachable = false;
 
-/** Transpile the TS module so node can import it. esbuild is already a dashboard dep. */
+/**
+ * Transpile the TS module so node can import it.
+ *
+ * Was an absolute `/Users/Q284340/...` require. That never crashed, which is
+ * precisely how it hid: the call sits inside the try/catch below, which maps
+ * ANY failure to "proxy not reachable", so on every machine but one this file
+ * reported a clean SKIP while testing nothing. Shared resolution now finds
+ * esbuild via the root devDependency, so a skip here means what it says.
+ */
 async function loadGates() {
-  const esbuild = require('/Users/Q284340/Agentic/coding/integrations/system-health-dashboard/node_modules/esbuild');
-  const out = esbuild.transformSync(fs.readFileSync(SRC, 'utf8'), { loader: 'ts', format: 'esm' });
-  const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gates-')), 'offload-gates.mjs');
-  fs.writeFileSync(tmp, out.code);
-  return import(tmp);
+  return loadRoutingModules({
+    names: ['offload-gates'],
+    entry: 'offload-gates',
+    prefix: 'gates-',
+  });
 }
 
 before(async () => {

@@ -13,14 +13,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { createRequire } from 'node:module';
+import { loadRoutingModules } from '../helpers/dashboard-ts.mjs';
 
-const require = createRequire(import.meta.url);
-const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const SRC = path.join(ROOT, 'integrations/system-health-dashboard/src/components/llm-routing');
 
 /**
  * Transpile recent-call.ts and the module it imports into one temp dir.
@@ -35,19 +29,11 @@ const SRC = path.join(ROOT, 'integrations/system-health-dashboard/src/components
  * executing nothing. An import that the module graph itself waits on cannot do
  * that.
  */
-const m = await (async () => {
-  const esbuild = require(path.join(ROOT, 'integrations/system-health-dashboard/node_modules/esbuild'));
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'recent-call-'));
-  for (const name of ['offload-gates', 'recent-call']) {
-    const ts = fs.readFileSync(path.join(SRC, `${name}.ts`), 'utf8');
-    const { code } = esbuild.transformSync(ts, { loader: 'ts', format: 'esm' });
-    // esbuild normalises string quotes, so match either. Getting this wrong is
-    // silent until resolution: the file writes fine and only the import throws.
-    fs.writeFileSync(path.join(dir, `${name}.mjs`),
-      code.replace(/(['"])\.\/offload-gates\1/g, '"./offload-gates.mjs"'));
-  }
-  return import(path.join(dir, 'recent-call.mjs'));
-})();
+const m = await loadRoutingModules({
+  names: ['offload-gates', 'recent-call'],
+  entry: 'recent-call',
+  prefix: 'recent-call-',
+});
 
 /** A row as the endpoint actually returns one. */
 function row(over = {}) {

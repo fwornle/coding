@@ -11,26 +11,14 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { createRequire } from 'node:module';
+import { loadRoutingModules } from '../helpers/dashboard-ts.mjs';
 
-const require = createRequire(import.meta.url);
-const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const SRC = path.join(ROOT, 'integrations/system-health-dashboard/src/components/llm-routing');
 
-const m = await (async () => {
-  const esbuild = require(path.join(ROOT, 'integrations/system-health-dashboard/node_modules/esbuild'));
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'replay-'));
-  for (const name of ['offload-gates', 'offload-replay']) {
-    const ts = fs.readFileSync(path.join(SRC, `${name}.ts`), 'utf8');
-    const { code } = esbuild.transformSync(ts, { loader: 'ts', format: 'esm' });
-    fs.writeFileSync(path.join(dir, `${name}.mjs`),
-      code.replace(/(['"])\.\/offload-gates\1/g, '"./offload-gates.mjs"'));
-  }
-  return import(path.join(dir, 'offload-replay.mjs'));
-})();
+const m = await loadRoutingModules({
+  names: ['offload-gates', 'offload-replay'],
+  entry: 'offload-replay',
+  prefix: 'replay-',
+});
 
 const PASS = 6;
 
