@@ -1,0 +1,65 @@
+@startuml ci-workflows
+!include _standard-style.puml
+
+title Continuous Integration — four independent workflows
+
+top to bottom direction
+
+rectangle "GitHub event" as EV <<external>>
+
+package "tests.yml — job: test" {
+  component "reconstruct the environment\nclone km-core at the pinned SHA ·\nlink @fwornle/km-core · build its ""dist/""" <<infra>> as T_ENV
+  component "build ""dist/""\ntolerates the ""tsc"" exit code,\nasserts the emitted artifact instead" <<infra>> as T_BUILD
+  component """lint"" · ""jest"" · ""node:test""\ntwo runners, split by content:\ndoes the file import ""node:test""?" <<core>> as T_RUN
+
+  T_ENV CONTROL_LINE T_BUILD
+  T_BUILD CONTROL_LINE T_RUN
+}
+
+package "egress-lint.yml — job: egress-lint" {
+  component "submodules, best effort\nno ""npm install"" at all" <<infra>> as E_PREP
+  component "refuse code that reaches\na provider cloud directly" <<api>> as E_CHECK
+
+  E_PREP CONTROL_LINE E_CHECK
+}
+
+package "deploy-docs.yml — the published site" {
+  component "gate\nreads the diff, not the event\n(PushEvent truncates at 20 commits)" <<core>> as D_GATE
+  component "build\n""mkdocs build ~--strict""\n+ stamp "".docs-manifest""" <<core>> as D_BUILD
+  component "deploy" <<api>> as D_DEPLOY
+  component "freshness\nlive manifest vs main —\nfails only on proven staleness" <<util>> as D_FRESH
+  database "GitHub Pages" <<storage>> as PAGES
+
+  D_GATE CONTROL_LINE D_BUILD : docs changed
+  D_BUILD CONTROL_LINE D_DEPLOY
+  D_DEPLOY DATA_LINE PAGES
+  D_GATE OPTIONAL_LINE D_FRESH : unchanged
+  D_FRESH ASYNC_LINE PAGES : reads "".docs-manifest""
+}
+
+package "cross-platform-lite.yml — installer portability" {
+  component "portability\nubuntu · macOS · windows\n(bash on all three)" <<core>> as X_PORT
+  component "dry-run-is-inert\n""~--dry-run"" mutates nothing" <<core>> as X_DRY
+  component "real-install\nthen requirement 7: shared agent\nconfigs still byte-identical" <<core>> as X_REAL
+
+  X_PORT -[hidden]- X_DRY
+  X_DRY -[hidden]- X_REAL
+}
+
+EV SYNC_LINE T_ENV : push · PR · manual
+EV SYNC_LINE E_PREP : push · PR · manual
+EV SYNC_LINE D_GATE : push · manual
+EV SYNC_LINE X_PORT : PR · manual
+
+note bottom of X_REAL
+  **lite** = no Docker, no agent CLIs, no private
+  submodules, no corporate proxy. Its ""push:"" trigger
+  is commented out, not absent — enabling it is one line.
+end note
+
+note bottom of T_RUN
+  Each workflow has its own failure meaning.
+  A red run in one says nothing about the other three.
+end note
+
+@enduml
