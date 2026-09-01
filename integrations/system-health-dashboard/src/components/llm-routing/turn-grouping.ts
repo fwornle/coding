@@ -34,7 +34,7 @@ export interface Turn {
   startedAt: string
   /** The route every call in the turn shares, or '' when they differ. */
   routeKey: string
-  /** The opening prompt, reused from prompt_preview; '' when unavailable. */
+  /** What the turn asked, from prompt_preview; '' when the row predates it. */
   prompt: string
   totalTokens: number
   /** Worst outcome across the turn — a turn is as interesting as its worst call. */

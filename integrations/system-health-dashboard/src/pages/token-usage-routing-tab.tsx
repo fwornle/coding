@@ -748,10 +748,11 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
  *
  * ── Why the unrecorded bucket is rendered so differently ────────────────────
  * Rows written before the proxy recorded turn identity have no turn, and there
- * is no honest way to invent one: prompt_preview is the conversation's FIRST
- * message, so it cannot separate turn 1 from turn 7. They are shown as a
- * labelled bucket, collapsed, and explicitly not called a turn — the same rule
- * the rest of this tab follows for reconstructed data.
+ * is no honest way to invent one — two calls sharing a preview may be one turn
+ * or two identical prompts an hour apart, and nothing on a legacy row tells
+ * them apart. They are shown as a labelled bucket, collapsed, and explicitly
+ * not called a turn — the same rule the rest of this tab follows for
+ * reconstructed data.
  */
 function TurnRows({ turns, open, onToggle }: {
   turns: Turn[]

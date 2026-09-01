@@ -25,10 +25,10 @@ export interface RecentCall {
   attempt_trail: string
   routing_source: string
   /**
-   * The opening user message of the conversation, truncated by the proxy. Not
-   * this call's own prompt — extractPromptPreview() takes the FIRST user
-   * message, so it is stable for a whole conversation. That is exactly what the
-   * turn header wants to show, and it is why no new content column was needed.
+   * What THIS turn asked: the last non-tool-result user message, redacted and
+   * truncated by the proxy. Every call of one turn therefore carries the same
+   * preview, which is what lets the turn header show it. Reusing this column is
+   * why the By-turn view needed no new content column of its own.
    */
   prompt_preview?: string
   /**
