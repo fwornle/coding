@@ -34,6 +34,13 @@ export interface OffloadTarget {
   requireNetwork: string | null
   enabled: boolean
   scope?: string[]
+  /**
+   * Bands THIS target may take, narrowing the policy's global `offloadBands`.
+   * `null`/absent means "every band the policy allows" — kept as absent rather
+   * than materialised so widening the global list reaches an unrestricted
+   * target without anyone having to edit it too.
+   */
+  offloadBands?: string[] | null
 }
 
 export interface OffloadPolicy {
@@ -74,6 +81,11 @@ export const GATES = [
     id: 'target',
     label: 'a target serves this network, and is switched on',
     hint: 'require_network · enabled',
+  },
+  {
+    id: 'target-band',
+    label: 'that target takes work this hard',
+    hint: 'targets[].offload_bands',
   },
   {
     id: 'scope',
@@ -125,7 +137,8 @@ export function pickTarget(policy: OffloadPolicy | null, network: string): Offlo
 /** Human list of the declared targets, as the proxy prints it in its reason strings. */
 export function describeTargets(policy: OffloadPolicy | null): string {
   const list = (policy?.targets ?? []).map((t) =>
-    `${t.provider}[${t.requireNetwork || 'any'}/${(t.scope ?? ['fg', 'bg']).join('+')}]`
+    `${t.provider}[${t.requireNetwork || 'any'}/${(t.scope ?? ['fg', 'bg']).join('+')}`
+    + `${t.offloadBands ? `/${t.offloadBands.join('+')}` : ''}]`
     + `${t.enabled === false ? ' (off)' : ''}`)
   return list.length ? list.join(', ') : 'none declared'
 }
@@ -180,14 +193,22 @@ export function evaluateOffload(
     return stay(3, `no offload target for network=${normalizeNetwork(network)} (targets: ${describeTargets(policy)})`)
   }
 
+  // Gate 4 — the target narrows what the policy allows. Distinct from gate 2:
+  // that one wants the POLICY widened, this one wants THIS endpoint widened (or
+  // another declared for this network). Before targets could narrow, the two
+  // could not both be reachable.
+  if (target.offloadBands && !target.offloadBands.includes(band)) {
+    return stay(4, `target "${target.provider}" takes bands [${target.offloadBands.join(', ')}] and this is ${band} work`)
+  }
+
   const cls = jobClassOf(routeKey)
   const scope = target.scope ?? ['fg', 'bg']
   if (!scope.includes(scopeOf(cls))) {
-    return stay(4, `target "${target.provider}" serves scope [${scope.join(', ')}] and this is ${scopeOf(cls)} work (${routeKey})`)
+    return stay(5, `target "${target.provider}" serves scope [${scope.join(', ')}] and this is ${scopeOf(cls)} work (${routeKey})`)
   }
 
   if (providerHasFgTransport(entry.provider) && !providerHasFgTransport(target.provider)) {
-    return stay(5, `route provider "${entry.provider}" serves a foreground transport that "${target.provider}" cannot`)
+    return stay(6, `route provider "${entry.provider}" serves a foreground transport that "${target.provider}" cannot`)
   }
 
   return { rung: RUNG_OFFLOADED, reason: null, provider: target.provider, offloadedFrom: entry.provider }
@@ -209,7 +230,8 @@ export function rungOfReason(reason: string): number | 'unclassified' {
   if (/is not in offload_bands/.test(reason)) return 2
   if (/^no offload target for network=/.test(reason)) return 3
   if (/^require_network=/.test(reason)) return 3          // pre-2026-08-29 spelling
-  if (/serves scope \[/.test(reason)) return 4
-  if (/serves a foreground transport/.test(reason)) return 5
+  if (/takes bands \[/.test(reason)) return 4
+  if (/serves scope \[/.test(reason)) return 5
+  if (/serves a foreground transport/.test(reason)) return 6
   return 'unclassified'
 }

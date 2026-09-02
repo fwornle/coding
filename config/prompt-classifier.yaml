@@ -1,0 +1,110 @@
+# prompt-classifier.yaml — WHO judges how hard a request is, and what they are asked.
+#
+# Read by scripts/prompt-classifier-service.mjs (com.coding.prompt-classifier,
+# 127.0.0.1:12437). Hot-reloaded on mtime — no restart. Edit it here, or in the
+# dashboard at Token Usage → Routing → the offload card ("The judge").
+#
+# ── Why this file exists at all ─────────────────────────────────────────────
+# rapid-llm-proxy decides WHERE a call goes. This service decides HOW HARD the
+# call is, which is an input to that. The split is deliberate (see the header of
+# prompt-classifier-service.mjs): which model judges, what the rubric says, and
+# what `small` means for this installation are local policy that changes on our
+# schedule, and changing them should not mean restarting the component every LLM
+# call in the house goes through.
+#
+# The proxy's own `classifier:` block in llm-routing.yaml says whether to ask at
+# all, which impl to ask, and which bands a verdict may take. It says nothing
+# about the model or the words — those are here.
+#
+# ── Why `backends` is a LIST and not a URL ──────────────────────────────────
+# Until 2026-09-02 this was one endpoint from one env var, fixed at boot: the
+# laptop's llama.cpp. That produced the failure this file was written for. On
+# 2026-09-02, inside the corporate network, two `--pi` turns went to
+# gh-copilot/claude-sonnet-5 and recorded `classifier error: classifier HTTP 502`
+# — because the judge dialled the laptop, which was not running, while the
+# offload DESTINATION for that network (the on-prem cluster) was up, enabled and
+# reachable the whole time. The judge was the only part that could not follow the
+# machine from one network to the other.
+#
+# semantic_routing in llm-routing.yaml had already solved exactly this with a
+# `targets:` list. This is the same shape, for the same reason, and the two
+# should be read together: `targets` says where cheap work GOES, `backends` says
+# who DECIDES that it is cheap. There is no reason for those to disagree about
+# which network the machine is on.
+#
+# ORDER IS MEANINGFUL: first ENABLED backend whose require_network matches the
+# live network wins. A second backend claiming an already-claimed network is
+# refused at load — it could never be reached, so declaring it can only mislead.
+# A backend with no require_network matches everywhere, and therefore may only
+# appear last.
+#
+# ── What a backend may be ───────────────────────────────────────────────────
+# Any OpenAI-compatible /chat/completions endpoint. It should be LOCAL and
+# unmetered: this judge sits IN FRONT of the call it is trying to make cheaper,
+# so paying a metered provider to ask "is this cheap?" would be spend added to
+# save spend. If no backend serves the current network, there is no verdict and
+# the caller's own band stands — the proxy fails open by design. That is the
+# intended degradation, not an outage.
+backends:
+  # The on-prem V100 cluster. LAN-only, unmetered, and the same box the corporate
+  # offload target sends the work to — so on corporate the judge and the
+  # destination are the same machine, which is the arrangement with the fewest
+  # ways to be half-broken.
+  #
+  # `qwen3.8-27b-dual-fast` is the cluster's `small` tier deliberately: the whole
+  # job is three tokens at temperature 0, and the deeper tiers would spend
+  # reasoning budget on a question that has three legal answers.
+  - id: qwen-local
+    base_url: http://10.143.241.223:8000/v1
+    model: qwen3.8-27b-dual-fast
+    api_key_env: QWEN_LOCAL_API_KEY
+    require_network: corporate
+    enabled: true
+    # Looser than the proxy's own 2s classifier budget, and that is not an
+    # oversight. The proxy abandons at 2s and keeps the caller's band — the
+    # fail-open path, working. This service should NOT also give up then,
+    # because a request the proxy has stopped waiting for still warms the
+    # backend's prefix cache by running to completion, which is what makes the
+    # NEXT verdict land inside 2s.
+    timeout_ms: 15000
+
+  # llama.cpp on this laptop. The only local option off VPN, where the cluster is
+  # on 10/8 and unreachable.
+  #
+  # NOT RUNNING as of 2026-09-02: the `llama-server` binary is absent from this
+  # machine (the GGUF remains at ~/models/Qwen3.8-27B-GGUF) and nothing has a
+  # launchd job for it. Left `enabled: true` on purpose — the declaration is
+  # correct and reachability is reported separately on /health, so the dashboard
+  # can say "declared, unreachable" rather than conflating "switched off" with
+  # "not answering". Those have opposite fixes.
+  - id: qwen-laptop
+    base_url: http://127.0.0.1:8081/v1
+    model: qwen3.8-27b-local
+    require_network: public
+    enabled: true
+    timeout_ms: 15000
+
+# ── The rubric ──────────────────────────────────────────────────────────────
+# The entire prompt the judge is sent, verbatim. The request text is appended as
+# the user message; nothing else is added.
+#
+# CALIBRATION IS THE WHOLE FEATURE, not a detail. Measured 2026-08-30 against
+# llama.cpp: with a bare "how hard is this?" prompt, "how many r's in strawberry"
+# came back `medium` — the exact request that motivated the work. With the three
+# definition lines below it comes back `small`. Same model, same temperature;
+# only this text changed.
+#
+# Keep it ONE stable block. llama.cpp KV-caches the prefix, so a rubric that
+# never varies costs a full prefill once (~4.8s measured) and ~600ms every time
+# after. A rubric interpolated per request would pay the prefill on every call
+# and blow the proxy's 2s budget every time.
+#
+# Editing this changes what `small` means for every agent at once. Re-run
+# `node scripts/eval-prompt-classifier.mjs` against the labelled corpus
+# afterwards — the precision gate is what says whether the change was an
+# improvement or a preference.
+rubric: |
+  You route requests to a model tier. Answer with EXACTLY one word: small, medium, or high.
+  small  = trivial factual/lookup/formatting, one-step, no code reasoning, no tools needed.
+  medium = ordinary single-file coding, explanation, or multi-step reasoning.
+  high   = multi-file refactor, architecture, debugging across systems, or subtle correctness.

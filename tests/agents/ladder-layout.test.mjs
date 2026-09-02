@@ -19,8 +19,24 @@ const m = await loadRoutingModules({
   prefix: 'ladder-',
 });
 
-const GATE_COUNT = 7;
-const PASS = 6;
+// The ladder's geometry lives in offload-gates, and the entry module does not
+// re-export it. Loaded separately so these fixtures can DERIVE the rung numbers
+// instead of writing them down — a gate was inserted on 2026-09-02 and every
+// hardcoded index here broke while the properties under test were unchanged.
+const gates = await loadRoutingModules({
+  names: ['offload-gates'],
+  entry: 'offload-gates',
+  prefix: 'ladder-gates-',
+});
+
+// Derived, never hardcoded. A gate was inserted between `target` and `scope` on
+// 2026-09-02 (per-target `offload_bands`), which moved the PASS rung from 6 to 7
+// and broke every fixture below that had written the number down. The geometry
+// is the module's to declare; these tests are about FOLDING, and should only
+// have to be revisited when folding changes.
+const GATE_COUNT = gates.GATES.length;
+const PASS = gates.RUNG_OFFLOADED;
+const GATES_ONLY = Array.from({ length: PASS }, (_, i) => i);
 
 /** Rung counts as an array; anything unlisted is zero. */
 const counts = (over = {}) =>
@@ -32,18 +48,19 @@ const folds = (l) => l.rows.filter(r => r.kind === 'collapsed');
 
 describe('folding', () => {
   test('the live configuration folds its two dead runs and keeps the rest', () => {
-    // Rungs 1/2/3 carry the traffic; 0 stands alone at zero and 4/5 are a run.
+    // Rungs 1/2/3 carry the traffic; 0 stands alone at zero and 4/5/6 are a run.
     const l = m.layoutLadder(counts({ 1: 3, 2: 19, 3: 17 }));
-    assert.deepEqual(folds(l).map(r => r.rungs), [[4, 5]]);
-    assert.deepEqual(ownRows(l), [0, 1, 2, 3, 6]);
+    assert.deepEqual(folds(l).map(r => r.rungs), [[4, 5, 6]]);
+    assert.deepEqual(ownRows(l), [0, 1, 2, 3, PASS]);
   });
 
   test('a run of one is never folded — it would save no height at all', () => {
     // "1 gate nothing reached" is the same row as the gate, so folding trades a
     // real label for a placeholder. Dimming already says "nothing reached this".
+    // Alternating, so every zero rung is a run of exactly one.
     const l = m.layoutLadder(counts({ 1: 5, 3: 5, 5: 5 }));
     assert.deepEqual(folds(l), []);
-    assert.deepEqual(ownRows(l), [0, 1, 2, 3, 4, 5, 6]);
+    assert.deepEqual(ownRows(l), [...GATES_ONLY, PASS]);
   });
 
   test('the PASS rung is never folded, even at zero — it is the answer', () => {
@@ -52,7 +69,7 @@ describe('folding', () => {
     const l = m.layoutLadder(counts({}));
     const passRow = l.rows.find(r => r.kind === 'rung' && r.rungs[0] === PASS);
     assert.ok(passRow, 'the outcome row must survive an all-zero ladder');
-    assert.deepEqual(folds(l).map(r => r.rungs), [[0, 1, 2, 3, 4, 5]],
+    assert.deepEqual(folds(l).map(r => r.rungs), [GATES_ONLY],
       'every GATE folds into one run, and the outcome is not one of them');
   });
 
@@ -61,14 +78,14 @@ describe('folding', () => {
     // leave the highlight pointing at a row that is not on screen.
     const l = m.layoutLadder(counts({}), { pinned: [3] });
     assert.ok(ownRows(l).includes(3));
-    assert.deepEqual(folds(l).map(r => r.rungs), [[0, 1, 2], [4, 5]]);
+    assert.deepEqual(folds(l).map(r => r.rungs), [[0, 1, 2], [4, 5, 6]]);
   });
 
   test('pinning splits a run rather than suppressing folding entirely', () => {
     const l = m.layoutLadder(counts({}), { pinned: [1] });
-    // 0 is left alone and so stays a rung; 2..5 remain foldable as one run.
-    assert.deepEqual(folds(l).map(r => r.rungs), [[2, 3, 4, 5]]);
-    assert.deepEqual(ownRows(l), [0, 1, 6]);
+    // 0 is left alone and so stays a rung; 2..6 remain foldable as one run.
+    assert.deepEqual(folds(l).map(r => r.rungs), [[2, 3, 4, 5, 6]]);
+    assert.deepEqual(ownRows(l), [0, 1, PASS]);
   });
 });
 
@@ -79,8 +96,8 @@ describe('folding against a different denominator', () => {
     // pins three of them whether or not any was called in the window. The flow
     // diagram pins every rung its callers land on for exactly this reason.
     const l = m.layoutLadder(counts({ 2: 400 }), { pinned: [1, 2, 3] });
-    assert.deepEqual(ownRows(l), [0, 1, 2, 3, 6]);
-    assert.deepEqual(folds(l).map(r => r.rungs), [[4, 5]]);
+    assert.deepEqual(ownRows(l), [0, 1, 2, 3, PASS]);
+    assert.deepEqual(folds(l).map(r => r.rungs), [[4, 5, 6]]);
     for (const r of [1, 3]) {
       assert.equal(l.isFolded(r), false, `gate ${r} has edges arriving and must keep its row`);
     }
@@ -91,9 +108,9 @@ describe('expanding', () => {
   test('an opened run shows its gates plus a header that closes it again', () => {
     const l = m.layoutLadder(counts({ 1: 3, 2: 19, 3: 17 }), { expanded: [4] });
     assert.deepEqual(folds(l), [], 'nothing stays folded once opened');
-    assert.deepEqual(ownRows(l), [0, 1, 2, 3, 4, 5, 6]);
+    assert.deepEqual(ownRows(l), [...GATES_ONLY, PASS]);
     const header = l.rows.find(r => r.kind === 'expanded-header');
-    assert.deepEqual(header.rungs, [4, 5]);
+    assert.deepEqual(header.rungs, [4, 5, 6]);
     assert.equal(header.runId, 4, 'a run is keyed by its first rung, so the toggle round-trips');
   });
 
@@ -116,7 +133,8 @@ describe('geometry', () => {
   });
 
   test('folding makes the ladder shorter, expanding makes it taller again', () => {
-    const all = m.layoutLadder(counts({ 0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 }));
+    const all = m.layoutLadder(counts(
+      Object.fromEntries(Array.from({ length: GATE_COUNT }, (_, i) => [i, 1]))));
     const folded = m.layoutLadder(counts({ 1: 3, 2: 19, 3: 17 }));
     const opened = m.layoutLadder(counts({ 1: 3, 2: 19, 3: 17 }), { expanded: [4] });
     assert.ok(folded.height < all.height, 'a fold must actually reclaim height');

@@ -27,6 +27,11 @@
  *   node scripts/eval-prompt-classifier.mjs                 # labelled, live endpoint
  *   node scripts/eval-prompt-classifier.mjs --corpus        # structural, offline
  *   node scripts/eval-prompt-classifier.mjs --gate=0.9      # exit 1 below this precision
+ *
+ * ── The gate widened on 2026-09-02 ──────────────────────────────────────────
+ * `classifier.bands` and `semantic_routing.offload_bands` both gained `medium`,
+ * which retired the premise this file was written on. Precision is now measured
+ * per emittable band and the gate is the WORST of them — see runLabelled().
  *   node scripts/eval-prompt-classifier.mjs --base-url=...  # default $CLASSIFIER_BASE_URL
  */
 
@@ -184,25 +189,63 @@ async function runLabelled() {
   // Production applies the verdict downgrade-only against a declared band. A
   // case is a DEFECT only if the classifier would actually have lowered a band
   // it should not have, which is what applyDowngrade decides.
-  let smallPredicted = 0;
-  let smallCorrect = 0;
+  // ── Precision is now measured on EVERY band a downgrade can land on ────────
+  //
+  // Until 2026-09-02 this file gated on precision-on-`small` alone, and said so
+  // for a good reason: `classifier.bands` was `[small]` and `offload_bands` was
+  // `[small]`, so a wrong `medium` or `high` verdict was discarded and changed
+  // nothing. Only a wrong `small` could spend a real turn on a weaker model.
+  //
+  // Both lists now include `medium`. That premise is therefore FALSE: a turn
+  // declared `high` and wrongly called `medium` is lowered, and on corporate it
+  // is also offloaded to the cluster. Continuing to report one number would keep
+  // printing a gate that no longer covers the damage it was written to bound.
+  //
+  // A defect is still defined by what production would DO, not by label
+  // disagreement: `applyDowngrade` decides, so a verdict that matches or raises
+  // the declared band is not counted either way.
+  const EMITTABLE = ['small', 'medium'];
+  const stats = new Map(EMITTABLE.map(b => [b, { predicted: 0, correct: 0, labelled: 0, recalled: 0 }]));
   const defects = [];
-  let smallLabelled = 0;
-  let smallRecalled = 0;
+
+  const rank = (b) => ['small', 'medium', 'high'].indexOf(b);
 
   for (const r of rows) {
-    const isSmallLabel = r.label === 'small';
-    if (isSmallLabel) smallLabelled += 1;
-    const declared = isSmallLabel ? 'medium' : r.label;   // something to lower FROM
+    const st = stats.get(r.label);
+    if (st) st.labelled += 1;
+    // Something to lower FROM. One rung harder than the label, so a correct
+    // verdict is always a real downgrade and the row actually exercises the
+    // path production would take.
+    const declared = ['small', 'medium', 'high'][Math.min(rank(r.label) + 1, 2)];
     const lowered = applyDowngrade(declared, r.got).lowered;
-    if (r.got === 'small' && lowered) {
-      smallPredicted += 1;
-      if (isSmallLabel) { smallCorrect += 1; smallRecalled += 1; } else defects.push(r);
+    const s = stats.get(r.got);
+    if (s && lowered) {
+      s.predicted += 1;
+      // Correct when the verdict is no CHEAPER than the truth. Written as `>=`
+      // rather than `===` because the asymmetry is the point and should be
+      // legible: too-cheap is the only direction that costs anything, and a
+      // verdict landing on a HARDER band than the label is a missed saving that
+      // must never be scored as a defect.
+      if (rank(r.got) >= rank(r.label)) {
+        s.correct += 1;
+        if (r.got === r.label) s.recalled += 1;
+      } else {
+        defects.push({ ...r, verdictBand: r.got });
+      }
     }
   }
 
+  const smallPredicted = [...stats.values()].reduce((n, s) => n + s.predicted, 0);
+
   const lat = rows.filter((r) => r.ms > 0).map((r) => r.ms).sort((a, b) => a - b);
-  const precision = smallPredicted ? smallCorrect / smallPredicted : 1;
+  // The gate is the WORST band, not the average. Averaging would let a large,
+  // easy `small` population hide a `medium` verdict that is wrong half the time
+  // — and `medium` is the band that now moves the most expensive work.
+  const perBand = EMITTABLE
+    .map(b => ({ band: b, ...stats.get(b) }))
+    .map(s => ({ ...s, precision: s.predicted ? s.correct / s.predicted : null }));
+  const measured = perBand.filter(s => s.precision !== null);
+  const precision = measured.length ? Math.min(...measured.map(s => s.precision)) : 1;
 
   process.stdout.write(`\nLabelled evaluation — ${BASE_URL} (${MODEL})\n${'='.repeat(66)}\n`);
   for (const r of rows) {
@@ -213,12 +256,19 @@ async function runLabelled() {
   process.stdout.write(`\n  cases                    ${rows.length}\n`);
   process.stdout.write(`  latency  median/p90/max  ${lat.length ? `${lat[Math.floor(lat.length / 2)]}/${lat[Math.floor(lat.length * 0.9)]}/${lat[lat.length - 1]}ms` : 'n/a'}\n`);
   process.stdout.write(`  downgrades proposed      ${smallPredicted}\n`);
-  process.stdout.write(`  PRECISION ON small       ${smallCorrect}/${smallPredicted} = ${(precision * 100).toFixed(0)}%   <- the gate\n`);
-  process.stdout.write(`  recall on small          ${smallRecalled}/${smallLabelled} = ${pct(smallRecalled, smallLabelled)}   (missed savings, not damage)\n`);
+  for (const s of perBand) {
+    process.stdout.write(`  precision on ${s.band.padEnd(7)}     `
+      + `${s.predicted ? `${s.correct}/${s.predicted} = ${(s.precision * 100).toFixed(0)}%` : 'not measured (no verdict landed here)'}\n`);
+    process.stdout.write(`  recall on ${s.band.padEnd(10)}     ${s.recalled}/${s.labelled} = ${pct(s.recalled, s.labelled)}`
+      + '   (missed savings, not damage)\n');
+  }
+  process.stdout.write(`  WORST-BAND PRECISION     ${(precision * 100).toFixed(0)}%   <- the gate\n`);
 
   if (defects.length) {
     process.stdout.write('\n  FALSE DOWNGRADES — each one spends a real turn on a weaker model:\n');
-    for (const d of defects) process.stdout.write(`    labelled ${d.label}: ${d.text.slice(0, 70)}\n`);
+    for (const d of defects) {
+      process.stdout.write(`    labelled ${d.label}, called ${d.verdictBand}: ${d.text.slice(0, 60)}\n`);
+    }
   } else {
     process.stdout.write('\n  No false downgrades.\n');
   }

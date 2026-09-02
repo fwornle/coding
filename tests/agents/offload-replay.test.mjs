@@ -20,7 +20,19 @@ const m = await loadRoutingModules({
   prefix: 'replay-',
 });
 
-const PASS = 6;
+// The ladder's geometry lives in offload-gates, and the entry module does not
+// re-export it. Loaded separately so these fixtures DERIVE the rung numbers
+// rather than writing them down — a gate was inserted between `target` and
+// `scope` on 2026-09-02 (per-target `offload_bands`) and every hardcoded index
+// here broke while the properties under test were unchanged.
+const gates = await loadRoutingModules({
+  names: ['offload-gates'],
+  entry: 'offload-gates',
+  prefix: 'replay-gates-',
+});
+const PASS = gates.RUNG_OFFLOADED;
+/** A gate by its id, so a reader sees which gate is meant, not which index. */
+const RUNG = Object.fromEntries(gates.GATES.map((g, i) => [g.id, i]));
 
 /** The live policy on 2026-08-30: corporate cluster on, laptop declared but off. */
 const POLICY = {
@@ -50,7 +62,7 @@ describe('replay', () => {
 
     const pub = replay(rows, 'public');
     assert.equal(pub.moved.calls, 0);
-    assert.equal(pub.callsByRung[3], 100, 'no target serves public, so it stops at the target gate');
+    assert.equal(pub.callsByRung[RUNG.target], 100, 'no target serves public, so it stops at the target gate');
 
     const corp = replay(rows, 'corporate');
     assert.equal(corp.moved.calls, 100);
@@ -65,7 +77,7 @@ describe('replay', () => {
     const rows = [{ route_key: 'bg-consolidator-insight', route_band: 'medium', calls: 40, tokens: 900 }];
     for (const net of ['public', 'corporate']) {
       const r = replay(rows, net);
-      assert.equal(r.callsByRung[2], 40, `band gate must hold on ${net}`);
+      assert.equal(r.callsByRung[RUNG.band], 40, `band gate must hold on ${net}`);
       assert.equal(r.moved.calls, 0);
     }
   });
@@ -73,7 +85,7 @@ describe('replay', () => {
   test('a route pinned with offload:false never moves, on any network', () => {
     const rows = [{ route_key: 'bg-kgbench-judge', route_band: 'small', calls: 12, tokens: 300 }];
     const r = replay(rows, 'corporate');
-    assert.equal(r.callsByRung[1], 12, 'the pin is checked before the band and before the target');
+    assert.equal(r.callsByRung[RUNG['route-allows']], 12, 'the pin is checked before the band and before the target');
     assert.equal(r.moved.calls, 0);
   });
 
@@ -83,7 +95,7 @@ describe('replay', () => {
     const rows = [{ route_key: 'fg-chat/claude', route_band: 'small', calls: 7, tokens: 90 }];
     const fgCapable = id => id === 'claude-code-max';
     const r = replay(rows, 'corporate', POLICY, fgCapable);
-    assert.equal(r.callsByRung[5], 7, 'stops at the wire-protocol gate');
+    assert.equal(r.callsByRung[RUNG.transport], 7, 'stops at the wire-protocol gate');
     assert.equal(r.moved.calls, 0);
   });
 
@@ -94,7 +106,7 @@ describe('replay', () => {
     ];
     const r = replay(rows, 'corporate');
     assert.equal(r.tokensByRung[PASS], 1000);
-    assert.equal(r.tokensByRung[2], 2000);
+    assert.equal(r.tokensByRung[RUNG.band], 2000);
     assert.equal(r.callsByRung.reduce((a, b) => a + b, 0), 30, 'every call lands on exactly one rung');
   });
 });
@@ -130,14 +142,14 @@ describe('policy state', () => {
     const on = { ...POLICY, targets: POLICY.targets.map(t => ({ ...t, enabled: true })) };
     const r = replay(rows, 'public', on);
     assert.equal(r.moved.to, 'qwen-laptop');
-    assert.equal(r.callsByRung[4], 100, 'but bg work still fails the fg-only scope gate');
+    assert.equal(r.callsByRung[RUNG.scope], 100, 'but bg work still fails the fg-only scope gate');
     assert.equal(r.moved.calls, 0);
   });
 
   test('policy off parks everything on rung 0 regardless of network', () => {
     const rows = [{ route_key: 'bg-observation-writer', route_band: 'small', calls: 9, tokens: 9 }];
     const r = replay(rows, 'corporate', { ...POLICY, enabled: false });
-    assert.equal(r.callsByRung[0], 9);
+    assert.equal(r.callsByRung[RUNG.considered], 9);
   });
 });
 

@@ -79,6 +79,16 @@ interface Behaviour {
   fallbackEdges: FallbackEdge[]
   skipReasons: Array<{ provider: string; reason: string; kind: string; count: number }>
   offloadSkips: Array<{ reason: string; count: number }>
+  /**
+   * What the prompt classifier DID, or why it did nothing, tallied.
+   *
+   * Aggregated by the proxy since 2026-09-02. The note has been written per row
+   * since the classifier shipped and read only per row — which is how a judge
+   * whose backend had been down for a day stayed invisible: the routing looked
+   * correct at every level anyone could see. Optional because a proxy that
+   * predates the field sends none.
+   */
+  classifierNotes?: Array<{ note: string; count: number }>
 }
 
 /** Trimmed from GET /api/llm/routing — the config half. */
@@ -721,7 +731,8 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs space-y-1.5">
-            {behaviour.skipReasons.length === 0 && behaviour.offloadSkips.length === 0 && (
+            {behaviour.skipReasons.length === 0 && behaviour.offloadSkips.length === 0
+              && (behaviour.classifierNotes ?? []).length === 0 && (
               <div className="text-muted-foreground py-2">Nothing was skipped in this window.</div>
             )}
             {behaviour.skipReasons.map(s => (
@@ -736,6 +747,21 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
               <div key={s.reason} className="flex items-baseline gap-2 pt-1 border-t first:border-t-0">
                 <Badge variant="outline" className="text-[9px] py-0">offload</Badge>
                 <span className="text-muted-foreground">{s.reason}</span>
+                <span className="tabular-nums text-muted-foreground ml-auto">×{fmt(s.count)}</span>
+              </div>
+            ))}
+            {/* The band was decided BEFORE the offload could act on it, so a
+                judge that never answered shows up here as the reason nothing
+                downstream had a cheaper band to move. An error is drawn as an
+                error: `classifier error: …` is a broken dependency, while
+                `conversation already contains tool results` is the gate working
+                exactly as designed, and one red line is what tells them apart
+                without expanding a row. */}
+            {(behaviour.classifierNotes ?? []).map(s => (
+              <div key={s.note} className="flex items-baseline gap-2 pt-1 border-t first:border-t-0">
+                <Badge variant="outline" className="text-[9px] py-0">judge</Badge>
+                <span className={/error|unreachable|timed? out/i.test(s.note)
+                  ? 'text-destructive' : 'text-muted-foreground'}>{s.note}</span>
                 <span className="tabular-nums text-muted-foreground ml-auto">×{fmt(s.count)}</span>
               </div>
             ))}

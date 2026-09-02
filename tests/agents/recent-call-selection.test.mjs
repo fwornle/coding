@@ -35,6 +35,16 @@ const m = await loadRoutingModules({
   prefix: 'recent-call-',
 });
 
+// The ladder's geometry lives in offload-gates, and the entry module does not
+// re-export it. Loaded separately so these fixtures can DERIVE the rung numbers
+// instead of writing them down — a gate was inserted on 2026-09-02 and every
+// hardcoded index here broke while the properties under test were unchanged.
+const gates = await loadRoutingModules({
+  names: ['offload-gates'],
+  entry: 'offload-gates',
+  prefix: 'recent-call-gates-',
+});
+
 /** A row as the endpoint actually returns one. */
 function row(over = {}) {
   return {
@@ -177,7 +187,11 @@ describe('binning', () => {
 
 describe('rung attribution', () => {
   test('an offloaded call lands on the PASS rung', () => {
-    assert.equal(m.rungOfCall(row({ offloaded_from: 'gh-copilot' })), 6);
+    // The PASS rung by NAME. It was a literal 6 until a gate was added between
+    // `target` and `scope` on 2026-09-02 and moved it to 7 — a fixture that
+    // hardcodes a ladder index breaks on any change to the ladder's length,
+    // while saying nothing about the property it meant to assert.
+    assert.equal(m.rungOfCall(row({ offloaded_from: 'gh-copilot' })), gates.RUNG_OFFLOADED);
   });
 
   test('a recorded reason maps to the rung that emitted it', () => {
