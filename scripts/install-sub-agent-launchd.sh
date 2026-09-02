@@ -3,9 +3,17 @@
 #
 # Installs four jobs:
 #   - com.coding.sub-agent-sweep         StartInterval=1800 (30 min), no KeepAlive
-#   - com.coding.sub-agent-live-claude   KeepAlive=true (restart on crash)
-#   - com.coding.sub-agent-live-opencode KeepAlive=true (restart on crash)
-#   - com.coding.sub-agent-live-copilot  KeepAlive=true (restart on crash)
+#   - com.coding.sub-agent-live-claude   KeepAlive=true (restart on any exit)
+#   - com.coding.sub-agent-live-opencode KeepAlive=true (restart on any exit)
+#   - com.coding.sub-agent-live-copilot  KeepAlive=true (restart on any exit)
+#
+# The three live plists used to carry KeepAlive={SuccessfulExit=false,
+# NetworkState=true}. SuccessfulExit=false means "restart only on a non-zero
+# exit", and these daemons trap SIGTERM and exit(0) — so any signalled stop was
+# permanent (14.5h capture outage, 2026-09-01). NetworkState, which looks like
+# it would cover that case, is not implemented at all (`man 5 launchd.plist`).
+# Both keys are gone in favour of plain <true/>; see the plist comments. Stop a
+# live daemon with `launchctl bootout`, never with a kill.
 #
 # Iterates each plist label:
 #   - Validates source via `plutil -lint`.
@@ -114,14 +122,46 @@ for LABEL in "${PLISTS[@]}"; do
   log "${LABEL}: boot-out (if loaded)"
   launchctl bootout "gui/${UID_VAL}/${LABEL}" 2>/dev/null || true
 
+  # `bootout` returns as soon as the SIGTERM is delivered, NOT once the process
+  # is gone. The live daemons shut down gracefully (drain the in-flight poll,
+  # close the writer, checkpoint the cursor), which takes about a second — and
+  # bootstrapping a label whose previous instance is still exiting fails with
+  # the useless `Bootstrap failed: 5: Input/output error`. Hit exactly this on
+  # 2026-09-02: the first label errored, `set -e` aborted the run, and the
+  # remaining two plists were left on the old version. Retry rather than sleep
+  # blindly — a clean unload is usually done well inside the first backoff.
   log "${LABEL}: bootstrap gui/${UID_VAL}"
-  if ! launchctl bootstrap "gui/${UID_VAL}" "${DEST_PLIST}"; then
-    log "ERROR: launchctl bootstrap failed for ${LABEL}"
+  BOOTSTRAPPED=0
+  for ATTEMPT in 1 2 3 4 5; do
+    if launchctl bootstrap "gui/${UID_VAL}" "${DEST_PLIST}" 2>/dev/null; then
+      BOOTSTRAPPED=1
+      break
+    fi
+    log "${LABEL}: bootstrap attempt ${ATTEMPT} failed (previous instance still exiting?) — retrying"
+    sleep 1
+  done
+  if [[ "${BOOTSTRAPPED}" -ne 1 ]]; then
+    # Final attempt with stderr shown, so the operator sees launchctl's reason.
+    log "ERROR: launchctl bootstrap failed for ${LABEL} after 5 attempts:"
+    launchctl bootstrap "gui/${UID_VAL}" "${DEST_PLIST}" || true
     exit 1
   fi
 
-  # 2e. Verify registration.
-  if launchctl list | grep -qF "${LABEL}"; then
+  # 2e. Verify registration. Same asynchrony as the bootstrap above: a label
+  #     can be accepted by launchd a beat before `launchctl list` reports it,
+  #     so a single check right after bootstrap produces a false FAIL on a job
+  #     that is in fact loaded (hit on 2026-09-02 with measurement-reconciler,
+  #     which was running under a pid the whole time the installer called it
+  #     dead). Poll briefly instead of trusting the first read.
+  LOADED=0
+  for ATTEMPT in 1 2 3 4 5; do
+    if launchctl list | grep -qF "${LABEL}"; then
+      LOADED=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "${LOADED}" -eq 1 ]]; then
     log "OK: ${LABEL} is loaded"
   else
     log "FAIL: ${LABEL} did not load"
@@ -133,6 +173,7 @@ done
 log "all 4 jobs installed"
 log "  sweep cadence: every 1800s (30 min) via StartInterval (no KeepAlive)"
 log "  live daemons: KeepAlive=true with ThrottleInterval=60s (anti-tight-loop)"
+log "                restart on ANY exit — stop one with 'launchctl bootout', not a kill"
 log "  logs:         ${LOG_DIR}/live-*.log (stderr redirected to keep terminal clean)"
 log "  follow:       tail -F ${LOG_DIR}/live-claude.log ${LOG_DIR}/live-opencode.log ${LOG_DIR}/live-copilot.log"
 log "  kickstart sweep immediately: launchctl kickstart -k gui/${UID_VAL}/com.coding.sub-agent-sweep"
