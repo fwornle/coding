@@ -116,7 +116,14 @@ function atomicWriteJson(filePath, obj) {
   if (parentDir && parentDir !== '.' && !fs.existsSync(parentDir)) {
     fs.mkdirSync(parentDir, { recursive: true });
   }
-  const tmpPath = `${filePath}.tmp`;
+  // Temp name is pid-unique. `launchctl kickstart -k` overlaps the outgoing
+  // process's shutdown write with the incoming one's first heartbeat, and with
+  // a shared `<file>.tmp` those two interleave: A writes tmp, B overwrites tmp,
+  // A renames, B renames — so a rename can publish the OTHER process's payload,
+  // or a half-written one. rename(2) is atomic per path, which buys nothing
+  // when two writers share the path. Observed on 2026-09-02 as a state file
+  // that briefly disagreed with the daemon that had just written it.
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
   fs.writeFileSync(tmpPath, JSON.stringify(obj, null, 2), 'utf-8');
   fs.renameSync(tmpPath, filePath);
 }
