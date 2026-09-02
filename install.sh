@@ -2662,7 +2662,7 @@ ensure_dmr_model() {
     fi
 }
 
-# Setup LLM CLI Proxy - HTTP bridge to host CLI tools (claude, copilot-cli)
+# Setup LLM CLI Proxy - HTTP bridge to host CLI tools (claude, copilot, pi)
 # for Docker containers. Port 12435, adjacent to DMR's port 12434.
 setup_llm_cli_proxy() {
     local proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
@@ -2723,6 +2723,49 @@ setup_llm_cli_proxy() {
     else
         info "  copilot CLI not found (optional)"
     fi
+
+    # Check for the pi coding agent.
+    #
+    # pi belongs in this probe because it is a PROXY CLIENT: config/agents/pi.sh
+    # points it at 127.0.0.1:12435 and every pi turn routes through
+    # `fg-chat/pi`. Before this block a machine with pi but neither claude nor
+    # copilot left has_cli=false, so the whole proxy setup below was skipped —
+    # and pi came up with nothing to talk to.
+    #
+    # `command -v pi` is an exact lookup; never substring-match a two-character
+    # binary name against a process or PATH listing.
+    if command -v pi >/dev/null 2>&1; then
+        local pi_version
+        pi_version=$(run_with_timeout 10 pi --version 2>/dev/null | head -1 || true)
+        success "  pi CLI found: ${pi_version:-unknown version}"
+        has_cli=true
+    else
+        info "  pi CLI not found (optional)"
+        echo ""
+        echo -e "  ${CYAN}'pi' is a coding agent that routes through the local LLM proxy.${NC}"
+        echo -e "  Install: ${GREEN}npm install -g @earendil-works/pi-coding-agent${NC}"
+        if confirm_system_change \
+            "Install pi CLI globally via npm" \
+            "Runs: npm install -g @earendil-works/pi-coding-agent"; then
+            if npm install -g @earendil-works/pi-coding-agent 2>/dev/null; then
+                success "  pi CLI installed"
+                has_cli=true
+            else
+                warning "  Failed to install pi CLI"
+            fi
+        fi
+    fi
+
+    # Whether or not pi is installed right now, say where its guard rails come
+    # from — they are NOT written by this installer.
+    #
+    # config/agents/pi.sh installs them into PI_CODING_AGENT_DIR on every launch
+    # (models.json, extensions/, APPEND_SYSTEM.md), which is what keeps a bare
+    # `pi` outside this wrapper byte-for-byte unaffected and means a user who
+    # installs pi LATER still gets them. An installer-time copy would have to be
+    # re-done by hand after every update, and would write into a directory the
+    # user owns under CODING_AGENT_SCOPE=global.
+    info "  pi guard rails (no-unbounded-fs-scan) install per launch via bin/coding"
 
     # If no CLI tools available, skip proxy setup
     if [[ "$has_cli" != "true" ]]; then

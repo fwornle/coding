@@ -73,6 +73,96 @@ agent_check_requirements() {
   return 1
 }
 
+# Install the repo's pi extensions into the agent config dir.
+#
+# $1 = the pi config directory to write into.
+#
+# pi auto-discovers `<agent-dir>/extensions/*.ts`, and $1 IS the agent dir
+# (PI_CODING_AGENT_DIR), so this reaches every pi launch through the wrapper
+# regardless of which project the session is cwd'd into. That matters: the
+# incident these guard against happened in _work/a2a, not in this repo, so a
+# project-local `.pi/extensions` here would have done nothing.
+#
+# Copied rather than symlinked. The agent dir is gitignored scratch that the
+# wrapper owns and rewrites; a symlink into the repo would make a `pi` session
+# silently pick up an extension mid-edit from an unrelated branch checkout.
+# Copying pins the behaviour to launch time, like models.json above.
+_pi_install_extensions() {
+  local cfg_dir="$1"
+  local src_dir="${CODING_REPO:-}/config/agents/pi-extensions"
+  [ -d "$src_dir" ] || return 0
+
+  local ext_dir="$cfg_dir/extensions"
+  mkdir -p "$ext_dir"
+  local n=0
+  for f in "$src_dir"/*.ts; do
+    [ -e "$f" ] || continue
+    # cmp before cp so an unchanged file keeps its mtime — pi caches by path and
+    # there is no reason to look modified on every launch.
+    if ! cmp -s "$f" "$ext_dir/$(basename "$f")"; then
+      cp "$f" "$ext_dir/$(basename "$f")" || {
+        _agent_log "WARNING: could not install pi extension $(basename "$f")"
+        continue
+      }
+    fi
+    n=$((n + 1))
+  done
+  [ "$n" -gt 0 ] && _agent_log "pi extensions installed: $n in $ext_dir"
+  return 0
+}
+
+# State the search convention the extension enforces.
+#
+# $1 = the pi config directory.
+#
+# APPEND_SYSTEM.md is appended to pi's system prompt rather than replacing it
+# (SYSTEM.md would replace). Belt and braces with the extension: the extension
+# is the deterministic gate, this is what stops the model SPENDING a tool call
+# to discover the gate. A blocked call costs a round trip; a model that never
+# tries costs nothing.
+#
+# WRAPPER SCOPE ONLY. $1 is our gitignored scratch dir there, so writing is
+# safe. Under `CODING_AGENT_SCOPE=global` it is ~/.pi/agent, which the user
+# owns — the same reason _pi_write_models_json exists rather than editing a
+# user-authored models.json in place. The marker guard is the second line of
+# defence: we only ever overwrite a file we wrote.
+_PI_APPEND_MARKER="<!-- managed by coding/config/agents/pi.sh -->"
+_pi_write_append_system() {
+  local cfg_dir="$1"
+  local scope="$2"
+  [ "$scope" = "global" ] && return 0
+
+  local f="$cfg_dir/APPEND_SYSTEM.md"
+  if [ -f "$f" ] && ! grep -qF "$_PI_APPEND_MARKER" "$f" 2>/dev/null; then
+    _agent_log "pi: leaving user-authored APPEND_SYSTEM.md alone"
+    return 0
+  fi
+
+  mkdir -p "$cfg_dir"
+  cat > "$f" <<'PIAPPEND'
+<!-- managed by coding/config/agents/pi.sh -->
+
+## Searching the filesystem
+
+Keep searches inside the project. `find .`, the `find`/`grep` tools, and
+`git ls-files` are the right instruments.
+
+Never search from `/`, `~`, `/Users`, or another whole-machine root. Such a scan
+takes minutes (343s measured here) and is refused by a tool guard, so attempting
+it only wastes a turn.
+
+When a file is not in the project, that IS the answer — report it and stop.
+Do not widen the search to the machine. If you have a specific reason to believe
+it is somewhere particular, search that place by name:
+
+- recently deleted -> `~/.Trash`
+- installed by a package manager -> `which`, `npm ls`, `brew list`
+- elsewhere in a known checkout -> that path directly
+PIAPPEND
+  _agent_log "pi: APPEND_SYSTEM.md written ($cfg_dir)"
+  return 0
+}
+
 # Write the models.json that points pi at the local proxy.
 #
 # $1 = the pi config directory to write into.
@@ -318,6 +408,8 @@ agent_pre_launch() {
   fi
 
   _pi_write_models_json "$_pi_cfg_dir"
+  _pi_install_extensions "$_pi_cfg_dir"
+  _pi_write_append_system "$_pi_cfg_dir" "${_pi_scope:-wrapper}"
 
   # Deny the direct-provider escape hatch.
   #
