@@ -40,6 +40,7 @@ import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
+import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import {
   reclassifyTimeoutAsUnknown, debounceDbStatus,
   classifyProxyHttpFailure, isProxyRestartActionable,
@@ -1861,29 +1862,36 @@ function evaluateAutoHealFSM() {
   });
 }
 
-// Hysteresis state for networkMode flip detection. The proxy's reported
-// networkMode can oscillate around a threshold (e.g. PAC TCP latency hovering
-// at ~47ms with a 30ms threshold) — without hysteresis every oscillation
-// dispatches a kickstart, which on 2026-05-20 produced ~30 kickstarts in
-// 30 minutes (08:08-08:37 CEST). Require 2 consecutive readings of the new
-// mode before dispatching.
-let pendingNetworkModeFlip = null;  // { from, to, count } or null
-const NETWORK_MODE_FLIP_CONFIRM_TICKS = 2;
+// Hysteresis state for networkMode flip detection. The RULE lives in
+// lib/network/proxy-mode-flip.mjs (pure, unit-tested); only the carried state
+// lives here.
+//
+// `settledProxyClass` is the last CONFIRMED mode, deliberately separate from
+// currentState.proxy.networkMode (the latest reading). Comparing each tick
+// against the latest reading — which the poller had already overwritten with
+// the current one — is what made a genuine one-shot switch unable to reach the
+// 2-tick threshold, while a `vpn`/`corporate` ping-pong reached it every time.
+let settledProxyClass = null;       // last confirmed mode, or null before the first read
+let pendingNetworkModeFlip = 0;     // consecutive confirmations toward the threshold
 
 /**
- * Phase 34 R2: poll the proxy's networkMode every tick (~5s) and surface as
- * state.proxy.networkMode. Pattern A: any error -> 'unknown' (never silently
- * a real value). Plan 34-03 will add VPN/CN flap kickstart on transition;
- * THIS PLAN ONLY OBSERVES.
+ * Phase 34 R2/R3: poll the proxy's networkMode every tick (~5s), surface it as
+ * state.proxy.networkMode, and kickstart the proxy when the network CLASS under
+ * it has really changed. Pattern A: any error -> 'unknown' (never silently a
+ * real value), and an 'unknown' never dispatches — see proxy-mode-flip.mjs.
+ *
+ * This function is the SOLE writer of state.proxy.networkMode. The host's own
+ * view of the network is netState.location; do not translate one into the other
+ * here (see the note in the network probe).
  */
 async function pollProxyMode() {
   try {
-    const prevMode = currentState.proxy.networkMode;
     const r = await fetch(`${PROXY_URL}/health`, {
       signal: AbortSignal.timeout(PROXY_MODE_POLL_TIMEOUT_MS)
     });
     if (!r.ok) {
       currentState.proxy.networkMode = 'unknown';
+      pendingNetworkModeFlip = 0;  // an interrupted run is not an uninterrupted one
       return;
     }
     const body = await r.json();
@@ -1891,57 +1899,38 @@ async function pollProxyMode() {
     currentState.proxy.networkMode = (mode === 'vpn' || mode === 'corporate' || mode === 'public') ? mode : 'unknown';
 
     // Phase 34 R3 / D-05: VPN/CN flap re-detection.
-    // Trigger kickstart ONLY on real-value <-> real-value transitions
-    // (vpn -> public OR public -> vpn). Transitions involving 'unknown'
-    // are coordinator-side noise (proxy startup, transient errors) and
-    // are NOT actionable. Flap kickstart does NOT push to
-    // kickstart_timestamps — flap is a USER ACTION (network changed),
-    // not a proxy-failure response, so cooldown does not gate it.
-    const realModes = new Set(['vpn', 'corporate', 'public']);
+    // Kickstart ONLY when the network CLASS actually changed. `vpn` and
+    // `corporate` are the same network spelled two ways — comparing the raw
+    // strings made every poll on the VPN look like a flip and restarted the
+    // proxy every 60s indefinitely (2026-09-02). Transitions involving
+    // 'unknown' are coordinator-side noise (proxy startup, transient errors)
+    // and are never actionable. See lib/network/proxy-mode-flip.mjs.
     const newMode = currentState.proxy.networkMode;
-    const isRealTransition =
-      realModes.has(prevMode) &&
-      realModes.has(newMode) &&
-      prevMode !== newMode;
+    const flip = settleModeFlip({
+      observed: newMode,
+      previous: settledProxyClass,
+      pending: pendingNetworkModeFlip,
+    });
+    settledProxyClass = flip.settled;
+    pendingNetworkModeFlip = flip.pending;
 
-    if (isRealTransition) {
-      // Hysteresis: confirm the flip is stable before dispatching a kickstart.
-      // Each consecutive tick that reports the same new mode increments the
-      // pending counter. Once it reaches NETWORK_MODE_FLIP_CONFIRM_TICKS we
-      // dispatch. An intervening reversion clears the pending state.
-      if (
-        pendingNetworkModeFlip &&
-        pendingNetworkModeFlip.from === prevMode &&
-        pendingNetworkModeFlip.to === newMode
-      ) {
-        pendingNetworkModeFlip.count += 1;
-      } else {
-        pendingNetworkModeFlip = { from: prevMode, to: newMode, count: 1 };
-      }
-
-      if (pendingNetworkModeFlip.count >= NETWORK_MODE_FLIP_CONFIRM_TICKS) {
-        pendingNetworkModeFlip = null;
-        // countsTowardCap: false — a network change is a user action, not a
-        // proxy failure, so it must not spend the failure budget. It IS
-        // debounced: if something restarted the proxy seconds ago, the fresh
-        // network detection this flip wants has already happened.
-        dispatchProxyKickstart({
-          reason: 'networkMode-flip',
-          logPrefix: `proxy networkMode flip ${prevMode} -> ${newMode} confirmed`,
-          detail: `${NETWORK_MODE_FLIP_CONFIRM_TICKS} consecutive ticks`,
-          countsTowardCap: false,
-        });
-      } else {
-        log(`proxy networkMode flip ${prevMode} -> ${newMode} pending (${pendingNetworkModeFlip.count}/${NETWORK_MODE_FLIP_CONFIRM_TICKS})`, 'DEBUG');
-      }
-    } else if (pendingNetworkModeFlip && newMode === pendingNetworkModeFlip.from) {
-      // Reversion: the new reading matches the prior stable mode, so the
-      // pending flip was oscillation noise — clear it without dispatching.
-      log(`proxy networkMode flip ${pendingNetworkModeFlip.from} -> ${pendingNetworkModeFlip.to} cancelled (mode reverted)`, 'DEBUG');
-      pendingNetworkModeFlip = null;
+    if (flip.dispatch) {
+      // countsTowardCap: false — a network change is a user action, not a
+      // proxy failure, so it must not spend the failure budget. It IS
+      // debounced: if something restarted the proxy seconds ago, the fresh
+      // network detection this flip wants has already happened.
+      dispatchProxyKickstart({
+        reason: 'networkMode-flip',
+        logPrefix: `proxy networkMode flip ${flip.from} -> ${flip.to} confirmed`,
+        detail: flip.reason,
+        countsTowardCap: false,
+      });
+    } else if (flip.pending > 0) {
+      log(`proxy networkMode flip ${flip.from} -> ${flip.to} ${flip.reason}`, 'DEBUG');
     }
   } catch (err) {
     currentState.proxy.networkMode = 'unknown';
+    pendingNetworkModeFlip = 0;  // as above: a probe error breaks the run
   }
 }
 
@@ -1949,15 +1938,11 @@ async function pollProxyMode() {
 let pendingProxyStaleMismatch = null;        // { class, count } or null
 const PROXY_STALE_CONFIRM_TICKS = 3;         // sustained mismatch ticks before restart
 
-// Collapse both network vocabularies onto two comparable classes. The
-// coordinator's network.location speaks {corporate,vpn,open,unknown}; the
-// proxy's self-reported networkMode speaks {corporate,vpn,public,unknown}.
-// Returns null for anything not confidently classifiable (never comparable).
-function classifyNetClass(v) {
-  if (v === 'corporate' || v === 'vpn') return 'corporate';
-  if (v === 'open' || v === 'home' || v === 'public' || v === 'direct') return 'public';
-  return null;
-}
+// classifyNetClass — collapses both network vocabularies onto two comparable
+// classes — now lives in lib/network/proxy-mode-flip.mjs and is imported above.
+// It was defined here AND compared-around by the flip detector in
+// pollProxyMode(), which is how the two detectors came to disagree about
+// whether `vpn` and `corporate` are the same network. One definition now.
 
 /**
  * Restart the proxy when the host's authoritative network location disagrees
@@ -2899,8 +2884,19 @@ async function pollNetworkStatus() {
 
   netState.last_probe_end = new Date().toISOString();
 
-  // Also update proxy.networkMode to match (backwards compat for dashboard)
-  currentState.proxy.networkMode = netState.location === 'open' ? 'public' : netState.location;
+  // NOTE: this function must NOT write currentState.proxy.networkMode.
+  //
+  // It used to, "for backwards compat for dashboard", translating the host
+  // location into the proxy's field. That made two loops write one field in two
+  // vocabularies: this one put `vpn` there, pollProxyMode() put the proxy's own
+  // `corporate` there, and the flip detector read one as the predecessor of the
+  // other and restarted the proxy every 60s for as long as the laptop stayed on
+  // the VPN. No consumer ever read the value — combined-status-line.js only
+  // passes it through, and the dashboard has a type for it and no renderer.
+  //
+  // The field means "what the proxy says about itself" (see its declaration in
+  // the state shape). pollProxyMode() is its only writer. The host's own view
+  // is netState.location, and evaluateProxyStaleness() is what compares them.
 
    log(`network: location=${netState.location} proxy_enabled=${proxyEnabledByUser} port_listening=${effectivePortListening} proxy_running=${netState.proxy_running} proxy_functional=${netState.proxy_functional} internet=${netState.internet_reachable}`);
 }
