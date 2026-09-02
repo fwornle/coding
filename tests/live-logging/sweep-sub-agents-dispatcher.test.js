@@ -27,11 +27,27 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { jest } from '@jest/globals';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const CLI = path.join(REPO_ROOT, 'scripts/sweep-sub-agents.mjs');
+
+// Every test here spawns the CLI as a real node subprocess — several of them
+// twice — so the honest cost of a test is seconds, not milliseconds. Measured
+// standalone on 2026-09-02: Test 6 13.7s, Test 3 7.1s, Test 7 7.0s, against
+// jest's 30s default. That is under a 2.2x margin for the slowest one, and the
+// margin is spent by whatever else the machine is doing: in a full `npm test`
+// (81 suites in parallel, cold jest cache) Test 7 crossed 30s and failed the
+// run, then passed standalone at 7.0s and on two full re-runs. Nothing was
+// wrong with it — the budget was simply sized for a test that does not fork.
+//
+// 60s keeps the timeout doing its real job (a CLI that genuinely hangs still
+// fails the suite, and fails it in a minute) while no longer reporting machine
+// load as a defect. Raise this only with a measurement, not a hunch: a test
+// here creeping past ~20s standalone is a signal about the CLI, not about jest.
+jest.setTimeout(60_000);
 
 let tmpDir;
 
