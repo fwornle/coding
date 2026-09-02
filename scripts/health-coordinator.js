@@ -39,6 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
+import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import {
   reclassifyTimeoutAsUnknown, debounceDbStatus,
   classifyProxyHttpFailure, isProxyRestartActionable,
@@ -2452,6 +2453,7 @@ function refreshLslStaleness() {
 // ---------------------------------------------------------------------------
 const NETWORK_PROBE_INTERVAL_MS = 15_000;
 
+
 // Reachability probe target. MUST be reachable from every network we run on,
 // including the CN corporate network where GitHub is throttled/blocked by the
 // GFW. `captive.apple.com` is a tiny fixed "Success" page served from Apple's
@@ -2769,7 +2771,13 @@ async function pollNetworkStatus() {
   // 'dig' spawns a fresh process that uses the OS's current DNS configuration.
   const pacResolved = await (async () => {
     try {
-      const { stdout: result } = await execFileAsync('dig', ['+short', '+timeout=2', '+tries=1', 'muc.proxy-pac.bmwgroup.net', 'A'], { timeout: 4000, encoding: 'utf8' });
+      // +tries=2, not 1: this single lookup decides the whole location verdict,
+      // and a lost UDP packet is not evidence of anything. One retry costs at
+      // most another 2s on a tick that runs every 15s, and stops the commonest
+      // transient from ever reaching the decision. The exec timeout below is
+      // raised to match (2 tries x 2s + slack) — leaving it at 4000 would have
+      // capped the second try before dig could use it.
+      const { stdout: result } = await execFileAsync('dig', ['+short', '+timeout=2', '+tries=2', 'muc.proxy-pac.bmwgroup.net', 'A'], { timeout: 6000, encoding: 'utf8' });
       return /\d+\.\d+\.\d+\.\d+/.test(result.trim());
     } catch {
       return false;
@@ -2790,17 +2798,40 @@ async function pollNetworkStatus() {
   }
 
   // Determine location from signals (N is NEVER influenced by proxy/port state)
+  let observedLocation;
   if (vpnConnected) {
-    netState.location = 'vpn';          // Cisco says connected — definitive
+    observedLocation = 'vpn';           // Cisco says connected — definitive
   } else if (pacResolved && onPhysicalCN) {
-    netState.location = 'corporate';    // PAC resolves + low latency = on-site
+    observedLocation = 'corporate';     // PAC resolves + low latency = on-site
   } else if (pacResolved) {
-    netState.location = 'vpn';          // PAC resolves + high latency = VPN (CLI missed?)
+    observedLocation = 'vpn';           // PAC resolves + high latency = VPN (CLI missed?)
   } else {
-    netState.location = 'open';         // no corporate access whatsoever
+    observedLocation = 'open';          // no corporate access whatsoever
   }
 
+  // Publish the SETTLED verdict, not the raw one — one lost DNS packet must not
+  // read as "left the building". Rules and rationale in
+  // lib/network/location-hysteresis.mjs; the counter lives here, in state, so a
+  // pending demotion is visible in /health/state instead of hidden in a module
+  // global. 0 whenever nothing is pending, which is the common case.
+  const settled = settleLocation({
+    observed: observedLocation,
+    previous: netState.location,
+    pending: netState.location_demotion_pending,
+  });
+  netState.location = settled.location;
+  netState.location_demotion_pending = settled.pending;
+
    log(`network: location=${netState.location} (vpnCli=${vpnConnected}, pac=${pacResolved}, physCN=${onPhysicalCN}, px=${effectivePortListening}, envSet=${proxyEnvSet})`, 'DEBUG');
+
+  // A hold is the interesting event and it changes nothing observable, so it
+  // has to say so itself — otherwise the only trace of a swallowed blip is a
+  // log line that looks identical to a quiet tick.
+  if (settled.held) {
+    log(`network: probe says 'open' but holding '${settled.location}' `
+      + `(${settled.pending}/${OPEN_DEMOTION_CONFIRM_TICKS} confirmations) — `
+      + 'a single failed PAC lookup is not a network change', 'INFO');
+  }
 
    // Auto-manage proxy env vars in THIS process based on user intent (bash_profile toggle):
    // - User enabled proxy (px) + port listening → set env vars so our probes use proxy
