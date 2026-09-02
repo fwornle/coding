@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Self-healing front end to the gsd-browser CLI.
+#
+# gsd-browser runs a background `_serve` daemon that owns one headless Chrome.
+# The two can get out of step: kill the browser and the daemon stays up holding
+# a dead CDP connection, after which EVERY command fails with
+#
+#     Error: navigate failed: send failed because receiver is gone
+#
+# and keeps failing forever, because nothing notices. The daemon is not
+# supervised — no launchd job, no KeepAlive — and the published binary is a
+# closed prebuilt (a root-owned symlink into ~/.gsd-browser/bin), so the restart
+# cannot be added where it belongs, inside the daemon. This shim is the next
+# best place: it sits earlier on PATH than /usr/local/bin, notices that exact
+# failure, restarts the daemon, and retries once.
+#
+# How it happens in practice: the documented fix for a *different* fault — an
+# orphaned Chrome holding a SingletonLock — is `pkill -9 -f chromiumoxide-runner`.
+# That kills the browser and leaves the daemon, i.e. it converts one broken
+# state into this one. On 2026-09-01 a stray pkill did the same thing by
+# accident and left the tool dead for a day; the recipe everyone reaches for
+# (kill chrome, clear Singleton*) does not fix this variant, because the stale
+# component is the daemon.
+#
+# Deliberately narrow: only this signature retries, only once, and only the
+# daemon is restarted. A blanket "retry on any error" would paper over real
+# failures — a bad selector, an unreachable URL — and turn a fast no into a slow
+# one. Set GSD_BROWSER_NO_AUTOHEAL=1 to pass straight through.
+
+# No `-e`: this script's whole job is to inspect a non-zero exit code.
+set -uo pipefail
+
+REAL="${GSD_BROWSER_BIN:-${HOME}/.gsd-browser/bin/gsd-browser}"
+
+if [[ ! -x "${REAL}" ]]; then
+    echo "gsd-browser: real binary not found at ${REAL}" >&2
+    echo "  set GSD_BROWSER_BIN to its path, or reinstall gsd-browser" >&2
+    exit 127
+fi
+
+# Refuse to invoke ourselves. If the install ever moves such that ${REAL}
+# resolves back to this shim, recursing would fork-bomb rather than fail.
+if [[ "$(cd "$(dirname "${REAL}")" && pwd -P)/$(basename "${REAL}")" == "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")" ]]; then
+    echo "gsd-browser: GSD_BROWSER_BIN points back at this shim — refusing to recurse" >&2
+    exit 127
+fi
+
+if [[ -n "${GSD_BROWSER_NO_AUTOHEAL:-}" ]]; then
+    exec "${REAL}" "$@"
+fi
+
+# TWO wedges, and healing the first can cause the second — which is why both
+# are handled here rather than only the one that prompted this.
+#
+#   A. Daemon alive, browser dead  -> "…send failed because receiver is gone"
+#   B. Stale SingletonLock         -> "daemon exited during startup with status
+#                                      exit status: 1", and with GSD_BROWSER_DEBUG=1,
+#                                      "Failed to create …/SingletonLock: File exists"
+#
+# B is what a SIGKILLed Chrome leaves behind: the lock in the automation profile
+# is only removed on a clean exit. So `pkill -9 -f chromiumoxide-runner` — the
+# standard fix for A — reliably produces B, and a restart that does not also
+# clear the lock just trades one dead state for another. Observed doing exactly
+# that on 2026-09-02 while testing this shim.
+DEAD_RECEIVER='receiver is gone'
+DEAD_DAEMON='daemon exited during startup'
+
+# Chrome profile the daemon drives. Its own dir, not the user's real profile —
+# clearing a lock here cannot touch a browsing session.
+CHROME_PROFILE="${TMPDIR:-/tmp}/chromiumoxide-runner"
+
+# Explicit XXXXXX template, not `mktemp -t gsd-browser-err`: GNU coreutils is
+# ahead of /usr/bin on this PATH and its -t wants a template with X's, so the
+# BSD spelling fails with "too few X's in template" — and, because the error
+# lands on stderr while mktemp still exits into an empty variable, it fails by
+# redirecting every command's stderr to "" rather than by stopping.
+ERRFILE="$(mktemp "${TMPDIR:-/tmp}/gsd-browser-err.XXXXXX")" || {
+    echo "gsd-browser: could not create a temp file for stderr capture" >&2
+    exec "${REAL}" "$@"
+}
+trap 'rm -f "${ERRFILE}"' EXIT
+
+# stdout is NOT captured — `screenshot` and `page-source` emit raw bytes, and
+# routing them through a shell variable would corrupt them and buffer them.
+# Only stderr is inspected, which is where every error above goes.
+run() {
+    "${REAL}" "$@" 2> "${ERRFILE}"
+}
+
+restart_daemon() {
+    # Test seam. The real reset SIGKILLs the daemon and every automation Chrome,
+    # which a test suite must not do to a developer's live session just by
+    # running. A hook lets the retry logic be exercised for real while the
+    # destructive half is stubbed — and lets the test assert the reset was
+    # actually reached, which a no-op flag could not.
+    if [[ -n "${GSD_BROWSER_RESET_HOOK:-}" && -x "${GSD_BROWSER_RESET_HOOK}" ]]; then
+        "${GSD_BROWSER_RESET_HOOK}"
+        return 0
+    fi
+
+    # Kill by executable name, never by `pkill -f 'gsd-browser _serve'`: this
+    # shim's own command line CONTAINS that string when invoked as
+    # `gsd-browser _serve`, so a -f match would have the shim kill itself.
+    # Filtering on comm= means only the real binary's processes are candidates.
+    local pid pids=()
+    while read -r pid; do
+        [[ -z "${pid}" || "${pid}" == "$$" ]] && continue
+        [[ "$(/bin/ps -o comm= -p "${pid}" 2>/dev/null | xargs basename 2>/dev/null)" == "gsd-browser" ]] \
+            && pids+=("${pid}")
+    done < <(pgrep -f '_serve' 2>/dev/null)
+
+    (( ${#pids[@]} > 0 )) && kill -9 "${pids[@]}" 2>/dev/null
+
+    # Then the browser it was driving. An orphaned automation Chrome is a wedge
+    # in its own right — the third state, and the one that actually blocked
+    # recovery here: with the daemon gone its Chrome kept running, kept holding
+    # a VALID SingletonLock naming its own pid, and every new daemon was refused
+    # the profile by ProcessSingleton. Preserving that lock is pointless (no
+    # daemon is using the browser) and fatal (nothing else can start one).
+    #
+    # Safe by construction: this profile is the automation instance's alone —
+    # a temp --user-data-dir — so nothing here can touch a real browsing session.
+    pkill -9 -f 'chromiumoxide-runner' 2>/dev/null
+
+    # Wait for the profile to actually be free before clearing. Killing is
+    # asynchronous, and removing a lock while its owner is still exiting invites
+    # the two-processes-one-profile corruption the lock exists to prevent.
+    local waited=0
+    while pgrep -f 'chromiumoxide-runner' >/dev/null 2>&1 && (( waited < 10 )); do
+        sleep 0.5
+        waited=$(( waited + 1 ))
+    done
+
+    # Only now, and only if the profile is genuinely unowned.
+    if ! pgrep -f 'chromiumoxide-runner' >/dev/null 2>&1; then
+        rm -f "${CHROME_PROFILE}"/Singleton* 2>/dev/null
+    fi
+    return 0
+}
+
+run "$@"
+rc=$?
+
+if (( rc != 0 )) \
+    && { grep -qF "${DEAD_RECEIVER}" "${ERRFILE}" 2>/dev/null \
+      || grep -qF "${DEAD_DAEMON}" "${ERRFILE}" 2>/dev/null; }; then
+    echo "gsd-browser: browser/daemon out of step — resetting both and retrying once" >&2
+    restart_daemon
+    run "$@"
+    rc=$?
+fi
+
+cat "${ERRFILE}" >&2
+exit "${rc}"
