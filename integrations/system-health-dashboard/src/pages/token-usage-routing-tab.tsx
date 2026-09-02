@@ -232,6 +232,13 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
   // turn identity. Not a filter — the same rows, read at the altitude the
   // question is actually asked at ("why did half my question run locally?").
   const [view, setView] = useState<'call' | 'turn'>('call')
+  // fg / bg / both. UNLIKE `view` above, this IS a filter — it changes which
+  // rows exist, not how they are grouped. It has to be applied server-side: the
+  // endpoint's LIMIT is what decides how much tail you get, so filtering after
+  // the fetch would silently return however many of the last 500 rows happened
+  // to be foreground. On this machine background outnumbers foreground by
+  // roughly 10:1, which would make "fg" look like a handful of stragglers.
+  const [scope, setScope] = useState<'both' | 'fg' | 'bg'>('both')
   const [openTurn, setOpenTurn] = useState<string | null>(null)
   // Bumped when the offload policy is saved. Every figure on this tab is
   // downstream of the routing config, so a policy write invalidates all of them,
@@ -256,7 +263,7 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
       const [b, c, rec] = await Promise.all([
         fetch(`${proxyBase}/api/llm/routing/behaviour?hours=${encodeURIComponent(hours)}`).then(r => r.json()),
         skipConfig ? Promise.resolve(null) : fetch(`${proxyBase}/api/llm/routing`).then(r => r.json()),
-        fetch(`${proxyBase}/api/token-usage/recent?limit=500`).then(r => r.json()),
+        fetch(`${proxyBase}/api/token-usage/recent?limit=500&scope=${scope}`).then(r => r.json()),
       ])
         if (b.error) throw new Error(b.error)
         setBehaviour(b)
@@ -275,10 +282,10 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
     } catch (e) {
       setError(String((e as Error).message || e))
     }
-  }, [proxyBase, hours, draftDirty])
+  }, [proxyBase, hours, draftDirty, scope])
 
   // Mount + whenever the window or a policy save invalidates everything.
-  useEffect(() => { void load(false) }, [proxyBase, hours, reloadNonce])
+  useEffect(() => { void load(false) }, [proxyBase, hours, reloadNonce, scope])
 
   // ...and on a timer thereafter. Everything on this tab is a record of what the
   // router just did, so a tab left open on a once-fetched frame is the one
@@ -795,6 +802,17 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                 onClick={refreshNow}
                 className="text-[10px] px-2 py-0.5 rounded border hover:bg-muted/60"
               >Refresh</button>
+              <div className="flex rounded border overflow-hidden" title="Foreground = a conversation with a human waiting (agent adapter hashes). Background = cognitive services.">
+                {(['both', 'fg', 'bg'] as const).map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setScope(v)}
+                    className={`text-[10px] px-2 py-0.5 ${
+                      scope === v ? 'bg-muted font-medium' : 'hover:bg-muted/60'
+                    }`}
+                  >{v === 'both' ? 'All' : v === 'fg' ? 'Foreground' : 'Background'}</button>
+                ))}
+              </div>
               <div className="flex rounded border overflow-hidden">
                 {(['call', 'turn'] as const).map(v => (
                   <button
