@@ -149,7 +149,12 @@ agent_pre_launch() {
   local _oc_variants='"variants":{"cheap":{"reasoningEffort":"low"},"standard":{"reasoningEffort":"medium"},"deep":{"reasoningEffort":"high"}}'
   local _oc_models=""
   local _m
-  for _m in claude-sonnet-5 claude-sonnet-4.6 claude-haiku-4.5 gpt-4o gpt-4o-mini; do
+  # Must stay a subset of the proxy's available_models for rapid-proxy's provider
+  # — scripts/audit-agent-model-catalogue.mjs fails the build otherwise, and the
+  # proxy would discard the id anyway (it routes by job+band and rewrites
+  # body.model). claude-sonnet-4.6 was dropped 2026-09-02 when it was retired
+  # upstream from the Copilot catalogue.
+  for _m in claude-sonnet-5 claude-haiku-4.5 gpt-4o gpt-4o-mini; do
     [ -n "$_oc_models" ] && _oc_models="${_oc_models},"
     _oc_models="${_oc_models}\"${_m}\":{${_oc_variants}}"
   done
