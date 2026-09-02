@@ -144,8 +144,9 @@ _pi_write_append_system() {
 
 ## Searching the filesystem
 
-Keep searches inside the project. `find .`, the `find`/`grep` tools, and
-`git ls-files` are the right instruments.
+Keep searches inside the project. `find .` and `git ls-files` are the right
+instruments (this agent's tools are read/bash/edit/write — there is no separate
+find or grep tool to reach for).
 
 Never search from `/`, `~`, `/Users`, or another whole-machine root. Such a scan
 takes minutes (343s measured here) and is refused by a tool guard, so attempting

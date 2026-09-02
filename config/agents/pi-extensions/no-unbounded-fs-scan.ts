@@ -135,7 +135,7 @@ export default function extension(pi: ExtensionAPI) {
           `Refused: \`find\` rooted at ${root} walks the entire filesystem and typically takes `
           + `minutes (measured: 343s on this machine). It is almost never the right next step.\n\n`
           + `Do this instead:\n`
-          + `  - Search the project: \`find . -name '<pattern>'\`, or use the grep/find tools.\n`
+          + `  - Search the project: \`find . -name '<pattern>'\` or \`git ls-files\`.\n`
           + `  - Deleted recently? Look in ~/.Trash specifically.\n`
           + `  - Installed elsewhere? Ask the package manager (\`which\`, \`npm ls\`, \`brew list\`).\n`
           + `  - If it is not in the project, say so and stop. "Not found here" is a useful `
