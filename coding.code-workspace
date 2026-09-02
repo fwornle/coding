@@ -23,6 +23,10 @@
 		{
 			"name": "graphify",
 			"path": "integrations/graphify"
+		},
+		{
+			"name": "rapid-llm-proxy",
+			"path": "../_work/rapid-llm-proxy"
 		}
 	],
 	"settings": {
