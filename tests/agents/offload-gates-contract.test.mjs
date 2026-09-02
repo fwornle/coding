@@ -129,6 +129,52 @@ describe('offload-gates mirrors the proxy', () => {
     // two orderings a tidier-looking ladder would get wrong — and would then
     // blame the wrong gate for real recorded calls.
     assert.deepEqual(gates.GATES.map((g) => g.id),
-      ['considered', 'route-allows', 'band', 'target', 'scope', 'transport', 'offloaded']);
+      ['considered', 'route-allows', 'band', 'target', 'target-band', 'scope', 'transport', 'offloaded']);
+  });
+
+  test('a target that narrows its bands is refused at its own rung, not the policy rung', async (t) => {
+    if (!reachable) return t.skip('proxy not reachable on :12435');
+    // Added 2026-09-02 with per-target `offload_bands`. The two band gates are
+    // easy to conflate and must not be: rung 2 means "widen the policy", rung 4
+    // means "widen THIS endpoint, or declare another for this network". Before
+    // targets could narrow, only one of them was reachable.
+    const policy = {
+      enabled: true,
+      offloadBands: ['small', 'medium'],
+      targets: [{
+        provider: 'qwen-laptop', requireNetwork: 'public', enabled: true,
+        scope: ['fg', 'bg'], offloadBands: ['small'],
+      }],
+    };
+    const entry = { provider: 'gh-copilot', complexity: 'from-caller' };
+    const never = () => false;
+
+    const small = gates.evaluateOffload(policy, entry, 'fg-chat/pi', 'small', 'public', never);
+    assert.equal(small.rung, gates.RUNG_OFFLOADED);
+    assert.equal(small.provider, 'qwen-laptop');
+
+    const medium = gates.evaluateOffload(policy, entry, 'fg-chat/pi', 'medium', 'public', never);
+    assert.equal(medium.rung, 4, 'the target-band rung, not the policy-band rung');
+    assert.match(medium.reason, /takes bands \[small\]/);
+    assert.equal(gates.rungOfReason(medium.reason), 4);
+
+    // And the policy rung still answers for a band the policy itself excludes.
+    const high = gates.evaluateOffload(policy, entry, 'fg-chat/pi', 'high', 'public', never);
+    assert.equal(high.rung, 2);
+    assert.equal(gates.rungOfReason(high.reason), 2);
+  });
+
+  test('every classifier note the proxy is emitting is a string the panel can draw', async (t) => {
+    if (!reachable) return t.skip('proxy not reachable on :12435');
+    const r = await fetch(`${BASE}/api/llm/routing/behaviour?hours=168`);
+    const b = await r.json();
+    // The field is optional on the wire (a proxy predating it sends none), so an
+    // absent array is a pass and an array of malformed entries is not. This is
+    // the aggregate whose absence hid the 2026-09-02 outage.
+    for (const n of b.classifierNotes ?? []) {
+      assert.equal(typeof n.note, 'string');
+      assert.ok(n.note.length > 0, 'a blank note would render as an empty row');
+      assert.ok(Number.isInteger(n.count) && n.count > 0);
+    }
   });
 });

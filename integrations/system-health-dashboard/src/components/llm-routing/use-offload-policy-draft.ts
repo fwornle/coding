@@ -46,7 +46,10 @@ export interface ClassifierPolicy {
 /** The `semanticRouting` half of `GET /api/llm/routing`, as it arrives. */
 interface WireSemanticRouting {
   enabled: boolean
-  targets: Array<{ provider: string; requireNetwork: string | null; enabled: boolean; scope?: string[] }>
+  targets: Array<{
+    provider: string; requireNetwork: string | null; enabled: boolean;
+    scope?: string[]; offloadBands?: string[] | null;
+  }>
   offloadBands: string[]
 }
 
@@ -103,6 +106,13 @@ function toPolicy(sr: WireSemanticRouting | null | undefined): OffloadPolicy | n
       requireNetwork: t.requireNetwork ?? null,
       enabled: t.enabled === true,
       scope: t.scope ? [...t.scope] : undefined,
+      // Carried through untouched. Nothing in the UI edits a target's band
+      // narrowing — it is a statement about what the BOX can do, not a policy
+      // knob — but the ladder must see it or it would render the laptop as
+      // taking medium work it refuses, and `save()` echoes the working copy
+      // back, so dropping it here would delete it from the YAML on the next
+      // unrelated toggle.
+      offloadBands: t.offloadBands ? [...t.offloadBands] : null,
     })),
   }
 }

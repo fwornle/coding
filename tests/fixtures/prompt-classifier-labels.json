@@ -17,29 +17,168 @@
     "to cover a boundary the corpus happens not to contain."
   ],
   "cases": [
-    { "text": "how many r's in strawberry", "label": "small", "source": "written", "note": "the request that motivated the whole feature" },
-    { "text": "what is 2+2", "label": "small", "source": "written" },
-    { "text": "say ok", "label": "small", "source": "corpus" },
-    { "text": "Reply with exactly one word: ok", "label": "small", "source": "corpus" },
-    { "text": "Reply exactly: OK", "label": "small", "source": "corpus" },
-    { "text": "What is the secret codeword?", "label": "small", "source": "corpus" },
-    { "text": "Generate a title for this conversation:", "label": "small", "source": "corpus", "note": "opencode's own internal call; already declares low effort itself" },
-    { "text": "what is the capital of France", "label": "small", "source": "written" },
-    { "text": "convert 30 celsius to fahrenheit", "label": "small", "source": "written" },
-    { "text": "what does the acronym TLS stand for", "label": "small", "source": "written" },
-
-    { "text": "write a python function that reverses a string", "label": "medium", "source": "written" },
-    { "text": "explain what a mutex is", "label": "medium", "source": "written" },
-    { "text": "add a --verbose flag to this script and print the config it resolved", "label": "medium", "source": "written" },
-    { "text": "what is the difference between a git rebase and a git merge, and when would I prefer each", "label": "medium", "source": "written" },
-    { "text": "write a regex that matches an ISO 8601 timestamp with an optional timezone offset", "label": "medium", "source": "written" },
-    { "text": "summarise what this function does and whether the early return is reachable", "label": "medium", "source": "written" },
-
-    { "text": "Refactor the routing chain builder in server.mjs so the offload decision is testable in isolation, then update every affected unit test", "label": "high", "source": "written" },
-    { "text": "why is my ETM crash-looping with ERR_MODULE_NOT_FOUND across two submodules", "label": "high", "source": "written" },
-    { "text": "Search the codebase thoroughly for the Enhanced Transcript Monitor (ETM) implementation files.", "label": "high", "source": "corpus" },
-    { "text": "Which HTTP route does the system-health dashboard expose to trigger a code-graph re-index, and in which file", "label": "high", "source": "corpus" },
-    { "text": "design a caching layer for the retrieval path that survives a process restart without serving stale entries", "label": "high", "source": "written" },
-    { "text": "the proxy pins a dead HTTPS_PROXY after the VPN drops and every provider call fails at once — find the root cause", "label": "high", "source": "written" }
+    {
+      "text": "how many r's in strawberry",
+      "label": "small",
+      "source": "written",
+      "note": "the request that motivated the whole feature"
+    },
+    {
+      "text": "what is 2+2",
+      "label": "small",
+      "source": "written"
+    },
+    {
+      "text": "say ok",
+      "label": "small",
+      "source": "corpus"
+    },
+    {
+      "text": "Reply with exactly one word: ok",
+      "label": "small",
+      "source": "corpus"
+    },
+    {
+      "text": "Reply exactly: OK",
+      "label": "small",
+      "source": "corpus"
+    },
+    {
+      "text": "What is the secret codeword?",
+      "label": "small",
+      "source": "corpus"
+    },
+    {
+      "text": "Generate a title for this conversation:",
+      "label": "small",
+      "source": "corpus",
+      "note": "opencode's own internal call; already declares low effort itself"
+    },
+    {
+      "text": "what is the capital of France",
+      "label": "small",
+      "source": "written"
+    },
+    {
+      "text": "convert 30 celsius to fahrenheit",
+      "label": "small",
+      "source": "written"
+    },
+    {
+      "text": "what does the acronym TLS stand for",
+      "label": "small",
+      "source": "written"
+    },
+    {
+      "text": "write a python function that reverses a string",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "explain what a mutex is",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "add a --verbose flag to this script and print the config it resolved",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "what is the difference between a git rebase and a git merge, and when would I prefer each",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "write a regex that matches an ISO 8601 timestamp with an optional timezone offset",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "summarise what this function does and whether the early return is reachable",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "Refactor the routing chain builder in server.mjs so the offload decision is testable in isolation, then update every affected unit test",
+      "label": "high",
+      "source": "written"
+    },
+    {
+      "text": "why is my ETM crash-looping with ERR_MODULE_NOT_FOUND across two submodules",
+      "label": "high",
+      "source": "written"
+    },
+    {
+      "text": "Search the codebase thoroughly for the Enhanced Transcript Monitor (ETM) implementation files.",
+      "label": "high",
+      "source": "corpus"
+    },
+    {
+      "text": "Which HTTP route does the system-health dashboard expose to trigger a code-graph re-index, and in which file",
+      "label": "high",
+      "source": "corpus"
+    },
+    {
+      "text": "design a caching layer for the retrieval path that survives a process restart without serving stale entries",
+      "label": "high",
+      "source": "written"
+    },
+    {
+      "text": "the proxy pins a dead HTTPS_PROXY after the VPN drops and every provider call fails at once — find the root cause",
+      "label": "high",
+      "source": "written"
+    },
+    {
+      "text": "Create a python class that exposes methods that clasify if the number is positive, negative, prime, even, odd, etc...",
+      "label": "medium",
+      "source": "corpus",
+      "note": "the second 2026-09-02 pi turn; medium by the rubric's own definition, and now offload-eligible"
+    },
+    {
+      "text": "write a bash function that retries a command up to 3 times with exponential backoff",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "convert this JSON schema into a TypeScript interface",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "explain the difference between a process and a thread",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "write a SQL query that returns the top 5 customers by total order value",
+      "label": "medium",
+      "source": "written"
+    },
+    {
+      "text": "the dashboard shows the right number in one tab and a different one in another — work out which query is wrong",
+      "label": "high",
+      "source": "written"
+    },
+    {
+      "text": "we need to move token accounting off the file adapter and onto the proxy without losing historical rows",
+      "label": "high",
+      "source": "written"
+    },
+    {
+      "text": "pick between per-target and global band lists for the offload policy and justify the choice",
+      "label": "high",
+      "source": "written"
+    },
+    {
+      "text": "our background classifier is outspending the foreground agents — find out why and propose a fix",
+      "label": "high",
+      "source": "written"
+    },
+    {
+      "text": "the service restarts cleanly but loses its cache every time; is the shutdown path or the load path at fault?",
+      "label": "high",
+      "source": "written"
+    }
   ]
 }

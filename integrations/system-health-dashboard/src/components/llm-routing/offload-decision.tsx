@@ -34,6 +34,7 @@ import { FlowTab } from '@/pages/token-usage-flow-tab'
 import type { FlowData } from '@/pages/token-usage-flow-tab'
 import { OffloadHeadline } from './offload-headline'
 import { useOffloadPolicyDraft } from './use-offload-policy-draft'
+import { useClassifierJudge } from './use-classifier-judge'
 import { CallStrip, stripRows } from './call-strip'
 import type { StripFilter } from './call-strip'
 import { CallDetail } from './call-detail'
@@ -170,6 +171,10 @@ export function OffloadDecision({
   const [resolved, setResolved] = useState<Record<string, Resolved> | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [selectedRung, setSelectedRung] = useState<number | null>(null)
+  // WHO judges, and whether they are answering. A second hook because it writes
+  // a different file on a different machine's schedule — see use-classifier-judge.
+  const judge = useClassifierJudge(proxyBase)
+  const [showRubric, setShowRubric] = useState(false)
 
   const fgCapable = useMemo(() => {
     const set = new Set(providers.filter(p => p.fgCapable).map(p => p.id))
@@ -594,6 +599,124 @@ export function OffloadDecision({
               </div>
             )}
 
+            {/* ── The judge ──
+                WHICH MODEL answers that question, on which network, and whether
+                it is answering at all. None of this was on screen until
+                2026-09-02, which is how a judge whose model endpoint had been
+                down for a day looked exactly like a policy that had decided not
+                to downgrade anything. `enabled` and `reachable` are drawn as
+                separate things throughout: one is a decision, the other a fault,
+                and they have opposite fixes. */}
+            {cls?.enabled && cls.impl !== 'none' && (
+              <div className="pl-[1.35rem] space-y-1.5 border-l-2 border-muted ml-[0.35rem]">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-muted-foreground">judged by:</span>
+                  {judge.judge
+                    ? <span className="font-mono">
+                        {judge.judge.backends.find(b => b.selected)?.model ?? 'nothing on this network'}
+                      </span>
+                    : <span className="text-destructive">
+                        judge unreachable{judge.judgeUrl ? ` at ${judge.judgeUrl}` : ''}
+                      </span>}
+                  {judge.judge && (
+                    <span className="text-muted-foreground">
+                      on <span className="font-mono">{judge.judge.network}</span>
+                    </span>
+                  )}
+                </div>
+
+                {judge.judgeError && (
+                  <div className="text-destructive">
+                    {judge.judgeError} — no verdict is sought, so every caller’s own band stands.
+                  </div>
+                )}
+
+                {judge.judge?.configError && (
+                  <div className="text-destructive">
+                    prompt-classifier.yaml is unusable ({judge.judge.configError}) — the judge is
+                    running on the last config that loaded.
+                  </div>
+                )}
+
+                {judge.judge?.backends.map(b => (
+                  <label key={b.id} className="flex items-center gap-1.5 flex-wrap"
+                    title={`${b.baseUrl} — serves ${b.requireNetwork ?? 'any network'}`}>
+                    <input type="checkbox" className="accent-primary" checked={b.enabled}
+                      onChange={e => judge.setBackendEnabled(b.id, e.target.checked)} />
+                    <span className={b.enabled ? 'font-mono' : 'font-mono opacity-50'}>{b.id}</span>
+                    <span className="text-muted-foreground">
+                      [{b.requireNetwork ?? 'any'}] {b.model}
+                    </span>
+                    {b.selected && <Badge variant="outline" className="text-[9px] py-0">serves this network</Badge>}
+                    {/* Runtime, never merged into the checkbox above. `null` is
+                        its own state: this box has not been asked, because it
+                        does not serve the network we are on — which is not the
+                        same as it being broken. */}
+                    {b.reachable === false && (
+                      <span className="text-destructive">
+                        unreachable{b.lastError ? ` — ${b.lastError}` : ''}
+                      </span>
+                    )}
+                    {b.reachable === true && (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        answering{b.lastLatencyMs != null ? ` in ${fmt(b.lastLatencyMs)}ms` : ''}
+                      </span>
+                    )}
+                    {b.reachable === null && (
+                      <span className="text-muted-foreground">not asked on this network</span>
+                    )}
+                  </label>
+                ))}
+
+                {judge.judge && (
+                  <div>
+                    <button className="text-[10px] px-1.5 py-0.5 rounded border hover:bg-muted/60"
+                      onClick={() => setShowRubric(v => !v)}>
+                      {showRubric ? 'hide' : 'show'} the rubric
+                    </button>
+                    <span className="text-muted-foreground ml-2">
+                      the entire prompt the judge is sent, before the request text
+                    </span>
+                  </div>
+                )}
+
+                {showRubric && judge.judge && (
+                  <div className="space-y-1">
+                    <textarea
+                      className="w-full h-28 font-mono text-[11px] p-2 rounded border bg-background"
+                      value={judge.draftRubric ?? judge.judge.rubric}
+                      onChange={e => judge.setDraftRubric(e.target.value)}
+                    />
+                    <div className="text-muted-foreground">
+                      Editing this changes what <span className="font-mono">small</span> means for
+                      every agent at once. Re-run{' '}
+                      <span className="font-mono">scripts/eval-prompt-classifier.mjs</span> after —
+                      the precision gate is what says whether a change was an improvement or a
+                      preference.
+                    </div>
+                  </div>
+                )}
+
+                {judge.error && <div className="text-destructive">{judge.error}</div>}
+
+                {judge.dirty && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-500 border-amber-500/40">
+                      judge · unsaved
+                    </Badge>
+                    <span className="ml-auto flex gap-1.5">
+                      <Button size="sm" variant="ghost" className="h-6 text-[11px] px-2"
+                        onClick={judge.revert} disabled={judge.saving}>Revert</Button>
+                      <Button size="sm" className="h-6 text-[11px] px-2"
+                        onClick={judge.save} disabled={judge.saving}>
+                        {judge.saving ? 'Saving…' : 'Save to prompt-classifier.yaml'}
+                      </Button>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-3 flex-wrap">
               <label className="flex items-center gap-1.5">
                 <input type="checkbox" className="accent-primary" checked={p.enabled}
@@ -617,13 +740,21 @@ export function OffloadDecision({
               <span className="text-muted-foreground">targets:</span>
               {p.targets.map(t => (
                 <label key={t.provider} className="flex items-center gap-1"
-                  title={`serves ${t.requireNetwork ?? 'any network'} · scope ${(t.scope ?? ['fg', 'bg']).join('+')}`}>
+                  title={`serves ${t.requireNetwork ?? 'any network'} · scope ${(t.scope ?? ['fg', 'bg']).join('+')}`
+                    + `${t.offloadBands ? ` · takes only ${t.offloadBands.join(', ')}` : ''}`}>
                   <input type="checkbox" className="accent-primary" disabled={!p.enabled}
                     checked={t.enabled}
                     onChange={e => policy.setTargetEnabled(t.provider, e.target.checked)} />
                   <span className={p.enabled ? 'font-mono' : 'font-mono opacity-50'}>{t.provider}</span>
-                  <span className="text-muted-foreground">
-                    [{t.requireNetwork ?? 'any'}/{(t.scope ?? ['fg', 'bg']).join('+')}]
+                  <span className="text-muted-foreground" data-testid={`offload-target-${t.provider}`}>
+                    [{t.requireNetwork ?? 'any'}/{(t.scope ?? ['fg', 'bg']).join('+')}
+                    {/* The target's OWN band list, shown only when it narrows the
+                        policy — the same rule describeTargets() follows, so this
+                        row and the ladder's reason strings read identically.
+                        Printing the global list on every target would put policy
+                        in a per-target slot and read as though each one had
+                        chosen it. */}
+                    {t.offloadBands ? `/${t.offloadBands.join('+')}` : ''}]
                   </span>
                 </label>
               ))}
