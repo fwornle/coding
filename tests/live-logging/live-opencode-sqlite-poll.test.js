@@ -544,3 +544,170 @@ describe('opencode poll watcher - Plan 03 cumulative gate', () => {
     expect(row.agent_metadata.session_id).toBe('ses_abcdef0123456');
   });
 });
+
+describe('opencode poll watcher - resume cursor', () => {
+  test('Test 14: getStats exposes a cursor carrying both high-water marks', async () => {
+    const dbPath = seed({
+      numSubSessions: 1,
+      messagesPerSession: [
+        { role: 'user', content: 'hello', timeMs: Date.now() - 1000 },
+      ],
+    });
+    const registry = createRegistry();
+    const handle = await startOpencodeWatcher({
+      dbPath,
+      registry,
+      observationWriter: makeObservationWriterStub(),
+      projectRoot: FIXTURE_PROJECT_ROOT,
+      pollIntervalMs: 50,
+    });
+    try {
+      await wait(200);
+      const { cursor } = handle.getStats();
+      expect(cursor).toBeDefined();
+      expect(typeof cursor.last_poll_time).toBe('number');
+      expect(cursor.last_poll_time).toBeGreaterThan(0);
+      // The message high-water mark matters as much as the session one: without
+      // it a resumed session re-sends its entire history (see Test 15).
+      const sids = Object.keys(cursor.last_seen_message_id_by_session);
+      expect(sids).toHaveLength(1);
+      expect(typeof cursor.last_seen_message_id_by_session[sids[0]]).toBe('string');
+    } finally {
+      await handle.stop();
+    }
+  });
+
+  test('Test 15: a watcher resumed from a cursor replays nothing', async () => {
+    const dbPath = seed({
+      numSubSessions: 2,
+      messagesPerSession: [
+        { role: 'user', content: 'first user', timeMs: Date.now() - 1000 },
+        { role: 'assistant', content: 'first asst', timeMs: Date.now() - 900 },
+      ],
+    });
+
+    // Run 1: cold start — does the full pass and hands back a cursor.
+    const first = await startOpencodeWatcher({
+      dbPath,
+      registry: createRegistry(),
+      observationWriter: makeObservationWriterStub(),
+      projectRoot: FIXTURE_PROJECT_ROOT,
+      pollIntervalMs: 50,
+    });
+    let cursor;
+    try {
+      await wait(200);
+      expect(writerCalls.length).toBeGreaterThanOrEqual(1);
+      cursor = first.getStats().cursor;
+    } finally {
+      await first.stop();
+    }
+
+    // Run 2: same unchanged DB, resumed. This is the restart case that used to
+    // re-feed every historical sub-session to the observation writer.
+    writerCalls.length = 0;
+    const second = await startOpencodeWatcher({
+      dbPath,
+      registry: createRegistry(),
+      observationWriter: makeObservationWriterStub(),
+      projectRoot: FIXTURE_PROJECT_ROOT,
+      pollIntervalMs: 50,
+      cursor,
+    });
+    try {
+      await wait(200);
+      expect(writerCalls).toHaveLength(0);
+    } finally {
+      await second.stop();
+    }
+  });
+
+  test('Test 16: a resumed session sends only its NEW messages', async () => {
+    const dbPath = seed({
+      numSubSessions: 1,
+      messagesPerSession: [
+        { role: 'user', content: 'first user', timeMs: Date.now() - 1000 },
+      ],
+    });
+
+    const registry = createRegistry();
+    const first = await startOpencodeWatcher({
+      dbPath,
+      registry,
+      observationWriter: makeObservationWriterStub(),
+      projectRoot: FIXTURE_PROJECT_ROOT,
+      pollIntervalMs: 50,
+    });
+    let cursor;
+    let subSid;
+    try {
+      await wait(200);
+      subSid = registry.listByAgent('opencode')[0]?.agent_metadata?.session_id;
+      expect(subSid).toBeDefined();
+      cursor = first.getStats().cursor;
+    } finally {
+      await first.stop();
+    }
+
+    // The session advances while no watcher is running.
+    const writerDb = openWriterDb(dbPath);
+    appendMessageRow(writerDb, {
+      sessionId: subSid,
+      msgId: 'msg_zzz_after_restart',
+      role: 'user',
+      text: 'sent while the daemon was down',
+      timeMs: Date.now() + 100,
+    });
+    bumpSessionUpdate(writerDb, subSid, Date.now() + 20000);
+    writerDb.close();
+
+    writerCalls.length = 0;
+    const second = await startOpencodeWatcher({
+      dbPath,
+      registry: createRegistry(),
+      observationWriter: makeObservationWriterStub(),
+      projectRoot: FIXTURE_PROJECT_ROOT,
+      pollIntervalMs: 50,
+      cursor,
+    });
+    try {
+      await wait(200);
+      expect(writerCalls.length).toBeGreaterThanOrEqual(1);
+      const ids = writerCalls.flatMap((c) => c.messages.map((m) => m.id));
+      expect(ids).toContain('msg_zzz_after_restart');
+      expect(ids.filter((id) => !id.startsWith('msg_zzz_'))).toHaveLength(0);
+    } finally {
+      await second.stop();
+    }
+  });
+
+  test('Test 17: a missing or malformed cursor degrades to a cold start', async () => {
+    const dbPath = seed({
+      numSubSessions: 1,
+      messagesPerSession: [
+        { role: 'user', content: 'hello', timeMs: Date.now() - 1000 },
+      ],
+    });
+
+    // Each of these must behave exactly like no cursor at all — never throw,
+    // and never silently skip work.
+    for (const bad of [undefined, null, 'nonsense', 42, {}, { last_poll_time: 'x' },
+      { last_seen_message_id_by_session: [] }]) {
+      writerCalls.length = 0;
+      const handle = await startOpencodeWatcher({
+        dbPath,
+        registry: createRegistry(),
+        observationWriter: makeObservationWriterStub(),
+        projectRoot: FIXTURE_PROJECT_ROOT,
+        pollIntervalMs: 50,
+        cursor: bad,
+      });
+      try {
+        await wait(150);
+        expect(writerCalls.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        await handle.stop();
+      }
+    }
+  });
+});

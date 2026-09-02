@@ -14,13 +14,32 @@
         <string>--state-file</string>
         <string>/Users/Q284340/Agentic/coding/.data/sub-agent-live-state-opencode.json</string>
     </array>
+    <!-- KeepAlive: unconditional. Restart this daemon whenever it exits, for
+         any reason. To stop one on purpose use `launchctl bootout` — never a
+         kill, which is now indistinguishable from a crash.
+
+         This was a <dict> of {SuccessfulExit=false, NetworkState=true} and both
+         halves were wrong:
+
+         * SuccessfulExit=false means "restart only on a NON-ZERO exit". These
+           daemons trap SIGTERM, shut down gracefully and exit 0, so every
+           signalled stop was permanent. On 2026-09-01 a stray pkill SIGTERMed
+           all three; sub-agent capture stayed down 14.5 hours, reported by the
+           Health API and acted on by nothing. Daemons with no graceful handler
+           (auto-measure-foreground, prompt-classifier) took the same signal,
+           exited non-zero, and launchd restarted them at once — the asymmetry
+           was the SIGTERM handler, not the intent.
+
+         * NetworkState=true looks like the safety net that covers the above.
+           It is not: `man 5 launchd.plist` says it "is no longer implemented
+           as it never acted how most users expected". So the dict had exactly
+           one live condition, and dropping SuccessfulExit on its own left a
+           dict that keeps the job alive under NO condition — verified on
+           2026-09-02 by SIGTERMing the claude daemon and watching launchd
+           leave it dead for three minutes. Hence plain <true/>, not a
+           narrower dict. -->
     <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-        <key>NetworkState</key>
-        <true/>
-    </dict>
+    <true/>
     <key>RunAtLoad</key>
     <true/>
     <key>ThrottleInterval</key>

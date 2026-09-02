@@ -353,6 +353,17 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
       const livePlist = path.join(LAUNCHD_DIR, `com.coding.sub-agent-live-${agent}.plist`);
       const body = fs.readFileSync(livePlist, 'utf8');
       expect((body.match(/<key>KeepAlive<\/key>/g) || []).length).toBeGreaterThanOrEqual(1);
+      // ...and it must be UNCONDITIONAL. Asserting the literal `<true/>` form
+      // rather than merely the absence of SuccessfulExit, because the obvious
+      // narrower fix is also broken: these daemons trap SIGTERM and exit(0),
+      // so SuccessfulExit=false made every signalled stop permanent (14.5h
+      // outage, 2026-09-01), while the NetworkState=true that sat beside it
+      // is not implemented at all per `man 5 launchd.plist` — a dict keeping
+      // only that key restarts the job under NO condition. Verified by
+      // SIGTERM against a live daemon, not by reading the plist.
+      expect(body).toMatch(/<key>KeepAlive<\/key>\s*<true\/>/);
+      expect(body).not.toMatch(/<key>SuccessfulExit<\/key>/);
+      expect(body).not.toMatch(/<key>NetworkState<\/key>/);
       expect(body).toMatch(/<key>ThrottleInterval<\/key>\s*<integer>60<\/integer>/);
       // Critical defect mitigation: stderr redirected to .data/live-<agent>.log.
       expect(body).toMatch(new RegExp(`<key>StandardErrorPath</key>\\s*<string>[^<]*\\.data/live-${agent}\\.log</string>`));
