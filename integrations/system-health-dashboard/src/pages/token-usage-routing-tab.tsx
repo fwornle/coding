@@ -786,14 +786,18 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
         <CardContent className="p-0">
           <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
             <table className="w-full text-xs">
-              <thead className="bg-muted/40 text-muted-foreground sticky top-0">
+              {/* The background belongs on the th cells and must be opaque.
+                  bg-muted/40 on the thead let the scrolling rows show straight
+                  through the sticky header, and a background set on <thead> is
+                  not reliably painted for a sticky table header anyway. */}
+              <thead className="text-muted-foreground sticky top-0 z-10">
                 <tr>
-                  <th className="text-left px-3 py-1.5 font-medium">Time</th>
-                  <th className="text-left px-3 py-1.5 font-medium">Route</th>
-                  <th className="text-left px-3 py-1.5 font-medium">Band</th>
-                  <th className="text-left px-3 py-1.5 font-medium">Served by</th>
-                  <th className="text-left px-3 py-1.5 font-medium">Decision</th>
-                  <th className="text-right px-3 py-1.5 font-medium">Tokens</th>
+                  <th className="text-left px-3 py-1.5 font-medium bg-muted border-b">Time</th>
+                  <th className="text-left px-3 py-1.5 font-medium bg-muted border-b">Route</th>
+                  <th className="text-left px-3 py-1.5 font-medium bg-muted border-b">Band</th>
+                  <th className="text-left px-3 py-1.5 font-medium bg-muted border-b">Served by</th>
+                  <th className="text-left px-3 py-1.5 font-medium bg-muted border-b">Decision</th>
+                  <th className="text-right px-3 py-1.5 font-medium bg-muted border-b">Tokens</th>
                 </tr>
               </thead>
               <tbody>
