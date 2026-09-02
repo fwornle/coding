@@ -110,13 +110,36 @@ function printHelp() {
     '  --help, -h                  print this banner',
     '',
     'Heartbeat payload schema:',
-    '  { agent, last_heartbeat_at, polls, registered, last_poll_at, errors }',
+    '  { agent, last_heartbeat_at, polls, registered, last_poll_at, errors,',
+    '    cursor: { last_poll_time, last_seen_message_id_by_session } }',
+    '',
+    'The cursor is read back at startup so a restart resumes instead of',
+    'replaying every historical sub-session through the observation writer.',
     '',
     'Atomic state-file write: <state-file>.tmp + renameSync swap.',
     'Graceful shutdown on SIGTERM / SIGINT.',
     'Error budget: >10 errors in 60s -> exit 1 (supervisor restart).',
   ];
   process.stdout.write(lines.join('\n') + '\n');
+}
+
+// ---- Resume cursor --------------------------------------------------------
+/**
+ * Read the previous run's cursor out of the heartbeat state file so the first
+ * poll resumes instead of replaying the whole opencode.db. See the "Resume
+ * cursor" block in lib/lsl/live/opencode-sqlite-poll.mjs for why.
+ *
+ * Every failure mode here — file absent, unreadable, not JSON, no cursor key —
+ * returns undefined, which the watcher treats as a cold start. That is the
+ * safe direction: a lost cursor costs a replay, a wrong one loses observations.
+ */
+function readCursorFromStateFile(filePath) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return raw && typeof raw === 'object' ? raw.cursor : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // ---- Atomic heartbeat write -----------------------------------------------
@@ -213,11 +236,19 @@ async function main() {
     `[live-opencode] watching ${dbPath} (poll=${args.pollIntervalMs}ms)\n`,
   );
 
+  const resumeCursor = readCursorFromStateFile(stateFile);
+  process.stderr.write(
+    resumeCursor
+      ? `[live-opencode] resuming from cursor (last_poll_time=${resumeCursor.last_poll_time})\n`
+      : '[live-opencode] no cursor in state file — cold start, replaying history\n',
+  );
+
   const handle = await startOpencodeWatcher({
     dbPath,
     registry,
     observationWriter,
     projectRoot,
+    cursor: resumeCursor,
     pollIntervalMs: args.pollIntervalMs,
     onError: (err) => {
       process.stderr.write(
@@ -237,6 +268,10 @@ async function main() {
       registered: stats.registered,
       last_poll_at: stats.last_poll_at,
       errors: stats.errors,
+      // Resume point for the NEXT process. Persisted here rather than in a
+      // file of its own so there is exactly one state write to reason about,
+      // and so the shutdown heartbeat checkpoints a clean stop for free.
+      cursor: stats.cursor,
       // Phase 51 Plan 51-13 (CR-02): mirror Plan 51-07/51-09 daemons by
       // emitting registry_rows so lib/lsl/registry-reader.mjs:145 can
       // enumerate live OpenCode sub-agents. Without this, the registry
