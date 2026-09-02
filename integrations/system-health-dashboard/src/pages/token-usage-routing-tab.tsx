@@ -186,6 +186,32 @@ const fmt = (n: number): string => (
 
 const pct = (num: number, den: number): string => (den > 0 ? `${Math.round((num / den) * 100)}%` : '—')
 
+const FOREGROUND_LABEL = 'Foreground — a person is waiting'
+
+/**
+ * How the Observed table is sectioned. Order here IS the order on screen, and
+ * it is deliberate: foreground first because those are the only routes with a
+ * human blocked on them, then the background families in rough order of how
+ * much they spend and how often they are the thing under investigation.
+ *
+ * `match` is a prefix test against the route key, not a regex, so a new route
+ * joins its family by being named like it. Anything unmatched falls through to
+ * a trailing "Other" group — that group growing is the signal that a naming
+ * convention has drifted, so it is left visible rather than hidden.
+ *
+ * Knowledge-base work deliberately spans two prefixes: `bg-kb-*` (retrieval and
+ * the A/B harness) and `bg-observation-*` (what feeds it). They are one concern
+ * to an operator even though the names never converged.
+ */
+const ROUTE_GROUPS: { label: string, match: (key: string) => boolean }[] = [
+  { label: FOREGROUND_LABEL, match: k => k.startsWith('fg-') },
+  { label: 'Wave analysis', match: k => k.startsWith('bg-wave-analysis-') },
+  { label: 'Consolidator', match: k => k.startsWith('bg-consolidator-') },
+  { label: 'Knowledge base', match: k => k.startsWith('bg-kb-') || k.startsWith('bg-observation-') },
+  { label: 'Auto-measure', match: k => k.startsWith('bg-auto-measure-') },
+  { label: 'Defaults (no route named this job)', match: k => k.startsWith('defaults.') },
+]
+
 export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
   const [behaviour, setBehaviour] = useState<Behaviour | null>(null)
   const [config, setConfig] = useState<RoutingConfig | null>(null)
@@ -255,6 +281,9 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
 
   // Routes whose traffic did NOT all land on the provider the config names.
   // This is the list the old dashboard could not produce at all.
+  //
+  // Ordering: see ROUTE_GROUPS below. This array stays sorted by tokens because
+  // that is the order WITHIN a group; the grouping is applied on top of it.
   const divergent = useMemo(() => {
     if (!behaviour || !config) return []
     const byRoute = new Map<string, PerRoute[]>()
@@ -308,6 +337,48 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
       })
       .sort((a, b) => b.tokens - a.tokens)
   }, [behaviour, config])
+
+  // Group the observed routes so the table reads as "who was waiting" first and
+  // "which subsystem" after, instead of one ~40-row list ordered only by spend.
+  //
+  // Flat token-descending ordering answered "what cost the most" and nothing
+  // else: the four interactive routes — the only ones with a human attached —
+  // scattered among three dozen background jobs, and the wave-analysis family
+  // (14 routes that are one workflow) appeared as 14 unrelated lines wherever
+  // their individual totals happened to land.
+  //
+  // Groups come from the route NAMES rather than a new `group:` field in
+  // llm-routing.yaml, because the names already encode this and a second source
+  // of truth would need boot validation and would drift. The cost is that a
+  // route named outside these prefixes lands in "Other" rather than failing
+  // loudly — acceptable for a display concern, and "Other" staying small is
+  // itself the signal that the naming convention is holding.
+  const grouped = useMemo(() => {
+    const buckets = ROUTE_GROUPS.map(g => ({ ...g, rows: [] as typeof divergent }))
+    const other = { label: 'Other', match: () => true, rows: [] as typeof divergent }
+
+    for (const r of divergent) {
+      const bucket = buckets.find(g => g.match(r.key)) ?? other
+      bucket.rows.push(r)
+    }
+
+    // Foreground is the one group NOT left in token order. These four are a
+    // fixed, memorised set and an operator looks one of them up by name, so a
+    // stable alphabetical order beats an order that reshuffles with yesterday's
+    // spend. Every other group keeps tokens-descending, where "what cost the
+    // most" is the question actually being asked.
+    const fg = buckets.find(g => g.label === FOREGROUND_LABEL)
+    if (fg) fg.rows.sort((a, b) => a.key.localeCompare(b.key))
+
+    return [...buckets, other]
+      .filter(g => g.rows.length > 0)
+      .map(g => ({
+        label: g.label,
+        rows: g.rows,
+        tokens: g.rows.reduce((s, r) => s + r.tokens, 0),
+        calls: g.rows.reduce((s, r) => s + r.total, 0),
+      }))
+  }, [divergent])
 
   const turns = useMemo(
     () => groupIntoTurns(recent as unknown as RecentCall[]),
@@ -539,7 +610,25 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {divergent.map(r => (
+                {grouped.map(g => (
+                  <Fragment key={g.label}>
+                    {/* Section header as a spanning row rather than a separate
+                        table per group: one <table> keeps every column aligned
+                        across sections, which is the whole point of comparing
+                        a background job's spend against a foreground one. */}
+                    <tr className="bg-muted/50 border-b">
+                      <th
+                        scope="colgroup"
+                        colSpan={8}
+                        className="text-left px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                      >
+                        {g.label}
+                        <span className="ml-2 font-normal normal-case tracking-normal tabular-nums">
+                          {g.rows.length} route{g.rows.length === 1 ? '' : 's'} · {fmt(g.calls)} calls · {fmt(g.tokens)} tokens
+                        </span>
+                      </th>
+                    </tr>
+                    {g.rows.map(r => (
                   <tr key={r.key} className={`border-b last:border-b-0 ${r.offPlan > 0 ? 'bg-amber-500/5' : ''}`}>
                     <td className="px-3 py-1.5 font-mono">
                       {r.key}
@@ -578,9 +667,11 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                       {r.fellBack ? <span className="text-amber-600 dark:text-amber-500">{fmt(r.fellBack)}</span> : '—'}
                     </td>
                   </tr>
+                    ))}
+                  </Fragment>
                 ))}
                 {divergent.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
+                  <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
                     No routed calls recorded in this window.
                   </td></tr>
                 )}
