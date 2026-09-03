@@ -631,7 +631,22 @@ export function TokenUsagePage() {
     // total, and dropping a part of it because the part is small defeats the
     // view: fresh input is 0.4% of a cache-dominated window and is precisely
     // what a reader comparing it against the cache needs to see.
-    .filter(k => evoGroupBy === 'tokens'
+    //
+    // PROVIDERS are exempt for both of those reasons at once. They are a bounded
+    // set — the routing config declares a handful, not dozens — so the legend
+    // does not need protecting. And the threshold actively hides the thing this
+    // view exists to show: qwen-local is the free on-prem offload target, it
+    // serves deliberately tiny work (16 output tokens on average across every
+    // call it has ever answered), and it is measured against a total dominated
+    // by foreground Claude's cache reads. At 75.3K against 435.9M it is 0.017%
+    // — two orders of magnitude below the cut — so the one provider whose
+    // ADOPTION you are trying to read can never appear on the chart that would
+    // show it, no matter how much work it takes on.
+    //
+    // The page also contradicted itself: the Account card and the Total Calls
+    // breakdown both list On-prem Qwen, while the chart and Top Consumers said
+    // it did not exist. One page, two answers.
+    .filter(k => evoGroupBy === 'tokens' || evoGroupBy === 'provider'
       || (evoKeyTotals.get(k) || 0) / evoGrandTotal >= MAIN_CONSUMER_THRESHOLD)
     // Composition keeps its natural reading order (what we sent, what came
     // back, what was cached); everything else ranks by size.
@@ -1066,6 +1081,16 @@ export function TokenUsagePage() {
                   if (evoGroupBy === 'process') {
                     for (const p of (summary.by_process || [])) {
                       meta.set(p.process, { calls: p.calls, avg_latency: p.avg_latency })
+                    }
+                  } else if (evoGroupBy === 'provider') {
+                    // by_provider carries calls (no latency), and the key must be
+                    // canonicalized the same way evoKeys was — otherwise copilot/
+                    // github-copilot merge into one series whose metadata lookup
+                    // then misses. Calls sum across merged aliases.
+                    for (const p of (summary.by_provider || [])) {
+                      const pk = normalizeProvider(p.provider)
+                      const prev = meta.get(pk)
+                      meta.set(pk, { calls: (prev?.calls || 0) + (p.calls || 0) })
                     }
                   } else if (evoGroupBy === 'model') {
                     for (const m of (summary.by_model || [])) {
