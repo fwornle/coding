@@ -1,3 +1,8 @@
+---
+name: documentation-style
+description: Enforce consistent styling for documentation artifacts (PlantUML, Mermaid, markdown, PNG diagrams). Invoke BEFORE creating or modifying any .puml file, generating PNGs from PlantUML, working with Mermaid diagrams, or updating documentation artifacts — and whenever the user mentions diagrams, PlantUML, PUML, PNG, visualization, or architecture diagrams.
+---
+
 # Documentation Style Guide
 
 Enforce consistent styling for documentation artifacts (PlantUML, Mermaid, markdown, PNG diagrams).
