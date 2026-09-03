@@ -202,6 +202,13 @@ HEADER
 # ──────────────────────────────────────────────────────────────────────────────
 # 3. OpenCode: append skill catalog to CLAUDE.md
 #    (OpenCode reads CLAUDE.md but has no slash command system)
+#
+#    Also called against $HOME/CLAUDE.md (see main()): that file used to carry
+#    a hand-copied "Available Skills (Auto-Generated)" section that nothing
+#    ever regenerated, so it silently drifted out of sync with .claude/commands/
+#    (missing constraints.md and semantic.md for weeks). Labeling a section
+#    "Auto-Generated" is a promise that this script keeps it current — so any
+#    CLAUDE.md carrying that marker must be a target this function is called on.
 # ──────────────────────────────────────────────────────────────────────────────
 ensure_skill_references_in_claude_md() {
     local claude_md="$1"
@@ -256,6 +263,17 @@ main() {
     install_claude_global
     generate_copilot_instructions "$PROJECT_DIR"
     ensure_skill_references_in_claude_md "$CLAUDE_MD"
+
+    # Keep the user's global ~/CLAUDE.md skill catalog in sync too, if it has
+    # one. Independent of CODING_AGENT_SCOPE: that setting controls whether
+    # ~/.claude/commands/ gets the actual command files (global slash-command
+    # install), which is a different thing from whether ~/CLAUDE.md's doc
+    # section lists the project's skills accurately.
+    local home_claude_md="$HOME/CLAUDE.md"
+    if [[ -f "$home_claude_md" && "$home_claude_md" != "$CLAUDE_MD" ]] \
+        && grep -qF -- "## Available Skills (Auto-Generated)" "$home_claude_md" 2>/dev/null; then
+        ensure_skill_references_in_claude_md "$home_claude_md"
+    fi
 
     # Be accurate about what actually happened: in wrapper-scoped installs the
     # global Claude command dir was deliberately skipped, and claiming otherwise
