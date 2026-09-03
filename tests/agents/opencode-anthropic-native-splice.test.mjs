@@ -90,6 +90,19 @@ printf '%s' "$OPENCODE_CONFIG_CONTENT"
     env: {
       PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
       HOME: process.env.HOME || '/tmp',
+      // Pin the agent scope. This is the one contamination channel the `env`
+      // restriction and --norc together CANNOT close: when CODING_AGENT_SCOPE is
+      // unset, opencode.sh reads it out of $CODING_REPO/.env — off disk, after
+      // we have chosen what to pass in. On a machine where that file says
+      // `global`, the wrapper-scoped plugin splice is skipped and the assertions
+      // below fail with "precondition: CODING_REPO set must splice the
+      // wrapper-scoped plugins", pointing at the splice rather than at the
+      // developer's install scope.
+      //
+      // These suites are about the WRAPPER-scoped splice specifically, so they
+      // must state that rather than inherit it. Overridable: a global-scope case
+      // can pass CODING_AGENT_SCOPE explicitly.
+      CODING_AGENT_SCOPE: 'wrapper',
       ...overrideEnv,
     },
     timeout: 10_000,
