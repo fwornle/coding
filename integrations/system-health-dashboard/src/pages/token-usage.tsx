@@ -34,11 +34,6 @@ const WINDOW_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'All time' },
 ]
 
-// Series contributing less than this fraction of the window's total tokens
-// are hidden from the Overview "By Model" table AND the Evolution chart's
-// stacked legend, so the two views agree. 0.5% of a 46M-token month is
-// ~230K — below that, the noise outweighs the signal.
-const MAIN_CONSUMER_THRESHOLD = 0.005
 
 // Stable color palette for the stacked-area Evolution chart. Cycles when
 // the number of stacked series exceeds the palette length.
@@ -482,6 +477,10 @@ export function TokenUsagePage() {
   // Evolution chart can stack tokens by process (purpose) or by model.
   const [evoGroupBy, setEvoGroupBy] = useState<'process' | 'model' | 'provider' | 'tokens'>('process')
   const [evoStackMode, setEvoStackMode] = useState<'stacked' | 'overlapping'>('stacked')
+  // Linear hides anything small next to a big series: qwen-local's 75.3K against
+  // claude-code-max's 400M is a third of a pixel. A log axis is the only way to
+  // read KB and MB traffic on one chart.
+  const [evoYScale, setEvoYScale] = useState<'linear' | 'log'>('linear')
   const [evoHidden, setEvoHidden] = useState<Set<string>>(new Set())
   const toggleEvoSeries = (key: string) => {
     setEvoHidden(prev => {
@@ -624,35 +623,33 @@ export function TokenUsagePage() {
     for (const row of evoSeriesRaw) t += Number(row[k] || 0)
     evoKeyTotals.set(k, t)
   }
+  // Every series is shown. There used to be a 0.5% "main consumer" threshold
+  // here, to keep the legend short. It hid the things most worth seeing: it
+  // dropped qwen-local, the free on-prem offload target, at 75.3K against 435.9M
+  // (0.017%) — so the one provider whose ADOPTION you are trying to read could
+  // never appear on the chart meant to show it, however much work it took on.
+  // The page contradicted itself too: the Account card and the Total Calls
+  // breakdown both listed On-prem Qwen while the chart said it did not exist.
+  //
+  // The legend it was protecting is not big: measured over 24h, 14 processes,
+  // 4 models, 4 providers. Pair this with the log Y scale below — a small series
+  // is unreadable on a linear axis next to a 400M one, which is the actual
+  // problem the threshold was working around.
   const evoKeys = evoKeysRaw
-    // The "main consumer" threshold exists to keep a legend of PROCESSES or
-    // MODELS focused — there are dozens of them and the long tail is noise.
-    // Input/output/cache is not a ranked list, it is the composition of one
-    // total, and dropping a part of it because the part is small defeats the
-    // view: fresh input is 0.4% of a cache-dominated window and is precisely
-    // what a reader comparing it against the cache needs to see.
-    //
-    // PROVIDERS are exempt for both of those reasons at once. They are a bounded
-    // set — the routing config declares a handful, not dozens — so the legend
-    // does not need protecting. And the threshold actively hides the thing this
-    // view exists to show: qwen-local is the free on-prem offload target, it
-    // serves deliberately tiny work (16 output tokens on average across every
-    // call it has ever answered), and it is measured against a total dominated
-    // by foreground Claude's cache reads. At 75.3K against 435.9M it is 0.017%
-    // — two orders of magnitude below the cut — so the one provider whose
-    // ADOPTION you are trying to read can never appear on the chart that would
-    // show it, no matter how much work it takes on.
-    //
-    // The page also contradicted itself: the Account card and the Total Calls
-    // breakdown both list On-prem Qwen, while the chart and Top Consumers said
-    // it did not exist. One page, two answers.
-    .filter(k => evoGroupBy === 'tokens' || evoGroupBy === 'provider'
-      || (evoKeyTotals.get(k) || 0) / evoGrandTotal >= MAIN_CONSUMER_THRESHOLD)
     // Composition keeps its natural reading order (what we sent, what came
     // back, what was cached); everything else ranks by size.
     .sort((a, b) => (evoGroupBy === 'tokens'
       ? ['input', 'output', 'cached', 'cacheWrite'].indexOf(a) - ['input', 'output', 'cached', 'cacheWrite'].indexOf(b)
       : (evoKeyTotals.get(b) || 0) - (evoKeyTotals.get(a) || 0)))
+  // Stacking and a log axis cannot both be true. A stack encodes a value as the
+  // HEIGHT of a band, and height is not preserved under log — log(a+b) is not
+  // log(a)+log(b) — so the bands would render as areas whose thickness means
+  // nothing. Worse for the case that motivates log at all: a 75.3K series
+  // stacked on top of a 400M one sits at the very top of the axis, exactly where
+  // it is least readable. Overlapping draws every series from the axis floor, so
+  // a small one is visible on its own terms. Log therefore forces overlap rather
+  // than silently drawing a misleading stack.
+  const evoStacked = evoStackMode === 'stacked' && evoYScale === 'linear'
   // Bucket label format adapts to window width — short windows show HH:MM,
   // multi-day windows show MM/DD HH:MM so the X-axis stays readable.
   const isMultiDay = (summary.hours ?? 24) > 36
@@ -661,8 +658,15 @@ export function TokenUsagePage() {
     const label = isMultiDay
       ? `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
       : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-    const out: Record<string, number | string> = { label }
-    for (const k of evoKeys) out[k] = Number(row[k] || 0)
+    const out: Record<string, number | string | null> = { label }
+    for (const k of evoKeys) {
+      const v = Number(row[k] || 0)
+      // log(0) is undefined, so a zero bucket cannot be plotted. null renders as
+      // a gap, which is what it is — a bucket with no traffic. Substituting a
+      // floor value instead would draw a continuous baseline that reads as
+      // "always a little activity" and is a lie about a sparse series.
+      out[k] = (evoYScale === 'log' && v <= 0) ? null : v
+    }
     return out
   })
   const evoColorFor = (key: string, _idx: number): string => {
@@ -926,11 +930,6 @@ export function TokenUsagePage() {
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">By Provider / Model</h4>
                   {byModel
-                    .filter(m => (allTokens(m) / (allTokens({
-                      total_tokens: summary.total_tokens,
-                      cache_read_tokens: summary.total_cache_read,
-                      cache_write_tokens: summary.total_cache_write,
-                    }) || 1)) >= MAIN_CONSUMER_THRESHOLD)
                     .map(m => (
                       <div key={m.key} className="flex justify-between items-center text-sm py-1">
                         {/* The account is what determines cost, so it leads. The same
@@ -969,7 +968,7 @@ export function TokenUsagePage() {
                   </CardTitle>
                   <CardDescription>
                     {windowLabel} · {summary.bucket_minutes ?? '?'}-minute buckets ·
-                    {' '}{evoStackMode === 'stacked' ? 'stacked by' : 'overlapping by'} {
+                    {' '}{evoStacked ? 'stacked by' : 'overlapping by'} {
                       evoGroupBy === 'process' ? 'purpose'
                       : evoGroupBy === 'model' ? 'model'
                       : evoGroupBy === 'provider' ? 'provider'
@@ -983,10 +982,24 @@ export function TokenUsagePage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setEvoStackMode(m => m === 'stacked' ? 'overlapping' : 'stacked')}
-                    title={evoStackMode === 'stacked' ? 'Switch to overlapping (translucent)' : 'Switch to stacked'}
+                    disabled={evoYScale === 'log'}
+                    title={evoYScale === 'log'
+                      ? 'A log axis cannot stack — a stack encodes value as band height, which log does not preserve. Overlapping while log is on.'
+                      : evoStackMode === 'stacked' ? 'Switch to overlapping (translucent)' : 'Switch to stacked'}
                     className="h-9"
                   >
-                    {evoStackMode === 'stacked' ? 'Stacked' : 'Overlap'}
+                    {evoStacked ? 'Stacked' : 'Overlap'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEvoYScale(v => v === 'linear' ? 'log' : 'linear')}
+                    title={evoYScale === 'linear'
+                      ? 'Switch to a log Y axis — reads KB and MB series on one chart. Forces overlapping.'
+                      : 'Switch back to a linear Y axis'}
+                    className="h-9"
+                  >
+                    {evoYScale === 'linear' ? 'Linear' : 'Log'}
                   </Button>
                   <Select
                     value={evoGroupBy}
@@ -1011,7 +1024,17 @@ export function TokenUsagePage() {
                   <AreaChart data={evoData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} minTickGap={24} />
-                    <YAxis tickFormatter={formatTokens} tick={{ fontSize: 11 }} />
+                    <YAxis
+                      tickFormatter={formatTokens}
+                      tick={{ fontSize: 11 }}
+                      scale={evoYScale}
+                      // A log axis needs a positive floor; 1 token is the
+                      // smallest real quantity, so it is the honest one. Linear
+                      // keeps its 0 baseline. allowDataOverflow lets the floor
+                      // hold rather than being widened back down to 0.
+                      domain={evoYScale === 'log' ? [1, 'auto'] : [0, 'auto']}
+                      allowDataOverflow={evoYScale === 'log'}
+                    />
                     <Tooltip
                       formatter={(val: number, name: string) => [formatTokens(val), name]}
                       labelStyle={{ color: '#999' }}
@@ -1039,10 +1062,13 @@ export function TokenUsagePage() {
                         key={k}
                         type="monotone"
                         dataKey={k}
-                        stackId={evoStackMode === 'stacked' ? 'evo' : undefined}
+                        stackId={evoStacked ? 'evo' : undefined}
                         stroke={evoColorFor(k, i)}
                         fill={evoColorFor(k, i)}
-                        fillOpacity={evoStackMode === 'stacked' ? 0.7 : 0.35}
+                        fillOpacity={evoStacked ? 0.7 : 0.35}
+                        // Gaps are real (a bucket with no traffic); do not
+                        // bridge them into a line that implies steady activity.
+                        connectNulls={false}
                         name={k}
                         hide={evoHidden.has(k)}
                       />
