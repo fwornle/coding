@@ -1,0 +1,82 @@
+@startuml status-line-context-gauge
+!include _standard-style.puml
+
+title Context Window Gauge — one implementation, four agents
+
+top to bottom direction
+
+' NOTE ON LABELS: PlantUML creole treats "~" as an escape and a leading "*" as a
+' bullet, so "~/.copilot" renders as "/.copilot" and "*.jsonl" becomes a list
+' item. Paths below use $HOME and a named placeholder instead of relying on
+' escaping — it survives edits better than a stray "~~".
+
+rectangle "Pane identity — exported per session by tmux-session-wrapper.sh" {
+  component "CODING_AGENT\nTRANSCRIPT_SOURCE_PROJECT\nTMUX_SESSION_NAME" as PaneEnv <<infra>>
+}
+
+rectangle "Per-agent context sources" {
+  database "claude\n$TMPDIR/claude-ctx-<id>.json\nremaining_percentage" as ClaudeBridge <<storage>>
+  database "opencode\nopencode.db message.tokens\ninput + cache.read" as OpencodeDb <<storage>>
+  database "copilot\n$HOME/.copilot/session-store.db\ninput_tokens ONLY" as CopilotDb <<storage>>
+  database "pi\n<piCfgDir>/sessions/<file>.jsonl\ninput + cacheRead" as PiSessions <<storage>>
+}
+
+component "lib/statusline/context-gauge.cjs" as Gauge <<core>>
+
+rectangle "Renderers" {
+  component "combined-status-line.js\nfull render (ESM)" as CSL <<core>>
+  database "cache-<project>-<agent>-w<width>.txt" as Cache <<storage>>
+  component "status-line-fast.cjs\n5s tick (CJS)" as Fast <<core>>
+}
+
+component "tmux status-right" as Tmux <<external>>
+
+PaneEnv CONTROL_LINE Gauge : which reader,\nwhich project
+ClaudeBridge DATA_LINE Gauge
+OpencodeDb DATA_LINE Gauge
+CopilotDb DATA_LINE Gauge
+PiSessions DATA_LINE Gauge
+
+Gauge SYNC_LINE CSL : render into the line
+CSL DATA_LINE Cache : write
+Cache DATA_LINE Fast : read
+Gauge SYNC_LINE Fast : re-render in place
+Fast SYNC_LINE Tmux
+
+' The two-wires warning is a LEGEND rather than a note anchored to CopilotDb:
+' a note on a node inside a rectangle gets placed outside that rectangle, and
+' PlantUML then draws a connector clear across the top of the diagram to reach
+' it. The content is about the picture as a whole anyway.
+legend bottom
+  <b>The two wires disagree — this is where that bites.</b>
+  Copilot is OpenAI wire: input_tokens ALREADY includes cache reads.
+  OpenCode and pi are Anthropic wire, where cache reads add.
+  Adding them on the copilot path would roughly double a cache-heavy
+  reading, and nothing would error.
+endlegend
+
+note right of Gauge
+  CommonJS so BOTH renderers load the
+  same file — no second copy to keep
+  in step.
+
+  Returns null, never 0%, when a store
+  cannot be read: an empty gauge and a
+  blind one must not look alike.
+
+  Fixed 15 cells in every severity
+  band, measured against tmux. Width
+  drift here is the trailing-residue
+  bug.
+end note
+
+note right of Fast
+  Patches the gauge in place so the
+  number stays live between full
+  renders. A line borrowed from a
+  sibling pane is BLANKED first —
+  same width, no reading — because
+  that value is another session's.
+end note
+
+@enduml

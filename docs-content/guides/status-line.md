@@ -9,7 +9,7 @@ Real-time visual indicators of system health and development activity rendered v
 ### Example Display
 
 ```
-[🏥●] [RA●C●] [🔒77% ⚙️IMP] [📚●] [N:VPN] [P:ON] [📋18-19] 18:34
+[🏥●] [RA●C●] [🔒77% ⚙️IMP] [📚●] [N:VPN] [P:ON] ████░░░░░░  42% [📋18-19] 18:34
 ```
 
 The current pane's project is rendered with an underline (`#[underscore]…#[nounderscore]`) so each parallel tmux window highlights its own project.
@@ -20,14 +20,19 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 |-----------|---------|-------------|
 | System Health | `[🏥●]` green | Coordinator-derived health rollup (services + databases + container) |
 | Active Sessions | `[RA●C●]` | Per-project abbreviations with a graduated green activity ramp |
+| LSL Health | `[LSL●]` | Live-session-logging monitor for THIS pane — hidden when healthy |
 | Constraint | `[🔒77%]` | Code quality % (with optional `●N` (amber) violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚●]` green | Observation/digest/insight pipeline freshness |
 | Network Location | `[N:VPN]` | Network environment: VPN / CN / OPEN / ?? |
 | Proxy Status | `[P:AUTO]` | Local proxy daemon (proxydetox): ON / AUTO / OFF |
 | Prompt Downgrades | `[D:12]` | Turns the prompt classifier moved to a cheaper band since proxy start — absent when the classifier is off |
 | Local Execution | `[L:3]` | Completions served by hardware we own — absent at zero |
+| Context Window | `████░░░░░░  42%` | How full THIS pane's agent conversation is — see [Context Window Gauge](#context-window-gauge) |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
+
+The context gauge is the one segment with no `[…]` brackets and no leading emoji: it
+carries a tinted background instead, which delimits it on its own.
 
 ---
 
@@ -218,6 +223,107 @@ The badge reflects the freshness of the **observation → digest → insight** p
 **Idle suppression** is applied via `CombinedStatusLine.isUserActive()`, which checks `state.lsl` for any session whose `lastBeat` is within 5 min. When no session is heartbeating, the freshness-derived icons collapse to a single grey `●` (idle, `colour238`). True error states (`disabled`, `unknown`, `unreachable`) are NOT suppressed.
 
 Tooltip details (visible in the verbose status output) include observation/digest/insight ages, totals, and any in-flight consolidation.
+
+### LSL Health Indicators
+
+Whether an enhanced-transcript-monitor (ETM) is actually watching **this pane's**
+project. Hidden entirely when healthy — the badge only appears when there is something
+to say.
+
+| State | Badge | Meaning |
+|-------|-------|---------|
+| Healthy | *(hidden)* | An ETM is heartbeating for this project |
+| Starting | `[LSL●]` grey | Session is < 60 s old and its ETM has not heartbeat yet |
+| Stale | `[LSL●]` bold amber | ETM alive but `degraded` — 0 exchanges in > 30 min uptime, or heartbeat > 2 min old |
+| Down | `[LSL●]` bold red | ETM stopped, or no monitor at all for this project |
+
+!!! note "Why 'starting' exists"
+    Closing a session makes the coordinator reap its ETM within one 5 s tick, while
+    respawning was gated by `ETM_SPAWN_INTERVAL_MS = 30_000`. So **every freshly opened
+    session** began with a red `[LSL●]` for up to thirty seconds — and it was telling
+    the truth: nothing was logging that session yet.
+
+    Two changes fixed it. `scripts/tmux-session-wrapper.sh` now POSTs an `etm_ensure`
+    signal to the coordinator at launch, which spawns the monitor for that one project
+    immediately (measured: **106 ms**, against up to 30 s before). And the badge
+    distinguishes a seconds-old session from a dead monitor, so start-up reads as
+    start-up rather than as an alarm. Grey deliberately does **not** drag the line's
+    overall colour — a session three seconds old is not a degraded system.
+
+    The grace window is bounded at 60 s, and an unknown session age falls back to
+    "old", so a genuinely broken launch still goes red. Session age comes from
+    `.data/agent-sessions/<tmux-session>.json`, written by the launcher.
+
+### Context Window Gauge
+
+How full the **current pane's agent conversation** is. It used to exist only inside
+Claude's own statusline, so only one of the four agents had it; it now lives in the
+tmux bar, where `opencode`, `copilot` and `pi` panes get the same reading.
+
+```
+████░░░░░░  42%
+```
+
+A bright fill over a **duller background of the same hue** — the fill reads as a
+watermark against a tinted trough. Thresholds are the ones the old Claude meter used:
+
+| Used | Fill | Background | Meaning |
+|------|------|------------|---------|
+| < 50% | `colour46` bright green | `colour22` dark green | Comfortable |
+| 50 – 64% | `colour226` yellow | `colour58` olive | Filling up |
+| 65 – 79% | `colour208` orange | `colour94` brown | Getting tight |
+| ≥ 80% | `colour196` red, **bold** | `colour52` dark red | Compaction is close |
+
+!!! note "Why the ≥80% band has no 💀"
+    Claude's meter prefixed a skull at 80%. That prefix is three extra cells in one
+    state only, and this segment is a fixed **15 cells in every band** — measured
+    against tmux, not assumed. `status-line-fast.cjs` substitutes a freshly rendered
+    gauge into a line the full renderer has already truncated and left-padded, so a
+    width that changed with severity would push the payload past the pane edge and
+    reintroduce the trailing-residue artifact (`15:322`). Severity is carried by
+    colour and bold instead, which is what every other badge on this bar already does.
+
+**Where the number comes from**, per agent. All four are exact on-disk sources — none
+is estimated:
+
+| Agent | Source | Field |
+|-------|--------|-------|
+| `claude` | `$TMPDIR/claude-ctx-<sessionId>.json` (written by Claude's own statusline) | `remaining_percentage`, normalised against the autocompact reserve |
+| `opencode` | `~/.local/share/opencode/opencode.db` → newest assistant `message` rows | `tokens.input` **+** `tokens.cache.read` |
+| `copilot` | `~/.copilot/session-store.db` → `assistant_usage_events` | `input_tokens` **only** |
+| `pi` | `<piCfgDir>/sessions/<encoded-cwd>/*.jsonl` → last `usage` record | `usage.input` **+** `usage.cacheRead` |
+
+!!! warning "The two wires disagree — copilot is the trap"
+    Copilot reports OpenAI-style usage, where `input_tokens` **already includes** cache
+    reads. OpenCode and pi report Anthropic-style usage, where they add. Adding
+    `cache_read_tokens` on the copilot path would roughly double a cache-heavy
+    session's reading, and nothing would error — the gauge would simply be wrong. This
+    is the same two-wires distinction documented for token accounting in `CLAUDE.md`.
+
+    Also deliberately unused: opencode's `session.tokens_input` column. It is a
+    *cumulative* spend total (measured: 91,977 on a session whose last turn was 243
+    tokens), not context occupancy.
+
+**Absent, not zero.** When a store cannot be read — an agent with no session for this
+project, a missing database, an unreadable file — the gauge renders nothing at all. A
+gauge showing 0% and a gauge that cannot see its source must not look the same.
+
+**Per-pane, not per-project.** `CODING_AGENT` is part of the render-cache key
+(`cache-<project>-<agent>-w<width>.txt`), so a `claude` pane and an `opencode` pane on
+the same project at the same width cannot share a cached line and show each other's
+reading. When a pane borrows a sibling's cache because it has none of its own, the
+gauge is **blanked** first — a width-identical run of spaces — because that value
+belongs to a different session.
+
+![Context Window Gauge](../images/status-line-context-gauge.png)
+
+!!! note "Claude renders it once, not twice"
+    Claude Code's own statusline still writes the bridge file this gauge reads, but its
+    *rendering* of the meter is stripped by `scripts/claude-statusline.cjs`, which wraps
+    whatever status-line command is configured. The wrapper approach is deliberate:
+    `~/.claude/hooks/gsd-statusline.js` is GSD-managed, so editing it would be undone by
+    `/gsd:update`, and filtering keeps the bridge file that both GSD's context-monitor
+    hook and this gauge depend on.
 
 ### Coordinator Health Endpoint
 

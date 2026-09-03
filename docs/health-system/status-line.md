@@ -33,7 +33,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Native Mode:**
 ```
-[🏥●] [Gq$0FEB A$0 O$0 X$25] [C● UT●] [🔒67% 🔍EX] [📚●] 📋17-18
+[🏥●] [Gq$0FEB A$0 O$0 X$25] [C● UT●] [🔒67% 🔍EX] [📚●] ████░░░░░░  42% 📋17-18
 ```
 
 **Docker Mode:**
@@ -43,7 +43,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 ### Reading the Status Line
 
-**Format**: `[🐳] [🐳MCP:health] [🏥 health] [sessions] [🔒compliance] [📚 knowledge] 📋time`
+**Format**: `[🐳] [🐳MCP:health] [🏥 health] [sessions] [LSL health] [🔒compliance] [📚 knowledge] <context gauge> 📋time`
 
 **Components**:
 - `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
@@ -52,6 +52,8 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `[C● UT●]` - **Active Sessions**: Project abbreviations with activity icons
 - `🔒67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `●N` (amber) violations sub-segment when non-zero)
 - `[📚●]` green - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
+- `[LSL●]` - **LSL Health**: Whether an ETM is watching THIS pane's project. Hidden when healthy; grey = starting (session < 60 s old), bold amber = degraded or stale, bold red = stopped or absent.
+- `████░░░░░░  42%` - **Context Window Gauge**: How full this pane's agent conversation is — all four agents, not just Claude.
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
 ### Internal Health Status (Raw Output)
@@ -161,6 +163,94 @@ The statusline-health-monitor detects **broken transcript monitors** — monitor
 - `HHMM-HHMM` - Session time window
 - `(Xmin)` - Minutes since last activity
 - `→project` - Project with activity
+
+### LSL Health Badge
+
+Distinct from the time window above: `[LSL●]` reports whether an enhanced-transcript-monitor
+(ETM) is actually watching **this pane's** project. `getLSLHealthStatus()` resolves it
+per-pane, then per-project, from `state.lsl` at `:3034/health/state`.
+
+| Verdict | Badge | Condition |
+|---------|-------|-----------|
+| `healthy` | *(hidden)* | A heartbeat for this project within 120 s |
+| `starting` | `[LSL●]` grey (`STATE_DOTS.IDLE`) | No entry yet AND this tmux session is < 60 s old |
+| `stale` | `[LSL●]` bold amber (`ALARM_DOTS.WARN`) | ETM `degraded` (0 exchanges in > 30 min uptime), or heartbeat > 120 s old |
+| `down` | `[LSL●]` bold red (`ALARM_DOTS.CRIT`) | ETM stopped, coordinator unreachable, or no entry and the session is not new |
+
+**Why `starting` exists.** `reapEtmsForClosedSessions()` kills a project's ETM within one
+5 s tick when its tmux session closes, but the respawn came only from
+`ensureEtmForActiveProjects()`, rate-limited by `ETM_SPAWN_INTERVAL_MS = 30_000`. Every
+newly opened session therefore showed red for up to thirty seconds — accurately, because
+nothing was logging it yet.
+
+Both halves are fixed:
+
+- `scripts/tmux-session-wrapper.sh` POSTs an `etm_ensure` signal to the coordinator at
+  launch. A targeted request bypasses the 30 s gate and the startup grace for that one
+  project, does **not** advance the shared rate-limit clock (a burst of launches must not
+  postpone the sweep covering every other project), and still passes the
+  `looksLikeProjectDir` / `agenticDir` qualification. Measured: **106 ms** from signal to
+  spawn.
+- The badge separates "warming up" from "broken". Grey does not drag the line's overall
+  colour. The 60 s window is bounded and an unknown session age falls back to "old", so a
+  genuinely failed launch still goes red. Session age is read from
+  `.data/agent-sessions/<tmux-session>.json`, written by the launcher.
+
+### Context Window Gauge
+
+How full this pane's agent conversation is, for **all four agents** — previously this
+existed only inside Claude's own statusline.
+
+```
+████░░░░░░  42%
+```
+
+Rendered by `lib/statusline/context-gauge.cjs`, which is CommonJS so both
+`combined-status-line.js` (ESM, full render) and `status-line-fast.cjs` (CJS, 5 s tick)
+load the *same* file rather than keeping two copies in step.
+
+| Used | Fill | Background |
+|------|------|------------|
+| < 50% | `colour46` | `colour22` |
+| 50 – 64% | `colour226` | `colour58` |
+| 65 – 79% | `colour208` | `colour94` |
+| ≥ 80% | `colour196` bold | `colour52` |
+
+**Fixed 15 cells in every band**, measured against tmux rather than assumed. The fast path
+substitutes a freshly rendered gauge into a line the full renderer has already truncated
+and left-padded, so a width that varied by severity would push the payload past the pane
+edge — the trailing-residue artifact (`15:322`). This is why the ≥ 80% band carries no 💀
+prefix: severity is colour and bold, as everywhere else on this bar.
+
+**Sources** (all exact, none estimated):
+
+| Agent | Source | Field |
+|-------|--------|-------|
+| `claude` | `$TMPDIR/claude-ctx-<sessionId>.json` | `remaining_percentage`, normalised against the autocompact reserve |
+| `opencode` | `~/.local/share/opencode/opencode.db` → newest assistant `message` rows | `tokens.input` + `tokens.cache.read` |
+| `copilot` | `~/.copilot/session-store.db` → `assistant_usage_events` | `input_tokens` only |
+| `pi` | `<piCfgDir>/sessions/<encoded-cwd>/*.jsonl` → last `usage` | `usage.input` + `usage.cacheRead` |
+
+⚠️ **The two wires disagree.** Copilot is OpenAI-wire: `input_tokens` already includes
+cache reads, so adding `cache_read_tokens` there would roughly double a cache-heavy
+reading with nothing erroring. OpenCode and pi are Anthropic-wire, where they add. Same
+distinction documented for token accounting in `CLAUDE.md`. OpenCode's
+`session.tokens_input` is deliberately unused — it is cumulative spend, not occupancy.
+
+The opencode query **must** filter by `session_id` so it rides
+`message_session_time_created_id_idx`; unfiltered it takes ~1.5 s on a 2.2 GB database and
+would be visible as statusline lag. Measured cost with the filter: ~10 ms (copilot ~9 ms).
+
+`pi`'s agent directory follows `CODING_AGENT_SCOPE` — `$CODING_REPO/.pi-agent` in wrapper
+scope, `~/.pi/agent` in global — never "whichever directory exists". Switching an install
+to global leaves the old `.pi-agent` behind, and an existence check would read that frozen
+snapshot forever.
+
+**Absent, not zero**: an unreadable store renders no gauge at all. `CODING_AGENT` is part
+of the cache key so two agents on one project cannot show each other's reading, and a line
+borrowed from a sibling pane has its gauge blanked (width-identical) first.
+
+![Context Window Gauge](../images/status-line-context-gauge.png)
 
 ### Session Activity Indicators
 

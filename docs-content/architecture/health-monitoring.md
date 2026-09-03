@@ -82,6 +82,8 @@ POST /signals
 
 `status: 'degraded'` is set when `isSuspiciousActivity` fires (0 exchanges processed in >30 min uptime — pipeline alive but stalled). Statusline maps this to a bold amber `●` (`ALARM_DOTS.WARN`), rendered as `[LSL●]`; a stopped ETM gives the bold red `[LSL●]` (`ALARM_DOTS.CRIT`).
 
+A third verdict, `starting`, renders a grey `●` (`STATE_DOTS.IDLE`) and deliberately does NOT set the line's overall colour: no entry yet, but this tmux session is less than 60 s old. It exists because closing a session reaps its ETM within one 5 s tick while the respawn was gated by `ETM_SPAWN_INTERVAL_MS = 30_000`, so every freshly opened session opened on a red badge for up to thirty seconds. Launchers now POST an `etm_ensure` signal to `:3034/signals` naming their project; a targeted request bypasses that gate (and the coordinator startup grace) for that project only, without advancing the shared rate-limit clock the untargeted sweep uses. Measured: 106 ms from signal to spawn. Session age comes from `.data/agent-sessions/<tmux-session>.json`; an unknown age falls back to "old", so a genuinely failed launch still goes red.
+
 The ETM also writes per-project LSL files to `.specstory/history/YYYY/MM/YYYY-MM-DD_HHMM-HHMM_<hash>.md` and posts observation summaries to the proxy.
 
 **Host path resolution:** ETM uses a `resolveHostCodingPath()` helper at script init that prefers `/Users/`-style values from `CODING_REPO` / `CODING_TOOLS_PATH` and falls back to `__dirname/..`. This avoids the `claude-mcp` launcher's `CODING_TOOLS_PATH=/coding` (in-container path) leaking into the host-side ETM and breaking redactor config / `.health` mkdir.
