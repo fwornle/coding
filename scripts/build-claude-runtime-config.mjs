@@ -115,15 +115,44 @@ const derived = {
 // anyway would replace Claude Code's own default with the output of a command
 // that has nothing to wrap — trading a duplicate gauge for a blank status line.
 if (userSettings.statusLine?.type === 'command' && userSettings.statusLine.command) {
+  const upstream = userSettings.statusLine.command;
   derived.statusLine = {
     ...userSettings.statusLine,
-    command: `node ${repo}/scripts/claude-statusline.cjs`,
+    // Pin the command being wrapped rather than letting the shim rediscover it.
+    // In global scope the shim IS the command in settings.json, so a shim that
+    // re-read that file would find itself; naming the upstream here keeps the
+    // wrapper honest in both scopes and makes the chain readable to anyone who
+    // opens the settings file.
+    command: `CODING_UPSTREAM_STATUSLINE=${JSON.stringify(upstream)} node ${repo}/scripts/claude-statusline.cjs`,
   };
+}
+
+// ── 1b. global scope: write the same merged settings to the user's own file ──
+//
+// `--install-global` is what `CODING_AGENT_SCOPE=global` needs. In that scope
+// bin/coding passes no --settings, so the derived file below is never read and
+// the project's three hooks (constraint monitor, tool-interaction capture,
+// health prompt) would simply not run — silently. Tool-interaction capture is
+// how a foreground Claude session reaches token accounting, so losing it looks
+// like a dashboard that has gone flat rather than like a misconfiguration.
+//
+// It writes the SAME object the wrapper path derives, so the two scopes cannot
+// drift: one mergeHooks(), one hook list, one status-line decision. install.sh's
+// install_constraint_monitor_hooks() installs the same three hooks with the same
+// dedup-by-script-name semantics; running either leaves the same state.
+if (process.argv.includes('--install-global')) {
+  const backup = `${userSettingsPath}.pre-global-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+  if (existsSync(userSettingsPath)) copyFileSync(userSettingsPath, backup);
+  writeFileSync(userSettingsPath, `${JSON.stringify(derived, null, 2)}\n`);
+  process.stderr.write(
+    `[claude-runtime] global scope: merged coding hooks into ${userSettingsPath}\n`
+    + `[claude-runtime] previous settings saved to ${backup}\n`,
+  );
 }
 
 const runtimeDir = join(repo, '.coding', 'runtime');
 mkdirSync(runtimeDir, { recursive: true });
-const settingsOut = join(runtimeDir, 'claude-settings.json');
+const settingsOut = join(repo, '.coding', 'runtime', 'claude-settings.json');
 writeFileSync(settingsOut, `${JSON.stringify(derived, null, 2)}\n`);
 
 // ── 2. slash commands as a session-scoped plugin ─────────────────────────────
