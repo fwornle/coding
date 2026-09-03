@@ -320,6 +320,39 @@ describe('pi reader', () => {
     }
   });
 
+  test('the agent dir follows SCOPE, not whichever directory still exists', () => {
+    // Switching an install to global leaves the old $CODING_REPO/.pi-agent on
+    // disk. An existence check would keep reading that frozen snapshot and
+    // report a stale context for a live pi pane, forever and without erroring.
+    const repo = path.join(tmp, 'scope-repo');
+    const stale = path.join(repo, '.pi-agent', 'sessions');
+    const projectPath = '/Users/x/Agentic/scoped';
+    fs.mkdirSync(path.join(stale, gauge.encodePiSessionDir(projectPath)), { recursive: true });
+    fs.writeFileSync(
+      path.join(stale, gauge.encodePiSessionDir(projectPath), 'old.jsonl'),
+      `${JSON.stringify({ usage: { input: 100000, cacheRead: 0 }, model: 'claude-sonnet-5' })}\n`,
+    );
+    fs.writeFileSync(path.join(repo, '.env'), 'CODING_AGENT_SCOPE=global\n');
+
+    const prevRepo = process.env.CODING_REPO;
+    const prevScope = process.env.CODING_AGENT_SCOPE;
+    delete process.env.CODING_AGENT_SCOPE;
+    process.env.CODING_REPO = repo;
+    try {
+      // Global scope → ~/.pi/agent, which has no session for this project, so
+      // the honest answer is "no reading" rather than the stale repo-local one.
+      expect(gauge.readContextUsage({ agent: 'pi', projectPath })).toBeNull();
+
+      // Flip the same install back to wrapper and the repo-local dir is used.
+      fs.writeFileSync(path.join(repo, '.env'), 'CODING_AGENT_SCOPE=wrapper\n');
+      expect(gauge.readContextUsage({ agent: 'pi', projectPath }).usedPct).toBeCloseTo(50, 5);
+    } finally {
+      if (prevRepo === undefined) delete process.env.CODING_REPO;
+      else process.env.CODING_REPO = prevRepo;
+      if (prevScope !== undefined) process.env.CODING_AGENT_SCOPE = prevScope;
+    }
+  });
+
   test('no session directory for the project yields null', () => {
     const cfg = path.join(tmp, 'pi-empty');
     fs.mkdirSync(path.join(cfg, 'sessions'), { recursive: true });
