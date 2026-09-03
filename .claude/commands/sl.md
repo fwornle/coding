@@ -1,4 +1,5 @@
 ---
+name: sl
 description: Load session logs (LSL) from current and coding projects for continuity
 argument-hint: Optional number of files to load (default auto-detects based on length)
 ---
