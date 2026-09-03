@@ -103,6 +103,24 @@ const derived = {
   hooks: mergeHooks(userSettings.hooks, codingHooks(repo)),
 };
 
+// Wrap the user's own status-line command so the context meter is rendered once,
+// in the tmux status bar, instead of twice. scripts/claude-statusline.cjs runs
+// whatever they had configured and strips only that one segment; it reads the
+// original command out of their settings.json itself, so this stays a wrapper
+// rather than a replacement. Wrapper-scoped like everything else here — a bare
+// `claude` elsewhere is untouched.
+//
+// Conditional on them HAVING a command-type status line. With no status line
+// configured there is no second gauge to remove, and installing the wrapper
+// anyway would replace Claude Code's own default with the output of a command
+// that has nothing to wrap — trading a duplicate gauge for a blank status line.
+if (userSettings.statusLine?.type === 'command' && userSettings.statusLine.command) {
+  derived.statusLine = {
+    ...userSettings.statusLine,
+    command: `node ${repo}/scripts/claude-statusline.cjs`,
+  };
+}
+
 const runtimeDir = join(repo, '.coding', 'runtime');
 mkdirSync(runtimeDir, { recursive: true });
 const settingsOut = join(runtimeDir, 'claude-settings.json');

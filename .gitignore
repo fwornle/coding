@@ -147,6 +147,11 @@ integrations/mcp-server-browserbase/
 # Workflow execution configs (per-run configs with unique IDs)
 .data/workflow-configs/
 
+# Per-tmux-session agent identity, written by scripts/tmux-session-wrapper.sh.
+# Machine-local runtime state (which agent owns which pane, and since when) —
+# meaningless on another machine and rewritten on every launch.
+.data/agent-sessions/
+
 # Derived kb-ab sampler output. The published round's inputs ARE tracked, so its result is
 # reproducible: the derivation ledgers, the frozen insight population they were drawn from, the
 # graded specs and the mined fact sets. Runtime scratch and superseded pilots are not.

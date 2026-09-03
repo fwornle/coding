@@ -13,6 +13,11 @@ import { execSync } from 'child_process';
 import { getTimeWindow, getShortTimeWindow } from './timezone-utils.js';
 import { lslListAll } from './lsl-paths.js';
 import { UKBProcessManager } from './ukb-process-manager.js';
+// CommonJS on purpose — status-line-fast.cjs requires the same file, so the
+// gauge has exactly one implementation instead of the duplicate-and-keep-in-sync
+// arrangement that LIFECYCLE_ICONS and _lastContentTimestampMs live with.
+import contextGauge from '../lib/statusline/context-gauge.cjs';
+import paneCacheKey from '../lib/statusline/pane-cache-key.cjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = process.env.CODING_REPO || join(__dirname, '..');
@@ -189,6 +194,17 @@ const ALARM_DOTS = {
   WARN: '#[fg=colour214,bold]●#[fg=default,nobold]',  // #ffaf00 bold  (was 🟡)
   CRIT: '#[fg=colour196,bold]●#[fg=default,nobold]',  // #ff0000 bold  (was 🔴)
 };
+
+// How long a just-opened tmux session may show no LSL heartbeat before the
+// badge treats it as a fault rather than as start-up.
+//
+// Sized against what actually has to happen in that window: the launcher POSTs
+// etm_ensure, the coordinator spawns the ETM, and the ETM heartbeats on its
+// first poll. That is normally a second or two. 60s is generous on purpose —
+// the cost of being generous is a slightly late alarm on a genuinely broken
+// launch, while the cost of being tight is the false red badge on every single
+// session open, which is the bug being fixed.
+const LSL_STARTUP_GRACE_MS = 60_000;
 
 // Left-pad a status-line payload with regular spaces so tmux always allocates
 // the same number of cells for status-right, regardless of payload length.
@@ -844,7 +860,40 @@ class CombinedStatusLine {
       if (verdicts.includes('stale')) return 'stale';
       if (verdicts.length > 0) return 'down';
     }
+    // No entry at all for this project. That means one of two very different
+    // things, and collapsing them into 'down' is what made every freshly opened
+    // session greet the user with a red [LSL] badge:
+    //
+    //   • the ETM is genuinely gone (crashed, reaped, never spawned)  → 'down'
+    //   • this session is SECONDS old and its ETM is still coming up  → 'starting'
+    //
+    // Closing a session reaps its ETM within one 5s tick, so a relaunch always
+    // starts from "no entry". The launcher now asks the coordinator to spawn one
+    // immediately (etm_ensure), but that still takes a beat, and a red alarm for
+    // a beat is a false alarm. Anything older than the window below is a real
+    // problem and stays red.
+    if (CombinedStatusLine._sessionAgeMs() < LSL_STARTUP_GRACE_MS) return 'starting';
     return 'down';
+  }
+
+  /**
+   * Age of THIS tmux session in ms, from the launcher-written session map, or
+   * Infinity when unknown.
+   *
+   * Infinity is the safe default on purpose: an unknown age must not suppress a
+   * genuine alarm. Only a session we can positively show is newborn earns the
+   * quieter 'starting' state.
+   */
+  static _sessionAgeMs() {
+    const name = process.env.TMUX_SESSION_NAME;
+    if (!name || /[/\\]|\.\./.test(name)) return Infinity;
+    try {
+      const f = join(rootDir, '.data', 'agent-sessions', `${name}.json`);
+      const startedAt = Number(JSON.parse(readFileSync(f, 'utf8')).startedAt);
+      return Number.isFinite(startedAt) && startedAt > 0 ? Date.now() - startedAt : Infinity;
+    } catch {
+      return Infinity;
+    }
   }
 
   async getConstraintStatus() {
@@ -2358,6 +2407,11 @@ class CombinedStatusLine {
     } else if (lslStatus === 'stale') {
       parts.push(`[LSL${ALARM_DOTS.WARN}]`);
       if (overallColor === 'green') overallColor = 'yellow';
+    } else if (lslStatus === 'starting') {
+      // Visible, but not an alarm: the badge says "not logging yet", and
+      // deliberately does NOT drag overallColor, because a session that is
+      // three seconds old is not a degraded system.
+      parts.push(`[LSL${STATE_DOTS.IDLE}]`);
     }
 
     // Constraint Monitor Status
@@ -2625,6 +2679,46 @@ class CombinedStatusLine {
       parts.push(ukbPart);
     }
     // Don't show anything when no UKB processes are running (cleaner status line)
+
+    // Context-window gauge for whichever agent owns this pane.
+    //
+    // Placed here, late in `parts`, deliberately: truncateFromLeftToCells()
+    // drops content from the LEFT, so a narrow pane sheds the leading badges
+    // first and the gauge survives alongside the clock and the log tranche.
+    //
+    // Absent rather than zero when the agent's context store can't be read — a
+    // gauge showing 0% and a gauge that cannot see its source must not look the
+    // same.
+    try {
+      const paneAgent = process.env.CODING_AGENT;
+      if (paneAgent) {
+        const projectPath = process.env.TRANSCRIPT_SOURCE_PROJECT
+          || process.env.TMUX_PANE_PATH
+          || process.cwd();
+        // Claude's bridge file is keyed on Claude Code's own session id, which
+        // only the transcript path reveals — see sessionIdFromTranscriptPath.
+        let sessionId = null;
+        if (paneAgent === 'claude') {
+          const coordResult = await this.getCoordinatorState();
+          if (coordResult.ok) {
+            const myProject = basename(projectPath);
+            const myPane = process.env.TMUX_PANE || null;
+            const entries = Object.values(coordResult.state.lsl || {})
+              .filter(e => e && e.projectName === myProject && e.transcriptPath);
+            const pinned = myPane && entries.find(e => e.tmuxPane === myPane);
+            const chosen = pinned
+              || entries.sort((a, b) => (b.lastBeat || 0) - (a.lastBeat || 0))[0];
+            sessionId = contextGauge.sessionIdFromTranscriptPath(chosen?.transcriptPath);
+          }
+        }
+        const usage = contextGauge.readContextUsage({
+          agent: paneAgent, projectPath, sessionId
+        });
+        if (usage) parts.push(contextGauge.renderGauge(usage.usedPct));
+      }
+    } catch {
+      // A status line must never fail because a context store was unreadable.
+    }
 
     // Add live log target with optional redirect indicator
     if (liveLogTarget && liveLogTarget !== '----') {
@@ -2951,15 +3045,10 @@ async function main() {
     // so a 30s cache is safe. This ensures tmux always gets output within milliseconds.
     // TMUX_PANE_PATH or TRANSCRIPT_SOURCE_PROJECT identifies which project
     // this status render is for; cache is keyed per-project.
-    const panePath = process.env.TMUX_PANE_PATH || process.env.TRANSCRIPT_SOURCE_PROJECT || '';
-    const paneProject = panePath ? basename(panePath) : '';
-    // Cache key includes pane width so two same-project panes don't share
-    // a per-render cache. (padStatusLine itself no longer adapts to width --
-    // tmux right-aligns -- but the cache content is per-render.)
-    const paneWidth = process.env.TMUX_PANE_WIDTH || '';
-    const cacheSuffix = paneProject
-      ? `-${paneProject}${paneWidth ? `-w${paneWidth}` : ''}`
-      : '';
+    // Cache key (project + agent + pane width) comes from the shared builder so
+    // this writer and status-line-fast.cjs's reader cannot drift apart — see
+    // lib/statusline/pane-cache-key.cjs for why each component is in the key.
+    const { paneWidth, suffix: cacheSuffix } = paneCacheKey.paneIdentity();
     const cacheFile = join(rootDir, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
     try {
       if (existsSync(cacheFile)) {
