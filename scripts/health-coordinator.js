@@ -507,6 +507,30 @@ function ingestSignal(signal) {
       };
       break;
     }
+    case 'etm_ensure': {
+      // An agent launcher has just opened a session for this project and wants
+      // its ETM now, rather than whenever the 30s safety-net sweep next runs.
+      //
+      // Why this exists: closing a session reaps its ETM within one 5s tick,
+      // while respawning is gated by ETM_SPAWN_INTERVAL_MS = 30s. Every
+      // relaunch therefore spent up to half a minute with no monitor at all —
+      // visible as a red [LSL] badge that was, accurately, reporting that
+      // nothing was logging the session.
+      //
+      // The path is not trusted blindly: ensureEtmForActiveProjects() still
+      // applies looksLikeProjectDir()/agenticDir qualification to `only`, so
+      // this cannot conscript a monitor for an arbitrary directory.
+      const projectPath = signal.payload?.projectPath;
+      if (!projectPath || typeof projectPath !== 'string') {
+        throw new Error('etm_ensure requires payload.projectPath');
+      }
+      try {
+        ensureEtmForActiveProjects({ only: projectPath, force: true });
+      } catch (err) {
+        log(`etm_ensure(${projectPath}) threw: ${err.message}`, 'ERROR');
+      }
+      break;
+    }
     case 'service_status': {
       // Plan 33-03 fills in the full service registry; skeleton accepts and stores
       // by source name so observability is available immediately.
@@ -2177,16 +2201,32 @@ function openEtmChildLog(projectName) {
  * actively-written Claude transcript. Skips projects that already have a
  * running heartbeat in currentState.lsl (set by ETM heartbeats; staleness
  * pass at HEARTBEAT_STALENESS_MS = 15s). Rate-limited to once per 30s.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.only]  Restrict the sweep to this one project path.
+ * @param {boolean} [opts.force] Bypass the 30s rate limit. ONLY valid together
+ *   with `only`: an agent launcher asking for its own project is a specific,
+ *   user-initiated event, not the periodic safety net, and making it wait up to
+ *   30s is what left every fresh session unmonitored (and its [LSL] badge red)
+ *   for that whole window. Forcing the UNTARGETED sweep would be a different
+ *   thing entirely — it would let a caller drive a full ~/Agentic tree walk at
+ *   arbitrary frequency — so it is refused below.
  */
-function ensureEtmForActiveProjects() {
+function ensureEtmForActiveProjects(opts = {}) {
+  const { only = null, force = false } = opts;
   const now = Date.now();
   // Startup grace: wait HEARTBEAT_STALENESS_MS + buffer before doing the first
   // spawn check so existing ETMs (started before us) get a chance to heartbeat
   // and populate currentState.lsl. Without this, a coordinator restart spawns
   // a redundant ETM for every active project even when one is already running.
-  if (now - STARTED_AT < HEARTBEAT_STALENESS_MS + 5_000) return;
-  if (now - _lastEtmSpawnCheck < ETM_SPAWN_INTERVAL_MS) return;
-  _lastEtmSpawnCheck = now;
+  // A targeted request is exempt: it names a project a launcher just opened, so
+  // there is no ambiguity about whether some pre-existing ETM covers it.
+  const targeted = force && only;
+  if (!targeted && now - STARTED_AT < HEARTBEAT_STALENESS_MS + 5_000) return;
+  if (!targeted && now - _lastEtmSpawnCheck < ETM_SPAWN_INTERVAL_MS) return;
+  // A targeted spawn must NOT advance the shared rate-limit clock — otherwise a
+  // burst of launches would postpone the sweep that covers every other project.
+  if (!targeted) _lastEtmSpawnCheck = now;
 
   const homeDir = process.env.HOME;
   if (!homeDir) return;
@@ -2197,11 +2237,21 @@ function ensureEtmForActiveProjects() {
   if (!fs.existsSync(monitorScript)) return;
 
   // Project names already covered by a fresh heartbeat — skip these.
+  //
+  // `status === 'running'` alone is a claim about the LAST heartbeat, not about
+  // this instant: refreshLslStaleness() only demotes an entry once the heartbeat
+  // has aged past HEARTBEAT_STALENESS_MS, so an ETM that died a second ago still
+  // reads 'running'. The periodic sweep can live with that (it runs at most every
+  // 30s, by which time the demotion has happened), but a targeted request cannot:
+  // it arrives at the exact moment a session is starting, which is precisely when
+  // the previous ETM's corpse is still warm. Requiring an actually-fresh
+  // heartbeat is what makes the "ETM crashed, user relaunched" case work rather
+  // than silently falling back to the 30s sweep.
   const coveredProjects = new Set();
   for (const entry of Object.values(currentState.lsl)) {
-    if (entry?.status === 'running' && entry?.projectName) {
-      coveredProjects.add(entry.projectName);
-    }
+    if (entry?.status !== 'running' || !entry?.projectName) continue;
+    if (targeted && now - (entry.lastBeat || 0) > HEARTBEAT_STALENESS_MS) continue;
+    coveredProjects.add(entry.projectName);
   }
 
   // Projects with a live tmux session bypass the 2-min mtime gate below.
@@ -2221,6 +2271,16 @@ function ensureEtmForActiveProjects() {
   for (const p of tmuxOpen) candidates.add(p);
   for (const p of openCodeFresh) {
     if (p.startsWith(agenticDir + '/') || looksLikeProjectDir(p)) candidates.add(p);
+  }
+  // A targeted request names its own project, which is not necessarily in the
+  // discovery set yet: the launcher fires the moment the tmux session exists,
+  // and `tmux list-sessions` may not report it for another beat. It still has
+  // to clear the same qualification gates below — only the discovery step is
+  // short-circuited, so a caller cannot conscript an ETM for an arbitrary path.
+  if (only) {
+    if (!looksLikeProjectDir(only) && !only.startsWith(agenticDir + '/')) return;
+    candidates.clear();
+    candidates.add(only);
   }
 
   for (const projectPath of candidates) {
@@ -2255,16 +2315,24 @@ function ensureEtmForActiveProjects() {
     const transcriptFresh = latestMtime > 0 && (now - latestMtime) <= ETM_TRANSCRIPT_ACTIVE_MS;
     const tmuxAlive = tmuxOpen.has(projectPath);
     const hasOpenCode = openCodeFresh.has(projectPath);
-    if (!transcriptFresh && !tmuxAlive && !hasOpenCode) continue;
+    // A targeted launcher request is itself a fourth activity signal, and the
+    // only one available at the instant it matters. A session that is two
+    // seconds old has no fresh Claude transcript (the agent has not spoken yet)
+    // and may not be in `tmux list-sessions` output yet either, so requiring one
+    // of the other three would reintroduce exactly the delay this removes.
+    if (!targeted && !transcriptFresh && !tmuxAlive && !hasOpenCode) continue;
 
     // Do not resurrect what the reaper just took. A session closed seconds ago
     // still satisfies `transcriptFresh` (the transcript was written on the way
     // out), so without this the two fight and the project flickers back within
     // ~10s. Any signal NEWER than the reap — a transcript write, a new tmux
     // session, OpenCode activity — is genuine new work and clears the block.
+    // A targeted request clears it outright: the previous session's reap is
+    // precisely what a relaunch supersedes, and it is the common case (close a
+    // session, reopen it) rather than an edge one.
     const reapedAt = _reapedProjects.get(projectName);
     if (reapedAt) {
-      if (tmuxAlive || hasOpenCode || latestMtime > reapedAt) {
+      if (targeted || tmuxAlive || hasOpenCode || latestMtime > reapedAt) {
         _reapedProjects.delete(projectName);
       } else {
         continue;

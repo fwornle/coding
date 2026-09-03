@@ -83,7 +83,13 @@ tmux_session_wrapper() {
   # status-right, which every session created here overrides one line below, so it
   # never actually ran. Both values come from tmux formats so they track the real
   # session name and the configured status-left-length rather than a guess.
-  local status_cmd="CODING_REPO=${coding_repo} TRANSCRIPT_SOURCE_PROJECT=${transcript_project} TMUX_PANE_WIDTH=#{pane_width} TMUX_SESSION_NAME=#{session_name} TMUX_STATUS_LEFT_LENGTH=#{status-left-length} node ${coding_repo}/scripts/status-line-fast.cjs"
+  # CODING_AGENT tells the renderer WHICH agent owns this pane, which is what
+  # lets the context gauge read the right store (Claude's bridge file vs
+  # opencode's / copilot's databases vs pi's session JSONL). It is also folded
+  # into the status-line cache key: the cache is keyed on project + pane width,
+  # so without the agent a claude pane and an opencode pane on the same project
+  # at the same width would share one cached line and show each other's gauge.
+  local status_cmd="CODING_REPO=${coding_repo} CODING_AGENT=${agent} TRANSCRIPT_SOURCE_PROJECT=${transcript_project} TMUX_PANE_WIDTH=#{pane_width} TMUX_SESSION_NAME=#{session_name} TMUX_STATUS_LEFT_LENGTH=#{status-left-length} node ${coding_repo}/scripts/status-line-fast.cjs"
 
   # Export so tmux environment inherits it (needed for the status-right #() command)
   export CODING_REPO
@@ -100,12 +106,56 @@ tmux_session_wrapper() {
     tmux set-option -t "$target_session" mouse on
   }
 
+  # Record which agent owns this tmux session, where, and since when.
+  #
+  # Two consumers, both in the status line:
+  #   • the context gauge, to pick the right per-agent context store;
+  #   • the LSL badge, to tell "this session started seconds ago and its ETM is
+  #     still coming up" apart from "the ETM is dead". Without a session start
+  #     time those two are indistinguishable, and every fresh session opened
+  #     with an alarming — but wrong — red [LSL] badge.
+  _record_agent_session() {
+    local target_session="$1"
+    local map_dir="${coding_repo}/.data/agent-sessions"
+    mkdir -p "$map_dir" 2>/dev/null || return 0
+    # Stale entries accumulate one per session otherwise; they are tiny, but a
+    # week is long past any use as a "did this just start?" signal.
+    find "$map_dir" -type f -name '*.json' -mtime +7 -delete 2>/dev/null || true
+    printf '{"agent":"%s","projectPath":"%s","tmuxSession":"%s","pid":%s,"startedAt":%s}\n' \
+      "$agent" "$transcript_project" "$target_session" "$$" "$(date +%s)000" \
+      > "${map_dir}/${target_session}.json" 2>/dev/null || true
+  }
+
+  # Ask the health coordinator to start this project's ETM NOW.
+  #
+  # The coordinator's own safety-net sweep is rate-limited to once per 30s
+  # (ETM_SPAWN_INTERVAL_MS in scripts/health-coordinator.js), and closing the
+  # previous session reaps the ETM within one 5s tick. A new session therefore
+  # spent up to 30 seconds with genuinely nothing logging it, which is what the
+  # red [LSL] badge was honestly reporting. Asking directly closes that gap.
+  #
+  # Strictly best-effort: backgrounded, short timeout, failure ignored. A
+  # coordinator that is down must never delay or fail an agent launch — the
+  # 30s sweep remains the fallback exactly as before.
+  _request_etm() {
+    local url="${HEALTH_COORDINATOR_URL:-http://localhost:3034}"
+    (
+      curl -s --max-time 2 -X POST "${url}/signals" \
+        -H 'Content-Type: application/json' \
+        -d "{\"kind\":\"etm_ensure\",\"payload\":{\"projectPath\":\"${transcript_project}\"}}" \
+        >/dev/null 2>&1 || true
+    ) &
+    disown 2>/dev/null || true
+  }
+
   # --- Case: already inside tmux → configure current session, exec directly ---
   if [ -n "$TMUX" ]; then
     local current_session
     current_session=$(tmux display-message -p '#S')
     echo "[tmux-wrapper] Already in tmux session '$current_session', configuring status bar"
     _configure_tmux_status "$current_session"
+    _record_agent_session "$current_session"
+    _request_etm
     exec "$cmd" "$@"
   fi
 
@@ -189,6 +239,8 @@ tmux_session_wrapper() {
   # Configure status bar on the new session (guarded — the session can still
   # race-die between the check above and here).
   _configure_tmux_status "$session_name" 2>/dev/null || true
+  _record_agent_session "$session_name"
+  _request_etm
 
   # --- Optional: pipe-pane capture for non-native agents ---
   local capture_monitor_pid=""

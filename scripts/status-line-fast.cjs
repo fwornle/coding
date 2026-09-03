@@ -7,18 +7,11 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const codingRepo = process.env.CODING_REPO || path.join(__dirname, '..');
-// Per-project + per-pane-width cache. Width suffix prevents an older wider-
-// pane render from leaking into a narrower pane's display when two same-
-// project panes coexist. The padStatusLine in combined-status-line.js no
-// longer pads (tmux right-aligns automatically) but per-pane caching is
-// still required: cache content is per-render, and two same-project panes
-// would otherwise see each other's stale cache.
-const projectPath = process.env.TRANSCRIPT_SOURCE_PROJECT || process.env.TMUX_PANE_PATH || '';
-const projectName = projectPath ? path.basename(projectPath) : '';
-const paneWidth = process.env.TMUX_PANE_WIDTH || '';
-const cacheSuffix = projectName
-  ? `-${projectName}${paneWidth ? `-w${paneWidth}` : ''}`
-  : '';
+// Pane identity and the cache filename both come from lib/statusline/pane-cache-key.cjs,
+// which combined-status-line.js also uses — the two MUST agree on the filename
+// or this fast path silently never finds the cache the full render writes.
+const { paneIdentity } = require(path.join(codingRepo, 'lib', 'statusline', 'pane-cache-key.cjs'));
+const { projectPath, projectName, agent: paneAgent, paneWidth, suffix: cacheSuffix } = paneIdentity();
 const cacheFile = path.join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 const cslScript = path.join(__dirname, 'combined-status-line.js');
 
@@ -174,6 +167,73 @@ function lastContentTimestampMs(transcriptPath, tailBytes = 64 * 1024) {
 // characters instead of the intended glyph, and corrupting the payload.
 function reEscape(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+// Shared with combined-status-line.js — one gauge implementation, four agents.
+let contextGauge = null;
+try {
+  contextGauge = require(path.join(codingRepo, 'lib', 'statusline', 'context-gauge.cjs'));
+} catch { /* gauge unavailable → the line simply renders without it */ }
+
+/**
+ * Re-render the context gauge inside a cached line against the CURRENT reading.
+ *
+ * Same reasoning as patchLifecycleIcons above: without this the gauge would
+ * freeze at whatever the last full CSL render wrote and only move on the next
+ * refresh, so the number would visibly lag the conversation it describes.
+ *
+ * Replacement is width-preserving by construction — the gauge is a fixed
+ * GAUGE_CELLS wide in every severity state (see context-gauge.cjs) — which is
+ * what makes it safe to substitute into a string CSL has already truncated to
+ * fit the pane. A width change here would re-open the trailing-residue bug.
+ *
+ * No match is a deliberate no-op: an older cache written before the gauge
+ * existed, or a pane whose agent has no readable context store, keeps rendering
+ * exactly as it did.
+ */
+function patchContextGauge(text) {
+  if (!contextGauge) return text;
+  if (!contextGauge.GAUGE_RE.test(text)) return text;
+  let usage = null;
+  if (paneAgent) {
+    try {
+      usage = contextGauge.readContextUsage({
+        agent: paneAgent,
+        projectPath,
+        sessionId: claudeSessionIdForPane(),
+      });
+    } catch { usage = null; }
+  }
+  // No reading → blank it, never leave what is already there. Whatever is there
+  // belongs to the previous render or, on the sibling-borrow path, to a
+  // different pane entirely; showing a stale or foreign number as this session's
+  // context is worse than showing none.
+  return text.replace(
+    contextGauge.GAUGE_RE,
+    usage ? contextGauge.renderGauge(usage.usedPct) : contextGauge.GAUGE_BLANK
+  );
+}
+
+/** Replace any gauge in `text` with the width-identical blank. */
+function blankContextGauge(text) {
+  if (!contextGauge) return text;
+  return text.replace(contextGauge.GAUGE_RE, contextGauge.GAUGE_BLANK);
+}
+
+/**
+ * Claude Code's own session id for this pane's project, via the transcript path
+ * in the sidecar CSL already writes. Null for every other agent — they key off
+ * the project directory instead and need no session id.
+ */
+function claudeSessionIdForPane() {
+  if (paneAgent !== 'claude' || !contextGauge) return null;
+  try {
+    const entry = readProjectMapping()[projectName];
+    const tp = typeof entry === 'string' ? entry : entry?.tp;
+    return contextGauge.sessionIdFromTranscriptPath(tp);
+  } catch {
+    return null;
+  }
+}
+
 function patchLifecycleIcons(text, mapping, cacheMtimeMs) {
   const lifecycleAlt = LIFECYCLE_ICONS.map(reEscape).join('|');
   let out = text;
@@ -293,7 +353,12 @@ if (!cachedContent.trimEnd() && projectName) {
       if (age < CACHE_TTL_MS) {
         const content = fs.readFileSync(sibPath, 'utf8').replace(/\r?\n$/, '');
         if (content.trimEnd()) {
-          cachedContent = reunderline(content, getAbbrev(projectName));
+          // Blank the sibling's context gauge before adopting its line. It is a
+          // different project's — possibly a different agent's — reading, and
+          // this borrowed line is also written BACK to our own cache key below,
+          // so an un-blanked gauge would persist as ours until the next full
+          // render. patchContextGauge() fills in our own value moments later.
+          cachedContent = blankContextGauge(reunderline(content, getAbbrev(projectName)));
           cacheAgeMs = age;
           cacheMtimeMs = stat.mtimeMs;
           // Write the re-underlined cache so future reads are instant
@@ -315,7 +380,7 @@ if (cacheAgeMs < CACHE_TTL_MS && cachedContent.trimEnd()) {
   const { text: patched, anyNewer } = patchLifecycleIcons(
     cachedContent, mapping, cacheMtimeMs
   );
-  process.stdout.write(patched + '\n');
+  process.stdout.write(patchContextGauge(patched) + '\n');
   // Trigger background refresh when:
   //   - cache has aged past the background-refresh threshold, OR
   //   - any tracked transcript is newer than the cache (user activity
@@ -420,7 +485,7 @@ child.on('exit', (code, signal) => {
   if (cachedContent.trimEnd()) {
     const mapping = readProjectMapping();
     const { text: patched } = patchLifecycleIcons(cachedContent, mapping, cacheMtimeMs);
-    process.stdout.write(patched + '\n');
+    process.stdout.write(patchContextGauge(patched) + '\n');
     // Trigger background refresh for next cycle (also feeds stdin EOF immediately)
     const bg = spawn('node', [cslScript], {
       env, stdio: ['ignore', 'ignore', 'ignore'], detached: true
