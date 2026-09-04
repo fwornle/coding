@@ -1,6 +1,24 @@
+!!! abstract "Which layer this page describes"
+
+    `rapid-llm-proxy` has **two paths**, and this page is about the lower one.
+
+    | | Serves | Chooses a model by |
+    |---|---|---|
+    | **The library (this page)** | Callers that embed the package directly — OKB and other consumers | `fast` / `standard` / `premium` **tiers** |
+    | **The runtime bridge** | Every LLM call in *this* project, on `:12435` | a per-job route plus a `small` / `medium` / `high` **band**, from two YAML files |
+
+    Verified rather than assumed: the running daemon is `proxy-bridge/server.mjs`, which reads
+    `llm-routing.yaml` and `llm-fallback.yaml` and imports only utility modules from the
+    library's build — token accounting, cache parsing, network detection. It does **not** load
+    the tier router described below.
+
+    So the tier model, the provider-priority chains and the quota logic on this page are real,
+    and they are **not** what decides where your session's calls go. That is
+    [LLM Routing](llm-routing.md).
+
 ## Overview
 
-The [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unified LLM layer consolidates three previously separate LLM abstractions into a single, comprehensive library that provides intelligent routing, resilience, and cost optimization across 14 different LLM providers, including **subscription-based providers** that eliminate per-token API costs. It is maintained as a **standalone package** shared with OKB and other projects.
+The [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unified LLM layer consolidates three previously separate LLM abstractions into a single, comprehensive library that provides intelligent routing, resilience, and cost optimization across its provider implementations (12 concrete ones under `src/providers/`), including **subscription-based providers** that eliminate per-token API costs. It is maintained as a **standalone package** shared with OKB and other projects.
 
 **Why it was created:**
 - **Before**: 3 separate LLM abstractions (Semantic Analysis, Unified Inference Engine, Semantic Validator)
@@ -8,7 +26,7 @@ The [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unifi
 - **After**: Single unified layer ([`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy)) with shared infrastructure, tier-based routing, circuit breaker, and LRU cache
 
 **Key Features:**
-- **Parallelized copilot-first routing** — Copilot scales beautifully with parallelism (0.77s effective per call at 10 concurrent)
+- **Parallelized copilot-first routing** *(library path)* — Copilot scales well with parallelism (0.77s effective per call at 10 concurrent). The runtime bridge does not order providers globally: its `defaults.background` is `claude-code-max` and each route names its own provider
 - **Zero-cost routing** via GitHub Copilot and Claude Code subscriptions
 - **Automatic fallback** to paid APIs on quota exhaustion
 - **Batch-optimized** — agents already use `Promise.all` with concurrency 5-20, copilot as primary unlocks peak throughput
@@ -59,7 +77,8 @@ The unified layer serves three primary consumers:
 
 ## Supported Providers
 
-The system supports 14 LLM providers with tier-based model selection:
+The library ships 12 concrete provider implementations under `src/providers/` with
+tier-based model selection:
 
 ### Subscription Providers (Zero Cost)
 
@@ -210,7 +229,28 @@ When running inside Docker, host-side tools are unavailable. The [LLM Proxy Brid
 
 ![LLM Tier Routing](../images/llm-tier-routing.png)
 
-The system routes requests to providers based on task complexity and cost optimization:
+!!! note "Library path only"
+
+    The tiers below are the **library's** routing model (`ModelTier` in `src/types.ts`,
+    applied by `src/provider-registry.ts`). This project's own calls do not use it — they
+    resolve through a per-job route and a `small`/`medium`/`high` band, with fallback given by
+    an ordered per-provider chain rather than one global priority list. The fixed
+    "Copilot → Groq → Claude Code → …" ordering stated below is therefore **not** the order
+    your calls take; see [LLM Routing](llm-routing.md) for the one that is.
+
+The library routes requests to providers based on task complexity and cost optimization:
+
+!!! warning "`claude-opus-4.6` is the library's id, and it is not in the runtime catalogue"
+
+    The premium entries below say `claude-opus-4.6`, and that is genuinely what the library
+    declares — in `src/config.ts`, `config/llm-providers.yaml`, `copilot-provider.ts` and
+    `anthropic-provider.ts`. It is documented here as-is because this page describes that
+    code.
+
+    It is **not** a model the runtime bridge can route to: `llm-routing.yaml` declares
+    `claude-opus-5` and `claude-opus-4.8`, and a band naming a model outside a provider's
+    `available_models` fails validation at boot. Do not copy the id from here into a routing
+    config.
 
 ### Tier Definitions
 
