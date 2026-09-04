@@ -175,7 +175,7 @@ providers:
     models:
       fast: "claude-haiku-4.5"
       standard: "claude-sonnet-4.6"
-      premium: "claude-opus-4.6"
+      premium: "claude-opus-5"
     quotaTracking:
       enabled: true
       softLimitPerHour: 100
