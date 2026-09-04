@@ -1,251 +1,94 @@
 # API Reference
 
-MCP tools and REST API endpoints.
+The tools and HTTP endpoints the system exposes, and how each is reached.
 
-## MCP Tools
+=== "⚡ Quick (~3 min)"
 
-### Semantic Analysis
+    ## One MCP server, two CLIs
 
-| Tool | Description |
-|------|-------------|
-| `heartbeat` | Connection health monitoring |
-| `test_connection` | Server connectivity verification |
-| `determine_insights` | AI-powered content analysis |
-| `analyze_code` | Code pattern and quality analysis |
-| `analyze_repository` | Repository-wide architecture analysis |
-| `extract_patterns` | Design pattern identification |
-| `create_ukb_entity_with_insight` | Knowledge base entity creation |
-| `execute_workflow` | Multi-agent workflows |
-| `generate_documentation` | Automated documentation |
-| `create_insight_report` | Detailed analysis reports |
-| `generate_plantuml_diagrams` | Architecture diagrams |
-| `reset_analysis_checkpoint` | Reset checkpoints |
-| `refresh_entity` | Refresh knowledge entity |
-| `analyze_code_graph` | AST-based code analysis |
+    **Graphify** is the only remaining MCP server. The semantic-analysis and constraint-monitor
+    tools still exist and do the same work — they are reached by running a command instead:
 
-### Constraint Monitor
+    | Surface | Reached by |
+    |---------|------------|
+    | Semantic analysis | `semantic <command>`; `semantic tools` lists them |
+    | Constraint monitor | `constraints <command>` — works with the container down |
+    | Graphify | MCP at `http://localhost:3851/mcp` |
 
-| Tool | Description |
-|------|-------------|
-| `check_constraints` | Validate against constraints |
-| `get_constraint_status` | Current compliance metrics |
-| `get_violation_history` | Past violations |
-| `update_constraints` | Modify constraint rules |
+    Retiring those two as MCP servers removed roughly **14 KB of tool schema from every context
+    window**.
 
-### Graphify
+    ## The endpoints you will actually use
 
-HTTP MCP endpoint at `http://localhost:3851/mcp` (served from inside `coding-services`), backed by the static `graph.json`.
+    ```bash
+    curl -s localhost:3034/health/state | jq .    # live health, the source of truth
+    curl -s localhost:12435/health | jq .         # LLM proxy
+    curl -s localhost:3033/health | jq .          # health API (backs the dashboard)
+    ```
 
-| Tool | Description |
-|------|-------------|
-| `query_graph` | Structural / natural-language query over the graph |
-| `get_node` | Retrieve a single node by id |
-| `get_neighbors` | List a node's neighbours |
-| `shortest_path` | Shortest path between two nodes |
-| `graph_stats` | Graph size and shape statistics |
-| `god_nodes` | Most-connected hub nodes |
+    ## The port pairs that get confused
 
-## REST APIs
+    **12435** is the LLM proxy, **12436** is observations. **3848** runs workflows, **3033** does
+    not. Both mistakes fail as a bare 404 that names nothing.
 
-### Constraint Monitor API (Port 3031)
+    ## Generic tool access
 
-#### List Violations
+    ```bash
+    semantic tools                            # everything available
+    semantic tool <name> '{"key":"value"}'    # invoke one directly
+    ```
 
-```bash
-GET /api/violations?project=coding
-```
+=== "📖 Standard (~15 min)"
 
-Response:
+    ## Why the MCP servers became CLIs
 
-```json
-{
-  "violations": [
-    {
-      "id": "uuid",
-      "constraintId": "no-logging-statements",
-      "severity": "warning",
-      "message": "Avoid logging statements",
-      "timestamp": "2025-01-15T10:30:00Z"
-    }
-  ],
-  "total": 1
-}
-```
+    Every MCP tool a server exposes costs tool-schema tokens in **every** context window, whether
+    or not it is used. Nineteen semantic-analysis tools and four constraint-monitor tools came to
+    roughly 14 KB per window, permanently, for capabilities used occasionally.
 
-#### Log Violation
+    Both are now CLIs and neither lost functionality. The `semantic` CLI posts to the running
+    workflow server, so it drives the same state machine that feeds the dashboard's live view. The
+    `constraints` CLI evaluates in-process, which makes it strictly more available than the MCP
+    server was — it works when the container is down.
 
-```bash
-POST /api/violations
-Content-Type: application/json
+    Graphify stays on MCP because structural code queries are genuinely per-turn work, where the
+    schema cost buys something on most turns.
 
-{
-  "constraintId": "no-logging-statements",
-  "severity": "warning",
-  "message": "Logging statement found in file.js",
-  "project": "coding"
-}
-```
+    ## HTTP surfaces
 
-#### Get Compliance
+    | Port | Service | Notes |
+    |------|---------|-------|
+    | 3030 / 3031 | Constraint dashboard / API | |
+    | 3032 / 3033 | Health dashboard / API | The dashboard's backend, **not** workflows |
+    | 3034 | Health coordinator | `/health/state` — the single source of truth |
+    | 3848 | Semantic analysis | Workflow execution over HTTP/SSE |
+    | 3851 | Graphify | MCP |
+    | 8080 | VKB server | |
+    | 12435 | LLM proxy | `POST /api/complete` |
+    | 12436 | Observations API | Also mounts km-core's `/api/km/` |
 
-```bash
-GET /api/compliance/coding
-```
+    Two pairs cause nearly all the confusion here, and both fail as a bare 404 rather than
+    anything diagnostic: **12435 versus 12436**, and **3848 versus 3033**.
 
-Response:
+    ## The LLM proxy's endpoint
 
-```json
-{
-  "score": 9.5,
-  "violations": 1,
-  "trend": "improving"
-}
-```
+    ```bash
+    curl -s localhost:12435/api/complete \
+      -H 'content-type: application/json' \
+      -d '{"process":"my-service","messages":[{"role":"user","content":"hi"}],"complexity":"small"}'
+    ```
 
-#### List Constraints
+    Not the OpenAI-shaped path. `process` is what makes token accounting attributable, and
+    `complexity` is the band that decides cost — a `taskType` field is read by nothing.
 
-```bash
-GET /api/constraints
-```
+    ## Health as an API
 
-#### Health Check
+    `GET localhost:3034/health/state` returns the whole document: container state, per-service
+    status, per-project session logging, database sub-checks, network location and proxy state.
+    Everything else — the dashboards, the status line, the prompt hooks — renders that one
+    document, which is why they agree, and why a disagreement means something is reading a stale
+    copy rather than that two things are broken.
 
-```bash
-GET /api/health
-```
+=== "📚 Deep Dive (full)"
 
-### Health Dashboard API (Port 3033)
-
-#### Overall Health
-
-```bash
-GET /api/health
-```
-
-Response:
-
-```json
-{
-  "status": "healthy",
-  "services": {
-    "lsl": "healthy",
-    "ukb": "healthy",
-    "constraints": "healthy"
-  },
-  "uptime": 3600
-}
-```
-
-#### Service Status
-
-```bash
-GET /api/services
-```
-
-#### Metrics History
-
-```bash
-GET /api/metrics?range=24h
-```
-
-#### Alerts
-
-```bash
-GET /api/alerts?limit=10
-```
-
-### VKB Server API (Port 8080)
-
-#### List Entities
-
-```bash
-GET /api/entities?team=coding
-```
-
-#### Get Entity
-
-```bash
-GET /api/entities/:id
-```
-
-#### Search
-
-```bash
-GET /api/search?q=authentication&type=ImplementationPattern
-```
-
-#### Graph Data
-
-```bash
-GET /api/graph?team=coding
-```
-
-## Agent Integration
-
-### AgentAdapter Interface
-
-```typescript
-interface AgentAdapter {
-  // Identification
-  getName(): string;
-  getVersion(): string;
-
-  // Capabilities
-  supportsMemory(): boolean;
-  supportsBrowser(): boolean;
-  supportsHooks(): boolean;
-
-  // Operations
-  initialize(config: AgentConfig): Promise<void>;
-  createMemory(key: string, value: any): Promise<void>;
-  searchMemory(query: string): Promise<Memory[]>;
-  readMemory(key: string): Promise<any>;
-}
-```
-
-### Required APIs for New Agents
-
-| API | Purpose |
-|-----|---------|
-| Transcript generation | JSONL format session logs |
-| Memory operations | create/search/read |
-| Browser automation | navigate/act/extract |
-| Hook support | PreToolUse/PostToolUse |
-
-### Integration Steps
-
-1. Implement `AgentAdapter` interface
-2. Register in `agent-registry.js`
-3. Add detection in `agent-detector.js`
-4. Create launcher script `launch-{agent}.sh`
-5. Update `bin/coding` routing
-6. Test with validation commands
-
-## Webhook Events
-
-### Constraint Violations
-
-```json
-{
-  "event": "constraint.violation",
-  "data": {
-    "constraintId": "no-hardcoded-secrets",
-    "severity": "critical",
-    "project": "coding",
-    "blocked": true
-  }
-}
-```
-
-### Health Alerts
-
-```json
-{
-  "event": "health.alert",
-  "data": {
-    "service": "lsl",
-    "status": "degraded",
-    "message": "High memory usage"
-  }
-}
-```
+    --8<-- "_tiers/reference/api.deep.md"
