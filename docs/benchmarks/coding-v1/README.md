@@ -133,7 +133,7 @@ pins CodeGraph's own environment variables and what owns index freshness.
 > A1, whose answer lives outside any code index, does NOT move — so the corpus-scope finding
 > below stands on its own. See
 > [the CodeGraph index does not cover the tree under test](#the-codegraph-index-does-not-cover-the-tree-under-test)
-> and [the re-measurement](#the-index-was-fixed-and-the-two-affected-arms-re-measured--coding-v1-r8-cgidx).
+> and [the re-measurement](#the-index-was-fixed-and-the-two-affected-arms-re-measured-coding-v1-r8-cgidx).
 
 Everything else this page used to list here was a single run's noise. See
 [which per-question results replicate](#which-per-question-results-replicate).
@@ -853,7 +853,7 @@ On this question the rubric pays better for guessing than for an accurate report
 tool — which is exactly backwards from what you want an agent to do, and it is why five
 correct diagnoses sat in the data for three runs looking like a retrieval failure.
 
-### The index was fixed and the two affected arms re-measured — `coding-v1-r8-cgidx`
+### The index was fixed and the two affected arms re-measured (`coding-v1-r8-cgidx`)
 
 The harness was repaired and `codegraph` and `hybrid` re-run at **the same corpus commit**
 (`f4f13e86a`, pinned with `--commit`), same questions, reps, agent, model, judge and
@@ -893,7 +893,7 @@ bimodal with no arm effect. Three cells within a question's known range is not a
 | **arm mean** | 0.985 | **0.985** |
 
 Hybrid's T3 first read 0.67 here, and that was a grader defect rather than an arm effect;
-[it is now fixed and regraded](#hybrids-t3-was-a-grading-defect--since-fixed-and-regraded).
+[it is now fixed and regraded](#hybrids-t3-was-a-grading-defect-since-fixed-and-regraded).
 Not one of hybrid's sixteen questions moved in either direction.
 
 #### The change is behavioural, and it is larger than any score
@@ -921,7 +921,7 @@ strongly when one backend was broken; with it fixed they consult the graph three
 often and answer no better.* A tool being reached for and a tool being useful are different
 claims, and only the second one is still clean.
 
-#### Hybrid's T3 was a grading defect — since fixed and regraded
+#### Hybrid's T3 was a grading defect, since fixed and regraded
 
 T3 is an abstain probe. One cell scored 0.00 with `hallucinated: true`, which would have been
 the worst kind of regression — except the answer abstains, twice:
