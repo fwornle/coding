@@ -20,7 +20,7 @@
  * CLI usage:
  *   node scripts/sub-agent-live-copilot.mjs \
  *     --session-state-dir ~/.copilot/session-state \
- *     --project-root /Users/Q284340/Agentic/coding \
+ *     --project-root /path/to/coding \
  *     --state-file .data/sub-agent-live-state-copilot.json \
  *     --scan-interval 10000 \
  *     --heartbeat-interval 30

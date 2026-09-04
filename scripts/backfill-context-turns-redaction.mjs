@@ -8,7 +8,7 @@
  *
  * WHY: Phase-84 per-turn context capture (context-turns / raw-bodies) and the
  * archived span .json records store raw message text, which includes local
- * filesystem paths like /Users/Q284340/… — leaking the operator's staff number
+ * filesystem paths like /Users/<staff-id>/… — leaking the operator's staff number
  * into the dashboard timeline + turn-modal. The render-path scrub (dashboard
  * scrubSecrets) and the write-path redaction (measurement-stop closeContextTurns)
  * stop the leak going forward; this script purges data captured BEFORE those fixes.
@@ -47,7 +47,7 @@ const countHits = (s) => (s.match(COUNT_RE) || []).length;
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const dirIdx = args.indexOf('--dir');
-const REPO = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
+const REPO = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 const MEAS = dirIdx >= 0 && args[dirIdx + 1]
   ? path.resolve(args[dirIdx + 1])
   : path.join(REPO, '.data/measurements');

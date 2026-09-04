@@ -40,6 +40,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { encodeCwd } from '../lib/lsl/adapters/claude-jsonl-tree.mjs';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -58,7 +60,8 @@ const GREP_TIMEOUT_MS = 120_000;
 
 /** Host agent-memory dir — off-tree, reachable only by escaping the sandbox. */
 const HOST_MEMORY_DIR = path.join(
-  process.env.HOME || '', '.claude', 'projects', '-Users-Q284340-Agentic-coding', 'memory',
+  os.homedir(), '.claude', 'projects',
+  encodeCwd(process.env.CODING_REPO || path.resolve(import.meta.dirname, '..')), 'memory',
 );
 
 /**

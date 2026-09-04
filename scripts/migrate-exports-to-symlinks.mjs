@@ -36,7 +36,9 @@ function log(msg) {
 
 function ensureRepoRootSafe() {
   // T-37-05-02: refuse to operate outside the coding repo
-  const expected = path.resolve('/Users/Q284340/Agentic/coding');
+  const expected = path.resolve(
+    process.env.CODING_REPO || path.resolve(import.meta.dirname, '..'),
+  );
   const actual = path.resolve(REPO_ROOT);
   if (!actual.startsWith(expected) && !process.env.ALLOW_NONSTANDARD_REPO) {
     throw new Error(`Refusing to operate outside coding repo: ${actual}`);

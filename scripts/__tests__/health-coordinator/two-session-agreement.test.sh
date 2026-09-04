@@ -14,7 +14,7 @@ SID_A="claude-test-A-$$"
 SID_B="claude-test-B-$$"
 
 # Spawn two mock reporters in /coding (project rollup expects projectPath=…/coding)
-PROJECT="/Users/Q284340/Agentic/coding"
+PROJECT="${CODING_REPO:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 mock_reporter() {
   local sid="$1"
   while true; do
@@ -42,7 +42,7 @@ assert_state_field ".lsl[\"$SID_B\"].status" 'running' 'B alive'   || exit 1
 assert_state_field '.lsl_by_project["coding"]' 'healthy' 'project still healthy' || exit 1
 
 # Three-reader agreement (SPEC AC #5 / R8) — health-prompt-hook output shape
-prompt_hook_out=$(echo '{"cwd":"/Users/Q284340/Agentic/coding"}' | node "$SCRIPT_DIR/../../health-prompt-hook.js")
+prompt_hook_out=$(echo "{\"cwd\":\"$PROJECT\"}" | node "$SCRIPT_DIR/../../health-prompt-hook.js")
 echo "$prompt_hook_out" | grep -qF -- '"hookSpecificOutput"' || { echo "prompt-hook shape broken"; exit 1; }
 echo "$prompt_hook_out" | grep -qF 'LSL DOWN' && { echo "prompt-hook reported LSL DOWN — FAIL (expected healthy)"; exit 1; } || true
 

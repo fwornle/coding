@@ -25,7 +25,7 @@
  *   node scripts/experiments-recompute-score.mjs <task_id> --dry-run
  *
  * Env:
- *   CODING_REPO         repo root (default /Users/Q284340/Agentic/coding)
+ *   CODING_REPO         repo root (default this script's own checkout)
  *   LLM_PROXY_DATA_DIR  data dir for the archived span files (default <repo>/.data)
  *
  * Analog: scripts/experiments-recompute-route.mjs — verbatim arg parse + span read +
@@ -51,7 +51,7 @@ import { runJudge, nullJudgment } from '../lib/experiments/judge.mjs';
 import { writeScore } from '../lib/experiments/score-write.mjs';
 import { isTrivialRun, filterConsequential } from '../lib/experiments/consequential-events.mjs';
 
-const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
+const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
 const out = (s) => process.stdout.write(s + '\n');
 const warn = (s) => process.stderr.write(s + '\n');

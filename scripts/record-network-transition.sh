@@ -7,7 +7,8 @@
 #
 #   scripts/record-network-transition.sh &        # or: nohup ... &
 #   tail -f .logs/network-transition.log
-OUT="${1:-/Users/Q284340/Agentic/coding/.logs/network-transition.log}"
+REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+OUT="${1:-$REPO_ROOT/.logs/network-transition.log}"
 say() { printf '%s %s\n' "$(date '+%H:%M:%S')" "$*" >> "$OUT"; }
 
 say "=== recorder started (pid $$) ==="

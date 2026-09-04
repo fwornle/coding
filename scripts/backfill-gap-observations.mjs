@@ -29,6 +29,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { encodeCwd } from '../lib/lsl/adapters/claude-jsonl-tree.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (k, d = null) => {
@@ -37,7 +38,8 @@ const getArg = (k, d = null) => {
 };
 const DRY = args.includes('--dry-run');
 const OBS_API = process.env.OBS_API_URL || 'http://localhost:12436';
-const PROJECT_DIR = os.homedir() + '/.claude/projects/-Users-Q284340-Agentic-coding';
+const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
+const PROJECT_DIR = path.join(os.homedir(), '.claude', 'projects', encodeCwd(REPO_ROOT));
 const transcriptArg = getArg('transcript');
 const LO = getArg('lo');
 const HI = getArg('hi');

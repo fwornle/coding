@@ -30,7 +30,7 @@
  *   node scripts/backfill-task-id-by-timestamp.mjs --self-test     # node:test fixture
  *
  * Env:
- *   LLM_PROXY_DATA_DIR  default /Users/Q284340/Agentic/coding/.data — derives
+ *   LLM_PROXY_DATA_DIR  default <repo>/.data — derives
  *                       both the token DB (<dir>/llm-proxy/token-usage.db) and
  *                       the archive dir (<dir>/measurements).
  */
@@ -56,7 +56,7 @@ function parseStrArg(argv, flag) {
 /** Resolve the default data dir (mirrors the proxy's resolveTokenDbPath order). */
 function resolveDataDir() {
   return process.env.LLM_PROXY_DATA_DIR
-    || '/Users/Q284340/Agentic/coding/.data';
+    || path.join(process.env.CODING_REPO || path.resolve(import.meta.dirname, '..'), '.data');
 }
 
 function resolveDbPath(override) {

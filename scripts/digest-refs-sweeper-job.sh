@@ -31,10 +31,10 @@ set -uo pipefail
 # scripts/context-turns-sweeper-job.sh (Phase 84) conventions.
 #
 # Env overrides (tests + hand-driving):
-#   CODING_REPO           repo root (default /Users/Q284340/Agentic/coding)
+#   CODING_REPO           repo root (default the script's own checkout)
 #   OBS_API_URL           obs-api base (default http://localhost:12436)
 
-REPO_ROOT="${CODING_REPO:-/Users/Q284340/Agentic/coding}"
+REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 OBS_API_URL="${OBS_API_URL:-http://localhost:12436}"
 
 log() { printf '[digest-refs-sweeper][%s] %s\n' "$(date -u +%H:%M:%SZ)" "$*" >&2; }

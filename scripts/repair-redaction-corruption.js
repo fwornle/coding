@@ -5,7 +5,7 @@
  * The aws_secret_standalone regex used to be `[a-zA-Z0-9+/]{40}` (no
  * boundary anchors), which ate the leading 40 chars of any sufficiently
  * long path. Example:
- *   /Users/Q284340/Agentic/coding/scripts/migrate-add-project-column.js
+ *   <repo>/scripts/migrate-add-project-column.js
  * became:
  *   <AWS_SECRET_REDACTED>rate-add-project-column.js
  *
@@ -116,7 +116,7 @@ function repairText(text) {
       if (match) {
         fixed++;
         // Replace the corrupted span with the canonical absolute path.
-        // We use Q284340-style absolute path; the redactor will replace
+        // We use a staff-id-style absolute path; the redactor will replace
         // the user-id at write time per the user-ID rule.
         const fullPath = `/Users/<USER_ID_REDACTED>/Agentic/coding/${match}`;
         // If the original frag captured more than just the path tail,

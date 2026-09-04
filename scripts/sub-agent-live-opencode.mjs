@@ -11,7 +11,7 @@
  *
  * CLI flags:
  *   --db-path <path>            default: ~/.local/share/opencode/opencode.db
- *   --project-root <path>       default: /Users/Q284340/Agentic/coding
+ *   --project-root <path>       default: $CODING_REPO, else this checkout
  *   --state-file <path>         default: .data/sub-agent-live-state-opencode.json
  *   --poll-interval <ms>        default: 5000
  *   --heartbeat-interval <s>    default: 30
@@ -102,7 +102,7 @@ function printHelp() {
     '  --db-path <path>            opencode.db path',
     '                              (default: ~/.local/share/opencode/opencode.db)',
     '  --project-root <path>       project root to filter by',
-    '                              (default: /Users/Q284340/Agentic/coding)',
+    '                              (default: $CODING_REPO, else this checkout)',
     '  --state-file <path>         heartbeat state file',
     '                              (default: .data/sub-agent-live-state-opencode.json)',
     '  --poll-interval <ms>        poll cadence in ms (default: 5000)',

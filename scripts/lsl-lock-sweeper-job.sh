@@ -32,7 +32,7 @@ set -uo pipefail
 #
 # Mirrors scripts/sub-agent-sweep-job.sh conventions (Phase 54 LSL hardening).
 
-REPO_ROOT="${CODING_REPO:-/Users/Q284340/Agentic/coding}"
+REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 STALE_SECS="${LSL_LOCK_STALE_SECS:-90}"
 DEFAULT_LOCK="${REPO_ROOT}/.specstory/history/.git/index.lock"
 LOCK_PATHS="${LSL_LOCK_PATHS:-${DEFAULT_LOCK}}"
