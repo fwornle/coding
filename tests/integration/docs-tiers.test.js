@@ -104,13 +104,41 @@ function parseTiers(file) {
   return tiers;
 }
 
-/** Heading text within a tier, normalised for comparison. */
+/**
+ * Heading text within a tier, normalised for comparison.
+ *
+ * Includes are EXPANDED. The Deep Dive tier is a single `--8<--` line, so reading only the
+ * shell page finds no headings for it at all — and Deep Dive is the tier that carries every
+ * anchor the site already links to, which makes it the one a clash actually damages. Without
+ * this the rule silently checked Quick against Standard and nothing else.
+ */
 function headings(tier) {
-  return tier.lines
-    .filter(([, , fenced]) => !fenced)
-    .map(([n, line]) => [n, HEADING_RE.exec(line)])
-    .filter(([, m]) => m)
-    .map(([n, m]) => ({ line: n, text: m[2].replace(/\s+/g, ' ').trim() }));
+  const out = [];
+
+  for (const [n, line, fenced] of tier.lines) {
+    if (fenced) continue;
+
+    const include = SNIPPET_RE.exec(line);
+    if (include) {
+      const base = [DOCS, path.join(REPO, 'docs')]
+        .map((b) => path.join(b, include[1]))
+        .find((f) => fs.existsSync(f));
+      if (!base) continue; // reported by the include rule; not this one's business
+      for (const [i, l] of fs.readFileSync(base, 'utf8').split('\n').entries()) {
+        const m = HEADING_RE.exec(l);
+        // Fences inside a partial are handled by the same rule as the shell: a partial is
+        // ordinary markdown, so `## x` in a code block is text, not a heading.
+        if (m && !/^\s*(`{3,}|~{3,})/.test(l)) {
+          out.push({ line: `${path.relative(REPO, base)}:${i + 1}`, text: m[2].replace(/\s+/g, ' ').trim() });
+        }
+      }
+      continue;
+    }
+
+    const m = HEADING_RE.exec(line);
+    if (m) out.push({ line: n, text: m[2].replace(/\s+/g, ' ').trim() });
+  }
+  return out;
 }
 
 /** Tier includes whose target does not exist under either snippets base_path. */
@@ -137,7 +165,8 @@ function headingClashes(file, rel) {
       // Within one tier a repeat is the author's business and mkdocs' _1 suffix is correct.
       // Across tiers it silently renames an anchor readers already link to.
       if (prev && prev.label !== tier.label) {
-        clashes.push(`${rel}:${h.line}: "${h.text}" also appears in ${prev.label} (line ${prev.line})`);
+        const at = String(h.line).includes(':') ? h.line : `${rel}:${h.line}`;
+        clashes.push(`${at}: "${h.text}" also appears in ${prev.label} (at ${prev.line})`);
       } else if (!prev) {
         seen.set(key, { label: tier.label, line: h.line });
       }
