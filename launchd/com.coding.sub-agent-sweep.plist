@@ -7,7 +7,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/Q284340/Agentic/coding/scripts/sub-agent-sweep-job.sh</string>
+        <string>__CODING_REPO__/scripts/sub-agent-sweep-job.sh</string>
     </array>
     <key>RunAtLoad</key>
     <false/>
@@ -16,11 +16,11 @@
     <key>ThrottleInterval</key>
     <integer>30</integer>
     <key>WorkingDirectory</key>
-    <string>/Users/Q284340/Agentic/coding</string>
+    <string>__CODING_REPO__</string>
     <key>StandardErrorPath</key>
-    <string>/Users/Q284340/Agentic/coding/.data/live-sub-agent-sweep.log</string>
+    <string>__CODING_REPO__/.data/live-sub-agent-sweep.log</string>
     <key>StandardOutPath</key>
-    <string>/Users/Q284340/Agentic/coding/.data/live-sub-agent-sweep.log</string>
+    <string>__CODING_REPO__/.data/live-sub-agent-sweep.log</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>

@@ -7,18 +7,18 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/Q284340/Agentic/coding/scripts/digest-refs-sweeper-job.sh</string>
+        <string>__CODING_REPO__/scripts/digest-refs-sweeper-job.sh</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>StartInterval</key>
     <integer>21600</integer>
     <key>WorkingDirectory</key>
-    <string>/Users/Q284340/Agentic/coding</string>
+    <string>__CODING_REPO__</string>
     <key>StandardErrorPath</key>
-    <string>/Users/Q284340/Agentic/coding/.data/digest-refs-sweeper.log</string>
+    <string>__CODING_REPO__/.data/digest-refs-sweeper.log</string>
     <key>StandardOutPath</key>
-    <string>/Users/Q284340/Agentic/coding/.data/digest-refs-sweeper.log</string>
+    <string>__CODING_REPO__/.data/digest-refs-sweeper.log</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
