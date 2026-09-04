@@ -313,6 +313,20 @@ export CODING_PROJECT_DIR="$PROJECT_DIR"
 if [ -x "$SCRIPT_DIR/init-history.sh" ]; then
   "$SCRIPT_DIR/init-history.sh" 2>/dev/null || true
 fi
+
+# Reclaim stale status-line temp files (claude-ctx-*, claude-tmux-session-*).
+# One file is left in the temp dir per session and nothing else removes them; on
+# Windows the OS never reclaims %TEMP% at all.
+#
+# Here rather than in a launchd/systemd job because this path is the one thing that
+# runs on every platform, and the sweep is cheap. Backgrounded and silenced so it
+# cannot add latency to a launch; --if-older-than makes a burst of launches sweep
+# once, not once each. Windows additionally registers an hourly Scheduled Task at
+# install time, so its temp dir is reclaimed even when no agent is started.
+if [ -f "$SCRIPT_DIR/../scripts/claude-ctx-sweeper.mjs" ]; then
+  node "$SCRIPT_DIR/../scripts/claude-ctx-sweeper.mjs" --if-older-than=3600 --quiet \
+    >/dev/null 2>&1 &
+fi
 export CODING_AGENT_ADAPTER_PATH="$SCRIPT_DIR/../lib/agent-api/adapters"
 export CODING_HOOKS_CONFIG="$SCRIPT_DIR/../config/hooks-config.json"
 export CODING_TRANSCRIPT_FORMAT="$AGENT"
