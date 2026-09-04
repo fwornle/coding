@@ -20,7 +20,7 @@
  *   node scripts/experiments-recompute-route.mjs <task_id> --dry-run
  *
  * Env:
- *   CODING_REPO         repo root (default /Users/Q284340/Agentic/coding)
+ *   CODING_REPO         repo root (default this script's own checkout)
  *   LLM_PROXY_DATA_DIR  data dir for the archived span files (default <repo>/.data)
  *
  * Analog: scripts/backfill-task-id-by-timestamp.mjs (entry-point guard, --dry-run,
@@ -39,7 +39,7 @@ import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
 import { computeHeuristics, ALL_NULL_HEURISTICS } from '../lib/experiments/route-heuristics.mjs';
 import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-resolve.mjs';
 
-const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
+const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
 const out = (s) => process.stdout.write(s + '\n');
 const warn = (s) => process.stderr.write(s + '\n');

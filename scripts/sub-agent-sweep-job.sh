@@ -29,7 +29,7 @@ set -euo pipefail
 #
 # Phase 51, Plan 11 (Task 1). Mirrors scripts/lsl-resolver-job.sh.
 
-REPO_ROOT="/Users/Q284340/Agentic/coding"
+REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 STATE_FILE="${SUB_AGENT_SWEEP_STATE_FILE:-${REPO_ROOT}/.data/sub-agent-sweep-state.json}"
 LIMIT="${SUB_AGENT_SWEEP_LIMIT:-100}"
 PROXY_URL="${LLM_CLI_PROXY_URL:-${RAPID_LLM_PROXY_URL:-${LLM_PROXY_URL:-http://localhost:12435}}}"

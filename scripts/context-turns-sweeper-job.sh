@@ -30,13 +30,13 @@ set -uo pipefail
 # `context-turns.jsonl` digest is still fresh, and vice-versa.
 #
 # Env overrides (tests + hand-driving):
-#   CODING_REPO                   repo root (default /Users/Q284340/Agentic/coding)
+#   CODING_REPO                   repo root (default the script's own checkout)
 #   CONTEXT_TURNS_RETENTION_DAYS  retention window in days before a file is
 #                                 eligible for deletion (default 14)
 #
 # Mirrors scripts/lsl-lock-sweeper-job.sh conventions (Phase 54 LSL hardening).
 
-REPO_ROOT="${CODING_REPO:-/Users/Q284340/Agentic/coding}"
+REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 RETENTION_DAYS="${CONTEXT_TURNS_RETENTION_DAYS:-14}"
 STALE_SECS=$((RETENTION_DAYS * 86400))
 MEASUREMENTS_DIR="${REPO_ROOT}/.data/measurements"

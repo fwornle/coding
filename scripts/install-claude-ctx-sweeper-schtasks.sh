@@ -15,7 +15,7 @@
 # platform gets.
 #
 # Deliberately NOT modelled on scripts/install-*-launchd.sh beyond its shape. Those
-# hardcode REPO_ROOT="/Users/Q284340/Agentic/coding" and so only work on one machine;
+# hardcode REPO_ROOT to one developer's checkout and so only work on one machine;
 # this derives the repo from its own location, because install.sh runs it on any host.
 #
 # Usage:

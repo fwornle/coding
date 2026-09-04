@@ -33,7 +33,7 @@
  * Env:
  *   LLM_PROXY_DATA_DIR  data dir for the span files (default <REPO_ROOT>/.data)
  *   LLM_PROXY_DIST_DIR  proxy dist dir (default _work/rapid-llm-proxy/dist)
- *   CODING_REPO         repo root (default /Users/Q284340/Agentic/coding)
+ *   CODING_REPO         repo root (default this script's own checkout)
  *   BEHAVIOR_CONFIG     behavior.json path (default <REPO_ROOT>/config/behavior.json)
  *
  * Usage:
@@ -50,10 +50,10 @@ import {
   detectForegroundSession,
 } from '../lib/measurement/foreground-sessions.mjs';
 
-const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
+const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 const DATA_DIR = process.env.LLM_PROXY_DATA_DIR || path.join(REPO_ROOT, '.data');
 const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
-  || '/Users/Q284340/Agentic/_work/rapid-llm-proxy/dist';
+  || path.resolve(REPO_ROOT, '..', '_work', 'rapid-llm-proxy', 'dist');
 const BEHAVIOR_CONFIG = process.env.BEHAVIOR_CONFIG
   || path.join(REPO_ROOT, 'config', 'behavior.json');
 

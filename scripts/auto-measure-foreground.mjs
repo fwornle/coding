@@ -47,7 +47,8 @@ function log(msg) { process.stderr.write(`[auto-measure] ${msg}\n`); }
 
 /** Same token DB the proxy owns and aggregateByTaskId reads (Plan 71-03). */
 function tokenDbPath() {
-  const dir = process.env.LLM_PROXY_DATA_DIR || '/Users/Q284340/Agentic/coding/.data';
+  const dir = process.env.LLM_PROXY_DATA_DIR
+    || path.join(process.env.CODING_REPO || path.resolve(import.meta.dirname, '..'), '.data');
   return path.join(dir, 'llm-proxy', 'token-usage.db');
 }
 

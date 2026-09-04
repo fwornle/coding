@@ -27,7 +27,7 @@
  * Usage:
  *   node scripts/sub-agent-live-claude.mjs --help
  *   node scripts/sub-agent-live-claude.mjs
- *   node scripts/sub-agent-live-claude.mjs --projects-dir ~/.claude/projects/-Users-Q284340-Agentic-coding
+ *   node scripts/sub-agent-live-claude.mjs --projects-dir ~/.claude/projects/<encoded-cwd>
  *   node scripts/sub-agent-live-claude.mjs --state-file .data/sub-agent-live-state.json --heartbeat-interval 30
  *
  * Env:
@@ -46,9 +46,11 @@ import process from 'node:process';
 
 import { createRegistry } from '../lib/lsl/registry.mjs';
 import { startClaudeWatcher, stopClaudeWatcher } from '../lib/lsl/live/claude-fs-watch.mjs';
+import { encodeCwd } from '../lib/lsl/adapters/claude-jsonl-tree.mjs';
 
+const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 const DEFAULT_PROJECTS_DIR = process.env.LSL_CLAUDE_PROJECTS_DIR
-  || path.join(os.homedir(), '.claude', 'projects', '-Users-Q284340-Agentic-coding');
+  || path.join(os.homedir(), '.claude', 'projects', encodeCwd(REPO_ROOT));
 const DEFAULT_STATE_FILE = path.join('.data', 'sub-agent-live-state.json');
 const DEFAULT_HEARTBEAT_INTERVAL_S = 30;
 const ERROR_BUDGET_LIMIT = 10;

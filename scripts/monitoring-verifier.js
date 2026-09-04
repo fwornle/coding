@@ -33,6 +33,7 @@ import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const os = require('os');
 const execAsync = promisify(exec);
 
 class MonitoringVerifier {
@@ -379,7 +380,7 @@ class MonitoringVerifier {
       // file exists on disk so a stale `launchctl bootout` could be
       // re-bootstrapped without restoring the file from git.
       const plistPath = path.join(
-        process.env.HOME || '/Users/Q284340',
+        os.homedir(),
         'Library', 'LaunchAgents', 'com.coding.health-coordinator.plist'
       );
       if (fs.existsSync(plistPath)) {

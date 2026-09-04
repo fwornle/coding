@@ -10,7 +10,7 @@
  * Import-resolution decision: coding's node_modules holds the pinned v1.0.0
  * .tgz of @rapid/llm-proxy (pre-measurement-span). The operator CLIs therefore
  * import the measurement-span surface from the LOCAL proxy build at
- * /Users/Q284340/Agentic/_work/rapid-llm-proxy/dist — the SAME dist the daemon
+ * <parent-of-repo>/_work/rapid-llm-proxy/dist — the SAME dist the daemon
  * (proxy-bridge/server.mjs) loads and that Plan 68-03's write path will import
  * getActiveMeasurement from. This keeps exactly one reader across the whole
  * system and avoids re-packing/re-pinning the tarball just for two operator CLIs.
@@ -49,10 +49,10 @@ import { captureSnapshot, sanitizeTaskId } from '../lib/repro/capture-snapshot.m
 import { resolveExperimentSpec } from '../lib/experiments/experiment-spec.mjs';
 import { SHELL_META_RE } from '../lib/experiments/evidence-harness.mjs';
 
-const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
+const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
 const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
-  || '/Users/Q284340/Agentic/_work/rapid-llm-proxy/dist';
+  || path.resolve(REPO_ROOT, '..', '_work', 'rapid-llm-proxy', 'dist');
 
 function parseStrArg(argv, flag) {
   const i = argv.indexOf(flag);

@@ -2335,7 +2335,7 @@ class EnhancedTranscriptMonitor {
     try {
       let Database;
       try { Database = require('better-sqlite3'); }
-      catch { Database = require('/Users/Q284340/Agentic/coding/node_modules/better-sqlite3'); }
+      catch { Database = require(path.join(__dirname, '..', 'node_modules', 'better-sqlite3')); }
       const db = Database(dbPath, { readonly: true });
       // Freshness MUST be judged by the latest MESSAGE time, not s.time_updated:
       // opencode stamps session.time_updated at creation and does NOT bump it per
@@ -2415,7 +2415,7 @@ class EnhancedTranscriptMonitor {
       } catch { 
         try {
           // Try absolute path if CWD-relative require fails
-          Database = require('/Users/Q284340/Agentic/coding/node_modules/better-sqlite3');
+          Database = require(path.join(__dirname, '..', 'node_modules', 'better-sqlite3'));
         } catch {
           this.debug('better-sqlite3 not available, using sqlite3 CLI fallback');
           return this._readOpenCodeMessagesCli(sessionId);

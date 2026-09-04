@@ -45,11 +45,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+const REPO = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
+// Sibling checkout: <parent>/_work/rapid-llm-proxy.
 const ROUTING_YAML = process.env.LLM_ROUTING_YAML
-  || '/Users/Q284340/Agentic/_work/rapid-llm-proxy/config/llm-routing.yaml';
+  || path.resolve(REPO, '..', '_work', 'rapid-llm-proxy', 'config', 'llm-routing.yaml');
 const OPENCODE_JSON = process.env.OPENCODE_CONFIG_PATH
   || path.join(os.homedir(), '.config', 'opencode', 'opencode.json');
-const REPO = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
 /**
  * Parse `providers.<id>.available_models` out of llm-routing.yaml.

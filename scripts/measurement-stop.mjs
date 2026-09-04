@@ -83,10 +83,10 @@ import { filterConsequential, isTrivialRun } from '../lib/experiments/consequent
 import { recordHarnessFixtures } from '../lib/repro/fixtures/harness-record.mjs';
 import { sanitizeTaskId } from '../lib/repro/capture-snapshot.mjs';
 
-const REPO_ROOT = process.env.CODING_REPO || '/Users/Q284340/Agentic/coding';
+const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
 const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
-  || '/Users/Q284340/Agentic/_work/rapid-llm-proxy/dist';
+  || path.resolve(REPO_ROOT, '..', '_work', 'rapid-llm-proxy', 'dist');
 
 // The three deterministic, harness-derived (non-LLM) rubric dims (76-03, D-08).
 const NON_GSD_DIMS = Object.freeze(['code_quality', 'test_coverage', 'regressions']);
@@ -407,7 +407,7 @@ export async function loadObservationsForWindow({ from, to, agent } = {}) {
  * the digit lookahead avoids matching plain words like "quality"/"queried").
  * Mirrors the canonical corporate_user_ids rule in
  * `.specstory/config/redaction-patterns.json`. Context-turns message previews
- * carry raw filesystem paths (e.g. /Users/Q284340/…), so the persisted digest
+ * carry raw filesystem paths (e.g. /Users/<staff-id>/…), so the persisted digest
  * would otherwise store the staff number. Applied to the serialized JSON string:
  * the replacement contains no JSON-special chars, so validity is preserved.
  */
