@@ -1,281 +1,82 @@
 # Troubleshooting
 
-Common issues and solutions.
+Indexed by symptom. Start with the quick diagnostics, then the section matching what you
+are seeing.
 
-## Quick Diagnostics
+=== "⚡ Quick (~3 min)"
 
-```bash
-# System health check
-./scripts/test-coding.sh
+    ## First three commands
 
-# LSL validation
-node scripts/validate-lsl-config.js
+    ```bash
+    coding --health                               # what the system thinks
+    docker compose -f docker/docker-compose.yml ps  # what is actually running
+    curl -s localhost:3034/health/state | jq .    # the raw state document
+    ```
 
-# Docker services status
-docker compose -f docker/docker-compose.yml ps
-```
+    If those three disagree with each other, that disagreement **is** the diagnosis — something is
+    reading a stale copy.
 
-## Installation Issues
+    ## By symptom
 
-### Commands Not Found
+    | What you see | Section |
+    |--------------|---------|
+    | Install failed, `coding` not found | Installation issues |
+    | Sessions not being logged | Session logging issues |
+    | Containers missing or restarting | Docker issues |
+    | The knowledge graph is empty or stale | Knowledge base issues |
+    | A tool call was blocked unexpectedly | Constraint monitor issues |
+    | Everything is slow | Performance issues |
 
-```bash
-# Reload shell configuration
-source ~/.bashrc  # or ~/.zshrc
+    ## The rule that saves the most time
 
-# Verify PATH
-echo $PATH | grep coding
+    **Check the reporter before the thing reported.** A grey or stale health badge means the
+    process writing that state has stopped — the services it describes may be entirely fine.
 
-# If missing, reinstall
-./install.sh --update-shell-config
-```
+    ## Last resort
 
-### Permission Errors
+    A complete reset exists in the Deep tier. Try targeted fixes first; a reset discards state
+    that is usually not the cause.
 
-```bash
-# Make scripts executable
-chmod +x install.sh
-chmod +x bin/*
+=== "📖 Standard (~15 min)"
 
-# Run installer
-./install.sh
-```
+    ## Diagnosing in the right order
 
-### MCP Servers Not Loading
+    Nearly every confusing failure here comes from checking things in the wrong order, because the
+    layers nest. Docker underpins the services; the coordinator reports on them; the dashboard and
+    status line read the coordinator. A failure at any level makes everything above it look
+    broken.
 
-```bash
-# Check MCP configuration
-cat ~/.config/Claude/claude_desktop_config.json
+    So: Docker, then the coordinator, then state freshness, then the individual service. Only the
+    last of those means what it appears to mean.
 
-# Reinstall MCP config
-./install.sh --update-mcp-config
+    ## The categories
 
-# Check server logs
-ls ~/.claude/logs/mcp*.log
-```
+    **Installation** — almost always Docker not running, a shell not reloaded, or submodules that
+    did not come down with the clone.
 
-### Agent Drops Back to the Shell on Startup
+    **Session logging** — a per-project monitor that is absent, or one that is alive but wedged.
+    Those need different fixes, and the status line distinguishes them: no badge means healthy, a
+    badge means unhealthy, and a project missing from the list entirely means no monitor at all.
 
-If `coding` prints `[tmux-wrapper] Creating tmux session: …` and then returns
-straight to the shell prompt (no interactive agent), the agent process exited
-during startup before the session became interactive — usually a transient timing
-race (e.g. an MCP pre-flight gate such as VKB on port 8080 not yet ready). The
-wrapper now surfaces *why* instead of failing silently: it prints a `⚠️ Session …
-exited` diagnostic with the tail of the captured launch output, and writes the
-full log to `.logs/launch/<session>.log`.
+    **Docker** — a container that never started is a different problem from one that is
+    restarting. `docker ps` distinguishes them and the container logs explain the second.
 
-```bash
-# Inspect the most recent failed launch
-ls -t .logs/launch/*.log | head -1 | xargs tail -40
+    **Knowledge base** — an empty or stale graph usually means no extraction pass has run
+    recently, rather than a broken store. The pass is asynchronous and takes 10–20 minutes.
 
-# Re-running usually clears a startup timing race
-coding --claude
-```
+    **Constraints** — a blocked call is usually correct. When it is genuinely a false positive,
+    the supported response is an explicit override naming the constraint, not rewording until the
+    pattern stops matching.
 
-## LSL Issues
+    **Performance** — check whether something is wedged before assuming load. A stalled process
+    consumes a slot without consuming CPU, and looks like everything simply being slow.
 
-### LSL Files Not Generated
+    ## Resetting everything
 
-```bash
-# Check if monitor is running
-ps aux | grep enhanced-transcript-monitor
+    The full procedure is in the Deep tier. It is the last resort rather than a first move,
+    because it discards caches, indexes and health state that are usually not the cause — and a
+    reset that resolves a problem without identifying it is a reset you will perform again.
 
-# Check ETM heartbeat via coordinator (Phase 33+: .health/*.json files are
-# no longer written; coordinator's lsl slice is the source of truth)
-curl -fs http://localhost:3034/health/state \
-  | jq '.lsl | to_entries | map(select(.key | endswith(":coding")))'
+=== "📚 Deep Dive (full)"
 
-# Restart monitor
-coding --restart-monitor
-```
-
-### Classification Not Working
-
-```bash
-# Check classification logs
-ls -la .specstory/logs/classification/
-
-# Verify configuration
-cat config/live-logging-config.json | jq '.embedding_classifier'
-```
-
-### Recovery from Transcripts
-
-```bash
-# Batch recover LSL files
-PROJECT_PATH=/path/to/project CODING_REPO=/path/to/coding \
-  node scripts/batch-lsl-processor.js from-transcripts ~/.claude/projects/-path-to-project
-
-# Recover specific date range
-PROJECT_PATH=/path/to/project CODING_REPO=/path/to/coding \
-  node scripts/batch-lsl-processor.js retroactive 2024-12-01 2024-12-03
-```
-
-## Docker Issues
-
-### Container Won't Start
-
-```bash
-# First try: clean start (kills orphaned processes hogging ports)
-coding --force
-
-# Check logs if --force doesn't help
-docker compose -f docker/docker-compose.yml logs coding-services
-
-# Force rebuild
-docker compose -f docker/docker-compose.yml build --no-cache
-docker compose -f docker/docker-compose.yml up -d
-```
-
-### Port Conflicts
-
-```bash
-# Recommended: force-clean all coding processes and restart
-coding --force
-
-# This kills supervisors, health monitors, all processes on coding ports,
-# stops Docker containers, then proceeds with a clean startup.
-# Combine with agent flags: coding --force --claude
-
-# Manual investigation if --force doesn't resolve it
-lsof -i :3848
-kill $(lsof -ti :3848)
-
-# Or change ports in .env.ports
-```
-
-### Connection Refused
-
-```bash
-# Check container status
-docker compose -f docker/docker-compose.yml ps
-
-# Test health endpoint
-curl -v http://localhost:3848/health
-```
-
-### Volume Permission Issues
-
-```bash
-# Fix directory permissions
-mkdir -p .data/knowledge-graph .specstory/history
-chmod -R 755 .data/ .specstory/
-
-# Restart
-docker compose -f docker/docker-compose.yml restart
-```
-
-## Knowledge Base Issues
-
-### VKB Won't Start
-
-```bash
-# Check if installed
-ls -la integrations/memory-visualizer/
-
-# If missing, initialize submodule
-git submodule update --init --recursive integrations/memory-visualizer
-cd integrations/memory-visualizer
-npm install && npm run build
-
-# Test viewer
-vkb --debug
-```
-
-### Missing Knowledge Export
-
-```bash
-# Check knowledge-export files
-ls -la .data/knowledge-export/*.json
-
-# If missing, graph database will create on next run
-```
-
-## Constraint Monitor Issues
-
-### Dashboard Not Loading
-
-```bash
-# Check if services are running
-lsof -i :3030
-lsof -i :3031
-
-# Start dashboard
-cd integrations/constraint-monitor
-PORT=3030 npm run dashboard
-```
-
-### Hooks Not Firing
-
-```bash
-# Check hook configuration
-cat ~/.claude/settings.json | jq '.hooks'
-
-# Verify hook script exists
-ls -la integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js
-```
-
-## Performance Issues
-
-### High Memory Usage
-
-```bash
-# Increase Node.js memory
-export NODE_OPTIONS="--max_old_space_size=4096"
-
-# Restart with higher limit
-NODE_OPTIONS="--max_old_space_size=4096" coding --claude
-```
-
-### Slow Processing
-
-```bash
-# Process with lower priority
-nice -n 19 node scripts/enhanced-transcript-monitor.js &
-
-# Reduce monitoring frequency in config
-```
-
-## Complete Reset
-
-If installation is corrupted:
-
-```bash
-# Uninstall
-./uninstall.sh
-
-# Remove all data (WARNING: loses knowledge base)
-rm -rf ~/.coding-tools/
-rm -rf integrations/memory-visualizer/node_modules
-rm -rf .data/knowledge-export/*.json
-
-# Reinstall
-./install.sh
-source ~/.bashrc
-```
-
-## Getting Help
-
-### Diagnostic Information
-
-```bash
-# Collect diagnostics
-echo "=== System Info ===" > diagnostics.txt
-uname -a >> diagnostics.txt
-node --version >> diagnostics.txt
-echo "PWD: $(pwd)" >> diagnostics.txt
-
-echo -e "\n=== Environment ===" >> diagnostics.txt
-env | grep -E "(USER|CODING|LSL)" >> diagnostics.txt
-
-echo -e "\n=== Configuration ===" >> diagnostics.txt
-cat .specstory/lsl-config.json 2>/dev/null >> diagnostics.txt
-
-echo "Diagnostics collected in diagnostics.txt"
-```
-
-### Support Resources
-
-- [GitHub Issues](https://github.com/fwornle/coding/issues)
-- [Documentation](../index.md)
-- Configuration Validator: `node scripts/validate-lsl-config.js`
+    --8<-- "_tiers/reference/troubleshooting.deep.md"
