@@ -30,7 +30,7 @@ The header cards plus two side-by-side panels:
 
 - **Token Consumption by Process** — a treemap where larger rectangles mean more tokens. Top of the page in the screenshot above shows `observation-writer` (≈ 2.6 M tokens) dominating, with `consolidator-digest` and `consolidator-insight` as distant runners-up. **Hover any box** for a tooltip with process, total tokens, input/output split, call count, and avg latency — including the small boxes that don't fit an inline label. The same payload is also rendered as an SVG `<title>` element so screen readers and native-browser hover work even when the recharts tooltip is unavailable.
 - **By Provider** — a donut chart split by provider (claude-code 67 % / copilot 33 % under normal conditions on this host).
-- **By Model** — the same totals broken down by canonical model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`). The proxy canonicalizes whatever spelling each upstream returns — `claude-sonnet-4-6` (Claude CLI dash-version), `claude-sonnet-4.6` (Copilot dot-version), `Claude Sonnet 4.6` (Anthropic title-case), bare `sonnet` (CLI fallback when `modelUsage` is empty), `claude-haiku-4-5-20251001` (Copilot dated snapshot) all collapse to the same row. The raw upstream identifier is preserved per call in the `model_raw` column.
+- **By Model** — the same totals broken down by canonical model name (`claude-haiku-4.5`, `claude-sonnet-5`, `claude-opus-5`). The proxy canonicalizes whatever spelling each upstream returns — `claude-sonnet-4-6` (Claude CLI dash-version), `claude-sonnet-4.6` (Copilot dot-version), `Claude Sonnet 4.6` (Anthropic title-case), bare `sonnet` (CLI fallback when `modelUsage` is empty), `claude-haiku-4-5-20251001` (Copilot dated snapshot) all collapse to the same row. The raw upstream identifier is preserved per call in the `model_raw` column.
 
 ### Evolution tab
 
@@ -47,7 +47,7 @@ The dropdown at top-right of the chart card switches what each band represents. 
 | Mode | One band per | Use when |
 |---|---|---|
 | **By Process** *(default)* | Cognitive process (`observation-writer`, `wave-analysis-wave1`, `health-coordinator`, …) | Identifying which subsystem is driving consumption |
-| **By Model** | Canonical model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`) | Assessing the model mix and per-model spend |
+| **By Model** | Canonical model name (`claude-haiku-4.5`, `claude-sonnet-5`, `claude-opus-5`) | Assessing the model mix and per-model spend |
 | **By Provider** | The **account** that gets billed (`claude-code-max`, `gh-copilot`, `anthropic-api`) | Seeing which account is serving the traffic — useful after routing changes, and the only view that separates flat-rate subscription spend from metered API spend |
 | **By Tokens (in/out)** | `input_tokens` vs `output_tokens` only | Tracking prompt-bloat vs generation share — this is what the retired *Timeline* tab used to show |
 
@@ -73,20 +73,42 @@ Latest 50 calls across all processes. Columns: Time · Process · Provider · Mo
 
 ---
 
-## LLM Routing Settings (the ⚙ dialog)
+## Where routing is actually configured { #llm-routing-settings-the-dialog }
 
 ![LLM Routing Settings dialog](../images/health-mon-tokens-config.png)
 
-The Settings button opens a modal that pins individual services (cognitive processes) to a specific provider + model. The dialog is the dashboard-side of `GET / PUT /api/llm/settings` exposed by the proxy.
+Routing lives in **two version-controlled YAML files** in the `rapid-llm-proxy` repo —
+`config/llm-routing.yaml` (which provider and complexity band serves a given job) and
+`config/llm-fallback.yaml` (what happens when that provider cannot). Both hot-reload on save.
+[LLM Routing](llm-routing.md) documents the whole mechanism; the ⚙ button on this page opens
+its editor.
 
-**Available providers** row at the top reflects the proxy's current `/health` snapshot — `claude-code` and `copilot` typically show online; `openai`, `groq`, and `anthropic` show "(offline)" when their API keys are unset *or* when the host is on a corporate network where the firewall blocks them.
+!!! warning "Per-process pins no longer route anything"
 
-**Service rows** list every `process` value the proxy has ever logged (read from the live token-usage DB). Each row has two dropdowns:
+    This section previously described the ⚙ dialog as pinning individual services to a
+    provider and model, with those pins acting as a hard override. **That mechanism is dead.**
 
-- **Provider** — any of the five providers, plus "(auto-route)" to clear the pin.
-- **Model** — auto-populated from the chosen provider's model alias list (so picking `copilot` shows `claude-haiku-4-5`, `claude-sonnet-4-6`, `claude-opus-4-6`).
+    The legacy surface is still there and still answers: `GET /api/llm/settings` returns 200,
+    and `.data/llm-proxy/llm-settings.json` — note the filename, not `settings.json` — still
+    holds 26 `processOverrides` entries. Nothing consults them.
 
-**Hard-pin semantics.** A pin is a hard override in routing — it wins over any `body.provider` the caller passes. If the pinned provider becomes unreachable mid-flight, the proxy still falls through to auto-route (so a Copilot outage doesn't take down `observation-writer`). Unpinned services use the auto-route logic — Claude Max for Claude Code, Copilot for OpenCode / corporate sessions, falling back to Groq → OpenAI → Anthropic on public networks. `Save` writes the new pin map to the proxy via `PUT /api/llm/settings`; the proxy persists it to `.data/llm-proxy/settings.json`.
+    Demonstrated rather than asserted. The stored pin for `wave-analysis-wave1` is
+    `copilot/claude-sonnet-4.6`; asking the proxy what it would actually do gives:
+
+    ```console
+    $ curl -s 'localhost:12435/api/llm/routing/resolve?job=bg-wave-analysis-wave1' | jq -r .summary
+    bg-wave-analysis-wave1 (step 2) -> gh-copilot/claude-sonnet-5 > claude-code-max/claude-sonnet-5 > …
+    ```
+
+    A different provider and a different model, with `matchedKey: bg-wave-analysis-wave1` and
+    `complexitySource: "route bg-wave-analysis-wave1"` — the YAML route, not the pin. Left in
+    place rather than quietly deleted, because a stale file that still serves over HTTP is
+    exactly the kind of thing someone rediscovers and trusts.
+
+**Available providers** at the top of the dialog reflects the proxy's `/health` snapshot. Note
+that this legacy endpoint still reports the **old provider spellings** (`claude-code`,
+`copilot`, `anthropic`) while `llm-routing.yaml` uses the account names that replaced them
+(`claude-code-max`, `gh-copilot`, `anthropic-api`). The two name the same accounts.
 
 ---
 
@@ -110,15 +132,30 @@ The schema is one `token_usage` table:
 | `id` | INTEGER PK | Monotonic per-instance |
 | `user_hash` | TEXT NOT NULL DEFAULT `'unknown'` | 6-char hex hash identifying the contributor. Together with `id` forms `UNIQUE INDEX idx_token_usage_user_id(user_hash, id)` — the cross-user merge key |
 | `timestamp` | TEXT | ISO-8601 with ms + Z |
-| `provider` | TEXT | One of `claude-code`, `copilot`, `openai`, `groq`, `anthropic` |
-| `model` | TEXT | **Canonical** model name (`claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.6`). The proxy normalizes the upstream-returned spelling at the persistence boundary via `canonicalizeModelName()` so the dashboard's By-Model panel doesn't fragment across 8 spellings of 3 models. |
+| `provider` | TEXT | The **account** that was billed — not the company. **Not a fixed enum**: the column has accumulated several spellings for the same account over time. A live count on this machine returns `copilot`, `claude-code` and `anthropic` (the older spellings) alongside `gh-copilot`, `claude-code-max`, `github-copilot`, and the local offload targets `qwen-local` / `qwen-laptop`. Normalise before grouping — `normalizeProvider()` in `src/lib/providers.ts` — or the same account appears as three rows. |
+| `model` | TEXT | **Canonical** model name (`claude-haiku-4.5`, `claude-sonnet-5`, `claude-opus-5`). The proxy normalizes the upstream-returned spelling at the persistence boundary via `canonicalizeModelName()` so the dashboard's By-Model panel doesn't fragment across 8 spellings of 3 models. |
 | `model_raw` | TEXT | The verbatim upstream spelling (`Claude Sonnet 4.6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`, bare `sonnet`, etc.) — preserved for forensic debugging. Never used by the UI; queryable via `SELECT model_raw, COUNT(*) FROM token_usage GROUP BY model_raw`. |
 | `process` | TEXT | Caller's `process` field; empty rows are labeled `unknown` |
 | `subscription` | TEXT | `claude-max`, `github-copilot`, or the API-key tier name |
-| `input_tokens` / `output_tokens` / `total_tokens` | INTEGER | |
+| `input_tokens` / `output_tokens` | INTEGER | `input_tokens` is **fresh (uncached) prompt tokens** on both wires — `openAIFreshInputTokens()` subtracts `cached_tokens` at the parse boundary so the OpenAI leg agrees with the Anthropic one |
+| `total_tokens` | INTEGER | `input + output`. **Cache traffic is NOT included** — see the two columns below, which are additive to this one. Summing `total_tokens` alone understates a cache-heavy session, sometimes by more than two orders of magnitude |
+| `cache_read_tokens` / `cache_write_tokens` | INTEGER | Prompt-cache traffic, additive to `total_tokens`. To display consumption, add them back — the dashboard's `allTokens()` helper is the canonical form |
+| `reasoning_tokens` | INTEGER | Completion tokens spent thinking before any content is emitted. A reasoning model can show few `output_tokens` for a long, expensive call |
 | `latency_ms` | INTEGER | Round-trip from request send to response close |
 | `prompt_preview` | TEXT | XML-wrapper-stripped prefix (first ~120 chars) |
 | `tokens_estimated` | INTEGER (0/1) | `1` when the proxy estimated tokens from text length because the provider returned 0 |
+
+The table carries roughly thirty columns; the ones above are what the page's charts read.
+The rest fall into three groups worth knowing about:
+
+| Group | Columns | Answers |
+|---|---|---|
+| Attribution | `agent`, `task_id`, `tool_call_id`, `parent_call_id`, `granularity_tier`, `conversation_key`, `turn_index` | which agent, task and turn a call belongs to |
+| Routing decision | `route_key`, `route_band`, `route_step`, `band_source`, `offloaded_from`, `chain_position`, `attempt_trail`, `routing_source` | why the call went where it did — see [LLM Routing](llm-routing.md) |
+| Timing | `overhead_ms` | proxy-side cost on top of `latency_ms` |
+
+`PRAGMA table_info(token_usage)` is the authoritative list; this page is a reader's selection
+of it and will drift.
 
 ### Manual queries
 
