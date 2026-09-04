@@ -225,6 +225,15 @@ function blankContextGauge(text) {
  */
 function claudeSessionIdForPane() {
   if (paneAgent !== 'claude' || !contextGauge) return null;
+  // Recorded by scripts/claude-statusline.cjs from Claude Code's own stdin, and
+  // keyed on this tmux session — so it names THIS session rather than whichever
+  // one the project sidecar happens to hold. The sidecar carries one transcript
+  // per project, which is the wrong session for the whole window between a new
+  // session starting and the sidecar catching up.
+  try {
+    const own = contextGauge.claudeSessionForTmuxSession(process.env.TMUX_SESSION_NAME);
+    if (own) return own;
+  } catch { /* fall through to the project sidecar */ }
   try {
     const entry = readProjectMapping()[projectName];
     const tp = typeof entry === 'string' ? entry : entry?.tp;

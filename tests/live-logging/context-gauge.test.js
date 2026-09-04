@@ -24,7 +24,7 @@
  *      number, with no error anywhere.
  */
 
-import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterAll, afterEach } from '@jest/globals';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -381,6 +381,112 @@ describe('sessionIdFromTranscriptPath', () => {
   test('non-transcript paths yield null', () => {
     expect(gauge.sessionIdFromTranscriptPath('/a/b/opencode.db')).toBeNull();
     expect(gauge.sessionIdFromTranscriptPath(null)).toBeNull();
+  });
+});
+
+/**
+ * Which Claude session the gauge draws for.
+ *
+ * The regression this locks down: a first-turn session rendered 66%, which was
+ * the normalised reading of the session the user had just closed. Both renderers
+ * resolved the session id from PROJECT-keyed state (the newest-beating
+ * coordinator entry, the one transcript per project in the fast path's sidecar),
+ * so any project that had hosted two sessions could name the wrong one — and did,
+ * for the whole window before the new session's ETM out-beat the old one's.
+ *
+ * Nothing errored while it was wrong, and both numbers were real, which is why
+ * these are behaviour tests over two live-looking bridge files rather than an
+ * assertion that some lookup was called.
+ */
+describe('claudeSessionForTmuxSession (whose context is this)', () => {
+  // The record is a file, because it crosses processes: scripts/claude-statusline.cjs
+  // writes it under Claude Code, both renderers read it under tmux.
+  const recordFile = (name) => path.join(os.tmpdir(), `claude-tmux-session-${name}.json`);
+  const written = [];
+  const cleanup = () => {
+    while (written.length) fs.rmSync(written.pop(), { force: true });
+  };
+  afterEach(cleanup);
+
+  test('records and returns the session running in a tmux session', () => {
+    const name = 'ctx-gauge-test-roundtrip';
+    written.push(recordFile(name));
+    expect(gauge.recordClaudeSession({
+      tmuxSession: name,
+      sessionId: 'aaaaaaaa-1111-2222-3333-444444444444',
+      cwd: '/proj',
+    })).toBe(true);
+    expect(gauge.claudeSessionForTmuxSession(name))
+      .toBe('aaaaaaaa-1111-2222-3333-444444444444');
+  });
+
+  test('THE REGRESSION: a fresh session reads its own context, not the one it replaced', () => {
+    // Both sessions belong to one project, so every project-keyed lookup can
+    // only return one of them — the reason the wrong one used to win.
+    const previous = 'ctx-gauge-test-previous';
+    const fresh = 'ctx-gauge-test-fresh';
+    const bridges = [previous, fresh].map(id => path.join(os.tmpdir(), `claude-ctx-${id}.json`));
+    // remaining 45 ⇒ 66% used; remaining 89 ⇒ 13% used. These are the measured
+    // values from the report, so a change to the normalisation shows up here.
+    fs.writeFileSync(bridges[0], JSON.stringify({
+      session_id: previous, remaining_percentage: 45,
+      total_tokens: 1_000_000, timestamp: Math.floor(Date.now() / 1000),
+    }));
+    fs.writeFileSync(bridges[1], JSON.stringify({
+      session_id: fresh, remaining_percentage: 89,
+      total_tokens: 1_000_000, timestamp: Math.floor(Date.now() / 1000),
+    }));
+
+    const name = 'ctx-gauge-test-regression';
+    written.push(recordFile(name));
+    try {
+      gauge.recordClaudeSession({ tmuxSession: name, sessionId: fresh, cwd: '/proj' });
+      const sessionId = gauge.claudeSessionForTmuxSession(name);
+      const usage = gauge.readContextUsage({ agent: 'claude', projectPath: '/proj', sessionId });
+      expect(Math.round(usage.usedPct)).toBe(13);
+      // The number the bug rendered. Asserted explicitly so a future refactor
+      // that reintroduces project-keyed resolution fails loudly here.
+      expect(Math.round(usage.usedPct)).not.toBe(66);
+    } finally {
+      bridges.forEach(f => fs.rmSync(f, { force: true }));
+    }
+  });
+
+  test('no record yields null, so the caller falls back instead of guessing', () => {
+    // Null is the signal both renderers use to reach for their older
+    // project-keyed lookup — an unwrapped `claude`, or the tick before the first
+    // status-line render. It must never be confused with "0% used".
+    expect(gauge.claudeSessionForTmuxSession('ctx-gauge-test-absent')).toBeNull();
+    expect(gauge.claudeSessionForTmuxSession('')).toBeNull();
+    expect(gauge.claudeSessionForTmuxSession(undefined)).toBeNull();
+  });
+
+  test('a record past its TTL is refused rather than believed', () => {
+    // tmux session names embed the launcher pid, and pids come round again after
+    // a reboot. A live session rewrites its record every render, so only a
+    // genuinely dead one can age out.
+    const name = 'ctx-gauge-test-stale';
+    const file = recordFile(name);
+    written.push(file);
+    gauge.recordClaudeSession({ tmuxSession: name, sessionId: 'stale-session', cwd: '/proj' });
+    const rec = JSON.parse(fs.readFileSync(file, 'utf8'));
+    rec.ts = Date.now() - (25 * 60 * 60 * 1000);
+    fs.writeFileSync(file, JSON.stringify(rec));
+    expect(gauge.claudeSessionForTmuxSession(name)).toBeNull();
+  });
+
+  test('a session id shaped like a traversal is not recorded', () => {
+    // The id reaches path.join in readClaude; refusing it at the writer keeps a
+    // poisoned record from ever existing.
+    const name = 'ctx-gauge-test-traversal';
+    written.push(recordFile(name));
+    expect(gauge.recordClaudeSession({ tmuxSession: name, sessionId: '../../etc/passwd' })).toBe(false);
+    expect(gauge.claudeSessionForTmuxSession(name)).toBeNull();
+  });
+
+  test('a tmux session name that cannot key a file is refused, not coerced', () => {
+    expect(gauge.recordClaudeSession({ tmuxSession: '../..', sessionId: 'x' })).toBe(false);
+    expect(gauge.recordClaudeSession({ tmuxSession: '', sessionId: 'x' })).toBe(false);
   });
 });
 
