@@ -41,8 +41,28 @@ const TIER_LABELS = ['⚡ Quick (~3 min)', '📖 Standard (~15 min)', '📚 Deep
 
 const TAB_RE = /^=== "(.+)"$/;
 const SNIPPET_RE = /^\s*--8<--\s+"(.+)"\s*$/;
+/**
+ * A snippet target may carry a line range: `path.md:3` or `path.md:3:20`.
+ *
+ * Used by the two symlinked partials. Their source lives in docs/ and is ALSO read directly
+ * on GitHub, so its `# H1` cannot be stripped the way a private partial's is — the include
+ * skips past it instead.
+ */
+function splitSnippetTarget(target) {
+  const m = /^(.*?)((?::\d*)+)?$/.exec(target);
+  const range = (m[2] || '').split(':').filter(Boolean).map(Number);
+  return { file: m[1], start: range[0] || null };
+}
 /** ATX headings only, and never inside a fenced block (handled by the caller). */
 const HEADING_RE = /^\s*(#{1,6})\s+(.+?)\s*$/;
+
+/** Absolute path of a snippet target, or null. base_path in mkdocs.yml is [docs-content, docs]. */
+function resolveSnippet(target) {
+  const { file } = splitSnippetTarget(target);
+  return [DOCS, path.join(REPO, 'docs')]
+    .map((b) => path.join(b, file))
+    .find((f) => fs.existsSync(f)) || null;
+}
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -120,11 +140,12 @@ function headings(tier) {
 
     const include = SNIPPET_RE.exec(line);
     if (include) {
-      const base = [DOCS, path.join(REPO, 'docs')]
-        .map((b) => path.join(b, include[1]))
-        .find((f) => fs.existsSync(f));
+      const base = resolveSnippet(include[1]);
       if (!base) continue; // reported by the include rule; not this one's business
-      for (const [i, l] of fs.readFileSync(base, 'utf8').split('\n').entries()) {
+      const from = splitSnippetTarget(include[1]).start || 1;
+      const all = fs.readFileSync(base, 'utf8').split('\n');
+      for (const [i, l] of all.entries()) {
+        if (i + 1 < from) continue;   // skipped by the include's line range
         const m = HEADING_RE.exec(l);
         // Fences inside a partial are handled by the same rule as the shell: a partial is
         // ordinary markdown, so `## x` in a code block is text, not a heading.
@@ -149,7 +170,7 @@ function missingIncludes(file, rel) {
     .map((line, i) => [i + 1, SNIPPET_RE.exec(line)])
     .filter(([, m]) => m)
     // base_path in mkdocs.yml is [docs-content, docs], searched in that order.
-    .filter(([, m]) => ![DOCS, path.join(REPO, 'docs')].some((b) => fs.existsSync(path.join(b, m[1]))))
+    .filter(([, m]) => !resolveSnippet(m[1]))
     .map(([n, m]) => `${rel}:${n}: ${m[1]}`);
 }
 
@@ -206,6 +227,39 @@ describe('docs-content 3-tier pages', () => {
     },
   );
 
+  test.each(PAGES.map((p) => [path.relative(REPO, p), p]))(
+    '%s: a line-offset include skips exactly a title',
+    (rel, file) => {
+      // An offset include exists only for the two partials that are symlinks into docs/,
+      // whose `# H1` cannot be stripped because that file is also read directly on GitHub.
+      // The offset is therefore a positional assumption about somebody else's file: insert a
+      // badge or a frontmatter block above that H1 and the include silently starts mid-title,
+      // producing a page that renders but is wrong. This converts that into a failure.
+      const problems = [];
+
+      for (const [i, line] of fs.readFileSync(file, 'utf8').split('\n').entries()) {
+        const m = SNIPPET_RE.exec(line);
+        if (!m) continue;
+        const { file: target, start } = splitSnippetTarget(m[1]);
+        if (!start) continue;
+
+        const abs = resolveSnippet(m[1]);
+        if (!abs) continue; // the include rule owns this case
+        const skipped = fs.readFileSync(abs, 'utf8').split('\n').slice(0, start - 1);
+        const meaningful = skipped.filter((l) => l.trim() !== '');
+
+        if (meaningful.length !== 1 || !/^# \S/.test(meaningful[0])) {
+          problems.push(
+            `${rel}:${i + 1}: include skips ${start - 1} line(s) of ` +
+            `${path.relative(REPO, abs)}, expected exactly one "# Title" but found ` +
+            `${meaningful.length ? JSON.stringify(meaningful) : 'nothing'}`,
+          );
+        }
+      }
+      expect(problems).toEqual([]);
+    },
+  );
+
   test('every tier partial is included by exactly one page', () => {
     const included = new Map();
     for (const page of PAGES) {
@@ -213,7 +267,7 @@ describe('docs-content 3-tier pages', () => {
       for (const line of text.split('\n')) {
         const m = SNIPPET_RE.exec(line);
         if (!m) continue;
-        const abs = path.join(DOCS, m[1]);
+        const abs = resolveSnippet(m[1]) || path.join(DOCS, splitSnippetTarget(m[1]).file);
         included.set(abs, [...(included.get(abs) || []), path.relative(REPO, page)]);
       }
     }
@@ -284,6 +338,22 @@ describe('the tier guards actually fire', () => {
       ].join('\n'),
     );
     expect(headingClashes(file, 'probe')).toHaveLength(1);
+  });
+
+  test('an offset that would skip more than a title is reported', () => {
+    // Simulates the real hazard: a badge or frontmatter block added above the H1 of a
+    // docs/ file that a shell includes from line 3.
+    const src = path.join(dir, 'src.md');
+    fs.writeFileSync(src, ['[![badge](x.svg)](y)', '', '# Real Title', '', 'body', ''].join('\n'));
+    const skipped = fs.readFileSync(src, 'utf8').split('\n').slice(0, 2).filter((l) => l.trim());
+    expect(skipped.length === 1 && /^# \S/.test(skipped[0])).toBe(false);
+  });
+
+  test('an offset that skips exactly a title is accepted', () => {
+    const src = path.join(dir, 'ok.md');
+    fs.writeFileSync(src, ['# Real Title', '', 'body', ''].join('\n'));
+    const skipped = fs.readFileSync(src, 'utf8').split('\n').slice(0, 2).filter((l) => l.trim());
+    expect(skipped.length === 1 && /^# \S/.test(skipped[0])).toBe(true);
   });
 
   test('a heading inside a fenced block is not mistaken for a real one', () => {
