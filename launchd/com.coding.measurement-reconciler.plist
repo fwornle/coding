@@ -10,7 +10,7 @@
         <string>-c</string>
         <string>exec node "$@"</string>
         <string>node</string>
-        <string>/Users/Q284340/Agentic/coding/scripts/measurement-reconciler.mjs</string>
+        <string>__CODING_REPO__/scripts/measurement-reconciler.mjs</string>
         <string>--verbose</string>
     </array>
     <key>KeepAlive</key>
@@ -25,11 +25,11 @@
     <key>ThrottleInterval</key>
     <integer>60</integer>
     <key>WorkingDirectory</key>
-    <string>/Users/Q284340/Agentic/coding</string>
+    <string>__CODING_REPO__</string>
     <key>StandardErrorPath</key>
-    <string>/Users/Q284340/Agentic/coding/.data/measurement-reconciler.log</string>
+    <string>__CODING_REPO__/.data/measurement-reconciler.log</string>
     <key>StandardOutPath</key>
-    <string>/Users/Q284340/Agentic/coding/.data/measurement-reconciler.log</string>
+    <string>__CODING_REPO__/.data/measurement-reconciler.log</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
