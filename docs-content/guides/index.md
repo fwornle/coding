@@ -1,100 +1,70 @@
-# Deep Dive Guides
+# Guides
 
-Comprehensive reference guides with detailed explanations, complete configurations, and visual walkthroughs.
+Task-oriented walkthroughs. Each one assumes the system is installed and running.
 
-<div class="thumbnail-grid">
+=== "⚡ Quick (~3 min)"
 
-<a href="agent-integration/" class="thumbnail-card">
-  <img src="../images/agent-integration-flow.png" alt="Agent Integration">
-  <div class="card-content">
-    <h3>Agent Integration</h3>
-    <p>Add a new coding agent with a single config file — config reference, hooks, API contract</p>
-  </div>
-</a>
+    ## Pick by what you are doing
 
-<a href="network-configuration/" class="thumbnail-card">
-  <img src="../images/network-aware-agent-selection.png" alt="Network Configuration">
-  <div class="card-content">
-    <h3>Network Configuration</h3>
-    <p>Corporate VPN and proxy detection, and how each agent's API traffic is routed on either network</p>
-  </div>
-</a>
+    | You want to… | Guide |
+    |--------------|-------|
+    | Add a new coding agent | [Agent Integration](agent-integration.md) |
+    | Work behind a corporate proxy or VPN | [Network Configuration](network-configuration.md) |
+    | Decode the tmux status bar | [Status Line](status-line.md) |
+    | Investigate a health problem | [Health Dashboard](health-dashboard.md) |
+    | Add, switch or debug an LLM provider | [LLM Providers](llm-providers.md) |
+    | Write or debug a constraint | [Constraint Testing](constraint-testing.md) |
+    | Explore the knowledge graph | [VKB Visualization](vkb-visualization.md) |
+    | Understand how knowledge is captured | [Knowledge Workflows](knowledge-workflows.md) |
+    | Work out why CI went red | [Continuous Integration](../ci/README.md) |
+    | Write or use a skill | [Skills System](skills-system.md) |
 
-<a href="status-line/" class="thumbnail-card">
-  <img src="../images/status-line-display.png" alt="Status Line">
-  <div class="card-content">
-    <h3>Status Line Guide</h3>
-    <p>Complete emoji reference and configuration</p>
-  </div>
-</a>
+    ## If you are new
 
-<a href="health-dashboard/" class="thumbnail-card">
-  <img src="../images/health-monitor.png" alt="Health Dashboard">
-  <div class="card-content">
-    <h3>Health Dashboard</h3>
-    <p>6-layer protection architecture, 9-class system design, and UKB workflow monitoring</p>
-  </div>
-</a>
+    Read [Getting Started](../getting-started/index.md) first, then
+    [Core Systems](../core-systems/index.md). The guides here go deeper than either and assume
+    you already have something running.
 
-<a href="llm-providers/" class="thumbnail-card">
-  <img src="../images/llm-mode-control.png" alt="LLM Providers">
-  <div class="card-content">
-    <h3>LLM Providers</h3>
-    <p>Cloud and local providers for semantic analysis — mock/local/public modes, fallback, per-agent overrides</p>
-  </div>
-</a>
+=== "📖 Standard (~15 min)"
 
-<a href="constraint-testing/" class="thumbnail-card">
-  <img src="../images/constraint-testing-architecture.png" alt="Constraint Testing">
-  <div class="card-content">
-    <h3>Constraint Testing</h3>
-    <p>18 constraints with detection status, automated testing framework, and hook configuration</p>
-  </div>
-</a>
+    ## What these guides are for
 
-<a href="../ci/" class="thumbnail-card">
-  <img src="../images/ci-workflows.png" alt="Continuous Integration">
-  <div class="card-content">
-    <h3>Continuous Integration</h3>
-    <p>Four GitHub Actions workflows — what each one proves, and how to read a red run</p>
-  </div>
-</a>
+    The [Core Systems](../core-systems/index.md) pages explain what each system *is*. These
+    guides are about *doing* something with them — adding an agent, chasing a failure, changing a
+    provider — and so carry complete configurations and worked examples rather than overviews.
 
-<a href="vkb-visualization/" class="thumbnail-card">
-  <img src="../images/vkb-cli-architecture.png" alt="VKB Visualization">
-  <div class="card-content">
-    <h3>VKB Visualization</h3>
-    <p>Interactive knowledge graph exploration, CLI commands, and HTTP API endpoints</p>
-  </div>
-</a>
+    ## Choosing one
 
-<a href="knowledge-workflows/" class="thumbnail-card">
-  <img src="../images/ukb-architecture.png" alt="Knowledge Workflows">
-  <div class="card-content">
-    <h3>Knowledge Workflows</h3>
-    <p>14-agent UKB system, continuous learning, and SmartOrchestrator coordination</p>
-  </div>
-</a>
+    | Guide | Reach for it when |
+    |-------|-------------------|
+    | **[Agent Integration](agent-integration.md)** | Adding a coding assistant to the system — the config contract, hooks and API |
+    | **[Network Configuration](network-configuration.md)** | Behind a corporate proxy or VPN, or an agent's traffic is being routed unexpectedly |
+    | **[Status Line](status-line.md)** | Decoding the tmux bar — every indicator, and how to configure it |
+    | **[Health Dashboard](health-dashboard.md)** | A service is unhealthy, or you want to understand the supervision architecture |
+    | **[LLM Providers](llm-providers.md)** | Adding, switching or troubleshooting a cloud or local provider |
+    | **[Constraint Testing](constraint-testing.md)** | Writing a constraint, or one is firing when it should not |
+    | **[VKB Visualization](vkb-visualization.md)** | Exploring the knowledge graph, or driving the viewer programmatically |
+    | **[Knowledge Workflows](knowledge-workflows.md)** | Understanding how knowledge is captured, processed and stored |
+    | **[Continuous Integration](../ci/README.md)** | A CI run went red, or you want to know what a green one actually proves |
+    | **[Skills System](skills-system.md)** | Writing a skill, or working out why one did not trigger |
 
-</div>
+    ## Two that pay off early
 
-## When to Use These Guides
+    **Status Line.** It is on screen the entire time you work, and it reports health, cost and
+    logging state continuously. Learning to read it turns most "is something broken?" questions
+    into a glance.
 
-| Guide | Use When... |
-|-------|-------------|
-| **Agent Integration** | Adding a new AI coding assistant to the system |
-| **Status Line** | You need to understand status bar indicators |
-| **Health Dashboard** | Investigating health issues or understanding the monitoring architecture |
-| **Constraint Testing** | Adding new constraints, debugging detection, or testing enforcement |
-| **VKB Visualization** | Exploring knowledge graphs or integrating VKB programmatically |
-| **Knowledge Workflows** | Understanding how knowledge is captured, processed, and stored |
-| **Continuous Integration** | A CI run went red, or you need to know what a green one actually proves |
-| **Network Configuration** | Working behind a corporate proxy or VPN, or routing an agent's API traffic |
-| **LLM Providers** | Adding, switching, or troubleshooting a cloud or local LLM provider |
+    **Health Dashboard.** When something *is* broken, this is where the answer is. It also
+    explains the layered supervision model, which is what makes an unresponsive-but-alive process
+    detectable at all.
 
-## Quick Links
+    ## Related
 
-- [Getting Started](../getting-started/index.md) - Initial setup and configuration
-- [Core Systems](../core-systems/index.md) - Overview of LSL, UKB/VKB, Constraints
-- [Architecture](../architecture/index.md) - System architecture and data flow
-- [Troubleshooting](../reference/troubleshooting.md) - Common issues and solutions
+    - [Getting Started](../getting-started/index.md) — installation and first session
+    - [Core Systems](../core-systems/index.md) — what each system does
+    - [Architecture](../architecture/index.md) — why it is built this way
+    - [Troubleshooting](../reference/troubleshooting.md) — symptom-first index
+
+=== "📚 Deep Dive (full)"
+
+    --8<-- "_tiers/guides/index.deep.md"

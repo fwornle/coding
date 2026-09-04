@@ -1,127 +1,103 @@
 # Architecture
 
-System design principles and patterns for the coding infrastructure.
+The design principles behind the infrastructure, and where each of them lives in the code.
 
-![Complete System Overview](../images/complete-system-overview.png)
+=== "⚡ Quick (~3 min)"
 
-## Key Principles
+    ## Four ideas explain the design
 
-### 1. Agent-Agnostic Design
+    1. **The agent is replaceable.** Everything shared lives outside the agent; adding one is a
+       single config file in `config/agents/`, not a change to common code.
+    2. **Knowledge is stored in tiers.** Fast in memory, durable in LevelDB, reviewable as
+       git-tracked JSON exports.
+    3. **Enforcement happens before execution.** Constraints are PreToolUse hooks, so a bad call
+       is blocked rather than reported.
+    4. **Supervision is layered.** Watchdog, coordinator, verifier and service health escalate
+       progressively instead of one monitor trying to catch everything.
 
-!!! success "Multi-Agent Support"
-    Both **Claude Code** and **GitHub CoPilot** are fully supported with identical infrastructure (containerized services + stdio proxies on the host) and a unified launcher. Adding new agents follows a documented adapter pattern.
+    ## Where things live
 
-The architecture supports multiple AI coding assistants through a unified adapter pattern:
+    | Concern | Where |
+    |---------|-------|
+    | Agent definitions | `config/agents/<name>.sh` |
+    | Shared startup | `scripts/launch-agent-common.sh` |
+    | Session wrapping | `scripts/tmux-session-wrapper.sh` |
+    | Knowledge storage | `.data/knowledge-graph/` |
+    | Session logs | `.specstory/history/` |
 
-![Agent-Agnostic Architecture](../images/agent-agnostic-architecture-components.png)
+    ## Read next
 
-![Agent-Agnostic Architecture Sequence](../images/agent-agnostic-architecture-sequence.png)
+    [Health Monitoring](health-monitoring.md) for the supervision layers,
+    [Data Flow](data-flow.md) for how information moves between systems, and
+    [LLM Routing](llm-routing.md) for how a model is chosen for a piece of work.
 
-**Layers**:
+=== "📖 Standard (~15 min)"
 
-1. **Agent Layer** - AI assistants (Claude Code, GitHub CoPilot, OpenCode, future agents)
-2. **Tmux Wrapper Layer** - Unified session wrapping via `tmux-session-wrapper.sh` — status bar, nesting guard, env propagation, optional pipe-pane I/O capture
-3. **Config Layer** - Agent definitions in `config/agents/<name>.sh` (10-30 lines each)
-4. **Orchestration Layer** - `launch-agent-common.sh` handles all shared startup (Docker detection, service startup, monitoring, session management)
-5. **Common Setup Layer** - Shared initialization (`agent-common-setup.sh`)
-6. **Shared Services** - VKB, Semantic Analysis, Constraint Monitor, LSL
-7. **Adapter Layer** - Abstract interface + agent implementations (dynamic import by convention)
+    ## Agent-agnostic by construction
 
-### 2. Knowledge Persistence
+    Claude Code, Copilot CLI, OpenCode and Pi all run on identical infrastructure. That is
+    enforced structurally rather than by convention: the shared behaviour lives in layers none of
+    the agents own.
 
-Multi-tier storage for reliability and performance:
+    ![Agent-Agnostic Architecture](../images/agent-agnostic-architecture-components.png)
 
-**Runtime (Fast)**:
+    From the outside in — the agent itself; a tmux wrapper providing the status bar, nesting
+    guard and I/O capture; a per-agent config file of 10–30 lines; a shared orchestration script
+    handling Docker detection, service startup and session management; and beneath those the
+    shared services and a thin adapter interface resolved by naming convention.
 
-- MCP Memory (Claude)
-- Graphology Graph (in-memory)
+    The proof that the seam is real: `config/agents/opencode.sh` is 25 lines and buys full
+    integration. Adding an agent touches nothing else.
 
-**Persistence (Reliable)**:
+    ## Where knowledge is kept
 
-- LevelDB (persistent graph storage)
-- JSON exports (git-tracked)
-- `.specstory/history/` (session logs)
+    Three tiers, chosen for different failure modes:
 
-### 3. Real-Time Quality Enforcement
+    - **Runtime** — an in-memory Graphology graph, fast enough to query mid-session.
+    - **Persistent** — LevelDB, which survives restarts.
+    - **Reviewable** — JSON exports committed to git, so knowledge changes show up in diffs and
+      can be reverted like anything else.
 
-PreToolUse hooks intercept tool calls BEFORE execution:
+    ## Enforcement happens before the tool runs
 
-```mermaid
-flowchart LR
-    A[Claude Tool Call] --> B[PreToolUse Hook]
-    B --> C[Constraint Monitor]
-    C -->|Violation| D[BLOCK]
-    C -->|Clean| E[ALLOW]
-    E --> F[Tool Execution]
-```
+    ```mermaid
+    flowchart LR
+        A[Agent tool call] --> B[PreToolUse hook]
+        B --> C[Constraint monitor]
+        C -->|Violation| D[BLOCK + suggested fix]
+        C -->|Clean| E[ALLOW]
+        E --> F[Tool executes]
+    ```
 
-### 4. 4-Layer Monitoring
+    Constraints are declarative — an id, a pattern, a severity and the message shown when they
+    fire — and a blocked call can be overridden deliberately by naming the constraint, which
+    keeps the escape hatch explicit and auditable rather than tempting you to reword around the
+    rule.
 
-Progressive escalation for reliability:
+    ## Supervision in layers
 
-| Layer | Component | Function |
-|-------|-----------|----------|
-| 4 | Service Health | UKB, VKB, Semantic Analysis |
-| 3 | System Verifier | LSL, Constraints |
-| 2 | System Coordinator | Overall health, metrics |
-| 1 | System Watchdog | Critical failures, alerts |
+    | Layer | Component | Catches |
+    |-------|-----------|---------|
+    | 4 | Service health | An individual service failing |
+    | 3 | System verifier | Logging and constraints drifting |
+    | 2 | Coordinator | Overall health and metrics |
+    | 1 | Watchdog | Critical failures worth alerting on |
 
-## Deployment
+    Each layer assumes the one below it may be wrong, which is why a wedged process that still
+    answers `ps` is caught — the layer above notices it has stopped producing work.
 
-MCP servers run as HTTP/SSE services in Docker containers; the host-side Claude/Copilot CLI talks to them via lightweight stdio proxies. Docker Desktop must be installed and running. The stack is launched automatically by `coding --claude`. See the [Docker Deployment Guide](https://github.com/fwornle/coding/blob/main/docker/README.md) for container details.
+    ## How it is deployed
 
-## Development Patterns
+    Services run as HTTP/SSE endpoints in Docker containers; the host-side agent CLI reaches
+    them through stdio proxies. `coding --claude` brings the whole stack up, so Docker must be
+    running before you launch.
 
-### Constraint-Based Development
+    ## Adding an agent
 
-Define constraints before implementation:
+    Create `config/agents/<name>.sh` with `AGENT_NAME`, `AGENT_COMMAND` and any optional hook
+    functions. Detection, launcher routing and tmux wrapping follow automatically. The
+    [Agent Integration Guide](../guides/agent-integration.md) has the full contract.
 
-```yaml
-constraints:
-  - id: no-parallel-versions
-    pattern: /(v\d+|enhanced|improved|new|fixed)_/
-    severity: CRITICAL
-    message: Never create parallel versions - edit originals
-```
+=== "📚 Deep Dive (full)"
 
-### Agent Detection
-
-```javascript
-const detector = new AgentDetector();
-const available = await detector.detectAll();
-// { claude: true, copilot: true }
-
-const best = await detector.getBest();
-// 'claude'
-```
-
-### Knowledge Capture
-
-```bash
-# Auto-analysis from git commits
-ukb
-
-# Structured interactive capture
-ukb --interactive
-
-# Visualization
-vkb
-```
-
-## Adding New Agents
-
-Adding a new agent requires **only a single config file** — zero changes to shared code.
-
-![Agent Integration Flow](../images/agent-integration-flow.png)
-
-Create `config/agents/<name>.sh` defining `AGENT_NAME`, `AGENT_COMMAND`, and optional hook functions. Agent detection, launcher routing, and tmux wrapping all happen automatically.
-
-**Proof:** The OpenCode agent (`config/agents/opencode.sh`) is a 25-line file providing full integration.
-
-See the [Agent Integration Guide](../guides/agent-integration.md) for the complete walkthrough, config reference, and API contract.
-
-## Related Documentation
-
-- [Health Monitoring](health-monitoring.md) - 4-layer architecture details
-- [Data Flow](data-flow.md) - System data flow diagrams
-- [Integrations](../integrations/index.md) - MCP server architectures
+    --8<-- "_tiers/architecture/index.deep.md"

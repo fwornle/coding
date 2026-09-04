@@ -1,0 +1,246 @@
+MCP servers and tools that extend the coding infrastructure.
+
+![Integration Architecture](../images/integration-architecture.png)
+
+---
+
+## MCP Servers
+
+<div class="grid cards" markdown>
+
+-   :material-brain:{ .lg .middle } **Semantic Analysis**
+
+    ---
+
+    14-agent AI system for code understanding and knowledge extraction.
+
+    ![Semantic Analysis](../images/semantic-analysis-system-overview.png)
+
+    - Knowledge workflow orchestration
+    - Pattern recognition
+    - Ontology mapping
+
+    **Port**: 3848 (Docker)
+
+    [:octicons-arrow-right-24: Details](semantic-analysis.md)
+
+-   :material-shield:{ .lg .middle } **Constraint Monitor**
+
+    ---
+
+    Real-time code quality enforcement via PreToolUse hooks.
+
+    ![Constraint Monitor](../images/constraint-monitor-components.png)
+
+    - 20+ configurable constraints
+    - Web dashboard
+    - Violation tracking
+
+    **Port**: 3849 (Docker)
+
+    [:octicons-arrow-right-24: Details](constraint-monitor.md)
+
+-   :material-graph:{ .lg .middle } **Graphify**
+
+    ---
+
+    tree-sitter static code graph (file-based `graph.json`, no database).
+
+    - Call graph analysis
+    - Structural / natural language queries
+    - Shortest-path finding
+
+    **Port**: 3851 (HTTP MCP, in `coding-services`)
+
+    [:octicons-arrow-right-24: Details](graphify.md)
+
+-   :material-view-dashboard:{ .lg .middle } **Dashboard**
+
+    ---
+
+    System monitoring and knowledge visualization.
+
+    ![Health Dashboard](../images/health-mon.png)
+
+    - VKB knowledge viewer
+    - Health monitoring
+    - Workflow visualization
+
+    **Port**: 8080 (VKB), 3032 (Health)
+
+    [:octicons-arrow-right-24: Details](dashboard.md)
+
+-   :material-swap-horizontal:{ .lg .middle } **LLM Proxy Bridge**
+
+    ---
+
+    HTTP bridge exposing [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) to Docker containers.
+
+    - Direct HTTP to Copilot API, CLI for Claude Code
+    - Zero-cost subscription routing
+    - Automatic provider fallback
+
+    **Port**: 12435 (Host)
+
+    [:octicons-arrow-right-24: Details](llm-cli-proxy.md)
+
+-   :material-eye-outline:{ .lg .middle } **Observations API**
+
+    ---
+
+    Host-side single-owner API for observations / digests / insights. Also mounts the shared **`@fwornle/km-core` REST router** at `/api/km/`.
+
+    - Runtime store: km-core `GraphKMStore` (`.data/knowledge-graph/`). Legacy `.observations/observations.db` (SQLite, WAL mode) was archived 2026-06-05 (Phase 44 Plan 18).
+    - In-process consolidator + retrieval
+    - Forwarded into the container by the Health Dashboard
+
+    **Port**: 12436 (Host)
+
+    [:octicons-arrow-right-24: Details](../core-systems/observational-memory.md)
+
+-   :material-database-search:{ .lg .middle } **OKB (Operational Knowledge Base)**
+
+    ---
+
+    Cross-repo operational knowledge — RCAs, runbooks, design docs. Lives in [`rapid-automations/integrations/operational-knowledge-management`](https://bmw.ghe.com/adpnext-apps/rapid-automations/tree/main/integrations/operational-knowledge-management). Consumes the same **`@fwornle/km-core`** library as the UKB and the observations API.
+
+    - LLM-driven extraction + governance
+    - Four-tier ontology (upper + RaaS + KPI-FW + business)
+    - VOKB graph viewer
+
+    **Ports**: 8090 (API), 3002 (VOKB viewer)
+
+    [:octicons-arrow-right-24: OKB docs](https://bmw.ghe.com/adpnext-apps/rapid-automations/tree/main/integrations/operational-knowledge-management/docs)
+
+</div>
+
+---
+
+## Service Ports
+
+| Service | Port | Protocol | Health Check |
+|---------|------|----------|--------------|
+| Semantic Analysis | 3848 | HTTP/SSE | `/health` |
+| Constraint Monitor | 3030/3031/3849 | HTTP | `/health` |
+| Graphify | 3851 | HTTP MCP | N/A |
+| VKB Server | 8080 | HTTP | `/health` |
+| Health Dashboard | 3032 | HTTP | `/health` |
+| Health API | 3033 | HTTP | `/health` |
+| Qdrant | 6333/6334 | HTTP/gRPC | `/health` |
+| LLM Proxy Bridge | 12435 | HTTP | `/health` |
+| Observations API (mounts km-core `/api/km/`) | 12436 | HTTP | `/health` |
+| OKB API (cross-repo) | 8090 | HTTP | `/health` |
+| VOKB viewer (cross-repo) | 3002 | HTTP | N/A |
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TB
+    CC[Claude Code] --> MCP{MCP Protocol}
+    MCP --> SA[Semantic Analysis]
+    MCP --> CM[Constraint Monitor]
+    MCP --> CGR[Graphify]
+
+    SA --> GDB[(GraphDB)]
+    SA --> QD[(Qdrant)]
+    CGR --> GJ[graph.json]
+    CM --> CMDB[(Violations DB)]
+
+    GDB --> VKB[VKB Dashboard]
+    CMDB --> CMD[Constraint Dashboard]
+```
+
+---
+
+## MCP Configuration
+
+MCP servers are configured automatically by the installer. They run as HTTP/SSE services in Docker containers; Claude communicates via stdio-proxy:
+
+```
+Claude Code <-> stdio-proxy.js <-> HTTP/SSE <-> Docker Container
+```
+
+### Configuration Location
+
+- **macOS/Linux**: `~/.claude/settings.json`
+- **Windows**: `%APPDATA%/Claude/settings.json`
+
+!!! note "Auto-Configuration"
+    The installer creates and maintains MCP configuration. Manual editing is rarely needed.
+
+---
+
+## Available Tools
+
+Each MCP server provides tools accessible within Claude sessions:
+
+### Semantic Analysis Tools
+
+| Tool | Purpose |
+|------|---------|
+| `determine_insights` | AI-powered content analysis |
+| `execute_workflow` | Run multi-agent workflows |
+| `analyze_code` | Code pattern analysis |
+| `analyze_repository` | Repository-wide analysis |
+| `create_ukb_entity_with_insight` | Create knowledge entities |
+| `refresh_entity` | Update stale entities |
+
+### Constraint Monitor Tools
+
+| Tool | Purpose |
+|------|---------|
+| `check_constraints` | Validate code against constraints |
+| `get_violation_history` | View past violations |
+| `get_constraint_status` | Current compliance metrics |
+| `update_constraints` | Modify constraint rules |
+
+### Graphify Tools
+
+| Tool | Purpose |
+|------|---------|
+| `query_graph` | Structural / natural language queries |
+| `get_node` | Retrieve a single node by id |
+| `get_neighbors` | List a node's neighbours |
+| `shortest_path` | Shortest path between two nodes |
+| `graph_stats` | Graph size and shape statistics |
+| `god_nodes` | Most-connected hub nodes |
+
+---
+
+## Health Checks
+
+```bash
+# Check all health endpoints
+for port in 3848 3849 8080 3032; do
+  echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status // "N/A"')"
+done
+
+# Check MCP servers are registered
+cat ~/.claude/settings.json | jq '.mcpServers | keys'
+```
+
+---
+
+## Submodule Management
+
+Integration components are git submodules:
+
+```bash
+# Update all submodules
+git submodule update --remote
+
+# Initialize missing submodules
+git submodule update --init --recursive
+
+# Update specific submodule
+git submodule update --remote integrations/semantic-analysis
+```
+
+---
+
+## Related Documentation
+
+- [Configuration](../getting-started/configuration.md) - API keys and settings
+- [Data Flow](../architecture/data-flow.md) - Integration data flow

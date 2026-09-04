@@ -1,229 +1,109 @@
 # Coding
 
-**A self-learning experience layer for AI coding assistants**
+**A self-learning experience layer for AI coding assistants** — it captures your sessions,
+builds knowledge from them, and stops known mistakes before they happen.
 
-Coding wraps around your AI coding assistant to capture conversations, build knowledge, prevent mistakes, and track progress - creating a continuously improving development environment.
+=== "⚡ Quick (~3 min)"
 
-![VKB Knowledge Graph](images/vkb-hero.png)
+    ## In one paragraph
 
----
+    Coding wraps whichever AI coding assistant you use — Claude Code, Copilot CLI, OpenCode or
+    Pi — in a shared environment that records every session, extracts durable knowledge from that
+    history, blocks known mistakes at the moment a tool is called, and reports what it all cost.
+    The assistant is replaceable; the environment around it is the point.
 
-## What is Coding?
+    ## Install and run
 
-Coding is an infrastructure layer that enhances AI coding assistants by:
+    ```bash
+    git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
+    cd ~/Agentic/coding && ./install.sh
+    source ~/.zshrc          # or ~/.bashrc
+    coding                   # launches Claude Code with everything wired up
+    ```
 
-- **Capturing everything** - Automatic session logging of all prompts, tool calls, and responses
-- **Learning from experience** - Build a knowledge base from your coding history and conversations
-- **Preventing mistakes** - Constraint system stops errors before they happen
+    ## What you get
 
-![System Architecture](images/coding-system-architecture.png)
+    | Feature | What it does for you |
+    |---------|----------------------|
+    | Live Session Logging | Records every prompt, tool call and response, secrets redacted |
+    | Knowledge Management | Turns that history into a searchable graph — `vkb` to look at it |
+    | Constraints | Blocks a bad tool call before it runs, with a suggested fix |
+    | Health Monitoring | Supervises the services and restarts what dies |
+    | Status Line | Health, cost and logging state, live in your tmux bar |
+    | Multi-agent support | The same environment for Claude, Copilot, OpenCode and Pi |
 
----
+    ## Where to go next
 
-## Key Features
+    `coding --health` should come back all green. If it does, read
+    [Getting Started](getting-started/index.md); if it does not, go straight to
+    [Verify & Repair](getting-started/verify-repair.md).
 
-### Live Session Logging (LSL)
+=== "📖 Standard (~15 min)"
 
-Every conversation is captured automatically with intelligent 5-layer classification that routes content between projects.
+    ## What the layer actually does
 
-![LSL Sample Output](images/lsl-sample-output.png)
+    Coding is infrastructure that sits around an AI coding assistant rather than inside it. It
+    does four things, and they compound: it **captures** every session, **learns** from the
+    accumulated history, **prevents** repeats of known mistakes, and **measures** what the work
+    costs.
 
-- Real-time monitoring with zero data loss
-- Automatic redaction of secrets and credentials
-- Multi-project support with foreign session tracking
-- Configurable time-based slots (hourly files)
+    ![System Architecture](images/coding-system-architecture.png)
 
-[Learn more about LSL](core-systems/lsl.md){ .md-button }
+    ## Capture, learn, prevent
 
----
+    **Live Session Logging** records every conversation automatically into
+    `.specstory/history/`, classifying content so that work touching several projects is routed
+    to the right one, and redacting secrets on the way through. Nothing is asked of you.
 
-### Knowledge Management (UKB/VKB)
+    **Knowledge Management** turns that history, plus your git log, into a knowledge graph via a
+    14-agent extraction pass:
 
-A 14-agent AI system extracts insights from your git history and conversation logs, building a searchable knowledge graph.
+    ```bash
+    semantic workflow run wave-analysis --team coding   # the extraction pass, async, 10-20 min
+    semantic workflow status                            # how far it has got
+    vkb                                                 # browse the result at :8080
+    ```
 
-![VKB Viewer — interactive knowledge graph with 281 entities across Project, Component, SubComponent, and Detail hierarchy](images/viewer.png)
+    **Constraints** run as PreToolUse hooks, so a violating call is stopped *before* execution
+    rather than reported afterwards. Twenty-odd rules ship configured; the dashboard at
+    `localhost:3030` shows what fired and why.
 
-**Update Knowledge Base (UKB)**:
-```bash
-ukb           # Incremental update from last checkpoint
-ukb full      # Full analysis from first commit
-ukb debug     # Single-stepping with mocked LLM
-```
+    **Health monitoring** supervises the services in layers, restarting what dies, and surfaces
+    the result both at `localhost:3032` and in the tmux status bar.
 
-**View Knowledge Base (VKB)**:
-```bash
-vkb           # Opens http://localhost:8080
-```
+    ## Any agent, one environment
 
-[Learn more about Knowledge Management](core-systems/ukb-vkb.md){ .md-button }
+    Claude Code is the default, but nothing above is specific to it:
 
----
+    | Agent | Launch |
+    |-------|--------|
+    | Claude Code (default) | `coding` or `coding --claude` |
+    | GitHub Copilot CLI | `coding --copilot` |
+    | OpenCode | `coding --opencode` |
+    | Pi | `coding --pi` |
 
-### Constraint System
+    All four share the same tmux wrapping, status line, health monitoring, session logging,
+    knowledge base and constraint enforcement. Adding a fifth is a single config file in
+    `config/agents/` — see the [Agent Integration Guide](guides/agent-integration.md).
 
-20+ configurable constraints enforce code quality via PreToolUse hooks - preventing mistakes before they happen.
+    Always launch through `coding`. A bare `claude` session still works, but it is invisible to
+    token accounting because the adapters that capture it are installed per launch.
 
-![Constraint Dashboard](images/constraint-dashboard.png)
+    ## Everyday commands
 
-- Real-time violation detection and blocking
-- Web dashboard for monitoring and configuration
-- Per-project constraint configuration
-- Auto-correction suggestions
+    | Command | Does |
+    |---------|------|
+    | `coding` | Start a session with everything running |
+    | `coding --health` | Check every service |
+    | `vkb` | Open the knowledge graph at `localhost:8080` |
+    | `semantic workflow run wave-analysis --team coding` | Refresh the knowledge base |
 
-[Learn more about Constraints](core-systems/constraints.md){ .md-button }
+    ## What is production-ready
 
----
+    Session logging, the knowledge base and viewer, constraints, health monitoring and the status
+    line are all in production use. Online learning — continuous knowledge capture without an
+    explicit pass — is still beta.
 
-### Health Monitoring
+=== "📚 Deep Dive (full)"
 
-3-layer supervision architecture ensures system reliability with automatic recovery.
-
-![Health Dashboard](images/health-mon.png)
-
-- Process health monitoring with automatic restart
-- Service lifecycle management
-- Multi-agent workflow visualization
-- LLM call tracing (tokens, duration, costs)
-
-[Learn more about Health Monitoring](architecture/health-monitoring.md){ .md-button }
-
----
-
-### Status Line
-
-Real-time feedback via the unified tmux status bar showing system health, costs, and development state. All coding agents (Claude, Copilot, OpenCode, Pi) are wrapped in tmux sessions with a shared status line rendered by `combined-status-line.js`.
-
-![Coding Environment — Tmux Status Bar](images/status-line.png)
-
-| Indicator | Meaning |
-|-----------|---------|
-| Health icons | Service status (green/red) |
-| Cost display | API usage tracking |
-| LSL status | Logging window and routing |
-
-[Learn more about Status Line](guides/status-line.md){ .md-button }
-
----
-
-### Multi-Agent Support
-
-While Claude Code is the primary and default agent, **coding** is fully agent-agnostic. Any coding assistant can be integrated with a single config file — no changes to shared code needed.
-
-| Agent | Launch | Status |
-|-------|--------|--------|
-| **Claude Code** (default) | `coding` or `coding --claude` | Full MCP integration |
-| **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
-| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
-| **Pi** | `coding --pi` | Native session JSONL |
-
-All agents share the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, and constraint enforcement. Missing agent CLIs are auto-installed on first launch.
-
-![GitHub Copilot CLI running in coding](images/coding-copilot-cli.png)
-
-![OpenCode running in coding](images/coding-opencode.png)
-
-![Pi running in coding](images/coding-pi.png)
-
-[Agent Integration Guide](guides/agent-integration.md){ .md-button }
-
----
-
-## Quick Start
-
-```bash
-# Clone and install
-git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
-cd ~/Agentic/coding && ./install.sh
-
-# Reload shell
-source ~/.bashrc  # or ~/.zshrc
-
-# Start coding with all features
-coding
-
-# View your knowledge graph
-vkb
-```
-
-![Coding Startup](images/coding-startup-dockerized.png)
-
-[Full Installation Guide](getting-started/index.md){ .md-button .md-button--primary }
-
----
-
-## Design Principles
-
-| Principle | Description |
-|-----------|-------------|
-| **Agent-Agnostic** | Designed for any AI assistant — add a new agent with [a single config file](guides/agent-integration.md). Claude, CoPilot, OpenCode, and Pi integrated |
-| **Non-Intrusive** | Docker deployment keeps your system clean |
-| **Provider Flexible** | Works with Anthropic, OpenAI, Groq, and local LLMs (DMR/llama.cpp) |
-| **Multi-Project** | Handle multiple projects with automatic context routing |
-| **Multi-Developer** | Session logs tagged per user for collaboration |
-| **Self-Healing** | 3-layer supervision with automatic recovery |
-
----
-
-## Feature Status
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Live Session Logging | :material-check-circle:{ .green } Production | Full session capture with 5-layer classification |
-| Knowledge Base (UKB) | :material-check-circle:{ .green } Production | 14-agent knowledge extraction system |
-| Knowledge Viewer (VKB) | :material-check-circle:{ .green } Production | Graph visualization and exploration |
-| Constraint System | :material-check-circle:{ .green } Production | 20+ constraints with web dashboard |
-| Health Monitoring | :material-check-circle:{ .green } Production | 3-layer supervision architecture |
-| Status Line | :material-check-circle:{ .green } Production | Real-time terminal feedback |
-| Online Learning | :material-progress-clock:{ .yellow } Beta | Continuous learning without manual UKB |
-
----
-
-## MCP Integrations
-
-Coding provides several MCP (Model Context Protocol) servers:
-
-| Integration | Purpose |
-|-------------|---------|
-| [Semantic Analysis](integrations/semantic-analysis.md) | 14-agent AI-powered code analysis |
-| [Constraint Monitor](integrations/constraint-monitor.md) | Real-time violation detection |
-| [Graphify](integrations/graphify.md) | tree-sitter static code graph (file-based, no database) |
-
----
-
-## Documentation
-
-<div class="grid cards" markdown>
-
--   :material-rocket-launch:{ .lg .middle } **Getting Started**
-
-    ---
-
-    Installation, configuration, and first steps
-
-    [:octicons-arrow-right-24: Get started](getting-started/index.md)
-
--   :material-cog:{ .lg .middle } **Core Systems**
-
-    ---
-
-    LSL, UKB/VKB, Constraints, Observational Memory
-
-    [:octicons-arrow-right-24: Explore](core-systems/index.md)
-
--   :material-puzzle:{ .lg .middle } **Integrations**
-
-    ---
-
-    MCP servers and external tools
-
-    [:octicons-arrow-right-24: View integrations](integrations/index.md)
-
--   :material-book-open-variant:{ .lg .middle } **Guides**
-
-    ---
-
-    Deep-dive tutorials and workflows
-
-    [:octicons-arrow-right-24: Read guides](guides/index.md)
-
-</div>
+    --8<-- "_tiers/index.deep.md"
