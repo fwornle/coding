@@ -225,3 +225,54 @@
 [data-md-color-scheme="slate"] .dot-green-vdark { color: #008700; }
 [data-md-color-scheme="slate"] .dot-grey        { color: #8a8a8a; }
 [data-md-color-scheme="slate"] .dot { text-shadow: none; }
+
+/* ── Status-line examples rendered in colour ──────────────────────────────
+ * The "Example Display" used to be a fenced code block, which is monochrome by
+ * definition. That is a poor fit for this particular page: every badge on the
+ * bar encodes its state as a COLOUR, and the context gauge is specifically a
+ * bright fill over a duller background of the same hue. Rendered in one flat
+ * grey, the example showed the layout and hid the entire point.
+ *
+ * `.statusline` is therefore a small terminal surface, and the badge/gauge
+ * spans inside it carry the same xterm-256 values the bar uses — the same
+ * agreement between page and terminal that the `.dot` block above keeps.
+ *
+ * Only docs-content/ uses these. docs/health-system/status-line.md keeps plain
+ * fenced blocks on purpose: it is read on GitHub, which strips class
+ * attributes, so an HTML version there would render as bare text with the
+ * markup showing through.
+ */
+.statusline {
+  display: block;
+  overflow-x: auto;            /* narrow viewports scroll the bar, not the page */
+  white-space: pre;
+  padding: 0.65rem 0.9rem;
+  border-radius: 4px;
+  background: #1c1c1c;         /* a terminal, not a page element */
+  color: #d0d0d0;
+  font-family: var(--md-code-font-family, monospace);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* The bar's own dot ramp, on the terminal surface. The `.dot` values above are
+ * tuned for a light PAGE background; on #1c1c1c the darkest shades vanish, so
+ * these mirror what the slate scheme already does for the same reason.
+ */
+.statusline .sl-green  { color: #00d75f; }
+.statusline .sl-amber  { color: #ffaf00; font-weight: 700; }
+.statusline .sl-red    { color: #ff0000; font-weight: 700; }
+.statusline .sl-grey   { color: #8a8a8a; }
+.statusline .sl-dim    { color: #8a8a8a; }
+.statusline .sl-under  { text-decoration: underline; }
+
+/* Context gauge — fill colour over the duller same-hue trough, per band.
+ * Pairs are the exact tmux values in lib/statusline/context-gauge.cjs:
+ *   <50%  colour46/colour22 · 50-64 colour226/colour58
+ *   65-79 colour208/colour94 · >=80 colour196/colour52 (bold)
+ */
+.gauge         { padding: 0 0.15em; border-radius: 2px; }
+.gauge-ok      { color: #00ff00; background: #005f00; }
+.gauge-warn    { color: #ffff00; background: #5f5f00; }
+.gauge-high    { color: #ff8700; background: #875f00; }
+.gauge-crit    { color: #ff0000; background: #5f0000; font-weight: 700; }
