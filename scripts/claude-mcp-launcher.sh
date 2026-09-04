@@ -70,6 +70,25 @@ if [[ "${_coding_scope:-wrapper}" != "global" ]]; then
     else
         echo -e "${YELLOW}⚠️  Could not build per-launch Claude config — hooks/skills may be inactive${NC}"
     fi
+else
+    # GLOBAL SCOPE — re-assert this project's hooks and status line in the
+    # user's own ~/.claude/settings.json before launching.
+    #
+    # Global scope passes no --settings, so nothing else keeps that file in
+    # step. It drifts for one specific, recurring reason: reinstalling or
+    # updating GSD rewrites `statusLine` back to gsd-statusline.js, which brings
+    # the duplicated context meter back (the tmux bar renders the gauge now, so
+    # Claude's own copy of it is redundant). Re-asserting here means the next
+    # `coding --claude` repairs that instead of the user re-running an installer.
+    #
+    # Cheap and quiet by design: the script writes nothing when the merged
+    # result already matches disk, so the steady state is a read. Failure is
+    # non-fatal — a launch must not depend on being able to write that file.
+    if _global_out="$(CODING_REPO="$CODING_REPO_DIR" node "$CODING_REPO_DIR/scripts/build-claude-runtime-config.mjs" --install-global 2>&1 >/dev/null)"; then
+        if grep -q 'asserted in' <<<"$_global_out"; then
+            echo -e "${BLUE}🌍 Global scope: coding hooks + status line re-asserted in ~/.claude/settings.json${NC}"
+        fi
+    fi
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

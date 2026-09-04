@@ -8,9 +8,7 @@ Real-time visual indicators of system health and development activity rendered v
 
 ### Example Display
 
-```
-[🏥●] [RA●C●] [🔒77% ⚙️IMP] [📚●] [N:VPN] [P:ON] ████░░░░░░  42% [📋18-19] 18:34
-```
+<span class="statusline">[🏥<span class="sl-green">●</span>] [<span class="sl-under">RA</span><span class="sl-green">●</span>C<span class="sl-green">●</span>] [🔒77% ⚙️IMP] [📚<span class="sl-green">●</span>] [N:VPN] [P:ON] <span class="gauge gauge-ok">████░░░░░░&nbsp;&nbsp;42%</span> [📋18-19] 18:34</span>
 
 The current pane's project is rendered with an underline (`#[underscore]…#[nounderscore]`) so each parallel tmux window highlights its own project.
 
@@ -27,7 +25,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | Proxy Status | `[P:AUTO]` | Local proxy daemon (proxydetox): ON / AUTO / OFF |
 | Prompt Downgrades | `[D:12]` | Turns the prompt classifier moved to a cheaper band since proxy start — absent when the classifier is off |
 | Local Execution | `[L:3]` | Completions served by hardware we own — absent at zero |
-| Context Window | `████░░░░░░  42%` | How full THIS pane's agent conversation is — see [Context Window Gauge](#context-window-gauge) |
+| Context Window | `████░░░░░░&nbsp;&nbsp;42%` | How full THIS pane's agent conversation is — see [Context Window Gauge](#context-window-gauge) |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
 
@@ -260,9 +258,7 @@ How full the **current pane's agent conversation** is. It used to exist only ins
 Claude's own statusline, so only one of the four agents had it; it now lives in the
 tmux bar, where `opencode`, `copilot` and `pi` panes get the same reading.
 
-```
-████░░░░░░  42%
-```
+<span class="statusline"><span class="gauge gauge-ok">████░░░░░░&nbsp;&nbsp;42%</span></span>
 
 A bright fill over a **duller background of the same hue** — the fill reads as a
 watermark against a tinted trough. Thresholds are the ones the old Claude meter used:
@@ -273,6 +269,8 @@ watermark against a tinted trough. Thresholds are the ones the old Claude meter 
 | 50 – 64% | `colour226` yellow | `colour58` olive | Filling up |
 | 65 – 79% | `colour208` orange | `colour94` brown | Getting tight |
 | ≥ 80% | `colour196` red, **bold** | `colour52` dark red | Compaction is close |
+
+<span class="statusline"><span class="gauge gauge-ok">███░░░░░░░&nbsp;&nbsp;31%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-warn">█████░░░░░&nbsp;&nbsp;55%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-high">███████░░░&nbsp;&nbsp;71%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-crit">█████████░&nbsp;&nbsp;93%</span></span>
 
 !!! note "Why the ≥80% band has no 💀"
     Claude's meter prefixed a skull at 80%. That prefix is three extra cells in one
@@ -324,6 +322,14 @@ belongs to a different session.
     `~/.claude/hooks/gsd-statusline.js` is GSD-managed, so editing it would be undone by
     `/gsd:update`, and filtering keeps the bridge file that both GSD's context-monitor
     hook and this gauge depend on.
+
+    **It survives reinstalls.** In wrapper scope the wrapper is rebuilt per launch. In
+    global scope it is asserted by `install.sh` and re-asserted on every
+    `coding --claude` launch, so a GSD reinstall — which rewrites `statusLine` back to
+    `gsd-statusline.js` and would bring the second meter back — is repaired by the next
+    launch rather than needing the installer re-run. Assertion recovers the *original*
+    upstream command instead of wrapping whatever is currently there, so repeating it is
+    a no-op rather than nesting one wrapper inside the next.
 
 ### Coordinator Health Endpoint
 

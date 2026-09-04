@@ -4793,7 +4793,6 @@ install_constraint_monitor_hooks() {
     local pre_hook_cmd="node $CODING_REPO/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
     local post_hook_cmd="node $CODING_REPO/scripts/tool-interaction-hook-wrapper.js"
     local prompt_hook_cmd="node $CODING_REPO/scripts/health-prompt-hook.js"
-    local status_line_cmd="node $CODING_REPO/scripts/combined-status-line-wrapper.js"
 
     # Create .claude directory if it doesn't exist
     mkdir -p "$HOME/.claude"
@@ -4879,7 +4878,7 @@ EOF
 
     # IMPORTANT: Remove any old hook entries (duplicates or wrong paths) before adding new ones
     # This ensures clean state and prevents accumulation of stale hooks
-    jq --arg pre_cmd "$pre_hook_cmd" --arg post_cmd "$post_hook_cmd" --arg prompt_cmd "$prompt_hook_cmd" --arg status_line_cmd "$status_line_cmd" '
+    jq --arg pre_cmd "$pre_hook_cmd" --arg post_cmd "$post_hook_cmd" --arg prompt_cmd "$prompt_hook_cmd" '
         # Remove ALL existing PreToolUse hooks that match the wrapper script (regardless of path)
         .hooks.PreToolUse = (
             if .hooks.PreToolUse then
@@ -4935,7 +4934,29 @@ EOF
         info "  - PreToolUse: Constraint monitoring (blocks violations)"
         info "  - PostToolUse: LSL logging (captures interactions)"
         info "  - UserPromptSubmit: System health verification"
-        info "  - StatusLine: provided by tmux (see tmux-session-wrapper.sh)"
+
+        # Assert the Claude status-line wrapper too. The tmux bar now renders the
+        # context-window gauge for ALL agents, so Claude's own copy of that meter
+        # is a duplicate; scripts/claude-statusline.cjs runs whatever status-line
+        # command the user has configured and strips only that one segment.
+        #
+        # Delegated rather than done with jq here on purpose:
+        # build-claude-runtime-config.mjs already owns "what does coding need in
+        # Claude's settings", so keeping the decision there is what stops the two
+        # scopes drifting. It is idempotent — it re-merges the same hooks this jq
+        # block just wrote and returns without writing when nothing changed — and
+        # it recovers the original upstream command rather than wrapping a
+        # wrapper, so running the installer twice cannot nest it.
+        #
+        # Ordering note: this must run AFTER GSD is installed, since GSD is what
+        # puts gsd-statusline.js in settings.json. Re-running the installer, or
+        # simply launching via `coding`, repairs the order if GSD lands later.
+        if node "$CODING_REPO/scripts/build-claude-runtime-config.mjs" --install-global >/dev/null 2>&1; then
+            info "  - StatusLine: wrapped (context gauge shown once, in the tmux bar)"
+        else
+            warning "Could not assert the Claude status-line wrapper"
+            INSTALLATION_WARNINGS+=("StatusLine: wrapper not asserted; the context gauge may appear twice")
+        fi
     else
         rm -f "$temp_file"
         warning "Failed to update settings file - JSON validation failed"

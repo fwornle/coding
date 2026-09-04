@@ -114,17 +114,44 @@ const derived = {
 // configured there is no second gauge to remove, and installing the wrapper
 // anyway would replace Claude Code's own default with the output of a command
 // that has nothing to wrap — trading a duplicate gauge for a blank status line.
+const statusLineWrapper = `${repo}/scripts/claude-statusline.cjs`;
+
+/**
+ * The command our wrapper should run, given whatever is configured today.
+ *
+ * Wrapping is NOT idempotent unless this exists. In global scope the wrapper is
+ * itself the command in settings.json, so re-asserting would wrap the wrapper:
+ * `CODING_UPSTREAM_STATUSLINE="CODING_UPSTREAM_STATUSLINE=..." node shim`,
+ * nesting one level deeper on every launch. Recovering the ORIGINAL upstream
+ * makes repeated assertion a no-op, which is what lets the launcher call this on
+ * every start to undo a GSD reinstall.
+ *
+ * @returns the command to wrap, or null when it is already wrapped and the
+ *   original cannot be recovered — in which case the caller must leave the
+ *   user's setting untouched rather than guess.
+ */
+function upstreamStatusLineCommand(cmd) {
+  if (!cmd.includes('claude-statusline.cjs')) return cmd;
+  const m = cmd.match(/^CODING_UPSTREAM_STATUSLINE=("(?:[^"\\]|\\.)*")\s+node\s/);
+  if (m) {
+    try { return JSON.parse(m[1]); } catch { /* fall through */ }
+  }
+  return null;
+}
+
 if (userSettings.statusLine?.type === 'command' && userSettings.statusLine.command) {
-  const upstream = userSettings.statusLine.command;
-  derived.statusLine = {
-    ...userSettings.statusLine,
-    // Pin the command being wrapped rather than letting the shim rediscover it.
-    // In global scope the shim IS the command in settings.json, so a shim that
-    // re-read that file would find itself; naming the upstream here keeps the
-    // wrapper honest in both scopes and makes the chain readable to anyone who
-    // opens the settings file.
-    command: `CODING_UPSTREAM_STATUSLINE=${JSON.stringify(upstream)} node ${repo}/scripts/claude-statusline.cjs`,
-  };
+  const upstream = upstreamStatusLineCommand(userSettings.statusLine.command);
+  if (upstream !== null) {
+    derived.statusLine = {
+      ...userSettings.statusLine,
+      // Pin the command being wrapped rather than letting the shim rediscover
+      // it. In global scope the shim IS the command in settings.json, so a shim
+      // that re-read that file would find itself; naming the upstream here keeps
+      // the wrapper honest in both scopes and makes the chain readable to anyone
+      // who opens the settings file.
+      command: `CODING_UPSTREAM_STATUSLINE=${JSON.stringify(upstream)} node ${statusLineWrapper}`,
+    };
+  }
 }
 
 // ── 1b. global scope: write the same merged settings to the user's own file ──
@@ -140,14 +167,37 @@ if (userSettings.statusLine?.type === 'command' && userSettings.statusLine.comma
 // drift: one mergeHooks(), one hook list, one status-line decision. install.sh's
 // install_constraint_monitor_hooks() installs the same three hooks with the same
 // dedup-by-script-name semantics; running either leaves the same state.
+// Safe to call on EVERY launch, which is what makes the global install
+// self-healing: reinstalling or updating GSD rewrites ~/.claude/settings.json's
+// statusLine back to gsd-statusline.js, and the duplicated context meter would
+// come back with it. Re-asserting at launch means the next `coding --claude`
+// repairs that, rather than the user having to re-run the installer.
+//
+// Two properties make per-launch invocation acceptable:
+//   • idempotent — writes nothing when the merged result already matches disk,
+//     so the common case is a read;
+//   • ONE backup, ever — a timestamped copy per launch would litter the user's
+//     .claude directory. install.sh takes the same one-time-original approach
+//     with its .coding-orig file.
 if (process.argv.includes('--install-global')) {
-  const backup = `${userSettingsPath}.pre-global-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-  if (existsSync(userSettingsPath)) copyFileSync(userSettingsPath, backup);
-  writeFileSync(userSettingsPath, `${JSON.stringify(derived, null, 2)}\n`);
-  process.stderr.write(
-    `[claude-runtime] global scope: merged coding hooks into ${userSettingsPath}\n`
-    + `[claude-runtime] previous settings saved to ${backup}\n`,
-  );
+  const next = `${JSON.stringify(derived, null, 2)}\n`;
+  const current = existsSync(userSettingsPath)
+    ? readFileSync(userSettingsPath, 'utf8')
+    : null;
+
+  if (current === next) {
+    process.stderr.write('[claude-runtime] global scope: settings already current\n');
+  } else {
+    const backup = `${userSettingsPath}.coding-pre-global`;
+    if (current !== null && !existsSync(backup)) {
+      writeFileSync(backup, current);
+      process.stderr.write(`[claude-runtime] saved a one-time original: ${backup}\n`);
+    }
+    writeFileSync(userSettingsPath, next);
+    process.stderr.write(
+      `[claude-runtime] global scope: coding hooks + status line asserted in ${userSettingsPath}\n`,
+    );
+  }
 }
 
 const runtimeDir = join(repo, '.coding', 'runtime');

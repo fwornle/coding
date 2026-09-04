@@ -1,64 +1,67 @@
-@startuml
+@startuml status-line-display
 !include _standard-style.puml
-!theme plain
-title Status Line Display States
+
+title Status Line Display — badges and their state vocabulary
+
+' PlantUML creole notes for future editors:
+'   "~" escapes the next character and a LEADING "*" starts a bullet list, so
+'   paths and globs in labels use $HOME / <placeholder> spellings instead of
+'   relying on escapes. Avoid a bare "$" elsewhere — it reads as a variable.
 
 top to bottom direction
 
-rectangle "Status Line Components" {
-  rectangle "Constraint\nMonitoring" as Constraint {
-    label "🛡️ 8.5" as Shield
+rectangle "One rule: the emoji is the LABEL, the dot is the STATE" as Rule {
+  rectangle "Severity dots — a badge's own health" as Severity {
+    card "STATE_DOTS\n● green  colour41   healthy\n● amber  colour214  warning\n● red    colour196  critical\n● grey   colour238  idle / offline" as StateDots <<util>>
+    card "ALARM_DOTS — bold, for a dot\nsitting among other dots\n● amber  colour214 bold\n● red    colour196 bold" as AlarmDots <<util>>
   }
-  
-  rectangle "Experimentation\nMode" as Experiment {
-    label "🔍EX" as Search
+  rectangle "Lifecycle ramp — how old, never an alarm" as Lifecycle {
+    card "● colour41  Active     < 5 min\n● colour34  Cooling    5 - 30 min\n● colour28  Fading     30 min - 6 h\n● colour22  Inactive   6 - 24 h\n● colour238 Sleeping   > 24 h" as Ramp <<util>>
   }
-  
-  rectangle "Semantic\nAnalysis" as Semantic {
-    label "🧠 ✅" as Brain
-  }
-  
-  rectangle "Content\nRedirection" as Redirect {
-    label "🔀→coding" as Arrow
-  }
-  
-  rectangle "Network\nLocation" as NetLoc {
-    label "[N:VPN]" as NetBadge
-  }
-  
-  rectangle "Proxy\nStatus" as ProxyStat {
-    label "[P:ON]" as ProxyBadge
-  }
-  
-  rectangle "Session\nStatus" as Session {
-    rectangle "Normal State" {
-      label "📋1530-1630-session" as Normal
-    }
-    rectangle "Warning State" {
-      label "📋🟠1530-1630(5min)" as Warning
-    }
-    rectangle "Ended State" {  
-      label "📋🔴1530-1630(ended)" as Ended
-    }
+  rectangle "Not severities — these keep a pictogram" as Pictograms {
+    card "⏰ stale data    ⏳ pending\n🔇 suppressed    ❓ unknown\n🚫 blocked" as Picto <<util>>
   }
 }
 
-rectangle "Data Sources" {
-  component "Combined Status Line\nScript" as StatusScript
-  database ".services-running.json" as Services
-  database ".redirect-status" as RedirectFile
-  database ".specstory/history" as History
-  database "Health coordinator\n:3034 /health/state" as CoordState
+rectangle "Badges, left to right as rendered" as Bar {
+  card "[🏥●]\nsystem health rollup" as Health <<core>>
+  card "[RA●C●]\nper-project activity,\ncurrent pane underlined" as Sessions <<core>>
+  card "[LSL●]\nETM watching THIS pane\nhidden when healthy\ngrey = starting (< 60 s)" as Lsl <<core>>
+  card "[🔒77%●3]\ncompliance, then violations" as Constraint <<core>>
+  card "[📚●]\nknowledge pipeline freshness" as Knowledge <<core>>
+  card "[N:VPN] [P:AUTO]\nnetwork + proxy daemon" as Net <<core>>
+  card "[D:12] [L:3]\nprompt downgrades,\nlocal completions\n(both hidden at zero)" as Routing <<core>>
+  card "████░░░░░░ 42%\ncontext window —\nfill over a duller trough\nfixed 15 cells, no brackets" as Gauge <<core>>
+  card "[📋18-19]  18:34\nLSL window, then the clock" as Window <<core>>
 }
 
-StatusScript -> Services : Check service health
-StatusScript -> RedirectFile : Check routing status
-StatusScript -> History : Find current session
-StatusScript -> Session : Calculate time remaining
-StatusScript -> CoordState : Network location\n+ proxy status
+rectangle "Where the values come from" as Sources {
+  database "health coordinator\n:3034 /health/state\nservices · lsl · knowledge · network" as Coord <<storage>>
+  database "constraint-status-line.js" as ConstraintSrc <<storage>>
+  database "per-agent context stores\n(claude · opencode · copilot · pi)" as CtxSrc <<storage>>
+}
 
-' Status line updates every 5 seconds. Project detection via TRANSCRIPT_SOURCE_PROJECT, Current working directory, Coding repo directory
+component "combined-status-line.js\nfull render" as CSL <<core>>
+component "status-line-fast.cjs\n5 s tick, patches in place" as Fast <<core>>
 
-' Timing Logic: Over 5 min (Normal display), Under 5 min (Orange warning), Past end (Red ended)
+Coord DATA_LINE CSL
+ConstraintSrc DATA_LINE CSL
+CtxSrc DATA_LINE CSL
+CtxSrc DATA_LINE Fast : gauge re-read each tick
+CSL SYNC_LINE Bar : render
+Fast SYNC_LINE Bar : serve from cache
+
+' Hidden edge purely for layout: without it PlantUML parks the vocabulary block
+' beside the sources, which pushes the page past 1900px and shrinks every label
+' once MkDocs scales the image to content width. Stacking it under the badges
+' keeps the diagram tall rather than wide, per the documentation style guide.
+Bar -[hidden]-> Rule
+
+legend bottom
+  <b>Amber and red mean something is wrong — never merely old.</b>
+  Age is carried by the five-step green ramp, which ends in grey.
+  A healthy badge is often HIDDEN rather than green: the bar is a
+  place for exceptions, not a dashboard.
+endlegend
 
 @enduml
