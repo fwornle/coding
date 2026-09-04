@@ -319,7 +319,7 @@ back. Not changed on a guess.
 
 > Unchanged. Every `copilot` invocation this session opened with:
 > `Warning: Ignoring unknown top-level key(s) in user settings file
-> "/Users/Q284340/.copilot/settings.json": "enableFileHooks"`. Still its own investigation,
+> "~/.copilot/settings.json": "enableFileHooks"`. Still its own investigation,
 > and still a silent confound for any KB-on/KB-off arm run on copilot.
 
 

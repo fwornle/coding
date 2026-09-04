@@ -105,7 +105,7 @@ The constraint monitor used to load configs from multiple paths with silent fall
 - The host hooks loaded `${CODING_REPO}/.constraint-monitor.yaml`
 - The container dashboard loaded `integrations/constraint-monitor/constraints.yaml`
 
-These two files drifted — the same `no-console-log` rule was severity=error on the host and severity=warning in the dashboard. The dashboard reported 20 constraints; the running hook enforced 30. **`/Users/Q284340/Agentic/coding/.constraint-monitor.yaml` is now the only canonical config.** It is bind-mounted into the container at `/coding/.constraint-monitor.yaml`, and `findProjectConfig()` throws when the file is missing instead of falling back to a different one.
+These two files drifted — the same `no-console-log` rule was severity=error on the host and severity=warning in the dashboard. The dashboard reported 20 constraints; the running hook enforced 30. **`$CODING_REPO/.constraint-monitor.yaml` is now the only canonical config.** It is bind-mounted into the container at `/coding/.constraint-monitor.yaml`, and `findProjectConfig()` throws when the file is missing instead of falling back to a different one.
 
 If you see `Error: CODING_REPO=... but ... does not exist`, fix the path or set `CONSTRAINT_CONFIG_PATH` explicitly — the system refuses to silently load from somewhere else.
 

@@ -362,8 +362,8 @@ grep -n 'resolveHostCodingPath' scripts/enhanced-transcript-monitor.js
 # Restart with a clean env:
 pkill -f 'enhanced-transcript-monitor.js.*coding'
 nohup env -i HOME=$HOME PATH=$PATH \
-  CODING_REPO=/Users/Q284340/Agentic/coding \
-  node scripts/enhanced-transcript-monitor.js /Users/Q284340/Agentic/coding \
+  CODING_REPO="$PWD" \
+  node scripts/enhanced-transcript-monitor.js "$PWD" \
   >> .logs/etm-coding.log 2>&1 &
 ```
 
