@@ -81,7 +81,7 @@ opencode
 
 - `claude-haiku-4.5` (fast tier — benchmarked fastest at 0.77s @10 parallel)
 - `claude-sonnet-4.5` (standard tier)
-- `claude-opus-4.6` (premium tier)
+- `claude-opus-5` (premium tier)
 
 **Features:**
 - ✅ Zero per-token cost
@@ -151,7 +151,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 - `claude-sonnet-4-5` (standard tier)
 - `claude-haiku-4-5` (fast tier)
-- `claude-opus-4-6` (premium tier)
+- `claude-opus-5` (premium tier)
 
 ### OpenAI
 

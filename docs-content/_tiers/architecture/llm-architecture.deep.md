@@ -131,7 +131,7 @@ The v7.3 milestone restructures the **CLI fallback** described above into a **tw
 |------|-------|-------------|
 | Fast | `claude-haiku-4.5` | Benchmarked: 5s sequential, 0.77s @10 parallel |
 | Standard | `claude-sonnet-4.5` | Claude Sonnet 4.5 via Copilot |
-| Premium | `claude-opus-4.6` | Claude Opus 4.6 via Copilot |
+| Premium | `claude-opus-5` | Claude Opus 5 via Copilot |
 
 **Why Copilot is primary**: Performance benchmarks revealed that Copilot API calls scale beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Since batch agents already parallelize LLM calls via `Promise.all` (concurrency 5-20), copilot as the first-choice provider unlocks peak throughput.
 
@@ -172,7 +172,7 @@ When running inside Docker, host-side tools are unavailable. The [LLM Proxy Brid
 |------|-------|------|
 | Fast | `claude-haiku-4-5` | $1/$5 per MTok |
 | Standard | `claude-sonnet-4-5` | $3/$15 per MTok |
-| Premium | `claude-opus-4-6` | $5/$25 per MTok |
+| Premium | `claude-opus-5` | $5/$25 per MTok |
 
 ### 5. OpenAI
 **API Key**: `OPENAI_API_KEY`
@@ -240,17 +240,20 @@ When running inside Docker, host-side tools are unavailable. The [LLM Proxy Brid
 
 The library routes requests to providers based on task complexity and cost optimization:
 
-!!! warning "`claude-opus-4.6` is the library's id, and it is not in the runtime catalogue"
+!!! note "The premium tier said `claude-opus-4.6` until 2026-09-04"
 
-    The premium entries below say `claude-opus-4.6`, and that is genuinely what the library
-    declares — in `src/config.ts`, `config/llm-providers.yaml`, `copilot-provider.ts` and
-    `anthropic-provider.ts`. It is documented here as-is because this page describes that
-    code.
+    Every table below used to name `claude-opus-4.6` (Copilot spelling) or `claude-opus-4-6`
+    (Anthropic wire spelling), because that is what the library declared — in `src/config.ts`,
+    `config/llm-providers.yaml`, `copilot-provider.ts` and `anthropic-provider.ts`. The id was
+    real and was genuinely served (3,268 token-usage rows via Copilot between 2026-03-06 and
+    2026-07-26), but it has since left both catalogues: `opencode models` now lists Copilot's
+    opus ids as 4.7, 4.8 and 5, and `llm-routing.yaml` declares `claude-opus-4.8` and
+    `claude-opus-5`.
 
-    It is **not** a model the runtime bridge can route to: `llm-routing.yaml` declares
-    `claude-opus-5` and `claude-opus-4.8`, and a band naming a model outside a provider's
-    `available_models` fails validation at boot. Do not copy the id from here into a routing
-    config.
+    The library now names **`claude-opus-5`** on both spellings — one string valid on the
+    Anthropic wire and in Copilot's catalogue. The claude-code alias table further up still
+    shows 4.6 on purpose: that column is the daemon's `CLAUDE_OAUTH_MODEL_MAP`, which still
+    resolves the bare `opus` alias to `claude-opus-4-6` and was not part of that change.
 
 ### Tier Definitions
 
@@ -459,7 +462,7 @@ providers:
     models:
       fast: "claude-haiku-4.5"        # Benchmarked: 0.77s @10 parallel
       standard: "claude-sonnet-4.5"
-      premium: "claude-opus-4.6"
+      premium: "claude-opus-5"
     quotaTracking:
       enabled: true
       softLimitPerHour: 100
@@ -475,7 +478,7 @@ providers:
     apiKeyEnvVar: ANTHROPIC_API_KEY
     fast: "claude-haiku-4-5"
     standard: "claude-sonnet-4-5"
-    premium: "claude-opus-4-6"
+    premium: "claude-opus-5"
   # ... more providers (openai, gemini, github-models)
 
 # Copilot first — scales with parallelism (0.77s effective @10 concurrent)
@@ -554,7 +557,7 @@ export SEMANTIC_ANALYSIS_MODE=local
 **After subscriptions** (until quota exhausted):
 - Fast: $0 (Copilot/claude-haiku-4.5, parallelized)
 - Standard: $0 (Copilot/claude-sonnet-4.5)
-- Premium: $0 (Copilot/claude-opus-4.6)
+- Premium: $0 (Copilot/claude-opus-5)
 - **Total: $0.00 per run** ✅
 - **Bonus: ~3x faster** via parallelized copilot calls
 
