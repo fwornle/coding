@@ -100,8 +100,8 @@ two `ls` forms plus `Read`.
 
 **Only if current project is NOT `coding`:**
 
-1. `ls -d /Users/Q284340/Agentic/coding/.specstory/history/[0-9][0-9][0-9][0-9]/[0-9][0-9]`,
-   then `ls -1r /Users/Q284340/Agentic/coding/.specstory/history/<YYYY>/<MM>` for the
+1. `ls -d "$CODING_REPO"/.specstory/history/[0-9][0-9][0-9][0-9]/[0-9][0-9]`,
+   then `ls -1r "$CODING_REPO"/.specstory/history/<YYYY>/<MM>` for the
    tranche(s) covering the Step 2 range
 2. Find files that fall within or overlap the timestamp range from Step 2
 3. **Read** the most recent coding LSL file from that time range
@@ -156,7 +156,7 @@ Judged from the `Read` result — do not shell out to `wc`/`ls -l` to measure a 
 ## Path Constants
 
 - Current project LSL: `.specstory/history/YYYY/MM/*.md`
-- Coding project LSL: `/Users/Q284340/Agentic/coding/.specstory/history/YYYY/MM/*.md`
+- Coding project LSL: `$CODING_REPO/.specstory/history/YYYY/MM/*.md`
 
 ## Permissions
 
@@ -164,13 +164,17 @@ Judged from the `Read` result — do not shell out to `wc`/`ls -l` to measure a 
 user-level rules in `~/.claude/settings.json`:
 
 ```json
-"Read(//Users/Q284340/**/.specstory/history/**)",
-"Read(//Users/Q284340/Agentic/coding/.specstory/history/**)",
+"Read(//<your-home>/**/.specstory/history/**)",
+"Read(//<your-coding-checkout>/.specstory/history/**)",
 "Bash(ls -d .specstory/history/:*)",
 "Bash(ls -1r .specstory/history/:*)",
-"Bash(ls -d /Users/Q284340/Agentic/coding/.specstory/history/:*)",
-"Bash(ls -1r /Users/Q284340/Agentic/coding/.specstory/history/:*)"
+"Bash(ls -d /<your-coding-checkout>/.specstory/history/:*)",
+"Bash(ls -1r /<your-coding-checkout>/.specstory/history/:*)"
 ```
+
+Substitute your own absolute paths. Permission rules are matched as literal globs —
+unlike the commands above, they do **not** expand `$CODING_REPO` or `~`, so a rule written
+with a variable in it silently matches nothing.
 
 The relative pair covers whatever project is current; the absolute pair covers the
 cross-project access in Step 3 (needed because that path is outside the workspace whenever the

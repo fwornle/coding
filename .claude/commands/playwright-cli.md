@@ -169,7 +169,7 @@ console.log(`semantic_analysis status: ${status}`);
 
 ```js
 const fs = require('fs');
-const progressPath = '/Users/Q284340/Agentic/coding/.data/workflow-progress.json';
+const progressPath = process.env.CODING_REPO + '/.data/workflow-progress.json';
 fs.writeFileSync(progressPath, JSON.stringify({
   workflowId: 'wf_test',
   workflowName: 'wave-analysis',

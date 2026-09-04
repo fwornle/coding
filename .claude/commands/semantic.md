@@ -53,7 +53,7 @@ semantic checkpoint reset --days-ago 7      # re-analyse from N days back
 
 semantic insights notes.md --type architecture
 semantic analyze code src/foo.ts --focus security
-semantic analyze repo /Users/Q284340/Agentic/coding --max-files 200
+semantic analyze repo "$CODING_REPO" --max-files 200
 
 semantic tools                              # names + descriptions of all 19 tools
 semantic tool <name> '{"key":"value"}'      # generic escape hatch for anything unmapped

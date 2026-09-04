@@ -14,7 +14,8 @@
 #   OpenCode → appends "Available Skills" section to CLAUDE.md (idempotent)
 #
 # Machine-specific paths (home dir, repo path, username) are replaced with
-# portable placeholders in all generated output.
+# portable placeholders in EVERY output — the copied slash commands, the copilot
+# instructions, and the skills section. See sanitize_paths().
 #
 # Usage:
 #   ./scripts/generate-agent-instructions.sh [project_dir] [coding_repo]
@@ -135,10 +136,16 @@ install_claude_global() {
 
     [[ -d "$COMMANDS_DIR" ]] || { log "No .claude/commands/ dir — skipping Claude global"; return 0; }
 
+    # Sanitised, not copied. This header promises portable placeholders in all
+    # generated output, and until now this path was the exception: a raw `cp` shipped
+    # whatever absolute paths a skill happened to contain straight into the user's
+    # GLOBAL ~/.claude/commands, where they apply in every project on every machine.
+    # The copilot output has been going through sanitize_paths all along; this is the
+    # same treatment for the one output that was missing it.
     local count=0
     for cmd_file in "$COMMANDS_DIR"/*.md; do
         [[ -f "$cmd_file" ]] || continue
-        cp "$cmd_file" "$target/$(basename "$cmd_file")"
+        sanitize_paths < "$cmd_file" > "$target/$(basename "$cmd_file")"
         count=$((count + 1))
     done
 
