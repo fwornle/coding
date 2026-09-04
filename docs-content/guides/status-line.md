@@ -333,6 +333,34 @@ its record on every render, but an idle one may not render for hours and must ke
 mapping. It bounds the one case where the name alone is ambiguous: tmux session names embed
 the launcher pid, and pids come round again after a reboot.
 
+**Reclaiming the temp files.** Three families accumulate in the system temp directory, one
+per session, and until recently nothing removed them: `claude-ctx-<sessionId>.json`,
+GSD's `claude-ctx-<sessionId>-warned.json` companion, and the
+`claude-tmux-session-<name>.json` records above. `scripts/claude-ctx-sweeper.mjs` deletes
+them once they pass `CLAUDE_CTX_RETENTION_DAYS` (default 2), and is run from the agent
+launch path in `bin/coding` — backgrounded, and rate-limited via `--if-older-than` so a
+burst of launches sweeps once rather than once each. It never throws and always exits 0: a
+launch must not be able to fail over housekeeping.
+
+It keys on **the temp file's own mtime**, not on the session transcript's. The transcript
+is the tempting signal and the wrong one — transcript mtimes are bulk-touched, and one
+session was observed with a transcript modified minutes ago whose ctx file had not moved in
+three days. These files are written only by the render loop, so their mtime means exactly
+"when this session last drew its status line". Reclaiming one wrongly costs a blank gauge
+in that pane until its next render, which rewrites the file.
+
+Only those three prefixes are matched, and only with a `.json` extension. The temp
+directory is shared with the OS and with the rest of this repo (`vkb-server.pid`,
+`kgbench-needles-*`, the copilot KB stash), so a wildcard sweep there would be a footgun.
+
+**Windows also gets a scheduled task.** macOS purges `/var/folders` and Linux ships
+systemd-tmpfiles for `/tmp`, so on those the launch-time sweep plus the OS is enough.
+Windows reclaims `%TEMP%` never, so `install.sh` offers an hourly Scheduled Task
+(`\coding\claude-ctx-sweeper`, installed by
+`scripts/install-claude-ctx-sweeper-schtasks.sh`, removed by `uninstall.sh`). It is the
+only system-scope change the sweeper makes on any platform, and declining it loses nothing
+but the sweeps that would have happened while no agent was running.
+
 **Absent, not zero.** When a store cannot be read — an agent with no session for this
 project, a missing database, an unreadable file — the gauge renders nothing at all. A
 gauge showing 0% and a gauge that cannot see its source must not look the same.

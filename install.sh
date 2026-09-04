@@ -162,6 +162,7 @@ global|~/.copilot/settings.json|enableFileHooks|yes|OPT-IN (separate): lets repo
 global|~/.copilot/config.json|add trustedFolders|yes|OPT-IN (separate): trusts this repo; rewrite drops JSONC comments
 system|~/Library/LaunchAgents/com.coding.llm-cli-proxy.plist|create+load|yes|OPT-IN: starts the LLM proxy at login (macOS)
 system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux)
+system|Scheduled Task \coding\claude-ctx-sweeper|create|yes|Windows only: hourly cleanup of stale status-line temp files, because nothing else ever reclaims %TEMP% (elsewhere this runs at agent launch and changes nothing)
 MANIFEST
 }
 
@@ -186,6 +187,7 @@ print_impact_manifest() {
             case "$path" in
                 *LaunchAgents*) [[ "$PLATFORM" == "macos" ]] || continue ;;
                 *systemd*)      [[ "$PLATFORM" == "linux" || "$PLATFORM" == "wsl" ]] || continue ;;
+                "Scheduled Task"*) [[ "$PLATFORM" == "windows" ]] || continue ;;
             esac
             if [[ "$any" == "false" ]]; then
                 any=true
@@ -2903,6 +2905,40 @@ PLIST_EOF
     fi
 }
 
+# Register the status-line temp-file sweeper as a Windows Scheduled Task.
+#
+# A NO-OP ON EVERY OTHER PLATFORM, and that is the design rather than an omission. The
+# sweep runs from the agent launch path (bin/coding) on all four platforms and needs no
+# scheduler; macOS purges /var/folders and Linux ships systemd-tmpfiles for /tmp, so there
+# the launch-time sweep plus the OS covers it. Windows reclaims %TEMP% never, which is why
+# it alone gets a timer.
+#
+# Consent is `confirm_system_change` and NOT the CODING_INSTALL_SYSTEM_SERVICES gate the
+# LLM proxy uses. That gate guards a login-persistent daemon; this is an hourly cleanup
+# task, and confirm_system_change already declines under --ci/non-interactive and approves
+# under --yes. Declining costs nothing: the launch-time sweep still reclaims the files.
+setup_claude_ctx_sweeper() {
+    [[ "$PLATFORM" == "windows" ]] || return 0
+
+    local installer="$CODING_REPO/scripts/install-claude-ctx-sweeper-schtasks.sh"
+    [[ -f "$installer" ]] || return 0
+
+    if ! confirm_system_change \
+        "Register an hourly Windows Scheduled Task to delete stale status-line temp files" \
+        "Creates the scheduled task \\coding\\claude-ctx-sweeper. Removed by ./uninstall.sh."; then
+        info "  Skipped the scheduled task — temp files are still swept at agent launch."
+        return 0
+    fi
+
+    if bash "$installer"; then
+        success "✓ Scheduled Task \\coding\\claude-ctx-sweeper registered (hourly)"
+    else
+        # Never fatal: the launch-time sweep is the guarantee, the task is the extra.
+        warning "  Could not register the scheduled task — temp files are still swept at agent launch"
+        INSTALLATION_WARNINGS+=("claude-ctx sweeper: scheduled task not registered; sweeping happens at agent launch instead")
+    fi
+}
+
 # Create Linux systemd user service for LLM CLI Proxy
 create_llm_proxy_systemd() {
     local proxy_dir="$1"
@@ -4103,6 +4139,7 @@ main() {
     install_plantuml
     setup_local_llm  # DMR preferred, Ollama as fallback
     setup_llm_cli_proxy  # HTTP bridge for claude/copilot CLI in Docker
+    setup_claude_ctx_sweeper  # Windows-only scheduled task; a no-op elsewhere
     install_memory_visualizer
     run_step install_semantic_analysis
     run_step install_constraint_monitor

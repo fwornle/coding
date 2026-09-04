@@ -130,6 +130,25 @@ if [[ -d "$CODING_REPO/integrations/llm-cli-proxy" ]]; then
     echo "    Source code preserved"
 fi
 
+# Remove the Windows scheduled task for the status-line temp-file sweeper.
+#
+# Unconditional and quiet by design: it exists only on Windows and only if the user
+# accepted it at install time, so "no such task" is the common case, not an error. The
+# sweeper itself needs no uninstalling — it is a repo script invoked from the launch path,
+# and deleting the repo removes it.
+#
+# install.sh's mutation_manifest() declares this as the row
+# `system|Scheduled Task \coding\claude-ctx-sweeper|create|yes|...`; the two are
+# hand-mirrored, so keep them in step.
+if command -v schtasks.exe >/dev/null 2>&1 || command -v schtasks >/dev/null 2>&1; then
+    SCHTASKS_BIN="$(command -v schtasks.exe 2>/dev/null || command -v schtasks)"
+    if "$SCHTASKS_BIN" /Query /TN '\coding\claude-ctx-sweeper' >/dev/null 2>&1; then
+        echo -e "\n${BLUE}🧹 Removing status-line temp-file sweeper task...${NC}"
+        "$SCHTASKS_BIN" /Delete /F /TN '\coding\claude-ctx-sweeper' >/dev/null 2>&1 || true
+        echo "  Removed scheduled task \\coding\\claude-ctx-sweeper"
+    fi
+fi
+
 # Clean up Mastra OpenCode plugin
 echo -e "\n${BLUE}🧠 Removing Mastra OpenCode plugin...${NC}"
 
