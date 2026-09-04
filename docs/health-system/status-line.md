@@ -246,6 +246,37 @@ scope, `~/.pi/agent` in global — never "whichever directory exists". Switching
 to global leaves the old `.pi-agent` behind, and an existence check would read that frozen
 snapshot forever.
 
+**Which Claude session the gauge reads.** The bridge file is keyed on Claude Code's own
+session id, so the renderers have to know *which* session owns the pane before they can
+read anything. That id is recorded by `scripts/claude-statusline.cjs`, the shim Claude Code
+runs as its status line — the one place that sees the session id (handed to it on stdin)
+and the tmux session together. It writes
+`$TMPDIR/claude-tmux-session-<tmux-session-name>.json` on every render, and both renderers
+look the pane up there first.
+
+The key is the **tmux session name**, not the pane: tmux runs `status-right` in the server
+rather than in a pane, so the renderers never receive `TMUX_PANE` — what the format string
+passes them is `#{session_name}` as `TMUX_SESSION_NAME`. It is also the right granularity,
+since `status-right` is drawn once per tmux session and these agent launches are one tmux
+session apiece.
+
+Without a record the renderers fall back to their older project-keyed lookups — the
+newest-beating coordinator LSL entry in the full render, the single transcript path per
+project in the fast path's sidecar. Those name a *project*, not a session, so on a project
+that has hosted more than one they can name the wrong one, and the per-pane tie-break meant
+to disambiguate them never fires (coordinator entries take their pane from the ETM
+heartbeat, and ETMs are project singletons carrying only the launcher's pane, so
+`tmuxPane` is null in practice). The symptom was a first-turn session rendering the context
+of the session the user had just closed until its own ETM registered and out-beat the old
+one's remaining heartbeats — measured at 66%, which is exactly what the previous session's
+bridge file normalises to while the fresh one said 13%. The fallback is kept for panes with
+no record: an unwrapped `claude`, or the tick before the first render.
+
+Records expire after 24 h. That is not a freshness requirement — a live session rewrites
+its record on every render, but an idle one may not render for hours and must keep its
+mapping. It bounds the one case where the name alone is ambiguous: tmux session names embed
+the launcher pid, and pids come round again after a reboot.
+
 **Absent, not zero**: an unreadable store renders no gauge at all. `CODING_AGENT` is part
 of the cache key so two agents on one project cannot show each other's reading, and a line
 borrowed from a sibling pane has its gauge blanked (width-identical) first.

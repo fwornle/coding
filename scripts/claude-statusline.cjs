@@ -33,7 +33,7 @@
  * A duplicated gauge is a cosmetic annoyance; a blank status line is not.
  */
 
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -87,10 +87,59 @@ function resolveUpstream() {
   return `node "${path.join(os.homedir(), '.claude', 'hooks', 'gsd-statusline.js')}"`;
 }
 
+/**
+ * Record which Claude session is running here, for the tmux context gauge.
+ *
+ * This shim is the ONLY place in the system that sees Claude Code's own session
+ * id and the tmux session together, which is why the recording lives here rather
+ * than in either renderer. The gauge previously had to guess the id from
+ * project-keyed state, and on a fresh session guessed the session the user had
+ * just left — see the long note in lib/statusline/context-gauge.cjs.
+ *
+ * The tmux session name has to be resolved rather than read: tmux exports
+ * TMUX_PANE to programs started in a pane, not the session name, and the
+ * renderers get the name (as TMUX_SESSION_NAME) from `#{session_name}` in the
+ * status-right format string. `display-message` is the seam that turns one into
+ * the other — measured at 10ms, against the ~40ms node spawn this function's
+ * caller is already paying for the upstream status line.
+ *
+ * Everything here is best-effort by design. Not under tmux, no tmux binary, a
+ * payload without a session id, an unwritable temp dir: skip the recording and
+ * let the gauge fall back to what it did before. The status line is the job.
+ */
+function recordSessionForGauge(raw) {
+  try {
+    const pane = process.env.TMUX_PANE;
+    if (!pane || !process.env.TMUX) return;
+
+    const data = JSON.parse(raw);
+    if (!data?.session_id) return;
+
+    const tmuxSession = execFileSync(
+      'tmux', ['display-message', '-p', '-t', pane, '#{session_name}'],
+      { encoding: 'utf8', timeout: 1000, stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+    if (!tmuxSession) return;
+
+    // Required lazily: a globally-installed shim whose coding repo has moved
+    // must still render a status line, and this is the only import that can fail.
+    require(path.join(__dirname, '..', 'lib', 'statusline', 'context-gauge.cjs'))
+      .recordClaudeSession({
+        tmuxSession,
+        sessionId: data.session_id,
+        cwd: data.workspace?.current_dir || null,
+      });
+  } catch {
+    /* the gauge falls back on its own */
+  }
+}
+
 let stdin = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (c) => { stdin += c; });
 process.stdin.on('end', () => {
+  recordSessionForGauge(stdin);
+
   const child = spawn(resolveUpstream(), {
     shell: true,
     stdio: ['pipe', 'pipe', 'inherit'],

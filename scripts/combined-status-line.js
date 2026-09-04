@@ -2699,6 +2699,18 @@ class CombinedStatusLine {
         // only the transcript path reveals — see sessionIdFromTranscriptPath.
         let sessionId = null;
         if (paneAgent === 'claude') {
+          // This tmux session's OWN Claude session id, as Claude Code reported
+          // it to scripts/claude-statusline.cjs. Authoritative and per session,
+          // so it is tried first; the coordinator lookup below is a
+          // project-level guess that names the wrong session whenever a project
+          // has had more than one (the case that rendered a fresh session at the
+          // previous one's 66%). It stays as the fallback for panes with no
+          // record: an unwrapped `claude`, or a tick before the first render.
+          sessionId = contextGauge.claudeSessionForTmuxSession(
+            process.env.TMUX_SESSION_NAME
+          );
+        }
+        if (paneAgent === 'claude' && !sessionId) {
           const coordResult = await this.getCoordinatorState();
           if (coordResult.ok) {
             const myProject = basename(projectPath);
