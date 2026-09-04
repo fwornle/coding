@@ -20,7 +20,7 @@ behind every table below. Re-run it after any new run and the prose here can be 
 against freshly derived numbers rather than remembered ones.
 
 > **Scope.** Everything here concerns the `hybrid` arm on **claude**. That is not a choice —
-> see [correction 1](#correction-1--this-is-a-finding-about-one-agent).
+> see [correction 1](#correction-1-this-is-a-finding-about-one-agent).
 
 ---
 
@@ -51,7 +51,7 @@ entirely on one agent.
 
 ## Three corrections to the premise
 
-### Correction 1 — this is a finding about one agent
+### Correction 1: this is a finding about one agent
 
 Neither copilot nor opencode records a single tool call, in any run:
 
@@ -201,7 +201,7 @@ no shared instruction — which is precisely why one would expect it to replicat
 harnesses without any of them containing the rule.
 
 It is not isolated by any measurement here, and it cannot be with the current telemetry
-(see [correction 1](#correction-1--this-is-a-finding-about-one-agent)).
+(see [correction 1](#correction-1-this-is-a-finding-about-one-agent)).
 
 ### The benchmark deliberately removes the counter-steer
 
@@ -422,7 +422,7 @@ nearly half the set.
 
 ---
 
-## Null result — coverage does not drive the choice
+## Null result: coverage does not drive the choice
 
 The obvious follow-up hypothesis is that the agent has learned where the index is blind. It
 has not:
@@ -558,7 +558,7 @@ transport, not retrieval*. Any future arm comparison should separate them.
 returns every match in file order, so the agent can reason over the whole set — count hits,
 notice 22 of 24 sit in one directory, spot the one in a test file. A graph returns a selected
 set, and the agent cannot tell a true negative from an unindexed one. This is the mechanism
-behind [the coverage null](#null-result--coverage-does-not-drive-the-choice): recall failures
+behind [the coverage null](#null-result-coverage-does-not-drive-the-choice): recall failures
 are invisible, precision failures are obvious, and agents recover well from noise and badly
 from silence. It also explains why CodeGraph's own code goes out of its way to return
 guidance text rather than `isError` — they are buying back legibility.

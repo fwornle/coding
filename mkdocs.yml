@@ -54,7 +54,18 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  # base_path so a tier partial is addressed relative to docs_dir ("_tiers/…"), not to the
+  # directory mkdocs happens to be invoked from. `docs` is second because three pages under
+  # docs-content/ are symlinks into docs/, and restrict_base_path (on by default) rejects a
+  # target whose REAL path falls outside every base_path.
+  #
+  # check_paths defaults to FALSE, which renders a missing include as an empty tab and leaves
+  # the build green. That is the same silent-success failure class as the 2026-08-19 gate
+  # incident in .github/workflows/deploy-docs.yml — a mistyped tier would publish a blank
+  # Deep Dive and nothing would say so. On.
+  - pymdownx.snippets:
+      base_path: [docs-content, docs]
+      check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
   - tables
@@ -63,8 +74,23 @@ markdown_extensions:
   - toc:
       permalink: true
 
+# Tier partials are included into their shell page by pymdownx.snippets; they are not pages
+# of their own and must not be rendered, navigated to, or searched as if they were.
+exclude_docs: |
+  _tiers/
+
+# A link to a #heading that does not exist is reported at INFO by default, so `--strict` does
+# not catch it. Tiering moves headings between files, and a heading repeated across two tiers
+# gets its second occurrence renamed (#foo -> #foo_1) — which breaks inbound deep links
+# silently. Promote it to a warning so --strict fails the build instead.
+validation:
+  anchors: warn
+
 extra_css:
   - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/tabbed-toc.js
 
 nav:
   - Home: index.md
