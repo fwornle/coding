@@ -1,0 +1,639 @@
+## Overview
+
+The [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unified LLM layer consolidates three previously separate LLM abstractions into a single, comprehensive library that provides intelligent routing, resilience, and cost optimization across 14 different LLM providers, including **subscription-based providers** that eliminate per-token API costs. It is maintained as a **standalone package** shared with OKB and other projects.
+
+**Why it was created:**
+- **Before**: 3 separate LLM abstractions (Semantic Analysis, Unified Inference Engine, Semantic Validator)
+- **Problem**: Code duplication, inconsistent provider handling, no shared caching or resilience
+- **After**: Single unified layer ([`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy)) with shared infrastructure, tier-based routing, circuit breaker, and LRU cache
+
+**Key Features:**
+- **Parallelized copilot-first routing** — Copilot scales beautifully with parallelism (0.77s effective per call at 10 concurrent)
+- **Zero-cost routing** via GitHub Copilot and Claude Code subscriptions
+- **Automatic fallback** to paid APIs on quota exhaustion
+- **Batch-optimized** — agents already use `Promise.all` with concurrency 5-20, copilot as primary unlocks peak throughput
+- **Optimistic quota tracking** with exponential backoff
+
+---
+
+## Architecture Components
+
+![LLM Provider Architecture](../images/llm-provider-architecture.png)
+
+### Core Components
+
+1. **LLMService** (Facade)
+   - Single entry point for all LLM operations
+   - Handles tier-based routing
+   - Manages provider selection and fallback
+   - Integrates with infrastructure (cache, circuit breaker, metrics)
+
+2. **ProviderRegistry**
+   - Central registry for all LLM providers
+   - Dynamic provider registration and lookup
+   - Configuration validation
+
+3. **Infrastructure Layer**
+   - **Circuit Breaker**: Prevents cascading failures (threshold: 5 failures, reset: 60s)
+   - **LRU Cache**: 1000 entries, 1-hour TTL
+   - **Metrics**: Request tracking, cost monitoring, performance stats
+
+### Consumers
+
+The unified layer serves three primary consumers:
+
+1. **SemanticAnalyzer** (`integrations/semantic-analysis/`)
+   - Batch analysis workflows
+   - Git history analysis
+   - Ontology classification
+
+2. **UnifiedInferenceEngine** (shared utility)
+   - General-purpose LLM inference
+   - Multi-provider support
+
+3. **SemanticValidator** (`integrations/constraint-monitor/`)
+   - Constraint violation detection
+   - Semantic code analysis
+
+---
+
+## Supported Providers
+
+The system supports 14 LLM providers with tier-based model selection:
+
+### Subscription Providers (Zero Cost)
+
+#### 1. Claude Code (Max subscription)
+**Path**: Direct OAuth → CLI fallback (since 2026-05-19)
+**Cost**: $0 per token (uses existing Claude Max subscription)
+
+| Tier | Model alias | Anthropic model returned | Typical latency (direct → fallback) |
+|------|-------------|--------------------------|-----|
+| Fast | `claude-haiku-4.5` | `claude-haiku-4-5-20251001` | ~0.9s (direct path; rarely rate-limited) |
+| Standard | `claude-sonnet-4.6` | `claude-sonnet-4-6-...` | ~10-14s (typically falls back to CLI; bearer endpoint rate-limits sonnet) |
+| Premium | `claude-opus-4.6` | `claude-opus-4-6-...` | ~10-14s (same as sonnet — bearer rate-limited) |
+
+**Two-tier dispatch (`proxy-bridge/server.mjs`)**:
+
+1. **Direct OAuth (fast path)** — `completeClaudeCodeDirect()` POSTs to `api.anthropic.com/v1/messages` with `Authorization: Bearer <oauth>` read from the macOS keychain. Real token counts (9 in / 4 out for `say OK`). Bearer + `anthropic-version: 2023-06-01` + `anthropic-beta: oauth-2025-04-20`.
+2. **CLI fallback (slower)** — on 401/403/429, falls back to `completeClaudeCodeViaCLI()` which spawns `claude -p --output-format json --tools '' ...`. Uses the **same Max subscription** but a different Anthropic rate-limit bucket (sonnet/opus succeed via CLI when bearer 429s). Costs ~16-22K `cache_creation` tokens per call because the CLI auto-injects its full system prompt + tool definitions.
+
+**Requirements**:
+- The `claude` CLI on the host (only used for fallback path): `which claude && claude --version`
+- Authenticated: `env -u ANTHROPIC_API_KEY claude auth status` returns `loggedIn: true, authMethod: "claude.ai", subscriptionType: "max"`
+- Keychain entry `Claude Code-credentials` populated by the CLI
+
+**Token cache** (proxy-side, in-memory):
+- Read on first claude-code call; cached until `expiresAt - now < 60s`
+- On 401: cache cleared, CLI fallback fires, the CLI rotates the keychain blob; next direct call reads the fresh token
+
+**Escape hatches**:
+- `LLM_PROXY_DISABLE_CLAUDE_DIRECT=1` — force every claude-code call through the legacy CLI path
+
+#### Claude CLI Worker Pool (v7.3)
+
+The v7.3 milestone restructures the **CLI fallback** described above into a **two-tier dispatch backed by a warm worker pool** (`proxy-bridge/worker-pool.mjs`, wired into the claude-code dispatcher in `proxy-bridge/server.mjs`). The legacy fallback paid the CLI's full system-prompt warm-up (~16-22K `cache_creation` tokens, ~10-14s) on *every* call because each call cold-spawned a fresh `claude -p`. The pool keeps that subprocess warm and reuses it, cutting steady-state fallback latency to ~2-3s. This affects **claude-code only** — `copilot` stays a direct HTTP POST and is never pooled.
+
+![Claude CLI Worker Pool architecture](../images/claude-worker-pool-architecture.png)
+
+**WorkerPool / ClaudeWorker, keyed by (model × systemPrompt)**:
+
+- **`WorkerPool`** owns a map of per-key worker pools, keyed by `model :: sha256(systemPrompt)[:16]`. Keying on both the model *and* the system prompt means callers sharing an identical (model, prompt) pairing reuse the same warm subprocess, while distinct prompts get isolated pools. An LRU prompt-cap bounds the number of distinct (model × prompt) pools held in memory.
+- **`ClaudeWorker`** wraps one persistent `claude -p --input-format stream-json --output-format stream-json` subprocess running concurrency-1 behind a FIFO queue. It owns that worker's lifecycle: lazy spawn, idle eviction, crash tracking, request/token-based recycling, and cancellation (see [LLM Proxy Bridge → Claude CLI Worker Pool](../integrations/llm-cli-proxy.md#claude-cli-worker-pool-v73) for the WLIFE-01..04 lifecycle guarantees).
+
+**How it slots under the claude-code dispatcher**: the dispatcher's direct-OAuth fast path is unchanged. Only when it falls back to the CLI does the pool engage, as **Tier 1**: `WorkerPool.complete(body, abortSignal, overflowFn)`. If every worker for a key is busy, the key is in crash-cooldown, or `LLM_PROXY_DISABLE_WORKER_POOL=1` is set, the call transparently degrades to **Tier 2 overflow** — `completeClaudeCodeViaCLI`, the original cold one-shot `execFile` of `claude -p`. The pool is therefore a latency optimisation layered *inside* the existing CLI-fallback leg of the two-tier claude-code dispatch, not a new provider.
+
+
+#### 2. GitHub Copilot (Primary Provider)
+**Method**: Direct HTTP POST to Copilot API
+**Cost**: $0 per token (uses existing GitHub Copilot subscription)
+
+| Tier | Model | Description |
+|------|-------|-------------|
+| Fast | `claude-haiku-4.5` | Benchmarked: 5s sequential, 0.77s @10 parallel |
+| Standard | `claude-sonnet-4.5` | Claude Sonnet 4.5 via Copilot |
+| Premium | `claude-opus-4.6` | Claude Opus 4.6 via Copilot |
+
+**Why Copilot is primary**: Performance benchmarks revealed that Copilot API calls scale beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Since batch agents already parallelize LLM calls via `Promise.all` (concurrency 5-20), copilot as the first-choice provider unlocks peak throughput.
+
+**Authentication**:
+- Reads OAuth token from `~/.local/share/opencode/auth.json`
+- Direct HTTP POST to OpenAI-compatible Copilot API endpoint
+- No CLI tools required
+
+**Features**:
+- Shared quota tracking system
+- Automatic provider rotation on exhaustion
+- Zero API costs
+- **From containers**: Falls back to [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
+
+---
+
+### LLM Proxy Bridge (Docker Bridge)
+
+When running inside Docker, host-side tools are unavailable. The [LLM Proxy Bridge](../integrations/llm-cli-proxy.md) runs on the host (port 12435) and forwards requests. For **Copilot**, the proxy bridge reads OAuth tokens from `~/.local/share/opencode/auth.json` and makes direct HTTP POST calls to the Copilot API. For **Claude Code**, it spawns the `claude` CLI. Each provider automatically detects and uses the proxy during initialization when the `LLM_CLI_PROXY_URL` environment variable is set.
+
+---
+
+### API Providers (Per-Token Cost)
+
+#### 3. Groq
+**API Key**: `GROQ_API_KEY`
+
+| Tier | Model | Performance | Cost |
+|------|-------|-------------|------|
+| Fast | `llama-3.1-8b-instant` | 750 tok/s | ~$0.05/M tokens |
+| Standard | `llama-3.3-70b-versatile` | 275 tok/s | ~$0.59/M tokens |
+| Premium | `openai/gpt-oss-120b` | - | High |
+
+### 4. Anthropic
+**API Key**: `ANTHROPIC_API_KEY`
+
+| Tier | Model | Cost |
+|------|-------|------|
+| Fast | `claude-haiku-4-5` | $1/$5 per MTok |
+| Standard | `claude-sonnet-4-5` | $3/$15 per MTok |
+| Premium | `claude-opus-4-6` | $5/$25 per MTok |
+
+### 5. OpenAI
+**API Key**: `OPENAI_API_KEY`
+
+| Tier | Model | Description |
+|------|-------|-------------|
+| Fast | `gpt-4.1-mini` | Affordable small model |
+| Standard | `gpt-4.1` | Latest standard model |
+| Premium | `o4-mini` | Reasoning model |
+
+### 6. Google Gemini
+**API Key**: `GOOGLE_API_KEY`
+
+| Tier | Model | Description |
+|------|-------|-------------|
+| Fast | `gemini-2.5-flash` | Fast, cost-effective |
+| Standard | `gemini-2.5-flash` | Good balance |
+| Premium | `gemini-2.5-pro` | Deep reasoning |
+
+### 7. GitHub Models
+**API Key**: `GITHUB_TOKEN`
+**Base URL**: `https://models.github.ai/inference/v1`
+
+| Tier | Model |
+|------|-------|
+| Fast | `gpt-4.1-mini` |
+| Standard | `gpt-4.1` |
+| Premium | `o4-mini` |
+
+### 8. DMR (Docker Model Runner)
+**Local provider** - no API key required
+**Base URL**: `http://localhost:12434/engines/v1`
+
+- **Default Model**: `ai/llama3.2`
+- **Specialized Models**:
+  - `ai/llama3.2:3B-Q4_K_M` (lightweight tasks)
+  - `ai/qwen2.5-coder:7B-Q4_K_M` (code analysis)
+
+### 9. Ollama
+**Local provider** - no API key required
+
+- Supports any locally installed Ollama models
+- Used as final fallback for local-only mode
+
+### 10. Mock Provider
+**Test/debug mode** - no API key required
+
+- Returns simulated responses
+- Used for testing and development
+
+---
+
+## Tier-Based Routing
+
+![LLM Tier Routing](../images/llm-tier-routing.png)
+
+The system routes requests to providers based on task complexity and cost optimization:
+
+### Tier Definitions
+
+**Fast Tier** (zero cost → low cost, high speed)
+- Simple extraction and parsing
+- Basic classification
+- File pattern matching
+- **Provider Priority**: Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models
+
+**Standard Tier** (zero cost → balanced cost/quality)
+- Semantic code analysis
+- Git history analysis
+- Documentation linking
+- Ontology classification
+- **Provider Priority**: Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models
+
+**Premium Tier** (zero cost → highest quality)
+- Insight generation
+- Pattern recognition
+- Quality assurance review
+- Deep code analysis
+- **Provider Priority**: Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models
+
+### Task-to-Tier Mapping
+
+Tasks are automatically mapped to tiers based on their complexity:
+
+```yaml
+# Fast tier examples
+- git_file_extraction
+- commit_message_parsing
+- basic_classification
+
+# Standard tier examples
+- git_history_analysis
+- semantic_code_analysis
+- ontology_classification
+
+# Premium tier examples
+- insight_generation
+- observation_generation
+- pattern_recognition
+```
+
+### Fallback Chain
+
+1. **Primary**: Try providers in priority order (copilot first — parallelism-optimized)
+2. **Subscription check**: Verify quota availability (copilot, claude-code)
+3. **Circuit breaker check**: Skip failed providers temporarily
+4. **Cache check**: Return cached results if available
+5. **API fallback**: Use paid API providers (Groq, Anthropic, OpenAI, Gemini, GitHub Models)
+6. **Local fallback**: DMR → Ollama (always available, no API costs)
+
+**Parallelism**: Batch agents call LLMService via `Promise.all` (concurrency 5-20). Copilot scales from 5s sequential to 0.77s effective per call at 10 concurrent, making it ideal as the primary provider.
+
+---
+
+## Subscription Quota Management
+
+The system tracks subscription usage and automatically handles quota exhaustion:
+
+### Quota Tracking
+
+**Storage**: `.data/llm-subscription-usage.json`
+
+**Tracked Metrics**:
+- Completions per hour (rolling window)
+- Estimated token usage
+- Quota exhaustion state
+- Consecutive failure count
+
+**Soft Limits**:
+- Claude Code: 100 completions/hour
+- Copilot: 100 completions/hour
+
+### Exponential Backoff
+
+When quota is exhausted, the system applies exponential backoff:
+
+1. **First exhaustion**: Retry after 5 minutes
+2. **Second exhaustion**: Retry after 15 minutes
+3. **Third+ exhaustion**: Retry after 1 hour
+
+**Automatic recovery**: On successful completion, reset failure counters
+
+### Automatic Fallback
+
+```
+Request → Check Copilot quota (primary — parallelism-optimized)
+       ↓ (exhausted)
+       → Use Groq (paid API, fast fallback)
+       ↓ (circuit breaker open)
+       → Check Claude Code quota
+       ↓ (exhausted)
+       → Use Anthropic (paid API)
+       ↓ (all failed)
+       → Use DMR (local)
+```
+
+**Cost Impact**:
+- If subscriptions available: $0
+- If subscriptions exhausted: Standard API costs apply
+- Seamless transition - no user intervention needed
+
+### Data Persistence
+
+Quota data is automatically:
+- **Persisted** to disk after each request
+- **Pruned** (keep last 24 hours only)
+- **Loaded** on service initialization
+
+**Reset quota tracking** (for testing):
+```bash
+rm .data/llm-subscription-usage.json
+```
+
+---
+
+## Mode Routing
+
+The system supports three routing modes:
+
+### 1. Mock Mode
+**Environment**: `SEMANTIC_ANALYSIS_MODE=mock`
+
+- Uses Mock provider exclusively
+- Returns simulated responses
+- No API calls or costs
+- Ideal for testing and development
+
+### 2. Local Mode
+**Environment**: `SEMANTIC_ANALYSIS_MODE=local`
+
+- Uses DMR and Ollama only
+- No external API calls
+- Zero API costs
+- Requires local model servers running
+
+### 3. Public Mode (Default)
+**Environment**: `SEMANTIC_ANALYSIS_MODE=public` or unset
+
+- Uses all cloud providers (Groq, Anthropic, OpenAI, Gemini, GitHub)
+- Falls back to DMR/Ollama if all cloud providers fail
+- Optimizes for quality and availability
+
+---
+
+## Dependency Injection Hooks
+
+The system provides interfaces for extending functionality:
+
+### 1. MockServiceInterface
+```typescript
+interface MockServiceInterface {
+  getMockResponse(task: string, tier: string): Promise<string>;
+}
+```
+Used to customize mock responses for testing.
+
+### 2. BudgetTrackerInterface
+```typescript
+interface BudgetTrackerInterface {
+  trackCost(provider: string, tokens: number, cost: number): void;
+  getBudgetRemaining(): number;
+  isOverBudget(): boolean;
+}
+```
+Enables cost tracking and budget enforcement.
+
+### 3. SensitivityClassifierInterface
+```typescript
+interface SensitivityClassifierInterface {
+  classifyContent(content: string): 'public' | 'internal' | 'confidential';
+  canUseProvider(provider: string, sensitivity: string): boolean;
+}
+```
+Restricts provider usage based on content sensitivity.
+
+---
+
+## Configuration
+
+All LLM provider configuration is centralized in:
+
+**File**: `config/llm-providers.yaml`
+
+Key configuration sections:
+
+```yaml
+providers:
+  # Subscription providers (zero cost)
+  claude-code:
+    cliCommand: "claude"
+    timeout: 60000
+    models:
+      fast: "sonnet"
+      standard: "sonnet"
+      premium: "opus"
+    quotaTracking:
+      enabled: true
+      softLimitPerHour: 100
+
+  copilot:
+    cliCommand: "copilot-cli"
+    timeout: 120000
+    models:
+      fast: "claude-haiku-4.5"        # Benchmarked: 0.77s @10 parallel
+      standard: "claude-sonnet-4.5"
+      premium: "claude-opus-4.6"
+    quotaTracking:
+      enabled: true
+      softLimitPerHour: 100
+
+  # API providers (per-token cost)
+  groq:
+    apiKeyEnvVar: GROQ_API_KEY
+    fast: "llama-3.1-8b-instant"
+    standard: "llama-3.3-70b-versatile"
+    premium: "openai/gpt-oss-120b"
+
+  anthropic:
+    apiKeyEnvVar: ANTHROPIC_API_KEY
+    fast: "claude-haiku-4-5"
+    standard: "claude-sonnet-4-5"
+    premium: "claude-opus-4-6"
+  # ... more providers (openai, gemini, github-models)
+
+# Copilot first — scales with parallelism (0.77s effective @10 concurrent)
+# Batch agents use Promise.all, so copilot as primary unlocks peak throughput
+provider_priority:
+  fast: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  premium: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+
+cache:
+  maxSize: 1000
+  ttlMs: 3600000  # 1 hour
+
+circuit_breaker:
+  threshold: 5
+  resetTimeoutMs: 60000  # 1 minute
+```
+
+### Environment Overrides
+
+Force specific behavior via environment variables:
+
+```bash
+# Force all tasks to premium tier
+export SEMANTIC_ANALYSIS_TIER=premium
+
+# Force specific provider (skip routing)
+export SEMANTIC_ANALYSIS_PROVIDER=anthropic
+
+# Use budget mode (fast tier everywhere)
+export SEMANTIC_ANALYSIS_COST_MODE=budget
+
+# Use local-only mode
+export SEMANTIC_ANALYSIS_MODE=local
+```
+
+---
+
+## Cost Management
+
+### Cost Limits
+
+**Per-workflow limits** (configured in `llm-providers.yaml`):
+- **Budget mode**: $0.05 per run
+- **Standard mode**: $0.50 per run
+- **Quality mode**: $2.00 per run
+
+**Batch workflow limits**:
+- Max tokens per batch: 500,000
+- Max cost per batch: $1.00 USD
+- Total budget: $50.00 USD
+- Automatic fallback to local on quota exceeded
+
+### Cost Optimization Strategies
+
+1. **Copilot-first parallelized routing**: Copilot scales with concurrency (0.77s @10 parallel), batch agents use Promise.all
+2. **Tier-based routing**: Use cheapest provider that meets quality requirements
+3. **Caching**: Avoid duplicate LLM calls (1-hour TTL)
+4. **Automatic fallback**: Switch to paid APIs only when subscriptions exhausted
+5. **Local fallback**: Switch to DMR/Ollama when budget exhausted
+6. **Circuit breaker**: Stop calling failed providers quickly
+
+### Cost Savings Example
+
+**Typical UKB batch analysis run**:
+- 50 fast tier calls (extraction, parsing)
+- 100 standard tier calls (semantic analysis)
+- 20 premium tier calls (insight generation)
+
+**Before subscriptions** (all API):
+- Fast: 50 × $0.001 = $0.05
+- Standard: 100 × $0.01 = $1.00
+- Premium: 20 × $0.05 = $1.00
+- **Total: ~$2.05 per run**
+
+**After subscriptions** (until quota exhausted):
+- Fast: $0 (Copilot/claude-haiku-4.5, parallelized)
+- Standard: $0 (Copilot/claude-sonnet-4.5)
+- Premium: $0 (Copilot/claude-opus-4.6)
+- **Total: $0.00 per run** ✅
+- **Bonus: ~3x faster** via parallelized copilot calls
+
+**Savings**: When the subscription quota covers the request, the per-token cost is $0 — material per-call savings vs. the paid-API fallback path.
+
+---
+
+## Token Usage Monitoring
+
+All LLM calls pass through the **LLM Proxy Bridge** (`:12435`), which logs every request to a persistent SQLite database for usage analytics and cost attribution.
+
+![Token Usage Architecture](../images/token-usage-architecture.png)
+
+### How It Works
+
+Every cognitive process that calls the LLM proxy includes a `process` identifier in the request body. The proxy logs the call with provider, model, token counts, latency, and subscription type to `.observations/token-usage.db`.
+
+### Logged Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `provider` | LLM provider used | `copilot`, `claude-code`, `anthropic` |
+| `model` | Specific model | `claude-sonnet-4-5`, `claude-haiku-4.5` |
+| `process` | Cognitive process identifier | `observation-writer`, `consolidator`, `wave1-analysis` |
+| `input_tokens` | Prompt tokens consumed | `1,200` |
+| `output_tokens` | Completion tokens generated | `450` |
+| `latency_ms` | Round-trip time | `2,340` |
+| `subscription` | Billing source | `copilot-subscription`, `max-subscription`, `api-key` |
+
+### Cognitive Process Identifiers
+
+| Process | Description | Typical Volume |
+|---------|-------------|----------------|
+| `observation-writer` | Session observation classification + summary | High (every session event) |
+| `consolidator` | Digest → insight synthesis | Medium (batch, periodic) |
+| `insight-generator` | Entity insight generation | Low (batch, on refresh) |
+| `content-validator` | Entity content validation + refresh | Low (on demand) |
+| `wave1-analysis` | Code analysis agents | Medium (batch workflows) |
+| `constraint-check` | Constraint rule evaluation | Low |
+| `auto-heal` | Service recovery decisions | Rare |
+| `health-check` | Proxy liveness pings | High (every 30s) |
+
+### Dashboard
+
+The **Token Usage** page on the Health Dashboard (`:3032/token-usage`) provides:
+
+- **Token distribution by process** — treemap showing biggest consumers
+- **Provider breakdown** — donut chart of provider usage
+- **Timeline** — hourly token consumption area chart
+- **Recent calls** — sortable table with process, model, tokens, latency
+
+See [Token Usage Dashboard](token-usage.md) for full documentation.
+
+### API Endpoints
+
+The proxy exposes query endpoints for programmatic access:
+
+```
+GET /api/token-usage/summary?hours=24    # Aggregated stats
+GET /api/token-usage/recent?limit=50     # Recent calls
+```
+
+### Storage
+
+- **Database**: `.observations/token-usage.db` (SQLite)
+- **Retention**: All calls logged indefinitely
+- **Size**: ~1KB per logged call
+
+---
+
+## In-Memory Metrics
+
+The LLM layer also tracks in-memory metrics per session:
+
+- **Request metrics**: Total calls per provider, success/failure rates
+- **Performance**: Latency per provider, throughput
+- **Cost**: Token usage, estimated costs per provider
+- **Cache**: Hit/miss ratio, cache size
+
+Metrics are exposed via the `LLMService.getMetrics()` method.
+
+---
+
+## Integration Example
+
+```typescript
+import { LLMService, loadProviderConfig } from '@rapid/llm-proxy';
+import type { LLMCompletionRequest } from '@rapid/llm-proxy';
+
+const llmService = LLMService.getInstance();
+
+const request: LLMCompletionRequest = {
+  messages: [
+    { role: 'user', content: 'Analyze this code for bugs...' }
+  ],
+  tier: 'standard',  // or 'fast' / 'premium'
+  task: 'semantic_code_analysis',
+  temperature: 0.7,
+  maxTokens: 4096
+};
+
+const result = await llmService.complete(request);
+
+Logger.log('info', result.content);           // LLM response
+Logger.log('info', `Provider: ${result.provider}`);          // Which provider was used
+Logger.log('info', `Model: ${result.model}`);             // Specific model
+Logger.log('info', `Tokens: ${result.usage.totalTokens}`); // Token usage
+Logger.log('info', `Cached: ${result.cached}`);            // Was it from cache?
+```
+
+---
+
+## Related Documentation
+
+- [Token Usage Dashboard](token-usage.md) - Detailed token usage monitoring documentation
+- [LLM Provider Guide](../guides/llm-providers.md) - User guide for working with providers
+- [Semantic Analysis Integration](../integrations/semantic-analysis.md) - SA consumer usage
+- [Getting Started](../getting-started/index.md) - Installation and API key setup
+
+**Configuration Files:**
+- `config/llm-providers.yaml` - Full provider configuration schema
+- `docs/provider-configuration.md` - Detailed API key setup guide
