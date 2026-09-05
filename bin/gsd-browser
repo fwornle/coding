@@ -67,7 +67,27 @@ DEAD_DAEMON='daemon exited during startup'
 
 # Chrome profile the daemon drives. Its own dir, not the user's real profile —
 # clearing a lock here cannot touch a browsing session.
-CHROME_PROFILE="${TMPDIR:-/tmp}/chromiumoxide-runner"
+# The gsd-browser build of 2026-09-04 MOVED this profile out of the temp dir to
+# ~/.gsd-browser/browser-profile, and the session manifest is the only thing that
+# actually knows where it is. Hardcoding the old temp path made every branch
+# below a silent no-op: `pkill -f chromiumoxide-runner` matched nothing (that
+# string is a --user-data-dir argument, so it moved with the profile), and the
+# lock clear cleaned a directory Chrome had stopped using. The visible symptom
+# was Chrome's "Something went wrong when opening your profile" dialog on every
+# single launch, because nothing was left to reset the crash flag.
+#
+# Read the manifest, fall back to the current default, and only then to the old
+# temp path so an older binary still recovers.
+CHROME_PROFILE="$(
+    node -e 'try{const j=require(process.env.HOME+"/.gsd-browser/session.json");if(j.browserUserDataDir)process.stdout.write(j.browserUserDataDir)}catch{}' 2>/dev/null
+)"
+[[ -z "${CHROME_PROFILE}" || ! -d "${CHROME_PROFILE}" ]] && CHROME_PROFILE="${HOME}/.gsd-browser/browser-profile"
+[[ -d "${CHROME_PROFILE}" ]] || CHROME_PROFILE="${TMPDIR:-/tmp}/chromiumoxide-runner"
+
+# Match the automation Chrome by its --user-data-dir, which is what makes it the
+# automation instance. Never a bare "Chrome": this pattern is passed to pkill -9,
+# and matching the user's own browser would kill their real session.
+CHROME_MATCH="user-data-dir=${CHROME_PROFILE}"
 
 # Explicit XXXXXX template, not `mktemp -t gsd-browser-err`: GNU coreutils is
 # ahead of /usr/bin on this PATH and its -t wants a template with X's, so the
@@ -120,20 +140,42 @@ restart_daemon() {
     #
     # Safe by construction: this profile is the automation instance's alone —
     # a temp --user-data-dir — so nothing here can touch a real browsing session.
-    pkill -9 -f 'chromiumoxide-runner' 2>/dev/null
+    pkill -9 -f "${CHROME_MATCH}" 2>/dev/null
 
     # Wait for the profile to actually be free before clearing. Killing is
     # asynchronous, and removing a lock while its owner is still exiting invites
     # the two-processes-one-profile corruption the lock exists to prevent.
     local waited=0
-    while pgrep -f 'chromiumoxide-runner' >/dev/null 2>&1 && (( waited < 10 )); do
+    while pgrep -f "${CHROME_MATCH}" >/dev/null 2>&1 && (( waited < 10 )); do
         sleep 0.5
         waited=$(( waited + 1 ))
     done
 
     # Only now, and only if the profile is genuinely unowned.
-    if ! pgrep -f 'chromiumoxide-runner' >/dev/null 2>&1; then
+    if ! pgrep -f "${CHROME_MATCH}" >/dev/null 2>&1; then
         rm -f "${CHROME_PROFILE}"/Singleton* 2>/dev/null
+
+        # Clearing the lock is not enough. A SIGKILLed Chrome also leaves
+        # profile.exit_type = "Crashed" in Default/Preferences, and on the next
+        # start that raises a MODAL "Something went wrong when opening your
+        # profile" dialog. Headless it is invisible but still blocking; headful
+        # the operator has to dismiss it by hand, once per launch, forever —
+        # observed 8-10 times in a row on 2026-09-05 because this reset was
+        # pointed at the wrong directory and never ran.
+        #
+        # Chrome itself only rewrites this on a clean exit, which is precisely
+        # what -9 denies it, so the reset that caused the flag has to clear it.
+        local prefs="${CHROME_PROFILE}/Default/Preferences"
+        [[ -f "${prefs}" ]] && node -e '
+            const fs = require("fs"), p = process.argv[1];
+            try {
+                const j = JSON.parse(fs.readFileSync(p, "utf8"));
+                j.profile = j.profile || {};
+                j.profile.exit_type = "Normal";
+                j.profile.exited_cleanly = true;
+                fs.writeFileSync(p, JSON.stringify(j));
+            } catch { /* unreadable/partial profile: Chrome rebuilds it */ }
+        ' "${prefs}" 2>/dev/null
     fi
     return 0
 }
