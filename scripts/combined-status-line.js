@@ -18,9 +18,31 @@ import { UKBProcessManager } from './ukb-process-manager.js';
 // arrangement that LIFECYCLE_ICONS and _lastContentTimestampMs live with.
 import contextGauge from '../lib/statusline/context-gauge.cjs';
 import paneCacheKey from '../lib/statusline/pane-cache-key.cjs';
+import { loadFeatures } from '../lib/features/index.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = process.env.CODING_REPO || join(__dirname, '..');
+
+/**
+ * The active feature set, as a plain {id: boolean} map.
+ *
+ * Reads the resolver directly (mtime-cached, so a render costs a stat()) and
+ * falls back to all-on if anything goes wrong. Fail-OPEN is the right default
+ * here and only here: a status line that silently drops half its badges because
+ * a config file was briefly unreadable looks exactly like a broken system, and
+ * would send the reader hunting for an outage that does not exist. Everything
+ * that STARTS a process fails closed instead.
+ */
+function readFeatures() {
+  try {
+    const resolved = loadFeatures();
+    return Object.fromEntries(
+      Object.entries(resolved.features).map(([id, f]) => [id, f.enabled]),
+    );
+  } catch {
+    return new Proxy({}, { get: () => true });
+  }
+}
 
 // Phase 51 Plan 10: Sub-agent freshness sourced from heartbeat files written
 // by lib/lsl/live/* daemons, NOT a re-walk of <parent>/subagents/. Cached
@@ -358,16 +380,30 @@ class CombinedStatusLine {
         }
       };
 
-      const constraintStatus      = await timeStep('constraint',      () => this.getConstraintStatus());
-      const semanticStatus        = await timeStep('semantic',        () => this.getSemanticStatus());
-      const knowledgeStatus       = await timeStep('knowledge',       () => this.getKnowledgeSystemStatus());
-      const proxyStatus           = await timeStep('proxy',           () => this.getProxySystemStatus());
-      const liveLogTarget         = await timeStep('liveLogTarget',   () => this.getCurrentLiveLogTarget());
-      const redirectStatus        = await timeStep('redirect',        () => this.getRedirectStatus());
-      const globalHealthStatus    = await timeStep('globalHealth',    () => this.getGlobalHealthStatus());
-      const healthVerifierStatus  = await timeStep('healthVerifier',  () => this.getHealthVerifierStatus());
-       const ukbStatus             = this.getUKBStatus();
-       const networkStatus         = await timeStep('network',         () => this.getNetworkStatus());
+      // Resolve once per render and hang it on `this`, so buildCombinedStatus
+      // can gate the badges without re-reading. The resolver is mtime-cached,
+      // so a render costs a stat() and nothing more.
+      this.features = readFeatures();
+
+      // A disabled feature must skip its COLLECTOR, not merely its badge.
+      // Several of these poll HTTP endpoints or scan directories; leaving them
+      // running for a switched-off feature would mean a pared-down install
+      // paid the full cost of the status line to display less of it — and
+      // would log timeouts against services the user deliberately stopped.
+      const gated = (feature, name, fn, fallback = null) => (
+        this.features[feature] ? timeStep(name, fn) : fallback
+      );
+
+      const constraintStatus      = await gated('constraints',  'constraint',    () => this.getConstraintStatus());
+      const semanticStatus        = await gated('llm-proxy',    'semantic',      () => this.getSemanticStatus());
+      const knowledgeStatus       = await gated('observations', 'knowledge',     () => this.getKnowledgeSystemStatus(), {});
+      const proxyStatus           = await gated('llm-proxy',    'proxy',         () => this.getProxySystemStatus());
+      const liveLogTarget         = await gated('lsl',          'liveLogTarget', () => this.getCurrentLiveLogTarget());
+      const redirectStatus        = await gated('lsl',          'redirect',      () => this.getRedirectStatus());
+      const globalHealthStatus    = await gated('health',       'globalHealth',  () => this.getGlobalHealthStatus());
+      const healthVerifierStatus  = await gated('health',       'healthVerifier',() => this.getHealthVerifierStatus());
+      const ukbStatus             = this.features.knowledge ? this.getUKBStatus() : null;
+      const networkStatus         = await gated('health',       'network',       () => this.getNetworkStatus());
 
        // Phase 33 plan 07: launchd's com.coding.health-coordinator KeepAlive
        // is the authoritative supervisor for the host-side health stack;
@@ -2319,6 +2355,10 @@ class CombinedStatusLine {
     const parts = [];
     let overallColor = 'green';
 
+    // Resolved feature set. Set by generateStatus(); defaulted to all-on so
+    // that calling this method directly (tests, bin/status) behaves as before.
+    const f = this.features || new Proxy({}, { get: () => true });
+
     // Whether ANY Claude session has a fresh heartbeat. When the user is idle,
     // we suppress the "warning" verdict on coordinator-derived badges and show
     // ⚫ idle instead — "no recent activity" is expected during idle and
@@ -2332,7 +2372,15 @@ class CombinedStatusLine {
 
     // Unified Health Status - FIRST in status line
     // Merges GCM + Health Verifier into single indicator showing overall system health
-    if (healthVerifier && healthVerifier.status === 'operational') {
+    //
+    // Feature gating from here down is OMISSION, never greying: the status line
+    // is a fixed-width budget shared with the context gauge and the clock, and a
+    // greyed placeholder for something the user switched off would cost cells
+    // that the badges they DO want get truncated from. The dashboard is where
+    // "off" is shown; here it is simply absent.
+    if (!f.health) {
+      // no badge
+    } else if (healthVerifier && healthVerifier.status === 'operational') {
       const criticalCount = healthVerifier.criticalCount || 0;
       const violationCount = healthVerifier.violationCount || 0;
       // Trust the verifier's verdict: when it has classified the run as
@@ -2370,7 +2418,7 @@ class CombinedStatusLine {
     // Sessions Display (without separate GCM indicator - merged into 🏥)
     // Show all sessions - inactive ones display with dark icons (💤/⚫)
     // Only remove sessions when the Claude session is actually closed/exited
-    if (globalHealth && globalHealth.status !== 'error') {
+    if (f.lsl && globalHealth && globalHealth.status !== 'error') {
       const sessionEntries = Object.entries(globalHealth.sessions || {});
 
       if (sessionEntries.length > 0) {
@@ -2413,7 +2461,7 @@ class CombinedStatusLine {
     // LSL (Live Session Logging) — compact per-pane health badge.
     // Hidden when healthy to keep the line tight; the per-project labels
     // (rendered above as Sessions Display) already show per-project status.
-    const lslStatus = await this.getLSLHealthStatus();
+    const lslStatus = f.lsl ? await this.getLSLHealthStatus() : 'healthy';
     if (lslStatus === 'down') {
       parts.push(`[LSL${ALARM_DOTS.CRIT}]`);
       overallColor = 'red';
@@ -2428,7 +2476,9 @@ class CombinedStatusLine {
     }
 
     // Constraint Monitor Status
-    if (constraint.status === 'operational') {
+    if (!f.constraints) {
+      // no badge
+    } else if (constraint.status === 'operational') {
       // Convert compliance to percentage (0-10 scale to 0-100%)
       const compliancePercent = constraint.compliance <= 10 ?
         Math.round(constraint.compliance * 10) :
@@ -2486,7 +2536,9 @@ class CombinedStatusLine {
        if (obsAgeMs < 24 * 60 * 60_000) return LIFECYCLE_ICONS.INACTIVE;
        return LIFECYCLE_ICONS.SLEEPING;
      })();
-     switch (knowledge.status) {
+     switch (f.observations ? knowledge.status : '__disabled__') {
+       case '__disabled__':
+         break;
        case 'healthy':
          parts.push(`[📚${STATE_DOTS.OK}]`);
          break;
@@ -2534,7 +2586,7 @@ class CombinedStatusLine {
 
     // Network location badge: [N:CN] / [N:VPN] / [N:HOME] / [N:??]
     // Uses ASCII-only to avoid emoji-width issues.
-    {
+    if (f.health) {
       const loc = network?.location || 'unknown';
       const locMap = { corporate: 'CN', vpn: 'VPN', open: 'OPEN', home: 'OPEN', unknown: '??' };
       const locLabel = locMap[loc] || loc.toUpperCase().slice(0, 4);
@@ -2550,7 +2602,7 @@ class CombinedStatusLine {
     //   AUTO — daemon up+functional, px toggle off (adaptive/direct-fallback;
     //          pinned sessions still routed — today's normal off-CN state)
     //   OFF  — daemon down or not functional (the only genuinely broken state)
-    {
+    if (f.health) {
       const daemonUp = network?.proxy_running && network?.proxy_functional;
       const pxLabel = !daemonUp ? 'OFF'
         : network?.proxy_enabled_by_user ? 'ON'
@@ -2586,7 +2638,7 @@ class CombinedStatusLine {
     // Never colours the line. A classifier that has downgraded nothing is not a
     // fault — it may simply have seen no eligible traffic — and a badge that
     // could turn the line yellow on an absence would cry wolf every quiet hour.
-    {
+    if (f['llm-proxy']) {
       const cls = await this.getClassifierStatus();
       if (cls) parts.push(`[D:${cls.downgraded}]`);
     }
@@ -2610,7 +2662,7 @@ class CombinedStatusLine {
     //
     // Never colours the line, for the same reason [D:] does not: no local
     // execution is not a fault. It usually means no eligible traffic.
-    {
+    if (f['llm-proxy']) {
       const ex = await this.getExecutionStatus();
       if (ex && ex.local > 0) parts.push(`[L:${ex.local}]`);
     }
@@ -2624,7 +2676,14 @@ class CombinedStatusLine {
     // emits a single status emoji ([🧠✅] / [🧠🟡] / [🧠🚫] / [🧠🔇] /
     // [🧠❓] / [🧠❌]); UKB emits an N+icon counter form ([🧠1⏳2🟡]).
     // Visually distinguishable.
-    switch (proxy?.status) {
+    //
+    // Gated rather than left to `proxy?.status` being undefined: the default
+    // arm of this switch renders [🧠❌] and paints the line red, so a switched-off
+    // proxy would have reported a permanent outage of a service that is not
+    // supposed to be running.
+    switch (f['llm-proxy'] ? proxy?.status : '__disabled__') {
+      case '__disabled__':
+        break;
       case 'healthy':
         parts.push(`[🧠${STATE_DOTS.OK}]`);
         break;
@@ -2674,7 +2733,7 @@ class CombinedStatusLine {
     }
 
     // UKB (Update Knowledge Base) Process Status - shows 13-agent workflow activity
-    if (ukbStatus && ukbStatus.total > 0) {
+    if (f.knowledge && ukbStatus && ukbStatus.total > 0) {
       // Active workflows running
       let ukbPart = `[🧠`;
       if (ukbStatus.running > 0) {

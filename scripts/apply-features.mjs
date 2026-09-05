@@ -28,7 +28,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadFeatures } from '../lib/features/index.mjs';
-import { writeSnapshot } from '../lib/features/snapshot.cjs';
+import { writeSnapshot, readSnapshot } from '../lib/features/snapshot.cjs';
 import { reconcile as reconcileDaemons, platform } from '../lib/features/daemons.mjs';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
@@ -64,7 +64,15 @@ async function run(cmd, args, timeout = 30000) {
   }
 }
 
-/** supervisorctl status, as {program: 'RUNNING'|'STOPPED'|...}, or null if unreachable. */
+/**
+ * supervisorctl status, as {program: {state, target}}, or null if unreachable.
+ *
+ * `target` keeps the GROUP-QUALIFIED name ("mcp-servers:graphify"). Programs in
+ * this image all belong to a group, and supervisorctl rejects the bare name —
+ * `supervisorctl start graphify` is "ERROR (no such process)". The bare name is
+ * still the key, because that is what the feature mapping and supervisord.conf
+ * use; only the command needs the qualifier.
+ */
 async function containerStatus() {
   const r = await run('docker', ['exec', CONTAINER, 'supervisorctl', 'status']);
   // `supervisorctl status` exits non-zero when ANY program is not running, so a
@@ -76,8 +84,9 @@ async function containerStatus() {
     // "web-services:vkb-server   RUNNING   pid 42, uptime 0:01:00"
     const m = /^(\S+)\s+(\w+)/.exec(line.trim());
     if (!m) continue;
-    const name = m[1].includes(':') ? m[1].split(':').pop() : m[1];
-    status[name] = m[2];
+    const target = m[1];
+    const name = target.includes(':') ? target.split(':').pop() : target;
+    status[name] = { state: m[2], target };
   }
   return Object.keys(status).length ? status : null;
 }
@@ -91,16 +100,16 @@ async function reconcileContainer(resolved, { dryRun }) {
   const out = { available: true, started: [], stopped: [], unchanged: [] };
   for (const [program, feature] of Object.entries(CONTAINER_PROGRAMS)) {
     const want = resolved.features[feature]?.enabled === true;
-    const state = status[program];
-    if (state === undefined) continue; // not in this image
-    const is = state === 'RUNNING' || state === 'STARTING';
+    const entry = status[program];
+    if (entry === undefined) continue; // not in this image
+    const is = entry.state === 'RUNNING' || entry.state === 'STARTING';
     if (want === is) { out.unchanged.push(program); continue; }
 
     if (dryRun) {
       (want ? out.started : out.stopped).push({ name: program, action: want ? 'would-start' : 'would-stop' });
       continue;
     }
-    const r = await run('docker', ['exec', CONTAINER, 'supervisorctl', want ? 'start' : 'stop', program], 60000);
+    const r = await run('docker', ['exec', CONTAINER, 'supervisorctl', want ? 'start' : 'stop', entry.target], 60000);
     (want ? out.started : out.stopped).push({
       name: program,
       action: want ? 'started' : 'stopped',
@@ -118,6 +127,12 @@ export async function applyFeatures(opts = {}) {
   const resolved = opts.resolved || loadFeatures({ force: true });
   const dryRun = opts.dryRun === true;
   const say = opts.quiet ? () => {} : (msg) => process.stdout.write(`${msg}\n`);
+
+  // Read the previous snapshot BEFORE overwriting it: it is the only record of
+  // what the system was last told to run, and without it the hook advice below
+  // would have to fire on every apply — including ones that changed nothing
+  // hook-related, which trains the reader to ignore it.
+  const previous = readSnapshot({ repoPath: REPO })?.features ?? null;
 
   if (!dryRun) writeSnapshot({ repoPath: REPO });
 
@@ -152,11 +167,16 @@ export async function applyFeatures(opts = {}) {
   }
 
   // Hooks are fixed at launch (--settings), so nothing here can change them.
-  // Saying so is the difference between "applied" and "applied, mostly".
-  const sessionScoped = resolved.disabled
-    .concat(resolved.enabled)
-    .filter((id) => resolved.features[id].applyTier === 'session');
-  if (sessionScoped.length && changed.length) {
+  // Saying so is the difference between "applied" and "applied, mostly" — but
+  // only for features that actually FLIPPED, and only ones whose reach is an
+  // agent session.
+  const flipped = previous
+    ? Object.keys(resolved.features).filter(
+      (id) => previous[id] !== undefined && previous[id] !== resolved.features[id].enabled,
+    )
+    : [];
+  const sessionScoped = flipped.filter((id) => resolved.features[id].applyTier === 'session');
+  if (sessionScoped.length) {
     say(`   ℹ️  ${sessionScoped.join(', ')} affect agent hooks — new sessions only.`);
   }
 
