@@ -165,8 +165,25 @@ async function tick(ms) {
  * for the watcher to NOTICE something — the scan interval is 50ms, and on a
  * loaded machine (a full jest run is ~10 workers deep) a 50ms sleep routinely
  * expires before the scan has run at all.
+ *
+ * The budget is 20s, not the 5s it was, because that same contention is worse on
+ * a hosted runner than it is on a laptop and 5s was demonstrably too tight. Both
+ * mechanisms this suite waits on are deliberately unref'd in production — the
+ * scan setInterval ("don't keep the event loop alive solely for this timer") and
+ * the per-file fs.watchFile({persistent:false}) — and an unref'd handle is the
+ * first thing libuv starves when the runner is oversubscribed. The measured
+ * failure was not a wrong result but an absent one: the watcher had attached
+ * (watching_sessions 1, tail_count 1), the append had landed (eventsBytes 288)
+ * and nothing had errored (errors 0), yet last_scan_at was 7 SECONDS stale
+ * against a 50ms interval. Nothing was broken; the loop simply had not run.
+ *
+ * 20s is affordable: jest.config.js allows 30s per test, and a healthy run of
+ * these same assertions completes in ~400ms, so the budget is only ever spent on
+ * a runner that is already struggling. If a wait ever exhausts even this, the
+ * `context` payload distinguishes "slow" (last_scan_at advancing) from "never"
+ * (frozen), which 5s could not.
  */
-async function waitFor(predicate, { timeoutMs = 5000, stepMs = 10, context } = {}) {
+async function waitFor(predicate, { timeoutMs = 20000, stepMs = 10, context } = {}) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) return;
