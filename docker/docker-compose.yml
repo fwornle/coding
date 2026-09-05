@@ -127,6 +127,11 @@ services:
       # rebuild. Mount over the inner path so both resolution targets see
       # the live host km-core (Phase 57 single-source-of-truth principle).
       - ${CODING_REPO:-.}/lib/km-core:/coding/integrations/semantic-analysis/node_modules/@fwornle/km-core:ro
+      # Resolved feature set. The container cannot run the resolver (it never
+      # sees ~/.coding/features.yaml), so it reads the flat snapshot the host
+      # writes on every launch. entrypoint.sh turns it into a supervisord
+      # override that keeps disabled programs from autostarting.
+      - ${CODING_REPO:-.}/.coding/runtime:/coding/.coding/runtime:ro
       # Config files (live-mounted to avoid staleness)
       - ${CODING_REPO:-.}/.env:/coding/.env:ro
       - ${CODING_REPO:-.}/integrations/semantic-analysis/config:/coding/integrations/semantic-analysis/config:rw

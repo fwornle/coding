@@ -146,8 +146,65 @@ _load_env_files() {
   fi
 }
 
-# Check and start Docker — required (Docker is the only supported mode).
+# Resolve the active feature set and refresh .coding/runtime/features.json.
+#
+# Sets CODING_FEATURES (space-separated enabled ids) and CODING_NEEDS_DOCKER
+# (true/false), and exports them so every child — the services starter, the
+# container entrypoint via the snapshot, the hook builder — acts on the same
+# decision rather than each re-deriving it.
+#
+# A malformed config aborts here. Launching a half-configured stack under a
+# configuration nobody could parse is worse than refusing with the reason.
+_resolve_features() {
+  local snapshot="$CODING_REPO/.coding/runtime/features.json"
+  mkdir -p "$CODING_REPO/.logs"
+
+  if ! node "$CODING_REPO/bin/coding-features" snapshot >/dev/null 2>"$CODING_REPO/.logs/features-resolve.err"; then
+    _agent_log "❌ Feature configuration is invalid — refusing to start."
+    sed 's/^/    /' "$CODING_REPO/.logs/features-resolve.err" >&2 2>/dev/null || true
+    _agent_log "   Fix it, or reset with: coding-features profile full"
+    exit 1
+  fi
+
+  # node, not jq: jq is not a dependency of this project and this path runs on
+  # every launch on three platforms.
+  CODING_FEATURES="$(node -e '
+    const s = require(process.argv[1]);
+    process.stdout.write(s.enabled.join(" "));
+  ' "$snapshot" 2>/dev/null)"
+  CODING_NEEDS_DOCKER="$(node -e '
+    const s = require(process.argv[1]);
+    process.stdout.write(String(s.needsDocker));
+  ' "$snapshot" 2>/dev/null)"
+
+  # Fail safe, not closed: if the snapshot could not be read, behave exactly as
+  # this script always has (everything on, Docker required) rather than silently
+  # skipping services.
+  [ -n "$CODING_NEEDS_DOCKER" ] || CODING_NEEDS_DOCKER=true
+
+  export CODING_FEATURES CODING_NEEDS_DOCKER
+  _agent_log "Features: ${CODING_FEATURES:-(none)}"
+}
+
+# Is one feature enabled? Reads the resolved list, so it costs nothing per call.
+_feature_enabled() {
+  case " $CODING_FEATURES " in
+    *" $1 "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Check and start Docker — required only when a feature actually needs it.
+#
+# This used to be unconditional, and the hard exit below is why a proxy-only or
+# logging-only install could not work at all on a machine without Docker: only
+# `knowledge`, `codegraph` and `constraints` run in the container, but every
+# launch demanded it regardless.
 _ensure_docker() {
+  if [ "$CODING_NEEDS_DOCKER" != "true" ]; then
+    _agent_log "🐳 Docker not needed for the active features — skipping."
+    return 0
+  fi
   if ! ensure_docker_running; then
     _agent_log "❌ Docker is required but not running. Start Docker Desktop and retry."
     exit 1
@@ -264,6 +321,15 @@ _start_services() {
   if ! command -v node &> /dev/null; then
     _agent_log "Error: Node.js is required but not found in PATH"
     exit 1
+  fi
+
+  # Nothing in the active feature set runs in the container. Host services are
+  # started separately (scripts/start-services-robust.js), so there is nothing
+  # left to do here — and, crucially, no reason to demand a docker-compose.yml
+  # or a running daemon.
+  if [ "$CODING_NEEDS_DOCKER" != "true" ]; then
+    _agent_log "🐳 No container-backed features enabled — skipping coding-services."
+    return 0
   fi
 
   local docker_dir="$CODING_REPO/docker"
@@ -658,6 +724,10 @@ launch_agent() {
   # 5. Load env files (before dry-run so env is available)
   _load_env_files
 
+  # 5b. Resolve features (before dry-run, so --dry-run reports the real set and
+  #     an invalid config is caught without starting anything)
+  _resolve_features
+
   # 6. Network detection (needed early for dry-run output and agent config)
   _agent_log "Detecting network environment..."
   detect_network_and_configure_proxy
@@ -667,6 +737,7 @@ launch_agent() {
     _agent_log "DRY-RUN: All startup logic completed successfully"
     _agent_log "DRY-RUN: Would launch in tmux: $AGENT_COMMAND"
     _agent_log "DRY-RUN: Agent=$AGENT_NAME, Docker=$DOCKER_MODE, Platform=$PLATFORM"
+    _agent_log "DRY-RUN: Features=${CODING_FEATURES:-none} (docker needed: $CODING_NEEDS_DOCKER)"
     _agent_log "DRY-RUN: Project=$TARGET_PROJECT_DIR"
     _agent_log "DRY-RUN: Network: CN=$INSIDE_CN, Proxy=$PROXY_WORKING, Required=$PROXY_REQUIRED"
     # Run agent pre-launch to show model selection
@@ -676,8 +747,12 @@ launch_agent() {
     exit 0
   fi
 
-  # 7. Early Docker launch (parallel with setup)
-  early_docker_launch
+  # 7. Early Docker launch (parallel with setup) — skipped when no enabled
+  #    feature runs in the container, so a machine without Docker Desktop is
+  #    never nudged to start it.
+  if [ "$CODING_NEEDS_DOCKER" = "true" ]; then
+    early_docker_launch
+  fi
 
   # 8. Session ID + register
   _generate_session_id
