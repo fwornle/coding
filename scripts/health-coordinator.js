@@ -2065,6 +2065,24 @@ const AGENT_PROCESS_RE = /(^|\/)(claude|opencode|pi|copilot)(\s|$)/;
  */
 const TMUX_AGENT_GRACE_MS = 60_000;
 
+/**
+ * Opt-in tracing for the ETM spawn/reap decision, enabled with HEALTH_DEBUG_ETM=1.
+ *
+ * This exists because the decision is invisible when it goes wrong: the reaper and the
+ * spawner both simply do nothing, which is byte-for-byte what a correct quiet tick looks
+ * like in the log. Working out WHICH of the four reap conditions held cost two sessions and
+ * a repro, and none of the evidence available at the time could distinguish "condition 2
+ * skipped it" from "the function was never reached".
+ *
+ * Takes a thunk so the string cost is not paid when tracing is off, which is always in
+ * normal operation — this runs every 5s tick.
+ */
+const ETM_TRACE = process.env.HEALTH_DEBUG_ETM === '1';
+function etmTrace(fn) {
+  if (!ETM_TRACE) return;
+  try { log(`etm-trace: ${fn()}`, 'DEBUG'); } catch { /* never let tracing break a tick */ }
+}
+
 const PS_SNAPSHOT_TTL_MS = 2_000;
 let _psSnapshot = null;
 let _psSnapshotAt = 0;
@@ -2201,6 +2219,8 @@ function tmuxOpenProjectPaths(agenticDir) {
     for (const [p, pids] of panes) {
       if (pids.length === 0 || pids.some((pid) => paneHasLiveAgent(pid, snap, now))) live.add(p);
     }
+    etmTrace(() => `tmux: ${panes.size} qualifying pane path(s), ${live.size} with a live agent`
+      + (panes.size ? ` — ${[...panes.keys()].map(p => `${path.basename(p)}:${live.has(p) ? 'live' : 'husk'}`).join(' ')}` : ''));
     return live;
   } catch {
     return new Set();
@@ -2400,7 +2420,10 @@ function ensureEtmForActiveProjects(opts = {}) {
   // bypasses below had nothing to qualify. Result: no ETM was ever spawned for
   // it and its statusline sat at [LSL🔴] forever (found 2026-08-09).
   const candidates = new Set(discoverProjectCandidates(agenticDir));
+  const discovered = candidates.size;
   for (const p of tmuxOpen) candidates.add(p);
+  etmTrace(() => `spawn sweep: ${discovered} discovered + ${tmuxOpen.size} tmux + ${openCodeFresh.size} opencode `
+    + `= ${candidates.size} candidates; covered=[${[...coveredProjects].join(',')}]`);
   for (const p of openCodeFresh) {
     if (p.startsWith(agenticDir + '/') || looksLikeProjectDir(p)) candidates.add(p);
   }
@@ -2452,7 +2475,11 @@ function ensureEtmForActiveProjects(opts = {}) {
     // seconds old has no fresh Claude transcript (the agent has not spoken yet)
     // and may not be in `tmux list-sessions` output yet either, so requiring one
     // of the other three would reintroduce exactly the delay this removes.
-    if (!targeted && !transcriptFresh && !tmuxAlive && !hasOpenCode) continue;
+    if (!targeted && !transcriptFresh && !tmuxAlive && !hasOpenCode) {
+      etmTrace(() => `spawn ${projectName}: skip — no activity signal `
+        + `(transcriptFresh=${transcriptFresh} tmuxAlive=${tmuxAlive} openCode=${hasOpenCode})`);
+      continue;
+    }
 
     // Do not resurrect what the reaper just took. A session closed seconds ago
     // still satisfies `transcriptFresh` (the transcript was written on the way
@@ -2560,18 +2587,34 @@ function reapEtmsForClosedSessions() {
   // Empty set means "tmux told us nothing" — including the failure path, which
   // returns an empty Set indistinguishably. Reaping on that would wipe every
   // project the moment tmux hiccups.
-  if (!live || live.size === 0) return;
+  if (!live || live.size === 0) {
+    etmTrace(() => 'reap: SKIPPED ENTIRELY — tmux reported no live project paths (cannot tell "none" from "query failed")');
+    return;
+  }
 
   const now = Date.now();
   let openCode;
   try { openCode = openCodeFreshProjects(now); } catch { openCode = new Set(); }
 
   for (const [key, e] of Object.entries(currentState.lsl)) {
-    if (!e || e.status !== 'running' || !e.projectPath) continue;
-    if (live.has(e.projectPath)) continue;
-    if (openCode.has(e.projectPath)) continue;
+    // Each `continue` names itself, so a tick that reaps nothing says WHY per entry.
+    if (!e || e.status !== 'running' || !e.projectPath) {
+      etmTrace(() => `reap ${key}: skip — status=${e?.status} projectPath=${e?.projectPath ?? 'MISSING'}`);
+      continue;
+    }
+    if (live.has(e.projectPath)) {
+      etmTrace(() => `reap ${key}: skip — tmux session with a live agent at ${e.projectPath}`);
+      continue;
+    }
+    if (openCode.has(e.projectPath)) {
+      etmTrace(() => `reap ${key}: skip — fresh OpenCode session`);
+      continue;
+    }
     const ca = e.lastContentActivityTs || 0;
-    if (ca > 0 && (now - ca) < REAP_CONTENT_ACTIVE_MS) continue;
+    if (ca > 0 && (now - ca) < REAP_CONTENT_ACTIVE_MS) {
+      etmTrace(() => `reap ${key}: skip — content activity ${Math.round((now - ca) / 1000)}s ago`);
+      continue;
+    }
 
     // pid is embedded in the heartbeat key (`etm-<pid>-<start>:project`), the
     // same convention _probeHolderLiveness relies on.
