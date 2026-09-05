@@ -82,7 +82,17 @@ CHROME_PROFILE="$(
     node -e 'try{const j=require(process.env.HOME+"/.gsd-browser/session.json");if(j.browserUserDataDir)process.stdout.write(j.browserUserDataDir)}catch{}' 2>/dev/null
 )"
 [[ -z "${CHROME_PROFILE}" || ! -d "${CHROME_PROFILE}" ]] && CHROME_PROFILE="${HOME}/.gsd-browser/browser-profile"
-[[ -d "${CHROME_PROFILE}" ]] || CHROME_PROFILE="${TMPDIR:-/tmp}/chromiumoxide-runner"
+
+# Fall back to the legacy temp path only when it actually EXISTS — i.e. an older
+# binary really is using it. The first spelling of this dropped to the legacy path
+# whenever the CURRENT default was absent, which is exactly the state of a fresh
+# install: session.json is written by the daemon and browser-profile is created on
+# first start, so before the first run neither exists and the shim aimed its reset
+# at a directory nothing would ever use. Same silent no-op this commit's parent set
+# out to remove, reintroduced for new machines.
+if [[ ! -d "${CHROME_PROFILE}" && -d "${TMPDIR:-/tmp}/chromiumoxide-runner" ]]; then
+    CHROME_PROFILE="${TMPDIR:-/tmp}/chromiumoxide-runner"
+fi
 
 # Match the automation Chrome by its --user-data-dir, which is what makes it the
 # automation instance. Never a bare "Chrome": this pattern is passed to pkill -9,
