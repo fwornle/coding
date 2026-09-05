@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ES2020",
-    "lib": ["ES2020"],
+    "lib": ["ES2022"],
     "moduleResolution": "node",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -24,6 +24,14 @@
   "exclude": [
     "node_modules",
     "dist",
-    "coverage"
+    "coverage",
+    // Shared with integrations/semantic-analysis, which symlinks these two
+    // directories back here and compiles them as part of ITS graph (cleanly).
+    // Their relative imports are written from that vantage point, so building
+    // them from this root cannot resolve e.g. ../agents/semantic-analyzer.js.
+    // Nothing here consumes the output. Exclude, do not delete: the source is
+    // live code the submodule builds through the symlink.
+    "src/ontology",
+    "src/knowledge-management"
   ]
 }
