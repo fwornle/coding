@@ -177,6 +177,21 @@ per-pane, then per-project, from `state.lsl` at `:3034/health/state`.
 | `stale` | `[LSL●]` bold amber (`ALARM_DOTS.WARN`) | ETM `degraded` (0 exchanges in > 30 min uptime), or heartbeat > 120 s old |
 | `down` | `[LSL●]` bold red (`ALARM_DOTS.CRIT`) | ETM stopped, coordinator unreachable, or no entry and the session is not new |
 
+**What counts as "closed".** Not "tmux no longer lists the session" — that test had a hole.
+A pane can outlive the agent inside it (claude-mcp-launcher.sh runs `claude` as a child on
+its pipe-capture path rather than exec'ing it), and such a husk pinned its ETM, and the
+project's dot, indefinitely. `tmuxOpenProjectPaths()` therefore walks each pane's full
+process tree — the pane process **and** its descendants, because `claude` is a child of the
+launcher while `opencode` and `pi` are the pane process itself. A pane younger than 60 s
+counts as live regardless, so a session that is still starting is never reaped. The check
+fails open: no `ps` snapshot, or an unreadable pane pid, and every open session counts as
+live, exactly as before.
+
+Note the inverse case, which is *not* a husk: on 2026-09-05 VS Code was killed and the tmux
+server — a separate daemon — survived, so every agent kept running detached. Those sessions
+are genuinely live and are correctly left alone; their statusline dots simply fade to grey
+on the normal activity ladder.
+
 **Why `starting` exists.** `reapEtmsForClosedSessions()` kills a project's ETM within one
 5 s tick when its tmux session closes, but the respawn came only from
 `ensureEtmForActiveProjects()`, rate-limited by `ETM_SPAWN_INTERVAL_MS = 30_000`. Every

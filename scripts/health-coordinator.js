@@ -2040,7 +2040,104 @@ const ETM_TRANSCRIPT_ACTIVE_MS = 120_000; // jsonl mtime within 2 min = active
 let _lastEtmSpawnCheck = 0;
 
 /**
- * List project paths that currently have an open tmux session.
+ * Agent processes a launcher puts inside a tmux pane.
+ *
+ * Matched against the pane process AND every descendant, because the two
+ * shapes genuinely differ and checking only one gets half the fleet wrong:
+ * `claude` runs as a CHILD of claude-mcp-launcher.sh, while `opencode` and
+ * `pi` ARE the pane process itself. (Measured 2026-09-05: walking children
+ * only reported three live agents as husks; `#{pane_current_command}` is no
+ * better — it reads `bash` for a live Claude, because the launcher shell is
+ * the pane leader.)
+ *
+ * The trailing `(\s|$)` is what keeps the launcher script itself from
+ * matching: `.../scripts/claude-mcp-launcher.sh` contains `/claude`, but
+ * followed by `-`, so only the real `claude ...` argv matches.
+ */
+const AGENT_PROCESS_RE = /(^|\/)(claude|opencode|pi|copilot)(\s|$)/;
+
+/**
+ * A pane younger than this counts as agent-live even with nothing matching in
+ * its tree. tmux-session-wrapper.sh creates the session and the agent execs a
+ * beat later; without the grace window the reaper would kill the ETM of a
+ * session that is still starting — the one failure mode worse than a lingering
+ * dot, per this file's own reaping philosophy.
+ */
+const TMUX_AGENT_GRACE_MS = 60_000;
+
+const PS_SNAPSHOT_TTL_MS = 2_000;
+let _psSnapshot = null;
+let _psSnapshotAt = 0;
+
+/**
+ * One `ps` snapshot as {byPid, childrenOf}, or null if it could not be taken.
+ *
+ * Absolute `/bin/ps` and never a shell: a shell here would source the user's
+ * profile, and a profile that prints a banner (this machine's does) interleaves
+ * it with the output and makes every field unparseable.
+ *
+ * `lstart` rather than `etimes` — the latter is a Linux-only keyword and this
+ * runs on macOS, where it fails with "ps: etimes: keyword not found".
+ *
+ * Cached briefly because the reaper (every 5s tick) and the spawner (every 30s)
+ * both land in the same tick four times a minute and would otherwise fork twice
+ * for one answer.
+ */
+function processSnapshot() {
+  const now = Date.now();
+  if (_psSnapshot && now - _psSnapshotAt < PS_SNAPSHOT_TTL_MS) return _psSnapshot;
+  try {
+    const out = spawnSync('/bin/ps', ['-axo', 'pid=,ppid=,lstart=,command='], {
+      encoding: 'utf8',
+      timeout: 3000,
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    if (out.status !== 0 || !out.stdout) return null;
+    const byPid = new Map();
+    const childrenOf = new Map();
+    for (const line of out.stdout.split('\n')) {
+      // pid ppid <Day Mon DD HH:MM:SS YYYY> command...
+      const m = /^\s*(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\d+\s+\S+\s+\d+)\s+(.*)$/.exec(line);
+      if (!m) continue;
+      const pid = parseInt(m[1], 10);
+      const ppid = parseInt(m[2], 10);
+      const startedAt = Date.parse(m[3]);
+      byPid.set(pid, { ppid, startedAt: Number.isNaN(startedAt) ? 0 : startedAt, cmd: m[4] });
+      if (!childrenOf.has(ppid)) childrenOf.set(ppid, []);
+      childrenOf.get(ppid).push(pid);
+    }
+    if (byPid.size === 0) return null;
+    _psSnapshot = { byPid, childrenOf };
+    _psSnapshotAt = now;
+    return _psSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Does this pane still hold a live agent? Walks the pane process and its whole
+ * descendant tree. A pane process that has itself vanished is not live.
+ */
+function paneHasLiveAgent(panePid, snap, now) {
+  const self = snap.byPid.get(panePid);
+  if (!self) return false;
+  if (self.startedAt > 0 && now - self.startedAt < TMUX_AGENT_GRACE_MS) return true;
+  const seen = new Set();
+  const stack = [panePid];
+  while (stack.length > 0) {
+    const pid = stack.pop();
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    const proc = snap.byPid.get(pid);
+    if (proc && AGENT_PROCESS_RE.test(proc.cmd)) return true;
+    for (const child of snap.childrenOf.get(pid) || []) stack.push(child);
+  }
+  return false;
+}
+
+/**
+ * List project paths that currently have a tmux session with a live agent in it.
  *
  * The 2-minute jsonl-mtime gate above (ETM_TRANSCRIPT_ACTIVE_MS) defines
  * "active" as "user typed in the last 2 minutes". That's too aggressive
@@ -2054,22 +2151,57 @@ let _lastEtmSpawnCheck = 0;
  * `agenticDir` are accepted unconditionally (the historical rule); paths
  * outside it must carry a project marker (see looksLikeProjectDir) so that a
  * throwaway shell in $HOME or /tmp cannot conscript an ETM.
+ *
+ * "Open" means AN AGENT IS STILL IN IT, not merely that tmux lists the session.
+ * The two came apart on 2026-09-05: VS Code was killed, the tmux server (a
+ * separate daemon) survived, and every agent inside it kept running detached —
+ * so the sessions were genuinely live. The inverse is the case this filter
+ * exists for: the agent exits but the pane outlives it, which happens while
+ * claude-mcp-launcher.sh runs its post-session tail (it invokes `claude` as a
+ * CHILD on the pipe-capture path, scripts/claude-mcp-launcher.sh:224, rather
+ * than exec'ing it as on :231). Such a husk satisfied the old session-exists
+ * test and pinned its ETM — and the project's statusline dot — indefinitely.
+ *
+ * Both callers must use the SAME filtered view or they fight: the spawner
+ * treats a tmux session as a reason to spawn, the reaper treats its absence as
+ * a reason to kill, and `_reapedProjects` clears its own respawn block on
+ * `tmuxAlive`. Filter one and not the other and a husk flaps every tick.
  */
 function tmuxOpenProjectPaths(agenticDir) {
   try {
-    const out = spawnSync('tmux', ['list-sessions', '-F', '#{session_path}'], {
+    // list-panes, not list-sessions: the pane pid is what the agent-liveness
+    // check below needs, and a session can hold more than one pane.
+    const out = spawnSync('tmux', ['list-panes', '-a', '-F', '#{session_path}\t#{pane_pid}'], {
       encoding: 'utf8',
       timeout: 1500,
     });
     if (out.status !== 0 || !out.stdout) return new Set();
-    const paths = new Set();
+
+    const panes = new Map(); // projectPath -> pane pids
     for (const line of out.stdout.split('\n')) {
-      const p = line.trim();
+      const [rawPath, rawPid] = line.split('\t');
+      const p = (rawPath || '').trim();
       if (!p) continue;
       if (!fs.existsSync(p)) continue;
-      if (p.startsWith(agenticDir + '/') || looksLikeProjectDir(p)) paths.add(p);
+      if (!(p.startsWith(agenticDir + '/') || looksLikeProjectDir(p))) continue;
+      if (!panes.has(p)) panes.set(p, []);
+      const pid = parseInt(rawPid, 10);
+      if (pid > 0) panes.get(p).push(pid);
     }
-    return paths;
+
+    // Fail OPEN, twice over: with no process snapshot, or a pane whose pid we
+    // could not read, we cannot tell a husk from a live session — and the safe
+    // answer is the pre-filter one, every open session counts. Same reasoning
+    // as the reaper's "tmux told us nothing → reap nothing".
+    const snap = processSnapshot();
+    if (!snap) return new Set(panes.keys());
+
+    const now = Date.now();
+    const live = new Set();
+    for (const [p, pids] of panes) {
+      if (pids.length === 0 || pids.some((pid) => paneHasLiveAgent(pid, snap, now))) live.add(p);
+    }
+    return live;
   } catch {
     return new Set();
   }
@@ -2399,7 +2531,11 @@ const _reapedProjects = new Map(); // projectName -> reapedAt (ms)
  * Reaping is deliberately conservative — a wrongly-reaped project vanishes from
  * the statusline while someone is working in it, which is far worse than one
  * lingering. Three independent things must ALL say "nobody is here":
- *   • no tmux session rooted at the project path
+ *   • no tmux session rooted at the project path that still HOLDS AN AGENT.
+ *     Session-exists was the original test and it had a hole: a pane can
+ *     outlive the agent inside it, and such a husk pinned its ETM forever.
+ *     tmuxOpenProjectPaths now walks each pane's process tree, so this
+ *     condition means "nobody is here" rather than "no window is open".
  *   • no fresh OpenCode session for it
  *   • no fresh content-activity clock from the ETM itself — the honest "the
  *     agent is genuinely working right now" signal (set only on observed
