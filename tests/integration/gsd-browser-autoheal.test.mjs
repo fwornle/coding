@@ -63,6 +63,8 @@ case "$STUB_MODE" in
     echo "Error: navigation failed: net::ERR_UNSAFE_PORT" >&2; exit 3 ;;
   binary)
     printf '\\x89PNG\\r\\n\\x1a\\n\\x00\\x01\\x02\\x03'; exit 0 ;;
+  stop-ok)
+    echo "Daemon stopped."; exit 0 ;;
 esac
 `;
 
@@ -183,5 +185,117 @@ describe('gsd-browser shim heals a wedged daemon', () => {
     assert.equal(status, 1, 'the first failure is returned as-is');
     assert.equal(Number(fs.readFileSync(countFile, 'utf8').trim()), 1, 'no retry');
     assert.equal(fs.existsSync(hookFile), false, 'no reset');
+  });
+});
+
+describe('gsd-browser shim sweeps what `daemon stop` leaves behind', () => {
+  // `daemon stop` prints "Daemon stopped." and exits 0 while stopping neither
+  // half. Measured against the live install on 2026-09-05: 11 orphaned daemons
+  // and 2 automation Chromes before the call, the identical 11 and 2 after it.
+  // The manifest shows why it cannot do better — `daemonPid` is null, so stop
+  // has no pid to signal, and `browserPid` is recorded and then never used.
+  //
+  // This matters beyond tidiness: an orphaned Chrome keeps a VALID SingletonLock
+  // on the profile, which is exactly the state that refuses every future daemon
+  // (wedge C). The thing the user asked to stop is what wedges the next start.
+
+  it('sweeps after a successful `daemon stop`', () => {
+    const r = runShim('stop-ok', ['daemon', 'stop']);
+    assert.equal(r.status, 0);
+    assert.equal(r.calls, 1, 'stop is not retried — it succeeded');
+    assert.equal(r.resets, 1, 'the orphans stop leaves behind must be swept');
+  });
+
+  it('still sweeps when stop carries an option', () => {
+    for (const args of [['--json', 'daemon', 'stop'], ['daemon', 'stop', '--json']]) {
+      assert.equal(runShim('stop-ok', args).resets, 1, `should sweep: ${args.join(' ')}`);
+    }
+  });
+
+  it('sweeps only `daemon stop`, not every successful command', () => {
+    // The sweep SIGKILLs both halves. Firing it after `daemon start` would kill
+    // the daemon that command just started.
+    for (const args of [['daemon', 'start'], ['daemon', 'health'], ['navigate', 'x'], ['stop', 'daemon']]) {
+      assert.equal(runShim('stop-ok', args).resets, 0, `must not sweep: ${args.join(' ')}`);
+    }
+  });
+
+  it('does not sweep when the stop FAILED', () => {
+    // A failed stop has not established that anything should be torn down, and
+    // killing both halves would destroy the state needed to diagnose it.
+    const r = runShim('other', ['daemon', 'stop']);
+    assert.equal(r.status, 3, 'the real exit code must survive');
+    assert.equal(r.resets, 0);
+  });
+
+  it('does not sweep a session or a browser the default manifest does not describe', () => {
+    // `--session` has its own daemon and its own profile; `--cdp-url` is a
+    // browser we attached to rather than launched. Sweeping the default profile
+    // on either kills the wrong thing.
+    for (const args of [
+      ['--session', 'foo', 'daemon', 'stop'],
+      ['daemon', '--session', 'foo', 'stop'],
+      ['--cdp-url', 'ws://127.0.0.1:9222', 'daemon', 'stop'],
+    ]) {
+      assert.equal(runShim('stop-ok', args).resets, 0, `must not sweep: ${args.join(' ')}`);
+    }
+  });
+
+  it('refuses to treat an option VALUE as the subcommand', () => {
+    // `--browser-path /path/to/chrome daemon stop` puts a non-option token
+    // first. The match fails and nothing is swept — the safe way to be wrong.
+    const r = runShim('stop-ok', ['--browser-path', '/Applications/Chrome', 'daemon', 'stop']);
+    assert.equal(r.resets, 0);
+  });
+});
+
+describe('gsd-browser shim never SIGKILLs a browser that is not its own', () => {
+  // The sweep's pattern is `user-data-dir=<profile>` read from the manifest.
+  // When the daemon was told to ATTACH to a running Chrome (`--cdp-url`), that
+  // profile is the USER'S — so the pkill, the SingletonLock removal and the
+  // Preferences rewrite would all land on their real, logged-in session.
+  //
+  // The guard is asserted against the shipped source rather than a copy: the
+  // function is extracted from bin/gsd-browser itself, so a rename or a change
+  // of logic fails here instead of silently going untested.
+  const guard = fs.readFileSync(SHIM, 'utf8')
+    .split('\n')
+    .reduce((acc, line) => {
+      if (line.startsWith('browser_is_ours() {')) acc.on = true;
+      if (acc.on) acc.out.push(line);
+      if (acc.on && line === '}') acc.on = false;
+      return acc;
+    }, { on: false, out: [] }).out.join('\n');
+
+  /** Ask the real guard whether it would kill this browser. */
+  const wouldKill = (profile, launchMode) => {
+    const script = `${guard}\nCHROME_PROFILE=$1 LAUNCH_MODE=$2\nbrowser_is_ours && echo KILL || echo SPARE`;
+    return execFileSync('bash', ['-c', script, 'bash', profile, launchMode], { encoding: 'utf8' }).trim();
+  };
+
+  it('extracted the guard from the shim', () => {
+    assert.match(guard, /^browser_is_ours\(\) \{/, 'guard not found in bin/gsd-browser');
+  });
+
+  it('kills a browser it launched into its own profile', () => {
+    assert.equal(wouldKill(`${os.homedir()}/.gsd-browser/browser-profile`, 'launched'), 'KILL');
+  });
+
+  it('kills when launchMode is absent, so older installs still self-heal', () => {
+    // Gating on the field being PRESENT would turn the autoheal reset into a
+    // silent no-op on exactly the installs that predate it. The path decides;
+    // launchMode only ever vetoes.
+    assert.equal(wouldKill(`${os.homedir()}/.gsd-browser/browser-profile`, ''), 'KILL');
+  });
+
+  it("spares the user's real Chrome profile, whatever launchMode says", () => {
+    const real = `${os.homedir()}/Library/Application Support/Google/Chrome`;
+    for (const mode of ['attached', 'launched', '']) {
+      assert.equal(wouldKill(real, mode), 'SPARE', `must spare the real profile (launchMode=${mode || 'absent'})`);
+    }
+  });
+
+  it('spares an explicitly attached browser even inside its own tree', () => {
+    assert.equal(wouldKill(`${os.homedir()}/.gsd-browser/browser-profile`, 'attached'), 'SPARE');
   });
 });
