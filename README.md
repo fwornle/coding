@@ -399,6 +399,51 @@ start_workflow {
 
 ## 🛠️ Configuration
 
+### Choosing what runs
+
+`coding` is composable. Nine features can be switched on and off independently —
+and the parts you switch off do not install, do not start, do not appear in the
+dashboard and do not appear in the status line.
+
+| feature | what it is |
+|---------|------------|
+| `lsl` | verbatim session logging (`.specstory` markdown) |
+| `observations` | the observation → digest → insight pipeline |
+| `knowledge` | semantic analysis, UKB workflows, knowledge graph, VKB |
+| `codegraph` | the graphify code knowledge graph |
+| `constraints` | guardrail rules checked before every tool call |
+| `llm-proxy` | provider routing, fallback and token accounting |
+| `performance` | measurement, experiments, benchmarks |
+| `health` | health coordinator and the monitoring dashboard |
+| `statusline` | the tmux / agent status line |
+
+```bash
+coding-features status                 # what is on, and why
+coding-features profile proxy-only     # just the LLM proxy — no Docker needed
+coding-features set constraints off    # turn one thing off
+coding-features explain knowledge      # why is this off?
+```
+
+Or use the dashboard: **http://localhost:3032 → Features**.
+
+Four presets ship: `full` (the default — everything), `proxy-only`,
+`logging-only` and `minimal`. Pick one at install time with
+`./install.sh --features=proxy-only`, or change your mind later — a feature
+enabled after install is set up by `coding-features repair`.
+
+**Nothing changes unless you ask.** With no configuration the resolved set is
+everything, exactly as it has always been.
+
+Configuration is layered, last wins:
+
+1. built-in defaults (all on)
+2. `config/features.yaml` — committed, a team or project default
+3. `~/.coding/features.yaml` — this machine (what the dashboard writes)
+4. `CODING_FEATURE_<ID>=on|off` — environment, for CI
+
+See [Feature Modularity](docs/architecture/features.md) for the full map of
+which feature owns which daemon, container program, port, hook, tab and badge.
+
 ### Quick Configuration
 
 ```bash
