@@ -64,6 +64,8 @@ USAGE
   coding-features set <id> on|off     Turn one feature on or off
   coding-features profile [<name>]    Show, or switch to, a named preset
   coding-features profiles            List available presets
+  coding-features repair              Run install steps for features enabled
+                                      after install (idempotent)
   coding-features snapshot            Rewrite .coding/runtime/features.json
   coding-features json                Machine-readable resolved state
 
@@ -274,6 +276,40 @@ switch (cmd) {
     writeSnapshot({ repoPath: REPO });
     printStatus(resolved, asJson);
     if (!noApply) await applyDelta(resolved);
+    break;
+  }
+
+  case 'repair': {
+    // Turning a feature on months after install can find its setup missing:
+    // install.sh skipped the step, so there is no Docker image, no submodule
+    // build, no LaunchAgent. `apply-features` can only start things that
+    // already exist — this is the other half.
+    //
+    // Delegates to install.sh rather than reimplementing any of it. install.sh
+    // is idempotent by design (every step checks before acting) and reads the
+    // same resolver, so re-running it with the current selection installs
+    // exactly what is now missing and skips the rest.
+    const installer = join(REPO, 'install.sh');
+    if (!existsSync(installer)) die(`cannot find ${installer}`);
+
+    const resolved = resolveOrDie();
+    process.stdout.write(
+      `${C.bold}Repairing:${C.reset} ${resolved.enabled.join(', ')}\n`
+      + `${C.dim}Re-runs install.sh, which is idempotent — already-installed`
+      + ` features are checked and skipped.${C.reset}\n\n`,
+    );
+
+    const { spawnSync } = await import('node:child_process');
+    const result = spawnSync('bash', [installer, '--yes'], {
+      stdio: 'inherit',
+      cwd: REPO,
+      // `keep` tells install.sh a selection already exists and must not be
+      // re-answered. Passing a profile name would overwrite an explicit
+      // per-feature configuration with whatever name happened to fit — the
+      // opposite of repairing it.
+      env: { ...process.env, CODING_INSTALL_FEATURES: 'keep' },
+    });
+    process.exit(result.status ?? 1);
     break;
   }
 
