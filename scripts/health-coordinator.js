@@ -2207,22 +2207,54 @@ function tmuxOpenProjectPaths(agenticDir) {
   try {
     // list-panes, not list-sessions: the pane pid is what the agent-liveness
     // check below needs, and a session can hold more than one pane.
-    const out = spawnSync('tmux', ['list-panes', '-a', '-F', '#{session_path}\t#{pane_pid}\t#{session_attached}'], {
+    // Fields are SPACE-separated with the path LAST, and every character in the
+    // format is printable ASCII. Both properties are load-bearing.
+    //
+    // tmux sanitises unprintable and non-ASCII characters in format output when the
+    // locale is not UTF-8, replacing them with "_". launchd passes no LANG, so the
+    // coordinator got "path_pid_attached" where an interactive shell gets real tabs
+    // — every line then failed to parse, no pane qualified, and the reaper concluded
+    // nobody was attached anywhere and reaped every ETM on the machine. Measured:
+    // `tmux display-message -p 'X<tab>Y'` gives "X^IY" with LANG set and "X_Y"
+    // without.
+    //
+    // Path last, because a path may contain the separator (or anything else) while
+    // pane_pid and session_attached cannot: parsing takes the first two tokens and
+    // treats the entire remainder as the path.
+    const out = spawnSync('tmux', ['list-panes', '-a', '-F', '#{pane_pid} #{session_attached} #{session_path}'], {
       encoding: 'utf8',
       timeout: 1500,
     });
     if (out.status !== 0 || !out.stdout) return null; // asked and could not tell
 
     const panes = new Map(); // projectPath -> [{pid, attached}]
+    let parsed = 0;
+    let seen = 0;
     for (const line of out.stdout.split('\n')) {
-      const [rawPath, rawPid, rawAttached] = line.split('\t');
-      const p = (rawPath || '').trim();
+      if (!line.trim()) continue;
+      seen++;
+      const m = /^(\d+) (\d+) (.+)$/.exec(line);
+      if (!m) continue;
+      parsed++;
+      const pid = parseInt(m[1], 10);
+      const attached = parseInt(m[2], 10) > 0;
+      const p = m[3].trim();
       if (!p) continue;
       if (!fs.existsSync(p)) continue;
       if (!(p.startsWith(agenticDir + '/') || looksLikeProjectDir(p))) continue;
       if (!panes.has(p)) panes.set(p, []);
-      const pid = parseInt(rawPid, 10);
-      if (pid > 0) panes.get(p).push({ pid, attached: parseInt(rawAttached, 10) > 0 });
+      if (pid > 0) panes.get(p).push({ pid, attached });
+    }
+
+    // Output we could not parse AT ALL is "could not tell", never "nobody is here".
+    // Zero qualifying panes is a legitimate answer — every tmux session might be in a
+    // non-project directory — but zero PARSED lines out of a non-empty response means
+    // the contract with tmux is broken, and answering "nobody is attached" to that
+    // reaps every ETM on the machine. This is the guard that would have caught the
+    // locale bug above on its first tick instead of after ~15 false reaps.
+    if (seen > 0 && parsed === 0) {
+      etmTrace(() => `tmux: ${seen} line(s) returned, NONE parsable — treating as "cannot tell"`);
+      return null;
     }
 
     // Fail OPEN, twice over: with no process snapshot, or a pane whose pid we
