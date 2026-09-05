@@ -33,10 +33,23 @@ SEMANTIC_ANALYSIS_PORT="${SEMANTIC_ANALYSIS_PORT:-3848}"
 CONSTRAINT_MONITOR_PORT="${CONSTRAINT_MONITOR_PORT:-3849}"
 GRAPHIFY_MCP_PORT="${GRAPHIFY_MCP_PORT:-3851}"
 
+# The code-graph server is the `codegraph` feature. With that feature off there
+# is no :3851 to reach, and an MCP entry pointing at it would make every session
+# start with a connection error for a service the user deliberately switched
+# off. Emitting an empty server map is the correct output, not a degraded one.
+CODEGRAPH_ENABLED=true
+if command -v node >/dev/null 2>&1 && [ -x "$CODING_REPO/bin/coding-features" ]; then
+  if ! node "$CODING_REPO/bin/coding-features" enabled codegraph >/dev/null 2>&1; then
+    CODEGRAPH_ENABLED=false
+  fi
+fi
+
 # Resolve the active code-graph backend's MCP entry, as {"<serverName>": {...}}.
 CODE_GRAPH_ENTRY=""
 CODE_GRAPH_BACKEND_ID="(fallback)"
-if command -v node >/dev/null 2>&1 && [ -f "$CODING_REPO/config/code-graph.json" ]; then
+if [ "$CODEGRAPH_ENABLED" != "true" ]; then
+  CODE_GRAPH_BACKEND_ID="(disabled — feature 'codegraph' is off)"
+elif command -v node >/dev/null 2>&1 && [ -f "$CODING_REPO/config/code-graph.json" ]; then
   if CODE_GRAPH_ENTRY="$(node "$SCRIPT_DIR/code-graph-config.mjs" mcp-entry --agent claude --flavor claude --named 2>/dev/null)"; then
     CODE_GRAPH_BACKEND_ID="$(node "$SCRIPT_DIR/code-graph-config.mjs" active --agent claude 2>/dev/null || echo unknown)"
   else
@@ -44,7 +57,7 @@ if command -v node >/dev/null 2>&1 && [ -f "$CODING_REPO/config/code-graph.json"
   fi
 fi
 
-if [ -z "$CODE_GRAPH_ENTRY" ]; then
+if [ -z "$CODE_GRAPH_ENTRY" ] && [ "$CODEGRAPH_ENABLED" = "true" ]; then
   log "WARNING: code-graph registry unavailable — falling back to the literal graphify entry"
   CODE_GRAPH_ENTRY="{\"graphify\": {\"type\": \"http\", \"url\": \"http://localhost:$GRAPHIFY_MCP_PORT/mcp\"}}"
 fi
@@ -68,7 +81,9 @@ EOF
 
 # Splice the code-graph entry in. Done as a merge rather than string interpolation so a
 # stdio backend (command + args array) renders as valid JSON just like an http one.
-if command -v node >/dev/null 2>&1; then
+if [ -z "$CODE_GRAPH_ENTRY" ]; then
+  log "code-graph server omitted (feature 'codegraph' is off)"
+elif command -v node >/dev/null 2>&1; then
   CODE_GRAPH_ENTRY="$CODE_GRAPH_ENTRY" node -e '
     const fs = require("fs");
     const file = process.argv[1];

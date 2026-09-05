@@ -151,7 +151,8 @@ repo|$CODING_REPO/.npmrc|create|yes|proxy for npm, only if env vars are not hono
 repo|$CODING_REPO/.git/hooks/pre-commit|replace|yes|knowledge-snapshot guard (original saved as pre-commit.coding-orig)
 repo|$CODING_REPO/lib/km-core|checkout|yes|git submodule required for session logging
 repo|$CODING_REPO/.coding/|create|yes|per-launch agent config, so nothing global has to change
-repo|$CODING_REPO/.specstory/history/|clone or init|no|private session-history checkout; never pushed without confirmation, and uninstall.sh leaves your transcripts alone
+repo|$CODING_REPO/.specstory/history/|clone or init|no|private session-history checkout; never pushed without confirmation, and uninstall.sh leaves your transcripts alone [feature:lsl]
+home|~/.coding/features.yaml|create|yes|which parts of coding you chose to install (not written for the default, `full`)
 home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
 home|$SHELL_RC|one marker block|yes|exports CODING_REPO and adds bin/ to PATH
 home|~/.gsd-browser/|create|yes|gsd-browser CLI, the mandated browser-automation tool; installer reuses a system Chrome when present and otherwise downloads Chrome for Testing
@@ -161,8 +162,8 @@ global|~/.claude/commands/|copy skills|yes|OPT-IN: slash commands available to b
 global|~/.config/opencode/opencode.json|merge plugins|yes|OPT-IN: plugins load in every opencode session
 global|~/.copilot/settings.json|enableFileHooks|yes|OPT-IN (separate): lets repo hooks fire in ANY of your repos
 global|~/.copilot/config.json|add trustedFolders|yes|OPT-IN (separate): trusts this repo; rewrite drops JSONC comments
-system|~/Library/LaunchAgents/com.coding.llm-cli-proxy.plist|create+load|yes|OPT-IN: starts the LLM proxy at login (macOS)
-system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux)
+system|~/Library/LaunchAgents/com.coding.llm-cli-proxy.plist|create+load|yes|OPT-IN: starts the LLM proxy at login (macOS) [feature:llm-proxy]
+system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux) [feature:llm-proxy]
 system|Scheduled Task \coding\claude-ctx-sweeper|create|yes|Windows only: hourly cleanup of stale status-line temp files, because nothing else ever reclaims %TEMP% (elsewhere this runs at agent launch and changes nothing)
 MANIFEST
 }
@@ -190,6 +191,19 @@ print_impact_manifest() {
                 *systemd*)      [[ "$PLATFORM" == "linux" || "$PLATFORM" == "wsl" ]] || continue ;;
                 "Scheduled Task"*) [[ "$PLATFORM" == "windows" ]] || continue ;;
             esac
+            # Same argument, one step further: a row for a feature the user did
+            # not select will not happen, and the manifest's entire value is
+            # that it is a complete and TRUE account of what will.
+            #
+            # Only filters once a selection exists. At --dry-run time it has not
+            # been made yet, so every row shows — which is correct: the dry run
+            # is showing the maximum, and says so.
+            local row_feature="${why##*\[feature:}"
+            if [[ "$row_feature" != "$why" ]]; then
+                row_feature="${row_feature%%\]*}"
+                if [[ -n "$ACTIVE_FEATURES" ]] && ! feature_on "$row_feature"; then continue; fi
+                why="${why%% \[feature:*}"
+            fi
             if [[ "$any" == "false" ]]; then
                 any=true
                 case "$scope" in
@@ -1021,6 +1035,7 @@ check_dependencies() {
 
 # Install memory-visualizer (git submodule)
 install_memory_visualizer() {
+    skip_unless_feature knowledge "the memory visualizer" || return 0
     echo -e "\n${CYAN}📊 Installing memory-visualizer (git submodule)...${NC}"
 
     cd "$CODING_REPO"
@@ -1093,6 +1108,7 @@ install_memory_visualizer() {
 
 # Install semantic analysis MCP server (git submodule)
 install_semantic_analysis() {
+    skip_unless_feature knowledge "semantic analysis" || return 0
     echo -e "\n${CYAN}🧠 Installing semantic analysis MCP server (git submodule)...${NC}"
 
     cd "$CODING_REPO"
@@ -1204,6 +1220,7 @@ install_semantic_analysis() {
 
 # Install MCP Constraint Monitor with Professional Dashboard (git submodule)
 install_constraint_monitor() {
+    skip_unless_feature constraints "the constraint monitor" || return 0
     echo -e "\n${CYAN}🚦 Installing MCP Constraint Monitor with Professional Dashboard (git submodule)...${NC}"
 
     cd "$CODING_REPO"
@@ -1293,6 +1310,7 @@ install_constraint_monitor() {
 
 # Install System Health Dashboard
 install_system_health_dashboard() {
+    skip_unless_feature health "the health dashboard" || return 0
     echo -e "\n${CYAN}🏥 Installing System Health Dashboard...${NC}"
 
     if [[ ! -d "$CODING_REPO/integrations/system-health-dashboard" ]]; then
@@ -1434,6 +1452,7 @@ install_gsd_browser() {
 }
 
 install_graphify() {
+    skip_unless_feature codegraph "graphify" || return 0
     echo -e "\n${CYAN}🔗 Installing graphify code knowledge graph...${NC}"
 
     cd "$CODING_REPO"
@@ -2335,6 +2354,26 @@ configure_team_setup() {
 # removed; Docker is mandatory because the supervisor/coordinator/dashboard
 # stack assumes a single source of truth for service lifecycle.
 configure_docker_mode() {
+    # Docker is required only by knowledge, codegraph and constraints. With all
+    # three off there is nothing to build, and DEMANDING it would be the single
+    # biggest reason a proxy-only or logging-only install still could not work
+    # on a machine that has no Docker Desktop — which is most of the point of
+    # offering those profiles at all.
+    if [[ "$FEATURES_NEED_DOCKER" != "true" ]]; then
+        resolve_feature_selection_once
+    fi
+    if [[ "$FEATURES_NEED_DOCKER" != "true" ]]; then
+        info "Skipping Docker setup — no selected feature runs in a container"
+        # The MCP config is still generated: it is where the codegraph server
+        # entry is decided, and with codegraph off it must be written EMPTY
+        # rather than left stale from a previous install.
+        if [[ -x "$CODING_REPO/scripts/generate-docker-mcp-config.sh" ]]; then
+            "$CODING_REPO/scripts/generate-docker-mcp-config.sh" >/dev/null 2>&1 \
+                || warning "Could not generate MCP config"
+        fi
+        return 0
+    fi
+
     echo -e "\n${CYAN}🐳 Docker Setup${NC}"
     echo ""
     echo "All coding services (MCP servers, dashboards, semantic-analysis,"
@@ -2738,6 +2777,7 @@ ensure_dmr_model() {
 # Setup LLM CLI Proxy - HTTP bridge to host CLI tools (claude, copilot, pi)
 # for Docker containers. Port 12435, adjacent to DMR's port 12434.
 setup_llm_cli_proxy() {
+    skip_unless_feature llm-proxy "the LLM CLI proxy" || return 0
     local proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
     local proxy_dir="$CODING_REPO/integrations/llm-cli-proxy"
     local has_cli=false
@@ -3360,6 +3400,7 @@ install_vkb_server_deps() {
 
 # Initialize knowledge management databases (Qdrant + SQLite)
 initialize_knowledge_databases() {
+    skip_unless_feature knowledge "knowledge database setup" || return 0
     echo -e "\n${CYAN}📊 Initializing Continuous Learning Knowledge Databases...${NC}"
 
     cd "$CODING_REPO"
@@ -3925,6 +3966,12 @@ parse_args() {
             --dry-run)                   DRY_RUN=true; NON_INTERACTIVE=true
                                          INSTALL_LOG="${TMPDIR:-/tmp}/coding-install-dryrun.log" ;;
             --global-agents)             CODING_INSTALL_GLOBAL_AGENTS=1 ;;
+            # Which parts of `coding` to install and run. A profile name
+            # (full|proxy-only|logging-only|minimal) or a comma-separated
+            # feature list. Absent = ask interactively, default `full`, which is
+            # byte-for-byte the historical install.
+            --features=*)                CODING_INSTALL_FEATURES="${1#*=}" ;;
+            --features)                  shift; CODING_INSTALL_FEATURES="${1:-full}" ;;
             -h|--help)                   show_usage; exit 0 ;;
             --skip-hooks)                : ;;  # accepted, no-op at root level
             *)                           warning "Unknown option: $1 (ignored)" ;;
@@ -3936,6 +3983,9 @@ parse_args() {
     [[ "${CI:-}" == "true" ]] && { NON_INTERACTIVE=true; CI_LITE=true; }
     [[ -n "${CODING_INSTALL_YES:-}" ]] && { ASSUME_YES=true; NON_INTERACTIVE=true; }
     [[ -n "${CODING_INSTALL_CI:-}" ]] && { NON_INTERACTIVE=true; CI_LITE=true; }
+    # CODING_INSTALL_FEATURES is honoured whether it came from the flag above or
+    # from the environment, so a CI matrix can set it once for the whole job.
+    CODING_INSTALL_FEATURES="${CODING_INSTALL_FEATURES:-}"
 
     # No controlling TTY on stdin → force non-interactive so `read` under
     # `set -e` can never abort on EOF (the failure mode of piped/CI runs).
@@ -3970,6 +4020,189 @@ read_or_default() {
 # non-interactively requires the explicit CODING_INSTALL_GLOBAL_AGENTS=1 or
 # --global-agents.
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# WHICH PARTS TO INSTALL
+#
+# The second question that shapes the install. Default is `full` — byte-for-byte
+# what this installer has always done — so an existing user pressing Enter gets
+# no change at all.
+#
+# Writes ~/.coding/features.yaml. Everything downstream (this script's own skip
+# logic, bin/coding, the service starter, the container entrypoint, the hooks,
+# the status line, the dashboard) reads the same resolver, so this one answer
+# decides the whole shape of the install.
+#
+# See docs/architecture/features.md.
+# ─────────────────────────────────────────────────────────────────────────────
+ACTIVE_FEATURES=""          # space-separated ids, set by resolve_feature_selection
+FEATURES_NEED_DOCKER="true" # conservative default until resolved
+
+ask_feature_selection() {
+    local choice="${CODING_INSTALL_FEATURES:-}"
+
+    # `keep` — used by `coding-features repair` — means "a selection already
+    # exists; do not touch it". Re-answering the question would overwrite an
+    # explicit per-feature configuration with whatever profile name happened to
+    # be passed, which is the opposite of repairing it.
+    if [[ "$choice" == "keep" ]]; then
+        resolve_feature_selection
+        info "Keeping the existing feature selection: ${ACTIVE_FEATURES:-(none)}"
+        return 0
+    fi
+
+    # An existing selection is also kept in an unattended run with nothing
+    # specified, for the same reason: re-running the installer to pick up a
+    # fix must not silently reset which parts of the system are installed.
+    if [[ -z "$choice" && -f "$HOME/.coding/features.yaml" ]]; then
+        resolve_feature_selection
+        info "Existing feature selection found — keeping it: ${ACTIVE_FEATURES:-(none)}"
+        info "  Change it with: coding-features profile <name>"
+        return 0
+    fi
+
+    if [[ -z "$choice" && "$NON_INTERACTIVE" != "true" ]]; then
+        echo ""
+        echo -e "${PURPLE}────────────────────────────────────────────────────────────────────${NC}"
+        echo -e "${PURPLE}  WHICH PARTS DO YOU WANT?${NC}"
+        echo -e "${PURPLE}────────────────────────────────────────────────────────────────────${NC}"
+        echo ""
+        echo "  1) full          everything (default — what this installer has always done)"
+        echo "  2) proxy-only    just the LLM proxy: routing, fallback, token accounting."
+        echo "                   No Docker, no logging, no knowledge base."
+        echo "  3) logging-only  verbatim session logging + health monitoring. No Docker."
+        echo "  4) minimal       the agent launcher and a status line. No background services."
+        echo ""
+        echo "  Any of this can be changed later with \`coding-features\`, or in the"
+        echo "  dashboard under Features. Nothing here is permanent."
+        echo ""
+        read_or_default choice "full" "Choice [1-4, or a profile name] (default: full): "
+        case "$choice" in
+            1|"") choice="full" ;;
+            2) choice="proxy-only" ;;
+            3) choice="logging-only" ;;
+            4) choice="minimal" ;;
+        esac
+    fi
+
+    [[ -n "$choice" ]] || choice="full"
+    CODING_INSTALL_FEATURES="$choice"
+
+    # `full` is the default and writes nothing: an absent features.yaml already
+    # resolves to all-on, and not creating a file keeps `coding-features status`
+    # honest about the user never having made a choice.
+    if [[ "$choice" == "full" ]]; then
+        info "Installing everything (default)"
+    elif [[ -x "$CODING_REPO/bin/coding-features" ]] && command -v node >/dev/null 2>&1; then
+        mkdir -p "$HOME/.coding"
+        if [[ "$choice" == *","* ]]; then
+            # A comma-separated list: start from nothing, switch on what was named.
+            {
+                echo "# Written by install.sh --features=$choice"
+                echo "profile: minimal"
+                echo "features:"
+                local f
+                IFS=',' read -ra _feature_list <<< "$choice"
+                for f in "${_feature_list[@]}"; do
+                    echo "  ${f// /}: on"
+                done
+            } > "$HOME/.coding/features.yaml"
+        else
+            printf '# Written by install.sh --features=%s\nprofile: %s\n' "$choice" "$choice" \
+                > "$HOME/.coding/features.yaml"
+        fi
+
+        # Validate immediately rather than at first launch. A typo'd profile
+        # name written here would otherwise abort `coding --claude` days later,
+        # with nothing pointing back at the install.
+        if ! node "$CODING_REPO/bin/coding-features" status >/dev/null 2>&1; then
+            warning "  '$choice' is not a valid feature selection — falling back to full"
+            rm -f "$HOME/.coding/features.yaml"
+            CODING_INSTALL_FEATURES="full"
+            INSTALLATION_WARNINGS+=("Feature selection '$choice' was invalid; installed everything instead")
+        else
+            success "  Feature selection: $choice"
+        fi
+    else
+        warning "  Cannot write a feature selection yet (node or bin/coding-features missing) — installing everything"
+        CODING_INSTALL_FEATURES="full"
+    fi
+
+    resolve_feature_selection
+}
+
+# Resolve a selection for DISPLAY only, without writing anything.
+#
+# print_impact_manifest() runs before ask_feature_selection() — deliberately,
+# since the manifest is the consent document and must precede the first
+# mutation. But when --features was passed explicitly the answer is already
+# known, and a manifest listing rows that will not happen is a worse consent
+# document than one that is complete.
+#
+# CODING_FEATURE_PROFILE is the resolver's own env layer, so this reads the
+# real resolution of that profile without creating a file --dry-run promised
+# not to create.
+preview_feature_selection() {
+    local choice="${CODING_INSTALL_FEATURES:-}"
+    [[ -n "$choice" && "$choice" != "keep" && "$choice" != *","* ]] || return 0
+    [[ -x "$CODING_REPO/bin/coding-features" ]] || return 0
+    command -v node >/dev/null 2>&1 || return 0
+
+    local listed
+    listed="$(CODING_FEATURE_PROFILE="$choice" node "$CODING_REPO/bin/coding-features" list 2>/dev/null | tr '\n' ' ')" || return 0
+    [[ -n "$listed" ]] || return 0
+    ACTIVE_FEATURES="$listed"
+    _FEATURES_RESOLVED=true
+}
+
+# Populate ACTIVE_FEATURES / FEATURES_NEED_DOCKER from the resolver.
+#
+# Fails OPEN: if the resolver cannot run, every feature counts as enabled and
+# the installer behaves exactly as it did before this existed. An installer that
+# silently skipped steps because it could not read a config would be far worse
+# than one that installs too much.
+resolve_feature_selection() {
+    ACTIVE_FEATURES=""
+    FEATURES_NEED_DOCKER="true"
+
+    if [[ -x "$CODING_REPO/bin/coding-features" ]] && command -v node >/dev/null 2>&1; then
+        ACTIVE_FEATURES="$(node "$CODING_REPO/bin/coding-features" list 2>/dev/null | tr '\n' ' ')" || ACTIVE_FEATURES=""
+        FEATURES_NEED_DOCKER="$(node -e '
+            const { loadFeatures } = require(process.argv[1]);
+            process.stdout.write(String(loadFeatures({force: true}).needsDocker));
+        ' "$CODING_REPO/lib/features/resolve.cjs" 2>/dev/null)" || FEATURES_NEED_DOCKER="true"
+    fi
+
+    [[ -n "$ACTIVE_FEATURES" ]] || ACTIVE_FEATURES="lsl observations knowledge codegraph constraints llm-proxy performance health statusline"
+    [[ -n "$FEATURES_NEED_DOCKER" ]] || FEATURES_NEED_DOCKER="true"
+}
+
+# Is a feature part of this install? Used to skip setup steps.
+feature_on() {
+    resolve_feature_selection_once
+    case " $ACTIVE_FEATURES " in
+        *" $1 "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+_FEATURES_RESOLVED=false
+resolve_feature_selection_once() {
+    [[ "$_FEATURES_RESOLVED" == "true" ]] && return 0
+    resolve_feature_selection
+    _FEATURES_RESOLVED=true
+}
+
+# Skip an install step whose feature is off, and say so once.
+#
+# Named for what it protects rather than what it checks, so the call sites read
+# as intent: `skip_unless_feature knowledge "Semantic analysis" || return 0`.
+skip_unless_feature() {
+    local feature="$1" what="$2"
+    if feature_on "$feature"; then return 0; fi
+    info "Skipping $what — feature '$feature' is not part of this install"
+    return 1
+}
+
 ask_agent_scope() {
     # Explicit opt-in wins, interactive or not.
     if [[ "${CODING_INSTALL_GLOBAL_AGENTS:-0}" == "1" ]]; then
@@ -4179,6 +4412,10 @@ main() {
 
     # Disclose everything BEFORE the first mutation. --dry-run stops here, so
     # the manifest is also a way to inspect the installer without running it.
+    #
+    # When --features named a profile, resolve it first (read-only) so the
+    # manifest lists only what will actually happen.
+    preview_feature_selection
     print_impact_manifest
     if [[ "$DRY_RUN" == "true" ]]; then
         success "Dry run — nothing was changed."
@@ -4188,6 +4425,10 @@ main() {
 
     # The single question that decides host impact (default: wrapper-scoped).
     ask_agent_scope
+
+    # The second question: which parts to install (default: everything).
+    # Runs BEFORE any install step, so the skips below act on the answer.
+    ask_feature_selection
 
     # Choosing wrapper does not undo what an earlier global install wrote, so
     # offer to remove those leftovers — otherwise the choice is quietly untrue.
@@ -4325,6 +4566,7 @@ show_installation_status() {
 
 # Install Enhanced Live Session Logging system
 install_enhanced_lsl() {
+    skip_unless_feature lsl "live session logging" || return 0
     echo -e "\n${CYAN}📝 Installing Enhanced LSL system...${NC}"
 
     # Run LSL deployment script

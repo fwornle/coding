@@ -1,0 +1,324 @@
+#!/usr/bin/env node
+
+/**
+ * coding-features — inspect and change which parts of `coding` are active.
+ *
+ * The shell-facing half of the feature system. `enabled <id>` exits 0/1 so bash
+ * gates read naturally:
+ *
+ *   if coding-features enabled lsl; then ... fi
+ *
+ * Writes go to ~/.coding/features.yaml — the per-machine layer, which is also
+ * what the dashboard writes. The repo's config/features.yaml is left alone so a
+ * committed team default is never clobbered by a local preference.
+ *
+ * See docs/architecture/features.md.
+ */
+
+import { existsSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
+
+import {
+  loadFeatures,
+  loadProfiles,
+  configPaths,
+  FeatureConfigError,
+  FEATURE_IDS,
+  FEATURES,
+  envVarFor,
+} from '../lib/features/index.mjs';
+import { setFeatures, setProfile } from '../lib/features/write.mjs';
+import { writeSnapshot } from '../lib/features/snapshot.cjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO = process.env.CODING_REPO || resolve(__dirname, '..');
+
+const C = process.stdout.isTTY
+  ? { dim: '\x1b[2m', bold: '\x1b[1m', green: '\x1b[32m', red: '\x1b[31m', yellow: '\x1b[33m', reset: '\x1b[0m' }
+  : { dim: '', bold: '', green: '', red: '', yellow: '', reset: '' };
+
+// `coding-features list | head -1` closes stdout early, and an unhandled EPIPE
+// there exits with a stack trace instead of the zero status every other CLI
+// gives. This command explicitly advertises `list` as being for scripts, so
+// being pipe-safe is part of the contract.
+process.stdout.on('error', (err) => {
+  if (err.code === 'EPIPE') process.exit(0);
+  throw err;
+});
+
+function die(message, code = 1) {
+  process.stderr.write(`${C.red}error:${C.reset} ${message}\n`);
+  process.exit(code);
+}
+
+function usage() {
+  return `coding-features — compose which parts of coding are active
+
+USAGE
+  coding-features [status]            Show the resolved feature set
+  coding-features list                One id per line (enabled only, for scripts)
+  coding-features enabled <id>        Exit 0 if on, 1 if off. Prints nothing.
+  coding-features explain <id>        Why a feature is on or off
+  coding-features set <id> on|off     Turn one feature on or off
+  coding-features profile [<name>]    Show, or switch to, a named preset
+  coding-features profiles            List available presets
+  coding-features repair              Run install steps for features enabled
+                                      after install (idempotent)
+  coding-features snapshot            Rewrite .coding/runtime/features.json
+  coding-features json                Machine-readable resolved state
+
+OPTIONS
+  --json                              JSON output (status, explain, profile)
+  --no-apply                          After 'set'/'profile', do not start/stop
+                                      services; just record the change
+
+FEATURES
+${FEATURE_IDS.map((id) => `  ${id.padEnd(14)} ${FEATURES[id].description}`).join('\n')}
+
+CONFIG LAYERS (last wins)
+  1. built-in defaults (all on)
+  2. ${join(REPO, 'config', 'features.yaml')}
+  3. ${join(homedir(), '.coding', 'features.yaml')}   <- written by this command
+  4. CODING_FEATURE_<ID>=on|off
+`;
+}
+
+// ── read side ────────────────────────────────────────────────────────────────
+
+function resolveOrDie() {
+  try {
+    return loadFeatures({ force: true });
+  } catch (err) {
+    if (err instanceof FeatureConfigError) die(err.message, 2);
+    throw err;
+  }
+}
+
+function printStatus(resolved, asJson) {
+  if (asJson) {
+    process.stdout.write(`${JSON.stringify(resolved, null, 2)}\n`);
+    return;
+  }
+
+  const profile = resolved.profile ? `profile: ${C.bold}${resolved.profile}${C.reset}` : `profile: ${C.dim}(none — explicit features)${C.reset}`;
+  process.stdout.write(`\n${profile}\n`);
+  process.stdout.write(`${C.dim}layers applied: ${resolved.layers.length ? resolved.layers.join(' → ') : 'built-in defaults only'}${C.reset}\n\n`);
+
+  const width = Math.max(...FEATURE_IDS.map((id) => id.length));
+  for (const id of FEATURE_IDS) {
+    const f = resolved.features[id];
+    const mark = f.enabled ? `${C.green}on ${C.reset}` : `${C.dim}off${C.reset}`;
+    const tier = f.enabled ? '' : ` ${C.dim}(${f.source})${C.reset}`;
+    process.stdout.write(`  ${mark}  ${id.padEnd(width)}  ${f.label}${tier}\n`);
+  }
+
+  process.stdout.write(`\n${C.dim}docker required: ${resolved.needsDocker ? 'yes' : 'no'}${C.reset}\n`);
+
+  for (const w of resolved.warnings) {
+    process.stdout.write(`${C.yellow}note:${C.reset} ${w}\n`);
+  }
+
+  // Env overrides beat both files, so a user who set one and forgot will
+  // otherwise spend a while editing YAML that cannot win.
+  const envSet = FEATURE_IDS.filter((id) => process.env[envVarFor(id)]);
+  if (envSet.length) {
+    process.stdout.write(
+      `${C.yellow}note:${C.reset} env overrides in effect (beat both config files): `
+      + `${envSet.map((id) => `${envVarFor(id)}=${process.env[envVarFor(id)]}`).join(', ')}\n`,
+    );
+  }
+  process.stdout.write('\n');
+}
+
+// ── write side ──────────────────────────────────────────────────────────────
+//
+// The rules for writing ~/.coding/features.yaml live in lib/features/write.mjs,
+// shared with the health coordinator's /features API (what the dashboard
+// editor talks to). Two writers with two copies of the rules is how a config
+// ends up with a shape only one of them understands.
+
+/**
+ * Apply the delta to running services. Delegated to scripts/apply-features.mjs
+ * so the CLI and the dashboard converge on the same reconciliation.
+ */
+async function applyDelta(resolved) {
+  const applyScript = join(REPO, 'scripts', 'apply-features.mjs');
+  if (!existsSync(applyScript)) return;
+  const { applyFeatures } = await import(applyScript);
+  await applyFeatures({ resolved });
+}
+
+// ── commands ─────────────────────────────────────────────────────────────────
+
+const argv = process.argv.slice(2);
+const asJson = argv.includes('--json');
+const noApply = argv.includes('--no-apply');
+const args = argv.filter((a) => a !== '--json' && a !== '--no-apply');
+const cmd = args[0] || 'status';
+
+function requireFeatureId(id) {
+  if (!id) die('missing feature id. Known features: ' + FEATURE_IDS.join(', '));
+  if (!FEATURES[id]) die(`unknown feature '${id}'. Known features: ${FEATURE_IDS.join(', ')}`);
+  return id;
+}
+
+switch (cmd) {
+  case 'help':
+  case '--help':
+  case '-h':
+    process.stdout.write(usage());
+    break;
+
+  case 'status':
+    printStatus(resolveOrDie(), asJson);
+    break;
+
+  case 'json':
+    process.stdout.write(`${JSON.stringify(resolveOrDie(), null, 2)}\n`);
+    break;
+
+  case 'list':
+    for (const id of resolveOrDie().enabled) process.stdout.write(`${id}\n`);
+    break;
+
+  case 'enabled': {
+    // The bash gate. Deliberately silent: callers test $?, and a message on
+    // stdout would end up interpolated into whatever they are building.
+    const id = requireFeatureId(args[1]);
+    process.exit(resolveOrDie().features[id].enabled ? 0 : 1);
+    break;
+  }
+
+  case 'explain': {
+    const id = requireFeatureId(args[1]);
+    const f = resolveOrDie().features[id];
+    if (asJson) {
+      process.stdout.write(`${JSON.stringify({ id, ...f }, null, 2)}\n`);
+    } else {
+      process.stdout.write(`${C.bold}${id}${C.reset} — ${f.label}\n  ${f.reason}\n`);
+      if (f.requires.length) process.stdout.write(`  ${C.dim}requires: ${f.requires.join(', ')}${C.reset}\n`);
+      process.stdout.write(`  ${C.dim}apply tier: ${f.applyTier}${C.reset}\n`);
+    }
+    break;
+  }
+
+  case 'profiles': {
+    const profiles = loadProfiles(configPaths().profiles);
+    for (const name of Object.keys(profiles).sort()) {
+      const on = FEATURE_IDS.filter((id) => profiles[name][id] === true);
+      process.stdout.write(`  ${C.bold}${name.padEnd(14)}${C.reset} ${on.join(', ') || '(nothing)'}\n`);
+    }
+    break;
+  }
+
+  case 'profile': {
+    const name = args[1];
+    if (!name) {
+      const resolved = resolveOrDie();
+      process.stdout.write(`${resolved.profile || '(none)'}\n`);
+      break;
+    }
+    const profiles = loadProfiles(configPaths().profiles);
+    if (!profiles[name]) {
+      die(`unknown profile '${name}'. Known: ${Object.keys(profiles).sort().join(', ')}`);
+    }
+    let resolved; let dropped;
+    try {
+      ({ resolved, dropped } = setProfile(name));
+    } catch (err) {
+      die(err.message, 2);
+    }
+    if (dropped.length) {
+      process.stdout.write(
+        `${C.yellow}note:${C.reset} dropped ${dropped.length} explicit override(s) `
+        + `(${dropped.join(', ')}) — a profile switch is a reset.\n`,
+      );
+    }
+    writeSnapshot({ repoPath: REPO });
+    printStatus(resolved, asJson);
+    if (!noApply) await applyDelta(resolved);
+    break;
+  }
+
+  case 'set': {
+    const id = requireFeatureId(args[1]);
+    const raw = (args[2] || '').toLowerCase();
+    if (!['on', 'off', 'true', 'false', 'yes', 'no'].includes(raw)) {
+      die(`expected 'on' or 'off', got ${JSON.stringify(args[2] ?? '')}`);
+    }
+    const value = ['on', 'true', 'yes'].includes(raw);
+
+    let resolved;
+    try {
+      resolved = setFeatures({ [id]: value });
+    } catch (err) {
+      die(err.message, 2);
+    }
+
+    // Turning something on that a dependency keeps off is a common surprise;
+    // say so here rather than leaving the user to notice nothing happened.
+    if (value && !resolved.features[id].enabled) {
+      process.stdout.write(
+        `${C.yellow}note:${C.reset} '${id}' is still off — ${resolved.features[id].reason}\n`,
+      );
+    }
+    const knockedOut = resolved.disabled.filter(
+      (other) => other !== id && resolved.features[other].source === 'dependency',
+    );
+    if (!value && knockedOut.length) {
+      process.stdout.write(
+        `${C.yellow}note:${C.reset} also off as a consequence: ${knockedOut.join(', ')}\n`,
+      );
+    }
+
+    writeSnapshot({ repoPath: REPO });
+    printStatus(resolved, asJson);
+    if (!noApply) await applyDelta(resolved);
+    break;
+  }
+
+  case 'repair': {
+    // Turning a feature on months after install can find its setup missing:
+    // install.sh skipped the step, so there is no Docker image, no submodule
+    // build, no LaunchAgent. `apply-features` can only start things that
+    // already exist — this is the other half.
+    //
+    // Delegates to install.sh rather than reimplementing any of it. install.sh
+    // is idempotent by design (every step checks before acting) and reads the
+    // same resolver, so re-running it with the current selection installs
+    // exactly what is now missing and skips the rest.
+    const installer = join(REPO, 'install.sh');
+    if (!existsSync(installer)) die(`cannot find ${installer}`);
+
+    const resolved = resolveOrDie();
+    process.stdout.write(
+      `${C.bold}Repairing:${C.reset} ${resolved.enabled.join(', ')}\n`
+      + `${C.dim}Re-runs install.sh, which is idempotent — already-installed`
+      + ` features are checked and skipped.${C.reset}\n\n`,
+    );
+
+    const { spawnSync } = await import('node:child_process');
+    const result = spawnSync('bash', [installer, '--yes'], {
+      stdio: 'inherit',
+      cwd: REPO,
+      // `keep` tells install.sh a selection already exists and must not be
+      // re-answered. Passing a profile name would overwrite an explicit
+      // per-feature configuration with whatever name happened to fit — the
+      // opposite of repairing it.
+      env: { ...process.env, CODING_INSTALL_FEATURES: 'keep' },
+    });
+    process.exit(result.status ?? 1);
+    break;
+  }
+
+  case 'snapshot': {
+    const { path: out, changed } = writeSnapshot({ repoPath: REPO });
+    process.stdout.write(`${out}${changed ? '' : ` ${C.dim}(unchanged)${C.reset}`}\n`);
+    break;
+  }
+
+  default:
+    die(`unknown command '${cmd}'\n\n${usage()}`);
+}

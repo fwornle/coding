@@ -33,6 +33,8 @@ import {
 } from '../lib/service-starter.js';
 import ProcessStateManager from './process-state-manager.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import { loadFeatures } from '../lib/features/index.mjs';
+import { writeSnapshot } from '../lib/features/snapshot.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -205,6 +207,8 @@ const PORTS = {
 const SERVICE_CONFIGS = {
   transcriptMonitor: {
     name: 'Transcript Monitor',
+    feature: 'lsl',
+    psmPath: 'scripts/enhanced-transcript-monitor.js',
     required: true,
     maxRetries: 3,
     timeout: 20000,
@@ -278,6 +282,8 @@ const SERVICE_CONFIGS = {
 
   liveLoggingCoordinator: {
     name: 'Live Logging Coordinator',
+    feature: 'lsl',
+    psmPath: 'scripts/live-logging-coordinator.js',
     required: true,
     maxRetries: 3,
     timeout: 20000,
@@ -330,6 +336,8 @@ const SERVICE_CONFIGS = {
 
   vkbServer: {
     name: 'VKB Server',
+    feature: 'knowledge',
+    psmPath: 'lib/vkb-server/cli.js',
     required: true, // REQUIRED - must start successfully
     maxRetries: 3,
     timeout: 30000, // VKB server uses LAZY INITIALIZATION - Express starts immediately
@@ -451,6 +459,8 @@ const SERVICE_CONFIGS = {
 
   constraintMonitor: {
     name: 'Constraint Monitor',
+    feature: 'constraints',
+    psmPath: null, // Docker-based; PSM does not track it
     required: false, // OPTIONAL - degrade gracefully
     maxRetries: 2,
     timeout: 30000,
@@ -481,6 +491,8 @@ const SERVICE_CONFIGS = {
 
   healthVerifier: {
     name: 'Health Verifier',
+    feature: 'health',
+    psmPath: 'scripts/health-verifier.js',
     required: false, // OPTIONAL - Layer 3 monitoring
     maxRetries: 2,
     timeout: 15000,
@@ -523,6 +535,8 @@ const SERVICE_CONFIGS = {
 
   statuslineHealthMonitor: {
     name: 'StatusLine Health Monitor',
+    feature: 'health',
+    psmPath: 'scripts/statusline-health-monitor.js',
     required: false, // OPTIONAL - status line monitoring
     maxRetries: 2,
     timeout: 15000,
@@ -622,6 +636,8 @@ const SERVICE_CONFIGS = {
 
   systemHealthDashboardAPI: {
     name: 'System Health Dashboard API',
+    feature: 'health',
+    psmPath: 'integrations/system-health-dashboard/server.js',
     required: false, // OPTIONAL - system health dashboard
     maxRetries: 2,
     timeout: 15000,
@@ -684,6 +700,8 @@ const SERVICE_CONFIGS = {
 
   systemHealthDashboardFrontend: {
     name: 'System Health Dashboard Frontend',
+    feature: 'health',
+    psmPath: 'integrations/system-health-dashboard/vite-frontend',
     required: false, // OPTIONAL - frontend dashboard
     maxRetries: 2,
     timeout: 20000,
@@ -786,6 +804,8 @@ const SERVICE_CONFIGS = {
 
   llmCliProxy: {
     name: 'LLM CLI Proxy',
+    feature: 'llm-proxy',
+    psmPath: 'integrations/llm-cli-proxy/dist/server.js',
     required: false, // OPTIONAL - host-side HTTP bridge for CLI LLM providers
     maxRetries: 2,
     timeout: 15000,
@@ -848,6 +868,8 @@ const SERVICE_CONFIGS = {
 
   observationsApi: {
     name: 'Observations API',
+    feature: 'observations',
+    psmPath: 'scripts/observations-api-server.mjs',
     required: false,
     maxRetries: 2,
     timeout: 15000,
@@ -935,54 +957,73 @@ async function registerWithPSM(result, scriptPath) {
 /**
  * Create .services-running.json status file for status line
  */
-async function createServicesStatusFile(results) {
+async function createServicesStatusFile(results, features) {
   const statusFile = path.join(CODING_DIR, '.services-running.json');
 
   const servicesRunning = results.successful
     .filter(r => r.status === 'success')
     .map(r => r.serviceName.toLowerCase().replace(/\s+/g, '-'));
 
+  // The status line reads this file. Without the feature set it cannot tell a
+  // service that failed from one the user switched off, and would paint the
+  // line yellow for a pared-down install that is working exactly as configured.
+  const disabledServices = results.disabled
+    .map(r => r.serviceName.toLowerCase().replace(/\s+/g, '-'));
+
+  /** '🔇 DISABLED' for a service whose feature is off, else the caller's verdict. */
+  const verdict = (serviceName, ok, okLabel, degradedLabel) => {
+    if (results.disabled.some(r => r.serviceName === serviceName)) return '🔇 DISABLED';
+    return ok ? okLabel : degradedLabel;
+  };
+  const health = (serviceName, ok) => {
+    if (results.disabled.some(r => r.serviceName === serviceName)) return 'disabled';
+    return ok ? 'healthy' : 'degraded';
+  };
+
   const status = {
     timestamp: new Date().toISOString(),
     services: servicesRunning,
     services_running: servicesRunning.length,
+    services_disabled: disabledServices,
+    features: features ? {
+      profile: features.profile,
+      enabled: features.enabled,
+      disabled: features.disabled,
+    } : null,
     constraint_monitor: {
-      status: results.successful.some(r => r.serviceName === 'Constraint Monitor')
-        ? '✅ FULLY OPERATIONAL'
-        : '⚠️ DEGRADED MODE',
+      status: verdict('Constraint Monitor',
+        results.successful.some(r => r.serviceName === 'Constraint Monitor'),
+        '✅ FULLY OPERATIONAL', '⚠️ DEGRADED MODE'),
       dashboard_port: PORTS.CONSTRAINT_DASHBOARD,
       api_port: PORTS.CONSTRAINT_API,
-      health: results.successful.some(r => r.serviceName === 'Constraint Monitor')
-        ? 'healthy'
-        : 'degraded',
+      health: health('Constraint Monitor',
+        results.successful.some(r => r.serviceName === 'Constraint Monitor')),
       last_check: new Date().toISOString()
     },
     semantic_analysis: {
-      status: '✅ OPERATIONAL',
-      health: 'healthy'
+      status: verdict('VKB Server', true, '✅ OPERATIONAL', '✅ OPERATIONAL'),
+      health: health('VKB Server', true)
     },
     vkb_server: {
-      status: results.successful.some(r => r.serviceName === 'VKB Server')
-        ? '✅ OPERATIONAL'
-        : '⚠️ DEGRADED',
+      status: verdict('VKB Server',
+        results.successful.some(r => r.serviceName === 'VKB Server'),
+        '✅ OPERATIONAL', '⚠️ DEGRADED'),
       port: PORTS.VKB,
-      health: results.successful.some(r => r.serviceName === 'VKB Server')
-        ? 'healthy'
-        : 'degraded'
+      health: health('VKB Server',
+        results.successful.some(r => r.serviceName === 'VKB Server'))
     },
     transcript_monitor: {
-      status: '✅ OPERATIONAL',
-      health: 'healthy'
+      status: verdict('Transcript Monitor', true, '✅ OPERATIONAL', '✅ OPERATIONAL'),
+      health: health('Transcript Monitor', true)
     },
     system_health_api: {
-      status: results.successful.some(r => r.serviceName === 'System Health Dashboard API')
-        ? '✅ OPERATIONAL'
-        : '⚠️ DEGRADED',
+      status: verdict('System Health Dashboard API',
+        results.successful.some(r => r.serviceName === 'System Health Dashboard API'),
+        '✅ OPERATIONAL', '⚠️ DEGRADED'),
       port: PORTS.SYSTEM_HEALTH_API,
       dashboard_port: PORTS.SYSTEM_HEALTH_DASHBOARD,
-      health: results.successful.some(r => r.serviceName === 'System Health Dashboard API')
-        ? 'healthy'
-        : 'degraded'
+      health: health('System Health Dashboard API',
+        results.successful.some(r => r.serviceName === 'System Health Dashboard API'))
     }
   };
 
@@ -1056,10 +1097,116 @@ async function cleanupDanglingProcesses() {
 /**
  * Main startup function
  */
+/**
+ * The order services start in, and the only list of them.
+ *
+ * Previously ten near-identical blocks, each repeating the config lookup, the
+ * option object, the PSM path and the success/degraded bucketing. Feature
+ * gating had to be added to every one of them, which is ten chances to miss
+ * one — so the repetition is collapsed here instead. A service that is not in
+ * this array does not start, and a service whose config carries no `feature`
+ * fails loudly at startup rather than quietly ignoring the config.
+ */
+const SERVICE_ORDER = [
+  { key: 'transcriptMonitor', section: 'required' },
+  { key: 'liveLoggingCoordinator' },
+  { key: 'vkbServer', section: 'optional' },
+  { key: 'constraintMonitor' },
+  { key: 'healthVerifier' },
+  { key: 'statuslineHealthMonitor' },
+  { key: 'systemHealthDashboardAPI' },
+  { key: 'systemHealthDashboardFrontend' },
+  { key: 'llmCliProxy' },
+  { key: 'observationsApi' },
+];
+
+/**
+ * Start one service, unless its feature is off.
+ *
+ * A disabled service lands in its own `disabled` bucket. It is deliberately NOT
+ * `degraded`: degraded means "we wanted this and could not have it", which is a
+ * problem to investigate, while disabled means "you switched this off", which is
+ * not. Conflating them is how a pared-down install ends up looking broken in the
+ * status line and on the dashboard.
+ *
+ * @returns {{blocked: boolean}} blocked=true when a REQUIRED service failed, so
+ *   the caller stops rather than starting everything downstream of it — which is
+ *   the pre-existing behaviour for a required failure.
+ */
+async function startOneService(key, results, features) {
+  const config = SERVICE_CONFIGS[key];
+  if (!config) throw new Error(`SERVICE_ORDER names '${key}', which has no SERVICE_CONFIGS entry`);
+  if (!config.feature) throw new Error(`service '${key}' declares no feature (see docs/architecture/features.md)`);
+
+  const feature = features.features[config.feature];
+  if (!feature) throw new Error(`service '${key}' names unknown feature '${config.feature}'`);
+
+  if (!feature.enabled) {
+    console.log(`🔇 ${config.name}: skipped — feature '${config.feature}' is ${feature.reason}`);
+    results.disabled.push({ serviceName: config.name, feature: config.feature, reason: feature.reason });
+    return { blocked: false };
+  }
+
+  try {
+    const result = await startServiceWithRetry(
+      config.name,
+      config.startFn,
+      config.healthCheckFn,
+      {
+        required: config.required,
+        maxRetries: config.maxRetries,
+        timeout: config.timeout,
+      }
+    );
+
+    if (result.status === 'success') {
+      results.successful.push(result);
+      if (config.psmPath) await registerWithPSM(result, config.psmPath);
+    } else {
+      results.degraded.push(result);
+    }
+    return { blocked: false };
+  } catch (error) {
+    // startServiceWithRetry only throws for a REQUIRED service whose retries
+    // are exhausted; optional ones return {status:'degraded'}.
+    results.failed.push({
+      serviceName: config.name,
+      error: error.message,
+      required: true,
+    });
+    return { blocked: true };
+  }
+}
+
 async function startAllServices() {
   console.log('═══════════════════════════════════════════════════════════════════════');
   console.log('🚀 STARTING CODING SERVICES (ROBUST MODE)');
   console.log('═══════════════════════════════════════════════════════════════════════');
+  console.log('');
+
+  // Resolve the active feature set FIRST and refresh the derived snapshot, so
+  // that every later consumer that cannot run the resolver — the shell
+  // launchers, the container entrypoint, graphify's Python — reads the same
+  // decision this run is acting on. A malformed config throws here, before any
+  // service is started, which is the point: a half-started stack under a
+  // configuration nobody could parse is worse than a clear refusal.
+  let features;
+  try {
+    features = loadFeatures({ force: true });
+    writeSnapshot({ repoPath: CODING_DIR });
+  } catch (error) {
+    console.error('💥 FATAL: feature configuration is invalid — nothing started.');
+    console.error(`   ${error.message}`);
+    console.error('   Fix it, or reset with: coding-features profile full');
+    process.exit(1);
+  }
+
+  console.log(`🎛️  Features: ${features.enabled.join(', ') || '(none)'}`);
+  if (features.disabled.length) {
+    console.log(`   off: ${features.disabled.join(', ')}`);
+  }
+  if (features.profile) console.log(`   profile: ${features.profile}`);
+  for (const warning of features.warnings) console.log(`   ⚠️  ${warning}`);
   console.log('');
 
   // Clean up any dangling processes from crashed sessions before starting
@@ -1068,230 +1215,24 @@ async function startAllServices() {
   const results = {
     successful: [],
     degraded: [],
-    failed: []
+    failed: [],
+    disabled: []
   };
 
   // Start services sequentially for better error tracking
   // (Could be parallel, but sequential provides clearer output)
-
-  // 1. REQUIRED: Live Logging System
-  console.log('📋 Starting REQUIRED services (Live Logging System)...');
-  console.log('');
-
-  try {
-    const transcriptResult = await startServiceWithRetry(
-      SERVICE_CONFIGS.transcriptMonitor.name,
-      SERVICE_CONFIGS.transcriptMonitor.startFn,
-      SERVICE_CONFIGS.transcriptMonitor.healthCheckFn,
-      {
-        required: SERVICE_CONFIGS.transcriptMonitor.required,
-        maxRetries: SERVICE_CONFIGS.transcriptMonitor.maxRetries,
-        timeout: SERVICE_CONFIGS.transcriptMonitor.timeout
-      }
-    );
-    results.successful.push(transcriptResult);
-    await registerWithPSM(transcriptResult, 'scripts/enhanced-transcript-monitor.js');
-  } catch (error) {
-    results.failed.push({
-      serviceName: SERVICE_CONFIGS.transcriptMonitor.name,
-      error: error.message,
-      required: true
-    });
-  }
-
-  try {
-    const coordinatorResult = await startServiceWithRetry(
-      SERVICE_CONFIGS.liveLoggingCoordinator.name,
-      SERVICE_CONFIGS.liveLoggingCoordinator.startFn,
-      SERVICE_CONFIGS.liveLoggingCoordinator.healthCheckFn,
-      {
-        required: SERVICE_CONFIGS.liveLoggingCoordinator.required,
-        maxRetries: SERVICE_CONFIGS.liveLoggingCoordinator.maxRetries,
-        timeout: SERVICE_CONFIGS.liveLoggingCoordinator.timeout
-      }
-    );
-    results.successful.push(coordinatorResult);
-    await registerWithPSM(coordinatorResult, 'scripts/live-logging-coordinator.js');
-  } catch (error) {
-    results.failed.push({
-      serviceName: SERVICE_CONFIGS.liveLoggingCoordinator.name,
-      error: error.message,
-      required: true
-    });
-  }
-
-  console.log('');
-
-  // 2. OPTIONAL: VKB Server
-  console.log('🔵 Starting OPTIONAL services (graceful degradation enabled)...');
-  console.log('');
-
-  const vkbResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.vkbServer.name,
-    SERVICE_CONFIGS.vkbServer.startFn,
-    SERVICE_CONFIGS.vkbServer.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.vkbServer.required,
-      maxRetries: SERVICE_CONFIGS.vkbServer.maxRetries,
-      timeout: SERVICE_CONFIGS.vkbServer.timeout
+  for (const { key, section } of SERVICE_ORDER) {
+    if (section === 'required') {
+      console.log('📋 Starting REQUIRED services (Live Logging System)...');
+      console.log('');
+    } else if (section === 'optional') {
+      console.log('🔵 Starting OPTIONAL services (graceful degradation enabled)...');
+      console.log('');
     }
-  );
 
-  if (vkbResult.status === 'success') {
-    results.successful.push(vkbResult);
-    await registerWithPSM(vkbResult, 'lib/vkb-server/cli.js');
-  } else {
-    results.degraded.push(vkbResult);
-  }
-
-  console.log('');
-
-  // 3. OPTIONAL: Constraint Monitor
-  const constraintResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.constraintMonitor.name,
-    SERVICE_CONFIGS.constraintMonitor.startFn,
-    SERVICE_CONFIGS.constraintMonitor.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.constraintMonitor.required,
-      maxRetries: SERVICE_CONFIGS.constraintMonitor.maxRetries,
-      timeout: SERVICE_CONFIGS.constraintMonitor.timeout
-    }
-  );
-
-  if (constraintResult.status === 'success') {
-    results.successful.push(constraintResult);
-    // No PSM registration for Docker-based service
-  } else {
-    results.degraded.push(constraintResult);
-  }
-
-  console.log('');
-
-  // 4. OPTIONAL: Health Verifier
-  const healthVerifierResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.healthVerifier.name,
-    SERVICE_CONFIGS.healthVerifier.startFn,
-    SERVICE_CONFIGS.healthVerifier.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.healthVerifier.required,
-      maxRetries: SERVICE_CONFIGS.healthVerifier.maxRetries,
-      timeout: SERVICE_CONFIGS.healthVerifier.timeout
-    }
-  );
-
-  if (healthVerifierResult.status === 'success') {
-    results.successful.push(healthVerifierResult);
-    await registerWithPSM(healthVerifierResult, 'scripts/health-verifier.js');
-  } else {
-    results.degraded.push(healthVerifierResult);
-  }
-
-  console.log('');
-
-  // 5. OPTIONAL: StatusLine Health Monitor
-  const statuslineHealthResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.statuslineHealthMonitor.name,
-    SERVICE_CONFIGS.statuslineHealthMonitor.startFn,
-    SERVICE_CONFIGS.statuslineHealthMonitor.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.statuslineHealthMonitor.required,
-      maxRetries: SERVICE_CONFIGS.statuslineHealthMonitor.maxRetries,
-      timeout: SERVICE_CONFIGS.statuslineHealthMonitor.timeout
-    }
-  );
-
-  if (statuslineHealthResult.status === 'success') {
-    results.successful.push(statuslineHealthResult);
-    await registerWithPSM(statuslineHealthResult, 'scripts/statusline-health-monitor.js');
-  } else {
-    results.degraded.push(statuslineHealthResult);
-  }
-
-  console.log('');
-
-  // 6. (removed) Legacy host process-supervisor — Phase 33 plan 07 cutover.
-  //    launchd's com.coding.health-coordinator KeepAlive owns supervision now.
-
-  // 7. OPTIONAL: System Health Dashboard API (renumbered from 6)
-  const systemHealthAPIResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.systemHealthDashboardAPI.name,
-    SERVICE_CONFIGS.systemHealthDashboardAPI.startFn,
-    SERVICE_CONFIGS.systemHealthDashboardAPI.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.systemHealthDashboardAPI.required,
-      maxRetries: SERVICE_CONFIGS.systemHealthDashboardAPI.maxRetries,
-      timeout: SERVICE_CONFIGS.systemHealthDashboardAPI.timeout
-    }
-  );
-
-  if (systemHealthAPIResult.status === 'success') {
-    results.successful.push(systemHealthAPIResult);
-    await registerWithPSM(systemHealthAPIResult, 'integrations/system-health-dashboard/server.js');
-  } else {
-    results.degraded.push(systemHealthAPIResult);
-  }
-
-  console.log('');
-
-  // 7b. OPTIONAL: System Health Dashboard Frontend (depends on API being available)
-  const systemHealthFrontendResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.systemHealthDashboardFrontend.name,
-    SERVICE_CONFIGS.systemHealthDashboardFrontend.startFn,
-    SERVICE_CONFIGS.systemHealthDashboardFrontend.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.systemHealthDashboardFrontend.required,
-      maxRetries: SERVICE_CONFIGS.systemHealthDashboardFrontend.maxRetries,
-      timeout: SERVICE_CONFIGS.systemHealthDashboardFrontend.timeout
-    }
-  );
-
-  if (systemHealthFrontendResult.status === 'success') {
-    results.successful.push(systemHealthFrontendResult);
-    await registerWithPSM(systemHealthFrontendResult, 'integrations/system-health-dashboard/vite-frontend');
-  } else {
-    results.degraded.push(systemHealthFrontendResult);
-  }
-
-  console.log('');
-
-  console.log('');
-
-  // 9. OPTIONAL: LLM CLI Proxy (host-side HTTP bridge to CLI LLM providers)
-  const llmCliProxyResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.llmCliProxy.name,
-    SERVICE_CONFIGS.llmCliProxy.startFn,
-    SERVICE_CONFIGS.llmCliProxy.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.llmCliProxy.required,
-      maxRetries: SERVICE_CONFIGS.llmCliProxy.maxRetries,
-      timeout: SERVICE_CONFIGS.llmCliProxy.timeout
-    }
-  );
-
-  if (llmCliProxyResult.status === 'success') {
-    results.successful.push(llmCliProxyResult);
-    await registerWithPSM(llmCliProxyResult, 'integrations/llm-cli-proxy/dist/server.js');
-  } else {
-    results.degraded.push(llmCliProxyResult);
-  }
-
-  // OPTIONAL: Observations API (host-side gateway for .observations/observations.db)
-  const observationsApiResult = await startServiceWithRetry(
-    SERVICE_CONFIGS.observationsApi.name,
-    SERVICE_CONFIGS.observationsApi.startFn,
-    SERVICE_CONFIGS.observationsApi.healthCheckFn,
-    {
-      required: SERVICE_CONFIGS.observationsApi.required,
-      maxRetries: SERVICE_CONFIGS.observationsApi.maxRetries,
-      timeout: SERVICE_CONFIGS.observationsApi.timeout
-    }
-  );
-
-  if (observationsApiResult.status === 'success') {
-    results.successful.push(observationsApiResult);
-    await registerWithPSM(observationsApiResult, 'scripts/observations-api-server.mjs');
-  } else {
-    results.degraded.push(observationsApiResult);
+    const { blocked } = await startOneService(key, results, features);
+    console.log('');
+    if (blocked) break;
   }
 
   console.log('');
@@ -1306,6 +1247,17 @@ async function startAllServices() {
     console.log(`   - ${service.serviceName}`);
   });
   console.log('');
+
+  if (results.disabled.length > 0) {
+    // Listed BEFORE degraded, and worded as a choice rather than a fault: this
+    // block is the answer to "why is X not running", and it must not read like
+    // something went wrong.
+    console.log(`🔇 Disabled by configuration: ${results.disabled.length} services`);
+    results.disabled.forEach(service => {
+      console.log(`   - ${service.serviceName} (feature '${service.feature}')`);
+    });
+    console.log('');
+  }
 
   if (results.degraded.length > 0) {
     console.log(`⚠️  Degraded (optional failed): ${results.degraded.length} services`);
@@ -1328,15 +1280,18 @@ async function startAllServices() {
 
   // Create .services-running.json status file for status line
   try {
-    await createServicesStatusFile(results);
+    await createServicesStatusFile(results, features);
   } catch (error) {
     console.log(`⚠️  Warning: Failed to create services status file: ${error.message}`);
   }
 
   console.log('');
 
-  // Success
-  const mode = results.degraded.length > 0 ? 'DEGRADED' : 'FULL';
+  // Success. `disabled` deliberately does not make the mode DEGRADED — running
+  // exactly what the user asked for is a complete startup, not a partial one.
+  const mode = results.degraded.length > 0
+    ? 'DEGRADED'
+    : (results.disabled.length > 0 ? `${features.profile || 'CUSTOM'}` : 'FULL');
   console.log(`🎉 Startup complete in ${mode} mode!`);
 
   if (results.degraded.length > 0) {
@@ -1361,4 +1316,4 @@ runIfMain(import.meta.url, () => {
   });
 });
 
-export { startAllServices, SERVICE_CONFIGS };
+export { startAllServices, startOneService, SERVICE_CONFIGS, SERVICE_ORDER };

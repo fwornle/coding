@@ -35,19 +35,49 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 
+import { isEnabled } from '../lib/features/index.mjs';
+
 const repo = process.env.CODING_REPO || process.cwd();
 const home = homedir();
 
-/** The hooks this project contributes. Single source of truth for both scopes. */
-function codingHooks(repoPath) {
+/**
+ * The hooks this project contributes, filtered by feature. Single source of
+ * truth for both scopes.
+ *
+ * Each hook IS a feature's entry point into an agent session, so a disabled
+ * feature must not install one:
+ *
+ *   PreToolUse        constraints  — the guardrail check itself
+ *   PostToolUse       lsl          — tool-interaction capture, which is how a
+ *                                    foreground session reaches live session
+ *                                    logging AND token accounting
+ *   UserPromptSubmit  health       — the health verification prompt hook
+ *
+ * Filtering here rather than at the two call sites is what keeps wrapper scope
+ * and --install-global from drifting: one hook list, one decision, both scopes.
+ *
+ * `isEnabled` resolves closed on a broken config, but a broken config never
+ * reaches here — the launcher's _resolve_features aborts first — so the
+ * fail-closed default only applies to someone running this script by hand.
+ */
+function allCodingHooks(repoPath) {
   const preTool = `node ${repoPath}/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js`;
   const postTool = `node ${repoPath}/scripts/tool-interaction-hook-wrapper.js`;
   const prompt = `node ${repoPath}/scripts/health-prompt-hook.js`;
   return {
-    PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: preTool }] }],
-    PostToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: postTool }] }],
-    UserPromptSubmit: [{ hooks: [{ type: 'command', command: prompt, timeout: 5 }] }],
+    PreToolUse: { feature: 'constraints', entries: [{ matcher: '*', hooks: [{ type: 'command', command: preTool }] }] },
+    PostToolUse: { feature: 'lsl', entries: [{ matcher: '*', hooks: [{ type: 'command', command: postTool }] }] },
+    UserPromptSubmit: { feature: 'health', entries: [{ hooks: [{ type: 'command', command: prompt, timeout: 5 }] }] },
   };
+}
+
+/** Just the hooks whose feature is currently on. */
+function codingHooks(repoPath) {
+  const out = {};
+  for (const [event, { feature, entries }] of Object.entries(allCodingHooks(repoPath))) {
+    if (isEnabled(feature)) out[event] = entries;
+  }
+  return out;
 }
 
 /**
@@ -66,19 +96,32 @@ function hookScriptName(command) {
   return match ? match[1] : command;
 }
 
-function mergeHooks(userHooks = {}, ours) {
+/**
+ * @param {object} userHooks  the user's own hooks, preserved
+ * @param {object} ours       {event: entries[]} — what to install NOW
+ * @param {object} all        {event: {feature, entries}} — everything we could
+ *   install. The strip pass runs over ALL of them, not just `ours`: switching a
+ *   feature off has to REMOVE the hook it installed on an earlier launch, and a
+ *   strip driven by `ours` alone would leave it behind, running a disabled
+ *   feature's code on every tool call.
+ */
+function mergeHooks(userHooks = {}, ours, all) {
   const out = { ...userHooks };
-  for (const [event, ourEntries] of Object.entries(ours)) {
+  for (const [event, { entries: everEntries }] of Object.entries(all)) {
     const theirs = Array.isArray(out[event]) ? out[event] : [];
     const ourScripts = new Set(
-      ourEntries.flatMap((e) => (e.hooks || []).map((h) => hookScriptName(h.command))),
+      everEntries.flatMap((e) => (e.hooks || []).map((h) => hookScriptName(h.command))),
     );
     // Drop any previous copy of OUR hooks (identified by script name, so old
     // paths are replaced rather than duplicated), keep theirs.
     const kept = theirs.filter(
       (entry) => !(entry.hooks || []).some((h) => ourScripts.has(hookScriptName(h.command))),
     );
-    out[event] = [...kept, ...ourEntries];
+    const ourEntries = ours[event] || [];
+    // Leave the key out entirely when neither side contributes, rather than
+    // writing an empty array the user never had.
+    if (kept.length || ourEntries.length) out[event] = [...kept, ...ourEntries];
+    else delete out[event];
   }
   return out;
 }
@@ -100,7 +143,7 @@ const userSettings = readJsonIfPresent(userSettingsPath);
 
 const derived = {
   ...userSettings,
-  hooks: mergeHooks(userSettings.hooks, codingHooks(repo)),
+  hooks: mergeHooks(userSettings.hooks, codingHooks(repo), allCodingHooks(repo)),
 };
 
 // Wrap the user's own status-line command so the context meter is rendered once,

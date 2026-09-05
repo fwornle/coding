@@ -455,6 +455,17 @@ elif [[ -e "$HOME/bin/coding" ]]; then
     echo "  ~/bin/coding exists but is not our symlink — left alone"
 fi
 
+# 1b. The per-machine feature selection.
+#
+# Ours alone (~/.coding is created by this project and nothing else writes
+# there), so it goes with the install rather than being left behind to
+# silently shape a future one.
+if [[ -f "$HOME/.coding/features.yaml" ]]; then
+    rm -f "$HOME/.coding/features.yaml"
+    echo "  Removed ~/.coding/features.yaml (feature selection)"
+    rmdir "$HOME/.coding" 2>/dev/null || true
+fi
+
 # 2. Global slash commands, but ONLY the files that came from this repo.
 if [[ -d "$HOME/.claude/commands" && -d "$CODING_REPO/.claude/commands" ]]; then
     _removed=0

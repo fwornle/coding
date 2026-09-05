@@ -12,26 +12,25 @@
  */
 
 import { readFileSync, statSync, existsSync } from 'fs';
-import { dirname, join, basename } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRepo = process.env.CODING_REPO || join(__dirname, '..');
 
-// Determine which project this tmux window belongs to.
-// TMUX_PANE_PATH is expanded per-window by tmux before running this command.
-const panePath = process.env.TMUX_PANE_PATH || '';
-const paneProject = panePath ? basename(panePath) : '';
-// Cache key includes pane_width because every-render content varies (LSL
-// counts, time, badge states), and we want each pane to read a freshly-
-// rendered cache that matches its own width even when two panes share the
-// same project. Without the width suffix, two same-project panes share a
-// cache and an older render from a wider pane can leak into a narrower
-// pane's display.
-const paneWidth = process.env.TMUX_PANE_WIDTH || '';
-const cacheSuffix = paneProject
-  ? `-${paneProject}${paneWidth ? `-w${paneWidth}` : ''}`
-  : '';
+// The cache key comes from the shared builder, exactly as the writer
+// (combined-status-line.js) and the other reader (status-line-fast.cjs) do.
+//
+// This file used to rebuild the suffix from its own copy of the rule — the
+// precise drift lib/statusline/pane-cache-key.cjs was written to prevent, and
+// it had already fallen behind: it never learned the `agent` component, so a
+// claude pane and an opencode pane on one project read each other's cached
+// line. Adding a feature component would have widened that gap to two, with
+// the failure mode "the toggle did not work" rather than a visible error.
+const require = createRequire(import.meta.url);
+const { paneIdentity } = require(join(codingRepo, 'lib', 'statusline', 'pane-cache-key.cjs'));
+const { suffix: cacheSuffix } = paneIdentity();
 const cacheFile = join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 
 // Invalidation flag — `px` toggle writes this to force immediate re-render

@@ -1,0 +1,58 @@
+# Named feature presets.
+#
+# A profile lists what is ON. Everything it omits is OFF — stating only the
+# positives is what keeps a preset readable, and it means a newly added feature
+# does not silently switch itself on in every profile.
+#
+# Select one with:
+#   coding-features profile <name>
+# which writes `profile: <name>` into ~/.coding/features.yaml. Individual
+# features can then be refined on top:
+#
+#   profile: proxy-only
+#   features:
+#     lsl: on
+#
+# The built-in defaults (lib/features/catalogue.cjs) are all-on and are what
+# apply when no profile and no features.yaml exist anywhere — so an install that
+# never touches this file behaves exactly as it always has.
+#
+# See docs/architecture/features.md for the feature -> artifact matrix.
+
+profiles:
+  full:
+    description: Everything. The default.
+    features:
+      lsl: on
+      observations: on
+      knowledge: on
+      codegraph: on
+      constraints: on
+      llm-proxy: on
+      performance: on
+      health: on
+      statusline: on
+
+  proxy-only:
+    description: >-
+      Just the LLM proxy — provider routing, fallback and token accounting.
+      No Docker, no logging, no knowledge base.
+    features:
+      llm-proxy: on
+      statusline: on
+
+  logging-only:
+    description: >-
+      Verbatim session logging and health monitoring, without the observation
+      pipeline, knowledge base or guardrails.
+    features:
+      lsl: on
+      health: on
+      statusline: on
+
+  minimal:
+    description: >-
+      The agent launcher and nothing else. Bare `coding --claude` with a status
+      line; no background services at all.
+    features:
+      statusline: on

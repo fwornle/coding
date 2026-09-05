@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useState } from 'react'
-import { Sun, Moon, Monitor } from 'lucide-react'
+import { Sun, Moon, Monitor, SlidersHorizontal } from 'lucide-react'
 import { type Theme, getStoredTheme, cycleTheme } from '@/lib/theme'
+import { useAppSelector } from '@/store'
+import type { FeatureId } from '@/store/slices/featuresSlice'
 
 function ThemeToggle() {
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme())
@@ -30,6 +32,7 @@ export function NavBar() {
   const [obsCount, setObsCount] = useState<number | null>(null)
   const [digestCount, setDigestCount] = useState<number | null>(null)
   const [insightCount, setInsightCount] = useState<number | null>(null)
+  const features = useAppSelector(state => state.features.features)
 
   useEffect(() => {
     fetch(`/api/observations?limit=0`)
@@ -46,16 +49,25 @@ export function NavBar() {
       .catch(() => { setDigestCount(null); setInsightCount(null) })
   }, [location.pathname])
 
-  const tabs = [
-    { label: 'Health', path: '/' },
-    { label: 'Sessions', path: '/sessions', testId: 'sessions-tab' },
-    { label: 'Observations', path: '/observations', count: obsCount },
-    { label: 'Digests', path: '/digests', count: digestCount },
-    { label: 'Insights', path: '/insights', count: insightCount },
-    { label: 'Coverage', path: '/coverage' },
-    { label: 'Token Usage', path: '/token-usage' },
-    { label: 'Performance', path: '/performance', testId: 'performance-tab' },
+  // Tabs for disabled features are OMITTED, not greyed. A greyed nav item that
+  // routes nowhere is worse than no item: it invites a click that goes to a
+  // dead page. The route still resolves (see App.tsx) and renders an
+  // explanation, so a bookmarked URL is not a mystery either — and the Features
+  // tab below is always present, so there is always a way back.
+  const allTabs: Array<{
+    label: string; path: string; testId?: string; count?: number | null; feature?: FeatureId
+  }> = [
+    { label: 'Health', path: '/', feature: 'health' },
+    { label: 'Sessions', path: '/sessions', testId: 'sessions-tab', feature: 'lsl' },
+    { label: 'Observations', path: '/observations', count: obsCount, feature: 'observations' },
+    { label: 'Digests', path: '/digests', count: digestCount, feature: 'observations' },
+    { label: 'Insights', path: '/insights', count: insightCount, feature: 'observations' },
+    { label: 'Coverage', path: '/coverage', feature: 'knowledge' },
+    { label: 'Token Usage', path: '/token-usage', feature: 'llm-proxy' },
+    { label: 'Performance', path: '/performance', testId: 'performance-tab', feature: 'performance' },
   ]
+
+  const tabs = allTabs.filter(tab => !tab.feature || features[tab.feature]?.enabled !== false)
 
   return (
     <nav className="border-b border-border px-6">
@@ -83,7 +95,20 @@ export function NavBar() {
             </Link>
           )
         })}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <Link
+            to="/features"
+            data-testid="features-tab"
+            title="Choose which parts of coding are active"
+            aria-label="Features"
+            className={`flex items-center justify-center h-8 w-8 rounded-md transition-colors ${
+              location.pathname === '/features'
+                ? 'text-foreground bg-accent'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </Link>
           <ThemeToggle />
         </div>
       </div>

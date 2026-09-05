@@ -1,0 +1,267 @@
+import { useEffect, useState } from 'react'
+import { AlertTriangle, Check, Info, Loader2, RotateCcw } from 'lucide-react'
+import { useAppDispatch, useAppSelector } from '@/store'
+import {
+  fetchFeatures, saveFeatures, dismissRestartNotice,
+  type FeatureId, type FeatureState,
+} from '@/store/slices/featuresSlice'
+import { Badge } from '@/components/ui/badge'
+
+/**
+ * Features — choose which parts of `coding` are active.
+ *
+ * Writes ~/.coding/features.yaml (the per-machine layer) through the health
+ * coordinator, then applies the delta to running services. The repo's
+ * config/features.yaml is never touched here: it is the committed team default
+ * and a local preference must not clobber it.
+ *
+ * See docs/architecture/features.md for what each feature actually controls.
+ */
+
+const TIER_COPY: Record<FeatureState['applyTier'], { label: string; hint: string }> = {
+  live: { label: 'live', hint: 'Takes effect immediately — no restart.' },
+  apply: { label: 'on save', hint: 'Services are started or stopped when you save.' },
+  session: { label: 'new sessions', hint: 'Agent hooks are fixed at launch, so this applies to sessions started after the change.' },
+}
+
+function Toggle({ checked, disabled, onChange, label }: {
+  checked: boolean; disabled?: boolean; onChange: (v: boolean) => void; label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors
+        ${checked ? 'bg-primary' : 'bg-muted-foreground/30'}
+        ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      <span
+        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform
+          ${checked ? 'translate-x-[1.15rem]' : 'translate-x-[0.2rem]'}`}
+      />
+    </button>
+  )
+}
+
+export function FeaturesPage() {
+  const dispatch = useAppDispatch()
+  const {
+    features, profile, profiles, enabled, needsDocker, warnings,
+    loading, saving, error, loaded, restartNotice,
+  } = useAppSelector(state => state.features)
+
+  /** Local edits, applied on Save. Null means "no pending change for this id". */
+  const [draft, setDraft] = useState<Record<string, boolean>>({})
+
+  useEffect(() => { dispatch(fetchFeatures()) }, [dispatch])
+  // A save returns the newly resolved set, so any pending edit is now redundant
+  // — and keeping it would make the UI disagree with the resolver about
+  // dependency-disabled features.
+  useEffect(() => { if (!saving) setDraft({}) }, [saving])
+
+  const ids = Object.keys(features) as FeatureId[]
+  const dirty = Object.keys(draft).length > 0
+  const valueOf = (id: FeatureId) => draft[id] ?? features[id]?.enabled ?? true
+
+  const onToggle = (id: FeatureId, value: boolean) => {
+    setDraft(prev => {
+      const next = { ...prev }
+      if ((features[id]?.enabled ?? true) === value) delete next[id]
+      else next[id] = value
+      return next
+    })
+  }
+
+  const onSave = () => { dispatch(saveFeatures({ features: draft })) }
+  const onProfile = (name: string) => { setDraft({}); dispatch(saveFeatures({ profile: name })) }
+
+  /**
+   * What a toggle would knock out. Shown BEFORE saving, because the surprising
+   * case — turning off `lsl` also silences observations and the knowledge base
+   * — is exactly the one a user should not discover afterwards.
+   */
+  const dependentsOf = (id: FeatureId) =>
+    ids.filter(other => features[other]?.requires?.includes(id))
+
+  if (!loaded && loading) {
+    return (
+      <div className="p-6 flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Reading feature configuration…
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 max-w-4xl" data-testid="features-page">
+      <div className="flex items-start justify-between gap-4 mb-1">
+        <div>
+          <h1 className="text-xl font-semibold">Features</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose which parts of <code>coding</code> run. Saved to{' '}
+            <code>~/.coding/features.yaml</code> on this machine.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {dirty && (
+            <button
+              type="button"
+              onClick={() => setDraft({})}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Discard
+            </button>
+          )}
+          <button
+            type="button"
+            data-testid="features-save"
+            disabled={!dirty || saving}
+            onClick={onSave}
+            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition-colors
+              ${dirty && !saving
+                ? 'bg-primary text-primary-foreground hover:opacity-90'
+                : 'bg-muted text-muted-foreground cursor-not-allowed'}`}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            {saving ? 'Applying…' : 'Save & apply'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+          <div>
+            <div className="font-medium">Feature configuration unavailable</div>
+            <div className="text-muted-foreground">{error}</div>
+            <div className="text-muted-foreground mt-1">
+              Everything is shown as enabled until this is resolved — the dashboard does not
+              hide tabs on a failure it cannot explain.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restartNotice && (
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="flex-1">{restartNotice}</div>
+          <button type="button" onClick={() => dispatch(dismissRestartNotice())} className="text-muted-foreground hover:text-foreground">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Profiles */}
+      <div className="mt-6">
+        <div className="text-sm font-medium mb-2">Profiles</div>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(profiles).map(([name, on]) => (
+            <button
+              key={name}
+              type="button"
+              data-testid={`features-profile-${name}`}
+              disabled={saving}
+              onClick={() => onProfile(name)}
+              title={on.length ? on.join(', ') : 'nothing enabled'}
+              className={`text-sm px-3 py-1.5 rounded-md border transition-colors
+                ${profile === name
+                  ? 'border-primary text-foreground bg-primary/10'
+                  : 'border-border text-muted-foreground hover:text-foreground'}`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Choosing a profile is a reset — it clears any individual overrides below.
+        </p>
+      </div>
+
+      {/* Feature list */}
+      <div className="mt-6 rounded-md border border-border divide-y divide-border">
+        {ids.map(id => {
+          const f = features[id]
+          const value = valueOf(id)
+          const changed = draft[id] !== undefined
+          // A feature whose dependency is off cannot be turned on from here;
+          // the resolver would immediately switch it back off, and a toggle
+          // that silently undoes itself is worse than one that will not move.
+          const blockedBy = (f.requires || []).filter(dep => valueOf(dep) === false)
+          const dependents = dependentsOf(id)
+
+          return (
+            <div
+              key={id}
+              data-testid={`feature-row-${id}`}
+              className={`flex items-start gap-3 p-3 ${value ? '' : 'bg-muted/20'}`}
+            >
+              <div className="pt-0.5">
+                <Toggle
+                  checked={value && blockedBy.length === 0}
+                  disabled={saving || blockedBy.length > 0}
+                  onChange={v => onToggle(id, v)}
+                  label={f.label}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-sm font-medium ${value ? '' : 'text-muted-foreground'}`}>
+                    {f.label}
+                  </span>
+                  <code className="text-xs text-muted-foreground">{id}</code>
+                  <Badge variant="secondary" className="text-[10px]" title={TIER_COPY[f.applyTier].hint}>
+                    {TIER_COPY[f.applyTier].label}
+                  </Badge>
+                  {f.needsDocker && (
+                    <Badge variant="outline" className="text-[10px]" title="Runs in the coding-services container">
+                      docker
+                    </Badge>
+                  )}
+                  {changed && <Badge className="text-[10px]">unsaved</Badge>}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">{f.description}</div>
+
+                {blockedBy.length > 0 && (
+                  <div className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                    Needs {blockedBy.map(d => features[d]?.label ?? d).join(', ')} — switch that on first.
+                  </div>
+                )}
+                {value && dependents.length > 0 && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Turning this off also switches off {dependents.map(d => features[d]?.label ?? d).join(', ')}.
+                  </div>
+                )}
+                {!value && f.source === 'dependency' && (
+                  <div className="text-xs text-muted-foreground mt-1">{f.reason}</div>
+                )}
+                {!value && f.source === 'env' && (
+                  <div className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                    Forced off by an environment variable — this toggle cannot override it.
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer facts */}
+      <div className="mt-4 text-xs text-muted-foreground space-y-1">
+        <div>
+          {enabled.length} of {ids.length} enabled
+          {profile ? <> · profile <code>{profile}</code></> : null}
+          {' '}· Docker {needsDocker ? 'required' : 'not needed'}
+        </div>
+        {warnings.map((w, i) => (
+          <div key={i} className="flex items-start gap-1.5">
+            <Info className="h-3 w-3 mt-0.5 shrink-0" /> <span>{w}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

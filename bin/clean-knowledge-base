@@ -4,6 +4,18 @@
 
 set -euo pipefail
 
+# Feature gate. Without it this command fails with whatever its backend happens
+# to say — "connection refused", "no such container", a timeout — none of which
+# mention that the feature is switched off. See docs/architecture/features.md.
+if [ -z "${CODING_REPO:-}" ]; then
+  CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
+  export CODING_REPO
+fi
+# shellcheck source=/dev/null
+. "$CODING_REPO/lib/features/require-feature.sh"
+require_feature knowledge
+
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
