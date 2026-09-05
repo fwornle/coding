@@ -102,7 +102,16 @@ describe('coordinator — targeted etm_ensure bypasses the 30s sweep gate', () =
   test('a targeted request qualifies on its own, without waiting for tmux to list the session', () => {
     // A two-second-old session has no fresh Claude transcript and may not be in
     // `tmux list-sessions` yet; requiring one of those would reinstate the delay.
-    expect(flat(COORD)).toMatch(/if \(!targeted && !transcriptFresh && !tmuxAlive && !hasOpenCode\) continue/);
+    //
+    // Matches the guard and the `continue` it leads to, but NOT the statement
+    // layout between them. The original pattern required `continue` on the same
+    // line as the `if`, so adding a trace line inside the guard broke this test
+    // while the behaviour was byte-identical — a false failure that says nothing
+    // about the thing under test. The four conditions and the skip are the
+    // contract; whether the body is one statement or a block is not.
+    expect(flat(COORD)).toMatch(
+      /if \(!targeted && !transcriptFresh && !tmuxAlive && !hasOpenCode\).{0,300}?continue;/,
+    );
   });
 });
 
