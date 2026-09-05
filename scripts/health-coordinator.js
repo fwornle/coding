@@ -41,6 +41,7 @@ import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
+import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
 import {
   reclassifyTimeoutAsUnknown, debounceDbStatus,
   classifyProxyHttpFailure, isProxyRestartActionable,
@@ -671,6 +672,10 @@ const PROXY_KICKSTART_MAX = 3;                    // D-06: 3 kickstarts then coo
 // "skip if recent real traffic" check, the synthetic probe usually doesn't
 // fire at all during active sessions.
 const PROXY_STRONG_PROBE_INTERVAL_MS = 5 * 60_000;       // every 5 min
+// Set when an auto-heal kickstart is dispatched, cleared once recovery is
+// proven. While set, each tick re-checks the FREE proof of recovery instead of
+// waiting out the full strong-probe interval. See the tick-loop block below.
+let _awaitingKickstartRecovery = false;
 const PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS = 5 * 60_000; // real obs within 5 min counts as proof
 // Cheap-probe real-traffic gate (2026-07-07): same principle as the strong
 // probe's skip — ANY successful real LLM call through the proxy within this
@@ -1578,6 +1583,7 @@ function dispatchProxyKickstart({ reason, logPrefix, detail = '', countsTowardCa
     currentState.proxy.kickstart_count += 1;
   }
   log(`${logPrefix}: dispatching restart_llm_cli_proxy (${detail}${detail ? ', ' : ''}kickstart_count=${currentState.proxy.kickstart_count})`, 'INFO');
+  _awaitingKickstartRecovery = true;
   getRemediationDispatcher()
     .then(d => d.executeAction('restart_llm_cli_proxy', { reason }))
     .catch(err => log(`${logPrefix} kickstart failed: ${err.message}`, 'ERROR'));
@@ -3479,6 +3485,44 @@ async function runAllChecks() {
   const _strongAge = currentState.proxy.semantic_strong_last_probe_end
     ? Date.now() - new Date(currentState.proxy.semantic_strong_last_probe_end).getTime()
     : Infinity;
+  // Post-kickstart fast path. An auto-heal typically repairs the proxy within
+  // seconds, but the badge cannot say so until the next strong probe — 309s of
+  // amber against an already-healthy proxy, observed 2026-09-05 when connecting
+  // to the VPN left the bridge frozen on its `public` egress decision.
+  //
+  // So while a kickstart is outstanding, re-check the FREE proof every tick:
+  // a real observation-writer call that SUCCEEDED SINCE THE RESTART. The
+  // synthetic probe is never fired early — that is the part that falls through
+  // to the CLI path and bills ~14-22K cache_creation tokens, and paying it per
+  // auto-heal is exactly the cost the 5-min cadence exists to avoid.
+  //
+  // "Since the restart" is the load-bearing half. A call that succeeded BEFORE
+  // the kickstart is within the 5-minute real-traffic window but proves nothing
+  // about the restart, so comparing only its AGE would clear the badge on the
+  // strength of traffic from the broken era.
+  if (_userActive && _awaitingKickstartRecovery
+      && currentState.proxy.semantic_strong_ok === false) {
+    fetchLastObservationWriterCallAge().then(ageMs => {
+      const verdict = decidePostKickstartRecovery({
+        awaiting: _awaitingKickstartRecovery,
+        strongOk: currentState.proxy.semantic_strong_ok,
+        strongAgeMs: _strongAge,
+        intervalMs: PROXY_STRONG_PROBE_INTERVAL_MS,
+        lastCallAgeMs: ageMs,
+        dispatchedAt: currentState.proxy.last_kickstart_dispatch_at || 0,
+        now: Date.now(),
+        realTrafficMaxAgeMs: PROXY_STRONG_PROBE_REAL_TRAFFIC_MAX_AGE_MS,
+      });
+      if (!verdict.recovered) return;
+      currentState.proxy.semantic_strong_ok = true;
+      currentState.proxy.semantic_strong_reason = verdict.reason;
+      currentState.proxy.semantic_strong_last_probe_end = new Date().toISOString();
+      currentState.proxy.semantic_strong_round_trip_ms = null;
+      _awaitingKickstartRecovery = false;
+      log(`proxy semantic_strong_ok flip -> true (${verdict.reason} age=${Math.round(ageMs / 1000)}s)`, 'INFO');
+    }).catch(() => { /* cheap check only; the scheduled probe remains the backstop */ });
+  }
+
   if (_userActive && _strongAge >= PROXY_STRONG_PROBE_INTERVAL_MS) {
     // Query the proxy's token-usage DB for the most recent observation-writer
     // call. That timestamp is set the instant the LLM call completes — much
