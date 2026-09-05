@@ -108,6 +108,8 @@ export const CI_SKIPPED = new Map([
     'runMatrix threads argv through measurement-start — unreachable without the sibling proxy dist'],
   ['tests/experiments/variant-override.test.mjs',
     'same: asserts on --base-variant in the measurement-start argv runMatrix never emits here'],
+  ['scripts/backfill-claude-prompt-preview.test.mjs',
+    'top-level await import of _work/rapid-llm-proxy/proxy-bridge/turn-identity.mjs — sibling repo'],
 ]);
 
 /** True when running under CI, where {@link CI_SKIPPED} applies. */
