@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Check, Info, Loader2, RotateCcw } from 'lucide-react'
+import { AlertTriangle, Check, Info, Loader2, RotateCcw, Terminal } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/store'
 import {
   fetchFeatures, saveFeatures, dismissRestartNotice,
@@ -57,6 +57,19 @@ export function FeaturesPage() {
   /** Local edits, applied on Save. Null means "no pending change for this id". */
   const [draft, setDraft] = useState<Record<string, boolean>>({})
 
+  /**
+   * A save that would switch off `health` is held here until confirmed.
+   *
+   * WHY. The dashboard is SERVED by the health feature — the coordinator answers
+   * /api/features and the container's health-dashboard programs serve this page.
+   * Saving `proxy-only` or `minimal` therefore stops the thing you are looking
+   * at, mid-request, and takes the Features editor down with it. The first time
+   * that happened it read as "I clicked save and the system broke", which is
+   * exactly right and entirely avoidable: the resolver already knows, we just
+   * were not asking first.
+   */
+  const [confirm, setConfirm] = useState<{ payload: { features?: Record<string, boolean>; profile?: string }; label: string } | null>(null)
+
   useEffect(() => { dispatch(fetchFeatures()) }, [dispatch])
   // A save returns the newly resolved set, so any pending edit is now redundant
   // — and keeping it would make the UI disagree with the resolver about
@@ -76,8 +89,33 @@ export function FeaturesPage() {
     })
   }
 
-  const onSave = () => { dispatch(saveFeatures({ features: draft })) }
-  const onProfile = (name: string) => { setDraft({}); dispatch(saveFeatures({ profile: name })) }
+  /** Would this change leave `health` off? */
+  const disablesHealth = (payload: { features?: Record<string, boolean>; profile?: string }) => {
+    if (payload.profile) return !(profiles[payload.profile] ?? []).includes('health')
+    if (payload.features && 'health' in payload.features) return payload.features.health === false
+    return false
+  }
+
+  const submit = (payload: { features?: Record<string, boolean>; profile?: string }, label: string) => {
+    // Only ask when health is actually ON right now — re-confirming a change
+    // that takes an already-off feature off again would be noise.
+    if (disablesHealth(payload) && features.health?.enabled) {
+      setConfirm({ payload, label })
+      return
+    }
+    if (payload.profile) setDraft({})
+    dispatch(saveFeatures(payload))
+  }
+
+  const onSave = () => submit({ features: draft }, 'this change')
+  const onProfile = (name: string) => submit({ profile: name }, `the '${name}' profile`)
+
+  const confirmProceed = () => {
+    if (!confirm) return
+    if (confirm.payload.profile) setDraft({})
+    dispatch(saveFeatures(confirm.payload))
+    setConfirm(null)
+  }
 
   /**
    * What a toggle would knock out. Shown BEFORE saving, because the surprising
@@ -130,6 +168,50 @@ export function FeaturesPage() {
           </button>
         </div>
       </div>
+
+      {confirm && (
+        <div
+          data-testid="features-confirm-health"
+          className="mt-4 rounded-md border border-amber-500/50 bg-amber-500/10 p-4"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">Applying {confirm.label} will switch off Health Monitoring</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                This dashboard is served by that feature. Saving will stop the health coordinator
+                and this page along with it — including this editor. It is a valid thing to want;
+                it just cannot be undone from here afterwards.
+              </p>
+              <div className="mt-3 text-sm">
+                <div className="text-muted-foreground mb-1">To get it back, run in a terminal:</div>
+                <code className="flex items-center gap-2 rounded bg-background/70 border border-border px-2 py-1.5 font-mono text-xs">
+                  <Terminal className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  coding-features profile full
+                </code>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <button
+                  type="button"
+                  data-testid="features-confirm-cancel"
+                  onClick={() => setConfirm(null)}
+                  className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  data-testid="features-confirm-proceed"
+                  onClick={confirmProceed}
+                  className="text-sm px-3 py-1.5 rounded-md bg-amber-600 text-white hover:opacity-90"
+                >
+                  Switch it off anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">

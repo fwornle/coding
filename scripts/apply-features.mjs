@@ -155,6 +155,23 @@ export async function applyFeatures(opts = {}) {
     }
   }
 
+  // Stopping `health` takes down the coordinator and the dashboard — including
+  // the editor that most likely just requested this. Whatever terminal or log
+  // this lands in is the ONLY place the way back can still be printed, so it is
+  // printed unconditionally rather than as a nicety.
+  // `stopped` or `would-stop`: a --dry-run that does not mention the way back
+  // is precisely the run someone does BEFORE deciding, so it is the one that
+  // most needs to say it.
+  if (!resolved.features.health?.enabled
+      && changed.some((r) => r.name === 'health-coordinator' && r.action.endsWith('stop'))) {
+    say('');
+    say('⚠️  Health Monitoring is now off: the coordinator and the dashboard have stopped.');
+    say('    The dashboard cannot turn it back on, because the dashboard is part of it.');
+    say('    To restore everything:  coding-features profile full');
+    say('    Or just health:         coding-features set health on');
+    say('');
+  }
+
   if (!container.available) {
     // Not a failure: with knowledge, codegraph and constraints all off there is
     // no container, which is the whole point of the proxy-only profile.
