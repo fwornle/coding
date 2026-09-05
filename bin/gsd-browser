@@ -99,6 +99,34 @@ fi
 # and matching the user's own browser would kill their real session.
 CHROME_MATCH="user-data-dir=${CHROME_PROFILE}"
 
+# Did WE start this browser, or were we pointed at one that was already running
+# (`daemon --cdp-url ws://…`, "attach to an already-running Chrome")? Only the
+# first is ours to kill. In attach mode the manifest's browserUserDataDir names
+# the profile of a browser THE USER started — very possibly their real, logged-in
+# one — and CHROME_MATCH would then be a pkill pattern aimed straight at it.
+LAUNCH_MODE="$(
+    node -e 'try{const j=require(process.env.HOME+"/.gsd-browser/session.json");if(j.launchMode)process.stdout.write(String(j.launchMode))}catch{}' 2>/dev/null
+)"
+
+# Whether the automation Chrome may be SIGKILLed.
+#
+# The PATH is the decisive test, not launchMode: gsd-browser's own profile lives
+# under its own directories, and a browser we merely attached to does not. That
+# ordering matters — an older binary writes no launchMode at all, and gating on
+# the field being present would silently turn the autoheal reset into a no-op on
+# exactly the installs that still need it. So: the path decides, and launchMode
+# only ever VETOES.
+browser_is_ours() {
+    case "${CHROME_PROFILE}" in
+        "${HOME}/.gsd-browser/"*) ;;
+        "${TMPDIR:-/tmp}/"*) ;;
+        *) return 1 ;;  # not one of ours — never a pkill target
+    esac
+    # An explicit attach, even to a profile inside our tree, is still not ours.
+    [[ -n "${LAUNCH_MODE}" && "${LAUNCH_MODE}" != "launched" ]] && return 1
+    return 0
+}
+
 # Explicit XXXXXX template, not `mktemp -t gsd-browser-err`: GNU coreutils is
 # ahead of /usr/bin on this PATH and its -t wants a template with X's, so the
 # BSD spelling fails with "too few X's in template" — and, because the error
@@ -117,7 +145,18 @@ run() {
     "${REAL}" "$@" 2> "${ERRFILE}"
 }
 
-restart_daemon() {
+# How much the last sweep actually killed. Read by the `daemon stop` path below
+# to report only when there was something to report.
+SWEPT_DAEMONS=0
+SWEPT_BROWSER=0
+
+# SIGKILL both halves and clear what a SIGKILL leaves behind. Two callers with
+# the same need: the autoheal retry below, and `daemon stop`, which reports
+# success without stopping anything.
+sweep_daemons_and_browser() {
+    SWEPT_DAEMONS=0
+    SWEPT_BROWSER=0
+
     # Test seam. The real reset SIGKILLs the daemon and every automation Chrome,
     # which a test suite must not do to a developer's live session just by
     # running. A hook lets the retry logic be exercised for real while the
@@ -139,7 +178,10 @@ restart_daemon() {
             && pids+=("${pid}")
     done < <(pgrep -f '_serve' 2>/dev/null)
 
-    (( ${#pids[@]} > 0 )) && kill -9 "${pids[@]}" 2>/dev/null
+    if (( ${#pids[@]} > 0 )); then
+        kill -9 "${pids[@]}" 2>/dev/null
+        SWEPT_DAEMONS=${#pids[@]}
+    fi
 
     # Then the browser it was driving. An orphaned automation Chrome is a wedge
     # in its own right — the third state, and the one that actually blocked
@@ -148,46 +190,81 @@ restart_daemon() {
     # the profile by ProcessSingleton. Preserving that lock is pointless (no
     # daemon is using the browser) and fatal (nothing else can start one).
     #
-    # Safe by construction: this profile is the automation instance's alone —
-    # a temp --user-data-dir — so nothing here can touch a real browsing session.
-    pkill -9 -f "${CHROME_MATCH}" 2>/dev/null
+    # This whole half — the kill, the lock clear, the crash-flag rewrite — is
+    # gated on the profile being ours. The comment that used to sit here said it
+    # was "safe by construction, a temp --user-data-dir, so nothing here can
+    # touch a real browsing session". That is true of a browser we LAUNCHED and
+    # false of one we were told to ATTACH to, where every path below is aimed at
+    # the user's own profile: pkill on their session, rm on their SingletonLock,
+    # and a rewrite of their Preferences. Construction was never what made it
+    # safe; the guard is.
+    if browser_is_ours; then
+        pgrep -f "${CHROME_MATCH}" >/dev/null 2>&1 && SWEPT_BROWSER=1
+        pkill -9 -f "${CHROME_MATCH}" 2>/dev/null
 
-    # Wait for the profile to actually be free before clearing. Killing is
-    # asynchronous, and removing a lock while its owner is still exiting invites
-    # the two-processes-one-profile corruption the lock exists to prevent.
-    local waited=0
-    while pgrep -f "${CHROME_MATCH}" >/dev/null 2>&1 && (( waited < 10 )); do
-        sleep 0.5
-        waited=$(( waited + 1 ))
-    done
+        # Wait for the profile to actually be free before clearing. Killing is
+        # asynchronous, and removing a lock while its owner is still exiting invites
+        # the two-processes-one-profile corruption the lock exists to prevent.
+        local waited=0
+        while pgrep -f "${CHROME_MATCH}" >/dev/null 2>&1 && (( waited < 10 )); do
+            sleep 0.5
+            waited=$(( waited + 1 ))
+        done
 
-    # Only now, and only if the profile is genuinely unowned.
-    if ! pgrep -f "${CHROME_MATCH}" >/dev/null 2>&1; then
-        rm -f "${CHROME_PROFILE}"/Singleton* 2>/dev/null
+        # Only now, and only if the profile is genuinely unowned.
+        if ! pgrep -f "${CHROME_MATCH}" >/dev/null 2>&1; then
+            rm -f "${CHROME_PROFILE}"/Singleton* 2>/dev/null
 
-        # Clearing the lock is not enough. A SIGKILLed Chrome also leaves
-        # profile.exit_type = "Crashed" in Default/Preferences, and on the next
-        # start that raises a MODAL "Something went wrong when opening your
-        # profile" dialog. Headless it is invisible but still blocking; headful
-        # the operator has to dismiss it by hand, once per launch, forever —
-        # observed 8-10 times in a row on 2026-09-05 because this reset was
-        # pointed at the wrong directory and never ran.
-        #
-        # Chrome itself only rewrites this on a clean exit, which is precisely
-        # what -9 denies it, so the reset that caused the flag has to clear it.
-        local prefs="${CHROME_PROFILE}/Default/Preferences"
-        [[ -f "${prefs}" ]] && node -e '
-            const fs = require("fs"), p = process.argv[1];
-            try {
-                const j = JSON.parse(fs.readFileSync(p, "utf8"));
-                j.profile = j.profile || {};
-                j.profile.exit_type = "Normal";
-                j.profile.exited_cleanly = true;
-                fs.writeFileSync(p, JSON.stringify(j));
-            } catch { /* unreadable/partial profile: Chrome rebuilds it */ }
-        ' "${prefs}" 2>/dev/null
+            # Clearing the lock is not enough. A SIGKILLed Chrome also leaves
+            # profile.exit_type = "Crashed" in Default/Preferences, and on the next
+            # start that raises a MODAL "Something went wrong when opening your
+            # profile" dialog. Headless it is invisible but still blocking; headful
+            # the operator has to dismiss it by hand, once per launch, forever —
+            # observed 8-10 times in a row on 2026-09-05 because this reset was
+            # pointed at the wrong directory and never ran.
+            #
+            # Chrome itself only rewrites this on a clean exit, which is precisely
+            # what -9 denies it, so the reset that caused the flag has to clear it.
+            local prefs="${CHROME_PROFILE}/Default/Preferences"
+            [[ -f "${prefs}" ]] && node -e '
+                const fs = require("fs"), p = process.argv[1];
+                try {
+                    const j = JSON.parse(fs.readFileSync(p, "utf8"));
+                    j.profile = j.profile || {};
+                    j.profile.exit_type = "Normal";
+                    j.profile.exited_cleanly = true;
+                    fs.writeFileSync(p, JSON.stringify(j));
+                } catch { /* unreadable/partial profile: Chrome rebuilds it */ }
+            ' "${prefs}" 2>/dev/null
+        fi
     fi
     return 0
+}
+
+# Is this invocation `daemon stop` against the DEFAULT session?
+#
+# Conservative by construction: it walks to the first two non-option tokens and
+# demands exactly "daemon" "stop". An option that takes a value (`--browser-path
+# /path/to/chrome`) puts a non-option token first and the match simply fails —
+# no sweep, which is the safe way to be wrong.
+#
+# `--session` and `--cdp-url` are refused outright. Both mean the daemon being
+# stopped is not the one the default manifest describes: a named session has its
+# own daemon and its own profile, and an attached browser is not ours at all.
+# Sweeping the default profile on either would kill the wrong thing.
+is_daemon_stop() {
+    local a seen=()
+    for a in "$@"; do
+        case "${a}" in
+            --session|--session=*|--cdp-url|--cdp-url=*) return 1 ;;
+        esac
+    done
+    for a in "$@"; do
+        [[ "${a}" == -* ]] && continue
+        seen+=("${a}")
+        (( ${#seen[@]} == 2 )) && break
+    done
+    (( ${#seen[@]} == 2 )) && [[ "${seen[0]}" == "daemon" && "${seen[1]}" == "stop" ]]
 }
 
 run "$@"
@@ -197,9 +274,32 @@ if (( rc != 0 )) \
     && { grep -qF "${DEAD_RECEIVER}" "${ERRFILE}" 2>/dev/null \
       || grep -qF "${DEAD_DAEMON}" "${ERRFILE}" 2>/dev/null; }; then
     echo "gsd-browser: browser/daemon out of step — resetting both and retrying once" >&2
-    restart_daemon
+    sweep_daemons_and_browser
     run "$@"
     rc=$?
+fi
+
+# `daemon stop` says "Daemon stopped." and exits 0 while stopping neither half.
+# Verified 2026-09-05 against the live install: 11 orphaned daemons and 2
+# automation Chromes before the call, the same 11 and 2 after it. The manifest
+# shows why it cannot do better — it records `daemonPid: null`, so stop has no
+# pid to signal, and it records `browserPid` and then never uses it.
+#
+# The cost is not cosmetic: every orphaned daemon holds a dead CDP connection,
+# and an orphaned Chrome keeps a VALID SingletonLock on the profile, which is
+# the state that refuses every future daemon the profile (wedge C above). So the
+# thing the user asked to stop is also the thing that wedges the next start.
+#
+# Only on rc == 0: a stop that FAILED has not established that anything should
+# be torn down, and killing both halves after an error would destroy the state
+# needed to diagnose it.
+if (( rc == 0 )) && is_daemon_stop "$@"; then
+    sweep_daemons_and_browser
+    if (( SWEPT_DAEMONS > 0 || SWEPT_BROWSER > 0 )); then
+        swept="${SWEPT_DAEMONS} orphaned daemon(s)"
+        (( SWEPT_BROWSER > 0 )) && swept="${swept} and the automation browser"
+        echo "gsd-browser: stop left ${swept} running — swept" >&2
+    fi
 fi
 
 cat "${ERRFILE}" >&2
