@@ -10,6 +10,7 @@ import cgrReducer from './slices/cgrSlice'
 import workflowConfigReducer from './slices/workflowConfigSlice'
 import performanceReducer from './slices/performanceSlice'
 import kgbenchReducer from './slices/kgbenchSlice'
+import featuresReducer from './slices/featuresSlice'
 
 // Import middleware
 import { healthRefreshMiddleware } from './middleware/healthRefreshMiddleware'
@@ -24,6 +25,7 @@ const rootReducer = combineReducers({
   workflowConfig: workflowConfigReducer,
   performance: performanceReducer,
   kgbench: kgbenchReducer,
+  features: featuresReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>

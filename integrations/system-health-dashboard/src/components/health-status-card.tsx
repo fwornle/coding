@@ -31,10 +31,22 @@ interface HealthStatusCardProps {
   items: StatusItem[]
   onClick?: () => void
   clickable?: boolean
+  /**
+   * The tile's feature is switched off. The tile is GREYED rather than removed:
+   * unlike a nav tab (which is omitted, because a tab that routes nowhere
+   * invites a dead click) the health grid is a fixed inventory of what this
+   * system CAN monitor, and a hole in it reads as something having gone
+   * missing. Greying says "you turned this off" and keeps the layout stable.
+   */
+  disabledReason?: string
 }
 
-export default function HealthStatusCard({ title, icon, items, onClick, clickable }: HealthStatusCardProps) {
+export default function HealthStatusCard({ title, icon, items, onClick, clickable, disabledReason }: HealthStatusCardProps) {
+  const isDisabled = Boolean(disabledReason)
   const handleCardClick = () => {
+    // A disabled tile is inert: its modal would open onto a service that is not
+    // running, which is a worse answer than not opening at all.
+    if (isDisabled) return
     if (clickable && onClick) {
       Logger.debug(LogCategories.HEALTH, `HealthStatusCard clicked: ${title}`)
       onClick()
@@ -79,6 +91,28 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
       default:
         return <Badge variant="outline">Offline</Badge>
     }
+  }
+
+  if (isDisabled) {
+    return (
+      <Card className="opacity-50" data-testid={`disabled-tile-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-muted-foreground">
+            {icon}
+            {title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2" title={disabledReason}>
+            <Minus className="h-4 w-4 text-gray-400" />
+            <Badge variant="outline" className="bg-status-neutral-subtle text-status-neutral border-status-neutral-line">
+              Disabled
+            </Badge>
+          </div>
+          <div className="text-xs text-muted-foreground mt-2">{disabledReason}</div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (

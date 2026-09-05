@@ -334,6 +334,15 @@ class SystemHealthAPIServer {
         // Health check endpoint
         this.app.get('/api/health', this.handleHealthCheck.bind(this));
 
+        // Feature configuration. Pure reverse-proxy to the host coordinator:
+        // the file being edited is ~/.coding/features.yaml on the HOST, which
+        // this server (running inside coding-services) cannot see, and applying
+        // a change runs launchctl / systemctl / schtasks, none of which exist
+        // in the container. See scripts/health-coordinator.js.
+        this.app.get('/api/features', this.handleGetFeatures.bind(this));
+        this.app.put('/api/features', this.handlePutFeatures.bind(this));
+        this.app.post('/api/features/apply', this.handleApplyFeatures.bind(this));
+
         // System health verifier endpoints — read-mostly, hit hard by the
         // dashboard's polling loop. A 1 s response cache keeps perceived
         // freshness while bounding CPU cost from many concurrent tabs.
@@ -617,6 +626,51 @@ class SystemHealthAPIServer {
                 }
             });
         }
+    }
+
+    /**
+     * Forward a request to the host coordinator, INCLUDING its body.
+     *
+     * _forwardCoordinator() drops the body — fine for its GET/POST-without-body
+     * callers, fatal for a PUT that carries the change. Kept separate rather
+     * than extending that one, because its failure envelope is the health-state
+     * SPEC R8 shape, which would be nonsense for a config write.
+     */
+    async _forwardCoordinatorWithBody(req, res, pathAndQuery) {
+        const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
+        const url = `${base}${pathAndQuery}`;
+        try {
+            const upstream = await fetch(url, {
+                method: req.method,
+                headers: { 'Content-Type': 'application/json' },
+                body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body ?? {}),
+            });
+            const body = await upstream.text();
+            res.status(upstream.status)
+                .type(upstream.headers.get('content-type') || 'application/json')
+                .send(body);
+        } catch (err) {
+            process.stderr.write(`[Features] forward to ${url} failed: ${err.message}\n`);
+            // 503 with a reason the UI can render. Never a silent success: the
+            // editor must not report a change as saved when nothing was written.
+            res.status(503).json({
+                ok: false,
+                error: 'health coordinator unreachable — feature configuration is unavailable',
+                detail: err.message,
+            });
+        }
+    }
+
+    async handleGetFeatures(req, res) {
+        return this._forwardCoordinatorWithBody(req, res, '/features');
+    }
+
+    async handlePutFeatures(req, res) {
+        return this._forwardCoordinatorWithBody(req, res, '/features');
+    }
+
+    async handleApplyFeatures(req, res) {
+        return this._forwardCoordinatorWithBody(req, res, '/features/apply');
     }
 
     /**

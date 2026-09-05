@@ -188,9 +188,36 @@ omitted entirely — no greying, no placeholder.
 
 ## Dashboard surfaces
 
+### Where the API lives
+
+The `/features` API is served by the **health coordinator** (`scripts/health-coordinator.js`,
+port 3034), not by the dashboard server. The dashboard server runs *inside* the
+coding-services container; the file being edited is `~/.coding/features.yaml` on the
+**host**, which is not mounted, and applying a change runs `launchctl` / `systemctl` /
+`schtasks`, none of which exist in the container. `integrations/system-health-dashboard/server.js`
+reverse-proxies `/api/features` to it, the same way it already proxies
+`/health/remediate`, `/experiments/run` and `/kgbench/run`.
+
+| endpoint | coordinator route | does |
+|----------|-------------------|------|
+| `GET /api/features` | `GET /features` | resolved set + available profiles |
+| `PUT /api/features` | `PUT /features` | validate, write `~/.coding/features.yaml`, re-resolve |
+| `POST /api/features/apply` | `POST /features/apply` | run `scripts/apply-features.mjs` |
+
+`~/.coding/features.yaml` has exactly one writer implementation
+(`lib/features/write.mjs`), shared by the coordinator and `bin/coding-features`.
+
+### Rendering
+
+The dashboard **fails open**: if the coordinator is unreachable, everything renders as
+enabled and an error is shown. A dashboard that silently loses half its navigation
+because a host service blipped is indistinguishable from a broken build; briefly offering
+a tab for a feature that is off costs an empty panel and an honest message.
+
 Nav tabs (`src/components/nav-bar.tsx`) are **omitted** when disabled — a greyed tab that
 routes nowhere is worse than no tab. Their routes still resolve, rendering a
-"this feature is off" panel so a bookmarked URL explains itself.
+"this feature is off" panel (`src/components/feature-disabled.tsx`) so a bookmarked URL
+explains itself. The Features entry is always present, so there is always a way back.
 
 | tab | route | feature |
 |-----|-------|---------|
@@ -205,6 +232,11 @@ routes nowhere is worse than no tab. Their routes still resolve, rendering a
 
 Health-page tiles (`src/components/system-health-dashboard.tsx`) are **greyed** when
 disabled, carrying a `Disabled` chip whose tooltip is the resolver's reason string.
+
+Tiles are **greyed** rather than removed, unlike tabs: the health grid is a fixed
+inventory of what this system *can* monitor, and a hole in it reads as something having
+gone missing rather than something switched off. A greyed tile is inert — its modal would
+open onto a service that is not running.
 
 | tile | feature |
 |------|---------|

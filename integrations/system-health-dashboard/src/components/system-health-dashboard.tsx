@@ -46,6 +46,20 @@ export default function SystemHealthDashboard() {
   const autoHealing = useAppSelector((state) => state.autoHealing)
   const ukb = useAppSelector((state) => state.ukb)
   const cgr = useAppSelector((state) => state.cgr)
+  const features = useAppSelector((state) => state.features.features)
+
+  /**
+   * The resolver's reason a tile is greyed, or undefined when it is live.
+   *
+   * Uses the resolver's own words rather than a locally invented sentence, so
+   * "off because its dependency is off" reads the same here as in the CLI and
+   * in the Features editor. Unknown / not-yet-loaded reads as enabled — the
+   * dashboard fails open, so a slow first fetch never greys a working tile.
+   */
+  const featureOff = (id: string): string | undefined => {
+    const f = features[id]
+    return f && !f.enabled ? f.reason : undefined
+  }
 
   // Log component mount
   useEffect(() => {
@@ -574,6 +588,7 @@ export default function SystemHealthDashboard() {
             items={getCodeGraphItems()}
             clickable={true}
             onClick={() => setGraphViewerOpen(true)}
+            disabledReason={featureOff('codegraph')}
           />
         </div>
         <HealthStatusCard
@@ -592,11 +607,13 @@ export default function SystemHealthDashboard() {
           items={getUKBItems()}
           clickable={true}
           onClick={() => setUkbModalOpen(true)}
+          disabledReason={featureOff('knowledge')}
         />
         <HealthStatusCard
           title="LLM Proxy Health"
           icon={<Brain className="h-5 w-5 text-purple-500" />}
           items={getProxyHealthItems()}
+          disabledReason={featureOff('llm-proxy')}
         />
         {/* Phase 66-02: headline per-model median latency tile (D-01 glanceable
             surface). Owns its own fetch of the same-origin /api/token-usage/summary

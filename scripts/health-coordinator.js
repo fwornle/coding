@@ -42,6 +42,8 @@ import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-he
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
+import { loadFeatures, FeatureConfigError, loadProfiles, configPaths } from '../lib/features/index.mjs';
+import { setFeatures, setProfile } from '../lib/features/write.mjs';
 import {
   reclassifyTimeoutAsUnknown, debounceDbStatus,
   classifyProxyHttpFailure, isProxyRestartActionable,
@@ -3917,6 +3919,76 @@ app.get('/health/state', (_req, res) => {
   // even between ticks. generated_at is owned by the tick.
   currentState.coordinator_uptime_s = Math.floor((Date.now() - STARTED_AT) / 1000);
   res.json(currentState);
+});
+
+// ── Feature configuration ────────────────────────────────────────────────────
+//
+// The coordinator owns this API rather than the dashboard, because the
+// dashboard server runs INSIDE the coding-services container and the config it
+// has to edit is ~/.coding/features.yaml on the HOST — not mounted, and not
+// mountable without giving a container write access to the user's home. The
+// coordinator is already the host-side executor for dashboard actions
+// (/health/remediate, /experiments/run, /kgbench/run), so this fits where it
+// sits rather than adding a second privileged path.
+//
+// It is also the only process that can apply a change: reconciliation runs
+// launchctl / systemctl / schtasks, none of which exist in the container.
+
+app.get('/features', (_req, res) => {
+  try {
+    const resolved = loadFeatures({ force: true });
+    const profiles = loadProfiles(configPaths().profiles);
+    res.json({
+      ok: true,
+      ...resolved,
+      profiles: Object.fromEntries(
+        Object.entries(profiles).map(([name, set]) => [
+          name,
+          Object.keys(set).filter((id) => set[id] === true),
+        ]),
+      ),
+    });
+  } catch (err) {
+    // 200 with ok:false, not 500: an invalid config is a state the editor must
+    // be able to SHOW and fix, and a 500 gives the UI nothing to render but an
+    // error toast.
+    res.json({ ok: false, error: err.message, invalid: err instanceof FeatureConfigError });
+  }
+});
+
+app.put('/features', async (req, res) => {
+  const { features, profile } = req.body || {};
+  try {
+    let resolved; let dropped = [];
+    if (typeof profile === 'string' && profile) {
+      ({ resolved, dropped } = setProfile(profile));
+      if (features && Object.keys(features).length) {
+        resolved = setFeatures(features);
+      }
+    } else if (features && typeof features === 'object') {
+      resolved = setFeatures(features, 'profile' in (req.body || {}) ? { profile } : {});
+    } else {
+      return res.status(400).json({ ok: false, error: "expected { features: {id: boolean} } and/or { profile: '<name>' }" });
+    }
+    res.json({ ok: true, ...resolved, droppedOverrides: dropped });
+  } catch (err) {
+    const status = err instanceof FeatureConfigError ? 400 : 500;
+    res.status(status).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/features/apply', async (_req, res) => {
+  try {
+    const { applyFeatures } = await import(path.join(REPO_ROOT, 'scripts', 'apply-features.mjs'));
+    const result = await applyFeatures({ quiet: true });
+    res.json({
+      ok: true,
+      changed: result.changed,
+      containerAvailable: result.container.available,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.post('/signals', (req, res) => {
