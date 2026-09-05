@@ -2190,6 +2190,14 @@ function paneHasLiveAgent(panePid, snap, now) {
  * than exec'ing it as on :231). Such a husk satisfied the old session-exists
  * test and pinned its ETM — and the project's statusline dot — indefinitely.
  *
+ * Returns null for "could not tell" (tmux missing, query failed, output unusable)
+ * and a Set — possibly EMPTY — for "asked, and this is the answer". The two were
+ * the same value until the attachment gate landed, because a detached session
+ * with an agent still counted as live, so an empty result could only mean the
+ * query had failed. It now has a second, legitimate meaning: tmux answered
+ * fully, and nobody is attached anywhere. Collapsing them makes the gate no-op
+ * in exactly the case it exists for — a crash where nothing gets re-attached.
+ *
  * Both callers must use the SAME filtered view or they fight: the spawner
  * treats a tmux session as a reason to spawn, the reaper treats its absence as
  * a reason to kill, and `_reapedProjects` clears its own respawn block on
@@ -2203,7 +2211,7 @@ function tmuxOpenProjectPaths(agenticDir) {
       encoding: 'utf8',
       timeout: 1500,
     });
-    if (out.status !== 0 || !out.stdout) return new Set();
+    if (out.status !== 0 || !out.stdout) return null; // asked and could not tell
 
     const panes = new Map(); // projectPath -> [{pid, attached}]
     for (const line of out.stdout.split('\n')) {
@@ -2244,7 +2252,7 @@ function tmuxOpenProjectPaths(agenticDir) {
       + (why.length ? ` — ${why.join(' ')}` : ''));
     return live;
   } catch {
-    return new Set();
+    return null; // asked and could not tell
   }
 }
 
@@ -2431,7 +2439,9 @@ function ensureEtmForActiveProjects(opts = {}) {
   // Without this, idle-but-open sessions (e.g. sketcher with last prompt
   // 4 hours ago) silently drop out of the statusline because no ETM ever
   // gets spawned for them.
-  const tmuxOpen = tmuxOpenProjectPaths(agenticDir);
+  // null (could not tell) behaves as "no tmux signal" here: the spawner's failure
+  // mode is not spawning, which the transcript and OpenCode signals still cover.
+  const tmuxOpen = tmuxOpenProjectPaths(agenticDir) ?? new Set();
   const openCodeFresh = openCodeFreshProjects(now);
 
   // Candidates = the ~/Agentic tree walk UNION whatever the live-session signals
@@ -2622,13 +2632,17 @@ function reapEtmsForClosedSessions() {
   } catch {
     return; // cannot tell → reap nothing
   }
-  // Empty set means "tmux told us nothing" — including the failure path, which
-  // returns an empty Set indistinguishably. Reaping on that would wipe every
-  // project the moment tmux hiccups.
-  if (!live || live.size === 0) {
-    etmTrace(() => 'reap: SKIPPED ENTIRELY — tmux reported no live project paths (cannot tell "none" from "query failed")');
+  // null is "could not tell" and is the only fail-open case. An EMPTY set is a
+  // real answer — tmux responded and nothing is attached — and reaping on it is
+  // the whole point of the gate: a crash that leaves every session detached is
+  // precisely when every ETM should go. Treating empty as failure (as this did
+  // until the gate landed, when empty could only mean failure) made the gate
+  // no-op in its own headline scenario.
+  if (live === null) {
+    etmTrace(() => 'reap: SKIPPED ENTIRELY — could not read tmux (failing open)');
     return;
   }
+  etmTrace(() => `reap: ${live.size} attached project path(s) with a live agent`);
 
   const now = Date.now();
   let openCode;
