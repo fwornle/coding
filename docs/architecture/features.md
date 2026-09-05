@@ -252,14 +252,43 @@ open onto a service that is not running.
 Each guards on its feature and exits 2 with an actionable message
 (`feature 'knowledge' is disabled — enable with: coding-features set knowledge on`).
 
+The guard is one shared helper, `lib/features/require-feature.sh`, so the wording is
+identical everywhere.
+
 | command | feature |
 |---------|---------|
-| `bin/semantic`, `bin/vkb`, `bin/ckb`, `bin/clean-knowledge-base` | `knowledge` |
-| `bin/graphify`, `bin/codegraph`, `bin/graph-sync` | `codegraph` |
+| `bin/semantic`, `bin/vkb`, `bin/clean-knowledge-base`, `bin/fix-knowledge-base` | `knowledge` |
+| `bin/graphify`, `bin/codegraph` | `codegraph` |
 | `bin/constraints` | `constraints` |
-| `bin/llm` | `llm-proxy` |
 | `bin/log-session` | `lsl` |
-| `bin/status`, `bin/mcp-status` | core — always work, and report the active profile |
+| `bin/status`, `bin/mcp-status`, `bin/coding-features` | core — always work, and report the active profile |
+
+`bin/llm` is deliberately **not** gated on `llm-proxy`: it queries Docker Model Runner
+directly (`/engines/v1/chat/completions`), not rapid-llm-proxy.
+
+## Coordinator health checks
+
+Rules in `config/health-verification-rules.json` carry an optional `feature` — an id, or
+a list meaning **any-of** (`qdrant_availability` is `["knowledge", "constraints"]`, since
+either keeps Qdrant in use). `forEachEnabledRule()` in `scripts/health-coordinator.js`
+skips a rule whose feature is off.
+
+Skipped, not failed: checking a service the user deliberately stopped would paint the
+dashboard and the status line red for a system working exactly as configured — the single
+loudest way to make a pared-down install look broken. Rules without a `feature` are core
+and always run.
+
+| rule | feature |
+|------|---------|
+| `databases.leveldb_lock_check`, `leveldb_accessibility`, `graph_integrity` | `knowledge` |
+| `databases.qdrant_availability` | `knowledge` or `constraints` |
+| `services.vkb_server`, `semantic_analysis_sse` | `knowledge` |
+| `services.constraint_monitor`, `dashboard_server` | `constraints` |
+| `services.health_dashboard_api`, `health_dashboard_frontend` | `health` |
+| `services.llm_cli_proxy` | `llm-proxy` |
+| `services.obs_api` | `observations` |
+| `services.enhanced_transcript_monitor` | `lsl` |
+| everything under `processes` and `files` | core — always run |
 
 ## Configuration
 

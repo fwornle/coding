@@ -359,6 +359,42 @@ function loadRules() {
 let RULES = loadRules();
 
 /**
+ * The resolved feature set, refreshed on each tick's read.
+ *
+ * Cached by the resolver on mtime, so calling it per sweep costs a stat().
+ * Resolves OPEN on a broken config: the coordinator's job is to report on the
+ * system, and silently skipping every feature-tagged check because a YAML file
+ * was briefly unreadable would turn a config typo into a monitoring blackout.
+ */
+function currentFeatures() {
+  try {
+    const resolved = loadFeatures();
+    return Object.fromEntries(
+      Object.entries(resolved.features).map(([id, f]) => [id, f.enabled]),
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Is a rule's feature active? `feature` is an id, or a list meaning ANY-OF —
+ * qdrant backs both the knowledge base and the constraint monitor, so its check
+ * must survive while either is on.
+ *
+ * @param {string|string[]} feature
+ * @param {Record<string, boolean>|null} features null = unresolvable, fail open
+ */
+function ruleFeatureActive(feature, features) {
+  if (!features) return true;
+  const ids = Array.isArray(feature) ? feature : [feature];
+  // An id this build does not know is treated as active, so a rules file from a
+  // newer version cannot silently disable checks here.
+  return ids.some((id) => features[id] === undefined || features[id] === true);
+}
+
+
+/**
  * Iterate over each enabled rule in a category. Per-rule errors are caught and
  * logged so one throwing rule cannot poison the rest of the category iteration.
  * SPEC R6: outer catch logs only — the inner check function tags its own slice
@@ -369,12 +405,19 @@ let RULES = loadRules();
  */
 async function forEachEnabledRule(category, fn) {
   if (!RULES?.rules?.[category]) return;
+  const features = currentFeatures();
   for (const [name, rule] of Object.entries(RULES.rules[category])) {
     if (FORBIDDEN_RULE_NAMES.has(name)) {
       log(`skipping forbidden rule '${name}' (Phase 33 D-06/D-08)`, 'WARN');
       continue;
     }
     if (!rule || rule.enabled === false) continue;
+    // A rule whose feature is switched off is skipped entirely — not reported
+    // as failing. Checking a service the user deliberately stopped would paint
+    // the dashboard and the status line red for a system that is working
+    // exactly as configured, which is the single loudest way to make a
+    // pared-down install look broken.
+    if (rule.feature && !ruleFeatureActive(rule.feature, features)) continue;
     try {
       await fn(name, rule);
     } catch (err) {

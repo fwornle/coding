@@ -14,7 +14,20 @@ const rootDir = join(__dirname, '..');
 async function showDetailedStatus() {
   console.log('🎯 System Status Dashboard');
   console.log('═'.repeat(50));
-  
+
+  // Which features are on, first: everything below reports on a subset of the
+  // system, and reading "VKB Server: offline" without knowing the knowledge base
+  // was switched off is how a working install gets diagnosed as broken.
+  try {
+    const { loadFeatures } = await import('../lib/features/index.mjs');
+    const f = loadFeatures();
+    console.log(`\n🎛️  Features${f.profile ? ` (profile: ${f.profile})` : ''}: ${f.enabled.join(', ') || '(none)'}`);
+    if (f.disabled.length) console.log(`   off: ${f.disabled.join(', ')}`);
+    for (const w of f.warnings) console.log(`   ⚠️  ${w}`);
+  } catch (error) {
+    console.log(`\n🎛️  Features: unreadable — ${error.message}`);
+  }
+
   try {
     // Get status line output
     const output = execSync('node ./scripts/combined-status-line.js', { 

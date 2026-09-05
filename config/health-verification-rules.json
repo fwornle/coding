@@ -10,6 +10,7 @@
     "databases": {
       "leveldb_lock_check": {
         "enabled": true,
+        "feature": "knowledge",
         "severity": "critical",
         "check_type": "lock_status",
         "description": "Detect Level DB locks by unregistered processes",
@@ -20,6 +21,7 @@
       },
       "leveldb_accessibility": {
         "enabled": true,
+        "feature": "knowledge",
         "severity": "critical",
         "check_type": "database_open",
         "timeout_seconds": 5,
@@ -29,6 +31,10 @@
       },
       "qdrant_availability": {
         "enabled": true,
+        "feature": [
+          "knowledge",
+          "constraints"
+        ],
         "severity": "error",
         "check_type": "http_health",
         "endpoint": "http://localhost:6333/readyz",
@@ -40,6 +46,7 @@
       },
       "graph_integrity": {
         "enabled": true,
+        "feature": "knowledge",
         "severity": "error",
         "check_type": "data_validation",
         "min_nodes": 0,
@@ -51,6 +58,7 @@
     "services": {
       "vkb_server": {
         "enabled": true,
+        "feature": "knowledge",
         "severity": "warning",
         "check_type": "http_health",
         "endpoint": "http://localhost:8080/health",
@@ -62,6 +70,7 @@
       },
       "constraint_monitor": {
         "enabled": true,
+        "feature": "constraints",
         "severity": "error",
         "check_type": "http_health",
         "endpoint": "http://localhost:3031/api/health",
@@ -72,6 +81,7 @@
       },
       "dashboard_server": {
         "enabled": true,
+        "feature": "constraints",
         "severity": "warning",
         "check_type": "port_listening",
         "port": 3030,
@@ -82,6 +92,7 @@
       },
       "health_dashboard_api": {
         "enabled": true,
+        "feature": "health",
         "severity": "error",
         "check_type": "http_health",
         "endpoint": "http://localhost:3033/api/health",
@@ -93,6 +104,7 @@
       },
       "health_dashboard_frontend": {
         "enabled": true,
+        "feature": "health",
         "severity": "warning",
         "check_type": "port_listening",
         "port": 3032,
@@ -104,6 +116,7 @@
       },
       "semantic_analysis_sse": {
         "enabled": true,
+        "feature": "knowledge",
         "severity": "error",
         "check_type": "http_health",
         "endpoint": "http://localhost:3848/health",
@@ -114,6 +127,7 @@
       },
       "llm_cli_proxy": {
         "enabled": true,
+        "feature": "llm-proxy",
         "severity": "warning",
         "check_type": "http_health",
         "endpoint": "http://localhost:12435/health",
@@ -130,6 +144,7 @@
       },
       "obs_api": {
         "enabled": true,
+        "feature": "observations",
         "severity": "error",
         "check_type": "http_health",
         "endpoint": "http://localhost:12436/health",
@@ -142,6 +157,7 @@
       },
       "enhanced_transcript_monitor": {
         "enabled": true,
+        "feature": "lsl",
         "severity": "error",
         "check_type": "psm_service",
         "service_name": "enhanced-transcript-monitor",
@@ -309,5 +325,6 @@
     "violation_count_warning": 3,
     "violation_count_error": 1,
     "critical_violations_alert": 1
-  }
+  },
+  "_feature_note": "Rules carry an optional `feature` (id, or list of ids meaning any-of). A rule whose feature is switched off is skipped: checking a service the user deliberately stopped would report a permanent outage of something that is working as configured. Rules without a `feature` are core and always run. See docs/architecture/features.md."
 }
