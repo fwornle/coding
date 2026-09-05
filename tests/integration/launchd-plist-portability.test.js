@@ -26,6 +26,21 @@ const LAUNCHD_DIR = path.join(REPO, 'launchd');
 const LIB = path.join(REPO, 'scripts', 'lib', 'launchd-plist.sh');
 const TOKEN = '__CODING_REPO__';
 
+// /usr/bin/plutil is macOS-only — and so is launchd, so these plists are never installed
+// anywhere else. The three assertions below that reach it (directly, or through
+// render_plist, which lints what it wrote) cannot run on the Linux runner: plutil is
+// absent, spawnSync reports status null, and render_plist returns 1 for a rendering that
+// is in fact correct.
+//
+// They are gated rather than the whole FILE being added to CI_SKIPPED, because most of
+// this suite is platform-neutral and already passes on Linux — including the plist grep,
+// which is the check this file exists for (see the header) and the only one that can
+// catch the regression on a machine that is not the author's. Skipping the file would
+// have retired exactly that guard in CI while keeping the macOS-only parts nobody can
+// run there anyway.
+const HAS_PLUTIL = process.platform === 'darwin' && fs.existsSync('/usr/bin/plutil');
+const testWithPlutil = HAS_PLUTIL ? test : test.skip;
+
 const plists = fs.readdirSync(LAUNCHD_DIR).filter((f) => f.endsWith('.plist'));
 const installers = fs.readdirSync(path.join(REPO, 'scripts'))
   .filter((f) => /^install-.*launchd.*\.sh$/.test(f))
@@ -49,14 +64,14 @@ describe('launchd plists are machine-portable', () => {
     if (/\/(scripts|\.data|\.logs)\//.test(body)) expect(body).toContain(TOKEN);
   });
 
-  test.each(plists)('%s is still a valid plist as a template', (name) => {
+  testWithPlutil.each(plists)('%s is still a valid plist as a template', (name) => {
     // plutil must accept the template as well as the rendering, so `plutil -lint` stays a
     // usable check on the checked-in file.
     const r = spawnSync('/usr/bin/plutil', ['-lint', path.join(LAUNCHD_DIR, name)], { encoding: 'utf8' });
     expect(r.status).toBe(0);
   });
 
-  test.each(plists)('%s renders for an arbitrary checkout', (name) => {
+  testWithPlutil.each(plists)('%s renders for an arbitrary checkout', (name) => {
     const r = render(name, '/opt/somewhere/else/coding');
     expect(r.status).toBe(0);
     const body = r.read();
@@ -81,7 +96,7 @@ describe('launchd installers resolve the repo rather than assume it', () => {
 });
 
 describe('render_plist fails loudly rather than installing something broken', () => {
-  test('a MISTYPED placeholder fails the install instead of loading a broken job', () => {
+  testWithPlutil('a MISTYPED placeholder fails the install instead of loading a broken job', () => {
     // The realistic mistake: a new plist copied from an existing one with the placeholder
     // spelled wrong. There is then no occurrence of the real token, so an exact-match
     // check passes and plutil -lint passes too — it is still valid XML. launchd would load
