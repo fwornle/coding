@@ -2478,6 +2478,21 @@ function openEtmChildLog(projectName) {
  */
 function ensureEtmForActiveProjects(opts = {}) {
   const { only = null, force = false } = opts;
+
+  // `lsl` off means no verbatim session logging, and the ETM is what writes it.
+  // Without this the feature switched off its five sweeper daemons and left the
+  // actual writer running: `coding-features set lsl off` with health still on
+  // had this sweep respawning ETMs every 30s, which carried on filling
+  // .specstory/history for a feature the user had turned off.
+  //
+  // Fails OPEN, like every other feature read in this file: an unresolvable
+  // config must not silently stop session logging.
+  const features = currentFeatures();
+  if (features && features.lsl === false) {
+    etmTrace(() => 'spawn: SKIPPED ENTIRELY — the lsl feature is off');
+    return;
+  }
+
   const now = Date.now();
   // Startup grace: wait HEARTBEAT_STALENESS_MS + buffer before doing the first
   // spawn check so existing ETMs (started before us) get a chance to heartbeat
@@ -2708,6 +2723,24 @@ const _reapedProjects = new Map(); // projectName -> reapedAt (ms)
 const REAP_CONTENT_ACTIVE_MS = 30 * 60 * 1000;
 
 function reapEtmsForClosedSessions() {
+  // The feature is off: every running ETM goes, and none of the conservatism
+  // below applies. That conservatism exists because a wrongly-reaped project
+  // vanishes from the statusline while someone is working in it — but here the
+  // answer is not a guess about presence, it is a stated preference. Spawning
+  // is gated too, so this does not fight ensureEtmForActiveProjects.
+  //
+  // The coordinator can only do this while it is itself running. `minimal` and
+  // `proxy-only` stop it, so the same reap exists in scripts/apply-features.mjs
+  // for the case where health goes off in the same change.
+  const features = currentFeatures();
+  if (features && features.lsl === false) {
+    for (const [key, e] of Object.entries(currentState.lsl)) {
+      if (!e || e.status !== 'running') continue;
+      killEtmEntry(key, e, 'the lsl feature is off');
+    }
+    return;
+  }
+
   const agenticDir = path.dirname(REPO_ROOT);
   let live;
   try {
@@ -2751,19 +2784,35 @@ function reapEtmsForClosedSessions() {
       continue;
     }
 
-    // pid is embedded in the heartbeat key (`etm-<pid>-<start>:project`), the
-    // same convention _probeHolderLiveness relies on.
-    const m = /^[a-z]+-(\d+)-/.exec(key);
-    const pid = m ? parseInt(m[1], 10) : 0;
-    if (pid > 0) {
-      // SIGTERM, not SIGKILL: the ETM's shutdown handler announces a clean stop,
-      // flushes any pending prompt set, and unregisters from PSM.
-      try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
-    }
-    delete currentState.lsl[key];
-    if (e.projectName) _reapedProjects.set(e.projectName, now);
-    log(`lsl: reaped ETM for '${e.projectName}' — session closed (pid=${pid || 'unknown'})`, 'INFO');
+    killEtmEntry(key, e, 'session closed');
   }
+}
+
+/**
+ * Stop one ETM and forget its heartbeat.
+ *
+ * Shared by the two reasons an ETM should go — its session closed, or `lsl` was
+ * switched off — so both take the same care: SIGTERM rather than SIGKILL, so the
+ * ETM's shutdown handler announces a clean stop, flushes any pending prompt set
+ * and unregisters from PSM; and a `_reapedProjects` stamp, so the spawner does
+ * not immediately undo the reap on a transcript that is still inside its
+ * freshness window.
+ *
+ * @param {string} key heartbeat key, `etm-<pid>-<start>:project`
+ * @param {object} e   the currentState.lsl entry
+ * @param {string} why reason, logged verbatim
+ */
+function killEtmEntry(key, e, why) {
+  // pid is embedded in the heartbeat key (`etm-<pid>-<start>:project`), the
+  // same convention _probeHolderLiveness relies on.
+  const m = /^[a-z]+-(\d+)-/.exec(key);
+  const pid = m ? parseInt(m[1], 10) : 0;
+  if (pid > 0) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+  }
+  delete currentState.lsl[key];
+  if (e.projectName) _reapedProjects.set(e.projectName, Date.now());
+  log(`lsl: reaped ETM for '${e.projectName}' — ${why} (pid=${pid || 'unknown'})`, 'INFO');
 }
 
 /**
