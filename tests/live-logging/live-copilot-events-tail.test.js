@@ -166,13 +166,22 @@ async function tick(ms) {
  * loaded machine (a full jest run is ~10 workers deep) a 50ms sleep routinely
  * expires before the scan has run at all.
  */
-async function waitFor(predicate, { timeoutMs = 5000, stepMs = 10 } = {}) {
+async function waitFor(predicate, { timeoutMs = 5000, stepMs = 10, context } = {}) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) return;
     await tick(stepMs);
   }
-  throw new Error(`waitFor: condition not met within ${timeoutMs}ms`);
+  // A bare "condition not met" says nothing about WHICH link broke: the watcher
+  // never attached, the append never landed, the tail read it but the row was
+  // keyed differently, or an onError fired and was swallowed. `context` is
+  // evaluated only on the failure path and appended to the message, so a red CI
+  // run reports the state instead of requiring a local repro of the runner.
+  let extra = '';
+  if (context) {
+    try { extra = ` — ${JSON.stringify(await context())}`; } catch (err) { extra = ` — context threw: ${err.message}`; }
+  }
+  throw new Error(`waitFor: condition not met within ${timeoutMs}ms${extra}`);
 }
 
 /**
@@ -294,7 +303,13 @@ describe('copilot-events-tail watcher contract', () => {
     try {
       await waitForAttach(handle);
       fs.appendFileSync(eventsPath, startedEvent('toolu_vrtx_01ABCDEF') + '\n');
-      await waitFor(() => registry.get('copilot', '01ABCDE'));
+      await waitFor(() => registry.get('copilot', '01ABCDE'), {
+        context: () => ({
+          stats: handle.getStats(),
+          eventsBytes: fs.statSync(eventsPath).size,
+          registryKeys: registry.listByAgent('copilot').map((r) => r.sub_hash),
+        }),
+      });
 
       const row = registry.get('copilot', '01ABCDE');
       expect(row).toBeDefined();
