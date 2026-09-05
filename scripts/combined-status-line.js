@@ -18,6 +18,7 @@ import { UKBProcessManager } from './ukb-process-manager.js';
 // arrangement that LIFECYCLE_ICONS and _lastContentTimestampMs live with.
 import contextGauge from '../lib/statusline/context-gauge.cjs';
 import paneCacheKey from '../lib/statusline/pane-cache-key.cjs';
+import featureGate from '../lib/statusline/feature-gate.cjs';
 import { loadFeatures } from '../lib/features/index.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -3134,6 +3135,19 @@ class CombinedStatusLine {
 // Main execution
 async function main() {
   try {
+    // The whole feature, off. Emit nothing and exit 0 — tmux renders an empty
+    // status-right, and `#(... || echo '[Status Offline]')` must NOT fire,
+    // because the line is absent by request, not broken.
+    //
+    // This is checked before the cache read on purpose. A line rendered while
+    // the feature was on is still sitting in .logs under a DIFFERENT key (the
+    // fingerprint is part of the filename), and the borrow path in
+    // status-line-fast.cjs would happily adopt it otherwise.
+    if (!featureGate.statuslineEnabled()) {
+      process.stdout.write('', () => process.exit(0));
+      return;
+    }
+
     // FAST PATH: If a recent cached render exists, output it immediately.
     // The full generateStatus() does heavy imports, PSM init, ensure* checks, and
     // API calls which can take >4s under load (especially with many Node processes).

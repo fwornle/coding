@@ -33,6 +33,16 @@ const { paneIdentity } = require(join(codingRepo, 'lib', 'statusline', 'pane-cac
 const { suffix: cacheSuffix } = paneIdentity();
 const cacheFile = join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 
+// The `statusline` feature, off: print nothing and exit 0 before touching the
+// cache. Exit 0 matters — tmux's status-right is wrapped in
+// `#(... || echo '[Status Offline]')`, and a non-zero exit would replace the
+// deliberately-empty line with an outage banner. See lib/statusline/feature-gate.cjs.
+const { statuslineEnabled } = require(join(codingRepo, 'lib', 'statusline', 'feature-gate.cjs'));
+if (!statuslineEnabled()) {
+  process.stdout.write('');
+  process.exit(0);
+}
+
 // Invalidation flag — `px` toggle writes this to force immediate re-render
 const invalidateFlag = join(codingRepo, '.logs', 'statusline-invalidate');
 let cacheInvalidated = false;

@@ -10,8 +10,9 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,9 +20,18 @@ const exec = promisify(execFile);
 const REPO = process.env.CODING_REPO || new URL('../..', import.meta.url).pathname.replace(/\/$/, '');
 
 let sandbox;
-/** Saved copy of the real runtime artifacts, restored in `after`. */
-const RUNTIME = join(REPO, '.coding', 'runtime', 'claude-settings.json');
-let savedRuntime = null;
+/**
+ * Derived settings go to a sandbox, never `<repo>/.coding/runtime`.
+ *
+ * This test file and tests/agents/claude-statusline-wrapper.test.mjs both drive
+ * build-claude-runtime-config.mjs, node:test runs files concurrently, and both
+ * used to write that one repo path — so each run tore the other's JSON and
+ * `npm test` failed a different assertion every time. It also meant a test run
+ * deleted a live session's slash-command plugin dir. CODING_RUNTIME_DIR is the
+ * seam; nothing here touches the real machine any more.
+ */
+let runtimeDir;
+const RUNTIME = () => join(runtimeDir, 'runtime', 'claude-settings.json');
 
 function homeWith(yaml) {
   const dir = join(sandbox, `home-${Buffer.from(yaml).toString('hex').slice(0, 12)}`);
@@ -31,7 +41,9 @@ function homeWith(yaml) {
 }
 
 async function run(script, home, extraEnv = {}) {
-  const env = { ...process.env, CODING_REPO: REPO, ...extraEnv };
+  const env = {
+    ...process.env, CODING_REPO: REPO, CODING_RUNTIME_DIR: runtimeDir, ...extraEnv,
+  };
   if (home) env.CODING_HOME = home; else delete env.CODING_HOME;
   const { stdout } = await exec('node', [join(REPO, script)], { env, timeout: 60000 });
   return stdout;
@@ -39,21 +51,34 @@ async function run(script, home, extraEnv = {}) {
 
 before(() => {
   sandbox = mkdtempSync(join(tmpdir(), 'coding-surface-'));
-  if (existsSync(RUNTIME)) savedRuntime = readFileSync(RUNTIME, 'utf8');
+  runtimeDir = join(sandbox, 'runtime-root');
 });
 
 after(() => {
   rmSync(sandbox, { recursive: true, force: true });
-  // build-claude-runtime-config.mjs writes into the repo. Put the real file back
-  // so a test run cannot leave this machine's next launch with sandbox hooks.
-  if (savedRuntime !== null) writeFileSync(RUNTIME, savedRuntime);
 });
 
 describe('agent hooks', () => {
   const hookEvents = async (home) => {
     await run('scripts/build-claude-runtime-config.mjs', home);
-    return Object.keys(JSON.parse(readFileSync(RUNTIME, 'utf8')).hooks || {});
+    return Object.keys(JSON.parse(readFileSync(RUNTIME(), 'utf8')).hooks || {});
   };
+
+  test('CODING_RUNTIME_DIR keeps the builder out of the repo', async () => {
+    // The guard on the isolation this whole file depends on. If the override
+    // stops being honoured, these tests go back to writing the real
+    // <repo>/.coding — which tore JSON under concurrency and deleted a live
+    // session's plugin dir — and they would still PASS while doing it.
+    const repoSettings = join(REPO, '.coding', 'runtime', 'claude-settings.json');
+    const before = statSync(repoSettings, { throwIfNoEntry: false })?.mtimeMs ?? null;
+    const stdout = await run('scripts/build-claude-runtime-config.mjs', homeWith('profile: full\n'));
+    const [writtenTo] = stdout.trim().split('\n');
+    assert.ok(writtenTo.startsWith(runtimeDir), `builder wrote to ${writtenTo}`);
+    assert.equal(
+      statSync(repoSettings, { throwIfNoEntry: false })?.mtimeMs ?? null, before,
+      'the real repo settings were rewritten',
+    );
+  });
 
   test('all features on contributes all three hooks', async () => {
     const events = await hookEvents(homeWith('profile: full\n'));
@@ -65,7 +90,7 @@ describe('agent hooks', () => {
   test('each hook follows its own feature', async () => {
     const settings = async (yaml) => {
       await run('scripts/build-claude-runtime-config.mjs', homeWith(yaml));
-      return readFileSync(RUNTIME, 'utf8');
+      return readFileSync(RUNTIME(), 'utf8');
     };
 
     const noConstraints = await settings('profile: full\nfeatures:\n  constraints: off\n');
@@ -84,16 +109,16 @@ describe('agent hooks', () => {
     // we are installing now — otherwise a disabled feature's hook stays behind
     // and keeps running on every tool call.
     await run('scripts/build-claude-runtime-config.mjs', homeWith('profile: full\nfeatures:\n  constraints: off\n'));
-    assert.ok(!readFileSync(RUNTIME, 'utf8').includes('pre-tool-hook-wrapper.js'));
+    assert.ok(!readFileSync(RUNTIME(), 'utf8').includes('pre-tool-hook-wrapper.js'));
 
     await run('scripts/build-claude-runtime-config.mjs', homeWith('profile: full\n'));
-    assert.ok(readFileSync(RUNTIME, 'utf8').includes('pre-tool-hook-wrapper.js'));
+    assert.ok(readFileSync(RUNTIME(), 'utf8').includes('pre-tool-hook-wrapper.js'));
   });
 
   test("the user's own hooks are never dropped", async () => {
     const settings = JSON.parse(await (async () => {
       await run('scripts/build-claude-runtime-config.mjs', homeWith('profile: minimal\n'));
-      return readFileSync(RUNTIME, 'utf8');
+      return readFileSync(RUNTIME(), 'utf8');
     })());
     // Nothing of ours should remain under `minimal`...
     const text = JSON.stringify(settings);
@@ -181,7 +206,122 @@ function visibleCells(text) {
   return w;
 }
 
+describe('the statusline feature itself', () => {
+  /**
+   * Every program that can put a line on screen, and the environment tmux gives
+   * it. All four must agree, because the user sees whichever one their pane
+   * happens to invoke — and until this test existed, none of them read the flag
+   * at all: `statusline: false` was a switch wired to nothing.
+   */
+  const RENDERERS = [
+    'scripts/combined-status-line.js',
+    'scripts/status-line-fast.cjs',
+    'scripts/combined-status-line-wrapper.js',
+  ];
+  const PANE = {
+    TRANSCRIPT_SOURCE_PROJECT: REPO,
+    CODING_AGENT: 'claude',
+    TMUX_PANE_WIDTH: '120',
+  };
+  const OFF = 'features:\n  statusline: false\n';
+
+  test('off means every renderer prints nothing', async () => {
+    const home = homeWith(OFF);
+    for (const script of RENDERERS) {
+      assert.equal((await run(script, home, PANE)).trim(), '', `${script} still rendered`);
+    }
+  });
+
+  test('off exits 0, so tmux shows an empty bar and not [Status Offline]', async () => {
+    // status-right is `#(... || echo '[Status Offline]')`. A non-zero exit on the
+    // quiet path would replace the deliberately-absent line with an outage
+    // banner — the single most misleading thing this feature could do.
+    const home = homeWith(OFF);
+    for (const script of RENDERERS) {
+      const env = { ...process.env, CODING_REPO: REPO, CODING_HOME: home, ...PANE };
+      const { stdout } = await exec('node', [join(REPO, script)], { env, timeout: 60000 });
+      assert.equal(stdout.trim(), '', `${script} rendered on the quiet path`);
+    }
+  });
+
+  test('the Claude Code shim goes quiet too, and still drains stdin', async () => {
+    // Claude Code writes the session payload into this process. Exiting before
+    // the pipe drains hands it an EPIPE on the path the user asked to be quiet.
+    const env = { ...process.env, CODING_REPO: REPO, CODING_HOME: homeWith(OFF) };
+    const child = execFile('node', [join(REPO, 'scripts/claude-statusline.cjs')], { env, timeout: 30000 });
+    child.stdin.end(JSON.stringify({ session_id: 'surface-gating-test' }));
+    const { stdout } = await new Promise((resolve, reject) => {
+      let out = '';
+      child.stdout.on('data', (c) => { out += c; });
+      child.on('error', reject);
+      child.on('close', (code) => (code === 0 ? resolve({ stdout: out }) : reject(new Error(`exit ${code}`))));
+    });
+    assert.equal(stdout.trim(), '');
+  });
+
+  test('on is the default, and every profile keeps it on', async () => {
+    // Fail-open is the documented policy for display surfaces, and no shipped
+    // profile pares the status line away — a profile that did would leave the
+    // user with no visible sign of what is still running.
+    const { statuslineEnabled } = await import(join(REPO, 'lib/statusline/feature-gate.cjs'))
+      .then((m) => m.default ?? m);
+    for (const profile of ['full', 'proxy-only', 'logging-only', 'minimal']) {
+      assert.equal(
+        statuslineEnabled({ CODING_REPO: REPO, CODING_HOME: homeWith(`profile: ${profile}\n`) }),
+        true,
+        `'${profile}' switched the status line off`,
+      );
+    }
+  });
+
+  test('an unreadable config renders rather than blanks', async () => {
+    const { statuslineEnabled } = await import(join(REPO, 'lib/statusline/feature-gate.cjs'))
+      .then((m) => m.default ?? m);
+    assert.equal(statuslineEnabled({ CODING_REPO: join(REPO, 'no', 'such', 'repo') }), true);
+  });
+});
+
 describe('status-line cache key', () => {
+  test('a borrowed cache may differ only in project and agent', () => {
+    // The borrow path serves a cold key from a fresh sibling. It re-underlines
+    // for the new project, so project and agent are fixable; width and the
+    // feature set are not.
+    //
+    // The regression: the tail was width-only, and paneIdentity appends the
+    // fingerprint AFTER the width — so on any pared-down install `-w220.txt`
+    // matched no `-w220-f<hash>.txt` sibling, borrowing never fired, and every
+    // new pane paid a full render. Which is what "I switched a feature off and
+    // the status line broke" actually looked like.
+    const { borrowTail } = createRequire(import.meta.url)(
+      join(REPO, 'lib/statusline/pane-cache-key.cjs'),
+    );
+
+    const paredDown = borrowTail({ paneWidth: '220', features: '7' });
+    assert.ok(
+      'combined-status-line-cache-other-claude-w220-f7.txt'.endsWith(paredDown),
+      'same width and features must be borrowable',
+    );
+    assert.ok(
+      !'combined-status-line-cache-other-claude-w220.txt'.endsWith(paredDown),
+      'an all-on line must not be adopted by a pared-down pane',
+    );
+
+    const allOn = borrowTail({ paneWidth: '220' });
+    assert.ok(
+      !'combined-status-line-cache-other-claude-w220-f7.txt'.endsWith(allOn),
+      'a pared-down line must not be adopted by an all-on pane',
+    );
+    assert.ok(
+      !'combined-status-line-cache-other-claude-w80.txt'.endsWith(allOn),
+      'width must still be respected',
+    );
+  });
+
+  test('the borrow rule and the key builder come from one file', () => {
+    const src = readFileSync(join(REPO, 'scripts/status-line-fast.cjs'), 'utf8');
+    assert.match(src, /borrowTail\(/, 'status-line-fast.cjs rebuilt the tail itself');
+  });
+
   test('the feature set is part of the key', async () => {
     const { featureFingerprint } = await import(join(REPO, 'lib/statusline/pane-cache-key.cjs'))
       .then((m) => m.default ?? m);

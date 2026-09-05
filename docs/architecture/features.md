@@ -182,9 +182,56 @@ omitted entirely — no greying, no placeholder.
 | `[D:n]` | classifier downgrades | `llm-proxy` |
 | `[L:n]` | completions served by local hardware | `llm-proxy` |
 | `[🧠n⏳]` | running / stale / frozen UKB workflows | `knowledge` |
-| context gauge, clock | — | always (core) |
+| context gauge, clock | — | always (core) (but see `statusline` below) |
 
-`scripts/claude-statusline.cjs` and `scripts/status-line-fast.cjs` gate the same set.
+`scripts/status-line-fast.cjs` and `scripts/combined-status-line-wrapper.js` do not gate
+badges themselves — they read the per-pane render cache that `combined-status-line.js`
+writes, so the gating happens once, upstream.
+
+### Switching off the status line itself
+
+`statusline` gates the *whole surface*, not a badge, so it is checked before anything
+else: all four renderers print nothing and **exit 0**.
+
+| program | surface |
+|---------|---------|
+| `scripts/combined-status-line.js` | full render + cache writer |
+| `scripts/status-line-fast.cjs` | tmux per-session `status-right` |
+| `scripts/combined-status-line-wrapper.js` | tmux global `status-right` |
+| `scripts/claude-statusline.cjs` | Claude Code's in-terminal `statusLine` |
+
+The shared check is `lib/statusline/feature-gate.cjs`. Two things about it are load-bearing:
+
+- **Exit 0, not 1.** `status-right` is wrapped in `#(… || echo '[Status Offline]')`. A
+  non-zero exit would replace the deliberately-empty line with an outage banner, which is
+  the most misleading thing a "switched off" feature could do.
+- **Fail-open.** An unreadable config renders the line, per the display/start asymmetry
+  above. The user who actually turned it off has a readable config, so the honest answer
+  and the safe answer coincide.
+
+Known consequence, worth stating: `claude-statusline.cjs` wraps
+`~/.claude/hooks/gsd-statusline.js`, which is also what writes
+`$TMPDIR/claude-ctx-<session>.json` for GSD's own context-monitor hook. Off means that
+upstream is not spawned, so that bridge stops too. Nothing in *this* repo is left
+half-fed — the tmux gauge is the other reader and it is off by the same switch — but
+GSD's monitor is. Turning the feature back on restores it, live.
+
+No shipped profile switches it off; `proxy-only`, `logging-only` and `minimal` all keep
+it, because a pared-down install is exactly the one where the user most needs a visible
+sign of what is still running.
+
+### Borrowing a cached render
+
+`status-line-fast.cjs` serves a cold cache key by adopting a fresh *sibling* cache and
+re-underlining it for this project. It may only borrow across the components it can fix
+up — project and agent. Width and the feature fingerprint it cannot, so
+`borrowTail()` in `lib/statusline/pane-cache-key.cjs` builds the required filename tail
+and lives beside the key builder rather than being mirrored into the reader.
+
+This was width-only until it bit: `paneIdentity()` appends `-f<hash>` *after* `-w<width>`,
+so on any pared-down install `endsWith('-w220.txt')` matched no fingerprinted sibling at
+all. Borrowing silently never fired, every new pane paid a full render, and the symptom
+read as "I switched a feature off and the status line broke".
 
 ## Dashboard surfaces
 

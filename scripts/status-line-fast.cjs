@@ -10,9 +10,19 @@ const codingRepo = process.env.CODING_REPO || path.join(__dirname, '..');
 // Pane identity and the cache filename both come from lib/statusline/pane-cache-key.cjs,
 // which combined-status-line.js also uses — the two MUST agree on the filename
 // or this fast path silently never finds the cache the full render writes.
-const { paneIdentity } = require(path.join(codingRepo, 'lib', 'statusline', 'pane-cache-key.cjs'));
-const { projectPath, projectName, agent: paneAgent, paneWidth, suffix: cacheSuffix } = paneIdentity();
+const { paneIdentity, borrowTail } = require(path.join(codingRepo, 'lib', 'statusline', 'pane-cache-key.cjs'));
+const { projectPath, projectName, agent: paneAgent, paneWidth, features: paneFeatures, suffix: cacheSuffix } = paneIdentity();
 const cacheFile = path.join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
+
+// The `statusline` feature, off: print nothing and exit 0 before reading any
+// cache. Exit 0 matters — tmux's status-right is wrapped in
+// `#(... || echo '[Status Offline]')`, so a non-zero exit would swap the
+// deliberately-empty line for an outage banner. See lib/statusline/feature-gate.cjs.
+const { statuslineEnabled } = require(path.join(codingRepo, 'lib', 'statusline', 'feature-gate.cjs'));
+if (!statuslineEnabled()) {
+  process.stdout.write('');
+  process.exit(0);
+}
 const cslScript = path.join(__dirname, 'combined-status-line.js');
 
 // Load .env file so admin/management API keys are available
@@ -352,9 +362,22 @@ const BG_REFRESH_THRESHOLD_MS = 10000;
 if (!cachedContent.trimEnd() && projectName) {
   try {
     const logsDir = path.join(codingRepo, '.logs');
-    const widthSuffix = paneWidth ? `-w${paneWidth}.txt` : '.txt';
+    // The borrowable tail is EVERY key component that is not the pane's identity:
+    // width and the feature fingerprint. Only project and agent may differ.
+    //
+    // Width was here from the start (borrowing a line sized for another pane
+    // produces the "shifted left + leftover characters" render). The feature
+    // fingerprint was not, and its absence broke this path outright for any
+    // pared-down install: paneIdentity appends `-f<hash>` AFTER `-w<width>`, so
+    // `endsWith('-w220.txt')` matched no fingerprinted sibling at all. Every new
+    // pane then started cold and paid a full CSL render — which is what a
+    // switched-off feature looked like from the outside. Matching on the joint
+    // tail fixes both halves: fingerprinted panes can borrow from each other,
+    // and a line carrying badges for features this pane has turned off can
+    // never be adopted (an all-on `-w220.txt` no longer ends with `-w220-f7.txt`).
+    const tailSuffix = borrowTail({ paneWidth, features: paneFeatures });
     const siblings = fs.readdirSync(logsDir)
-      .filter(f => f.startsWith('combined-status-line-cache-') && f.endsWith(widthSuffix));
+      .filter(f => f.startsWith('combined-status-line-cache-') && f.endsWith(tailSuffix));
     for (const sib of siblings) {
       const sibPath = path.join(logsDir, sib);
       const stat = fs.statSync(sibPath);
