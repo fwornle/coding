@@ -12,6 +12,9 @@
  *
  *   host daemons        launchd / systemd --user / Task Scheduler, via
  *                       lib/features/daemons.mjs
+ *   ETMs                the one artifact with no supervisor of either kind —
+ *                       spawned detached by the health coordinator, so only a
+ *                       process listing can find it and only a signal can stop it
  *   container programs  supervisorctl inside coding-services, when it is up
  *
  * Deliberately NOT restarting the whole world: `coding --claude` already does
@@ -91,6 +94,68 @@ async function containerStatus() {
   return Object.keys(status).length ? status : null;
 }
 
+/**
+ * Running ETMs, as `{pid, projectPath}`.
+ *
+ * The enhanced transcript monitor is the writer behind the `lsl` feature, and
+ * it is the one artifact that is neither a host DAEMON nor a container program:
+ * the health coordinator spawns it `detached` and `unref()`s it, so it has no
+ * supervisor entry to stop and it outlives whoever started it. Process listing
+ * is therefore the only handle on it.
+ *
+ * @param {{list?: () => Promise<{ok:boolean, stdout:string}>}} [opts] seam for tests
+ */
+export async function listEtms(opts = {}) {
+  if (platform() === 'windows') return [];
+  // /bin/ps by absolute path: `ps` is aliased on this developer's shells, and a
+  // seam that silently returns nothing would make the reap below a no-op that
+  // still reports success.
+  const list = opts.list || (() => run('/bin/ps', ['-Ao', 'pid=,args=']));
+  const r = await list();
+  if (!r.ok) return [];
+  const out = [];
+  for (const line of r.stdout.split('\n')) {
+    const m = /^\s*(\d+)\s+.*enhanced-transcript-monitor\.js\s+(\S+)/.exec(line);
+    if (m) out.push({ pid: parseInt(m[1], 10), projectPath: m[2] });
+  }
+  return out;
+}
+
+/**
+ * Stop the ETMs when `lsl` is off.
+ *
+ * Only ever STOPS. Spawning is the coordinator's safety-net sweep, which is
+ * gated on the same feature — an apply that started ETMs itself would be a
+ * second spawner racing the first.
+ *
+ * This exists because the coordinator's own reap cannot cover every case: turn
+ * `lsl` and `health` off in one change and the coordinator is stopped in the
+ * same pass, leaving detached ETMs writing .specstory/history indefinitely —
+ * measured at two of them, up 8-9 hours, under `minimal`.
+ *
+ * SIGTERM so the ETM's shutdown handler runs; a dead pid is success, not an
+ * error, because "not running" is the state being asked for.
+ */
+export async function reconcileEtm(resolved, { dryRun, ...opts } = {}) {
+  const out = { started: [], stopped: [], unchanged: [] };
+  const running = await listEtms(opts);
+  if (resolved.features.lsl?.enabled === true) {
+    for (const e of running) out.unchanged.push(etmName(e));
+    return out;
+  }
+  const kill = opts.kill || ((pid) => process.kill(pid, 'SIGTERM'));
+  for (const e of running) {
+    if (dryRun) { out.stopped.push({ name: etmName(e), action: 'would-stop' }); continue; }
+    let ok = true;
+    let detail = '';
+    try { kill(e.pid); } catch (err) { ok = err.code === 'ESRCH'; detail = err.message; }
+    out.stopped.push({ name: etmName(e), action: 'stopped', ok, detail });
+  }
+  return out;
+}
+
+const etmName = (e) => `etm(${e.projectPath.split('/').filter(Boolean).pop() || e.projectPath})`;
+
 async function reconcileContainer(resolved, { dryRun }) {
   const status = await containerStatus();
   if (!status) {
@@ -137,10 +202,12 @@ export async function applyFeatures(opts = {}) {
   if (!dryRun) writeSnapshot({ repoPath: REPO });
 
   const daemons = await reconcileDaemons(resolved, { dryRun });
+  const etm = await reconcileEtm(resolved, { dryRun, ...(opts.etm || {}) });
   const container = await reconcileContainer(resolved, { dryRun });
 
   const changed = [
     ...daemons.started, ...daemons.stopped,
+    ...etm.started, ...etm.stopped,
     ...container.started, ...container.stopped,
   ];
 

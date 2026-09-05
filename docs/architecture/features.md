@@ -75,6 +75,26 @@ Platform service manager: launchd (macOS), systemd `--user` (Linux), Scheduled T
 | `com.coding.context-turns-sweeper` | `scripts/context-turns-sweeper-job.sh` | `performance` |
 | `com.coding.health-coordinator` | `scripts/health-coordinator.js` | `health` |
 
+### The ETM is neither a daemon nor a container program
+
+`scripts/enhanced-transcript-monitor.js` — the writer behind `lsl` — is the one artifact
+with no supervisor entry of either kind. The health coordinator spawns it per project
+with `detached: true` + `unref()`, so it has no label to stop and it outlives whoever
+started it. Three places therefore have to agree, and for a while only the first did:
+
+| path | where | what it does when `lsl` is off |
+|------|-------|-------------------------------|
+| launch | `SERVICE_CONFIGS.transcriptMonitor` | not started |
+| coordinator safety-net | `ensureEtmForActiveProjects()` | does not spawn |
+| coordinator reap | `reapEtmsForClosedSessions()` | SIGTERMs every running ETM |
+| apply | `reconcileEtm()` in `scripts/apply-features.mjs` | SIGTERMs every running ETM |
+
+The last two overlap on purpose. The coordinator can only reap while it is itself
+running, and `minimal` / `proxy-only` stop it in the same pass that switches `lsl` off —
+which used to leave detached ETMs writing `.specstory/history` indefinitely (measured:
+two of them, up 8-9 hours, under `minimal`). `reconcileEtm` only ever stops; spawning
+stays the coordinator's job, so an apply cannot become a second spawner racing the first.
+
 ## Launch-time host services
 
 Started by `scripts/start-services-robust.js` (`SERVICE_CONFIGS`). Each entry carries a
