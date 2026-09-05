@@ -8,7 +8,7 @@
 
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, utimesSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, utimesSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -17,8 +17,10 @@ const require = createRequire(import.meta.url);
 const REPO = process.env.CODING_REPO || new URL('../..', import.meta.url).pathname;
 
 const {
-  loadFeatures, isEnabled, explain, invalidateFeatures, FeatureConfigError, FEATURE_IDS,
+  loadFeatures, isEnabled, explain, invalidateFeatures, loadProfiles,
+  FeatureConfigError, FEATURE_IDS,
 } = require(join(REPO, 'lib/features/resolve.cjs'));
+const yaml = require('js-yaml');
 
 let dir;
 const PROFILES = join(REPO, 'config', 'feature-profiles.yaml');
@@ -221,6 +223,27 @@ describe('validation', () => {
     assert.equal(loadFeatures(opts()).disabled.length, 0);
   });
 
+  test('a file that states no opinion is not reported as an applied layer', () => {
+    // The shipped config/features.yaml is entirely comments. "layers applied"
+    // must mean "layers that decided something" — listing a file that changed
+    // nothing sends whoever is debugging a feature to read the wrong file.
+    writeRepo('# team default: no opinion\n');
+    writeHome('');
+    assert.deepEqual(loadFeatures(opts()).layers, []);
+  });
+
+  test('an inert layer is still VALIDATED', () => {
+    // Order matters: skipping the layer before validating it would turn a typo
+    // in an otherwise-empty file into silence.
+    writeRepo('features:\n  nope: on\n');
+    assert.throws(() => loadFeatures(opts()), /unknown feature 'nope'/);
+  });
+
+  test('a layer that only sets a profile counts as applied', () => {
+    writeRepo('profile: minimal\n');
+    assert.deepEqual(loadFeatures(opts()).layers, ['config/features.yaml']);
+  });
+
   test('YAML 1.1 bare on/off are accepted as booleans', () => {
     writeHome('features:\n  lsl: off\n  codegraph: on\n');
     const r = loadFeatures(opts());
@@ -354,5 +377,53 @@ describe('snapshot', () => {
     for (const v of Object.values(snapshot.features)) assert.equal(typeof v, 'boolean');
 
     assert.deepEqual(readSnapshot({ repoPath: repoDir }).enabled, snapshot.enabled);
+  });
+});
+
+describe('the shipped team default', () => {
+  // config/features.yaml is layer 2 — committed, shared by everyone who clones.
+  const shipped = join(REPO, 'config', 'features.yaml');
+
+  test('exists, so the layer is discoverable rather than folklore', () => {
+    assert.ok(readFileSync(shipped, 'utf8').length > 0);
+  });
+
+  test('is inert — it states no opinion', () => {
+    // Shipping it pre-populated with every feature `on` would silently override
+    // any future change to the built-in defaults with a stale answer nobody had
+    // revisited, and the override would be invisible precisely because it
+    // agreed with what you already expected.
+    const doc = yaml.load(readFileSync(shipped, 'utf8'));
+    assert.ok(
+      doc === null || Object.keys(doc).length === 0,
+      `config/features.yaml must ship with everything commented out, got: ${JSON.stringify(doc)}`,
+    );
+  });
+
+  test('parses, and resolves to the historical stack', () => {
+    const r = loadFeatures({
+      repoConfigPath: shipped,
+      homeConfigPath: join(dir, 'absent.yaml'),
+      profilesPath: PROFILES,
+      env: {},
+      force: true,
+    });
+    assert.deepEqual(r.disabled, []);
+    assert.deepEqual(r.layers, [], 'an inert file must not appear as an applied layer');
+  });
+
+  test('documents every feature id, so the template cannot go stale', () => {
+    const text = readFileSync(shipped, 'utf8');
+    for (const id of FEATURE_IDS) {
+      assert.match(text, new RegExp(`\\b${id.replace('-', '\\-')}\\b`), `${id} is not mentioned`);
+    }
+  });
+
+  test('names only profiles that exist', () => {
+    const profiles = Object.keys(loadProfiles(PROFILES));
+    const named = [...readFileSync(shipped, 'utf8').matchAll(/^# profile: (\S+)/gm)].map((m) => m[1]);
+    for (const name of named) {
+      assert.ok(profiles.includes(name), `commented example names unknown profile '${name}'`);
+    }
   });
 });

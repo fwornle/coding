@@ -1,0 +1,64 @@
+# Team / project default for which parts of `coding` run.
+#
+# This is LAYER 2 of four. Last wins:
+#
+#   1. built-in defaults              lib/features/catalogue.cjs — everything on
+#   2. THIS FILE                      committed; shared by everyone who clones
+#   3. ~/.coding/features.yaml        per machine; what `coding-features` and
+#                                     the dashboard write
+#   4. CODING_FEATURE_<ID>=on|off     environment; for CI and one-off runs
+#
+# EVERYTHING BELOW IS COMMENTED OUT, DELIBERATELY.
+#
+# An empty file means "this project states no opinion", which is the right
+# default for a checkout that has never been configured — and it is not the same
+# as a file that lists every feature as `on`. A file like that would silently
+# override any future change to the built-in defaults with a stale answer nobody
+# had revisited, and the override would be invisible precisely because it agreed
+# with what you already expected.
+#
+# So: uncomment only what your project actually needs to pin.
+#
+# Run `coding-features status` to see the resolved result and which layer
+# decided each feature. See docs/architecture/features.md for the full map of
+# what each feature owns — daemons, container programs, ports, hooks, dashboard
+# tabs, status-line badges and CLIs.
+
+# ── Pin a preset ─────────────────────────────────────────────────────────────
+# A profile turns ON what it names and OFF everything else. Available:
+# full, proxy-only, logging-only, minimal (see config/feature-profiles.yaml).
+#
+# profile: full
+
+# ── Or pin individual features ───────────────────────────────────────────────
+# Valid values: on / off. Can be combined with `profile:` above, in which case
+# these refine it.
+#
+# A feature whose dependency is off is auto-disabled, and the dependency is
+# never switched back on for you:
+#   observations requires lsl
+#   knowledge    requires observations
+#   performance  requires llm-proxy
+#
+# features:
+#   lsl:          on   # verbatim session transcripts (.specstory markdown)
+#   observations: on   # observation → digest → insight pipeline
+#   knowledge:    on   # semantic analysis, UKB workflows, knowledge graph, VKB
+#   codegraph:    on   # graphify code knowledge graph
+#   constraints:  on   # guardrail rules checked before every tool call
+#   llm-proxy:    on   # provider routing, fallback, token accounting
+#   performance:  on   # measurement, experiments, benchmarks
+#   health:       on   # health coordinator and the monitoring dashboard
+#   statusline:   on   # the tmux / agent status line
+
+# ── A worked example ─────────────────────────────────────────────────────────
+# "This project wants logging and guardrails, but no knowledge base and no
+#  benchmarking — and each developer can still turn things on locally."
+#
+# features:
+#   knowledge:   off
+#   codegraph:   off
+#   performance: off
+#
+# Note that a developer CAN override this in ~/.coding/features.yaml; layer 3
+# beats layer 2 on purpose. This file sets the default, not a policy.

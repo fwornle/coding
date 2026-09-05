@@ -296,10 +296,25 @@ Four layers, last wins, deep-merged per feature key.
 
 | layer | source | purpose |
 |-------|--------|---------|
-| 1 | `lib/features/defaults.mjs` | built-in, all-on |
+| 1 | `lib/features/catalogue.cjs` | built-in, all-on |
 | 2 | `<repo>/config/features.yaml` | committed team/project default |
-| 3 | `~/.coding/features.yaml` | this machine; **what the dashboard writes**; gitignored |
+| 3 | `~/.coding/features.yaml` | this machine; **what the dashboard writes** |
 | 4 | `CODING_FEATURE_<ID>=on\|off` | env override, for CI and the test matrix |
+
+**Layer 2 ships inert** — `config/features.yaml` is entirely comments. That is not
+the same as a file listing every feature as `on`: such a file would silently override
+any future change to the built-in defaults with a stale answer nobody had revisited,
+and the override would be invisible precisely because it agreed with what you expected.
+A project pins what it needs by uncommenting; everything else keeps following the
+defaults.
+
+Layer 3 beats layer 2 on purpose. A committed default is a *default*, not a policy — a
+developer can always switch something back on locally.
+
+A layer that exists but states no opinion does **not** appear in `layers`: "layers
+applied" means "layers that decided something", and listing a file that changed nothing
+sends whoever is debugging a feature to read the wrong file. Such a layer is still
+validated, so a typo in an otherwise-empty file is a loud error rather than silence.
 
 ```yaml
 # ~/.coding/features.yaml
