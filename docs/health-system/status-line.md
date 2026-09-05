@@ -177,7 +177,7 @@ per-pane, then per-project, from `state.lsl` at `:3034/health/state`.
 | `stale` | `[LSL●]` bold amber (`ALARM_DOTS.WARN`) | ETM `degraded` (0 exchanges in > 30 min uptime), or heartbeat > 120 s old |
 | `down` | `[LSL●]` bold red (`ALARM_DOTS.CRIT`) | ETM stopped, coordinator unreachable, or no entry and the session is not new |
 
-**What counts as "closed".** Not "tmux no longer lists the session" — that test had a hole.
+**What counts as "closed".** Not "tmux no longer lists the session" — that test had two holes.
 A pane can outlive the agent inside it (claude-mcp-launcher.sh runs `claude` as a child on
 its pipe-capture path rather than exec'ing it), and such a husk pinned its ETM, and the
 project's dot, indefinitely. `tmuxOpenProjectPaths()` therefore walks each pane's full
@@ -187,10 +187,23 @@ counts as live regardless, so a session that is still starting is never reaped. 
 fails open: no `ps` snapshot, or an unreadable pane pid, and every open session counts as
 live, exactly as before.
 
-Note the inverse case, which is *not* a husk: on 2026-09-05 VS Code was killed and the tmux
-server — a separate daemon — survived, so every agent kept running detached. Those sessions
-are genuinely live and are correctly left alone; their statusline dots simply fade to grey
-on the normal activity ladder.
+The second hole was the inverse case. On 2026-09-05 VS Code was killed and the tmux server
+— a separate daemon — survived, so every agent kept running *detached*: 8 of 10 sessions had
+nobody attached and had been idle for one to six days, while the statusline reported all ten
+as live. A live agent process is not the same as a session anyone is in, so
+`tmuxOpenProjectPaths()` requires **both** `#{session_attached}` and an agent in the pane
+tree. `attached` answers "is anyone there"; the process walk answers "is anything running".
+
+A pane younger than 60 s passes the attachment test regardless, because
+`tmux-session-wrapper.sh` creates the session with `new-session -d` and attaches a beat
+later — a launch is briefly detached by construction.
+
+Detaching from a session that is genuinely working therefore no longer protects its ETM by
+itself; `REAP_CONTENT_ACTIVE_MS` does, and it was widened from 2 to 30 minutes when the gate
+landed. It now has to cover a long quiet stretch *inside* one turn rather than the gap
+between two prompts — an agent in a ten-minute build writes nothing to its transcript for
+the whole ten minutes — while still sitting far below the multi-day idleness the gate exists
+to catch.
 
 **Why `starting` exists.** `reapEtmsForClosedSessions()` kills a project's ETM within one
 5 s tick when its tmux session closes, but the respawn came only from

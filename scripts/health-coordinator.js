@@ -2134,6 +2134,16 @@ function processSnapshot() {
 }
 
 /**
+ * Is this pane new enough that we should not judge it yet? Used to exempt a
+ * just-created session from the attachment test, which it necessarily fails for
+ * the moment between `tmux new-session -d` and the attach that follows.
+ */
+function paneIsWithinGrace(panePid, snap, now) {
+  const self = snap.byPid.get(panePid);
+  return !!self && self.startedAt > 0 && now - self.startedAt < TMUX_AGENT_GRACE_MS;
+}
+
+/**
  * Does this pane still hold a live agent? Walks the pane process and its whole
  * descendant tree. A pane process that has itself vanished is not live.
  */
@@ -2189,22 +2199,22 @@ function tmuxOpenProjectPaths(agenticDir) {
   try {
     // list-panes, not list-sessions: the pane pid is what the agent-liveness
     // check below needs, and a session can hold more than one pane.
-    const out = spawnSync('tmux', ['list-panes', '-a', '-F', '#{session_path}\t#{pane_pid}'], {
+    const out = spawnSync('tmux', ['list-panes', '-a', '-F', '#{session_path}\t#{pane_pid}\t#{session_attached}'], {
       encoding: 'utf8',
       timeout: 1500,
     });
     if (out.status !== 0 || !out.stdout) return new Set();
 
-    const panes = new Map(); // projectPath -> pane pids
+    const panes = new Map(); // projectPath -> [{pid, attached}]
     for (const line of out.stdout.split('\n')) {
-      const [rawPath, rawPid] = line.split('\t');
+      const [rawPath, rawPid, rawAttached] = line.split('\t');
       const p = (rawPath || '').trim();
       if (!p) continue;
       if (!fs.existsSync(p)) continue;
       if (!(p.startsWith(agenticDir + '/') || looksLikeProjectDir(p))) continue;
       if (!panes.has(p)) panes.set(p, []);
       const pid = parseInt(rawPid, 10);
-      if (pid > 0) panes.get(p).push(pid);
+      if (pid > 0) panes.get(p).push({ pid, attached: parseInt(rawAttached, 10) > 0 });
     }
 
     // Fail OPEN, twice over: with no process snapshot, or a pane whose pid we
@@ -2216,11 +2226,22 @@ function tmuxOpenProjectPaths(agenticDir) {
 
     const now = Date.now();
     const live = new Set();
-    for (const [p, pids] of panes) {
-      if (pids.length === 0 || pids.some((pid) => paneHasLiveAgent(pid, snap, now))) live.add(p);
+    const why = [];
+    for (const [p, entries] of panes) {
+      if (entries.length === 0) { live.add(p); why.push(`${path.basename(p)}:unknown-pid`); continue; }
+      // A pane counts only when SOMEONE IS THERE and an agent is running in it.
+      // `attached` answers "is anyone looking", the process walk answers "is
+      // anything running" — two independent questions, and a session needs both.
+      // Young panes pass the attachment test regardless: tmux-session-wrapper.sh
+      // creates the session with `new-session -d` and attaches a beat later, so a
+      // launch is briefly detached-by-construction.
+      const ok = entries.some(({ pid, attached }) =>
+        (attached || paneIsWithinGrace(pid, snap, now)) && paneHasLiveAgent(pid, snap, now));
+      if (ok) live.add(p);
+      why.push(`${path.basename(p)}:${ok ? 'live' : (entries.some((e) => e.attached) ? 'husk' : 'detached')}`);
     }
-    etmTrace(() => `tmux: ${panes.size} qualifying pane path(s), ${live.size} with a live agent`
-      + (panes.size ? ` — ${[...panes.keys()].map(p => `${path.basename(p)}:${live.has(p) ? 'live' : 'husk'}`).join(' ')}` : ''));
+    etmTrace(() => `tmux: ${panes.size} qualifying pane path(s), ${live.size} attached with a live agent`
+      + (why.length ? ` — ${why.join(' ')}` : ''));
     return live;
   } catch {
     return new Set();
@@ -2558,11 +2579,15 @@ const _reapedProjects = new Map(); // projectName -> reapedAt (ms)
  * Reaping is deliberately conservative — a wrongly-reaped project vanishes from
  * the statusline while someone is working in it, which is far worse than one
  * lingering. Three independent things must ALL say "nobody is here":
- *   • no tmux session rooted at the project path that still HOLDS AN AGENT.
- *     Session-exists was the original test and it had a hole: a pane can
- *     outlive the agent inside it, and such a husk pinned its ETM forever.
- *     tmuxOpenProjectPaths now walks each pane's process tree, so this
- *     condition means "nobody is here" rather than "no window is open".
+ *   • no tmux session rooted at the project path that is ATTACHED and still
+ *     HOLDS AN AGENT. Session-exists was the original test and it had two
+ *     holes. A pane can outlive the agent inside it, and such a husk pinned
+ *     its ETM forever. And an agent can outlive the person: after a VS Code
+ *     crash on 2026-09-05 the tmux server survived, so eight sessions kept
+ *     running detached and idle for one to six days while the statusline
+ *     reported all ten as live. tmuxOpenProjectPaths now requires both
+ *     signals, so this condition means "nobody is here" rather than "no
+ *     window is open".
  *   • no fresh OpenCode session for it
  *   • no fresh content-activity clock from the ETM itself — the honest "the
  *     agent is genuinely working right now" signal (set only on observed
@@ -2574,7 +2599,20 @@ const _reapedProjects = new Map(); // projectName -> reapedAt (ms)
  * Fails OPEN: if tmux reports nothing at all (not running, or the query failed)
  * we cannot distinguish "no sessions" from "cannot tell", so we reap nothing.
  */
-const REAP_CONTENT_ACTIVE_MS = 2 * 60 * 1000;
+// How long after the last observed transcript growth a project is still treated as
+// working, and so spared even with nobody attached.
+//
+// Widened from 2 minutes when the attachment gate landed. Before the gate, a
+// detached session stayed in `live` on agent-liveness alone and this window only
+// had to cover the gap between two prompts. Now detachment removes that
+// protection, and this is the ONLY thing standing between a working agent and a
+// reaped ETM — so it has to cover a long quiet stretch INSIDE one turn, not
+// between turns. An agent in a ten-minute build writes nothing to its transcript
+// for the whole ten minutes.
+//
+// 30 minutes is chosen to sit far above that and far below the case the gate is
+// for: the sessions that prompted this were detached and idle for one to six DAYS.
+const REAP_CONTENT_ACTIVE_MS = 30 * 60 * 1000;
 
 function reapEtmsForClosedSessions() {
   const agenticDir = path.dirname(REPO_ROOT);
