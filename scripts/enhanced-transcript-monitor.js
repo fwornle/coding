@@ -4923,10 +4923,27 @@ ORDER BY m.time_created ASC;`;
       // Phase 33 D-09: POST lsl_heartbeat signal to coordinator (replaces
       // the legacy file write). session_id comes from CLAUDE_SESSION_ID ||
       // SESSION_ID env vars set by bin/coding via launch-agent-common.sh.
-      // tmux_pane is captured from TMUX_PANE inherited from the spawning
-      // shell so the statusline can find THIS pane's heartbeat even when
-      // CLAUDE_SESSION_ID leaks across panes (env inheritance from a common
-      // parent shell makes session-id-only matching unreliable).
+      // tmux_pane: BEST-EFFORT, and frequently null. Read from TMUX_PANE in
+      // this process's environment, which helps the statusline pin a heartbeat
+      // to a pane when CLAUDE_SESSION_ID has leaked across panes (env
+      // inheritance from a common parent shell makes session-id-only matching
+      // unreliable). Two limits, both by construction — do not "fix" the null:
+      //
+      //   * Null for every coordinator-spawned ETM. The coordinator is a
+      //     launchd job and launchd passes no tmux environment at all
+      //     (`/bin/ps -Eww -p <pid> | grep '^TMUX'` is empty), so there is
+      //     nothing to inherit.
+      //   * The ETM is a PROJECT SINGLETON on both spawn paths — the launcher
+      //     pkills by project path before spawning (agent-common-setup.sh:490)
+      //     and the coordinator dedups on projectName — so even when this IS
+      //     set it names the pane that happened to launch the monitor, not a
+      //     pane the monitor is specific to. A project with three panes has one
+      //     ETM and one health signal.
+      //
+      // So a consumer must treat a pane match as a hint and fall back to the
+      // project level, which combined-status-line.js does. Stamping a pane onto
+      // a project-level singleton would make the field look authoritative while
+      // being arbitrary among siblings.
       await this._postSignal({
         kind: 'lsl_heartbeat',
         session_id: this.sessionId,

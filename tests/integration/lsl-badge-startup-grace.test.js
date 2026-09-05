@@ -162,6 +162,25 @@ describe('fast path — a borrowed cache never carries a foreign context gauge',
   });
 });
 
+describe('status line — a pane-pinned corpse must not outrank a live ETM', () => {
+  // Relaunching an agent in a pane leaves TWO entries carrying the same
+  // TMUX_PANE: agent-common-setup.sh pkills the old ETM, the coordinator marks
+  // it 'stopped' 15s later, and it lingers for EVICT_AFTER_STOPPED_MS (5 min)
+  // beside the new ETM already heartbeating from that same pane. The pinned
+  // branch trusts its pick exclusively, so picking the wrong one is a red badge
+  // for five minutes with a healthy monitor running.
+  test('the pinned lookup takes the FRESHEST match, not the first', () => {
+    const fn = CSL.slice(CSL.indexOf('async getLSLHealthStatus()'));
+    const branch = fn.slice(0, fn.indexOf('// Otherwise aggregate'));
+    // Object.values() is insertion-ordered and the corpse is inserted first, so
+    // .find() specifically returns it. Requiring a reduce on lastBeat is what
+    // pins the ordering rather than the lookup merely existing.
+    expect(branch).not.toMatch(/Object\.values\(state\.lsl \|\| \{\}\)\.find\(/);
+    expect(branch).toMatch(/\.filter\(/);
+    expect(branch).toMatch(/reduce\(\(a, b\) => \(\(b\.lastBeat \|\| 0\) > \(a\.lastBeat \|\| 0\) \? b : a\)\)/);
+  });
+});
+
 describe('status line — "starting" is not an alarm', () => {
   test('getLSLHealthStatus can return the distinct starting verdict', () => {
     expect(flat(CSL)).toMatch(/if \(CombinedStatusLine\._sessionAgeMs\(\) < LSL_STARTUP_GRACE_MS\) return 'starting'/);

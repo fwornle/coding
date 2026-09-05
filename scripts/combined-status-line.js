@@ -841,11 +841,24 @@ class CombinedStatusLine {
     // Strongest signal: an entry pinned to THIS pane. If found, trust it
     // exclusively — pane-level distinctions matter (e.g. a dead pane
     // shouldn't go green just because a sibling pane is alive).
+    //
+    // FRESHEST match, not the first. Two entries can carry the same pane at
+    // once: relaunching an agent in a pane makes agent-common-setup.sh pkill
+    // the old ETM, the coordinator marks it 'stopped' 15s later, and it then
+    // lingers for EVICT_AFTER_STOPPED_MS (5 min) beside the new ETM that is
+    // already heartbeating from the same TMUX_PANE. Object.values() is
+    // insertion-ordered, so .find() returned the CORPSE, and this branch
+    // trusts its pick exclusively — a red badge for up to five minutes with a
+    // perfectly healthy monitor running. Exactly the spurious-red failure the
+    // project-level fallback below was written to stop, reintroduced above it.
     if (myTmuxPane && myProject) {
-      const e = Object.values(state.lsl || {}).find(x =>
+      const pinned = Object.values(state.lsl || {}).filter((x) =>
         x && x.tmuxPane === myTmuxPane && x.projectName === myProject
       );
-      if (e) return evaluate(e);
+      if (pinned.length) {
+        const freshest = pinned.reduce((a, b) => ((b.lastBeat || 0) > (a.lastBeat || 0) ? b : a));
+        return evaluate(freshest);
+      }
     }
     // Otherwise aggregate across all entries for this project. A stopped
     // ghost (e.g. an old ETM that the coordinator marked stopped after >15s
@@ -2717,7 +2730,19 @@ class CombinedStatusLine {
             const myPane = process.env.TMUX_PANE || null;
             const entries = Object.values(coordResult.state.lsl || {})
               .filter(e => e && e.projectName === myProject && e.transcriptPath);
-            const pinned = myPane && entries.find(e => e.tmuxPane === myPane);
+            // Freshest among the pane-pinned, for the same reason as
+            // getLSLHealthStatus(): relaunching in a pane leaves a 'stopped'
+            // ETM carrying that same TMUX_PANE for EVICT_AFTER_STOPPED_MS
+            // (5 min) beside the live one. `.find()` is insertion-ordered and
+            // returns the corpse, and `pinned` outranks the freshest sort
+            // below — so the gauge would read the PREVIOUS session's
+            // transcript. That is precisely the wrong-session render this
+            // block's own comment describes.
+            const pinned = myPane
+              ? entries
+                .filter(e => e.tmuxPane === myPane)
+                .sort((a, b) => (b.lastBeat || 0) - (a.lastBeat || 0))[0]
+              : null;
             const chosen = pinned
               || entries.sort((a, b) => (b.lastBeat || 0) - (a.lastBeat || 0))[0];
             sessionId = contextGauge.sessionIdFromTranscriptPath(chosen?.transcriptPath);
