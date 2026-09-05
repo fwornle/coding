@@ -52,7 +52,14 @@ function payload(off: string[] = []) {
     disabled: off,
     needsDocker: ALL_FEATURES.some((id) => !off.includes(id) && META[id].needsDocker),
     warnings: [],
-    profiles: { full: [...ALL_FEATURES], 'proxy-only': ['llm-proxy', 'statusline'], minimal: ['statusline'] },
+    // Mirrors config/feature-profiles.yaml. `logging-only` KEEPS health, which
+    // is what makes it the control case for the self-destruct confirmation.
+    profiles: {
+      full: [...ALL_FEATURES],
+      'proxy-only': ['llm-proxy', 'statusline'],
+      'logging-only': ['lsl', 'health', 'statusline'],
+      minimal: ['statusline'],
+    },
   }
 }
 
@@ -179,6 +186,76 @@ test.describe('features editor', () => {
     await page.getByTestId('feature-row-codegraph').getByRole('switch').click()
     await expect(page.getByTestId('features-save')).toBeEnabled()
     await expect(page.getByTestId('feature-row-codegraph')).toContainText('unsaved')
+  })
+
+  test('a profile that turns off health asks before saving', async ({ page }) => {
+    // The dashboard is SERVED by the health feature. Saving proxy-only stops the
+    // coordinator and this page with it — which the first time round read as
+    // "I clicked save and the system broke". It is a valid thing to want; it
+    // just must not happen by surprise, and cannot be undone from here.
+    await stubFeatures(page)
+    let saved = false
+    await page.route('**/api/features', async (route) => {
+      if (route.request().method() === 'PUT') { saved = true; return route.fulfill({ status: 200, body: '{}' }) }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload()) })
+    })
+    await page.goto('/features')
+    await page.getByTestId('features-profile-proxy-only').click()
+
+    const panel = page.getByTestId('features-confirm-health')
+    await expect(panel).toBeVisible()
+    await expect(panel).toContainText('switch off Health Monitoring')
+    // The way back has to be on screen BEFORE the page that shows it dies.
+    await expect(panel).toContainText('coding-features profile full')
+    expect(saved, 'nothing may be written until it is confirmed').toBe(false)
+  })
+
+  test('cancelling the confirmation writes nothing', async ({ page }) => {
+    await stubFeatures(page)
+    let saved = false
+    await page.route('**/api/features', async (route) => {
+      if (route.request().method() === 'PUT') { saved = true; return route.fulfill({ status: 200, body: '{}' }) }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload()) })
+    })
+    await page.goto('/features')
+    await page.getByTestId('features-profile-minimal').click()
+    await page.getByTestId('features-confirm-cancel').click()
+    await expect(page.getByTestId('features-confirm-health')).toHaveCount(0)
+    expect(saved).toBe(false)
+  })
+
+  test('a profile that KEEPS health saves without asking', async ({ page }) => {
+    // The prompt must be about self-destruction specifically. Asking on every
+    // save would train the user to click through it.
+    await stubFeatures(page)
+    let putBody: unknown = null
+    await page.route('**/api/features', async (route) => {
+      if (route.request().method() === 'PUT') {
+        putBody = route.request().postDataJSON()
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload()) })
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload()) })
+    })
+    await page.route('**/api/features/apply', (route) => route.fulfill({ status: 200, body: '{"ok":true}' }))
+    await page.goto('/features')
+    await page.getByTestId('features-profile-logging-only').click()
+    await expect(page.getByTestId('features-confirm-health')).toHaveCount(0)
+    await expect.poll(() => putBody).toEqual({ profile: 'logging-only' })
+  })
+
+  test('turning health off by its own toggle asks too', async ({ page }) => {
+    // Same destination, different route through the UI.
+    await stubFeatures(page)
+    let saved = false
+    await page.route('**/api/features', async (route) => {
+      if (route.request().method() === 'PUT') { saved = true; return route.fulfill({ status: 200, body: '{}' }) }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload()) })
+    })
+    await page.goto('/features')
+    await page.getByTestId('feature-row-health').getByRole('switch').click()
+    await page.getByTestId('features-save').click()
+    await expect(page.getByTestId('features-confirm-health')).toBeVisible()
+    expect(saved).toBe(false)
   })
 
   test('an unreachable coordinator fails OPEN, with an honest error', async ({ page }) => {

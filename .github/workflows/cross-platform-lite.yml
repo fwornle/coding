@@ -64,6 +64,90 @@ jobs:
         run: bash scripts/test-coding.sh --ci
 
   # ───────────────────────────────────────────────────────────────────────────
+  # The daemon backends.
+  #
+  # lib/features/daemons.mjs speaks launchd, systemd --user and Task Scheduler,
+  # and for a while only launchd had ever run: the other two were shipped and
+  # unverified, where a wrong flag would have surfaced as "the toggle did
+  # nothing" on a machine none of us was sitting at.
+  #
+  # Two tiers, deliberately:
+  #
+  #   contract  — asserts the exact command lines and the parsing of real
+  #               command output, with the executor substituted. Runs on all
+  #               three OSes, so a Linux regression is caught on a Mac. This is
+  #               the HARD gate.
+  #   live      — creates a real unit and drives install → start → observe →
+  #               stop → observe against the actual service manager. Catches a
+  #               command that is right on paper and rejected in practice.
+  #
+  # The live tier exits 0 when the runner cannot host a user service (a bare
+  # GitHub runner often has no systemd --user session bus). That is an
+  # environment fact rather than a defect, the reason is always printed, and the
+  # contract tier still gates the PR — so a skip never means "unchecked".
+  # ───────────────────────────────────────────────────────────────────────────
+  daemon-backends:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # js-yaml is the resolver's only runtime dependency. `npm ci` here would
+      # pull the whole tree (and its native postinstalls) for two test files.
+      - name: Minimal dependencies
+        run: npm install --no-save --ignore-scripts js-yaml
+
+      - name: Contract tests — all three backends, on every OS
+        run: node --test tests/features/daemon-backends.test.mjs
+
+      # Give the Linux runner a user systemd instance if it can have one.
+      # Without lingering there is no user manager for a non-login session, and
+      # `systemctl --user` fails with "Failed to connect to bus" — which the
+      # live script detects and reports rather than mistaking for our bug.
+      - name: Enable a user systemd session (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo loginctl enable-linger "$USER" || true
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus" >> "$GITHUB_ENV"
+
+      - name: Report service-manager capability
+        run: node scripts/test-daemon-backend.mjs --probe
+
+      - name: Live round-trip against the real service manager
+        run: node scripts/test-daemon-backend.mjs
+
+      # The live script always cleans up, including on failure. This asserts it
+      # actually did: a test that leaves a unit behind would make the NEXT run
+      # pass for the wrong reason.
+      - name: No test unit left behind
+        if: always()
+        run: |
+          leftover=0
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            [ -f "$HOME/.config/systemd/user/lsl-lock-sweeper.service" ] && leftover=1
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            schtasks //Query //TN "\\coding\\lsl-lock-sweeper" >/dev/null 2>&1 && leftover=1
+          fi
+          if [ "$leftover" = "1" ]; then
+            echo "::error::the live test left its unit installed"
+            exit 1
+          fi
+          echo "no leftover unit"
+
+  # ───────────────────────────────────────────────────────────────────────────
   # --dry-run must be exactly as inert as it claims.
   #
   # This is cheap and catches a specific, plausible regression: someone adds a
