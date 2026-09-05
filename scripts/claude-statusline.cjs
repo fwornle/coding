@@ -38,6 +38,17 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Required by path, and tolerant of a moved repo, for the same reason
+// resolveUpstream() is defensive: a globally-installed shim must still render.
+// A missing gate means "on", which keeps the historical behaviour.
+let statuslineEnabled = () => true;
+try {
+  ({ statuslineEnabled } = require(
+    path.join(process.env.CODING_REPO || path.join(__dirname, '..'),
+      'lib', 'statusline', 'feature-gate.cjs'),
+  ));
+} catch { /* no gate reachable — render, as this file always has */ }
+
 /**
  * The context meter as gsd-statusline.js emits it: a colour SGR, an optional
  * 💀 for the critical band, exactly ten block glyphs, the percentage, and a
@@ -138,6 +149,22 @@ let stdin = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (c) => { stdin += c; });
 process.stdin.on('end', () => {
+  // The `statusline` feature, off: no line, and no upstream spawn to produce
+  // one. stdin is consumed first regardless — Claude Code writes the session
+  // payload into this process, and exiting before the pipe drains would give it
+  // an EPIPE on a path the user asked to be quiet.
+  //
+  // Known consequence, stated rather than hidden: the upstream we wrap
+  // (~/.claude/hooks/gsd-statusline.js) is also what writes
+  // $TMPDIR/claude-ctx-<session>.json, which GSD's own context-monitor hook
+  // reads. Not spawning it stops that bridge too. The tmux gauge is the other
+  // reader and it is off by the same switch, so nothing in THIS repo is left
+  // half-fed — but GSD's monitor is, and turning the feature back on restores it.
+  if (!statuslineEnabled()) {
+    process.stdout.write('');
+    process.exit(0);
+  }
+
   recordSessionForGauge(stdin);
 
   const child = spawn(resolveUpstream(), {

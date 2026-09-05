@@ -42,7 +42,14 @@ const GSD_CMD = 'node "/somewhere/.claude/hooks/gsd-statusline.js"';
 function assertGlobal(home) {
   const res = spawnSync(process.execPath, [BUILDER, '--install-global'], {
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CODING_REPO: REPO_ROOT },
+    // CODING_RUNTIME_DIR keeps the derived artifacts inside this test's own
+    // HOME. Without it this builder and the one in
+    // tests/features/surface-gating.test.mjs write the same repo path
+    // concurrently — a torn JSON that failed a different assertion each run —
+    // and every test run wiped a live session's slash-command plugin dir.
+    env: {
+      ...process.env, HOME: home, CODING_REPO: REPO_ROOT, CODING_RUNTIME_DIR: path.join(home, '.coding'),
+    },
   });
   assert.equal(res.status, 0, res.stderr);
   return res.stderr;
@@ -190,7 +197,13 @@ test('the shim strips the context meter but keeps the milestone bar', () => {
   const res = spawnSync(process.execPath, [SHIM], {
     input: hookInput,
     encoding: 'utf8',
-    env: { ...process.env, CODING_UPSTREAM_STATUSLINE: fake },
+    // Pin the feature ON. The shim now goes quiet when `statusline` is off
+    // (lib/statusline/feature-gate.cjs), and without this pin the test asserts
+    // against whatever the developer's own ~/.coding/features.yaml happens to
+    // say — it failed on exactly that. The env layer is last-wins, so this
+    // holds regardless of repo or per-machine config. That the shim DOES go
+    // quiet when off is covered in tests/features/surface-gating.test.mjs.
+    env: { ...process.env, CODING_UPSTREAM_STATUSLINE: fake, CODING_FEATURE_STATUSLINE: 'on' },
   });
   assert.equal(res.status, 0, res.stderr);
 

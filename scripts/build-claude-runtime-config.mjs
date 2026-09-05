@@ -28,7 +28,8 @@
  *
  * Both live inside the repo, are regenerated on every launch, and are removed
  * when the repo is deleted. Prints the two paths, one per line, for the shell
- * to consume.
+ * to consume. `CODING_RUNTIME_DIR` relocates the `.coding` half of both, which
+ * is how concurrent builds (tests, most of all) stay out of each other's way.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, readdirSync, copyFileSync } from 'node:fs';
@@ -243,15 +244,27 @@ if (process.argv.includes('--install-global')) {
   }
 }
 
-const runtimeDir = join(repo, '.coding', 'runtime');
+// Where the derived artifacts land. `<repo>/.coding` in production; overridable
+// so two processes building at once do not fight over one path.
+//
+// That is not hypothetical: two test files drive this builder against the real
+// repo, node:test runs files concurrently, and the resulting torn write made
+// `npm test` fail a different assertion on each run ("Unexpected non-whitespace
+// character after JSON" — a short write leaving the tail of a longer one). The
+// unconditional rmSync of the plugin dir below is the sharper edge of the same
+// problem: without an override, every test run deletes a LIVE session's slash
+// commands out from under it.
+const codingDir = process.env.CODING_RUNTIME_DIR || join(repo, '.coding');
+
+const runtimeDir = join(codingDir, 'runtime');
 mkdirSync(runtimeDir, { recursive: true });
-const settingsOut = join(repo, '.coding', 'runtime', 'claude-settings.json');
+const settingsOut = join(runtimeDir, 'claude-settings.json');
 writeFileSync(settingsOut, `${JSON.stringify(derived, null, 2)}\n`);
 
 // ── 2. slash commands as a session-scoped plugin ─────────────────────────────
 // `--plugin-dir` loads commands for one session only, so the repo's commands
 // stay live instead of going stale as copies in ~/.claude/commands.
-const pluginDir = join(repo, '.coding', 'claude-plugin');
+const pluginDir = join(codingDir, 'claude-plugin');
 const pluginCommands = join(pluginDir, 'commands');
 const manifestDir = join(pluginDir, '.claude-plugin');
 rmSync(pluginDir, { recursive: true, force: true });

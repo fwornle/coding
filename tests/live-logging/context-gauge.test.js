@@ -491,12 +491,49 @@ describe('claudeSessionForTmuxSession (whose context is this)', () => {
 });
 
 describe('paneIdentity (the cache-key coupling)', () => {
+  /**
+   * An empty per-machine config, so the key is the developer's to predict.
+   *
+   * paneIdentity() ends the suffix with a fingerprint of the ENABLED FEATURE
+   * SET, which it resolves from ~/.coding/features.yaml unless told otherwise.
+   * Without this pin the exact-suffix assertion below silently encodes whatever
+   * the machine running the suite happens to have switched on — and it did:
+   * `statusline: false` on one laptop turned '-coding-claude-w200' into
+   * '-coding-claude-w200-fe6' and failed a test about AGENT identity for
+   * reasons that have nothing to do with agents.
+   */
+  let featurelessHome;
+  beforeAll(() => {
+    featurelessHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pane-identity-'));
+    fs.mkdirSync(path.join(featurelessHome, '.coding'), { recursive: true });
+  });
+  afterAll(() => fs.rmSync(featurelessHome, { recursive: true, force: true }));
+
+  const allOn = () => ({ CODING_REPO: REPO_ROOT, CODING_HOME: featurelessHome });
+
   test('the agent is part of the key, so two agents on one project do not share a cache', () => {
-    const base = { TRANSCRIPT_SOURCE_PROJECT: '/Users/x/coding', TMUX_PANE_WIDTH: '200' };
+    const base = { ...allOn(), TRANSCRIPT_SOURCE_PROJECT: '/Users/x/coding', TMUX_PANE_WIDTH: '200' };
     const a = paneIdentity({ ...base, CODING_AGENT: 'claude' }).suffix;
     const b = paneIdentity({ ...base, CODING_AGENT: 'opencode' }).suffix;
     expect(a).not.toBe(b);
     expect(a).toBe('-coding-claude-w200');
+  });
+
+  test('a switched-off feature changes the key, all-on leaves it historical', () => {
+    // The other half of the same coupling: an all-on install must keep the
+    // filenames it has always had, and any narrowing must produce a different
+    // one — otherwise a stale line survives the toggle for the cache lifetime.
+    const base = { TRANSCRIPT_SOURCE_PROJECT: '/Users/x/coding', TMUX_PANE_WIDTH: '200', CODING_AGENT: 'claude' };
+    const paredHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pane-identity-off-'));
+    try {
+      fs.mkdirSync(path.join(paredHome, '.coding'), { recursive: true });
+      fs.writeFileSync(path.join(paredHome, '.coding', 'features.yaml'), 'profile: minimal\n');
+      const off = paneIdentity({ ...base, CODING_REPO: REPO_ROOT, CODING_HOME: paredHome }).suffix;
+      expect(off).not.toBe('-coding-claude-w200');
+      expect(off.startsWith('-coding-claude-w200-f')).toBe(true);
+    } finally {
+      fs.rmSync(paredHome, { recursive: true, force: true });
+    }
   });
 
   test('panes with no project identity keep the historical shared key', () => {
