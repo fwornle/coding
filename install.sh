@@ -154,6 +154,7 @@ repo|$CODING_REPO/.coding/|create|yes|per-launch agent config, so nothing global
 repo|$CODING_REPO/.specstory/history/|clone or init|no|private session-history checkout; never pushed without confirmation, and uninstall.sh leaves your transcripts alone
 home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
 home|$SHELL_RC|one marker block|yes|exports CODING_REPO and adds bin/ to PATH
+home|~/.gsd-browser/|create|yes|gsd-browser CLI, the mandated browser-automation tool; installer reuses a system Chrome when present and otherwise downloads Chrome for Testing
 global|~/.claude/settings.json|merge hooks|yes|OPT-IN: adds hooks that run for EVERY claude session, in every project
 global|~/.claude.json|merge mcpServers|yes|OPT-IN: MCP servers visible to bare `claude` everywhere
 global|~/.claude/commands/|copy skills|yes|OPT-IN: slash commands available to bare `claude` everywhere
@@ -1372,6 +1373,66 @@ _install_codegraph_support() {
 # Install graphify (code knowledge graph; replaces the former code-graph-rag + Memgraph stack).
 # Graphify builds a static graph.json and serves it over MCP from the coding-graphify
 # container — no host Python/uv venv and no Memgraph database are required.
+# gsd-browser — the browser-automation CLI this repo mandates for any UI check
+# (CLAUDE.md: "Any time you need to drive, inspect, or screenshot a web page …
+# use the gsd-browser CLI"). bin/gsd-browser is only a self-healing SHIM: it
+# execs ${HOME}/.gsd-browser/bin/gsd-browser and exits 127 when that is absent.
+#
+# Nothing installed it. That gap was opened by the commit that removed
+# `npx playwright install chromium` from here, whose own rationale was that
+# "gsd-browser — the mandated tool — ships its own Chrome for Testing". True,
+# but only on a machine where gsd-browser exists; a fresh checkout had neither.
+#
+# Failure is NEVER fatal. Every other install step still produces a working
+# repo, and a missing browser tool costs UI verification, not the install.
+install_gsd_browser() {
+    echo -e "\n${CYAN}🌐 Installing gsd-browser (browser automation)...${NC}"
+
+    # Same resolution the shim uses (bin/gsd-browser:33), so someone who has
+    # pointed GSD_BROWSER_BIN at a vetted binary is not told it is missing and
+    # offered a download they do not need.
+    local gsd_bin="${GSD_BROWSER_BIN:-${HOME}/.gsd-browser/bin/gsd-browser}"
+
+    # Idempotent: a working binary is left exactly as it is. Deliberately not a
+    # version check — `gsd-browser update` is the supported upgrade path and is
+    # the user's call, not the installer's.
+    if [[ -x "$gsd_bin" ]] && "$gsd_bin" --version >/dev/null 2>&1; then
+        success "gsd-browser already installed ($("$gsd_bin" --version 2>/dev/null | head -1))"
+        return 0
+    fi
+
+    # Executing a remote script is a real system change, so it goes through the
+    # same consent gate as every other one: --yes approves, --ci and
+    # --non-interactive decline and the install continues without it.
+    if ! confirm_system_change \
+        "download and run the gsd-browser installer (https://install.gsd.build/browser), writing ~/.gsd-browser/" \
+        "Fetches a remote shell script and executes it. It reuses a system Chrome/Chromium when one is present, and otherwise downloads Chrome for Testing (~150MB)."; then
+        warning "Skipped gsd-browser install"
+        info "  Install later: curl -fsSL https://install.gsd.build/browser | bash"
+        info "  Until then bin/gsd-browser exits 127 and UI verification is unavailable."
+        INSTALLATION_WARNINGS+=("gsd-browser: not installed (declined); bin/gsd-browser will exit 127")
+        return 0
+    fi
+
+    # curl honours the proxy configure_proxy_for_install() already resolved, so
+    # a corporate box needs nothing extra here.
+    info "Fetching the gsd-browser installer..."
+    if curl -fsSL https://install.gsd.build/browser 2>/dev/null | bash >/dev/null 2>&1; then
+        if [[ -x "$gsd_bin" ]] && "$gsd_bin" --version >/dev/null 2>&1; then
+            success "gsd-browser installed ($("$gsd_bin" --version 2>/dev/null | head -1))"
+        else
+            # Installer exited 0 but produced nothing usable — report it rather
+            # than let the first UI check fail with a bare 127 much later.
+            warning "gsd-browser installer reported success but $gsd_bin is not runnable"
+            INSTALLATION_WARNINGS+=("gsd-browser: installer succeeded but the binary is missing or not executable")
+        fi
+    else
+        warning "gsd-browser install failed (network, proxy, or unsupported platform)"
+        info "  Retry later: curl -fsSL https://install.gsd.build/browser | bash"
+        INSTALLATION_WARNINGS+=("gsd-browser: install failed; bin/gsd-browser will exit 127 until it is installed")
+    fi
+}
+
 install_graphify() {
     echo -e "\n${CYAN}🔗 Installing graphify code knowledge graph...${NC}"
 
@@ -2163,6 +2224,16 @@ verify_installation() {
         success "Semantic Analysis MCP server is built"
     else
         warning "Semantic Analysis MCP server not built"
+    fi
+
+    # Check gsd-browser. A warning, never an error: it is the one component whose
+    # install needs the network at a moment the rest of the install does not, and
+    # a declined or failed download must not fail an otherwise good install. Same
+    # resolution as bin/gsd-browser:33 so a vetted GSD_BROWSER_BIN counts.
+    if [[ -x "${GSD_BROWSER_BIN:-${HOME}/.gsd-browser/bin/gsd-browser}" ]]; then
+        success "gsd-browser is available (UI verification)"
+    else
+        warning "gsd-browser not installed — bin/gsd-browser will exit 127; UI verification unavailable"
     fi
 
     
@@ -4137,6 +4208,7 @@ main() {
     run_step install_node_dependencies
     initialize_knowledge_databases
     install_plantuml
+    install_gsd_browser
     setup_local_llm  # DMR preferred, Ollama as fallback
     setup_llm_cli_proxy  # HTTP bridge for claude/copilot CLI in Docker
     setup_claude_ctx_sweeper  # Windows-only scheduled task; a no-op elsewhere
