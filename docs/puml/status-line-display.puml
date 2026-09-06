@@ -29,9 +29,9 @@ rectangle "Badges, left to right as rendered" as Bar {
   card "[LSL●]\nETM watching THIS pane\nhidden when healthy\ngrey = starting (< 60 s)" as Lsl <<core>>
   card "[🔒77%●3]\ncompliance, then violations" as Constraint <<core>>
   card "[📚●]\nknowledge pipeline freshness" as Knowledge <<core>>
-  card "[N:VPN] [P:AUTO]\nnetwork + proxy daemon" as Net <<core>>
+  card "[N:VPN P:ON]\nwhere we are + how we\nget out — ONE bracket" as Net <<core>>
   card "[D:12] [L:3]\nprompt downgrades,\nlocal completions\n(both hidden at zero)" as Routing <<core>>
-  card "████░░░░░░ 42%\ncontext window —\nfill over a duller trough\nfixed 15 cells, no brackets" as Gauge <<core>>
+  card "███░░░░░ 42%\ncontext window —\nfill over a duller trough\nfixed 13 cells, no brackets\nempty trough at 0%% = not reported yet" as Gauge <<core>>
   card "[📋18-19]  18:34\nLSL window, then the clock" as Window <<core>>
 }
 

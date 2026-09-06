@@ -33,7 +33,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Native Mode:**
 ```
-[🏥●] [Gq$0FEB A$0 O$0 X$25] [C● UT●] [🔒67% 🔍EX] [📚●] ████░░░░░░  42% 📋17-18
+[🏥●] [Gq$0FEB A$0 O$0 X$25] [C● UT●] [🔒67% 🔍EX] [📚●] ███░░░░░  42% 📋17-18
 ```
 
 **Docker Mode:**
@@ -53,7 +53,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `🔒67%` - **Constraint Compliance**: Code quality compliance percentage (with optional `●N` (amber) violations sub-segment when non-zero)
 - `[📚●]` green - **Knowledge Pipeline**: Observation/digest/insight pipeline freshness — driven by observation write age (healthy <15 min · stale 15 min–6 h · stalled >6 h · disabled empty · unreachable obs_api down). Source: `state.knowledge_pipeline` at `:3034/health/state`.
 - `[LSL●]` - **LSL Health**: Whether an ETM is watching THIS pane's project. Hidden when healthy; grey = starting (session < 60 s old), bold amber = degraded or stale, bold red = stopped or absent.
-- `████░░░░░░  42%` - **Context Window Gauge**: How full this pane's agent conversation is — all four agents, not just Claude.
+- `███░░░░░  42%` - **Context Window Gauge**: How full this pane's agent conversation is — all four agents, not just Claude. An empty trough at `0%` means the agent has not reported yet (a new session), not that the gauge is broken.
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
 ### Internal Health Status (Raw Output)
@@ -230,7 +230,7 @@ How full this pane's agent conversation is, for **all four agents** — previous
 existed only inside Claude's own statusline.
 
 ```
-████░░░░░░  42%
+███░░░░░  42%
 ```
 
 Rendered by `lib/statusline/context-gauge.cjs`, which is CommonJS so both
@@ -244,7 +244,7 @@ load the *same* file rather than keeping two copies in step.
 | 65 – 79% | `colour208` | `colour94` |
 | ≥ 80% | `colour196` bold | `colour52` |
 
-**Fixed 15 cells in every band**, measured against tmux rather than assumed. The fast path
+**Fixed 13 cells in every band** (8 bar + 1 space + 4 for the right-padded percentage), measured against tmux rather than assumed. The fast path
 substitutes a freshly rendered gauge into a line the full renderer has already truncated
 and left-padded, so a width that varied by severity would push the payload past the pane
 edge — the trailing-residue artifact (`15:322`). This is why the ≥ 80% band carries no 💀

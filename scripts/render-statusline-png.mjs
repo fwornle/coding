@@ -13,6 +13,7 @@
  * The content is verbatim; only the medium changes.
  *
  * Usage:
+ *   node scripts/render-statusline-png.mjs [--cache <file>] --spans   # MkDocs markup
  *   node scripts/render-statusline-png.mjs [--cache <file>] --out <file.html>
  *   echo '<status-right output>' | node scripts/render-statusline-png.mjs --out x.html
  *
@@ -21,7 +22,7 @@
  *   gsd-browser screenshot --selector .bar --output docs/images/<name>.png --format png
  */
 
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const REPO = process.env.CODING_REPO || process.cwd();
@@ -75,21 +76,83 @@ function toHtml(line, { fgDefault = '#d0d0d0' } = {}) {
   return out;
 }
 
-/** Newest per-pane render cache — whatever tmux most recently drew. */
+/**
+ * Newest per-pane render cache — whatever tmux most recently drew.
+ *
+ * By mtime, not by readdir order. The directory holds one file per pane and
+ * several stale ones, so "the first non-empty entry" picks an arbitrary pane —
+ * which silently produced a bar for a DIFFERENT project than the one the
+ * caller was looking at, an error visible only by reading the output carefully.
+ */
 function newestCache() {
   const dir = join(REPO, '.logs');
-  const files = readdirSync(dir)
+  const candidates = readdirSync(dir)
     .filter((f) => f.startsWith('combined-status-line-cache-') && f.endsWith('.txt'))
-    .map((f) => join(dir, f));
-  if (!files.length) throw new Error('no status-line cache in .logs — is the status line on?');
-  return files.map((f) => ({ f, m: readFileSync(f, 'utf8') })).find((x) => x.m.trim())?.m
-    ?? readFileSync(files[0], 'utf8');
+    .map((f) => join(dir, f))
+    .map((f) => ({ f, mtime: statSync(f).mtimeMs, body: readFileSync(f, 'utf8') }))
+    .filter((x) => x.body.trim())
+    .sort((a, b) => b.mtime - a.mtime);
+  if (!candidates.length) throw new Error('no status-line cache in .logs — is the status line on?');
+  return candidates[0].body;
+}
+
+/**
+ * The same line as MkDocs markup, using the `.statusline` classes in
+ * docs-content/stylesheets/extra.css.
+ *
+ * Every badge on this bar encodes its state as a COLOUR, so a fenced code block
+ * shows the layout and hides the entire point — which is what the docs' own CSS
+ * comment says, and what happened anyway the first time a new page was written
+ * with backticks. Generating the markup from the real output rather than typing
+ * it means the page cannot drift from the bar the way the hand-written examples
+ * had (ten-cell gauges and a split `[N:] [P:]` pair, months after both changed).
+ *
+ * Unmapped colours degrade to an unstyled span rather than being guessed at, so
+ * a new badge shows up in plain text instead of silently wearing another
+ * badge's meaning. Add the pair here and in extra.css together.
+ */
+const SPAN_CLASS = new Map([
+  // the shared state dots, and the session-activity green ramp
+  ['colour41', 'sl-green'], ['colour34', 'sl-green-mid'], ['colour28', 'sl-green-dark'],
+  ['colour22', 'sl-green-vdark'], ['colour214', 'sl-amber'], ['colour196', 'sl-red'],
+  ['colour238', 'sl-grey'],
+]);
+
+/** fg+bg pairs that are the context gauge, per band in context-gauge.cjs. */
+const GAUGE_CLASS = new Map([
+  ['colour46/colour22', 'gauge gauge-ok'], ['colour226/colour58', 'gauge gauge-warn'],
+  ['colour208/colour94', 'gauge gauge-high'], ['colour196/colour52', 'gauge gauge-crit'],
+]);
+
+function toSpans(line) {
+  let fg = 'default';
+  let bg = 'default';
+  let under = false;
+  let out = '';
+  for (const part of line.split(/(#\[[^\]]*\])/)) {
+    if (!part) continue;
+    if (part.startsWith('#[')) {
+      for (const attr of part.slice(2, -1).split(',')) {
+        const [k, v] = attr.includes('=') ? attr.split('=') : [attr, null];
+        if (k === 'fg') fg = v;
+        else if (k === 'bg') bg = v;
+        else if (k === 'underscore') under = true;
+        else if (k === 'nounderscore') under = false;
+      }
+      continue;
+    }
+    const cls = GAUGE_CLASS.get(`${fg}/${bg}`) ?? SPAN_CLASS.get(fg) ?? null;
+    const classes = [cls, under ? 'sl-under' : null].filter(Boolean).join(' ');
+    out += classes ? `<span class="${classes}">${escapeHtml(part)}</span>` : escapeHtml(part);
+  }
+  return `<span class="statusline">${out}</span>`;
 }
 
 const argv = process.argv.slice(2);
 const argOf = (name) => { const i = argv.indexOf(name); return i === -1 ? null : argv[i + 1]; };
+const spansOnly = argv.includes('--spans');
 const out = argOf('--out');
-if (!out) { process.stderr.write('--out <file.html> is required\n'); process.exit(2); }
+if (!out && !spansOnly) { process.stderr.write('--out <file.html> or --spans is required\n'); process.exit(2); }
 
 const cacheArg = argOf('--cache');
 const raw = cacheArg ? readFileSync(cacheArg, 'utf8') : newestCache();
@@ -98,6 +161,11 @@ const raw = cacheArg ? readFileSync(cacheArg, 'utf8') : newestCache();
 // tmux's `#(...)` substitution cannot strip the pad; written as an escape rather
 // than the literal character, which is invisible in a diff and trips eslint.
 const line = raw.replace(/\r?\n$/, '').replace(/^\s+/, '').replace(/[\u00a0 ]+$/, '');
+
+if (spansOnly) {
+  process.stdout.write(`${toSpans(line)}\n`);
+  process.exit(0);
+}
 
 writeFileSync(out, `<!doctype html><meta charset="utf-8"><style>
   body { margin: 0; background: #1c1c1c; }
