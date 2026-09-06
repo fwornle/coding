@@ -288,7 +288,13 @@ _pi_write_models_json() {
     _agent_log "Interactive launch: x-task-id omitted (proxy binds the ambient span)"
   fi
 
-  cat > "$models_file" <<JSON
+  # Written to a scratch file, then MERGED — never straight over models.json.
+  # Under CODING_AGENT_SCOPE=global this path IS the user's own ~/.pi/agent, so a
+  # plain `cat >` would silently destroy providers they authored themselves. Same
+  # contract _pi_merge_settings already keeps for settings.json: we own specific
+  # keys, we preserve everything else.
+  local ours_file="$models_file.coding-ours"
+  cat > "$ours_file" <<JSON
 {
   "providers": {
     "rapid-proxy-pi": {
@@ -334,7 +340,60 @@ _pi_write_models_json() {
   }
 }
 JSON
-  _agent_log "Wrote pi provider config: $models_file (rapid-proxy-pi + qwen-laptop)"
+
+  # Merge ours into whatever is already there, preserving foreign providers and
+  # any top-level keys pi owns. Atomic via tmp + os.replace, as settings.json is.
+  #
+  # The preserved-provider list goes to a file rather than through $(...): bash
+  # 3.2 — which is what /bin/bash still is on macOS — mis-parses a heredoc nested
+  # inside a command substitution once the body carries quotes and parens, and
+  # fails the whole file with a syntax error pointing at an unrelated line far
+  # below. A plain heredoc plus a read is what _pi_merge_settings already does.
+  local _pi_preserved_file="$models_file.coding-preserved"
+  python3 - "$models_file" "$ours_file" > "$_pi_preserved_file" <<'PYMODELS'
+import io, json, os, sys
+
+path, ours_path = sys.argv[1], sys.argv[2]
+
+with io.open(ours_path, encoding="utf-8") as fh:
+    ours = json.load(fh)["providers"]
+
+try:
+    with io.open(path, encoding="utf-8") as fh:
+        doc = json.load(fh)
+    if not isinstance(doc, dict):
+        raise ValueError("not an object")
+except (OSError, ValueError):
+    doc = {}
+
+providers = doc.get("providers")
+if not isinstance(providers, dict):
+    providers = {}
+
+# We own these two ids outright and rewrite them every launch (the port, the
+# headers and the qwen URL all move). Every other provider is the user's own and
+# is left exactly as found.
+foreign = [k for k in providers if k not in ours]
+providers.update(ours)
+doc["providers"] = providers
+
+tmp = path + ".tmp"
+with io.open(tmp, "w", encoding="utf-8") as fh:
+    json.dump(doc, fh, indent=2)
+    fh.write("\n")
+os.replace(tmp, path)
+
+print(",".join(foreign))
+PYMODELS
+
+  local _pi_preserved=""
+  [ -f "$_pi_preserved_file" ] && _pi_preserved="$(cat "$_pi_preserved_file")"
+  rm -f "$ours_file" "$_pi_preserved_file"
+  if [ -n "$_pi_preserved" ]; then
+    _agent_log "Merged pi provider config into $models_file (rapid-proxy-pi + qwen-laptop; preserved: $_pi_preserved)"
+  else
+    _agent_log "Wrote pi provider config: $models_file (rapid-proxy-pi + qwen-laptop)"
+  fi
 }
 
 # Merge our provider/model pins into pi's settings.json, preserving keys pi owns.
@@ -400,10 +459,18 @@ agent_pre_launch() {
   # PI_CODING_AGENT_DIR relocates pi's whole config root (default ~/.pi/agent:
   # models.json, auth.json, AGENTS.md, skills, extensions). Pointing it at a
   # repo-local directory means a bare `pi` outside this project behaves exactly
-  # as it did before the project was installed, and — the part that matters —
-  # we never rewrite a user-authored ~/.pi/agent/models.json to insert our
-  # provider. Writing into the user's config root would be a destructive edit of
-  # a file we do not own.
+  # as it did before the project was installed — nothing we write is even on the
+  # path it reads.
+  #
+  # Under CODING_AGENT_SCOPE=global there is no such separation: cfg_dir IS
+  # ~/.pi/agent, and we write models.json and settings.json directly into it.
+  # This comment used to claim we never touch a user-authored models.json, which
+  # was true only for as long as wrapper was the only scope — the global branch
+  # below then clobbered it wholesale. Both writers now MERGE (see
+  # _pi_write_models_json and _pi_merge_settings): we own specific providers and
+  # specific keys, rewrite those every launch, and leave every other provider and
+  # key exactly as found. That is the property the old wording was reaching for,
+  # and it now holds in both scopes rather than only one.
   local _pi_scope="${CODING_AGENT_SCOPE:-}"
   if [ -z "$_pi_scope" ] && [ -f "${CODING_REPO:-}/.env" ]; then
     _pi_scope="$(grep -m1 '^CODING_AGENT_SCOPE=' "${CODING_REPO}/.env" 2>/dev/null | cut -d= -f2- || true)"
