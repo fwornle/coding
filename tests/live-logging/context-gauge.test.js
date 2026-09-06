@@ -73,16 +73,72 @@ describe('renderGauge', () => {
     // knob (10 → 8 when the line was slimmed), and a test that pins it asserts
     // the knob's value rather than the property that the fill tracks the number.
     const N = gauge.BAR_SEGMENTS;
-    const bar = (p) => gauge.renderGauge(p).replace(/#\[[^\]]*\]/g, '').split(' ')[0];
-    expect(bar(0)).toBe('░'.repeat(N));
-    expect(bar(50)).toBe('█'.repeat(Math.floor(N / 2)) + '░'.repeat(N - Math.floor(N / 2)));
-    expect(bar(100)).toBe('█'.repeat(N));
+    // Sliced to a fixed width rather than cut at the first space: the trough is
+    // spaces now, so splitting on one would truncate the bar at its first
+    // empty cell and silently assert against a fragment.
+    const bar = (p) => [...gauge.renderGauge(p).replace(/#\[[^\]]*\]/g, '')]
+      .slice(0, gauge.BAR_SEGMENTS).join('');
+    expect(bar(0)).toBe(gauge.EMPTY.repeat(N));
+    expect(bar(50)).toBe(gauge.FILLED.repeat(Math.floor(N / 2))
+      + gauge.EMPTY.repeat(N - Math.floor(N / 2)));
+    expect(bar(100)).toBe(gauge.FILLED.repeat(N));
     // Monotonic: more context used never means fewer filled cells.
     let prev = -1;
     for (let p = 0; p <= 100; p += 1) {
       const filled = [...bar(p)].filter((c) => c === '█').length;
       expect(filled).toBeGreaterThanOrEqual(prev);
       prev = filled;
+    }
+  });
+
+  test('fill has sub-cell resolution, and any usage at all is visible', () => {
+    // Whole-cell fill gave 0 filled cells for anything under one segment's worth
+    // (12.5% at BAR_SEGMENTS=8), so the entire first eighth of the context window
+    // rendered as an empty trough — 11% and 0% were pixel-identical, and the
+    // dithered ░ trough reads as a solid block at terminal font sizes, so it
+    // looked like the bar had stopped working rather than like a low reading.
+    //
+    // Measured in eighths rather than whole blocks: that IS the fix, so a test
+    // counting only '█' would assert the behaviour that was wrong.
+    // Sliced to a fixed width rather than cut at the first space: the trough is
+    // spaces now, so splitting on one would truncate the bar at its first
+    // empty cell and silently assert against a fragment.
+    const bar = (p) => [...gauge.renderGauge(p).replace(/#\[[^\]]*\]/g, '')]
+      .slice(0, gauge.BAR_SEGMENTS).join('');
+    const eighths = (p) => [...bar(p)].reduce((n, c) => {
+      if (c === '█') return n + gauge.SUBCELLS;
+      const i = gauge.PARTIALS.indexOf(c);
+      return i === -1 ? n : n + i + 1;
+    }, 0);
+
+    // Nothing used still reads as nothing used.
+    expect(eighths(0)).toBe(0);
+    // Every non-zero reading shows something, including ones far below a cell.
+    for (let p = 1; p <= 100; p += 1) expect(eighths(p)).toBeGreaterThan(0);
+    // Strictly finer than whole cells: readings that used to collapse together
+    // below the first cell boundary are now distinguishable from each other.
+    expect(eighths(2)).toBeLessThan(eighths(11));
+    // Monotonic in eighths, and exact at the ends.
+    let prev = -1;
+    for (let p = 0; p <= 100; p += 1) {
+      expect(eighths(p)).toBeGreaterThanOrEqual(prev);
+      prev = eighths(p);
+    }
+    expect(eighths(100)).toBe(gauge.BAR_SEGMENTS * gauge.SUBCELLS);
+  });
+
+  test('a partially filled cell is still exactly one cell', () => {
+    // The whole point of sub-cell fill is resolution WITHOUT width. If a partial
+    // glyph ever cost a different number of cells the line would grow past the
+    // pane edge on some readings only — the trailing-residue bug, back again and
+    // intermittent.
+    for (let p = 0; p <= 100; p += 1) {
+      expect(cells(gauge.renderGauge(p))).toBe(gauge.GAUGE_CELLS);
+    }
+    // And the patcher must still recognise every one of them, or the fast path
+    // silently stops substituting and the gauge freezes at the last full render.
+    for (let p = 0; p <= 100; p += 1) {
+      expect(gauge.GAUGE_RE.test(gauge.renderGauge(p))).toBe(true);
     }
   });
 
@@ -97,8 +153,8 @@ describe('renderGauge', () => {
     // already-truncated line cannot re-open the trailing-residue bug.
     const cells = (t) => t.replace(/#\[[^\]]*\]/g, '').length;
     expect(cells(gauge.GAUGE_ZERO)).toBe(gauge.GAUGE_CELLS);
-    // Calm band, empty trough — dull green, nothing filled.
-    expect(gauge.GAUGE_ZERO).toContain('░'.repeat(gauge.BAR_SEGMENTS));
+    // Calm band, empty trough — a painted dark-green bar, nothing filled.
+    expect(gauge.GAUGE_ZERO).toContain(gauge.EMPTY.repeat(gauge.BAR_SEGMENTS));
     expect(gauge.GAUGE_ZERO).toMatch(/fg=colour46,bg=colour22/);
   });
 
