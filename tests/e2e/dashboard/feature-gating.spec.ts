@@ -179,6 +179,34 @@ test.describe('features editor', () => {
     await expect(row).toContainText('switch that on first')
   })
 
+  test('the cascade previewed is the WHOLE cascade, not one level of it', async ({ page }) => {
+    // knowledge → observations → lsl. Reading each row's dependencies straight
+    // off the draft only ever saw one level: switching lsl off correctly greyed
+    // Observations while Knowledge Base sat there still showing ON, and the save
+    // switched it off anyway. A preview that under-reports is worse than none,
+    // because the surprise arrives after the click.
+    await stubFeatures(page)
+    await page.goto('/features')
+    await page.getByTestId('feature-row-lsl').getByRole('switch').click()
+
+    for (const [id, blocker] of [['observations', 'Live Session Logging'], ['knowledge', 'Observations']]) {
+      const row = page.getByTestId(`feature-row-${id}`)
+      await expect(row.getByRole('switch')).not.toBeChecked()
+      await expect(row).toContainText(`Needs ${blocker}`)
+    }
+  })
+
+  test('the footer counts the draft, not the saved answer', async ({ page }) => {
+    // It read "9 of 9 enabled" above two visibly greyed-out rows — the one line
+    // whose whole job is to summarise what you are looking at.
+    await stubFeatures(page)
+    await page.goto('/features')
+    const page_ = page.getByTestId('features-page')
+    await expect(page_).toContainText('9 of 9 enabled')
+    await page.getByTestId('feature-row-lsl').getByRole('switch').click()
+    await expect(page_).toContainText('6 of 9 enabled if saved')
+  })
+
   test('Save is inert until something changes', async ({ page }) => {
     await stubFeatures(page)
     await page.goto('/features')

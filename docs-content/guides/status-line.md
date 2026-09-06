@@ -10,20 +10,25 @@ something broken?" questions into a glance.
     **The emoji is the label; the dot is the state.** The leading emoji says what the badge is
     about and never changes; the tinted `●` after it says how that thing is doing.
 
+    ![The status line as tmux draws it](../images/status-line-compact.png)
+
     ```
-    [🏥●] [RA●C●] [🔒77% ⚙️IMP] [📚●] [N:VPN] [P:ON] ████░░░░░░ 42% [📋18-19] 18:34
+    [🏥●] [AX●C●] [🔒72%●6] [📚●] [N:OPEN P:AUTO] [🧠●] ███░░░░░  43% [📋8-9] 08:03
     ```
 
     | Segment | Means |
     |---------|-------|
     | `[🏥●]` | Overall system health |
-    | `[RA●C●]` | Active sessions per project — your pane's project is underlined |
-    | `[🔒77%]` | Constraint compliance; `●N` in amber appears when there are violations |
+    | `[AX●C●]` | Active sessions per project — your pane's project is underlined |
+    | `[🔒72%●6]` | Constraint compliance; `●N` in amber appears when there are violations |
     | `[📚●]` | Knowledge pipeline freshness |
-    | `[N:VPN]` | Network — VPN / CN / OPEN / ?? |
-    | `[P:ON]` | Local proxy daemon |
-    | `████░░ 42%` | How full **this pane's** conversation context is |
-    | `[📋18-19]` | Session logging time window |
+    | `[N:OPEN P:AUTO]` | Where this machine is, and how it gets out — one bracket, because you read them together |
+    | `[🧠●]` | Proxy semantic readiness |
+    | `███░░░░░ 43%` | How full **this pane's** conversation context is |
+    | `[📋8-9]` | Session logging time window |
+
+    Each badge belongs to a feature, and a feature you have switched off contributes no badge
+    at all — see [Composing What Runs](features.md).
 
     ## Two absences that are good news
 
@@ -34,6 +39,11 @@ something broken?" questions into a glance.
 
     The context gauge has no brackets and no emoji — it carries a tinted background instead,
     which is what separates it. It describes the agent in *this* pane, not the system.
+
+    A pane that has just started shows the gauge's **zero position** — an empty trough at
+    `0%` — until its agent first reports. That is a new session, not a fault. A gauge that is
+    absent altogether means the agent has no readable context store at all, which is a
+    different thing and looks different.
 
     ## Colours
 

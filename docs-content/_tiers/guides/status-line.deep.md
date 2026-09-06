@@ -6,7 +6,7 @@ Real-time visual indicators of system health and development activity rendered v
 
 ### Example Display
 
-<span class="statusline">[🏥<span class="sl-green">●</span>] [<span class="sl-under">RA</span><span class="sl-green">●</span>C<span class="sl-green">●</span>] [🔒77% ⚙️IMP] [📚<span class="sl-green">●</span>] [N:VPN] [P:ON] <span class="gauge gauge-ok">████░░░░░░&nbsp;&nbsp;42%</span> [📋18-19] 18:34</span>
+<span class="statusline">[🏥<span class="sl-green">●</span>] [<span class="sl-under">RA</span><span class="sl-green">●</span>C<span class="sl-green">●</span>] [🔒77% ⚙️IMP] [📚<span class="sl-green">●</span>] [N:VPN P:ON] <span class="gauge gauge-ok">███░░░░░&nbsp;&nbsp;42%</span> [📋18-19] 18:34</span>
 
 The current pane's project is rendered with an underline (`#[underscore]…#[nounderscore]`) so each parallel tmux window highlights its own project.
 
@@ -19,11 +19,10 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | LSL Health | `[LSL●]` | Live-session-logging monitor for THIS pane — hidden when healthy |
 | Constraint | `[🔒77%]` | Code quality % (with optional `●N` (amber) violations sub-segment when non-zero) |
 | Knowledge Pipeline | `[📚●]` green | Observation/digest/insight pipeline freshness |
-| Network Location | `[N:VPN]` | Network environment: VPN / CN / OPEN / ?? |
-| Proxy Status | `[P:AUTO]` | Local proxy daemon (proxydetox): ON / AUTO / OFF |
+| Network + egress | `[N:VPN P:ON]` | Where the machine is (VPN / CN / OPEN / ??) and how it gets out (ON / AUTO / OFF), in one bracket |
 | Prompt Downgrades | `[D:12]` | Turns the prompt classifier moved to a cheaper band since proxy start — absent when the classifier is off |
 | Local Execution | `[L:3]` | Completions served by hardware we own — absent at zero |
-| Context Window | `████░░░░░░&nbsp;&nbsp;42%` | How full THIS pane's agent conversation is — see [Context Window Gauge](#context-window-gauge) |
+| Context Window | `███░░░░░&nbsp;&nbsp;42%` | How full THIS pane's agent conversation is — see [Context Window Gauge](#context-window-gauge) |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
 
@@ -116,16 +115,16 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[N:VPN]` | Connected via corporate VPN (Cisco CLI or utun interface detected) | Normal remote-work state |
-| `[N:CN]` | On the physical corporate network (BMW DNS resolves via `dig`, TCP latency <100 ms, no VPN interface) | Normal on-site state |
-| `[N:OPEN]` | Home / public network — no VPN, no corporate LAN | Expected off-VPN |
-| `[N:??]` | Network location unknown (coordinator just started or probe failed) | Transient — clears within 15s |
+| `N:VPN` | Connected via corporate VPN (Cisco CLI or utun interface detected) | Normal remote-work state |
+| `N:CN` | On the physical corporate network (BMW DNS resolves via `dig`, TCP latency <100 ms, no VPN interface) | Normal on-site state |
+| `N:OPEN` | Home / public network — no VPN, no corporate LAN | Expected off-VPN |
+| `N:??` | Network location unknown (coordinator just started or probe failed) | Transient — clears within 15s |
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[P:ON]` | Daemon running + functional AND user toggled `px` on | Normal on VPN/CN |
-| `[P:AUTO]` | Daemon running + functional, `px` toggle off — adaptive `--direct-fallback` mode; pinned sessions still routed | Normal off-CN state |
-| `[P:OFF]` | Daemon down or not functional | Problem on VPN/CN (bar turns yellow); investigate proxydetox |
+| `P:ON` | Daemon running + functional AND user toggled `px` on | Normal on VPN/CN |
+| `P:AUTO` | Daemon running + functional, `px` toggle off — adaptive `--direct-fallback` mode; pinned sessions still routed | Normal off-CN state |
+| `P:OFF` | Daemon down or not functional | Problem on VPN/CN (bar turns yellow); investigate proxydetox |
 
 !!! note "P: is three-state since 2026-07-26"
     Since the always-on proxy redesign (2026-07-25), the proxydetox daemon stays loaded on :3128 regardless of the `px` toggle — agent sessions are pinned to it and its `--direct-fallback` adapts routing per request. A daemon-truth-only badge would therefore read `ON` nearly always. The badge now combines daemon truth with user intent (`proxy_enabled_by_user` from the coordinator): `ON` (daemon healthy + `px` on), `AUTO` (daemon healthy, `px` off), `OFF` (daemon down/not functional — the only broken state). The former `P:ERR` state remains removed.
@@ -256,7 +255,7 @@ How full the **current pane's agent conversation** is. It used to exist only ins
 Claude's own statusline, so only one of the four agents had it; it now lives in the
 tmux bar, where `opencode`, `copilot` and `pi` panes get the same reading.
 
-<span class="statusline"><span class="gauge gauge-ok">████░░░░░░&nbsp;&nbsp;42%</span></span>
+<span class="statusline"><span class="gauge gauge-ok">███░░░░░&nbsp;&nbsp;42%</span></span>
 
 A bright fill over a **duller background of the same hue** — the fill reads as a
 watermark against a tinted trough. Thresholds are the ones the old Claude meter used:
@@ -268,11 +267,39 @@ watermark against a tinted trough. Thresholds are the ones the old Claude meter 
 | 65 – 79% | `colour208` orange | `colour94` brown | Getting tight |
 | ≥ 80% | `colour196` red, **bold** | `colour52` dark red | Compaction is close |
 
-<span class="statusline"><span class="gauge gauge-ok">███░░░░░░░&nbsp;&nbsp;31%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-warn">█████░░░░░&nbsp;&nbsp;55%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-high">███████░░░&nbsp;&nbsp;71%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-crit">█████████░&nbsp;&nbsp;93%</span></span>
+<span class="statusline"><span class="gauge gauge-ok">██░░░░░░&nbsp;&nbsp;31%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-warn">████░░░░&nbsp;&nbsp;55%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-high">█████░░░&nbsp;&nbsp;71%</span>&nbsp;&nbsp;&nbsp;<span class="gauge gauge-crit">███████░&nbsp;&nbsp;93%</span></span>
+
+#### The zero position, and the absence
+
+A pane whose agent has not reported yet renders the gauge's **zero position** — an empty
+trough at `0%`, in the calm band:
+
+<span class="statusline"><span class="gauge gauge-ok">░░░░░░░░&nbsp;&nbsp;&nbsp;0%</span></span>
+
+That window is real: on a fresh session the agent has not drawn its own status line yet, so
+the bridge file the gauge reads does not exist. It used to render as a 13-cell blank, which
+on screen is a black hole in the bar — indistinguishable from a fault, and it lasted until
+the first command.
+
+The principle behind that blank is kept, because it is right: *a gauge reading 0% and a gauge
+that cannot see its source must not look the same.* It was being applied to the wrong case. A
+brand-new session is not a gauge that cannot see its source; it is a gauge whose source has
+nothing to report yet, and one tick later the agent reports exactly this — `0%`.
+
+The distinction survives where it is still real. `hasContextReader()` separates the two
+reasons there might be no number:
+
+| situation | render |
+|-----------|--------|
+| supported agent, nothing reported yet | zero position — `░░░░░░░░   0%` |
+| no reader for this agent at all | **no gauge**, and the bar closes up around it |
+
+The second is structural — no next tick is going to change it — so it stays absent.
 
 !!! note "Why the ≥80% band has no 💀"
     Claude's meter prefixed a skull at 80%. That prefix is three extra cells in one
-    state only, and this segment is a fixed **15 cells in every band** — measured
+    state only, and this segment is a fixed **13 cells in every band** (8 bar +
+    1 space + 4 for the right-padded percentage) — measured
     against tmux, not assumed. `status-line-fast.cjs` substitutes a freshly rendered
     gauge into a line the full renderer has already truncated and left-padded, so a
     width that changed with severity would push the payload past the pane edge and
