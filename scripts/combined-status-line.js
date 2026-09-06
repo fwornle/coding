@@ -2585,30 +2585,36 @@ class CombinedStatusLine {
          break;
      }
 
-    // Network location badge: [N:CN] / [N:VPN] / [N:HOME] / [N:??]
-    // Uses ASCII-only to avoid emoji-width issues.
-    if (f.health) {
-      const loc = network?.location || 'unknown';
-      const locMap = { corporate: 'CN', vpn: 'VPN', open: 'OPEN', home: 'OPEN', unknown: '??' };
-      const locLabel = locMap[loc] || loc.toUpperCase().slice(0, 4);
-      parts.push(`[N:${locLabel}]`);
-    }
-
-    // Proxy status badge: [P:ON] / [P:AUTO] / [P:OFF]
+    // Network badge: [N:CN P:ON] / [N:OPEN P:AUTO] / [N:?? P:OFF] …
+    //
+    // ONE bracket for the pair, not two. They answer halves of a single
+    // question — where this machine is, and how it is getting out — and they
+    // are read together every time; two brackets spent four cells on saying
+    // twice what one delimiter says once. Both are ASCII-only, to avoid the
+    // emoji-width fights this line has lost before.
+    //
+    //   N:  CN / VPN / OPEN / ??      where we are
+    //   P:  ON / AUTO / OFF           how we get out
+    //
     // Since the 2026-07-25 always-on redesign the proxydetox daemon on :3128
     // stays loaded regardless of the `px` toggle (sessions are pinned to it;
     // --direct-fallback makes it adaptive), so daemon-up alone would render a
-    // near-constant ON. Three states keep the badge informative:
+    // near-constant ON. Three states keep the P half informative:
     //   ON   — daemon up+functional AND user toggled px on (env vars exported)
     //   AUTO — daemon up+functional, px toggle off (adaptive/direct-fallback;
     //          pinned sessions still routed — today's normal off-CN state)
     //   OFF  — daemon down or not functional (the only genuinely broken state)
     if (f.health) {
+      const loc = network?.location || 'unknown';
+      const locMap = { corporate: 'CN', vpn: 'VPN', open: 'OPEN', home: 'OPEN', unknown: '??' };
+      const locLabel = locMap[loc] || loc.toUpperCase().slice(0, 4);
+
       const daemonUp = network?.proxy_running && network?.proxy_functional;
       const pxLabel = !daemonUp ? 'OFF'
         : network?.proxy_enabled_by_user ? 'ON'
         : 'AUTO';
-      parts.push(`[P:${pxLabel}]`);
+
+      parts.push(`[N:${locLabel} P:${pxLabel}]`);
       if ((network?.location === 'corporate' || network?.location === 'vpn') && !daemonUp) {
         // On CN/VPN without a working local proxy — external APIs unreachable
         if (overallColor === 'green') overallColor = 'yellow';
@@ -2639,9 +2645,18 @@ class CombinedStatusLine {
     // Never colours the line. A classifier that has downgraded nothing is not a
     // fault — it may simply have seen no eligible traffic — and a badge that
     // could turn the line yellow on an absence would cry wolf every quiet hour.
+    //
+    // Hidden at zero, like [L:] below and for the same reason: on a machine
+    // whose eligible traffic is rare, [D:0] is a line of noise on every render.
+    // Be clear about what that trades. getClassifierStatus() already returns
+    // null for "no data", so [D:0] was a genuine MEASUREMENT of zero, and
+    // hiding it collapses "the classifier is alive and has downgraded nothing"
+    // into the same absence as "no classifier". Acceptable only because
+    // liveness is already carried next door: [🧠] is the proxy's semantic
+    // readiness, and a dead classifier shows up there.
     if (f['llm-proxy']) {
       const cls = await this.getClassifierStatus();
-      if (cls) parts.push(`[D:${cls.downgraded}]`);
+      if (cls && cls.downgraded > 0) parts.push(`[D:${cls.downgraded}]`);
     }
 
     // Local execution: how many completions since the proxy started were served
@@ -2759,9 +2774,15 @@ class CombinedStatusLine {
     // drops content from the LEFT, so a narrow pane sheds the leading badges
     // first and the gauge survives alongside the clock and the log tranche.
     //
-    // Absent rather than zero when the agent's context store can't be read — a
-    // gauge showing 0% and a gauge that cannot see its source must not look the
-    // same.
+    // Absent when the agent's context store cannot be read AT ALL — a gauge
+    // showing 0% and a gauge that cannot see its source must not look the same.
+    //
+    // "Cannot be read" means no reader for this agent (hasContextReader), not
+    // "the reader found nothing this tick". A supported agent that has not
+    // reported yet renders the zero position instead: on a fresh session the
+    // bridge file does not exist until the agent first draws its own status
+    // line, and omitting the segment for that window left a black hole in the
+    // bar that read as a fault rather than as a new session. See GAUGE_ZERO.
     try {
       const paneAgent = process.env.CODING_AGENT;
       if (paneAgent) {
@@ -2812,6 +2833,7 @@ class CombinedStatusLine {
           agent: paneAgent, projectPath, sessionId
         });
         if (usage) parts.push(contextGauge.renderGauge(usage.usedPct));
+        else if (contextGauge.hasContextReader(paneAgent)) parts.push(contextGauge.GAUGE_ZERO);
       }
     } catch {
       // A status line must never fail because a context store was unreadable.

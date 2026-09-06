@@ -212,13 +212,21 @@ function patchContextGauge(text) {
       });
     } catch { usage = null; }
   }
-  // No reading → blank it, never leave what is already there. Whatever is there
-  // belongs to the previous render or, on the sibling-borrow path, to a
-  // different pane entirely; showing a stale or foreign number as this session's
-  // context is worse than showing none.
+  // Never leave what is already there: it belongs to the previous render or, on
+  // the sibling-borrow path, to a different pane entirely, and showing a stale
+  // or foreign number as this session's context is worse than showing none.
+  //
+  // What replaces it depends on WHY there is no reading. A supported agent that
+  // has not reported yet — the gap between a session starting and the agent
+  // first rendering its own status line — gets the gauge's zero position, which
+  // is what it will report a tick later anyway. Only an agent with no readable
+  // store at all keeps the hole, because for that one no number is ever coming.
+  const fallback = contextGauge.hasContextReader(paneAgent)
+    ? contextGauge.GAUGE_ZERO
+    : contextGauge.GAUGE_BLANK;
   return text.replace(
     contextGauge.GAUGE_RE,
-    usage ? contextGauge.renderGauge(usage.usedPct) : contextGauge.GAUGE_BLANK
+    usage ? contextGauge.renderGauge(usage.usedPct) : fallback
   );
 }
 
