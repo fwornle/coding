@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Check, Info, Loader2, RotateCcw, Terminal } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/store'
 import {
@@ -79,6 +79,41 @@ export function FeaturesPage() {
   const ids = Object.keys(features) as FeatureId[]
   const dirty = Object.keys(draft).length > 0
   const valueOf = (id: FeatureId) => draft[id] ?? features[id]?.enabled ?? true
+
+  /**
+   * What WOULD be running if the current draft were saved.
+   *
+   * The resolver disables a dependent whose dependency is off, and that cascades
+   * — `knowledge` needs `observations`, which needs `lsl`. Reading each row's
+   * dependencies straight off `valueOf` only ever saw ONE level: switching `lsl`
+   * off correctly greyed out Observations, while Knowledge Base sat there still
+   * showing ON, and the save then switched it off anyway. A preview that
+   * under-reports the cascade is worse than none, because the surprise arrives
+   * after the click.
+   *
+   * Iterating to a fixed point rather than one pass, so the answer does not
+   * depend on the order features happen to be declared in.
+   */
+  const effective = useMemo(() => {
+    const out: Record<string, boolean> = {}
+    for (const id of ids) out[id] = draft[id] ?? features[id]?.enabled ?? true
+    for (let pass = 0; pass < ids.length; pass++) {
+      let changed = false
+      for (const id of ids) {
+        if (!out[id]) continue
+        if ((features[id]?.requires || []).some(dep => out[dep] === false)) {
+          out[id] = false
+          changed = true
+        }
+      }
+      if (!changed) break
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [features, draft])
+
+  const draftEnabled = ids.filter(id => effective[id])
+  const draftNeedsDocker = draftEnabled.some(id => features[id]?.needsDocker)
 
   const onToggle = (id: FeatureId, value: boolean) => {
     setDraft(prev => {
@@ -272,7 +307,9 @@ export function FeaturesPage() {
           // A feature whose dependency is off cannot be turned on from here;
           // the resolver would immediately switch it back off, and a toggle
           // that silently undoes itself is worse than one that will not move.
-          const blockedBy = (f.requires || []).filter(dep => valueOf(dep) === false)
+          // Against `effective`, not `valueOf`: a dependency that is itself only
+          // off BECAUSE of its own dependency still blocks this one.
+          const blockedBy = (f.requires || []).filter(dep => effective[dep] === false)
           const dependents = dependentsOf(id)
 
           return (
@@ -334,9 +371,18 @@ export function FeaturesPage() {
       {/* Footer facts */}
       <div className="mt-4 text-xs text-muted-foreground space-y-1">
         <div>
-          {enabled.length} of {ids.length} enabled
-          {profile ? <> · profile <code>{profile}</code></> : null}
-          {' '}· Docker {needsDocker ? 'required' : 'not needed'}
+          {/*
+            Counted from the DRAFT, not from the server's saved answer. With an
+            unsaved edit on screen the two disagree, and the footer used to read
+            "9 of 9 enabled" above two visibly greyed-out rows — the one line
+            whose whole job is to summarise what you are looking at.
+            `enabled`/`needsDocker` from the store are the saved figures and are
+            what this falls back to once the draft is empty.
+          */}
+          {dirty ? draftEnabled.length : enabled.length} of {ids.length} enabled
+          {dirty ? ' if saved' : null}
+          {profile && !dirty ? <> · profile <code>{profile}</code></> : null}
+          {' '}· Docker {(dirty ? draftNeedsDocker : needsDocker) ? 'required' : 'not needed'}
         </div>
         {warnings.map((w, i) => (
           <div key={i} className="flex items-start gap-1.5">

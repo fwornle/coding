@@ -139,6 +139,7 @@ nav:
     - LLM CLI Proxy: integrations/llm-cli-proxy.md
   - Guides:
     - Overview: guides/index.md
+    - Composing What Runs: guides/features.md
     - Agent Integration: guides/agent-integration.md
     - Network Configuration: guides/network-configuration.md
     - Status Line: guides/status-line.md

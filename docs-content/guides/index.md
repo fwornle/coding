@@ -8,6 +8,7 @@ Task-oriented walkthroughs. Each one assumes the system is installed and running
 
     | You want to… | Guide |
     |--------------|-------|
+    | Run only part of `coding` — or none of the Docker parts | [Composing What Runs](features.md) |
     | Add a new coding agent | [Agent Integration](agent-integration.md) |
     | Work behind a corporate proxy or VPN | [Network Configuration](network-configuration.md) |
     | Decode the tmux status bar | [Status Line](status-line.md) |
@@ -37,6 +38,7 @@ Task-oriented walkthroughs. Each one assumes the system is installed and running
 
     | Guide | Reach for it when |
     |-------|-------------------|
+    | **[Composing What Runs](features.md)** | Deciding which of the nine features to run — presets, dependencies, and what a pared-down install costs you |
     | **[Agent Integration](agent-integration.md)** | Adding a coding assistant to the system — the config contract, hooks and API |
     | **[Network Configuration](network-configuration.md)** | Behind a corporate proxy or VPN, or an agent's traffic is being routed unexpectedly |
     | **[Status Line](status-line.md)** | Decoding the tmux bar — every indicator, and how to configure it |
