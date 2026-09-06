@@ -202,6 +202,17 @@ _pi_write_models_json() {
   # localhost and holds the real provider credentials itself. Same arrangement
   # copilot's BYOK seam already uses.
   #
+  # `input` includes image on the proxy provider: the proxy's OpenAI shim used
+  # to flatten array-form message content down to its text parts, so an attached
+  # image was deleted before the request left the proxy and the model — seeing a
+  # message that never had one — reported that image input was unsupported. The
+  # shim now preserves non-text parts for the OpenAI-native legs and gives the
+  # text-only legs a visible marker instead of a silent deletion, so declaring
+  # the modality here is what lets pi attach the image at all.
+  #
+  # qwen-laptop keeps ["text"]: it is dialled direct, never through the shim, and
+  # the llama.cpp build serving it is not a vision model.
+  #
   # ONE model entry on the PROXY provider, deliberately. The proxy replaces
   # body.model with whatever (provider, complexity) resolves to in
   # llm-routing.yaml, so a longer list there would offer a choice that Ctrl+P
@@ -291,7 +302,7 @@ _pi_write_models_json() {
         {
           "id": "claude-sonnet-5",
           "name": "Claude Sonnet 5 (routed by the coding proxy)",
-          "input": ["text"],
+          "input": ["text", "image"],
           "contextWindow": 200000,
           "reasoning": true,
           "thinkingLevelMap": {
