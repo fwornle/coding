@@ -156,9 +156,23 @@ describe('fast path — a borrowed cache never carries a foreign context gauge',
     expect(FAST).toMatch(/blankContextGauge\(reunderline\(content, getAbbrev\(projectName\)\)\)/);
   });
 
-  test('no reading blanks the gauge rather than leaving the previous value', () => {
-    const fn = FAST.slice(FAST.indexOf('function patchContextGauge('));
-    expect(fn.slice(0, 1200)).toMatch(/usage \? contextGauge\.renderGauge\(usage\.usedPct\) : contextGauge\.GAUGE_BLANK/);
+  test('no reading always replaces the gauge, never leaves the previous value', () => {
+    // The point of the guard is that whatever is already in the string is not
+    // ours — it is the previous render's, or on the borrow path another pane's.
+    // WHAT replaces it depends on why there is no reading (below); that it is
+    // always replaced is the invariant.
+    const fn = FAST.slice(FAST.indexOf('function patchContextGauge('), FAST.indexOf('function blankContextGauge('));
+    expect(fn).toMatch(/usage \? contextGauge\.renderGauge\(usage\.usedPct\) : fallback/);
+  });
+
+  test('a supported agent with nothing to report yet gets zero, not a hole', () => {
+    // The black gap after starting a session: the agent has not drawn its own
+    // status line yet, so no bridge file exists, and the bar rendered as a
+    // GAUGE_CELLS-wide black hole until the first command. A gauge that cannot
+    // see its source still stays blank — but only when no reader exists for the
+    // agent at all, which no next tick is going to change.
+    const fn = FAST.slice(FAST.indexOf('function patchContextGauge('), FAST.indexOf('function blankContextGauge('));
+    expect(fn).toMatch(/hasContextReader\(paneAgent\)[\s\S]{0,80}GAUGE_ZERO[\s\S]{0,60}GAUGE_BLANK/);
   });
 });
 

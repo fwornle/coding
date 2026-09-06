@@ -68,11 +68,50 @@ describe('renderGauge', () => {
     }
   });
 
-  test('fill tracks the percentage in tenths', () => {
+  test('fill tracks the percentage across the bar', () => {
+    // Derived from BAR_SEGMENTS, not hardcoded: the segment count is a width
+    // knob (10 → 8 when the line was slimmed), and a test that pins it asserts
+    // the knob's value rather than the property that the fill tracks the number.
+    const N = gauge.BAR_SEGMENTS;
     const bar = (p) => gauge.renderGauge(p).replace(/#\[[^\]]*\]/g, '').split(' ')[0];
-    expect(bar(0)).toBe('░'.repeat(10));
-    expect(bar(50)).toBe('█'.repeat(5) + '░'.repeat(5));
-    expect(bar(100)).toBe('█'.repeat(10));
+    expect(bar(0)).toBe('░'.repeat(N));
+    expect(bar(50)).toBe('█'.repeat(Math.floor(N / 2)) + '░'.repeat(N - Math.floor(N / 2)));
+    expect(bar(100)).toBe('█'.repeat(N));
+    // Monotonic: more context used never means fewer filled cells.
+    let prev = -1;
+    for (let p = 0; p <= 100; p += 1) {
+      const filled = [...bar(p)].filter((c) => c === '█').length;
+      expect(filled).toBeGreaterThanOrEqual(prev);
+      prev = filled;
+    }
+  });
+
+  test('the zero position is a real gauge, not a hole', () => {
+    // What a pane shows between a session starting and its agent first
+    // reporting. It used to be GAUGE_BLANK, which read on screen as a black gap
+    // in the bar and looked like a fault rather than a new session.
+    expect(gauge.GAUGE_ZERO).toBe(gauge.renderGauge(0));
+    expect(gauge.GAUGE_ZERO).not.toBe(gauge.GAUGE_BLANK);
+    expect(gauge.GAUGE_RE.test(gauge.GAUGE_ZERO)).toBe(true);
+    // Same width as every other state, so substituting it into an
+    // already-truncated line cannot re-open the trailing-residue bug.
+    const cells = (t) => t.replace(/#\[[^\]]*\]/g, '').length;
+    expect(cells(gauge.GAUGE_ZERO)).toBe(gauge.GAUGE_CELLS);
+    // Calm band, empty trough — dull green, nothing filled.
+    expect(gauge.GAUGE_ZERO).toContain('░'.repeat(gauge.BAR_SEGMENTS));
+    expect(gauge.GAUGE_ZERO).toMatch(/fg=colour46,bg=colour22/);
+  });
+
+  test('hasContextReader separates "no reader" from "no reading"', () => {
+    // The distinction that lets the zero position exist without lying: a
+    // supported agent with nothing to report yet renders zero, an agent whose
+    // store cannot be read at all still renders nothing.
+    for (const a of ['claude', 'opencode', 'copilot', 'pi', 'CLAUDE']) {
+      expect(gauge.hasContextReader(a)).toBe(true);
+    }
+    for (const a of ['zsh', 'unknown', '', null, undefined]) {
+      expect(gauge.hasContextReader(a)).toBe(false);
+    }
   });
 
   test('every band carries a foreground AND a duller background', () => {
