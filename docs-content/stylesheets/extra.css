@@ -260,6 +260,13 @@
  * these mirror what the slate scheme already does for the same reason.
  */
 .statusline .sl-green  { color: #00d75f; }
+/* The session-activity ramp: an active session fades through four greens rather
+ * than flipping between two states, so an idle pane is distinguishable from a
+ * busy one without a second glyph. Values are the tmux ones (colour41 → 34 → 28
+ * → 22); on #1c1c1c the darkest are legible as-is, unlike on a light page. */
+.statusline .sl-green-mid   { color: #00af00; }
+.statusline .sl-green-dark  { color: #008700; }
+.statusline .sl-green-vdark { color: #006f00; }
 .statusline .sl-amber  { color: #ffaf00; font-weight: 700; }
 .statusline .sl-red    { color: #ff0000; font-weight: 700; }
 .statusline .sl-grey   { color: #8a8a8a; }

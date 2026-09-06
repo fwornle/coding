@@ -121,14 +121,27 @@ you switch parts off.
     The status line is the fastest way to see the effect — a disabled feature contributes no
     badge at all, rather than a greyed-out one:
 
-    | profile | bar |
-    |---------|-----|
-    | `full` | `[🏥●] [AX●C●] [🔒74%●4] [📚●] [N:OPEN P:AUTO] [🧠●] ███░░░░░  41% [📋●7-8(1min)] 07:59` |
-    | `logging-only` | `[🏥●] [AX●C●] [N:OPEN P:AUTO] ███░░░░░  41% [📋8-9] 08:00` |
-    | `proxy-only` | `[🧠●] ███░░░░░  41% 08:00` |
-    | `minimal` | `███░░░░░  41% 08:00` |
+    `full` — everything on:
+
+    <span class="statusline">[🏥<span class="sl-green">●</span>] [AX<span class="sl-green">●</span><span class="sl-under">C</span><span class="sl-green">●</span>] [🔒72%<span class="sl-amber">●</span>7] [📚<span class="sl-green">●</span>] [N:OPEN P:AUTO] [🧠<span class="sl-green">●</span>] <span class="gauge gauge-ok">███░░░░░  46%</span> [📋8-9] 08:19</span>
+
+    `logging-only` — health, sessions and the log tranche survive; the knowledge, constraint
+    and proxy badges go with their features:
+
+    <span class="statusline">[🏥<span class="sl-green">●</span>] [AX<span class="sl-green">●</span><span class="sl-under">C</span><span class="sl-green">●</span>] [N:OPEN P:AUTO] <span class="gauge gauge-ok">███░░░░░  47%</span> [📋8-9] 08:19</span>
+
+    `proxy-only` — one badge, the gauge, the clock:
+
+    <span class="statusline">[🧠<span class="sl-green">●</span>] <span class="gauge gauge-ok">███░░░░░  47%</span> 08:19</span>
+
+    `minimal`:
+
+    <span class="statusline"><span class="gauge gauge-ok">███░░░░░  47%</span> 08:19</span>
 
     The context gauge and the clock are core, not a feature, so they survive every profile.
+    The examples above are generated from the real renders by
+    `scripts/render-statusline-png.mjs --spans`, not typed — hand-written bars on this site had
+    already drifted to ten-cell gauges and a split `[N:] [P:]` pair months after both changed.
 
 === "📚 Deep Dive (full)"
 

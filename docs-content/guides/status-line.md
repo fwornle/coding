@@ -10,21 +10,17 @@ something broken?" questions into a glance.
     **The emoji is the label; the dot is the state.** The leading emoji says what the badge is
     about and never changes; the tinted `●` after it says how that thing is doing.
 
-    ![The status line as tmux draws it](../images/status-line-compact.png)
-
-    ```
-    [🏥●] [AX●C●] [🔒72%●6] [📚●] [N:OPEN P:AUTO] [🧠●] ███░░░░░  43% [📋8-9] 08:03
-    ```
+    <span class="statusline">[🏥<span class="sl-green">●</span>] [AX<span class="sl-green">●</span><span class="sl-under">C</span><span class="sl-green">●</span>] [🔒72%<span class="sl-amber">●</span>7] [📚<span class="sl-green">●</span>] [N:OPEN P:AUTO] [🧠<span class="sl-green">●</span>] <span class="gauge gauge-ok">███░░░░░  47%</span> [📋8-9] 08:20</span>
 
     | Segment | Means |
     |---------|-------|
     | `[🏥●]` | Overall system health |
     | `[AX●C●]` | Active sessions per project — your pane's project is underlined |
-    | `[🔒72%●6]` | Constraint compliance; `●N` in amber appears when there are violations |
+    | `[🔒72%●7]` | Constraint compliance; `●N` in amber appears when there are violations |
     | `[📚●]` | Knowledge pipeline freshness |
     | `[N:OPEN P:AUTO]` | Where this machine is, and how it gets out — one bracket, because you read them together |
     | `[🧠●]` | Proxy semantic readiness |
-    | `███░░░░░ 43%` | How full **this pane's** conversation context is |
+    | `███░░░░░ 47%` | How full **this pane's** conversation context is |
     | `[📋8-9]` | Session logging time window |
 
     Each badge belongs to a feature, and a feature you have switched off contributes no badge
