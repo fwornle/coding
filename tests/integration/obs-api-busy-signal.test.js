@@ -174,4 +174,59 @@ describe('health-coordinator — busy-window source contract', () => {
   test('busy freezes the auto-heal FSM rather than counting a failure', () => {
     expect(coordFlat).toMatch(/if \(status === 'busy'\) return;/);
   });
+
+  // ── the 2026-09-07 gap ────────────────────────────────────────────────────
+  //
+  // Every arming signal above needs obs_api to ANSWER (an inflight report) or a
+  // fresh dispatch. A blocked event loop supplies neither, so the window was in
+  // practice a fixed 120s from the last answer. A consolidation outliving that
+  // fell through a gap and was published as 'unreachable' — a red [📚] badge
+  // for a pipeline that was working hard. Observed: window opened 05:28:47 on
+  // dispatch, expired 05:30:47, obs_api could not answer again until 05:41:07.
+  //
+  // The re-arm closes it: a timeout arriving while we already believe obs_api
+  // is busy is itself evidence the run continues. That must stay bounded, or
+  // "no answer" becomes a way to excuse a dead service forever — hence the
+  // episode ceiling, measured from the FIRST signal so re-arms cannot walk it
+  // forward indefinitely.
+  test('a timeout while already busy RE-ARMS the window', () => {
+    expect(coordFlat).toMatch(/if \(!obsApiBusyExhausted\(\)\) noteObsApiBusy\('probe timed out while busy'\)/);
+  });
+
+  test('the re-arm is bounded by an episode ceiling', () => {
+    expect(coordSrc).toMatch(/OBS_API_BUSY_MAX_MS/);
+    expect(coordFlat).toMatch(/function obsApiBusyExhausted\(\) \{ return obsApiBusySince > 0 && \(Date\.now\(\) - obsApiBusySince\) >= OBS_API_BUSY_MAX_MS; \}/);
+  });
+
+  test('the ceiling is measured from the FIRST signal, not the latest re-arm', () => {
+    // If obsApiBusySince were reassigned on every note, a stream of timeouts
+    // would push the ceiling forward forever and the bound would be decorative.
+    expect(coordFlat).toMatch(/if \(!obsApiBusyNow\(\)\) obsApiBusySince = now;/);
+  });
+
+  test('a clean probe with nothing in flight ends the episode', () => {
+    // Otherwise the ceiling is consumed by an earlier, long-finished run and a
+    // later genuine consolidation gets less grace than it should.
+    expect(coordFlat).toMatch(/else clearObsApiBusyEpisode\(\);/);
+  });
+});
+
+describe('status line — the [📚] badge fails open on an unknown status', () => {
+  const slSrc = fs.readFileSync(
+    path.join(REPO_ROOT, 'scripts', 'combined-status-line.js'), 'utf-8',
+  );
+  const slFlat = slSrc.replace(/\s+/g, ' ');
+
+  test("'unreachable' still renders the red alarm", () => {
+    expect(slFlat).toMatch(/case 'unreachable': \/\/ obs_api service itself is down/);
+  });
+
+  test('an UNRECOGNISED status renders the unknown glyph, not the alarm', () => {
+    // Folding default into 'unreachable' meant any status the coordinator
+    // learns to emit lights a red alarm here until this file catches up — a
+    // false failure caused purely by version skew. Display surfaces fail open.
+    const def = slFlat.indexOf("default: // A status this switch does not know");
+    expect(def).toBeGreaterThan(-1);
+    expect(slFlat.slice(def, def + 800)).toMatch(/parts\.push\('\[📚❓\]'\)/);
+  });
 });

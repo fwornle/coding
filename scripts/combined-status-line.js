@@ -2578,10 +2578,18 @@ class CombinedStatusLine {
          parts.push('[📚❓]');
          break;
        case 'unreachable':
-       default:
          // obs_api service itself is down — this IS broken.
          parts.push(`[📚${STATE_DOTS.CRIT}]`);
          if (overallColor === 'green') overallColor = 'red';
+         break;
+       default:
+         // A status this switch does not know is NOT evidence of failure, and
+         // must not be drawn as one. The status line is a DISPLAY surface, so
+         // it fails open (CLAUDE.md): show "I don't know", not "it's broken".
+         // Folding the unknown into `unreachable` meant any new status the
+         // coordinator learns to emit would light a red alarm here until this
+         // file caught up — a false failure caused purely by version skew.
+         parts.push('[📚❓]');
          break;
      }
 

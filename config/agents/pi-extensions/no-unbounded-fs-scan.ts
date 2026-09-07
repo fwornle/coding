@@ -1,3 +1,4 @@
+// managed by coding/config/agents/pi.sh
 /**
  * Refuse whole-filesystem scans, and say what to do instead.
  *
