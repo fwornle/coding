@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ModelNormalization
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ModelNormalization] as model_normalization #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[ProxyCompletionClient] as proxy_completion_client #F0F0F0
+[CostModelEngine] as cost_model_engine #F0F0F0
+[OffloadDecisionEngine] as offload_decision_engine #F0F0F0
+[ModelFamilyPriceResolution] as model_family_price_resolution #E8F5E8
+[BudgetProviderMapping] as budget_provider_mapping #E8F5E8
+
+llmabstraction --> model_normalization
+dmrprovider -[hidden]- model_normalization
+proxy_completion_client -[hidden]- model_normalization
+cost_model_engine -[hidden]- model_normalization
+offload_decision_engine -[hidden]- model_normalization
+model_normalization --> model_family_price_resolution
+model_normalization --> budget_provider_mapping
+
+@enduml

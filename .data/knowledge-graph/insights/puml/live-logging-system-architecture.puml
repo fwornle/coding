@@ -1,31 +1,23 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Pre-flight Validation" {
+package "Capture Layer" {
+  component "logging.ts" as logging <<core>>
+}
+
+package "Classification Layer" {
+  component "ontology-classification-agent.ts" as classifier <<agent>>
+  component "hierarchy-roots.test.ts" as hierTest <<agent>>
+  component "classification-agent.test.ts" as classTest <<agent>>
+}
+
+package "Config Validation" {
   component "validate-lsl-config.js" as validator <<cli>>
 }
 
-package "Pipeline Core" {
-  component "Session Windowing" as windowing <<core>>
-  component "File Routing" as routing <<core>>
-  component "ontology-classification-agent.ts" as classifier <<agent>>
-  component "logging.ts" as capture <<core>>
-}
-
-package "Verification & External" {
-  component "hierarchy-roots.test.ts" as test <<core>>
-  cloud "LLM Proxy" as llmproxy <<external>>
-}
-
-validator --> windowing : "validates config for"
-validator --> routing : "validates config for"
-
-windowing --> routing : "chunks session content"
-routing --> classifier : "routes windowed content"
-classifier --> llmproxy : "sends session window for classification"
-classifier --> capture : "enriched, classified content"
-capture --> capture : "persists final transcript"
-
-test ..> classifier : "validates hierarchy roots"
+logging --> classifier : "produces raw transcript segments"
+classifier ..> hierTest : "verified by"
+classifier ..> classTest : "verified by"
+validator ..> logging : "validates config before session windowing"
 
 @enduml

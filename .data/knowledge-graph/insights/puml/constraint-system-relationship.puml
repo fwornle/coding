@@ -11,10 +11,11 @@ title Hierarchy Context: ConstraintSystem
 [KnowledgeManagement] as knowledge_management #F0F0F0
 [CodingPatterns] as coding_patterns #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
+[HookManager] as hook_manager #E8F5E8
 [HookConfigLoader] as hook_config_loader #E8F5E8
-[UnifiedHookManager] as unified_hook_manager #E8F5E8
 [ViolationCaptureService] as violation_capture_service #E8F5E8
-[ContentValidationAgent] as content_validation_agent #E8F5E8
+[KnowledgeInjectionHooks] as knowledge_injection_hooks #E8F5E8
+[HealthPromptHook] as health_prompt_hook #E8F5E8
 
 coding --> constraint_system
 live_logging_system -[hidden]- constraint_system
@@ -23,9 +24,10 @@ dockerized_services -[hidden]- constraint_system
 knowledge_management -[hidden]- constraint_system
 coding_patterns -[hidden]- constraint_system
 semantic_analysis -[hidden]- constraint_system
+constraint_system --> hook_manager
 constraint_system --> hook_config_loader
-constraint_system --> unified_hook_manager
 constraint_system --> violation_capture_service
-constraint_system --> content_validation_agent
+constraint_system --> knowledge_injection_hooks
+constraint_system --> health_prompt_hook
 
 @enduml

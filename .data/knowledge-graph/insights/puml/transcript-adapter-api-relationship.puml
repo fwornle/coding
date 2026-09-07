@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TranscriptAdapterAPI
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TranscriptAdapterAPI] as transcript_adapter_api #LightBlue
+[LslSessionDashboard] as lsl_session_dashboard #F0F0F0
+[BackendLoggerCore] as backend_logger_core #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+[ProgressFireTrigger] as progress_fire_trigger #F0F0F0
+[TranscriptAdapterAbstractContract] as transcript_adapter_abstract_contract #E8F5E8
+[ClaudeParser] as claude_parser #E8F5E8
+[CopilotParser] as copilot_parser #E8F5E8
+[LSLConverter] as lslconverter #E8F5E8
+
+live_logging_system --> transcript_adapter_api
+lsl_session_dashboard -[hidden]- transcript_adapter_api
+backend_logger_core -[hidden]- transcript_adapter_api
+specstory_adapter -[hidden]- transcript_adapter_api
+progress_fire_trigger -[hidden]- transcript_adapter_api
+transcript_adapter_api --> transcript_adapter_abstract_contract
+transcript_adapter_api --> claude_parser
+transcript_adapter_api --> copilot_parser
+transcript_adapter_api --> lslconverter
+
+@enduml

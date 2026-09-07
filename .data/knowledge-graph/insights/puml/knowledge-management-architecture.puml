@@ -1,9 +1,14 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Runtime Path" {
-  component "code-graph-agent.ts" as agent <<agent>>
+package "Consumers" {
+  component "Agents" as agents <<agent>>
+  component "CLI Tools" as cli <<cli>>
+}
+
+package "VKB Service" {
   component "VKB Server" as vkb <<api>>
+  component "Decay Tracking Subsystem" as decay <<core>>
 }
 
 package "Storage Layer" {
@@ -11,27 +16,23 @@ package "Storage Layer" {
   database "LevelDB (legacy)" as leveldb <<storage>>
 }
 
-package "Administrative Path" {
-  component "migrate-graph-db-entity-types.js" as migscript <<cli>>
+package "Migration & Lifecycle" {
   component "migrate-leveldb-to-kmcore.test.ts" as migtest <<cli>>
+  component "migrate-graph-db-entity-types.js" as migschema <<cli>>
 }
 
-package "Documentation & Ontology" {
-  component "cross-project-knowledge.md" as crossdoc <<external>>
-  component "RELEASE-2.0.md ontology" as release2 <<external>>
-}
+agents --> vkb : "CRUD / query"
+cli --> vkb : "CRUD / query"
 
-agent --> vkb : "entity persistence ops"
-vkb --> kmcore : "query / mutate graph"
-vkb ..> leveldb : "legacy access (deprecated)"
+vkb --> kmcore : "graph read/write"
+vkb --> decay : "score/filter results"
+decay --> kmcore : "reads timestamp/confidence metadata"
 
-migscript --> kmcore : "bulk schema updates"
-migtest --> leveldb : "validate source data"
-migtest --> kmcore : "validate migrated data"
+migtest --> leveldb : "reads legacy entities"
+migtest --> kmcore : "validates transformed entities"
+migschema --> kmcore : "in-place schema updates"
 
-kmcore --> vkb : "decay-aware query results"
-
-crossdoc ..> vkb : "documents consumers"
-release2 ..> kmcore : "ontology integration"
+migtest ..> vkb : "requires maintenance mode"
+migschema ..> vkb : "requires maintenance mode"
 
 @enduml

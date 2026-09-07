@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HealthPromptHook
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[HealthPromptHook] as health_prompt_hook #LightBlue
+[HookManager] as hook_manager #F0F0F0
+[HookConfigLoader] as hook_config_loader #F0F0F0
+[ViolationCaptureService] as violation_capture_service #F0F0F0
+[KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
+
+constraint_system --> health_prompt_hook
+hook_manager -[hidden]- health_prompt_hook
+hook_config_loader -[hidden]- health_prompt_hook
+violation_capture_service -[hidden]- health_prompt_hook
+knowledge_injection_hooks -[hidden]- health_prompt_hook
+
+@enduml

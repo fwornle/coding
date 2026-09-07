@@ -1,42 +1,30 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Hook Configuration Layer" {
+package "Configuration" {
+  component "User Config\n~/.coding-tools/hooks.json" as userCfg <<external>>
+  component "Project Config\n.coding/hooks.json" as projCfg <<external>>
   component "HookConfigLoader" as loader <<core>>
-  database "~/.coding-tools/hooks.json" as userCfg
-  database ".coding/hooks.json" as projCfg
-  component "DEFAULT_CONFIG\n(event buckets)" as defaults <<core>>
 }
 
-package "Hook Dispatch" {
+package "Hook Orchestration" {
   component "UnifiedHookManager" as manager <<core>>
+  component "Registered Handlers\n(script/command/module)" as handlers <<agent>>
 }
 
-package "Violation Handling" {
+package "Violation Persistence" {
   component "ViolationCaptureService" as capture <<core>>
-  component "sanitizeParams()" as sanitize <<core>>
-  component "calculateStatistics()" as stats <<core>>
   database "session-violations.jsonl" as jsonl
   database "violation-history.json" as history
 }
 
-package "Related Systems" {
-  component "ContentValidationAgent" as content <<agent>>
-  component "System Health Dashboard" as dashboard <<external>>
-}
-
-userCfg --> loader : "user config"
-projCfg --> loader : "project override"
-defaults --> loader : "default buckets"
-loader --> manager : "merged config"
-
-manager --> capture : "dispatches pre/post-tool events"
-capture --> sanitize : "redacts secrets"
-sanitize --> jsonl : "writes record"
-capture --> stats : "on write"
-stats --> history : "rolling summary\n(capped at 1000)"
-
-history --> dashboard : "constraint/violation data"
-content ..> capture : "shares severity taxonomy"
+userCfg --> loader : "loaded first"
+projCfg --> loader : "overrides (precedence)"
+loader --> manager : "provides merged config"
+manager --> handlers : "dispatch by event\n(sorted by priority)"
+handlers --> capture : "reports violations"
+capture --> jsonl : "append-only writes\n(sanitized params)"
+capture --> history : "capped at 1000 entries"
+history --> capture : "calculateStatistics()"
 
 @enduml

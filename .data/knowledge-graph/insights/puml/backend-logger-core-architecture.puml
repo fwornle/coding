@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Consumers" {
+  component "transcript-api.js" as transcriptApi <<api>>
+  component "claude-parser.js" as claudeParser <<agent>>
+  component "copilot-parser.js" as copilotParser <<agent>>
+  component "specstory-adapter.js" as specstoryAdapter <<agent>>
+}
+
+package "BackendLoggerCore" {
+  component "createLogger() Factory" as factory <<core>>
+  component "Logger Instance" as logger <<core>>
+  component "LOG_LEVELS / isLevelEnabled()" as levels <<core>>
+  component "CATEGORY_COLORS" as colors <<core>>
+  component "loadConfig() / reloadConfig()" as configLoader <<core>>
+}
+
+package "Configuration" {
+  database "logging-config.json" as configFile
+}
+
+transcriptApi ..> factory : "createLogger(category)"
+claudeParser ..> factory : "createLogger(category)"
+copilotParser ..> factory : "createLogger(category)"
+specstoryAdapter ..> factory : "createLogger(category)"
+
+factory --> logger : "instantiates"
+logger --> configLoader : "reads sharedConfig"
+logger --> levels : "checks isLevelEnabled()"
+logger --> colors : "applies category color"
+
+configLoader --> configFile : "loadConfig() (cached)"
+configFile --> logger : "categories[category].level override"
+
+@enduml

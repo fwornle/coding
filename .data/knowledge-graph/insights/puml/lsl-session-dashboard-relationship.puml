@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LslSessionDashboard
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[LslSessionDashboard] as lsl_session_dashboard #LightBlue
+[TranscriptAdapterAPI] as transcript_adapter_api #F0F0F0
+[BackendLoggerCore] as backend_logger_core #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+[ProgressFireTrigger] as progress_fire_trigger #F0F0F0
+[ChainGroupingModel] as chain_grouping_model #E8F5E8
+[MixedFormatLivePreview] as mixed_format_live_preview #E8F5E8
+[ProjectDiscovery] as project_discovery #E8F5E8
+
+live_logging_system --> lsl_session_dashboard
+transcript_adapter_api -[hidden]- lsl_session_dashboard
+backend_logger_core -[hidden]- lsl_session_dashboard
+specstory_adapter -[hidden]- lsl_session_dashboard
+progress_fire_trigger -[hidden]- lsl_session_dashboard
+lsl_session_dashboard --> chain_grouping_model
+lsl_session_dashboard --> mixed_format_live_preview
+lsl_session_dashboard --> project_discovery
+
+@enduml

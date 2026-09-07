@@ -1,0 +1,37 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Orchestration Layer" {
+  component "bin/coding" as codingcli <<cli>>
+  component "Agent Abstraction API" as api <<api>>
+}
+
+package "Agent Wrapper Scripts" {
+  component "claude.sh" as claude <<agent>>
+  component "copilot.sh" as copilot <<agent>>
+  component "opencode.sh" as opencode <<agent>>
+  component "pi.sh" as pi <<agent>>
+}
+
+package "Config & Routing" {
+  component "Env Var Namespaces\n(e.g. CODING_OPENCODE_MODEL)" as envvars <<core>>
+  component "LLM_PROXY_URL /\nLLM_CLI_PROXY_URL" as proxy <<external>>
+}
+
+codingcli --> api : "invokes uniformly"
+api ..> claude : "canonical template"
+api --> copilot
+api --> opencode
+api --> pi
+
+claude --> envvars : "reads model config"
+copilot --> envvars
+opencode --> envvars
+pi --> envvars
+
+claude --> proxy : "translate to native flags"
+copilot --> proxy
+opencode --> proxy
+pi --> proxy
+
+@enduml

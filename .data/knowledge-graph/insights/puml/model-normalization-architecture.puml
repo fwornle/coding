@@ -1,0 +1,28 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Normalization" {
+  component "ModelNormalization" as norm <<core>>
+  component "Deduplication Logic" as dedup <<core>>
+}
+
+package "Cost Modeling" {
+  component "CostConfig.modelPrices" as prices <<storage>>
+  component "priceForModel()" as priceFn <<core>>
+  component "modelFamily() heuristics" as family <<core>>
+}
+
+package "UI Components" {
+  component "CallDetail" as detail <<ui>>
+  component "CallStrip" as strip <<ui>>
+}
+
+norm --> dedup : "removes version-suffixed duplicates"
+dedup --> prices : "provides canonical keys"
+prices --> priceFn : "consumed by"
+norm --> family : "matched via substring checks"
+family --> priceFn : "fallback pricing"
+norm --> detail : "'served by' row (provider/model)"
+norm --> strip : "used for filtering"
+
+@enduml

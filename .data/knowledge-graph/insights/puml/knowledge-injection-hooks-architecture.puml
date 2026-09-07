@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Hook Scripts" {
+  component "knowledge-injection-hook.js" as hook <<core>>
+  component "knowledge-injection-pi.js" as pihook <<core>>
+  component "isInjectionEnabled()" as enabled <<core>>
+  component "extractConversationTopics()" as topics <<core>>
+  component "resolveTargetFile()" as resolve <<core>>
+}
+
+package "Shared Client" {
+  component "retrieval-client.js\ncallRetrieval()" as client <<api>>
+}
+
+package "External Resources" {
+  cloud "Retrieval Service" as retrieval <<external>>
+  database "Session Transcript" as transcript <<storage>>
+  database "~/.pi/agent (AGENTS.md)" as agentsmd <<storage>>
+  component "git diff --name-only" as gitdiff <<external>>
+}
+
+hook --> enabled : "checks CODING_KNOWLEDGE_INJECTION"
+hook --> topics : "reads last 50000 bytes"
+topics --> transcript : "fs.readSync at offset"
+topics ..> topics : "filters <system-reminder>,\n## Insights, ## Digests"
+
+pihook --> resolve : "validates target path"
+resolve ..> agentsmd : "refuses to overwrite default dir"
+pihook --> gitdiff : "gathers recent_files"
+
+hook --> client : "invokes with timeouts\n(15000/12000 vs 5000/4500)"
+pihook --> client : "invokes with context.recent_files"
+client --> retrieval : "HTTP request"
+
+@enduml

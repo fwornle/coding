@@ -11,11 +11,11 @@ title Hierarchy Context: LLMAbstraction
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[LLMMockService] as llmmock_service #E8F5E8
 [DMRProvider] as dmrprovider #E8F5E8
-[LLMWithProcessClient] as llmwith_process_client #E8F5E8
-[CostModel] as cost_model #E8F5E8
-[ProxyURLResolver] as proxy_urlresolver #E8F5E8
+[ProxyCompletionClient] as proxy_completion_client #E8F5E8
+[CostModelEngine] as cost_model_engine #E8F5E8
+[ModelNormalization] as model_normalization #E8F5E8
+[OffloadDecisionEngine] as offload_decision_engine #E8F5E8
 
 coding --> llmabstraction
 live_logging_system -[hidden]- llmabstraction
@@ -24,10 +24,10 @@ knowledge_management -[hidden]- llmabstraction
 coding_patterns -[hidden]- llmabstraction
 constraint_system -[hidden]- llmabstraction
 semantic_analysis -[hidden]- llmabstraction
-llmabstraction --> llmmock_service
 llmabstraction --> dmrprovider
-llmabstraction --> llmwith_process_client
-llmabstraction --> cost_model
-llmabstraction --> proxy_urlresolver
+llmabstraction --> proxy_completion_client
+llmabstraction --> cost_model_engine
+llmabstraction --> model_normalization
+llmabstraction --> offload_decision_engine
 
 @enduml

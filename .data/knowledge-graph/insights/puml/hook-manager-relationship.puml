@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HookManager
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[HookManager] as hook_manager #LightBlue
+[HookConfigLoader] as hook_config_loader #F0F0F0
+[ViolationCaptureService] as violation_capture_service #F0F0F0
+[KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
+[HealthPromptHook] as health_prompt_hook #F0F0F0
+[ClaudeBridge] as claude_bridge #E8F5E8
+[HooksApiInterface] as hooks_api_interface #E8F5E8
+[HookMigrationTool] as hook_migration_tool #E8F5E8
+[UnifiedHookManagerConfigLoader] as unified_hook_manager_config_loader #E8F5E8
+
+constraint_system --> hook_manager
+hook_config_loader -[hidden]- hook_manager
+violation_capture_service -[hidden]- hook_manager
+knowledge_injection_hooks -[hidden]- hook_manager
+health_prompt_hook -[hidden]- hook_manager
+hook_manager --> claude_bridge
+hook_manager --> hooks_api_interface
+hook_manager --> hook_migration_tool
+hook_manager --> unified_hook_manager_config_loader
+
+@enduml

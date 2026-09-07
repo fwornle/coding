@@ -1,0 +1,28 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Experiment Definitions" {
+  component "coding-v1 README" as readme <<external>>
+  component "coding-v1 RESULTS" as results <<external>>
+  component "YAML Experiment Definition" as yamldef <<core>>
+}
+
+package "Validation Tooling" {
+  component "verify-patterns.sh" as verify <<cli>>
+  component "EntityPatternAnalyzer.ts" as analyzer <<core>>
+}
+
+package "Misclassified Fixtures" {
+  component "DesignViewModel.cs" as vm <<external>>
+  component "DesignView.xaml" as view <<external>>
+}
+
+readme ..> yamldef : "documents"
+results ..> yamldef : "documents"
+
+verify --> yamldef : "validates structure"
+analyzer ..> yamldef : "could parse/classify"
+
+vm .. view : "unrelated MVVM fixture"
+
+@enduml

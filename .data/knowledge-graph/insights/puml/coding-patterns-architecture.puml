@@ -1,37 +1,48 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Documentation Sources" {
-  component "CLAUDE.md" as claude <<core>>
-  component "architecture-report.md" as report <<core>>
-  component "adding-new-agent.md" as agentdoc <<core>>
-  component "llm-routing.md" as routingdoc <<core>>
+package "CLI Entry Layer" {
+  component "bin/ckb" as ckb <<cli>>
+  component "bin/graphify" as graphify <<cli>>
+  component "bin/codegraph" as codegraph <<cli>>
+  component "docker/entrypoint.sh" as entrypoint <<cli>>
 }
 
-package "Naming Convention Patterns" {
-  component "GraphDatabaseAdapter" as gda <<adapter>>
-  component "TranscriptAdapter" as ta <<adapter>>
-  component "SpecstoryAdapter" as sa <<adapter>>
-  component "ConnectionManager" as cm <<core>>
-  component "LLMServiceProvider" as lsp <<api>>
+package "Agent Adapter Layer" {
+  component "claude.sh" as claude <<agent>>
+  component "opencode.sh" as opencode <<agent>>
+  component "copilot.sh" as copilot <<agent>>
+  component "pi.sh" as pi <<agent>>
+  component "LLM Routing (env-based)" as llmrouting <<core>>
 }
 
-package "Runtime Gating / Offload" {
-  component "GATES" as gates <<core>>
-  component "RUNG_OFFLOADED" as offload <<core>>
-  cloud "LLM Proxy (Local/Remote)" as proxy <<external>>
+package "Config & Docs Layer" {
+  database "features.yaml" as features <<storage>>
+  database "task-taxonomy.yaml" as taxonomy <<storage>>
+  database "health-verification-rules.json" as healthrules <<storage>>
+  component "supervisord.conf" as supervisord <<core>>
+  component "docs/architecture/*" as archdocs <<external>>
 }
 
-claude ..> gda : "documents convention"
-claude ..> cm : "documents convention"
-claude ..> lsp : "documents convention"
-report ..> claude : "aggregates"
-agentdoc ..> gda : "informs pattern"
-routingdoc ..> lsp : "informs pattern"
-routingdoc ..> gates : "documents"
+ckb --> llmrouting : "delegates to modules"
+graphify --> llmrouting : "delegates to modules"
+codegraph --> llmrouting : "delegates to modules"
 
-gates --> offload : "controls"
-offload --> proxy : "routes work to"
-lsp --> proxy : "invokes"
+llmrouting --> claude : "invokes"
+llmrouting --> opencode : "invokes"
+llmrouting --> copilot : "invokes"
+llmrouting --> pi : "invokes"
+
+entrypoint --> supervisord : "delegates process mgmt"
+supervisord --> codegraph : "manages codegraph-index.sh"
+supervisord --> graphify : "manages graphify-serve.sh"
+
+llmrouting ..> features : "reads config"
+llmrouting ..> taxonomy : "reads config"
+supervisord ..> healthrules : "health polling"
+
+archdocs ..> claude : "documents pattern"
+archdocs ..> features : "documents pattern"
+archdocs ..> supervisord : "documents pattern"
 
 @enduml

@@ -1,46 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Docker Layer" {
-  component "docker-compose.yml" as compose <<core>>
-  component "entrypoint.sh / supervisord.conf" as entry <<core>>
+package "Host Orchestration" {
+  component "CLI Bootstrap / Agent Init" as cli <<cli>>
+  component "service-probe.js" as probe <<core>>
+  component "Task Gating (GATES/RUNG_OFFLOADED)" as gating <<core>>
 }
 
-package "Service Wrappers" {
-  component "api-service.js" as apiSvc <<core>>
-  component "dashboard-service.js" as dashSvc <<core>>
-  component "llm-mock-service.ts" as mockSvc <<core>>
+package "Dockerized Containers" {
+  component "Semantic Analysis MCP" as sem <<core>>
+  component "Constraint Monitor" as cmon <<core>>
+  component "Graphify" as graphify <<core>>
+  database "Postgres/Neo4j/Redis" as dbs <<storage>>
 }
 
-package "Lifecycle & Health" {
-  component "ProcessStateManager" as psm <<core>>
-  component "service-starter.js\n(startServiceWithRetry)" as starter <<core>>
-  component "service-probe.js\n(probeHttpHealth/probeTcpPort)" as probe <<core>>
-  component "health-coordinator.js" as coord <<core>>
+package "LLM Backend Access" {
+  cloud "LLM Proxy Layer\n(LLM_CLI_PROXY_URL, RAPID_LLM_PROXY_URL, LLM_PROXY_URL)" as proxy <<external>>
+  cloud "Qwen Local/Laptop APIs" as qwen <<external>>
+  component "llm-mock-service.ts" as mock <<agent>>
 }
 
-component "dashboard-server.js (port 3031)" as dashServer <<api>>
-component "Next.js Dashboard" as nextjs <<api>>
-database "workflow-progress.json" as wfjson <<storage>>
+cli --> probe : "polls readiness"
+probe --> sem : "health check"
+probe --> cmon : "health check"
 
-entry --> compose : "orchestrates containers"
-compose --> apiSvc : "runs"
-compose --> dashSvc : "runs"
+sem --> dbs : "reads/writes state"
+cmon --> dbs : "monitors state"
+graphify --> dbs : "stores graph data"
 
-apiSvc --> dashServer : "spawns child process"
-apiSvc --> psm : "register/unregister"
-dashSvc --> nextjs : "npm run dev"
-dashSvc --> psm : "register/unregister"
-nextjs --> dashServer : "NEXT_PUBLIC_API_BASE_URL"
+sem --> proxy : "routes LLM calls"
+proxy --> qwen : "forwards requests"
 
-apiSvc --> starter : "uses for startup"
-dashSvc --> starter : "uses for startup"
-starter --> probe : "health-check fn"
+sem ..> mock : "test substitution"
 
-coord --> probe : "polls every 5s"
-probe --> coord : "status: running|stopped|unknown"
-
-mockSvc --> wfjson : "reads/writes llmState"
-apiSvc ..> mockSvc : "mock-mode LLM calls"
+gating --> sem : "assigns offloaded work"
+gating --> cli : "routes foreground/background"
 
 @enduml

@@ -1,34 +1,36 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Manual Entry Path" {
-  component "Human Editor" as human <<agent>>
-  component "VKB Mutation Interface" as mutation <<api>>
+package "Manual Authoring" {
+  component "cli.js" as cli <<cli>>
+  component "UKBDatabaseWriter" as writer <<core>>
 }
 
 package "VKB Server" {
-  component "Entity Persistence Operations" as persist <<core>>
-  component "Provenance/Source Field" as provenance <<core>>
+  component "ApiRoutes" as api <<api>>
+  component "_getWriter(team)" as getWriter <<core>>
 }
 
-package "Graph Storage" {
-  database "Knowledge Graph Schema" as graph <<storage>>
-  component "Decay Tracking Logic" as decay <<core>>
+package "Storage Backends" {
+  database "SQLite (analytics)" as sqlite
+  database "Qdrant (vector)" as qdrant
+  database "GraphDB" as graphdb
 }
 
-package "Auto-Extraction Path" {
-  component "Batch Analysis Pipeline" as batch <<core>>
-}
+component "data-processor.js" as dataProcessor <<core>>
 
-human --> mutation : "manual edits"
-mutation --> persist : "bypasses batch pipeline"
-persist --> provenance : "tags source"
-provenance --> graph : "manual entities"
+cli --> writer : "add/update/import/export"
+cli --> api : "sendToVKB() if running"
+cli --> writer : "fallback direct write"
 
-batch --> persist : "auto-extracted entities"
-persist --> decay : "applies to online-learned only"
-decay --> graph : "prunes stale auto entities"
+api --> getWriter : "per-team lookup"
+getWriter --> writer : "creates instance"
 
-graph --> provenance : "distinguishes manual vs. online-learned"
+writer --> sqlite : "writes analytics"
+writer --> qdrant : "optional vector index"
+writer --> graphdb : "writes graph data"
+
+writer --> dataProcessor : "manual entities (source != 'auto')"
+dataProcessor --> dataProcessor : "tag as 'batch'"
 
 @enduml

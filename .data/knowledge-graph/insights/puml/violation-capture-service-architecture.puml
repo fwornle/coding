@@ -1,31 +1,27 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Hook Flow" {
-  component "UnifiedHookManager" as hookMgr <<core>>
+package "Input Context" {
+  component "Hook/Tool Context\n(sessionId, params)" as ctx <<external>>
 }
 
-package "Violation Capture" {
-  component "ViolationCaptureService" as vcs <<core>>
-  component "Statistics Aggregator" as stats <<core>>
+package "ViolationCaptureService" {
+  component "getViolationCaptureService()" as factory <<api>>
+  component "ViolationCaptureService" as service <<core>>
+  component "Redaction Step" as redact <<core>>
+  component "Aggregation Logic\n(severity, most-common,\navg-per-session)" as agg <<core>>
 }
 
 package "Persistence" {
-  component "violation-capture-service.js\n(JSONL Log)" as jsonl <<storage>>
-  database "JSON Store\n(cap: 1000 entries)" as jsonStore <<storage>>
+  database "session-violations.jsonl\n(append-only raw log)" as jsonl <<storage>>
+  database "violation-history.json\n(capped at 1000 entries)" as history <<storage>>
 }
 
-package "Validation Domain" {
-  component "ContentValidationAgent" as cva <<agent>>
-  component "ValidationIssue Model" as vim <<core>>
-}
-
-hookMgr --> vcs : "pre/post-tool event"
-vcs --> jsonl : "append violation event"
-vcs --> stats : "compute at write time"
-stats --> jsonStore : "update rolling stats"
-vcs --> jsonStore : "persist + evict oldest"
-cva --> vim : "defines severity taxonomy"
-vim ..> vcs : "shared classification"
+ctx --> service : "provides raw event data"
+factory --> service : "instantiates/returns singleton"
+service --> redact : "sanitizes sensitive params"
+redact --> jsonl : "appends redacted record"
+jsonl --> agg : "feeds raw records"
+agg --> history : "writes computed stats\n(bounded growth)"
 
 @enduml

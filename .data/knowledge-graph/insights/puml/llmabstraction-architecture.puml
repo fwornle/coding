@@ -2,36 +2,32 @@
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Mode Resolution" {
-  component "getLLMMode()" as mode <<core>>
-  component "isMockLLMEnabled()\ngetLLMState()" as state <<core>>
-  database "workflow-progress.json" as progress <<storage>>
+  component "LLM Mock Service\n(getLLMMode)" as mockSvc <<core>>
+  component "workflow-progress.json" as wfProgress <<storage>>
 }
 
-package "Provider Layer" {
-  component "DMRProvider" as dmr <<agent>>
-  component "loadDMRConfig()\nexpandEnvVars()" as dmrconfig <<core>>
-  component "checkDMRAvailability()" as dmrhealth <<core>>
-  cloud "Docker Model Runner" as dmrRuntime <<external>>
+package "Local Provider" {
+  component "DMR Provider" as dmrProvider <<core>>
+  component "dmr-config.yaml" as dmrConfig <<storage>>
+  cloud "Docker Model Runner" as dmr <<external>>
 }
 
-package "Process-Tagged Path" {
-  component "llmWithProcessComplete()" as proc <<agent>>
-  cloud "LLM Proxy\n(RAPID/CLI/generic/localhost)" as proxy <<external>>
-  component "cost-model.ts\npriceForModel()" as cost <<core>>
+package "Proxy & Cost" {
+  component "LLM With Process\n(resolveProxyCompleteUrl)" as llmProcess <<core>>
+  cloud "rapid-llm-proxy" as proxy <<external>>
+  component "Cost Model\n(priceForModel)" as costModel <<core>>
 }
 
-mode --> state : "resolves mode"
-state --> progress : "reads/writes\n(CODING_ROOT aware)"
+mockSvc --> wfProgress : "reads per-agent override"
+mockSvc ..> mockSvc : "CODING_ROOT path normalization"
 
-mode --> dmr : "dispatch to local"
-dmr --> dmrconfig : "load YAML config"
-dmr --> dmrhealth : "cached availability"
-dmrhealth --> dmrRuntime : "models.list()"
-dmrconfig --> dmrRuntime : "OpenAI-compatible client"
+dmrProvider --> dmrConfig : "loadDMRConfig (multi-path)"
+dmrProvider --> dmr : "health-checked, cached"
 
-mode --> proc : "bypasses SDK"
-proc --> proxy : "fetch + process tag"
-proc --> cost : "normalized token usage"
-cost --> cost : "isOpenAIWireProvider()\nmodelFamily() fallback"
+llmProcess --> proxy : "4-tier env var resolution"
+llmProcess --> costModel : "normalized token usage"
+
+mockSvc --> dmrProvider : "delegates when mock disabled"
+mockSvc --> llmProcess : "delegates to external proxy"
 
 @enduml

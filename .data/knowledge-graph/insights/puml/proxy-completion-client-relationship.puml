@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ProxyCompletionClient
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ProxyCompletionClient] as proxy_completion_client #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[CostModelEngine] as cost_model_engine #F0F0F0
+[ModelNormalization] as model_normalization #F0F0F0
+[OffloadDecisionEngine] as offload_decision_engine #F0F0F0
+[ProcessTagAttribution] as process_tag_attribution #E8F5E8
+
+llmabstraction --> proxy_completion_client
+dmrprovider -[hidden]- proxy_completion_client
+cost_model_engine -[hidden]- proxy_completion_client
+model_normalization -[hidden]- proxy_completion_client
+offload_decision_engine -[hidden]- proxy_completion_client
+proxy_completion_client --> process_tag_attribution
+
+@enduml

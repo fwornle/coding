@@ -1,0 +1,25 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "CLI Entrypoint" {
+  component "verify-patterns.sh" as script <<cli>>
+  component "set -euo pipefail" as guard <<core>>
+}
+
+package "Path Resolution" {
+  component "SCRIPT_DIR" as scriptdir <<core>>
+  component "CODING_REPO" as codingrepo <<core>>
+  component "CLAUDE_REPO" as clauderepo <<core>>
+}
+
+package "Output" {
+  component "Timestamped Report" as report <<storage>>
+}
+
+script --> guard : "enforces fail-fast"
+script --> scriptdir : "computes"
+scriptdir --> codingrepo : "two levels up"
+scriptdir --> clauderepo : "two levels up"
+script --> report : "writes to /tmp/pattern-verification-*.md"
+
+@enduml

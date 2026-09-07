@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: BackendLoggerCore
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[BackendLoggerCore] as backend_logger_core #LightBlue
+[LslSessionDashboard] as lsl_session_dashboard #F0F0F0
+[TranscriptAdapterAPI] as transcript_adapter_api #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+[ProgressFireTrigger] as progress_fire_trigger #F0F0F0
+[LoggingConfigSchema] as logging_config_schema #E8F5E8
+[CreateLoggerFactory] as create_logger_factory #E8F5E8
+
+live_logging_system --> backend_logger_core
+lsl_session_dashboard -[hidden]- backend_logger_core
+transcript_adapter_api -[hidden]- backend_logger_core
+specstory_adapter -[hidden]- backend_logger_core
+progress_fire_trigger -[hidden]- backend_logger_core
+backend_logger_core --> logging_config_schema
+backend_logger_core --> create_logger_factory
+
+@enduml

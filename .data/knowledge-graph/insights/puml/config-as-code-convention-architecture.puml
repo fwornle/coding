@@ -1,0 +1,26 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Environment Configuration" {
+  component "CODING_OPENCODE_MODEL\n(+ similar model env vars)" as modelEnv <<external>>
+  component "KNOWLEDGE_EXPORT_DIR" as exportDirEnv <<external>>
+  component "CODING_TOOLS_PATH /\nCODING_REPO" as pathEnv <<external>>
+}
+
+package "Agent Wrapper Scripts" {
+  component "Agent Wrapper" as wrapper <<agent>>
+}
+
+package "Pattern Verification" {
+  component "verify-patterns.sh" as verify <<cli>>
+  database "$SHARED_MEMORY\n(JSON Knowledge Base)" as sharedMem <<storage>>
+}
+
+modelEnv --> wrapper : "externalizes model selection"
+pathEnv --> verify : "overrides repo/tools path"
+exportDirEnv --> verify : "overrides export location"
+
+verify --> sharedMem : "jq queries"
+sharedMem --> verify : "entity Type == 'TransferablePattern'\nsignificance >= 8"
+
+@enduml

@@ -7,11 +7,11 @@ title Hierarchy Context: Pipeline
 [Pipeline] as pipeline #LightBlue
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
-[CoordinatorAgent] as coordinator_agent #E8F5E8
+[RelationDiscovery] as relation_discovery #E8F5E8
 
 semantic_analysis --> pipeline
 ontology -[hidden]- pipeline
 insights -[hidden]- pipeline
-pipeline --> coordinator_agent
+pipeline --> relation_discovery
 
 @enduml

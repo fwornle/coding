@@ -2,30 +2,28 @@
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Input Sources" {
-  component "Git History" as git <<external>>
-  component "LSL Session Data" as lsl <<external>>
+  component "Git History\n(diffs/commits)" as git <<external>>
+  component "LSL Session Logs" as lsl <<external>>
 }
 
-package "Pipeline Agents" {
+package "Batch Analysis Pipeline" {
   component "base-agent.ts" as base <<core>>
   component "semantic-analysis-agent.ts" as semantic <<agent>>
   component "ontology-classification-agent.ts" as ontology <<agent>>
-  component "Hierarchy Root Detection" as hierarchy <<agent>>
 }
 
 package "Knowledge Storage" {
-  database "Knowledge Graph" as kg <<storage>>
+  database "Ontology / Knowledge Graph Store" as kg <<storage>>
 }
 
-git --> semantic : "parsed diffs/commits"
-lsl --> semantic : "session logs"
+git --> semantic : "raw commit/diff data"
+lsl --> semantic : "session transcripts"
 
-base --> semantic : "LLM invocation utilities"
-base --> ontology : "LLM invocation utilities"
+base --> semantic : "provides LLM invocation,\nprompt templating"
+base --> ontology : "provides LLM invocation,\nprompt templating"
 
-semantic --> ontology : "extracted entities"
-ontology --> hierarchy : "delegates root detection"
+semantic --> ontology : "extracted knowledge entities"
 
-ontology --> kg : "structured knowledge entities"
+ontology --> kg : "persists classified entities"
 
 @enduml

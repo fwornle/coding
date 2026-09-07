@@ -1,24 +1,31 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Mode Resolution" {
-  component "LLMMockService" as mock <<core>>
+package "LLM Mode Resolution" {
+  component "getLLMMode()" as mode <<core>>
+  component "isMockLLMEnabled()" as mock <<core>>
 }
 
-package "Local Inference" {
+package "Offload Decision Layer" {
+  component "OffloadDecision" as decision <<core>>
+  component "evaluateOffload()" as evaluate <<core>>
+  component "OffloadTarget.provider" as target <<core>>
+}
+
+package "Inference Providers" {
   component "DMRProvider" as dmr <<agent>>
-  component "OpenAI-Compatible Client Shape" as shape <<api>>
+  component "OpenAI-Compatible Client Interface" as iface <<api>>
+  cloud "Remote Provider" as remote <<external>>
 }
 
-package "External Runtime" {
-  cloud "Docker Model Runner API" as runner <<external>>
-  component "Qwen-family Local Models" as qwen <<external>>
-}
-
-mock --> dmr : "mode == 'local'"
-dmr --> shape : "reuses"
-shape --> runner : "OpenAI-style requests"
-runner --> qwen : "hosts"
-dmr ..> runner : "QWEN_LOCAL_API_KEY /\nQWEN_LAPTOP_API_BASE_URL"
+mock --> mode : "resolves mode"
+mode --> decision : "non-mock local mode"
+decision --> evaluate : "requireNetwork gate"
+evaluate --> target : "selects local target"
+target --> dmr : "references as local target"
+dmr --> iface : "implements"
+iface ..> remote : "substitutable without\nchanging call sites"
+evaluate --> remote : "requires network egress"
+dmr --> evaluate : "no network egress needed"
 
 @enduml

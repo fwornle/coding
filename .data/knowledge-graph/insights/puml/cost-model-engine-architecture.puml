@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Input Filtering" {
+  component "isSynthetic()" as synth <<core>>
+  component "isOpenAIWireProvider()" as wireproto <<core>>
+  component "freshInputTokens()" as freshtok <<core>>
+}
+
+package "Cost Resolution" {
+  component "priceForModel()" as priceres <<core>>
+  component "DEFAULT_COST_CONFIG" as defcfg <<storage>>
+  component "budgetProvider()" as budgetprov <<core>>
+}
+
+package "Budget Management" {
+  component "budgetForMonth()" as budgetmon <<core>>
+  database "BudgetConfig.monthlyEurByMonth" as budgetcfg <<storage>>
+}
+
+cloud "GET /api/llm/settings" as settingsapi <<external>>
+
+synth --> priceres : "filters rows before"
+wireproto ..> freshtok : "documents wire semantics\n(no longer affects pricing)"
+
+priceres --> defcfg : "falls back to defaults"
+settingsapi --> priceres : "operator-edited overrides"
+
+budgetprov --> budgetmon : "maps provider to bucket"
+budgetmon --> budgetcfg : "reads monthly cap\n(null = no cap)"
+
+synth --> budgetmon : "excludes synthetic rows"
+
+@enduml

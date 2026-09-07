@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Core API" {
+  component "TranscriptAdapter" as base <<core>>
+  component "LSLEntryType" as lsl <<core>>
+  component "watchTranscripts()" as watcher <<core>>
+}
+
+package "Agent Adapters" {
+  component "ClaudeParser" as claude <<agent>>
+  component "CopilotParser" as copilot <<agent>>
+}
+
+package "Conversion & Filesystem" {
+  component "LSLConverter" as converter <<core>>
+  database "Transcript Files" as files <<storage>>
+}
+
+base ..> lsl : "defines vocabulary"
+base --> watcher : "polls via getCurrentSession()"
+watcher --> claude : "invokes"
+watcher --> copilot : "invokes"
+
+claude --> files : "getTranscriptDirectory()\nfindCurrentTranscript()"
+copilot --> files : "findCurrentLog()"
+
+claude --> converter : "parseFile() -> sessionId from filename"
+copilot --> converter : "parseFile() distinguishes\nsession_start/end vs content"
+
+converter --> lsl : "fromCopiEntry() / convertToLSL()"
+
+claude ..> base : "implements getAgentType,\nreadTranscripts, convertToLSL,\ngetCurrentSession"
+copilot ..> base : "implements getAgentType,\nreadTranscripts, convertToLSL,\ngetCurrentSession"
+
+@enduml

@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SupervisorManagedContainerPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[SupervisorManagedContainerPattern] as supervisor_managed_container_pattern #LightBlue
+[AgentWrapperScriptPattern] as agent_wrapper_script_pattern #F0F0F0
+[CliEntrypointPattern] as cli_entrypoint_pattern #F0F0F0
+[ConfigAsCodeConvention] as config_as_code_convention #F0F0F0
+[ExperimentDefinitionPattern] as experiment_definition_pattern #F0F0F0
+[EntityPatternAnalyzer] as entity_pattern_analyzer #F0F0F0
+
+coding_patterns --> supervisor_managed_container_pattern
+agent_wrapper_script_pattern -[hidden]- supervisor_managed_container_pattern
+cli_entrypoint_pattern -[hidden]- supervisor_managed_container_pattern
+config_as_code_convention -[hidden]- supervisor_managed_container_pattern
+experiment_definition_pattern -[hidden]- supervisor_managed_container_pattern
+entity_pattern_analyzer -[hidden]- supervisor_managed_container_pattern
+
+@enduml
