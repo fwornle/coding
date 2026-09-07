@@ -70,6 +70,20 @@ import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
+
+// launchd hands this process no shell environment, so CODING_REPO — which
+// several downstream modules read to locate the repo — arrives unset. The
+// modules then fall back to the CONTAINER path (/coding), which does not
+// exist on the host. GraphifyGraph.resolveGraphPath() resolved graph.json to
+// /coding/.data/graphify/graphify-out/graph.json, so the first in-process
+// wave-analysis run logged "graph.json not found" and CodeGraphAgent skipped
+// indexing entirely: the run proceeded with no code graph at all and nothing
+// failed loudly. REPO_ROOT is derived from this file's own location, so it is
+// correct on host and in container alike.
+// Only fill the gap — an explicitly exported CODING_REPO still wins.
+if (!process.env.CODING_REPO) {
+  process.env.CODING_REPO = REPO_ROOT;
+}
 const PORT = parseInt(process.env.OBSERVATIONS_API_PORT || '12436', 10);
 // Heartbeat path stays under `.observations/` (a sibling of the now-archived
 // SQLite file) — directory is preserved post-archive for consolidation

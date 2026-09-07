@@ -163,3 +163,54 @@ describe('tools.ts routes wave-analysis to the owner', () => {
     assert.doesNotMatch(branch, /spawn\(/);
   });
 });
+
+describe('the host run sees the host filesystem', () => {
+  test('obs-api fills CODING_REPO from its own location when unset', () => {
+    // launchd inherits no shell environment. Without this, every module that
+    // resolves the repo from CODING_REPO/CODING_TOOLS_PATH/CODING_ROOT falls
+    // back to the CONTAINER path /coding, which does not exist on the host —
+    // GraphifyGraph then reported "graph.json not found at /coding/..." and
+    // the run silently continued without the code graph.
+    const flat = obsApi.replace(/\s+/g, ' ');
+    assert.match(flat, /if \(!process\.env\.CODING_REPO\) \{ process\.env\.CODING_REPO = REPO_ROOT; \}/);
+  });
+
+});
+
+describe('both callers get trace history', () => {
+  test('run-wave-analysis owns saveTraceHistory', () => {
+    assert.match(runWave, /export function saveTraceHistory\(/);
+    assert.match(runWave, /saveTraceHistory\(repositoryPath, progressSnapshot, 'wave-analysis', logLine/);
+  });
+
+  test('the runner no longer keeps its own copy', () => {
+    // A second copy is how the obs-api path ended up writing a workflow report
+    // with no trace beside it.
+    assert.doesNotMatch(code(runner), /saveTraceHistory/);
+  });
+
+  test('the trace is snapshotted BEFORE the terminal write', () => {
+    // writeTerminalState() rebuilds the progress file from a field allowlist
+    // that excludes stepsDetail, so a snapshot taken afterwards records a run
+    // with no steps in it.
+    const snapshot = runWave.indexOf('readProgressSnapshot(progressFile)');
+    const terminal = runWave.indexOf("writeTerminalState(progressFile, 'completed'");
+    const save = runWave.indexOf('saveTraceHistory(repositoryPath, progressSnapshot');
+    assert.ok(snapshot > -1 && terminal > -1 && save > -1);
+    assert.ok(snapshot < terminal, 'snapshot must precede the terminal write');
+    assert.ok(terminal < save, 'the trace is written after the terminal state, from the snapshot');
+  });
+
+  test('the trace records the TERMINAL status, not the snapshot\'s', () => {
+    // The snapshot is taken while the run is still 'running' — recording that
+    // would label every completed run as unfinished in the History tab.
+    assert.match(runWave, /terminalStatus: string = 'completed'/);
+    assert.match(runWave, /status: terminalStatus,/);
+    assert.match(runWave, /'wave-analysis', logLine, 'completed'\)/);
+  });
+
+  test('only a successful run is recorded', () => {
+    const flat = runWave.replace(/\s+/g, ' ');
+    assert.match(flat, /if \(result\.success\) \{ saveTraceHistory\(/);
+  });
+});
