@@ -243,6 +243,15 @@ interface RecentCall {
   prompt_preview: string
 }
 
+// recharts declares a tooltip formatter's value as `TValue | undefined` (a point
+// can be missing), so a `(val: number)` handler is too narrow to satisfy it.
+// Coerce once here rather than widening formatTokens, which every other caller
+// invokes with a real number.
+function toTokenCount(val: unknown): number {
+  const n = typeof val === 'number' ? val : Number(val)
+  return Number.isFinite(n) ? n : 0
+}
+
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
@@ -913,7 +922,7 @@ export function TokenUsagePage() {
                         <Cell key={p.provider} fill={getProviderColor(p.provider)} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(val: number) => formatTokens(val)} />
+                    <Tooltip formatter={(val) => formatTokens(toTokenCount(val))} />
                     <Legend
                       verticalAlign="bottom"
                       wrapperStyle={{ paddingTop: '12px' }}
@@ -1036,7 +1045,7 @@ export function TokenUsagePage() {
                       allowDataOverflow={evoYScale === 'log'}
                     />
                     <Tooltip
-                      formatter={(val: number, name: string) => [formatTokens(val), name]}
+                      formatter={(val, name) => [formatTokens(toTokenCount(val)), String(name)]}
                       labelStyle={{ color: '#999' }}
                       contentStyle={{ backgroundColor: '#1e1e2e', border: '1px solid #333' }}
                     />
