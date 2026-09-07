@@ -548,6 +548,12 @@ interface UKBState {
 
   // Historical workflows
   historicalWorkflows: HistoricalWorkflow[]
+  // How many reports the server actually has, before the request's page size.
+  // Kept so the list can say "N of M" instead of presenting a page as a total —
+  // the count used to read `historicalWorkflows.length`, which said
+  // "50 workflows found" while 119 existed, and the reports that fell off the
+  // end were simply unreachable with no indication anything was missing.
+  historyTotal: number
   loadingHistory: boolean
   historyError: string | null
 
@@ -622,6 +628,7 @@ const initialState: UKBState = {
 
   // Historical workflows
   historicalWorkflows: [],
+  historyTotal: 0,
   loadingHistory: false,
   historyError: null,
 
@@ -762,9 +769,15 @@ const ukbSlice = createSlice({
       state.loadingHistory = true
       state.historyError = null
     },
-    fetchHistorySuccess(state, action: PayloadAction<HistoricalWorkflow[]>) {
+    fetchHistorySuccess(
+      state,
+      action: PayloadAction<{ workflows: HistoricalWorkflow[]; total: number }>,
+    ) {
       state.loadingHistory = false
-      state.historicalWorkflows = action.payload
+      state.historicalWorkflows = action.payload.workflows
+      // Fall back to the page length when the server did not report a total, so
+      // the label degrades to the old behaviour rather than showing 0.
+      state.historyTotal = action.payload.total ?? action.payload.workflows.length
     },
     fetchHistoryFailure(state, action: PayloadAction<string>) {
       state.loadingHistory = false
