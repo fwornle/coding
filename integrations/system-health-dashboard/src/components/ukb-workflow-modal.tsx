@@ -46,6 +46,27 @@ import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_
 import type { SubStep } from './workflow'
 import { UKBNodeDetailsSidebar } from './workflow'
 import type { RootState } from '@/store'
+
+/**
+ * How many workflow reports the History tab asks for.
+ *
+ * This is a page size, not a cap on what exists. It used to be 50, which is
+ * fewer than the reports this project already has (119 at the time of writing,
+ * and one per run thereafter). Everything past the newest 50 was simply
+ * unreachable: the only batch-analysis run — the one whose Pipeline Totals card
+ * shows commits, sessions and entity counts — sat at position ~51 and could not
+ * be opened from the UI at all, while the list said "50 workflows found" as if
+ * that were the total.
+ *
+ * Raising it is close to free. /api/ukb/history reads and parses EVERY report
+ * on every call regardless of `limit` and only slices at the end, so a larger
+ * page costs response size, not server work; the payload is ~13 header fields
+ * per report. 500 covers several years at the current rate.
+ *
+ * If it is ever hit again, the count reads "N of M" and a warning is logged,
+ * rather than the list silently ending.
+ */
+const HISTORY_PAGE_SIZE = 500
 import { Logger, LogCategories } from '@/utils/logging'
 import {
   setActiveTab,
@@ -360,6 +381,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const selectedNode = useSelector((state: RootState) => state.ukb.selectedNode)
   const activeTab = useSelector((state: RootState) => state.ukb.activeTab)
   const historicalWorkflows = useSelector((state: RootState) => state.ukb.historicalWorkflows)
+  const historyTotal = useSelector((state: RootState) => state.ukb.historyTotal)
   const loadingHistory = useSelector((state: RootState) => state.ukb.loadingHistory)
   const selectedHistoricalWorkflowState = useSelector((state: RootState) => state.ukb.selectedHistoricalWorkflow)
   const historicalWorkflowDetail = useSelector((state: RootState) => state.ukb.historicalWorkflowDetail)
@@ -904,11 +926,24 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     Logger.debug(LogCategories.API, 'Loading historical workflows')
     dispatch(fetchHistoryStart())
     try {
-      const response = await fetch(`${apiBaseUrl}/api/ukb/history?limit=50`)
+      const response = await fetch(`${apiBaseUrl}/api/ukb/history?limit=${HISTORY_PAGE_SIZE}`)
       const result = await response.json()
       if (result.status === 'success') {
-        Logger.info(LogCategories.UKB, `Loaded ${result.data?.length || 0} historical workflows`)
-        dispatch(fetchHistorySuccess(result.data))
+        const total = typeof result.total === 'number' ? result.total : result.data?.length || 0
+        Logger.info(
+          LogCategories.UKB,
+          `Loaded ${result.data?.length || 0} of ${total} historical workflows`,
+        )
+        if (total > (result.data?.length || 0)) {
+          // Visible rather than silent: a truncated list is how the batch-analysis
+          // reports became unreachable in the first place.
+          Logger.warn(
+            LogCategories.UKB,
+            `Workflow history truncated at ${HISTORY_PAGE_SIZE}; ${total} reports exist. ` +
+              'Older runs are not reachable from this list — raise HISTORY_PAGE_SIZE.',
+          )
+        }
+        dispatch(fetchHistorySuccess({ workflows: result.data, total }))
       } else {
         Logger.warn(LogCategories.API, 'Failed to load historical workflows', { message: result.message })
         dispatch(fetchHistoryFailure('Failed to load workflows'))
@@ -1933,7 +1968,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm text-muted-foreground">
-            {historicalWorkflows.length} workflow{historicalWorkflows.length !== 1 ? 's' : ''} found
+            {historicalWorkflows.length}
+            {historyTotal > historicalWorkflows.length ? ` of ${historyTotal}` : ''} workflow
+            {historicalWorkflows.length !== 1 ? 's' : ''} found
           </div>
           <Button variant="outline" size="sm" onClick={loadHistoricalWorkflows}>
             <RefreshCw className="h-3 w-3 mr-1" />
