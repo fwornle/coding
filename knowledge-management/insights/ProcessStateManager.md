@@ -2,52 +2,65 @@
 
 **Type:** SubComponent
 
-All wrapper scripts within the DockerizedServices layer call `unregisterService` in their cleanup/teardown handlers to ensure stale PID entries are purged from the `process-state-manager.js` registry when child processes terminate.
+Tracks metadata (PID, service name, start time) across both Docker-contained and standalone Node process contexts, unifying visibility under the Global Service Coordinator
+
+# ProcessStateManager — Technical Insight Document
 
 ## What It Is
 
-ProcessStateManager is a singleton module implemented in `process-state-manager.js` within the DockerizedServices layer. It serves as a centralized in-memory registry that tracks all active child processes by mapping their PIDs to structured metadata.
+ProcessStateManager is implemented in `scripts/process-state-manager.js` and serves as the centralized lifecycle-tracking facility for services managed within the DockerizedServices layer. It exposes register/unregister operations that are invoked asynchronously by wrapper scripts such as `api-service.js` and `dashboard-service.js`. Its core responsibility is to track metadata — PID, service name, and start time — across both Docker-contained and standalone Node process contexts, unifying visibility of running services under the Global Service Coordinator. As the sibling component `ServiceWrapperScripts` handles path resolution and process spawning, ProcessStateManager (PSM) is the downstream ledger that records what those wrappers actually launched.
 
 ## Architecture and Design
 
-ProcessStateManager uses a simple singleton pattern to maintain a single authoritative process inventory across the DockerizedServices runtime. This centralized approach ensures all components query one consistent source of truth for active process state.
+The architectural approach is that of a lightweight, asynchronous state registry decoupled from the actual process supervision logic. Rather than owning process lifecycle itself, PSM is called out to reactively — registration occurs only *after* the underlying real process is spawned, ensuring that PSM's records reflect actual running processes rather than merely intended ones. This reflects a deliberate design trade-off: correctness/accuracy of state over eagerness, avoiding the false-positive problem where a service is presumed running before it truly exists.
+
+Symmetrically, unregistration is triggered on process exit or signal forwarding, so when wrapper scripts forward SIGTERM/SIGINT to their spawned child processes, PSM state is kept consistent with reality. This mirrors the "avoid false positives" philosophy also seen in sibling `HealthCoordinator`'s SPEC R6 invariant, though PSM addresses process *existence* rather than *health*.
 
 ![ProcessStateManager — Architecture](images/process-state-manager-architecture.png)
 
-The design deliberately keeps state in-memory rather than persisting it, which aligns with the ephemeral nature of containerized processes—if the parent dies, the registry is irrelevant anyway.
+Structurally, PSM sits beneath `DockerizedServices` and above its own child, `RegistrationAPI`, which is the concrete registration/unregistration interface exposed by `process-state-manager.js`. This parent-child relationship indicates PSM itself is largely a thin orchestrating concept, with RegistrationAPI carrying the actual operational surface.
 
 ## Implementation Details
 
-The module exposes a `registerService` function that accepts a child PID and associates it with a metadata object containing `port`, `type`, and `script` fields. This structured metadata allows other components to look up not just whether a process exists, but what role it plays and how to reach it.
+The implementation centers on register/unregister functions in `scripts/process-state-manager.js`, called asynchronously so as not to block the wrapper scripts' primary responsibilities (spawning, path resolution, signal forwarding). Each registration call carries metadata: PID, service name, and start time — the minimal fields needed to answer "is this service alive, and since when." Because wrapper scripts run in both Docker-contained and standalone Node contexts, PSM's data model must remain agnostic to execution environment, tracking processes uniformly regardless of whether they run inside a container or directly on the host.
 
-All wrapper scripts in the DockerizedServices layer call `unregisterService` during their cleanup/teardown handlers when child processes terminate. This ensures the registry never contains stale entries for dead processes.
-
-![ProcessStateManager — Relationship](images/process-state-manager-relationship.png)
+The register call is placed strictly after process spawn succeeds, and the unregister call is tied to the exit/signal-forwarding pathway in the wrapper scripts — meaning PSM's accuracy is entirely dependent on wrapper scripts correctly invoking these hooks at the right lifecycle moments.
 
 ## Integration Points
 
-ProcessStateManager sits alongside its sibling HealthCoordinator within DockerizedServices. The port information stored in the registry is likely consumed by health-probing logic—HealthCoordinator needs to know which ports to probe, and ProcessStateManager holds that mapping. The `type` field in registered metadata could inform which probe strategy (HTTP vs TCP) applies to a given process.
+PSM's primary integration points are its callers: `api-service.js` and `dashboard-service.js` (part of sibling `ServiceWrapperScripts`), which invoke register/unregister asynchronously around process spawn and signal-forwarding events. Its child, `RegistrationAPI`, is effectively the interface contract these callers use.
 
-Every wrapper script in the DockerizedServices layer integrates with this module by calling `registerService` at spawn time and `unregisterService` at teardown.
+More broadly, PSM acts as the source of truth queried elsewhere in the coordinator ecosystem to determine which services are currently alive — implying other components (e.g., the Global Service Coordinator, and potentially `HealthCoordinator`) consult PSM state rather than probing processes directly for liveness/identity information.
+
+![ProcessStateManager — Relationship](images/process-state-manager-relationship.png)
+
+Within its parent `DockerizedServices`, PSM complements `ServiceStarter`'s retry/backoff startup logic and `ServiceProbe`/`HealthCoordinator`'s health polling: where those components answer "is the service healthy," PSM answers "is the service registered as running, and what is it."
 
 ## Usage Guidelines
 
-- Always call `unregisterService` in cleanup handlers—failing to do so leaves stale PIDs that could confuse health checks or port allocation.
-- Since this is a singleton, do not instantiate multiple copies; import the shared module directly.
-- The registry is in-memory only; do not rely on it surviving process restarts.
+Developers adding new wrapper scripts should follow the established pattern: spawn the real process first, then asynchronously register with PSM — never register speculatively before spawn success. Correspondingly, unregistration must be wired into the same signal-forwarding path (SIGTERM/SIGINT) used to terminate the child process, ensuring no orphaned PSM entries persist after a service exits. Because PSM is treated as the ecosystem's source of truth for "which services are alive," any component querying service liveness should prefer PSM state over ad hoc process checks, and any new wrapper script integrated into DockerizedServices should conform to the same register/unregister contract exposed by RegistrationAPI to keep the Global Service Coordinator's view accurate.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component enforces a strict probe-result invariant called SPEC R6, implemented in `lib/utils/service-probe.js`, which mandates that both `probeHttpHealth()` and `probeTcpPort()` may only return the string values `'running'`, `'stopped'`, or `'unknown'` — never `'healthy'`. This design decision is architecturally significant because it prevents a class of silent-degradation bugs where a container that technically responds to a health endpoint (e.g., returning HTTP 200 with an incomplete initialization state) could be incorrectly classified as production-ready. The distinction between 'running' (process is alive and responding) and 'healthy' (fully initialized, all dependencies satisfied) is deliberately kept outside the probe layer and left to higher-level orchestration logic.
+- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices provides the containerization and process-management layer that wraps Coding's various services (semantic analysis MCP, constraint monitor API/dashboard, graphify, LLM services) so they can run reliably both inside Docker containers and as standalone Node processes managed by a Global Service Coordinator. The layer combines Docker artifacts (docker-compose.yml, Dockerfile.coding-services, supervisord.conf, entrypoint.sh) with a set of Node.js wrapper scripts (api-service.js, dashboard-service.js) that spawn actual backend processes, forward signals, and register/unregister with a ProcessStateManager (PSM) for lifecycle tracking.
 
-This invariant is consumed by `scripts/health-coordinator.js`, which polls on 5-second ticks and evaluates probe results against rules defined in `config/health-verification-rules.json`. By separating the probe vocabulary from the health-verdict vocabulary, the system avoids conflating network-layer liveness (can I reach the port?) with application-layer readiness (is this service actually functioning correctly?). A new developer reading the codebase should understand that if they ever modify `service-probe.js` to return `'healthy'`, they risk corrupting the health-coordinator's decision logic, which presumably maps probe results to actions like alerting, restart scheduling, or dependency unblocking.
+A core architectural pattern is robust startup with retry/backoff and health verification, implemented in lib/service-starter.js's startServiceWithRetry(), which wraps a start function and a health-check function with timeouts (via withDeadline) and exponential backoff, distinguishing required vs optional services for graceful degradation. Complementing this, lib/utils/service-probe.js implements liveness probes (probeHttpHealth, probeTcpPort) used by scripts/health-coordinator.js to poll services every 5 seconds per config/health-verification-rules.json, strictly avoiding false-positive 'healthy' states per its SPEC R6 invariant.
+
+Service wrappers such as api-service.js and dashboard-service.js follow a consistent pattern: resolve CODING_REPO-relative paths, verify target files/directories exist, spawn the real process with stdio inherited, forward SIGTERM/SIGINT, and asynchronously register/unregister with ProcessStateManager for centralized process tracking across the dockerized/global service fleet. Mock-mode support (llm-mock-service.ts) allows service behavior (LLM calls) to be swapped for deterministic mocks driven by a shared workflow-progress.json state file, aiding testing inside containers where CODING_ROOT may differ from host paths.
+
+### Children
+- [RegistrationAPI](./RegistrationAPI.md) -- The L2 description explicitly states process-state-manager.js exposes register/unregister operations called asynchronously by wrapper scripts like api-service.js and dashboard-service.js.
 
 ### Siblings
-- [HealthCoordinator](./HealthCoordinator.md) -- HealthCoordinator is a sub-component of DockerizedServices
+- [ServiceStarter](./ServiceStarter.md) -- startServiceWithRetry() in lib/service-starter.js wraps a caller-supplied start function and health-check function, retrying with exponential backoff on failure
+- [ServiceProbe](./ServiceProbe.md) -- probeHttpHealth() in lib/utils/service-probe.js issues HTTP requests to a service's health endpoint and interprets response codes/timeouts
+- [LLMMockService](./LLMMockService.md) -- integrations/semantic-analysis/src/mock/llm-mock-service.ts implements mode management supporting 'mock', 'local', and 'public' LLM call routing
+- [HealthCoordinator](./HealthCoordinator.md) -- scripts/health-coordinator.js polls services every 5 seconds, using probeHttpHealth() and probeTcpPort() from lib/utils/service-probe.js
+- [ServiceWrapperScripts](./ServiceWrapperScripts.md) -- api-service.js and dashboard-service.js resolve CODING_REPO-relative paths before spawning target processes, supporting both container and host execution
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 5 observations*

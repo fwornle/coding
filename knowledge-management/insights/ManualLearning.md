@@ -2,69 +2,52 @@
 
 **Type:** SubComponent
 
-Agent Integration Guide (docs/agent-integration-guide.md) references direct observation injection, suggesting ManualLearning exposes an API for agents to assert facts without triggering the automated analysis pipeline
+Human-authored observations are stored alongside automatically extracted ones in the same graph schema, requiring a provenance/source field to distinguish manual vs. online-learned entities
 
-# ManualLearning — Technical Reference
+# ManualLearning — Technical Insight Document
 
 ## What It Is
 
-ManualLearning is a SubComponent of KnowledgeManagement responsible for ingesting human-authored knowledge into the shared knowledge graph. Rather than receiving entities from automated analysis pipelines, it provides the pathway through which developers, agents, and curators directly assert facts, relationships, and cross-project edges into the same graph infrastructure that OnlineLearning and KMCoreMigration populate. Its behavior is documented across `docs/architecture/memory-systems.md`, `docs/architecture/cross-project-knowledge.md`, and `docs/agent-integration-guide.md`, though no dedicated source files have been identified in the current codebase scan.
-
-The defining characteristic of ManualLearning is provenance: every entity it produces carries metadata explicitly marking it as human-authored, a concern delegated to its child component HumanProvenanceStamping. This provenance mark is a discriminating value on a shared provenance field — not a separate entity type — distinguishing manual records from the pipeline provenance stamps applied by KMCoreMigration during automated migration runs.
+ManualLearning represents one of two knowledge provenance categories within the graph-based storage architecture documented in `docs/architecture/memory-systems.md`. It captures human-authored observations that are entered directly into the knowledge graph, as opposed to knowledge derived through automated extraction. As a SubComponent of KnowledgeManagement, ManualLearning entities are persisted exclusively through the VKB server's entity persistence operations rather than through direct storage writes — meaning there is no separate storage backend or schema for manually entered knowledge. Instead, human-authored observations live in the same graph schema as automatically extracted entities, distinguished at the data level by a provenance/source field rather than by structural separation.
 
 ![ManualLearning — Architecture](images/manual-learning-architecture.png)
 
 ## Architecture and Design
 
-ManualLearning sits within KnowledgeManagement alongside three siblings — OnlineLearning, KMCoreMigration, and EntityTypeRegistry — each contributing entities to the same underlying graph store. The architectural decision to unify all entry paths through a single write interface (GraphKMStore, backed by LevelDB) means ManualLearning does not own its own storage layer. Instead, it relies on GraphKMStore as the persistence gateway, ensuring that hand-crafted entities and pipeline-generated entities coexist in one addressable graph without structural divergence.
+The defining architectural decision for ManualLearning is its bypass of the batch analysis pipeline entirely. Where its sibling, OnlineLearning, produces entities through a multi-stage pipeline ingesting git history, LSL session logs, and code analysis output, ManualLearning instead goes straight through the VKB server's mutation interface. This is a deliberate "fast path" design: manual edits don't need transformation, correlation, or extraction logic — they're already structured knowledge supplied by a human — so routing them through the same pipeline as automated learning would add unnecessary latency and complexity.
 
-The design makes provenance a first-class attribute rather than an implicit assumption about which code path was invoked. This is a deliberate trade-off: it adds a metadata field to every entity but eliminates the need for separate storage partitions or query-time routing logic to distinguish human versus automated knowledge. The shared provenance field with distinct enum-like values (human-authored vs. pipeline-stamped) keeps the ontology flat and the query surface uniform.
-
-![ManualLearning — Relationship](images/manual-learning-relationship.png)
-
-Type conformance is enforced externally by EntityTypeRegistry, which maps all incoming entity types to the three-type ontology (System, Project, Pattern) before graph insertion. ManualLearning does not bypass this constraint — hand-crafted nodes must conform to the same classification surface as automated ones. This prevents ontology drift where human authors might introduce ad-hoc types that fragment the shared schema.
+This design reinforces the parent KnowledgeManagement component's principle that the VKB server is the single choke point for all entity mutations, regardless of provenance. Both ManualLearning and OnlineLearning converge on the same persistence interface, preserving consistency guarantees and caching behavior uniformly across provenance types, even though their upstream paths to that interface are entirely different (direct mutation vs. batch pipeline output).
 
 ## Implementation Details
 
-The core mechanics of ManualLearning operate through two concerns: identifier assignment and provenance stamping.
+Because Manual and automated entities share a unified graph schema, the schema itself must carry a provenance/source field to distinguish which entities were manually authored versus online-learned. This is the primary mechanism enabling coexistence: rather than segregating storage, the system tags data at the entity level. No dedicated code symbols or classes for ManualLearning were identified in the current codebase inventory, suggesting that "ManualLearning" as a concept is currently realized more as a data-provenance pattern and a code path (the VKB mutation interface) than as a distinct module or class hierarchy.
 
-Identifier assignment follows the same UUIDv7 scheme established by KMCoreMigration. Manual entities receive time-ordered UUIDv7 IDs consistent with the canonical shape defined during migration, meaning legacy manual records and newly authored ones share the same identifier format. This is significant for graph traversal and temporal ordering — a UUIDv7 encodes creation time, so manual entities are naturally sortable alongside automated ones without a separate timestamp field.
-
-Provenance stamping is the responsibility of HumanProvenanceStamping, ManualLearning's only child component. Based on the observation that provenance is a shared field with distinct values rather than a type split, HumanProvenanceStamping likely applies a specific provenance marker at write time, before or during the GraphKMStore persistence call. The contrast with KMCoreMigration's automated pipeline stamps suggests this is a well-defined enum or constant value rather than free-form metadata.
-
-Cross-project edge authoring is an explicit capability of ManualLearning, as documented in `docs/architecture/cross-project-knowledge.md`. This means ManualLearning handles not just node creation but inter-project relationship assertion — a responsibility that requires awareness of entity identities across project boundaries. This positions ManualLearning as the primary mechanism for curating the relational structure of the knowledge graph where automation cannot infer connections.
+A significant implementation gap flagged by the observations concerns decay tracking. Auto-extracted knowledge is subject to decay tracking logic (likely used to age out or deprioritize stale automated inferences), but manual entities skip this logic since they never pass through the batch pipeline where such tracking is presumably applied. This means manually authored knowledge likely requires separate handling to avoid premature pruning — an explicit design risk rather than a solved problem, based on current observations.
 
 ## Integration Points
 
-The `docs/agent-integration-guide.md` reference to direct observation injection indicates that ManualLearning exposes an API surface accessible to agents — allowing them to assert facts without triggering the automated analysis pipeline (OnlineLearning's path). This is a meaningful architectural boundary: it separates deliberate, curated assertions from continuous automated inference, giving consumers control over which pipeline semantics apply to a given fact.
+ManualLearning integrates with the rest of the system almost entirely through the VKB server, which is also the persistence interface used by KnowledgeManagement broadly and consumed by downstream agents such as code-graph-agent.ts. Because ManualLearning entities share the same graph schema as OnlineLearning entities, any query or consumer operating over the knowledge graph must be aware of the provenance field to properly interpret or filter manually authored versus automatically learned facts.
 
-GraphKMStore is the write dependency. All entities authored through ManualLearning are persisted via this interface to the LevelDB backend, placing ManualLearning downstream of GraphKMStore and upstream of the raw storage layer. EntityTypeRegistry acts as a schema gatekeeper that ManualLearning must satisfy before insertion succeeds. KMCoreMigration shares the UUIDv7 identifier contract, ensuring interoperability between migrated historical records and new manual entries.
+![ManualLearning — Relationship](images/manual-learning-relationship.png)
+
+The relationship to OnlineLearning is one of schema-sharing and interface-sharing but pipeline-divergence: both are governed by the same graph-based storage architecture and both ultimately persist through VKB server operations, but only OnlineLearning passes through the batch analysis pipeline (git history, LSL session logs, code analysis output). This makes ManualLearning the "direct write" counterpart to OnlineLearning's "derived write" model within the same parent system.
 
 ## Usage Guidelines
 
-Developers and agents authoring knowledge through ManualLearning should treat EntityTypeRegistry conformance as a hard constraint — all entities must resolve to System, Project, or Pattern before they can be persisted. Attempting to introduce novel types will be rejected at the classification layer, not silently coerced.
+Developers working with manually entered knowledge should ensure the provenance/source field is correctly set whenever writing through the VKB mutation interface, since this is the only mechanism distinguishing manual entities from auto-extracted ones in the shared schema. Any tooling or query logic that filters, ranks, or ages knowledge should explicitly account for the fact that manual entities do not carry decay tracking metadata — treating them uniformly with auto-extracted entities in decay-based pruning logic risks either incorrectly preserving stale automated knowledge or, more importantly, incorrectly pruning valid human-curated knowledge that was never designed to decay in the same way.
 
-When asserting cross-project relationships, authors should be aware that ManualLearning is the designated path for inter-project edge authoring per `docs/architecture/cross-project-knowledge.md`. These edges are curated rather than inferred, so they carry implicit authority within the graph — <USER_ID_REDACTED> that traverse cross-project relationships are relying on the correctness of manually authored data.
-
-The direct observation injection API documented in `docs/agent-integration-guide.md` should be used when an agent has high-confidence, deliberate facts to record that should not be re-derived by the automated pipeline. This avoids duplication and prevents automated analysis from overwriting or conflicting with intentional assertions. The provenance field, set by HumanProvenanceStamping, serves as the durable signal for downstream consumers to distinguish these authoritative records from pipeline-generated ones.
-
-Since no dedicated source files were identified in the code scan, implementors working in this area should treat `docs/architecture/memory-systems.md`, `docs/architecture/cross-project-knowledge.md`, and `docs/agent-integration-guide.md` as the primary normative references until code-level symbols are indexed.
+Given the absence of dedicated code symbols for this subcomponent, future implementation work should focus on formalizing decay/retention handling for manually authored entities and, if warranted, introducing explicit code-level constructs (classes, functions) rather than relying solely on the implicit "goes straight through the mutation interface" pathway. Any schema changes affecting the provenance field must be coordinated through the VKB server, consistent with the parent KnowledgeManagement component's rule that the VKB server is the single choke point for schema and consistency guarantees.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing persistent storage, entity lifecycle management, and graph query capabilities. It is built on a Graphology in-memory graph with LevelDB as the persistence backend, exposing entities with typed attributes (System, Project, Pattern) and relationships. The system supports both local graph operations and integration with external graph databases like Memgraph via the CodeGraphAgent, which uses Tree-sitter AST parsing to index repositories into a queryable knowledge graph.
-
-### Children
-- [HumanProvenanceStamping](./HumanProvenanceStamping.md) -- Per the ManualLearning sub-component description, entities carry provenance metadata explicitly marking them as human-authored, contrasting with pipeline provenance stamps applied by KMCoreMigration — indicating a shared provenance field with distinct enum-like values rather than separate entity types.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component centers on a graph-based knowledge storage architecture (documented in docs/architecture/memory-systems.md) that replaced or augments a prior LevelDB-based store. The VKB (Virtual Knowledge Base) server acts as the primary runtime interface for querying and mutating the graph, exposing entity persistence operations that downstream agents (like code-graph-agent.ts) rely on rather than talking to the storage layer directly. This separation of concerns means the VKB server is the single choke point for consistency guarantees, caching, and decay tracking logic, so any schema change to entities must be coordinated through it rather than through ad-hoc script access.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- docs/architecture/memory-systems.md describes the Graph-Based Knowledge Storage Architecture that OnlineLearning populates, with Graphology as the in-memory layer backed by LevelDB
-- [KMCoreMigration](./KMCoreMigration.md) -- The migration script migrate-leveldb-to-kmcore.mjs reads raw LevelDB B-shape records and rewrites them with UUIDv7 identifiers, providing stable, time-ordered IDs for all canonical entities
-- [EntityTypeRegistry](./EntityTypeRegistry.md) -- EntityTypeRegistry enforces a three-type ontology (System/Project/Pattern) as the canonical classification surface, with all incoming entity types mapped through this consolidation layer before graph insertion
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning entities are produced by a batch analysis pipeline that ingests git history, LSL session logs, and code analysis output as documented in docs/architecture/memory-systems.md
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 5 observations*
