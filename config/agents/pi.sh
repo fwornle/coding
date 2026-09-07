@@ -87,6 +87,9 @@ agent_check_requirements() {
 # wrapper owns and rewrites; a symlink into the repo would make a `pi` session
 # silently pick up an extension mid-edit from an unrelated branch checkout.
 # Copying pins the behaviour to launch time, like models.json above.
+# Line-1 marker our extension sources carry, so the installer can tell a file
+# it wrote from one the user authored. Same contract as _PI_APPEND_MARKER.
+_PI_EXTENSION_MARKER="// managed by coding/config/agents/pi.sh"
 _pi_install_extensions() {
   local cfg_dir="$1"
   local src_dir="${CODING_REPO:-}/config/agents/pi-extensions"
@@ -95,18 +98,31 @@ _pi_install_extensions() {
   local ext_dir="$cfg_dir/extensions"
   mkdir -p "$ext_dir"
   local n=0
+  local skipped=0
   for f in "$src_dir"/*.ts; do
     [ -e "$f" ] || continue
+    local dest="$ext_dir/$(basename "$f")"
+    # Same marker contract as APPEND_SYSTEM.md: only ever overwrite a file we
+    # wrote. Under CODING_AGENT_SCOPE=global ext_dir is ~/.pi/agent/extensions,
+    # which the user owns — a same-named extension of theirs is theirs to keep.
+    # Our sources carry the marker on line 1 and the copy is verbatim, so it
+    # travels with the file.
+    if [ -e "$dest" ] && ! grep -qF "$_PI_EXTENSION_MARKER" "$dest" 2>/dev/null; then
+      _agent_log "pi: leaving user-authored extension $(basename "$f") alone"
+      skipped=$((skipped + 1))
+      continue
+    fi
     # cmp before cp so an unchanged file keeps its mtime — pi caches by path and
     # there is no reason to look modified on every launch.
-    if ! cmp -s "$f" "$ext_dir/$(basename "$f")"; then
-      cp "$f" "$ext_dir/$(basename "$f")" || {
+    if ! cmp -s "$f" "$dest"; then
+      cp "$f" "$dest" || {
         _agent_log "WARNING: could not install pi extension $(basename "$f")"
         continue
       }
     fi
     n=$((n + 1))
   done
+  [ "$skipped" -gt 0 ] && _agent_log "pi extensions skipped (user-authored): $skipped"
   [ "$n" -gt 0 ] && _agent_log "pi extensions installed: $n in $ext_dir"
   return 0
 }
@@ -369,6 +385,21 @@ except (OSError, ValueError):
 providers = doc.get("providers")
 if not isinstance(providers, dict):
     providers = {}
+
+# ONE backup, ever — the original as it stood before this project first touched
+# it. Not per-launch: this file is rewritten on every launch (the proxy port and
+# the x-task-id header move), so timestamped copies would litter the user's
+# config dir for no gain. Same one-time-original approach as install.sh's
+# .coding-orig and build-claude-runtime-config.mjs's .coding-pre-global.
+backup = path + ".coding-orig"
+if os.path.exists(path) and not os.path.exists(backup):
+    try:
+        with io.open(path, encoding="utf-8") as fh:
+            original = fh.read()
+        with io.open(backup, "w", encoding="utf-8") as fh:
+            fh.write(original)
+    except OSError:
+        pass  # a backup we could not take must not stop the launch
 
 # We own these two ids outright and rewrite them every launch (the port, the
 # headers and the qwen URL all move). Every other provider is the user's own and

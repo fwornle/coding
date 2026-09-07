@@ -149,3 +149,111 @@ test('no scratch or temp files are left behind', () => {
     assert.ok(!existsSync(path.join(dir, 'models.json.tmp')));
   });
 });
+
+// ── the one-time backup ──────────────────────────────────────────────────────
+//
+// models.json is rewritten on EVERY launch (the proxy port and the x-task-id
+// header move), so a per-launch backup would litter the config dir. What is
+// worth keeping is the original as it stood before this project first touched
+// it — the same one-time-original approach install.sh takes with .coding-orig
+// and build-claude-runtime-config.mjs with .coding-pre-global.
+
+/** Run the writer and return the backup's contents, or null if absent. */
+function backupOf(dir) {
+  const p = path.join(dir, 'models.json.coding-orig');
+  return existsSync(p) ? readFileSync(p, 'utf8') : null;
+}
+
+test('the pre-existing file is backed up once', () => {
+  withTempDir((dir) => {
+    const original = JSON.stringify({ providers: { mine: { api: 'x' } }, userKey: 'original' });
+    writeFileSync(path.join(dir, 'models.json'), original);
+    writeModels(dir);
+    assert.equal(JSON.parse(backupOf(dir)).userKey, 'original');
+  });
+});
+
+test('a later launch does NOT overwrite the backup with the merged file', () => {
+  withTempDir((dir) => {
+    writeFileSync(path.join(dir, 'models.json'), JSON.stringify({ providers: {}, userKey: 'original' }));
+    writeModels(dir);
+    // Mutate the live file the way a later launch (or the user) would, then
+    // launch again. A backup taken per-launch would now say "changed later" and
+    // the true original would be gone — which is the whole thing it exists to
+    // prevent.
+    const live = JSON.parse(readFileSync(path.join(dir, 'models.json'), 'utf8'));
+    live.userKey = 'changed later';
+    writeFileSync(path.join(dir, 'models.json'), JSON.stringify(live));
+    writeModels(dir);
+    assert.equal(JSON.parse(backupOf(dir)).userKey, 'original');
+  });
+});
+
+test('no backup is invented when there was nothing to back up', () => {
+  withTempDir((dir) => {
+    writeModels(dir);
+    assert.equal(backupOf(dir), null);
+  });
+});
+
+// ── the extension marker guard ───────────────────────────────────────────────
+//
+// Under global scope the extensions dir is ~/.pi/agent/extensions, which the
+// user owns. Our sources carry a line-1 marker and the copy is verbatim, so the
+// installer can tell a file it wrote from one the user authored — the same
+// contract _pi_write_append_system keeps for APPEND_SYSTEM.md.
+
+/** Run _pi_install_extensions against `cfgDir`. */
+function installExtensions(cfgDir) {
+  const script = `
+_agent_log() { :; }
+source "${PI_SH}"
+_pi_install_extensions "${cfgDir}"
+`;
+  const result = spawnSync('bash', ['--norc', '--noprofile', '-c', script], {
+    encoding: 'utf8',
+    env: {
+      PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+      HOME: process.env.HOME || '/tmp',
+      CODING_REPO: REPO_ROOT,
+    },
+  });
+  assert.equal(result.status, 0, `installer failed: ${result.stderr}`);
+}
+
+test('extensions install into a fresh dir', () => {
+  withTempDir((dir) => {
+    installExtensions(dir);
+    const files = readdirSync(path.join(dir, 'extensions'));
+    assert.ok(files.length > 0, 'nothing installed');
+    for (const f of files) {
+      const head = readFileSync(path.join(dir, 'extensions', f), 'utf8').split('\n')[0];
+      assert.match(head, /managed by coding\/config\/agents\/pi\.sh/, `${f} lacks the marker`);
+    }
+  });
+});
+
+test('a user-authored extension of the same name is left alone', () => {
+  withTempDir((dir) => {
+    installExtensions(dir);
+    const [name] = readdirSync(path.join(dir, 'extensions'));
+    const mine = '// my own extension, do not touch\n';
+    writeFileSync(path.join(dir, 'extensions', name), mine);
+    installExtensions(dir);
+    assert.equal(readFileSync(path.join(dir, 'extensions', name), 'utf8'), mine);
+  });
+});
+
+test('our own previously-installed extension IS refreshed', () => {
+  // The guard must not freeze our own file: an outdated copy of an extension we
+  // ship is exactly what the installer exists to replace.
+  withTempDir((dir) => {
+    installExtensions(dir);
+    const [name] = readdirSync(path.join(dir, 'extensions'));
+    const target = path.join(dir, 'extensions', name);
+    const fresh = readFileSync(target, 'utf8');
+    writeFileSync(target, '// managed by coding/config/agents/pi.sh\n// stale copy\n');
+    installExtensions(dir);
+    assert.equal(readFileSync(target, 'utf8'), fresh);
+  });
+});

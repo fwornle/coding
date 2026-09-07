@@ -661,11 +661,23 @@ let obsApiLastRestartAt = 0;
 // distinction is reliable rather than a fudge. The window is bounded so a
 // genuinely dead obs_api still heals within OBS_API_BUSY_GRACE_MS.
 const OBS_API_BUSY_GRACE_MS = Number(process.env.OBS_API_BUSY_GRACE_MS) || 120_000;
+// Ceiling on ONE busy episode, counted from its first signal. The grace window
+// above can be re-armed by a timeout (see pollKnowledgePipeline), which is what
+// lets a consolidation outlive a single grace period — but re-arming on the
+// absence of an answer must not become a way to forgive a genuinely dead
+// obs_api forever. Past this, timeouts stop being excused and the heal path
+// gets its say. Generous because consolidations legitimately run for minutes.
+const OBS_API_BUSY_MAX_MS = Number(process.env.OBS_API_BUSY_MAX_MS) || 900_000;
 let obsApiBusyUntil = 0;
+let obsApiBusySince = 0;
 
 /** Mark obs_api as legitimately busy for the next grace period. */
 function noteObsApiBusy(reason) {
-  const until = Date.now() + OBS_API_BUSY_GRACE_MS;
+  const now = Date.now();
+  // A new episode starts only when we were not already inside one, so the
+  // ceiling is measured from the first signal rather than the latest re-arm.
+  if (!obsApiBusyNow()) obsApiBusySince = now;
+  const until = now + OBS_API_BUSY_GRACE_MS;
   if (until > obsApiBusyUntil) {
     obsApiBusyUntil = until;
     log(`obs_api busy window opened (${reason}, ${Math.round(OBS_API_BUSY_GRACE_MS / 1000)}s)`, 'DEBUG');
@@ -675,6 +687,16 @@ function noteObsApiBusy(reason) {
 /** Whether obs_api is inside a known-busy window right now. */
 function obsApiBusyNow() {
   return Date.now() < obsApiBusyUntil;
+}
+
+/** Whether the current busy episode has run past OBS_API_BUSY_MAX_MS. */
+function obsApiBusyExhausted() {
+  return obsApiBusySince > 0 && (Date.now() - obsApiBusySince) >= OBS_API_BUSY_MAX_MS;
+}
+
+/** Consolidation finished (obs_api answered and reported nothing in flight). */
+function clearObsApiBusyEpisode() {
+  obsApiBusySince = 0;
 }
 
 /**
@@ -929,6 +951,21 @@ async function pollKnowledgePipeline() {
     // [📚] badge doesn't blank out during a consolidation burst.
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
     if (timedOut && obsApiBusyNow()) {
+      // Re-arm. A timeout arriving while we ALREADY believe obs_api is busy is
+      // itself evidence the consolidation is still running, and it is the only
+      // evidence available: the two other arming signals both need obs_api to
+      // answer (an inflight report) or a fresh dispatch, and a blocked event
+      // loop can supply neither. Without this the window is a fixed 120s from
+      // the last answer, so any consolidation outliving it fell through a gap
+      // and was reported as 'unreachable' — a red [📚] badge for a pipeline
+      // that was working hard. Observed 2026-09-07: window opened 05:28:47 on
+      // dispatch, expired 05:30:47, obs_api could not answer again until
+      // 05:41:07, and the badge showed a confirmed failure throughout.
+      //
+      // Bounded by OBS_API_BUSY_MAX_MS so this cannot forgive a dead obs_api
+      // indefinitely; a refused connection is still death on the first probe,
+      // because only timeouts reach this branch at all.
+      if (!obsApiBusyExhausted()) noteObsApiBusy('probe timed out while busy');
       const prev = currentState.knowledge_pipeline || {};
       currentState.knowledge_pipeline = {
         ...prev,
@@ -991,7 +1028,10 @@ async function pollKnowledgePipeline() {
   };
   // obs_api told us work is in flight — any timeout from here until the grace
   // period expires is that work blocking the loop, not a dead service.
+  // obs_api answered, so the loop is not blocked: either it is still working
+  // (re-arm) or the episode is over and the ceiling resets for the next one.
   if (body.inflight) noteObsApiBusy('inflight reported by obs_api');
+  else clearObsApiBusyEpisode();
   // NOTE: this is the ONLY call site, and it sits on the probe's success path,
   // where status is never 'unreachable' — so the unreachable branch inside the
   // FSM is currently unreachable itself and obs_api auto-heal has never fired
