@@ -2595,6 +2595,115 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Wave-analysis (UKB) — runs IN-PROCESS on the single-owner km-core store.
+//
+// Same reasoning as the LSL resolver above. km-core's LevelDB is
+// single-owner-rw and this process holds the lock, so the workflow runner
+// spawned by tools.ts could not open it: every wave-analysis run after the
+// Plan 44-12 cutover (2026-06-04) died one second in with "Database failed to
+// open" — 2026-07-01, twice on 2026-08-27, 2026-09-07. Rather than stopping
+// obs-api to free the lock (it is the designated owner, has KeepAlive=true and
+// a coordinator auto-heal), the run comes here and borrows the open store.
+//
+// Fire-and-forget with a 202, like /api/consolidation/run: a full run is tens
+// of minutes, far past any reverse-proxy timeout. Progress and the terminal
+// state land in .data/workflow-progress.json, which the dashboard already
+// polls; /api/workflows/wave-analysis/status reports this process's view.
+// ---------------------------------------------------------------------------
+const WORKFLOW_PROGRESS_FILE = path.join(REPO_ROOT, '.data', 'workflow-progress.json');
+
+let _waveRunPromise = null;      // in-flight run, or null
+let _waveRunStartedAt = null;    // ISO timestamp of the in-flight run
+let _waveRunJobId = 0;           // monotonic, surfaced in the 202
+let _waveRunLastResult = null;   // { success, totalEntities, waves, error? }
+let _waveRunLastFinishedAt = null;
+
+async function runWaveAnalysisInProcess(team) {
+  // Serialised deliberately: the shared workflow-state-machine is module-level
+  // singleton state and the progress file has a single writer. A second caller
+  // attaches to the in-flight run rather than starting a competing one.
+  if (_waveRunPromise) return _waveRunPromise;
+
+  _waveRunJobId += 1;
+  _waveRunStartedAt = new Date().toISOString();
+
+  _waveRunPromise = (async () => {
+    const store = await ensureKMStore();
+    if (!store) throw new Error('Knowledge graph store not ready');
+
+    // Imported lazily so a broken or unbuilt semantic-analysis dist cannot stop
+    // obs-api from starting — it only breaks this one endpoint.
+    const { runWaveAnalysis } = await import(
+      '../integrations/semantic-analysis/dist/run-wave-analysis.js'
+    );
+
+    return runWaveAnalysis({
+      repositoryPath: REPO_ROOT,
+      team: team || 'coding',
+      progressFile: WORKFLOW_PROGRESS_FILE,
+      kmStore: store,
+      logLine: (m) => process.stderr.write(`[obs-api] ${m}\n`),
+    });
+  })()
+    .then((result) => {
+      _waveRunLastResult = result;
+      return result;
+    })
+    .catch((err) => {
+      _waveRunLastResult = { success: false, totalEntities: 0, waves: 0, error: err.message };
+      throw err;
+    })
+    .finally(() => {
+      _waveRunLastFinishedAt = new Date().toISOString();
+      _waveRunPromise = null;
+      _waveRunStartedAt = null;
+    });
+
+  return _waveRunPromise;
+}
+
+/**
+ * POST /api/workflows/wave-analysis/run — start a run on the owned store.
+ * Body: { team?: string }
+ * Returns 202 immediately; a concurrent caller attaches to the in-flight run.
+ */
+app.post('/api/workflows/wave-analysis/run', (req, res) => {
+  if (_shuttingDown) {
+    return res.status(503).json({ success: false, error: 'Server is shutting down' });
+  }
+  const attached = !!_waveRunPromise;
+
+  // Swallow here: the error is kept in _waveRunLastResult for the status route.
+  // Without this an unhandledRejection is logged on every failed run.
+  runWaveAnalysisInProcess((req.body || {}).team).catch((err) => {
+    process.stderr.write(`[obs-api] wave-analysis async error: ${err.message}\n`);
+  });
+
+  res.status(202).json({
+    success: true,
+    accepted: true,
+    attached,
+    jobId: _waveRunJobId,
+    startedAt: _waveRunStartedAt,
+    progressFile: WORKFLOW_PROGRESS_FILE,
+  });
+});
+
+/** GET /api/workflows/wave-analysis/status — this process's view of the run. */
+app.get('/api/workflows/wave-analysis/status', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      running: !!_waveRunPromise,
+      jobId: _waveRunJobId,
+      startedAt: _waveRunStartedAt,
+      finishedAt: _waveRunLastFinishedAt,
+      lastResult: _waveRunLastResult,
+    },
+  });
+});
+
 // Phase 44 Plan 14 — guard auto-listen so the integration test
 // (tests/integration/obs-api.legacy-endpoints.km-core.test.js) can
 // import this module without triggering a real :12436 bind. The test
