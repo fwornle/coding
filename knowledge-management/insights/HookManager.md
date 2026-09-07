@@ -2,91 +2,81 @@
 
 **Type:** SubComponent
 
-HookManager works with the integrations/copi/docs/hooks.md file to provide hook event documentation.
+claude-bridge.js acts as the agent-native entry point: it reads stdin JSON, calls transformContext() to map Claude's PreToolUse/PostToolUse etc. into the unified event names, then lazily imports getHookManager() from hook-manager.js and calls manager.initialize(projectPath) only if not already initialized.
 
-## What It Is  
+# HookManager — Technical Insight Document
 
-`HookManager` is the sub‑component that lives inside the **ConstraintSystem** package. It is responsible for the complete lifecycle of hook events – from loading their definitions (either from a configuration file or a database) to dispatching those events to the handlers that have registered interest. The component’s documentation is anchored in the file **integrations/copi/docs/hooks.md**, which serves both as a reference for developers and as a source of metadata that the manager consumes at runtime. Internally, `HookManager` delegates the low‑level loading work to its child component **HookLoader**, while exposing a registration API that other parts of the system can use to plug in custom handlers.
+## What It Is
 
-## Architecture and Design  
-
-The design of `HookManager` follows a clear separation of concerns. The **loading** concern is isolated in the **HookLoader** child, allowing the manager to remain focused on **registration** and **dispatch**. This modular split is evident in the hierarchy: *ConstraintSystem → HookManager → HookLoader*. By keeping the loader distinct, the system can evolve the source of hook definitions (e.g., switching from a flat file to a database) without impacting the dispatch logic.
-
-`HookManager` implements a **registration‑dispatch** workflow. Handlers first invoke a registration mechanism to express interest in specific hook events. The manager maintains an internal registry that maps event identifiers to the set of subscribed handlers. When an event is triggered—either because the loader read it from the configuration or because another component raised it—`HookManager` uses its **hook dispatching mechanism** to iterate over the registry and invoke each handler in turn. This approach ensures loose coupling: handlers do not need to know about each other, and the manager does not need to know the concrete implementation details of any handler.
-
-The component also integrates documentation tightly with runtime behavior. By consulting **integrations/copi/docs/hooks.md** both for human‑readable reference and for loading hook metadata, `HookManager` guarantees that the runtime view of available hooks stays synchronized with the documented contract. This dual‑use of the same file reduces the risk of drift between code and documentation.
+HookManager is implemented primarily as `UnifiedHookManager` in `lib/agent-api/hooks/hook-manager.js`, alongside the module-level factory functions `getHookManager()` and `resetHookManager()` that manage its lifecycle. As a SubComponent of ConstraintSystem, it serves as the central dispatch and registration engine for the coding-tools hook architecture — the mechanism by which user-level and project-level configuration entries are merged and turned into an ordered, queryable set of event handlers. It is not merely a config loader; it is the orchestration layer that bridges agent-native hook systems (like Claude Code) into a common internal event model.
 
 ![HookManager — Architecture](images/hook-manager-architecture.png)
 
-## Implementation Details  
+## Architecture and Design
 
-* **Hook Loading** – The process begins with `HookLoader`, which reads hook definitions from either a configuration file or a database. Although the exact class name for the loader is not listed, the observation that “HookManager contains HookLoader” tells us that the loader is instantiated and invoked by the manager during initialization. The loader likely parses the **integrations/copi/docs/hooks.md** file to extract hook signatures, descriptions, and any default parameters.
+The core design pattern is a **layered configuration override with deterministic dispatch ordering**. `initialize(projectPath)` loads user configuration first via `loadConfig(userConfigPath, 'user')`, then project configuration via `loadConfig(projectConfigPath, 'project')`, so project-level entries always take precedence by virtue of loading — and thus overwriting — after user entries. This mirrors the same two-phase pattern implemented independently in `UnifiedHookManagerConfigLoader`, which computes `projectConfigPath` as `path.join(projectPath, '.coding', 'hooks.json')` and performs the identical user-then-project sequencing.
 
-* **Registration Mechanism** – `HookManager` exposes an API (e.g., `registerHandler(eventName, handler)`) that lets external modules add their handler functions to the internal registry. The registry is a data structure—most probably a map from event identifiers to an array of handler callbacks. Because the manager “relies on the integrations/copi/docs/hooks.md file for hook event documentation,” registration may include validation against the documented schema to prevent mismatched event names.
+Internally, the manager uses a **pre-populated Map keyed by the HookEvent enum** (imported from hooks-api.js), initialized in the constructor with an empty array for every event value. This is a deliberate defensive design choice: it eliminates null-checking at lookup time, trading a small amount of upfront memory for simplified, safer dispatch code paths.
 
-* **Dispatching Mechanism** – When a hook event occurs, the manager looks up the corresponding handler list and invokes each handler in sequence (or possibly in parallel, though the observations do not specify concurrency). The dispatch flow is described as “utilizes a hook dispatching mechanism to send events to registered handlers,” indicating a dedicated routine that abstracts the iteration and error handling for each handler invocation.
+Handler registration follows an **idempotent upsert pattern** rather than naive appending: `registerHandler()` generates a fallback ID (`${event}-${handler.type}-${Date.now()}`) when none is provided, then searches `eventHandlers` by ID to overwrite existing entries in place. Combined with an eager `sort((a, b) => a.priority - b.priority)` executed on every registration, this guarantees handlers are always stored in priority order, pushing the sorting cost to write-time rather than read/dispatch-time — an explicit space/time trade-off favoring fast, predictable dispatch.
 
-* **Lifecycle Management** – Beyond registration and dispatch, `HookManager` “is responsible for managing the lifecycle of hook events and handlers.” This suggests that it may also provide facilities for deregistering handlers, pausing/resuming event propagation, and cleaning up resources when the parent **ConstraintSystem** shuts down.
-
-* **Documentation Coupling** – The repeated mention that `HookManager` “works with the integrations/copi/docs/hooks.md file to provide hook event documentation” implies that the manager may expose a method to retrieve the documentation programmatically (e.g., `getHookDocs()`), enabling UI components or API consumers to present up‑to‑date hook information.
+Error handling follows a **fail-soft philosophy**: `loadConfig()` swallows non-ENOENT errors by logging them via `logger.error` instead of throwing, so malformed `hooks.json` degrades gracefully to "no hooks loaded." This same philosophy propagates outward into the ClaudeBridge child component.
 
 ![HookManager — Relationship](images/hook-manager-relationship.png)
 
-## Integration Points  
+## Implementation Details
 
-`HookManager` sits directly under **ConstraintSystem**, making it a core service for any component that needs to react to system‑wide events. Its siblings—**GraphDatabaseManager**, **ContentValidator**, **ViolationCaptureModule**, **WorkflowManager**, and **ConstraintConfigurationManager**—share the same parent and therefore have similar access patterns to the broader configuration and persistence layers. For example, just as **WorkflowManager** loads workflow definitions from a configuration source, `HookManager` loads hook definitions from a similar source, hinting at a consistent configuration‑loading strategy across the subsystem.
+The class `UnifiedHookManager` [CGR] anchors hook-manager.js, exposing `initialize(projectPath)`, `registerHandler()`, and implicitly `unregisterHandler()` (per parent architecture description). Module-level helpers `getHookManager()` [CGR] and `resetHookManager()` [CGR] provide singleton-style access and test/reset support, consistent with claude-bridge.js's usage pattern of lazily importing `getHookManager()` and calling `manager.initialize(projectPath)` only if not already initialized — avoiding redundant config reloads across repeated invocations.
 
-External modules register their callbacks with `HookManager` through the registration API. Because the manager does not prescribe how a handler implements its logic, any component (including the sibling modules) can become a hook consumer. Conversely, when `HookManager` dispatches an event, the payload may include references to entities managed by other siblings (e.g., a graph node from **GraphDatabaseManager** or a validation result from **ContentValidator**), enabling cross‑component coordination without tight coupling.
+Configuration application is conservative: settings like `enableLogging`, `stopOnError`, and `timeout` are applied only when explicitly defined (`!== undefined` checks), as implemented in the sibling HookConfigLoader, preserving constructor defaults otherwise. This ensures partial config files don't inadvertently reset established behavior.
 
-The child **HookLoader** is the only direct implementation dependency inside the manager. Should the source of hook definitions change (e.g., moving from a static markdown file to a dynamic database table), only `HookLoader` would need to be updated, leaving the registration and dispatch logic untouched.
+Duplicate handling logic (`findIndex(h => h.id === id)`) and the fallback ID generation scheme together form a de facto handler identity system without requiring a separate registry structure — the array itself doubles as the lookup and storage mechanism per event.
 
-## Usage Guidelines  
+## Integration Points
 
-1. **Register Early, Deregister When Done** – Handlers should register their interest during component initialization and explicitly deregister when the component is disposed. This prevents stale callbacks from lingering after a module has been unloaded.
+HookManager sits under ConstraintSystem as the orchestration core, working alongside sibling components: HookConfigLoader (structural validation and settings merge logic), ViolationCaptureService (persists dispatch outcomes to JSONL and aggregate history), KnowledgeInjectionHooks, and HealthPromptHook, all of which register into the unified handler model.
 
-2. **Validate Against Documentation** – When registering, developers should verify that the event name matches one documented in **integrations/copi/docs/hooks.md**. This practice avoids runtime mismatches and keeps the system’s contract clear.
+Its child components implement or consume specific facets of this design: **ClaudeBridge** (claude-bridge.js) acts as the agent-native entry point, reading stdin JSON, using `EVENT_MAP` to translate Claude's `PreToolUse`/`PostToolUse` events into unified names (`pre-tool`/`post-tool`) via `transformContext()`, then invoking the manager. **HooksApiInterface** enforces an abstract base contract (`HooksManager` throws if instantiated directly), ensuring proper subclassing discipline. **HookMigrationTool** provides CLI-driven migration (`--dry-run`, `--no-backup`, `--force`, `--source`, `--project`) for transitioning configurations into the unified format. **UnifiedHookManagerConfigLoader** duplicates/implements the initialize sequencing logic described above, forming the config-loading half of the manager's responsibilities.
 
-3. **Keep Handlers Lightweight** – Since the dispatch mechanism iterates over all registered handlers, long‑running or blocking operations inside a handler can delay other listeners. If heavy work is required, handlers should off‑load to background jobs or async queues.
+## Usage Guidelines
 
-4. **Leverage the Documentation API** – If a UI or external API needs to expose available hooks, use the manager’s documentation retrieval functions (if exposed) rather than parsing the markdown file directly. This ensures the view stays in sync with the runtime loader.
+Developers extending HookManager should register handlers with explicit, stable IDs where duplicate-overwrite semantics matter — relying on the auto-generated timestamp-based ID makes handlers effectively non-overwritable across calls unless the same event/type collide within the same millisecond. Priority values should be treated as the sole dispatch-order mechanism since sorting happens automatically on registration; no manual sort step is needed or should be added downstream.
 
-5. **Respect Lifecycle Hooks** – `HookManager` may emit lifecycle events (e.g., “hookLoaded”, “hookDisposed”). Components that need to perform setup or teardown should listen for these rather than relying on external timing.
+Because `loadConfig()` never throws on malformed JSON (aside from ENOENT), consumers should rely on `logger.error` output — not exceptions — to detect configuration issues; the system is designed to degrade to "no hooks loaded" rather than block execution. This fail-soft posture is amplified in ClaudeBridge, which is explicitly fail-open: any thrown error during bridge execution is caught in `main()` and still emits `{decision:'allow', ...}` with exit code 0, ensuring a broken bridge never blocks Claude Code — a critical guideline for anyone modifying bridge or manager initialization logic, since introducing a hard failure there would violate this core safety guarantee.
 
----
 
-### Architectural patterns identified  
-* Separation of concerns between loading (HookLoader) and event management (HookManager).  
-* Registration‑dispatch workflow that decouples producers (event sources) from consumers (handlers).  
+## Code Evidence
 
-### Design decisions and trade‑offs  
-* **File‑based documentation as source of truth** – Guarantees alignment between code and docs but ties the runtime to the presence and format of a markdown file.  
-* **Child loader component** – Improves modularity and testability; however, adds an extra indirection that may affect startup latency if loading is heavyweight.  
+Key code artifacts grounding this entity's analysis:
 
-### System structure insights  
-* `HookManager` is a leaf sub‑component of **ConstraintSystem** and a sibling to other configuration‑driven managers, suggesting a cohesive design where each manager handles a distinct domain (hooks, workflows, constraints, etc.).  
+**Structural:**
+- UnifiedHookManager (class) in hook-manager.js
+- getHookManager (function) in hook-manager.js
+- resetHookManager (function) in hook-manager.js
 
-### Scalability considerations  
-* The current registration‑dispatch model scales linearly with the number of handlers per event. If the system grows to hundreds of listeners, dispatch latency could increase; introducing batching or asynchronous dispatch could mitigate this.  
-
-### Maintainability assessment  
-* Strong coupling to a single documentation file simplifies maintenance—updates to hook definitions are made in one place.  
-* The clear division between loader and manager, together with the explicit registration API, makes the component easy to test and evolve independently of its siblings.
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is implemented in the storage/graph-database-adapter.ts file. This adapter enables the system to store and retrieve graph structures using Graphology and LevelDB, with automatic JSON export sync. The use of Graphology allows for efficient graph operations, while LevelDB provides a robust and scalable storage solution. The GraphDatabaseAdapter class in storage/graph-database-adapter.ts is responsible for managing the graph database, including creating and deleting graphs, as well as handling graph queries. The automatic JSON export sync feature ensures that the graph data is consistently updated and available for other components to access.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem provides rule-based validation and enforcement of code actions and file operations during Claude Code sessions, spanning hook configuration loading, hook dispatch orchestration, and violation capture/persistence. It is built around a unified hook architecture that merges user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) configurations, with project config taking precedence, and dispatches events (pre-tool, post-tool, pre-prompt, post-prompt, startup, shutdown, error) to registered handlers of type script, command, or module.
+
+Core orchestration lives in UnifiedHookManager (lib/agent-api/hooks/hook-manager.js), which maintains a Map of event names to sorted handler arrays (by priority), supports duplicate-ID overwrite semantics, and exposes registerHandler/unregisterHandler APIs bridging agent-native hook systems to a common HookEvent enum. Configuration parsing and structural validation is handled separately by HookConfigLoader (lib/agent-api/hooks/hook-config.js), which loads, merges, and validates settings/hooks blocks, logging warnings (not throwing) on malformed entries.
+
+Violation detection results are captured and persisted via ViolationCaptureService (scripts/violation-capture-service.js), which writes JSONL violation records to .mcp-sync/session-violations.jsonl and maintains an aggregated violation-history.json with session tracking and computed statistics (severity breakdowns, most common constraint, average violations per session) for dashboard consumption. Sensitive parameter values are redacted before being written to logs, and history is capped at 1000 entries to bound file growth.
 
 ### Children
-- [HookLoader](./HookLoader.md) -- The integrations/copi/docs/hooks.md file provides a reference for hook functions, indicating the importance of hook loading in the overall system.
+- [ClaudeBridge](./ClaudeBridge.md) -- EVENT_MAP in claude-bridge.js maps native events like 'PreToolUse' and 'PostToolUse' to unified names 'pre-tool' and 'post-tool'.
+- [HooksApiInterface](./HooksApiInterface.md) -- HooksManager's constructor throws if instantiated directly ('HooksManager is abstract and cannot be instantiated directly'), enforcing subclassing.
+- [HookMigrationTool](./HookMigrationTool.md) -- parseArgs() supports --dry-run, --no-backup, --force, --source, and --project flags for controlling migration behavior.
+- [UnifiedHookManagerConfigLoader](./UnifiedHookManagerConfigLoader.md) -- initialize(projectPath) first calls loadConfig(this.config.userConfigPath, 'user') then, if a projectPath is given, sets projectConfigPath to path.join(projectPath, '.coding', 'hooks.json') and calls loadConfig(..., 'project'), so project config loads and registers after user config.
 
 ### Siblings
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to manage graph database operations.
-- [ContentValidator](./ContentValidator.md) -- ContentValidator checks entity content against predefined validation rules to ensure accuracy and consistency.
-- [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule captures constraint violations from tool interactions and stores them in a database.
-- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager loads workflow definitions from a configuration file or database.
-- [ConstraintConfigurationManager](./ConstraintConfigurationManager.md) -- ConstraintConfigurationManager loads constraint configurations from a configuration file or database.
+- [HookConfigLoader](./HookConfigLoader.md) -- loadConfig() in hook-manager.js applies config.settings.enableLogging, stopOnError, and timeout only when explicitly defined in the file (`!== undefined` checks), preserving constructor defaults otherwise.
+- [ViolationCaptureService](./ViolationCaptureService.md) -- Per architecture description, ViolationCaptureService writes JSONL violation records to .mcp-sync/session-violations.jsonl, separating an append-only raw log from a computed aggregate file.
+- [KnowledgeInjectionHooks](./KnowledgeInjectionHooks.md) -- knowledge-injection-hook.js's isInjectionEnabled() reads process.env.CODING_KNOWLEDGE_INJECTION and treats only '0'/'false'/'off' (case-insensitive) as disabling, defaulting to enabled for unset values.
+- [HealthPromptHook](./HealthPromptHook.md) -- checkHealthStatus() uses existsSync(VERIFIER_SCRIPT) as a heuristic to detect 'outside the coding repo' and returns servicesAvailable:false rather than attempting a network call in that case (Q3 carve-out).
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 10 observations*

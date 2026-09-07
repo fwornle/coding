@@ -2,55 +2,61 @@
 
 **Type:** SubComponent
 
-DMRProvider is documented alongside env vars like QWEN_LOCAL_API_KEY and QWEN_LAPTOP_API_BASE_URL, indicating it targets locally hosted Qwen-family models
+DMRProvider (dmr-provider.ts) implements an OpenAI-compatible client interface so it can be substituted for remote providers without changing call sites
 
-# DMRProvider: Technical Insight Document
+# DMRProvider — Technical Insight Document
 
 ## What It Is
 
-DMRProvider is a provider implementation within the LLMAbstraction component that wraps Docker Model Runner's OpenAI-compatible API surface. It exists specifically to support locally hosted inference, targeting the Qwen-family of models as evidenced by its documentation alongside environment variables such as `QWEN_LOCAL_API_KEY` and `QWEN_LAPTOP_API_BASE_URL`. Rather than introducing a bespoke request/response protocol, DMRProvider deliberately conforms to the OpenAI-style client shape, allowing existing code paths built for OpenAI-compatible clients to be reused without modification when talking to a locally running model runner.
+DMRProvider is implemented in `dmr-provider.ts` as a local inference backend that adheres to an OpenAI-compatible client interface. This interface conformance is the defining architectural characteristic of the component: by matching the shape of remote LLM providers, DMRProvider can be substituted at call sites without requiring changes to consuming code. It exists within the broader LLMAbstraction component, sitting alongside sibling implementations like ProxyCompletionClient as one of several interchangeable completion-serving mechanisms.
 
-![DMRProvider — Architecture](images/dmrprovider-architecture.png)
+Its principal distinguishing trait—stated explicitly in the observations—is that it does not require network egress. This single property is what makes DMRProvider relevant to multiple other subsystems: the offload gating logic, the LLM mode-resolution logic, and cost/telemetry systems that need to distinguish local from remote execution paths.
 
 ## Architecture and Design
 
-The defining architectural decision behind DMRProvider is its adapter-style relationship to the OpenAI API contract: by exposing the same request/response shape as OpenAI, it lets the rest of the LLMAbstraction layer treat local inference as a drop-in alternative to remote/public providers, rather than requiring provider-aware branching throughout the codebase. This mirrors a broader pattern in the parent LLMAbstraction component, which centralizes dispatch logic in a mode-resolution hierarchy rather than scattering provider-selection logic across callers.
+The core design pattern here is the **interface substitution / adapter pattern**: DMRProvider wraps a local model runtime behind an OpenAI-compatible surface so that any code written against the standard completion API can transparently target either a remote provider or this local one. This is a deliberate trade-off — sacrificing some flexibility in how local inference is exposed in exchange for uniformity across the LLMAbstraction call sites.
 
-Selection of DMRProvider is entirely gated by LLMMockService's mode-resolution chain — DMRProvider is only invoked when `getLLMMode()` resolves to `'local'` for a given agent. This resolution follows the strict precedence order documented for the parent component: per-agent override, then global mode, then the legacy `mockLLM` boolean, and finally the `'public'` default. DMRProvider itself has no awareness of this precedence logic; it simply becomes the active implementation when the upstream decision lands on `'local'`. This separation of concerns is intentional — the provider isolates local-inference-specific error handling and quirks so that they do not leak back into the mode-resolution layer, keeping LLMMockService generic and provider-agnostic.
+![DMRProvider — Architecture](images/dmrprovider-architecture.png)
+
+DMRProvider is also woven into the **offload decision system**. It is positioned as a "local target" option evaluated by OffloadDecisionEngine's `evaluateOffload()` function in `offload-gates.ts`. This function reproduces a specific short-circuit gate order (considered→route-allows→band→target→target-band→scope→transport→offloaded) that determines the reason string attributed to any offload decision. DMRProvider's role in this chain is as the "no network required" branch: because it doesn't require egress, it interacts directly with the `requireNetwork` gate, effectively acting as a fallback/local path that can satisfy routing without triggering network-dependent gates like `band` or `transport`. Architecturally, this means DMRProvider is not just a completion backend but a first-class value in the OffloadTarget.provider enumeration that the gating logic branches on.
 
 ## Implementation Details
 
-At its core, DMRProvider's implementation responsibility is translating calls into Docker Model Runner's OpenAI-compatible endpoints. Because it reuses the OpenAI request/response shape, the provider likely does minimal transformation work relative to providers that must reformat requests for a divergent API — its main technical burden is instead configuration-driven: resolving the correct local endpoint and credentials from environment variables like `QWEN_LOCAL_API_KEY` and `QWEN_LAPTOP_API_BASE_URL` rather than reshaping payloads.
+While no code symbols were enumerated for this component, the observations establish its functional contract precisely: it must expose an OpenAI-compatible client interface (mirroring method signatures/response shapes expected by consumers), and it must be referenceable as a `provider` value within `OffloadTarget.provider` entries in `offload-gates.ts`. This implies DMRProvider likely exports a class or factory function conforming to a shared completion-client interface type, consistent with how ProxyCompletionClient (a sibling) tags requests with process identifiers for `llm-with-process.ts`.
 
-Error handling is a notable implementation concern called out explicitly in the observations: provider-specific failure modes (e.g., local runner unavailability, model-loading issues) are handled within DMRProvider itself rather than being propagated in a way that would force LLMMockService or the mode-resolution logic to understand DMR-specific failure semantics. This containment strategy keeps the provider swappable and the orchestration layer simple.
+DMRProvider's selection as the active backend is driven externally by mode-resolution logic in the parent LLMAbstraction component — specifically `getLLMMode()` and `isMockLLMEnabled()` in `llm-mock-service.ts`. When these functions resolve to a non-mock, local mode, DMRProvider is the backend most likely selected to serve inference. This establishes an important implementation dependency: DMRProvider itself does not decide when it's used; it is a passive target selected by upstream mode-resolution and offload-decision logic.
 
 ## Integration Points
 
 ![DMRProvider — Relationship](images/dmrprovider-relationship.png)
 
-DMRProvider is contained within LLMAbstraction, alongside sibling components LLMMockService, LLMWithProcessClient, CostModel, and ProxyURLResolver. Its most direct integration point is with LLMMockService, whose `getLLMMode()` function in `llm-mock-service.ts` acts as the gatekeeper determining whether DMRProvider is invoked at all for a given agent call. Unlike LLMWithProcessClient, which bypasses higher-level SDK abstractions with a direct `fetch()` call to `/api/complete` on rapid-llm-proxy, DMRProvider instead relies on the OpenAI-compatible client abstraction to reach Docker Model Runner — a contrasting integration style within the same sibling set that reflects the different target backends (remote proxy vs. local runner).
+DMRProvider integrates with the system along three primary axes:
 
-While no direct observation ties DMRProvider to CostModel or ProxyURLResolver, its position as a peer within LLMAbstraction suggests it operates independently of the proxy-URL-resolution concerns (relevant to remote/public providers) and of cost-modeling concerns (which map token counts to pricing tables) — local inference via Docker Model Runner does not carry the same per-token billing considerations as hosted providers.
+1. **LLMAbstraction (parent)** — DMRProvider is one of the concrete backends contained within LLMAbstraction, alongside siblings ProxyCompletionClient, CostModelEngine, ModelNormalization, and OffloadDecisionEngine. Its activation is gated by the four-tier mode-resolution precedence chain (per-agent override → global mode → legacy `mockLLM` flag → 'public' fallback) defined in the parent's `getLLMMode()`.
+
+2. **OffloadDecisionEngine (sibling)** — DMRProvider is a referenced value within `OffloadTarget.provider` entries and is evaluated by `evaluateOffload()` in `offload-gates.ts`. Its no-egress property makes it specifically relevant to the `requireNetwork` gate, differentiating it from network-aware remote targets.
+
+3. **Interface conformance with remote providers** — Because DMRProvider matches the OpenAI-compatible interface, it can theoretically interoperate with downstream consumers (such as cost tracking via CostModelEngine or process tagging via ProxyCompletionClient) without those systems needing DMRProvider-specific logic, provided model identifiers are normalized consistently (per ModelNormalization).
 
 ## Usage Guidelines
 
-Developers seeking to route an agent to local inference should ensure the mode-resolution chain actually resolves to `'local'` for that agent — since per-agent overrides silently win over global settings, simply expecting DMRProvider to activate based on a global mode change may not be sufficient, and the four-level precedence (per-agent, global, legacy `mockLLM`, default `'public'`) must be checked to diagnose unexpected routing behavior.
+Developers should treat DMRProvider as a drop-in local substitute for remote completion clients — call sites should not special-case it beyond what the OpenAI-compatible interface already supports, preserving the abstraction's value. When debugging why a request went to DMRProvider instead of a remote provider, check the mode-resolution chain in `llm-mock-service.ts` first (per-agent overrides in `workflow-progress.json` can silently override global settings), and then check `evaluateOffload()`'s gate order in `offload-gates.ts` to see whether `requireNetwork` or another gate routed the call locally.
 
-Configuration of DMRProvider should be done through the documented Qwen-oriented environment variables (`QWEN_LOCAL_API_KEY`, `QWEN_LAPTOP_API_BASE_URL`), and developers should expect Docker Model Runner to be running locally and exposing an OpenAI-compatible endpoint. Because DMRProvider absorbs its own provider-specific error handling, failures surfaced from this path should be treated as local-environment issues (e.g., runner not started, model not loaded) rather than issues with the mode-resolution logic itself — troubleshooting should start with the DMR/runner setup before suspecting LLMMockService's dispatch logic.
+Because gate order in `evaluateOffload()` determines the reported reason string, any change to DMRProvider's registration as an `OffloadTarget.provider` should be validated against the existing gate sequence to avoid misattributing offload reasons. Finally, since DMRProvider has no enumerated code symbols in this analysis, any deeper implementation changes should begin by locating and documenting its actual class/function structure in `dmr-provider.ts` to keep this reference accurate going forward.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component implements a mode-resolution hierarchy that is critical for understanding how any given agent call is actually dispatched. getLLMMode() in llm-mock-service.ts checks, in strict order: a per-agent override (allowing individual agents to be pinned to mock/local/public independently of global state), then a global mode setting, then a legacy mockLLM boolean flag (retained for backward compatibility with older config schemas), and finally falls back to 'public' as the safe default. This layered precedence means a developer debugging unexpected LLM behavior for a specific agent must check all four levels rather than assuming the global setting applies uniformly—per-agent overrides silently win even if the global mode says otherwise, which is a common source of confusion during multi-agent experiments.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The mode-resolution logic in getLLMMode() (llm-mock-service.ts) establishes a clear precedence chain that new developers must understand before debugging unexpected LLM behavior: per-agent overrides in workflow-progress.json take precedence over a global mode setting, which in turn overrides a legacy mockLLM boolean flag, with 'public' as the ultimate fallback. This four-tier resolution means that a developer trying to force mock mode for testing might set the global mode but be silently overridden by a stale per-agent override left in workflow-progress.json from a previous run. The dual-checking of both llmState (new) and mockLLM (legacy) shapes in isMockLLMEnabled() and getLLMState() is a deliberate backward-compatibility shim, indicating the config schema evolved over time but old state files or tooling that only write the legacy flag must continue to work without breaking the mock system.
 
 ### Siblings
-- [LLMMockService](./LLMMockService.md) -- getLLMMode() in llm-mock-service.ts implements a strict precedence chain: per-agent override, then global mode, then legacy mockLLM boolean, then 'public' default
-- [LLMWithProcessClient](./LLMWithProcessClient.md) -- LLMWithProcessClient bypasses higher-level SDK abstractions in favor of a direct fetch() call to /api/complete on rapid-llm-proxy
-- [CostModel](./CostModel.md) -- CostModel contains pure functions mapping token counts to €/$ costs based on per-provider pricing tables
-- [ProxyURLResolver](./ProxyURLResolver.md) -- ProxyURLResolver reads environment variables such as RAPID_LLM_PROXY_URL and LLM_CLI_PROXY_URL to decide which endpoint to use
+- [ProxyCompletionClient](./ProxyCompletionClient.md) -- llm-with-process.ts tags each completion request with a process identifier, which downstream shows up as CostRow.process in cost-model.ts
+- [CostModelEngine](./CostModelEngine.md) -- priceForModel() implements a three-tier resolution: exact model key match, family-representative fallback via FAMILY_REPRESENTATIVE, then generic family match, defaulting to a zero-priced 'none' source
+- [ModelNormalization](./ModelNormalization.md) -- Model identifiers normalized here feed directly into CostConfig.modelPrices keys consumed by priceForModel() in cost-model.ts
+- [OffloadDecisionEngine](./OffloadDecisionEngine.md) -- evaluateOffload() in offload-gates.ts reproduces the proxy's short-circuit gate order exactly (considered→route-allows→band→target→target-band→scope→transport→offloaded), because gate order determines which reason string is attributed to a call
 
 
 ---
 
-*Generated from 4 observations*
+*Generated from 5 observations*

@@ -2,58 +2,75 @@
 
 **Type:** SubComponent
 
-Pipeline stages include a coordinator agent that sequences execution across semantic-analysis-agent.ts and ontology-classification-agent.ts, matching the two-stage extraction/classification split described for SemanticAnalysis
+[CGR] Imports: graphify/analyze.py, god_nodes, surprising_connections, suggest_questions, graphify/build.py, build_from_json, graphify/cluster.py, cluster, score_all, detect.py (+10 more)
 
-# Pipeline: Technical Insight Document
+# Pipeline — Technical Insight Document
 
 ## What It Is
 
-Pipeline is the orchestration layer of the SemanticAnalysis subsystem, responsible for sequencing a multi-stage batch-analysis workflow. It does not perform extraction or classification itself; rather, it coordinates execution across `semantic-analysis-agent.ts` and `ontology-classification-agent.ts`, along with additional stages for observation generation, deduplication, and persistence. As the parent SemanticAnalysis component describes, the underlying workflow extracts raw entities and relationships from git history and LSL (session log) data, then maps them into a hierarchical ontology — Pipeline is the mechanism that ties these steps together in the correct order.
-
-![Pipeline — Architecture](images/pipeline-architecture.png)
+Pipeline is the SubComponent representing the ordered, staged execution model that underlies the semantic-analysis workflow, defined primarily through `AGENT_SUBSTEPS['semantic_analysis']` in `multi-agent-graph.tsx`. It is not a single class but a declarative structure describing four sequential sub-steps — parse, extract, relate, enrich — each carrying explicit metadata about inputs, outputs, and LLM usage tier. This same pattern of declaring a pipeline as an ordered list of typed sub-steps recurs elsewhere in the codebase, notably in `AGENT_SUBSTEPS['kg_operators']` (conv/aggr/embed/dedup/pred/merge) and `AGENT_SUBSTEPS['git_history']` (fetch/diff/extract), indicating "Pipeline" is a general architectural idiom rather than a one-off implementation. As a child of SemanticAnalysis, Pipeline realizes the multi-agent workflow's extraction phase described at the parent level, while its own child, RelationDiscovery, implements the 'relate' stage explicitly.
 
 ## Architecture and Design
 
-The central architectural pattern is coordinator-driven staged execution. A dedicated CoordinatorAgent (Pipeline's child component) sequences execution across the semantic-analysis-agent.ts and ontology-classification-agent.ts stages, explicitly implementing the two-stage extraction/classification split defined at the SemanticAnalysis level. This is a deliberate separation-of-concerns design: each stage — extraction, classification, observation generation, deduplication, knowledge-graph (KG) writes, and persistence — is isolated so it can be independently developed, tuned, and tested.
+The core design pattern is a declarative, metadata-driven staged pipeline: each sub-step is described with an explicit inputs/outputs contract and an `llmUsage` classification (`none`, `standard`, `fast`, or `premium` as seen in sibling Insights' 'patterns' step). This lets the system reason about cost and capability per stage without inspecting implementation code — a deliberate trade-off favoring inspectability and tunability over flexibility of ad hoc step definition.
 
-Beyond the two primary agents, the pipeline introduces additional intermediate stages not visible at the SemanticAnalysis level alone: an observation-generation stage that runs prior to KG operator invocation (producing an intermediate representation before any graph writes occur), a deduplication stage that runs as a distinct step rather than being folded into extraction, and a persistence stage that decouples in-memory KG operator results from durable storage. This yields a clear staged pipeline: extract → classify → generate observations → deduplicate → write to KG (in-memory) → persist (durable). Each boundary represents a conscious decoupling decision favoring modularity over a monolithic, tightly-coupled extraction-to-storage flow.
+![Pipeline — Architecture](images/pipeline-architecture.png)
+
+Stages are strictly ordered and data-dependent: 'parse' produces parsed content consumed by 'extract', whose entities feed 'relate', whose relations feed 'enrich'. This mirrors the parent SemanticAnalysis's separation-of-concerns philosophy (extraction agent vs. classification agent), applied at finer granularity within a single agent's internal pipeline. The `git_history` sub-pipeline (fetch/diff/extract) acts as an upstream ingestion pipeline that feeds into this same semantic extraction stage, while `kg_operators` acts as a downstream parallel pipeline consuming semantic_analysis's outputs for embedding and deduplication — establishing Pipeline as a middle link in a larger multi-stage graph.
 
 ## Implementation Details
 
-The coordinator agent pattern is the mechanical backbone of Pipeline: it invokes semantic-analysis-agent.ts to extract raw entities/relationships from git and LSL data, then hands the extracted output to ontology-classification-agent.ts for hierarchical classification. Because these agents are coordinated rather than directly chained, they function as independently swappable stages — the coordinator mediates data flow rather than the stages calling each other directly.
+Each sub-step entry encodes a `techNote` describing its underlying mechanism: 'parse' is explicitly rule-based (`llmUsage:'none'`, "Rule-based parsing"), deliberately avoiding LLM cost for deterministic content parsing. 'extract' (Entity Extraction) is LLM-powered NER (`llmUsage:'standard'`) consuming 'Parsed content' and 'Domain context'. 'relate' (Relation Discovery) consumes 'Entities' and 'Context windows' to produce 'Entity relations' and 'Relation types' — this is the exact contract implemented by the child component RelationDiscovery. 'enrich' (Context Enrichment) uses a cheaper `llmUsage:'fast'` tier with "Fast context summarization" techNote, producing 'Enriched entities' and 'Observations', reflecting a cost-conscious design that reserves premium/standard LLM usage for stages that need it and downgrades enrichment to a fast tier.
 
-Following classification, a separate observation-generation stage produces an intermediate representation of the analyzed data. This representation exists specifically to precede KG operator invocation, implying that raw classified entities are transformed into an observation format suitable for graph construction before any write operations touch the knowledge graph.
-
-Deduplication is implemented as its own stage, operating on entities merged from both git history and LSL session data after extraction — meaning duplicate detection is a cross-source concern handled post-hoc rather than during per-source extraction. Finally, persistence is isolated as a dedicated agent stage, separating the in-memory results produced by KG operator invocation from the actual durable write. This split allows KG operations to be validated or manipulated in memory before committing to storage.
-
-![Pipeline — Relationship](images/pipeline-relationship.png)
+Separately, at the operational/testing layer, concrete pipeline execution and validation appear via `run_pipeline` and `full_pipeline` (in `sample_calls.py`), and a battery of tests in `test_pipeline.py` (`test_pipeline_runs_end_to_end`, `test_pipeline_graph_has_edges`, `test_pipeline_all_nodes_have_community`, `test_pipeline_report_mentions_top_god_node`, `test_pipeline_detection_finds_code_and_docs`, `test_pipeline_incremental_update`). These tests imply the pipeline builds a graph (`build_from_json` from `graphify/build.py`), clusters it (`cluster`, `score_all` from `graphify/cluster.py`), analyzes it (`god_nodes`, `surprising_connections`, `suggest_questions` from `graphify/analyze.py`), and detects entities via `detect.py`, supporting incremental updates rather than only full rebuilds. `pollKnowledgePipeline` in `health-coordinator.js` suggests a separate health/monitoring hook into pipeline execution status.
 
 ## Integration Points
 
-Pipeline sits directly beneath SemanticAnalysis, which supplies the conceptual two-stage extraction/classification design that Pipeline operationalizes via its CoordinatorAgent. Its sibling Ontology component depends on the output of the classification stage coordinated here — ontology-classification-agent.ts consumes entities produced by semantic-analysis-agent.ts and positions them within the upper/lower ontology hierarchy that Ontology governs. Its other sibling, Insights, sits further downstream, consuming ontology-classified entities (themselves dependent on Pipeline's staged output) rather than raw extraction data — meaning Pipeline's staging decisions directly determine the shape of data available for insight generation.
+![Pipeline — Relationship](images/pipeline-relationship.png)
 
-Internally, Pipeline's only explicit child is CoordinatorAgent, which implements the sequencing logic described above. The KG operator is another key integration point: the observation-generation stage feeds it an intermediate representation, and the persistence stage handles its durable output — making the KG operator a pivot around which two of Pipeline's stages are organized.
+Pipeline integrates upstream with `git_history`'s fetch/diff/extract sub-pipeline, which supplies raw commit diffs into the semantic extraction stage. Downstream, `kg_operators` consumes semantic_analysis outputs for embedding and deduplication, forming a three-stage macro-pipeline (ingest → semantic analysis → knowledge-graph operations). Within SemanticAnalysis, Pipeline sits alongside sibling Ontology's `ontology_classification` sub-steps (match/validate/extend) and Insights' `insight_generation` sub-steps (e.g., 'patterns'), all following the same declarative sub-step convention, suggesting a shared schema/interface across agent pipelines in `multi-agent-graph.tsx`. Its child RelationDiscovery is a direct, named realization of the 'relate' entry's input/output contract. Operationally, `health-coordinator.js`'s `pollKnowledgePipeline` and calls like `noteObsApiBusy`/`obsApiBusyNow`/`evaluateObsApiAutoHeal` indicate integration with a health-monitoring/auto-heal subsystem tracking pipeline load.
 
 ## Usage Guidelines
 
-Developers extending Pipeline should preserve the staged, coordinator-mediated structure rather than introducing direct calls between agents — the value of this design is that semantic-analysis-agent.ts and ontology-classification-agent.ts (and other stages) remain independently swappable. New extraction or classification logic should be added as alternate implementations behind the existing stage boundaries rather than embedded into the coordinator itself.
+Developers extending Pipeline should preserve the declared inputs/outputs contract per sub-step so downstream consumers (RelationDiscovery, kg_operators) remain compatible. LLM-usage tiers should be assigned deliberately: reserve 'none' for deterministic logic (as in 'parse'), 'fast' for lightweight summarization tasks (as in 'enrich'), and 'standard'/'premium' for tasks genuinely requiring stronger models. When adding new pipeline stages, follow the existing `AGENT_SUBSTEPS` declarative pattern used by `semantic_analysis`, `kg_operators`, `git_history`, and `ontology_classification` rather than introducing bespoke step definitions. New end-to-end behavior should be validated against the `test_pipeline.py` suite pattern (graph edges, community assignment, incremental updates) to ensure consistency with existing pipeline correctness guarantees.
 
-When modifying deduplication logic, keep it as a distinct post-extraction stage rather than reintroducing inline merging within semantic-analysis-agent.ts, since the current design assumes deduplication operates across merged git and LSL-derived entities. Similarly, changes to persistence should respect the separation from in-memory KG operator results — persistence should remain a durable-write concern distinct from KG construction, ensuring in-memory KG state can be inspected or modified before commit. Any new stage inserted into the pipeline should be evaluated against this observation-generation-before-KG-write ordering to avoid violating the intermediate-representation contract that downstream stages (KG operator, persistence) rely on.
+
+## Code Evidence
+
+Key code artifacts grounding this entity's analysis:
+
+**Structural:**
+- pollKnowledgePipeline (function) in health-coordinator.js
+- full_pipeline (method) in sample_calls.py
+- run_pipeline (function) in test_pipeline.py
+- test_pipeline_runs_end_to_end (function) in test_pipeline.py
+- test_pipeline_graph_has_edges (function) in test_pipeline.py
+- test_pipeline_all_nodes_have_community (function) in test_pipeline.py
+- test_pipeline_report_mentions_top_god_node (function) in test_pipeline.py
+- test_pipeline_detection_finds_code_and_docs (function) in test_pipeline.py
+- test_pipeline_incremental_update (function) in test_pipeline.py
+
+**Relationships:**
+- Calls: log, noteObsApiBusy, obsApiBusyNow, userActiveNow, evaluateObsApiAutoHeal, normalize, score, god_nodes, surprising_connections, suggest_questions (+10 more)
+- Imports: graphify/analyze.py, god_nodes, surprising_connections, suggest_questions, graphify/build.py, build_from_json, graphify/cluster.py, cluster, score_all, detect.py (+10 more)
+
+**Other:**
+- test_pipeline.py (module) in test_pipeline.py
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The batch-analysis workflow is structured as a multi-stage pipeline where semantic-analysis-agent.ts is responsible for extracting raw entities and relationships from git history and LSL (likely 'Language/Session Log') session data, while ontology-classification-agent.ts takes those extracted entities and maps them into a hierarchical ontology structure. This separation of concerns means the extraction logic (identifying what something is—a function, a decision, a bug fix) is decoupled from the classification logic (determining where that entity fits in a broader knowledge hierarchy), allowing each agent to be independently tuned, tested, and potentially swapped out without affecting the other stage's implementation.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The batch-analysis pipeline is organized as a multi-agent workflow where distinct responsibilities are separated into dedicated agent classes rather than a single monolithic analyzer. semantic-analysis-agent.ts is responsible for extracting structured knowledge entities from raw inputs (git history diffs/commits and LSL session logs), while ontology-classification-agent.ts takes those extracted entities and classifies them into a hierarchy (determining parent-child relationships and where a given entity fits within the broader ontology). This separation of extraction from classification allows each agent to have a narrower, more testable prompt/response contract with the underlying LLM, and lets the pipeline swap or tune one stage without affecting the other's logic.
 
 ### Children
-- [CoordinatorAgent](./CoordinatorAgent.md) -- The L2 Pipeline description explicitly states a coordinator agent sequences execution across semantic-analysis-agent.ts and ontology-classification-agent.ts
+- [RelationDiscovery](./RelationDiscovery.md) -- Defined as the 'relate' entry in AGENT_SUBSTEPS['semantic_analysis'] with inputs ['Entities', 'Context windows'] and outputs ['Entity relations', 'Relation types']
 
 ### Siblings
-- [Ontology](./Ontology.md) -- ontology-classification-agent.ts consumes entities produced by semantic-analysis-agent.ts and assigns them positions within an upper/lower ontology hierarchy
-- [Insights](./Insights.md) -- Insight generation consumes ontology-classified entities to derive higher-order patterns, rather than operating directly on raw git/LSL extraction output
+- [Ontology](./Ontology.md) -- AGENT_SUBSTEPS['ontology_classification'] in multi-agent-graph.tsx defines match, validate, and extend sub-steps for the classification agent
+- [Insights](./Insights.md) -- AGENT_SUBSTEPS['insight_generation'] defines a 'patterns' sub-step (Pattern Discovery) tagged llmUsage:'premium', consuming 'Code entities' and 'Relations' to produce 'Pattern instances' and descriptions
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 19 observations*

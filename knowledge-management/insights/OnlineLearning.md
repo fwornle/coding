@@ -2,54 +2,58 @@
 
 **Type:** SubComponent
 
-code-graph-agent.ts is described as a downstream agent consuming VKB-exposed entity operations rather than accessing storage directly, implying it participates in or consumes OnlineLearning output
+lib/ukb-unified/core/WorkflowOrchestrator.js executeIncrementalWorkflow() builds workflow_name: 'incremental-analysis' parameters from a gap scope (sinceCommit, commits, sessions) and calls mcp__semantic_analysis__execute_workflow to run automated extraction
 
-# OnlineLearning: Technical Insight Document
+# OnlineLearning — Technical Insight Document
 
 ## What It Is
 
-OnlineLearning is a SubComponent of the broader KnowledgeManagement architecture, representing the automated, high-volume entity extraction pipeline documented in `docs/architecture/memory-systems.md`. Rather than being a manually curated store of knowledge, OnlineLearning is populated by a batch analysis pipeline that ingests three distinct sources: git history, LSL session logs, and code analysis output. This positions OnlineLearning as the "automatic" counterpart within the knowledge graph, in contrast to its sibling, ManualLearning, which represents human-curated entities persisted through the same underlying infrastructure but via a different provenance path.
+OnlineLearning is the automated, incremental knowledge-extraction subsystem within KnowledgeManagement, implemented primarily around `lib/ukb-unified/core/WorkflowOrchestrator.js` and `lib/ukb-unified/cli.js`. Where its sibling ManualLearning provides a human-authoring path (add-entity/update-entity commands via UKBDatabaseWriter), OnlineLearning exists to automatically detect what has changed since the last analysis run — new commits, new sessions — and drive an extraction pipeline over just that gap, rather than reprocessing the entire codebase. Its core entry point is `WorkflowOrchestrator.executeIncrementalWorkflow()`, which constructs an `incremental-analysis` workflow request and dispatches it through `mcp__semantic_analysis__execute_workflow`.
 
 ![OnlineLearning — Architecture](images/online-learning-architecture.png)
 
 ## Architecture and Design
 
-The defining architectural decision for OnlineLearning is strict decoupling between extraction and persistence. The batch analysis pipeline does not write directly to any storage layer; instead, extracted entities are written to the graph exclusively through the VKB server's persistence operations. This mirrors the pattern established for ManualLearning and reflects the parent KnowledgeManagement component's design principle that the VKB server is the single choke point for all graph mutations, caching, and consistency guarantees.
+The dominant pattern is gap-based incremental processing with a capability-gated execution strategy. `UKBCliDefaultCommand` (in `lib/ukb-unified/cli.js`) begins each run by loading a `TeamCheckpointManager` checkpoint and calling `GapAnalyzer.getGapSummary()` to determine whether this is a first run or an incremental one, based on `checkpoint.lastSuccessfulRun`. The resulting gap scope (sinceCommit, sinceTimestamp, commits, sessions) is handed to `WorkflowOrchestrator.executeIncrementalWorkflow()`, which packages it into `IncrementalAnalysisWorkflowParams` — notably mapping commits to `c.sha` and sessions to `s.path`, so the workflow consumes lightweight descriptors rather than full domain objects, keeping the orchestration layer decoupled from GapAnalyzer's internal representations.
 
-This choke-point pattern is a deliberate trade-off: it sacrifices some flexibility (pipelines can't optimize storage access for their specific high-volume needs) in exchange for centralized control over schema consistency and decay logic. The prior LevelDB-based store was replaced or augmented by the current graph architecture specifically to accommodate this kind of automated, high-volume ingestion pattern, suggesting that OnlineLearning's requirements were a primary driver behind the storage layer's evolution.
+A second key design decision is the availability gate implemented by `WorkflowOrchestrator.checkMCPToolsAvailability()`: all automated workflow execution checks for the presence of MCP tool functions before running, falling back to `mock*Workflow` methods when MCP isn't available. This makes the subsystem degrade gracefully in environments without the MCP toolchain (e.g., local dev, tests) while preserving the same orchestration interface.
+
+The actual extraction pipeline is structured as named, ordered substep sequences per agent, defined in `AGENT_SUBSTEPS` (multi-agent-graph.tsx) — e.g., `kg_operators: conv→aggr→embed→dedup→pred→merge` and `git_history: fetch→diff→extract`. Each substep is tagged with an `llmUsage` level (`none`/`fast`/`standard`/`premium`), explicitly documenting which stages are pure algorithmic transformations versus LLM-invoking steps, which is a meaningful cost/latency design signal baked directly into the pipeline metadata.
 
 ## Implementation Details
 
-The pipeline's inputs are heterogeneous — git history, LSL session logs, and code analysis output — implying an aggregation or normalization step that transforms disparate raw signals into a common entity schema before they reach the VKB server's persistence API. No specific class or function names for this batch pipeline are documented, indicating it is treated as an external process relative to the graph runtime itself, communicating only through VKB's exposed operations rather than internal APIs.
+`executeIncrementalWorkflow()` builds a `workflow_name: 'incremental-analysis'` payload carrying `sinceCommit`, `sinceTimestamp`, `commits`, `sessions`, `maxCommits`, `maxSessions`, and `significanceThreshold` — giving the underlying MCP workflow both boundary information (since when) and volume/quality caps (max counts, significance threshold) to bound the work performed. This is consistent with an incremental system that must avoid unbounded reprocessing as gaps grow.
 
-Downstream, `code-graph-agent.ts` is described as consuming VKB-exposed entity operations rather than accessing storage directly. Since code analysis output is one of OnlineLearning's ingestion sources, code-graph-agent.ts likely sits on both sides of this pipeline conceptually — as a contributor of raw analysis data and/or a consumer of resulting graph entities — though it interacts with everything strictly through the VKB abstraction layer rather than touching OnlineLearning's storage directly.
+On the UI side, `ukb-workflow-modal.tsx`'s `calculateDynamicEta()` observes `process.batchIterations` from the currently running batch to project completion time for the online-learning batch pipeline — an adaptive, self-referential estimation technique rather than a static progress bar, useful given that substep durations vary by `llmUsage` tier.
 
-A distinguishing implementation detail is that OnlineLearning entities are subject to decay tracking logic centralized in the VKB server. This decay mechanism is what structurally separates OnlineLearning entities from manually curated ones: automatically extracted knowledge is presumed to have a shelf life or confidence level that erodes over time, requiring the VKB server to track and apply this decay uniformly across all such entities.
-
-![OnlineLearning — Relationship](images/online-learning-relationship.png)
+Once extraction completes, `data-processor.js`'s `exportOnlineKnowledge()` pulls the results back out via `databaseManager.graphDB.queryEntities({team, limit:5000})`, and explicitly relabels entities whose `source` was `'auto'` into `'online'` for visualization purposes — a small but important semantic translation layer between how data is tagged internally by the extraction pipeline and how it's presented to consumers.
 
 ## Integration Points
 
-OnlineLearning's primary integration point is the VKB server, inherited directly from its parent KnowledgeManagement component. All entity writes flow through VKB's persistence operations, and any schema changes affecting automatically extracted entity types must be coordinated through the VKB server as the single point of consistency enforcement — no ad-hoc script access is permitted.
+![OnlineLearning — Relationship](images/online-learning-relationship.png)
 
-Its sibling, ManualLearning, shares this same integration contract, writing through identical VKB persistence operations despite representing a different provenance (human-curated vs. automated). This shared interface suggests the VKB server's entity persistence API is provenance-agnostic at the write layer, while downstream logic (like decay tracking) differentiates behavior based on entity origin. code-graph-agent.ts represents another integration point, consuming entities via VKB rather than reaching into OnlineLearning's underlying data directly, reinforcing the storage-decoupling principle throughout the system.
+OnlineLearning sits under KnowledgeManagement alongside ManualLearning and VkbServer. It shares the underlying graph storage with VkbServer (via `databaseManager.graphDB`) and, downstream, its exported `'online'`-tagged entities are presumably visualized through the same channels VkbServer exposes (`/api/entities`, `/api/export`, etc.), though the exact route wiring for online-sourced data isn't detailed in these observations. It contrasts directly with ManualLearning, which writes through `UKBDatabaseWriter` from stdin JSON — OnlineLearning instead writes through the batch/automated extraction path driven by MCP workflows. Internally, its children `WorkflowOrchestrator`, `IncrementalAnalysisWorkflowParams`, and `UKBCliDefaultCommand` form a clear call chain: CLI detects the gap → orchestrator builds and dispatches workflow params → MCP tools (or mocks) execute the actual analysis.
 
 ## Usage Guidelines
 
-Developers extending or modifying OnlineLearning's ingestion sources (git history, LSL logs, code analysis) should never bypass the VKB server to write entities directly — doing so would break the decoupling contract and could interfere with centralized decay tracking. Any change to the schema of automatically extracted entity types must be coordinated through the VKB server, since it is documented as the required choke point for such changes.
-
-Because decay tracking is centralized and specific to OnlineLearning-style entities, developers should be mindful that these entities are not intended for permanent, static storage the way ManualLearning entities might be — consumers of this data (such as code-graph-agent.ts) should account for the possibility that entity relevance or confidence degrades over time. When debugging or extending the batch pipeline, refer to `docs/architecture/memory-systems.md` as the authoritative source on ingestion and persistence flow.
+Developers extending OnlineLearning should treat `GapAnalyzer.getGapSummary()` and the `TeamCheckpointManager` checkpoint as the source of truth for incremental scope — new substeps or extraction agents should be registered in `AGENT_SUBSTEPS` with an accurate `llmUsage` tag so ETA calculations and cost expectations remain meaningful. Because `checkMCPToolsAvailability()` silently falls back to mock workflows, care should be taken when testing that MCP tools are actually available if real incremental analysis (not mock output) is required. When exposing new online-learned data, follow the `exportOnlineKnowledge()` convention of tagging with `source: 'online'` rather than leaving the raw `'auto'` tag, to keep the visualization layer's semantics consistent with what ManualLearning-produced entities look like.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component centers on a graph-based knowledge storage architecture (documented in docs/architecture/memory-systems.md) that replaced or augments a prior LevelDB-based store. The VKB (Virtual Knowledge Base) server acts as the primary runtime interface for querying and mutating the graph, exposing entity persistence operations that downstream agents (like code-graph-agent.ts) rely on rather than talking to the storage layer directly. This separation of concerns means the VKB server is the single choke point for consistency guarantees, caching, and decay tracking logic, so any schema change to entities must be coordinated through it rather than through ad-hoc script access.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component centers around a VKB (Virtual Knowledge Base) server that exposes graph-based storage operations to the rest of the Coding infrastructure. This server acts as the primary access point for entity CRUD operations, query resolution, and relationship traversal across the knowledge graph, decoupling consumers (agents, CLI tools, other components) from the underlying storage engine. This abstraction layer is critical because it has allowed the project to migrate storage backends (LevelDB to KMCore) without requiring downstream consumers to change their integration code, as evidenced by the dedicated migration test suite.
+
+### Children
+- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- executeIncrementalWorkflow() builds workflow_name: 'incremental-analysis' with parameters sinceCommit, sinceTimestamp, commits (mapped to sha), sessions (mapped to path), maxCommits, maxSessions, significanceThreshold
+- [IncrementalAnalysisWorkflowParams](./IncrementalAnalysisWorkflowParams.md) -- scope.commits.map(c => c.sha) and scope.sessions.map(s => s.path) show the incremental workflow expects lightweight commit/session descriptors from GapAnalyzer rather than full objects
+- [UKBCliDefaultCommand](./UKBCliDefaultCommand.md) -- UKBCli.defaultCommand() calls this.checkpointManager.loadCheckpoint() and checks checkpoint.lastSuccessfulRun to detect first-run vs incremental scenarios
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are persisted through the VKB server's entity persistence operations rather than via direct storage writes, per docs/architecture/memory-systems.md
+- [ManualLearning](./ManualLearning.md) -- lib/ukb-database/cli.js exposes add-entity, update-entity, add-relation, import, and export commands that read JSON from stdin and pass it through UKBDatabaseWriter, a manual-authoring entry point distinct from the batch pipeline
+- [VkbServer](./VkbServer.md) -- lib/vkb-server/api-routes.js's ApiRoutes.registerRoutes() wires dozens of endpoints (/api/entities, /api/relations, /api/stats, /api/export, /api/query, /api/ontology/classes) as the single HTTP surface for all consumers
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

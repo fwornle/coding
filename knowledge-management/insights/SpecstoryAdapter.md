@@ -2,146 +2,67 @@
 
 **Type:** SubComponent
 
-The SpecstoryAdapter provides a synchronization mechanism for logging operations, ensuring that logging data is accessed and modified in a thread-safe and predictable manner, as seen in the WorkStealer's synchronization mechanism.
+connectViaHTTP() probes fixed candidate ports [7357, 7358, 7359] with a GET /api/status request, verifying response.extensionId or response.name matches 'specstory' before establishing a log() closure
 
-## What It Is  
+# SpecstoryAdapter: Technical Insight Document
 
-**SpecstoryAdapter** is the concrete logging bridge that lives under `lib/integrations/specstory-adapter.js`.  It is the component that the **Trajectory** parent consumes to persist conversations and events to the external Specstory service.  The class follows a predictable three‑step lifecycle – a `constructor()`, an `initialize()` method that wires up its internal subsystems, and a `logConversation()` entry point that is invoked by Trajectory whenever a new dialogue slice must be recorded.  Each conversation is assigned its own dedicated logging module inside the `integrations` directory (e.g., `browser-access`, `code-graph-rag`), giving the adapter a **modular logging** foundation that can be extended or pruned without touching the core adapter code.
+## What It Is
 
-The adapter does not merely forward messages; it also maintains a **caching layer** for recent logging payloads, a **synchronization mechanism** that guarantees thread‑safe updates, and a **callback interface** that notifies Trajectory when a log entry has been successfully persisted.  All of these capabilities are reflected in the observations that link SpecstoryAdapter to the caching strategy of `EnvironmentConfigurator`, the storage‑module contract of `GraphDatabaseManager`, and the work‑stealing concurrency pattern of `WorkStealer`.
+SpecstoryAdapter is a class implemented in `specstory-adapter.js` that serves as the integration bridge between the LiveLoggingSystem and the SpecStory VS Code extension. As a direct child of LiveLoggingSystem, it inherits responsibility for translating live conversation events into a format consumable by SpecStory, while insulating the rest of the logging pipeline from the volatility of extension connectivity. Unlike its sibling TranscriptAdapterAPI — which enforces a strict abstract-base-class contract (`getAgentType`, `readTranscripts`, `convertToLSL`, `getCurrentSession`) — SpecstoryAdapter is a connection-oriented adapter, concerned primarily with *how* to reach the extension rather than *how* to parse transcript formats.
+
+## Architecture and Design
+
+The defining architectural pattern here is a **fallback chain** (essentially a Chain-of-Responsibility applied to connection establishment), explicitly modeled as its own child component, SpecstoryInitializeFallbackChain. The `initialize()` method encodes this as a single expression: `this.extensionApi = await connectViaHTTP() || await connectViaIPC() || await connectViaFileWatch()`, relying on JavaScript's OR short-circuit evaluation to attempt each transport in order of preference (fastest/most capable to most durable/least capable) and stop at the first success.
 
 ![SpecstoryAdapter — Architecture](images/specstory-adapter-architecture.png)
 
----
+This design reflects a clear trade-off: HTTP is preferred for its bidirectional richness and immediacy, IPC is a fallback for environments where HTTP probing fails (e.g., port conflicts or firewalling), and file-watching is the most degraded but always-available option, since it only requires filesystem access. Each transport is encapsulated as its own connect method, keeping the initialize() logic declarative and free of protocol-specific detail — a separation of concerns that also allows HTTPPortScanConnection (the HTTP-specific child) to evolve independently.
 
-## Architecture and Design  
+## Implementation Details
 
-The architecture of SpecstoryAdapter is deliberately **modular**.  Logging responsibilities are split into per‑conversation modules that implement a **standardized interface** (mirroring the storage modules of `GraphDatabaseManager`).  This interface defines the essential operations – typically `open()`, `write()`, `close()` – and guarantees that every logging module behaves predictably, regardless of its underlying transport (browser‑access, code‑graph‑rag, etc.).  
+**connectViaHTTP()** (implemented via HTTPPortScanConnection) performs a fixed-port scan across `[7357, 7358, 7359]`, issuing a `GET /api/status` request per candidate via `this.httpRequest()`. A response is only accepted as valid if `response.extensionId` or `response.name` matches `'specstory'`, guarding against false positives from unrelated services occupying those ports. On success, it establishes a `log()` closure bound to the confirmed HTTP endpoint.
 
-Concurrency is handled through a **work‑stealing pattern** that originates in the sibling `WorkStealer`.  The adapter’s `logConversation()` method increments a shared atomic index counter; idle worker threads can “steal” pending log tasks, ensuring high throughput when many conversations are logged in parallel.  To protect the shared state, SpecstoryAdapter incorporates the **synchronization mechanism** described for `WorkStealer`, wrapping cache reads/writes and module invocations in atomic sections or mutex‑like constructs.  
+**connectViaIPC()** is platform-aware: it selects `\\.\pipe\specstory-vscode` on `win32` versus `/tmp/specstory-vscode.sock` elsewhere, with a hard 1-second connection timeout to avoid blocking the fallback chain indefinitely on a dead socket.
 
-Caching is another first‑class concern.  Drawing on the configurable cache design of `GraphDatabaseManager` and the environment‑aware cache of `EnvironmentConfigurator`, SpecstoryAdapter stores recent logging payloads in an in‑memory store whose **expiration and invalidation policies** can be tuned via configuration files (e.g., `specstory-cache.json`).  This reduces the number of outbound HTTP calls to Specstory, lowering latency and network cost.  
+**connectViaFileWatch()** is the last-resort mechanism, requiring no live process on the other end. It writes timestamped JSON entries into `~/.specstory/watch` and touches a `.new-log` marker file, which the extension presumably polls or watches to detect new entries — a classic filesystem-as-message-queue pattern.
 
-Finally, the adapter employs a **callback‑based notification** channel, similar to the one used by `EnvironmentConfigurator`.  After a successful log write, the adapter invokes a registered callback on the **Trajectory** component, allowing the parent to react (e.g., update UI state or trigger downstream analytics) without polling.  
+**logConversation()** is the unified write path once a connection method is established. It wraps each entry in a `specstoryEntry` envelope, tagging `metadata.tool` as `'coding-tools'` and `metadata.session` with a `Date.now()`-based `sessionId` generated once at construction time, ensuring all entries from a single adapter instance share a consistent session identity regardless of which transport ultimately delivers them.
+
+## Integration Points
 
 ![SpecstoryAdapter — Relationship](images/specstory-adapter-relationship.png)
 
----
+SpecstoryAdapter is contained within LiveLoggingSystem, whose parent module `logging.ts` is the authoritative source for session windowing and transcript capture semantics — meaning any change to session lifecycle definitions upstream can affect how `sessionId` and entry timing are interpreted downstream by SpecstoryAdapter. Structurally, it exposes two internal children as first-class entities: HTTPPortScanConnection (the port-scanning HTTP transport) and SpecstoryInitializeFallbackChain (the ordered fallback logic itself), both of which are documented and reasoned about independently despite living inside the same class. Its siblings — LslSessionDashboard, TranscriptAdapterAPI, BackendLoggerCore, and ProgressFireTrigger — operate at the same hierarchy level but address orthogonal concerns (session chain rotation, transcript format abstraction, config caching, and progress-fire timing triggers respectively), none of which SpecstoryAdapter directly depends on based on current observations.
 
-## Implementation Details  
+## Usage Guidelines
 
-1. **Core Class – `SpecstoryAdapter`** (`lib/integrations/specstory-adapter.js`)  
-   - **Constructor**: Accepts a configuration object that points to the desired logging modules and cache parameters.  
-   - **initialize()**: Dynamically loads each module from the `integrations` directory, validates that they conform to the standardized logging interface, and creates a shared atomic index (`AtomicLong` or similar) used for work‑stealing.  
-   - **logConversation(conversationId, payload)**:  
-     * Increments the atomic index to obtain a unique work slot.  
-     * Retrieves (or creates) the per‑conversation logging module from the modular registry.  
-     * Checks the cache; if a recent entry exists and is still valid, it re‑uses the cached payload to avoid duplicate writes.  
-     * Wraps the write operation in a synchronized block to guarantee thread safety.  
-     * On success, stores the result in the cache (respecting configurable TTL) and fires the registered callback to Trajectory.  
+Developers extending or debugging SpecstoryAdapter should preserve the fallback ordering invariant in `initialize()` — the HTTP → IPC → FileWatch sequence is a deliberate degradation path, not an arbitrary order, and reordering it changes latency/reliability trade-offs system-wide. When adding new transports, follow the existing pattern of a dedicated `connectVia*()` method returning a truthy connection handle on success and falsy on failure, so it composes cleanly with the OR-chain in SpecstoryInitializeFallbackChain. The port list `[7357, 7358, 7359]` in HTTPPortScanConnection is fixed and should be treated as a contract with the SpecStory extension; changing it requires coordinated updates on the extension side. Finally, because `sessionId` is generated once at construction via `Date.now()`, adapter instances should not be long-lived across logically distinct sessions — a new SpecstoryAdapter should be constructed per session boundary to keep `metadata.session` semantically meaningful.
 
-2. **Modular Logging Modules** (`integrations/*`)  
-   - Each module (e.g., `browser-access.js`, `code-graph-rag.js`) exports an object that implements `open()`, `write(payload)`, and `close()`.  
-   - Because they share the same interface, the adapter can treat them interchangeably, which simplifies addition of new logging back‑ends.  
 
-3. **Caching Layer**  
-   - Implemented as an in‑memory map keyed by `conversationId`.  
-   - Expiration logic follows the pattern in `GraphDatabaseManager` – a per‑module TTL can be set in the adapter’s configuration, and an invalidation routine runs periodically (or on cache miss).  
+## Code Evidence
 
-4. **Synchronization**  
-   - The adapter uses a lightweight lock primitive (e.g., `Mutex` from the `async-mutex` library) around critical sections that mutate the cache or invoke module writes.  This mirrors the synchronization strategy observed in `WorkStealer`.  
+Key code artifacts grounding this entity's analysis:
 
-5. **Callback Mechanism**  
-   - Trajectory registers a handler via `adapter.registerUpdateCallback(callbackFn)`.  
-   - After each successful `logConversation`, the adapter invokes `callbackFn(conversationId, result)` on the next tick, ensuring non‑blocking notification.  
+**Structural:**
+- SpecstoryAdapter (class) in specstory-adapter.js
 
-No additional symbols were discovered beyond the ones described, which confirms that the adapter’s responsibilities are tightly scoped to logging, caching, concurrency, and notification.
-
----
-
-## Integration Points  
-
-- **Parent – Trajectory**: Trajectory creates an instance of SpecstoryAdapter, calls `initialize()`, and relies on the `logConversation()` API to persist LLM dialogue turns.  The callback registration (`registerUpdateCallback`) is the primary feedback loop from adapter to Trajectory.  
-
-- **Sibling – WorkStealer**: The atomic index counter and work‑stealing logic are directly borrowed from WorkStealer’s concurrency model.  This ensures that logging tasks can be distributed across worker pools without central bottlenecks.  
-
-- **Sibling – GraphDatabaseManager**: The standardized module interface and the configurable caching strategy are patterned after GraphDatabaseManager’s storage modules, providing a familiar contract for developers who have worked with graph persistence.  
-
-- **Sibling – EnvironmentConfigurator**: The cache configuration schema (TTL, max size) and the callback registration pattern follow the same design used by EnvironmentConfigurator for environment variable updates.  
-
-- **Child – ModularLogging**: All concrete logging modules reside under the `integrations` directory.  Adding a new module simply involves placing a file that implements the required interface; the adapter will auto‑discover it during `initialize()`.  
-
-These integration points mean that changes in one sibling (e.g., a new work‑stealing algorithm in WorkStealer) can be adopted by SpecstoryAdapter with minimal code churn, thanks to the shared abstractions.
-
----
-
-## Usage Guidelines  
-
-1. **Instantiate Early** – Create the adapter as soon as the application starts and call `initialize()` before any logging occurs.  This ensures that all logging modules are loaded and the atomic index is ready.  
-
-2. **Configure Cache Thoughtfully** – Set TTL values that balance freshness against memory pressure.  For high‑volume chat sessions, a shorter TTL (e.g., 30 seconds) prevents the cache from growing unchecked, while low‑traffic scenarios can benefit from longer retention.  
-
-3. **Respect the Callback Contract** – Register a single, idempotent callback with `registerUpdateCallback`.  The callback should be fast and non‑blocking; heavy processing belongs in a downstream worker to avoid delaying the logging pipeline.  
-
-4. **Leverage Modularity** – When introducing a new logging destination (e.g., a file‑based logger), place the implementation in `integrations/` and export the required interface.  No changes to SpecstoryAdapter’s core are needed.  
-
-5. **Avoid Direct Cache Manipulation** – The cache is an internal concern.  Interact with it only through `logConversation()`; manual reads or writes can break the synchronization guarantees and lead to race conditions.  
-
-6. **Monitor Concurrency** – The work‑stealing index can be inspected via the adapter’s `debugInfo()` method (if exposed).  In environments with limited CPU cores, consider throttling the number of concurrent workers to prevent oversubscription.  
-
----
-
-### Architectural Patterns Identified  
-
-- **Modular Design** (per‑conversation logging modules)  
-- **Standardized Interface** (common logging contract)  
-- **Work‑Stealing Concurrency** (shared atomic index counter)  
-- **Cache‑Aside / Configurable Caching** (TTL‑driven in‑memory store)  
-- **Callback‑Based Notification** (parent‑child update channel)  
-- **Synchronization via Mutex/Atomic Primitives** (thread‑safe operations)  
-
-### Design Decisions and Trade‑offs  
-
-| Decision | Benefit | Trade‑off |
-|----------|---------|-----------|
-| Separate logging module per conversation | High flexibility; easy addition/removal | Slight overhead in module lookup and memory per conversation |
-| In‑memory cache for recent payloads | Reduces network latency, lowers Specstory API calls | Increases memory footprint; requires eviction logic |
-| Work‑stealing atomic index | Scales logging across many workers, avoids idle threads | Complexity in debugging race conditions |
-| Configurable TTL for cache | Allows fine‑tuning per deployment | Misconfiguration can cause stale data or cache thrashing |
-| Callback to Trajectory | Immediate feedback without polling | Callback must be lightweight; heavy work must be offloaded |
-
-### System Structure Insights  
-
-- **Parent‑Child Relationship**: Trajectory → SpecstoryAdapter → ModularLogging.  The hierarchy enforces a clear separation: Trajectory handles LLM orchestration, SpecstoryAdapter deals with persistence concerns, and each logging module encapsulates the transport details.  
-- **Sibling Cohesion**: SpecstoryAdapter reuses patterns from WorkStealer, GraphDatabaseManager, and EnvironmentConfigurator, demonstrating a consistent architectural language across the codebase.  
-
-### Scalability Considerations  
-
-- **Concurrency**: Work‑stealing enables the system to handle bursts of concurrent conversations without a central queue bottleneck.  
-- **Cache Effectiveness**: By caching recent logs, the adapter can sustain high write rates even when the external Specstory endpoint experiences latency spikes.  
-- **Modular Extensibility**: Adding new logging back‑ends does not impact existing throughput, as each module runs independently under the same concurrency and cache framework.  
-
-### Maintainability Assessment  
-
-- **High** – The modular interface isolates changes; a new logging module can be dropped in without touching core logic.  
-- **Predictable** – Standardized method signatures and shared synchronization primitives reduce the cognitive load for developers familiar with sibling components.  
-- **Configurable** – Cache policies and callback registration are externalized, allowing operations teams to tune performance without code changes.  
-- **Potential Risk** – The concurrency and cache layers introduce subtle bugs if developers bypass the provided APIs, so strict linting and code reviews are recommended.
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component utilizes the SpecstoryAdapter class, defined in lib/integrations/specstory-adapter.js, for logging conversations and events via Specstory. This class follows a specific pattern of constructor() + initialize() + logConversation() for its initialization and logging functionality. The logConversation() method employs a work-stealing concurrency pattern via a shared atomic index counter, allowing for efficient and concurrent logging of conversations and events.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem centers around logging.ts, which owns the core responsibilities of session windowing, file routing, and transcript capture. This module acts as the single ingestion point for live Claude Code conversation data, meaning any change to session lifecycle semantics (e.g., how a 'session window' is defined or when it rolls over to a new file) has cascading effects on downstream consumers like the classification agent and config validation tooling. New developers should treat logging.ts as the authoritative source of truth for how raw conversation events are structured before they are persisted to disk.
 
 ### Children
-- [ModularLogging](./ModularLogging.md) -- The integrations directory contains various logging modules, such as browser-access and code-graph-rag, which suggests a modular logging approach.
+- [HTTPPortScanConnection](./HTTPPortScanConnection.md) -- connectViaHTTP() iterates over ports = [7357, 7358, 7359] issuing GET /api/status to each via this.httpRequest()
+- [SpecstoryInitializeFallbackChain](./SpecstoryInitializeFallbackChain.md) -- initialize() sets this.extensionApi = await connectViaHTTP() || await connectViaIPC() || await connectViaFileWatch(), relying on JS OR short-circuit for fallback ordering
 
 ### Siblings
-- [LazyLoader](./LazyLoader.md) -- LazyLoader uses a modular approach to loading extension APIs, with each API having its own dedicated loader module, as seen in the integrations directory.
-- [WorkStealer](./WorkStealer.md) -- WorkStealer uses a shared atomic index counter to enable work-stealing, allowing idle workers to pull tasks immediately, as seen in the WaveController's runWithConcurrency method.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses a modular approach to data storage and management, with each graph having its own dedicated storage module, as seen in the integrations directory.
-- [EnvironmentConfigurator](./EnvironmentConfigurator.md) -- EnvironmentConfigurator uses a modular approach to environment configuration and connectivity, with each environment variable having its own dedicated configuration module, as seen in the integrations directory.
+- [LslSessionDashboard](./LslSessionDashboard.md) -- lsl-sessions.mjs defines a chain as an hourly tranche including rotation parts, not a single file, because legacy '-N_' markdown parts are headerless fragments split mid-token and pi-format parts are linked via parentSession
+- [TranscriptAdapterAPI](./TranscriptAdapterAPI.md) -- TranscriptAdapter is an abstract base class in transcript-api.js that throws on direct instantiation via `new.target === TranscriptAdapter` check, forcing agent-specific subclasses to implement getAgentType, readTranscripts, convertToLSL, getCurrentSession
+- [BackendLoggerCore](./BackendLoggerCore.md) -- Logger.js loads config/logging-config.json once via loadConfig(), caching it in module-level sharedConfig and exposing reloadConfig() to force a refresh
+- [ProgressFireTrigger](./ProgressFireTrigger.md) -- progressFireDecision() fires on EITHER of two independent triggers: a token-delta trigger (cumulative output tokens grown by >= thresholdTokens since last mark) or a wall-clock trigger (elapsed ms >= elapsedThresholdMs)
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

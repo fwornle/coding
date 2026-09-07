@@ -1,69 +1,68 @@
 # VkbApiClient
 
-**Type:** SubComponent
+**Type:** Detail
 
-VkbApiClient.isServerAvailable() is called once at GraphDatabaseAdapter initialization to determine routing mode — live vs direct — and the result is never re-evaluated, making server availability at startup a critical operational dependency
+isServerAvailable() checks /api/health and returns true based solely on response.ok, deliberately not requiring graph===true because 'Entity APIs work via HTTP even if graph health check has issues'
 
-# VkbApiClient — Technical Insight Document
+# VkbApiClient: Technical Insight Document
 
 ## What It Is
 
-`VkbApiClient` is implemented at `lib/ukb-unified/core/VkbApiClient.js`, placing it deliberately in the unified library layer (`ukb-unified/core`) rather than inside the feature-specific knowledge-management directory. This location signals its role as a foundational, shared utility consumed across multiple parts of the system rather than a feature-bound helper. Structurally, it is a SubComponent contained within `KnowledgeManagement`, alongside siblings such as `GraphDatabaseAdapter`, `ManualLearning`, `OnlineLearning`, `GraphKnowledgeExporter`, and `CheckpointManager`.
-
-Functionally, `VkbApiClient` is the HTTP-based client that bridges in-process code to an out-of-process VKB HTTP server. Its critical responsibility is to enable lock-free, multi-process access to the underlying LevelDB store by serializing all reads and writes through a single HTTP endpoint. Without it, concurrent writers would collide on LevelDB's single-writer file lock.
-
-![VkbApiClient — Architecture](images/vkb-api-client-architecture.png)
+VkbApiClient is a client-side class implemented in `VkbApiClient.js` (with corresponding type declarations in `VkbApiClient.d.ts`) that provides a JavaScript API surface for communicating with the VkbServer's HTTP endpoints. It acts as the consumer-facing wrapper around the server's REST API, translating method calls into HTTP requests against endpoints registered by `ApiRoutes.registerRoutes()`. As a child component of VkbServer, it exists specifically to abstract away raw HTTP mechanics (fetch calls, timeouts, endpoint paths) behind a clean, typed JavaScript interface.
 
 ## Architecture and Design
 
-The architecture centers on a **dual-mode routing strategy** implemented by the parent-adjacent sibling `GraphDatabaseAdapter` (at `storage/graph-database-adapter.ts`). At initialization, `GraphDatabaseAdapter` calls `VkbApiClient.isServerAvailable()` exactly once to probe whether a VKB HTTP server is reachable. The boolean result is cached as the adapter's permanent operating mode — either `live` (route through `VkbApiClient` over HTTP) or `direct` (access `GraphDatabaseService` and the LevelDB handle directly). This decision is never re-evaluated, making the state of the HTTP server at adapter startup a critical operational dependency.
+The class follows a **thin-wrapper/facade pattern**: rather than implementing business logic, VkbApiClient's methods (`getEntities()`, `createEntity()`, `updateEntity()`, `deleteEntity()`) map directly to corresponding HTTP verbs and paths on `/api/entities`, mirroring the route definitions in `lib/vkb-server/api-routes.js`. This keeps the client intentionally "dumb," pushing all authoritative logic (validation, persistence, export generation) to the server side.
 
-The design pattern is best described as a **proxy/gateway with implicit write serialization**. Because all writers in `live` mode funnel through a single HTTP layer, `VkbApiClient` implicitly acts as a write queue: concurrent writers block on the HTTP layer's request handling rather than on the filesystem-level LevelDB lock. This trades filesystem-level contention (which would produce hard lock failures across processes) for application-layer contention (which can be managed gracefully on the server side).
+A notable design decision is in `isServerAvailable()`, which checks `/api/health` but deliberately evaluates availability based solely on `response.ok`, ignoring the `graph` health flag. This reflects an explicit architectural judgment that Entity APIs remain functional over HTTP independent of graph subsystem health — decoupling the availability contract from a specific internal dependency's status, and preventing a non-critical subsystem failure from blocking clients unnecessarily.
 
-The key trade-off is **availability vs. simplicity**: the system gains the ability for multiple processes to coexist as writers, but the cost is that the HTTP server becomes a hard prerequisite for multi-process scenarios, and the once-only availability check means runtime changes in server state are not detected.
+The `searchEntities(query, params)` method exemplifies a **composition-over-duplication** approach: rather than exposing a distinct search endpoint, it reuses `getEntities()` with an injected `searchTerm` parameter, avoiding endpoint proliferation and keeping the server-side API surface (and this client's mapping to it) simpler.
+
+`exportTeam(team, filePath)` is architecturally significant because it delegates the actual export operation to the server via a POST to `/api/export`, rather than performing file assembly client-side. This centralizes export logic on the server, ensuring consistency regardless of which client (this API client, a CLI, etc.) triggers the export.
 
 ## Implementation Details
 
-The primary entry point exposed by `VkbApiClient` is `isServerAvailable()`, which returns a boolean indicating whether the HTTP API can be reached. This method is invoked exactly once during `GraphDatabaseAdapter` construction, and its return value determines the entire downstream routing behavior for the lifetime of the adapter instance. There is no retry, no periodic re-probe, and no fallback recovery if the server later becomes unavailable while the adapter is in `live` mode (or becomes available while it is in `direct` mode).
+Core CRUD methods wrap `/api/entities` endpoints using `AbortSignal.timeout(this.timeout)`, giving every request a configurable, cancellable timeout — a defensive mechanic against hung requests, consistent with the pattern used elsewhere in the system (e.g., `UkbDatabaseCli.isVKBRunning()` uses a similar 1-second `AbortSignal` timeout against `/api/health`).
 
-In `live` mode, all read and write operations are translated into HTTP requests against the VKB API. This is the only safe path for multi-process write scenarios. The HTTP layer between client and server provides the natural serialization point: requests queue at the HTTP server, which holds the sole `LevelDB` handle internally and applies writes sequentially. This is what allows multiple processes to coexist without colliding on LevelDB's single-writer lock.
+The dual presence of `VkbApiClient.js` and `VkbApiClient.d.ts` indicates the module ships with hand-authored or generated TypeScript type declarations alongside plain JavaScript implementation, supporting type-checked consumption without a full TypeScript build pipeline.
 
-In `direct` mode, `VkbApiClient` is bypassed entirely; `GraphDatabaseAdapter` reaches into `GraphDatabaseService` to manipulate LevelDB directly. This mode is only safe when exactly one process is performing writes — any second process attempting `direct` mode simultaneously will fail on the LevelDB lock.
-
-![VkbApiClient — Relationship](images/vkb-api-client-relationship.png)
+Method naming and structure directly parallel server route definitions: `getEntities()`, `createEntity()`, `updateEntity()`, and `deleteEntity()` correspond respectively to `app.get('/api/entities')`, `app.post('/api/entities')`, `app.put('/api/entities/:name')`, and `app.delete('/api/entities/:name')` as registered by ApiRoutes — a tight, predictable 1:1 mapping that simplifies tracing client calls to server behavior.
 
 ## Integration Points
 
-`VkbApiClient`'s most important integration is with its sibling `GraphDatabaseAdapter`, which is its sole known caller for the mode-selection probe and the routing target in `live` mode. `GraphDatabaseAdapter` in turn fronts `GraphDatabaseService`, the holder of the LevelDB handle, in `direct` mode. This forms a clear three-layer dependency: callers → `GraphDatabaseAdapter` → (`VkbApiClient` over HTTP) or (`GraphDatabaseService` directly).
+VkbApiClient is a contained child of VkbServer, and its entire behavior is dependent on the HTTP surface defined by its sibling ApiRoutes, which registers all endpoints (`/api/entities`, `/api/relations`, `/api/stats`, `/api/export`, `/api/query`, `/api/ontology/classes`) as the single point of contact for consumers. Any change to ApiRoutes' endpoint contracts directly impacts VkbApiClient's method implementations.
 
-Other siblings within `KnowledgeManagement` interact with `VkbApiClient` indirectly. `ManualLearning` writes directly through `GraphDatabaseAdapter`, which means it inherits whichever mode the adapter selected at startup — if `live`, its writes flow through `VkbApiClient`; if `direct`, they bypass it entirely. `GraphKnowledgeExporter` is decoupled from the write path; it subscribes to `entity:stored` events emitted after successful graph writes regardless of the underlying mode. `OnlineLearning` and `CheckpointManager` (the latter at `src/utils/checkpoint-manager.ts`) operate on commit-hash bookkeeping that is independent of the routing mode but still ultimately persists through `GraphDatabaseAdapter`.
-
-The external integration point is the **VKB HTTP server itself**. `VkbApiClient` is meaningless without a running server on the expected endpoint. Server availability at adapter initialization time is a hard architectural dependency for multi-process deployments.
+It also shares a conceptual pattern with sibling UkbDatabaseCli, which independently pings `/api/health` with its own AbortSignal-based timeout to decide whether to route operations through the server — suggesting `/api/health` is a common integration checkpoint across multiple consumers, though each implements its own client logic rather than sharing a unified health-check abstraction.
 
 ## Usage Guidelines
 
-**Treat `VkbApiClient` as the only sanctioned multi-writer path.** Any new write path that bypasses it and goes straight to LevelDB risks lock collisions with concurrent writers. When integrating additional write functionality — for example, extending `ManualLearning` or building a new sibling under `KnowledgeManagement` — route through `GraphDatabaseAdapter` so that the mode selection is respected, and ensure the deployment runs the VKB HTTP server so `live` mode is selected.
+Developers should treat `isServerAvailable()` as a lightweight liveness check only — it does not guarantee full subsystem (e.g., graph) health, so callers needing graph-specific guarantees should check that separately. When needing entity search, use `searchEntities()` rather than manually reconstructing `getEntities()` calls with search terms, since it centralizes that translation. For exports, rely on `exportTeam()` rather than assembling export data manually client-side, since the server is the authoritative source for export formatting via `/api/export`. All request-issuing methods respect `this.timeout` via `AbortSignal.timeout`, so configuring an appropriate timeout value at construction is important for balancing responsiveness against slow-network tolerance.
 
-**Be aware that `isServerAvailable()` is evaluated exactly once.** Operators must guarantee the HTTP server is up *before* `GraphDatabaseAdapter` initializes. Starting the server later will not promote the adapter from `direct` to `live`, and conversely, stopping the server after a `live`-mode adapter has initialized will cause subsequent HTTP calls to fail with no automatic fallback. Initialization ordering is therefore an operational invariant, not an implementation detail.
 
-**Never run two processes in `direct` mode simultaneously.** This is the failure case the dual-mode design exists to prevent. If you anticipate multi-process scenarios — concurrent learners, exporters, or analyzers — the VKB HTTP server must be available at startup so all adapters initialize into `live` mode and serialize their writes through `VkbApiClient`.
+## Code Evidence
 
-**Remember the implicit queue.** Because the HTTP layer serializes all writers, `VkbApiClient` is also where contention manifests under load. Bursts of concurrent writes will queue at the HTTP server rather than fail outright, which is preferable to lock collisions but can introduce latency. Designs that issue large numbers of small writes should consider batching at the call site rather than relying on the implicit queue to absorb them.
+Key code artifacts grounding this entity's analysis:
+
+**Structural:**
+- VkbApiClient (class) in VkbApiClient.js
+- VkbApiClient (class) in VkbApiClient.d.ts
+
+**Other:**
+- VkbApiClient.js (module) in VkbApiClient.js
+- VkbApiClient.d.ts (module) in VkbApiClient.d.ts
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] GraphDatabaseAdapter (storage/graph-database-adapter.ts) implements a dual-mode routing strategy that is determined once at initialization time via VkbApiClient.isServerAvailable(), not re-evaluated on each operation. This means if the VKB HTTP server starts or stops after the adapter is initialized, the adapter continues using the mode it selected at startup. In 'live' mode it routes all reads and writes through the HTTP API, avoiding LevelDB's single-writer lock. In 'direct' mode it accesses GraphDatabaseService (which holds the LevelDB handle) directly. The consequence is that two processes attempting direct mode simultaneously will collide on the LevelDB lock — the dual-mode design exists specifically to serialize writers through the HTTP server when it is available. New developers integrating additional write paths must either go through the VKB HTTP API or ensure only one process operates in direct mode at a time.
+- [VkbServer](./VkbServer.md) -- lib/vkb-server/api-routes.js's ApiRoutes.registerRoutes() wires dozens of endpoints (/api/entities, /api/relations, /api/stats, /api/export, /api/query, /api/ontology/classes) as the single HTTP surface for all consumers
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning writes directly through GraphDatabaseAdapter, which means it must route through the VKB HTTP API (live mode) or risk LevelDB lock collisions in direct mode when other writers are active
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning feeds CheckpointManager with commit hashes and session counts so incremental runs skip already-analyzed history, as tracked in src/utils/checkpoint-manager.ts
-- [GraphKnowledgeExporter](./GraphKnowledgeExporter.md) -- GraphKnowledgeExporter subscribes to entity:stored events emitted after each successful graph write, decoupling export from the write path itself
-- [CheckpointManager](./CheckpointManager.md) -- CheckpointManager at src/utils/checkpoint-manager.ts stores commit hashes as markers so the OnlineLearning pipeline can skip already-processed git history on subsequent runs
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter calls VkbApiClient.isServerAvailable() exactly once at initialization and caches the result as the permanent routing mode — no per-operation re-evaluation occurs
+- [ApiRoutes](./ApiRoutes.md) -- ApiRoutes.registerRoutes(app) registers core CRUD endpoints like app.get('/api/entities'), app.post('/api/entities'), app.put('/api/entities/:name'), and app.delete('/api/entities/:name')
+- [UkbDatabaseCli](./UkbDatabaseCli.md) -- isVKBRunning() pings `${VKB_SERVER_URL}/api/health` with a 1-second AbortSignal timeout before deciding whether to route through the server
+- [VkbServerCli](./VkbServerCli.md) -- The `server start` subcommand instantiates a VKBServer and calls server.start({ foreground, force }), reporting result.alreadyRunning vs a fresh PID and log file
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 8 observations*
