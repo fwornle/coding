@@ -2838,7 +2838,10 @@ class CombinedStatusLine {
           }
         }
         const usage = contextGauge.readContextUsage({
-          agent: paneAgent, projectPath, sessionId
+          agent: paneAgent, projectPath, sessionId,
+          // Dates this pane's launch, so opencode never reports the context of
+          // the session that was running here BEFORE the last restart.
+          tmuxSession: process.env.TMUX_SESSION_NAME,
         });
         if (usage) parts.push(contextGauge.renderGauge(usage.usedPct));
         else if (contextGauge.hasContextReader(paneAgent)) parts.push(contextGauge.GAUGE_ZERO);
