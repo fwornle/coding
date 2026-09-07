@@ -1103,6 +1103,249 @@ function OrchestratorDetailsSidebar({
 }
 
 // Sidebar component for detailed node information
+type DisplayStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'paused'
+
+/**
+ * Status / duration / tokens / LLM usage rows.
+ *
+ * Its own component for the same reason as StepExecutionDetails — see the note
+ * there. Keeping each JSX tree small enough for the checker to infer is what
+ * keeps these rows type-checked at all.
+ */
+function ExecutionMetrics({
+  resolvedStatus,
+  stepInfo,
+}: {
+  resolvedStatus: DisplayStatus
+  stepInfo: StepInfo | undefined
+}) {
+  return (
+    <>
+    {/* Status */}
+    <div className="flex justify-between">
+      <span className="text-muted-foreground">Status</span>
+      <span className={
+        resolvedStatus === 'completed' ? 'text-green-600 font-medium' :
+        resolvedStatus === 'failed' ? 'text-red-600 font-medium' :
+        resolvedStatus === 'running' ? 'text-blue-600 font-medium' :
+        resolvedStatus === 'paused' ? 'text-amber-600 font-medium animate-pulse' :
+        'text-muted-foreground'
+      }>
+        {(resolvedStatus || 'pending').charAt(0).toUpperCase() + (resolvedStatus || 'pending').slice(1)}
+      </span>
+    </div>
+
+    {/* Duration - only show if we have it */}
+    {stepInfo?.duration != null && stepInfo.duration > 0 ? (
+      <div className="flex justify-between">
+        <span className="text-muted-foreground flex items-center gap-1">
+          <Timer className="h-3 w-3" />
+          Duration
+        </span>
+        <span>{formatDurationMs(stepInfo.duration)}</span>
+      </div>
+    ) : undefined}
+
+    {/* Tokens - only show if we have it */}
+    {stepInfo?.tokensUsed !== undefined && stepInfo.tokensUsed > 0 && (
+      <div className="flex justify-between">
+        <span className="text-muted-foreground flex items-center gap-1">
+          <Hash className="h-3 w-3" />
+          Tokens Used
+        </span>
+        <span>{stepInfo.tokensUsed.toLocaleString()}</span>
+      </div>
+    )}
+
+    {/* LLM Usage Details - show model by provider and token breakdown */}
+    {stepInfo?.outputs?.llmUsage && (() => {
+      const llmUsage = stepInfo.outputs.llmUsage as Record<string, any>
+      return (
+      <div className="space-y-1 pt-1 border-t border-dashed mt-1">
+        {/* Combined LLM display: model by provider */}
+        {(llmUsage.modelsUsed?.length > 0 || llmUsage.providersUsed?.length > 0) && (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">LLM</span>
+            <span className="font-mono text-[10px] text-right max-w-[180px]">
+              {(() => {
+                const models = llmUsage.modelsUsed || []
+                const providers = llmUsage.providersUsed || []
+                if (models.length > 0 && providers.length > 0) {
+                  // Format: model by provider (e.g., "llama-3.3-70b by groq")
+                  return models.map((m: string, i: number) =>
+                    `${m}${providers[i] ? ` by ${providers[i]}` : ''}`
+                  ).join(', ')
+                } else if (models.length > 0) {
+                  return models.join(', ')
+                } else if (providers.length > 0) {
+                  return providers.join(', ')
+                }
+                return 'unknown'
+              })()}
+            </span>
+          </div>
+        )}
+        {llmUsage.totalTokens > 0 && (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Tokens</span>
+            <span>
+              <span className="text-green-600">{(llmUsage.totalPromptTokens || 0).toLocaleString()}</span>
+              <span className="text-muted-foreground mx-0.5">{'->'}</span>
+              <span className="text-blue-600">{(llmUsage.totalCompletionTokens || 0).toLocaleString()}</span>
+              <span className="text-muted-foreground ml-1">({llmUsage.totalTokens.toLocaleString()} total)</span>
+            </span>
+          </div>
+        )}
+      </div>
+      )
+    })()}
+
+    {/* Show message if no timing data yet */}
+    {!stepInfo?.duration && resolvedStatus === 'completed' && (
+      <div className="text-xs text-muted-foreground italic">
+        Timing data will be available in next workflow run
+      </div>
+    )}
+    </>
+  )
+}
+
+
+/**
+ * The trailing half of the agent sidebar: execution details, errors, results
+ * and data flow.
+ *
+ * Extracted from UKBNodeDetailsSidebar rather than left inline. That component's
+ * <CardContent> had grown to ~320 lines of direct JSX children, and past a
+ * certain size TypeScript stops inferring the children and falls back to
+ * `unknown`, which then fails the ReactNode check (TS2322). The give-away was
+ * that two IDENTICAL `<Separator />` elements in the same parent behaved
+ * differently — the early one fine, a later one an error — and that the reported
+ * lines MOVED when unrelated siblings were reshuffled. Nothing was wrong with
+ * the flagged elements; the tree was simply too big to infer.
+ *
+ * Splitting it is the fix, not a suppression: both halves are now well within
+ * what the checker handles, and the sections were independent already.
+ */
+function StepExecutionDetails({
+  resolvedStatus,
+  stepInfo,
+  aggregatedSteps,
+  agentId,
+  edges,
+  agents,
+}: {
+  resolvedStatus: DisplayStatus
+  stepInfo: StepInfo | undefined
+  aggregatedSteps?: AggregatedSteps | null
+  agentId: string
+  edges: Array<{ from: string; to: string; type?: string; label?: string }>
+  agents: typeof WORKFLOW_AGENTS
+}) {
+  return (
+    <>
+    {/* Step Execution Details - Always show with available data */}
+    <div><Separator className="" /></div>
+    <div className="space-y-3">
+      <h4 className="font-medium text-sm">Execution Details</h4>
+      <div className="space-y-2 text-sm">
+        <ExecutionMetrics resolvedStatus={resolvedStatus} stepInfo={stepInfo} />
+      </div>
+    </div>
+
+    {/* Error Information */}
+    {stepInfo?.error && (
+      <>
+        <Separator />
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm text-red-600 flex items-center gap-1">
+            <AlertTriangle className="h-4 w-4" />
+            Error
+          </h4>
+          <div className="text-xs bg-red-50 border border-red-200 rounded p-2 text-red-800 break-words">
+            {stepInfo.error}
+          </div>
+        </div>
+      </>
+    )}
+
+    {/* LLM Error Warning - show when LLM failed but step continued with fallback */}
+    {stepInfo?.outputs?.llmError && !stepInfo?.error && (
+      <>
+        <Separator />
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm text-amber-600 flex items-center gap-1">
+            <AlertTriangle className="h-4 w-4" />
+            LLM Call Failed
+          </h4>
+          <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800 break-words">
+            <div>{String(stepInfo.outputs.llmError)}</div>
+            <div className="text-amber-500 text-[10px] mt-1 italic">Using rule-based fallback</div>
+          </div>
+        </div>
+      </>
+    )}
+
+    {/* Results Summary - show stats and key outcomes */}
+    {stepInfo?.outputs && Object.keys(stepInfo.outputs).filter(k => !k.startsWith('_')).length > 0 && (
+      <>
+        <Separator />
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm flex items-center gap-1">
+            <Zap className="h-3 w-3" />
+            Results
+          </h4>
+          {/* Semantic Summary based on agent type - uses aggregated totals for historical workflows */}
+          <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} aggregatedSteps={aggregatedSteps} status={resolvedStatus} />
+          {/* Only show detailed results if we DON'T have aggregated data (which would contradict it) */}
+          {!aggregatedSteps && <StepResultDetails outputs={stepInfo.outputs} />}
+        </div>
+      </>
+    )}
+
+    {/* Data Flow */}
+    <Separator />
+    <div className="space-y-2">
+      <h4 className="font-medium text-sm">Data Flow</h4>
+      <div className="text-xs space-y-1">
+        <div className="text-muted-foreground">Receives from:</div>
+        <div className="flex flex-wrap gap-1">
+          {edges
+            .filter(e => e.to === agentId)
+            .map(e => {
+              const fromAgent = agents.find(a => a.id === e.from)
+              return (
+                <Badge key={e.from} variant="outline" className="text-[10px]">
+                  {fromAgent?.shortName || e.from}
+                </Badge>
+              )
+            })}
+          {edges.filter(e => e.to === agentId).length === 0 && (
+            <span className="text-muted-foreground italic">None (entry point)</span>
+          )}
+        </div>
+        <div className="text-muted-foreground mt-2">Sends to:</div>
+        <div className="flex flex-wrap gap-1">
+          {edges
+            .filter(e => e.from === agentId)
+            .map(e => {
+              const toAgent = agents.find(a => a.id === e.to)
+              return (
+                <Badge key={e.to} variant="outline" className="text-[10px]">
+                  {toAgent?.shortName || e.to}
+                </Badge>
+              )
+            })}
+          {edges.filter(e => e.from === agentId).length === 0 && (
+            <span className="text-muted-foreground italic">None (final step)</span>
+          )}
+        </div>
+      </div>
+    </div>
+    </>
+  )
+}
+
 export function UKBNodeDetailsSidebar({
   agentId,
   process,
@@ -1162,7 +1405,6 @@ export function UKBNodeDetailsSidebar({
   const { status: nodeStatus } = useSelector((state: RootState) => selectNodeStatus(state, agentId, false))
 
   // Determine display status: check for paused state, then use derived status, then stepInfo
-  type DisplayStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'paused'
   const resolvedStatus: DisplayStatus = (() => {
     // Check if this agent's step is currently paused in single-step mode
     if ((process as any).stepPaused && (process as any).pausedAtStep) {
@@ -1389,188 +1631,14 @@ export function UKBNodeDetailsSidebar({
           </>
         ) : null}
 
-        {/* Step Execution Details - Always show with available data */}
-        <div><Separator className="" /></div>
-        <div className="space-y-3">
-          <h4 className="font-medium text-sm">Execution Details</h4>
-          <div className="space-y-2 text-sm">
-            {/* Status */}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Status</span>
-              <span className={
-                resolvedStatus === 'completed' ? 'text-green-600 font-medium' :
-                resolvedStatus === 'failed' ? 'text-red-600 font-medium' :
-                resolvedStatus === 'running' ? 'text-blue-600 font-medium' :
-                resolvedStatus === 'paused' ? 'text-amber-600 font-medium animate-pulse' :
-                'text-muted-foreground'
-              }>
-                {(resolvedStatus || 'pending').charAt(0).toUpperCase() + (resolvedStatus || 'pending').slice(1)}
-              </span>
-            </div>
-
-            {/* Duration - only show if we have it */}
-            {stepInfo?.duration != null && stepInfo.duration > 0 ? (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <Timer className="h-3 w-3" />
-                  Duration
-                </span>
-                <span>{formatDurationMs(stepInfo.duration)}</span>
-              </div>
-            ) : undefined}
-
-            {/* Tokens - only show if we have it */}
-            {stepInfo?.tokensUsed !== undefined && stepInfo.tokensUsed > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <Hash className="h-3 w-3" />
-                  Tokens Used
-                </span>
-                <span>{stepInfo.tokensUsed.toLocaleString()}</span>
-              </div>
-            )}
-
-            {/* LLM Usage Details - show model by provider and token breakdown */}
-            {stepInfo?.outputs?.llmUsage && (() => {
-              const llmUsage = stepInfo.outputs.llmUsage as Record<string, any>
-              return (
-              <div className="space-y-1 pt-1 border-t border-dashed mt-1">
-                {/* Combined LLM display: model by provider */}
-                {(llmUsage.modelsUsed?.length > 0 || llmUsage.providersUsed?.length > 0) && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">LLM</span>
-                    <span className="font-mono text-[10px] text-right max-w-[180px]">
-                      {(() => {
-                        const models = llmUsage.modelsUsed || []
-                        const providers = llmUsage.providersUsed || []
-                        if (models.length > 0 && providers.length > 0) {
-                          // Format: model by provider (e.g., "llama-3.3-70b by groq")
-                          return models.map((m: string, i: number) =>
-                            `${m}${providers[i] ? ` by ${providers[i]}` : ''}`
-                          ).join(', ')
-                        } else if (models.length > 0) {
-                          return models.join(', ')
-                        } else if (providers.length > 0) {
-                          return providers.join(', ')
-                        }
-                        return 'unknown'
-                      })()}
-                    </span>
-                  </div>
-                )}
-                {llmUsage.totalTokens > 0 && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Tokens</span>
-                    <span>
-                      <span className="text-green-600">{(llmUsage.totalPromptTokens || 0).toLocaleString()}</span>
-                      <span className="text-muted-foreground mx-0.5">{'->'}</span>
-                      <span className="text-blue-600">{(llmUsage.totalCompletionTokens || 0).toLocaleString()}</span>
-                      <span className="text-muted-foreground ml-1">({llmUsage.totalTokens.toLocaleString()} total)</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-              )
-            })()}
-
-            {/* Show message if no timing data yet */}
-            {!stepInfo?.duration && resolvedStatus === 'completed' && (
-              <div className="text-xs text-muted-foreground italic">
-                Timing data will be available in next workflow run
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Error Information */}
-        {stepInfo?.error && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-red-600 flex items-center gap-1">
-                <AlertTriangle className="h-4 w-4" />
-                Error
-              </h4>
-              <div className="text-xs bg-red-50 border border-red-200 rounded p-2 text-red-800 break-words">
-                {stepInfo.error}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* LLM Error Warning - show when LLM failed but step continued with fallback */}
-        {stepInfo?.outputs?.llmError && !stepInfo?.error && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-amber-600 flex items-center gap-1">
-                <AlertTriangle className="h-4 w-4" />
-                LLM Call Failed
-              </h4>
-              <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800 break-words">
-                <div>{String(stepInfo.outputs.llmError)}</div>
-                <div className="text-amber-500 text-[10px] mt-1 italic">Using rule-based fallback</div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Results Summary - show stats and key outcomes */}
-        {stepInfo?.outputs && Object.keys(stepInfo.outputs).filter(k => !k.startsWith('_')).length > 0 && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm flex items-center gap-1">
-                <Zap className="h-3 w-3" />
-                Results
-              </h4>
-              {/* Semantic Summary based on agent type - uses aggregated totals for historical workflows */}
-              <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} aggregatedSteps={aggregatedSteps} status={resolvedStatus} />
-              {/* Only show detailed results if we DON'T have aggregated data (which would contradict it) */}
-              {!aggregatedSteps && <StepResultDetails outputs={stepInfo.outputs} />}
-            </div>
-          </>
-        )}
-
-        {/* Data Flow */}
-        <Separator />
-        <div className="space-y-2">
-          <h4 className="font-medium text-sm">Data Flow</h4>
-          <div className="text-xs space-y-1">
-            <div className="text-muted-foreground">Receives from:</div>
-            <div className="flex flex-wrap gap-1">
-              {edges
-                .filter(e => e.to === agentId)
-                .map(e => {
-                  const fromAgent = agents.find(a => a.id === e.from)
-                  return (
-                    <Badge key={e.from} variant="outline" className="text-[10px]">
-                      {fromAgent?.shortName || e.from}
-                    </Badge>
-                  )
-                })}
-              {edges.filter(e => e.to === agentId).length === 0 && (
-                <span className="text-muted-foreground italic">None (entry point)</span>
-              )}
-            </div>
-            <div className="text-muted-foreground mt-2">Sends to:</div>
-            <div className="flex flex-wrap gap-1">
-              {edges
-                .filter(e => e.from === agentId)
-                .map(e => {
-                  const toAgent = agents.find(a => a.id === e.to)
-                  return (
-                    <Badge key={e.to} variant="outline" className="text-[10px]">
-                      {toAgent?.shortName || e.to}
-                    </Badge>
-                  )
-                })}
-              {edges.filter(e => e.from === agentId).length === 0 && (
-                <span className="text-muted-foreground italic">None (final step)</span>
-              )}
-            </div>
-          </div>
-        </div>
+        <StepExecutionDetails
+          resolvedStatus={resolvedStatus}
+          stepInfo={stepInfo}
+          aggregatedSteps={aggregatedSteps}
+          agentId={agentId}
+          edges={edges}
+          agents={agents}
+        />
       </CardContent>
     </Card>
   )

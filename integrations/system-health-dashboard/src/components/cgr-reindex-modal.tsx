@@ -372,17 +372,14 @@ export default function CGRReindexModal() {
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button
-                variant="outline"
-                disabled={cgr.reindexStatus === 'running'}
-                onClick={() => handleConfirm('full')}
-              >
+              {/* No `disabled` guard here: this whole block only renders while
+                  reindexStatus === 'idle', so a `=== 'running'` test is dead —
+                  TS proved it (TS2367). The running state has its own footer
+                  below. */}
+              <Button variant="outline" onClick={() => handleConfirm('full')}>
                 Full re-extract
               </Button>
-              <Button
-                disabled={cgr.reindexStatus === 'running'}
-                onClick={() => handleConfirm('update')}
-              >
+              <Button onClick={() => handleConfirm('update')}>
                 Incremental update
               </Button>
             </>
