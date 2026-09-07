@@ -288,7 +288,7 @@ A target is **not probed at all on a network it does not serve**. The routing gu
 refuses to send work to `qwen-local` off corporate, so a probe there could only produce a
 `false` the router is contractually going to ignore — and it would open a connection to a
 private-range address, carrying the corporate bearer token, on whatever network the laptop
-happens to be on. `10.143.241.223` is not ours at a cafe, and something there may well answer.
+happens to be on. `10.143.242.184` is not ours at a cafe, and something there may well answer.
 The endpoint is marked unavailable without being touched, which is the honest state anyway.
 
 > **Why `qwen-laptop` ships switched off.** Reachability is not usability, and the probe

@@ -22,7 +22,7 @@
  *   OUTCOME       what a real turn actually did, read back from token_usage.
  *                 Only true where you ran it.
  *
- * This separation is not pedantry. qwen-local's base URL (10.143.241.223:8000)
+ * This separation is not pedantry. qwen-local's base URL (10.143.242.184:8000)
  * was chosen rather than probed. If the port is wrong, the corporate run shows
  * DECISION=qwen-local, REACHABILITY=false, OUTCOME=fell back to gh-copilot —
  * which reads instantly as "the routing is right, the endpoint is wrong". With

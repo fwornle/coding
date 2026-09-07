@@ -260,6 +260,28 @@ describe('contextWindowFor', () => {
     );
     expect(gauge.contextWindowFor(undefined)).toBe(gauge.DEFAULT_CONTEXT_WINDOW);
   });
+
+  /**
+   * The on-prem cluster and the laptop GGUF are both "qwen3", and they do NOT
+   * share a window: the cluster publishes 65,536, the laptop build is catalogued
+   * at 262,144. One generic /^qwen3/i line cannot say both, and it used to
+   * answer 262,144 for everything — sizing a full cluster session at 25%.
+   *
+   * The specific line therefore has to sort BEFORE the generic one, and that
+   * ordering is the whole fix, so it is what this pins.
+   */
+  test.each([
+    'qwen3.8-27b-dual-fast',
+    'qwen3.8-27b-dual-normal',
+    'qwen3.8-27b-dual-deep',
+    'qwen3.8-27b-hga-fast',
+  ])('the on-prem cluster id %s is sized at its published 65K', (model) => {
+    expect(gauge.contextWindowFor(model, 'qwen-local')).toBe(65_536);
+  });
+
+  test('the laptop GGUF keeps the generic qwen3 window — the ids are not interchangeable', () => {
+    expect(gauge.contextWindowFor('qwen3.8-27b-local', 'qwen-laptop')).toBe(262_144);
+  });
 });
 
 describe('contextWindowFor — the model catalogue outranks the regex table', () => {
