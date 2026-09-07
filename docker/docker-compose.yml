@@ -151,6 +151,9 @@ services:
       # Same live-mount rationale as server.js — these are plain .mjs/.html with
       # no build step, and the tab is iterated on frequently.
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/lsl-sessions.mjs:/coding/integrations/system-health-dashboard/lsl-sessions.mjs:ro
+      # UKB history: which completed batches belong to the report being viewed.
+      # Same live-mount rationale as server.js, which imports it.
+      - ${CODING_REPO:-.}/integrations/system-health-dashboard/batch-provenance.mjs:/coding/integrations/system-health-dashboard/batch-provenance.mjs:ro
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/assets:/coding/integrations/system-health-dashboard/assets:ro
       # src/live-logging holds the LSL parser + pi writer that lsl-sessions.mjs
       # imports. The image bakes a copy, but it predates these modules, so a

@@ -39,6 +39,7 @@ import {
     findPromptSet as lslFindPromptSet,
     discoverProjects as lslDiscoverProjects,
 } from './lsl-sessions.mjs';
+import { selectBatchesForReport } from './batch-provenance.mjs';
 
 // ---------------------------------------------------------------------------
 // Code Graph VIEWER — in-memory graphify index (see /api/cgr/graph* handlers).
@@ -2817,22 +2818,56 @@ class SystemHealthAPIServer {
                 }
             }
 
-            // Load batch checkpoints for accumulated totals (only for batch-analysis workflows)
+            // Load batch checkpoints for accumulated totals.
+            //
+            // batch-checkpoints.json is ONE current, project-wide file — not a
+            // per-run artifact. Two things follow, and the gate below is built
+            // around both:
+            //
+            //  1. Whether a run had batches is a property of the run, not of its
+            //     NAME. This used to test `workflowName.includes('batch')`. That
+            //     happens to be true today (only batch-analysis.yaml declares the
+            //     batch steps) but it is a substring match on a display string:
+            //     renaming the workflow would silently blank these cards, and the
+            //     failure would look like missing data rather than a broken gate.
+            //  2. Attaching the file wholesale to whichever report matched
+            //     credited every such run with every batch the project has EVER
+            //     completed, including batches from other runs.
+            //
+            // So attribute by provenance instead: a batch belongs to this report
+            // if it completed inside the report's own [start, end] window. A run
+            // that processed no batches gets no card — which is the same outcome
+            // the name test produced for wave-analysis, reached for a reason that
+            // stays true if anything is renamed.
             const projectDir = dirname(dirname(filePath)); // Go from workflow-reports to .data to project
             const checkpointsPath = join(projectDir, 'batch-checkpoints.json');
             let accumulatedStats = null;
             let batchSummary = null;
             let persistedKnowledge = null;
-            const isBatchWorkflow = (workflowMatch?.[1]?.trim() || '').includes('batch');
 
-            if (isBatchWorkflow && existsSync(checkpointsPath)) {
+            if (existsSync(checkpointsPath)) {
                 try {
                     const checkpointsData = JSON.parse(readFileSync(checkpointsPath, 'utf8'));
-                    accumulatedStats = checkpointsData.accumulatedStats || null;
+
+                    const batches = selectBatchesForReport(checkpointsData.completedBatches, {
+                        startTime: startTimeMatch?.[1]?.trim(),
+                        endTime: endTimeMatch?.[1]?.trim(),
+                        team: teamMatch?.[1],
+                        checkpointTeam: checkpointsData.team,
+                    });
 
                     // Build batch summary - aggregate stats per agent across all batches
-                    if (checkpointsData.completedBatches?.length > 0) {
-                        const batches = checkpointsData.completedBatches;
+                    if (batches.length > 0) {
+                        // Derived from the SAME scoped set as batchSummary, so the
+                        // two totals in one response can never disagree.
+                        accumulatedStats = {
+                            totalCommits: batches.reduce((sum, b) => sum + (b.stats?.commits || 0), 0),
+                            totalSessions: batches.reduce((sum, b) => sum + (b.stats?.sessions || 0), 0),
+                            totalTokensUsed: batches.reduce((sum, b) => sum + (b.stats?.tokensUsed || 0), 0),
+                            totalEntitiesCreated: batches.reduce((sum, b) => sum + (b.stats?.entitiesCreated || 0), 0),
+                            totalEntitiesUpdated: batches.reduce((sum, b) => sum + (b.stats?.entitiesUpdated || 0), 0),
+                            totalRelationsAdded: batches.reduce((sum, b) => sum + (b.stats?.relationsAdded || 0), 0),
+                        };
                         batchSummary = {
                             totalBatches: batches.length,
                             totalCommits: batches.reduce((sum, b) => sum + (b.stats?.commits || 0), 0),
@@ -2866,9 +2901,11 @@ class SystemHealthAPIServer {
                         };
                     }
 
-                    // Build aggregated step data - totals across ALL batches for each agent type
-                    if (checkpointsData.completedBatches?.length > 0) {
-                        const batches = checkpointsData.completedBatches;
+                    // Build aggregated step data - totals per agent type across the
+                    // batches attributed to THIS report (same scoped set as above;
+                    // it also guards the batchSummary deref, which is null when the
+                    // run processed no batches).
+                    if (batchSummary && batches.length > 0) {
                         batchSummary.aggregatedSteps = {
                             git_history: {
                                 totalCommits: batches.reduce((sum, b) => sum + (b.stats?.commits || 0), 0),
@@ -2912,13 +2949,21 @@ class SystemHealthAPIServer {
                 }
             }
 
-            // Extract completedBatches for tracer batch iteration display
+            // Extract completedBatches for tracer batch iteration display.
+            // Scoped by the same provenance rule as batchSummary — the tracer must
+            // show the batches THIS run processed, not every batch in the file.
             let completedBatches = null;
             if (existsSync(checkpointsPath)) {
                 try {
                     const checkpointsData = JSON.parse(readFileSync(checkpointsPath, 'utf8'));
-                    if (checkpointsData.completedBatches?.length > 0) {
-                        completedBatches = checkpointsData.completedBatches;
+                    const scoped = selectBatchesForReport(checkpointsData.completedBatches, {
+                        startTime: startTimeMatch?.[1]?.trim(),
+                        endTime: endTimeMatch?.[1]?.trim(),
+                        team: teamMatch?.[1],
+                        checkpointTeam: checkpointsData.team,
+                    });
+                    if (scoped.length > 0) {
+                        completedBatches = scoped;
                     }
                 } catch (e) {
                     // Already loaded above, this is just a fallback
