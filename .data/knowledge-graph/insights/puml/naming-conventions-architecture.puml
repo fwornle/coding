@@ -1,0 +1,35 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Documentation" {
+  component "CodingPatterns" as patterns <<core>>
+  component "architecture/README.md" as readme <<core>>
+  component "NamingConventions (informal)" as conventions <<core>>
+}
+
+package "Suffix Taxonomy" {
+  component "*Manager" as mgr <<agent>>
+  component "*Service" as svc <<core>>
+  component "*Adapter" as adapter <<core>>
+  component "*Provider" as provider <<core>>
+}
+
+package "Example Classes" {
+  component "TranscriptAdapter" as transcript <<core>>
+  component "Wave Agent Managers" as waveagents <<agent>>
+}
+
+patterns --> conventions : "defines retroactive taxonomy"
+conventions --> readme : "referenced by"
+readme --> mgr : "groups files by suffix"
+readme --> svc
+readme --> adapter
+readme --> provider
+
+adapter --> transcript : "manifests as"
+mgr --> waveagents : "manifests as"
+
+conventions ..> transcript : "no enforcement,\nname-driven only"
+conventions ..> waveagents : "no linter rule"
+
+@enduml

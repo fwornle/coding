@@ -1,39 +1,27 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-top to bottom direction
-
-package "Configuration" {
-  component "OntologyConfigManager" as ocm <<core>>
+package "Extraction" {
+  component "Semantic Analysis Agent" as sem <<agent>>
 }
 
-package "Ontology Definitions" {
-  component "Upper Ontology" as upper <<storage>>
-  component "Lower Ontology" as lower <<storage>>
+package "Ontology Classification" {
+  component "Ontology Classification Agent" as ont <<agent>>
+  component "Upper Ontology" as upper <<core>>
+  component "Lower Ontology" as lower <<core>>
+  component "Entity Type Resolver" as resolver <<core>>
+  component "Validation Routines" as validator <<core>>
 }
 
-package "Classification Pipeline" {
-  component "OntologyClassifier" as classifier <<core>>
-  component "LegacyOntologyAdapter" as adapter <<external>>
-  component "OntologyRegistry" as registry <<core>>
-  component "OntologyValidator" as validator <<core>>
+package "Pipeline" {
+  component "Persistence Stage" as persist <<storage>>
 }
 
-package "Output" {
-  component "Classified Entity\n(entity Type, ontologyClass)" as entity <<api>>
-}
-
-ocm --> upper : "configures path"
-ocm --> lower : "configures path"
-ocm --> classifier : "thresholds"
-
-upper --> classifier : "upper definitions"
-lower --> classifier : "lower definitions"
-
-registry --> adapter : "Phase 42-03\nmigration"
-adapter --> validator : "feeds entities"
-classifier --> registry : "resolves types"
-
-validator --> entity : "attaches metadata"
+sem --> ont : "produces entities"
+ont --> resolver : "resolve most specific class"
+resolver --> upper : "domain-independent categories"
+resolver --> lower : "domain-specific types"
+resolver --> validator : "classified entities"
+validator --> persist : "validated entities"
 
 @enduml

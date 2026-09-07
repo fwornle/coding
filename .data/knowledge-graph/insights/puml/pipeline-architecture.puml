@@ -1,42 +1,30 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
-
-package "MCP Server Layer" {
-  component "MCP Server\n(mcp-server-semantic-analysis)" as mcpServer <<api>>
+package "Coordination" {
+  component "Coordinator Agent" as coord <<agent>>
 }
 
-package "Orchestration" {
-  component "Coordinator Agent" as coordinator <<agent>>
+package "Analysis Stages" {
+  component "Semantic Analysis Agent" as sem <<agent>>
+  component "Ontology Classification Agent" as onto <<agent>>
+  component "Observation Generation" as obs <<core>>
+  component "Deduplication Stage" as dedup <<core>>
 }
 
-package "Processing Pipeline" {
-  component "Observation Generation Agent" as obsAgent <<agent>>
-  component "KG Operator Agents" as kgOps <<agent>>
-  component "Deduplication Agent" as dedupAgent <<agent>>
-  component "Persistence Agent" as persistAgent <<agent>>
+package "Graph & Storage" {
+  component "KG Operator" as kg <<core>>
+  component "Persistence Agent" as persist <<agent>>
+  database "Durable Store" as store <<storage>>
 }
 
-package "Input Sources" {
-  component "Git History" as gitHistory <<external>>
-  component "LSL Session Logs" as lslLogs <<external>>
-}
-
-package "Storage" {
-  database "GraphKMStore" as graphStore <<storage>>
-}
-
-mcpServer --> coordinator : "triggers"
-gitHistory --> obsAgent : "commit diffs"
-lslLogs --> obsAgent : "session events"
-coordinator --> obsAgent : "1. generate observations"
-obsAgent --> kgOps : "candidate entities"
-coordinator --> kgOps : "2. construct/mutate graph"
-kgOps --> dedupAgent : "classified entities"
-coordinator --> dedupAgent : "3. merge duplicates"
-dedupAgent --> persistAgent : "deduplicated entities"
-coordinator --> persistAgent : "4. persist"
-persistAgent --> graphStore : "writes with ontology metadata"
+coord --> sem : "sequences"
+coord --> onto : "sequences"
+sem --> obs : "produces entities"
+onto --> obs : "produces classifications"
+obs --> dedup : "merges git/LSL entities"
+dedup --> kg : "writes intermediate rep"
+kg --> persist : "in-memory results"
+persist --> store : "durable writes"
 
 @enduml

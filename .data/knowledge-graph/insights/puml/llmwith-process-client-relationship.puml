@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMWithProcessClient
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMWithProcessClient] as llmwith_process_client #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[CostModel] as cost_model #F0F0F0
+[ProxyURLResolver] as proxy_urlresolver #F0F0F0
+
+llmabstraction --> llmwith_process_client
+llmmock_service -[hidden]- llmwith_process_client
+dmrprovider -[hidden]- llmwith_process_client
+cost_model -[hidden]- llmwith_process_client
+proxy_urlresolver -[hidden]- llmwith_process_client
+
+@enduml

@@ -1,30 +1,37 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Core Knowledge Graph" {
-  component "GraphDatabaseService" as gds <<core>>
-  database "LevelDB" as leveldb <<storage>>
-  component "GraphKMStore" as gkmstore <<storage>>
+package "Runtime Path" {
+  component "code-graph-agent.ts" as agent <<agent>>
+  component "VKB Server" as vkb <<api>>
 }
 
-package "Integration & Indexing" {
-  component "CodeGraphAgent" as cga <<agent>>
-  cloud "Memgraph" as memgraph <<external>>
+package "Storage Layer" {
+  database "KMCore Graph DB" as kmcore <<storage>>
+  database "LevelDB (legacy)" as leveldb <<storage>>
 }
 
-package "Migration & Observability" {
-  component "migrate-leveldb-to-kmcore" as migrator <<cli>>
-  component "UKB Trace Report" as ukbtrace <<core>>
-  component "ukbSlice / Dashboard" as ukbslice <<core>>
+package "Administrative Path" {
+  component "migrate-graph-db-entity-types.js" as migscript <<cli>>
+  component "migrate-leveldb-to-kmcore.test.ts" as migtest <<cli>>
 }
 
-gds --> leveldb : "persists graph (JSON blob)"
-gds --> gkmstore : "exports per-domain JSON"
-cga --> gds : "indexes via Tree-sitter AST"
-cga ..> memgraph : "optional external graph"
-migrator --> leveldb : "reads entities"
-migrator --> gds : "migrates to km-core"
-ukbtrace --> gds : "tracks pipeline data loss"
-ukbslice --> ukbtrace : "monitors workflow state"
+package "Documentation & Ontology" {
+  component "cross-project-knowledge.md" as crossdoc <<external>>
+  component "RELEASE-2.0.md ontology" as release2 <<external>>
+}
+
+agent --> vkb : "entity persistence ops"
+vkb --> kmcore : "query / mutate graph"
+vkb ..> leveldb : "legacy access (deprecated)"
+
+migscript --> kmcore : "bulk schema updates"
+migtest --> leveldb : "validate source data"
+migtest --> kmcore : "validate migrated data"
+
+kmcore --> vkb : "decay-aware query results"
+
+crossdoc ..> vkb : "documents consumers"
+release2 ..> kmcore : "ontology integration"
 
 @enduml

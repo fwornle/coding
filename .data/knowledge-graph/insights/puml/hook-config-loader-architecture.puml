@@ -1,0 +1,28 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Config Sources" {
+  component "Defaults" as defaults <<core>>
+  component "~/.coding-tools/hooks.json" as userConfig <<external>>
+  component ".coding/hooks.json" as projectConfig <<external>>
+}
+
+package "HookConfigLoader" {
+  component "Layered Merge Engine" as merge <<core>>
+  component "Schema Normalizer" as normalize <<core>>
+  component "Validation Warnings" as validate <<core>>
+}
+
+package "Consumer" {
+  component "UnifiedHookManager" as hookMgr <<agent>>
+}
+
+defaults --> merge : "layer 1"
+userConfig --> merge : "layer 2 (overrides)"
+projectConfig --> merge : "layer 3 (overrides,\nno-op if absent)"
+
+merge --> validate : "checks entries"
+validate --> normalize : "warns on failure,\ncontinues with defaults"
+normalize --> hookMgr : "event, handler type,\npriority schema"
+
+@enduml

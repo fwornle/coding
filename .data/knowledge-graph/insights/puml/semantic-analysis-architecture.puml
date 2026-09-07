@@ -1,52 +1,31 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "MCP Server" {
-  component "SemanticAnalysis\nMCP Server" as mcpServer <<api>>
+package "Input Sources" {
+  component "Git History" as git <<external>>
+  component "LSL Session Data" as lsl <<external>>
 }
 
-package "Agent Pipeline" {
-  component "BaseAgent<TInput,TOutput>" as baseAgent <<core>>
-  component "SemanticAnalysisAgent" as semAgent <<agent>>
-  component "CodeGraphAgent" as cgAgent <<agent>>
-  component "OntologyClassificationAgent" as ontAgent <<agent>>
-  component "ContentValidationAgent" as cvAgent <<agent>>
+package "Pipeline Agents" {
+  component "base-agent.ts" as base <<core>>
+  component "semantic-analysis-agent.ts" as semantic <<agent>>
+  component "ontology-classification-agent.ts" as ontology <<agent>>
+  component "Hierarchy Root Detection" as hierarchy <<agent>>
 }
 
-package "Supporting Services" {
-  component "OntologyRegistry\n+ LegacyOntologyAdapter" as ontRegistry <<core>>
-  component "TokenUsageLogger" as tokenLogger <<core>>
-  component "GitStalenessDetector\n(60s cache)" as gitDetector <<core>>
-  component "KmCoreAdapter" as kmAdapter <<storage>>
+package "Knowledge Storage" {
+  database "Knowledge Graph" as kg <<storage>>
 }
 
-package "External Systems" {
-  database "Memgraph\nGraph DB" as memgraph <<storage>>
-  component "code-graph-rag\nMCP CLI (uv)" as codeGraphCli <<cli>>
-  cloud "LLM Service\ngenerateSemanticInsights()" as llm <<external>>
-}
+git --> semantic : "parsed diffs/commits"
+lsl --> semantic : "session logs"
 
-mcpServer --> baseAgent : orchestrates
-baseAgent <-- semAgent : extends
-baseAgent <-- cgAgent : extends
-baseAgent <-- ontAgent : extends
-baseAgent <-- cvAgent : extends
+base --> semantic : "LLM invocation utilities"
+base --> ontology : "LLM invocation utilities"
 
-mcpServer --> semAgent : depth:\nsurface/deep/comprehensive
-mcpServer --> cgAgent : AST parsing
-mcpServer --> ontAgent : classify
-mcpServer --> cvAgent : validate & persist
+semantic --> ontology : "extracted entities"
+ontology --> hierarchy : "delegates root detection"
 
-semAgent --> llm : enriches patterns
-semAgent --> tokenLogger : tracks token usage
-
-cgAgent --> memgraph : graph queries
-cgAgent --> codeGraphCli : Tree-sitter AST
-
-ontAgent --> ontRegistry : classifies entities
-
-cvAgent --> kmAdapter : persist entities
-cvAgent --> gitDetector : staleness check
-cvAgent --> kmAdapter : graphDB + persistenceAgent
+ontology --> kg : "structured knowledge entities"
 
 @enduml

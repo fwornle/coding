@@ -1,35 +1,33 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "DockerizedServices" {
-
-    package "ProcessStateManager" {
-        component "process-state-manager.js" as psm <<core>>
-        component "In-Memory PID Registry" as registry <<storage>>
-    }
-
-    package "Wrapper Scripts" {
-        component "Wrapper Script A" as wrapperA <<cli>>
-        component "Wrapper Script B" as wrapperB <<cli>>
-        component "Wrapper Script C" as wrapperC <<cli>>
-    }
-
-    package "Child Processes" {
-        component "Child Process" as childProc <<external>>
-    }
-
+package "Wrapper Scripts" {
+  component "api-service.js" as api <<agent>>
+  component "dashboard-service.js" as dash <<agent>>
 }
 
-psm --> registry : "maintains"
+package "Process State Manager" {
+  component "process-state-manager.js" as psm <<core>>
+  database "PSM State\n(PID, name, start time)" as state <<storage>>
+}
 
-wrapperA --> psm : "registerService / unregisterService"
-wrapperB --> psm : "registerService / unregisterService"
-wrapperC --> psm : "registerService / unregisterService"
+package "Process Contexts" {
+  component "Docker-contained Process" as docker <<external>>
+  component "Standalone Node Process" as node <<external>>
+}
 
-wrapperA --> childProc : "spawns"
-wrapperB --> childProc : "spawns"
-wrapperC --> childProc : "spawns"
+component "Global Service Coordinator" as gsc <<core>>
 
-childProc --> psm : "PID mapped to\n{port, type, script}"
+api --> docker : "spawns"
+dash --> node : "spawns"
+
+api --> psm : "register() after spawn"
+dash --> psm : "register() after spawn"
+
+api ..> psm : "unregister() on SIGTERM/SIGINT"
+dash ..> psm : "unregister() on SIGTERM/SIGINT"
+
+psm --> state : "updates"
+gsc --> psm : "queries source of truth"
 
 @enduml

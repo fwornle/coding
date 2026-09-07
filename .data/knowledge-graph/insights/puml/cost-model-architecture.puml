@@ -1,0 +1,23 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "LLM Request Paths" {
+  component "Mock LLM Path" as mock <<agent>>
+  component "Public LLM Path" as public <<agent>>
+}
+
+package "Cost Computation" {
+  component "CostModel" as costmodel <<core>>
+  component "Provider Pricing Tables" as pricing <<storage>>
+}
+
+package "Reporting" {
+  component "Token Usage Dashboard" as dashboard <<api>>
+}
+
+mock --> costmodel : "token counts"
+public --> costmodel : "token counts"
+pricing --> costmodel : "per-provider rates"
+costmodel --> dashboard : "budget figures (€/$)"
+
+@enduml

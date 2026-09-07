@@ -1,36 +1,37 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Execution Modes" {
-  component "Mock LLM Service" as mock <<core>>
-  component "DMR Provider" as dmr <<core>>
-  component "LLM With Process" as lwp <<core>>
+package "Mode Resolution" {
+  component "getLLMMode()" as mode <<core>>
+  component "isMockLLMEnabled()\ngetLLMState()" as state <<core>>
+  database "workflow-progress.json" as progress <<storage>>
 }
 
-package "Configuration & State" {
-  database "workflow-progress.json" as wpj <<storage>>
-  component "dmr-config.yaml" as dmrcfg <<storage>>
+package "Provider Layer" {
+  component "DMRProvider" as dmr <<agent>>
+  component "loadDMRConfig()\nexpandEnvVars()" as dmrconfig <<core>>
+  component "checkDMRAvailability()" as dmrhealth <<core>>
+  cloud "Docker Model Runner" as dmrRuntime <<external>>
 }
 
-package "External Endpoints" {
-  cloud "rapid-llm-proxy\n/api/complete" as proxy <<external>>
-  cloud "DMR Engine\nOpenAI-compatible API" as dmrengine <<external>>
-  cloud "Public LLM Providers\n(Anthropic / OpenAI / Groq)" as publlm <<external>>
+package "Process-Tagged Path" {
+  component "llmWithProcessComplete()" as proc <<agent>>
+  cloud "LLM Proxy\n(RAPID/CLI/generic/localhost)" as proxy <<external>>
+  component "cost-model.ts\npriceForModel()" as cost <<core>>
 }
 
-component "wave-controller.ts" as wc <<agent>>
+mode --> state : "resolves mode"
+state --> progress : "reads/writes\n(CODING_ROOT aware)"
 
-wc --> mock : "mock mode"
-wc --> dmr : "local mode"
-wc --> lwp : "public mode\n(with process tag)"
+mode --> dmr : "dispatch to local"
+dmr --> dmrconfig : "load YAML config"
+dmr --> dmrhealth : "cached availability"
+dmrhealth --> dmrRuntime : "models.list()"
+dmrconfig --> dmrRuntime : "OpenAI-compatible client"
 
-mock --> wpj : "getLLMMode()\nsetGlobalLLMMode()"
-dmr --> dmrcfg : "expandEnvVars()"
-dmr --> dmrengine : "OpenAI-compat client\nhealth-check cached"
-
-lwp --> proxy : "POST /api/complete\ninject process field"
-proxy --> publlm : "routes to provider"
-
-wpj ..> mock : "per-agent overrides\n+ legacy mockLLM flag"
+mode --> proc : "bypasses SDK"
+proc --> proxy : "fetch + process tag"
+proc --> cost : "normalized token usage"
+cost --> cost : "isOpenAIWireProvider()\nmodelFamily() fallback"
 
 @enduml

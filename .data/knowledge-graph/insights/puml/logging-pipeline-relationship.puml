@@ -1,0 +1,13 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LoggingPipeline
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[LoggingPipeline] as logging_pipeline #LightBlue
+[ConfigValidation] as config_validation #F0F0F0
+
+live_logging_system --> logging_pipeline
+config_validation -[hidden]- logging_pipeline
+
+@enduml

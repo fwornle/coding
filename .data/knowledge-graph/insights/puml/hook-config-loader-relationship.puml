@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HookConfigLoader
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[HookConfigLoader] as hook_config_loader #LightBlue
+[UnifiedHookManager] as unified_hook_manager #F0F0F0
+[ViolationCaptureService] as violation_capture_service #F0F0F0
+[ContentValidationAgent] as content_validation_agent #F0F0F0
+[LayeredConfigMerge] as layered_config_merge #E8F5E8
+
+constraint_system --> hook_config_loader
+unified_hook_manager -[hidden]- hook_config_loader
+violation_capture_service -[hidden]- hook_config_loader
+content_validation_agent -[hidden]- hook_config_loader
+hook_config_loader --> layered_config_merge
+
+@enduml

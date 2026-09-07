@@ -1,37 +1,42 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Hook Interception Layer" {
-  component "UnifiedHookManager" as hookMgr <<core>>
-  component "HookConfigLoader" as configLoader <<core>>
+package "Hook Configuration Layer" {
+  component "HookConfigLoader" as loader <<core>>
+  database "~/.coding-tools/hooks.json" as userCfg
+  database ".coding/hooks.json" as projCfg
+  component "DEFAULT_CONFIG\n(event buckets)" as defaults <<core>>
 }
 
-package "Configuration Sources" {
-  component "User Hooks Config\n~/.coding-tools/hooks.json" as userCfg <<external>>
-  component "Project Hooks Config\n.coding/hooks.json" as projCfg <<external>>
+package "Hook Dispatch" {
+  component "UnifiedHookManager" as manager <<core>>
 }
 
-package "Constraint Enforcement" {
-  component "Pre-Tool Hook Handler" as preHook <<api>>
-  component "Post-Tool Hook Handler" as postHook <<api>>
-  component "ContentValidationAgent" as cva <<agent>>
+package "Violation Handling" {
+  component "ViolationCaptureService" as capture <<core>>
+  component "sanitizeParams()" as sanitize <<core>>
+  component "calculateStatistics()" as stats <<core>>
+  database "session-violations.jsonl" as jsonl
+  database "violation-history.json" as history
 }
 
-package "Persistence Layer" {
-  component "ViolationCaptureService" as vcs <<core>>
-  database "session-violations.jsonl\n.mcp-sync/" as jsonl <<storage>>
-  database "violation-history.json\n.mcp-sync/" as jsonHist <<storage>>
+package "Related Systems" {
+  component "ContentValidationAgent" as content <<agent>>
+  component "System Health Dashboard" as dashboard <<external>>
 }
 
-userCfg --> configLoader : "user-level config"
-projCfg --> configLoader : "project-level override"
-configLoader --> hookMgr : "validated handler configs"
-hookMgr --> preHook : "dispatches pre-tool events"
-hookMgr --> postHook : "dispatches post-tool events"
-preHook --> vcs : "constraint violations"
-postHook --> vcs : "constraint violations"
-cva --> vcs : "EntityValidationReport scores"
-vcs --> jsonl : "append JSONL stream"
-vcs --> jsonHist : "capped 1000 entries"
+userCfg --> loader : "user config"
+projCfg --> loader : "project override"
+defaults --> loader : "default buckets"
+loader --> manager : "merged config"
+
+manager --> capture : "dispatches pre/post-tool events"
+capture --> sanitize : "redacts secrets"
+sanitize --> jsonl : "writes record"
+capture --> stats : "on write"
+stats --> history : "rolling summary\n(capped at 1000)"
+
+history --> dashboard : "constraint/violation data"
+content ..> capture : "shares severity taxonomy"
 
 @enduml

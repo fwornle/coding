@@ -1,33 +1,25 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Semantic Analysis MCP" {
-    component "LLMMockService" as lms <<core>>
-    component "Mode Switcher" as ms <<core>>
-    component "Docker Path Resolver" as dpr <<core>>
+package "Configuration" {
+  component "Environment Config\n(LLM_PROXY_URL etc)" as envcfg <<external>>
 }
 
-package "Operation Modes" {
-    component "Mock Mode" as mock <<api>>
-    component "Local Mode" as local <<api>>
-    component "Public Mode" as pub <<api>>
+package "LLM Mock Layer" {
+  component "LLMMockService" as mockservice <<core>>
+  component "Mode Router\n(mock/local/public)" as router <<core>>
+  database "workflow-progress.json" as progressfile <<storage>>
 }
 
-package "External Dependencies" {
-    cloud "OpenAI / Anthropic API" as extapi <<external>>
-    component "Local LLM Proxy" as llmproxy <<external>>
-    component "CI Pipeline" as ci <<external>>
+package "Consumers" {
+  component "Semantic Analysis MCP" as mcp <<agent>>
+  cloud "Real LLM Provider" as realllm <<external>>
 }
 
-lms --> ms : "selects mode"
-lms --> dpr : "resolves paths"
-
-ms --> mock : "mock"
-ms --> local : "local"
-ms --> pub : "public"
-
-mock --> ci : "static responses"
-local --> llmproxy : "LLM_CLI_PROXY_URL\nRAPID_LLM_PROXY_URL"
-pub --> extapi : "OPENAI_API_KEY\nANTHROPIC_API_KEY"
+envcfg --> router : configures mode
+router --> mockservice : selects routing behavior
+mockservice --> progressfile : reads/writes deterministic state
+mcp --> mockservice : requests LLM call
+mockservice --> realllm : forwards (local/public mode only)
 
 @enduml

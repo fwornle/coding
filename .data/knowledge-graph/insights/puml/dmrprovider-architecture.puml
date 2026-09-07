@@ -1,0 +1,24 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Mode Resolution" {
+  component "LLMMockService" as mock <<core>>
+}
+
+package "Local Inference" {
+  component "DMRProvider" as dmr <<agent>>
+  component "OpenAI-Compatible Client Shape" as shape <<api>>
+}
+
+package "External Runtime" {
+  cloud "Docker Model Runner API" as runner <<external>>
+  component "Qwen-family Local Models" as qwen <<external>>
+}
+
+mock --> dmr : "mode == 'local'"
+dmr --> shape : "reuses"
+shape --> runner : "OpenAI-style requests"
+runner --> qwen : "hosts"
+dmr ..> runner : "QWEN_LOCAL_API_KEY /\nQWEN_LAPTOP_API_BASE_URL"
+
+@enduml

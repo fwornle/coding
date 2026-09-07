@@ -1,32 +1,32 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Orchestration Layer" {
-  component "ServiceStarter" as ss <<core>>
-  component "Retry + Backoff Engine" as retry <<core>>
+package "Wrapper Scripts" {
+  component "api-service.js" as api <<cli>>
+  component "dashboard-service.js" as dash <<cli>>
 }
 
-package "Health Verification" {
-  component "ServiceProbe" as probe <<api>>
+package "ServiceStarter Core" {
+  component "startServiceWithRetry()" as retry <<core>>
+  component "withDeadline()" as deadline <<core>>
 }
 
-package "Services" {
-  component "Memgraph" as memgraph <<external>>
-  component "Redis" as redis <<external>>
+package "Managed Services" {
+  component "MCP Service" as mcp <<agent>>
+  component "Constraint Monitor" as constraint <<agent>>
+  component "Graphify" as graphify <<agent>>
+  component "LLM Service" as llm <<agent>>
 }
 
-package "Infrastructure" {
-  component "Docker Compose" as docker <<external>>
-}
+api --> retry : "start + health-check fns"
+dash --> retry : "start + health-check fns"
 
-ss --> retry : "manages"
-ss --> probe : "gates startup via"
-probe --> memgraph : "probes"
-probe --> redis : "probes"
-docker --> memgraph : "starts container"
-docker --> redis : "starts container"
-ss --> docker : "post-start convergence"
-ss --> memgraph : "startup lifecycle"
-ss --> redis : "startup lifecycle"
+retry --> deadline : "bounds attempt duration"
+retry --> retry : "exponential backoff retry"
+
+retry --> mcp : "required/optional start"
+retry --> constraint : "required/optional start"
+retry --> graphify : "required/optional start"
+retry --> llm : "required/optional start"
 
 @enduml

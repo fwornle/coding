@@ -1,33 +1,31 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
-
-package "Ingestion Layer" {
-  component "TranscriptAdapter" as ta <<api>>
-  component "LSLConverter" as conv <<core>>
+package "Pre-flight Validation" {
+  component "validate-lsl-config.js" as validator <<cli>>
 }
 
-package "Configuration & Validation" {
-  component "LSLConfigValidator" as val <<cli>>
-  component "lsl-config.json" as cfg <<storage>>
-  component "redaction-config.yaml" as red <<storage>>
+package "Pipeline Core" {
+  component "Session Windowing" as windowing <<core>>
+  component "File Routing" as routing <<core>>
+  component "ontology-classification-agent.ts" as classifier <<agent>>
+  component "logging.ts" as capture <<core>>
 }
 
-package "Semantic Analysis Backend" {
-  component "SemanticLoggingBackend" as slb <<core>>
-  component "OntologyClassificationAgent" as oca <<agent>>
+package "Verification & External" {
+  component "hierarchy-roots.test.ts" as test <<core>>
+  cloud "LLM Proxy" as llmproxy <<external>>
 }
 
-database "LSL Session Files" as lsl <<storage>>
+validator --> windowing : "validates config for"
+validator --> routing : "validates config for"
 
-ta --> conv : "convertToLSL()"
-conv --> lsl : "toMarkdown() / toJSONL()"
-val --> cfg : "validates"
-val --> red : "validates"
-red ..> conv : "PII redaction gates"
-conv --> slb : "normalized LSL records"
-slb --> oca : "raw observations"
-oca --> lsl : "persists OntologyMetadata"
+windowing --> routing : "chunks session content"
+routing --> classifier : "routes windowed content"
+classifier --> llmproxy : "sends session window for classification"
+classifier --> capture : "enriched, classified content"
+capture --> capture : "persists final transcript"
+
+test ..> classifier : "validates hierarchy roots"
 
 @enduml

@@ -2,33 +2,29 @@
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Health Coordination" {
-  component "Health Coordinator" as hc <<core>>
+  component "Health Coordinator" as coordinator <<core>>
 }
 
-package "ServiceProbe (lib/utils/service-probe.js)" {
-  component "HTTP Endpoint Probe" as http <<api>>
-  component "TCP Port Probe" as tcp <<api>>
-  component "ServiceProbe" as sp <<core>>
+package "Service Probe (lib/utils/service-probe.js)" {
+  component "probeHttpHealth()" as httpProbe <<core>>
+  component "probeTcpPort()" as tcpProbe <<core>>
 }
 
-package "Monitored Services" {
-  component "Semantic Analysis MCP" as mcp <<external>>
-  component "Constraint Monitor" as cm <<external>>
-  component "Code Graph RAG" as cgr <<external>>
-  database "Memgraph" as mg <<storage>>
-  database "Redis" as redis <<storage>>
+package "Probed Services" {
+  component "MCP Service" as mcp <<external>>
+  component "Dashboard Service" as dashboard <<external>>
+  component "Graphify Service" as graphify <<external>>
 }
 
-hc --> sp : "polls liveness"
-sp --> http : "dispatches"
-sp --> tcp : "dispatches (fallback)"
+coordinator --> httpProbe : "invokes for HTTP-enabled services"
+coordinator --> tcpProbe : "invokes for non-HTTP services"
 
-http --> mcp : "HTTP check"
-http --> cm : "HTTP check"
-http --> cgr : "HTTP check"
-tcp --> mg : "TCP check"
-tcp --> redis : "TCP check"
+httpProbe --> mcp : "checks health endpoint"
+httpProbe --> dashboard : "checks health endpoint"
 
-sp --> hc : "running / stopped / unknown"
+tcpProbe --> graphify : "checks port open"
+
+httpProbe ..> coordinator : "returns boolean/status"
+tcpProbe ..> coordinator : "returns boolean/status"
 
 @enduml
