@@ -40,6 +40,7 @@ const {
   insertTokenRow,
   DIRECT_ROUTING_SOURCE,
   ADAPTER_USER_HASH_OPENCODE,
+  ROUTING_COLUMNS,
 } = await import('../../lib/lsl/token/token-db.mjs');
 const { buildOpencodeTokenRows, BYPASS_PROVIDERS } = await import(
   '../../lib/lsl/token/opencode-token-rows.mjs'
@@ -188,8 +189,11 @@ describe('token-db — routing attribution on adapter rows', () => {
   test('a proxy row with no routing fields is unchanged — defaults, not nulls', () => {
     const db = openTokenDb(makeDb(CREATE_WITH_ROUTING));
     try {
-      const { route_key, route_band, route_step, offloaded_from,
-        chain_position, attempt_trail, routing_source, ...bare } = directRow;
+      // Stripped by ROUTING_COLUMNS itself, not by a copy of it: a hand-written
+      // list here would go on passing after the real one gained a column.
+      const bare = Object.fromEntries(
+        Object.entries(directRow).filter(([k]) => !ROUTING_COLUMNS.includes(k)),
+      );
       expect(insertTokenRow(db, bare)).toBe(true);
       const got = db.prepare('SELECT * FROM token_usage').get();
       expect(got.routing_source).toBe('');
