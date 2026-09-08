@@ -1197,3 +1197,30 @@ describe('useViewerStore — legend select all/none (2026-06-19)', () => {
     expect(useViewerStore.getState().hiddenRelationTypes.has('c')).toBe(false)
   })
 })
+
+describe('hiddenRelationTypes default (2026-09-08)', () => {
+  it('starts with the provenance edge types hidden, not empty', () => {
+    // Structure-first default. capturedBy + mentions are 88% of the coding
+    // graph's edges and rendered the canvas an unreadable grey wall.
+    const fresh = useViewerStore.getInitialState().hiddenRelationTypes
+    expect([...fresh].sort()).toEqual(['capturedBy', 'mentions'])
+  })
+
+  it('the Legend "all" link can still bring provenance back', () => {
+    useViewerStore.setState({
+      hiddenRelationTypes: new Set(useViewerStore.getInitialState().hiddenRelationTypes),
+    })
+    useViewerStore.getState().setHiddenRelationTypes([])
+    expect(useViewerStore.getState().hiddenRelationTypes.size).toBe(0)
+  })
+
+  it('toggling one provenance type off leaves the other hidden', () => {
+    useViewerStore.setState({
+      hiddenRelationTypes: new Set(useViewerStore.getInitialState().hiddenRelationTypes),
+    })
+    useViewerStore.getState().toggleRelationType('mentions')
+    const hidden = useViewerStore.getState().hiddenRelationTypes
+    expect(hidden.has('mentions')).toBe(false)
+    expect(hidden.has('capturedBy')).toBe(true)
+  })
+})

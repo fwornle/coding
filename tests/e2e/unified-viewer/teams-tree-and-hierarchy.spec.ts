@@ -141,3 +141,58 @@ test.describe('Hierarchy Navigator', () => {
     await expect(nav.getByLabel(/Filter to Project: Kgbench \(\d+ descendants\)/)).toBeVisible()
   })
 })
+
+test.describe('Provenance edges hidden by default', () => {
+  // capturedBy + mentions are 88% of the coding graph (13,090 + 9,284 of
+  // 25,468 edges). Rendering them all put 24,997 paths on the canvas and made
+  // it an unreadable grey wall; the default now draws the ~2,900 structural
+  // edges instead. Asserted against the real backend because the ratio, and
+  // therefore the whole point, only exists on the real graph.
+  test('the canvas draws structure, not the full provenance set', async ({ page }) => {
+    await page.goto('/viewer/coding')
+    const paths = page.locator('[data-testid="viewer-canvas"] svg path')
+    await expect.poll(() => paths.count(), { timeout: 30_000 }).toBeGreaterThan(0)
+
+    // Structure is thousands of edges; the full set is tens of thousands. The
+    // bound is deliberately loose — this guards the default, not a fixed graph.
+    expect(await paths.count()).toBeLessThan(10_000)
+  })
+
+  test('the stats bar still reports every edge — nothing is silently dropped', async ({ page }) => {
+    await page.goto('/viewer/coding')
+    const footer = page.getByTestId('footer-status')
+    await expect(footer).toBeVisible()
+    // The footer paints "0 of 0 nodes · 0 edges" before the fetch resolves, so
+    // poll rather than reading it once.
+    const edgeCount = async () =>
+      Number(
+        ((await footer.textContent()) ?? '').match(/([\d,]+)\s+edges/)?.[1]?.replace(/,/g, '') ??
+          '0',
+      )
+    // A default that hid edges from the COUNT would be a lie about the graph.
+    await expect.poll(edgeCount, { timeout: 30_000 }).toBeGreaterThan(10_000)
+  })
+
+  test('the Legend shows them as hidden and can bring them back', async ({ page }) => {
+    await page.goto('/viewer/coding')
+    const paths = page.locator('[data-testid="viewer-canvas"] svg path')
+    await expect.poll(() => paths.count(), { timeout: 30_000 }).toBeGreaterThan(0)
+    const structureOnly = await paths.count()
+
+    // The Legend is a <details>, collapsed by default (UI-SPEC §7 row 12).
+    await page.getByTestId('viewer-legend-panel').locator('summary').click()
+
+    // Hidden rows render struck-through rather than vanishing, so the operator
+    // can see what is being withheld.
+    const captured = page.getByTestId('legend-rel-capturedBy')
+    await expect(captured).toBeVisible()
+    await expect(captured).toHaveAttribute('data-hidden', 'true')
+    await expect(captured).toHaveCSS('text-decoration-line', 'line-through')
+    // A structural type is NOT hidden — the default is targeted, not blanket.
+    // `data-hidden` is only emitted when true, so absence is the visible state.
+    await expect(page.getByTestId('legend-rel-contains')).not.toHaveAttribute('data-hidden', 'true')
+
+    await captured.click()
+    await expect.poll(() => paths.count(), { timeout: 30_000 }).toBeGreaterThan(structureOnly)
+  })
+})

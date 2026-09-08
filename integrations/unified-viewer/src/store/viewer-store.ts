@@ -34,6 +34,7 @@
 
 import { create } from 'zustand'
 import type { Observation } from '@/api/schemas'
+import { PROVENANCE_RELATION_TYPES } from '@/graph/relation-types'
 
 export type Level = 0 | 1 | 2 | 3
 export type ThemePref = 'light' | 'dark'
@@ -318,6 +319,11 @@ export interface ViewerState {
   // FULL graph set (UnifiedViewer passes useGraphData's entities/relations),
   // so hidden rows still render (dimmed) and can be toggled back. Non-persistent
   // (mirrors showDebugEntityTypes / D-11): resets on page load.
+  //
+  // 2026-09-08: `hiddenRelationTypes` no longer starts EMPTY. It is seeded with
+  // PROVENANCE_RELATION_TYPES, which are 88% of the coding graph's edges and
+  // rendered the canvas unreadable — see the note on that constant. Resetting
+  // on page load therefore means resetting to "structure only", not to "all".
   hiddenRelationTypes: ReadonlySet<string>
   hiddenNodeTypes: ReadonlySet<string>
   toggleRelationType: (type: string) => void
@@ -898,7 +904,10 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   // page load so operators must consciously re-enable Observation/Digest debug.
   showDebugEntityTypes: false,
   hoveredNodeId: null,
-  hiddenRelationTypes: new Set<string>(),
+  // Structure first. The Legend's RELATIONSHIPS "all" link clears this, which
+  // is how provenance comes back — one click, and the rows are visible-but-
+  // dimmed in the meantime rather than absent.
+  hiddenRelationTypes: new Set<string>(PROVENANCE_RELATION_TYPES),
   hiddenNodeTypes: new Set<string>(),
 
   toggleLayer: (layer) =>

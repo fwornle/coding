@@ -24,3 +24,26 @@ export function canonicalizeRelationType(type: string | null | undefined): strin
   }
   return type
 }
+
+// ---------------------------------------------------------------------------
+// Provenance edges — hidden by default (2026-09-08)
+// ---------------------------------------------------------------------------
+//
+// Two edge types are 88% of the coding graph: `capturedBy` (13,090 edges, 51%)
+// and `mentions` (9,284, 36%). They record WHERE a fact came from — which
+// observation captured an insight, which entity a digest names — so every node
+// carries a bundle of them, and drawn all at once they are a grey wall with the
+// structure somewhere underneath. Measured on the live graph: rendering all of
+// them puts 24,997 paths on the canvas; without them, 3,189.
+//
+// The remaining ~2,900 edges ARE the knowledge structure — `contains`,
+// `has_insight`, `parent-child`, `includes`, `derivedFrom`, `related_to` — and
+// that is what a knowledge-graph viewer is for. So the default is structure,
+// and provenance is one click away in the Legend's RELATIONSHIPS section
+// (its "all" link clears the hidden set, including these).
+//
+// This is a DEFAULT, not a filter: the edges are loaded, counted in the stats
+// bar, and listed in the Legend as hidden rows. Nothing is silently dropped —
+// ApiClient.listRelations's OKB cap is the one place edges actually go away,
+// and that one reports its own pre-cap total for exactly this reason.
+export const PROVENANCE_RELATION_TYPES: readonly string[] = ['capturedBy', 'mentions']

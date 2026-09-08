@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canonicalizeRelationType } from './relation-types'
+import { canonicalizeRelationType, PROVENANCE_RELATION_TYPES } from './relation-types'
 
 describe('canonicalizeRelationType', () => {
   it('folds space-separated LLM phrases into snake_case', () => {
@@ -41,5 +41,24 @@ describe('canonicalizeRelationType', () => {
   it('is idempotent', () => {
     const once = canonicalizeRelationType('implemented in')
     expect(canonicalizeRelationType(once)).toBe(once)
+  })
+})
+
+describe('PROVENANCE_RELATION_TYPES', () => {
+  it('names the two edge types that are 88% of the coding graph', () => {
+    // 13,090 capturedBy + 9,284 mentions of 25,468 edges, measured 2026-09-08.
+    // Widening this set is a real decision — every addition removes structure
+    // from the default view — so the contents are locked here rather than left
+    // to drift.
+    expect([...PROVENANCE_RELATION_TYPES].sort()).toEqual(['capturedBy', 'mentions'])
+  })
+
+  it('holds types canonicalizeRelationType leaves alone', () => {
+    // The store seeds `hiddenRelationTypes` with these, and the canvas matches
+    // them against CANONICALIZED edge types. A member that canonicalized to
+    // something else would hide nothing at all, silently.
+    for (const t of PROVENANCE_RELATION_TYPES) {
+      expect(canonicalizeRelationType(t)).toBe(t)
+    }
   })
 })
