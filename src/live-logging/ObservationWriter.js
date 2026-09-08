@@ -36,6 +36,7 @@ import { EventEmitter } from 'node:events';
 import Redis from 'ioredis';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { getLSLWindow } from '../../lib/lsl/window.mjs';
+import { routeFromArtifacts } from '../../lib/attribution/repo-router.mjs';
 // Phase 75 (OBS-01 / D-09): the shared single-span task_id reader. ETM stamps
 // metadata.task_id at the fire site; this is the best-effort fallback so direct
 // callers (without ETM) still link observations to the active Run. Never throws.
@@ -1220,6 +1221,46 @@ export class ObservationWriter {
    * @param {Array} messages - Original messages
    * @param {Object} metadata - Additional metadata (agent, sessionId, sourceFile)
    */
+  /**
+   * Re-point `metadata.project` at the repo the touched files actually live in.
+   *
+   * Returns the metadata unchanged when there is no decisive evidence — which
+   * is the common case for a discussion turn that edited nothing.
+   *
+   * @param {Object} metadata
+   * @returns {Object} metadata, possibly with project/team + attribution set
+   */
+  _routeProject(metadata) {
+    try {
+      const cwdProject = metadata.project;
+      const touched = [
+        ...(metadata.modifiedFiles || []),
+        ...(metadata.readFiles || []),
+      ];
+      const decision = routeFromArtifacts(touched);
+      if (!decision || !cwdProject || decision.team === cwdProject) return metadata;
+
+      process.stderr.write(
+        `[ObservationWriter] attribution: ${cwdProject} -> ${decision.team} `
+        + `(${decision.evidence.length} file(s) resolve there)\n`,
+      );
+      return {
+        ...metadata,
+        project: decision.team,
+        team: decision.team,
+        attribution: {
+          stampedFrom: 'artifacts',
+          previousTeam: cwdProject,
+          evidence: decision.evidence.slice(0, 5),
+        },
+      };
+    } catch (err) {
+      // Attribution is an improvement, never a precondition for capture.
+      process.stderr.write(`[ObservationWriter] attribution skipped: ${err.message}\n`);
+      return metadata;
+    }
+  }
+
   async writeObservation(summary, messages, metadata = {}) {
     // Phase 44 Plan 13: km-core is the single canonical store. The legacy
     // SQLite handle is gone; we require `_ensureKmStore()` to succeed.
@@ -1240,6 +1281,24 @@ export class ObservationWriter {
     }
 
     const agent = metadata.agent || null;
+
+    // ── Attribution: what the work was ABOUT, not where the shell stood ────
+    //
+    // `metadata.project` comes from the ETM, which derives it from the cwd's
+    // basename. Fix a coding bug from inside the a2a-xpr checkout and the
+    // observation — and every digest and insight built on it — files under
+    // a2a-xpr. Eleven entities in the live graph got there exactly this way.
+    //
+    // The tool calls already told us the truth: modifiedFiles holds ABSOLUTE
+    // paths, and a path resolves to a repository by walking to its .git. When
+    // every touched file agrees on a repo that is NOT the cwd's, believe the
+    // files. A mixed set means the session genuinely spanned repos, and the
+    // router abstains rather than picking a side.
+    //
+    // The override is recorded, not silent: `attribution` keeps the previous
+    // value and the evidence, so it is auditable and reversible.
+    metadata = this._routeProject(metadata);
+
     // Content-based dedup. Hash inputs: session id + user-message content +
     // first 500 chars of each assistant message. Including assistant content
     // is required because identical user prompts (e.g. "Continue") produce

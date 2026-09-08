@@ -36,6 +36,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react'
 import type { ApiClient, ConfidencePayload } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
 import { useGraphData } from '@/graph/useGraphData'
+import { headline, hasArticle } from '@/lib-domain/headline'
 import { useViewerStore } from '@/store/viewer-store'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -764,7 +765,35 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
         <>
           <Section title="Description" testId="entity-section-description">
             {description.length > 0 ? (
-              <MarkdownText text={description} />
+              /* 2026-09-08: descriptions here are reference articles (median
+                 984 chars, p90 2,587, max 10,530) because the consolidator
+                 prompts for Purpose/Architecture/Key Files/Usage/Trouble-
+                 shooting. That is the right shape to READ and the wrong shape
+                 to LAND ON, so the lead sentence comes first and the article
+                 sits behind a disclosure. Nothing is discarded. */
+              hasArticle(entity as Parameters<typeof headline>[0]) ? (
+                <>
+                  <p
+                    className="text-sm text-foreground"
+                    data-testid="entity-headline"
+                  >
+                    {headline(entity as Parameters<typeof headline>[0])}
+                  </p>
+                  <details className="mt-2 group">
+                    <summary
+                      className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer select-none"
+                      data-testid="entity-description-disclosure"
+                    >
+                      Full reference article
+                    </summary>
+                    <div className="mt-1.5">
+                      <MarkdownText text={description} />
+                    </div>
+                  </details>
+                </>
+              ) : (
+                <MarkdownText text={description} />
+              )
             ) : (
               <p className="text-sm text-muted-foreground italic">No description.</p>
             )}

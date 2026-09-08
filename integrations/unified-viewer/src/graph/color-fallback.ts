@@ -1,3 +1,5 @@
+import { isOnlineLearned } from './learning-source'
+
 // Operator feedback (Plan 03 checkpoint round 2): the FNV-1a HSL randomized
 // hue scheme produced a "children's drawing book" look. Replace with a
 // monochrome blue scale keyed off ontology hierarchy depth — VOKB-style
@@ -66,12 +68,12 @@ export function classColor(
   _theme: 'light' | 'dark',
   source?: string,
 ): string {
-  // Online-learned = source ∈ {'auto','online'} — the SAME predicate the
-  // visibility filter uses (visibility-predicate.ts:115). The data stamps
-  // ETM/consolidator output as 'online' far more often than 'auto', so the
-  // prior `=== 'auto'` check left most online-learned nodes painted in the
-  // blue/grey batch palette instead of the requested light-red. (2026-06-28)
-  const isOnline = source === 'auto' || source === 'online'
+  // Online-learned via the shared classifier (graph/learning-source.ts), so the
+  // canvas, Legend, filter and History sidebar cannot drift apart again. The
+  // data stamps ETM/consolidator output as 'online' far more often than 'auto',
+  // so the pre-2026-06-28 `=== 'auto'` check left most online-learned nodes in
+  // the blue/grey batch palette instead of the requested light-red.
+  const isOnline = isOnlineLearned({ metadata: { source } })
   const palette = isOnline ? ONLINE_PALETTE : BATCH_PALETTE
   const fallback = isOnline ? DEFAULT_ONLINE : DEFAULT_BATCH
   const c = (palette as Record<string, string>)[className]
@@ -203,10 +205,15 @@ export interface ClassRegistryEntry {
 /** Light-red ring color for online-learned (source ∈ {auto,online}) nodes. */
 export const ONLINE_RING_COLOR = '#f472b6' // pink-400 — visible on both themes
 
-/** Canonical "is this node online-learned?" — same rule as the visibility
- *  predicate (visibility-predicate.ts:115). Drives the online ring overlay. */
+/**
+ * DEPRECATED — takes a bare source string, so it cannot see the `subsystem` and
+ * digest-shape fallbacks that classify the ~138 entities carrying no `source`
+ * at all. Prefer `isOnlineLearned(node)` from './learning-source', which is the
+ * one rule the canvas, the Legend, the Learning Source filter and the History
+ * sidebar all share. Kept only for callers that genuinely hold a string.
+ */
 export function isOnlineSource(source?: string | null): boolean {
-  return source === 'auto' || source === 'online'
+  return isOnlineLearned({ metadata: { source: source ?? undefined } })
 }
 
 /**

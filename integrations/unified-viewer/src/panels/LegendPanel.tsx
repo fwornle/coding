@@ -17,12 +17,12 @@
 // actually on screen — fully removed in this rewrite.
 
 import { useMemo } from 'react'
+import { isOnlineLearned } from '@/graph/learning-source'
 import { useViewerStore } from '@/store/viewer-store'
 import { EDGE_STYLES, LAYER_BADGE_CLASS } from '@/graph/vokb-palette'
 import {
   nodeFillColor,
   nodeShapeFor,
-  isOnlineSource,
   ONLINE_RING_COLOR,
   DEFAULT_BATCH,
   type ShapeKind,
@@ -214,9 +214,8 @@ export function LegendPanel({
     for (const e of entities) {
       const cls = typeof e.ontologyClass === 'string' ? e.ontologyClass : ''
       if (!cls) continue
-      const src = (e as { metadata?: { source?: unknown } }).metadata?.source
       total.set(cls, (total.get(cls) ?? 0) + 1)
-      if (isOnlineSource(typeof src === 'string' ? src : undefined)) {
+      if (isOnlineLearned(e as { metadata?: Record<string, unknown> })) {
         onCount.set(cls, (onCount.get(cls) ?? 0) + 1)
       }
     }

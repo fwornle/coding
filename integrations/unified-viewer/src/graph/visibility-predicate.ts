@@ -13,6 +13,7 @@
 //     the strip's onTickClick path through `useVisibleEntityIds`, which
 //     calls this predicate.
 
+import { learningSourceOf } from './learning-source'
 import type { Entity } from './types'
 import { deriveLayer } from './layer'
 import { deriveLevel } from './graph-builder'
@@ -112,9 +113,13 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
     const ocls = e.ontologyClass
     const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
     if (!isStructural) {
-      const isAuto = meta.source === 'auto' || meta.source === 'online'
-      if (filters.learningSource === 'online' && !isAuto) return false
-      if (filters.learningSource === 'batch' && isAuto) return false
+      // Shared classifier — see graph/learning-source.ts. A bare
+      // `source ∈ {auto,online}` test mis-files the ~138 entities that carry no
+      // source at all, and the Batch/Online radio is exactly the control a user
+      // reaches for when they want to see one population and not the other.
+      const src = learningSourceOf(e as { metadata?: Record<string, unknown> })
+      if (filters.learningSource === 'online' && src !== 'online') return false
+      if (filters.learningSource === 'batch' && src === 'online') return false
     }
   }
 

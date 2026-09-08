@@ -4,7 +4,8 @@
 // (memory-visualizer/src/components/KnowledgeGraph/HistorySidebar.tsx):
 //
 //   - newest first (sorted by metadata.createdAt or entity.createdAt)
-//   - shows name + entityType + source badge (Manual/Auto) + relative time + team
+//   - shows name + entityType + source badge (Manual/Batch/Auto) + relative
+//     time + team
 //   - clicking a row selects the node in the graph
 //
 // Data source: the same `useGraphData` entities array the canvas reads
@@ -20,6 +21,12 @@ import { useViewerStore } from '@/store/viewer-store'
 import { ApiClient } from '@/api/ApiClient'
 import { System } from '@/config/system-endpoints'
 import { Logger } from '@/lib/logging'
+import { headline } from '@/lib-domain/headline'
+import {
+  learningSourceOf,
+  LEARNING_SOURCE_LABEL,
+  type LearningSource,
+} from '@/graph/learning-source'
 
 interface HistorySidebarProps {
   apiClient: ApiClient
@@ -30,7 +37,8 @@ interface HistoryItem {
   id: string
   name: string
   entityType: string
-  source: 'auto' | 'manual'
+  source: LearningSource
+  headline: string
   createdAt: string
   team: string
 }
@@ -72,19 +80,21 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
       const created = (e.createdAt as string | undefined)
         ?? (meta.createdAt as string | undefined)
         ?? ''
-      // 2026-06-12: default missing source to 'auto'. Observations and
-      // Digests written from claude-code sessions have no
-      // `metadata.source` field set yet (the writer's pipeline omits it)
-      // but they're auto-captured by definition. The previous default
-      // ('unknown') ⇒ Manual badge mis-labeled every recent Digest.
-      // 'manual' is only used when explicitly tagged.
-      const rawSource = meta.source as string | undefined
-      const source: 'auto' | 'manual' = rawSource === 'manual' ? 'manual' : 'auto'
+      // 2026-09-08: was `rawSource === 'manual' ? 'manual' : 'auto'`, which
+      // collapsed every non-manual source into Auto — so a UKB batch run's
+      // output badged red beside genuine ETM captures, and the sidebar
+      // contradicted the canvas, which had the right rule all along. Both now
+      // read graph/learning-source.ts, which also resolves the ~138 entities
+      // that carry no `source` at all (the 2026-06-12 note below was written
+      // about exactly those, and defaulting them ALL to auto was half right:
+      // the ETM digests are auto, the wave-analysis ones are batch).
+      const source = learningSourceOf({ metadata: meta })
       out.push({
         id: e.id,
         name: (e.name as string) || '(unnamed)',
         entityType: e.entityType as string,
         source,
+        headline: headline(e as Parameters<typeof headline>[0]),
         createdAt: created,
         team: (meta.team as string | undefined) ?? 'general',
       })
@@ -205,14 +215,25 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
                   </span>
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
-                      item.source === 'auto'
+                      item.source === 'online'
                         ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-200'
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
+                        : item.source === 'batch'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200'
                     }`}
+                    data-testid={`history-source-${item.source}`}
                   >
-                    {item.source === 'auto' ? 'Auto' : 'Manual'}
+                    {LEARNING_SOURCE_LABEL[item.source]}
                   </span>
                 </div>
+                {item.headline && item.headline !== item.name && (
+                  <p
+                    className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2"
+                    data-testid="history-headline"
+                  >
+                    {item.headline}
+                  </p>
+                )}
                 <div className="flex items-center justify-between mt-1 text-[11px] text-muted-foreground">
                   <span>{item.entityType}</span>
                   <span>

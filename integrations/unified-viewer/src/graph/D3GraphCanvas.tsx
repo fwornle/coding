@@ -26,10 +26,10 @@ import { renderNodeShape } from './node-shapes'
 import { EDGE_STYLES } from './vokb-palette'
 import {
   nodeFillColor,
-  isOnlineSource,
   ONLINE_RING_COLOR,
   type ClassRegistryEntry,
 } from './color-fallback'
+import { isOnlineLearned } from './learning-source'
 import { useGraphData } from './useGraphData'
 import type { Entity, Relation } from './types'
 // 2026-06-13 (Phase 56-04): computeAncestryPath extracted to a shared
@@ -924,7 +924,7 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     node.each(function (d) {
       const shape = renderNodeShape(d, d3.select(this), 10)
       const source = (d.metadata as { source?: string } | undefined)?.source
-      const online = isOnlineSource(source)
+      const online = isOnlineLearned(d as { metadata?: Record<string, unknown> })
       shape
         // FILL = class hue (source-independent), resolved by the SAME shared
         // resolver SigmaCanvas + LegendPanel use, with a parent-walk so L2
