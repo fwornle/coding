@@ -5,11 +5,19 @@ title Hierarchy Context: LLMMockService
 
 [DockerizedServices] as dockerized_services #FFFFDD
 [LLMMockService] as llmmock_service #LightBlue
-[ServiceProbe] as service_probe #F0F0F0
 [ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[ServiceWrapperScripts] as service_wrapper_scripts #F0F0F0
+[GetLLMMode] as get_llmmode #E8F5E8
 
 dockerized_services --> llmmock_service
-service_probe -[hidden]- llmmock_service
 service_starter -[hidden]- llmmock_service
+service_probe -[hidden]- llmmock_service
+process_state_manager -[hidden]- llmmock_service
+health_coordinator -[hidden]- llmmock_service
+service_wrapper_scripts -[hidden]- llmmock_service
+llmmock_service --> get_llmmode
 
 @enduml

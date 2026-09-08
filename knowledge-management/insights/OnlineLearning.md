@@ -2,77 +2,58 @@
 
 **Type:** SubComponent
 
-RELEASE-2.0.md (docs/RELEASE-2.0.md) documents the Ontology Integration System, indicating OnlineLearning was extended to emit ontology-classified entity types aligned with the EntityTypeRegistry normalization layer
+lib/ukb-unified/core/WorkflowOrchestrator.js executeIncrementalWorkflow() builds workflow_name: 'incremental-analysis' parameters from a gap scope (sinceCommit, commits, sessions) and calls mcp__semantic_analysis__execute_workflow to run automated extraction
 
 # OnlineLearning — Technical Insight Document
 
 ## What It Is
 
-OnlineLearning is a SubComponent of KnowledgeManagement responsible for automated, pipeline-driven knowledge extraction and graph population. Unlike its sibling ManualLearning — which sources entities from human-authored inputs marked with human-provenance metadata — OnlineLearning operates through a structured batch-analysis pipeline that ingests machine-readable signals: git history, LSL session data, and source code ASTs. The result is a continuously refreshed stream of entities and relationships written into GraphKMStore, the Graphology/LevelDB storage layer that OnlineLearning directly populates.
-
-The pipeline is scoped to a single repository root, configured via the `CODING_REPO` environment variable, which defines the filesystem boundary for all AST indexing operations. There are no specific source file paths surfaced in code symbols at this time, but the pipeline's behavior is documented across `docs/architecture/memory-systems.md`, `docs/architecture/token-usage.md`, and `docs/RELEASE-2.0.md`.
-
----
-
-## Architecture and Design
+OnlineLearning is the automated, incremental knowledge-extraction subsystem within KnowledgeManagement, implemented primarily around `lib/ukb-unified/core/WorkflowOrchestrator.js` and `lib/ukb-unified/cli.js`. Where its sibling ManualLearning provides a human-authoring path (add-entity/update-entity commands via UKBDatabaseWriter), OnlineLearning exists to automatically detect what has changed since the last analysis run — new commits, new sessions — and drive an extraction pipeline over just that gap, rather than reprocessing the entire codebase. Its core entry point is `WorkflowOrchestrator.executeIncrementalWorkflow()`, which constructs an `incremental-analysis` workflow request and dispatches it through `mcp__semantic_analysis__execute_workflow`.
 
 ![OnlineLearning — Architecture](images/online-learning-architecture.png)
 
-OnlineLearning is structured as a **DAG-based batch pipeline**, where discrete, ordered stages process different signal sources before committing entities to the knowledge graph. The three primary stages — git history extraction, LSL session analysis, and code analysis — are not interchangeable or concurrent; they represent a deliberate sequencing that mirrors the dependency structure of the knowledge they produce. Code analysis, for instance, depends on a stable repository root, while git history extraction provides temporal provenance context that enriches the resulting entities.
+## Architecture and Design
 
-The code-analysis branch of the pipeline is anchored by the `CodeGraphAgent`, which uses **Tree-sitter AST parsing** to index repositories. Tree-sitter provides language-agnostic, incremental parsing, making this branch resilient to multi-language codebases while remaining deterministic in its output shape. This is a meaningful design choice: AST-derived entities carry structural certainty (symbol names, file locations, relationship types) that prose-derived or heuristic extraction cannot guarantee.
+The dominant pattern is gap-based incremental processing with a capability-gated execution strategy. `UKBCliDefaultCommand` (in `lib/ukb-unified/cli.js`) begins each run by loading a `TeamCheckpointManager` checkpoint and calling `GapAnalyzer.getGapSummary()` to determine whether this is a first run or an incremental one, based on `checkpoint.lastSuccessfulRun`. The resulting gap scope (sinceCommit, sinceTimestamp, commits, sessions) is handed to `WorkflowOrchestrator.executeIncrementalWorkflow()`, which packages it into `IncrementalAnalysisWorkflowParams` — notably mapping commits to `c.sha` and sessions to `s.path`, so the workflow consumes lightweight descriptors rather than full domain objects, keeping the orchestration layer decoupled from GapAnalyzer's internal representations.
 
-A notable architectural extension, documented in `docs/RELEASE-2.0.md` as the **Ontology Integration System**, aligned OnlineLearning's output with the EntityTypeRegistry normalization layer. This means the pipeline does not emit raw or ad-hoc entity types — all extracted entities are classified through the three-type ontology (System / Project / Pattern) before graph insertion. This constraint binds OnlineLearning tightly to its sibling EntityTypeRegistry and ensures that automated extraction cannot introduce type drift that would corrupt downstream graph <USER_ID_REDACTED>.
+A second key design decision is the availability gate implemented by `WorkflowOrchestrator.checkMCPToolsAvailability()`: all automated workflow execution checks for the presence of MCP tool functions before running, falling back to `mock*Workflow` methods when MCP isn't available. This makes the subsystem degrade gracefully in environments without the MCP toolchain (e.g., local dev, tests) while preserving the same orchestration interface.
 
-![OnlineLearning — Relationship](images/online-learning-relationship.png)
-
----
+The actual extraction pipeline is structured as named, ordered substep sequences per agent, defined in `AGENT_SUBSTEPS` (multi-agent-graph.tsx) — e.g., `kg_operators: conv→aggr→embed→dedup→pred→merge` and `git_history: fetch→diff→extract`. Each substep is tagged with an `llmUsage` level (`none`/`fast`/`standard`/`premium`), explicitly documenting which stages are pure algorithmic transformations versus LLM-invoking steps, which is a meaningful cost/latency design signal baked directly into the pipeline metadata.
 
 ## Implementation Details
 
-The pipeline's LLM-assisted extraction steps are metered through the Token Usage Dashboard (`docs/architecture/token-usage.md`), indicating that at least some extraction stages involve language model inference — likely for entity classification, relationship labeling, or semantic summarization of code constructs that Tree-sitter alone cannot resolve (e.g., inferring that a class represents a "Pattern" rather than merely a "Project" artifact). The token metering implies these steps are budget-aware, and the dashboard provides operational visibility into batch run costs.
+`executeIncrementalWorkflow()` builds a `workflow_name: 'incremental-analysis'` payload carrying `sinceCommit`, `sinceTimestamp`, `commits`, `sessions`, `maxCommits`, `maxSessions`, and `significanceThreshold` — giving the underlying MCP workflow both boundary information (since when) and volume/quality caps (max counts, significance threshold) to bound the work performed. This is consistent with an incremental system that must avoid unbounded reprocessing as gaps grow.
 
-The `CODING_REPO` environment variable is the single configuration knob that scopes the entire AST indexer. This makes the pipeline explicitly **repo-scoped** — each invocation operates on one repository root, keeping extraction boundaries clean and avoiding cross-repository entity collisions. This is consistent with the parent KnowledgeManagement component's design, which treats the knowledge graph as a local-first, bounded structure rather than a federated one.
+On the UI side, `ukb-workflow-modal.tsx`'s `calculateDynamicEta()` observes `process.batchIterations` from the currently running batch to project completion time for the online-learning batch pipeline — an adaptive, self-referential estimation technique rather than a static progress bar, useful given that substep durations vary by `llmUsage` tier.
 
-Entity identity within the pipeline is stabilized by the sibling component KMCoreMigration's UUIDv7 scheme. Records extracted by OnlineLearning are assigned time-ordered, stable UUIDv7 identifiers, which means re-runs of the batch pipeline can produce deterministically comparable entity sets rather than accumulating duplicates. The migration script `migrate-leveldb-to-kmcore.mjs` is the mechanism through which raw pipeline output is canonicalized into this identifier space.
-
----
+Once extraction completes, `data-processor.js`'s `exportOnlineKnowledge()` pulls the results back out via `databaseManager.graphDB.queryEntities({team, limit:5000})`, and explicitly relabels entities whose `source` was `'auto'` into `'online'` for visualization purposes — a small but important semantic translation layer between how data is tagged internally by the extraction pipeline and how it's presented to consumers.
 
 ## Integration Points
 
-OnlineLearning's most direct downstream dependency is **GraphKMStore**, the child component that owns the Graphology in-memory graph backed by LevelDB. OnlineLearning is the primary writer to this store during batch runs; GraphKMStore exposes the graph surface that all consumers (query layers, the CodeGraphAgent's Memgraph integration) read from.
+![OnlineLearning — Relationship](images/online-learning-relationship.png)
 
-The relationship with **EntityTypeRegistry** is a hard constraint: OnlineLearning must route all emitted entity types through the three-type ontology (System / Project / Pattern) before insertion. This normalization gate prevents the automated pipeline from polluting the graph with uncategorized or inconsistently typed nodes, which would degrade the reliability of graph traversals used by the parent KnowledgeManagement infrastructure.
-
-The CodeGraphAgent serves as both a consumer and a contributor to the pipeline — it uses Tree-sitter to index repositories (feeding OnlineLearning's code-analysis stage) and separately integrates with Memgraph for external graph database <USER_ID_REDACTED>, as described in the KnowledgeManagement parent context. This dual role means changes to the CodeGraphAgent's parsing behavior have direct consequences for the shape and completeness of OnlineLearning's output.
-
----
+OnlineLearning sits under KnowledgeManagement alongside ManualLearning and VkbServer. It shares the underlying graph storage with VkbServer (via `databaseManager.graphDB`) and, downstream, its exported `'online'`-tagged entities are presumably visualized through the same channels VkbServer exposes (`/api/entities`, `/api/export`, etc.), though the exact route wiring for online-sourced data isn't detailed in these observations. It contrasts directly with ManualLearning, which writes through `UKBDatabaseWriter` from stdin JSON — OnlineLearning instead writes through the batch/automated extraction path driven by MCP workflows. Internally, its children `WorkflowOrchestrator`, `IncrementalAnalysisWorkflowParams`, and `UKBCliDefaultCommand` form a clear call chain: CLI detects the gap → orchestrator builds and dispatches workflow params → MCP tools (or mocks) execute the actual analysis.
 
 ## Usage Guidelines
 
-**Repository scoping is mandatory.** The `CODING_REPO` environment variable must be set correctly before any batch run. Because the AST indexer and git history extractor both anchor to this root, an incorrect path will silently produce an empty or partial extraction rather than a visible error — developers should validate this variable as a pre-flight check.
-
-**Stage ordering must be respected.** The DAG-based pipeline model means stages have implicit dependencies. Running code analysis before git history extraction, for example, may produce entities lacking the provenance context that makes them useful for downstream reasoning. The DAG structure should be treated as a contract, not a suggestion.
-
-**LLM steps incur token costs.** Because batch runs are metered (per `docs/architecture/token-usage.md`), developers should avoid triggering full pipeline re-runs unnecessarily. Incremental or scoped runs — where only changed files or new commits are processed — are preferable to full re-indexing when the repository has not changed substantially.
-
-**Ontology compliance is non-negotiable.** Any extension to OnlineLearning's extraction logic must emit entities that resolve cleanly through EntityTypeRegistry's three-type surface. Introducing new entity type strings without updating the registry will cause classification failures at the normalization layer, potentially blocking graph insertion entirely. Coordinate with the EntityTypeRegistry before adding new entity categories to the pipeline.
+Developers extending OnlineLearning should treat `GapAnalyzer.getGapSummary()` and the `TeamCheckpointManager` checkpoint as the source of truth for incremental scope — new substeps or extraction agents should be registered in `AGENT_SUBSTEPS` with an accurate `llmUsage` tag so ETA calculations and cost expectations remain meaningful. Because `checkMCPToolsAvailability()` silently falls back to mock workflows, care should be taken when testing that MCP tools are actually available if real incremental analysis (not mock output) is required. When exposing new online-learned data, follow the `exportOnlineKnowledge()` convention of tagging with `source: 'online'` rather than leaving the raw `'auto'` tag, to keep the visualization layer's semantics consistent with what ManualLearning-produced entities look like.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing persistent storage, entity lifecycle management, and graph query capabilities. It is built on a Graphology in-memory graph with LevelDB as the persistence backend, exposing entities with typed attributes (System, Project, Pattern) and relationships. The system supports both local graph operations and integration with external graph databases like Memgraph via the CodeGraphAgent, which uses Tree-sitter AST parsing to index repositories into a queryable knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component centers around a VKB (Virtual Knowledge Base) server that exposes graph-based storage operations to the rest of the Coding infrastructure. This server acts as the primary access point for entity CRUD operations, query resolution, and relationship traversal across the knowledge graph, decoupling consumers (agents, CLI tools, other components) from the underlying storage engine. This abstraction layer is critical because it has allowed the project to migrate storage backends (LevelDB to KMCore) without requiring downstream consumers to change their integration code, as evidenced by the dedicated migration test suite.
 
 ### Children
-- [GraphKMStore](./GraphKMStore.md) -- docs/architecture/memory-systems.md describes the Graph-Based Knowledge Storage Architecture that OnlineLearning populates, with Graphology as the in-memory layer backed by LevelDB
+- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- executeIncrementalWorkflow() builds workflow_name: 'incremental-analysis' with parameters sinceCommit, sinceTimestamp, commits (mapped to sha), sessions (mapped to path), maxCommits, maxSessions, significanceThreshold
+- [IncrementalAnalysisWorkflowParams](./IncrementalAnalysisWorkflowParams.md) -- scope.commits.map(c => c.sha) and scope.sessions.map(s => s.path) show the incremental workflow expects lightweight commit/session descriptors from GapAnalyzer rather than full objects
+- [UKBCliDefaultCommand](./UKBCliDefaultCommand.md) -- UKBCli.defaultCommand() calls this.checkpointManager.loadCheckpoint() and checks checkpoint.lastSuccessfulRun to detect first-run vs incremental scenarios
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning entities are distinguished by provenance metadata that marks their origin as human-authored, contrasting with the automated pipeline provenance stamps applied by KMCoreMigration
-- [KMCoreMigration](./KMCoreMigration.md) -- The migration script migrate-leveldb-to-kmcore.mjs reads raw LevelDB B-shape records and rewrites them with UUIDv7 identifiers, providing stable, time-ordered IDs for all canonical entities
-- [EntityTypeRegistry](./EntityTypeRegistry.md) -- EntityTypeRegistry enforces a three-type ontology (System/Project/Pattern) as the canonical classification surface, with all incoming entity types mapped through this consolidation layer before graph insertion
+- [ManualLearning](./ManualLearning.md) -- lib/ukb-database/cli.js exposes add-entity, update-entity, add-relation, import, and export commands that read JSON from stdin and pass it through UKBDatabaseWriter, a manual-authoring entry point distinct from the batch pipeline
+- [VkbServer](./VkbServer.md) -- lib/vkb-server/api-routes.js's ApiRoutes.registerRoutes() wires dozens of endpoints (/api/entities, /api/relations, /api/stats, /api/export, /api/query, /api/ontology/classes) as the single HTTP surface for all consumers
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

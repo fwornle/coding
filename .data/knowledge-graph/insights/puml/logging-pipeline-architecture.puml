@@ -1,0 +1,27 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Pre-flight Validation" {
+  component "validate-lsl-config.js" as validator <<cli>>
+}
+
+package "Logging Pipeline (logging.ts)" {
+  component "Session Windowing" as windowing <<core>>
+  component "File Routing" as routing <<core>>
+  component "Classification" as classify <<core>>
+  component "Transcript Capture" as capture <<core>>
+}
+
+package "Output" {
+  component "Log/Transcript Files" as output <<storage>>
+}
+
+validator --> windowing : "validates duration settings"
+validator --> routing : "validates routing rules"
+
+windowing --> routing : "time-bounded log groups"
+routing --> classify : "routed log data"
+classify --> capture : "classified events"
+capture --> output : "writes transcript"
+
+@enduml

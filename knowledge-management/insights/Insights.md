@@ -2,82 +2,74 @@
 
 **Type:** SubComponent
 
-Knowledge report authoring produces structured documents summarizing batch analysis findings, consistent with the cross-project knowledge sharing patterns described in docs/architecture/cross-project-knowledge.md
+[CGR] Imports: clipboard-button.tsx, ClipboardButton, consolidation-progress.tsx, InflightInfo, ConsolidationProgress, components/markdown-text.tsx, MarkdownText, system-health-dashboard/src/components/ui/badge.tsx, Badge, system-health-dashboard/src/components/ui/button.tsx (+10 more)
 
-# Insights
+# Insights — Technical Insight Document
 
 ## What It Is
 
-Insights is a SubComponent of SemanticAnalysis — the multi-agent MCP server hosted in `integrations/semantic-analysis` — responsible for LLM-driven analysis of already-classified knowledge entities. It operates as a downstream stage in the semantic analysis pipeline, receiving entities that have passed through ontology classification and producing structured analytical artifacts: pattern catalogs and knowledge reports. Its behavior is directly governed by token budget constraints managed by OntologyConfigManager, making its operational depth a configurable, budget-aware property of each batch run rather than a fixed capability.
+Insights is the terminal sub-component of the SemanticAnalysis pipeline, defined via `AGENT_SUBSTEPS['insight_generation']` in `multi-agent-graph.tsx`. It comprises two declared sub-steps: **Pattern Discovery** (`patterns`), which consumes Code entities and Relations to produce Pattern instances and descriptive text, and **Architecture Diagramming** (`arch`), which consumes Components and Dependencies to generate architecture diagrams. Beyond this orchestration-level definition, the codebase contains a wide surface of concrete artifacts touching "insights" — from UI components like `GatedInsights` in `App.tsx`, to server handlers like `handleGetInsights` in `server.js`, to consolidation logic in `ObservationConsolidator.js` (`synthesizeInsights`, `_relinkOrphanOnlineInsights`), to batch/migration scripts (`backfill-insight-mentions.mjs`, `backfill.ts`) that derive and read insight data.
 
 ![Insights — Architecture](images/insights-architecture.png)
 
 ## Architecture and Design
 
-The central architectural decision in Insights is that it operates **downstream of ontology classification**, meaning every entity it processes already carries `ontologyClass` metadata. This is not incidental — it is a deliberate sequencing choice that allows insight prompts to be class-aware and targeted rather than generic. Rather than asking an LLM "what is this?", the Insights layer can ask "given that this is a `[ontologyClass]`, what structural patterns or relationships are notable?" This improves both the precision and token-efficiency of LLM calls, since the classification work has already narrowed the semantic space.
+Insights sits downstream of both Pipeline (which extracts entities/relations via parse, extract, relate, enrich) and Ontology (which classifies those entities via match, validate, extend). This placement reflects a strict staged pipeline: raw extraction → classification → insight authoring, mirroring the parent SemanticAnalysis description of separating extraction from classification into dedicated agent responsibilities. Insight generation is the consumer at the end of this chain, relying on the outputs of its sibling stages rather than performing its own extraction or classification.
 
-The budget-aware design is encapsulated in the child component TokenBudgetConstrainedInsightDepth, which directly reflects how OntologyConfigManager's token budget configuration throttles insight generation. The singleton nature of OntologyConfigManager — shared across all pipeline agents in a batch run — means that the token ceiling imposed on Insights is consistent and cannot drift mid-run. This is a meaningful reliability guarantee: insight depth is bounded deterministically per batch, not subject to race conditions or per-agent configuration divergence.
-
-![Insights — Relationship](images/insights-relationship.png)
-
-Structurally, Insights produces two distinct output types: a **pattern catalog** (recurring structural patterns identified across entities in a batch) and **knowledge reports** (structured summary documents of batch findings). These serve different consumers — the pattern catalog is reusable across future classification and deduplication decisions, while knowledge reports are oriented toward cross-project knowledge sharing as described in `docs/architecture/cross-project-knowledge.md`. This separation suggests a deliberate distinction between machine-consumable analytical artifacts and human- or pipeline-readable summaries.
+A notable design decision is the tiering of LLM cost: Pattern Discovery is tagged `llmUsage:'premium'`, the same tier as Ontology's `extend` sub-step. This signals a deliberate architectural choice to budget novel-pattern discovery and novel-class discovery as similarly expensive, "creative" LLM operations, distinct from cheaper, more mechanical sub-steps like match/validate or parse/extract. The `arch` sub-step is architecturally distinct in output type — it produces diagrams rather than pattern text — suggesting Insights bifurcates into a text/semantic track and a visual/structural track from the same upstream Components/Dependencies data.
 
 ## Implementation Details
 
-No code symbols or key files were identified in the current observations, so implementation mechanics must be inferred from behavioral descriptions. The Insights agents consume entities in batch, leveraging the `ontologyClass` metadata already attached by upstream classifiers (OntologyClassifier, OntologyValidator) to construct class-aware prompts. The LLM interaction is budget-constrained via TokenBudgetConstrainedInsightDepth: as the token budget configured in OntologyConfigManager increases or decreases, the depth of analysis — likely the number of entities processed, the complexity of prompts, or the length of generated outputs — scales accordingly.
+At the implementation level, "insights" functionality is diffused across multiple layers rather than centralized in one module. `ObservationConsolidator.js` contains the core synthesis logic (`synthesizeInsights`) plus repair/maintenance logic (`_relinkOrphanOnlineInsights`), and calls a large set of internal helpers (`_forwardObsApi`, `readExport`, `makePreview`, `previewVersion`, `_toLegacyDigestRow`, `_toLegacyInsightRow`, `_publishEmbeddingEvent`, `_getSanitizer`, `_jaccard`, `_findSimilarInsightId`, among 10+ others). The presence of `_jaccard` and `_findSimilarInsightId` indicates similarity-based deduplication or matching logic underlies insight consolidation, while `_toLegacyDigestRow`/`_toLegacyInsightRow` point to backward-compatibility transforms for older data schemas, and `_publishEmbeddingEvent` implies insights are embedded and published as events for downstream consumers.
 
-The **pattern catalog extraction** sub-process identifies recurring structures across the batch. This implies some form of cross-entity comparison or aggregation logic within the Insights stage, though the specific implementation mechanism is not surfaced in the current observations. The catalog's stated purpose — informing future classification and deduplication — positions it as a persistent artifact that outlives the batch run and feeds back into the broader pipeline over time.
-
-**Knowledge report authoring** produces structured documents aligned with the conventions in `docs/architecture/cross-project-knowledge.md`. The consistency requirement here implies that report generation follows a defined schema or template rather than free-form LLM output, ensuring reports are interoperable with cross-project knowledge sharing infrastructure.
-
-Token usage is tracked and surfaced via the Token Usage Dashboard documented in `docs/architecture/token-usage.md`, enabling per-batch cost monitoring for the Insights stage specifically. This observability mechanism is important given that LLM costs are the primary operational variable in Insights' execution profile.
+On the data/backfill side, `deriveInsightSummary` (in `backfill-insight-mentions.mjs`) and `readInsights` (in `backfill.ts`) support batch reconstruction or migration of insight data, while `analyzeSessionForInsights` in `copilot-http-server.js` derives insights from session logs at request time. Server-side exposure is handled through `handleGetInsights` in `server.js`, and `INSIGHTS` as a class in `kb-ab-sample-tasks.mjs` suggests a sample/test fixture representing insight structures for AB-testing tasks.
 
 ## Integration Points
 
-Insights is embedded within SemanticAnalysis and sits downstream of the Ontology family of components — OntologyClassifier and OntologyValidator having already enriched entities before Insights receives them. The sibling relationship with OntologyConfigManager is particularly tight: OntologyConfigManager's singleton token budget configuration is the primary external control surface for Insights' behavior. Developers adjusting batch token budgets in OntologyConfigManager are directly tuning Insights' analytical depth.
+![Insights — Relationship](images/insights-relationship.png)
 
-The LegacyOntologyAdapter sibling is relevant insofar as it ensures OntologyClassifier and OntologyValidator continue to produce valid `ontologyClass` metadata during the Phase 42-03 migration period — metadata that Insights depends on for class-aware prompting. Any degradation in ontology metadata <USER_ID_REDACTED> upstream would directly reduce the targeting precision of Insights' LLM calls.
+Insights integrates with the UI layer through `GatedInsights` in `App.tsx`, which imports shared components including `ClipboardButton` (`clipboard-button.tsx`), `ConsolidationProgress`/`InflightInfo` (`consolidation-progress.tsx`), `MarkdownText` (`components/markdown-text.tsx`), and UI primitives `Badge`/`Button` from `system-health-dashboard/src/components/ui/`. This indicates insights are rendered as gated, progressively-loaded UI content with markdown rendering and copy-to-clipboard affordances, consistent with a consolidation workflow that surfaces in-progress or streaming results (`ConsolidationProgress`, `InflightInfo`).
 
-Outbound integration points include the Token Usage Dashboard (`docs/architecture/token-usage.md`) for cost observability and the cross-project knowledge sharing infrastructure (`docs/architecture/cross-project-knowledge.md`) that consumes knowledge reports. The pattern catalog's integration point — future classification and deduplication decisions — implies it is written to a shared store accessible to pipeline agents in subsequent runs, though the specific persistence mechanism is not detailed in current observations.
+On the pipeline side, Insights depends on outputs from Pipeline (Code entities, Relations, Components, Dependencies) and Ontology (classified entities), per the parent SemanticAnalysis architecture. Test and audit tooling (`online-mapper.test.ts`, `audit-knowledge-overlap.mjs`) reference `insights` as variables, implying these are validated/audited as part of quality-assurance processes across the knowledge graph.
 
 ## Usage Guidelines
 
-**Token budget configuration is the primary tuning lever for Insights.** Developers should treat OntologyConfigManager's token budget settings as the dial that controls insight <USER_ID_REDACTED> vs. cost. Because TokenBudgetConstrainedInsightDepth directly throttles LLM consumption, under-budgeted runs will produce shallower insights; over-budgeted runs risk cost overruns. The Token Usage Dashboard should be consulted after initial batch runs to calibrate budget settings against actual cost profiles.
+Given the premium LLM tagging on Pattern Discovery, callers should treat pattern generation as a costlier operation to be invoked judiciously rather than on every entity change — mirroring how Ontology's `extend` is similarly gated. Consumers of insight data should be aware of the dual legacy/current schema handling evident in `_toLegacyDigestRow`/`_toLegacyInsightRow`, meaning integrations should tolerate or explicitly handle both formats. Deduplication logic (`_jaccard`, `_findSimilarInsightId`) suggests new insights should be checked against existing ones before insertion to avoid redundant pattern entries. Finally, since Insights strictly consumes upstream Pipeline and Ontology outputs, changes to entity/relation schemas in those sibling stages will directly impact insight generation correctness and should be coordinated.
 
-**Ontology metadata <USER_ID_REDACTED> is a prerequisite.** Since Insights prompts are class-aware, the value of insight generation is contingent on accurate `ontologyClass` assignments from upstream. Batches run with misconfigured or degraded ontology definitions (e.g., during ontology migrations handled by LegacyOntologyAdapter) should be evaluated carefully — insights generated against incorrect classifications may be misleading.
 
-**Pattern catalogs are batch-spanning artifacts.** Because the pattern catalog is designed to inform future classification and deduplication, developers should treat it as a persistent knowledge artifact requiring versioning or management discipline, not a transient batch output. Overwriting or discarding catalogs between runs would forfeit the cross-batch learning value the sub-process is designed to provide.
+## Code Evidence
 
-**Knowledge reports must conform to cross-project conventions.** Reports should be validated against the schema described in `docs/architecture/cross-project-knowledge.md` before being shared across projects. Structural deviations reduce interoperability with the broader knowledge sharing infrastructure that downstream consumers depend on.
+Key code artifacts grounding this entity's analysis:
 
----
+**Structural:**
+- INSIGHTS (class) in kb-ab-sample-tasks.mjs
+- handleGetInsights (method) in server.js
+- GatedInsights (class) in App.tsx
+- analyzeSessionForInsights (method) in copilot-http-server.js
+- deriveInsightSummary (function) in backfill-insight-mentions.mjs
+- readInsights (function) in backfill.ts
+- synthesizeInsights (method) in ObservationConsolidator.js
+- _relinkOrphanOnlineInsights (method) in ObservationConsolidator.js
 
-### Architectural Patterns and Design Trade-offs: Summary
+**Relationships:**
+- Calls: _forwardObsApi, readExport, makePreview, previewVersion, _toLegacyDigestRow, _toLegacyInsightRow, _publishEmbeddingEvent, _getSanitizer, _jaccard, _findSimilarInsightId (+10 more)
+- Imports: clipboard-button.tsx, ClipboardButton, consolidation-progress.tsx, InflightInfo, ConsolidationProgress, components/markdown-text.tsx, MarkdownText, system-health-dashboard/src/components/ui/badge.tsx, Badge, system-health-dashboard/src/components/ui/button.tsx (+10 more)
 
-| Concern | Decision | Trade-off |
-|---|---|---|
-| Sequencing | Downstream of classification | Higher prompt precision; requires reliable upstream metadata |
-| Budget governance | Centralized via OntologyConfigManager singleton | Consistent depth; inflexible per-entity granularity |
-| Output types | Catalog (machine) vs. report (human/pipeline) | Dual-purpose artifacts; separate maintenance concerns |
-| Observability | Token Usage Dashboard integration | Cost transparency; adds instrumentation overhead |
-| Cross-run learning | Persistent pattern catalog | Accumulates value over time; requires artifact lifecycle management |
+**Other:**
+- insights (variable) in online-mapper.test.ts
+- insights (variable) in audit-knowledge-overlap.mjs
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
-
-### Children
-- [TokenBudgetConstrainedInsightDepth](./TokenBudgetConstrainedInsightDepth.md) -- Per parent context, OntologyConfigManager governs token budget allocation per batch run, directly throttling how many tokens the Insights sub-component can consume during LLM-driven analysis.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The batch-analysis pipeline is organized as a multi-agent workflow where distinct responsibilities are separated into dedicated agent classes rather than a single monolithic analyzer. semantic-analysis-agent.ts is responsible for extracting structured knowledge entities from raw inputs (git history diffs/commits and LSL session logs), while ontology-classification-agent.ts takes those extracted entities and classifies them into a hierarchy (determining parent-child relationships and where a given entity fits within the broader ontology). This separation of extraction from classification allows each agent to have a narrower, more testable prompt/response contract with the underlying LLM, and lets the pipeline swap or tune one stage without affecting the other's logic.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
-- [Ontology](./Ontology.md) -- The system maintains a two-level ontology hierarchy (upper/lower) with separate definition files, paths to which are managed by OntologyConfigManager, allowing the classification tier to be reconfigured without code changes
-- [OntologyConfigManager](./OntologyConfigManager.md) -- Implemented as a singleton to ensure all pipeline agents share identical ontology configuration throughout a batch run, preventing mid-run config drift between classifier and validator instances
-- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- Wraps km-core's OntologyRegistry behind a legacy-compatible interface, isolating the migration boundary so that OntologyValidator and OntologyClassifier continue to function without modification during Phase 42-03
+- [Pipeline](./Pipeline.md) -- AGENT_SUBSTEPS['semantic_analysis'] in multi-agent-graph.tsx defines four ordered sub-steps: parse, extract, relate, enrich, each with declared inputs/outputs
+- [Ontology](./Ontology.md) -- AGENT_SUBSTEPS['ontology_classification'] in multi-agent-graph.tsx defines match, validate, and extend sub-steps for the classification agent
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 16 observations*

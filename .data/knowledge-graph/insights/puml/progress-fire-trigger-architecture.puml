@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "ProgressFireTrigger" {
+  component "progressFireDecision()" as decision <<core>>
+  component "sumOutputTokens()" as sumTokens <<core>>
+  component "Token-Delta Trigger" as tokenTrigger <<core>>
+  component "Wall-Clock Trigger" as clockTrigger <<core>>
+  component "Base Rebase Logic" as rebase <<core>>
+}
+
+package "Config" {
+  component "DEFAULT_PROGRESS_TOKEN_DELTA\n(30_000)" as tokenThreshold <<external>>
+  component "elapsedThresholdMs" as timeThreshold <<external>>
+}
+
+package "Agents" {
+  component "Agents w/ usage.output_tokens" as fullAgents <<agent>>
+  component "opencode/copilot\n(no output_tokens)" as sparseAgents <<agent>>
+}
+
+component "Daemon (Caller)" as daemon <<external>>
+
+sumTokens --> tokenTrigger : "cumulative delta"
+tokenThreshold --> tokenTrigger : "threshold"
+timeThreshold --> clockTrigger : "threshold"
+
+tokenTrigger --> decision : "OR"
+clockTrigger --> decision : "OR"
+
+decision --> rebase : "detects turn reset"
+rebase --> decision : "base = 0"
+
+fullAgents --> sumTokens : "real token counts"
+sparseAgents --> sumTokens : "contributes 0"
+
+decision --> daemon : "returns mark/markAt"
+daemon --> decision : "persists mark,\ntriggers fire"
+
+@enduml

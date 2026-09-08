@@ -2,102 +2,75 @@
 
 **Type:** SubComponent
 
-The coordinator agent drives the batch-analysis workflow by sequencing downstream agents (observation generation, KG operators, deduplication, persistence) with explicit dependency ordering, consistent with the DAG-based step model documented in docs/architecture/system-overview.md
+[CGR] Imports: graphify/analyze.py, god_nodes, surprising_connections, suggest_questions, graphify/build.py, build_from_json, graphify/cluster.py, cluster, score_all, detect.py (+10 more)
 
 # Pipeline — Technical Insight Document
 
 ## What It Is
 
-Pipeline is a sub-component of SemanticAnalysis, hosted within `integrations/semantic-analysis`. It represents the orchestration backbone of the multi-agent batch-analysis workflow — a directed, dependency-ordered sequence of specialized agents that collectively transform raw git history and LSL session logs into enriched, classified, and persisted knowledge entities. Rather than exposing pipeline logic as an internal library, Pipeline surfaces its control interface outward through McpToolEndpointExposure, making pipeline execution callable by orchestrating agents via the MCP (Model Context Protocol) tool endpoint pattern.
-
-The Pipeline does not itself perform semantic analysis — it coordinates agents that do. Its value is structural: it defines the order, the handoffs, and the contracts between the observation layer, the graph construction layer, the deduplication layer, and the persistence layer.
-
----
+Pipeline is the SubComponent representing the ordered, staged execution model that underlies the semantic-analysis workflow, defined primarily through `AGENT_SUBSTEPS['semantic_analysis']` in `multi-agent-graph.tsx`. It is not a single class but a declarative structure describing four sequential sub-steps — parse, extract, relate, enrich — each carrying explicit metadata about inputs, outputs, and LLM usage tier. This same pattern of declaring a pipeline as an ordered list of typed sub-steps recurs elsewhere in the codebase, notably in `AGENT_SUBSTEPS['kg_operators']` (conv/aggr/embed/dedup/pred/merge) and `AGENT_SUBSTEPS['git_history']` (fetch/diff/extract), indicating "Pipeline" is a general architectural idiom rather than a one-off implementation. As a child of SemanticAnalysis, Pipeline realizes the multi-agent workflow's extraction phase described at the parent level, while its own child, RelationDiscovery, implements the 'relate' stage explicitly.
 
 ## Architecture and Design
 
+The core design pattern is a declarative, metadata-driven staged pipeline: each sub-step is described with an explicit inputs/outputs contract and an `llmUsage` classification (`none`, `standard`, `fast`, or `premium` as seen in sibling Insights' 'patterns' step). This lets the system reason about cost and capability per stage without inspecting implementation code — a deliberate trade-off favoring inspectability and tunability over flexibility of ad hoc step definition.
+
 ![Pipeline — Architecture](images/pipeline-architecture.png)
 
-Pipeline follows a **DAG-based step model** (explicitly referenced in `docs/architecture/system-overview.md`), where each agent stage has declared dependencies, preventing any stage from executing before its upstream producers have completed. This is a deliberate design decision that trades the flexibility of dynamic scheduling for the predictability of explicit dependency ordering — a sound trade-off in a batch-analysis context where correctness of intermediate state matters more than throughput elasticity.
-
-The coordinator agent sits at the top of this DAG, driving the sequencing of four downstream agent classes: observation generation, KG operators, deduplication, and persistence. Each represents a distinct semantic tier — raw input transformation, graph mutation, entity resolution, and durable storage — and each is isolated enough to be reasoned about independently. This clean tiering means that failures or changes in one layer have bounded blast radius on adjacent layers.
-
-![Pipeline — Relationship](images/pipeline-relationship.png)
-
-The decision to host Pipeline inside an MCP server (`integrations/semantic-analysis`) rather than as a directly invoked library is architecturally significant. It means pipeline execution is mediated through McpToolEndpointExposure, which wraps pipeline control logic as callable tools. This creates a clean boundary between the orchestrating agent (which drives the workflow) and the pipeline implementation (which executes it), allowing the pipeline to be invoked remotely, tested independently, and versioned without coupling to the caller's deployment.
-
-Siblings such as OntologyConfigManager reinforce the pipeline's consistency guarantees: by operating as a singleton, OntologyConfigManager ensures that the classifier and validator agents running within the pipeline share identical ontology configuration throughout a single batch run, eliminating the risk of mid-run config drift that would corrupt entity classification across stages.
-
----
+Stages are strictly ordered and data-dependent: 'parse' produces parsed content consumed by 'extract', whose entities feed 'relate', whose relations feed 'enrich'. This mirrors the parent SemanticAnalysis's separation-of-concerns philosophy (extraction agent vs. classification agent), applied at finer granularity within a single agent's internal pipeline. The `git_history` sub-pipeline (fetch/diff/extract) acts as an upstream ingestion pipeline that feeds into this same semantic extraction stage, while `kg_operators` acts as a downstream parallel pipeline consuming semantic_analysis's outputs for embedding and deduplication — establishing Pipeline as a middle link in a larger multi-stage graph.
 
 ## Implementation Details
 
-The pipeline's agent sequence is the primary implementation artifact. **Observation generation agents** sit at the entry point, consuming git commit diffs and LSL session events as raw input and producing candidate knowledge entities. These agents operate before any semantic enrichment — their responsibility is extraction and structuring, not classification. This separation ensures that the classification tier (handled by KG operators and informed by the Ontology component's two-level hierarchy) operates on clean, pre-normalized input.
+Each sub-step entry encodes a `techNote` describing its underlying mechanism: 'parse' is explicitly rule-based (`llmUsage:'none'`, "Rule-based parsing"), deliberately avoiding LLM cost for deterministic content parsing. 'extract' (Entity Extraction) is LLM-powered NER (`llmUsage:'standard'`) consuming 'Parsed content' and 'Domain context'. 'relate' (Relation Discovery) consumes 'Entities' and 'Context windows' to produce 'Entity relations' and 'Relation types' — this is the exact contract implemented by the child component RelationDiscovery. 'enrich' (Context Enrichment) uses a cheaper `llmUsage:'fast'` tier with "Fast context summarization" techNote, producing 'Enriched entities' and 'Observations', reflecting a cost-conscious design that reserves premium/standard LLM usage for stages that need it and downgrades enrichment to a fast tier.
 
-**KG operator agents** occupy the middle tier, constructing and mutating the graph representation of extracted entities. They bridge the raw observation layer and the persistence layer, which means they carry the dual responsibility of faithfully representing what was extracted while also expressing it in the graph model expected by GraphKMStore. Their position in the DAG means they only execute after observation generation has completed.
-
-**The deduplication agent** runs post-classification, merging semantically equivalent entities before they reach persistence. Per `docs/architecture/memory-systems.md`, this prevents redundant nodes in the graph knowledge store. The placement of deduplication *after* classification but *before* persistence is a deliberate design decision: merging based on semantic equivalence requires classified entities (so the agent knows what it's comparing), but must occur before write time to avoid polluting the graph with duplicates that are expensive to resolve after the fact.
-
-**PersistenceAgent** closes the pipeline by pre-populating ontology metadata fields — specifically `entityType` and `metadata.ontologyClass` — on each entity before writing to GraphKMStore. This is a meaningful optimization: by stamping classification at write time, the system avoids redundant LLM re-classification at read time. This decision encodes a read-heavy access pattern assumption — entities will be read (and their ontology class consumed) far more often than they are written, making the write-time enrichment cost worth paying.
-
-The LegacyOntologyAdapter sibling is worth noting here: it wraps km-core's OntologyRegistry behind a legacy-compatible interface so that OntologyValidator and OntologyClassifier continue to function within the pipeline without modification during the ongoing Phase 42-03 migration. This means the pipeline's agent stages are currently insulated from the underlying ontology registry migration, a clean isolation of the migration boundary.
-
----
+Separately, at the operational/testing layer, concrete pipeline execution and validation appear via `run_pipeline` and `full_pipeline` (in `sample_calls.py`), and a battery of tests in `test_pipeline.py` (`test_pipeline_runs_end_to_end`, `test_pipeline_graph_has_edges`, `test_pipeline_all_nodes_have_community`, `test_pipeline_report_mentions_top_god_node`, `test_pipeline_detection_finds_code_and_docs`, `test_pipeline_incremental_update`). These tests imply the pipeline builds a graph (`build_from_json` from `graphify/build.py`), clusters it (`cluster`, `score_all` from `graphify/cluster.py`), analyzes it (`god_nodes`, `surprising_connections`, `suggest_questions` from `graphify/analyze.py`), and detects entities via `detect.py`, supporting incremental updates rather than only full rebuilds. `pollKnowledgePipeline` in `health-coordinator.js` suggests a separate health/monitoring hook into pipeline execution status.
 
 ## Integration Points
 
-Pipeline's most direct structural relationship is with its parent, SemanticAnalysis, which provides the overall multi-agent MCP server context. Pipeline is the execution engine that SemanticAnalysis exposes — the parent defines *what* the system is, while Pipeline defines *how* it runs.
+![Pipeline — Relationship](images/pipeline-relationship.png)
 
-Downward, McpToolEndpointExposure is Pipeline's child component, responsible for wrapping pipeline control as MCP-callable tools. This is the public interface through which orchestrating agents invoke pipeline execution. The design implies that all external interaction with Pipeline flows through this endpoint layer, keeping the internal agent sequencing logic encapsulated.
-
-Sideways, Pipeline depends on the Ontology component's two-level hierarchy (upper/lower ontology definitions managed by OntologyConfigManager) to drive classification within KG operator and persistence stages. The Insights sibling contributes LLM-driven insight generation, operating within token budget constraints configured in OntologyConfigManager — meaning the depth of insight produced per batch run is a tunable parameter at the configuration level, not hardcoded in pipeline logic. The LegacyOntologyAdapter sibling provides the migration shim that keeps OntologyValidator and OntologyClassifier functional against the evolving km-core registry.
-
-GraphKMStore is the terminal dependency — all pipeline work ultimately lands there via PersistenceAgent, and the pre-population of ontology metadata at write time represents the pipeline's primary contract with the store.
-
----
+Pipeline integrates upstream with `git_history`'s fetch/diff/extract sub-pipeline, which supplies raw commit diffs into the semantic extraction stage. Downstream, `kg_operators` consumes semantic_analysis outputs for embedding and deduplication, forming a three-stage macro-pipeline (ingest → semantic analysis → knowledge-graph operations). Within SemanticAnalysis, Pipeline sits alongside sibling Ontology's `ontology_classification` sub-steps (match/validate/extend) and Insights' `insight_generation` sub-steps (e.g., 'patterns'), all following the same declarative sub-step convention, suggesting a shared schema/interface across agent pipelines in `multi-agent-graph.tsx`. Its child RelationDiscovery is a direct, named realization of the 'relate' entry's input/output contract. Operationally, `health-coordinator.js`'s `pollKnowledgePipeline` and calls like `noteObsApiBusy`/`obsApiBusyNow`/`evaluateObsApiAutoHeal` indicate integration with a health-monitoring/auto-heal subsystem tracking pipeline load.
 
 ## Usage Guidelines
 
-**Respect the DAG ordering.** The pipeline's correctness depends on the dependency ordering between agent stages. Observation generation must complete before KG operators run; deduplication must complete before persistence writes. Introducing new agent stages requires explicit declaration of their dependencies in the DAG definition, not implicit sequencing assumptions.
+Developers extending Pipeline should preserve the declared inputs/outputs contract per sub-step so downstream consumers (RelationDiscovery, kg_operators) remain compatible. LLM-usage tiers should be assigned deliberately: reserve 'none' for deterministic logic (as in 'parse'), 'fast' for lightweight summarization tasks (as in 'enrich'), and 'standard'/'premium' for tasks genuinely requiring stronger models. When adding new pipeline stages, follow the existing `AGENT_SUBSTEPS` declarative pattern used by `semantic_analysis`, `kg_operators`, `git_history`, and `ontology_classification` rather than introducing bespoke step definitions. New end-to-end behavior should be validated against the `test_pipeline.py` suite pattern (graph edges, community assignment, incremental updates) to ensure consistency with existing pipeline correctness guarantees.
 
-**Do not bypass McpToolEndpointExposure.** Pipeline control should be invoked through the MCP tool endpoints that McpToolEndpointExposure exposes. Directly invoking internal agent stages breaks the isolation boundary between the orchestrating layer and the pipeline implementation, and undermines the ability to test or version pipeline behavior independently.
 
-**Ontology configuration is batch-scoped.** Because OntologyConfigManager is a singleton, ontology configuration is fixed at the start of a batch run. Developers should not attempt to mutate ontology paths mid-run, as this will not propagate consistently to classifier and validator instances already initialized within the pipeline.
+## Code Evidence
 
-**Entity enrichment happens at write time, not read time.** The PersistenceAgent's pre-population of `entityType` and `metadata.ontologyClass` is the canonical enrichment point. Consumers reading from GraphKMStore should rely on these fields being populated at write time rather than performing their own classification on retrieval. Any changes to the classification logic must be reflected in the PersistenceAgent's write path to remain consistent.
+Key code artifacts grounding this entity's analysis:
 
-**Deduplication is semantic, not syntactic.** The deduplication agent merges entities based on semantic equivalence post-classification. Developers extending the entity model should ensure that their entity representations are classification-ready before the deduplication stage, or semantically equivalent entities may pass through as distinct nodes and create graph pollution that is difficult to remediate after persistence.
+**Structural:**
+- pollKnowledgePipeline (function) in health-coordinator.js
+- full_pipeline (method) in sample_calls.py
+- run_pipeline (function) in test_pipeline.py
+- test_pipeline_runs_end_to_end (function) in test_pipeline.py
+- test_pipeline_graph_has_edges (function) in test_pipeline.py
+- test_pipeline_all_nodes_have_community (function) in test_pipeline.py
+- test_pipeline_report_mentions_top_god_node (function) in test_pipeline.py
+- test_pipeline_detection_finds_code_and_docs (function) in test_pipeline.py
+- test_pipeline_incremental_update (function) in test_pipeline.py
 
----
+**Relationships:**
+- Calls: log, noteObsApiBusy, obsApiBusyNow, userActiveNow, evaluateObsApiAutoHeal, normalize, score, god_nodes, surprising_connections, suggest_questions (+10 more)
+- Imports: graphify/analyze.py, god_nodes, surprising_connections, suggest_questions, graphify/build.py, build_from_json, graphify/cluster.py, cluster, score_all, detect.py (+10 more)
 
-### Architectural Patterns Identified
-
-| Pattern | Where Applied |
-|---|---|
-| DAG-based step execution | Coordinator agent → downstream agent sequencing |
-| MCP tool endpoint exposure | Pipeline control surfaced via McpToolEndpointExposure |
-| Singleton configuration | OntologyConfigManager across all pipeline agents |
-| Write-time enrichment | PersistenceAgent pre-populates ontology metadata |
-| Migration isolation shim | LegacyOntologyAdapter insulates agent stages from registry changes |
-
-**Key trade-off:** Explicit DAG dependency ordering over dynamic scheduling — correct by construction, less flexible under partial failure recovery scenarios, but appropriate for a batch-analysis context where intermediate state integrity is paramount.
+**Other:**
+- test_pipeline.py (module) in test_pipeline.py
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The batch-analysis pipeline is organized as a multi-agent workflow where distinct responsibilities are separated into dedicated agent classes rather than a single monolithic analyzer. semantic-analysis-agent.ts is responsible for extracting structured knowledge entities from raw inputs (git history diffs/commits and LSL session logs), while ontology-classification-agent.ts takes those extracted entities and classifies them into a hierarchy (determining parent-child relationships and where a given entity fits within the broader ontology). This separation of extraction from classification allows each agent to have a narrower, more testable prompt/response contract with the underlying LLM, and lets the pipeline swap or tune one stage without affecting the other's logic.
 
 ### Children
-- [McpToolEndpointExposure](./McpToolEndpointExposure.md) -- Based on parent context, the sub-component is hosted in `integrations/semantic-analysis`, establishing it as an MCP server that wraps pipeline control logic as callable tools.
+- [RelationDiscovery](./RelationDiscovery.md) -- Defined as the 'relate' entry in AGENT_SUBSTEPS['semantic_analysis'] with inputs ['Entities', 'Context windows'] and outputs ['Entity relations', 'Relation types']
 
 ### Siblings
-- [Ontology](./Ontology.md) -- The system maintains a two-level ontology hierarchy (upper/lower) with separate definition files, paths to which are managed by OntologyConfigManager, allowing the classification tier to be reconfigured without code changes
-- [Insights](./Insights.md) -- Insight generation is LLM-driven, operating within the LLM budget constraints configured in OntologyConfigManager, meaning insight depth scales with available token budget per batch run
-- [OntologyConfigManager](./OntologyConfigManager.md) -- Implemented as a singleton to ensure all pipeline agents share identical ontology configuration throughout a batch run, preventing mid-run config drift between classifier and validator instances
-- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- Wraps km-core's OntologyRegistry behind a legacy-compatible interface, isolating the migration boundary so that OntologyValidator and OntologyClassifier continue to function without modification during Phase 42-03
+- [Ontology](./Ontology.md) -- AGENT_SUBSTEPS['ontology_classification'] in multi-agent-graph.tsx defines match, validate, and extend sub-steps for the classification agent
+- [Insights](./Insights.md) -- AGENT_SUBSTEPS['insight_generation'] defines a 'patterns' sub-step (Pattern Discovery) tagged llmUsage:'premium', consuming 'Code entities' and 'Relations' to produce 'Pattern instances' and descriptions
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 19 observations*

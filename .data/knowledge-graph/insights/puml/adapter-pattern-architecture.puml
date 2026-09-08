@@ -1,0 +1,32 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "External Formats" {
+  cloud "Transcript Source" as transcriptSrc <<external>>
+  cloud "Specstory Source" as specstorySrc <<external>>
+}
+
+package "Adapter Layer" {
+  component "TranscriptAdapter" as transcriptAdapter <<core>>
+  component "SpecstoryAdapter" as specstoryAdapter <<core>>
+  component "NamingConventions\n(*Adapter suffix)" as naming <<core>>
+}
+
+package "Internal System" {
+  component "Internal Memory /\nAgent-Consumable Structure" as internalShape <<storage>>
+  component "Agent Integration Guide\n(docs reference)" as guide <<api>>
+}
+
+transcriptSrc --> transcriptAdapter : "raw transcript data"
+specstorySrc --> specstoryAdapter : "raw specstory data"
+
+transcriptAdapter --> internalShape : "normalize/parse"
+specstoryAdapter --> internalShape : "normalize/parse"
+
+transcriptAdapter ..> naming : "follows convention"
+specstoryAdapter ..> naming : "follows convention"
+
+guide ..> transcriptAdapter : "documents example"
+guide ..> specstoryAdapter : "documents example"
+
+@enduml

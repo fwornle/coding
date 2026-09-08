@@ -1,35 +1,29 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
-
-top to bottom direction
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Health Coordination" {
-  component "health-coordinator.js" as hc <<core>>
-  component "State Machine\n(running | stopped | unknown)" as sm <<core>>
+  component "Health Coordinator" as hc <<core>>
+  component "Service Probe Lib" as probe <<core>>
+  component "Health Verification Rules" as rules <<storage>>
 }
 
-package "Probe Layer" {
-  component "service-probe.js" as sp <<api>>
-  component "probeHttpHealth()" as httpProbe <<api>>
-  component "probeTcpPort()" as tcpProbe <<api>>
+package "Probe Targets" {
+  component "HTTP Health Probe" as httpProbe <<api>>
+  component "TCP Port Probe" as tcpProbe <<api>>
+  component "Dockerized Service Fleet" as fleet <<external>>
 }
 
-package "Monitored Services" {
-  component "Next.js Dashboard" as nextjs <<external>>
-  component "Node.js API" as nodeapi <<external>>
-  database "Memgraph" as memgraph <<storage>>
-  database "Redis" as redis <<storage>>
+package "Consumers" {
+  component "Global Service Coordinator" as gsc <<agent>>
 }
 
-hc --> sm : "updates state"
-hc --> sp : "polls every 5s"
-
-sp --> httpProbe : "HTTP checks"
-sp --> tcpProbe : "TCP checks"
-
-httpProbe --> nextjs : "HTTP probe"
-httpProbe --> nodeapi : "HTTP probe"
-tcpProbe --> memgraph : "TCP probe"
-tcpProbe --> redis : "TCP probe"
+hc --> rules : "reads probe config\n(type, endpoint, thresholds)"
+hc --> probe : "invokes every 5s"
+probe --> httpProbe : "probeHttpHealth()"
+probe --> tcpProbe : "probeTcpPort()"
+httpProbe --> fleet : "checks"
+tcpProbe --> fleet : "checks"
+hc --> hc : "SPEC R6:\nconservative multi-check\nconfirmation"
+gsc --> hc : "queries aggregated\nhealth state"
 
 @enduml

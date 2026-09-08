@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OffloadDecisionEngine
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[OffloadDecisionEngine] as offload_decision_engine #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[ProxyCompletionClient] as proxy_completion_client #F0F0F0
+[CostModelEngine] as cost_model_engine #F0F0F0
+[ModelNormalization] as model_normalization #F0F0F0
+[OffloadGateLadder] as offload_gate_ladder #E8F5E8
+[RecordedCallStrip] as recorded_call_strip #E8F5E8
+[OffloadDecisionCard] as offload_decision_card #E8F5E8
+
+llmabstraction --> offload_decision_engine
+dmrprovider -[hidden]- offload_decision_engine
+proxy_completion_client -[hidden]- offload_decision_engine
+cost_model_engine -[hidden]- offload_decision_engine
+model_normalization -[hidden]- offload_decision_engine
+offload_decision_engine --> offload_gate_ladder
+offload_decision_engine --> recorded_call_strip
+offload_decision_engine --> offload_decision_card
+
+@enduml

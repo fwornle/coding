@@ -24,7 +24,7 @@
  *      number, with no error anywhere.
  */
 
-import { describe, test, expect, beforeAll, afterAll, afterEach } from '@jest/globals';
+import { describe, test, expect, beforeAll, beforeEach, afterAll, afterEach } from '@jest/globals';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,8 +47,22 @@ try {
 let tmp;
 beforeAll(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-gauge-test-'));
+
+  // Pin the model catalogue OUT of these tests.
+  //
+  // Every fixture below asserts a percentage, and a percentage is tokens over a
+  // window. The wire-semantics tests are about the numerator — whether cache
+  // reads are added — so the denominator has to be a constant of the test, not
+  // of whichever models.json the developer's machine happens to have cached.
+  // Pointing both catalogue sources at paths that do not exist forces
+  // contextWindowFor onto its regex table, where claude-* is a flat 200000.
+  // The catalogue path gets its own describe block, with its own fixture.
+  process.env.OPENCODE_MODELS_JSON = path.join(tmp, 'no-catalogue.json');
+  process.env.OPENCODE_CONFIG = path.join(tmp, 'no-config.json');
 });
 afterAll(() => {
+  delete process.env.OPENCODE_MODELS_JSON;
+  delete process.env.OPENCODE_CONFIG;
   if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -246,6 +260,149 @@ describe('contextWindowFor', () => {
     );
     expect(gauge.contextWindowFor(undefined)).toBe(gauge.DEFAULT_CONTEXT_WINDOW);
   });
+
+  /**
+   * The on-prem cluster and the laptop GGUF are both "qwen3", and they do NOT
+   * share a window: the cluster publishes 65,536, the laptop build is catalogued
+   * at 262,144. One generic /^qwen3/i line cannot say both, and it used to
+   * answer 262,144 for everything — sizing a full cluster session at 25%.
+   *
+   * The specific line therefore has to sort BEFORE the generic one, and that
+   * ordering is the whole fix, so it is what this pins.
+   */
+  test.each([
+    'qwen3.8-27b-dual-fast',
+    'qwen3.8-27b-dual-normal',
+    'qwen3.8-27b-dual-deep',
+    'qwen3.8-27b-hga-fast',
+  ])('the on-prem cluster id %s is sized at its published 65K', (model) => {
+    expect(gauge.contextWindowFor(model, 'qwen-local')).toBe(65_536);
+  });
+
+  test('the laptop GGUF keeps the generic qwen3 window — the ids are not interchangeable', () => {
+    expect(gauge.contextWindowFor('qwen3.8-27b-local', 'qwen-laptop')).toBe(262_144);
+  });
+});
+
+describe('contextWindowFor — the model catalogue outranks the regex table', () => {
+  /**
+   * Why this block exists.
+   *
+   * The regex table asserts that anything matching /^claude-/ has a 200K window.
+   * That was true once and is now false for the models these agents actually
+   * run: models.dev puts github-copilot/claude-opus-5 at 1,000,000. The gap was
+   * not cosmetic — a measured 188,240-token opencode session rendered 94% bold
+   * red (the about-to-compact state) instead of 19% green, and switching model
+   * could not move the gauge because the table mapped every claude-* to the same
+   * fabricated number.
+   *
+   * So: the catalogue must win over the table, a user's own per-provider
+   * declaration must win over the catalogue, and the table must still answer
+   * when neither exists. Those three, in that order, are what is tested here.
+   */
+  const limits = require(path.join(REPO_ROOT, 'lib', 'statusline', 'model-limits.cjs'));
+
+  let dir;
+  let prevRepo;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(tmp, 'catalogue-'));
+    // The derived cache is keyed on the source's mtime+size and written under
+    // $CODING_REPO/.logs — give each test its own so they cannot share one.
+    prevRepo = process.env.CODING_REPO;
+    process.env.CODING_REPO = dir;
+    limits._resetForTests();
+  });
+  afterEach(() => {
+    if (prevRepo === undefined) delete process.env.CODING_REPO;
+    else process.env.CODING_REPO = prevRepo;
+    process.env.OPENCODE_MODELS_JSON = path.join(tmp, 'no-catalogue.json');
+    process.env.OPENCODE_CONFIG = path.join(tmp, 'no-config.json');
+    limits._resetForTests();
+  });
+
+  function catalogue(providers) {
+    const file = path.join(dir, 'models.json');
+    fs.writeFileSync(file, JSON.stringify(providers));
+    process.env.OPENCODE_MODELS_JSON = file;
+    return file;
+  }
+
+  test('a catalogued 1M model reads as 1M, not as the tables 200K', () => {
+    catalogue({
+      'github-copilot': { models: { 'claude-opus-5': { limit: { context: 1_000_000 } } } },
+    });
+    expect(gauge.contextWindowFor('claude-opus-5', 'github-copilot')).toBe(1_000_000);
+    // The exact regression: 188240 tokens is 19%, not the 94% that painted red.
+    expect((188_240 / gauge.contextWindowFor('claude-opus-5', 'github-copilot')) * 100)
+      .toBeCloseTo(18.8, 1);
+  });
+
+  test('a model id is resolved even under a provider no catalogue knows', () => {
+    // The rapid-proxy case: the provider is declared in the user's own config
+    // and appears in no public catalogue, but the ids it exposes are the real
+    // upstream ids — the proxy rewrites the model by band and forwards.
+    catalogue({
+      'github-copilot': { models: { 'claude-sonnet-5': { limit: { context: 1_000_000 } } } },
+    });
+    expect(gauge.contextWindowFor('claude-sonnet-5', 'rapid-proxy')).toBe(1_000_000);
+  });
+
+  test('windows differ per provider, and the provider is honoured', () => {
+    catalogue({
+      'github-copilot': { models: { m: { limit: { context: 1_000_000 } } } },
+      other: { models: { m: { limit: { context: 128_000 } } } },
+    });
+    expect(gauge.contextWindowFor('m', 'other')).toBe(128_000);
+    expect(gauge.contextWindowFor('m', 'github-copilot')).toBe(1_000_000);
+  });
+
+  test('the users own per-provider limit outranks the catalogue', () => {
+    // A self-hosted endpoint is the case: qwen3.8-27b-local is catalogued at
+    // 262144, but this user's laptop llama.cpp serves it with a 32K window and
+    // says so in opencode.json. Taking the catalogue there would under-report
+    // occupancy 8x — green while the agent compacts.
+    catalogue({ 'qwen-laptop': { models: { 'qwen3.8-27b-local': { limit: { context: 262_144 } } } } });
+    const cfg = path.join(dir, 'opencode.json');
+    fs.writeFileSync(cfg, JSON.stringify({
+      provider: { 'qwen-laptop': { models: { 'qwen3.8-27b-local': { limit: { context: 32_768 } } } } },
+    }));
+    process.env.OPENCODE_CONFIG = cfg;
+    limits._resetForTests();
+    expect(gauge.contextWindowFor('qwen3.8-27b-local', 'qwen-laptop')).toBe(32_768);
+  });
+
+  test('an explicit [1m] session flag still outranks everything', () => {
+    // The suffix is a statement about THIS SESSION's window; no catalogue keyed
+    // on a bare model id can carry it.
+    catalogue({ 'github-copilot': { models: { 'claude-opus-5': { limit: { context: 200_000 } } } } });
+    expect(gauge.contextWindowFor('claude-opus-5[1m]', 'github-copilot')).toBe(1_000_000);
+  });
+
+  test('no catalogue on the machine falls back to the table, never to zero', () => {
+    process.env.OPENCODE_MODELS_JSON = path.join(dir, 'absent.json');
+    limits._resetForTests();
+    expect(gauge.contextWindowFor('claude-sonnet-5', 'github-copilot')).toBe(200_000);
+  });
+
+  test('a corrupt catalogue is survivable — it falls back, it does not throw', () => {
+    const file = path.join(dir, 'models.json');
+    fs.writeFileSync(file, '{not json');
+    process.env.OPENCODE_MODELS_JSON = file;
+    limits._resetForTests();
+    expect(gauge.contextWindowFor('claude-sonnet-5', 'github-copilot')).toBe(200_000);
+  });
+
+  test('the derived cache is written once and reused, not re-derived per tick', () => {
+    // The catalogue is 4.5MB / 33ms to parse, and the status line renders every
+    // 5s in a FRESH process per pane — so the boiled-down map has to survive on
+    // disk or the gauge costs a third of the render budget every tick.
+    catalogue({ 'github-copilot': { models: { 'claude-opus-5': { limit: { context: 1_000_000 } } } } });
+    expect(gauge.contextWindowFor('claude-opus-5', 'github-copilot')).toBe(1_000_000);
+    const cache = path.join(dir, '.logs', 'model-context-limits.json');
+    expect(fs.existsSync(cache)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(cache, 'utf8')).byPair['github-copilot/claude-opus-5'])
+      .toBe(1_000_000);
+  });
 });
 
 describe('claude reader', () => {
@@ -332,18 +489,60 @@ describeSqlite('copilot reader — OpenAI wire', () => {
 });
 
 describeSqlite('opencode reader — Anthropic wire', () => {
-  function seed(dbPath, messages) {
+  /**
+   * Mirrors opencode's real `session` schema for the columns the reader names.
+   *
+   * parent_id / time_archived / time_created are not decoration: the reader
+   * filters on all three to avoid reading a subagent's, an archived, or a
+   * pre-restart session. A fixture missing them makes the query throw and every
+   * assertion below would then pass against a null the test never asked for.
+   */
+  function seed(dbPath, messages, session = {}) {
     const d = new Database(dbPath);
     d.exec(`
       CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT, model TEXT,
-                            time_updated INTEGER, tokens_input INTEGER);
+                            parent_id TEXT, time_created INTEGER,
+                            time_updated INTEGER, time_archived INTEGER,
+                            tokens_input INTEGER);
       CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT,
                             time_created INTEGER, data TEXT);
-      INSERT INTO session VALUES ('s1', '/proj', '{"id":"claude-sonnet-5"}', 100, 9999999);
     `);
+    d.prepare('INSERT INTO session VALUES (?,?,?,?,?,?,?,?)').run(
+      session.id ?? 's1',
+      session.directory ?? '/proj',
+      session.model ?? '{"id":"claude-sonnet-5"}',
+      session.parent_id ?? null,
+      session.time_created ?? 100,
+      session.time_updated ?? 100,
+      session.time_archived ?? null,
+      9999999,
+    );
     const ins = d.prepare('INSERT INTO message VALUES (?,?,?,?)');
-    messages.forEach((m, i) => ins.run(`m${i}`, 's1', i, JSON.stringify(m)));
+    messages.forEach((m, i) => ins.run(`m${i}`, session.id ?? 's1', i, JSON.stringify(m)));
     d.close();
+  }
+
+  /**
+   * A compaction message, shaped as opencode really writes one.
+   *
+   * All three markers together, and a FOREIGN model: verified across all 216
+   * compaction messages in a real database, every one carries `summary: true`,
+   * `mode: 'compaction'` and `agent: 'compaction'`, and they run on whatever
+   * model is configured for compaction — measured as claude-opus-4.6, gpt-5.4
+   * and gpt-4o/rapid-proxy in a database whose conversations are claude-opus-5.
+   * The foreign model is the point: it is what lent its 128K window to a 194K
+   * count that belonged to a 1M model.
+   */
+  function compaction(inputTokens) {
+    return {
+      role: 'assistant',
+      mode: 'compaction',
+      agent: 'compaction',
+      summary: true,
+      modelID: 'gpt-4o',
+      providerID: 'rapid-proxy',
+      tokens: { input: inputTokens, output: 5703, cache: { read: 0, write: 0 } },
+    };
   }
 
   test('adds cache reads to input, because opencode reports them separately', () => {
@@ -390,6 +589,354 @@ describeSqlite('opencode reader — Anthropic wire', () => {
     } finally {
       delete process.env.OPENCODE_DB_PATH;
     }
+  });
+
+  /**
+   * THE 100% RED GAUGE ON A ONE-FIFTH-FULL SESSION.
+   *
+   * The count and the model used to be gathered independently: `used` as a max
+   * over the trailing window, `model` from whichever message happened to be
+   * newest. Nothing tied them together, so a window spanning two models paired
+   * one model's token count with the other's context window.
+   *
+   * Measured on a real session: 194,184 claude-opus-5 tokens — 19% of its 1M
+   * window — divided by gpt-4o's 128K, which clamps to a bold red 100%.
+   */
+  test('the window comes from the message that supplied the count, not the newest', () => {
+    const db = path.join(tmp, 'oc-model-pairing.db');
+    seed(db, [
+      // The big reading, on a 200K model.
+      { role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: 100000, cache: { read: 0 } } },
+      // Newest, small, on a 128K model — a mid-session /model switch.
+      { role: 'assistant', modelID: 'gpt-4o', tokens: { input: 10000, cache: { read: 0 } } },
+    ]);
+    process.env.OPENCODE_DB_PATH = db;
+    try {
+      const r = gauge.readContextUsage({ agent: 'opencode', projectPath: '/proj' });
+      // 100000 of claude-sonnet-5's 200000. NOT 100000 of gpt-4o's 128000 (78%).
+      expect(r.usedPct).toBeCloseTo(50, 5);
+      expect(r.model).toBe('claude-sonnet-5');
+    } finally {
+      delete process.env.OPENCODE_DB_PATH;
+    }
+  });
+
+  /**
+   * Compaction is the one event that makes the conversation SMALLER, so a max
+   * over a window that spans it reports the size of the conversation that was
+   * just discarded — and goes on reporting it for as many turns as the window
+   * is wide.
+   */
+  test('the trailing window does not reach back past a compaction', () => {
+    const db = path.join(tmp, 'oc-compaction-boundary.db');
+    seed(db, [
+      { role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: 190000, cache: { read: 0 } } },
+      compaction(110000),
+      { role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: 40000, cache: { read: 0 } } },
+    ]);
+    process.env.OPENCODE_DB_PATH = db;
+    try {
+      // 40000/200000 — the conversation as it stands. Not 190000/200000 (95%),
+      // and not the compaction's own 110000 either.
+      expect(gauge.readContextUsage({ agent: 'opencode', projectPath: '/proj' }).usedPct)
+        .toBeCloseTo(20, 5);
+    } finally {
+      delete process.env.OPENCODE_DB_PATH;
+    }
+  });
+
+  test('a compaction with nothing after it yet reads zero, and says why', () => {
+    const db = path.join(tmp, 'oc-compaction-only.db');
+    seed(db, [
+      { role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: 190000, cache: { read: 0 } } },
+      compaction(110000),
+    ]);
+    process.env.OPENCODE_DB_PATH = db;
+    try {
+      const r = gauge.readContextUsage({ agent: 'opencode', projectPath: '/proj' });
+      // The session really has been emptied; its new size is not yet measured
+      // and arrives on the next assistant turn.
+      expect(r.usedPct).toBe(0);
+      expect(r.source).toBe('opencode-db-compacted');
+    } finally {
+      delete process.env.OPENCODE_DB_PATH;
+    }
+  });
+
+  test.each([
+    ['summary', { summary: true }],
+    ['mode', { mode: 'compaction' }],
+    ['agent', { agent: 'compaction' }],
+  ])('a compaction is recognised by its %s marker alone', (_name, marker) => {
+    const db = path.join(tmp, `oc-compaction-${_name}.db`);
+    seed(db, [
+      { role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: 190000, cache: { read: 0 } } },
+      { role: 'assistant', modelID: 'gpt-4o', tokens: { input: 110000, cache: { read: 0 } }, ...marker },
+      { role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: 40000, cache: { read: 0 } } },
+    ]);
+    process.env.OPENCODE_DB_PATH = db;
+    try {
+      expect(gauge.readContextUsage({ agent: 'opencode', projectPath: '/proj' }).usedPct)
+        .toBeCloseTo(20, 5);
+    } finally {
+      delete process.env.OPENCODE_DB_PATH;
+    }
+  });
+
+  /**
+   * opencode writes the assistant row when a turn STARTS, with every token
+   * field zero, and fills it in when the turn completes. Runs of four such rows
+   * back to back are measured in a real database — with a five-message window
+   * that leaves room for exactly one real reading, and one more evicts them
+   * all, at which point a mid-conversation session reports itself empty.
+   */
+  test('zero-token placeholder rows do not evict real readings from the window', () => {
+    const db = path.join(tmp, 'oc-placeholders.db');
+    const placeholder = {
+      role: 'assistant',
+      modelID: 'claude-sonnet-5',
+      tokens: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+    };
+    seed(db, [
+      { role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: 100000, cache: { read: 0 } } },
+      placeholder, placeholder, placeholder, placeholder, placeholder,
+    ]);
+    process.env.OPENCODE_DB_PATH = db;
+    try {
+      const r = gauge.readContextUsage({ agent: 'opencode', projectPath: '/proj' });
+      expect(r.usedPct).toBeCloseTo(50, 5);
+      expect(r.source).toBe('opencode-db');
+    } finally {
+      delete process.env.OPENCODE_DB_PATH;
+    }
+  });
+
+  test('a session of nothing but placeholders is still fresh, not a hole', () => {
+    const db = path.join(tmp, 'oc-placeholders-only.db');
+    seed(db, [
+      { role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: 0, cache: { read: 0 } } },
+    ]);
+    process.env.OPENCODE_DB_PATH = db;
+    try {
+      const r = gauge.readContextUsage({ agent: 'opencode', projectPath: '/proj' });
+      expect(r.usedPct).toBe(0);
+      expect(r.source).toBe('opencode-db-fresh');
+    } finally {
+      delete process.env.OPENCODE_DB_PATH;
+    }
+  });
+});
+
+describeSqlite('opencode reader — which session belongs to this pane', () => {
+  /**
+   * These are the ways the reader used to answer with a session the pane was
+   * not in. They rendered as one symptom: a pane showing the PREVIOUS
+   * conversation's occupancy — 94% bold red on a pane that had not yet sent a
+   * message, 100% on one the user had just cleared — and going on showing it
+   * until the user typed.
+   *
+   * The pane's launch instant comes from the record tmux-session-wrapper.sh
+   * writes, so each test builds one.
+   */
+  function seedSessions(dbPath, sessions, messagesBySession) {
+    const d = new Database(dbPath);
+    d.exec(`
+      CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT, model TEXT,
+                            parent_id TEXT, time_created INTEGER,
+                            time_updated INTEGER, time_archived INTEGER,
+                            tokens_input INTEGER);
+      CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT,
+                            time_created INTEGER, data TEXT);
+    `);
+    const si = d.prepare('INSERT INTO session VALUES (?,?,?,?,?,?,?,?)');
+    for (const s of sessions) {
+      si.run(s.id, s.directory ?? '/proj', '{"id":"claude-sonnet-5"}',
+        s.parent_id ?? null, s.time_created, s.time_updated ?? s.time_created,
+        s.time_archived ?? null, 0);
+    }
+    const mi = d.prepare('INSERT INTO message VALUES (?,?,?,?)');
+    for (const [sid, msgs] of Object.entries(messagesBySession)) {
+      // `at` sets a real timestamp, for the tests that rank sessions by when the
+      // user last spoke in each. Index order is the default and is enough
+      // wherever only the ordering within one session matters.
+      msgs.forEach(({ at, ...m }, i) => mi.run(`${sid}-m${i}`, sid, at ?? i, JSON.stringify(m)));
+    }
+    d.close();
+  }
+
+  /** A pane launch record, exactly as _record_agent_session() writes it. */
+  function pane(name, startedAt) {
+    const repo = fs.mkdtempSync(path.join(tmp, 'pane-repo-'));
+    fs.mkdirSync(path.join(repo, '.data', 'agent-sessions'), { recursive: true });
+    fs.writeFileSync(
+      path.join(repo, '.data', 'agent-sessions', `${name}.json`),
+      JSON.stringify({ agent: 'opencode', projectPath: '/proj', tmuxSession: name, startedAt }),
+    );
+    return repo;
+  }
+
+  const big = (n) => ({ role: 'assistant', modelID: 'claude-sonnet-5', tokens: { input: n, cache: { read: 0 } } });
+
+  /**
+   * A user message at a given instant — the evidence that a human was in this
+   * session, which is what separates it from a background write.
+   */
+  const user = (at) => ({ at, role: 'user', time: { created: at } });
+
+  function withPane(repo, dbPath, fn) {
+    const prevRepo = process.env.CODING_REPO;
+    process.env.CODING_REPO = repo;
+    process.env.OPENCODE_DB_PATH = dbPath;
+    try {
+      return fn();
+    } finally {
+      if (prevRepo === undefined) delete process.env.CODING_REPO;
+      else process.env.CODING_REPO = prevRepo;
+      delete process.env.OPENCODE_DB_PATH;
+    }
+  }
+
+  test('a session from before this pane launched is NOT reported as its context', () => {
+    // The reported bug, reduced: opencode creates the session row lazily, on the
+    // first assistant message, so a pane that has not been prompted yet owns no
+    // row at all — and the newest row in the directory belongs to the session
+    // that was running here before the restart.
+    const db = path.join(tmp, 'oc-restart.db');
+    seedSessions(db, [{ id: 'before', time_created: 1000, time_updated: 2000 }], { before: [big(188000)] });
+    const repo = pane('coding-opencode-1', 5000);
+
+    withPane(repo, db, () => {
+      const r = gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-1',
+      });
+      // Zero, not 94%, and not null: the store IS readable, this pane simply has
+      // no session yet. A hole would read as a fault; the previous session's
+      // number would be a lie.
+      expect(r.usedPct).toBe(0);
+      expect(r.source).toBe('opencode-db-fresh');
+    });
+  });
+
+  test('the session this pane started IS reported, once it has one', () => {
+    const db = path.join(tmp, 'oc-after.db');
+    seedSessions(db, [
+      { id: 'before', time_created: 1000, time_updated: 2000 },
+      { id: 'after', time_created: 6000, time_updated: 7000 },
+    ], { before: [big(188000)], after: [big(100000)] });
+    const repo = pane('coding-opencode-2', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-2',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  test('a subagent session is never mistaken for the pane conversation', () => {
+    // opencode gives every subagent its own session row in the SAME directory,
+    // and while one runs it is the most recently updated row there. Ordering
+    // alone therefore hands the gauge a @explore task's context.
+    const db = path.join(tmp, 'oc-subagent.db');
+    seedSessions(db, [
+      { id: 'main', time_created: 6000, time_updated: 7000 },
+      { id: 'sub', parent_id: 'main', time_created: 6500, time_updated: 9999 },
+    ], { main: [big(100000)], sub: [big(20000)] });
+    const repo = pane('coding-opencode-3', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-3',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  test('an archived session is not the pane current session', () => {
+    const db = path.join(tmp, 'oc-archived.db');
+    seedSessions(db, [
+      { id: 'live', time_created: 6000, time_updated: 7000 },
+      { id: 'put-away', time_created: 6500, time_updated: 9999, time_archived: 9999 },
+    ], { live: [big(100000)], 'put-away': [big(190000)] });
+    const repo = pane('coding-opencode-4', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-4',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  test('no launch record means no lower bound — an unwrapped opencode still reads', () => {
+    // paneStartedAtMs returns 0 for a pane it has no record of, and 0 must mean
+    // "unbounded", never "started at the epoch". An agent run outside the
+    // wrapper has no record and must still get a gauge.
+    const db = path.join(tmp, 'oc-unwrapped.db');
+    seedSessions(db, [{ id: 'only', time_created: 1000, time_updated: 2000 }], { only: [big(100000)] });
+    const repo = pane('coding-opencode-5', 5000); // record exists, but for another pane
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-unknown',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  /**
+   * THE /clear CASE, which every filter above passes straight through.
+   *
+   * `/clear` makes a NEW session inside the SAME pane, so both sessions clear
+   * the parent/archived/launch-time filters and only the tie-break separates
+   * them. `ORDER BY time_updated DESC` cannot: the discarded session goes on
+   * being WRITTEN after the new one is created, by work that was already in
+   * flight. Measured:
+   *
+   *   16:19:46.249  /clear — new session row created
+   *   16:20:46.849  PREVIOUS session written again (a compaction landing)
+   *
+   * For that minute the pane the user had just emptied rendered the context of
+   * the conversation they had just discarded.
+   */
+  test('after /clear, a background write to the previous session does not win', () => {
+    const db = path.join(tmp, 'oc-clear.db');
+    seedSessions(db, [
+      // The discarded conversation: last spoken to at 6000, still being written
+      // at 9999 by an in-flight compaction.
+      { id: 'discarded', time_created: 6000, time_updated: 9999 },
+      // /clear, a moment later. No user message yet — that is the whole point.
+      { id: 'cleared', time_created: 8000, time_updated: 8000 },
+    ], {
+      discarded: [user(6000), big(190000)],
+      cleared: [],
+    });
+    const repo = pane('coding-opencode-6', 5000);
+
+    withPane(repo, db, () => {
+      const r = gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-6',
+      });
+      expect(r.usedPct).toBe(0);
+      expect(r.source).toBe('opencode-db-fresh');
+    });
+  });
+
+  test('the session the user last spoke in wins, however old its row is', () => {
+    // The property `ORDER BY time_updated DESC` was defending: resuming an
+    // earlier session from the picker must move the gauge with it. A prompt is
+    // a user message, and a user message outranks any background write.
+    const db = path.join(tmp, 'oc-resume.db');
+    seedSessions(db, [
+      { id: 'resumed', time_created: 6000, time_updated: 9999 },
+      { id: 'newer', time_created: 8000, time_updated: 8000 },
+    ], {
+      resumed: [big(100000), user(9999)],
+      newer: [big(190000)],
+    });
+    const repo = pane('coding-opencode-7', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-7',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
   });
 });
 

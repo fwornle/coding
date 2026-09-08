@@ -1,0 +1,29 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Client Layer" {
+  component "ProxyCompletionClient" as pcc <<core>>
+  component "llm-with-process.ts" as llmproc <<core>>
+}
+
+package "Proxy Routing" {
+  component "offload-gates.ts" as gates <<api>>
+  component "offload-replay.ts" as replay <<core>>
+}
+
+package "Telemetry & Cost Model" {
+  component "cost-model.ts" as costmodel <<core>>
+  component "CallDetail/CallStrip" as callui <<agent>>
+  database "RecentCall / CostRow Records" as records <<storage>>
+}
+
+pcc --> llmproc : "tags request with process id"
+llmproc --> records : "produces raw usage rows"
+records --> costmodel : "CostRow.process attribution"
+costmodel --> costmodel : "isSynthetic() filters demo noise"
+records --> callui : "RecentCall.process feeds"
+pcc --> gates : "client-side counterpart to routing decisions"
+records --> replay : "perRoute/offloadSkips aggregation"
+gates --> replay : "routing/offload evaluation"
+
+@enduml

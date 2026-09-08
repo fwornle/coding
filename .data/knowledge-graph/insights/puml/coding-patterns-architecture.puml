@@ -1,47 +1,48 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "CLI Entry Points" {
-  component "coding / coding.bat" as cli <<cli>>
-  component "llm / vkb" as llmcli <<cli>>
+package "CLI Entry Layer" {
+  component "bin/ckb" as ckb <<cli>>
+  component "bin/graphify" as graphify <<cli>>
+  component "bin/codegraph" as codegraph <<cli>>
+  component "docker/entrypoint.sh" as entrypoint <<cli>>
 }
 
-package "Agent Adapters" {
+package "Agent Adapter Layer" {
   component "claude.sh" as claude <<agent>>
-  component "copilot.sh" as copilot <<agent>>
-  component "mastra.sh" as mastra <<agent>>
   component "opencode.sh" as opencode <<agent>>
+  component "copilot.sh" as copilot <<agent>>
+  component "pi.sh" as pi <<agent>>
+  component "LLM Routing (env-based)" as llmrouting <<core>>
 }
 
-package "Externalized Configuration" {
-  component "llm-providers.yaml" as llmprov <<core>>
-  component "agent-profiles.json" as agentprof <<core>>
-  component "hooks-config.json" as hooks <<core>>
-  component "teams/coding.json\nteams/agentic.json" as teams <<core>>
+package "Config & Docs Layer" {
+  database "features.yaml" as features <<storage>>
+  database "task-taxonomy.yaml" as taxonomy <<storage>>
+  database "health-verification-rules.json" as healthrules <<storage>>
+  component "supervisord.conf" as supervisord <<core>>
+  component "docs/architecture/*" as archdocs <<external>>
 }
 
-package "Runtime & Storage" {
-  component "Supervisor Process Manager\n(supervisord.conf)" as supervisor <<core>>
-  component "GraphKMStore\n(graph-database-config.json)" as graphkm <<storage>>
-}
+ckb --> llmrouting : "delegates to modules"
+graphify --> llmrouting : "delegates to modules"
+codegraph --> llmrouting : "delegates to modules"
 
-cli --> claude : delegates
-cli --> copilot : delegates
-cli --> mastra : delegates
-cli --> opencode : delegates
-llmcli --> llmprov : routes via
+llmrouting --> claude : "invokes"
+llmrouting --> opencode : "invokes"
+llmrouting --> copilot : "invokes"
+llmrouting --> pi : "invokes"
 
-llmprov --> claude : selects
-llmprov --> copilot : selects
-llmprov --> mastra : selects
-llmprov --> opencode : selects
+entrypoint --> supervisord : "delegates process mgmt"
+supervisord --> codegraph : "manages codegraph-index.sh"
+supervisord --> graphify : "manages graphify-serve.sh"
 
-agentprof --> claude : configures
-agentprof --> copilot : configures
-hooks --> cli : lifecycle hooks
-teams --> cli : assembles workflows
+llmrouting ..> features : "reads config"
+llmrouting ..> taxonomy : "reads config"
+supervisord ..> healthrules : "health polling"
 
-supervisor --> graphkm : manages
-graphkm --> agentprof : persists agent state
+archdocs ..> claude : "documents pattern"
+archdocs ..> features : "documents pattern"
+archdocs ..> supervisord : "documents pattern"
 
 @enduml

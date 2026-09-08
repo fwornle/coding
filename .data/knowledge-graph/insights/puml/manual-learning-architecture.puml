@@ -1,32 +1,36 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Manual Authoring Layer" {
-    component "ManualLearning" as ml <<core>>
-    component "Direct Observation API" as api <<api>>
+package "Manual Authoring" {
+  component "cli.js" as cli <<cli>>
+  component "UKBDatabaseWriter" as writer <<core>>
 }
 
-package "Schema & Identity" {
-    component "EntityTypeRegistry" as etr <<core>>
-    component "UUIDv7 ID Generator" as uuid <<core>>
-    component "Provenance Metadata" as prov <<core>>
+package "VKB Server" {
+  component "ApiRoutes" as api <<api>>
+  component "_getWriter(team)" as getWriter <<core>>
 }
 
-package "Persistence Layer" {
-    component "GraphKMStore" as gkms <<storage>>
-    database "LevelDB" as ldb <<storage>>
+package "Storage Backends" {
+  database "SQLite (analytics)" as sqlite
+  database "Qdrant (vector)" as qdrant
+  database "GraphDB" as graphdb
 }
 
-component "Agent" as agent <<agent>>
-component "KMCoreMigration" as kmcm <<external>>
+component "data-processor.js" as dataProcessor <<core>>
 
-agent --> api : "injects observations"
-api --> ml : "asserts facts"
-ml --> etr : "validates typed attributes"
-ml --> uuid : "generates IDs"
-ml --> prov : "stamps human-authored origin"
-prov ..> kmcm : "contrasts with automated provenance"
-ml --> gkms : "persists entities & edges"
-gkms --> ldb : "writes to backend"
+cli --> writer : "add/update/import/export"
+cli --> api : "sendToVKB() if running"
+cli --> writer : "fallback direct write"
+
+api --> getWriter : "per-team lookup"
+getWriter --> writer : "creates instance"
+
+writer --> sqlite : "writes analytics"
+writer --> qdrant : "optional vector index"
+writer --> graphdb : "writes graph data"
+
+writer --> dataProcessor : "manual entities (source != 'auto')"
+dataProcessor --> dataProcessor : "tag as 'batch'"
 
 @enduml

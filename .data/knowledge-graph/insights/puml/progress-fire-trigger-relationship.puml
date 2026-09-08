@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ProgressFireTrigger
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[ProgressFireTrigger] as progress_fire_trigger #LightBlue
+[LslSessionDashboard] as lsl_session_dashboard #F0F0F0
+[TranscriptAdapterAPI] as transcript_adapter_api #F0F0F0
+[BackendLoggerCore] as backend_logger_core #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+live_logging_system --> progress_fire_trigger
+lsl_session_dashboard -[hidden]- progress_fire_trigger
+transcript_adapter_api -[hidden]- progress_fire_trigger
+backend_logger_core -[hidden]- progress_fire_trigger
+specstory_adapter -[hidden]- progress_fire_trigger
+
+@enduml

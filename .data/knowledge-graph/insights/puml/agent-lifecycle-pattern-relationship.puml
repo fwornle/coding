@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentLifecyclePattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentLifecyclePattern] as agent_lifecycle_pattern #LightBlue
+[NamingConventions] as naming_conventions #F0F0F0
+[AdapterPattern] as adapter_pattern #F0F0F0
+
+coding_patterns --> agent_lifecycle_pattern
+naming_conventions -[hidden]- agent_lifecycle_pattern
+adapter_pattern -[hidden]- agent_lifecycle_pattern
+
+@enduml

@@ -5,9 +5,15 @@ title Hierarchy Context: ProxyURLResolver
 
 [LLMAbstraction] as llmabstraction #FFFFDD
 [ProxyURLResolver] as proxy_urlresolver #LightBlue
-[EnvironmentVariableFallbackChain] as environment_variable_fallback_chain #E8F5E8
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMWithProcessClient] as llmwith_process_client #F0F0F0
+[CostModel] as cost_model #F0F0F0
 
 llmabstraction --> proxy_urlresolver
-proxy_urlresolver --> environment_variable_fallback_chain
+llmmock_service -[hidden]- proxy_urlresolver
+dmrprovider -[hidden]- proxy_urlresolver
+llmwith_process_client -[hidden]- proxy_urlresolver
+cost_model -[hidden]- proxy_urlresolver
 
 @enduml

@@ -1,0 +1,29 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Client Layer" {
+  component "LLMWithProcessClient" as client <<core>>
+  component "ProxyURLResolver" as resolver <<core>>
+}
+
+package "Configuration" {
+  component "RAPID_LLM_PROXY_URL" as envVar1 <<external>>
+  component "LLM_PROXY_URL" as envVar2 <<external>>
+}
+
+package "External Service" {
+  cloud "rapid-llm-proxy" as proxy <<external>>
+  component "/api/complete" as endpoint <<api>>
+}
+
+client --> resolver : "resolves endpoint via"
+resolver --> envVar1 : "reads config"
+resolver --> envVar2 : "reads config"
+resolver --> proxy : "determines URL for"
+
+client --> endpoint : "direct fetch()"
+endpoint --> proxy : "hosted on"
+
+client ..> proxy : "attaches process\ntelemetry attribution"
+
+@enduml

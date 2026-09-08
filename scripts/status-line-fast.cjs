@@ -209,6 +209,7 @@ function patchContextGauge(text) {
         agent: paneAgent,
         projectPath,
         sessionId: claudeSessionIdForPane(),
+        tmuxSession: process.env.TMUX_SESSION_NAME,
       });
     } catch { usage = null; }
   }

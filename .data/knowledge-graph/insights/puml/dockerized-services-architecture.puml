@@ -1,51 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Docker Compose Deployment" {
-  component "docker-compose.yml" as compose <<core>>
-  component "Dockerfile.coding-services" as dockerfile <<core>>
-  component "supervisord.conf" as supervisord <<core>>
+package "Host Orchestration" {
+  component "CLI Bootstrap / Agent Init" as cli <<cli>>
+  component "service-probe.js" as probe <<core>>
+  component "Task Gating (GATES/RUNG_OFFLOADED)" as gating <<core>>
 }
 
-package "Containerized Services" {
-  component "Semantic Analysis MCP" as mcp <<api>>
-  component "Constraint Monitor API\n(port 3031)" as constraint <<api>>
-  component "Next.js Dashboard\n(port 3030)" as dashboard <<api>>
-  component "code-graph-rag" as rag <<core>>
-  database "Memgraph" as memgraph <<storage>>
-  database "Redis" as redis <<storage>>
+package "Dockerized Containers" {
+  component "Semantic Analysis MCP" as sem <<core>>
+  component "Constraint Monitor" as cmon <<core>>
+  component "Graphify" as graphify <<core>>
+  database "Postgres/Neo4j/Redis" as dbs <<storage>>
 }
 
-package "Process Management" {
-  component "ProcessStateManager" as psm <<core>>
-  component "service-starter.js\n(retry + backoff)" as starter <<core>>
-  component "service-probe.js\n(running/stopped/unknown)" as probe <<core>>
+package "LLM Backend Access" {
+  cloud "LLM Proxy Layer\n(LLM_CLI_PROXY_URL, RAPID_LLM_PROXY_URL, LLM_PROXY_URL)" as proxy <<external>>
+  cloud "Qwen Local/Laptop APIs" as qwen <<external>>
+  component "llm-mock-service.ts" as mock <<agent>>
 }
 
-package "LLM Mode Control" {
-  component "llm-mock-service.ts" as llmmock <<core>>
-  component "workflow-progress.json" as wpjson <<storage>>
-}
+cli --> probe : "polls readiness"
+probe --> sem : "health check"
+probe --> cmon : "health check"
 
-compose --> dockerfile : builds
-dockerfile --> supervisord : managed by
-supervisord --> mcp : spawns
-supervisord --> constraint : spawns
-supervisord --> dashboard : spawns
-supervisord --> rag : spawns
+sem --> dbs : "reads/writes state"
+cmon --> dbs : "monitors state"
+graphify --> dbs : "stores graph data"
 
-constraint --> psm : registers
-dashboard --> psm : registers
-psm --> starter : delegates lifecycle
-starter --> probe : health check
-probe ..> constraint : TCP/HTTP check
-probe ..> mcp : TCP/HTTP check
+sem --> proxy : "routes LLM calls"
+proxy --> qwen : "forwards requests"
 
-mcp --> memgraph : queries
-rag --> memgraph : queries
-mcp --> redis : caches
+sem ..> mock : "test substitution"
 
-llmmock --> wpjson : reads/writes llmState
-llmmock ..> mcp : path translation via CODING_ROOT
+gating --> sem : "assigns offloaded work"
+gating --> cli : "routes foreground/background"
 
 @enduml

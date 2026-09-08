@@ -2,73 +2,72 @@
 
 **Type:** SubComponent
 
-The system maintains a two-level ontology hierarchy (upper/lower) with separate definition files, paths to which are managed by OntologyConfigManager, allowing the classification tier to be reconfigured without code changes
+[CGR] Imports: OntologyConfigManager.ts, OntologyConfigManager, ontologyPathResolver.ts, __clearCache, __getProbeCount, OntologyPathNotFoundError, __resetProbeCounter, resolveOntologyPath, ApiClient.ts, Entity (+10 more)
 
 # Ontology — Technical Insight Document
 
 ## What It Is
 
-The Ontology subsystem is a structured classification engine embedded within the SemanticAnalysis component (`integrations/semantic-analysis`). Its responsibility is to take raw observation categories produced earlier in the pipeline and resolve them into well-defined ontology classes, enriching entities with typed metadata before they flow downstream to persistence and querying layers. It was introduced as a major architectural addition, documented under *Release 2.0 - Ontology Integration System* in `docs/RELEASE-2.0.md`, signaling that ontology-awareness was a deliberate, bounded upgrade rather than an organic growth of the codebase.
-
-The subsystem owns two direct child components — OntologyConfigManager and TwoLevelOntologyHierarchy — and operates alongside siblings Pipeline, Insights, and LegacyOntologyAdapter within SemanticAnalysis. Its outputs (structured `entityType` and `ontologyClass` metadata attached to entities) are the contract that makes the entire SemanticAnalysis pipeline ontology-aware.
+Ontology is the classification and knowledge-modeling subcomponent of the SemanticAnalysis system, responsible for taking entities extracted upstream and organizing them into a structured class hierarchy. Its behavior as an agent is formally declared in `multi-agent-graph.tsx` via `AGENT_SUBSTEPS['ontology_classification']`, which defines three ordered sub-steps: match, validate, and extend. Beyond this agent definition, "ontology" appears pervasively across the codebase as a first-class concept: as a variable in `knowledge-management.json`, `events.test.ts`, and `graph-builder.test.ts`; as a method on `GraphKMStore.ts`; as a dedicated `Ontology` class in `types.ts`; and as request-handling logic (`handleOntologyClasses`) in `api-routes.js`. This breadth indicates Ontology is not an isolated agent step but a cross-cutting data model referenced throughout storage, API, and tooling layers.
 
 ## Architecture and Design
 
+Architecturally, Ontology follows the same multi-agent decomposition pattern as its parent, SemanticAnalysis: rather than a monolithic classifier, responsibilities are split into three discrete, linearly-ordered sub-steps — match, validate, extend — each with its own LLM usage tier and technical note. This mirrors the sibling Pipeline component's `parse -> extract -> relate -> enrich` chain and the Insights component's pattern-discovery step, reflecting a house style of exposing pipeline stages as explicitly declared, inspectable sub-steps in `multi-agent-graph.tsx` rather than hiding them inside opaque agent logic.
+
 ![Ontology — Architecture](images/ontology-architecture.png)
 
-The central architectural decision is the **two-level ontology hierarchy**: an upper ontology tier capturing broad categorical concepts and a lower ontology tier holding domain-specific classes. These tiers are defined in separate files, the paths to which are managed exclusively by OntologyConfigManager. This separation enforces a clean abstraction boundary — upper ontology provides stable root anchors while lower ontology can evolve independently with domain vocabulary. OntologyClassifier consumes both tiers simultaneously, selecting the most specific matching lower-ontology class while anchoring the result to an upper-ontology root, ensuring every classified entity has both a precise label and a stable categorical parent.
-
-OntologyConfigManager is implemented as a singleton, consistent with its role across the broader SemanticAnalysis pipeline. A singleton guarantees that OntologyClassifier and OntologyValidator share identical configuration — the same file paths, the same classification thresholds — throughout an entire batch run. This directly prevents the class of bug where the classifier uses one threshold to assign a class that the validator then rejects because it loaded a different configuration. The sibling Insights component also respects OntologyConfigManager's boundaries, with LLM budget constraints configured there, illustrating that OntologyConfigManager is a cross-cutting configuration authority across multiple siblings.
-
-The **LegacyOntologyAdapter** pattern addresses a live migration problem. During Phase 42-03, the system is transitioning from a legacy ontology source to `km-core`'s OntologyRegistry. Rather than modifying OntologyValidator and OntologyClassifier to understand the new registry directly, LegacyOntologyAdapter wraps OntologyRegistry behind a legacy-compatible interface. This isolates the migration boundary to a single adapter, allowing both classifying and validating components to continue functioning without modification — a textbook application of the Adapter pattern to manage migration risk.
+A key design decision is the graduated cost/risk model applied to LLM usage across the three steps: 'match' (Class Matching) uses a 'standard' tier LLM for semantic-similarity-based mapping of entities to existing classes; 'validate' (Classification Validation) uses a 'fast' tier, combining rule-based checks with LLM validation to catch constraint violations cheaply; 'extend' (Ontology Auto-Extension) alone uses a 'premium' LLM tier. This escalation reflects a deliberate trade-off: routine classification is optimized for cost and speed, while decisions that reshape the ontology itself (creating new classes) are treated as higher-stakes and warrant the most capable model, complete with rationale generation for new class suggestions.
 
 ## Implementation Details
 
-![Ontology — Relationship](images/ontology-relationship.png)
+The match step assigns entities to ontology classes via LLM-guided semantic similarity ("standard" tier). The validate step cross-checks these classifications against ontology constraints, surfacing "Violations" using a hybrid rule + fast-LLM approach — a cheaper gate before any structural change is considered. The extend step only engages when entities don't fit existing classes, producing "New class suggestions" with accompanying rationale via a premium LLM, effectively acting as a controlled schema-evolution mechanism.
 
-**OntologyClassifier** is the core classification engine. It ingests definitions from both ontology tiers and applies hierarchical classification logic: given a raw observation category, it traverses the lower ontology to find the most specific matching class, then resolves the corresponding upper-ontology root. Classification is not binary — a quantitative threshold configured in OntologyConfigManager governs ambiguous assignments. This means that when a raw category sits near a class boundary, the threshold determines whether the entity receives a confident class assignment or is treated as unresolvable, preventing spurious classifications from propagating downstream.
-
-**OntologyValidator** enforces structural and semantic constraints on classified entities. Critically, during the Phase 42-03 migration, it does not receive entities directly from OntologyRegistry. Instead, LegacyOntologyAdapter mediates the feed, ensuring the validator's interface contract remains stable. This design means the validator's correctness guarantees are preserved across the migration boundary — it validates the same shape of data it has always validated, regardless of where that data originates.
-
-**TwoLevelOntologyHierarchy** as a child component represents the definitional content itself — the actual upper and lower ontology files — while OntologyConfigManager represents the runtime wiring that points to those files. This separation means the hierarchy can be versioned, swapped, or extended purely by updating file paths in OntologyConfigManager, with no code changes required. The classification tier is effectively a pluggable configuration artifact.
-
-Once classification completes, results are attached as structured metadata fields — `entityType` and `ontologyClass` — directly to the entity before it exits the Ontology subsystem. This attachment makes the metadata portable: downstream persistence and querying layers do not need to re-derive ontology information; it travels with the entity as a first-class attribute.
+Beyond the agent flow, ontology data is materialized and manipulated through several concrete artifacts: the `Ontology` class in `types.ts` defines the shape of ontology data; `GraphKMStore.ts` exposes an `ontology` method for graph-based storage access; and path/config resolution is handled by dedicated utilities — `resolveOntologyDir` (in both `backfill-insight-mentions.mjs` and `backfill-l2-subsystem-class.mjs`), `KG_ONTOLOGY_DIR` and `collectByOntologyClass` in `observations-api-server.mjs`. Imports referencing `OntologyConfigManager.ts`, `ontologyPathResolver.ts` (with `resolveOntologyPath`, `OntologyPathNotFoundError`, `__clearCache`, `__getProbeCount`, `__resetProbeCounter`) indicate a dedicated configuration/path-resolution layer with cache and probe-count instrumentation for testability.
 
 ## Integration Points
 
-The Ontology subsystem sits downstream of raw observation/categorization stages and upstream of persistence in the SemanticAnalysis pipeline. Its primary upstream dependency is the source of raw observation categories (fed through the pipeline orchestrated by the Pipeline sibling). Its downstream consumers are the persistence layer and any query mechanisms that filter or aggregate by `entityType` or `ontologyClass`.
+![Ontology — Relationship](images/ontology-relationship.png)
 
-The integration with LegacyOntologyAdapter is the most structurally significant current coupling. OntologyValidator's data path runs through the adapter, meaning the adapter's fidelity in translating OntologyRegistry output to the legacy interface is load-bearing for validation correctness. The sibling LegacyOntologyAdapter explicitly exists to protect this boundary during Phase 42-03.
-
-OntologyConfigManager serves as the configuration integration point for siblings as well. Because Insights' LLM budget constraints are also housed there, OntologyConfigManager functions as a shared configuration authority across the SemanticAnalysis component, not merely an internal concern of the Ontology subsystem.
+Ontology is the second stage in the SemanticAnalysis pipeline, consuming entities produced by `semantic-analysis-agent.ts` extraction and feeding downstream consumers such as `Insights`, whose Pattern Discovery step consumes "Code entities" and "Relations" — outputs consistent with what Ontology classification would help produce. Ontology's classes and registries are queried across the system via calls like `getClass`, `getAllClassNames`, `getRegistry`, `classifyAvailable`, `resolveOverlaySystem`, and `loadDisplayOverlay`, alongside API access through `apiPath`/`get`/`ApiClient.ts` and viewer state via `useViewerStore`. Backfill scripts (`backfill-insight-mentions.mjs`, `backfill-l2-subsystem-class.mjs`) depend on `resolveOntologyDir`, and the observations API server exposes `collectByOntologyClass` and `KG_ONTOLOGY_DIR`, showing Ontology data is queried both live (via `handleOntologyClasses` in `api-routes.js`) and in batch/maintenance contexts.
 
 ## Usage Guidelines
 
-Developers modifying ontology definitions should do so exclusively through the files referenced by OntologyConfigManager, never by hardcoding paths or class names elsewhere in the codebase. The entire reconfigurability guarantee depends on OntologyConfigManager being the single source of path truth for both upper and lower ontology tiers.
+Developers should preserve the match -> validate -> extend ordering when extending or debugging the classification agent, since validation assumes matching has occurred and extension is explicitly reserved for entities that fail both prior steps. Given the premium-tier cost of the extend step, new-class creation should not be triggered casually — it's designed as an exception path, not a routine one. When working with ontology paths and configuration, use the established resolver utilities (`resolveOntologyPath`, `OntologyConfigManager`) rather than hardcoding directories, since cache-clearing (`__clearCache`) and probe-counting (`__getProbeCount`, `__resetProbeCounter`) hooks exist specifically to support testable, deterministic path resolution. Tests in `events.test.ts` and `graph-builder.test.ts` should be consulted as the reference contract for expected ontology variable shapes when modifying `GraphKMStore.ts` or `types.ts`.
 
-Classification threshold values in OntologyConfigManager should be treated as semantically significant tuning parameters, not arbitrary numbers. Lowering a threshold increases the number of entities that receive class assignments, potentially at the cost of accuracy. Raising it increases precision but may leave more entities unclassified. Any threshold change should be validated against a representative batch before deployment.
 
-During the Phase 42-03 migration period, changes to OntologyValidator or OntologyClassifier must account for the fact that their data path runs through LegacyOntologyAdapter. Direct integration with OntologyRegistry is not yet active for these components; bypassing the adapter would break the migration isolation contract. Once the migration completes and the adapter is retired, both components should be updated to consume OntologyRegistry directly, and this document should be revised accordingly.
+## Code Evidence
 
-New ontology tiers or structural changes to the two-level hierarchy should be reflected in TwoLevelOntologyHierarchy's definition files and validated against OntologyValidator's constraint set before promotion. Because OntologyClassifier anchors every classification to an upper-ontology root, removing or renaming upper-ontology classes is a breaking change for any downstream system that <USER_ID_REDACTED> by those root classes.
+Key code artifacts grounding this entity's analysis:
+
+**Structural:**
+- ontology (method) in GraphKMStore.ts
+- Ontology (class) in types.ts
+- handleOntologyClasses (method) in api-routes.js
+- resolveOntologyDir (function) in backfill-insight-mentions.mjs
+- resolveOntologyDir (function) in backfill-l2-subsystem-class.mjs
+- KG_ONTOLOGY_DIR (class) in observations-api-server.mjs
+- collectByOntologyClass (function) in observations-api-server.mjs
+
+**Relationships:**
+- Calls: _tokenize, apiPath, get, classifyAvailable, useViewerStore, getClass, getAllClassNames, getRegistry, resolveOverlaySystem, loadDisplayOverlay (+10 more)
+- Imports: OntologyConfigManager.ts, OntologyConfigManager, ontologyPathResolver.ts, __clearCache, __getProbeCount, OntologyPathNotFoundError, __resetProbeCounter, resolveOntologyPath, ApiClient.ts, Entity (+10 more)
+
+**Other:**
+- ontology (variable) in knowledge-management.json
+- ontology (variable) in events.test.ts
+- ontology (variable) in graph-builder.test.ts
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
-
-### Children
-- [OntologyConfigManager](./OntologyConfigManager.md) -- Referenced in the Ontology sub-component description as the mechanism that decouples ontology file paths from code, allowing runtime reconfiguration of both upper and lower ontology tiers.
-- [TwoLevelOntologyHierarchy](./TwoLevelOntologyHierarchy.md) -- The parent sub-component description explicitly states 'upper/lower' as the two tiers, with separate definition files for each, indicating a deliberate separation of broad categorical concepts from domain-specific ones.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The batch-analysis pipeline is organized as a multi-agent workflow where distinct responsibilities are separated into dedicated agent classes rather than a single monolithic analyzer. semantic-analysis-agent.ts is responsible for extracting structured knowledge entities from raw inputs (git history diffs/commits and LSL session logs), while ontology-classification-agent.ts takes those extracted entities and classifies them into a hierarchy (determining parent-child relationships and where a given entity fits within the broader ontology). This separation of extraction from classification allows each agent to have a narrower, more testable prompt/response contract with the underlying LLM, and lets the pipeline swap or tune one stage without affecting the other's logic.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- Pipeline is hosted within the `integrations/semantic-analysis` directory, establishing it as an MCP server that exposes pipeline control as tool endpoints to orchestrating agents
-- [Insights](./Insights.md) -- Insight generation is LLM-driven, operating within the LLM budget constraints configured in OntologyConfigManager, meaning insight depth scales with available token budget per batch run
-- [OntologyConfigManager](./OntologyConfigManager.md) -- Implemented as a singleton to ensure all pipeline agents share identical ontology configuration throughout a batch run, preventing mid-run config drift between classifier and validator instances
-- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- Wraps km-core's OntologyRegistry behind a legacy-compatible interface, isolating the migration boundary so that OntologyValidator and OntologyClassifier continue to function without modification during Phase 42-03
+- [Pipeline](./Pipeline.md) -- AGENT_SUBSTEPS['semantic_analysis'] in multi-agent-graph.tsx defines four ordered sub-steps: parse, extract, relate, enrich, each with declared inputs/outputs
+- [Insights](./Insights.md) -- AGENT_SUBSTEPS['insight_generation'] defines a 'patterns' sub-step (Pattern Discovery) tagged llmUsage:'premium', consuming 'Code entities' and 'Relations' to produce 'Pattern instances' and descriptions
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 18 observations*

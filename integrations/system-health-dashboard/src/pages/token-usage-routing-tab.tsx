@@ -887,7 +887,19 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                         {r.offloaded_from && (
                           <Badge variant="outline" className="text-[9px] py-0 mr-1">offloaded from {r.offloaded_from}</Badge>
                         )}
-                        {r.chain_position === 0 && !r.offloaded_from && (
+                        {/* A bypassed call must not read "as routed". The agent
+                            picked this provider itself — the proxy was never
+                            asked, so there is no decision of ours to report and
+                            saying otherwise would credit the router with a
+                            choice it did not make. Reconstructed afterwards from
+                            the agent's own store; see BYPASS_PROVIDERS in
+                            lib/lsl/token/opencode-token-rows.mjs. */}
+                        {r.routing_source === 'direct' && (
+                          <Badge variant="outline" className="text-[9px] py-0 mr-1 text-sky-600 dark:text-sky-400 border-sky-500/40">
+                            bypassed proxy
+                          </Badge>
+                        )}
+                        {r.chain_position === 0 && !r.offloaded_from && r.routing_source !== 'direct' && (
                           <span className="text-muted-foreground">as routed</span>
                         )}
                         {expanded === id && trail && (

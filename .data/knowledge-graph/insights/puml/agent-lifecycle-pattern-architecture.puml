@@ -1,0 +1,32 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Documentation Guidance" {
+  component "adding-new-agent.md" as doc <<external>>
+}
+
+package "Wave Agents (independent implementations)" {
+  component "Wave Agent A" as agentA <<agent>>
+  component "Wave Agent B" as agentB <<agent>>
+  component "Wave Agent C" as agentC <<agent>>
+}
+
+package "Lifecycle Phases (per-agent, duplicated)" {
+  component "Constructor" as ctor <<core>>
+  component "Lazy Init" as lazyInit <<core>>
+  component "Execute" as exec <<core>>
+}
+
+doc ..> agentA : guides convention
+doc ..> agentB : guides convention
+doc ..> agentC : guides convention
+
+agentA --> ctor : instantiate
+agentB --> ctor : instantiate
+agentC --> ctor : instantiate
+
+ctor --> lazyInit : defers setup
+lazyInit --> exec : first invocation triggers init
+exec --> lazyInit : subsequent calls reuse state
+
+@enduml

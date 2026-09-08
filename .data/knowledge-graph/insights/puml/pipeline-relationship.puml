@@ -7,15 +7,11 @@ title Hierarchy Context: Pipeline
 [Pipeline] as pipeline #LightBlue
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
-[OntologyConfigManager] as ontology_config_manager #F0F0F0
-[LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
-[McpToolEndpointExposure] as mcp_tool_endpoint_exposure #E8F5E8
+[RelationDiscovery] as relation_discovery #E8F5E8
 
 semantic_analysis --> pipeline
 ontology -[hidden]- pipeline
 insights -[hidden]- pipeline
-ontology_config_manager -[hidden]- pipeline
-legacy_ontology_adapter -[hidden]- pipeline
-pipeline --> mcp_tool_endpoint_exposure
+pipeline --> relation_discovery
 
 @enduml

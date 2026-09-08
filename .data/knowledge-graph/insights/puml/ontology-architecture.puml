@@ -1,39 +1,40 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-top to bottom direction
-
-package "Configuration" {
-  component "OntologyConfigManager" as ocm <<core>>
+package "Classification Agent Sub-Steps" {
+  component "Class Matching" as match <<agent>>
+  component "Classification Validation" as validate <<agent>>
+  component "Ontology Auto-Extension" as extend <<agent>>
 }
 
-package "Ontology Definitions" {
-  component "Upper Ontology" as upper <<storage>>
-  component "Lower Ontology" as lower <<storage>>
+package "Ontology Core" {
+  component "Ontology" as ontClass <<core>>
+  component "OntologyConfigManager" as configMgr <<core>>
+  component "ontologyPathResolver" as pathResolver <<core>>
+  component "GraphKMStore.ontology" as kmStore <<core>>
 }
 
-package "Classification Pipeline" {
-  component "OntologyClassifier" as classifier <<core>>
-  component "LegacyOntologyAdapter" as adapter <<external>>
-  component "OntologyRegistry" as registry <<core>>
-  component "OntologyValidator" as validator <<core>>
+package "Ontology Data & Tools" {
+  database "KG_ONTOLOGY_DIR" as ontDir <<storage>>
+  component "handleOntologyClasses" as apiHandler <<api>>
+  component "collectByOntologyClass" as collector <<core>>
+  component "resolveOntologyDir" as resolveDir <<core>>
 }
 
-package "Output" {
-  component "Classified Entity\n(entity Type, ontologyClass)" as entity <<api>>
-}
+match --> validate : "classifications"
+validate --> extend : "unclassified entities"
 
-ocm --> upper : "configures path"
-ocm --> lower : "configures path"
-ocm --> classifier : "thresholds"
+match --> ontClass : "queries classes"
+validate --> ontClass : "checks constraints"
+extend --> ontClass : "new class suggestions"
 
-upper --> classifier : "upper definitions"
-lower --> classifier : "lower definitions"
+ontClass --> configMgr : "configured by"
+configMgr --> pathResolver : "resolves paths"
+pathResolver --> ontDir : "locates"
 
-registry --> adapter : "Phase 42-03\nmigration"
-adapter --> validator : "feeds entities"
-classifier --> registry : "resolves types"
-
-validator --> entity : "attaches metadata"
+apiHandler --> ontClass : "exposes"
+collector --> ontDir : "reads from"
+resolveDir --> ontDir : "resolves"
+kmStore --> ontClass : "manages"
 
 @enduml

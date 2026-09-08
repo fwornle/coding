@@ -2,63 +2,55 @@
 
 **Type:** SubComponent
 
-The probe contract enforced by lib/utils/service-probe.js explicitly prohibits returning 'healthy' as a status value, returning only 'running'/'stopped'/'unknown' to maintain strict liveness semantics distinct from readiness
+Probe functions are stateless and return simple boolean/status results, keeping them reusable across multiple service types (MCP, dashboard, graphify)
 
-# ServiceProbe — Technical Reference
+# ServiceProbe — Technical Insight Document
 
 ## What It Is
 
-ServiceProbe is implemented in `lib/utils/service-probe.js` as a sub-component of DockerizedServices, providing the low-level probe mechanics that the health coordinator uses to determine liveness of containerized services. It contains two concrete probe strategies — HttpProbe and TcpProbe — each suited to a different class of service. The monitored targets span the full Docker Compose deployment: the semantic analysis MCP, constraint monitor, code-graph-rag, Memgraph, and Redis.
-
-![ServiceProbe — Architecture](images/service-probe-architecture.png)
+ServiceProbe is implemented in `lib/utils/service-probe.js` and provides the low-level liveness-checking primitives used throughout the DockerizedServices layer. It exposes two core functions: `probeHttpHealth()`, which issues HTTP requests to a service's health endpoint and interprets response codes and timeouts, and `probeTcpPort()`, which performs raw TCP connection attempts to verify that a port is open and accepting connections for services that lack an HTTP health endpoint. Together these two probing strategies cover the full spectrum of health-check needs across the service fleet — HTTP-based services (MCP, dashboard, graphify) and lower-level TCP-only services alike.
 
 ## Architecture and Design
 
-ServiceProbe is organized around a two-strategy model: HttpProbe handles services that expose HTTP health endpoints, while TcpProbe handles services that do not — databases and brokers like Memgraph and Redis being the canonical examples. This division reflects a deliberate design decision to use the most semantically appropriate protocol for each service type rather than forcing a single probe mechanism across heterogeneous services.
+ServiceProbe sits as a child of DockerizedServices in the component hierarchy, with `HttpHealthProbe` (i.e., `probeHttpHealth()`) formally modeled as its child entity, reflecting HTTP health-checking as a first-class specialization of the more general probing concept. Architecturally, the design centralizes probe logic: rather than allowing individual service wrappers (such as `api-service.js` or `dashboard-service.js`) to call probing logic directly, both `probeHttpHealth()` and `probeTcpPort()` are consumed exclusively by `scripts/health-coordinator.js`. This is a deliberate separation-of-concerns decision — probing mechanics are decoupled from both process lifecycle management (handled by ServiceWrapperScripts and ProcessStateManager) and startup orchestration (handled by sibling ServiceStarter).
 
-The most architecturally significant decision in ServiceProbe is its **status vocabulary constraint**: the probe contract explicitly prohibits returning `'healthy'` as a status. Valid return values are strictly `'running'`, `'stopped'`, and `'unknown'`. This enforces a clear semantic boundary between *liveness* (is the process reachable?) and *readiness* (is the service capable of serving traffic?). By never emitting `'healthy'`, ServiceProbe avoids conflating these two concerns — a distinction that matters when the health coordinator at the DockerizedServices layer must decide whether to attempt a service interaction vs. whether to consider a service fully operational.
+![ServiceProbe — Architecture](images/service-probe-architecture.png)
 
-The third status value, `'unknown'`, is an intentional departure from binary up/down semantics. It encodes the difference between a conclusive negative (explicit connection refusal — the port is closed, the process is down) and an inconclusive result (connection timeout — the service may be starting, overloaded, or network-partitioned). This three-state model gives consumers richer signal to act on.
-
-![ServiceProbe — Relationship](images/service-probe-relationship.png)
+A key architectural driver is correctness under uncertainty: the probes are explicitly designed to avoid false positives, supporting the SPEC R6 invariant that "healthy" must never be reported prematurely. This constraint shapes the probe implementations toward conservative interpretation of response codes, timeouts, and connection failures rather than optimistic assumptions.
 
 ## Implementation Details
 
-Both HttpProbe and TcpProbe live inside `lib/utils/service-probe.js`, co-located rather than split into separate files. HttpProbe issues an HTTP request to a configured endpoint and maps the outcome to the three-status vocabulary: a successful response maps to `'running'`, an explicit connection refused maps to `'stopped'`, and ambiguous failures (timeouts, DNS errors) map to `'unknown'`. TcpProbe opens a raw TCP socket to a host/port pair and applies the same status mapping logic — a successful connection means `'running'`, an immediate refusal means `'stopped'`, and anything inconclusive means `'unknown'`.
-
-TcpProbe's role as a fallback or alternative — rather than a second-class citizen — reflects the reality that infrastructure services like Redis and Memgraph do not expose HTTP health endpoints by design. Forcing them through an HTTP probe would require either a sidecar or a wrapper, both of which add complexity. TcpProbe enables uniform polling cadence and status reporting across all services without that overhead.
+`probeHttpHealth()` performs HTTP calls against a service's health endpoint, inspecting status codes and enforcing timeout handling to determine service state. `probeTcpPort()` complements this by attempting a raw socket connection to a given port, useful for services that don't expose an HTTP-based health surface. Both functions are stateless, returning simple boolean/status results rather than maintaining internal state or history. This statelessness is a deliberate design choice enabling reuse across heterogeneous service types (MCP, dashboard, graphify) without needing per-service adapter logic or shared mutable context.
 
 ## Integration Points
 
-ServiceProbe feeds directly into the health coordinator, which aggregates per-service liveness states across the full set of Dockerized services. The health coordinator is the sole consumer described in the observations; ServiceProbe does not appear to be called ad hoc from other layers.
+![ServiceProbe — Relationship](images/service-probe-relationship.png)
 
-ServiceStarter, a sibling component in `lib/service-starter.js`, operates downstream of the same liveness signals — it implements retry-with-backoff on startup, relying on health checks resolving to `'running'` before proceeding. While ServiceStarter and ServiceProbe are siblings rather than directly coupled, they share an implicit contract: ServiceStarter's retry logic only terminates successfully when a probe returns `'running'`, making the status vocabulary a shared interface boundary across both components.
-
-LLMMockService, the other sibling, is unrelated to probe mechanics — it operates at the LLM interaction layer and has no dependency on ServiceProbe's output.
+ServiceProbe's primary integration point is HealthCoordinator (`scripts/health-coordinator.js`), which polls services every 5 seconds per `config/health-verification-rules.json`, invoking `probeHttpHealth()` and `probeTcpPort()` as its polling mechanism. This makes HealthCoordinator the sole consumer/orchestrator of ServiceProbe's functionality — service wrappers do not call the probes directly. Within the broader DockerizedServices parent component, ServiceProbe's stateless checks feed into the health-verification pipeline that complements ServiceStarter's `startServiceWithRetry()`, which itself uses health-check functions (conceptually aligned with ServiceProbe's outputs) combined with `withDeadline` timeouts and exponential backoff during startup. ProcessStateManager and LLMMockService are not direct consumers but are part of the same sibling ecosystem coordinated through the health/lifecycle layer.
 
 ## Usage Guidelines
 
-**Never expect `'healthy'` as a return value.** Any consumer code that checks for `'healthy'` will never match — the contract is `'running'`/`'stopped'`/`'unknown'` exclusively. This is a hard invariant of the probe design, not a convention that might change.
-
-**Treat `'unknown'` as distinct from `'stopped'`.** The `'unknown'` state means a conclusive determination was impossible, not that the service is down. Consumers (such as ServiceStarter's retry logic) should handle `'unknown'` as "retry is warranted" rather than "service is confirmed stopped." Treating it as `'stopped'` risks aborting startup sequences for services that are still initializing.
-
-**Choose the probe type based on what the target service actually exposes.** HttpProbe is appropriate for services with a dedicated health route; TcpProbe is appropriate for bare TCP services like Redis and Memgraph. Using TcpProbe for an HTTP service is technically valid (a successful TCP connection means the port is open) but loses the signal that comes from HTTP response codes — a 500-responding service would still appear as `'running'` under a TCP probe. Match the probe type to the service's actual health surface.
-
-**Scalability and maintainability** of ServiceProbe are straightforward given its scope: it is a utility with two concrete strategies and a fixed vocabulary. Adding support for a new service type would mean either reusing TcpProbe (for any TCP-speaking service) or extending with a new probe strategy alongside HttpProbe and TcpProbe in `lib/utils/service-probe.js`. The co-location of both strategies in a single file keeps the surface area small and the status contract enforceable in one place.
+Developers should treat `probeHttpHealth()` and `probeTcpPort()` as the canonical, centralized source of truth for service liveness — new service integrations should route health checks through HealthCoordinator rather than invoking probes ad hoc from wrapper scripts, preserving the centralization pattern. Because the probes are stateless and boolean/status-returning, they should not be extended with internal caching or state accumulation; any stateful health history belongs in a higher layer (e.g., HealthCoordinator or ProcessStateManager). Above all, any modification to probe logic must preserve the SPEC R6 invariant — never report "healthy" prematurely — since this correctness guarantee is the primary reason the probes exist as a distinct, carefully scoped subcomponent rather than inline checks within each service wrapper.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices provides the containerization layer for the coding infrastructure, packaging services like the semantic analysis MCP, constraint monitor, code-graph-rag, Memgraph, and Redis into a unified Docker Compose deployment. The architecture centers on docker/docker-compose.yml and docker/Dockerfile.coding-services with supervisord.conf managing multiple processes within a container. Service health is verified through two probe mechanisms: HTTP health endpoints and TCP port checks, used by the health coordinator to track service liveness with strict contracts (never returning 'healthy', only 'running'/'stopped'/'unknown').
+- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices provides the containerization and process-management layer that wraps Coding's various services (semantic analysis MCP, constraint monitor API/dashboard, graphify, LLM services) so they can run reliably both inside Docker containers and as standalone Node processes managed by a Global Service Coordinator. The layer combines Docker artifacts (docker-compose.yml, Dockerfile.coding-services, supervisord.conf, entrypoint.sh) with a set of Node.js wrapper scripts (api-service.js, dashboard-service.js) that spawn actual backend processes, forward signals, and register/unregister with a ProcessStateManager (PSM) for lifecycle tracking.
+
+A core architectural pattern is robust startup with retry/backoff and health verification, implemented in lib/service-starter.js's startServiceWithRetry(), which wraps a start function and a health-check function with timeouts (via withDeadline) and exponential backoff, distinguishing required vs optional services for graceful degradation. Complementing this, lib/utils/service-probe.js implements liveness probes (probeHttpHealth, probeTcpPort) used by scripts/health-coordinator.js to poll services every 5 seconds per config/health-verification-rules.json, strictly avoiding false-positive 'healthy' states per its SPEC R6 invariant.
+
+Service wrappers such as api-service.js and dashboard-service.js follow a consistent pattern: resolve CODING_REPO-relative paths, verify target files/directories exist, spawn the real process with stdio inherited, forward SIGTERM/SIGINT, and asynchronously register/unregister with ProcessStateManager for centralized process tracking across the dockerized/global service fleet. Mock-mode support (llm-mock-service.ts) allows service behavior (LLM calls) to be swapped for deterministic mocks driven by a shared workflow-progress.json state file, aiding testing inside containers where CODING_ROOT may differ from host paths.
 
 ### Children
-- [HttpProbe](./HttpProbe.md) -- Defined in lib/utils/service-probe.js as part of the ServiceProbe sub-component, handling services that expose HTTP health endpoints
-- [TcpProbe](./TcpProbe.md) -- Defined in lib/utils/service-probe.js alongside HttpProbe, providing an alternative probe mechanism for non-HTTP services such as databases or message brokers
+- [HttpHealthProbe](./HttpHealthProbe.md) -- probeHttpHealth() in lib/utils/service-probe.js is described in the L2 context as issuing HTTP requests to a service's health endpoint
 
 ### Siblings
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter in lib/service-starter.js implements a retry-with-backoff pattern for service startup, meaning each failed health check attempt waits an increasing delay before retrying rather than polling at a fixed interval
-- [LLMMockService](./LLMMockService.md) -- LLMMockService in integrations/semantic-analysis/src/mock/llm-mock-service.ts implements a three-mode switcher (mock/local/public) allowing the semantic analysis MCP to operate without external LLM dependencies during development or testing
+- [ServiceStarter](./ServiceStarter.md) -- startServiceWithRetry() in lib/service-starter.js wraps a caller-supplied start function and health-check function, retrying with exponential backoff on failure
+- [ProcessStateManager](./ProcessStateManager.md) -- scripts/process-state-manager.js exposes register/unregister operations called asynchronously by wrapper scripts like api-service.js and dashboard-service.js
+- [LLMMockService](./LLMMockService.md) -- integrations/semantic-analysis/src/mock/llm-mock-service.ts implements mode management supporting 'mock', 'local', and 'public' LLM call routing
+- [HealthCoordinator](./HealthCoordinator.md) -- scripts/health-coordinator.js polls services every 5 seconds, using probeHttpHealth() and probeTcpPort() from lib/utils/service-probe.js
+- [ServiceWrapperScripts](./ServiceWrapperScripts.md) -- api-service.js and dashboard-service.js resolve CODING_REPO-relative paths before spawning target processes, supporting both container and host execution
 
 
 ---

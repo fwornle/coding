@@ -1,32 +1,33 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Input Sources" {
-  component "Git History Extractor" as git <<core>>
-  component "LSL Session Analyzer" as lsl <<core>>
-  component "CodeGraphAgent" as cga <<agent>>
+package "CLI & Orchestration" {
+  component "cli.js" as cli <<cli>>
+  component "GapAnalyzer" as gap <<core>>
+  component "TeamCheckpointManager" as ckpt <<core>>
+  component "WorkflowOrchestrator" as orch <<core>>
 }
 
-package "OnlineLearning Pipeline" {
-  component "Batch Analysis DAG" as dag <<core>>
-  component "LLM-Assisted Extractor" as llm <<core>>
-  component "EntityTypeRegistry" as etr <<core>>
+package "Automated Extraction" {
+  component "MCP Tools\n(execute_workflow)" as mcp <<external>>
+  component "AGENT_SUBSTEPS Pipeline\n(kg_operators, git_history)" as substeps <<agent>>
 }
 
-package "Knowledge Storage" {
-  component "Graphology (in-memory)" as graphology <<storage>>
-  database "LevelDB" as leveldb <<storage>>
+package "Data & Visualization" {
+  database "GraphDB" as graphdb <<storage>>
+  component "data-processor.js\nexportOnlineKnowledge()" as dproc <<core>>
+  component "ukb-workflow-modal.tsx\ncalculateDynamicEta()" as eta <<core>>
 }
 
-cloud "Token Usage Dashboard" as tokenDash <<external>>
-
-git --> dag : feeds
-lsl --> dag : feeds
-cga --> dag : AST index
-dag --> llm : extraction steps
-llm --> etr : ontology classification
-etr --> graphology : typed entities
-graphology --> leveldb : persistence
-dag ..> tokenDash : meters token usage
+cli --> ckpt : "loads checkpoint"
+cli --> gap : "getGapSummary()"
+gap --> orch : "gap scope (sinceCommit, commits, sessions)"
+orch --> mcp : "checkMCPToolsAvailability()"
+orch ..> orch : "fallback mock*Workflow"
+mcp --> substeps : "executeIncrementalWorkflow()"
+substeps --> graphdb : "writes auto-extracted entities"
+substeps --> eta : "batchIterations timing"
+graphdb --> dproc : "queryEntities(team, limit:5000)"
+dproc --> dproc : "source 'auto' -> 'online'"
 
 @enduml

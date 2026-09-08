@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentWrapperScriptPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentWrapperScriptPattern] as agent_wrapper_script_pattern #LightBlue
+[CliEntrypointPattern] as cli_entrypoint_pattern #F0F0F0
+[ConfigAsCodeConvention] as config_as_code_convention #F0F0F0
+[ExperimentDefinitionPattern] as experiment_definition_pattern #F0F0F0
+[SupervisorManagedContainerPattern] as supervisor_managed_container_pattern #F0F0F0
+[EntityPatternAnalyzer] as entity_pattern_analyzer #F0F0F0
+
+coding_patterns --> agent_wrapper_script_pattern
+cli_entrypoint_pattern -[hidden]- agent_wrapper_script_pattern
+config_as_code_convention -[hidden]- agent_wrapper_script_pattern
+experiment_definition_pattern -[hidden]- agent_wrapper_script_pattern
+supervisor_managed_container_pattern -[hidden]- agent_wrapper_script_pattern
+entity_pattern_analyzer -[hidden]- agent_wrapper_script_pattern
+
+@enduml

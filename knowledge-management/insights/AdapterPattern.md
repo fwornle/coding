@@ -2,95 +2,47 @@
 
 **Type:** SubComponent
 
-The SpecstoryAdapter class in lib/integrations/specstory-adapter.js employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods.
+This pattern addresses integration of heterogeneous external formats, suggesting each adapter likely exposes a normalize/parse-style entry point converting raw input into the system's internal memory or agent-consumable structures
 
-## What It Is  
+# AdapterPattern: Technical Insight Document
 
-The **AdapterPattern** sub‑component lives inside the **Trajectory** component and is concretely realized by the `SpecstoryAdapter` class located at `lib/integrations/specstory‑adapter.js`.  This class implements a classic *Adapter* – it translates the generic logging contract expected by the Trajectory subsystem into the concrete protocol required by the external **Specstory** service.  The adapter exposes a single, stable interface to the rest of the system while internally juggling three distinct connection strategies: HTTP, Inter‑Process Communication (IPC), and file‑system watching.  The ordering of these strategies (HTTP → IPC → file watch) is encoded in the methods `connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch`, respectively.  By encapsulating all of the “how do we talk to Specstory?” details, the AdapterPattern enables the Trajectory component to log conversations without needing to know anything about the underlying transport mechanism.
+## What It Is
 
-## Architecture and Design  
+AdapterPattern is a conceptual, recurring design pattern documented within the Coding project's `docs/agent-integration-guide.md`, rather than a single centralized module or shared interface. It is best understood through its concrete instances: **TranscriptAdapter** and **SpecstoryAdapter**, both of which exist to convert external, format-specific data (transcripts, specstory data) into a common internal shape consumable by the system's memory or agent infrastructure. As a member of the CodingPatterns grouping, AdapterPattern is not owned by any single subsystem—like its parent, it is a retroactively identified convention observed across the codebase rather than a browsable, standalone component.
 
-The design follows the **Adapter pattern** explicitly (observations 1, 6, 7).  `SpecstoryAdapter` acts as a façade that conforms to the logging interface required by **Trajectory** while delegating the actual communication to one of three concrete strategies.  This is a textbook example of *Strategy* embedded within an Adapter: the three `connectVia*` methods represent interchangeable algorithms selected at runtime based on availability.  
+## Architecture and Design
 
-The component hierarchy shows **Trajectory** as the parent, which *contains* the AdapterPattern.  The AdapterPattern, in turn, *contains* a **ConnectionManager** child that houses the three connection methods.  Sibling components such as **SpecstoryLogger** also depend on the same adapter, reinforcing a shared‑service model.  The presence of siblings like **ConcurrencyManager** and **LLMInitializer** indicates that the overall system is modular, with each concern isolated behind a well‑defined interface.  No cross‑cutting coupling is observed beyond the adapter’s public contract, which keeps the architecture clean and promotes independent evolution of each sibling.
+The defining architectural characteristic of AdapterPattern is its **decentralization**: adapters are "recurring" rather than centralized in a shared interface or base class. This means TranscriptAdapter and SpecstoryAdapter are each implemented independently, following a similar structural shape without inheriting from or implementing a common formal contract. This is a deliberate (or emergent) trade-off—favoring implementation flexibility and low coupling over enforced consistency via abstraction.
 
-## Implementation Details  
+![AdapterPattern — Architecture](images/adapter-pattern-architecture.png)
 
-`SpecstoryAdapter` is defined in `lib/integrations/specstory‑adapter.js`.  Its core responsibility is to expose a unified logging API to **Trajectory** while internally attempting to establish a connection using the most efficient channel first.  
+Each adapter's implicit responsibility is to expose a normalize/parse-style entry point that ingests raw, heterogeneous external input and outputs the system's internal, agent-consumable structures. This positions AdapterPattern as an integration-boundary pattern: it isolates the complexity of external formats at the edge of the system, shielding downstream consumers (memory, agents) from format-specific variance.
 
-* **`connectViaHTTP`** – Issues standard HTTP requests to the Specstory endpoint.  The observation notes that this method “provides a reliable and efficient means of communication,” implying that it likely uses a lightweight HTTP client (e.g., `fetch` or `axios`) and handles typical response codes, retries, and time‑outs.  
+## Implementation Details
 
-* **`connectViaIPC`** – Falls back to an Inter‑Process Communication mechanism when HTTP is unavailable.  While the exact IPC technology is not spelled out, the method’s existence signals that the adapter can communicate with a locally running Specstory daemon, perhaps via Unix domain sockets or Node’s `process.send`/`process.on` channels.  
+Because no formal shared interface exists, the "implementation" of AdapterPattern is really the aggregate behavior of its instances. TranscriptAdapter handles transcript-formatted external data, while SpecstoryAdapter handles specstory-formatted data—both presumably implementing similar parse/normalize logic tailored to their respective input formats. The lack of a unifying abstract class or interface means each adapter's internal mechanics (parsing logic, error handling, output shaping) must be inferred from its own source rather than a shared contract. This is consistent with the broader CodingPatterns philosophy: patterns are named and recognized post-hoc based on structural similarity, not enforced through shared code.
 
-* **`connectViaFileWatch`** – Acts as the last‑resort fallback, watching a predefined file or directory for changes (e.g., using `fs.watch`).  When the file is updated, the adapter interprets the change as a signal from Specstory and proceeds to log the conversation.  This method guarantees that logging continues even in highly constrained environments where network or IPC are blocked.  
+## Integration Points
 
-The **ConnectionManager** child aggregates these three methods, likely exposing a `connect()` wrapper that sequentially attempts each strategy until one succeeds.  Because the ordering is hard‑coded (HTTP → IPC → file watch), the system automatically prefers the most performant path without requiring external configuration.
+![AdapterPattern — Relationship](images/adapter-pattern-relationship.png)
 
-## Integration Points  
+AdapterPattern has a direct structural relationship with the **NamingConventions** sub-component: the `*Adapter` naming suffix is itself one of the classifying suffixes (`*Manager`, `*Service`, `*Adapter`, `*Provider`) that NamingConventions uses to categorize classes by name rather than by directory location. This overlap means adapters are identifiable purely by their naming convention, reinforcing that classification in this system is name-driven, not structure-driven. AdapterPattern also sits alongside **AgentLifecyclePattern** as a sibling under CodingPatterns—both are inferred from repeated structural similarity across the codebase rather than from a shared interface, suggesting a broader project-wide tendency toward convention-based rather than contract-based architecture. Documented within `docs/agent-integration-guide.md`, AdapterPattern is explicitly tied to the agent integration surface of the system.
 
-* **Trajectory (parent)** – Calls into the AdapterPattern to log conversation data.  The parent expects a stable interface (e.g., `logConversation(payload)`) that `SpecstoryAdapter` satisfies.  This relationship is explicitly mentioned in the hierarchy context.  
+## Usage Guidelines
 
-* **SpecstoryLogger (sibling)** – Also consumes `SpecstoryAdapter`.  Both the logger and Trajectory share the same adapter instance, ensuring consistent handling of connection failures and fallback logic across the system.  
+New adapters should be added by following the existing TranscriptAdapter and SpecstoryAdapter examples as templates rather than expecting or requiring a formal abstract base class or interface contract. Developers should name new adapter classes with the `*Adapter` suffix to remain consistent with NamingConventions and to preserve discoverability. Each new adapter should implement a normalize/parse-style entry point converting its specific external format into the system's common internal shape. Because there is no enforced contract, developers should exercise discipline in mirroring the structure of existing adapters to maintain consistency, and should consult `docs/agent-integration-guide.md` and `docs/architecture/` for onboarding rather than searching for a dedicated AdapterPattern module, since—like its parent CodingPatterns—this pattern has no dedicated source directory of its own.
 
-* **ConnectionManager (child)** – Encapsulates the low‑level connection logic.  Any future integration that needs a new transport (e.g., WebSocket) would be added here without touching Trajectory or the logger.  
-
-* **External Specstory service** – The ultimate target of the communication.  The adapter abstracts away whether Specstory is reachable via HTTP, a local IPC endpoint, or a file‑based protocol, allowing the rest of the codebase to remain agnostic of these details.  
-
-No other internal modules are referenced in the observations, so the adapter’s dependencies appear limited to standard Node.js networking/file APIs and possibly a lightweight HTTP client library.
-
-## Usage Guidelines  
-
-1. **Prefer the default adapter** – When logging from Trajectory or SpecstoryLogger, instantiate `SpecstoryAdapter` directly; the internal ordering of connection strategies ensures the optimal path is chosen automatically.  
-2. **Do not bypass the adapter** – Directly invoking HTTP, IPC, or file‑watch logic outside the adapter defeats the purpose of the pattern and introduces duplicated connection handling.  
-3. **Handle asynchronous initialization** – Since the connection attempt may involve network I/O or file‑system watchers, callers should await the adapter’s `connect()` promise (or equivalent) before sending the first log entry.  
-4. **Extend carefully** – Adding a new transport (e.g., WebSocket) should be done inside the **ConnectionManager** child as a new `connectViaWebSocket` method and then referenced in the sequential fallback chain.  No changes to Trajectory or SpecstoryLogger are required.  
-5. **Monitor fallback usage** – For observability, log which connection method succeeded.  This information can guide future infrastructure decisions (e.g., if file‑watch fallback is used frequently, it may indicate network restrictions that need remediation).
-
----
-
-### 1. Architectural patterns identified  
-* **Adapter Pattern** – `SpecstoryAdapter` translates the generic logging contract into Specstory‑specific calls.  
-* **Strategy (within Adapter)** – The three `connectVia*` methods act as interchangeable connection algorithms.  
-
-### 2. Design decisions and trade‑offs  
-* **Preference ordering (HTTP → IPC → file watch)** – Maximizes performance and reliability but adds complexity in the fallback logic.  
-* **Single responsibility** – Adapter focuses on protocol translation; ConnectionManager isolates low‑level transport details, improving testability.  
-* **Extensibility vs. simplicity** – Adding new transports is straightforward (extend ConnectionManager) but requires careful ordering to avoid unintended preference changes.  
-
-### 3. System structure insights  
-* **Hierarchical composition** – Trajectory → AdapterPattern → ConnectionManager creates a clear vertical slice of responsibility.  
-* **Sibling reuse** – Both SpecstoryLogger and Trajectory share the same adapter, reinforcing a DRY approach.  
-* **Loose coupling** – Trajectory interacts only with the adapter’s stable interface; it is unaware of the underlying transport mechanisms.  
-
-### 4. Scalability considerations  
-* **Connection pooling** – HTTP connections could be reused across many log calls; the current design does not specify pooling, so future work may add a shared HTTP agent.  
-* **Concurrent logging** – Since the adapter abstracts transport, multiple concurrent log requests can be serialized or parallelized without affecting the calling components.  
-* **Fallback latency** – In large‑scale deployments, reliance on the slower file‑watch fallback could become a bottleneck; monitoring fallback frequency is essential.  
-
-### 5. Maintainability assessment  
-* **High** – The clear separation of concerns (Adapter vs. ConnectionManager) makes the codebase easy to understand and modify.  
-* **Extensible** – New integrations require only additions to ConnectionManager, preserving existing contracts.  
-* **Potential risk** – The hard‑coded ordering of connection strategies could become a maintenance burden if the environment’s preferred transport changes; exposing the order via configuration would mitigate this.
-
-## Diagrams
-
-### Relationship
-
-## Architecture Diagrams
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- [LLM] The Trajectory component utilizes the SpecstoryAdapter in lib/integrations/specstory-adapter.js for logging conversations via Specstory, demonstrating an adapter pattern for integration with different tools and services. This adapter pattern allows for a standardized interface to interact with various extensions, such as Specstory, facilitating the addition of new integrations with minimal modifications to the existing codebase. The SpecstoryAdapter class, specifically, employs connection methods in order of preference, starting with HTTP, then IPC, and finally file watch, as seen in the connectViaHTTP, connectViaIPC, and connectViaFileWatch methods. This approach ensures that the most efficient and reliable connection method is used, while providing fallback options in case of failures.
-
-### Children
-- [ConnectionManager](./ConnectionManager.md) -- The connectViaHTTP, connectViaIPC, and connectViaFileWatch methods in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js) implement the connection logic in order of preference.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] CodingPatterns has no dedicated source directory or module of its own within the Coding project; it exists purely as a conceptual grouping label applied during component analysis to catch conventions that recur across many subsystems but are not owned by any single one. A new developer searching for 'CodingPatterns.ts' or 'patterns/' will find nothing—the actual pattern implementations live scattered inside the real subsystems (wave agents, adapters, managers) and are only retroactively categorized as 'CodingPatterns' during architecture synthesis. This means any onboarding effort to understand this component should redirect to CLAUDE.md and docs/architecture/ rather than expecting a browsable codebase location.
 
 ### Siblings
-- [ConcurrencyManager](./ConcurrencyManager.md) -- The ConcurrencyManager may use a work-stealing concurrency model, allowing idle workers to pull tasks immediately, similar to the WaveController.runWithConcurrency() method.
-- [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer may use a lazy loading approach to initialize LLMs, delaying initialization until the model is actually needed, reducing memory usage and improving system responsiveness.
-- [SpecstoryLogger](./SpecstoryLogger.md) -- The SpecstoryLogger may use the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversations via Specstory.
+- [NamingConventions](./NamingConventions.md) -- The convention classifies classes by suffix pattern (e.g., *Manager, *Service, *Adapter, *Provider) rather than by directory location, meaning classification is name-driven not structure-driven
+- [AgentLifecyclePattern](./AgentLifecyclePattern.md) -- The pattern is described as 'potentially used' by wave/agent components, indicating it was inferred from repeated structural similarity rather than a shared interface or abstract class
+
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

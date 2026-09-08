@@ -2,149 +2,53 @@
 
 **Type:** Project
 
-Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 7 major components: LiveLoggingSystem: The LiveLoggingSystem (LSL) is a session logging infrastructure that captures, classifies, and persists AI agent conversations—primarily from Claude C; LLMAbstraction: LLMAbstraction is a multi-layered abstraction over LLM providers that enables provider-agnostic model calls across Anthropic, OpenAI, Groq, and local ; DockerizedServices: DockerizedServices provides the containerization layer for the coding infrastructure, packaging services like the semantic analysis MCP, constraint mo; KnowledgeManagement: The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing persistent storage, entity lif; CodingPatterns: CodingPatterns serves as the architectural catch-all component for the Coding project, capturing cross-cutting programming conventions, design pattern; ConstraintSystem: The ConstraintSystem is a multi-layered constraint monitoring and enforcement framework that validates code actions, file operations, and tool interac; SemanticAnalysis: The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized a.
+Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 7 major components: LiveLoggingSystem: [LLM] The LiveLoggingSystem centers around logging.ts, which owns the core responsibilities of session windowing, file routing, and transcript capture; LLMAbstraction: [LLM] The mode-resolution logic in getLLMMode() (llm-mock-service.ts) establishes a clear precedence chain that new developers must understand before ; DockerizedServices: [LLM] The DockerizedServices component centers on docker/README.md as the canonical deployment reference, describing how semantic analysis MCP, constr; KnowledgeManagement: [LLM] The KnowledgeManagement component centers around a VKB (Virtual Knowledge Base) server that exposes graph-based storage operations to the rest o; CodingPatterns: [LLM] The agent wrapper scripts under config/agents/ (claude.sh, copilot.sh, opencode.sh, pi.sh) implement a consistent adapter pattern where each scr; ConstraintSystem: The ConstraintSystem provides rule-based validation and enforcement of code actions and file operations during Claude Code sessions, spanning hook con; SemanticAnalysis: [LLM] The batch-analysis pipeline is organized as a multi-agent workflow where distinct responsibilities are separated into dedicated agent classes ra.
 
-# Coding Project — Technical Reference Manual
+# Coding — Project Insight Document
 
 ## What It Is
 
-The **Coding** project is a top-level development infrastructure platform composed of seven first-class components that together form a cohesive AI-assisted coding environment. There are no root-level code symbols directly attached to this node — it functions as an organizational and conceptual root in the knowledge hierarchy rather than a code artifact itself. Its children are the authoritative implementations: **LiveLoggingSystem**, **LLMAbstraction**, **DockerizedServices**, **KnowledgeManagement**, **CodingPatterns**, **ConstraintSystem**, and **SemanticAnalysis**. Each child addresses a distinct infrastructure concern, and together they constitute the full system.
-
-The platform is designed around AI agent workflows — primarily Claude Code — and provides the scaffolding for those agents to operate with observability, constraint enforcement, semantic understanding, and persistent knowledge. It is less a traditional application and more a *<COMPANY_NAME_REDACTED>-infrastructure*: tooling that supports the development process itself.
-
----
+Coding is the root development infrastructure project organizing seven major components that together implement an agent-orchestrated, LLM-assisted coding environment: LiveLoggingSystem, LLMAbstraction, DockerizedServices, KnowledgeManagement, CodingPatterns, ConstraintSystem, and SemanticAnalysis. Rather than being a single monolithic codebase, Coding acts as an umbrella coordinating distinct subsystems, each owning a specific concern — conversation capture, LLM mode resolution, containerized service deployment, graph-based knowledge storage, agent invocation conventions, rule enforcement, and multi-agent semantic analysis pipelines. The project's structure is documented through canonical references such as docker/README.md and docs/architecture/adding-new-agent.md, which serve as onboarding points for new developers navigating the component boundaries.
 
 ## Architecture and Design
 
-### Layered Infrastructure Model
+The dominant architectural pattern across Coding's children is separation of concerns via dedicated modules/servers, each acting as a single authoritative entry point for its domain. LiveLoggingSystem centralizes all conversation ingestion through logging.ts as the sole source of truth for session structure. KnowledgeManagement similarly centralizes graph storage access through a VKB server, deliberately decoupling consumers from the underlying storage engine — a classic abstraction-layer design that enabled a backend migration (LevelDB to KMCore) without breaking downstream integrations. DockerizedServices extends this separation to the deployment layer, isolating semantic analysis MCP, constraint monitor, and graphify into independently versioned/scaled containers reachable over well-known ports rather than in-process calls, which implies the host CLI tooling and these services communicate over network boundaries rather than shared memory.
 
-The seven L1 components map cleanly onto distinct infrastructure layers, each with well-scoped responsibilities:
-
-| Layer | Component | Responsibility |
-|---|---|---|
-| Observability | LiveLoggingSystem | Capture and normalize agent session transcripts |
-| AI Routing | LLMAbstraction | Provider-agnostic model dispatch |
-| Containerization | DockerizedServices | Service packaging and lifecycle |
-| Knowledge | KnowledgeManagement | Graph persistence and entity lifecycle |
-| Safety | ConstraintSystem | Validate and enforce code/tool actions |
-| Intelligence | SemanticAnalysis | Multi-agent semantic pipeline |
-| Convention | CodingPatterns | Cross-cutting design governance |
-
-This is not a microservices decomposition in the traditional sense — the components are infrastructure subsystems that operate cooperatively rather than independently deployable business services. The coupling between them is intentional and data-driven: **LiveLoggingSystem** feeds normalized transcripts downstream into **SemanticAnalysis** and **KnowledgeManagement**; **SemanticAnalysis** runs as an MCP server (`integrations/semantic-analysis`) containerized by **DockerizedServices**; **KnowledgeManagement** stores the outputs of semantic analysis into a persistent graph.
-
-### Agent-Agnostic Design as a First-Class Principle
-
-A fundamental architectural decision visible across the project is **agent-agnosticism**. **CodingPatterns** documents this explicitly: multiple AI backends (Claude, Copilot, Mastra, OpenCode) operate under a unified interface. This manifests concretely in **LLMAbstraction**, which supports Anthropic, OpenAI, Groq, and local inference backends through a single abstraction layer with three execution modes (`mock`, `local`, `public`). The routing decision is externalized into `workflow-progress.json`, meaning AI backend selection requires no code changes — a deliberate design to keep the execution environment separate from the logic.
-
-### Externalized Configuration
-
-Across all components, configuration is externalized into `config/` YAML/JSON files rather than hardcoded values. This is identified as a project-wide pattern in **CodingPatterns** and is structurally enforced by the existence of `workflow-progress.json` for LLM routing, `docker/docker-compose.yml` and `supervisord.conf` for service topology, and typed YAML-driven agent configurations. This makes the system reconfigurable without recompilation and supports the multi-backend agent model.
-
----
+CodingPatterns codifies an adapter pattern at the agent-integration layer: wrapper scripts (claude.sh, copilot.sh, opencode.sh, pi.sh) each normalize a distinct third-party CLI into a common interface, letting orchestration code treat all agents uniformly. LLMAbstraction contributes a layered precedence/resolution pattern (getLLMMode()) for configuration, and SemanticAnalysis organizes work as a multi-agent pipeline with responsibilities split across dedicated agent classes. Together these patterns show a system consistently favoring pluggable, uniform interfaces over ad-hoc branching logic.
 
 ## Implementation Details
 
-### Session Capture and Windowing (LiveLoggingSystem)
+Key implementation anchors called out in the observations include:
 
-The **LiveLoggingSystem** handles the boundary between raw agent-native transcript formats and the normalized LSL format consumed by downstream systems. It introduces **time-window identifiers** (e.g., `'0800-0900'`) for session windowing, **SHA-256 user hashing** for multi-user privacy, and **file rotation thresholds** to manage log volume. This design choice — hashing users rather than omitting them — preserves auditability while protecting identity. The LSL format acts as a contract: anything emitted by the logging system is guaranteed to be parseable by **SemanticAnalysis** and **KnowledgeManagement** pipelines.
-
-### LLM Dispatch Architecture (LLMAbstraction)
-
-**LLMAbstraction** implements three distinct execution paths:
-- **Mock service** — for deterministic testing without live API calls
-- **DMR (Docker Model Runner)** — local inference backend, containerized via **DockerizedServices**
-- **`llm-with-process.ts` direct-fetch wrapper** — bypasses the SDK entirely to inject telemetry process tags into the `rapid-llm-proxy` endpoint
-
-The direct-fetch approach in `llm-with-process.ts` is a notable trade-off: it sacrifices SDK-provided safety and type guarantees to gain the ability to inject custom telemetry metadata that the SDK would otherwise strip. Per-agent mode overrides stored in `workflow-progress.json` allow fine-grained routing — different agents in the same workflow can use different backends simultaneously.
-
-### Graph Infrastructure (KnowledgeManagement)
-
-The knowledge graph is built on **Graphology** (in-memory) with **LevelDB** as the persistence backend. Entities carry typed attributes (`System`, `Project`, `Pattern`) and participate in typed relationships. The **CodeGraphAgent** extends this with repository indexing via **Tree-sitter AST parsing**, enabling the graph to represent code structure (not just knowledge concepts). An integration path to **Memgraph** (an external graph database, containerized by **DockerizedServices**) provides a heavier-weight query capability via Cypher for workloads that exceed Graphology's in-process model.
-
-### Container Topology (DockerizedServices)
-
-The `docker/docker-compose.yml` and `docker/Dockerfile.coding-services` define the deployment topology. **supervisord.conf** manages multiple co-located processes within a single container — a deliberate choice that trades process isolation for deployment simplicity. The health system is strict by contract: the health coordinator returns only `'running'`, `'stopped'`, or `'unknown'` — never `'healthy'`. This prevents false-positive health signals and forces consumers to treat health as a binary liveness check rather than a <USER_ID_REDACTED> guarantee. Two probe mechanisms (HTTP health endpoints and TCP port checks) provide redundancy for heterogeneous service types.
-
-### Constraint Enforcement (ConstraintSystem)
-
-The **ConstraintSystem** is a multi-layered validation framework that intercepts code actions, file operations, and tool interactions. Its position in the architecture — sitting between agent intent and execution — makes it a safety boundary for the entire platform. Specific implementation details are not surfaced at this hierarchy level; see the **ConstraintSystem** child node for full mechanics.
-
-### Semantic Pipeline (SemanticAnalysis)
-
-**SemanticAnalysis** runs as an MCP server at `integrations/semantic-analysis`, orchestrating a pipeline of specialized agents. Its MCP server interface means it integrates natively with Claude Code's tool-use protocol, allowing semantic analysis capabilities to be invoked as tools within agent sessions. This is architecturally significant: semantic analysis is not a batch offline process but a live, on-demand capability available during agent execution.
-
----
+- **logging.ts** (LiveLoggingSystem): owns session windowing, file routing, and transcript capture — the ingestion point for all live Claude Code conversation data.
+- **getLLMMode() in llm-mock-service.ts** (LLMAbstraction): implements a four-tier precedence chain — per-agent overrides in workflow-progress.json > global mode setting > legacy mockLLM boolean > 'public' fallback. Companion functions isMockLLMEnabled() and getLLMState() perform dual-checking of both the new llmState shape and the legacy mockLLM flag, a deliberate backward-compatibility shim for evolved config schemas.
+- **config/agents/*.sh** (CodingPatterns): each wrapper script reads its own environment variables (e.g., CODING_OPENCODE_MODEL for opencode.sh) and translates them into flags/config expected by the underlying agent binary.
+- **VKB server** (KnowledgeManagement): exposes graph-based CRUD, query resolution, and relationship traversal, with a dedicated migration test suite validating the LevelDB→KMCore transition.
+- **docker/README.md** (DockerizedServices): documents packaging of semantic analysis MCP, constraint monitor, graphify, and supporting databases as isolated containers.
 
 ## Integration Points
 
-The data flow between components follows a clear pipeline:
-
-```
-Agent Sessions
-     │
-     ▼
-LiveLoggingSystem  ──(LSL format)──▶  SemanticAnalysis (MCP)
-                                            │
-                                            ▼
-                                    KnowledgeManagement
-                                    (Graphology + LevelDB + Memgraph)
-```
-
-**LLMAbstraction** is a horizontal dependency — consumed by any component that needs to invoke an LLM, including **SemanticAnalysis** and potentially **ConstraintSystem**. **DockerizedServices** is the deployment substrate for **SemanticAnalysis**, **KnowledgeManagement** (Memgraph), the constraint monitor, and Redis. **CodingPatterns** is not a runtime dependency but a design governance layer that shapes how all other components are built — its `constructor+initialize+execute` lifecycle convention, for instance, is expected to be followed by all agent abstractions across the project.
-
-The `bin/` shell scripts follow a **proxy/delegation pattern** — they do not implement logic directly but route to underlying services, providing a stable external interface that decouples callers from service internals.
-
----
+The components are interdependent rather than isolated: LiveLoggingSystem's session data feeds downstream consumers like the classification agent and config validation tooling referenced in SemanticAnalysis. LLMAbstraction's mode resolution reads state from workflow-progress.json, a file likely shared with agent orchestration logic in CodingPatterns. DockerizedServices provides the runtime substrate that SemanticAnalysis's MCP and ConstraintSystem's monitor depend on, with host-side orchestration (per docs/architecture/adding-new-agent.md) expecting these services over network endpoints. KnowledgeManagement's VKB abstraction likely underpins storage needs across sibling components that require graph queries, decoupling them from storage engine changes. ConstraintSystem spans hook configuration for validating code actions and file operations during Claude Code sessions, intersecting with both the logging pipeline and the agent wrapper scripts that trigger those actions.
 
 ## Usage Guidelines
 
-### Agent Lifecycle Convention
-All agent abstractions in the project follow the `constructor → initialize → execute` lifecycle pattern documented in **CodingPatterns**. New agent implementations must respect this contract to remain compatible with the orchestration layer. Deviation creates inconsistency in how agents are bootstrapped, particularly when **LLMAbstraction** injects routing configuration at initialization time.
-
-### LLM Backend Selection
-Backend routing is controlled via `workflow-progress.json`. Developers should not hardcode backend selection in agent logic. When adding a new agent or workflow, register its mode preference in the workflow-progress file. The `mock` mode should be the default for unit tests — never use `public` mode in test environments.
-
-### Health Checking
-When consuming the **DockerizedServices** health coordinator, treat responses strictly: `'running'` means the process is alive, not that it is ready to serve traffic. Implement your own readiness probes on top of liveness if functional readiness is required.
-
-### Knowledge Graph Writes
-Writes to the **KnowledgeManagement** graph should use typed entity attributes (`System`, `Project`, `Pattern`) consistently. Ad-hoc untyped writes degrade the graph's queryability. When working with code-structural knowledge (as opposed to conceptual knowledge), prefer the **CodeGraphAgent** path that uses Tree-sitter to maintain AST-accurate representations.
-
-### Constraint System as a Gate
-The **ConstraintSystem** validates actions before execution. Do not attempt to bypass it for "convenience" operations — it is the platform's primary safety mechanism. Any new tool or file operation capability introduced into the system should be registered with and validated by the **ConstraintSystem**.
-
----
-
-## Architectural Patterns Identified
-
-1. **Pipeline Pattern** — LiveLoggingSystem → SemanticAnalysis → KnowledgeManagement forms an explicit data transformation pipeline with defined intermediate formats (LSL).
-2. **Strategy Pattern** — LLMAbstraction's three execution modes (`mock`/`local`/`public`) are runtime-selectable strategies, externalized into configuration.
-3. **Proxy/Delegation Pattern** — `bin/` scripts delegate to underlying services, and `llm-with-process.ts` wraps the LLM provider SDK.
-4. **Lifecycle Pattern** — `constructor+initialize+execute` is a project-wide agent lifecycle contract.
-5. **Strict Contract Health Model** — The health coordinator's refusal to return `'healthy'` is a deliberate conservative contract design.
-
-## Design Trade-offs
-
-- **supervisord in a single container** trades process isolation for operational simplicity — acceptable for development infrastructure, would need reconsideration for production scale.
-- **Direct-fetch in `llm-with-process.ts`** trades SDK safety for telemetry injection capability — a pragmatic workaround for SDK limitations.
-- **Graphology + LevelDB** trades query expressiveness (vs. a full graph database) for zero-infrastructure simplicity, with Memgraph as an escape valve for complex <USER_ID_REDACTED>.
-- **SHA-256 user hashing** trades full anonymization for pseudonymized auditability — a deliberate privacy/observability balance.
-
-## Maintainability Assessment
-
-The project demonstrates strong maintainability signals: externalized configuration, agent-agnostic interfaces, a dedicated conventions component (**CodingPatterns**), and clear component boundaries. The primary maintainability risk is the breadth of the `CodingPatterns` catch-all — as cross-cutting concerns accumulate there, it may become harder to navigate. The strict LSL format contract between **LiveLoggingSystem** and its consumers is a double-edged sword: it ensures compatibility but makes format evolution potentially breaking across multiple consumers simultaneously.
+New developers should treat logging.ts as authoritative before modifying session lifecycle semantics, since changes cascade into classification and validation tooling. When debugging LLM mode issues, check workflow-progress.json for stale per-agent overrides before assuming global settings apply — the precedence chain in getLLMMode() is easy to misjudge. When adding a new agent, use an existing wrapper like claude.sh as a template and consult docs/architecture/adding-new-agent.md and docs/architecture/agent-abstraction-api.md to keep new capabilities (e.g., model selection) synchronized across all wrapper scripts. For deployment changes, docker/README.md is the canonical reference for how services are containerized and addressed. Any consumer of knowledge storage should integrate via the VKB server rather than a specific backend, preserving the migration-safe abstraction already validated by its test suite.
 
 
 ## Hierarchy Context
 
 ### Children
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem (LSL) is a session logging infrastructure that captures, classifies, and persists AI agent conversations—primarily from Claude Code—into a unified format. It handles session windowing (time-window identifiers like '0800-0900'), multi-user support via SHA-256 user hashing, file routing with rotation thresholds, and transcript capture from agent-native formats. The system bridges raw agent transcripts to a normalized LSL format used downstream by semantic analysis and knowledge management pipelines.
-- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a multi-layered abstraction over LLM providers that enables provider-agnostic model calls across Anthropic, OpenAI, Groq, and local inference backends. It provides three distinct execution modes (mock, local, public) with per-agent overrides stored in a workflow-progress.json file, allowing dynamic routing without code changes. The architecture consists of a mock service for testing, a DMR (Docker Model Runner) provider for local inference, and a direct-fetch wrapper (llm-with-process.ts) that bypasses the SDK to inject telemetry process tags into the rapid-llm-proxy endpoint.
-- [DockerizedServices](./DockerizedServices.md) -- DockerizedServices provides the containerization layer for the coding infrastructure, packaging services like the semantic analysis MCP, constraint monitor, code-graph-rag, Memgraph, and Redis into a unified Docker Compose deployment. The architecture centers on docker/docker-compose.yml and docker/Dockerfile.coding-services with supervisord.conf managing multiple processes within a container. Service health is verified through two probe mechanisms: HTTP health endpoints and TCP port checks, used by the health coordinator to track service liveness with strict contracts (never returning 'healthy', only 'running'/'stopped'/'unknown').
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component provides the core knowledge graph infrastructure for the Coding project, encompassing persistent storage, entity lifecycle management, and graph query capabilities. It is built on a Graphology in-memory graph with LevelDB as the persistence backend, exposing entities with typed attributes (System, Project, Pattern) and relationships. The system supports both local graph operations and integration with external graph databases like Memgraph via the CodeGraphAgent, which uses Tree-sitter AST parsing to index repositories into a queryable knowledge graph.
-- [CodingPatterns](./CodingPatterns.md) -- CodingPatterns serves as the architectural catch-all component for the Coding project, capturing cross-cutting programming conventions, design patterns, and best practices that permeate the entire codebase. The project follows consistent patterns visible across its configuration, tooling, and documentation: agent abstractions use a constructor+initialize+execute lifecycle, shell scripts in bin/ follow a proxy/delegation pattern to underlying services, and configuration is externalized into config/ YAML/JSON files rather than hardcoded values. The system emphasizes agent-agnostic design, enabling multiple AI backends (Claude, Copilot, Mastra, OpenCode) to operate under a unified interface.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem is a multi-layered constraint monitoring and enforcement framework that validates code actions, file operations, and tool interactions against configured rules during Claude Code sessions. It operates through a hook-based interception architecture where pre-tool and post-tool hook events capture agent actions, evaluate them against constraint rules, and record violations for persistence and dashboard display. The system bridges live session activity with persistent storage via the ViolationCaptureService, which writes violations to JSONL logs and maintains a JSON history file in the .mcp-sync directory for dashboard consumption.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent MCP server (`integrations/semantic-analysis`) that orchestrates a pipeline of specialized agents to extract, classify, validate, and persist structured knowledge from git history and LSL (Live Session Log) sessions. It combines AST-based code graph construction, LLM-powered semantic insight generation, ontology classification, and content validation into a coordinated batch-analysis workflow. The pipeline produces structured knowledge entities enriched with ontology metadata before persisting them to a graph-based knowledge store.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- [LLM] The LiveLoggingSystem centers around logging.ts, which owns the core responsibilities of session windowing, file routing, and transcript capture. This module acts as the single ingestion point for live Claude Code conversation data, meaning any change to session lifecycle semantics (e.g., how a 'session window' is defined or when it rolls over to a new file) has cascading effects on downstream consumers like the classification agent and config validation tooling. New developers should treat logging.ts as the authoritative source of truth for how raw conversation events are structured before they are persisted to disk.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The mode-resolution logic in getLLMMode() (llm-mock-service.ts) establishes a clear precedence chain that new developers must understand before debugging unexpected LLM behavior: per-agent overrides in workflow-progress.json take precedence over a global mode setting, which in turn overrides a legacy mockLLM boolean flag, with 'public' as the ultimate fallback. This four-tier resolution means that a developer trying to force mock mode for testing might set the global mode but be silently overridden by a stale per-agent override left in workflow-progress.json from a previous run. The dual-checking of both llmState (new) and mockLLM (legacy) shapes in isMockLLMEnabled() and getLLMState() is a deliberate backward-compatibility shim, indicating the config schema evolved over time but old state files or tooling that only write the legacy flag must continue to work without breaking the mock system.
+- [DockerizedServices](./DockerizedServices.md) -- [LLM] The DockerizedServices component centers on docker/README.md as the canonical deployment reference, describing how semantic analysis MCP, constraint monitor, graphify, and their supporting databases (likely Postgres/Neo4j/Redis instances based on the memory-systems architecture) are packaged as isolated containers. This separation allows each service to be versioned, scaled, and restarted independently of the host Coding CLI tooling, which is critical since the host-side agent orchestration (per docs/architecture/adding-new-agent.md) expects these services to be reachable over well-known ports/URLs rather than in-process calls.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The KnowledgeManagement component centers around a VKB (Virtual Knowledge Base) server that exposes graph-based storage operations to the rest of the Coding infrastructure. This server acts as the primary access point for entity CRUD operations, query resolution, and relationship traversal across the knowledge graph, decoupling consumers (agents, CLI tools, other components) from the underlying storage engine. This abstraction layer is critical because it has allowed the project to migrate storage backends (LevelDB to KMCore) without requiring downstream consumers to change their integration code, as evidenced by the dedicated migration test suite.
+- [CodingPatterns](./CodingPatterns.md) -- [LLM] The agent wrapper scripts under config/agents/ (claude.sh, copilot.sh, opencode.sh, pi.sh) implement a consistent adapter pattern where each script normalizes a distinct third-party CLI's invocation surface into a common interface expected by the rest of the Coding infrastructure. Rather than having callers branch on which agent is being invoked, each wrapper reads its own set of environment variables (e.g., CODING_OPENCODE_MODEL for opencode.sh) and translates them into the flags or config files that the underlying binary expects. This pattern lets orchestration code (likely in bin/coding or docs/architecture/agent-abstraction-api.md-described layers) treat all agents uniformly, at the cost of needing to keep each wrapper script in sync whenever a new common capability (like model selection or proxy routing) is added — a new developer adding agent support should look at an existing wrapper like claude.sh as the canonical template, per docs/architecture/adding-new-agent.md.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem provides rule-based validation and enforcement of code actions and file operations during Claude Code sessions, spanning hook configuration loading, hook dispatch orchestration, and violation capture/persistence. It is built around a unified hook architecture that merges user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) configurations, with project config taking precedence, and dispatches events (pre-tool, post-tool, pre-prompt, post-prompt, startup, shutdown, error) to registered handlers of type script, command, or module.
+
+Core orchestration lives in UnifiedHookManager (lib/agent-api/hooks/hook-manager.js), which maintains a Map of event names to sorted handler arrays (by priority), supports duplicate-ID overwrite semantics, and exposes registerHandler/unregisterHandler APIs bridging agent-native hook systems to a common HookEvent enum. Configuration parsing and structural validation is handled separately by HookConfigLoader (lib/agent-api/hooks/hook-config.js), which loads, merges, and validates settings/hooks blocks, logging warnings (not throwing) on malformed entries.
+
+Violation detection results are captured and persisted via ViolationCaptureService (scripts/violation-capture-service.js), which writes JSONL violation records to .mcp-sync/session-violations.jsonl and maintains an aggregated violation-history.json with session tracking and computed statistics (severity breakdowns, most common constraint, average violations per session) for dashboard consumption. Sensitive parameter values are redacted before being written to logs, and history is capped at 1000 entries to bound file growth.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- [LLM] The batch-analysis pipeline is organized as a multi-agent workflow where distinct responsibilities are separated into dedicated agent classes rather than a single monolithic analyzer. semantic-analysis-agent.ts is responsible for extracting structured knowledge entities from raw inputs (git history diffs/commits and LSL session logs), while ontology-classification-agent.ts takes those extracted entities and classifies them into a hierarchy (determining parent-child relationships and where a given entity fits within the broader ontology). This separation of extraction from classification allows each agent to have a narrower, more testable prompt/response contract with the underlying LLM, and lets the pipeline swap or tune one stage without affecting the other's logic.
 
 
 ---

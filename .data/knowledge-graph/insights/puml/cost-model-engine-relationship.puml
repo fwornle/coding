@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CostModelEngine
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[CostModelEngine] as cost_model_engine #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[ProxyCompletionClient] as proxy_completion_client #F0F0F0
+[ModelNormalization] as model_normalization #F0F0F0
+[OffloadDecisionEngine] as offload_decision_engine #F0F0F0
+[ModelFamilyPricing] as model_family_pricing #E8F5E8
+[BudgetResolution] as budget_resolution #E8F5E8
+[WireProtocolTokenSemantics] as wire_protocol_token_semantics #E8F5E8
+
+llmabstraction --> cost_model_engine
+dmrprovider -[hidden]- cost_model_engine
+proxy_completion_client -[hidden]- cost_model_engine
+model_normalization -[hidden]- cost_model_engine
+offload_decision_engine -[hidden]- cost_model_engine
+cost_model_engine --> model_family_pricing
+cost_model_engine --> budget_resolution
+cost_model_engine --> wire_protocol_token_semantics
+
+@enduml

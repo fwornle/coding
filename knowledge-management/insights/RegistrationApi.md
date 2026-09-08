@@ -1,131 +1,49 @@
-# RegistrationApi
+# RegistrationAPI
 
 **Type:** Detail
 
-ProcessStateManager.registerService() is explicitly identified in the L2 description as the single entry point used by both scripts/api-service.js and scripts/dashboard-service.js, establishing it as the canonical write interface for service identity data.
+The L2 description explicitly states process-state-manager.js exposes register/unregister operations called asynchronously by wrapper scripts like api-service.js and dashboard-service.js.
 
-## What It Is  
+# RegistrationAPI — Technical Insight Document
 
-`RegistrationApi` lives inside the **ProcessStateManager** component. The only public entry point that the rest of the codebase interacts with is **`ProcessStateManager.registerService()`**, which is invoked from two concrete scripts:
+## What It Is
 
-* `scripts/api‑service.js`  
-* `scripts/dashboard‑service.js`  
+RegistrationAPI is the interface exposed by `scripts/process-state-manager.js`, specifically the `register` and `unregister` operations that constitute its public surface. It is a child concept of the parent component **ProcessStateManager**, representing the contract through which external processes announce their lifecycle state to a centralized tracking mechanism. Rather than being a standalone module, RegistrationAPI is best understood as the operational boundary of ProcessStateManager — the set of entry points other scripts use to interact with process state tracking without needing to know its internal implementation.
 
-Both scripts spawn a child process first, obtain a live PID, and then call `registerService()` to record the newly‑started service in the **ServiceRegistry**. The complementary `unregisterService()` method (implied by the parent analysis) completes the lifecycle when the process exits. In effect, `RegistrationApi` is a thin, service‑agnostic façade that writes identity data (at minimum a PID) into a central registry; it does **not** contain any business logic about what the registered service actually does.
+## Architecture and Design
 
----
+The architecture reflects a **centralized registration pattern**: rather than each service independently tracking its own process lifecycle, wrapper scripts such as `api-service.js` and `dashboard-service.js` delegate this responsibility to a single authority (ProcessStateManager) via the register/unregister calls. This is a classic separation-of-concerns decision — process bookkeeping logic lives in one place, and consumers merely announce state transitions.
 
-## Architecture and Design  
+A key design decision evident from the observations is the **asynchronous invocation model**. Wrapper scripts call `register`/`unregister` asynchronously, implying these operations are treated as fire-and-forget (or at least non-blocking) with respect to the primary service startup/shutdown flow. This trade-off favors service responsiveness and startup speed over strict synchronization guarantees — a service can proceed with its own startup sequence without waiting for registration to fully complete or be acknowledged.
 
-The design follows a **single‑write façade** pattern. All mutations to the service registry flow through one canonical method – `ProcessStateManager.registerService()`. This guarantees a consistent registration contract and prevents scattered, ad‑hoc writes. Because the same façade is used by two distinct wrapper scripts, the API is deliberately **service‑agnostic**: the `ProcessStateManager` knows only that a service exists and has a PID; it never inspects the service’s internal behavior.
+## Implementation Details
 
-The surrounding architecture can be visualised as:
+The concrete implementation resides in `scripts/process-state-manager.js`, which exposes `register` and `unregister` as its primary operations. No additional internal classes or symbols were identified in the current observations, suggesting the API surface is intentionally narrow — likely a thin functional interface rather than a class hierarchy. The calling convention is asynchronous, meaning consumers (wrapper scripts) invoke these functions without blocking their own execution threads on the outcome, consistent with typical non-critical bookkeeping operations in service lifecycle management.
 
-```
-+-------------------+          +-------------------+
-| scripts/api‑service.js   |          | scripts/dashboard‑service.js |
-+----------+--------+          +----------+--------+
-           |                               |
-           | spawn → child PID              | spawn → child PID
-           v                               v
-+-------------------+   registerService()   +-------------------+
-| ProcessStateManager (RegistrationApi) |--------------------|
-+----------+--------+--------------------+-------------------+
-           | writes to ServiceRegistry (sibling)
-           v
-+-------------------+
-| ServiceRegistry   |
-+-------------------+
-```
+## Integration Points
 
-* **Facade / Wrapper** – `ProcessStateManager.registerService()` abstracts the underlying registry implementation.  
-* **Symmetric Lifecycle** – The implied `unregisterService()` mirrors registration, aligning with process start/stop events.  
-* **Explicit Dependency on PID** – Because registration occurs *after* `spawn`, the PID is guaranteed to be present, making it a required field rather than an optional attribute.  
+RegistrationAPI's primary integration points are its callers: `api-service.js` and `dashboard-service.js`. These wrapper scripts act purely as **consumers** of the API — they do not implement their own process tracking logic, reinforcing that ProcessStateManager (and by extension, RegistrationAPI) is the single source of truth for process state across these services. This establishes a dependency direction: wrapper scripts depend on ProcessStateManager's register/unregister contract, but ProcessStateManager itself has no reciprocal dependency on the specifics of any individual wrapper script's internals.
 
-No other design patterns (e.g., event‑driven, micro‑service) are evident from the observations.
+## Usage Guidelines
+
+Developers integrating new services into this ecosystem should follow the established pattern demonstrated by `api-service.js` and `dashboard-service.js`: call `register` at service startup and `unregister` at shutdown, invoking both asynchronously so they do not block the service's own lifecycle transitions. New wrapper scripts should avoid implementing parallel/duplicate process-tracking logic and instead route through ProcessStateManager's RegistrationAPI to preserve the centralized tracking model. Because the API is currently minimal (only register/unregister), any extension of its responsibilities should be done cautiously to preserve its lightweight, non-blocking contract.
 
 ---
 
-## Implementation Details  
-
-The implementation revolves around three concrete symbols:
-
-| Symbol | Location | Role |
-|--------|----------|------|
-| `ProcessStateManager.registerService()` | `ProcessStateManager` (parent component) | Canonical write method for service identity data. |
-| `ProcessStateManager.unregisterService()` | (implied) | Symmetric counterpart that removes a service entry on process termination. |
-| `ServiceRegistry` | sibling component | Holds the persisted registration records; receives all writes from the façade. |
-
-**Mechanics of registration**  
-
-1. **Spawn** – `scripts/api-service.js` or `scripts/dashboard-service.js` creates a child process via `child_process.spawn` (or equivalent). The child’s PID becomes immediately available.  
-2. **Call registerService** – The script passes an object containing at least `{ pid: <number>, name: <string> }` to `ProcessStateManager.registerService()`.  
-3. **Write path** – Inside `registerService()`, the method validates the presence of a PID (guaranteed by step 1) and then inserts a new entry into `ServiceRegistry`. No lazy population occurs; the registry entry is created **synchronously** at registration time.  
-4. **Unregister** – When the child process exits, the wrapper script (or a process‑exit handler) invokes `unregisterService()`, which removes the matching PID entry from `ServiceRegistry`.
-
-Because the registry is the sole source of truth for running services, any read‑only consumers must query `ServiceRegistry` directly; they never write to it.
-
----
-
-## Integration Points  
-
-* **Caller Scripts** – `scripts/api-service.js` and `scripts/dashboard-service.js` are the only current consumers of `RegistrationApi`. Both must adhere to the contract of spawning a process first and then invoking `registerService()`.  
-* **ServiceRegistry** – Acts as the persistent store for registration data. All other components that need to discover running services read from this sibling component.  
-* **Process Lifecycle Handlers** – Although not explicitly listed, the existence of `unregisterService()` suggests that the wrapper scripts (or a higher‑level supervisor) hook into the child process’s `exit`/`close` events to trigger deregistration.  
-* **Potential Future Consumers** – Because the API is service‑agnostic, any new wrapper script that follows the same spawn‑then‑register pattern can be added without modifying `ProcessStateManager`.
-
-No external libraries or additional modules are referenced in the observations, so the integration surface is limited to the two wrapper scripts and the `ServiceRegistry`.
-
----
-
-## Usage Guidelines  
-
-1. **Spawn before Register** – Always create the child process first and ensure a valid PID exists before calling `ProcessStateManager.registerService()`. Skipping this step violates the implicit contract and will result in an incomplete registration.  
-2. **Provide a PID (mandatory)** – The registration payload must contain a PID field; the API does not accept registrations without it. Optional metadata (e.g., service name, version) may be added, but the PID is the only required attribute.  
-3. **Symmetric Lifecycle** – Pair every `registerService()` call with a corresponding `unregisterService()` when the child process terminates. This keeps `ServiceRegistry` accurate and prevents stale entries.  
-4. **Do Not Bypass the Facade** – Direct writes to `ServiceRegistry` are discouraged. All mutations should flow through `ProcessStateManager.registerService()`/`unregisterService()` to maintain a single source of truth.  
-5. **Read‑Only Access** – Components that need to know which services are running should query `ServiceRegistry` read‑only; they must not attempt to modify the registry.
-
-Following these conventions ensures that the registration contract remains consistent, the registry stays clean, and future services can be added with minimal friction.
-
----
-
-### Architectural Patterns Identified  
-
-* **Facade (single‑write façade)** – `ProcessStateManager.registerService()` abstracts the underlying registry.  
-* **Symmetric Lifecycle Contract** – Paired `registerService()` / `unregisterService()` methods.  
-* **Service‑Agnostic Contract** – The API does not depend on the specifics of the service being registered.
-
-### Design Decisions & Trade‑offs  
-
-* **Centralised Write Path** – Guarantees consistency but creates a single point of contention if registration frequency spikes.  
-* **PID‑Required Registration** – Simplifies identification of processes but forces every caller to manage a live process handle.  
-* **Service‑Agnostic Interface** – Maximises reuse across different services, at the cost of not being able to enforce service‑specific validation at registration time.
-
-### System Structure Insights  
-
-* `ProcessStateManager` acts as the parent component that owns `RegistrationApi`.  
-* `ServiceRegistry` is a sibling that stores the state; it is write‑only via the façade and read‑only for consumers.  
-* The two wrapper scripts are leaf nodes that instantiate child processes and interact with the façade.
-
-### Scalability Considerations  
-
-Because all registrations funnel through a single method, the system scales well for a modest number of services (as typical for a monolithic or tightly‑coupled deployment). If the number of concurrently spawned services grows dramatically, the façade could become a bottleneck; sharding the registry or adding asynchronous <USER_ID_REDACTED> would be required, but such changes are not indicated by the current design.
-
-### Maintainability Assessment  
-
-The design’s simplicity—one write entry point, a clear contract, and a service‑agnostic interface—makes the codebase easy to understand and extend. Adding new services only requires invoking the existing façade. However, the tight coupling to a single registry means any change to the storage format or validation rules must be performed in one place, which can increase the impact radius of modifications. Overall, the current architecture favours maintainability through minimal surface area and clear lifecycle semantics.
+**Summary of Insights:**
+1. **Architectural pattern**: Centralized registration/state-tracking authority consumed by multiple wrapper scripts.
+2. **Design trade-off**: Asynchronous calls prioritize service startup/shutdown speed over strict registration confirmation.
+3. **Structure**: Thin, narrow API surface (register/unregister) with no exposed internal classes — implementation details are encapsulated in ProcessStateManager.
+4. **Scalability**: Centralization simplifies adding new wrapper scripts as consumers without duplicating tracking logic, though it may create a single point of coordination as more services are added.
+5. **Maintainability**: Clear separation between API consumers and the state-tracking implementation improves maintainability, provided the async contract and minimal API surface are preserved as new integrations are added.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager.registerService() is the entry point called by both scripts/api-service.js and scripts/dashboard-service.js after child process spawn, recording service identity in the registry
-
-### Siblings
-- [ServiceRegistry](./ServiceRegistry.md) -- ProcessStateManager.registerService() (referenced in the L2 hierarchy description) is the sole write path into the registry, meaning all registry entries are created post-spawn and never lazily populated at read time.
+- [ProcessStateManager](./ProcessStateManager.md) -- scripts/process-state-manager.js exposes register/unregister operations called asynchronously by wrapper scripts like api-service.js and dashboard-service.js
 
 
 ---
 
-*Generated from 4 observations*
+*Generated from 3 observations*

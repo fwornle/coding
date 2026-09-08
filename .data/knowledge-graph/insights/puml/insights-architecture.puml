@@ -1,30 +1,30 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Upstream Configuration" {
-  component "OntologyConfigManager" as ocm <<core>>
-  component "Ontology Classification" as ontClass <<core>>
+package "Upstream Stages" {
+  component "Pipeline" as pipeline <<core>>
+  component "Ontology" as ontology <<core>>
 }
 
-package "Insights SubComponent" {
-  component "Insights Agents" as agents <<agent>>
-  component "Pattern Catalog Extractor" as patCat <<core>>
-  component "Knowledge Report Authoring" as kbReport <<core>>
+package "Insight Generation" {
+  component "Pattern Discovery" as patterns <<agent>>
+  component "Architecture Diagramming" as arch <<agent>>
 }
 
-package "Observability & Output" {
-  component "Token Usage Dashboard" as tokenDash <<external>>
-  database "Pattern Catalog" as catalog <<storage>>
-  component "Knowledge Report" as report <<storage>>
+package "Consolidation & Access" {
+  component "ObservationConsolidator" as consolidator <<core>>
+  component "handleGetInsights" as handler <<api>>
+  component "GatedInsights" as ui <<external>>
 }
 
-ocm --> agents : "LLM budget constraints"
-ontClass --> agents : "ontologyClass metadata"
-agents --> patCat : "batch entities"
-agents --> kbReport : "batch findings"
-agents --> tokenDash : "token usage tracking"
-patCat --> catalog : "produces"
-kbReport --> report : "authors"
-catalog ..> ontClass : "informs future classification"
+pipeline --> patterns : "Code entities / Relations"
+ontology --> patterns : "Classified entities"
+pipeline --> arch : "Components / Dependencies"
+
+patterns --> consolidator : "Pattern instances"
+arch --> consolidator : "Architecture diagrams"
+
+consolidator --> handler : "synthesizeInsights"
+handler --> ui : "serves insights"
 
 @enduml

@@ -1,0 +1,31 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "EntityPatternAnalyzer Module" {
+  component "EntityPatternAnalyzer" as epa <<core>>
+  component "teamDirectories Map" as teamDirs <<core>>
+  component "artifactPatterns Array" as patterns <<core>>
+  component "extractArtifacts()" as extract <<core>>
+  component "checkLocalArtifact()" as localCheck <<core>>
+  component "matchArtifactPattern()" as patternMatch <<core>>
+}
+
+package "Team Regex Conventions" {
+  component "Coding / RaaS / ReSi / Agentic / UI" as teams <<agent>>
+}
+
+package "Dependencies" {
+  component "ontology/types.ts" as types <<external>>
+  database "LayerResult" as result <<storage>>
+}
+
+epa --> teamDirs : "owns mapping"
+epa --> patterns : "defines regex sets"
+epa --> extract : "step 1"
+extract --> localCheck : "confidence 0.9"
+localCheck --> patternMatch : "fallback confidence 0.75"
+patternMatch --> teams : "matches artifact patterns"
+epa --> types : "imports ArtifactMatch, LayerResult"
+epa --> result : "returns layer:1 result"
+
+@enduml

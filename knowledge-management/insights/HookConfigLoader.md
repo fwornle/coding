@@ -2,66 +2,71 @@
 
 **Type:** SubComponent
 
-The merge strategy means any handler, constraint rule, or hook binding defined at project scope supersedes the equivalent user-scope definition, enabling repositories to enforce stricter constraints without requiring changes to a developer's global setup
+Handler entries are validated implicitly by destructuring with fallbacks (type='script', args=[], priority=100, enabled!==false, agents=[]) in registerHandler, so a partially-specified handler object never breaks registration.
 
 # HookConfigLoader — Technical Insight Document
 
 ## What It Is
 
-`HookConfigLoader` is implemented at `lib/agent-api/hooks/hook-config.js` and serves as the sole entry point for reading hook configuration files in the codebase. It is responsible for loading and merging two distinct configuration scopes: the user-level file at `~/.coding-tools/hooks.json` and the project-level file at `{project}/.coding/hooks.json`. As a SubComponent of the broader `ConstraintSystem`, it provides the foundational configuration-resolution layer that downstream constraint enforcement and hook-binding logic depends on.
-
-The loader exists to reconcile two different audiences of configuration: individual developers who want machine-wide defaults shared across all Claude Code sessions, and repository maintainers who need to enforce per-project conventions. By centralizing this responsibility in a single module, `HookConfigLoader` ensures consistent merge semantics across the system and prevents ad-hoc configuration access from other modules.
-
-![HookConfigLoader — Architecture](images/hook-config-loader-architecture.png)
+HookConfigLoader is implemented as a class in `lib/agent-api/hooks/hook-config.js`, and it serves as the dedicated configuration-parsing and structural-validation layer within the broader ConstraintSystem. While its sibling, UnifiedHookManager (in `hook-manager.js`), owns runtime dispatch orchestration, HookConfigLoader owns the concerns of reading, merging, and validating the settings/hooks blocks that define how hook handlers behave. It also defines `DEFAULT_CONFIG`, a canonical default-settings shape that is imported directly by `migration-tool.js` to seed migrated configuration output — making HookConfigLoader the single source of truth for what a "default" hook configuration looks like, shared across both migration tooling and live runtime loading.
 
 ## Architecture and Design
 
-The architectural approach embodied by `HookConfigLoader` is a **two-tier layered configuration pattern** with strict precedence semantics. The loader treats user-level config (`~/.coding-tools/hooks.json`) as the base layer and project-level config (`{project}/.coding/hooks.json`) as an override layer. Its `mergeConfigs()` method is the critical seam where these two layers combine: project configuration is applied on top of user configuration with full, unconditional precedence over user-level defaults.
+The defining architectural trait of HookConfigLoader is defensive, non-throwing validation: malformed or unrecognized entries are logged and skipped rather than causing the entire configuration file to fail loading. This is exemplified by the handling of unknown event names in a config's hooks block, where each offending entry triggers `logger.warn('Unknown hook event in config')` followed by a `continue`, allowing the rest of the file to load successfully. This "warn and continue" philosophy reflects a design trade-off favoring system availability and graceful degradation over strict fail-fast correctness — appropriate for a constraint/enforcement subsystem where an entirely broken hook config would be worse than a partially-degraded one.
 
-This design follows a **single-entry-point pattern** — the child entity `DualScopeConfigResolution` makes explicit that no other module in the codebase reads either `hooks.json` file directly. All access flows through `HookConfigLoader`, which gives the system a single chokepoint for any future changes to merge semantics, file location resolution, or schema validation. This funneling discipline is what makes the merge behavior predictable across the system.
+![HookConfigLoader — Architecture](images/hook-config-loader-architecture.png)
 
-The design decision to grant project config unconditional precedence reflects a deliberate trade-off favoring **team-level enforcement over individual-level guarantees**. A repository can ratchet stricter constraints onto contributors without requiring those contributors to change their global setup. The downside, made explicit in the parent `ConstraintSystem` context, is that there is no "lock" mechanism — user config cannot mark fields as non-overridable. This means a malicious or misconfigured `.coding/hooks.json` can bypass globally-defined compliance constraints, a security boundary that `HookConfigLoader` does not enforce by design.
+Within its own boundary, HookConfigLoader contains two identified sub-behaviors: ConfigSettingsOverride and TwoTierConfigLoading. TwoTierConfigLoading reflects the two-tier precedence model used by the parent ConstraintSystem — user-level configuration (`~/.coding-tools/hooks.json`) is loaded first, followed by project-level configuration (`.coding/hooks.json`), with later loads able to override earlier ones. ConfigSettingsOverride governs the finer-grained mechanics of exactly which settings get overridden during that merge.
 
 ## Implementation Details
 
-The core mechanic is the `mergeConfigs()` method on `HookConfigLoader`. It receives the parsed contents of both configuration files and produces a unified configuration object. Its semantics are straightforward: for every handler, constraint rule, or hook binding defined at project scope, the project-level definition supersedes the equivalent user-level definition. There is no field-level merging strategy that would let user config protect specific keys.
+The override mechanics are implemented through explicit `!== undefined` checks: `loadConfig()` in `hook-manager.js` only applies `config.settings.enableLogging`, `stopOnError`, and `timeout` when they are explicitly defined in the loaded file, otherwise preserving whatever defaults were already set by the constructor. This pattern (ConfigSettingsOverride) ensures that a sparse or partial config file cannot accidentally null-out previously established defaults — each setting is independently and conditionally merged.
 
-The two filesystem paths the loader knows about are hard-coded conventions of the broader system:
-- `~/.coding-tools/hooks.json` — machine-wide defaults available across all Claude Code sessions on a developer's machine
-- `{project}/.coding/hooks.json` — repository-scoped overrides resolved relative to the active project root
+A similar defensiveness appears at the handler level: rather than performing explicit schema validation, handler entries are validated implicitly through destructuring with fallback values — `type='script'`, `args=[]`, `priority=100`, `enabled !== false`, and `agents=[]` — inside `registerHandler`. This means a partially-specified handler object can never break registration; missing fields simply resolve to sane defaults rather than throwing.
 
-Because the loader is the sole reader of these files (per the `DualScopeConfigResolution` child entity), any caller seeking hook configuration must obtain it through this module. This consolidation means changes to file format, path conventions, or merge strategy can be implemented in one place without coordinating with other consumers.
+Performance and control-flow efficiency are also considered at the I/O layer: before attempting an asynchronous `fs.readFile`, the loader checks `fsSync.existsSync(configPath)` synchronously. This avoids relying on an exception-driven control path for the very common case where no project-level config yet exists, trading a small synchronous check for cleaner, non-exceptional control flow.
 
 ## Integration Points
 
-`HookConfigLoader` sits inside the `ConstraintSystem`, which is its parent component and the primary consumer of the merged configuration it produces. The constraint system relies on the loader to deliver an authoritative, already-reconciled view of what handlers, constraint rules, and hook bindings should be active for a given session. The loader does not enforce constraints itself — it only resolves and merges configuration that constraint enforcement code further down the stack will apply.
-
 ![HookConfigLoader — Relationship](images/hook-config-loader-relationship.png)
 
-Its sole child entity, `DualScopeConfigResolution`, is the conceptual encoding of the two-scope resolution policy. Together they form a tight unit: `HookConfigLoader` is the physical module at `lib/agent-api/hooks/hook-config.js`, while `DualScopeConfigResolution` is the documented contract that all hook-config access is funneled through this single loader. There are no sibling components listed under `ConstraintSystem` for this entity to coordinate with directly — the loader's outputs feed into whatever downstream constraint and hook-binding machinery the parent system maintains.
+HookConfigLoader sits directly beneath ConstraintSystem, alongside sibling subcomponents HookManager, ViolationCaptureService, KnowledgeInjectionHooks, and HealthPromptHook. Its most direct integration is with HookManager: `UnifiedHookManager.initialize(projectPath)` drives the two-tier loading sequence, calling `loadConfig(userConfigPath, 'user')` first and then `loadConfig(projectConfigPath, 'project')`, relying on HookConfigLoader's merge semantics to give project-level entries precedence via later overwrite.
+
+Beyond the hook subsystem, HookConfigLoader's `DEFAULT_CONFIG` is consumed externally by `migration-tool.js`, establishing a dependency where migration tooling relies on the loader's canonical shape rather than duplicating default values — reducing drift risk between migrated and freshly-loaded configurations.
 
 ## Usage Guidelines
 
-Developers extending or interacting with the hook system should treat `HookConfigLoader` as the canonical access point for hook configuration. Direct file reads against `~/.coding-tools/hooks.json` or `{project}/.coding/hooks.json` should be avoided — they would bypass the merge semantics and create inconsistent views of configuration state, undermining the single-entry-point discipline that `DualScopeConfigResolution` formalizes.
+Developers extending hook configuration should preserve the "warn, don't throw" convention: new validation checks added to the hooks-block parsing should log via `logger.warn` and skip the offending entry rather than aborting the whole file load, consistent with the unknown-event-name handling. Similarly, new settings fields should follow the `!== undefined` conditional-override pattern used for `enableLogging`, `stopOnError`, and `timeout`, so that partial config files don't clobber constructor defaults. When adding new handler fields, prefer destructuring with defaults (as `registerHandler` does) over strict up-front schema validation, to preserve the tolerance for partially-specified entries. Any change to `DEFAULT_CONFIG` should be treated as a shared-contract change, since `migration-tool.js` depends on it directly — updates here ripple into migration output, not just runtime behavior.
 
-When deciding *where* to define a hook, constraint rule, or handler, the precedence model should guide placement:
-- Put settings in `~/.coding-tools/hooks.json` when they represent personal preferences or developer-wide defaults that any project should be free to override.
-- Put settings in `{project}/.coding/hooks.json` when the repository must enforce them consistently across all contributors, with the understanding that this scope wins every conflict.
 
-Teams should be especially aware of the security boundary the loader does **not** enforce. Because `mergeConfigs()` gives project config unconditional precedence and provides no lock mechanism for user-level fields, any compliance constraint defined globally can be silently bypassed by a `.coding/hooks.json` in a repository. When evaluating an unfamiliar repository, treat its `.coding/hooks.json` as trusted code — it can effectively disable or replace any user-level hook binding. If stricter guarantees are needed in the future, they would have to be added as new logic inside `HookConfigLoader` itself, since it is the only place where such a policy could be uniformly enforced.
+## Code Evidence
 
-Finally, when modifying `HookConfigLoader` itself, preserve the sole-entry-point invariant. Any new code that needs hook configuration should be routed through this loader rather than reading the JSON files directly, ensuring that future changes to merge strategy or path resolution propagate consistently across the `ConstraintSystem`.
+Key code artifacts grounding this entity's analysis:
+
+**Structural:**
+- HookConfigLoader (class) in hook-config.js
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem implements a two-level configuration hierarchy through `HookConfigLoader` (lib/agent-api/hooks/hook-config.js) that distinguishes between user-wide defaults and project-specific overrides. User-level configuration lives at `~/.coding-tools/hooks.json`, making it available across all Claude Code sessions on the machine, while project-level configuration resides at `{project}/.coding/hooks.json`, enabling per-repository constraint customization. The `mergeConfigs()` method is the critical integration point: it applies project configuration on top of user configuration, meaning any handler, constraint rule, or hook binding defined at the project level supersedes or augments what the user has set globally. This design has a meaningful implication for teams: a repository can enforce stricter or more specific constraints than a developer's personal defaults without requiring them to change their global setup. However, because the merge strategy gives project config full precedence, there is no mechanism for user config to 'lock' a setting that cannot be overridden by a project — a security boundary that new developers should be aware of when assessing whether globally-defined compliance constraints can be bypassed by a malicious or misconfigured `.coding/hooks.json`.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem provides rule-based validation and enforcement of code actions and file operations during Claude Code sessions, spanning hook configuration loading, hook dispatch orchestration, and violation capture/persistence. It is built around a unified hook architecture that merges user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) configurations, with project config taking precedence, and dispatches events (pre-tool, post-tool, pre-prompt, post-prompt, startup, shutdown, error) to registered handlers of type script, command, or module.
+
+Core orchestration lives in UnifiedHookManager (lib/agent-api/hooks/hook-manager.js), which maintains a Map of event names to sorted handler arrays (by priority), supports duplicate-ID overwrite semantics, and exposes registerHandler/unregisterHandler APIs bridging agent-native hook systems to a common HookEvent enum. Configuration parsing and structural validation is handled separately by HookConfigLoader (lib/agent-api/hooks/hook-config.js), which loads, merges, and validates settings/hooks blocks, logging warnings (not throwing) on malformed entries.
+
+Violation detection results are captured and persisted via ViolationCaptureService (scripts/violation-capture-service.js), which writes JSONL violation records to .mcp-sync/session-violations.jsonl and maintains an aggregated violation-history.json with session tracking and computed statistics (severity breakdowns, most common constraint, average violations per session) for dashboard consumption. Sensitive parameter values are redacted before being written to logs, and history is capped at 1000 entries to bound file growth.
 
 ### Children
-- [DualScopeConfigResolution](./DualScopeConfigResolution.md) -- lib/agent-api/hooks/hook-config.js is explicitly designated the 'sole entry point' for hook configuration, meaning no other module in the codebase directly reads either hooks.json file — all access is funneled through this one loader.
+- [ConfigSettingsOverride](./ConfigSettingsOverride.md) -- hook-manager.js loadConfig() checks `if (config.settings.enableLogging !== undefined)` before overwriting `this.config.enableLogging`, and repeats the same pattern for stopOnError and timeout
+- [TwoTierConfigLoading](./TwoTierConfigLoading.md) -- initialize() in hook-manager.js first calls `await this.loadConfig(this.config.userConfigPath, 'user')` then conditionally `await this.loadConfig(this.config.projectConfigPath, 'project')` if a projectPath was supplied
+
+### Siblings
+- [HookManager](./HookManager.md) -- UnifiedHookManager.initialize(projectPath) loads user config first via loadConfig(userConfigPath, 'user') then project config via loadConfig(projectConfigPath, 'project'), giving project-level entries precedence through later overwrite.
+- [ViolationCaptureService](./ViolationCaptureService.md) -- Per architecture description, ViolationCaptureService writes JSONL violation records to .mcp-sync/session-violations.jsonl, separating an append-only raw log from a computed aggregate file.
+- [KnowledgeInjectionHooks](./KnowledgeInjectionHooks.md) -- knowledge-injection-hook.js's isInjectionEnabled() reads process.env.CODING_KNOWLEDGE_INJECTION and treats only '0'/'false'/'off' (case-insensitive) as disabling, defaulting to enabled for unset values.
+- [HealthPromptHook](./HealthPromptHook.md) -- checkHealthStatus() uses existsSync(VERIFIER_SCRIPT) as a heuristic to detect 'outside the coding repo' and returns servicesAvailable:false rather than attempting a network call in that case (Q3 carve-out).
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

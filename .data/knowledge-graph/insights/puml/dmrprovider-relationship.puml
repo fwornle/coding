@@ -5,13 +5,15 @@ title Hierarchy Context: DMRProvider
 
 [LLMAbstraction] as llmabstraction #FFFFDD
 [DMRProvider] as dmrprovider #LightBlue
-[LLMMockService] as llmmock_service #F0F0F0
-[LLMWithProcess] as llmwith_process #F0F0F0
-[LLMStateManager] as llmstate_manager #F0F0F0
+[ProxyCompletionClient] as proxy_completion_client #F0F0F0
+[CostModelEngine] as cost_model_engine #F0F0F0
+[ModelNormalization] as model_normalization #F0F0F0
+[OffloadDecisionEngine] as offload_decision_engine #F0F0F0
 
 llmabstraction --> dmrprovider
-llmmock_service -[hidden]- dmrprovider
-llmwith_process -[hidden]- dmrprovider
-llmstate_manager -[hidden]- dmrprovider
+proxy_completion_client -[hidden]- dmrprovider
+cost_model_engine -[hidden]- dmrprovider
+model_normalization -[hidden]- dmrprovider
+offload_decision_engine -[hidden]- dmrprovider
 
 @enduml

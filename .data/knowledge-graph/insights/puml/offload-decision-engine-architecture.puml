@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Gate Evaluation" {
+  component "offline-gates.ts\nevaluateOffload()" as gates <<core>>
+  component "pickTarget()" as pick <<core>>
+}
+
+package "UI Reconciliation" {
+  component "OffloadDecision.tsx" as decisionUI <<agent>>
+  cloud "/api/llm/routing/resolve" as api <<external>>
+}
+
+package "Ladder & Replay" {
+  component "ladder-layout.ts\nlayoutLadder()" as ladder <<core>>
+  component "offload-replay.ts\nreplayRecorded()" as replay <<core>>
+}
+
+package "Recent Calls" {
+  component "recent-call.ts\nselectInteresting()" as select <<core>>
+  component "CallStrip.tsx" as strip <<agent>>
+}
+
+gates --> pick : "determines reason string"
+pick --> decisionUI : "null on no-target/disabled"
+decisionUI --> api : "cross-checks live answer"
+decisionUI ..> gates : "mirrors gate order"
+
+gates --> ladder : "gate hit counts"
+ladder --> decisionUI : "collapsed/pinned rungs"
+
+replay ..> gates : "replays with TODAY's config"
+replay --> decisionUI : "labeled as derived"
+
+select --> strip : "attempts[] + exemplar calls"
+strip --> decisionUI : "worst-outcome-wins coloring"
+
+@enduml

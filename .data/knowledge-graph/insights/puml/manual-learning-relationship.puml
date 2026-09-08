@@ -6,14 +6,16 @@ title Hierarchy Context: ManualLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [ManualLearning] as manual_learning #LightBlue
 [OnlineLearning] as online_learning #F0F0F0
-[KMCoreMigration] as kmcore_migration #F0F0F0
-[EntityTypeRegistry] as entity_type_registry #F0F0F0
-[HumanProvenanceStamping] as human_provenance_stamping #E8F5E8
+[VkbServer] as vkb_server #F0F0F0
+[UKBDatabaseCLI] as ukbdatabase_cli #E8F5E8
+[UKBDatabaseWriter] as ukbdatabase_writer #E8F5E8
+[EntityMutationRoutes] as entity_mutation_routes #E8F5E8
 
 knowledge_management --> manual_learning
 online_learning -[hidden]- manual_learning
-kmcore_migration -[hidden]- manual_learning
-entity_type_registry -[hidden]- manual_learning
-manual_learning --> human_provenance_stamping
+vkb_server -[hidden]- manual_learning
+manual_learning --> ukbdatabase_cli
+manual_learning --> ukbdatabase_writer
+manual_learning --> entity_mutation_routes
 
 @enduml

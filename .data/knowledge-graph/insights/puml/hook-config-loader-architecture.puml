@@ -1,0 +1,35 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Hook Configuration" {
+  component "HookConfigLoader" as loader <<core>>
+  component "DEFAULT_CONFIG" as defaults <<core>>
+  component "hook-config.js" as hookConfig <<core>>
+}
+
+package "Runtime" {
+  component "HookManager\n(loadConfig)" as manager <<core>>
+  component "registerHandler" as register <<core>>
+  component "logger" as logger <<external>>
+}
+
+package "Filesystem / Migration" {
+  component "fsSync.existsSync" as existsCheck <<external>>
+  component "fs.readFile" as readFile <<external>>
+  component "migration-tool.js" as migration <<cli>>
+}
+
+loader --> hookConfig : "defines class"
+hookConfig --> defaults : "owns canonical shape"
+migration --> defaults : "seeds migrated output"
+
+manager --> loader : "loadConfig() uses"
+existsCheck --> readFile : "guards async read"
+manager --> existsCheck : "checks config path"
+
+manager --> logger : "warn on unknown\nhook event"
+manager ..> register : "delegates handler\nregistration"
+
+register --> logger : "implicit defaults\n(no hard failure)"
+
+@enduml

@@ -6,14 +6,16 @@ title Hierarchy Context: OnlineLearning
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [OnlineLearning] as online_learning #LightBlue
 [ManualLearning] as manual_learning #F0F0F0
-[KMCoreMigration] as kmcore_migration #F0F0F0
-[EntityTypeRegistry] as entity_type_registry #F0F0F0
-[GraphKMStore] as graph_kmstore #E8F5E8
+[VkbServer] as vkb_server #F0F0F0
+[WorkflowOrchestrator] as workflow_orchestrator #E8F5E8
+[IncrementalAnalysisWorkflowParams] as incremental_analysis_workflow_params #E8F5E8
+[UKBCliDefaultCommand] as ukbcli_default_command #E8F5E8
 
 knowledge_management --> online_learning
 manual_learning -[hidden]- online_learning
-kmcore_migration -[hidden]- online_learning
-entity_type_registry -[hidden]- online_learning
-online_learning --> graph_kmstore
+vkb_server -[hidden]- online_learning
+online_learning --> workflow_orchestrator
+online_learning --> incremental_analysis_workflow_params
+online_learning --> ukbcli_default_command
 
 @enduml

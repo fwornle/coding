@@ -7,15 +7,9 @@ title Hierarchy Context: Insights
 [Insights] as insights #LightBlue
 [Pipeline] as pipeline #F0F0F0
 [Ontology] as ontology #F0F0F0
-[OntologyConfigManager] as ontology_config_manager #F0F0F0
-[LegacyOntologyAdapter] as legacy_ontology_adapter #F0F0F0
-[TokenBudgetConstrainedInsightDepth] as token_budget_constrained_insight_depth #E8F5E8
 
 semantic_analysis --> insights
 pipeline -[hidden]- insights
 ontology -[hidden]- insights
-ontology_config_manager -[hidden]- insights
-legacy_ontology_adapter -[hidden]- insights
-insights --> token_budget_constrained_insight_depth
 
 @enduml

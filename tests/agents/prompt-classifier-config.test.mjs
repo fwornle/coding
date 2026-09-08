@@ -43,7 +43,7 @@ const BOTH_NETWORKS = () => ({
   backends: [
     {
       id: 'qwen-local',
-      base_url: 'http://10.143.241.223:8000/v1',
+      base_url: 'http://10.143.242.184:8000/v1',
       model: 'qwen3.8-27b-dual-fast',
       api_key_env: 'QWEN_LOCAL_API_KEY',
       require_network: 'corporate',

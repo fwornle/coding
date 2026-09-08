@@ -1,50 +1,58 @@
-# ProxyUrlResolver
+# ProxyURLResolver
 
 **Type:** SubComponent
 
-llm-with-process.ts checks RAPID_LLM_PROXY_URL first, then falls back to LLM_CLI_PROXY_URL, then LLM_PROXY_URL, and finally a port-based default, creating a priority chain that allows environment-specific overrides without code changes
+LLMWithProcessClient calls into ProxyURLResolver before every request rather than caching a single resolved URL, allowing dynamic environment changes to take effect
+
+# ProxyURLResolver — Technical Insight Document
 
 ## What It Is
 
-`ProxyUrlResolver` is a URL resolution sub-component embedded directly within `llm-with-process.ts`, which serves as the direct-fetch wrapper layer inside LLMAbstraction. Rather than existing as a standalone class or module, the resolver is a logical component — a priority chain of environment variable lookups that determines which proxy endpoint all LLM traffic should target at runtime.
+ProxyURLResolver is a SubComponent of LLMAbstraction responsible for determining, at runtime, which proxy endpoint should be used to reach the LLM infrastructure. It operates by reading environment variables — specifically `RAPID_LLM_PROXY_URL` and `LLM_CLI_PROXY_URL` — and using their presence/values to select the correct endpoint for the current execution context. Its core responsibility is context-awareness: distinguishing between host-based execution and containerized (Docker) execution so that the rest of the system never has to hardcode environment-specific URLs like `localhost`.
+
+![ProxyURLResolver — Architecture](images/proxy-urlresolver-architecture.png)
 
 ## Architecture and Design
 
-The resolver implements a **priority-chain fallback pattern**: it checks `RAPID_LLM_PROXY_URL` first, then `LLM_CLI_PROXY_URL`, then `LLM_PROXY_URL`, and finally defaults to a port-based localhost address. This ordering reflects a deliberate hierarchy of specificity — from a named production target down to a zero-config local development default.
+The defining architectural pattern here is **environment-driven configuration resolution** rather than static or compile-time configuration. Instead of baking a proxy URL into the codebase or a single config file, ProxyURLResolver treats environment variables as the source of truth, which allows the same codebase to run unmodified across host and Dockerized deployments — a deployment concern documented in `docker/README.md`.
 
-![ProxyUrlResolver — Architecture](images/proxy-url-resolver-architecture.png)
+A second important design decision is that resolution happens **on-demand rather than once at startup**. LLMWithProcessClient — a sibling component under LLMAbstraction — calls into ProxyURLResolver before every request instead of caching a resolved URL. This is a deliberate trade-off: it sacrifices a small amount of per-request efficiency (an extra resolution step) in exchange for dynamic responsiveness to environment changes, which is valuable in development/debugging scenarios or orchestrated environments where proxy targets may shift without a full process restart.
 
-The key architectural decision is centralization. Rather than distributing proxy URL logic across individual provider implementations (Anthropic, OpenAI, Groq, DMR), resolution is consolidated inside `llm-with-process.ts`. This means all three execution modes that LLMAbstraction supports — mock, local, and public — funnel through the same resolution logic. A routing inconsistency at the URL level is therefore structurally impossible regardless of which mode or provider is active.
-
-The separation between `RAPID_LLM_PROXY_URL` and the generic `LLM_PROXY_URL` is a meaningful design signal. The rapid-llm-proxy endpoint is the telemetry-injecting target, and `llm-with-process.ts` exists specifically to reach it by bypassing standard SDK clients. Treating `RAPID_LLM_PROXY_URL` as the primary production variable reinforces that distinction — it is not just another proxy, but the canonical routing destination for instrumented inference traffic.
-
-![ProxyUrlResolver — Relationship](images/proxy-url-resolver-relationship.png)
+Within LLMAbstraction, ProxyURLResolver plays a supporting, infrastructure-facing role distinct from its siblings: LLMMockService governs *mode* resolution (mock/local/public), DMRProvider adapts to Docker Model Runner's API surface, and CostModel computes pricing — ProxyURLResolver's concern is purely *where* requests physically go, orthogonal to *how* they're shaped or priced.
 
 ## Implementation Details
 
-The resolution logic lives entirely within `llm-with-process.ts`. The chain evaluates environment variables in order, using the first defined value. This is idiomatic Node.js environment handling and keeps the implementation minimal — no configuration files, no registry, no external service discovery. The port-based localhost fallback is the lowest-priority rung and exists so that local development requires zero environment setup; developers can run the proxy on a known port and get working resolution automatically.
+The resolver's logic centers on inspecting environment variables at call time. `RAPID_LLM_PROXY_URL` and `LLM_CLI_PROXY_URL` act as explicit overrides/signals indicating the intended target proxy; their presence or absence — combined with detection of the execution context (host vs. container) — determines the returned URL. This avoids hardcoded `localhost` references that would silently break once code is moved into a Docker container, where `localhost` no longer refers to the host machine's services.
 
-The fact that `llm-with-process.ts` bypasses SDK clients is directly related to why `ProxyUrlResolver` exists here rather than elsewhere in LLMAbstraction. SDK clients for Anthropic, OpenAI, and Groq have their own base URL handling, but none of them accommodate the process-tag injection that the rapid-llm-proxy endpoint requires. The direct-fetch wrapper owns both concerns — constructing the request with telemetry headers and resolving the target URL — keeping them co-located.
+Because the resolution function is invoked repeatedly (once per request from LLMWithProcessClient) rather than memoized, the implementation implicitly favors simplicity and correctness over micro-optimization — there is no cache invalidation logic to reason about.
 
 ## Integration Points
 
-`ProxyUrlResolver` is exclusively consumed by `llm-with-process.ts` within the broader LLMAbstraction parent. It has no interface with the mock service or the DMR (Docker Model Runner) provider, both of which are sibling execution paths inside LLMAbstraction that handle their own endpoint configuration independently. The resolver's scope is intentionally narrow: it answers one question (where is the proxy?) for one consumer (the direct-fetch wrapper).
+![ProxyURLResolver — Relationship](images/proxy-urlresolver-relationship.png)
 
-The environment variables it reads — `RAPID_LLM_PROXY_URL`, `LLM_CLI_PROXY_URL`, and `LLM_PROXY_URL` — are the external integration surface. These are documented project-level variables, meaning deployment environments (CI, staging, production) are expected to configure the appropriate variable rather than modifying code.
+ProxyURLResolver is contained within LLMAbstraction, alongside LLMMockService, DMRProvider, LLMWithProcessClient, and CostModel. Its most direct consumer is **LLMWithProcessClient**, which bypasses higher-level SDK abstractions in favor of a direct `fetch()` call to `/api/complete` on `rapid-llm-proxy` — ProxyURLResolver is precisely what supplies the target URL for that fetch call. This tight coupling means any change to ProxyURLResolver's resolution logic has an immediate, direct effect on how LLMWithProcessClient reaches the proxy.
+
+More broadly, ProxyURLResolver's environment-variable contract is part of the Docker deployment model described in `docker/README.md`, making it a key integration seam between application code and deployment/orchestration configuration.
 
 ## Usage Guidelines
 
-Developers should set `RAPID_LLM_PROXY_URL` for any production or staging environment where telemetry-tagged inference routing is required — this is the primary intended target. `LLM_CLI_PROXY_URL` provides an override for CLI-specific tooling contexts without disturbing the production variable. `LLM_PROXY_URL` acts as a generic fallback for environments that predate the rapid-proxy naming convention. Local development requires no variable at all, relying on the port-based default.
+Developers should ensure `RAPID_LLM_PROXY_URL` and `LLM_CLI_PROXY_URL` are correctly set for the target execution context (host vs. container) — misconfiguration here is a likely root cause if requests silently fail or connect to the wrong endpoint. Because resolution is not cached, changing these environment variables at runtime (e.g., in orchestrated or multi-environment setups) will take effect on the next request without requiring a restart — a useful property to leverage during debugging or environment migration.
 
-Because resolution logic is centralized in `llm-with-process.ts`, any change to proxy routing priority or fallback behavior should be made there exclusively. Adding a new environment variable override means inserting it into the chain at the appropriate priority level — before `RAPID_LLM_PROXY_URL` only if it represents a more specific context, or between existing entries if it slots into the existing specificity hierarchy. Distributing resolution logic to other provider files would break the centralization guarantee that all execution modes resolve URLs consistently.
+Developers should never reintroduce hardcoded `localhost` URLs into request paths that rely on ProxyURLResolver's logic, as doing so would defeat its purpose and reintroduce the Docker-context fragility it was designed to eliminate. Finally, when tracing unexpected proxy behavior, check both environment variables together with LLMWithProcessClient's call site, since resolution and consumption are tightly coupled but implemented in separate components.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- LLMAbstraction is a multi-layered abstraction over LLM providers that enables provider-agnostic model calls across Anthropic, OpenAI, Groq, and local inference backends. It provides three distinct execution modes (mock, local, public) with per-agent overrides stored in a workflow-progress.json file, allowing dynamic routing without code changes. The architecture consists of a mock service for testing, a DMR (Docker Model Runner) provider for local inference, and a direct-fetch wrapper (llm-with-process.ts) that bypasses the SDK to inject telemetry process tags into the rapid-llm-proxy endpoint.
+- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component implements a mode-resolution hierarchy that is critical for understanding how any given agent call is actually dispatched. getLLMMode() in llm-mock-service.ts checks, in strict order: a per-agent override (allowing individual agents to be pinned to mock/local/public independently of global state), then a global mode setting, then a legacy mockLLM boolean flag (retained for backward compatibility with older config schemas), and finally falls back to 'public' as the safe default. This layered precedence means a developer debugging unexpected LLM behavior for a specific agent must check all four levels rather than assuming the global setting applies uniformly—per-agent overrides silently win even if the global mode says otherwise, which is a common source of confusion during multi-agent experiments.
+
+### Siblings
+- [LLMMockService](./LLMMockService.md) -- getLLMMode() in llm-mock-service.ts implements a strict precedence chain: per-agent override, then global mode, then legacy mockLLM boolean, then 'public' default
+- [DMRProvider](./DMRProvider.md) -- DMRProvider wraps Docker Model Runner's OpenAI-compatible API surface, letting existing OpenAI-style request/response code reuse the same client shape
+- [LLMWithProcessClient](./LLMWithProcessClient.md) -- LLMWithProcessClient bypasses higher-level SDK abstractions in favor of a direct fetch() call to /api/complete on rapid-llm-proxy
+- [CostModel](./CostModel.md) -- CostModel contains pure functions mapping token counts to €/$ costs based on per-provider pricing tables
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 4 observations*

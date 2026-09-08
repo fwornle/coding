@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConfigAsCodeConvention
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ConfigAsCodeConvention] as config_as_code_convention #LightBlue
+[AgentWrapperScriptPattern] as agent_wrapper_script_pattern #F0F0F0
+[CliEntrypointPattern] as cli_entrypoint_pattern #F0F0F0
+[ExperimentDefinitionPattern] as experiment_definition_pattern #F0F0F0
+[SupervisorManagedContainerPattern] as supervisor_managed_container_pattern #F0F0F0
+[EntityPatternAnalyzer] as entity_pattern_analyzer #F0F0F0
+[SharedMemoryPatternQuery] as shared_memory_pattern_query #E8F5E8
+
+coding_patterns --> config_as_code_convention
+agent_wrapper_script_pattern -[hidden]- config_as_code_convention
+cli_entrypoint_pattern -[hidden]- config_as_code_convention
+experiment_definition_pattern -[hidden]- config_as_code_convention
+supervisor_managed_container_pattern -[hidden]- config_as_code_convention
+entity_pattern_analyzer -[hidden]- config_as_code_convention
+config_as_code_convention --> shared_memory_pattern_query
+
+@enduml

@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "SpecstoryAdapter Core" {
+  component "SpecstoryAdapter" as adapter <<core>>
+  component "logConversation()" as logconv <<core>>
+  component "initialize()" as init <<core>>
+}
+
+package "Connection Strategies" {
+  component "connectViaHTTP()" as http <<api>>
+  component "connectViaIPC()" as ipc <<api>>
+  component "connectViaFileWatch()" as filewatch <<api>>
+}
+
+package "External Targets" {
+  cloud "Specstory Extension\n(ports 7357-7359)" as ext <<external>>
+  component "Named Pipe/Socket" as socket <<external>>
+  database "~/.specstory/watch" as watchdir <<storage>>
+}
+
+adapter --> init : "startup"
+init --> http : "1st attempt"
+http ..> ipc : "fallback"
+ipc ..> filewatch : "fallback"
+
+http --> ext : "GET /api/status"
+ipc --> socket : "platform-specific path"
+filewatch --> watchdir : "writes JSON + .new-log marker"
+
+adapter --> logconv : "wraps entries"
+logconv --> http : "log() closure"
+logconv --> ipc : "log() closure"
+logconv --> filewatch : "log() closure"
+
+@enduml
