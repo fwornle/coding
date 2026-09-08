@@ -46,7 +46,6 @@ const REPO = process.env.CODING_REPO || join(dirname(fileURLToPath(import.meta.u
  */
 const CONTAINER_PROGRAMS = {
   'semantic-analysis': 'knowledge',
-  'vkb-server': 'knowledge',
   'embedding-listener': 'knowledge',
   graphify: 'codegraph',
   'constraint-monitor': 'constraints',
@@ -84,7 +83,7 @@ async function containerStatus() {
 
   const status = {};
   for (const line of r.stdout.split('\n')) {
-    // "web-services:vkb-server   RUNNING   pid 42, uptime 0:01:00"
+    // "web-services:health-dashboard   RUNNING   pid 42, uptime 0:01:00"
     const m = /^(\S+)\s+(\w+)/.exec(line.trim());
     if (!m) continue;
     const target = m[1];

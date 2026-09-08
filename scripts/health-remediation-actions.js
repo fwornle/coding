@@ -30,7 +30,6 @@ const execAsync = promisify(exec);
  * Map of remediation actions to supervisord group:program names
  */
 const DOCKER_SERVICE_MAP = {
-  restart_vkb_server: 'web-services:vkb-server',
   restart_constraint_monitor: 'mcp-servers:constraint-monitor',
   restart_dashboard_server: 'web-services:health-dashboard-frontend',
   restart_health_api: 'web-services:health-dashboard',
@@ -135,10 +134,7 @@ export class HealthRemediationActions {
         case 'cleanup_dead_processes':
           result = await this.cleanupDeadProcesses(issueDetails);
           break;
-        case 'restart_vkb_server':
-          result = await this.restartVKBServer(issueDetails);
-          break;
-        case 'restart_constraint_monitor':
+case 'restart_constraint_monitor':
           result = await this.restartConstraintMonitor(issueDetails);
           break;
         case 'restart_dashboard_server':
@@ -236,18 +232,6 @@ export class HealthRemediationActions {
         success: true,
         message: `Cleaned ${cleaned} dead process(es) from registry`
       };
-    } catch (error) {
-      return { success: false, message: error.message };
-    }
-  }
-
-  /**
-   * Restart VKB server
-   */
-  async restartVKBServer(details) {
-    try {
-      this.log('Restarting VKB server...');
-      return await this.supervisorctlRestart('restart_vkb_server', 'http://localhost:8080/health');
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -513,7 +497,6 @@ export class HealthRemediationActions {
       const dashboardPort = process.env.HEALTH_DASHBOARD_PORT || '3032';
 
       // Gather health status from HTTP checks
-      const vkbHealthy = await this.checkHttpHealth('http://localhost:8080/health', 2000);
       const constraintHealthy = await this.checkHttpHealth(`http://localhost:${constraintPort}/health`, 2000);
       const healthApiHealthy = await this.checkHttpHealth('http://localhost:3033/api/health', 2000);
       const dashboardHealthy = await this.checkPortListening(parseInt(dashboardPort));
@@ -523,7 +506,6 @@ export class HealthRemediationActions {
       const servicesRunning = [];
 
       // Check which services are running
-      if (vkbHealthy) servicesRunning.push('vkb-server');
       if (constraintHealthy) servicesRunning.push('constraint-monitor');
       if (healthApiHealthy) servicesRunning.push('health-verifier');
       if (dashboardHealthy) servicesRunning.push('system-health-dashboard');
@@ -542,12 +524,6 @@ export class HealthRemediationActions {
         semantic_analysis: {
           status: '✅ OPERATIONAL',
           health: 'healthy'
-        },
-        vkb_server: {
-          status: vkbHealthy ? '✅ OPERATIONAL' : '⚠️ DEGRADED',
-          port: 8080,
-          health: vkbHealthy ? 'healthy' : 'degraded',
-          last_check: new Date().toISOString()
         },
         system_health_dashboard: {
           status: healthApiHealthy ? '✅ OPERATIONAL' : '⚠️ DEGRADED',

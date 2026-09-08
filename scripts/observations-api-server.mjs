@@ -61,12 +61,19 @@ import {
   insightToLegacy,
   defaultOntologyDir,
   SnapshotManager,
+  mergeEntities,
 } from '@fwornle/km-core';
 import { Router } from 'express';
 // Phase 44 Plan 14 — shared Artifacts-patch mutator used by both
 // `/patch-artifacts/recent` and `/patch-artifacts/historical`. Single
 // source of truth for the regex + meta merge.
 import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
+// Experiment API (27 endpoints) — re-homed here from vkb-server so retiring
+// VKB does not take the Experiments feature with it. These handlers use the
+// DEDICATED experiment LevelDB via openExperimentStore(), not the knowledge
+// graph this process owns, so the two stores stay independent.
+import { ExperimentApi } from '../lib/experiments/experiment-api.mjs';
+import { registerKgbenchRoutes } from '../lib/experiments/kgbench-routes.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -1506,6 +1513,339 @@ app.post('/api/retrieve', async (req, res) => {
   }
 });
 
+// ── Experiment API ─────────────────────────────────────────────────────────
+//
+// Mounted here rather than on vkb-server (:8080), which is being retired. The
+// dashboard proxies /api/experiments/* to this process now.
+const _experimentApi = new ExperimentApi({});
+_experimentApi.registerRoutes(app);
+// kgbench rides along for the same reason — the dashboard's Benchmarks
+// sub-tab proxies /api/kgbench/* to whatever hosts the experiment API.
+registerKgbenchRoutes(app, {
+  repoRoot: () => _experimentApi._repoRoot(),
+  coordinatorPost: (seamPath, body) => _experimentApi._coordinatorPost(seamPath, body),
+  logger: console,
+});
+process.stderr.write('[obs-api] /api/experiments + /api/kgbench routes mounted\n');
+
+// ── Insight documents ──────────────────────────────────────────────────────
+//
+// The unified viewer used to fetch these straight from the DISCONTINUED VKB
+// server on :8080 (`http://localhost:8080/knowledge-management/insights/
+// <Name>.md`), which is why every "View Insight Document" link died with that
+// host. Serving them here moves them onto the backend the live viewer already
+// talks to, and lets the viewer gate the link on the document actually
+// existing instead of guessing the URL from the entity name — 67 of the 749
+// entities offering the button had no file behind it.
+const INSIGHTS_DIR = path.join(REPO_ROOT, 'knowledge-management', 'insights');
+
+/** Reject anything that is not a bare document name (no traversal, no nesting). */
+function safeInsightName(raw) {
+  const name = String(raw || '').replace(/\.md$/i, '');
+  if (!name || name.length > 200) return null;
+  if (!/^[A-Za-z0-9._-]+$/.test(name)) return null;
+  if (name === '.' || name === '..') return null;
+  return name;
+}
+
+/**
+ * GET /api/insights/docs — names of every insight document that EXISTS.
+ *
+ * The viewer uses this as an existence index so it only offers a link it can
+ * actually open.
+ */
+app.get('/api/insights/docs', (_req, res) => {
+  try {
+    const names = fs
+      .readdirSync(INSIGHTS_DIR)
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => f.slice(0, -3));
+    res.json({ success: true, data: names, count: names.length });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/insights/docs error: ${err.message}\n`);
+    res.json({ success: true, data: [], count: 0 });
+  }
+});
+
+/**
+ * GET /api/insights/doc/images/:file — diagrams referenced BY those documents.
+ *
+ * The insight markdown carries relative refs (`images/foo-architecture.png`),
+ * and the viewer's modal resolves them against the document's own URL. Serving
+ * the docs without their images would render every diagram as a broken image,
+ * so this route has to sit directly under the doc path for that rebase to
+ * land here.
+ */
+app.get('/api/insights/doc/images/:file', (req, res) => {
+  const raw = String(req.params.file || '');
+  if (!/^[A-Za-z0-9._-]+\.(png|jpg|jpeg|svg|gif|webp)$/i.test(raw)) {
+    return res.status(400).json({ error: 'Invalid image name' });
+  }
+  const file = path.join(INSIGHTS_DIR, 'images', raw);
+  if (!path.resolve(file).startsWith(path.resolve(path.join(INSIGHTS_DIR, 'images')) + path.sep)) {
+    return res.status(400).json({ error: 'Invalid image name' });
+  }
+  res.sendFile(path.resolve(file), (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: 'No such image' });
+  });
+});
+
+/** GET /api/insights/doc/:name — one document as markdown. */
+app.get('/api/insights/doc/:name', (req, res) => {
+  const name = safeInsightName(req.params.name);
+  if (!name) return res.status(400).json({ error: 'Invalid document name' });
+  const file = path.join(INSIGHTS_DIR, `${name}.md`);
+  // Defence in depth: the regex already forbids separators, but re-check that
+  // the resolved path is still inside the insights directory.
+  if (!path.resolve(file).startsWith(path.resolve(INSIGHTS_DIR) + path.sep)) {
+    return res.status(400).json({ error: 'Invalid document name' });
+  }
+  try {
+    const body = fs.readFileSync(file, 'utf8');
+    res.type('text/markdown').send(body);
+  } catch {
+    res.status(404).json({ error: `No insight document for '${name}'` });
+  }
+});
+
+/**
+ * POST /api/maintenance/dedupe-entities — merge duplicate-name nodes.
+ *
+ * Repairs the damage left by the pre-ff144c4 adapter, which minted a NEW node
+ * on every storeEntity call. Because storeRelationship resolves its endpoints
+ * by name, edges kept landing on the pre-existing node while each run's fresh
+ * nodes were born edgeless — on 2026-09-07, `LiveLoggingSystem` was four
+ * Component nodes and 155 of 163 orphans shared a name with another node.
+ * The adapter now upserts, so this is a one-time repair of the backlog rather
+ * than a recurring sweep — but it stays available because any writer that
+ * bypasses the adapter (km-core's own POST /api/v1/entities mints too) can
+ * reintroduce a duplicate.
+ *
+ * Runs in-process because the km-core store is single-owner-rw and this
+ * process holds the lock — the same reason consolidation and wave-analysis
+ * run here.
+ *
+ * SURVIVOR RULE: oldest by createdAt, tie-broken on id. This MUST match
+ * km-core-adapter's findEntityByName, or a merge would consolidate onto one
+ * node while subsequent writes bind to another.
+ *
+ * Body: { dryRun?: boolean (default TRUE), entityTypes?: string[], limit?: number }
+ * Returns { dryRun, groups, merged, edgesRewired, skipped, errors, plan }.
+ */
+app.post('/api/maintenance/dedupe-entities', async (req, res) => {
+  try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+
+    // Default to a dry run: this rewires edges and closes entities, so the
+    // destructive reading of an ambiguous request is the wrong default.
+    const dryRun = req.body?.dryRun !== false;
+    // HIERARCHY TYPES ONLY by default. For a Component or a Detail, name+type
+    // identifies one logical entity, so two nodes sharing them are genuinely
+    // the same thing. For an Observation, Digest or Insight the name is a
+    // TITLE: the first dry run over every type proposed merging 20 distinct
+    // observations that were all called "Intent: Load and summarize recent
+    // session logs…". Those are different observations from different
+    // sessions and merging them would destroy data. An explicit entityTypes
+    // list can still opt in, but nothing gets there by default.
+    const entityTypes = Array.isArray(req.body?.entityTypes) && req.body.entityTypes.length > 0
+      ? new Set(req.body.entityTypes)
+      : new Set(['Project', 'Component', 'SubComponent', 'Detail']);
+    const limit = Number.isFinite(req.body?.limit) ? Number(req.body.limit) : Infinity;
+
+    // Group ACTIVE entities by (name, entityType). Superseded nodes are
+    // already closed — merging them again would trip the WR-02 single-
+    // successor invariant.
+    const groups = new Map();
+    for await (const e of store.iterate()) {
+      if (!entityTypes.has(e.entityType)) continue;
+      const key = `${e.entityType}\u0000${e.name}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(e);
+    }
+
+    const plan = [];
+    for (const [key, members] of groups) {
+      if (members.length < 2) continue;
+      const [entityType, name] = key.split('\u0000');
+      const sorted = [...members].sort((a, b) => {
+        const at = a.createdAt ?? '';
+        const bt = b.createdAt ?? '';
+        if (at !== bt) return at < bt ? -1 : 1;
+        return String(a.id) < String(b.id) ? -1 : 1;
+      });
+      plan.push({
+        name,
+        entityType,
+        survivorId: String(sorted[0].id),
+        survivorCreatedAt: sorted[0].createdAt ?? null,
+        duplicateIds: sorted.slice(1).map((d) => String(d.id)),
+      });
+    }
+    plan.sort((a, b) => b.duplicateIds.length - a.duplicateIds.length);
+    const selected = plan.slice(0, limit === Infinity ? plan.length : limit);
+
+    if (dryRun) {
+      return res.json({
+        dryRun: true,
+        groups: selected.length,
+        duplicatesToClose: selected.reduce((n, g) => n + g.duplicateIds.length, 0),
+        plan: selected,
+      });
+    }
+
+    let merged = 0;
+    let edgesRewired = 0;
+    const skipped = [];
+    const errors = [];
+    for (const g of selected) {
+      try {
+        const result = await mergeEntities(store, g.survivorId, g.duplicateIds, {
+          provenance: {
+            provider: 'obs-api',
+            model: 'dedupe-entities',
+            runId: `dedupe-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+          },
+          reason: 'duplicate name+entityType from pre-upsert storeEntity (ff144c4)',
+        });
+        merged += 1;
+        edgesRewired += result.edgesRewired;
+      } catch (err) {
+        // WR-02 (a duplicate already superseded) and missing-node errors are
+        // per-group problems, not a reason to abandon the sweep.
+        const message = err instanceof Error ? err.message : String(err);
+        if (/already has a successor/i.test(message)) skipped.push({ ...g, reason: message });
+        else errors.push({ name: g.name, entityType: g.entityType, error: message });
+      }
+    }
+
+    process.stderr.write(
+      `[obs-api] dedupe-entities: merged=${merged} edgesRewired=${edgesRewired} skipped=${skipped.length} errors=${errors.length}\n`,
+    );
+    res.json({ dryRun: false, groups: selected.length, merged, edgesRewired, skipped, errors });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /maintenance/dedupe-entities error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Dedupe failed' });
+  }
+});
+
+/**
+ * POST /api/maintenance/compress-hierarchy — merge near-duplicate siblings.
+ *
+ * Distinct from dedupe-entities, which merges nodes sharing an EXACT name.
+ * This merges siblings whose names differ only by the noun we happened to
+ * append: under LLMAbstraction the graph carried LLMServiceProvider,
+ * LLMProviderManager, LLMServiceModule and LLMProviderFactory as four
+ * SubComponents for one concept.
+ *
+ * The rule is deliberately narrow and explainable: same entityType, same
+ * parentEntityName, and the same name once case, separators and trailing
+ * role-nouns (Service/Manager/Module/Factory/...) are stripped. Requiring the
+ * SAME PARENT is what keeps `Ontology` under Coding distinct from `Ontology`
+ * under RaaS.
+ *
+ * Body: { dryRun?: boolean (default TRUE), entityTypes?: string[], limit?: number }
+ */
+const COMPRESS_SUFFIX_RE =
+  /(patterns?|modules?|services?|engines?|managers?|handlers?|components?|systems?|layers?|configs?|configurations?|utils?|helpers?|wrappers?|adapters?|providers?|factory|factories|registry|registries|controllers?|agents?)$/;
+
+/** Collapse a name to the concept it names: LLMProviderFactory -> llm. */
+function compressionKey(name) {
+  let s = String(name || '').replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  const full = s;
+  let prev = null;
+  while (prev !== s) {
+    prev = s;
+    s = s.replace(COMPRESS_SUFFIX_RE, '');
+  }
+  // A name that is ONLY role-nouns (e.g. "ServiceManager") must not collapse
+  // to the empty string and swallow every other such name under one parent.
+  return s || full;
+}
+
+app.post('/api/maintenance/compress-hierarchy', async (req, res) => {
+  try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+
+    const dryRun = req.body?.dryRun !== false;
+    const entityTypes = Array.isArray(req.body?.entityTypes) && req.body.entityTypes.length > 0
+      ? new Set(req.body.entityTypes)
+      : new Set(['Component', 'SubComponent', 'Detail']);
+    const limit = Number.isFinite(req.body?.limit) ? Number(req.body.limit) : Infinity;
+
+    const groups = new Map();
+    for await (const e of store.iterate()) {
+      if (!entityTypes.has(e.entityType)) continue;
+      const parent = (e.metadata && e.metadata.parentEntityName) || '(root)';
+      const key = `${e.entityType}\u0000${parent}\u0000${compressionKey(e.name)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(e);
+    }
+
+    const plan = [];
+    for (const [key, members] of groups) {
+      if (members.length < 2) continue;
+      const [entityType, parent] = key.split('\u0000');
+      // Survivor = oldest, matching dedupe-entities and the adapter resolver.
+      const sorted = [...members].sort((a, b) => {
+        const at = a.createdAt ?? '';
+        const bt = b.createdAt ?? '';
+        if (at !== bt) return at < bt ? -1 : 1;
+        return String(a.id) < String(b.id) ? -1 : 1;
+      });
+      plan.push({
+        entityType,
+        parent,
+        survivor: sorted[0].name,
+        survivorId: String(sorted[0].id),
+        merged: sorted.slice(1).map((d) => d.name),
+        duplicateIds: sorted.slice(1).map((d) => String(d.id)),
+      });
+    }
+    plan.sort((a, b) => b.duplicateIds.length - a.duplicateIds.length);
+    const selected = plan.slice(0, limit === Infinity ? plan.length : limit);
+
+    if (dryRun) {
+      return res.json({
+        dryRun: true,
+        groups: selected.length,
+        nodesRemoved: selected.reduce((n, g) => n + g.duplicateIds.length, 0),
+        plan: selected,
+      });
+    }
+
+    let merged = 0;
+    let edgesRewired = 0;
+    const errors = [];
+    for (const g of selected) {
+      try {
+        const r = await mergeEntities(store, g.survivorId, g.duplicateIds, {
+          provenance: {
+            provider: 'obs-api',
+            model: 'compress-hierarchy',
+            runId: `compress-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+          },
+          reason: `near-duplicate sibling of '${g.survivor}' under '${g.parent}'`,
+        });
+        merged += 1;
+        edgesRewired += r.edgesRewired;
+      } catch (err) {
+        errors.push({ survivor: g.survivor, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    process.stderr.write(
+      `[obs-api] compress-hierarchy: merged=${merged} edgesRewired=${edgesRewired} errors=${errors.length}\n`,
+    );
+    res.json({ dryRun: false, groups: selected.length, merged, edgesRewired, errors });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /maintenance/compress-hierarchy error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Compression failed' });
+  }
+});
+
 /**
  * POST /api/consolidation/run — trigger consolidation in-process.
  * Body: { date?: string, includeToday?: boolean, insightsOnly?: boolean }
@@ -1774,10 +2114,44 @@ function mountKMRoutes(store) {
 // (StatsBar tolerates either, but emitting the real evidence/pattern/component
 // counts means the chip shows correct numbers the instant SSE connects rather
 // than zeros from a stubbed stream — see Plan 55-06 / the /api/v1/stream fix).
+/**
+ * Is this node still live, or has it been retired by a merge?
+ *
+ * `mergeEntities` does not delete a duplicate — it CLOSES it by stamping
+ * `validUntil` and leaves it in the graph with a SUPERSEDED_BY edge so the
+ * supersession chain stays walkable. Retired nodes are history, not knowledge.
+ *
+ * `validUntil: null` means "never closed" and MUST count as active: the
+ * Phase 42-05 migrated cohort carries it, and `new Date(null).getTime()` is 0,
+ * which any naive comparison reads as long expired.
+ */
+function isLiveNode(attrs, nowMs) {
+  const until = attrs && attrs.validUntil;
+  if (until === undefined || until === null || until === '') return true;
+  const t = Date.parse(until);
+  return Number.isFinite(t) ? t > nowMs : true;
+}
+
 async function composeViewerStats(store) {
   const graph = store.graph;
-  const nodeCount = graph.order;
-  const edgeCount = graph.size;
+  // Count what the knowledge base HOLDS, not what the store has ever held.
+  //
+  // These used to be graph.order / graph.size, which include every retired
+  // node and the SUPERSEDED_BY edge each merge adds — so consolidating the
+  // graph made the headline counts go UP (2626 -> 2628 nodes, +57 edges while
+  // merging 44 groups) and 215 retired nodes sat in the total. Merging can
+  // never reduce a number that counts the things it retires.
+  const nowMs = Date.now();
+  const live = new Set();
+  graph.forEachNode((id, attrs) => {
+    if (isLiveNode(attrs, nowMs)) live.add(id);
+  });
+  const nodeCount = live.size;
+  let edgeCount = 0;
+  graph.forEachEdge((_key, attrs, source, target) => {
+    if (attrs && attrs.type === 'SUPERSEDED_BY') return; // bookkeeping, not knowledge
+    if (live.has(source) && live.has(target)) edgeCount += 1;
+  });
 
   const [evidenceCount, patternCount, componentCount] = await Promise.all([
     store.countByOntologyClass('Observation'),
@@ -1786,10 +2160,19 @@ async function composeViewerStats(store) {
   ]);
 
   // Orphan walk (mirrors /api/v1/graph/orphans handler logic but counts only).
+  // An orphan is a LIVE node with no live edge. A retired node is not an
+  // orphan, and an edge to a retired node does not rescue a live one.
   let orphanCount = 0;
-  graph.forEachNode((id) => {
-    if (graph.degree(id) === 0) orphanCount += 1;
-  });
+  for (const id of live) {
+    let hasLiveEdge = false;
+    graph.forEachEdge(id, (_k, attrs, source, target) => {
+      if (hasLiveEdge) return;
+      if (attrs && attrs.type === 'SUPERSEDED_BY') return;
+      const other = source === id ? target : source;
+      if (live.has(other)) hasLiveEdge = true;
+    });
+    if (!hasLiveEdge) orphanCount += 1;
+  }
   // Connectivity is the inverse density of orphans against the node
   // population — 1.0 means every node touches at least one edge.
   const connectivity = nodeCount > 0
@@ -2514,6 +2897,11 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       return 5;
     };
     const HIDDEN_FROM_VIEWER = new Set(['Observation', 'Digest']);
+    // Writers that mean "a human or a batch job put this here", as opposed to
+    // the online consolidator's 'auto'/'online'. Keep in step with the graph's
+    // own predicate in unified-viewer/src/graph/color-fallback.ts, which
+    // treats everything outside {auto, online} as batch.
+    const BATCH_SOURCES = new Set(['manual', 'wave-analysis']);
     const allEnts = []; // [{id, type, hidden, createdMs}]
     try {
       if (_kmStoreReady && _kmStore && _kmStore.graph) {
@@ -2559,10 +2947,19 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       return {
         entityIds: matches.map((x) => x.id),
         totalCount: matches.length,
-        // Phase 61 Plan 01 (D-09): any matched entity tagged 'manual' marks
-        // the whole session 'batch'; pure online/auto/null windows (incl.
-        // empty) default to 'online'. Order-independent, no tie-break.
-        source: matches.some((m) => m.source === 'manual') ? 'batch' : 'online',
+        // Phase 61 Plan 01 (D-09): any matched entity from a BATCH writer
+        // marks the whole session 'batch'; pure online/auto/null windows
+        // (incl. empty) default to 'online'. Order-independent, no tie-break.
+        //
+        // 'wave-analysis' belongs here and was missing: the UKB batch run
+        // stamps metadata.source='wave-analysis', not 'manual' (only 90 of
+        // the hierarchy nodes carry 'manual'’s sibling stamp). A window
+        // containing nothing but wave-analysis output therefore fell through
+        // to 'online' and the timeline painted a batch run pink — exactly the
+        // "auto-learned" label the operator questioned. The viewer's own
+        // contract already said so (useLslSessions.ts: "'batch' = any matched
+        // entity tagged manual/wave-analysis"); only this predicate disagreed.
+        source: matches.some((m) => BATCH_SOURCES.has(m.source)) ? 'batch' : 'online',
       };
     };
 

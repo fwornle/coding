@@ -296,7 +296,7 @@ fi
 open "http://localhost:3032/performance" >/dev/null 2>&1 || true   # visible in the operator's browser
 
 # 2) Launch parallel (default) with a run-dir so the monitor auto-attaches.
-RUN_ID="r$(date +%s | tail -c 9)"   # ≤12-char id (vkb-server _validRunId)
+RUN_ID="r$(date +%s | tail -c 9)"   # ≤12-char id (ExperimentApi._validRunId)
 node scripts/experiment-run.mjs --spec "$SPEC_FILE" \
   --repeats <N> --task-class <class> --parallel \
   --run-id "$RUN_ID" --run-dir ".data/experiments/runs/$RUN_ID"

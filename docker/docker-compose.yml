@@ -34,7 +34,6 @@ services:
       - OPENAI_BASE_URL=http://host.docker.internal:12435/v1/codegraph
       - OPENAI_API_KEY=proxy-local
       - OPENAI_MODEL=gpt-4o-mini
-      - VKB_PORT=8080
       - HEALTH_DASHBOARD_PORT=3032
       - HEALTH_DASHBOARD_WS_PORT=3033
       # Database connections (container networking)
@@ -74,7 +73,6 @@ services:
       # coordinator via host.docker.internal (extra_hosts wires this on Linux).
       - HEALTH_COORDINATOR_URL=http://host.docker.internal:3034
     ports:
-      - "8080:8080"     # VKB Server
       - "3848:3848"     # Semantic Analysis SSE
       - "3849:3849"     # Constraint Monitor SSE
       - "3851:3851"     # Graphify HTTP MCP (/mcp)
@@ -174,8 +172,6 @@ services:
       # dashboard (reader) must see the same file so what's logged appears on
       # the dashboard.
       - ${CODING_REPO:-.}/.mcp-sync:/coding/.mcp-sync:rw
-      # VKB visualizer build (live-mounted for development)
-      - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
       # Observation pipeline (live-mounted as a directory so new files like
       # ObservationSanitizer.js are picked up without rebuilding the image).
       - ${CODING_REPO:-.}/src/live-logging:/coding/src/live-logging:ro
@@ -186,15 +182,25 @@ services:
       - ${CODING_REPO:-.}/src/embedding/embedding-config.json:/coding/src/embedding/embedding-config.json:ro
       # Retrieval service modules (Phase 29 — plain JS, live-mounted)
       - ${CODING_REPO:-.}/src/retrieval:/coding/src/retrieval:ro
-      # Knowledge management writers (UKBDatabaseWriter and friends —
-      # live-mounted so VKB API changes don't require an image rebuild).
+      # Knowledge management writers (UKBDatabaseWriter and friends).
       - ${CODING_REPO:-.}/src/knowledge-management:/coding/src/knowledge-management:ro
-      # VKB server source (live-mounted to avoid Docker rebuild for JS changes)
-      - ${CODING_REPO:-.}/lib/vkb-server:/coding/lib/vkb-server:ro
-      # Experiment read/write services (Phase 74) — vkb-server's experiment
-      # handlers dynamic-import ../experiments/*.mjs; live-mounted like vkb-server
-      # so the DASH-01/02/03 + KB-04 endpoints resolve at runtime in-container.
+      # Experiment read/write services (Phase 74) — the experiment handlers
+      # dynamic-import ../experiments/*.mjs. They now run in obs-api on the
+      # HOST (moved off vkb-server when it was retired), but this mount stays:
+      # the dashboard in this container still resolves the same modules for the
+      # DASH-01/02/03 + KB-04 paths.
       - ${CODING_REPO:-.}/lib/experiments:/coding/lib/experiments:ro
+      # Pre-warmed fastembed model cache (all-MiniLM-L6-v2, ~88MB).
+      #
+      # The Dockerfile warms this at BUILD time and swallows failure by design
+      # (`.catch(... process.exit(0))`), so a build on a network without direct
+      # egress to storage.googleapis.com produces an EMPTY cache and the
+      # embedding-listener then crash-loops into FATAL at runtime — it does its
+      # own DNS lookup and ignores HTTPS_PROXY, so the proxy that serves every
+      # other egress here cannot save it. Mounting the host copy makes the
+      # model survive an image rebuild instead of depending on which network
+      # the build happened to run on.
+      - ${CODING_REPO:-.}/.data/fastembed-cache:/coding/local_cache:ro
       # Reproducibility/snapshot rig (Phase 67) — lib/experiments/experiment-restore.mjs
       # imports ../repro/restore-snapshot.mjs during spec resolution (the /api/experiments/specs
       # matrix preview loads the spec resolver chain), so lib/repro must be mounted too
@@ -233,7 +239,10 @@ services:
           memory: 1G
           cpus: '1'
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      # Was :8080/health (vkb-server). That server is retired, so the container's
+      # liveness now hangs off the health dashboard, which is the longest-lived
+      # web service left in here.
+      test: ["CMD-SHELL", "curl -sf http://localhost:3032/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5

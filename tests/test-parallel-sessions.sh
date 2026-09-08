@@ -37,7 +37,7 @@ echo ""
 # Test 2: Register services across different types
 echo "📋 Step 3: Register services (mixed types)..."
 # Global service
-node scripts/psm-register.js vkb-server 20001 global lib/vkb-server/cli.js
+node scripts/psm-register.js obs-api 20001 global scripts/observations-api-server.mjs
 
 # Per-project service
 node scripts/psm-register.js transcript-monitor-proj1 20002 per-project scripts/enhanced-transcript-monitor.js "$CODING_ROOT"
@@ -54,10 +54,10 @@ echo ""
 
 # Test 4: Test duplicate prevention
 echo "📋 Step 5: Test duplicate prevention..."
-if node scripts/psm-register.js --check vkb-server global 2>/dev/null; then
-  echo "✅ Duplicate check: vkb-server already running (correct)"
+if node scripts/psm-register.js --check obs-api global 2>/dev/null; then
+  echo "✅ Duplicate check: obs-api already running (correct)"
 else
-  echo "❌ Duplicate check: vkb-server not found (unexpected)"
+  echo "❌ Duplicate check: obs-api not found (unexpected)"
 fi
 echo ""
 

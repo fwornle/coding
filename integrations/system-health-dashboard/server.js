@@ -145,7 +145,6 @@ const AUTO_HEAL_MAP = {
         action: 'restart_transcript_monitor',
         recommendation: 'Restart the LSL transcript monitor (host process). Last heartbeat lapsed beyond stale threshold.'
     },
-    vkb_server: { action: 'restart_vkb_server', recommendation: 'Restart VKB server.' },
     constraint_monitor: { action: 'restart_constraint_monitor', recommendation: 'Restart constraint monitor.' },
     dashboard_server: { action: 'restart_dashboard_server', recommendation: 'Restart dashboard frontend.' },
     health_dashboard_api: { action: 'restart_health_api', recommendation: 'Restart health dashboard API.' },
@@ -490,7 +489,8 @@ class SystemHealthAPIServer {
          // experiment endpoints (DASH-01/02/03, KB-04). The Performance page is
          // served from this container and fetches same-origin /api/experiments/...;
          // the only consistent connectivity path is forwarding to the host's
-         // vkb-server on :8080 (RESEARCH Open Question 3). Mirrors the token-usage
+         // obs-api on :12436. (Was vkb-server on :8080 until that server was
+         // retired; the handlers moved to obs-api unchanged.) Mirrors the token-usage
          // proxy above; forwards method + query + body for all experiment subpaths
          // (GET runs/timeline/reports; POST reports + reports/:id/refresh; PATCH
          // scores/:taskId). NOTE: server.js is bind-mounted — this change only takes
@@ -499,7 +499,7 @@ class SystemHealthAPIServer {
          this.app.use('/api/experiments', async (req, res) => {
              try {
                  const qs = new URLSearchParams(req.query).toString();
-                 const url = `http://host.docker.internal:8080/api/experiments${req.path}${qs ? '?' + qs : ''}`;
+                 const url = `http://host.docker.internal:12436/api/experiments${req.path}${qs ? '?' + qs : ''}`;
                  const init = {
                      method: req.method,
                      headers: { 'Content-Type': 'application/json' },
@@ -511,14 +511,15 @@ class SystemHealthAPIServer {
                  const data = await resp.json();
                  res.status(resp.status).json(data);
              } catch (err) {
-                 res.status(502).json({ error: 'experiment API (vkb-server) unreachable', details: err.message });
+                 res.status(502).json({ error: 'experiment API (obs-api) unreachable', details: err.message });
              }
          });
 
          // kgbench Benchmarks API — the parallel of the experiments proxy above, for the
          // Performance → Benchmarks sub-tab. Same shape and same reason: the page is served
          // from this container and fetches same-origin /api/kgbench/..., so the only
-         // consistent path to the vkb-server is forwarding to the host on :8080.
+         // consistent path is forwarding to the host's obs-api on :12436 (was
+         // vkb-server on :8080 before it was retired).
          //
          // A longer timeout than a plain read would need, because one route here is not a
          // read: POST /api/kgbench/probe-models runs the host model probe, which serialises a
@@ -528,7 +529,7 @@ class SystemHealthAPIServer {
          this.app.use('/api/kgbench', async (req, res) => {
              try {
                  const qs = new URLSearchParams(req.query).toString();
-                 const url = `http://host.docker.internal:8080/api/kgbench${req.path}${qs ? '?' + qs : ''}`;
+                 const url = `http://host.docker.internal:12436/api/kgbench${req.path}${qs ? '?' + qs : ''}`;
                  const init = {
                      method: req.method,
                      headers: { 'Content-Type': 'application/json' },
@@ -1158,13 +1159,11 @@ class SystemHealthAPIServer {
             // Docker mode uses supervisorctl; native mode uses npm/bin commands.
             const isDocker = existsSync('/.dockerenv');
             const restartCommands = isDocker ? {
-                vkb_server: 'supervisorctl restart web-services:vkb-server',
                 constraint_monitor: 'supervisorctl restart mcp-servers:constraint-monitor',
                 dashboard_server: 'supervisorctl restart web-services:health-dashboard-frontend',
                 health_dashboard_api: 'supervisorctl restart web-services:health-dashboard',
                 health_dashboard_frontend: 'supervisorctl restart web-services:health-dashboard-frontend',
             } : {
-                vkb_server: `cd "${codingRoot}" && bin/vkb restart`,
                 constraint_monitor: `cd "${codingRoot}/integrations/constraint-monitor" && npm run restart`,
                 dashboard_server: `cd "${codingRoot}/integrations/system-health-dashboard" && npm run restart`,
             };

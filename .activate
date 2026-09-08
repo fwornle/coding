@@ -3,7 +3,7 @@
 export CODING_REPO="/Users/Q284340/Agentic/coding"
 export PATH="/Users/Q284340/Agentic/coding/bin:$PATH"
 echo "✅ Agent-Agnostic Coding Tools environment activated!"
-echo "Commands 'vkb' and 'coding' are now available."
+echo "Command 'coding' is now available."
 echo ""
 echo "Usage:"
 echo "  coding           # Use best available agent"

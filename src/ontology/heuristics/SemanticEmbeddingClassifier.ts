@@ -135,7 +135,7 @@ export class SemanticEmbeddingClassifier {
       // Search team-specific ontology collections
       const teams = team
         ? [team]
-        : ['Coding', 'RaaS', 'ReSi', 'Agentic', 'UI'];
+        : ['Coding', 'RaaS', 'ReSi', 'UI', 'Normalisa'];
       const searchResults: EmbeddingMatch[] = [];
 
       for (const t of teams) {

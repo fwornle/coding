@@ -97,29 +97,29 @@ describe('gating', () => {
 
   test('a REQUIRED service whose feature is off does not block startup', async () => {
     const results = emptyResults();
-    const out = await startOneService('vkbServer', results, featureSet({ knowledge: false }));
-    assert.equal(SERVICE_CONFIGS.vkbServer.required, true, 'precondition: vkbServer is required');
+    const out = await startOneService('transcriptMonitor', results, featureSet({ lsl: false }));
+    assert.equal(SERVICE_CONFIGS.transcriptMonitor.required, true, 'precondition: transcriptMonitor is required');
     assert.equal(out.blocked, false, 'required-ness applies only when the feature is on');
     assert.equal(results.failed.length, 0);
   });
 
   test('a required failure blocks, so downstream services do not start', async () => {
     const results = emptyResults();
-    const original = SERVICE_CONFIGS.vkbServer.startFn;
-    const originalRetries = SERVICE_CONFIGS.vkbServer.maxRetries;
-    SERVICE_CONFIGS.vkbServer.startFn = async () => { throw new Error('boom'); };
+    const original = SERVICE_CONFIGS.transcriptMonitor.startFn;
+    const originalRetries = SERVICE_CONFIGS.transcriptMonitor.maxRetries;
+    SERVICE_CONFIGS.transcriptMonitor.startFn = async () => { throw new Error('boom'); };
     // One attempt: this asserts the blocking contract, not the backoff schedule,
     // and the real value costs six seconds of exponential waiting.
-    SERVICE_CONFIGS.vkbServer.maxRetries = 1;
+    SERVICE_CONFIGS.transcriptMonitor.maxRetries = 1;
     try {
-      const out = await startOneService('vkbServer', results, featureSet());
+      const out = await startOneService('transcriptMonitor', results, featureSet());
       assert.equal(out.blocked, true);
       assert.equal(results.failed.length, 1);
       assert.equal(results.failed[0].required, true);
       assert.match(results.failed[0].error, /boom/);
     } finally {
-      SERVICE_CONFIGS.vkbServer.startFn = original;
-      SERVICE_CONFIGS.vkbServer.maxRetries = originalRetries;
+      SERVICE_CONFIGS.transcriptMonitor.startFn = original;
+      SERVICE_CONFIGS.transcriptMonitor.maxRetries = originalRetries;
     }
   });
 

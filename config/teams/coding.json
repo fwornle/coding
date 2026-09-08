@@ -1,5 +1,6 @@
 {
   "team": "Coding",
+  "kind": "project",
   "description": "Coding team focused on development tools, LSL system, knowledge management, and transcript processing",
   "lowerOntologyPath": "src/ontology/lower/coding-ontology.json",
   "confidenceThreshold": 0.75,

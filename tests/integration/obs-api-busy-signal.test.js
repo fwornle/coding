@@ -121,7 +121,7 @@ describe('health-prompt-hook — what the operator is actually told', () => {
     generated_at: new Date().toISOString(),
     services: [
       { name: 'obs_api', status: obsApiStatus },
-      { name: 'vkb_server', status: 'running' }
+      { name: 'health_coordinator', status: 'running' }
     ],
     lsl_by_project: { coding: 'healthy' }
   });

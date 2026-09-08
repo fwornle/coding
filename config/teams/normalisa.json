@@ -1,0 +1,13 @@
+{
+  "team": "Normalisa",
+  "kind": "team",
+  "description": "Normalisa team \u2014 normalisation of data models and semantic alignment across domains",
+  "lowerOntologyPath": "src/ontology/lower/normalisa-ontology.json",
+  "confidenceThreshold": 0.7,
+  "validationMode": "lenient",
+  "strictValidation": false,
+  "classification": {
+    "preferHeuristics": true,
+    "heuristicThreshold": 0.8
+  }
+}

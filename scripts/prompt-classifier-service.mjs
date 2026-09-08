@@ -56,6 +56,52 @@ import {
 } from './lib/prompt-classifier-config.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * Secrets come from the repo's .env, not from the launchd plist.
+ *
+ * WHY THIS EXISTS. Backends name an env var to authenticate with
+ * (`api_key_env: QWEN_LOCAL_API_KEY`) and askBackend() reads
+ * `process.env[that]`. Nothing ever put it there: com.coding.prompt-classifier
+ * launches node directly with an `EnvironmentVariables` block containing only
+ * PATH, and this module loaded no .env. So the variable was structurally always
+ * undefined and the judge could never answer — measured on a live service,
+ * `asked: 18, answered: 0, failed: 18`, every one of them
+ * "QWEN_LOCAL_API_KEY not set". It failed open, so the caller's own band stood
+ * and nothing looked broken from outside; it simply never contributed.
+ *
+ * The mechanism follows rapid-llm-proxy's bin/start-llm-proxy.sh, whose own
+ * comment gives the reason: a key in .env rather than "the launchd plist
+ * (rebuild-on-edit, brittle)". No other com.coding.* service carries a secret
+ * in its plist and this one should not be the first.
+ *
+ * process.loadEnvFile does NOT overwrite variables already in the environment,
+ * verified rather than assumed, so an explicitly exported key still wins over
+ * the file — which keeps CLASSIFIER_* overrides and test harnesses working.
+ *
+ * Fails soft and SILENTLY on a missing file: a machine with no .env is a normal
+ * development machine, the backend's own "<VAR> not set" error already names
+ * the problem precisely, and this runs before the logger exists. The path is
+ * reported on /health so the answer to "not set where?" is one request away.
+ */
+const ENV_FILE = process.env.CLASSIFIER_ENV_FILE || path.join(REPO, '.env');
+let envFileLoaded = false;
+try {
+  // An EMPTY variable counts as set, and loadEnvFile will not replace it — so a
+  // wrapper that exports `QWEN_LOCAL_API_KEY=` (the usual shape of `export
+  // FOO="$FOO"` on an unset FOO) silently defeats this whole mechanism, and the
+  // resulting error is the same "not set" as having no .env at all. Found the
+  // hard way while proving this change. Nothing legitimately wants an empty
+  // bearer token, so treat empty as absent and let the file speak.
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v === '') delete process.env[k];
+  }
+  process.loadEnvFile(ENV_FILE);
+  envFileLoaded = true;
+} catch {
+  // Absent or unreadable. See above — the backend error is the better message.
+}
+
 const PORT = parseInt(process.env.CLASSIFIER_SERVICE_PORT || '12437', 10);
 const CONFIG_PATH = process.env.CLASSIFIER_CONFIG || path.join(REPO, 'config', 'prompt-classifier.yaml');
 const MAX_TEXT = parseInt(process.env.CLASSIFIER_MAX_TEXT || '4000', 10);
@@ -514,6 +560,17 @@ const server = http.createServer(async (req, res) => {
       network,
       configPath: cfg.source === 'file' ? CONFIG_PATH : null,
       configSource: cfg.source,
+      // Where secrets were looked for, and whether each backend's named variable
+      // actually arrived. NEVER the value — `hasKey` is a boolean because the
+      // question worth answering is "is it set", and a health endpoint that can
+      // leak a bearer token is a worse problem than the one it diagnoses.
+      //
+      // Here because "QWEN_LOCAL_API_KEY not set" on its own is unactionable:
+      // the reader's next question is always "not set WHERE", and the answer
+      // used to require reading a launchd plist to discover that nothing loaded
+      // a .env at all.
+      envFile: ENV_FILE,
+      envFileLoaded,
       // Present only when the file on disk is currently unusable. Absent means
       // "no problem", not "not checked" — a null here would read the same as a
       // healthy load and hide exactly the state worth seeing.
@@ -530,6 +587,12 @@ const server = http.createServer(async (req, res) => {
           requireNetwork: b.requireNetwork,
           enabled: b.enabled,
           selected: b.id === selected,
+          // Whether the variable this backend names is populated. A backend can
+          // be enabled, selected and perfectly reachable and still never answer,
+          // and that combination is otherwise indistinguishable from a network
+          // fault at a glance.
+          apiKeyEnv: b.apiKeyEnv ?? null,
+          hasKey: b.apiKeyEnv ? Boolean(process.env[b.apiKeyEnv]) : null,
           reachable: rt.reachable,
           lastLatencyMs: rt.lastLatencyMs,
           lastError: rt.lastError,

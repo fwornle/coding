@@ -33,10 +33,28 @@ async function dryRun(args = []) {
 }
 
 describe('the mutation manifest tells the truth about the chosen profile', () => {
+  /**
+   * The autostart unit this platform actually gets.
+   *
+   * install.sh filters the manifest by platform on purpose — "listing a systemd
+   * unit on macOS (or a LaunchAgent on Linux) makes the manifest look careless
+   * and undermines its purpose as a consent document". These assertions used to
+   * name the LaunchAgent unconditionally, which can only hold on macOS, so the
+   * suite was permanently red on CI's ubuntu-latest.
+   *
+   * That mattered beyond this file: a job that is always failing cannot report
+   * a NEW failure, and a genuinely broken suite hid behind these two for weeks.
+   * The fix is to assert the same property the installer implements, rather
+   * than the answer one developer's laptop happens to give.
+   */
+  const AUTOSTART_UNIT = process.platform === 'darwin'
+    ? /com\.coding\.llm-cli-proxy\.plist/
+    : /llm-cli-proxy\.service/;
+
   test('the default lists everything, exactly as before', async () => {
     const out = await dryRun();
     assert.match(out, /\.specstory\/history\//);
-    assert.match(out, /com\.coding\.llm-cli-proxy\.plist/);
+    assert.match(out, AUTOSTART_UNIT);
     assert.match(out, /Dry run — nothing was changed/);
   });
 
@@ -46,13 +64,13 @@ describe('the mutation manifest tells the truth about the chosen profile', () =>
     // promise the installer will not keep.
     const out = await dryRun(['--features=proxy-only']);
     assert.doesNotMatch(out, /\.specstory\/history\//, 'lsl is off, so no history checkout');
-    assert.match(out, /com\.coding\.llm-cli-proxy\.plist/, 'llm-proxy is on, so the plist stays');
+    assert.match(out, AUTOSTART_UNIT, 'llm-proxy is on, so the autostart unit stays');
   });
 
   test('minimal drops the proxy service too', async () => {
     const out = await dryRun(['--features=minimal']);
     assert.doesNotMatch(out, /\.specstory\/history\//);
-    assert.doesNotMatch(out, /com\.coding\.llm-cli-proxy\.plist/);
+    assert.doesNotMatch(out, AUTOSTART_UNIT);
   });
 
   test('the feature selection file is itself declared, in HOME scope', async () => {

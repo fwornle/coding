@@ -17,7 +17,7 @@ the historical single-stack behaviour. Upgrading changes nothing until the user 
 |----|------------------------|
 | `lsl` | verbatim session logging (`.specstory` markdown) |
 | `observations` | the observation → digest → insight pipeline |
-| `knowledge` | semantic analysis, UKB workflows, the knowledge graph, VKB |
+| `knowledge` | semantic analysis, UKB workflows, the knowledge graph |
 | `codegraph` | the graphify code knowledge graph |
 | `constraints` | constraint monitoring / guardrails |
 | `llm-proxy` | rapid-llm-proxy, routing and token accounting |
@@ -105,7 +105,6 @@ Started by `scripts/start-services-robust.js` (`SERVICE_CONFIGS`). Each entry ca
 | `transcriptMonitor` | Transcript Monitor | `lsl` |
 | `liveLoggingCoordinator` | Live Logging Coordinator | `lsl` |
 | `observationsApi` | Observations API | `observations` |
-| `vkbServer` | VKB Server | `knowledge` |
 | `constraintMonitor` | Constraint Monitor | `constraints` |
 | `llmCliProxy` | LLM CLI Proxy | `llm-proxy` |
 | `healthVerifier` | Health Verifier | `health` |
@@ -113,7 +112,7 @@ Started by `scripts/start-services-robust.js` (`SERVICE_CONFIGS`). Each entry ca
 | `systemHealthDashboardAPI` | System Health Dashboard API | `health` |
 | `systemHealthDashboardFrontend` | System Health Dashboard Frontend | `health` |
 
-`transcriptMonitor`, `liveLoggingCoordinator` and `vkbServer` are `required: true` today.
+`transcriptMonitor` and `liveLoggingCoordinator` are `required: true` today.
 Required-ness applies **only when the owning feature is on**; a disabled required service
 is a skip, not a blocked launch.
 
@@ -126,7 +125,6 @@ for programs whose feature is off.
 | program | command | feature |
 |---------|---------|---------|
 | `semantic-analysis` | `integrations/semantic-analysis/dist/sse-server.js` | `knowledge` |
-| `vkb-server` | `lib/vkb-server/express-server.js` | `knowledge` |
 | `embedding-listener` | `dist/embedding/listener.js` | `knowledge` |
 | `graphify` | `/usr/local/bin/graphify-serve.sh` | `codegraph` |
 | `constraint-monitor` | `integrations/constraint-monitor/src/sse-server.js` | `constraints` |
@@ -163,7 +161,6 @@ requirement.
 | 3848 | Semantic Analysis SSE | `knowledge` |
 | 3849 | Constraint Monitor SSE | `constraints` |
 | 3851 | Graphify HTTP MCP | `codegraph` |
-| 8080 | VKB Server | `knowledge` |
 | 12435 | rapid-llm-proxy | `llm-proxy` |
 | 12436 | Observations API | `observations` |
 | 12437 | Prompt classifier | `llm-proxy` |
@@ -324,7 +321,7 @@ identical everywhere.
 
 | command | feature |
 |---------|---------|
-| `bin/semantic`, `bin/vkb`, `bin/clean-knowledge-base`, `bin/fix-knowledge-base` | `knowledge` |
+| `bin/semantic`, `bin/clean-knowledge-base`, `bin/fix-knowledge-base` | `knowledge` |
 | `bin/graphify`, `bin/codegraph` | `codegraph` |
 | `bin/constraints` | `constraints` |
 | `bin/log-session` | `lsl` |
@@ -349,7 +346,7 @@ and always run.
 |------|---------|
 | `databases.leveldb_lock_check`, `leveldb_accessibility`, `graph_integrity` | `knowledge` |
 | `databases.qdrant_availability` | `knowledge` or `constraints` |
-| `services.vkb_server`, `semantic_analysis_sse` | `knowledge` |
+| `semantic_analysis_sse` | `knowledge` |
 | `services.constraint_monitor`, `dashboard_server` | `constraints` |
 | `services.health_dashboard_api`, `health_dashboard_frontend` | `health` |
 | `services.llm_cli_proxy` | `llm-proxy` |

@@ -82,7 +82,7 @@ test('leaves unrelated temp files alone, however old', (t) => {
   // is older than the retention window and every one must survive: age is the eligibility
   // rule only AFTER the name has been matched, never on its own.
   const others = [
-    seed(dir, 'vkb-server.pid', 30),
+    seed(dir, 'obs-api.pid', 30),
     seed(dir, 'kgbench-needles-4242.txt', 30),
     seed(dir, 'claude-something-else.json', 30),  // shares a word, not the prefix
     seed(dir, 'some-unrelated-file.json', 30),

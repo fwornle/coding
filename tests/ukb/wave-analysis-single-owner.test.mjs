@@ -31,12 +31,60 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SA = path.join(REPO_ROOT, 'integrations', 'semantic-analysis', 'src');
 
-const waveController = readFileSync(path.join(SA, 'agents', 'wave-controller.ts'), 'utf8');
-const waveTypes = readFileSync(path.join(SA, 'types', 'wave-types.ts'), 'utf8');
-const runWave = readFileSync(path.join(SA, 'run-wave-analysis.ts'), 'utf8');
-const runner = readFileSync(path.join(SA, 'workflow-runner.ts'), 'utf8');
-const tools = readFileSync(path.join(SA, 'tools.ts'), 'utf8');
+/**
+ * MOST OF THIS SUITE READS THE SUBMODULE, WHICH CI DOES NOT HAVE.
+ *
+ * The three pieces this file pins live in integrations/semantic-analysis, and
+ * .github/workflows/cross-platform-lite.yml checks out with `submodules: false`
+ * on purpose — "private submodules aren't reachable here". Reading them at
+ * module load therefore threw ENOENT before a single assertion ran, and took
+ * the whole file down with it: `not ok 122 - tests/ukb/wave-analysis-single-owner`,
+ * red on every run since the suite was added.
+ *
+ * A test that cannot pass where it runs is worse than no test, because it
+ * trains everyone to ignore a red check — and there were two other long-standing
+ * failures on that job for it to hide behind.
+ *
+ * So the submodule-dependent groups SKIP when the submodule is absent, and the
+ * obs-api group (which reads this repo) runs everywhere. Locally, where the
+ * submodule IS checked out, every assertion runs exactly as before — the
+ * coverage is not weakened, it is made honest about where it applies.
+ *
+ * A skipped `describe` does NOT enumerate its children, so node --test reports
+ * `skipped 0` and the summary looks identical to a run where nothing was
+ * missing. That is silent degradation of exactly the kind this file exists to
+ * catch, so the sentinel test below is skipped in its own right — it is the one
+ * thing that makes the count non-zero and prints the reason.
+ */
+function readOrNull(p) {
+  try {
+    return readFileSync(p, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+const waveController = readOrNull(path.join(SA, 'agents', 'wave-controller.ts'));
+const waveTypes = readOrNull(path.join(SA, 'types', 'wave-types.ts'));
+const runWave = readOrNull(path.join(SA, 'run-wave-analysis.ts'));
+const runner = readOrNull(path.join(SA, 'workflow-runner.ts'));
+const tools = readOrNull(path.join(SA, 'tools.ts'));
+// This one is in THIS repo, so it is always present and never gates a skip.
 const obsApi = readFileSync(path.join(REPO_ROOT, 'scripts', 'observations-api-server.mjs'), 'utf8');
+
+const HAVE_SUBMODULE = [waveController, waveTypes, runWave, runner, tools].every(Boolean);
+const SKIP_NO_SUBMODULE = HAVE_SUBMODULE
+  ? false
+  : 'integrations/semantic-analysis is not checked out (CI uses submodules: false)';
+
+/**
+ * The sentinel. Its only job is to move the `skipped` counter off zero and put
+ * the reason in the output, so a run that checked five of six groups cannot be
+ * mistaken for a run that checked all six.
+ */
+test('the submodule-dependent groups are running', { skip: SKIP_NO_SUBMODULE }, () => {
+  assert.ok(HAVE_SUBMODULE);
+});
 
 /**
  * Strip comments so "does not contain X" assertions test CODE, not prose.
@@ -47,7 +95,7 @@ function code(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 }
 
-describe('WaveController can borrow the owner\'s store', () => {
+describe('WaveController can borrow the owner\'s store', { skip: SKIP_NO_SUBMODULE }, () => {
   test('the config accepts an already-open store', () => {
     assert.match(waveTypes, /kmStore\?: KmStoreHandle/);
   });
@@ -77,7 +125,7 @@ describe('WaveController can borrow the owner\'s store', () => {
   });
 });
 
-describe('one shared run implementation', () => {
+describe('one shared run implementation', { skip: SKIP_NO_SUBMODULE }, () => {
   test('run-wave-analysis owns the state machine and the terminal write', () => {
     assert.match(runWave, /export async function runWaveAnalysis/);
     assert.match(runWave, /writeTerminalState\(progressFile, 'completed', summary\)/);
@@ -145,7 +193,7 @@ describe('obs-api exposes the in-process run', () => {
   });
 });
 
-describe('tools.ts routes wave-analysis to the owner', () => {
+describe('tools.ts routes wave-analysis to the owner', { skip: SKIP_NO_SUBMODULE }, () => {
   test('it dispatches over HTTP instead of spawning a child', () => {
     assert.match(tools, /if \(resolvedWorkflowName === 'wave-analysis'\) \{/);
     assert.match(tools, /\/api\/workflows\/wave-analysis\/run/);
@@ -164,7 +212,7 @@ describe('tools.ts routes wave-analysis to the owner', () => {
   });
 });
 
-describe('the host run sees the host filesystem', () => {
+describe('the host run sees the host filesystem', { skip: SKIP_NO_SUBMODULE }, () => {
   test('obs-api fills CODING_REPO from its own location when unset', () => {
     // launchd inherits no shell environment. Without this, every module that
     // resolves the repo from CODING_REPO/CODING_TOOLS_PATH/CODING_ROOT falls
@@ -177,7 +225,7 @@ describe('the host run sees the host filesystem', () => {
 
 });
 
-describe('both callers get trace history', () => {
+describe('both callers get trace history', { skip: SKIP_NO_SUBMODULE }, () => {
   test('run-wave-analysis owns saveTraceHistory', () => {
     assert.match(runWave, /export function saveTraceHistory\(/);
     assert.match(runWave, /saveTraceHistory\(repositoryPath, progressSnapshot, 'wave-analysis', logLine/);

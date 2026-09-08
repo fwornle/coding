@@ -1070,12 +1070,10 @@ class CombinedStatusLine {
       const servicesPath = join(rootDir, '.services-running.json');
 
       // Check which services are healthy
-      const vkbHealthy = await this.checkHttpHealth('http://localhost:8080/health');
       const constraintHealthy = await this.checkHttpHealth('http://localhost:3031/api/health');
       const healthApiHealthy = await this.checkHttpHealth('http://localhost:3033/api/health');
 
       const servicesRunning = [];
-      if (vkbHealthy) servicesRunning.push('vkb-server');
       if (constraintHealthy) servicesRunning.push('constraint-monitor');
       if (healthApiHealthy) servicesRunning.push('health-verifier');
 
@@ -1093,12 +1091,6 @@ class CombinedStatusLine {
         semantic_analysis: {
           status: '✅ OPERATIONAL',
           health: 'healthy'  // MCP via stdio - healthy if Claude session is active
-        },
-        vkb_server: {
-          status: vkbHealthy ? '✅ OPERATIONAL' : '⚠️ DEGRADED',
-          port: 8080,
-          health: vkbHealthy ? 'healthy' : 'degraded',
-          last_check: new Date().toISOString()
         },
         system_health_dashboard: {
           status: healthApiHealthy ? '✅ OPERATIONAL' : '⚠️ DEGRADED',

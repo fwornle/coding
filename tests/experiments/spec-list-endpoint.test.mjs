@@ -1,6 +1,6 @@
 // tests/experiments/spec-list-endpoint.test.mjs
 //
-// Phase 85-04 (Wave 3) — handleSpecList on lib/vkb-server/api-routes.js.
+// Phase 85-04 (Wave 3) — handleSpecList on lib/experiments/experiment-api.mjs.
 // D-09: preview the resolved variant matrix for every config/experiments/*.yaml.
 // cellCount === variantCount * repeats. A MALFORMED spec is LISTED with
 // { file, error }, NOT fatal — the endpoint still 200s with the rest.
@@ -38,8 +38,8 @@ function makeRepoRoot(label) {
 }
 
 async function makeCtx(repoRoot) {
-  const { ApiRoutes } = await import('../../lib/vkb-server/api-routes.js');
-  const ctx = Object.create(ApiRoutes.prototype);
+  const { ExperimentApi } = await import('../../lib/experiments/experiment-api.mjs');
+  const ctx = Object.create(ExperimentApi.prototype);
   ctx.experimentRepoRoot = repoRoot;
   return ctx;
 }

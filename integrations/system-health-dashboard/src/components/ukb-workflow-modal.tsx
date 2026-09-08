@@ -2108,7 +2108,14 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   View Trace
                 </Button>
               )}
-              {activeProcesses.length > 0 && (
+              {/* The run-control toolbar (LLM mode, single-step, Cancel) acts on the
+                  ACTIVE workflow. It used to render whenever any workflow was
+                  active, including while the user was reading a COMPLETED run in
+                  the History tab — so a finished run showed a live "Cancel
+                  Workflow" button that would have cancelled a different,
+                  still-running workflow. Hide it whenever a historical run is
+                  being displayed. */}
+              {activeProcesses.length > 0 && !selectedHistoricalWorkflowState && (
                 <>
                   {/* Global LLM Mode Control */}
                   <div className="flex items-center gap-2 border-r pr-3 mr-1">

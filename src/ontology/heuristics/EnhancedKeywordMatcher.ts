@@ -49,7 +49,7 @@ export class EnhancedKeywordMatcher {
     // Get teams to search
     const teams = team
       ? [team]
-      : ['Coding', 'RaaS', 'ReSi', 'Agentic', 'UI'];
+      : ['Coding', 'RaaS', 'ReSi', 'UI', 'Normalisa'];
     const teamScores = new Map<string, KeywordScore>();
 
     // Score each team

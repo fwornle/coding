@@ -103,7 +103,6 @@ nav:
   - Core Systems:
     - Overview: core-systems/index.md
     - Live Session Logging: core-systems/lsl.md
-    - Knowledge Management: core-systems/ukb-vkb.md
     - Ontology: core-systems/ontology.md
     - Constraints: core-systems/constraints.md
     - Observational Memory: core-systems/observational-memory.md
@@ -147,7 +146,6 @@ nav:
     - LLM Providers: guides/llm-providers.md
     - Constraint Testing: guides/constraint-testing.md
     - Continuous Integration: ci/README.md
-    - VKB Visualization: guides/vkb-visualization.md
     - Knowledge Workflows: guides/knowledge-workflows.md
     - Skills System: guides/skills-system.md
   - Reference:

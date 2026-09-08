@@ -1,12 +1,12 @@
 // tests/experiments/runs-endpoint.test.mjs
 //
 // DASH-01 RED test (Phase 74, Wave 0): the `GET /api/experiments/runs` endpoint
-// handler `handleRunsQuery` on `lib/vkb-server/api-routes.js` (ApiRoutes). This
+// handler `handleRunsQuery` on `lib/experiments/experiment-api.mjs` (ExperimentApi). This
 // test MUST currently fail — `handleRunsQuery` is not yet defined (it depends on
 // the unwritten `lib/experiments/query.mjs`). Plan 02 turns it GREEN.
 //
 // Isolation idiom mirrors score-override-endpoint.test.mjs: invoke the handler via
-// `Object.create(ApiRoutes.prototype)` with `experimentRepoRoot` pointing at the
+// `Object.create(ExperimentApi.prototype)` with `experimentRepoRoot` pointing at the
 // seeded throwaway repo-root — exercising the route WITHOUT the heavy
 // DatabaseManager-backed constructor and WITHOUT touching the real store.
 //
@@ -26,8 +26,8 @@ function mockRes() {
 
 /** A handler `this` with the isolated experiment repo-root, no heavy constructor. */
 async function makeHandlerThis(repoRoot) {
-  const { ApiRoutes } = await import('../../lib/vkb-server/api-routes.js');
-  const ctx = Object.create(ApiRoutes.prototype);
+  const { ExperimentApi } = await import('../../lib/experiments/experiment-api.mjs');
+  const ctx = Object.create(ExperimentApi.prototype);
   ctx.experimentRepoRoot = repoRoot;
   return ctx;
 }

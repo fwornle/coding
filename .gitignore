@@ -487,3 +487,4 @@ local_cache/
 # equivalent — was never ignored and did show up as untracked noise; not
 # repeating that here.)
 .observations/pi-sessions/
+.data/fastembed-cache/

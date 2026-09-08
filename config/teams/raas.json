@@ -1,5 +1,6 @@
 {
   "team": "RaaS",
+  "kind": "team",
   "description": "Research as a Service team focused on research methodologies, academic processes, and knowledge synthesis",
   "lowerOntologyPath": "src/ontology/lower/raas-ontology.json",
   "confidenceThreshold": 0.7,
