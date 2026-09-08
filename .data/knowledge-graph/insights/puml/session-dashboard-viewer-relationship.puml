@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SessionDashboardViewer
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[SessionDashboardViewer] as session_dashboard_viewer #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[MultiUserSessionRouter] as multi_user_session_router #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[TranscriptAdapterFramework] as transcript_adapter_framework #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+live_logging_system --> session_dashboard_viewer
+lslconfig_validator -[hidden]- session_dashboard_viewer
+redaction_config_manager -[hidden]- session_dashboard_viewer
+multi_user_session_router -[hidden]- session_dashboard_viewer
+operational_logger -[hidden]- session_dashboard_viewer
+transcript_adapter_framework -[hidden]- session_dashboard_viewer
+specstory_adapter -[hidden]- session_dashboard_viewer
+
+@enduml

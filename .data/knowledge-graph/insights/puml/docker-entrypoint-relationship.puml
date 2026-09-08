@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DockerEntrypoint
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[DockerEntrypoint] as docker_entrypoint #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+[StartServicesRobust] as start_services_robust #F0F0F0
+[ServiceWrapperScripts] as service_wrapper_scripts #F0F0F0
+[FeatureGatingBridge] as feature_gating_bridge #E8F5E8
+[HostEnvImportFilter] as host_env_import_filter #E8F5E8
+
+dockerized_services --> docker_entrypoint
+service_starter -[hidden]- docker_entrypoint
+service_probe -[hidden]- docker_entrypoint
+process_state_manager -[hidden]- docker_entrypoint
+llmmock_service -[hidden]- docker_entrypoint
+start_services_robust -[hidden]- docker_entrypoint
+service_wrapper_scripts -[hidden]- docker_entrypoint
+docker_entrypoint --> feature_gating_bridge
+docker_entrypoint --> host_env_import_filter
+
+@enduml

@@ -1,36 +1,38 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Manual Authoring" {
-  component "cli.js" as cli <<cli>>
+package "CLI Entry Points" {
+  component "ukb-database/cli.js" as dbcli <<cli>>
+  component "ukb-unified/cli.js" as unicli <<cli>>
+  component "WorkflowOrchestrator" as orchestrator <<core>>
+  component "TeamCheckpointManager" as checkpoint <<core>>
+  component "GapAnalyzer" as gap <<core>>
+}
+
+package "Knowledge Store Access" {
   component "UKBDatabaseWriter" as writer <<core>>
+  component "VkbApiClient" as vkbclient <<api>>
+  database "SQLite + Qdrant" as db <<storage>>
+  cloud "VKB Server :8080" as vkbserver <<external>>
 }
 
-package "VKB Server" {
-  component "ApiRoutes" as api <<api>>
-  component "_getWriter(team)" as getWriter <<core>>
+package "Dashboard UI" {
+  component "ukb-workflow-modal.tsx\n(calculateDynamicEta)" as modal <<agent>>
+  component "multi-agent-graph.tsx\n(WAVE_AGENTS)" as graph <<agent>>
 }
 
-package "Storage Backends" {
-  database "SQLite (analytics)" as sqlite
-  database "Qdrant (vector)" as qdrant
-  database "GraphDB" as graphdb
-}
+dbcli --> writer : "storeEntity/storeRelation"
+dbcli ..> vkbserver : "isVKBRunning() check\n(update only)"
+writer --> db : "direct writes"
 
-component "data-processor.js" as dataProcessor <<core>>
+unicli --> checkpoint : "load .data/ukb-last-run.json"
+unicli --> gap : "getGapSummary"
+unicli --> orchestrator : "executeIncrementalWorkflow"
+orchestrator --> vkbclient : "createEntity/updateEntity"
+vkbclient --> vkbserver : "HTTP /api/health, /api/entity"
+vkbserver --> db : "server-mediated writes"
 
-cli --> writer : "add/update/import/export"
-cli --> api : "sendToVKB() if running"
-cli --> writer : "fallback direct write"
-
-api --> getWriter : "per-team lookup"
-getWriter --> writer : "creates instance"
-
-writer --> sqlite : "writes analytics"
-writer --> qdrant : "optional vector index"
-writer --> graphdb : "writes graph data"
-
-writer --> dataProcessor : "manual entities (source != 'auto')"
-dataProcessor --> dataProcessor : "tag as 'batch'"
+modal --> vkbserver : "GET /api/ukb/history"
+graph --> orchestrator : "reads execution steps"
 
 @enduml

@@ -1,37 +1,37 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Wrapper Scripts" {
-  component "api-service.js" as api <<cli>>
-  component "dashboard-service.js" as dash <<cli>>
-}
-
-package "Runtime Support" {
-  component "CODING_REPO Path Resolver" as pathres <<core>>
-  component "Path Existence Checker" as checker <<core>>
-  component "Signal Forwarder\n(SIGTERM/SIGINT)" as sig <<core>>
-}
-
-package "Process Management" {
-  component "Spawned Target Process" as target <<external>>
+package "Process Supervisor" {
+  component "Supervisor\n(SIGTERM/SIGINT)" as supervisor <<core>>
   component "ProcessStateManager" as psm <<core>>
-  database "Docker stdout/stderr" as stdio <<storage>>
 }
 
-api --> pathres : "resolve paths"
-dash --> pathres : "resolve paths"
+package "Wrapper Scripts" {
+  component "api-service.js" as apiWrapper <<cli>>
+  component "dashboard-service.js" as dashWrapper <<cli>>
+}
 
-pathres --> checker : "verify existence"
-checker --> target : "spawn if valid"
+package "Child Services" {
+  component "dashboard-server.js\n(constraint-monitor)" as apiChild <<api>>
+  component "Next.js Dev Server\n(dashboard)" as dashChild <<api>>
+}
 
-target --> stdio : "inherited stdio"
+supervisor --> apiWrapper : "sends SIGTERM/SIGINT"
+supervisor --> dashWrapper : "sends SIGTERM/SIGINT"
 
-api --> sig : "install handlers"
-dash --> sig : "install handlers"
-sig --> target : "forward signals"
+apiWrapper --> apiChild : "spawn node src/dashboard-server.js\n(PORT, DASHBOARD_PORT env)"
+dashWrapper --> dashChild : "spawn npm run dev\n(NEXT_PUBLIC_API_BASE_URL hardcoded)"
 
-api --> psm : "register/unregister"
-dash --> psm : "register/unregister"
-psm --> target : "track lifecycle"
+apiWrapper --> apiChild : "forwards signal via child.kill()"
+dashWrapper --> dashChild : "forwards signal via child.kill()"
+
+apiWrapper --> psm : "register 'constraint-api-child'\n(type:'global')"
+dashWrapper --> psm : "register 'constraint-dashboard-child'\n(type:'global')"
+
+apiChild ..> psm : "unregister on 'exit'"
+dashChild ..> psm : "unregister on 'exit'"
+
+psm ..> apiWrapper : "registration failure\n(logged, non-fatal)"
+psm ..> dashWrapper : "registration failure\n(logged, non-fatal)"
 
 @enduml

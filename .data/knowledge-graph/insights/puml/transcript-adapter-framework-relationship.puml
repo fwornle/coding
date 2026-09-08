@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TranscriptAdapterFramework
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TranscriptAdapterFramework] as transcript_adapter_framework #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[MultiUserSessionRouter] as multi_user_session_router #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[SessionDashboardViewer] as session_dashboard_viewer #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+live_logging_system --> transcript_adapter_framework
+lslconfig_validator -[hidden]- transcript_adapter_framework
+redaction_config_manager -[hidden]- transcript_adapter_framework
+multi_user_session_router -[hidden]- transcript_adapter_framework
+operational_logger -[hidden]- transcript_adapter_framework
+session_dashboard_viewer -[hidden]- transcript_adapter_framework
+specstory_adapter -[hidden]- transcript_adapter_framework
+
+@enduml

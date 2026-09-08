@@ -1,0 +1,42 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Entrypoint Pre-Flight" {
+  component "wait_for_service()\nTCP probe /dev/tcp" as waitsvc <<core>>
+  component ".env Loader\n(secrets denylist filter)" as envfilter <<core>>
+  component "Feature Gating Block\n(features.json → supervisord.d)" as featgate <<core>>
+}
+
+package "Runtime Supervision" {
+  component "supervisord" as supervisord <<core>>
+  component "api-service.js" as apisvc <<agent>>
+  component "dashboard-service.js" as dashsvc <<agent>>
+  component "service-starter.js\nwithDeadline / retry+backoff" as starter <<core>>
+}
+
+database "Qdrant" as qdrant
+database "Redis" as redis
+component "ProcessStateManager" as psm <<core>>
+component "generate-docker-mcp-config.sh" as mcpgen <<cli>>
+cloud "llm-cli-proxy :12435" as proxy <<external>>
+
+waitsvc ..> qdrant : "TCP probe (best-effort)"
+waitsvc ..> redis : "TCP probe (best-effort)"
+envfilter ..> proxy : "prevents SDK bypass"
+featgate --> supervisord : "writes autostart=false includes"
+envfilter --> supervisord : "exec \"$@\" handoff"
+
+supervisord --> apisvc : "spawns"
+supervisord --> dashsvc : "spawns"
+supervisord --> starter : "invokes for managed services"
+
+apisvc --> psm : "post-spawn registration (async)"
+dashsvc --> psm : "post-spawn registration (async)"
+dashsvc ..> apisvc : "hardcoded localhost:3031"
+
+starter --> qdrant : "health-check w/ deadline"
+starter --> redis : "health-check w/ deadline"
+
+mcpgen ..> featgate : "shares feature-flag snapshot logic"
+
+@enduml

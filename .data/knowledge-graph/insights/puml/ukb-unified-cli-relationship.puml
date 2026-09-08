@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: UkbUnifiedCli
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[UkbUnifiedCli] as ukb_unified_cli #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[VkbServer] as vkb_server #F0F0F0
+
+knowledge_management --> ukb_unified_cli
+manual_learning -[hidden]- ukb_unified_cli
+online_learning -[hidden]- ukb_unified_cli
+vkb_server -[hidden]- ukb_unified_cli
+
+@enduml

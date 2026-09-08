@@ -8,16 +8,20 @@ title Hierarchy Context: ProcessStateManager
 [ServiceStarter] as service_starter #F0F0F0
 [ServiceProbe] as service_probe #F0F0F0
 [LLMMockService] as llmmock_service #F0F0F0
-[HealthCoordinator] as health_coordinator #F0F0F0
+[DockerEntrypoint] as docker_entrypoint #F0F0F0
+[StartServicesRobust] as start_services_robust #F0F0F0
 [ServiceWrapperScripts] as service_wrapper_scripts #F0F0F0
-[RegistrationAPI] as registration_api #E8F5E8
+[ServiceRegistration] as service_registration #E8F5E8
+[PsmIntegrationInStartupOrchestration] as psm_integration_in_startup_orchestration #E8F5E8
 
 dockerized_services --> process_state_manager
 service_starter -[hidden]- process_state_manager
 service_probe -[hidden]- process_state_manager
 llmmock_service -[hidden]- process_state_manager
-health_coordinator -[hidden]- process_state_manager
+docker_entrypoint -[hidden]- process_state_manager
+start_services_robust -[hidden]- process_state_manager
 service_wrapper_scripts -[hidden]- process_state_manager
-process_state_manager --> registration_api
+process_state_manager --> service_registration
+process_state_manager --> psm_integration_in_startup_orchestration
 
 @enduml

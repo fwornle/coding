@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: StartServicesRobust
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[StartServicesRobust] as start_services_robust #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[LLMMockService] as llmmock_service #F0F0F0
+[DockerEntrypoint] as docker_entrypoint #F0F0F0
+[ServiceWrapperScripts] as service_wrapper_scripts #F0F0F0
+[KillProcessOnPortAndWait] as kill_process_on_port_and_wait #E8F5E8
+[WaitForPortBindable] as wait_for_port_bindable #E8F5E8
+[WrapperPsmRegistrationRace] as wrapper_psm_registration_race #E8F5E8
+
+dockerized_services --> start_services_robust
+service_starter -[hidden]- start_services_robust
+service_probe -[hidden]- start_services_robust
+process_state_manager -[hidden]- start_services_robust
+llmmock_service -[hidden]- start_services_robust
+docker_entrypoint -[hidden]- start_services_robust
+service_wrapper_scripts -[hidden]- start_services_robust
+start_services_robust --> kill_process_on_port_and_wait
+start_services_robust --> wait_for_port_bindable
+start_services_robust --> wrapper_psm_registration_race
+
+@enduml

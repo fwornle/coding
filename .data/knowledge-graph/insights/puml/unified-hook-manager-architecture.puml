@@ -1,31 +1,45 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Configuration" {
-  component "HookConfigLoader" as loader <<core>>
+package "Bridge Layer" {
+  component "claude-bridge.js\nmain()" as bridge <<agent>>
+  component "transformContext()\nEVENT_MAP" as transform <<agent>>
+}
+
+package "Unified Hook System" {
+  component "UnifiedHookManager" as uhm <<core>>
+  component "registerHandler()\nfindIndex+replace, sort" as register <<core>>
+  component "loadConfig()\nuser then project" as loadcfg <<core>>
+  component "executeHooks()\nenabled/agents filter\ndual stopOnError" as execute <<core>>
+}
+
+package "Legacy Hook System" {
+  component "HooksManager\n(hooks-api.js)" as hooksapi <<core>>
+  component "registerHook()\nalways push, no dedup" as regnodup <<core>>
+  component "triggerHook()\nfail-open loop" as trigger <<core>>
+}
+
+package "Tooling" {
+  component "migration-tool.js\nwriteUnifiedConfig()" as migrate <<cli>>
   database "hooks.json" as hooksjson
 }
 
-package "UnifiedHookManager" {
-  component "Handler Registry\n(priority-sorted per event)" as registry <<core>>
-  component "Dispatch Logic" as dispatch <<core>>
-  component "Handler-Type Resolver" as resolver <<core>>
-}
+bridge --> transform : "translate agent-native event"
+transform --> uhm : "dynamic import()"
+bridge ..> bridge : "fail-open on error\n(decision:allow, exit 0)"
 
-package "Handler Execution" {
-  component "Script Handler" as script <<external>>
-  component "Command Handler" as command <<external>>
-  component "Module Handler" as module <<core>>
-  component "Agent-Scoped Handler" as agent <<agent>>
-}
+uhm --> loadcfg : "initialize()"
+loadcfg --> register : "per handler entry"
+register --> uhm : "handlers Map<event,[]>"
+uhm --> execute : "dispatch on event"
+execute --> execute : "script/command/module\nstrategy dispatch"
 
-hooksjson --> loader : "raw config"
-loader --> registry : "merged config"
-registry --> dispatch : "priority order"
-dispatch --> resolver : "handler type"
-resolver --> script : "invokes"
-resolver --> command : "invokes"
-resolver --> module : "invokes"
-resolver --> agent : "scoped dispatch"
+hooksapi --> regnodup : "no ID guard"
+hooksapi --> trigger : "fail-open try/catch"
+
+migrate --> hooksjson : "direct JSON write\n(bypasses registerHandler)"
+loadcfg --> hooksjson : "reads project/user config"
+
+uhm ..> hooksapi : "structurally duplicated\n(no shared base class)"
 
 @enduml

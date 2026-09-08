@@ -1,0 +1,29 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Shell Resilience (verify-patterns.sh)" {
+  component "set -euo pipefail" as strict <<core>>
+  component "rg command || echo 0" as fallback <<core>>
+  component "Compliance Score Calc" as score <<core>>
+  component "Atomic Write (.tmp + mv)" as atomicwrite <<core>>
+  database "SHARED_MEMORY.json" as sharedmem
+}
+
+package "Heuristic Resilience (EntityPatternAnalyzer.ts)" {
+  component "extractArtifacts()\n(regex passes + Set dedup)" as extract <<core>>
+  component "checkLocalArtifact()\n(0.9 confidence)" as localcheck <<core>>
+  component "matchArtifactPattern()\n(0.75 confidence)" as patternmatch <<core>>
+  component "analyzeEntityPatterns()" as analyze <<core>>
+}
+
+strict --> fallback : "guards rg exit codes"
+fallback --> score : "feeds counts into"
+score --> sharedmem : "writes report"
+atomicwrite --> sharedmem : "safe persist (tmp+mv)"
+
+analyze --> extract : "step 0: gather artifacts"
+extract --> localcheck : "step a: try directory lookup"
+localcheck --> patternmatch : "fallback on miss"
+patternmatch --> analyze : "returns lower-confidence result"
+
+@enduml

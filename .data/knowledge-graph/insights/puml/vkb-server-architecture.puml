@@ -1,39 +1,38 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "CLI / Lifecycle" {
-  component "vkb-cli\n(server start/stop/status)" as cli <<cli>>
+package "Health Coordination" {
   component "VKBServer" as vkbserver <<core>>
-  component "restartVKBServer\n(health-remediation)" as restarter <<agent>>
+  component "restartVKBServer" as restart <<agent>>
 }
 
-package "API Layer" {
-  component "ApiRoutes\n(registerRoutes)" as apiroutes <<api>>
-  component "KnowledgeQueryService" as kqs <<core>>
-  component "db-query-cli.js" as dbcli <<cli>>
+package "HTTP Client Layer" {
+  component "VkbApiClient\n(isServerAvailable)" as apiclient <<api>>
+  component "cli.js\n(isVKBRunning/sendToVKB)" as clicli <<cli>>
 }
 
-package "Data Layer" {
-  database "GraphDB\n(database Manager.graphDB)" as graphdb <<storage>>
-  component "DataProcessor\n(prepareData)" as dataproc <<core>>
-  component "memory.json" as memoryjson <<storage>>
+package "Persistence Layer" {
+  database "DatabaseManager\n+ UKBDatabaseWriter" as dbmgr <<storage>>
+  database "SQLite / Qdrant /\nGraphDB (.data/knowledge-graph)" as storage <<storage>>
 }
 
-cloud "VkbApiClient\n(isServerAvailable)" as apiclient <<external>>
+package "Dashboard Visualization" {
+  component "multi-agent-graph.tsx\n(WAVE_AGENTS)" as graphviz <<external>>
+  component "ukb-workflow-modal.tsx\n(calculateDynamicEta)" as etamodal <<external>>
+}
 
-cli --> vkbserver : "manages lifecycle"
-restarter --> vkbserver : "supervisorctlRestart"
-restarter --> restarter : "log"
+restart --> vkbserver : "restarts on failure"
+restart --> restart : "supervisorctlRestart, log"
 
-vkbserver --> apiroutes : "hosts endpoints"
-apiroutes --> kqs : "builds from graphDB"
-kqs --> graphdb : "queries"
-dbcli --> kqs : "shells out to"
+apiclient --> vkbserver : "HTTP GET /api/health\n(lenient check)"
+clicli --> vkbserver : "HTTP GET /api/health\n(duplicate lenient check)"
 
-apiclient --> apiroutes : "GET /api/health\n(2s timeout probe)"
+clicli --> dbmgr : "direct write (add-entity/relation)"
+clicli --> vkbserver : "HTTP write (update-entity, if running)"
+dbmgr --> storage : "initialize()/write"
+vkbserver ..> dbmgr : "potential cache/state divergence"
 
-dataproc --> memoryjson : "deletes & regenerates"
-dataproc --> graphdb : "batch/online/combined mode"
-apiroutes --> dataproc : "/api/export, /api/query"
+graphviz ..> vkbserver : "stale 'GraphDB+LevelDB' reference"
+etamodal ..> vkbserver : "client-side ETA, no backend contract"
 
 @enduml

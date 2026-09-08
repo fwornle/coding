@@ -1,33 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "CLI & Orchestration" {
-  component "cli.js" as cli <<cli>>
-  component "GapAnalyzer" as gap <<core>>
-  component "TeamCheckpointManager" as ckpt <<core>>
-  component "WorkflowOrchestrator" as orch <<core>>
+package "Dashboard UI" {
+  component "ukb-workflow-modal.tsx" as modal <<core>>
+  component "calculateDynamicEta()" as dynEta <<core>>
+  component "calculateStepAwareEta()" as legacyEta <<core>>
+  component "multi-agent-graph.tsx" as graph <<core>>
+  component "AGENT_SUBSTEPS" as substeps <<core>>
+  component "WAVE_AGENTS" as waveAgents <<core>>
 }
 
-package "Automated Extraction" {
-  component "MCP Tools\n(execute_workflow)" as mcp <<external>>
-  component "AGENT_SUBSTEPS Pipeline\n(kg_operators, git_history)" as substeps <<agent>>
+package "Knowledge Store Access Paths" {
+  component "ukb-database/cli.js" as dbCli <<cli>>
+  component "ukb-unified/cli.js (UKBCli)" as unifiedCli <<cli>>
+  component "VkbApiClient" as vkbClient <<api>>
 }
 
-package "Data & Visualization" {
-  database "GraphDB" as graphdb <<storage>>
-  component "data-processor.js\nexportOnlineKnowledge()" as dproc <<core>>
-  component "ukb-workflow-modal.tsx\ncalculateDynamicEta()" as eta <<core>>
+package "Backend Store" {
+  database "SQLite + Qdrant + GraphDB" as store
+  cloud "VKB Server (port 8080)" as vkbServer
 }
 
-cli --> ckpt : "loads checkpoint"
-cli --> gap : "getGapSummary()"
-gap --> orch : "gap scope (sinceCommit, commits, sessions)"
-orch --> mcp : "checkMCPToolsAvailability()"
-orch ..> orch : "fallback mock*Workflow"
-mcp --> substeps : "executeIncrementalWorkflow()"
-substeps --> graphdb : "writes auto-extracted entities"
-substeps --> eta : "batchIterations timing"
-graphdb --> dproc : "queryEntities(team, limit:5000)"
-dproc --> dproc : "source 'auto' -> 'online'"
+modal --> dynEta : "computes batch-aware ETA"
+legacyEta --> dynEta : "delegates (legacy shim)"
+modal --> legacyEta : "some call sites use"
+
+graph --> substeps : "renders LLM-tier map"
+graph --> waveAgents : "fallback for historical view"
+
+dbCli --> store : "direct writes"
+unifiedCli --> store : "orchestrated incremental writes"
+vkbClient --> vkbServer : "HTTP CRUD + isServerAvailable()"
+vkbServer --> store : "enforces validation/decay"
+
+modal ..> unifiedCli : "reflects pipeline state"
+graph ..> unifiedCli : "visualizes agent pipeline"
 
 @enduml

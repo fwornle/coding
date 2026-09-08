@@ -11,11 +11,13 @@ title Hierarchy Context: LiveLoggingSystem
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[LslSessionDashboard] as lsl_session_dashboard #E8F5E8
-[TranscriptAdapterAPI] as transcript_adapter_api #E8F5E8
-[BackendLoggerCore] as backend_logger_core #E8F5E8
+[LSLConfigValidator] as lslconfig_validator #E8F5E8
+[RedactionConfigManager] as redaction_config_manager #E8F5E8
+[MultiUserSessionRouter] as multi_user_session_router #E8F5E8
+[OperationalLogger] as operational_logger #E8F5E8
+[TranscriptAdapterFramework] as transcript_adapter_framework #E8F5E8
+[SessionDashboardViewer] as session_dashboard_viewer #E8F5E8
 [SpecstoryAdapter] as specstory_adapter #E8F5E8
-[ProgressFireTrigger] as progress_fire_trigger #E8F5E8
 
 coding --> live_logging_system
 llmabstraction -[hidden]- live_logging_system
@@ -24,10 +26,12 @@ knowledge_management -[hidden]- live_logging_system
 coding_patterns -[hidden]- live_logging_system
 constraint_system -[hidden]- live_logging_system
 semantic_analysis -[hidden]- live_logging_system
-live_logging_system --> lsl_session_dashboard
-live_logging_system --> transcript_adapter_api
-live_logging_system --> backend_logger_core
+live_logging_system --> lslconfig_validator
+live_logging_system --> redaction_config_manager
+live_logging_system --> multi_user_session_router
+live_logging_system --> operational_logger
+live_logging_system --> transcript_adapter_framework
+live_logging_system --> session_dashboard_viewer
 live_logging_system --> specstory_adapter
-live_logging_system --> progress_fire_trigger
 
 @enduml

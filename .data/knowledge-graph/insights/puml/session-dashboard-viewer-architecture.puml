@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Frontend Dashboard" {
+  component "lsl-sessions.tsx" as viewer <<cli>>
+  component "iframe viewerSrc (pi shell)" as iframe <<external>>
+}
+
+package "Backend API" {
+  component "lsl-sessions.mjs" as api <<api>>
+  component "readSession()" as readSession <<core>>
+  component "discoverProjects()" as discover <<core>>
+  component "peekMeta()" as peek <<core>>
+  component "aliasToolNames()" as alias <<core>>
+}
+
+package "Transcript Adapter Layer" {
+  component "TranscriptAdapter" as adapter <<core>>
+  component "ClaudeParser" as claude <<agent>>
+  database "LSL Entries (.jsonl/.md)" as lsl <<storage>>
+}
+
+viewer --> api : "polls SYSTEM_HEALTH_API_PORT (30s + visibilitychange)"
+viewer --> iframe : "embeds for transcript render"
+api --> readSession : "dual jsonl/markdown ingestion"
+api --> discover : "container vs host root resolution"
+api --> peek : "cheap string prefilter"
+api --> alias : "render-time tool renaming"
+
+readSession --> adapter : "reuses backfill conversion"
+adapter --> claude : "delegates via Adapter pattern"
+claude --> lsl : "converts JSONL to unified entries"
+adapter --> lsl : "watchTranscripts() polling diff"
+readSession --> lsl : "reads chain-based sessions"
+
+@enduml

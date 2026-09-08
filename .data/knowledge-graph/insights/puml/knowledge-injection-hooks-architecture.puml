@@ -1,36 +1,41 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Hook Scripts" {
+package "Claude Code Hook" {
   component "knowledge-injection-hook.js" as hook <<core>>
-  component "knowledge-injection-pi.js" as pihook <<core>>
-  component "isInjectionEnabled()" as enabled <<core>>
-  component "extractConversationTopics()" as topics <<core>>
-  component "resolveTargetFile()" as resolve <<core>>
+  component "isInjectionEnabled()" as gate <<core>>
+  component "extractConversationTopics()" as extract <<core>>
+  component "SAFETY_TIMEOUT_MS Guard" as timeout <<core>>
 }
 
-package "Shared Client" {
-  component "retrieval-client.js\ncallRetrieval()" as client <<api>>
+package "PI Agent Hook" {
+  component "knowledge-injection-pi.js" as pihook <<core>>
+  component "Query Builder" as querybuild <<core>>
+  component "AGENTS.md Writer" as writer <<core>>
 }
 
 package "External Resources" {
-  cloud "Retrieval Service" as retrieval <<external>>
   database "Session Transcript" as transcript <<storage>>
-  database "~/.pi/agent (AGENTS.md)" as agentsmd <<storage>>
-  component "git diff --name-only" as gitdiff <<external>>
+  component "git diff HEAD~3" as gitdiff <<external>>
+  cloud "Retrieval Service" as retrieval <<external>>
+  component "Output Truncator (16000 chars)" as trunc <<core>>
 }
 
-hook --> enabled : "checks CODING_KNOWLEDGE_INJECTION"
-hook --> topics : "reads last 50000 bytes"
-topics --> transcript : "fs.readSync at offset"
-topics ..> topics : "filters <system-reminder>,\n## Insights, ## Digests"
+hook --> gate : "checks CODING_KNOWLEDGE_INJECTION"
+hook --> extract : "on enabled"
+extract --> transcript : "reads last 50000 bytes"
+hook --> timeout : "enforces 5s/15s deadline"
+timeout --> hook : "force-exits if hung"
 
-pihook --> resolve : "validates target path"
-resolve ..> agentsmd : "refuses to overwrite default dir"
-pihook --> gitdiff : "gathers recent_files"
+pihook --> querybuild : "builds query"
+querybuild --> gitdiff : "fetches changed files"
+querybuild --> retrieval : "sends query + context"
+retrieval --> trunc : "raw results"
+trunc --> pihook : "trimmed output"
+pihook --> writer : "writes AGENTS.md"
+writer ..> writer : "refuses if PI_CODING_AGENT_DIR is ~/.pi/agent"
 
-hook --> client : "invokes with timeouts\n(15000/12000 vs 5000/4500)"
-pihook --> client : "invokes with context.recent_files"
-client --> retrieval : "HTTP request"
+hook ..> hook : "fail-open on parse error"
+pihook ..> pihook : "fail-open, exit(0) on error"
 
 @enduml

@@ -1,23 +1,44 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Capture Layer" {
-  component "logging.ts" as logging <<core>>
+package "Configuration Validation" {
+  component "LSLConfigValidator" as validator <<core>>
+  component "validate-lsl-config.js" as script <<core>>
+  database "lsl-config.json" as configJson <<storage>>
+  database "redaction-config.yaml" as redactionYaml <<storage>>
 }
 
-package "Classification Layer" {
-  component "ontology-classification-agent.ts" as classifier <<agent>>
-  component "hierarchy-roots.test.ts" as hierTest <<agent>>
-  component "classification-agent.test.ts" as classTest <<agent>>
+package "Schema Domains" {
+  component "multiUser Schema" as multiUser <<core>>
+  component "fileManager Schema" as fileManager <<core>>
+  component "operationalLogger Schema" as opLogger <<core>>
+  component "classification Schema" as classification <<core>>
 }
 
-package "Config Validation" {
-  component "validate-lsl-config.js" as validator <<cli>>
+package "User Identity" {
+  component "validateUserEnvironment()" as userEnv <<core>>
+  component "FOREGROUND_USER_HASHES" as userHashes <<external>>
 }
 
-logging --> classifier : "produces raw transcript segments"
-classifier ..> hierTest : "verified by"
-classifier ..> classTest : "verified by"
-validator ..> logging : "validates config before session windowing"
+package "Ontology Classification" {
+  component "OntologyClassificationAgent" as ontAgent <<agent>>
+  component "buildL2RefinementPrompt()" as promptBuilder <<core>>
+  component "extractL2FromLLMResponse()" as extractor <<core>>
+}
+
+script --> validator : "instantiates"
+validator --> configJson : "validates"
+validator --> redactionYaml : "validates"
+validator --> multiUser : "enforces"
+validator --> fileManager : "enforces"
+validator --> opLogger : "enforces"
+validator --> classification : "enforces"
+
+validator --> userEnv : "delegates hashing"
+userEnv --> userHashes : "aligns with convention"
+
+ontAgent --> promptBuilder : "builds prompt"
+promptBuilder --> extractor : "parses response"
+extractor --> validator : "refines L2 classification"
 
 @enduml

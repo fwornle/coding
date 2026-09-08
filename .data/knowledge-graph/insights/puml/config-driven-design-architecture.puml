@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Verification Layer" {
+  component "verify-patterns.sh" as verify <<cli>>
+  component "ripgrep/jq heuristics" as heuristics <<core>>
+  component "set -euo pipefail control flow" as strictmode <<core>>
+}
+
+package "Knowledge Base" {
+  database "$SHARED_MEMORY JSON" as sharedmem <<storage>>
+  component "TransferablePattern list\n(significance >= 8)" as patterns <<core>>
+  component "metadata.pattern_compliance_score" as score <<core>>
+}
+
+package "Ontology Classification" {
+  component "EntityPatternAnalyzer" as analyzer <<core>>
+  component "extractArtifacts()\n(suffix regex)" as extract <<core>>
+  component "checkLocalArtifact()\nconfidence 0.9" as localcheck <<core>>
+  component "matchArtifactPattern()\nconfidence 0.75" as patterncheck <<core>>
+}
+
+verify --> heuristics : "runs conditional checks"
+heuristics --> strictmode : "guarded by"
+verify --> sharedmem : "reads pattern definitions"
+sharedmem --> patterns : "provides"
+patterns --> heuristics : "drives dynamic checks"
+verify --> score : "writes compliance score"
+score --> sharedmem : "read-modify-write"
+
+analyzer --> extract : "detects class-name suffixes"
+extract --> localcheck : "resolves team (tier 1)"
+localcheck ..> patterncheck : "fallback if no match"
+patterncheck --> analyzer : "returns team/entity Class"
+
+heuristics ..> analyzer : "shared naming-convention idiom"
+
+@enduml

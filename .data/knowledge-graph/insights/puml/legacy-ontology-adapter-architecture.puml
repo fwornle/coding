@@ -1,21 +1,30 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Classification & Validation Pipeline" {
+package "Agent Layer" {
+  component "OntologyClassificationAgent" as agent <<agent>>
+}
+
+package "Anti-Corruption Layer" {
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  component "ontology/types.ts\n(EntityDefinition,\nOntologyType,\nPropertyDefinition)" as types <<core>>
+}
+
+package "Core Registry" {
+  component "OntologyRegistry\n(@fwornle/km-core)" as registry <<external>>
+}
+
+package "Legacy Consumers" {
   component "OntologyValidator" as validator <<core>>
   component "OntologyClassifier" as classifier <<core>>
 }
 
-package "Migration Boundary (Phase 42-03)" {
-  component "LegacyOntologyAdapter" as adapter <<api>>
-}
+agent --> registry : "constructs"
+agent --> adapter : "wraps registry with"
+adapter --> registry : "delegates calls to"
+adapter --> types : "uses type contracts"
 
-package "km-core" {
-  component "OntologyRegistry" as registry <<core>>
-}
-
-validator --> adapter : "legacy interface"
-classifier --> adapter : "legacy interface"
-adapter --> registry : "wraps / translates"
+validator --> adapter : "consumes legacy shape"
+classifier --> adapter : "consumes legacy shape"
 
 @enduml

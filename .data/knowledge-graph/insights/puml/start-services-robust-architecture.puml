@@ -1,0 +1,37 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Service Orchestration (lib/service-starter.js)" {
+  component "withDeadline()" as deadline <<core>>
+  component "startServiceWithRetry()" as retry <<core>>
+  component "startServicesParallel()" as parallel <<core>>
+}
+
+package "Wrapper Scripts" {
+  component "api-service.js" as api <<cli>>
+  component "dashboard-service.js" as dash <<cli>>
+  component "ProcessStateManager" as psm <<agent>>
+}
+
+package "Container Feature Gating" {
+  component "entrypoint.sh" as entry <<external>>
+  component "generate-docker-mcp-config.sh" as mcpgen <<external>>
+  database "features.json" as feat
+  component "supervisord" as supervisor <<external>>
+}
+
+retry --> deadline : "wraps startFn/healthCheckFn"
+parallel --> retry : "Promise.allSettled per service"
+
+api --> psm : "dynamic-import + register"
+dash --> psm : "dynamic-import + register"
+dash --> api : "hardcoded NEXT_PUBLIC_API_BASE_URL:3031"
+
+entry --> feat : "reads snapshot"
+entry --> supervisor : "generates disabled.conf\n(fail-open)"
+mcpgen --> feat : "checks codegraph enabled\n(fail-toward-omission)"
+
+api ..> retry : "uses for robust startup"
+dash ..> retry : "uses for robust startup"
+
+@enduml

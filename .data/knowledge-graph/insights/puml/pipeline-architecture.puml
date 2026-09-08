@@ -1,34 +1,40 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Ingestion" {
-  component "Git History\n(fetch/diff/extract)" as git <<agent>>
+package "Pipeline Orchestration" {
+  component "Coordinator Agent" as coord <<agent>>
+  component "BaseAgent" as base <<core>>
+  component "OntologyClassificationAgent" as onto <<agent>>
+  component "SemanticAnalysisAgent" as sem <<agent>>
 }
 
-package "Semantic Analysis Pipeline" {
-  component "Content Parsing\n(rule-based)" as parse <<core>>
-  component "Entity Extraction\n(LLM NER)" as extract <<agent>>
-  component "Relation Discovery\n(LLM)" as relate <<agent>>
-  component "Context Enrichment\n(fast LLM)" as enrich <<agent>>
+package "Analysis Stages" {
+  component "AgentResponse Envelope" as resp <<core>>
+  component "Observation Accumulator" as obs <<core>>
+  component "Deduplication Logic" as dedup <<core>>
 }
 
-package "KG Operators" {
-  component "Embed / Dedup / Merge" as kgops <<core>>
+package "Persistence" {
+  component "Persistence Agent" as persist <<agent>>
+  database "Knowledge Graph" as kg <<storage>>
 }
 
-package "Pipeline Execution & Health" {
-  component "run_pipeline / full_pipeline" as runner <<cli>>
-  component "pollKnowledgePipeline" as health <<api>>
-}
+coord --> base : "extends"
+onto --> base : "extends"
+sem --> base : "extends"
 
-git --> parse : "raw commit diffs"
-parse --> extract : "Parsed content"
-extract --> relate : "Entities"
-relate --> enrich : "Entity relations"
-enrich --> kgops : "Enriched entities\n+ Observations"
+coord --> onto : "invokes"
+coord --> sem : "invokes"
 
-runner --> parse : "orchestrates"
-runner --> kgops : "orchestrates"
-health --> runner : "monitors"
+base --> resp : "wraps output"
+onto --> resp : "produces"
+sem --> resp : "produces"
+
+resp --> obs : "accumulates"
+obs --> dedup : "two-phase dedup"
+dedup --> kg : "merge"
+
+resp --> persist : "confidence/issue metadata"
+persist --> kg : "write or flag for review"
 
 @enduml

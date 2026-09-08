@@ -1,0 +1,39 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "UKB Unified CLI" {
+  component "UKBCli\n(defaultCommand/parseArgs)" as cli <<cli>>
+  component "TeamCheckpointManager" as checkpoint <<core>>
+  component "GapAnalyzer" as gap <<core>>
+  component "ConfigManager" as config <<core>>
+  component "WorkflowOrchestrator" as orchestrator <<core>>
+  component "VkbApiClient\n(isServerAvailable)" as vkbclient <<api>>
+}
+
+package "UKB Database CLI" {
+  component "ukb-database CLI\n(isVKBRunning/sendToVKB)" as dbcli <<cli>>
+  component "DatabaseManager /\nUKBDatabaseWriter" as dbwriter <<storage>>
+}
+
+cloud "VKB Server\n(REST: /api/entities,/api/relations,/api/export)" as vkb <<external>>
+
+package "System Health Dashboard" {
+  component "ukb-workflow-modal.tsx\n(calculateDynamicEta)" as modal <<external>>
+  component "multi-agent-graph.tsx\n(WAVE_AGENTS/AGENT_SUBSTEPS)" as graph <<external>>
+}
+
+cli --> checkpoint : "loads checkpoint"
+checkpoint --> cli : "first-run guard\n(recommend --full)"
+cli --> gap : "incremental gap analysis"
+cli --> config : "reads config"
+cli --> orchestrator : "runs 10-agent workflow"
+orchestrator --> vkbclient : "persists results"
+vkbclient --> vkb : "HTTP GET/POST/PUT/DELETE"
+
+dbcli --> dbwriter : "add-entity/import/export"
+dbcli --> vkb : "duplicate health-check\n(isVKBRunning)"
+
+modal --> vkb : "GET /api/ukb/history"
+graph --> orchestrator : "mirrors wave/agent model"
+
+@enduml

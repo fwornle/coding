@@ -5,11 +5,17 @@ title Hierarchy Context: NamingConventions
 
 [CodingPatterns] as coding_patterns #FFFFDD
 [NamingConventions] as naming_conventions #LightBlue
-[AgentLifecyclePattern] as agent_lifecycle_pattern #F0F0F0
-[AdapterPattern] as adapter_pattern #F0F0F0
+[ConfigDrivenDesign] as config_driven_design #F0F0F0
+[ResilienceWrappers] as resilience_wrappers #F0F0F0
+[ArtifactPatternMatching] as artifact_pattern_matching #E8F5E8
+[EntityClassMapping] as entity_class_mapping #E8F5E8
+[TeamDirectoryOwnership] as team_directory_ownership #E8F5E8
 
 coding_patterns --> naming_conventions
-agent_lifecycle_pattern -[hidden]- naming_conventions
-adapter_pattern -[hidden]- naming_conventions
+config_driven_design -[hidden]- naming_conventions
+resilience_wrappers -[hidden]- naming_conventions
+naming_conventions --> artifact_pattern_matching
+naming_conventions --> entity_class_mapping
+naming_conventions --> team_directory_ownership
 
 @enduml

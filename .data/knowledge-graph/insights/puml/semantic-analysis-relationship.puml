@@ -14,6 +14,9 @@ title Hierarchy Context: SemanticAnalysis
 [Pipeline] as pipeline #E8F5E8
 [Ontology] as ontology #E8F5E8
 [Insights] as insights #E8F5E8
+[BaseAgent] as base_agent #E8F5E8
+[L2SubsystemClassifier] as l2_subsystem_classifier #E8F5E8
+[LegacyOntologyAdapter] as legacy_ontology_adapter #E8F5E8
 
 coding --> semantic_analysis
 live_logging_system -[hidden]- semantic_analysis
@@ -25,5 +28,8 @@ constraint_system -[hidden]- semantic_analysis
 semantic_analysis --> pipeline
 semantic_analysis --> ontology
 semantic_analysis --> insights
+semantic_analysis --> base_agent
+semantic_analysis --> l2_subsystem_classifier
+semantic_analysis --> legacy_ontology_adapter
 
 @enduml

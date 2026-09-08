@@ -1,27 +1,32 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Input Context" {
-  component "Hook/Tool Context\n(sessionId, params)" as ctx <<external>>
+package "Hook Dispatch Layer" {
+  component "UnifiedHookManager.executeHooks()" as executeHooks <<core>>
+  component "registerHandler()\n(priority-sort, dedup)" as registerHandler <<core>>
+  component "claude-bridge.js main()\n(fail-open)" as bridge <<agent>>
 }
 
-package "ViolationCaptureService" {
-  component "getViolationCaptureService()" as factory <<api>>
+package "Violation Capture Service" {
+  component "getViolationCaptureService()" as getter <<api>>
   component "ViolationCaptureService" as service <<core>>
-  component "Redaction Step" as redact <<core>>
-  component "Aggregation Logic\n(severity, most-common,\navg-per-session)" as agg <<core>>
+  component "sanitizeParams()" as sanitize <<core>>
+  component "updateViolationHistory()\n(1000-entry cap)" as update <<core>>
+  component "calculateStatistics()" as stats <<core>>
 }
 
 package "Persistence" {
-  database "session-violations.jsonl\n(append-only raw log)" as jsonl <<storage>>
-  database "violation-history.json\n(capped at 1000 entries)" as history <<storage>>
+  database ".mcp-sync/violation-history.json" as history <<storage>>
 }
 
-ctx --> service : "provides raw event data"
-factory --> service : "instantiates/returns singleton"
-service --> redact : "sanitizes sensitive params"
-redact --> jsonl : "appends redacted record"
-jsonl --> agg : "feeds raw records"
-agg --> history : "writes computed stats\n(bounded growth)"
+bridge --> executeHooks : "invokes"
+registerHandler --> executeHooks : "provides sorted handlers"
+executeHooks --> getter : "allow:false triggers capture"
+getter --> service : "returns singleton"
+service --> sanitize : "redacts credentials"
+sanitize --> update : "passes clean payload"
+update --> history : "writes JSONL, enforces cap"
+update --> stats : "triggers recompute"
+stats --> history : "reads capped array"
 
 @enduml

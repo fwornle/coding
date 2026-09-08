@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Validation Layer" {
+  component "LSLConfigValidator" as validator <<core>>
+  component "lsl-config.json" as config <<storage>>
+  component "redaction-config.yaml" as redaction <<storage>>
+  component "logging-config.json" as loggingConfig <<storage>>
+}
+
+package "Transcript Pipeline" {
+  component "TranscriptAdapter\n(abstract base)" as adapter <<core>>
+  component "ClaudeParser" as parser <<agent>>
+  component "Logger.js" as logger <<core>>
+}
+
+package "Dashboard Consumers" {
+  component "lsl-sessions.mjs\n(discoverProjects, listSessions, peekMeta)" as sessions <<api>>
+  component "LslMarkdownParser\n(groupChains)" as chainParser <<core>>
+  component "lsl-sessions.tsx" as dashboardUI <<external>>
+}
+
+validator --> config : "validates schema\n(5 mandatory sections)"
+validator --> redaction : "governs classification/redaction"
+validator ..> adapter : "no visible enforcement\n(gap: bypasses gate)"
+
+adapter --> parser : "concrete implementation"
+parser --> logger : "createLogger('transcript-api')"
+loggingConfig --> logger : "operational logging policy"
+
+parser --> sessions : "produces rotated\ntranscript files"
+config --> sessions : "fileManager.maxFileSize\nbounds rotation"
+config --> sessions : "operationalLogger.batchSize\nbounds chain length"
+
+sessions --> chainParser : "reassemble multi-part chains"
+chainParser --> dashboardUI : "fetchSessions() via API"
+
+@enduml

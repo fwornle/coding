@@ -1,23 +1,36 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "HealthPromptHook Flow" {
-  component "main()" as main <<core>>
-  component "checkHealthStatus()" as check <<core>>
-  component "VERIFIER_SCRIPT existsSync" as verifier <<external>>
-  component "Coordinator Fetch" as fetch <<api>>
-  component "deriveSummary()" as summary <<core>>
-  component "OK_SERVICE_STATUSES" as okset <<storage>>
-  component "outputEnvelope()" as envelope <<core>>
+package "Hook Abstractions (parallel tracks)" {
+  component "HooksManager" as hm <<core>>
+  component "UnifiedHookManager" as uhm <<core>>
 }
 
-main --> check : "invokes"
-check --> verifier : "detects outside repo\n(existsSync heuristic)"
-check --> fetch : "queries service health"
-fetch --> summary : "raw status data\n(or failure)"
-summary --> okset : "checks 'busy' as OK"
-summary --> envelope : "overallStatus\n(unknown on failure, R6)"
-envelope --> main : "hookSpecificOutput\n(always R8 shape)"
-main --> main : "process.exit(0)\n(never blocks Claude)"
+package "Bridge Layer" {
+  component "claude-bridge.js" as bridge <<api>>
+  component "migration-tool.js" as migrate <<cli>>
+}
+
+package "Event Mapping Tables" {
+  component "EVENT_MAPPINGS" as em1 <<storage>>
+  component "EVENT_MAP" as em2 <<storage>>
+  component "CLAUDE_EVENT_MAP" as em3 <<storage>>
+}
+
+package "Dashboard (unrelated)" {
+  component "usePolledFetch.ts" as poll <<external>>
+}
+
+bridge --> uhm : "getHookManager()\ntightly coupled"
+bridge --> em2 : "translate native events"
+migrate --> em3 : "translate for migration"
+hm --> em1 : "translate for HooksManager"
+
+hm ..> uhm : "no inheritance/composition\n(duplicate responsibility)"
+migrate ..> bridge : "risk: omits PrePrompt/PostPrompt/Error"
+
+bridge --> bridge : "fail-open catch\nexit(0) allow"
+
+poll ..> uhm : "naming overlap only\n(architecturally isolated)"
 
 @enduml

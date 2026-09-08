@@ -1,29 +1,41 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Input Sources" {
-  component "Git History\n(diffs/commits)" as git <<external>>
-  component "LSL Session Logs" as lsl <<external>>
+package "Data Sources" {
+  component "Git History" as git <<external>>
+  component "LSL Session Data" as lsl <<external>>
 }
 
-package "Batch Analysis Pipeline" {
-  component "base-agent.ts" as base <<core>>
-  component "semantic-analysis-agent.ts" as semantic <<agent>>
-  component "ontology-classification-agent.ts" as ontology <<agent>>
+package "Agent Pipeline" {
+  component "BaseAgent" as base <<core>>
+  component "SemanticAnalysisAgent" as saa <<agent>>
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "L2 Subsystem Classifier" as l2 <<agent>>
+  component "LLMService" as llm <<external>>
 }
 
-package "Knowledge Storage" {
-  database "Ontology / Knowledge Graph Store" as kg <<storage>>
+package "Ontology & Storage" {
+  component "OntologyRegistry" as reg <<core>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  database "Knowledge Graph" as kg <<storage>>
+  component "coding.lower.json" as codingjson <<storage>>
 }
 
-git --> semantic : "raw commit/diff data"
-lsl --> semantic : "session transcripts"
+git --> saa : "code/commit analysis"
+lsl --> saa : "vibe/session analysis"
+saa --> llm : "generates semantic insights"
+base --> saa : "execute() pipeline"
+base --> oca : "execute() pipeline"
 
-base --> semantic : "provides LLM invocation,\nprompt templating"
-base --> ontology : "provides LLM invocation,\nprompt templating"
+saa --> oca : "observations"
+oca --> reg : "constructs"
+reg --> adapter : "wrapped by"
+oca --> llm : "LLM-backed classification"
+oca --> l2 : "refines L1 classes"
+l2 --> codingjson : "loadL2Classes()"
+l2 --> llm : "buildL2RefinementPrompt()"
 
-semantic --> ontology : "extracted knowledge entities"
-
-ontology --> kg : "persists classified entities"
+oca --> kg : "persists classified entities"
+adapter --> kg : "validates/classifies"
 
 @enduml

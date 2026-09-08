@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OperationalLogger
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[OperationalLogger] as operational_logger #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[MultiUserSessionRouter] as multi_user_session_router #F0F0F0
+[TranscriptAdapterFramework] as transcript_adapter_framework #F0F0F0
+[SessionDashboardViewer] as session_dashboard_viewer #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+live_logging_system --> operational_logger
+lslconfig_validator -[hidden]- operational_logger
+redaction_config_manager -[hidden]- operational_logger
+multi_user_session_router -[hidden]- operational_logger
+transcript_adapter_framework -[hidden]- operational_logger
+session_dashboard_viewer -[hidden]- operational_logger
+specstory_adapter -[hidden]- operational_logger
+
+@enduml
