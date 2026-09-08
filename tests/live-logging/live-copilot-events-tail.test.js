@@ -232,6 +232,17 @@ async function withTimeout(promise, ms, describe) {
  * forever. A fixed sleep expressed that ordering as a guess about scheduling —
  * three scan intervals of margin on an unloaded laptop, unknown margin on a
  * contended CI runner.
+ *
+ * Caveat, unproven and deliberately not worked around here: this waits on
+ * tails.size, which copilot-events-tail sets AFTER tailEventsFile() has taken its
+ * own statSync baseline — so the userland lastSize ordering is genuinely safe.
+ * What it cannot prove is that libuv's StatWatcher has taken ITS baseline, since
+ * fs.watchFile() returns before that happens off-thread. An append landing in that
+ * window leaves prev.size already at the post-append value, curr.size never
+ * differs, and the listener is never invoked at all. No observable state exposes
+ * that fact, so no wait can currently close it; only an observed listener callback
+ * would. Recorded here because the symptom is indistinguishable from timer
+ * starvation, and the two want opposite fixes.
  */
 async function waitForAttach(handle, n = 1) {
   await waitFor(() => handle.getStats().watching_sessions >= n);
@@ -580,16 +591,30 @@ branch: main
 
     // stop() is now issued strictly INSIDE processMessages. Both awaits are bounded
     // so that whichever one stalls says so — see withTimeout above.
-    await withTimeout(entered, 5000, () =>
+    // 20s, not 5s, for the reason waitFor already documents above: both mechanisms
+    // this suite depends on are deliberately unref'd in production, and an unref'd
+    // handle is the first thing libuv starves on an oversubscribed runner. 5s was
+    // left here when waitFor was raised, and on 2026-09-08 (run 34222700075) it
+    // fired on the FIRST bound — "the tail did not observe the append", with
+    // watching_sessions 1, tail_count 1, errors 0 and last_scan_at many seconds
+    // stale against a 50ms interval. Attached, nothing broken, the loop simply had
+    // not run: the same absent-not-wrong signature, against the one bound that was
+    // never widened. A healthy run reaches both in ~400ms, so this budget is only
+    // ever spent on a runner already in trouble.
+    await withTimeout(entered, 20000, () =>
       `processMessages never ran: the tail did not observe the append. stats=${JSON.stringify(handle.getStats())}`);
-    await withTimeout(handle.stop(), 5000, () =>
+    await withTimeout(handle.stop(), 20000, () =>
       `handle.stop() never settled: an in-flight write did not drain. stats=${JSON.stringify(handle.getStats())}`);
 
     // After stop, the write should have been allowed to complete.
     const row = registry.get('copilot', '01DRAIN');
     expect(row).toBeDefined();
     expect(writerCalls.length).toBeGreaterThan(0);
-  }, 15000);
+    // 45s > 20s + 20s. The per-test cap has to clear the sum of the bounds inside
+    // it, or jest kills the test first and reports its own anonymous timeout —
+    // destroying the named diagnosis those bounds exist to produce. At 15s the cap
+    // was below even one bound.
+  }, 45000);
 
   test('Test 12 — getStats returns shape with last_scan_at', async () => {
     const handle = await mod.startCopilotWatcher({
