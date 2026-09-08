@@ -233,16 +233,12 @@ async function withTimeout(promise, ms, describe) {
  * three scan intervals of margin on an unloaded laptop, unknown margin on a
  * contended CI runner.
  *
- * Caveat, unproven and deliberately not worked around here: this waits on
- * tails.size, which copilot-events-tail sets AFTER tailEventsFile() has taken its
- * own statSync baseline — so the userland lastSize ordering is genuinely safe.
- * What it cannot prove is that libuv's StatWatcher has taken ITS baseline, since
- * fs.watchFile() returns before that happens off-thread. An append landing in that
- * window leaves prev.size already at the post-append value, curr.size never
- * differs, and the listener is never invoked at all. No observable state exposes
- * that fact, so no wait can currently close it; only an observed listener callback
- * would. Recorded here because the symptom is indistinguishable from timer
- * starvation, and the two want opposite fixes.
+ * This wait is only sound because the tail now polls statSync against a lastSize
+ * it records synchronously inside tailEventsFile, before tails.size is set. It
+ * was NOT sound against the old fs.watchFile tail: fs.watchFile returns before
+ * libuv takes its baseline off-thread, so an append landing after this wait
+ * returned could still be invisible forever. tails.size could not witness that,
+ * and no budget could outlast it. See the poll comment in copilot-events-tail.mjs.
  */
 async function waitForAttach(handle, n = 1) {
   await waitFor(() => handle.getStats().watching_sessions >= n);
