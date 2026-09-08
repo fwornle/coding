@@ -44,10 +44,6 @@ export class EntityPatternAnalyzer {
         ['virtual-target', 'embedded-functions', 'reprocessing-engine'],
       ],
       [
-        'Agentic',
-        ['agent-frameworks', 'rag-systems', 'llm-integration'],
-      ],
-      [
         'UI',
         ['curriculum-alignment', 'aws-lambda', 'multi-agent-system'],
       ],
@@ -104,23 +100,6 @@ export class EntityPatternAnalyzer {
           Protobuf: 'ProtobufSPP',
           Function: 'FunctionOrchestrator',
           Compilation: 'CompilationProfile',
-        },
-      },
-      {
-        team: 'Agentic',
-        patterns: [
-          /LangChain|CrewAI|PydanticAI/i,
-          /RAG(System|Architecture)/i,
-          /AgentFramework|AgentWorkflow/i,
-          /MCP|ACP|A2A/i,
-          /VectorStore|KnowledgeGraph/i,
-        ],
-        entityClassMap: {
-          LangChain: 'AgentFramework',
-          RAG: 'RAGSystem',
-          Agent: 'AgentFramework',
-          Vector: 'VectorStore',
-          Knowledge: 'KnowledgeGraph',
         },
       },
       {

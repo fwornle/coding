@@ -2637,6 +2637,11 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       return 5;
     };
     const HIDDEN_FROM_VIEWER = new Set(['Observation', 'Digest']);
+    // Writers that mean "a human or a batch job put this here", as opposed to
+    // the online consolidator's 'auto'/'online'. Keep in step with the graph's
+    // own predicate in unified-viewer/src/graph/color-fallback.ts, which
+    // treats everything outside {auto, online} as batch.
+    const BATCH_SOURCES = new Set(['manual', 'wave-analysis']);
     const allEnts = []; // [{id, type, hidden, createdMs}]
     try {
       if (_kmStoreReady && _kmStore && _kmStore.graph) {
@@ -2682,10 +2687,19 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       return {
         entityIds: matches.map((x) => x.id),
         totalCount: matches.length,
-        // Phase 61 Plan 01 (D-09): any matched entity tagged 'manual' marks
-        // the whole session 'batch'; pure online/auto/null windows (incl.
-        // empty) default to 'online'. Order-independent, no tie-break.
-        source: matches.some((m) => m.source === 'manual') ? 'batch' : 'online',
+        // Phase 61 Plan 01 (D-09): any matched entity from a BATCH writer
+        // marks the whole session 'batch'; pure online/auto/null windows
+        // (incl. empty) default to 'online'. Order-independent, no tie-break.
+        //
+        // 'wave-analysis' belongs here and was missing: the UKB batch run
+        // stamps metadata.source='wave-analysis', not 'manual' (only 90 of
+        // the hierarchy nodes carry 'manual'’s sibling stamp). A window
+        // containing nothing but wave-analysis output therefore fell through
+        // to 'online' and the timeline painted a batch run pink — exactly the
+        // "auto-learned" label the operator questioned. The viewer's own
+        // contract already said so (useLslSessions.ts: "'batch' = any matched
+        // entity tagged manual/wave-analysis"); only this predicate disagreed.
+        source: matches.some((m) => BATCH_SOURCES.has(m.source)) ? 'batch' : 'online',
       };
     };
 

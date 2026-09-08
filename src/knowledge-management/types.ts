@@ -75,7 +75,7 @@ export interface KnowledgeConfig {
     lowerOntologyPath?: string;
 
     /** Team scope for classification */
-    team?: 'Coding' | 'RaaS' | 'ReSi' | 'Agentic' | 'UI' | 'mixed';
+    team?: 'Coding' | 'RaaS' | 'ReSi' | 'UI' | 'Normalisa' | 'mixed';
 
     /** Classification confidence threshold (0-1) */
     confidenceThreshold?: number;
@@ -165,7 +165,18 @@ export interface KnowledgeConfig {
  */
 export interface TeamOntologyConfig {
   /** Team identifier */
-  team: 'Coding' | 'RaaS' | 'ReSi' | 'Agentic' | 'UI';
+  team: 'Coding' | 'RaaS' | 'ReSi' | 'UI' | 'Normalisa';
+
+  /**
+   * Whether this entry is an organisational TEAM or a PROJECT.
+   *
+   * Both live in config/teams/ because both are predefined top-level
+   * registry entries, but they are not the same thing and the viewer must
+   * not present them as though they were: teams are owners, projects are
+   * bodies of work. Coding and UI are projects despite historically sitting
+   * beside the teams as sibling Project anchors in the graph.
+   */
+  kind: 'team' | 'project';
 
   /** Description of team focus */
   description: string;

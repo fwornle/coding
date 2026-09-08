@@ -1,5 +1,6 @@
 {
   "team": "UI",
+  "kind": "project",
   "description": "UI team focused on user interfaces, frontend components, UX patterns, and accessibility",
   "lowerOntologyPath": "src/ontology/lower/ui-ontology.json",
   "confidenceThreshold": 0.7,
