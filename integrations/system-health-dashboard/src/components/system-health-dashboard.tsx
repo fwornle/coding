@@ -228,17 +228,6 @@ export default function SystemHealthDashboard() {
     const checks = getChecksByCategory('services')
     const items = []
 
-    // VKB Server
-    const vkbCheck = checks.find((c: any) => c.check === 'vkb_server')
-    if (vkbCheck) {
-      items.push({
-        name: 'VKB Server',
-        status: mapCheckStatus(vkbCheck),
-        description: 'Port 8080',
-        tooltip: vkbCheck.message + (vkbCheck.recommendation ? ` - ${vkbCheck.recommendation}` : '')
-      })
-    }
-
     // Constraint Monitor
     const constraintCheck = checks.find((c: any) => c.check === 'constraint_monitor')
     if (constraintCheck) {
@@ -367,7 +356,6 @@ export default function SystemHealthDashboard() {
       'health_dashboard_frontend': { name: 'Health Dashboard UI', port: 3032 },
       'health_dashboard_api': { name: 'Health Dashboard API', port: 3033 },
       'semantic_analysis_sse': { name: 'Semantic Analysis SSE', port: 3848 },
-      'vkb_server': { name: 'VKB Server', port: 8080 },
       'llm_cli_proxy': { name: 'LLM CLI Proxy', port: 12435 },
     }
 

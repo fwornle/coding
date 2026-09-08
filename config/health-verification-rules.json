@@ -56,18 +56,6 @@
       }
     },
     "services": {
-      "vkb_server": {
-        "enabled": true,
-        "feature": "knowledge",
-        "severity": "warning",
-        "check_type": "http_health",
-        "endpoint": "http://localhost:8080/health",
-        "timeout_ms": 3000,
-        "description": "VKB visualization server availability",
-        "auto_heal": true,
-        "auto_heal_action": "restart_vkb_server",
-        "expected_status": "optional"
-      },
       "constraint_monitor": {
         "enabled": true,
         "feature": "constraints",
@@ -258,8 +246,7 @@
         "required_fields": [
           "timestamp",
           "services",
-          "semantic_analysis",
-          "vkb_server"
+          "semantic_analysis"
         ],
         "description": "Services status file required for status line API indicator",
         "auto_heal": true,

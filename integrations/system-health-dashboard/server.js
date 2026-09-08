@@ -145,7 +145,6 @@ const AUTO_HEAL_MAP = {
         action: 'restart_transcript_monitor',
         recommendation: 'Restart the LSL transcript monitor (host process). Last heartbeat lapsed beyond stale threshold.'
     },
-    vkb_server: { action: 'restart_vkb_server', recommendation: 'Restart VKB server.' },
     constraint_monitor: { action: 'restart_constraint_monitor', recommendation: 'Restart constraint monitor.' },
     dashboard_server: { action: 'restart_dashboard_server', recommendation: 'Restart dashboard frontend.' },
     health_dashboard_api: { action: 'restart_health_api', recommendation: 'Restart health dashboard API.' },
@@ -1160,13 +1159,11 @@ class SystemHealthAPIServer {
             // Docker mode uses supervisorctl; native mode uses npm/bin commands.
             const isDocker = existsSync('/.dockerenv');
             const restartCommands = isDocker ? {
-                vkb_server: 'supervisorctl restart web-services:vkb-server',
                 constraint_monitor: 'supervisorctl restart mcp-servers:constraint-monitor',
                 dashboard_server: 'supervisorctl restart web-services:health-dashboard-frontend',
                 health_dashboard_api: 'supervisorctl restart web-services:health-dashboard',
                 health_dashboard_frontend: 'supervisorctl restart web-services:health-dashboard-frontend',
             } : {
-                vkb_server: `cd "${codingRoot}" && bin/vkb restart`,
                 constraint_monitor: `cd "${codingRoot}/integrations/constraint-monitor" && npm run restart`,
                 dashboard_server: `cd "${codingRoot}/integrations/system-health-dashboard" && npm run restart`,
             };
