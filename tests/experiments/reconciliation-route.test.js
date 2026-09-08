@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { ApiRoutes } from '../../lib/vkb-server/api-routes.js';
+import { ExperimentApi } from '../../lib/experiments/experiment-api.mjs';
 
 // Minimal Express-style res double: captures the status code + JSON body.
 function makeRes() {
@@ -29,7 +29,7 @@ describe('GET /api/experiments/runs/:taskId/reconciliation', () => {
   before(async () => {
     tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'reconcile-route-'));
     // The handler resolves the file under <experimentRepoRoot>/.data/measurements/.
-    routes = new ApiRoutes({}, { experimentRepoRoot: tmpRoot });
+    routes = new ExperimentApi({ experimentRepoRoot: tmpRoot });
   });
 
   after(async () => {

@@ -1,7 +1,7 @@
 // tests/experiments/score-override-endpoint.test.mjs
 //
 // SCORE-02 proof (Phase 73, Plan 05): the PATCH /api/experiments/scores/:taskId
-// endpoint (lib/vkb-server/api-routes.js handleScoreOverride) applies a single
+// endpoint (lib/experiments/experiment-api.mjs handleScoreOverride) applies a single
 // per-dimension human override to a Run's Score via applyOverride against the
 // DEDICATED experiment store — validating all input BEFORE any write and
 // PRESERVING judged fields (D-06). Test groups:
@@ -13,11 +13,11 @@
 //   4. the Score path uses openExperimentStore/applyOverride, never the shared
 //      KG (asserted structurally: an isolated experiment store receives the write).
 //
-// Isolation: the handler is invoked via Object.create(ApiRoutes.prototype) with
+// Isolation: the handler is invoked via Object.create(ExperimentApi.prototype) with
 // `experimentRepoRoot` pointing at a throwaway tmp repo-root whose
 // .data/ontologies-experiment is the REAL ontology copied verbatim and whose
 // .data/experiments/leveldb is a fresh store. This exercises handleScoreOverride
-// WITHOUT constructing the heavy DatabaseManager-backed ApiRoutes and WITHOUT
+// WITHOUT constructing the heavy DatabaseManager-backed ExperimentApi and WITHOUT
 // touching the real single-owner store. Mirrors tests/experiments/score-write.test.mjs.
 //
 // Output via process.stderr.write only (no console.* — no-console-log).
@@ -104,8 +104,8 @@ async function readScoreMeta(repoRoot, taskId) {
 
 /** A handler `this` with the isolated experiment repo-root, no heavy constructor. */
 async function makeHandlerThis(repoRoot) {
-  const { ApiRoutes } = await import('../../lib/vkb-server/api-routes.js');
-  const ctx = Object.create(ApiRoutes.prototype);
+  const { ExperimentApi } = await import('../../lib/experiments/experiment-api.mjs');
+  const ctx = Object.create(ExperimentApi.prototype);
   ctx.experimentRepoRoot = repoRoot;
   return ctx;
 }

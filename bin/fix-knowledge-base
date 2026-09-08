@@ -94,7 +94,7 @@ if [[ "$DUPLICATE_RELATIONS" -gt 0 ]]; then
             echo
             echo -e "${BLUE}💡 Next steps:${NC}"
             echo -e "  • Restart any running services (coding --copilot)"
-            echo -e "  • Test with: vkb start"
+            echo -e "  • Test with: curl -s localhost:12436/health"
             echo -e "  • Monitor logs for reduced sync frequency"
 
         else

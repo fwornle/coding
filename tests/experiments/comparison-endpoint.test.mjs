@@ -1,7 +1,7 @@
 // tests/experiments/comparison-endpoint.test.mjs
 //
-// Phase 80-01 (CMP-04) — store-backed drift coverage for the vkb-server
-// `GET /api/experiments/comparison` endpoint (ApiRoutes.handleComparison):
+// Phase 80-01 (CMP-04) — store-backed drift coverage for the
+// `GET /api/experiments/comparison` endpoint (ExperimentApi.handleComparison):
 //
 //   1. The endpoint JSON (minus the volatile generated_at timestamp) deep-equals
 //      the CLI's writeReportJson doc for the SAME seeded rows — proving the live
@@ -17,7 +17,7 @@
 // via `experimentRepoRoot` — the real store is never touched.
 //
 // The handler is exercised directly with a mock req/res (no express server) —
-// ApiRoutes is constructible with a null databaseManager because handleComparison
+// ExperimentApi is constructible with a null databaseManager because handleComparison
 // only touches the experiment store (openExperimentStore), never the shared KG.
 //
 // node:test + node:assert/strict. Output via process.stderr.write only (no console.*).
@@ -29,7 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ApiRoutes } from '../../lib/vkb-server/api-routes.js';
+import { ExperimentApi } from '../../lib/experiments/experiment-api.mjs';
 import { buildComparison } from '../../lib/experiments/compare.mjs';
 import { writeReportJson } from '../../scripts/experiments-compare.mjs';
 
@@ -37,11 +37,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const SRC_ONTOLOGY_DIR = path.join(REPO_ROOT, '.data', 'ontologies-experiment');
 
-// A minimal databaseManager stub — ApiRoutes' constructor builds a
+// A minimal databaseManager stub — ExperimentApi' constructor builds a
 // KnowledgeQueryService + per-team UKBDatabaseWriter that read `.graphDB`, but
 // handleComparison touches ONLY the experiment store (openExperimentStore), never
-// the shared KG. `{ graphDB: null }` satisfies the constructor without a real DB.
-const DB_STUB = { graphDB: null };
+// the shared KG. The constructor used to demand a databaseManager for the
+// legacy-knowledge half; that half went with vkb-server, so there is nothing
+// left to stub.
 
 /** A minimal express-like res double capturing status + json payload. */
 function makeRes() {
@@ -125,7 +126,7 @@ test('endpoint JSON deep-equals the CLI writeReportJson doc (no 79->80 schema dr
   const { repoRoot, cleanup } = await seedComparisonStore(taskHash);
   try {
     // Endpoint side: invoke the real handler with a mock req/res.
-    const api = new ApiRoutes(DB_STUB, { experimentRepoRoot: repoRoot });
+    const api = new ExperimentApi({ experimentRepoRoot: repoRoot });
     const req = { query: { task_hash: taskHash } };
     const res = makeRes();
     await api.handleComparison(req, res);
@@ -158,7 +159,7 @@ test('endpoint JSON deep-equals the CLI writeReportJson doc (no 79->80 schema dr
 });
 
 test('endpoint rejects a traversal task_hash with 400 before opening the store', async () => {
-  const api = new ApiRoutes(DB_STUB, { experimentRepoRoot: '/nonexistent-should-never-be-opened' });
+  const api = new ExperimentApi({ experimentRepoRoot: '/nonexistent-should-never-be-opened' });
   const req = { query: { task_hash: '../../etc/passwd' } };
   const res = makeRes();
   await api.handleComparison(req, res);
@@ -167,7 +168,7 @@ test('endpoint rejects a traversal task_hash with 400 before opening the store',
 });
 
 test('endpoint rejects a missing task_hash with 400', async () => {
-  const api = new ApiRoutes(DB_STUB, {});
+  const api = new ExperimentApi({});
   const res = makeRes();
   await api.handleComparison({ query: {} }, res);
   assert.equal(res.statusCode, 400);
@@ -177,7 +178,7 @@ test('?rank_by=tokens reorders the ranked group', async () => {
   const taskHash = 'endpoint02';
   const { repoRoot, cleanup } = await seedComparisonStore(taskHash);
   try {
-    const api = new ApiRoutes(DB_STUB, { experimentRepoRoot: repoRoot });
+    const api = new ExperimentApi({ experimentRepoRoot: repoRoot });
     const res = makeRes();
     await api.handleComparison({ query: { task_hash: taskHash, rank_by: 'tokens' } }, res);
     assert.equal(res.statusCode, 200);

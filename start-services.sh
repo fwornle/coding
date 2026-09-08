@@ -65,7 +65,8 @@ check_docker() {
 
 # Kill any existing processes on our ports
 echo "🧹 Cleaning up existing processes..."
-# Kill VKB server port and FastMCP server port
+# 8080 was the retired VKB server; nothing starts there now, but a process
+# left over from before the retirement would still be holding it. FastMCP: 8001.
 for port in 8080 8001; do
     if check_port $port; then
         kill_port $port
@@ -387,16 +388,9 @@ else
     QDRANT_KB_STATUS="⚠️ DEGRADED"
 fi
 
-# Start VKB Server (with GraphDB knowledge)
-echo "🟢 Starting VKB Server (port 8080) with GraphDB..."
-cd "$CODING_DIR"
-# Use GraphDB as the primary data source
-export VKB_DATA_SOURCE=online
-nohup node lib/vkb-server/cli.js server start --foreground > vkb-server.log 2>&1 &
-VKB_PID=$!
-
-# Register with Process State Manager
-node scripts/psm-register.js vkb-server $VKB_PID global lib/vkb-server/cli.js
+# VKB Server retired (2fb090da6). Its /api/experiments and /api/kgbench
+# handlers moved to lib/experiments/ and are mounted by obs-api on :12436;
+# the viewer half was discontinued. Nothing starts on :8080 any more.
 
 # Start Semantic Analysis MCP Server
 echo "🟢 Starting Semantic Analysis MCP Server (Standard MCP)..."
@@ -473,13 +467,6 @@ elif ps -p $LIVE_LOGGING_PID > /dev/null 2>&1; then
     services_running=$((services_running + 1))
 else
     echo "❌ Live Logging Coordinator NOT running"
-fi
-
-if check_port 8080; then
-    echo "✅ VKB Server running on port 8080"
-    services_running=$((services_running + 1))
-else
-    echo "❌ VKB Server NOT running on port 8080"
 fi
 
 # Check if semantic analysis server is configured (stdio transport)
@@ -580,7 +567,7 @@ if [ "$QDRANT_KB_STATUS" != "✅ OPERATIONAL" ]; then
 fi
 echo ""
 echo "📊 Process State: node scripts/process-state-manager.js status"
-echo "📝 Logs: live-logging.log, vkb-server.log, logs/system-health-api.log, logs/system-health-dashboard.log"
+echo "📝 Logs: live-logging.log, logs/system-health-api.log, logs/system-health-dashboard.log"
 echo "🌐 System Health Dashboard: http://localhost:3032"
 echo "═══════════════════════════════════════════════════════════════════════"
 echo ""

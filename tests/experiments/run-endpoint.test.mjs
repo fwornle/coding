@@ -1,12 +1,12 @@
 // tests/experiments/run-endpoint.test.mjs
 //
 // Phase 85-04 (Wave 3) — handleExperimentRun + handleRunCancel on
-// lib/vkb-server/api-routes.js (ApiRoutes). D-02 dual-source 409 guard,
+// lib/experiments/experiment-api.mjs (ExperimentApi). D-02 dual-source 409 guard,
 // spec+override validation, and delegation of the detached host spawn /
 // group-kill to the Plan-03 coordinator seam (host.docker.internal:3034).
 //
 // Isolation idiom mirrors runs-endpoint.test.mjs: invoke the handler via
-// Object.create(ApiRoutes.prototype) with `experimentRepoRoot` pointing at a
+// Object.create(ExperimentApi.prototype) with `experimentRepoRoot` pointing at a
 // seeded throwaway repo-root, so the route runs WITHOUT the heavy
 // DatabaseManager constructor and WITHOUT touching the real store. The
 // coordinator fetch is injected (ctx._coordinatorFetch) so NO real HTTP fires
@@ -51,8 +51,8 @@ function makeRepoRoot(label) {
 
 /** A handler `this` with the isolated repo-root + injected coordinator fetch. */
 async function makeCtx(repoRoot, coordinatorFetch) {
-  const { ApiRoutes } = await import('../../lib/vkb-server/api-routes.js');
-  const ctx = Object.create(ApiRoutes.prototype);
+  const { ExperimentApi } = await import('../../lib/experiments/experiment-api.mjs');
+  const ctx = Object.create(ExperimentApi.prototype);
   ctx.experimentRepoRoot = repoRoot;
   ctx._coordinatorFetch = coordinatorFetch;
   return ctx;

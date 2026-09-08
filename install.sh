@@ -1061,7 +1061,7 @@ install_memory_visualizer() {
         if ! git submodule update --init --recursive integrations/memory-visualizer; then
             if [[ "$CI_LITE" == "true" ]]; then
                 warning "Could not clone memory-visualizer (no credentials for the private remote) — skipping (CI-lite portability run)"
-                INSTALLATION_FAILURES+=("memory-visualizer submodule unavailable (vkb visualiser not built)")
+                INSTALLATION_FAILURES+=("memory-visualizer submodule unavailable (visualiser not built)")
                 return 0
             fi
             error_exit "Failed to initialize memory-visualizer submodule"
@@ -1096,12 +1096,8 @@ install_memory_visualizer() {
     info "Updating browserslist database..."
     npx update-browserslist-db@latest 2>/dev/null || warning "Could not update browserslist database"
 
-    # Update vkb script to use local memory-visualizer
-    if [[ "$PLATFORM" == "macos" ]]; then
-        sed -i '' "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CODING_REPO/knowledge-management/vkb"
-    else
-        sed -i "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CODING_REPO/knowledge-management/vkb"
-    fi
+    # The vkb script that consumed VISUALIZER_DIR went with the VKB server
+    # (2fb090da6); the visualizer itself is still installed for other callers.
 
     success "Memory visualizer installed successfully"
 }
@@ -1487,15 +1483,9 @@ create_command_wrappers() {
     
     # ukb command removed - use MCP server workflow instead
 
-    # Create vkb wrapper
-    cat > "$bin_dir/vkb" << 'EOF'
-#!/bin/bash
-# Universal vkb wrapper
-CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
-export CODING_REPO
-exec "$CODING_REPO/knowledge-management/vkb" "$@"
-EOF
-    chmod +x "$bin_dir/vkb"
+    # vkb wrapper removed: knowledge-management/vkb went with the VKB server
+    # (2fb090da6). Writing a launcher for a missing target only moves the
+    # failure to first use.
     
     
     # Note: Original scripts now use dynamic repo detection, no need to update paths
@@ -2199,13 +2189,8 @@ verify_installation() {
     
     local errors=0
     
-    # Check vkb command (ukb removed - use MCP server workflow)
-    if [[ -x "$CODING_REPO/bin/vkb" ]]; then
-        success "vkb command is available"
-    else
-        error_exit "vkb command not found or not executable"
-        errors=$((errors + 1))
-    fi
+    # vkb check removed with the server it verified. It was an error_exit on a
+    # path the retirement deleted, so a fresh install aborted here.
     
     # Check memory visualizer
     if [[ -d "$MEMORY_VISUALIZER_DIR/dist" ]]; then
@@ -3205,7 +3190,6 @@ install_node_dependencies() {
 
     ensure_km_core_link
     install_fastembed_native
-    install_vkb_server_deps
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3249,7 +3233,7 @@ ensure_km_core_link() {
     fi
 
     # 2. km-core has its own dependencies (graphology, classic-level, fastembed…).
-    #    Stripping them breaks semantic-analysis and the vkb-server experiment API.
+    #    Stripping them breaks semantic-analysis and the experiment API.
     #
     #    Checking only "does node_modules/ exist" is not enough — it has been
     #    observed sitting there populated with nothing but stray transitive
@@ -3384,20 +3368,6 @@ verify_host_embeddings() {
     return 0
 }
 
-install_vkb_server_deps() {
-    info "Installing vkb-server dependencies..."
-    if [ -d "$CODING_REPO/lib/vkb-server" ]; then
-        cd "$CODING_REPO/lib/vkb-server"
-        if npm ci --ignore-scripts >/dev/null 2>&1 || npm install --ignore-scripts >/dev/null 2>&1; then
-            success "✓ vkb-server dependencies installed"
-        else
-            warning "Failed to install vkb-server dependencies"
-            INSTALLATION_WARNINGS+=("vkb-server dependencies failed")
-        fi
-        cd "$CODING_REPO"
-    fi
-}
-
 # Initialize knowledge management databases (Qdrant + SQLite)
 initialize_knowledge_databases() {
     skip_unless_feature knowledge "knowledge database setup" || return 0
@@ -3426,13 +3396,8 @@ initialize_knowledge_databases() {
         info "To enable Qdrant: docker run -d -p 6333:6333 qdrant/qdrant"
     fi
 
-    # Check if VKB server is running (which locks LevelDB)
-    local vkb_running=false
-    if pgrep -f "vkb-server" >/dev/null 2>&1 || lsof -i :8080 2>/dev/null | grep -q node; then
-        vkb_running=true
-        info "VKB server detected - Graph database will be skipped (this is OK)"
-        info "LevelDB is locked by VKB server, SQLite/Qdrant initialization will proceed"
-    fi
+    # The VKB server used to hold the LevelDB lock here and the graph step was
+    # skipped when it was up. It is retired (2fb090da6), so nothing holds it.
 
     # Initialize knowledge management system (databases + config)
     info "Initializing knowledge management system..."
@@ -4487,7 +4452,7 @@ main() {
 export CODING_REPO="$CODING_REPO"
 export PATH="$CODING_REPO/bin:\$PATH"
 echo "✅ Agent-Agnostic Coding Tools environment activated!"
-echo "Commands 'vkb' and 'coding' are now available."
+echo "Command 'coding' is now available."
 echo ""
 echo "Usage:"
 echo "  coding           # Use best available agent"
@@ -4556,7 +4521,6 @@ show_installation_status() {
     echo ""
     echo -e "${CYAN}📋 Next steps:${NC}"
     echo -e "   ${CYAN}⚡ To start using commands immediately:${NC} source .activate"
-    echo -e "   ${CYAN}📖 Commands available:${NC} vkb (View Knowledge Base)"
 
     if [[ ${#INSTALLATION_FAILURES[@]} -eq 0 ]]; then
         echo ""
@@ -4965,8 +4929,6 @@ create_project_local_settings() {
       "WebFetch(domain:github.com)",
       "Bash(sqlite3 .data/knowledge.db \"SELECT source, COUNT(*) as count FROM knowledge_extractions GROUP BY source\")",
       "Bash(sqlite3 .data/knowledge.db \"PRAGMA table_info(knowledge_extractions)\")",
-      "Bash(vkb restart:*)",
-      "Bash(bin/vkb restart:*)",
       "Bash(ps:*)",
       "Bash(git submodule:*)",
       "Bash(git config:*)",
@@ -4980,7 +4942,6 @@ create_project_local_settings() {
       "Bash(done)",
       "Bash(npm test:*)",
       "Bash(docker info:*)",
-      "Bash(bin/vkb:*)",
       "Bash(SYSTEM_HEALTH_API_PORT=3033 pnpm api:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",

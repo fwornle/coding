@@ -11,7 +11,7 @@
  *   - the Experiment Launcher card renders on the Performance tab
  *     (`spec-select`, `capture-raw-bodies`, `launch-experiment`)
  *   - selecting a real spec (populated from GET /api/experiments/specs via the
- *     proxy → vkb-server) reveals the server-resolved matrix preview
+ *     proxy → obs-api) reveals the server-resolved matrix preview
  *     (`matrix-preview` + a numeric `matrix-cell-count`, D-09)
  *   - the capture_raw_bodies checkbox exists and defaults OFF (D-12)
  *   - a Re-run button (`rerun-experiment`) appears on a completed experiment run

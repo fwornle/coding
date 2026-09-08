@@ -10,7 +10,6 @@
  * - REQUIRED: Must start successfully or block coding startup
  *   - Live Logging System (Transcript Monitor + Coordinator)
  * - OPTIONAL: Start with retry, degrade gracefully if failed
- *   - VKB Server (knowledge visualization)
  *   - Constraint Monitor (live guardrails)
  *   - Semantic Analysis (MCP)
  */
@@ -194,7 +193,6 @@ const TARGET_PROJECT_PATH = process.env.CODING_PROJECT_DIR || CODING_DIR;
 
 // Port configurations from .env.ports (with defaults)
 const PORTS = {
-  VKB: parseInt(process.env.VKB_PORT || '8080', 10),
   CONSTRAINT_DASHBOARD: parseInt(process.env.CONSTRAINT_DASHBOARD_PORT || '3030', 10),
   CONSTRAINT_API: parseInt(process.env.CONSTRAINT_API_PORT || '3031', 10),
   SYSTEM_HEALTH_DASHBOARD: parseInt(process.env.SYSTEM_HEALTH_DASHBOARD_PORT || '3032', 10),
@@ -334,129 +332,6 @@ const SERVICE_CONFIGS = {
     }
   },
 
-  vkbServer: {
-    name: 'VKB Server',
-    feature: 'knowledge',
-    psmPath: 'lib/vkb-server/cli.js',
-    required: true, // REQUIRED - must start successfully
-    maxRetries: 3,
-    timeout: 30000, // VKB server uses LAZY INITIALIZATION - Express starts immediately
-    // The server responds to /health within 1-2 seconds, then initializes DB/data in background
-    startFn: async () => {
-      console.log(`[VKB] Starting VKB server on port ${PORTS.VKB} (lazy initialization)...`);
-
-      // Check if already running globally (parallel session detection)
-      const isRunning = await psm.isServiceRunning('vkb-server', 'global');
-      if (isRunning) {
-        console.log('[VKB] Already running globally - using existing instance');
-        // Check if port is listening
-        if (await isPortListening(PORTS.VKB)) {
-          return { pid: 'already-running', port: PORTS.VKB, service: 'vkb-server', skipRegistration: true };
-        } else {
-          console.log(`[VKB] Warning: PSM shows running but port ${PORTS.VKB} not listening - cleaning up PSM entry`);
-          // PSM will clean this up automatically on next status check
-        }
-      }
-
-      // Kill any existing process on VKB port
-      try {
-        await new Promise((resolve) => {
-          exec(`lsof -ti:${PORTS.VKB} | xargs kill -9 2>/dev/null`, () => resolve());
-        });
-        await sleep(1000);
-      } catch (error) {
-        // Ignore errors
-      }
-
-      // Use GraphDB as the primary data source (no knowledge-export files needed)
-      const env = { ...process.env, VKB_DATA_SOURCE: 'online' };
-
-      // Create log file path
-      const logPath = path.join(CODING_DIR, 'vkb-server.log');
-
-      console.log(`[VKB] Logging to: ${logPath}`);
-
-      // Open log file and get file descriptor
-      const logFd = fs.openSync(logPath, 'a');
-
-      const child = spawn('node', [
-        path.join(CODING_DIR, 'lib/vkb-server/cli.js'),
-        'server',
-        'start',
-        '--foreground'
-      ], {
-        detached: true,
-        stdio: ['ignore', logFd, logFd], // Use file descriptor for stdout and stderr
-        cwd: CODING_DIR,
-        env: env
-      });
-
-      child.unref();
-
-      // Close our copy of the file descriptor (child process has its own)
-      fs.close(logFd, (err) => {
-        if (err) console.log('[VKB] Warning: Failed to close log fd:', err.message);
-      });
-
-      // Brief wait for process to start
-      await sleep(500);
-
-      // Check if process is still running
-      if (!isProcessRunning(child.pid)) {
-        throw new Error(`VKB server process died immediately. Check ${logPath} for errors.`);
-      }
-
-      return { pid: child.pid, port: PORTS.VKB, service: 'vkb-server', logPath };
-    },
-    healthCheckFn: async (result) => {
-      if (result.skipRegistration) return true;
-
-      // VKB uses lazy initialization - /health returns immediately with status
-      // We accept both 'starting' and 'ready' states as healthy (server is alive)
-      return new Promise((resolve) => {
-        const client = http.request({
-          host: 'localhost',
-          port: PORTS.VKB,
-          method: 'GET',
-          path: '/health',
-          timeout: 5000
-        }, (res) => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
-          res.on('end', () => {
-            if (res.statusCode >= 200 && res.statusCode < 300) {
-              try {
-                const healthData = JSON.parse(data);
-                const status = healthData.status || 'unknown';
-                const ready = healthData.ready ? 'ready' : 'initializing';
-                console.log(`[VKB] Health check passed (status: ${status}, ${ready})`);
-              } catch {
-                console.log('[VKB] Health check passed');
-              }
-              resolve(true);
-            } else {
-              console.log(`[VKB] Health check failed: HTTP ${res.statusCode}`);
-              resolve(false);
-            }
-          });
-        });
-
-        client.on('error', (error) => {
-          console.log(`[VKB] Health check error: ${error.message}`);
-          resolve(false);
-        });
-
-        client.on('timeout', () => {
-          console.log('[VKB] Health check timeout');
-          client.destroy();
-          resolve(false);
-        });
-
-        client.end();
-      });
-    }
-  },
-
   constraintMonitor: {
     name: 'Constraint Monitor',
     feature: 'constraints',
@@ -475,7 +350,10 @@ const SERVICE_CONFIGS = {
     },
     healthCheckFn: async (result) => {
       try {
-        const healthy = await isPortListening(PORTS.VKB);
+        // Was PORTS.VKB (8080) — a container-liveness probe that happened to
+        // use vkb-server's port. That server is retired, so probe the
+        // constraint API this monitor actually depends on.
+        const healthy = await isPortListening(PORTS.CONSTRAINT_API);
         if (healthy) {
           process.stderr.write('[ConstraintMonitor] coding-services healthy (Redis + Qdrant builtin)\n');
           return true;
@@ -1001,16 +879,8 @@ async function createServicesStatusFile(results, features) {
       last_check: new Date().toISOString()
     },
     semantic_analysis: {
-      status: verdict('VKB Server', true, '✅ OPERATIONAL', '✅ OPERATIONAL'),
-      health: health('VKB Server', true)
-    },
-    vkb_server: {
-      status: verdict('VKB Server',
-        results.successful.some(r => r.serviceName === 'VKB Server'),
-        '✅ OPERATIONAL', '⚠️ DEGRADED'),
-      port: PORTS.VKB,
-      health: health('VKB Server',
-        results.successful.some(r => r.serviceName === 'VKB Server'))
+      status: verdict('Semantic Analysis', true, '✅ OPERATIONAL', '✅ OPERATIONAL'),
+      health: health('Semantic Analysis', true)
     },
     transcript_monitor: {
       status: verdict('Transcript Monitor', true, '✅ OPERATIONAL', '✅ OPERATIONAL'),
@@ -1110,7 +980,6 @@ async function cleanupDanglingProcesses() {
 const SERVICE_ORDER = [
   { key: 'transcriptMonitor', section: 'required' },
   { key: 'liveLoggingCoordinator' },
-  { key: 'vkbServer', section: 'optional' },
   { key: 'constraintMonitor' },
   { key: 'healthVerifier' },
   { key: 'statuslineHealthMonitor' },

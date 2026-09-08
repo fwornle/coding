@@ -124,7 +124,7 @@ test('run: HOST-side D-02 slot guard — refuses (slot_busy + holder) when a sib
     });
 
     assert.equal(result.success, false, 'launch refused');
-    assert.equal(result.slot_busy, true, 'reports slot_busy so the vkb maps a 409');
+    assert.equal(result.slot_busy, true, 'reports slot_busy so the API maps a 409');
     assert.deepEqual(result.holder, { kind: 'experiment', run_id: 'live-run', pid: 7777 });
     assert.equal(launched, false, 'launchRun NEVER called while the slot is held');
   } finally {

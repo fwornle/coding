@@ -1,6 +1,6 @@
 // tests/experiments/run-status-endpoint.test.mjs
 //
-// Phase 85-04 (Wave 3) — handleRunStatus on lib/vkb-server/api-routes.js.
+// Phase 85-04 (Wave 3) — handleRunStatus on lib/experiments/experiment-api.mjs.
 // D-04: serve <runDir>/progress.json VERBATIM as a PURE file read (never opens
 // the experiment LevelDB — Pitfall 6). Graceful-empty on ENOENT; a `../`-bearing
 // runId is rejected 400 BEFORE the path build (T-85-04-01 traversal guard).
@@ -28,8 +28,8 @@ function makeRepoRoot(label) {
 }
 
 async function makeCtx(repoRoot) {
-  const { ApiRoutes } = await import('../../lib/vkb-server/api-routes.js');
-  const ctx = Object.create(ApiRoutes.prototype);
+  const { ExperimentApi } = await import('../../lib/experiments/experiment-api.mjs');
+  const ctx = Object.create(ExperimentApi.prototype);
   ctx.experimentRepoRoot = repoRoot;
   return ctx;
 }

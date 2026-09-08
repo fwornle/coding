@@ -1,4 +1,4 @@
-// tests/vkb/context-turns-route.test.mjs
+// tests/experiments/context-turns-route.test.mjs
 //
 // Phase 84-07 Task 1 (D-10): GET /api/experiments/runs/:taskId/context-turns
 // read-only route. Behavior (RESEARCH Test Map): the read API serves the
@@ -12,7 +12,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import zlib from 'node:zlib';
-import { ApiRoutes } from '../../lib/vkb-server/api-routes.js';
+import { ExperimentApi } from '../../lib/experiments/experiment-api.mjs';
 
 // Minimal Express-style res double: captures the status code + JSON body.
 function makeRes() {
@@ -32,7 +32,7 @@ describe('GET /api/experiments/runs/:taskId/context-turns', () => {
   before(async () => {
     tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'context-turns-route-'));
     // The handler resolves the file under <experimentRepoRoot>/.data/measurements/.
-    routes = new ApiRoutes({}, { experimentRepoRoot: tmpRoot });
+    routes = new ExperimentApi({ experimentRepoRoot: tmpRoot });
   });
 
   after(async () => {

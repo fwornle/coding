@@ -89,7 +89,6 @@ echo "=== Data directories ready ==="
 
 echo ""
 echo "=== Service Ports ==="
-echo "  VKB Server:          http://localhost:${VKB_PORT:-8080}"
 echo "  Browser Access SSE:  http://localhost:${BROWSER_ACCESS_PORT:-3847}"
 echo "  Semantic Analysis:   http://localhost:${SEMANTIC_ANALYSIS_PORT:-3848}"
 echo "  Constraint Monitor:  http://localhost:${CONSTRAINT_MONITOR_PORT:-3849}"
@@ -125,7 +124,6 @@ rm -f "$FEATURES_DIR"/*.conf
 
 PROGRAM_FEATURES="\
 semantic-analysis:knowledge \
-vkb-server:knowledge \
 embedding-listener:knowledge \
 graphify:codegraph \
 constraint-monitor:constraints \
