@@ -137,8 +137,9 @@ constraints:
   enabled: true
   applies_to: file_path
   suggestion: Never directly edit files in .data/knowledge-export/ or
-    .data/knowledge-graph/. Knowledge is written by the wave-analysis workflow; use vkb
-    to inspect it. The former bin/ukb entry point no longer works - do not advise it.
+    .data/knowledge-graph/. Knowledge is written by the wave-analysis workflow; read it
+    through obs-api on :12436. The former bin/ukb and bin/vkb entry points no longer
+    exist - do not advise either.
 - id: plantuml-standard-styling
   group: plantuml
   pattern: '@startuml.*\n(?!.*!include _standard-style\.puml)'
