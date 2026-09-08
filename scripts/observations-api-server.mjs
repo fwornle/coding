@@ -1507,6 +1507,86 @@ app.post('/api/retrieve', async (req, res) => {
   }
 });
 
+// ── Insight documents ──────────────────────────────────────────────────────
+//
+// The unified viewer used to fetch these straight from the DISCONTINUED VKB
+// server on :8080 (`http://localhost:8080/knowledge-management/insights/
+// <Name>.md`), which is why every "View Insight Document" link died with that
+// host. Serving them here moves them onto the backend the live viewer already
+// talks to, and lets the viewer gate the link on the document actually
+// existing instead of guessing the URL from the entity name — 67 of the 749
+// entities offering the button had no file behind it.
+const INSIGHTS_DIR = path.join(REPO_ROOT, 'knowledge-management', 'insights');
+
+/** Reject anything that is not a bare document name (no traversal, no nesting). */
+function safeInsightName(raw) {
+  const name = String(raw || '').replace(/\.md$/i, '');
+  if (!name || name.length > 200) return null;
+  if (!/^[A-Za-z0-9._-]+$/.test(name)) return null;
+  if (name === '.' || name === '..') return null;
+  return name;
+}
+
+/**
+ * GET /api/insights/docs — names of every insight document that EXISTS.
+ *
+ * The viewer uses this as an existence index so it only offers a link it can
+ * actually open.
+ */
+app.get('/api/insights/docs', (_req, res) => {
+  try {
+    const names = fs
+      .readdirSync(INSIGHTS_DIR)
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => f.slice(0, -3));
+    res.json({ success: true, data: names, count: names.length });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/insights/docs error: ${err.message}\n`);
+    res.json({ success: true, data: [], count: 0 });
+  }
+});
+
+/**
+ * GET /api/insights/doc/images/:file — diagrams referenced BY those documents.
+ *
+ * The insight markdown carries relative refs (`images/foo-architecture.png`),
+ * and the viewer's modal resolves them against the document's own URL. Serving
+ * the docs without their images would render every diagram as a broken image,
+ * so this route has to sit directly under the doc path for that rebase to
+ * land here.
+ */
+app.get('/api/insights/doc/images/:file', (req, res) => {
+  const raw = String(req.params.file || '');
+  if (!/^[A-Za-z0-9._-]+\.(png|jpg|jpeg|svg|gif|webp)$/i.test(raw)) {
+    return res.status(400).json({ error: 'Invalid image name' });
+  }
+  const file = path.join(INSIGHTS_DIR, 'images', raw);
+  if (!path.resolve(file).startsWith(path.resolve(path.join(INSIGHTS_DIR, 'images')) + path.sep)) {
+    return res.status(400).json({ error: 'Invalid image name' });
+  }
+  res.sendFile(path.resolve(file), (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: 'No such image' });
+  });
+});
+
+/** GET /api/insights/doc/:name — one document as markdown. */
+app.get('/api/insights/doc/:name', (req, res) => {
+  const name = safeInsightName(req.params.name);
+  if (!name) return res.status(400).json({ error: 'Invalid document name' });
+  const file = path.join(INSIGHTS_DIR, `${name}.md`);
+  // Defence in depth: the regex already forbids separators, but re-check that
+  // the resolved path is still inside the insights directory.
+  if (!path.resolve(file).startsWith(path.resolve(INSIGHTS_DIR) + path.sep)) {
+    return res.status(400).json({ error: 'Invalid document name' });
+  }
+  try {
+    const body = fs.readFileSync(file, 'utf8');
+    res.type('text/markdown').send(body);
+  } catch {
+    res.status(404).json({ error: `No insight document for '${name}'` });
+  }
+});
+
 /**
  * POST /api/maintenance/dedupe-entities — merge duplicate-name nodes.
  *

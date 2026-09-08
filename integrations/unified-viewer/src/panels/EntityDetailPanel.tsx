@@ -31,6 +31,7 @@
 //     selectedNodeId change.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import type { ApiClient, ConfidencePayload } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
@@ -665,21 +666,35 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
     { id: 'timeline', label: 'Timeline', visible: visibility.showTimeline },
   ]
 
-  // 2026-06-11: VKB-style "View Insight Document" link. Markdown files
-  // under knowledge-management/insights/ are named after the entity's
-  // SHORT PascalCase identifier (e.g. `ConfigurationManagement.md`). An
-  // entity whose `name` contains spaces, colons, or is longer than ~60
-  // chars is almost certainly an auto-generated Observation/Insight
-  // description rather than a documented component — hide the link in
-  // that case so the user doesn't click into a 404.
+  // "View Insight Document" link.
+  //
+  // This used to GUESS the URL from the entity name — reject names with
+  // spaces or over 60 chars, then point at the VKB server on :8080 and hope a
+  // file was there. Two things were wrong with that: 67 of the 749 entities
+  // that passed the name heuristic had no document at all and 404'd on click
+  // (`Rec` among them), and :8080 is the DISCONTINUED VKB, not the backend
+  // this viewer otherwise talks to.
+  //
+  // Now: obs-api serves the documents, and `/api/insights/docs` gives the set
+  // that actually exists, so the button appears only when it will open.
+  const { data: insightDocIndex } = useQuery({
+    queryKey: ['insight-doc-index', apiClient.base],
+    queryFn: async (): Promise<Set<string>> => {
+      const res = await fetch(`${apiClient.base}/api/insights/docs`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const body = (await res.json()) as { data?: string[] }
+      return new Set(body.data ?? [])
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
   const insightDocUrl = (() => {
     const name = (entity.name as string | undefined) || ''
     if (!name) return null
-    // Reject names that look like a free-form intent / summary, not a
-    // PascalCase component identifier.
-    if (name.length > 60) return null
-    if (/[\s:()/?#]/.test(name)) return null
-    return `http://localhost:8080/knowledge-management/insights/${encodeURIComponent(name)}.md`
+    // The index is authoritative; until it loads, offer nothing rather than a
+    // link that might 404.
+    if (!insightDocIndex?.has(name)) return null
+    return `${apiClient.base}/api/insights/doc/${encodeURIComponent(name)}`
   })()
 
   return (
