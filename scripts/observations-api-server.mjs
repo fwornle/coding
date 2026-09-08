@@ -61,6 +61,7 @@ import {
   insightToLegacy,
   defaultOntologyDir,
   SnapshotManager,
+  mergeEntities,
 } from '@fwornle/km-core';
 import { Router } from 'express';
 // Phase 44 Plan 14 — shared Artifacts-patch mutator used by both
@@ -1503,6 +1504,128 @@ app.post('/api/retrieve', async (req, res) => {
   } catch (err) {
     process.stderr.write(`[obs-api] /retrieve error: ${err.message}\n`);
     res.status(500).json({ error: 'Retrieval failed' });
+  }
+});
+
+/**
+ * POST /api/maintenance/dedupe-entities — merge duplicate-name nodes.
+ *
+ * Repairs the damage left by the pre-ff144c4 adapter, which minted a NEW node
+ * on every storeEntity call. Because storeRelationship resolves its endpoints
+ * by name, edges kept landing on the pre-existing node while each run's fresh
+ * nodes were born edgeless — on 2026-09-07, `LiveLoggingSystem` was four
+ * Component nodes and 155 of 163 orphans shared a name with another node.
+ * The adapter now upserts, so this is a one-time repair of the backlog rather
+ * than a recurring sweep — but it stays available because any writer that
+ * bypasses the adapter (km-core's own POST /api/v1/entities mints too) can
+ * reintroduce a duplicate.
+ *
+ * Runs in-process because the km-core store is single-owner-rw and this
+ * process holds the lock — the same reason consolidation and wave-analysis
+ * run here.
+ *
+ * SURVIVOR RULE: oldest by createdAt, tie-broken on id. This MUST match
+ * km-core-adapter's findEntityByName, or a merge would consolidate onto one
+ * node while subsequent writes bind to another.
+ *
+ * Body: { dryRun?: boolean (default TRUE), entityTypes?: string[], limit?: number }
+ * Returns { dryRun, groups, merged, edgesRewired, skipped, errors, plan }.
+ */
+app.post('/api/maintenance/dedupe-entities', async (req, res) => {
+  try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+
+    // Default to a dry run: this rewires edges and closes entities, so the
+    // destructive reading of an ambiguous request is the wrong default.
+    const dryRun = req.body?.dryRun !== false;
+    // HIERARCHY TYPES ONLY by default. For a Component or a Detail, name+type
+    // identifies one logical entity, so two nodes sharing them are genuinely
+    // the same thing. For an Observation, Digest or Insight the name is a
+    // TITLE: the first dry run over every type proposed merging 20 distinct
+    // observations that were all called "Intent: Load and summarize recent
+    // session logs…". Those are different observations from different
+    // sessions and merging them would destroy data. An explicit entityTypes
+    // list can still opt in, but nothing gets there by default.
+    const entityTypes = Array.isArray(req.body?.entityTypes) && req.body.entityTypes.length > 0
+      ? new Set(req.body.entityTypes)
+      : new Set(['Project', 'Component', 'SubComponent', 'Detail']);
+    const limit = Number.isFinite(req.body?.limit) ? Number(req.body.limit) : Infinity;
+
+    // Group ACTIVE entities by (name, entityType). Superseded nodes are
+    // already closed — merging them again would trip the WR-02 single-
+    // successor invariant.
+    const groups = new Map();
+    for await (const e of store.iterate()) {
+      if (!entityTypes.has(e.entityType)) continue;
+      const key = `${e.entityType}\u0000${e.name}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(e);
+    }
+
+    const plan = [];
+    for (const [key, members] of groups) {
+      if (members.length < 2) continue;
+      const [entityType, name] = key.split('\u0000');
+      const sorted = [...members].sort((a, b) => {
+        const at = a.createdAt ?? '';
+        const bt = b.createdAt ?? '';
+        if (at !== bt) return at < bt ? -1 : 1;
+        return String(a.id) < String(b.id) ? -1 : 1;
+      });
+      plan.push({
+        name,
+        entityType,
+        survivorId: String(sorted[0].id),
+        survivorCreatedAt: sorted[0].createdAt ?? null,
+        duplicateIds: sorted.slice(1).map((d) => String(d.id)),
+      });
+    }
+    plan.sort((a, b) => b.duplicateIds.length - a.duplicateIds.length);
+    const selected = plan.slice(0, limit === Infinity ? plan.length : limit);
+
+    if (dryRun) {
+      return res.json({
+        dryRun: true,
+        groups: selected.length,
+        duplicatesToClose: selected.reduce((n, g) => n + g.duplicateIds.length, 0),
+        plan: selected,
+      });
+    }
+
+    let merged = 0;
+    let edgesRewired = 0;
+    const skipped = [];
+    const errors = [];
+    for (const g of selected) {
+      try {
+        const result = await mergeEntities(store, g.survivorId, g.duplicateIds, {
+          provenance: {
+            provider: 'obs-api',
+            model: 'dedupe-entities',
+            runId: `dedupe-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+          },
+          reason: 'duplicate name+entityType from pre-upsert storeEntity (ff144c4)',
+        });
+        merged += 1;
+        edgesRewired += result.edgesRewired;
+      } catch (err) {
+        // WR-02 (a duplicate already superseded) and missing-node errors are
+        // per-group problems, not a reason to abandon the sweep.
+        const message = err instanceof Error ? err.message : String(err);
+        if (/already has a successor/i.test(message)) skipped.push({ ...g, reason: message });
+        else errors.push({ name: g.name, entityType: g.entityType, error: message });
+      }
+    }
+
+    process.stderr.write(
+      `[obs-api] dedupe-entities: merged=${merged} edgesRewired=${edgesRewired} skipped=${skipped.length} errors=${errors.length}\n`,
+    );
+    res.json({ dryRun: false, groups: selected.length, merged, edgesRewired, skipped, errors });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /maintenance/dedupe-entities error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Dedupe failed' });
   }
 });
 
