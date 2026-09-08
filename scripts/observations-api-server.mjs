@@ -47,6 +47,10 @@ import { LslObservationResolver } from '../src/live-logging/LslObservationResolv
 // and its TS dist deps.  Re-exported below for backwards-compatible discovery.
 import { _computeRetentionBoundary, _mergeObservations, _mergeDigests } from './observations-api-merge.mjs';
 
+// config/teams/ read at runtime — the predefined team/project registry the
+// unified viewer's Teams / Views rail groups by. Served at GET /api/teams.
+import { loadRegistry } from '../lib/teams/registry.mjs';
+
 // Phase 44 plan 07 — km-core canonical /api/v1 surface (root-barrel imports).
 // The legacy versioned-prefix-removed orphan-draft mount + the orphan-draft
 // router factory were REPLACED in this plan per CONTEXT R-4 hard cutover.
@@ -1015,6 +1019,33 @@ app.get('/api/projects', async (_req, res) => {
   } catch (err) {
     process.stderr.write(`[obs-api] /projects error: ${err.message}\n`);
     res.status(500).json({ error: 'Failed to query projects' });
+  }
+});
+
+/**
+ * GET /api/teams
+ *
+ * The predefined team/project registry from config/teams/, plus the grouping
+ * rules for dynamically created views. The unified viewer's "Teams / Views"
+ * rail joins this against the `metadata.team` values it finds in the graph:
+ * registry entries render in their own groups (and render even at count 0),
+ * everything else is a view.
+ *
+ * Deliberately NOT on /api/v1: that surface is km-core's graph router, sitting
+ * behind a 503-until-hydrated gate and a JSON 404 catch-all. This reads config
+ * files and has nothing to do with the store, so it must answer while the
+ * graph is still opening.
+ *
+ * No cache: these are five small files, and re-reading them means an edit shows
+ * up on the next page load rather than after a daemon restart.
+ */
+app.get('/api/teams', (_req, res) => {
+  try {
+    res.json(loadRegistry(REPO_ROOT));
+  } catch (err) {
+    // loadRegistry is fail-open by construction, so this is belt-and-braces.
+    process.stderr.write(`[obs-api] /teams error: ${err.message}\n`);
+    res.status(500).json({ error: 'Failed to load team registry' });
   }
 });
 

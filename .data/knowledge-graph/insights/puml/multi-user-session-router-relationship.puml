@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MultiUserSessionRouter
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[MultiUserSessionRouter] as multi_user_session_router #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[TranscriptAdapterFramework] as transcript_adapter_framework #F0F0F0
+[SessionDashboardViewer] as session_dashboard_viewer #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+live_logging_system --> multi_user_session_router
+lslconfig_validator -[hidden]- multi_user_session_router
+redaction_config_manager -[hidden]- multi_user_session_router
+operational_logger -[hidden]- multi_user_session_router
+transcript_adapter_framework -[hidden]- multi_user_session_router
+session_dashboard_viewer -[hidden]- multi_user_session_router
+specstory_adapter -[hidden]- multi_user_session_router
+
+@enduml

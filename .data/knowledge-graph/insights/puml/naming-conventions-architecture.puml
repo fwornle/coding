@@ -1,35 +1,36 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Documentation" {
-  component "CodingPatterns" as patterns <<core>>
-  component "architecture/README.md" as readme <<core>>
-  component "NamingConventions (informal)" as conventions <<core>>
+package "Compliance Auditing" {
+  component "verify-patterns.sh" as verify <<cli>>
+  component "CLAUDE_REPO Resolution" as reporoot <<core>>
+  component "ConditionalLoggingPattern Check" as logcheck <<core>>
+  component "Score Calculator\n(TOTAL/PASSED/SCORE)" as scorer <<core>>
 }
 
-package "Suffix Taxonomy" {
-  component "*Manager" as mgr <<agent>>
-  component "*Service" as svc <<core>>
-  component "*Adapter" as adapter <<core>>
-  component "*Provider" as provider <<core>>
+package "Entity Classification" {
+  component "EntityPatternAnalyzer" as epa <<core>>
+  component "extractArtifacts()\nclassPattern regex" as extract <<core>>
+  component "checkLocalArtifact()\n(teamDirectories 0.9)" as localcheck <<core>>
+  component "matchArtifactPattern()\n(artifactPatterns 0.75)" as patmatch <<core>>
+  component "inferEntityClass()" as infer <<core>>
 }
 
-package "Example Classes" {
-  component "TranscriptAdapter" as transcript <<core>>
-  component "Wave Agent Managers" as waveagents <<agent>>
+package "Test Fixtures" {
+  component "MVVM ViewModel/View\nFixture Pair" as mvvm <<external>>
 }
 
-patterns --> conventions : "defines retroactive taxonomy"
-conventions --> readme : "referenced by"
-readme --> mgr : "groups files by suffix"
-readme --> svc
-readme --> adapter
-readme --> provider
+verify --> reporoot : "resolves script location"
+verify --> logcheck : "greps console.log vs Logger"
+logcheck --> scorer : "always counted"
+verify --> scorer : "conditional checks\n(react/install.sh)"
 
-adapter --> transcript : "manifests as"
-mgr --> waveagents : "manifests as"
+epa --> extract : "detects suffix taxonomy"
+extract --> localcheck : "artifact string"
+extract --> patmatch : "artifact string"
+localcheck --> infer : "direct match (0.9)"
+patmatch --> infer : "regex match (0.75)"
 
-conventions ..> transcript : "no enforcement,\nname-driven only"
-conventions ..> waveagents : "no linter rule"
+mvvm ..> extract : "cross-language\nnaming test"
 
 @enduml

@@ -7,15 +7,19 @@ title Hierarchy Context: ManualLearning
 [ManualLearning] as manual_learning #LightBlue
 [OnlineLearning] as online_learning #F0F0F0
 [VkbServer] as vkb_server #F0F0F0
+[UkbUnifiedCli] as ukb_unified_cli #F0F0F0
 [UKBDatabaseCLI] as ukbdatabase_cli #E8F5E8
-[UKBDatabaseWriter] as ukbdatabase_writer #E8F5E8
-[EntityMutationRoutes] as entity_mutation_routes #E8F5E8
+[UKBUnifiedCLI] as ukbunified_cli #E8F5E8
+[WorkflowOrchestrator] as workflow_orchestrator #E8F5E8
+[VkbApiClient] as vkb_api_client #E8F5E8
 
 knowledge_management --> manual_learning
 online_learning -[hidden]- manual_learning
 vkb_server -[hidden]- manual_learning
+ukb_unified_cli -[hidden]- manual_learning
 manual_learning --> ukbdatabase_cli
-manual_learning --> ukbdatabase_writer
-manual_learning --> entity_mutation_routes
+manual_learning --> ukbunified_cli
+manual_learning --> workflow_orchestrator
+manual_learning --> vkb_api_client
 
 @enduml

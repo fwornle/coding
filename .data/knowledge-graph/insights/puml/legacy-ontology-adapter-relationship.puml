@@ -8,14 +8,14 @@ title Hierarchy Context: LegacyOntologyAdapter
 [Pipeline] as pipeline #F0F0F0
 [Ontology] as ontology #F0F0F0
 [Insights] as insights #F0F0F0
-[OntologyConfigManager] as ontology_config_manager #F0F0F0
-[LegacyInterfaceCompatibilityLayer] as legacy_interface_compatibility_layer #E8F5E8
+[BaseAgent] as base_agent #F0F0F0
+[L2SubsystemClassifier] as l2_subsystem_classifier #F0F0F0
 
 semantic_analysis --> legacy_ontology_adapter
 pipeline -[hidden]- legacy_ontology_adapter
 ontology -[hidden]- legacy_ontology_adapter
 insights -[hidden]- legacy_ontology_adapter
-ontology_config_manager -[hidden]- legacy_ontology_adapter
-legacy_ontology_adapter --> legacy_interface_compatibility_layer
+base_agent -[hidden]- legacy_ontology_adapter
+l2_subsystem_classifier -[hidden]- legacy_ontology_adapter
 
 @enduml

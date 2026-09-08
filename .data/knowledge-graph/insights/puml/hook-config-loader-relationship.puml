@@ -5,19 +5,17 @@ title Hierarchy Context: HookConfigLoader
 
 [ConstraintSystem] as constraint_system #FFFFDD
 [HookConfigLoader] as hook_config_loader #LightBlue
-[HookManager] as hook_manager #F0F0F0
+[UnifiedHookManager] as unified_hook_manager #F0F0F0
 [ViolationCaptureService] as violation_capture_service #F0F0F0
+[ContentValidationAgent] as content_validation_agent #F0F0F0
 [KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
 [HealthPromptHook] as health_prompt_hook #F0F0F0
-[ConfigSettingsOverride] as config_settings_override #E8F5E8
-[TwoTierConfigLoading] as two_tier_config_loading #E8F5E8
 
 constraint_system --> hook_config_loader
-hook_manager -[hidden]- hook_config_loader
+unified_hook_manager -[hidden]- hook_config_loader
 violation_capture_service -[hidden]- hook_config_loader
+content_validation_agent -[hidden]- hook_config_loader
 knowledge_injection_hooks -[hidden]- hook_config_loader
 health_prompt_hook -[hidden]- hook_config_loader
-hook_config_loader --> config_settings_override
-hook_config_loader --> two_tier_config_loading
 
 @enduml

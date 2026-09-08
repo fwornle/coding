@@ -5,19 +5,19 @@ title Hierarchy Context: SpecstoryAdapter
 
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [SpecstoryAdapter] as specstory_adapter #LightBlue
-[LslSessionDashboard] as lsl_session_dashboard #F0F0F0
-[TranscriptAdapterAPI] as transcript_adapter_api #F0F0F0
-[BackendLoggerCore] as backend_logger_core #F0F0F0
-[ProgressFireTrigger] as progress_fire_trigger #F0F0F0
-[HTTPPortScanConnection] as httpport_scan_connection #E8F5E8
-[SpecstoryInitializeFallbackChain] as specstory_initialize_fallback_chain #E8F5E8
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[MultiUserSessionRouter] as multi_user_session_router #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[TranscriptAdapterFramework] as transcript_adapter_framework #F0F0F0
+[SessionDashboardViewer] as session_dashboard_viewer #F0F0F0
 
 live_logging_system --> specstory_adapter
-lsl_session_dashboard -[hidden]- specstory_adapter
-transcript_adapter_api -[hidden]- specstory_adapter
-backend_logger_core -[hidden]- specstory_adapter
-progress_fire_trigger -[hidden]- specstory_adapter
-specstory_adapter --> httpport_scan_connection
-specstory_adapter --> specstory_initialize_fallback_chain
+lslconfig_validator -[hidden]- specstory_adapter
+redaction_config_manager -[hidden]- specstory_adapter
+multi_user_session_router -[hidden]- specstory_adapter
+operational_logger -[hidden]- specstory_adapter
+transcript_adapter_framework -[hidden]- specstory_adapter
+session_dashboard_viewer -[hidden]- specstory_adapter
 
 @enduml

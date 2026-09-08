@@ -13,10 +13,24 @@
 //   Renders null when `system !== 'coding'`. This is a defense-in-depth gate;
 //   FilterRail.tsx (55-08) ALREADY gates the lazy mount on `system === 'coding'`.
 //
-// TREE BUILD:
-//   Filter entities by ontologyClass in {Project, Component, SubComponent, Detail}.
-//   Index by id, then walk metadata.parent pointers to assemble children arrays.
-//   Each L1 (Project) row shows its descendant count.
+// TREE BUILD (rewritten — see below):
+//   Filter entities by ontologyClass in {System, Project, Component, SubComponent,
+//   Detail}, then take parent pointers from graph/hierarchy-parents.deriveParents.
+//   Each row shows its descendant count.
+//
+//   The original build walked `metadata.parent`. NOTHING HAS EVER WRITTEN THAT
+//   FIELD — it is absent on all 2441 entities in the live graph — so every node
+//   fell through to `roots` and this "tree" rendered ~1341 siblings. The real
+//   hierarchy is in the edges (`contains`, `parent-child`, `includes`), which is
+//   what deriveParents reads. Do not reintroduce a metadata.parent read without
+//   a writer to match it.
+//
+//   `System` joins the rendered classes so CollectiveKnowledge is the single
+//   root the Projects hang from; otherwise the top level is 26 Projects wide.
+//
+//   Nodes with no parent edge (~540 Details today, none of which carry a team
+//   either) collect under one synthetic UNPARENTED root rather than spilling
+//   across the top level. That keeps the gap visible instead of hiding it.
 //
 // RENDER:
 //   shadcn <Accordion type="multiple"> with role="tree" parent + role="treeitem"
@@ -47,20 +61,15 @@ import { Logger } from '@/lib/logging'
 import { useViewerStore } from '@/store/viewer-store'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import type { Entity } from '@/api/ApiClient'
+import type { HierarchyEdge } from '@/graph/hierarchy-parents'
+import {
+  deriveParents,
+  HIERARCHY_CLASSES,
+  HIERARCHY_LEVEL,
+} from '@/graph/hierarchy-parents'
 
-const HIERARCHY_CLASSES = new Set([
-  'Project',
-  'Component',
-  'SubComponent',
-  'Detail',
-])
-
-const HIERARCHY_LEVEL: Record<string, number> = {
-  Project: 1,
-  Component: 2,
-  SubComponent: 3,
-  Detail: 4,
-}
+/** Synthetic root collecting hierarchy nodes with no containment edge. */
+export const UNPARENTED_ID = '__unparented__'
 
 interface TreeNode {
   id: string
@@ -71,15 +80,7 @@ interface TreeNode {
   descendantCount: number
 }
 
-function getParentId(entity: Entity): string | null {
-  const meta = (entity as unknown as { metadata?: Record<string, unknown> }).metadata
-  if (!meta) return null
-  const parent = meta.parent
-  if (typeof parent === 'string' && parent.length > 0) return parent
-  return null
-}
-
-function buildTree(entities: readonly Entity[]): TreeNode[] {
+function buildTree(entities: readonly Entity[], relations: readonly HierarchyEdge[]): TreeNode[] {
   const filtered = entities.filter((e) => {
     const cls = typeof e.ontologyClass === 'string' ? e.ontologyClass : ''
     return HIERARCHY_CLASSES.has(cls)
@@ -99,17 +100,40 @@ function buildTree(entities: readonly Entity[]): TreeNode[] {
     })
   }
 
-  // Link children to parents.
+  const parents = deriveParents(filtered, relations)
+
+  // Link children to parents. A node with no parent edge is only a real root if
+  // it sits at the top of the ontology (System, or a Project when no System node
+  // exists); anything deeper is orphaned data and goes to the Unparented bucket,
+  // so a missing edge cannot masquerade as a top-level project.
   const roots: TreeNode[] = []
+  const unparented: TreeNode[] = []
+  const topLevel = byId.size > 0 ? Math.min(...[...byId.values()].map((n) => n.level)) : 0
+
   for (const e of filtered) {
     const node = byId.get(e.id)
     if (!node) continue
-    const parentId = getParentId(e)
+    const parentId = parents.get(e.id)
     if (parentId && byId.has(parentId)) {
       byId.get(parentId)!.children.push(node)
-    } else {
+    } else if (node.level <= topLevel) {
       roots.push(node)
+    } else {
+      unparented.push(node)
     }
+  }
+
+  if (unparented.length > 0) {
+    roots.push({
+      id: UNPARENTED_ID,
+      name: 'Unparented',
+      ontologyClass: 'Unparented',
+      // Sorts last among roots — this is a diagnostic bucket, not a peer of
+      // CollectiveKnowledge.
+      level: 99,
+      children: unparented,
+      descendantCount: 0,
+    })
   }
 
   // Compute descendant counts via post-order traversal.
@@ -148,6 +172,13 @@ interface HierarchyNavigatorProps {
    * directly via `useViewerStore.setState({entities})`. Either path works.
    */
   entities?: readonly Entity[]
+  /**
+   * Edge set the parent pointers are derived from. Same BC-shim contract as
+   * `entities`: FilterRail passes it explicitly, tests may drive the store.
+   * Without it the tree has no parents at all and every node lands in the
+   * Unparented bucket — which is precisely the old metadata.parent behaviour.
+   */
+  relations?: readonly HierarchyEdge[]
 }
 
 function TreeBranch({
@@ -214,6 +245,7 @@ function TreeBranch({
 export default function HierarchyNavigator({
   system,
   entities: entitiesProp,
+  relations: relationsProp,
 }: HierarchyNavigatorProps) {
   // Defense-in-depth gate (FilterRail also gates the mount).
   if (system !== 'coding') return null
@@ -222,6 +254,10 @@ export default function HierarchyNavigator({
   // harness drives the store via useViewerStore.setState).
   const storeEntities = useViewerStore((s) => (s as unknown as { entities?: readonly Entity[] }).entities)
   const entities: readonly Entity[] | undefined = entitiesProp ?? storeEntities
+  const storeRelations = useViewerStore(
+    (s) => (s as unknown as { relations?: readonly HierarchyEdge[] }).relations,
+  )
+  const relations: readonly HierarchyEdge[] = relationsProp ?? storeRelations ?? []
   const setHierarchySubtreeFilter = useViewerStore((s) => s.setHierarchySubtreeFilter)
 
   const [searchOpen, setSearchOpen] = useState(false)
@@ -268,7 +304,7 @@ export default function HierarchyNavigator({
     }
   }
 
-  const tree = useMemo(() => buildTree(entities ?? []), [entities])
+  const tree = useMemo(() => buildTree(entities ?? [], relations), [entities, relations])
 
   // Search filter — case-insensitive substring match on names; recursive
   // (a node matches if any descendant matches).

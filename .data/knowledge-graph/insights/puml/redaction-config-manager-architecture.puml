@@ -1,0 +1,35 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Ingestion Layer" {
+  component "ClaudeParser" as parser <<agent>>
+  component "TranscriptAdapter\n(abstract)" as adapter <<core>>
+  component "RedactionConfigManager" as redaction <<core>>
+}
+
+package "Config Surfaces" {
+  component "lsl-config.json /\nredaction-config.yaml" as lslconfig <<external>>
+  component "logging-config.json" as logconfig <<external>>
+}
+
+package "Presentation Layer" {
+  component "lsl-sessions.mjs\n(readSession/peekMeta)" as sessions <<core>>
+  component "lsl-sessions.tsx\n(RENDER_TOOL_ALIASES)" as tsx <<cli>>
+}
+
+database "Session Transcripts\n(.md/.jsonl)" as store <<storage>>
+
+parser --> adapter : "implements equivalent surface\n(convertToLSL seam)"
+parser --> store : "writes userHash\n(unhashed, RAW leak risk)"
+redaction ..> adapter : "should intercept\nconvertToLSL() output"
+redaction ..> lslconfig : "governed by\nclassification schema"
+logconfig ..> redaction : "separate concern,\nnot subsumed"
+
+store --> sessions : "read as chains\n(groupChains/concatChain)"
+sessions --> tsx : "rendered for display"
+tsx ..> store : "display-only,\nnever mutates source"
+
+redaction ..> store : "should enforce\nper-artifact redaction"
+sessions ..> redaction : "read-time conversion\nbypasses redaction (gap)"
+
+@enduml

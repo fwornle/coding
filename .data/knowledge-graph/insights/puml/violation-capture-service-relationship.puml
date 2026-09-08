@@ -5,14 +5,16 @@ title Hierarchy Context: ViolationCaptureService
 
 [ConstraintSystem] as constraint_system #FFFFDD
 [ViolationCaptureService] as violation_capture_service #LightBlue
-[HookManager] as hook_manager #F0F0F0
 [HookConfigLoader] as hook_config_loader #F0F0F0
+[UnifiedHookManager] as unified_hook_manager #F0F0F0
+[ContentValidationAgent] as content_validation_agent #F0F0F0
 [KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
 [HealthPromptHook] as health_prompt_hook #F0F0F0
 
 constraint_system --> violation_capture_service
-hook_manager -[hidden]- violation_capture_service
 hook_config_loader -[hidden]- violation_capture_service
+unified_hook_manager -[hidden]- violation_capture_service
+content_validation_agent -[hidden]- violation_capture_service
 knowledge_injection_hooks -[hidden]- violation_capture_service
 health_prompt_hook -[hidden]- violation_capture_service
 

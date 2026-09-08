@@ -2,41 +2,39 @@
 
 **Type:** Detail
 
-isServerAvailable() checks /api/health and returns true based solely on response.ok, deliberately not requiring graph===true because 'Entity APIs work via HTTP even if graph health check has issues'
+[LLM] Every one of the eight HTTP methods in `lib/ukb-unified/core/VkbApiClient.js` — `getEntities`, `deleteEntity`, `createEntity`, `updateEntity`, `getRelations`, `deleteRelation`, `createRelation`, `exportTeam` — independently repeats the identical five-step boilerplate: build URL, `fetch()` with `AbortSignal.timeout(this.timeout)`, check `!response.ok`, parse the error body via `response.json()`, and throw `new Error(error.message || 'Failed to X')`. There is no shared `#request()` or `_fetch()` private helper, so the class has eight near-identical fetch call sites instead of one parametrized one. This duplication means a cross-cutting change (auth headers, retry-on-5xx, exponential backoff, consistent error typing/status codes) requires eight coordinated edits, and any one of them drifting (e.g. a future method forgetting the `!response.ok` check) would silently swallow HTTP errors as a successful `.json()` parse of an error payload.
 
 # VkbApiClient: Technical Insight Document
 
 ## What It Is
 
-VkbApiClient is a client-side class implemented in `VkbApiClient.js` (with corresponding type declarations in `VkbApiClient.d.ts`) that provides a JavaScript API surface for communicating with the VkbServer's HTTP endpoints. It acts as the consumer-facing wrapper around the server's REST API, translating method calls into HTTP requests against endpoints registered by `ApiRoutes.registerRoutes()`. As a child component of VkbServer, it exists specifically to abstract away raw HTTP mechanics (fetch calls, timeouts, endpoint paths) behind a clean, typed JavaScript interface.
+`VkbApiClient` is implemented as a hand-authored JavaScript class in `lib/ukb-unified/core/VkbApiClient.js`, with a parallel, separately-maintained TypeScript declaration file at `lib/ukb-unified/core/VkbApiClient.d.ts`. It functions as a thin HTTP client wrapping the VKB server's REST surface — `/api/entities`, `/api/relations`, `/api/export`, and `/api/health` — behind eight instance methods: `getEntities`, `searchEntities`, `createEntity`, `updateEntity`, `deleteEntity`, `getRelations`, `createRelation`, `deleteRelation`, `exportTeam`, and `isServerAvailable`. As a component, it is contained by both `ManualLearning` and `VKBServer`, positioning it as the primary programmatic gateway these parents use to talk to the VKB backend, and it sits alongside siblings `ApiRoutes`, `VKBServerCLI`, `UKBUnifiedCLI`, and `WorkflowOrchestrator` in the broader UKB/VKB subsystem.
 
 ## Architecture and Design
 
-The class follows a **thin-wrapper/facade pattern**: rather than implementing business logic, VkbApiClient's methods (`getEntities()`, `createEntity()`, `updateEntity()`, `deleteEntity()`) map directly to corresponding HTTP verbs and paths on `/api/entities`, mirroring the route definitions in `lib/vkb-server/api-routes.js`. This keeps the client intentionally "dumb," pushing all authoritative logic (validation, persistence, export generation) to the server side.
+The dominant pattern is a **thin HTTP client / API gateway**: each public method maps one-to-one to a server endpoint, with no abstraction layer beyond the method boundary. This is paired with a **declaration-file-as-contract pattern** — `VkbApiClient.d.ts` is not generated via `tsc --declaration` but hand-written alongside the `.js` implementation, meaning TypeScript consumers (notably dashboard `.tsx` files) depend on a contract that must be manually kept in sync whenever a method like `getEntities` or `exportTeam` changes signature.
 
-A notable design decision is in `isServerAvailable()`, which checks `/api/health` but deliberately evaluates availability based solely on `response.ok`, ignoring the `graph` health flag. This reflects an explicit architectural judgment that Entity APIs remain functional over HTTP independent of graph subsystem health — decoupling the availability contract from a specific internal dependency's status, and preventing a non-critical subsystem failure from blocking clients unnecessarily.
+A second defining architectural characteristic is the **absence of a shared request helper**. Every method — `getEntities`, `deleteEntity`, `createEntity`, `updateEntity`, `getRelations`, `deleteRelation`, `createRelation`, `exportTeam` — independently repeats the same five-step boilerplate: build a URL, call `fetch()` with `AbortSignal.timeout(this.timeout)`, check `!response.ok`, parse the error body via `response.json()`, and throw a formatted `Error`. No `#request()` or `_fetch()` private method exists to centralize this, a gap also independently flagged from the sibling `VKBServerCLI` perspective. The one exception is `searchEntities`, which reuses `getEntities` by delegating with a `searchTerm` parameter rather than hitting a distinct endpoint — a narrow instance of DRY in an otherwise duplicated codebase.
 
-The `searchEntities(query, params)` method exemplifies a **composition-over-duplication** approach: rather than exposing a distinct search endpoint, it reuses `getEntities()` with an injected `searchTerm` parameter, avoiding endpoint proliferation and keeping the server-side API surface (and this client's mapping to it) simpler.
-
-`exportTeam(team, filePath)` is architecturally significant because it delegates the actual export operation to the server via a POST to `/api/export`, rather than performing file assembly client-side. This centralizes export logic on the server, ensuring consistency regardless of which client (this API client, a CLI, etc.) triggers the export.
+The system also exhibits a **fail-open availability check**: `isServerAvailable()` treats any 200 response as "healthy" without inspecting deeper graph/entity health, deferring granular failure detection to the individual entity/relation calls themselves.
 
 ## Implementation Details
 
-Core CRUD methods wrap `/api/entities` endpoints using `AbortSignal.timeout(this.timeout)`, giving every request a configurable, cancellable timeout — a defensive mechanic against hung requests, consistent with the pattern used elsewhere in the system (e.g., `UkbDatabaseCli.isVKBRunning()` uses a similar 1-second `AbortSignal` timeout against `/api/health`).
+The constructor (`constructor(options = {})`) accepts `baseUrl`, `timeout` (defaulting to 10000ms via `options.timeout || 10000`), and `debug`. Of these, `this.debug` is stored but never referenced anywhere else in the class body — it is dead configuration; callers such as `initializeDatabase` in `lib/ukb-database/cli.js` that pass `{ debug: true }` observe no behavioral change.
 
-The dual presence of `VkbApiClient.js` and `VkbApiClient.d.ts` indicates the module ships with hand-authored or generated TypeScript type declarations alongside plain JavaScript implementation, supporting type-checked consumption without a full TypeScript build pipeline.
+`isServerAvailable()` (lines 17–33) deliberately uses a hardcoded `AbortSignal.timeout(2000)` instead of the configurable `this.timeout`, justified in-code as a "fail fast" health-check design. This creates an asymmetry: callers who raise `this.timeout` for slow environments (cold-start CI, throttled networks) get no equivalent adjustment for the availability probe, risking false-negative unavailability under load.
 
-Method naming and structure directly parallel server route definitions: `getEntities()`, `createEntity()`, `updateEntity()`, and `deleteEntity()` correspond respectively to `app.get('/api/entities')`, `app.post('/api/entities')`, `app.put('/api/entities/:name')`, and `app.delete('/api/entities/:name')` as registered by ApiRoutes — a tight, predictable 1:1 mapping that simplifies tracing client calls to server behavior.
+URL construction is inconsistent in a subtle but consequential way. Query-based methods build `URLSearchParams` for filtering (e.g., `getEntities`'s `${this.baseUrl}/api/entities${query ? `?${query}` : ''}`), while path-segment identifiers are manually escaped with `encodeURIComponent(name)`, as seen in `deleteEntity` and `updateEntity` (lines 66–81). There is no unifying `buildUrl(path, params)` helper, so this split relies on convention rather than enforcement.
+
+`deleteRelation(from, to, params = {})` (lines 143–160) diverges structurally from `createRelation(relationData)`: deletion merges `from`, `to`, and `params` into a single `URLSearchParams` for a DELETE request, while creation POSTs a single JSON object body. This is conventional REST design but means the two operations on `/api/relations` have non-mirrored parameter shapes.
 
 ## Integration Points
 
-VkbApiClient is a contained child of VkbServer, and its entire behavior is dependent on the HTTP surface defined by its sibling ApiRoutes, which registers all endpoints (`/api/entities`, `/api/relations`, `/api/stats`, `/api/export`, `/api/query`, `/api/ontology/classes`) as the single point of contact for consumers. Any change to ApiRoutes' endpoint contracts directly impacts VkbApiClient's method implementations.
-
-It also shares a conceptual pattern with sibling UkbDatabaseCli, which independently pings `/api/health` with its own AbortSignal-based timeout to decide whether to route operations through the server — suggesting `/api/health` is a common integration checkpoint across multiple consumers, though each implements its own client logic rather than sharing a unified health-check abstraction.
+`VkbApiClient` is contained by `VKBServer` and `ManualLearning`, serving as their conduit to the VKB HTTP API. Its TypeScript declaration (`VkbApiClient.d.ts`) is the contract consumed by dashboard `.tsx` files. Notably, its HTTP contract is **independently reimplemented** rather than shared: `lib/ukb-database/cli.js`'s `isVKBRunning()`/`sendToVKB()` functions (lines 27–45) duplicate the same request/response logic with yet another timeout value (1000ms), distinct from both `isServerAvailable()`'s 2000ms and the class's default 10000ms — three uncoordinated timeout constants for conceptually related health/availability checks across the codebase.
 
 ## Usage Guidelines
 
-Developers should treat `isServerAvailable()` as a lightweight liveness check only — it does not guarantee full subsystem (e.g., graph) health, so callers needing graph-specific guarantees should check that separately. When needing entity search, use `searchEntities()` rather than manually reconstructing `getEntities()` calls with search terms, since it centralizes that translation. For exports, rely on `exportTeam()` rather than assembling export data manually client-side, since the server is the authoritative source for export formatting via `/api/export`. All request-issuing methods respect `this.timeout` via `AbortSignal.timeout`, so configuring an appropriate timeout value at construction is important for balancing responsiveness against slow-network tolerance.
+Developers extending this class should be aware of several traps baked into its current design. First, any new method must replicate the fetch/error-check/parse pattern by hand unless a shared helper is introduced — omitting the `!response.ok` check would silently swallow HTTP errors as successful JSON parses. Second, adding or renaming a method requires a manual, easy-to-forget edit to `VkbApiClient.d.ts` to avoid TypeScript consumers drifting from runtime behavior. Third, path-segment values (like entity names) must be explicitly wrapped in `encodeURIComponent` — there is no enforced helper, so a new method could accidentally introduce injection-style URL corruption. Finally, do not rely on `isServerAvailable()`'s pass/fail as tunable via the constructor's `timeout` option; it's hardcoded at 2000ms regardless of instance configuration, and the `debug` constructor option currently has zero effect on behavior — don't assume it enables logging without adding that logic yourself.
 
 
 ## Code Evidence
@@ -50,19 +48,18 @@ Key code artifacts grounding this entity's analysis:
 **Other:**
 - VkbApiClient.js (module) in VkbApiClient.js
 - VkbApiClient.d.ts (module) in VkbApiClient.d.ts
+- The code graph identifies exactly one class entity, `VkbApiClient`, present in both `VkbApiClient.js` (implementation) and `VkbApiClient.d.ts` (type declaration) — indicating this is a hand-maintained JS class with a parallel, separately-authored TypeScript declaration file rather than a TS source compiled to JS. This dual-file pattern is a maintenance risk distinct from the parent-context's `restartVKBServer`/`VKBServer` pairing: any method added, renamed, or resignatured in `VkbApiClient.js` (e.g. `getEntities`, `createEntity`, `updateEntity`, `deleteEntity`, `getRelations`, `createRelation`, `deleteRelation`, `exportTeam`, `isServerAvailable`) requires a manual, easy-to-forget parallel edit in `VkbApiClient.d.ts` to keep TypeScript consumers (such as the dashboard's `.tsx` files) from silently drifting out of sync with runtime behavior.
 
 
 ## Hierarchy Context
 
-### Parent
-- [VkbServer](./VkbServer.md) -- lib/vkb-server/api-routes.js's ApiRoutes.registerRoutes() wires dozens of endpoints (/api/entities, /api/relations, /api/stats, /api/export, /api/query, /api/ontology/classes) as the single HTTP surface for all consumers
-
 ### Siblings
-- [ApiRoutes](./ApiRoutes.md) -- ApiRoutes.registerRoutes(app) registers core CRUD endpoints like app.get('/api/entities'), app.post('/api/entities'), app.put('/api/entities/:name'), and app.delete('/api/entities/:name')
-- [UkbDatabaseCli](./UkbDatabaseCli.md) -- isVKBRunning() pings `${VKB_SERVER_URL}/api/health` with a 1-second AbortSignal timeout before deciding whether to route through the server
-- [VkbServerCli](./VkbServerCli.md) -- The `server start` subcommand instantiates a VKBServer and calls server.start({ foreground, force }), reporting result.alreadyRunning vs a fresh PID and log file
+- [ApiRoutes](./ApiRoutes.md) -- [CGR] ApiRoutes (class) in api-routes.js
+- [VKBServerCLI](./VKBServerCLI.md) -- [LLM] `VkbApiClient.js` (`lib/ukb-unified/core/VkbApiClient.js`) exposes eight methods — `isServerAvailable`, `getEntities`, `searchEntities`, `deleteEntity`, `createEntity`, `updateEntity`, `getRelations`, `deleteRelation`, `createRelation`, `exportTeam` — and every single one independently constructs its own `fetch` call, its own `AbortSignal.timeout`, and its own `if (!response.ok) { const error = await response.json(); throw new Error(error.message || 'Failed to X'); }` block. There is no shared `_request()` or `_handleResponse()` helper anywhere in the class. This is a textbook copy-paste-drift risk: `searchEntities` delegates to `getEntities` (reuse exists there), but every other method reimplements the boilerplate from scratch, meaning a change to error-shape handling (e.g. supporting a non-JSON error body, or adding a request-id header) requires seven coordinated edits rather than one.
+- [UKBUnifiedCLI](./UKBUnifiedCLI.md) -- [LLM] [object Object]
+- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- [CGR] WorkflowOrchestrator (class) in WorkflowOrchestrator.js
 
 
 ---
 
-*Generated from 8 observations*
+*Generated from 14 observations*

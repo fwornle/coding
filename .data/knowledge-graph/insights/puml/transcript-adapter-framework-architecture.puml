@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Abstract Framework" {
+  component "TranscriptAdapter" as base <<core>>
+  component "LSLEntryType Enum" as enum <<core>>
+  component "watchTranscripts()" as watcher <<core>>
+  component "TTL Session Cache" as cache <<storage>>
+}
+
+package "Claude Adapter" {
+  component "ClaudeParser" as parser <<agent>>
+  component "LSLConverter" as converter <<agent>>
+}
+
+package "Dashboard Read Path" {
+  component "lsl-sessions.mjs" as dash <<cli>>
+}
+
+database "Persisted LSL Files" as lslfiles <<storage>>
+cloud "Claude Code Transcript Dir" as claudedir <<external>>
+
+base --> enum : "defines contract"
+base --> watcher : "polls for new entries"
+base --> cache : "TTL freshness check"
+
+parser --> claudedir : "hardcoded path lookup"
+parser --> converter : "delegates parseFile()"
+converter --> enum : "conforms to schema"
+parser ..> base : "expected subclass (not shown extending)"
+
+watcher --> parser : "fans out diffs via callback Set"
+parser --> lslfiles : "writes normalized entries"
+
+dash --> lslfiles : "batch reads (groupChains/parseChain)"
+dash ..> base : "independent path, no live watch"
+
+@enduml

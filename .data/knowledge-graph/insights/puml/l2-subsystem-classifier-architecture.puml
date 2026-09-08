@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "BaseAgent Pipeline" {
+  component "BaseAgent.execute()" as base <<core>>
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "classifySingleObservation()\n(hard-root-guard)" as guard <<core>>
+}
+
+package "L2 Refinement (LLM)" {
+  component "loadL2Classes()" as load <<core>>
+  component "buildL2RefinementPrompt()" as prompt <<core>>
+  component "extractL2FromLLMResponse()" as extract <<core>>
+  cloud "LLM Provider" as llm <<external>>
+}
+
+package "Fallback & Config" {
+  component "L2SubsystemClassifier\n(keyword-based)" as l2fallback <<core>>
+  database "coding.lower.json" as config <<storage>>
+}
+
+base --> oca : "invokes process()"
+oca --> guard : "checks HIERARCHY_ROOTS"
+guard --> load : "if L1 in REFINABLE_L1_PARENTS"
+load --> config : "reads (optional)"
+load --> prompt : "L2 class set"
+prompt --> llm : "sends prompt"
+llm --> extract : "raw response"
+extract --> oca : "L2 class or empty"
+
+oca ..> l2fallback : "fallback on LLM failure/timeout"
+l2fallback --> config : "reads (optional)"
+
+oca --> base : "returns AgentResponse"
+
+@enduml

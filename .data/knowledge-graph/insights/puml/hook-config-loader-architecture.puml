@@ -1,35 +1,34 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Hook Configuration" {
+package "Config Layer" {
   component "HookConfigLoader" as loader <<core>>
-  component "DEFAULT_CONFIG" as defaults <<core>>
-  component "hook-config.js" as hookConfig <<core>>
+  component "DEFAULT_CONFIG" as defcfg <<storage>>
+  component "MigrationTool" as migtool <<core>>
 }
 
-package "Runtime" {
-  component "HookManager\n(loadConfig)" as manager <<core>>
-  component "registerHandler" as register <<core>>
-  component "logger" as logger <<external>>
+package "Hook Managers (Parallel, No Inheritance)" {
+  component "UnifiedHookManager" as uhm <<core>>
+  component "HooksManager (abstract)" as hm <<core>>
 }
 
-package "Filesystem / Migration" {
-  component "fsSync.existsSync" as existsCheck <<external>>
-  component "fs.readFile" as readFile <<external>>
-  component "migration-tool.js" as migration <<cli>>
+package "Agent Bridges" {
+  component "ClaudeBridge" as bridge <<agent>>
+  component "EVENT_MAPPINGS" as evmap <<storage>>
 }
 
-loader --> hookConfig : "defines class"
-hookConfig --> defaults : "owns canonical shape"
-migration --> defaults : "seeds migrated output"
+loader --> defcfg : "exports"
+migtool --> defcfg : "JSON deep-clone template"
+migtool --> uhm : "produces hooks.json\n(id/type/path/priority/agents)"
 
-manager --> loader : "loadConfig() uses"
-existsCheck --> readFile : "guards async read"
-manager --> existsCheck : "checks config path"
+uhm ..> hm : "structurally similar,\nno shared code"
 
-manager --> logger : "warn on unknown\nhook event"
-manager ..> register : "delegates handler\nregistration"
+bridge --> uhm : "getHookManager()\n(deferred init)"
+bridge --> loader : "manager.initialize()"
+bridge --> evmap : "translateEvent()"
 
-register --> logger : "implicit defaults\n(no hard failure)"
+uhm --> evmap : "agents[] filtering,\nstopOnError"
+
+bridge ..> bridge : "fail-open:\nalways exit 0,\ndecision:allow"
 
 @enduml

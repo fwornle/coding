@@ -2,41 +2,47 @@
 
 **Type:** SubComponent
 
-Session tracking within violation-history.json implies the service keys records by session ID, consistent with the sessionId field pattern seen in hook contexts (e.g., claude-bridge.js's transformContext sessionId derivation).
+[LLM+CGR] The code graph identifies exactly two symbols for this component: the `ViolationCaptureService` class and a `getViolationCaptureService` accessor function, both in `scripts/violation-capture-service.js`. The presence of a dedicated getter function alongside the class is a strong signal of a singleton-accessor pattern — the same shape used elsewhere in this codebase's agent-hook layer (e.g. `getHookManager()` in `lib/agent-api/hooks/hook-manager.js`, called from `lib/agent-api/hooks/claude-bridge.js`'s `main()`). This suggests `ViolationCaptureService` is instantiated once per process and shared across all callers that need to record a violation, rather than being constructed ad hoc at each call site, which avoids redundant file-handle/state setup for the same `.mcp-sync/violation-history.json` target.
 
-# ViolationCaptureService: Technical Insight Document
+# ViolationCaptureService — Technical Insight Document
 
 ## What It Is
 
-ViolationCaptureService is implemented in `scripts/violation-capture-service.js`, centered on the `ViolationCaptureService` class and its accompanying factory function `getViolationCaptureService`. As a subcomponent of the broader ConstraintSystem, its responsibility is narrow and well-defined: capture violation detection results generated elsewhere in the constraint pipeline and persist them durably for later analysis. It writes two distinct artifacts — an append-only raw log at `.mcp-sync/session-violations.jsonl` and a computed aggregate at `violation-history.json` — establishing a clear separation between raw event capture and derived analytics.
+`ViolationCaptureService` is implemented in `scripts/violation-capture-service.js`, alongside a companion accessor function, `getViolationCaptureService()`, defined in the same file. Together these two symbols constitute the entirety of the component's code-graph footprint: a class encapsulating sanitization, persistence, and statistics logic, and a getter that exposes a shared instance to callers. The service exists to capture, redact, persist, and summarize violations — records generated when a tool call is denied — writing its output to `.mcp-sync/violation-history.json`.
 
-![ViolationCaptureService — Architecture](images/violation-capture-service-architecture.png)
+As a child of ConstraintSystem, `ViolationCaptureService` plays a narrowly-scoped supporting role within the broader constraint-enforcement architecture, sitting alongside siblings such as HookConfigLoader and UnifiedHookManager but serving a distinct purpose: it doesn't decide what gets blocked, it records what already was.
 
 ## Architecture and Design
 
-The core architectural pattern here is the separation of raw log and aggregate view. Rather than requiring downstream dashboard consumers to replay or recompute statistics from the JSONL stream, ViolationCaptureService performs aggregation logic itself — computing severity breakdowns, most-common-constraint, and average-violations-per-session before writing to `violation-history.json`. This is a deliberate design decision to push computational cost to write-time rather than read-time, trading slightly higher per-violation write latency for cheap, ready-to-consume dashboard reads.
+The most prominent architectural signal is the singleton-accessor pattern: `getViolationCaptureService()` mirrors `getHookManager()` in `lib/agent-api/hooks/hook-manager.js` (invoked from `lib/agent-api/hooks/claude-bridge.js`'s `main()`). This shape implies a single shared instance per process, avoiding redundant setup against the same on-disk target and establishing a codebase-wide convention for stateful service access.
 
-A second notable decision is the bounded-growth policy: the aggregate file is explicitly capped at 1000 entries. This reflects an awareness that unbounded aggregate growth would degrade both file I/O performance and consumer parsing time, at the cost of eventually discarding older historical data — an intentional trade-off favoring operational stability over complete historical retention.
+![ViolationCaptureService — Architecture](images/violation-capture-service-architecture.png)
 
-Within the parent ConstraintSystem, this service occupies the "capture and persistence" tier, distinct from orchestration (HookManager) and configuration (HookConfigLoader). It complements those siblings by acting purely on results, not on the detection or dispatch logic itself.
+Structurally, the service is a pure downstream consumer. `UnifiedHookManager.executeHooks()` returns `{ allow, messages, results }`, and a handler setting `result.allow === false` is the natural upstream trigger for capture. Critically, `ViolationCaptureService` contains no dispatch or priority-sorting logic itself — that responsibility belongs entirely to `UnifiedHookManager.registerHandler()`'s priority-sort-on-insert and duplicate-ID-replace behavior. This is a deliberate separation of concerns: producer (hook dispatch) and recorder (violation capture) are decoupled, keeping this component's responsibility limited to sanitization, persistence, and statistics.
+
+Three further patterns define its internal design: data-masking at the write boundary (`sanitizeParams()`), a rolling-window bounded log (the 1000-entry cap in `updateViolationHistory()`), and on-demand recomputation over incremental state (`calculateStatistics()`). Each represents a deliberate trade-off favoring correctness and simplicity over raw performance or completeness.
 
 ## Implementation Details
 
-The `ViolationCaptureService` class encapsulates all persistence logic — the JSONL append operation, the aggregate computation, and the redaction step. Sensitive parameter values are redacted before being written to logs, implying a preprocessing pass over tool/hook context data that strips or masks sensitive fields prior to any disk write. This redaction must occur upstream of both the raw JSONL append and the aggregate computation, since either artifact could otherwise leak sensitive data.
+`sanitizeParams()` strips or masks parameter keys matching patterns like `password`, `token`, `key`, `secret`, or `auth` before a violation is serialized as JSONL. This makes the function the last code to touch a payload before it becomes durable, dashboard-visible history — a genuine trust boundary rather than a convenience filter.
 
-Session tracking is a key organizing principle: records in `violation-history.json` appear to be keyed or grouped by session ID, consistent with the `sessionId` field pattern seen elsewhere in the system (e.g., `claude-bridge.js`'s `transformContext` sessionId derivation). This shared identifier convention allows violation data to be correlated with the same session semantics used across the hook infrastructure.
+`updateViolationHistory()` enforces a hard cap of 1000 entries on `.mcp-sync/violation-history.json`, converting what might otherwise be an audit log into a rolling-window store. There is no archival mechanism inside the component; anything past the cap is silently dropped.
 
-The `getViolationCaptureService` function suggests a singleton-style accessor pattern, providing a shared instance of the service rather than requiring callers to construct and manage their own instance — likely to ensure consistent, non-conflicting writes to the shared log and aggregate files.
-
-![ViolationCaptureService — Relationship](images/violation-capture-service-relationship.png)
+`calculateStatistics()` recomputes severity breakdowns, 24-hour recency counts, and most-common-violation metrics from scratch on every update, rather than maintaining incremental counters. Because the underlying array is capped, this keeps per-call cost bounded, at the expense of O(n)-with-capped-n write-path latency instead of O(1) — a simplicity-over-micro-optimization choice consistent with the component's broader philosophy.
 
 ## Integration Points
 
-ViolationCaptureService sits downstream of violation detection within ConstraintSystem, consuming detection results rather than performing detection itself. Its session-keyed data model implicitly depends on the sessionId conventions established in hook context transformation logic (as seen in `claude-bridge.js`). While it doesn't directly interact with `UnifiedHookManager` (`lib/agent-api/hooks/hook-manager.js`) or `HookConfigLoader` (`lib/agent-api/hooks/hook-config.js`), it shares the same parent ConstraintSystem and the same overall hook-driven session lifecycle that those siblings orchestrate. The output files it produces — `.mcp-sync/session-violations.jsonl` and `violation-history.json` — serve as the integration surface for external dashboard consumers, which rely on the pre-computed statistics rather than needing to implement their own aggregation.
+![ViolationCaptureService — Relationship](images/violation-capture-service-relationship.png)
+
+The service's primary upstream dependency is the hook dispatch machinery in `lib/agent-api/hooks/hook-manager.js`, specifically `UnifiedHookManager.executeHooks()` and its denial (`allow: false`) results. It does not integrate with `registerHandler()`'s priority-sort or duplicate-ID logic directly — that remains UnifiedHookManager's exclusive concern, and a sibling relationship worth noting: ContentValidationAgent's observations flag a similar, independently-maintained `HooksManager` in `lib/agent-api/hooks-api.js` that duplicates much of `UnifiedHookManager`'s registration logic, a maintenance risk that does not directly touch `ViolationCaptureService` but underscores the fragility of the layer it depends on.
+
+Its persistence target, `.mcp-sync/violation-history.json`, is consumed by dashboard-facing statistics views, making this file an implicit interface contract: consumers must understand it represents a bounded rolling window, not a complete audit trail.
 
 ## Usage Guidelines
 
-Consumers of violation data should read from `violation-history.json` for aggregate statistics rather than reprocessing the raw JSONL log, since aggregation logic (severity breakdowns, most-common-constraint, averages) is already handled internally. Developers extending this service should preserve the redaction step as a mandatory precondition to any new write path, to avoid accidentally persisting sensitive parameter values. Any change to the 1000-entry cap should be considered carefully, as it directly affects historical completeness versus file size and read performance. Finally, new capture logic should continue to key records by session ID to remain consistent with the sessionId conventions used across the ConstraintSystem's hook infrastructure.
+Developers extending or calling this service should treat `sanitizeParams()` as the authoritative, non-bypassable redaction point — callers should not assume upstream hook handlers (including those governed by HookConfigLoader's merged user/project configuration) have already redacted sensitive data, since this component is explicitly designed not to trust its callers on that front. This fail-safe posture intentionally contrasts with the fail-open error handling in `claude-bridge.js`'s `main()`, which returns `{ decision: 'allow' }` on failure to avoid blocking Claude — availability failures should not block tool execution, but privacy failures here must never leak, even under partial failure.
+
+Anyone building dashboard or trend-analysis features on `.mcp-sync/violation-history.json` must account for the 1000-entry cap; a separate archival path is required if full historical completeness is needed, since none exists inside this component. Finally, always obtain the instance via `getViolationCaptureService()` rather than constructing `ViolationCaptureService` directly, preserving the singleton discipline shared with `getHookManager()` and avoiding duplicate file-handle/state setup against the same JSON target.
 
 
 ## Code Evidence
@@ -47,23 +53,23 @@ Key code artifacts grounding this entity's analysis:
 - ViolationCaptureService (class) in violation-capture-service.js
 - getViolationCaptureService (function) in violation-capture-service.js
 
+**Other:**
+- The code graph identifies exactly two symbols for this component: the `ViolationCaptureService` class and a `getViolationCaptureService` accessor function, both in `scripts/violation-capture-service.js`. The presence of a dedicated getter function alongside the class is a strong signal of a singleton-accessor pattern — the same shape used elsewhere in this codebase's agent-hook layer (e.g. `getHookManager()` in `lib/agent-api/hooks/hook-manager.js`, called from `lib/agent-api/hooks/claude-bridge.js`'s `main()`). This suggests `ViolationCaptureService` is instantiated once per process and shared across all callers that need to record a violation, rather than being constructed ad hoc at each call site, which avoids redundant file-handle/state setup for the same `.mcp-sync/violation-history.json` target.
+
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem provides rule-based validation and enforcement of code actions and file operations during Claude Code sessions, spanning hook configuration loading, hook dispatch orchestration, and violation capture/persistence. It is built around a unified hook architecture that merges user-level (~/.coding-tools/hooks.json) and project-level (.coding/hooks.json) configurations, with project config taking precedence, and dispatches events (pre-tool, post-tool, pre-prompt, post-prompt, startup, shutdown, error) to registered handlers of type script, command, or module.
-
-Core orchestration lives in UnifiedHookManager (lib/agent-api/hooks/hook-manager.js), which maintains a Map of event names to sorted handler arrays (by priority), supports duplicate-ID overwrite semantics, and exposes registerHandler/unregisterHandler APIs bridging agent-native hook systems to a common HookEvent enum. Configuration parsing and structural validation is handled separately by HookConfigLoader (lib/agent-api/hooks/hook-config.js), which loads, merges, and validates settings/hooks blocks, logging warnings (not throwing) on malformed entries.
-
-Violation detection results are captured and persisted via ViolationCaptureService (scripts/violation-capture-service.js), which writes JSONL violation records to .mcp-sync/session-violations.jsonl and maintains an aggregated violation-history.json with session tracking and computed statistics (severity breakdowns, most common constraint, average violations per session) for dashboard consumption. Sensitive parameter values are redacted before being written to logs, and history is capped at 1000 entries to bound file growth.
+- [ConstraintSystem](./ConstraintSystem.md) -- [LLM] The ConstraintSystem's configuration architecture follows a strict two-tier layered merge pattern implemented in HookConfigLoader (lib/agent-api/hooks/hook-config.js). User-level configuration lives at ~/.coding-tools/hooks.json and represents global defaults applicable across all projects, while project-level configuration at .coding/hooks.json can override specific handlers or add project-specific constraints. The mergeConfigs() function performs this layering, meaning a new developer modifying constraint behavior needs to understand which file actually takes effect at runtime — project config wins on key collisions, but non-overlapping keys from both sources are preserved. This design allows teams to ship organization-wide constraints via user config while individual projects retain the ability to loosen or tighten specific rules without forking the entire config file.
 
 ### Siblings
-- [HookManager](./HookManager.md) -- UnifiedHookManager.initialize(projectPath) loads user config first via loadConfig(userConfigPath, 'user') then project config via loadConfig(projectConfigPath, 'project'), giving project-level entries precedence through later overwrite.
-- [HookConfigLoader](./HookConfigLoader.md) -- loadConfig() in hook-manager.js applies config.settings.enableLogging, stopOnError, and timeout only when explicitly defined in the file (`!== undefined` checks), preserving constructor defaults otherwise.
-- [KnowledgeInjectionHooks](./KnowledgeInjectionHooks.md) -- knowledge-injection-hook.js's isInjectionEnabled() reads process.env.CODING_KNOWLEDGE_INJECTION and treats only '0'/'false'/'off' (case-insensitive) as disabling, defaulting to enabled for unset values.
-- [HealthPromptHook](./HealthPromptHook.md) -- checkHealthStatus() uses existsSync(VERIFIER_SCRIPT) as a heuristic to detect 'outside the coding repo' and returns servicesAvailable:false rather than attempting a network call in that case (Q3 carve-out).
+- [HookConfigLoader](./HookConfigLoader.md) -- [CGR] HookConfigLoader (class) in hook-config.js
+- [UnifiedHookManager](./UnifiedHookManager.md) -- [CGR] UnifiedHookManager (class) in hook-manager.js
+- [ContentValidationAgent](./ContentValidationAgent.md) -- [LLM] Two structurally similar but separately-maintained hook managers exist in this codebase: the abstract `HooksManager` class in lib/agent-api/hooks-api.js and the concrete `UnifiedHookManager` in lib/agent-api/hooks/hook-manager.js. Both independently implement a `Map<event, Handler[]>` registry, both re-sort the per-event array by numeric `priority` on every registration (`registerHook` in hooks-api.js vs `registerHandler` in hook-manager.js), and both generate a fallback ID using `Date.now()` when the caller doesn't supply one. This duplication suggests `HooksManager` was intended as a generic base class that `UnifiedHookManager` should have extended, but the two evolved independently — a maintenance risk if the duplicate-ID replacement fix (present in `registerHandler`) or the priority-sort fix ever needs to be applied to only one of them.
+- [KnowledgeInjectionHooks](./KnowledgeInjectionHooks.md) -- knowledge-injection-hook.js gates injection per-process via isInjectionEnabled(), reading CODING_KNOWLEDGE_INJECTION and treating only '0'/'false'/'off' (case-insensitive) as disabling, defaulting ON otherwise
+- [HealthPromptHook](./HealthPromptHook.md) -- [LLM] [object Object]
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 11 observations*

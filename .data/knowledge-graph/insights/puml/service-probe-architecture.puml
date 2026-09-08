@@ -1,30 +1,40 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Health Coordination" {
-  component "Health Coordinator" as coordinator <<core>>
+package "Service Orchestration" {
+  component "startServiceWithRetry()" as retry <<core>>
+  component "withDeadline()" as deadline <<core>>
+  component "startServicesParallel()" as parallel <<core>>
 }
 
-package "Service Probe (lib/utils/service-probe.js)" {
-  component "probeHttpHealth()" as httpProbe <<core>>
-  component "probeTcpPort()" as tcpProbe <<core>>
+package "Service Wrappers" {
+  component "api-service.js" as apisvc <<cli>>
+  component "dashboard-service.js" as dashsvc <<cli>>
+  component "ProcessStateManager" as psm <<core>>
 }
 
-package "Probed Services" {
-  component "MCP Service" as mcp <<external>>
-  component "Dashboard Service" as dashboard <<external>>
-  component "Graphify Service" as graphify <<external>>
+package "Container Startup" {
+  component "entrypoint.sh" as entry <<cli>>
+  component "wait_for_service()" as waitsvc <<core>>
+  component "Feature Gate (PROGRAM_FEATURES)" as featgate <<core>>
+  component "env-file loader (denylist)" as envloader <<core>>
+  component "supervisord" as supervisor <<external>>
 }
 
-coordinator --> httpProbe : "invokes for HTTP-enabled services"
-coordinator --> tcpProbe : "invokes for non-HTTP services"
+retry --> deadline : "guards start/healthcheck calls"
+parallel --> retry : "Promise.allSettled bucketing"
 
-httpProbe --> mcp : "checks health endpoint"
-httpProbe --> dashboard : "checks health endpoint"
+apisvc --> retry : "uses to start child process"
+dashsvc --> retry : "uses to start child process"
+apisvc --> psm : "registerService('constraint-api-child')"
+dashsvc --> psm : "registerService()"
+dashsvc ..> apisvc : "hardcoded NEXT_PUBLIC_API_BASE_URL:3031"
 
-tcpProbe --> graphify : "checks port open"
-
-httpProbe ..> coordinator : "returns boolean/status"
-tcpProbe ..> coordinator : "returns boolean/status"
+entry --> envloader : "imports .env, filters credentials"
+entry --> waitsvc : "polls Qdrant/Redis TCP ports"
+entry --> featgate : "reads features.json snapshot"
+featgate --> supervisor : "writes disabled.conf overrides"
+entry --> supervisor : "exec supervisord (handoff)"
+waitsvc ..> supervisor : "fail-open: return 0 on timeout"
 
 @enduml

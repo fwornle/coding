@@ -1,0 +1,37 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Write Side (agent-api)" {
+  component "TranscriptAdapter" as adapter <<core>>
+  component "ClaudeParser" as claude <<agent>>
+  component "watchTranscripts()\n(Polling Observer)" as watcher <<core>>
+  component "formatAsMarkdown\n(transcript-api.js)" as writer <<core>>
+}
+
+package "Read Side (dashboard)" {
+  component "lsl-sessions.mjs" as lsl <<core>>
+  component "describeKey()\n(filename routing)" as describe <<core>>
+  component "resolveChain()/groupChains()" as chain <<core>>
+  component "PiSessionWriter" as piwriter <<core>>
+}
+
+package "Storage" {
+  database "Transcript Files\n(.jsonl / .md)" as files <<storage>>
+}
+
+component "LSLConfigValidator" as validator <<external>>
+
+claude --> adapter : "implements getAgentType()/\nconvertToLSL()"
+adapter --> watcher : "diffs via Set<callback>"
+watcher --> writer : "emits session data"
+writer --> files : "writes markdown/LSL"
+
+files --> lsl : "discoverProjects()\nscans history trees"
+lsl --> describe : "regex-parses date/window/\nfrom/subAgent metadata"
+lsl --> chain : "merges multi-part\nrotated files"
+chain --> piwriter : "reassembled session\nas unified entry"
+
+validator ..> lsl : "no direct coupling\n(anomalies not exceptions)"
+claude ..> files : "raw userHash=process.env.USER\n(pre-hash boundary)"
+
+@enduml

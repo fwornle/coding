@@ -1,39 +1,46 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Host Orchestration" {
-  component "CLI Bootstrap / Agent Init" as cli <<cli>>
+package "Container Runtime" {
+  component "docker-compose.yml" as compose <<external>>
+  component "supervisord" as supervisord <<core>>
+  component "entrypoint.sh" as entrypoint <<core>>
+}
+
+package "Service Wrappers" {
+  component "api-service.js" as apiSvc <<api>>
+  component "dashboard-service.js" as dashSvc <<api>>
+  component "service-starter.js" as starter <<core>>
   component "service-probe.js" as probe <<core>>
-  component "Task Gating (GATES/RUNG_OFFLOADED)" as gating <<core>>
+  component "process-state-manager.js" as psm <<core>>
 }
 
-package "Dockerized Containers" {
-  component "Semantic Analysis MCP" as sem <<core>>
-  component "Constraint Monitor" as cmon <<core>>
-  component "Graphify" as graphify <<core>>
-  database "Postgres/Neo4j/Redis" as dbs <<storage>>
+package "Shared State" {
+  component "llm-mock-service.ts" as llmMock <<core>>
+  database "workflow-progress.json" as progress <<storage>>
+  database "Redis / Memgraph" as datastores <<storage>>
 }
 
-package "LLM Backend Access" {
-  cloud "LLM Proxy Layer\n(LLM_CLI_PROXY_URL, RAPID_LLM_PROXY_URL, LLM_PROXY_URL)" as proxy <<external>>
-  cloud "Qwen Local/Laptop APIs" as qwen <<external>>
-  component "llm-mock-service.ts" as mock <<agent>>
-}
+entrypoint --> supervisord : "launches"
+supervisord --> apiSvc : "manages process"
+supervisord --> dashSvc : "manages process"
+compose --> entrypoint : "configures container"
 
-cli --> probe : "polls readiness"
-probe --> sem : "health check"
-probe --> cmon : "health check"
+starter --> apiSvc : "startServiceWithRetry()"
+starter --> dashSvc : "startServiceWithRetry()"
+starter --> probe : "delegates liveness checks"
 
-sem --> dbs : "reads/writes state"
-cmon --> dbs : "monitors state"
-graphify --> dbs : "stores graph data"
+apiSvc --> psm : "registers/unregisters child"
+dashSvc --> psm : "registers/unregisters child"
+probe --> psm : "combined with process state"
 
-sem --> proxy : "routes LLM calls"
-proxy --> qwen : "forwards requests"
+dashSvc --> apiSvc : "NEXT_PUBLIC_API_BASE_URL"
 
-sem ..> mock : "test substitution"
+apiSvc --> datastores : "connects"
+dashSvc --> datastores : "connects"
 
-gating --> sem : "assigns offloaded work"
-gating --> cli : "routes foreground/background"
+llmMock --> progress : "reads/writes CODING_ROOT path"
+apiSvc ..> llmMock : "queries LLM mode"
+dashSvc ..> llmMock : "queries LLM mode"
 
 @enduml

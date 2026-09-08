@@ -7,17 +7,11 @@ title Hierarchy Context: VkbServer
 [VkbServer] as vkb_server #LightBlue
 [ManualLearning] as manual_learning #F0F0F0
 [OnlineLearning] as online_learning #F0F0F0
-[ApiRoutes] as api_routes #E8F5E8
-[VkbApiClient] as vkb_api_client #E8F5E8
-[UkbDatabaseCli] as ukb_database_cli #E8F5E8
-[VkbServerCli] as vkb_server_cli #E8F5E8
+[UkbUnifiedCli] as ukb_unified_cli #F0F0F0
 
 knowledge_management --> vkb_server
 manual_learning -[hidden]- vkb_server
 online_learning -[hidden]- vkb_server
-vkb_server --> api_routes
-vkb_server --> vkb_api_client
-vkb_server --> ukb_database_cli
-vkb_server --> vkb_server_cli
+ukb_unified_cli -[hidden]- vkb_server
 
 @enduml

@@ -1,32 +1,35 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Wrapper Scripts" {
-  component "api-service.js" as api <<cli>>
-  component "dashboard-service.js" as dash <<cli>>
+package "Service Wrappers" {
+  component "api-service.js" as apiSvc <<cli>>
+  component "dashboard-service.js" as dashSvc <<cli>>
 }
 
-package "ServiceStarter Core" {
-  component "startServiceWithRetry()" as retry <<core>>
+package "Orchestration Layer" {
+  component "ServiceStarter\n(startServiceWithRetry)" as starter <<core>>
   component "withDeadline()" as deadline <<core>>
+  component "ProcessStateManager" as psm <<core>>
 }
 
-package "Managed Services" {
-  component "MCP Service" as mcp <<agent>>
-  component "Constraint Monitor" as constraint <<agent>>
-  component "Graphify" as graphify <<agent>>
-  component "LLM Service" as llm <<agent>>
+package "Container Supervision" {
+  component "entrypoint.sh" as entry <<cli>>
+  component "supervisord.conf" as supervisord <<external>>
+  cloud "Qdrant / Redis" as datastores <<external>>
 }
 
-api --> retry : "start + health-check fns"
-dash --> retry : "start + health-check fns"
+apiSvc --> psm : "register/unregister PID"
+dashSvc --> psm : "register/unregister PID"
+dashSvc ..> apiSvc : "hardcoded\nNEXT_PUBLIC_API_BASE_URL"
 
-retry --> deadline : "bounds attempt duration"
-retry --> retry : "exponential backoff retry"
+starter --> deadline : "start/health-check\n(deadline-guarded)"
+starter --> psm : "tracks spawned pid/port"
+starter --> starter : "SIGTERM->SIGKILL\non health-check failure"
 
-retry --> mcp : "required/optional start"
-retry --> constraint : "required/optional start"
-retry --> graphify : "required/optional start"
-retry --> llm : "required/optional start"
+entry --> supervisord : "autostart overrides\n(fail-open feature gating)"
+entry --> datastores : "wait_for_service()\n(fail-open readiness poll)"
+
+apiSvc ..> starter : "not yet adopted\n(inline spawn logic)"
+dashSvc ..> starter : "not yet adopted\n(inline spawn logic)"
 
 @enduml

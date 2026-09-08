@@ -1,30 +1,43 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Upstream Stages" {
-  component "Pipeline" as pipeline <<core>>
-  component "Ontology" as ontology <<core>>
+package "Insight Sources" {
+  component "kb-ab-sample-tasks.mjs\nINSIGHTS" as kbTasks <<core>>
+  component "audit-knowledge-overlap.mjs" as auditOverlap <<core>>
+  component "backfill-insight-mentions.mjs\nderiveInsightSummary" as backfillMentions <<core>>
+  component "backfill.ts\nreadInsights" as backfillTs <<core>>
 }
 
-package "Insight Generation" {
-  component "Pattern Discovery" as patterns <<agent>>
-  component "Architecture Diagramming" as arch <<agent>>
+package "Consolidation Engine" {
+  component "ObservationConsolidator.js\nsynthesizeInsights" as consolidator <<core>>
+  component "_relinkOrphanOnlineInsights" as relink <<core>>
 }
 
-package "Consolidation & Access" {
-  component "ObservationConsolidator" as consolidator <<core>>
-  component "handleGetInsights" as handler <<api>>
-  component "GatedInsights" as ui <<external>>
+package "Server & API" {
+  component "server.js\nhandleGetInsights" as serverApi <<api>>
+  component "copilot-http-server.js\nanalyzeSessionForInsights" as copilotServer <<api>>
 }
 
-pipeline --> patterns : "Code entities / Relations"
-ontology --> patterns : "Classified entities"
-pipeline --> arch : "Components / Dependencies"
+package "UI Layer" {
+  component "App.tsx\nGatedInsights" as gatedUI <<agent>>
+  component "ClipboardButton" as clipboard <<external>>
+  component "ConsolidationProgress" as progressUI <<external>>
+  component "MarkdownText" as markdownUI <<external>>
+}
 
-patterns --> consolidator : "Pattern instances"
-arch --> consolidator : "Architecture diagrams"
+backfillMentions --> consolidator : "feeds summaries"
+backfillTs --> consolidator : "provides raw insights"
+auditOverlap --> consolidator : "detects overlaps"
+kbTasks --> consolidator : "sample insights"
 
-consolidator --> handler : "synthesizeInsights"
-handler --> ui : "serves insights"
+consolidator --> relink : "resolves orphans"
+consolidator --> serverApi : "exposes via API"
+
+serverApi --> gatedUI : "handleGetInsights response"
+copilotServer --> gatedUI : "session insights"
+
+gatedUI --> clipboard : "copy insight"
+gatedUI --> progressUI : "shows consolidation status"
+gatedUI --> markdownUI : "renders insight text"
 
 @enduml

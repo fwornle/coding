@@ -1,28 +1,32 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Semantic Analysis Agent Suite" {
-  component "ContentValidationAgent" as cva <<agent>>
-  component "Entity Observations" as obs <<core>>
-  component "Diagrams" as diagrams <<core>>
+package "Hook Registration Layer" {
+  component "HooksManager\n(abstract)" as hooksApi <<core>>
+  component "UnifiedHookManager\n(concrete)" as unified <<core>>
+  component "HookConfigLoader" as loader <<core>>
 }
 
-package "Codebase State" {
-  component "Live Codebase" as codebase <<external>>
+package "Agent Integration Layer" {
+  component "claude-bridge.js\n(main)" as bridge <<agent>>
+  component "migration-tool.js" as migration <<cli>>
 }
 
-package "Shared Reporting" {
-  component "ValidationIssue Severity Taxonomy" as taxonomy <<core>>
-  component "ViolationCaptureService" as vcs <<core>>
-  component "Severity-Breakdown Dashboard" as dashboard <<api>>
+package "Dashboard Observability" {
+  component "usePolledFetch.ts" as poll <<external>>
+  component "HealthRefreshManager" as refresh <<external>>
 }
 
-cva --> obs : "checks staleness of"
-cva --> diagrams : "checks staleness of"
-cva --> codebase : "compares against live state"
-cva --> taxonomy : "classifies issues using"
-vcs --> taxonomy : "shares severity classification"
-cva --> dashboard : "reports via shared format"
-vcs --> dashboard : "reports via shared format"
+hooksApi ..> unified : "duplicated registry logic\n(should extend, doesn't)"
+loader --> unified : "loads user+project\nhooks.json config"
+unified --> bridge : "executeHooks()\nenabled/agents/stopOnError"
+bridge --> unified : "translates stdin JSON\nvia EVENT_MAP"
+bridge ..> hooksApi : "duplicates\nEVENT_MAPPINGS"
+migration ..> hooksApi : "duplicates\nEVENT_MAPPINGS"
+migration ..> bridge : "duplicates\nEVENT_MAP"
+
+bridge --> bridge : "fail-open:\nalways exit(0), decision=allow"
+
+poll --> refresh : "avoids CPU cost\nof backgrounded tab"
 
 @enduml

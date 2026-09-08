@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: RedactionConfigManager
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[RedactionConfigManager] as redaction_config_manager #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[MultiUserSessionRouter] as multi_user_session_router #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[TranscriptAdapterFramework] as transcript_adapter_framework #F0F0F0
+[SessionDashboardViewer] as session_dashboard_viewer #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+live_logging_system --> redaction_config_manager
+lslconfig_validator -[hidden]- redaction_config_manager
+multi_user_session_router -[hidden]- redaction_config_manager
+operational_logger -[hidden]- redaction_config_manager
+transcript_adapter_framework -[hidden]- redaction_config_manager
+session_dashboard_viewer -[hidden]- redaction_config_manager
+specstory_adapter -[hidden]- redaction_config_manager
+
+@enduml

@@ -1,37 +1,38 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Agent Layer" {
-    component "BaseAgent<TInput, TOutput>" as baseAgent <<core>>
+package "CLI Agent Launch Configs" {
+  component "copilot.sh" as copilot <<cli>>
+  component "opencode.sh" as opencode <<cli>>
+  component "pi.sh" as pi <<cli>>
+  component "launch-agent-common.sh\nconfigure_proxy_routing()" as common <<core>>
 }
 
-package "Response Envelope" {
-    component "Confidence Score" as confidence <<core>>
-    component "Detected Issues" as issues <<core>>
-    component "Routing Suggestions" as routing <<core>>
-    component "Corrections" as corrections <<core>>
+package "pi Extensions" {
+  component "no-unbounded-fs-scan.ts\ntool_call guard" as fsguard <<agent>>
 }
 
-package "Pipeline Orchestration" {
-    component "Pipeline Coordinator" as coordinator <<core>>
-    component "DAG Step" as dagStep <<core>>
+package "Shared Infrastructure" {
+  cloud "rapid-llm-proxy\n(port 12435)" as proxy <<external>>
 }
 
-package "Downstream Targets" {
-    component "Downstream Agent" as downstreamAgent <<external>>
-    component "Human Review" as humanReview <<external>>
+package "System Health Dashboard" {
+  component "agent-badge.tsx\nAGENT_COLORS map" as badge <<external>>
 }
 
-baseAgent --> confidence : "reports"
-baseAgent --> issues : "reports"
-baseAgent --> routing : "self-reports"
-baseAgent --> corrections : "self-proposes"
+copilot ..> common : "defers BYOK wiring"
+opencode --> common : "sourced lifecycle hooks"
+pi --> common : "sourced lifecycle hooks"
 
-coordinator --> confidence : "quality-gates"
-coordinator --> corrections : "evaluates self-heal"
-coordinator --> dagStep : "advances on threshold met"
+copilot --> proxy : "routes LLM calls"
+opencode --> proxy : "routes LLM calls"
+pi --> proxy : "routes LLM calls"
 
-routing --> downstreamAgent : "routes accepted output"
-routing --> humanReview : "flags low-confidence entities"
+pi --> fsguard : "installs extension"
+fsguard ..> pi : "blocks unbounded find (fail-open)"
+
+badge ..> copilot : "renders badge (fallback color)"
+badge ..> opencode : "renders badge (fallback color)"
+badge ..> pi : "renders badge (fallback color)"
 
 @enduml

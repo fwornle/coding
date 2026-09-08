@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Logger Core" {
+  component "OperationalLogger" as opLogger <<core>>
+  component "EnhancedOperationalLogger\n(enhanced-operational-logger.js)" as enhLogger <<core>>
+  component "EnhancedOperationalLogger\n(live-logging-coordinator.js)" as coordLogger <<core>>
+  component "createLogger factory\n(lib/logging/Logger.js)" as loggerFactory <<core>>
+}
+
+package "Configuration & Validation" {
+  component "logging-config.json" as logConfig <<external>>
+  component "LSLConfigValidator\n(validate-lsl-config.js)" as validator <<core>>
+}
+
+package "Transcript Ingestion" {
+  component "TranscriptAdapter\n(abstract, Template Method)" as adapter <<core>>
+  component "ClaudeParser" as claudeParser <<agent>>
+  component "transcript-api.js" as transcriptApi <<api>>
+}
+
+package "Downstream Consumers" {
+  component "lsl-sessions.mjs\n(readSession/chain reconstruction)" as dashboard <<external>>
+}
+
+coordLogger ..> enhLogger : "wraps/facades (inferred)"
+opLogger --> loggerFactory : "implements via"
+transcriptApi --> loggerFactory : "createLogger('transcript-api')"
+claudeParser --> loggerFactory : "createLogger('claude-parser')"
+
+validator --> logConfig : "validates batchSize 10-1000"
+logConfig --> opLogger : "constrains config"
+
+adapter --> claudeParser : "subclass"
+adapter --> opLogger : "produces LSLEntry for"
+opLogger --> dashboard : "writes rotated part files"
+
+dashboard ..> opLogger : "reconstructs write contract\n(undocumented coupling)"
+
+@enduml

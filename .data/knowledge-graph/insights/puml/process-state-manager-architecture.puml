@@ -1,33 +1,37 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+package "Gating Layer" {
+  component "docker/entrypoint.sh" as entrypoint <<core>>
+  component "supervisord" as supervisord <<core>>
+}
+
 package "Wrapper Scripts" {
-  component "api-service.js" as api <<agent>>
-  component "dashboard-service.js" as dash <<agent>>
+  component "api-service.js" as apiService <<cli>>
+  component "dashboard-service.js" as dashboardService <<cli>>
 }
 
-package "Process State Manager" {
-  component "process-state-manager.js" as psm <<core>>
-  database "PSM State\n(PID, name, start time)" as state <<storage>>
+package "Registry Core" {
+  component "ProcessStateManager" as psm <<core>>
 }
 
-package "Process Contexts" {
-  component "Docker-contained Process" as docker <<external>>
-  component "Standalone Node Process" as node <<external>>
-}
+component "constraint-api child" as apiChild <<agent>>
+component "constraint-dashboard child" as dashChild <<agent>>
 
-component "Global Service Coordinator" as gsc <<core>>
+entrypoint --> supervisord : "feature-gates programs"
+supervisord --> apiService : "spawns (if enabled)"
+supervisord --> dashboardService : "spawns (if enabled)"
 
-api --> docker : "spawns"
-dash --> node : "spawns"
+apiService --> apiChild : "spawn"
+dashboardService --> dashChild : "spawn"
 
-api --> psm : "register() after spawn"
-dash --> psm : "register() after spawn"
+apiService ..> psm : "dynamic import + registerService('global')"
+dashboardService ..> psm : "dynamic import + registerService('global')"
 
-api ..> psm : "unregister() on SIGTERM/SIGINT"
-dash ..> psm : "unregister() on SIGTERM/SIGINT"
+apiChild ..> apiService : "exit event"
+dashChild ..> dashboardService : "exit event"
 
-psm --> state : "updates"
-gsc --> psm : "queries source of truth"
+apiService ..> psm : "unregisterService('global') on exit"
+dashboardService ..> psm : "unregisterService('global') on exit"
 
 @enduml

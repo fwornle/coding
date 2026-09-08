@@ -105289,37 +105289,6 @@
     "project": "coding"
   },
   {
-    "id": "e612a3c1-0f13-4669-8987-0b3302a51d2d",
-    "date": "2026-08-31",
-    "theme": "Counting Letter \"R\" Occurrences in Words",
-    "summary": "The developer queried the agent (pi) to count occurrences of the letter `\"r\"` in two words back-to-back. The approach in both cases was manual character-by-character spelling to ensure accuracy.\n\n- `\"strawberry\"` → **3** instances of `\"r\"`\n- `\"milk\"` → **0** instances of `\"r\"`\n\nNo artifacts were produced; these were purely analytical/linguistic counting tasks.",
-    "observationIds": [],
-    "agents": [
-      "pi"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-09-01T13:11:52.449Z",
-    "metadata": {
-      "sourceCount": 2,
-      "date": "2026-08-31",
-      "theme": "Counting Letter \"R\" Occurrences in Words",
-      "summary": "The developer queried the agent (pi) to count occurrences of the letter `\"r\"` in two words back-to-back. The approach in both cases was manual character-by-character spelling to ensure accuracy.\n\n- `\"strawberry\"` → **3** instances of `\"r\"`\n- `\"milk\"` → **0** instances of `\"r\"`\n\nNo artifacts were produced; these were purely analytical/linguistic counting tasks.",
-      "observation_ids": [
-        "5f2f68f6-2800-4602-965b-65b394c4d174",
-        "b63fa286-9206-4636-8ce9-21dc04d11e66"
-      ],
-      "agents": [
-        "pi"
-      ],
-      "files_touched": [],
-      "project": "a2a",
-      "quality": "normal",
-      "createdAt": "2026-09-01T13:11:52.449Z"
-    },
-    "project": "a2a"
-  },
-  {
     "id": "23cf92d3-f27f-4644-8a4c-0c57d5492a3c",
     "date": "2026-09-01",
     "theme": "Git Push and PR Creation for Local Execution Counter",
@@ -105514,6 +105483,37 @@
       "createdAt": "2026-09-01T06:00:03.840Z"
     },
     "project": "coding"
+  },
+  {
+    "id": "e612a3c1-0f13-4669-8987-0b3302a51d2d",
+    "date": "2026-08-31",
+    "theme": "Counting Letter \"R\" Occurrences in Words",
+    "summary": "The developer queried the agent (pi) to count occurrences of the letter `\"r\"` in two words back-to-back. The approach in both cases was manual character-by-character spelling to ensure accuracy.\n\n- `\"strawberry\"` → **3** instances of `\"r\"`\n- `\"milk\"` → **0** instances of `\"r\"`\n\nNo artifacts were produced; these were purely analytical/linguistic counting tasks.",
+    "observationIds": [],
+    "agents": [
+      "pi"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-01T13:11:52.449Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-08-31",
+      "theme": "Counting Letter \"R\" Occurrences in Words",
+      "summary": "The developer queried the agent (pi) to count occurrences of the letter `\"r\"` in two words back-to-back. The approach in both cases was manual character-by-character spelling to ensure accuracy.\n\n- `\"strawberry\"` → **3** instances of `\"r\"`\n- `\"milk\"` → **0** instances of `\"r\"`\n\nNo artifacts were produced; these were purely analytical/linguistic counting tasks.",
+      "observation_ids": [
+        "5f2f68f6-2800-4602-965b-65b394c4d174",
+        "b63fa286-9206-4636-8ce9-21dc04d11e66"
+      ],
+      "agents": [
+        "pi"
+      ],
+      "files_touched": [],
+      "project": "a2a",
+      "quality": "normal",
+      "createdAt": "2026-09-01T13:11:52.449Z"
+    },
+    "project": "a2a"
   },
   {
     "id": "de9e486b-4135-4061-a28e-f6cc77e7d19c",
@@ -113693,5 +113693,686 @@
       "createdAt": "2026-09-07T17:11:13.201Z"
     },
     "project": "coding"
+  },
+  {
+    "id": "0de9e776-54f1-4103-865e-705cc93a7a20",
+    "date": "2026-09-07",
+    "theme": "Semantic analysis integration commits and parse bug",
+    "summary": "- Goal: land pending commits and address a lingering parse bug in the semantic-analysis integration\n- Approach: staged and applied commits 1–3 covering two code fixes and in-progress branch work\n- Result: commits 1–3 successfully applied; parse bug fix deferred to a follow-up step\n- Agent: claude",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-07T19:05:32.030Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-07",
+      "theme": "Semantic analysis integration commits and parse bug",
+      "summary": "- Goal: land pending commits and address a lingering parse bug in the semantic-analysis integration\n- Approach: staged and applied commits 1–3 covering two code fixes and in-progress branch work\n- Result: commits 1–3 successfully applied; parse bug fix deferred to a follow-up step\n- Agent: claude",
+      "observation_ids": [
+        "35df3d3a-0189-46d6-9dfa-75b1548fcdcc"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-07T19:05:32.030Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "cd833736-9137-4a21-bc0d-eb0a4cd7fe0e",
+    "date": "2026-09-07",
+    "theme": "Debugging missing `contains` edges in anchor pass",
+    "summary": "- Goal: diagnose why the `contains` edge path fails for non-Project entities\n- Approach: traced edge creation via grep across codebase, inspected `wave-controller.ts` (lines 2480–2585) anchor pass implementation, cross-referenced documented guarantee against actual run logs\n- Result: located the anchor pass responsible for guaranteeing `contains` edges; identified discrepancy between documented behavior and actual output, but root cause not yet fixed\n- Agent: claude",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-07T19:05:32.030Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-07",
+      "theme": "Debugging missing `contains` edges in anchor pass",
+      "summary": "- Goal: diagnose why the `contains` edge path fails for non-Project entities\n- Approach: traced edge creation via grep across codebase, inspected `wave-controller.ts` (lines 2480–2585) anchor pass implementation, cross-referenced documented guarantee against actual run logs\n- Result: located the anchor pass responsible for guaranteeing `contains` edges; identified discrepancy between documented behavior and actual output, but root cause not yet fixed\n- Agent: claude",
+      "observation_ids": [
+        "5d2dc211-08a5-4c5c-8ff1-d32dd47a4552"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-07T19:05:32.030Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "cfa03b65-7e5c-423b-917c-873740beea48",
+    "date": "2026-09-07",
+    "theme": "Investigating GraphKMStore putEntity supersession for options 1 & 3",
+    "summary": "- Goal: proceed with previously discussed options 1 and 3\n- Approach: began by reading km-core's `GraphKMStore` to understand the `putEntity` supersession path before implementing changes\n- Result: no code changes made yet; investigation of supersession logic still in progress as a prerequisite\n- Agent: claude",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-07T19:05:32.030Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-07",
+      "theme": "Investigating GraphKMStore putEntity supersession for options 1 & 3",
+      "summary": "- Goal: proceed with previously discussed options 1 and 3\n- Approach: began by reading km-core's `GraphKMStore` to understand the `putEntity` supersession path before implementing changes\n- Result: no code changes made yet; investigation of supersession logic still in progress as a prerequisite\n- Agent: claude",
+      "observation_ids": [
+        "c837069e-5b42-4ffe-b8c8-abd0881bdaf5"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-07T19:05:32.030Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f4ace816-0048-482e-aa1a-247fcabffc17",
+    "date": "2026-09-07",
+    "theme": "Secure and commit rapid-llm-proxy and coding repo changes",
+    "summary": "- Goal: commit, push, and open a PR for pending changes across the `rapid-llm-proxy` and `coding` repos\n- Before committing, audited for leaked secrets and untracked files\n- Moved exposed `.env.bak` out of the repo and hardened `.gitignore` to also cover `.env.bak*`\n- Created a new branch `fix/qwen-cluster-turing2` in the proxy repo to isolate the cluster-routing fix from pre-existing commits\n- Edited `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/.gitignore`\n- Committed and pushed both repos: proxy repo branch with cluster-routing fix + `.gitignore` hardening, and coding repo with qwen config changes plus insight churn\n- Prepared PR description for review",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/.gitignore"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-07T19:05:32.030Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-07",
+      "theme": "Secure and commit rapid-llm-proxy and coding repo changes",
+      "summary": "- Goal: commit, push, and open a PR for pending changes across the `rapid-llm-proxy` and `coding` repos\n- Before committing, audited for leaked secrets and untracked files\n- Moved exposed `.env.bak` out of the repo and hardened `.gitignore` to also cover `.env.bak*`\n- Created a new branch `fix/qwen-cluster-turing2` in the proxy repo to isolate the cluster-routing fix from pre-existing commits\n- Edited `/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/.gitignore`\n- Committed and pushed both repos: proxy repo branch with cluster-routing fix + `.gitignore` hardening, and coding repo with qwen config changes plus insight churn\n- Prepared PR description for review",
+      "observation_ids": [
+        "159d87f7-568a-4c97-9ef6-a575d707bd8b"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/_work/rapid-llm-proxy/.gitignore"
+      ],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-07T19:05:32.030Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "990a8a94-d182-4672-aed3-f457856e7d32",
+    "date": "2026-09-07",
+    "theme": "Character count query for \"strawberry\"",
+    "summary": "- Agent `pi` was asked how many \"r\" characters appear in the word \"strawberry\".\n- Approach was a simple manual character count of the letter \"r\" in the word.\n- No artifacts were produced, as this was a quick factual query.\n- Result: answered that \"strawberry\" contains 3 occurrences of the letter \"r\".",
+    "observationIds": [],
+    "agents": [
+      "pi"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-07T19:05:32.030Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-07",
+      "theme": "Character count query for \"strawberry\"",
+      "summary": "- Agent `pi` was asked how many \"r\" characters appear in the word \"strawberry\".\n- Approach was a simple manual character count of the letter \"r\" in the word.\n- No artifacts were produced, as this was a quick factual query.\n- Result: answered that \"strawberry\" contains 3 occurrences of the letter \"r\".",
+      "observation_ids": [
+        "91006781-5ffe-4542-9029-f83b4275d307"
+      ],
+      "agents": [
+        "pi"
+      ],
+      "files_touched": [],
+      "project": "vault",
+      "quality": "normal",
+      "createdAt": "2026-09-07T19:05:32.030Z"
+    },
+    "project": "vault"
+  },
+  {
+    "id": "2fbff842-b309-4a1a-b1b8-2cc23415b9dc",
+    "date": "2026-09-08",
+    "theme": "Judge service loads QWEN_LOCAL_API_KEY from .env",
+    "summary": "- Goal: fix judge service failing to find `QWEN_LOCAL_API_KEY` due to missing environment variable\n- Approach: investigated launchd plist configs and startup scripts for existing secret-loading conventions across project services\n- Determined convention: source `.env` in the launcher script at runtime rather than hardcoding secrets in plist files\n- Result: identified that judge service should load `QWEN_LOCAL_API_KEY` from `coding/.env`, aligning with how `llm-cli-proxy` and other services handle secrets\n- No code artifacts produced yet; this was an investigation/decision step (opencode agent)",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T06:01:53.695Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Judge service loads QWEN_LOCAL_API_KEY from .env",
+      "summary": "- Goal: fix judge service failing to find `QWEN_LOCAL_API_KEY` due to missing environment variable\n- Approach: investigated launchd plist configs and startup scripts for existing secret-loading conventions across project services\n- Determined convention: source `.env` in the launcher script at runtime rather than hardcoding secrets in plist files\n- Result: identified that judge service should load `QWEN_LOCAL_API_KEY` from `coding/.env`, aligning with how `llm-cli-proxy` and other services handle secrets\n- No code artifacts produced yet; this was an investigation/decision step (opencode agent)",
+      "observation_ids": [
+        "d46ad138-060f-416f-8ec1-dc708f530799"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-08T06:01:53.695Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "9f6de8c2-6adc-4939-93a8-d6346bed9728",
+    "date": "2026-09-08",
+    "theme": "Knowledge graph compression and team/view hierarchy",
+    "summary": "- Goal: fix anchor pass gap and compress knowledge graph from 2500+ nodes/25000+ edges to <1000 nodes via ancestor-based node merging\n- Reduce node description verbosity using link-to-details pattern\n- Correct node coloring bug: AUTO learned nodes from batch mode should be blue, not pink\n- Restructure into predefined Teams (Coding, UI, RaaS, ReSi, Normalisa) separate from a Views folder for topic-based filtering; teams are predefined, not emergent from ingestion\n- Deferred build/restart until anchor pass fix lands, to avoid corrupting an in-progress verification run\n- Follow-up: instead of removing topic views from the sidebar, prioritized clustering/grouping them hierarchically to prevent sidebar clutter as views proliferate, while preserving their proven usefulness in the Unified Viewer",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T06:01:53.695Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Knowledge graph compression and team/view hierarchy",
+      "summary": "- Goal: fix anchor pass gap and compress knowledge graph from 2500+ nodes/25000+ edges to <1000 nodes via ancestor-based node merging\n- Reduce node description verbosity using link-to-details pattern\n- Correct node coloring bug: AUTO learned nodes from batch mode should be blue, not pink\n- Restructure into predefined Teams (Coding, UI, RaaS, ReSi, Normalisa) separate from a Views folder for topic-based filtering; teams are predefined, not emergent from ingestion\n- Deferred build/restart until anchor pass fix lands, to avoid corrupting an in-progress verification run\n- Follow-up: instead of removing topic views from the sidebar, prioritized clustering/grouping them hierarchically to prevent sidebar clutter as views proliferate, while preserving their proven usefulness in the Unified Viewer",
+      "observation_ids": [
+        "f17eba51-99ee-4a0d-a84b-7d49525cb26d",
+        "83d7339a-af00-4dce-a956-b86d4941011b"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T06:01:53.695Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "fce9276f-0fa2-4253-b568-c48f9e2b18bc",
+    "date": "2026-09-08",
+    "theme": "Orphaned file verification during project run",
+    "summary": "- Goal: verify no new orphaned files are created when running the project\n- Approach: capture a baseline snapshot of orphaned files before execution, then compare post-run state for objective measurement\n- Result: baseline capture initiated; results pending completion of run and post-run analysis",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T06:01:53.695Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Orphaned file verification during project run",
+      "summary": "- Goal: verify no new orphaned files are created when running the project\n- Approach: capture a baseline snapshot of orphaned files before execution, then compare post-run state for objective measurement\n- Result: baseline capture initiated; results pending completion of run and post-run analysis",
+      "observation_ids": [
+        "46a15b3f-ed0c-48a2-beca-b8ad6a8232da"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-08T06:01:53.695Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d4c789f3-1575-4993-b220-aa2cd3639a43",
+    "date": "2026-09-08",
+    "theme": "Documentation audit and Insight Document button gating",
+    "summary": "- Goal: check for missing documentation files and verify links across the coding project\n- Approach: read-only bash audit of insight document files on disk\n- Found missing documentation files\n- Found UI bug: \"View Insight Document\" button appears unconditionally even when an entity has no associated document, creating a false affordance\n- Recommendation: gate the button to only display when a document actually exists",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T06:01:53.695Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Documentation audit and Insight Document button gating",
+      "summary": "- Goal: check for missing documentation files and verify links across the coding project\n- Approach: read-only bash audit of insight document files on disk\n- Found missing documentation files\n- Found UI bug: \"View Insight Document\" button appears unconditionally even when an entity has no associated document, creating a false affordance\n- Recommendation: gate the button to only display when a document actually exists",
+      "observation_ids": [
+        "dac28786-ac68-4175-b12b-62a115860166"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T06:01:53.695Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ad96e598-b88a-41c4-a554-cef3d863489b",
+    "date": "2026-09-08",
+    "theme": "Locating team config and viewer for predefined views",
+    "summary": "- Goal: find the viewer component serving the insight link and understand how team configs (Coding, UI, RaaS, ReSi, Normalisa) are loaded for predefined Views\n- Approach: repo-wide search avoiding `node_modules`, later verified by examining `semantic-analysis/src/tools.ts` and querying the workflow API\n- Confirmed dynamic views belong under a collapsible tree in the Views section, sourced from config\n- Key finding: team configuration is actually hardcoded in `semantic-analysis/src/tools.ts`, meaning `config/teams/*.json` files are not consumed by the current implementation",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T06:32:44.965Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Locating team config and viewer for predefined views",
+      "summary": "- Goal: find the viewer component serving the insight link and understand how team configs (Coding, UI, RaaS, ReSi, Normalisa) are loaded for predefined Views\n- Approach: repo-wide search avoiding `node_modules`, later verified by examining `semantic-analysis/src/tools.ts` and querying the workflow API\n- Confirmed dynamic views belong under a collapsible tree in the Views section, sourced from config\n- Key finding: team configuration is actually hardcoded in `semantic-analysis/src/tools.ts`, meaning `config/teams/*.json` files are not consumed by the current implementation",
+      "observation_ids": [
+        "8e33e853-f5eb-4e2b-9539-bc9a462234d4",
+        "812d59d9-92eb-40eb-b18e-94226e2981fe"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T06:32:44.965Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "f4a22b3e-73bc-46fc-8ff9-5e18c4b4649f",
+    "date": "2026-09-08",
+    "theme": "Reorganizing Kgbench KB runs under parent anchor node",
+    "summary": "- Goal: group KB performance measurement runs under a single \"Kgbench\" node instead of separate \"projects\"\n- Root cause: auto-created Project anchors minted during observation consolidation, treating each run as independent\n- Fix: move `ensureProjectAnchor` before the relationship sweep, implementing outcome-based anchoring so runs become children of Kgbench\n- Artifacts: anchor-pass fix, shim, drift guard, and two new tests written; build held pending verification run",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T06:32:44.965Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Reorganizing Kgbench KB runs under parent anchor node",
+      "summary": "- Goal: group KB performance measurement runs under a single \"Kgbench\" node instead of separate \"projects\"\n- Root cause: auto-created Project anchors minted during observation consolidation, treating each run as independent\n- Fix: move `ensureProjectAnchor` before the relationship sweep, implementing outcome-based anchoring so runs become children of Kgbench\n- Artifacts: anchor-pass fix, shim, drift guard, and two new tests written; build held pending verification run",
+      "observation_ids": [
+        "a576a3a2-7e91-4ea8-bd4c-5887ff6964c5"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-08T06:32:44.965Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c38f6e17-80d2-4da2-aef4-3a76b400db4b",
+    "date": "2026-09-08",
+    "theme": "Diagnosing UKB workflow stall and timestamp confusion",
+    "summary": "- Goal: investigate why the UKB workflow appeared stuck at the end, suspecting a process crash\n- Approach: examined system logs and launchctl status, checked for SIGKILL signals and process start/stop timestamps\n- Found the original process exited via SIGKILL (-9) mid-wave-3 at 06:21:40, likely due to OOM/resource exhaustion, with a new instance starting at 07:43\n- Follow-up: resolved apparent \"2-hour-old\" log timestamps as a UTC vs local time (UTC+2) misinterpretation — the run was not actually stalled, 06:20:55Z corresponds to the present local time (~08:22)",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T06:32:44.965Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Diagnosing UKB workflow stall and timestamp confusion",
+      "summary": "- Goal: investigate why the UKB workflow appeared stuck at the end, suspecting a process crash\n- Approach: examined system logs and launchctl status, checked for SIGKILL signals and process start/stop timestamps\n- Found the original process exited via SIGKILL (-9) mid-wave-3 at 06:21:40, likely due to OOM/resource exhaustion, with a new instance starting at 07:43\n- Follow-up: resolved apparent \"2-hour-old\" log timestamps as a UTC vs local time (UTC+2) misinterpretation — the run was not actually stalled, 06:20:55Z corresponds to the present local time (~08:22)",
+      "observation_ids": [
+        "91ae46f3-8898-4a15-959b-df29add13ad2",
+        "ef8efaf6-defc-4fa8-b232-29410e6dc766"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T06:32:44.965Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "a87c3670-6889-4da2-a245-ce8ac2910708",
+    "date": "2026-09-08",
+    "theme": "Investigate stuck process and clean up agentic ontology file",
+    "summary": "- Goal: investigate a process reported as stuck (showing finished but still cancelable) and resolve related codebase issues\n- `claude` ran a grep search across `.ts`/`.tsx` files for references to \"Agentic\" to check for dependency/config issues, deferring a taxonomy pass until the running process completed\n- Confirmed `agentic-ontology.json` was unreferenced anywhere in the codebase\n- Removed the file via `git rm` to preserve version control history, cleaning up unused ontology data",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T09:04:30.301Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Investigate stuck process and clean up agentic ontology file",
+      "summary": "- Goal: investigate a process reported as stuck (showing finished but still cancelable) and resolve related codebase issues\n- `claude` ran a grep search across `.ts`/`.tsx` files for references to \"Agentic\" to check for dependency/config issues, deferring a taxonomy pass until the running process completed\n- Confirmed `agentic-ontology.json` was unreferenced anywhere in the codebase\n- Removed the file via `git rm` to preserve version control history, cleaning up unused ontology data",
+      "observation_ids": [
+        "da19f045-173a-4789-a964-6d335739ebe5",
+        "f7fdf10f-b590-483f-98e7-4778f7dfe1b1"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T09:04:30.301Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e5bf7086-2f5f-431b-a506-1f60d84b85fa",
+    "date": "2026-09-08",
+    "theme": "Measure deduplication pass results on observation log",
+    "summary": "- Goal: reduce the observation log from 2626/25137 entries via a multi-phase compression strategy (hierarchy merge, evidence retention, insight consolidation) targeting ~800 entries\n- `claude` ran a diagnostic query to quantify the yield of deduplication pass 1 before proceeding\n- Established a baseline ground truth of duplicates removed so far, to inform the next optimization phase of hierarchy merge and consolidation",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T09:04:30.301Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Measure deduplication pass results on observation log",
+      "summary": "- Goal: reduce the observation log from 2626/25137 entries via a multi-phase compression strategy (hierarchy merge, evidence retention, insight consolidation) targeting ~800 entries\n- `claude` ran a diagnostic query to quantify the yield of deduplication pass 1 before proceeding\n- Established a baseline ground truth of duplicates removed so far, to inform the next optimization phase of hierarchy merge and consolidation",
+      "observation_ids": [
+        "2bad955f-3a08-405f-91e4-328cfbc0021c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T09:04:30.301Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c7aef759-87d5-4d8f-bc63-bf0c127efaa7",
+    "date": "2026-09-08",
+    "theme": "Verifying LLM proxy Qwen endpoint auto-switching",
+    "summary": "- Goal: confirm rapid-llm-proxy changes were merged/deployed and that the Qwen endpoint correctly auto-switches based on network location (VPN/CN vs default).\n- `opencode` first verified via git status across `coding` and `rapid-llm-proxy` repos that PR #29 was merged, and confirmed the running proxy process had restarted with updated config/credentials, with auto-recovery logic in place for network-mode detection.\n- Follow-up testing was performed live from a China network: curl probes against local proxy health/behaviour endpoints (`127.0.0.1:12435`/`12437`) and live chat completions to validate routing verdicts.\n- Discovered a timing mismatch in `rapid-llm-proxy`: the classifier's timeout budget (~2s) is shorter than the judge's actual warm-response latency (~950ms was fine, but effectively the abort was triggered), causing the proxy to abort classifier verdicts prematurely.\n- Result: endpoint switching logic confirmed functional, but a latency/timeout bug in the classifier was surfaced needing follow-up fix.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T09:04:30.301Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Verifying LLM proxy Qwen endpoint auto-switching",
+      "summary": "- Goal: confirm rapid-llm-proxy changes were merged/deployed and that the Qwen endpoint correctly auto-switches based on network location (VPN/CN vs default).\n- `opencode` first verified via git status across `coding` and `rapid-llm-proxy` repos that PR #29 was merged, and confirmed the running proxy process had restarted with updated config/credentials, with auto-recovery logic in place for network-mode detection.\n- Follow-up testing was performed live from a China network: curl probes against local proxy health/behaviour endpoints (`127.0.0.1:12435`/`12437`) and live chat completions to validate routing verdicts.\n- Discovered a timing mismatch in `rapid-llm-proxy`: the classifier's timeout budget (~2s) is shorter than the judge's actual warm-response latency (~950ms was fine, but effectively the abort was triggered), causing the proxy to abort classifier verdicts prematurely.\n- Result: endpoint switching logic confirmed functional, but a latency/timeout bug in the classifier was surfaced needing follow-up fix.",
+      "observation_ids": [
+        "33cddc0e-dcf6-473c-b184-e01c3079e387",
+        "ed72cc7c-c9bf-4d61-adfd-df22777402f6"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T09:04:30.301Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "1c3e6495-2c33-44e7-9a44-67ceddb19813",
+    "date": "2026-09-08",
+    "theme": "Prompt classifier timeout investigation and CI fix",
+    "summary": "- (opencode) Investigated raising the timeout of the prompt classifier service, measuring latency scaling and the `max_request_bytes` (20,000) ceiling to pick a proper value; no change applied yet, though `wave-analysis-single-owner.test.mjs` was touched during exploration.\n- Later reviewed open PRs via `gh pr list` and found PR #8 had two failing CI checks (UNSTABLE).\n- Root-caused the `wave-analysis-single-owner` test failure: it reads a submodule source file at module load time, but CI runs with `submodules: false`.\n- Began fixing `tests/ukb/wave-analysis-single-owner.test.mjs` to remove the submodule dependency so CI can pass.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/ukb/wave-analysis-single-owner.test.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-08T10:32:56.192Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Prompt classifier timeout investigation and CI fix",
+      "summary": "- (opencode) Investigated raising the timeout of the prompt classifier service, measuring latency scaling and the `max_request_bytes` (20,000) ceiling to pick a proper value; no change applied yet, though `wave-analysis-single-owner.test.mjs` was touched during exploration.\n- Later reviewed open PRs via `gh pr list` and found PR #8 had two failing CI checks (UNSTABLE).\n- Root-caused the `wave-analysis-single-owner` test failure: it reads a submodule source file at module load time, but CI runs with `submodules: false`.\n- Began fixing `tests/ukb/wave-analysis-single-owner.test.mjs` to remove the submodule dependency so CI can pass.",
+      "observation_ids": [
+        "48cc332a-1b24-45df-ad99-c3fd2d2f73ec",
+        "75ad89e8-4fff-4c73-be9d-36f6623b6a11"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/ukb/wave-analysis-single-owner.test.mjs"
+      ],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T10:32:56.192Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "ce72c5e6-3d89-4b63-9f4f-83eb12b6b882",
+    "date": "2026-09-08",
+    "theme": "Removing VKB and rehoming experiment endpoints",
+    "summary": "- Goal: extract 27 experiment endpoints from the legacy knowledge API class in `api-routes.js` and fully remove VKB (vkb) from the system.\n- `claude` began by investigating `api-routes.js` structure to determine if the experiment endpoints could be cleanly separated from legacy knowledge API DB dependencies; no files modified yet.\n- A background container image rebuild (without VKB) completed; `claude` ran `docker-compose` to recreate the coding-services container with the new image.\n- Work then resumed on VKB verification after a usage-limit interruption: checked supervisor config and service status, finding `vkb-server` still present and several services in a STOPPED state.\n- Open issue: need to verify whether a prior `entrypoint.sh` edit caused the regression/feature-gating breakage.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T10:32:56.192Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-08",
+      "theme": "Removing VKB and rehoming experiment endpoints",
+      "summary": "- Goal: extract 27 experiment endpoints from the legacy knowledge API class in `api-routes.js` and fully remove VKB (vkb) from the system.\n- `claude` began by investigating `api-routes.js` structure to determine if the experiment endpoints could be cleanly separated from legacy knowledge API DB dependencies; no files modified yet.\n- A background container image rebuild (without VKB) completed; `claude` ran `docker-compose` to recreate the coding-services container with the new image.\n- Work then resumed on VKB verification after a usage-limit interruption: checked supervisor config and service status, finding `vkb-server` still present and several services in a STOPPED state.\n- Open issue: need to verify whether a prior `entrypoint.sh` edit caused the regression/feature-gating breakage.",
+      "observation_ids": [
+        "d8d1dae2-8215-484d-84ea-5d1ca71ed24c",
+        "bb181e8e-f17b-452d-a64d-4187072269fe",
+        "95761231-504b-486f-8160-293510c6629e"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-08T10:32:56.192Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "db21c6c7-59ba-45b8-afbc-ac08f03898cb",
+    "date": "2026-09-08",
+    "theme": "UKB duplicate-node dedupe and anchor pass fixes",
+    "summary": "Goal: resolve UKB duplicate-node issue in the knowledge graph, spanning the storeEntity upsert fix and a new maintenance dedupe endpoint.\n- Wired km-core's `mergeEntities` into obs-api as `POST /api/maintenance/dedupe-entities`, discovered a dry run would destroy Observation/Insight/Digest data (shared names ≠ identity), so scoped defaults to hierarchy types with `dryRun:true`.\n- Executed merge: 72/72 duplicate hierarchy nodes merged (156 duplicates removed, 64 edges rewired), orphans dropped 154→10, connectivity 0.9401→0.9961.\n- Added a test pinning the safety defaults; committed the `storeEntity` upsert fix earlier (resolves existing node id before `putEntity`).\n- Established a precise pre-run baseline (2574 nodes, 24903 edges, 10 orphans, 745 active hierarchy entities, 0 duplicate names) to verify no new orphans after a ~45 min pipeline run.\n- Identified 10 remaining orphans traced to the anchor pass's name-keyed \"already anchored?\" check; began fixing anchor pass layer-(a) gap and layer-(b) name lookup consistency (deterministic oldest-wins via `storeEntity` upsert), deferring restart until verification run completes.\n- Corrected an earlier claim: Kgbench-Tree teams pre-existed from kgbench benchmark runs, not created by this session.\n- Additional pending issues identified: graph compression (2500+ nodes/25000 edges → under 1000 via merging similar nodes with same ancestors), reducing node description verbosity (use insight doc links), fixing batch-mode node color (should be blue, not pink/AUTO), and correcting teams/views structure to use predefined teams (Coding, UI, RaaS, ReSi, Normalisa) with a views hierarchy.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T10:58:36.425Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-08",
+      "theme": "UKB duplicate-node dedupe and anchor pass fixes",
+      "summary": "Goal: resolve UKB duplicate-node issue in the knowledge graph, spanning the storeEntity upsert fix and a new maintenance dedupe endpoint.\n- Wired km-core's `mergeEntities` into obs-api as `POST /api/maintenance/dedupe-entities`, discovered a dry run would destroy Observation/Insight/Digest data (shared names ≠ identity), so scoped defaults to hierarchy types with `dryRun:true`.\n- Executed merge: 72/72 duplicate hierarchy nodes merged (156 duplicates removed, 64 edges rewired), orphans dropped 154→10, connectivity 0.9401→0.9961.\n- Added a test pinning the safety defaults; committed the `storeEntity` upsert fix earlier (resolves existing node id before `putEntity`).\n- Established a precise pre-run baseline (2574 nodes, 24903 edges, 10 orphans, 745 active hierarchy entities, 0 duplicate names) to verify no new orphans after a ~45 min pipeline run.\n- Identified 10 remaining orphans traced to the anchor pass's name-keyed \"already anchored?\" check; began fixing anchor pass layer-(a) gap and layer-(b) name lookup consistency (deterministic oldest-wins via `storeEntity` upsert), deferring restart until verification run completes.\n- Corrected an earlier claim: Kgbench-Tree teams pre-existed from kgbench benchmark runs, not created by this session.\n- Additional pending issues identified: graph compression (2500+ nodes/25000 edges → under 1000 via merging similar nodes with same ancestors), reducing node description verbosity (use insight doc links), fixing batch-mode node color (should be blue, not pink/AUTO), and correcting teams/views structure to use predefined teams (Coding, UI, RaaS, ReSi, Normalisa) with a views hierarchy.",
+      "observation_ids": [
+        "b75804d6-a84b-4d27-a8a8-d999c93d97c1",
+        "dab31f92-89c4-4a69-af15-d0cb600e1529",
+        "92ba5f73-37aa-4244-bee6-a89d603c51bf"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-08T10:58:36.425Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9ad34856-e6b0-4c99-8b5a-5dff52eccc3a",
+    "date": "2026-09-08",
+    "theme": "VKB removal fallout: stale health check and FATAL embedding-listener",
+    "summary": "Goal: diagnose dashboard/service issues following removal of the VKB service.\n- Root cause of red dashboard status: the VKB service was removed but its health check entry was left in place, causing a mismatch; fix is to remove the stale health check.\n- After a background image rebuild completed, confirmed `vkb-server` was successfully removed from the image/container.\n- Checked `supervisorctl` logs for `embedding-listener` and found it in a FATAL state, requiring further investigation to determine if it's related to the rebuild.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T10:58:36.425Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "VKB removal fallout: stale health check and FATAL embedding-listener",
+      "summary": "Goal: diagnose dashboard/service issues following removal of the VKB service.\n- Root cause of red dashboard status: the VKB service was removed but its health check entry was left in place, causing a mismatch; fix is to remove the stale health check.\n- After a background image rebuild completed, confirmed `vkb-server` was successfully removed from the image/container.\n- Checked `supervisorctl` logs for `embedding-listener` and found it in a FATAL state, requiring further investigation to determine if it's related to the rebuild.",
+      "observation_ids": [
+        "edb9042e-0338-4b84-a322-58dc6c72a1a0",
+        "70ff1d2e-7cb9-4365-93f0-af7008266f4e"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T10:58:36.425Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ecc01f6f-d27b-43c9-8d33-c5a36b959cc0",
+    "date": "2026-09-08",
+    "theme": "Auditing missing insight document links in UI",
+    "summary": "- Goal: investigate why the \"View Insight Document\" button appears unconditionally even when no insight document exists for an entity.\n- Agent `claude` scanned the wave controller agent source, listed insight markdown files on disk, and grep-searched for \"View Insight Document\" usage to map affected components.\n- Continued by investigating the unified-viewer integration: checked local dev server, listed viewer source directories, inspected `EntityDetailPanel.tsx`, and queried the wave-analysis status API to locate insight link/team/view sources.\n- Result: read-only investigation, incomplete — a repo-wide grep hit `node_modules` and timed out before the viewer component and its configuration were fully located.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T11:46:22.368Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Auditing missing insight document links in UI",
+      "summary": "- Goal: investigate why the \"View Insight Document\" button appears unconditionally even when no insight document exists for an entity.\n- Agent `claude` scanned the wave controller agent source, listed insight markdown files on disk, and grep-searched for \"View Insight Document\" usage to map affected components.\n- Continued by investigating the unified-viewer integration: checked local dev server, listed viewer source directories, inspected `EntityDetailPanel.tsx`, and queried the wave-analysis status API to locate insight link/team/view sources.\n- Result: read-only investigation, incomplete — a repo-wide grep hit `node_modules` and timed out before the viewer component and its configuration were fully located.",
+      "observation_ids": [
+        "0d2e2d39-c56c-43e9-991c-ecd3b3ff5bfb",
+        "e3251ded-6f4c-49a6-85e8-830a07294e40"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T11:46:22.368Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "68696b02-52f1-47b9-a73c-66bb9685d627",
+    "date": "2026-09-08",
+    "theme": "Recording and verifying Vladimir feedback meeting",
+    "summary": "- Started a recording of a feedback meeting with Vladimir using the `rapidscribe-meeting` skill, pinned to 2 speakers\n- Session `session-20260908-133518-278AFC11` created, output stored under `~/.rapidscribe/meetings/session-20260908-133518-278AFC11`\n- Recording later stopped after 2:17 duration, capturing 95% of the window\n- Verification of transcript and worker logs revealed no detected speech in the transcript despite audio files existing\n- Likely cause: microphone or permissions issue preventing spoken content capture",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T11:46:22.368Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Recording and verifying Vladimir feedback meeting",
+      "summary": "- Started a recording of a feedback meeting with Vladimir using the `rapidscribe-meeting` skill, pinned to 2 speakers\n- Session `session-20260908-133518-278AFC11` created, output stored under `~/.rapidscribe/meetings/session-20260908-133518-278AFC11`\n- Recording later stopped after 2:17 duration, capturing 95% of the window\n- Verification of transcript and worker logs revealed no detected speech in the transcript despite audio files existing\n- Likely cause: microphone or permissions issue preventing spoken content capture",
+      "observation_ids": [
+        "9a5c4f7c-c003-4923-98ed-8c95fa7b977c",
+        "135314e2-813a-4c8a-8a27-f096626ff5f1"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "rec",
+      "quality": "high",
+      "createdAt": "2026-09-08T11:46:22.368Z"
+    },
+    "project": "rec"
+  },
+  {
+    "id": "a72a497d-8b99-4b40-b75b-4be89f157c24",
+    "date": "2026-09-08",
+    "theme": "Clean up git state across repos before merging PRs",
+    "summary": "- Goal: bring the coding project to a clean state by committing uncommitted changes, then pushing and merging all pending PRs.\n- Approach: surveyed git status across branches, checking for unpushed commits and pending file changes to understand divergence before acting.\n- Result: no uncommitted changes found; a parallel session had already committed the teams work.\n- Next step: assistant is surveying all three repos before proceeding further.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T11:46:22.368Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Clean up git state across repos before merging PRs",
+      "summary": "- Goal: bring the coding project to a clean state by committing uncommitted changes, then pushing and merging all pending PRs.\n- Approach: surveyed git status across branches, checking for unpushed commits and pending file changes to understand divergence before acting.\n- Result: no uncommitted changes found; a parallel session had already committed the teams work.\n- Next step: assistant is surveying all three repos before proceeding further.",
+      "observation_ids": [
+        "6329e385-ec60-44a6-826e-d2320c1b7616"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T11:46:22.368Z"
+    },
+    "project": "a2a-xpr"
   }
 ]

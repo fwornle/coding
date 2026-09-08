@@ -8,14 +8,22 @@ title Hierarchy Context: ServiceStarter
 [ServiceProbe] as service_probe #F0F0F0
 [ProcessStateManager] as process_state_manager #F0F0F0
 [LLMMockService] as llmmock_service #F0F0F0
-[HealthCoordinator] as health_coordinator #F0F0F0
+[DockerEntrypoint] as docker_entrypoint #F0F0F0
+[StartServicesRobust] as start_services_robust #F0F0F0
 [ServiceWrapperScripts] as service_wrapper_scripts #F0F0F0
+[StartServiceWithRetry] as start_service_with_retry #E8F5E8
+[WithDeadline] as with_deadline #E8F5E8
+[PortListeningChecks] as port_listening_checks #E8F5E8
 
 dockerized_services --> service_starter
 service_probe -[hidden]- service_starter
 process_state_manager -[hidden]- service_starter
 llmmock_service -[hidden]- service_starter
-health_coordinator -[hidden]- service_starter
+docker_entrypoint -[hidden]- service_starter
+start_services_robust -[hidden]- service_starter
 service_wrapper_scripts -[hidden]- service_starter
+service_starter --> start_service_with_retry
+service_starter --> with_deadline
+service_starter --> port_listening_checks
 
 @enduml

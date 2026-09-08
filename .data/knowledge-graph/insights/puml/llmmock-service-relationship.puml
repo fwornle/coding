@@ -8,16 +8,18 @@ title Hierarchy Context: LLMMockService
 [ServiceStarter] as service_starter #F0F0F0
 [ServiceProbe] as service_probe #F0F0F0
 [ProcessStateManager] as process_state_manager #F0F0F0
-[HealthCoordinator] as health_coordinator #F0F0F0
+[DockerEntrypoint] as docker_entrypoint #F0F0F0
+[StartServicesRobust] as start_services_robust #F0F0F0
 [ServiceWrapperScripts] as service_wrapper_scripts #F0F0F0
-[GetLLMMode] as get_llmmode #E8F5E8
+[PromptClassifierBackendFallback] as prompt_classifier_backend_fallback #E8F5E8
 
 dockerized_services --> llmmock_service
 service_starter -[hidden]- llmmock_service
 service_probe -[hidden]- llmmock_service
 process_state_manager -[hidden]- llmmock_service
-health_coordinator -[hidden]- llmmock_service
+docker_entrypoint -[hidden]- llmmock_service
+start_services_robust -[hidden]- llmmock_service
 service_wrapper_scripts -[hidden]- llmmock_service
-llmmock_service --> get_llmmode
+llmmock_service --> prompt_classifier_backend_fallback
 
 @enduml

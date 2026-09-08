@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ResilienceWrappers
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ResilienceWrappers] as resilience_wrappers #LightBlue
+[NamingConventions] as naming_conventions #F0F0F0
+[ConfigDrivenDesign] as config_driven_design #F0F0F0
+
+coding_patterns --> resilience_wrappers
+naming_conventions -[hidden]- resilience_wrappers
+config_driven_design -[hidden]- resilience_wrappers
+
+@enduml

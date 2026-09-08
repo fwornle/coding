@@ -14,6 +14,7 @@ title Hierarchy Context: KnowledgeManagement
 [ManualLearning] as manual_learning #E8F5E8
 [OnlineLearning] as online_learning #E8F5E8
 [VkbServer] as vkb_server #E8F5E8
+[UkbUnifiedCli] as ukb_unified_cli #E8F5E8
 
 coding --> knowledge_management
 live_logging_system -[hidden]- knowledge_management
@@ -25,5 +26,6 @@ semantic_analysis -[hidden]- knowledge_management
 knowledge_management --> manual_learning
 knowledge_management --> online_learning
 knowledge_management --> vkb_server
+knowledge_management --> ukb_unified_cli
 
 @enduml

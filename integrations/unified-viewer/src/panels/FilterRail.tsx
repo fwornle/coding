@@ -22,6 +22,7 @@ import { useEffect, useRef, lazy, Suspense, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
 import type { ApiClient } from '@/api/ApiClient'
 import type { Entity } from '@/api/ApiClient'
+import type { HierarchyEdge } from '@/graph/hierarchy-parents'
 import type { System } from '@/config/system-endpoints'
 import { Checkbox } from '@/components/ui/checkbox'
 import { IconButton } from '@/components/IconButton'
@@ -60,6 +61,12 @@ export interface FilterRailProps {
   system: System
   /** Entity array — child filter components derive count badges. */
   entities: readonly Entity[]
+  /**
+   * Edge set. Only the HierarchyNavigator needs it: the tree's parent pointers
+   * come from `contains` / `parent-child` / `includes` edges, because the
+   * `metadata.parent` field it used to read has never been written by anything.
+   */
+  relations?: readonly HierarchyEdge[]
   /** Phase 55 — slot for the LegendPanel (or any other end-of-rail surface).
    * Mounted at the BOTTOM of the vertical stack per UI-SPEC §6 row 12. */
   bottomSlot?: ReactNode
@@ -78,6 +85,7 @@ export function FilterRail({
   registerSearchInputRef,
   system,
   entities,
+  relations,
   bottomSlot,
 }: FilterRailProps) {
   const searchQuery = useViewerStore((s) => s.searchQuery)
@@ -168,7 +176,7 @@ export function FilterRail({
           Phase 45 Level/Layer/Ontology rail. computeNodeState reads them
           alongside the legacy filters. */}
       <LearningSourceFilter />
-      <TeamsFilter entities={entities} />
+      <TeamsFilter entities={entities} apiClient={apiClient} />
 
       {/* Level (Phase 45 BC) */}
       <div className="space-y-2">
@@ -266,7 +274,13 @@ export function FilterRail({
             </div>
           }
         >
-          <HierarchyNavigator system={system} />
+          {/* 2026-09-08: `entities` was never passed. The navigator's BC-shim
+              falls back to `useViewerStore(s => s.entities)`, and nothing has
+              ever written that key — so this surface rendered its "No hierarchy
+              data yet / Run wave-analysis to populate" empty state permanently,
+              on a graph with 2441 entities in it. FilterRail already receives
+              both arrays; pass them. */}
+          <HierarchyNavigator system={system} entities={entities} relations={relations} />
         </Suspense>
       )}
 

@@ -1,33 +1,38 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Mode Resolution" {
-  component "LLM Mock Service\n(getLLMMode)" as mockSvc <<core>>
-  component "workflow-progress.json" as wfProgress <<storage>>
+package "Mode & Routing" {
+  component "llm-mock-service.ts" as mock <<core>>
+  database "workflow-progress.json" as wf
 }
 
-package "Local Provider" {
-  component "DMR Provider" as dmrProvider <<core>>
-  component "dmr-config.yaml" as dmrConfig <<storage>>
-  cloud "Docker Model Runner" as dmr <<external>>
+package "Providers" {
+  component "dmr-provider.ts" as dmr <<core>>
+  component "dmr-config.yaml loader" as dmrcfg <<core>>
+  cloud "Docker Model Runner" as dockermr <<external>>
 }
 
-package "Proxy & Cost" {
-  component "LLM With Process\n(resolveProxyCompleteUrl)" as llmProcess <<core>>
-  cloud "rapid-llm-proxy" as proxy <<external>>
-  component "Cost Model\n(priceForModel)" as costModel <<core>>
+package "Proxy Wrapper" {
+  component "llm-with-process.ts" as proxy <<core>>
+  cloud "@rapid/llm-proxy SDK" as sdk <<external>>
+  cloud "Anthropic / OpenAI / Groq" as extllm <<external>>
 }
 
-mockSvc --> wfProgress : "reads per-agent override"
-mockSvc ..> mockSvc : "CODING_ROOT path normalization"
+package "Response Hardening" {
+  component "parse-llm-json.ts" as parser <<core>>
+}
 
-dmrProvider --> dmrConfig : "loadDMRConfig (multi-path)"
-dmrProvider --> dmr : "health-checked, cached"
+mock --> wf : "reads/writes per-agent mode"
+mock --> dmr : "routes to local when mode=local"
+mock --> proxy : "routes to public when mode=public"
 
-llmProcess --> proxy : "4-tier env var resolution"
-llmProcess --> costModel : "normalized token usage"
+dmr --> dmrcfg : "loadDMRConfig()"
+dmr --> dockermr : "health-checked calls"
 
-mockSvc --> dmrProvider : "delegates when mock disabled"
-mockSvc --> llmProcess : "delegates to external proxy"
+proxy --> sdk : "wraps, injects 'process' field"
+sdk --> extllm : "forwards completion requests"
+
+dmr --> parser : "repairs malformed JSON"
+proxy --> parser : "repairs malformed JSON"
 
 @enduml

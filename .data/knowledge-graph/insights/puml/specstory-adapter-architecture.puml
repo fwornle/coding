@@ -1,36 +1,36 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "SpecstoryAdapter Core" {
-  component "SpecstoryAdapter" as adapter <<core>>
-  component "logConversation()" as logconv <<core>>
-  component "initialize()" as init <<core>>
+package "Transcript Adapter Layer" {
+  component "TranscriptAdapter\n(abstract base)" as base <<core>>
+  component "SpecstoryAdapter" as spec <<core>>
+  component "ClaudeParser" as claude <<core>>
+  component "LSLConverter" as conv <<core>>
 }
 
-package "Connection Strategies" {
-  component "connectViaHTTP()" as http <<api>>
-  component "connectViaIPC()" as ipc <<api>>
-  component "connectViaFileWatch()" as filewatch <<api>>
+package "Data Model" {
+  component "LSLEntryType Enum\n(6 fixed values)" as enum <<storage>>
+  component "LSLSession / LSLEntry" as lsl <<storage>>
 }
 
-package "External Targets" {
-  cloud "Specstory Extension\n(ports 7357-7359)" as ext <<external>>
-  component "Named Pipe/Socket" as socket <<external>>
-  database "~/.specstory/watch" as watchdir <<storage>>
+package "Downstream Consumers" {
+  component "lsl-sessions.mjs\n(dashboard)" as dash <<external>>
+  database ".specstory/history" as history
 }
 
-adapter --> init : "startup"
-init --> http : "1st attempt"
-http ..> ipc : "fallback"
-ipc ..> filewatch : "fallback"
+base ..> spec : "enforced via new.target guard"
+base ..> claude : "enforced via new.target guard"
 
-http --> ext : "GET /api/status"
-ipc --> socket : "platform-specific path"
-filewatch --> watchdir : "writes JSON + .new-log marker"
+spec --> conv : "delegates redaction/classification"
+claude --> conv : "delegates redaction/classification"
 
-adapter --> logconv : "wraps entries"
-logconv --> http : "log() closure"
-logconv --> ipc : "log() closure"
-logconv --> filewatch : "log() closure"
+conv --> lsl : "produces"
+lsl --> enum : "constrained by"
+
+spec --> history : "reads markdown transcripts"
+history --> dash : "discoverProjects()"
+dash --> lsl : "live in-memory format conversion"
+
+spec ..> dash : "format detection\n(pi vs markdown vs mixed)"
 
 @enduml

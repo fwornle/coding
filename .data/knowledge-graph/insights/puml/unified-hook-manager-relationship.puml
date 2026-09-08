@@ -8,10 +8,14 @@ title Hierarchy Context: UnifiedHookManager
 [HookConfigLoader] as hook_config_loader #F0F0F0
 [ViolationCaptureService] as violation_capture_service #F0F0F0
 [ContentValidationAgent] as content_validation_agent #F0F0F0
+[KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
+[HealthPromptHook] as health_prompt_hook #F0F0F0
 
 constraint_system --> unified_hook_manager
 hook_config_loader -[hidden]- unified_hook_manager
 violation_capture_service -[hidden]- unified_hook_manager
 content_validation_agent -[hidden]- unified_hook_manager
+knowledge_injection_hooks -[hidden]- unified_hook_manager
+health_prompt_hook -[hidden]- unified_hook_manager
 
 @enduml

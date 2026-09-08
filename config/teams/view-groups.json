@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "Grouping rules for DYNAMICALLY created views in the unified viewer's",
+    "Teams / Views rail. A view is any metadata.team value that has no",
+    "config/teams/<id>.json registry entry — it appears because some agent",
+    "session wrote observations under that team name.",
+    "",
+    "Each rule folds every matching view into one collapsible subgroup so the",
+    "list stays readable as new views appear. Rules are applied in order; the",
+    "first match wins. A view matching no rule renders as its own row.",
+    "",
+    "`match` is a JavaScript regular expression source string, anchored by the",
+    "author (not implicitly), tested case-insensitively against the team id."
+  ],
+  "groups": [
+    {
+      "id": "kgbench",
+      "label": "Kgbench",
+      "match": "^kgbench(-tree-.*)?$",
+      "description": "Benchmark run trees — one team per kgbench sandbox worktree (lib/kgbench/sandbox.mjs mints kgbench-tree-<id> per run)."
+    }
+  ]
+}

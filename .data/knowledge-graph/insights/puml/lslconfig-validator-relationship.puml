@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LSLConfigValidator
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[LSLConfigValidator] as lslconfig_validator #LightBlue
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[MultiUserSessionRouter] as multi_user_session_router #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[TranscriptAdapterFramework] as transcript_adapter_framework #F0F0F0
+[SessionDashboardViewer] as session_dashboard_viewer #F0F0F0
+[SpecstoryAdapter] as specstory_adapter #F0F0F0
+
+live_logging_system --> lslconfig_validator
+redaction_config_manager -[hidden]- lslconfig_validator
+multi_user_session_router -[hidden]- lslconfig_validator
+operational_logger -[hidden]- lslconfig_validator
+transcript_adapter_framework -[hidden]- lslconfig_validator
+session_dashboard_viewer -[hidden]- lslconfig_validator
+specstory_adapter -[hidden]- lslconfig_validator
+
+@enduml
