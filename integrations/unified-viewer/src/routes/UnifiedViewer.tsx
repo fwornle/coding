@@ -417,6 +417,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             registerSearchInputRef={registerSearchInputRef}
             system={system}
             entities={entities}
+            relations={relations}
             bottomSlot={<LegendPanel className="pt-2" entities={legendEntities} relations={relations} ontologyRegistry={ontology} hideLayers={system === 'coding'} />}
           />
           <main

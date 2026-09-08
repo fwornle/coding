@@ -6,8 +6,12 @@
 // Behavior covered (the plan's <behavior> block):
 //   - Test: when system !== 'coding', returns null (renders nothing)
 //   - Test: default export is a React component
-//   - Test (tree-build): entities with ontologyClass in {Project,Component,SubComponent,Detail}
-//     and metadata.parent linking them build a 4-level tree
+//   - Test (tree-build): entities with ontologyClass in {System,Project,Component,
+//     SubComponent,Detail} linked by containment EDGES build a 4-level tree.
+//     2026-09-08: the fixture used to link via `metadata.parent`. Nothing has ever
+//     written that field, so the component now derives parents from the graph's
+//     `contains` / `parent-child` / `includes` edges (graph/hierarchy-parents.ts)
+//     and the fixture supplies those instead.
 //   - Test (render): each L1 row is a button with aria-label including class+name+(N descendants)
 //   - Test (a11y): tree uses role="tree" parent + role="treeitem" rows + aria-level + aria-expanded
 //   - Test (click L1): setHierarchySubtreeFilter(l1.id) called
@@ -23,6 +27,7 @@ import path from 'node:path'
 import HierarchyNavigator from './HierarchyNavigator'
 import { useViewerStore } from '@/store/viewer-store'
 import type { Entity } from '@/api/ApiClient'
+import type { HierarchyEdge } from '@/graph/hierarchy-parents'
 
 function makeEntities(): Entity[] {
   return [
@@ -36,25 +41,25 @@ function makeEntities(): Entity[] {
       id: 'c1',
       name: 'LiveLoggingSystem',
       ontologyClass: 'Component',
-      metadata: { parent: 'p1' },
+      metadata: {},
     } as unknown as Entity,
     {
       id: 'c2',
       name: 'KnowledgeManagement',
       ontologyClass: 'Component',
-      metadata: { parent: 'p1' },
+      metadata: {},
     } as unknown as Entity,
     {
       id: 's1',
       name: 'ETM',
       ontologyClass: 'SubComponent',
-      metadata: { parent: 'c1' },
+      metadata: {},
     } as unknown as Entity,
     {
       id: 'd1',
       name: 'StallDetect',
       ontologyClass: 'Detail',
-      metadata: { parent: 's1' },
+      metadata: {},
     } as unknown as Entity,
     // entity OUTSIDE the hierarchy classes — must be excluded
     {
@@ -63,6 +68,18 @@ function makeEntities(): Entity[] {
       ontologyClass: 'Pattern',
       metadata: {},
     } as unknown as Entity,
+  ]
+}
+
+/** The containment edges that actually carry the hierarchy in the live graph. */
+function makeRelations(): HierarchyEdge[] {
+  return [
+    { from: 'p1', to: 'c1', type: 'parent-child' },
+    { from: 'p1', to: 'c2', type: 'parent-child' },
+    { from: 'c1', to: 's1', type: 'contains' },
+    { from: 's1', to: 'd1', type: 'contains' },
+    // non-containment edges must not create parents
+    { from: 'p1', to: 'd1', type: 'has_insight' },
   ]
 }
 
@@ -80,7 +97,7 @@ beforeEach(() => {
     theme: 'light',
     filterRailCollapsed: false,
     hierarchySubtreeFilter: null,
-    ...({ entities: makeEntities() } as Record<string, unknown>),
+    ...({ entities: makeEntities(), relations: makeRelations() } as Record<string, unknown>),
   } as unknown as Parameters<typeof useViewerStore.setState>[0])
 })
 
@@ -214,5 +231,104 @@ describe('HierarchyNavigator', () => {
     )
     const matches = src.match(/export default/g) ?? []
     expect(matches.length).toBe(1)
+  })
+
+  // ---- 2026-09-08: edge-derived hierarchy + the Unparented bucket ----
+
+  test('the tree comes from edges, not metadata.parent', () => {
+    // metadata.parent has never been written by anything. Honouring it would
+    // silently resurrect the flat-list bug the moment someone set it wrongly.
+    const entities = [
+      { id: 'p1', name: 'P', ontologyClass: 'Project', metadata: {} },
+      { id: 'c1', name: 'C', ontologyClass: 'Component', metadata: { parent: 'p1' } },
+    ] as unknown as Entity[]
+    render(<HierarchyNavigator system="coding" entities={entities} relations={[]} />)
+    // no edges → the Component is orphaned, not nested under P
+    expect(screen.getByLabelText(/Filter to Project: P \(0 descendants\)/)).toBeTruthy()
+    expect(screen.getByLabelText(/Filter to Unparented: Unparented/)).toBeTruthy()
+  })
+
+  test('System is rendered, so CollectiveKnowledge is the single root', () => {
+    const entities = [
+      { id: 'sys', name: 'CollectiveKnowledge', ontologyClass: 'System', metadata: {} },
+      { id: 'p1', name: 'Coding', ontologyClass: 'Project', metadata: {} },
+      { id: 'p2', name: 'Kgbench', ontologyClass: 'Project', metadata: {} },
+    ] as unknown as Entity[]
+    const relations = [
+      { from: 'sys', to: 'p1', type: 'includes' },
+      { from: 'sys', to: 'p2', type: 'includes' },
+    ]
+    render(<HierarchyNavigator system="coding" entities={entities} relations={relations} />)
+    const roots = screen.getAllByRole('treeitem').filter((i) => i.getAttribute('aria-level') === '1')
+    expect(roots).toHaveLength(1)
+    expect(screen.getByLabelText(/Filter to System: CollectiveKnowledge \(2 descendants\)/)).toBeTruthy()
+  })
+
+  test('a Project with no incoming edge is still a root, not orphaned', () => {
+    // No System node in this graph, so Project IS the top level.
+    const entities = [
+      { id: 'p1', name: 'Coding', ontologyClass: 'Project', metadata: {} },
+      { id: 'c1', name: 'C', ontologyClass: 'Component', metadata: {} },
+    ] as unknown as Entity[]
+    render(
+      <HierarchyNavigator
+        system="coding"
+        entities={entities}
+        relations={[{ from: 'p1', to: 'c1', type: 'parent-child' }]}
+      />,
+    )
+    expect(screen.getByLabelText(/Filter to Project: Coding \(1 descendants\)/)).toBeTruthy()
+    expect(screen.queryByLabelText(/Filter to Unparented/)).toBeNull()
+  })
+
+  test('deeper nodes with no containment edge collect under one Unparented root', () => {
+    // ~540 Details are in this state today. Spilling them across the top level
+    // is what made the "tree" a flat list of 1341 rows.
+    const entities = [
+      { id: 'sys', name: 'CollectiveKnowledge', ontologyClass: 'System', metadata: {} },
+      { id: 'p1', name: 'Coding', ontologyClass: 'Project', metadata: {} },
+      { id: 'd1', name: 'LooseOne', ontologyClass: 'Detail', metadata: {} },
+      { id: 'd2', name: 'LooseTwo', ontologyClass: 'Detail', metadata: {} },
+    ] as unknown as Entity[]
+    render(
+      <HierarchyNavigator
+        system="coding"
+        entities={entities}
+        relations={[{ from: 'sys', to: 'p1', type: 'includes' }]}
+      />,
+    )
+    const roots = screen.getAllByRole('treeitem').filter((i) => i.getAttribute('aria-level') === '1')
+    expect(roots).toHaveLength(2) // CollectiveKnowledge + Unparented
+    expect(screen.getByLabelText(/Filter to Unparented: Unparented \(2 descendants\)/)).toBeTruthy()
+  })
+
+  test('a kgbench-style regrouping nests the run anchors under their parent', () => {
+    const entities = [
+      { id: 'sys', name: 'CollectiveKnowledge', ontologyClass: 'System', metadata: {} },
+      { id: 'kg', name: 'Kgbench', ontologyClass: 'Project', metadata: {} },
+      { id: 'r1', name: 'KgbenchTreeHomruf', ontologyClass: 'Component', metadata: {} },
+      { id: 'r2', name: 'KgbenchTreeDltk21', ontologyClass: 'Component', metadata: {} },
+    ] as unknown as Entity[]
+    render(
+      <HierarchyNavigator
+        system="coding"
+        entities={entities}
+        relations={[
+          { from: 'sys', to: 'kg', type: 'includes' },
+          { from: 'kg', to: 'r1', type: 'contains' },
+          { from: 'kg', to: 'r2', type: 'contains' },
+        ]}
+      />,
+    )
+    // Radix unmounts collapsed AccordionContent, so nested rows are not in the
+    // DOM until expanded. Assert the nesting through what IS observable: one
+    // root, owning all three descendants (Kgbench + its two run anchors).
+    const roots = screen.getAllByRole('treeitem').filter((i) => i.getAttribute('aria-level') === '1')
+    expect(roots).toHaveLength(1)
+    expect(
+      screen.getByLabelText(/Filter to System: CollectiveKnowledge \(3 descendants\)/),
+    ).toBeTruthy()
+    // the run anchors are not top-level rows any more
+    expect(screen.queryByLabelText(/Filter to Component: KgbenchTreeHomruf/)).toBeNull()
   })
 })

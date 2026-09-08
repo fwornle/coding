@@ -42,6 +42,10 @@ function makeApiClient(overrides: Partial<ApiClient> = {}): ApiClient {
         { name: 'Insight' },
         { name: 'Digest' },
       ]),
+    // TeamsFilter fetches the config/teams registry on mount. Empty is a valid
+    // answer (it is what the OKB backend effectively returns) and keeps this
+    // file focused on rail composition rather than team grouping.
+    listTeams: vi.fn().mockResolvedValue({ teams: [], viewGroups: [] }),
     ...overrides,
   } as unknown as ApiClient
 }

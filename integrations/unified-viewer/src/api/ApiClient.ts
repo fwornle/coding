@@ -36,6 +36,41 @@ export interface Relation {
 }
 
 /**
+ * One predefined entry from config/teams/ (obs-api GET /api/teams).
+ *
+ * `kind` is load-bearing and must not be flattened away: a 'team' is an owner,
+ * a 'project' is a body of work (the contract is stated on TeamOntologyConfig
+ * in src/knowledge-management/types.ts). The rail renders them as separate
+ * groups for exactly that reason.
+ *
+ * `id` is the lowercased team name, which is what entity `metadata.team`
+ * carries — the config spells ReSi, the graph spells resi.
+ */
+export interface TeamRegistryEntry {
+  id: string
+  label: string
+  kind: 'team' | 'project'
+  description: string
+}
+
+/** One clustering rule for dynamically created views (config/teams/view-groups.json). */
+export interface ViewGroupRule {
+  id: string
+  label: string
+  /** JavaScript regex SOURCE, matched case-insensitively against a team id. */
+  match: string
+  description: string
+}
+
+export interface TeamRegistry {
+  teams: TeamRegistryEntry[]
+  viewGroups: ViewGroupRule[]
+}
+
+/** The "no registry" answer — see ApiClient.listTeams, which never rejects. */
+export const EMPTY_TEAM_REGISTRY: TeamRegistry = { teams: [], viewGroups: [] }
+
+/**
  * Phase 61-02 — uniform listRelations return shape on BOTH apiVersion branches.
  * `relations` is the (possibly capped) edge array the canvas renders; `total`
  * is the pre-cap relation count (on the okb/legacy branch this is the count
@@ -246,6 +281,34 @@ export class ApiClient {
     return this.get<NeighborhoodPayload>(
       this.apiPath(`/api/v1/entities/${safeId}/neighbors?depth=${depth}`),
     )
+  }
+
+  /**
+   * The predefined team/project registry (config/teams/, served by obs-api at
+   * GET /api/teams) plus the grouping rules for dynamically created views.
+   *
+   * Not on `/api/v1` and so not routed through `apiPath`: it reads config, not
+   * the graph store, and must answer while the store is still hydrating.
+   *
+   * NEVER REJECTS. Only the coding backend mounts this route — OKM Express
+   * (:8090) 404s it — and a registry is an enhancement to the Teams rail, not a
+   * precondition for it. An empty registry degrades to the historical
+   * behaviour: every team the data mentions renders as a dynamic view.
+   */
+  async listTeams(): Promise<TeamRegistry> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/teams`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) return EMPTY_TEAM_REGISTRY
+      const body = (await res.json()) as Partial<TeamRegistry>
+      return {
+        teams: Array.isArray(body.teams) ? body.teams : [],
+        viewGroups: Array.isArray(body.viewGroups) ? body.viewGroups : [],
+      }
+    } catch {
+      return EMPTY_TEAM_REGISTRY
+    }
   }
 
   /**
