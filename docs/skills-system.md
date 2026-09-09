@@ -1,6 +1,6 @@
 # Skills System
 
-Skills are reusable workflow instructions that all supported coding agents (Claude Code, GitHub Copilot CLI, OpenCode) can use. A single skill definition propagates automatically to every agent.
+Skills are reusable workflow instructions that all supported coding agents (Claude Code, GitHub Copilot CLI, OpenCode, Pi) can use. A single skill definition propagates automatically to every agent.
 
 ![Skills System Architecture](images/skills-system.png)
 
@@ -39,7 +39,8 @@ That's it. The skill is now available in all three agents.
 |-------|-----------|----------|
 | **Claude Code** | Copied as global slash command | `~/.claude/commands/*.md` |
 | **Copilot CLI** | Included in generated instructions | `.github/copilot-instructions.md` |
-| **OpenCode** | Appended to project instructions | `CLAUDE.md` (auto-generated section) |
+| **OpenCode** | Native `/sl` command plus project instructions | `OPENCODE_CONFIG_CONTENT`, `CLAUDE.md` |
+| **Pi** | Native `/sl` prompt template | `$PI_CODING_AGENT_DIR/prompts/sl.md` |
 
 ### Claude Code
 
@@ -56,9 +57,15 @@ Copilot can then read the referenced skill file when a task matches.
 
 ### OpenCode
 
-OpenCode reads `CLAUDE.md` natively but has no slash command system. The generator appends an "Available Skills (Auto-Generated)" section to `CLAUDE.md` listing all skills with descriptions and file paths.
+OpenCode reads `CLAUDE.md` natively. The generator appends an "Available Skills (Auto-Generated)" section to `CLAUDE.md` listing all skills with descriptions and file paths.
 
 This section is idempotent — re-running the script replaces it rather than duplicating.
+
+The coding wrapper also registers `/sl` as an OpenCode custom command that loads the canonical workflow in `.claude/commands/sl.md`.
+
+### Pi
+
+The coding wrapper installs `.claude/commands/sl.md` as `$PI_CODING_AGENT_DIR/prompts/sl.md`, which Pi exposes as `/sl`. In global scope, a user-authored `/sl` prompt is preserved.
 
 ---
 

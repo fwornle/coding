@@ -31,7 +31,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -220,6 +220,44 @@ _pi_install_extensions "${cfgDir}"
   });
   assert.equal(result.status, 0, `installer failed: ${result.stderr}`);
 }
+
+function installSessionLogPrompt(cfgDir, scope = 'wrapper') {
+  const script = `
+_agent_log() { :; }
+source "${PI_SH}"
+_pi_install_session_log_prompt "${cfgDir}" "${scope}"
+`;
+  const result = spawnSync('bash', ['--norc', '--noprofile', '-c', script], {
+    encoding: 'utf8',
+    env: {
+      PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+      HOME: process.env.HOME || '/tmp',
+      CODING_REPO: REPO_ROOT,
+    },
+  });
+  assert.equal(result.status, 0, `prompt installer failed: ${result.stderr}`);
+}
+
+test('the canonical /sl prompt is installed for wrapper-scoped pi sessions', () => {
+  withTempDir((dir) => {
+    installSessionLogPrompt(dir);
+    assert.equal(
+      readFileSync(path.join(dir, 'prompts', 'sl.md'), 'utf8'),
+      readFileSync(path.join(REPO_ROOT, '.claude', 'commands', 'sl.md'), 'utf8'),
+    );
+  });
+});
+
+test('a global user-authored /sl prompt is left untouched', () => {
+  withTempDir((dir) => {
+    const prompts = path.join(dir, 'prompts');
+    mkdirSync(prompts);
+    const target = path.join(prompts, 'sl.md');
+    writeFileSync(target, 'my session-log workflow\n');
+    installSessionLogPrompt(dir, 'global');
+    assert.equal(readFileSync(target, 'utf8'), 'my session-log workflow\n');
+  });
+});
 
 test('extensions install into a fresh dir', () => {
   withTempDir((dir) => {

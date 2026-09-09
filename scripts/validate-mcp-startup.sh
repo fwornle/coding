@@ -60,6 +60,59 @@ check_mcp_process() {
     fi
 }
 
+# Which services must be up?
+#
+# This used to gate the whole launch on VKB Server listening on :8080. That
+# server is retired and the port is no longer published, so the gate could never
+# pass: `claude-mcp` waited the full 30s and exited 1 with the container sitting
+# there healthy. Check the container services the enabled features actually
+# need instead, so the gate cannot outlive the thing it checks.
+if [ -f "$CODING_DIR/.env.ports" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . "$CODING_DIR/.env.ports"
+    set +a
+fi
+
+# An absent snapshot means "everything on" — the same convention the container
+# entrypoint uses — so a stale or missing file never silently skips a check.
+FEATURES_SNAPSHOT="$CODING_DIR/.coding/runtime/features.json"
+feature_enabled() {
+    [ -f "$FEATURES_SNAPSHOT" ] || return 0
+    node -e '
+        const snap = require(process.argv[1]);
+        const on = Array.isArray(snap.enabled) ? snap.enabled : null;
+        process.exit(!on || on.includes(process.argv[2]) ? 0 : 1);
+    ' "$FEATURES_SNAPSHOT" "$1" 2>/dev/null
+}
+
+# name|port|url|mode   (mode: health = needs 2xx, listen = any HTTP reply)
+REQUIRED_SERVICES=""
+feature_enabled knowledge && REQUIRED_SERVICES="$REQUIRED_SERVICES
+Semantic Analysis|${SEMANTIC_ANALYSIS_SSE_PORT:-3848}|http://localhost:${SEMANTIC_ANALYSIS_SSE_PORT:-3848}/health|health"
+feature_enabled constraints && REQUIRED_SERVICES="$REQUIRED_SERVICES
+Constraint Monitor|${CONSTRAINT_MONITOR_SSE_PORT:-3849}|http://localhost:${CONSTRAINT_MONITOR_SSE_PORT:-3849}/health|health"
+# graphify speaks MCP only and has no /health route: a bare GET is rejected at
+# the JSON-RPC layer (400), which still proves the server is listening.
+feature_enabled codegraph && REQUIRED_SERVICES="$REQUIRED_SERVICES
+Graphify MCP|${GRAPHIFY_MCP_PORT:-3851}|http://localhost:${GRAPHIFY_MCP_PORT:-3851}/mcp|listen"
+
+REQUIRED_SERVICES="$(printf '%s\n' "$REQUIRED_SERVICES" | sed '/^$/d')"
+
+if [ -z "$REQUIRED_SERVICES" ]; then
+    echo -e "${GREEN}✅ No container-backed features enabled - nothing to validate${NC}"
+    exit 0
+fi
+
+check_service() {
+    local url=$1 mode=$2
+    if [ "$mode" = "listen" ]; then
+        curl -s --max-time 5 -o /dev/null "$url" >/dev/null 2>&1
+    else
+        curl -sf --max-time 5 "$url" >/dev/null 2>&1
+    fi
+}
+
 # Wait for services to start up
 echo -e "${YELLOW}⏳ Waiting for services to start (timeout: ${TIMEOUT}s)...${NC}"
 
@@ -75,42 +128,26 @@ while [ $(($(date +%s) - start_time)) -lt $TIMEOUT ]; do
     echo -e "\n${BLUE}📊 Service Status Check #${check_count} (${remaining}s remaining)${NC}"
 
     services_ok=0
-    total_services=2
-
-    # Check VKB Server (port 8080)
-    vkb_port_ok=false
-    if check_port 8080 "VKB Server"; then
-        vkb_port_ok=true
-        services_ok=$((services_ok + 1))
-    fi
-
-    # Check VKB Health Endpoint (but don't fail if health check has issues)
-    if [ "$vkb_port_ok" = true ]; then
-        if check_health "http://localhost:8080/health" "VKB Server"; then
-            # Health check passed, all good
-            :
+    total_services=0
+    while IFS='|' read -r name port url mode; do
+        [ -n "$name" ] || continue
+        total_services=$((total_services + 1))
+        if check_service "$url" "$mode"; then
+            echo -e "${GREEN}✅ $name (port $port): Ready${NC}"
+            services_ok=$((services_ok + 1))
         else
-            echo -e "${YELLOW}⚠️  VKB Server health check failed but server is running on port 8080${NC}"
-            echo -e "${YELLOW}💡 This is likely due to missing dependencies (psutil) in health endpoint${NC}"
-            # Still count as partially working since the port is listening
+            echo -e "${RED}❌ $name (port $port): Not ready${NC}"
         fi
-    fi
+    done <<EOF
+$REQUIRED_SERVICES
+EOF
 
     # MCP servers run via stdio, not as separate processes
-    # We can only verify they're configured correctly, not running independently
     echo -e "${YELLOW}⚠️  MCP servers run via stdio (not as separate processes)${NC}"
 
-    # We only really need VKB server port to be listening for basic functionality
-    # Health endpoint failures are non-critical if port is responding
-    if [ "$vkb_port_ok" = true ]; then
+    if [ "$services_ok" -eq "$total_services" ]; then
         all_ready=true
         break
-    fi
-
-    # Show progress and helpful information
-    if [ $check_count -eq 1 ]; then
-        echo -e "${BLUE}💡 Waiting for VKB Server to bind to port 8080...${NC}"
-        echo -e "${BLUE}   Check ${CODING_DIR}/vkb-server.log for startup errors${NC}"
     fi
 
     echo -e "${YELLOW}⏳ $services_ok/$total_services services ready, retrying in ${RETRY_INTERVAL}s... (${remaining}s left)${NC}"
@@ -122,19 +159,13 @@ echo -e "\n${BLUE}📋 Final Status Report:${NC}"
 if [ "$all_ready" = true ]; then
     echo -e "${GREEN}🎉 Core MCP services are running!${NC}"
     echo -e "${GREEN}✅ System ready for Claude Code session${NC}"
-    
-    # Check if health endpoint is working for informational purposes
-    if ! curl -s --max-time 5 "http://localhost:8080/health" >/dev/null 2>&1; then
-        echo -e "${YELLOW}💡 Note: VKB health endpoint has issues (likely missing psutil dependency)${NC}"
-        echo -e "${YELLOW}   This doesn't affect core functionality - VKB server is running normally${NC}"
-    fi
     exit 0
 else
     echo -e "${RED}❌ Critical services failed to start within ${TIMEOUT} seconds${NC}"
     echo -e "${YELLOW}💡 Troubleshooting tips:${NC}"
-    echo "   1. Check if port 8080 is free: lsof -i :8080"
-    echo "   2. Restart services: ./start-services.sh"
-    echo "   3. Check logs: tail -f vkb-server.log"
-    echo "   4. VKB server should be listening on port 8080"
+    echo "   1. Check container state: docker ps --filter name=coding-services"
+    echo "   2. Check container logs: docker compose -f ${CODING_DIR}/docker/docker-compose.yml logs coding-services"
+    echo "   3. Restart services: docker compose -f ${CODING_DIR}/docker/docker-compose.yml restart coding-services"
+    echo "   4. Check which features are enabled: coding-features list"
     exit 1
 fi

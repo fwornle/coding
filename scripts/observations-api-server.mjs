@@ -2819,7 +2819,7 @@ app.get('/api/coding/observations/stream', (req, res) => {
 // Walks the LSL history directory (env-overridable for tests via
 // OBSERVATIONS_LSL_HISTORY_DIR; defaults to `.specstory/history` relative
 // to REPO_ROOT). Parses the Phase 51 filename convention:
-//   {YYYY-MM-DD}_{HHMM-HHMM}[-{idx}][_S{slot}-{sub-idx}-{sub-hash}][_partN]_{hash}.md
+//   {YYYY-MM-DD}_{HHMM-HHMM}[-{idx}][_S{slot}-{sub-idx}-{sub-hash}][_partN]_{hash}.{md,jsonl}
 // per `.planning/phases/51-.../51-CONTEXT.md`. For each session, derives:
 //   - `id` from the hash group
 //   - `startAt`/`endAt` from the HHMM-HHMM range (UTC ISO via the date prefix)
@@ -2839,10 +2839,10 @@ const LSL_FILE_REGEX = new RegExp(
   + '(?:-(\\d+))?'             // optional -idx (sub-agent variant 1)
   + '(?:_S(\\d+)-(\\d+)-([^_]+))?' // optional _S{slot}-{sub-idx}-{sub-hash} (variant 2)
   + '(?:-part\\d+)?'           // optional -partN
-  + '_([A-Za-z0-9]+)\\.md$'   // _<hash>.md
+  + '_([A-Za-z0-9]+)\\.(?:md|jsonl)$' // _<hash>.<supported transcript format>
 );
 
-function* _walkLslDir(rootDir) {
+function* _walkLslDir(rootDir, seenStems = new Set()) {
   let entries;
   try {
     entries = fs.readdirSync(rootDir, { withFileTypes: true });
@@ -2852,8 +2852,17 @@ function* _walkLslDir(rootDir) {
   for (const entry of entries) {
     const full = path.join(rootDir, entry.name);
     if (entry.isDirectory()) {
-      yield* _walkLslDir(full);
-    } else if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'README.md') {
+      yield* _walkLslDir(full, seenStems);
+    } else if (
+      entry.isFile()
+      && (entry.name.endsWith('.md') || entry.name.endsWith('.jsonl'))
+      && entry.name !== 'README.md'
+    ) {
+      // During the format migration, some tranches exist in both formats.
+      // They describe the same session window and must produce one tick.
+      const stem = full.replace(/\.(?:md|jsonl)$/, '');
+      if (seenStems.has(stem)) continue;
+      seenStems.add(stem);
       yield full;
     }
   }

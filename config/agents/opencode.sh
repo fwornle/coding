@@ -172,6 +172,11 @@ agent_pre_launch() {
   _oc_splice_config "\"provider\":{${_oc_provider_entries}}"
   _agent_log "🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)"
 
+  # OpenCode has native custom commands. Keep /sl's workflow in the canonical
+  # Claude command file and have the command load it, so all agents follow one
+  # continuity procedure rather than four copied versions that drift.
+  _oc_splice_config '"command":{"sl":{"description":"Load recent session logs for continuity","template":"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: $ARGUMENTS"}}'
+
   # ───────────────────────────────────────────────────────────────────────────
   # Wrapper-scoped plugins (default since P2).
   #

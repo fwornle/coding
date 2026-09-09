@@ -1,0 +1,20 @@
+{
+  "name": "coding-session-commands",
+  "version": "1.0.0",
+  "description": "Session-continuity commands supplied by coding",
+  "commands": [
+    {
+      "name": "sl",
+      "description": "Load recent session logs for continuity",
+      "handler": "./commands/sl.js",
+      "parameters": [
+        {
+          "name": "count",
+          "description": "Optional number of recent session logs to load",
+          "type": "string",
+          "required": false
+        }
+      ]
+    }
+  ]
+}

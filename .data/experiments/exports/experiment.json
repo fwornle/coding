@@ -284446,11 +284446,11 @@
         "name": "ses_f8354da36ffe6BRKoIm3EL6Mrr",
         "entityType": "Run",
         "layer": "evidence",
-        "description": "Fix tmux status-line context timeout",
+        "description": "Fix context display flicker in tmux status line",
         "metadata": {
           "domain": "experiment",
           "task_id": "ses_f8354da36ffe6BRKoIm3EL6Mrr",
-          "task_hash": "35ee5a0df2d62a2d",
+          "task_hash": "dd50f45cd7378b71",
           "task_class": "bugfix",
           "agent": "opencode",
           "model": "claude-opus-5",
@@ -284460,11 +284460,11 @@
           "trace_id": "ses_f8354da36ffe6BRKoIm3EL6Mrr",
           "pending": false,
           "started_at": "2026-09-07T16:20:29.751Z",
-          "ended_at": "2026-09-08T11:54:55.933Z",
+          "ended_at": "2026-09-08T12:11:09.510Z",
           "canonical_model": "claude-opus-5",
           "canonical_agent": "opencode",
           "background_models": [],
-          "session_summary": "Investigated and fixed the context display glitch in the tmux status line after clearing a session by adjusting the timeout value. Verified and merged the related PRs, leaving the system in a clean state.",
+          "session_summary": "Fixed an intermittent bug in the context-display timeout handling in the live-copilot event tailer. Merged the resulting PR to restore a clean working system.",
           "variant": null,
           "repeat": null,
           "terminal_state": null,
@@ -284490,14 +284490,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f8354da36ffe6BRKoIm3EL6Mrr",
-              "timestamp": "2026-09-08T11:55:57.647Z"
+              "timestamp": "2026-09-08T12:24:20.010Z"
             },
-            "confirmationCount": 129
+            "confirmationCount": 141
           }
         },
-        "createdAt": "2026-09-08T11:55:57.647Z",
-        "updatedAt": "2026-09-08T11:55:57.647Z",
-        "validFrom": "2026-09-08T11:55:57.647Z"
+        "createdAt": "2026-09-08T12:24:20.010Z",
+        "updatedAt": "2026-09-08T12:24:20.010Z",
+        "validFrom": "2026-09-08T12:24:20.010Z"
       }
     },
     {
@@ -284511,9 +284511,9 @@
         "metadata": {
           "domain": "experiment",
           "run_task_id": "ses_f8354da36ffe6BRKoIm3EL6Mrr",
-          "totalTokens": 5398456,
-          "inputTokens": 5081472,
-          "outputTokens": 316984,
+          "totalTokens": 5451536,
+          "inputTokens": 5113410,
+          "outputTokens": 338126,
           "reasoningTokens": 0,
           "closedState": "closed",
           "provenance": {
@@ -284527,14 +284527,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f8354da36ffe6BRKoIm3EL6Mrr",
-              "timestamp": "2026-09-08T11:55:57.647Z"
+              "timestamp": "2026-09-08T12:24:20.010Z"
             },
-            "confirmationCount": 129
+            "confirmationCount": 141
           }
         },
-        "createdAt": "2026-09-08T11:55:57.681Z",
-        "updatedAt": "2026-09-08T11:55:57.681Z",
-        "validFrom": "2026-09-08T11:55:57.681Z"
+        "createdAt": "2026-09-08T12:24:20.024Z",
+        "updatedAt": "2026-09-08T12:24:20.024Z",
+        "validFrom": "2026-09-08T12:24:20.024Z"
       }
     },
     {
@@ -284544,7 +284544,7 @@
         "name": "ses_f8354da36ffe6BRKoIm3EL6Mrr-route",
         "entityType": "Route",
         "layer": "evidence",
-        "description": "Fix tmux status-line context timeout",
+        "description": "Fix context display flicker in tmux status line",
         "metadata": {
           "domain": "experiment",
           "run_task_id": "ses_f8354da36ffe6BRKoIm3EL6Mrr",
@@ -284554,7 +284554,7 @@
           "abandoned_tool_count": null,
           "total_step_count": null,
           "wallclock_per_step": null,
-          "goal_sentence": "Fix tmux status-line context timeout",
+          "goal_sentence": "Fix context display flicker in tmux status line",
           "provenance": {
             "createdBy": {
               "provider": "coding-measure-stop",
@@ -284566,14 +284566,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f8354da36ffe6BRKoIm3EL6Mrr",
-              "timestamp": "2026-09-08T11:55:57.647Z"
+              "timestamp": "2026-09-08T12:24:20.010Z"
             },
-            "confirmationCount": 129
+            "confirmationCount": 141
           }
         },
-        "createdAt": "2026-09-08T11:55:57.718Z",
-        "updatedAt": "2026-09-08T11:55:57.718Z",
-        "validFrom": "2026-09-08T11:55:57.718Z"
+        "createdAt": "2026-09-08T12:24:20.051Z",
+        "updatedAt": "2026-09-08T12:24:20.051Z",
+        "validFrom": "2026-09-08T12:24:20.051Z"
       }
     },
     {
@@ -284857,11 +284857,11 @@
         "name": "edb47be0-2c69-4743-aa63-2133a4aaeee3",
         "entityType": "Run",
         "layer": "evidence",
-        "description": "Load LSL, verify end-to-end, and commit",
+        "description": "Fix relation edges and hide provenance by default",
         "metadata": {
           "domain": "experiment",
           "task_id": "edb47be0-2c69-4743-aa63-2133a4aaeee3",
-          "task_hash": "815cbddad1d860b9",
+          "task_hash": "faa39b3c8713d32f",
           "task_class": "docs",
           "agent": "claude",
           "model": "claude-opus-5",
@@ -284871,11 +284871,11 @@
           "trace_id": "edb47be0-2c69-4743-aa63-2133a4aaeee3",
           "pending": false,
           "started_at": "2026-09-08T10:57:38.039Z",
-          "ended_at": "2026-09-08T11:43:28.607Z",
+          "ended_at": "2026-09-08T15:51:16.251Z",
           "canonical_model": "claude-opus-5",
           "canonical_agent": "claude",
           "background_models": [],
-          "session_summary": "Load and summarize recent Live Session Logs (LSL) to provide continuity from previous work sessions. · Verified end-to-end after a fresh container recreate. Committing: | actions: Bash(ls -d .specstory/history/[0-9][0-9][0-9][0-9]/[0), Bash(ls -1r .specstory/history/2026/09), Bash(for f in .specstory/history/2026/09/2026-09-08_1), Bash(cd .specstory/history/2026/09 && for f in 2026-0), Bash(grep -a '^\\[A\\]\\|^\\[U\\]' /Users/Q284340/.claude/), Bash(sed -n '240,272p' api/ApiClient.ts), Edit(ApiClient.ts), Write(team-groups.ts), Write(TeamsFilter.tsx), Edit(FilterRail.tsx)",
+          "session_summary": "Load and summarize recent Live Session Logs (LSL) to provide continuity from previous work sessions. · Verified end-to-end after a fresh container recreate. Committing: · fix the km-core findRelations key and drop the stale edges - also, when do I get the reduced number of node and relation · go - default to hiding the provenance edges · now do the concise descriptions - also, why are those nodes we just created (online learning) associated with a2a-xpr?.. · Your claude.ai usage limit has reset. Continue the task you were working on when the limit was reached; do not repeat wo | actions: Bash(",
           "variant": null,
           "repeat": null,
           "terminal_state": null,
@@ -284901,14 +284901,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "edb47be0-2c69-4743-aa63-2133a4aaeee3",
-              "timestamp": "2026-09-08T11:56:16.308Z"
+              "timestamp": "2026-09-08T16:04:49.531Z"
             },
-            "confirmationCount": 21
+            "confirmationCount": 69
           }
         },
-        "createdAt": "2026-09-08T11:56:16.308Z",
-        "updatedAt": "2026-09-08T11:56:16.308Z",
-        "validFrom": "2026-09-08T11:56:16.308Z"
+        "createdAt": "2026-09-08T16:04:49.531Z",
+        "updatedAt": "2026-09-08T16:04:49.531Z",
+        "validFrom": "2026-09-08T16:04:49.531Z"
       }
     },
     {
@@ -284922,9 +284922,9 @@
         "metadata": {
           "domain": "experiment",
           "run_task_id": "edb47be0-2c69-4743-aa63-2133a4aaeee3",
-          "totalTokens": 130562,
-          "inputTokens": 11809,
-          "outputTokens": 118753,
+          "totalTokens": 258046,
+          "inputTokens": 24140,
+          "outputTokens": 233906,
           "reasoningTokens": 0,
           "closedState": "closed",
           "provenance": {
@@ -284938,14 +284938,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "edb47be0-2c69-4743-aa63-2133a4aaeee3",
-              "timestamp": "2026-09-08T11:56:16.308Z"
+              "timestamp": "2026-09-08T16:04:49.531Z"
             },
-            "confirmationCount": 21
+            "confirmationCount": 69
           }
         },
-        "createdAt": "2026-09-08T11:56:16.322Z",
-        "updatedAt": "2026-09-08T11:56:16.322Z",
-        "validFrom": "2026-09-08T11:56:16.322Z"
+        "createdAt": "2026-09-08T16:04:49.546Z",
+        "updatedAt": "2026-09-08T16:04:49.546Z",
+        "validFrom": "2026-09-08T16:04:49.546Z"
       }
     },
     {
@@ -284955,7 +284955,7 @@
         "name": "edb47be0-2c69-4743-aa63-2133a4aaeee3-route",
         "entityType": "Route",
         "layer": "evidence",
-        "description": "Load LSL, verify end-to-end, and commit",
+        "description": "Fix relation edges and hide provenance by default",
         "metadata": {
           "domain": "experiment",
           "run_task_id": "edb47be0-2c69-4743-aa63-2133a4aaeee3",
@@ -284965,7 +284965,7 @@
           "abandoned_tool_count": null,
           "total_step_count": null,
           "wallclock_per_step": null,
-          "goal_sentence": "Load LSL, verify end-to-end, and commit",
+          "goal_sentence": "Fix relation edges and hide provenance by default",
           "provenance": {
             "createdBy": {
               "provider": "coding-measure-stop",
@@ -284977,14 +284977,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "edb47be0-2c69-4743-aa63-2133a4aaeee3",
-              "timestamp": "2026-09-08T11:56:16.308Z"
+              "timestamp": "2026-09-08T16:04:49.531Z"
             },
-            "confirmationCount": 21
+            "confirmationCount": 69
           }
         },
-        "createdAt": "2026-09-08T11:56:16.354Z",
-        "updatedAt": "2026-09-08T11:56:16.354Z",
-        "validFrom": "2026-09-08T11:56:16.354Z"
+        "createdAt": "2026-09-08T16:04:49.575Z",
+        "updatedAt": "2026-09-08T16:04:49.575Z",
+        "validFrom": "2026-09-08T16:04:49.575Z"
       }
     },
     {
@@ -284994,25 +284994,25 @@
         "name": "ses_f7f259ac5ffeoucEzSjibbHb3S",
         "entityType": "Run",
         "layer": "evidence",
-        "description": "Reformat Thomas's personal feedback entry bullet points",
+        "description": "Record feedback meeting for David Raehles",
         "metadata": {
           "domain": "experiment",
           "task_id": "ses_f7f259ac5ffeoucEzSjibbHb3S",
-          "task_hash": "73df18ff8a662ca5",
+          "task_hash": "bb457d912ebcab30",
           "task_class": "docs",
           "agent": "opencode",
-          "model": "gpt-5.6-luna",
+          "model": "claude-opus-4.8-fast",
           "framework": "opencode",
           "spec_level": null,
           "snapshot_id": null,
           "trace_id": "ses_f7f259ac5ffeoucEzSjibbHb3S",
           "pending": false,
           "started_at": "2026-09-08T11:49:51.627Z",
-          "ended_at": "2026-09-08T11:52:01.404Z",
-          "canonical_model": "gpt-5.6-luna",
+          "ended_at": "2026-09-08T13:28:01.206Z",
+          "canonical_model": "claude-opus-4.8-fast",
           "canonical_agent": "opencode",
           "background_models": [],
-          "session_summary": "Reformatted Thomas's personal entry in the private Obsidian vault (EF-412) to retain bullet points in the evidence column. Inspected the vault structure, schema, and staff roster to locate and verify the correct file.",
+          "session_summary": "Updated feedback meeting files for David Raehles, setting the FuMa to \"funktionsmatrix-software-engineering\" as a decision and refining Thomas's entry format.",
           "variant": null,
           "repeat": null,
           "terminal_state": null,
@@ -285038,14 +285038,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f7f259ac5ffeoucEzSjibbHb3S",
-              "timestamp": "2026-09-08T11:56:15.415Z"
+              "timestamp": "2026-09-08T13:42:46.905Z"
             },
-            "confirmationCount": 3
+            "confirmationCount": 24
           }
         },
-        "createdAt": "2026-09-08T11:56:15.415Z",
-        "updatedAt": "2026-09-08T11:56:15.415Z",
-        "validFrom": "2026-09-08T11:56:15.415Z"
+        "createdAt": "2026-09-08T13:42:46.905Z",
+        "updatedAt": "2026-09-08T13:42:46.905Z",
+        "validFrom": "2026-09-08T13:42:46.905Z"
       }
     },
     {
@@ -285059,10 +285059,10 @@
         "metadata": {
           "domain": "experiment",
           "run_task_id": "ses_f7f259ac5ffeoucEzSjibbHb3S",
-          "totalTokens": 45395,
-          "inputTokens": 42587,
-          "outputTokens": 2808,
-          "reasoningTokens": 588,
+          "totalTokens": 404805,
+          "inputTokens": 378200,
+          "outputTokens": 26605,
+          "reasoningTokens": 1241,
           "closedState": "closed",
           "provenance": {
             "createdBy": {
@@ -285075,14 +285075,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f7f259ac5ffeoucEzSjibbHb3S",
-              "timestamp": "2026-09-08T11:56:15.415Z"
+              "timestamp": "2026-09-08T13:42:46.905Z"
             },
-            "confirmationCount": 3
+            "confirmationCount": 24
           }
         },
-        "createdAt": "2026-09-08T11:56:15.430Z",
-        "updatedAt": "2026-09-08T11:56:15.430Z",
-        "validFrom": "2026-09-08T11:56:15.430Z"
+        "createdAt": "2026-09-08T13:42:46.922Z",
+        "updatedAt": "2026-09-08T13:42:46.922Z",
+        "validFrom": "2026-09-08T13:42:46.922Z"
       }
     },
     {
@@ -285092,7 +285092,7 @@
         "name": "ses_f7f259ac5ffeoucEzSjibbHb3S-route",
         "entityType": "Route",
         "layer": "evidence",
-        "description": "Reformat Thomas's personal feedback entry bullet points",
+        "description": "Record feedback meeting for David Raehles",
         "metadata": {
           "domain": "experiment",
           "run_task_id": "ses_f7f259ac5ffeoucEzSjibbHb3S",
@@ -285102,7 +285102,7 @@
           "abandoned_tool_count": null,
           "total_step_count": null,
           "wallclock_per_step": null,
-          "goal_sentence": "Reformat Thomas's personal feedback entry bullet points",
+          "goal_sentence": "Record feedback meeting for David Raehles",
           "provenance": {
             "createdBy": {
               "provider": "coding-measure-stop",
@@ -285114,14 +285114,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f7f259ac5ffeoucEzSjibbHb3S",
-              "timestamp": "2026-09-08T11:56:15.415Z"
+              "timestamp": "2026-09-08T13:42:46.905Z"
             },
-            "confirmationCount": 3
+            "confirmationCount": 24
           }
         },
-        "createdAt": "2026-09-08T11:56:15.464Z",
-        "updatedAt": "2026-09-08T11:56:15.464Z",
-        "validFrom": "2026-09-08T11:56:15.464Z"
+        "createdAt": "2026-09-08T13:42:46.959Z",
+        "updatedAt": "2026-09-08T13:42:46.959Z",
+        "validFrom": "2026-09-08T13:42:46.959Z"
       }
     },
     {
@@ -285175,14 +285175,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f7f229ee9ffeKjYoZhndKJ5xn6",
-              "timestamp": "2026-09-08T11:56:14.816Z"
+              "timestamp": "2026-09-08T12:08:11.696Z"
             },
-            "confirmationCount": 1
+            "confirmationCount": 6
           }
         },
-        "createdAt": "2026-09-08T11:56:14.816Z",
-        "updatedAt": "2026-09-08T11:56:14.816Z",
-        "validFrom": "2026-09-08T11:56:14.816Z"
+        "createdAt": "2026-09-08T12:08:11.696Z",
+        "updatedAt": "2026-09-08T12:08:11.696Z",
+        "validFrom": "2026-09-08T12:08:11.696Z"
       }
     },
     {
@@ -285212,14 +285212,14 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f7f229ee9ffeKjYoZhndKJ5xn6",
-              "timestamp": "2026-09-08T11:56:14.816Z"
+              "timestamp": "2026-09-08T12:08:11.696Z"
             },
-            "confirmationCount": 1
+            "confirmationCount": 6
           }
         },
-        "createdAt": "2026-09-08T11:56:14.852Z",
-        "updatedAt": "2026-09-08T11:56:14.852Z",
-        "validFrom": "2026-09-08T11:56:14.852Z"
+        "createdAt": "2026-09-08T12:08:11.711Z",
+        "updatedAt": "2026-09-08T12:08:11.711Z",
+        "validFrom": "2026-09-08T12:08:11.711Z"
       }
     },
     {
@@ -285251,14 +285251,1658 @@
               "provider": "coding-measure-stop",
               "model": "n/a",
               "runId": "ses_f7f229ee9ffeKjYoZhndKJ5xn6",
-              "timestamp": "2026-09-08T11:56:14.816Z"
+              "timestamp": "2026-09-08T12:08:11.696Z"
             },
-            "confirmationCount": 1
+            "confirmationCount": 6
           }
         },
-        "createdAt": "2026-09-08T11:56:14.894Z",
-        "updatedAt": "2026-09-08T11:56:14.894Z",
-        "validFrom": "2026-09-08T11:56:14.894Z"
+        "createdAt": "2026-09-08T12:08:11.746Z",
+        "updatedAt": "2026-09-08T12:08:11.746Z",
+        "validFrom": "2026-09-08T12:08:11.746Z"
+      }
+    },
+    {
+      "key": "01a080f3-33c6-7517-90a4-aeadaa37c5e8",
+      "attributes": {
+        "id": "01a080f3-33c6-7517-90a4-aeadaa37c5e8",
+        "name": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Update NL Realm PoC docs and open PR",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+          "task_hash": "7f60b17b7903286c",
+          "task_class": "docs",
+          "agent": "opencode",
+          "model": "claude-opus-5",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+          "pending": false,
+          "started_at": "2026-09-08T12:16:24.129Z",
+          "ended_at": "2026-09-08T14:11:05.958Z",
+          "canonical_model": "claude-opus-5",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Reviewed the full a2a-xpr repo and normalization-main docs to trace NL realm evolution beyond LDU. Rewrote the PoC docs as a concise tutorial for new developers and created updated docs in the original normalization repo, then committed and opened a PR.",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+              "timestamp": "2026-09-08T12:16:57.286Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+              "timestamp": "2026-09-08T14:24:53.825Z"
+            },
+            "confirmationCount": 36
+          }
+        },
+        "createdAt": "2026-09-08T14:24:53.825Z",
+        "updatedAt": "2026-09-08T14:24:53.825Z",
+        "validFrom": "2026-09-08T14:24:53.825Z"
+      }
+    },
+    {
+      "key": "01a080f3-33ea-7ffc-b6de-4ce501eede3e",
+      "attributes": {
+        "id": "01a080f3-33ea-7ffc-b6de-4ce501eede3e",
+        "name": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+          "totalTokens": 987998,
+          "inputTokens": 847259,
+          "outputTokens": 140739,
+          "reasoningTokens": 0,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+              "timestamp": "2026-09-08T12:16:57.286Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+              "timestamp": "2026-09-08T14:24:53.825Z"
+            },
+            "confirmationCount": 36
+          }
+        },
+        "createdAt": "2026-09-08T14:24:53.846Z",
+        "updatedAt": "2026-09-08T14:24:53.846Z",
+        "validFrom": "2026-09-08T14:24:53.846Z"
+      }
+    },
+    {
+      "key": "01a080f3-3411-72b2-a905-bf436ff73547",
+      "attributes": {
+        "id": "01a080f3-3411-72b2-a905-bf436ff73547",
+        "name": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Update NL Realm PoC docs and open PR",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Update NL Realm PoC docs and open PR",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+              "timestamp": "2026-09-08T12:16:57.286Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0d4df5ffeyZYJ8C9H0pSZam",
+              "timestamp": "2026-09-08T14:24:53.825Z"
+            },
+            "confirmationCount": 36
+          }
+        },
+        "createdAt": "2026-09-08T14:24:53.896Z",
+        "updatedAt": "2026-09-08T14:24:53.896Z",
+        "validFrom": "2026-09-08T14:24:53.896Z"
+      }
+    },
+    {
+      "key": "01a080f5-627c-7fb2-bddd-3a5c3efeb387",
+      "attributes": {
+        "id": "01a080f5-627c-7fb2-bddd-3a5c3efeb387",
+        "name": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Explore regression-ops module",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+          "task_hash": "bd52af87bca73886",
+          "task_class": "debug",
+          "agent": "opencode",
+          "model": "claude-opus-5",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+          "pending": false,
+          "started_at": "2026-09-08T12:18:08.504Z",
+          "ended_at": "2026-09-08T12:36:31.828Z",
+          "canonical_model": "claude-opus-5",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Explored and mapped the regression-ops module: read its manifests, terraform, Python sources, and schema/migrations to characterise its purpose, pipeline, and report structure.",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+              "timestamp": "2026-09-08T12:19:20.316Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+              "timestamp": "2026-09-08T12:49:59.440Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:49:59.440Z",
+        "updatedAt": "2026-09-08T12:49:59.440Z",
+        "validFrom": "2026-09-08T12:49:59.440Z"
+      }
+    },
+    {
+      "key": "01a080f5-6298-72f5-b622-a20b23be69da",
+      "attributes": {
+        "id": "01a080f5-6298-72f5-b622-a20b23be69da",
+        "name": "ses_f7f0bb625ffeqNNUFvmbTJHpQg-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+          "totalTokens": 236598,
+          "inputTokens": 211157,
+          "outputTokens": 25441,
+          "reasoningTokens": 0,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+              "timestamp": "2026-09-08T12:19:20.316Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+              "timestamp": "2026-09-08T12:49:59.440Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:49:59.459Z",
+        "updatedAt": "2026-09-08T12:49:59.459Z",
+        "validFrom": "2026-09-08T12:49:59.459Z"
+      }
+    },
+    {
+      "key": "01a080f5-62ba-7f67-8b8f-2c9b712f1520",
+      "attributes": {
+        "id": "01a080f5-62ba-7f67-8b8f-2c9b712f1520",
+        "name": "ses_f7f0bb625ffeqNNUFvmbTJHpQg-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Explore regression-ops module",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Explore regression-ops module",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+              "timestamp": "2026-09-08T12:19:20.316Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bb625ffeqNNUFvmbTJHpQg",
+              "timestamp": "2026-09-08T12:49:59.440Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:49:59.512Z",
+        "updatedAt": "2026-09-08T12:49:59.512Z",
+        "validFrom": "2026-09-08T12:49:59.512Z"
+      }
+    },
+    {
+      "key": "01a080f5-a5c5-72f0-8c9e-df1988d4a152",
+      "attributes": {
+        "id": "01a080f5-a5c5-72f0-8c9e-df1988d4a152",
+        "name": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Explore Normalization observability durable-state modules",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+          "task_hash": "51c26505eb2901c8",
+          "task_class": "debug",
+          "agent": "opencode",
+          "model": "claude-opus-5",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+          "pending": false,
+          "started_at": "2026-09-08T12:17:57.853Z",
+          "ended_at": "2026-09-08T12:35:55.369Z",
+          "canonical_model": "claude-opus-5",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Explored the observability and durable-state modules in the Normalization realm, reading migration SQL files and source code such as log parsers and batch log aggregators. Produced a report on how the modules handle log processing, state persistence, and event streaming.",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+              "timestamp": "2026-09-08T12:19:37.541Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+              "timestamp": "2026-09-08T12:49:59.685Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:49:59.685Z",
+        "updatedAt": "2026-09-08T12:49:59.685Z",
+        "validFrom": "2026-09-08T12:49:59.685Z"
+      }
+    },
+    {
+      "key": "01a080f5-a5ec-7dfc-8088-1ac93c79816c",
+      "attributes": {
+        "id": "01a080f5-a5ec-7dfc-8088-1ac93c79816c",
+        "name": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+          "totalTokens": 163238,
+          "inputTokens": 132981,
+          "outputTokens": 30257,
+          "reasoningTokens": 0,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+              "timestamp": "2026-09-08T12:19:37.541Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+              "timestamp": "2026-09-08T12:49:59.685Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:49:59.706Z",
+        "updatedAt": "2026-09-08T12:49:59.706Z",
+        "validFrom": "2026-09-08T12:49:59.706Z"
+      }
+    },
+    {
+      "key": "01a080f5-a61c-7a82-97a1-207703cad6f9",
+      "attributes": {
+        "id": "01a080f5-a61c-7a82-97a1-207703cad6f9",
+        "name": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Explore Normalization observability durable-state modules",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Explore Normalization observability durable-state modules",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+              "timestamp": "2026-09-08T12:19:37.541Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0bdfb0ffe4IhpWae8ygN0XJ",
+              "timestamp": "2026-09-08T12:49:59.685Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:49:59.738Z",
+        "updatedAt": "2026-09-08T12:49:59.738Z",
+        "validFrom": "2026-09-08T12:49:59.738Z"
+      }
+    },
+    {
+      "key": "01a080f5-e710-7d43-8905-c38ff15cbfdd",
+      "attributes": {
+        "id": "01a080f5-e710-7d43-8905-c38ff15cbfdd",
+        "name": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Trace normalization realm trigger paths",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+          "task_hash": "c7beb2eb961377ab",
+          "task_class": "debug",
+          "agent": "opencode",
+          "model": "claude-opus-5",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+          "pending": false,
+          "started_at": "2026-09-08T12:17:47.275Z",
+          "ended_at": "2026-09-08T12:35:27.926Z",
+          "canonical_model": "claude-opus-5",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Explored the Normalization repo to trace all trigger paths by which work enters the NL realm. Examined ingest modules, api-gateway-conversion, and event-bridge-rules code and Terraform files.",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+              "timestamp": "2026-09-08T12:19:54.256Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+              "timestamp": "2026-09-08T12:50:00.016Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:50:00.016Z",
+        "updatedAt": "2026-09-08T12:50:00.016Z",
+        "validFrom": "2026-09-08T12:50:00.016Z"
+      }
+    },
+    {
+      "key": "01a080f5-e735-70bd-a9b0-01d17e61d8eb",
+      "attributes": {
+        "id": "01a080f5-e735-70bd-a9b0-01d17e61d8eb",
+        "name": "ses_f7f0c0909ffefOyud9D0b6gPfS-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+          "totalTokens": 163106,
+          "inputTokens": 145404,
+          "outputTokens": 17702,
+          "reasoningTokens": 0,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+              "timestamp": "2026-09-08T12:19:54.256Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+              "timestamp": "2026-09-08T12:50:00.016Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:50:00.038Z",
+        "updatedAt": "2026-09-08T12:50:00.038Z",
+        "validFrom": "2026-09-08T12:50:00.038Z"
+      }
+    },
+    {
+      "key": "01a080f5-e75c-7984-a3c2-a26f3d739711",
+      "attributes": {
+        "id": "01a080f5-e75c-7984-a3c2-a26f3d739711",
+        "name": "ses_f7f0c0909ffefOyud9D0b6gPfS-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Trace normalization realm trigger paths",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Trace normalization realm trigger paths",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+              "timestamp": "2026-09-08T12:19:54.256Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7f0c0909ffefOyud9D0b6gPfS",
+              "timestamp": "2026-09-08T12:50:00.016Z"
+            },
+            "confirmationCount": 12
+          }
+        },
+        "createdAt": "2026-09-08T12:50:00.066Z",
+        "updatedAt": "2026-09-08T12:50:00.066Z",
+        "validFrom": "2026-09-08T12:50:00.066Z"
+      }
+    },
+    {
+      "key": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7",
+      "attributes": {
+        "id": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7",
+        "name": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Explore deployment, CI/CD, environments, and identity configuration",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+          "task_hash": "ad4ddfb69f793870",
+          "task_class": "debug",
+          "agent": "opencode",
+          "model": "claude-opus-5",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+          "pending": false,
+          "started_at": "2026-09-08T12:40:36.183Z",
+          "ended_at": "2026-09-08T12:42:08.175Z",
+          "canonical_model": "claude-opus-5",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Performed a deep audit of the repository's deployment and CI/CD setup. Read all GitHub workflow scripts, seedfarmer.yaml manifests, and environment configs to map out realms, environments, and account identities.",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+              "timestamp": "2026-09-08T12:42:12.204Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+              "timestamp": "2026-09-08T12:56:47.982Z"
+            },
+            "confirmationCount": 7
+          }
+        },
+        "createdAt": "2026-09-08T12:56:47.982Z",
+        "updatedAt": "2026-09-08T12:56:47.982Z",
+        "validFrom": "2026-09-08T12:56:47.982Z"
+      }
+    },
+    {
+      "key": "01a0810a-518a-7024-8ff1-72cb726b2626",
+      "attributes": {
+        "id": "01a0810a-518a-7024-8ff1-72cb726b2626",
+        "name": "ses_f7ef725c6ffeMXrDf6psj0fHcf-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+          "totalTokens": 162763,
+          "inputTokens": 136087,
+          "outputTokens": 26676,
+          "reasoningTokens": 0,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+              "timestamp": "2026-09-08T12:42:12.204Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+              "timestamp": "2026-09-08T12:56:47.982Z"
+            },
+            "confirmationCount": 7
+          }
+        },
+        "createdAt": "2026-09-08T12:56:47.996Z",
+        "updatedAt": "2026-09-08T12:56:47.996Z",
+        "validFrom": "2026-09-08T12:56:47.996Z"
+      }
+    },
+    {
+      "key": "01a0810a-51d8-7e79-ad44-a418055b1ca4",
+      "attributes": {
+        "id": "01a0810a-51d8-7e79-ad44-a418055b1ca4",
+        "name": "ses_f7ef725c6ffeMXrDf6psj0fHcf-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Explore deployment, CI/CD, environments, and identity configuration",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Explore deployment, CI/CD, environments, and identity configuration",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+              "timestamp": "2026-09-08T12:42:12.204Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef725c6ffeMXrDf6psj0fHcf",
+              "timestamp": "2026-09-08T12:56:47.982Z"
+            },
+            "confirmationCount": 7
+          }
+        },
+        "createdAt": "2026-09-08T12:56:48.026Z",
+        "updatedAt": "2026-09-08T12:56:48.026Z",
+        "validFrom": "2026-09-08T12:56:48.026Z"
+      }
+    },
+    {
+      "key": "01a0810a-9b51-7079-a754-f41237fadc77",
+      "attributes": {
+        "id": "01a0810a-9b51-7079-a754-f41237fadc77",
+        "name": "ses_f7ef756ceffeu76450JQGhkv0F",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Explore conversion pipeline state machine and job",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7ef756ceffeu76450JQGhkv0F",
+          "task_hash": "143b2ccabb9f1a1a",
+          "task_class": "docs",
+          "agent": "opencode",
+          "model": "claude-opus-5",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7ef756ceffeu76450JQGhkv0F",
+          "pending": false,
+          "started_at": "2026-09-08T12:40:23.617Z",
+          "ended_at": "2026-09-08T12:42:40.875Z",
+          "canonical_model": "claude-opus-5",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Explored the conversion pipeline modules, terraform definitions, and related scripts to produce an evidence-based report on the pipeline's outputs and the two generations (legacy doer/LDU vs newer nrm/NormaLisa).",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef756ceffeu76450JQGhkv0F",
+              "timestamp": "2026-09-08T12:42:31.121Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef756ceffeu76450JQGhkv0F",
+              "timestamp": "2026-09-08T12:56:47.791Z"
+            },
+            "confirmationCount": 7
+          }
+        },
+        "createdAt": "2026-09-08T12:56:47.791Z",
+        "updatedAt": "2026-09-08T12:56:47.791Z",
+        "validFrom": "2026-09-08T12:56:47.791Z"
+      }
+    },
+    {
+      "key": "01a0810a-9b6d-792f-83d9-0c83ea87850d",
+      "attributes": {
+        "id": "01a0810a-9b6d-792f-83d9-0c83ea87850d",
+        "name": "ses_f7ef756ceffeu76450JQGhkv0F-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7ef756ceffeu76450JQGhkv0F",
+          "totalTokens": 145827,
+          "inputTokens": 116093,
+          "outputTokens": 29734,
+          "reasoningTokens": 0,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef756ceffeu76450JQGhkv0F",
+              "timestamp": "2026-09-08T12:42:31.121Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef756ceffeu76450JQGhkv0F",
+              "timestamp": "2026-09-08T12:56:47.791Z"
+            },
+            "confirmationCount": 7
+          }
+        },
+        "createdAt": "2026-09-08T12:56:47.808Z",
+        "updatedAt": "2026-09-08T12:56:47.808Z",
+        "validFrom": "2026-09-08T12:56:47.808Z"
+      }
+    },
+    {
+      "key": "01a0810a-9b96-7102-8777-9e65080e74fd",
+      "attributes": {
+        "id": "01a0810a-9b96-7102-8777-9e65080e74fd",
+        "name": "ses_f7ef756ceffeu76450JQGhkv0F-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Explore conversion pipeline state machine and job",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7ef756ceffeu76450JQGhkv0F",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Explore conversion pipeline state machine and job",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef756ceffeu76450JQGhkv0F",
+              "timestamp": "2026-09-08T12:42:31.121Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7ef756ceffeu76450JQGhkv0F",
+              "timestamp": "2026-09-08T12:56:47.791Z"
+            },
+            "confirmationCount": 7
+          }
+        },
+        "createdAt": "2026-09-08T12:56:47.843Z",
+        "updatedAt": "2026-09-08T12:56:47.843Z",
+        "validFrom": "2026-09-08T12:56:47.843Z"
+      }
+    },
+    {
+      "key": "01a081c7-9166-7618-8890-78e61ef67f68",
+      "attributes": {
+        "id": "01a081c7-9166-7618-8890-78e61ef67f68",
+        "name": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Review PoC document for consistency and add tiered content structure",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+          "task_hash": "4df9a4bc249533cd",
+          "task_class": "docs",
+          "agent": "opencode",
+          "model": "gpt-5.6-sol",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+          "pending": false,
+          "started_at": "2026-09-08T16:07:44.616Z",
+          "ended_at": "2026-09-08T16:49:00.673Z",
+          "canonical_model": "gpt-5.6-sol",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Reviewed and restructured the PoC documentation for clarity, correcting misconceptions about data sources (LDU and test fleet as two parallel streams) and implementation status (doer vs. normalisa), then implemented a quick-read/deep-dive tabbed system across lengthy pages like the NL realm section to improve…",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+              "timestamp": "2026-09-08T16:08:54.886Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+              "timestamp": "2026-09-08T17:03:51.529Z"
+            },
+            "confirmationCount": 27
+          }
+        },
+        "createdAt": "2026-09-08T17:03:51.529Z",
+        "updatedAt": "2026-09-08T17:03:51.529Z",
+        "validFrom": "2026-09-08T17:03:51.529Z"
+      }
+    },
+    {
+      "key": "01a081c7-9184-72be-816b-40f3af6a02a8",
+      "attributes": {
+        "id": "01a081c7-9184-72be-816b-40f3af6a02a8",
+        "name": "ses_f7e3983c9ffeQq5vmSmOPuOt2t-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+          "totalTokens": 317913,
+          "inputTokens": 276053,
+          "outputTokens": 41860,
+          "reasoningTokens": 12614,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+              "timestamp": "2026-09-08T16:08:54.886Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+              "timestamp": "2026-09-08T17:03:51.529Z"
+            },
+            "confirmationCount": 27
+          }
+        },
+        "createdAt": "2026-09-08T17:03:51.539Z",
+        "updatedAt": "2026-09-08T17:03:51.539Z",
+        "validFrom": "2026-09-08T17:03:51.539Z"
+      }
+    },
+    {
+      "key": "01a081c7-91a7-70ee-b296-a9152bfdd42e",
+      "attributes": {
+        "id": "01a081c7-91a7-70ee-b296-a9152bfdd42e",
+        "name": "ses_f7e3983c9ffeQq5vmSmOPuOt2t-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Review PoC document for consistency and add tiered content structure",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Review PoC document for consistency and add tiered content structure",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+              "timestamp": "2026-09-08T16:08:54.886Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3983c9ffeQq5vmSmOPuOt2t",
+              "timestamp": "2026-09-08T17:03:51.529Z"
+            },
+            "confirmationCount": 27
+          }
+        },
+        "createdAt": "2026-09-08T17:03:51.542Z",
+        "updatedAt": "2026-09-08T17:03:51.542Z",
+        "validFrom": "2026-09-08T17:03:51.542Z"
+      }
+    },
+    {
+      "key": "01a081c9-79e6-7002-8df5-51cdbe573fbb",
+      "attributes": {
+        "id": "01a081c9-79e6-7002-8df5-51cdbe573fbb",
+        "name": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Audit architecture documentation for realm routing and boundary inconsistencies",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+          "task_hash": "2be76d1964c879ff",
+          "task_class": "docs",
+          "agent": "opencode",
+          "model": "gpt-5.6-sol",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+          "pending": false,
+          "started_at": "2026-09-08T16:10:10.838Z",
+          "ended_at": "2026-09-08T16:12:42.999Z",
+          "canonical_model": "gpt-5.6-sol",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Conducted a read-only architecture consistency audit comparing nl-realm.md's realm and OAO event routing claims against architecture-proposal, adp-internal-a2a.md, coder-platform.md, trust-boundaries.md, identity.md, open-items.md, and build chapters to identify stale claims, misleading diagrams, and omissions about…",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+              "timestamp": "2026-09-08T16:10:59.942Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+              "timestamp": "2026-09-08T16:26:02.338Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.338Z",
+        "updatedAt": "2026-09-08T16:26:02.338Z",
+        "validFrom": "2026-09-08T16:26:02.338Z"
+      }
+    },
+    {
+      "key": "01a081c9-7a08-71c3-b54c-278fb38bbf3d",
+      "attributes": {
+        "id": "01a081c9-7a08-71c3-b54c-278fb38bbf3d",
+        "name": "ses_f7e3745f5ffeVankMv5mqqhFVF-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+          "totalTokens": 279894,
+          "inputTokens": 274070,
+          "outputTokens": 5824,
+          "reasoningTokens": 8028,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+              "timestamp": "2026-09-08T16:10:59.942Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+              "timestamp": "2026-09-08T16:26:02.338Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.340Z",
+        "updatedAt": "2026-09-08T16:26:02.340Z",
+        "validFrom": "2026-09-08T16:26:02.340Z"
+      }
+    },
+    {
+      "key": "01a081c9-7a2a-7c34-9878-d6f121ce0a20",
+      "attributes": {
+        "id": "01a081c9-7a2a-7c34-9878-d6f121ce0a20",
+        "name": "ses_f7e3745f5ffeVankMv5mqqhFVF-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Audit architecture documentation for realm routing and boundary inconsistencies",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Audit architecture documentation for realm routing and boundary inconsistencies",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+              "timestamp": "2026-09-08T16:10:59.942Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e3745f5ffeVankMv5mqqhFVF",
+              "timestamp": "2026-09-08T16:26:02.338Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.343Z",
+        "updatedAt": "2026-09-08T16:26:02.343Z",
+        "validFrom": "2026-09-08T16:26:02.343Z"
+      }
+    },
+    {
+      "key": "01a081c9-8912-709d-b653-7f37cc6e33a7",
+      "attributes": {
+        "id": "01a081c9-8912-709d-b653-7f37cc6e33a7",
+        "name": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Audit ADP.Next realm and OaO bus Markdown for terminology inconsistencies",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+          "task_hash": "a1f192c9e188231d",
+          "task_class": "docs",
+          "agent": "opencode",
+          "model": "gpt-5.6-sol",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+          "pending": false,
+          "started_at": "2026-09-08T16:10:10.789Z",
+          "ended_at": "2026-09-08T16:11:22.161Z",
+          "canonical_model": "gpt-5.6-sol",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Conducted a comprehensive read-only audit of Markdown documentation across ADP.Next realms, OAO event bus, Normalization/NL, LDU, CFD, test fleet, doer, and normalisa components, identifying contradictory wording, outdated terminology, and terminology clarifications needed across multiple documentation files without…",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+              "timestamp": "2026-09-08T16:11:03.826Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+              "timestamp": "2026-09-08T16:26:02.664Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.664Z",
+        "updatedAt": "2026-09-08T16:26:02.664Z",
+        "validFrom": "2026-09-08T16:26:02.664Z"
+      }
+    },
+    {
+      "key": "01a081c9-8934-77a4-bb92-a89254e7bb9f",
+      "attributes": {
+        "id": "01a081c9-8934-77a4-bb92-a89254e7bb9f",
+        "name": "ses_f7e37462cffe1bdcZRh6A25Wxj-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+          "totalTokens": 155117,
+          "inputTokens": 150196,
+          "outputTokens": 4921,
+          "reasoningTokens": 1663,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+              "timestamp": "2026-09-08T16:11:03.826Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+              "timestamp": "2026-09-08T16:26:02.664Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.667Z",
+        "updatedAt": "2026-09-08T16:26:02.667Z",
+        "validFrom": "2026-09-08T16:26:02.667Z"
+      }
+    },
+    {
+      "key": "01a081c9-896d-7b76-bb3d-70d6aaa3664a",
+      "attributes": {
+        "id": "01a081c9-896d-7b76-bb3d-70d6aaa3664a",
+        "name": "ses_f7e37462cffe1bdcZRh6A25Wxj-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Audit ADP.Next realm and OaO bus Markdown for terminology inconsistencies",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Audit ADP.Next realm and OaO bus Markdown for terminology inconsistencies",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+              "timestamp": "2026-09-08T16:11:03.826Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37462cffe1bdcZRh6A25Wxj",
+              "timestamp": "2026-09-08T16:26:02.664Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.670Z",
+        "updatedAt": "2026-09-08T16:26:02.670Z",
+        "validFrom": "2026-09-08T16:26:02.670Z"
+      }
+    },
+    {
+      "key": "01a081c9-97d4-74a1-b94b-aeddf82ce96a",
+      "attributes": {
+        "id": "01a081c9-97d4-74a1-b94b-aeddf82ce96a",
+        "name": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Review MkDocs PoC documentation for readability and consistency issues",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+          "task_hash": "37e03b45d42c8496",
+          "task_class": "docs",
+          "agent": "opencode",
+          "model": "gpt-5.6-sol",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+          "pending": false,
+          "started_at": "2026-09-08T16:10:10.817Z",
+          "ended_at": "2026-09-08T16:11:42.757Z",
+          "canonical_model": "gpt-5.6-sol",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Conducted a thorough read-only review of the MkDocs PoC documentation across shell and _tiers pages, identifying prioritized findings on reader orientation, undefined acronyms, scope contradictions, stale statements, heading inconsistencies, and diagram context gaps with exact file locations and recommended minimal…",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+              "timestamp": "2026-09-08T16:11:07.604Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+              "timestamp": "2026-09-08T16:26:02.533Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.533Z",
+        "updatedAt": "2026-09-08T16:26:02.533Z",
+        "validFrom": "2026-09-08T16:26:02.533Z"
+      }
+    },
+    {
+      "key": "01a081c9-97f4-7621-8492-719bf8d98599",
+      "attributes": {
+        "id": "01a081c9-97f4-7621-8492-719bf8d98599",
+        "name": "ses_f7e37460dffeL2CSvZaX3GvE6N-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+          "totalTokens": 421098,
+          "inputTokens": 415428,
+          "outputTokens": 5670,
+          "reasoningTokens": 3371,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+              "timestamp": "2026-09-08T16:11:07.604Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+              "timestamp": "2026-09-08T16:26:02.533Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.535Z",
+        "updatedAt": "2026-09-08T16:26:02.535Z",
+        "validFrom": "2026-09-08T16:26:02.535Z"
+      }
+    },
+    {
+      "key": "01a081c9-981d-7b54-ae57-e81e43f22373",
+      "attributes": {
+        "id": "01a081c9-981d-7b54-ae57-e81e43f22373",
+        "name": "ses_f7e37460dffeL2CSvZaX3GvE6N-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Review MkDocs PoC documentation for readability and consistency issues",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Review MkDocs PoC documentation for readability and consistency issues",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+              "timestamp": "2026-09-08T16:11:07.604Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e37460dffeL2CSvZaX3GvE6N",
+              "timestamp": "2026-09-08T16:26:02.533Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:26:02.538Z",
+        "updatedAt": "2026-09-08T16:26:02.538Z",
+        "validFrom": "2026-09-08T16:26:02.538Z"
+      }
+    },
+    {
+      "key": "01a081d5-30fd-71e2-a332-4f0e479bc1ad",
+      "attributes": {
+        "id": "01a081d5-30fd-71e2-a332-4f0e479bc1ad",
+        "name": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Fix coding insights timeline population",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+          "task_hash": "3621dc006ecb924a",
+          "task_class": "bugfix",
+          "agent": "opencode",
+          "model": "gpt-5.6-sol",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+          "pending": false,
+          "started_at": "2026-09-08T16:22:33.828Z",
+          "ended_at": "2026-09-08T17:10:18.124Z",
+          "canonical_model": "gpt-5.6-sol",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Added /sl slash command across all four coding agents and fixed .env.ports and test-coding.sh referencing retired VKB_PORT. Diagnosed and resolved empty ingested-insights timeline via observation API changes and rebuild.",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+              "timestamp": "2026-09-08T16:23:47.709Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+              "timestamp": "2026-09-08T17:25:07.510Z"
+            },
+            "confirmationCount": 29
+          }
+        },
+        "createdAt": "2026-09-08T17:25:07.510Z",
+        "updatedAt": "2026-09-08T17:25:07.510Z",
+        "validFrom": "2026-09-08T17:25:07.510Z"
+      }
+    },
+    {
+      "key": "01a081d5-3119-7a0e-bf06-49bb759c05e1",
+      "attributes": {
+        "id": "01a081d5-3119-7a0e-bf06-49bb759c05e1",
+        "name": "ses_f7e2befceffeKKHDRKdxVGQtbt-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+          "totalTokens": 570509,
+          "inputTokens": 551648,
+          "outputTokens": 18861,
+          "reasoningTokens": 25273,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+              "timestamp": "2026-09-08T16:23:47.709Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+              "timestamp": "2026-09-08T17:25:07.510Z"
+            },
+            "confirmationCount": 29
+          }
+        },
+        "createdAt": "2026-09-08T17:25:07.514Z",
+        "updatedAt": "2026-09-08T17:25:07.514Z",
+        "validFrom": "2026-09-08T17:25:07.514Z"
+      }
+    },
+    {
+      "key": "01a081d5-3159-7f9c-bf9a-7c6f5751dd1b",
+      "attributes": {
+        "id": "01a081d5-3159-7f9c-bf9a-7c6f5751dd1b",
+        "name": "ses_f7e2befceffeKKHDRKdxVGQtbt-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Fix coding insights timeline population",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Fix coding insights timeline population",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+              "timestamp": "2026-09-08T16:23:47.709Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e2befceffeKKHDRKdxVGQtbt",
+              "timestamp": "2026-09-08T17:25:07.510Z"
+            },
+            "confirmationCount": 29
+          }
+        },
+        "createdAt": "2026-09-08T17:25:07.517Z",
+        "updatedAt": "2026-09-08T17:25:07.517Z",
+        "validFrom": "2026-09-08T17:25:07.517Z"
+      }
+    },
+    {
+      "key": "01a081e8-1201-759d-bdc2-47eec844b467",
+      "attributes": {
+        "id": "01a081e8-1201-759d-bdc2-47eec844b467",
+        "name": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+        "entityType": "Run",
+        "layer": "evidence",
+        "description": "Audit documentation for Quick-Dive tiering candidates",
+        "metadata": {
+          "domain": "experiment",
+          "task_id": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+          "task_hash": "3aa286cd1a963128",
+          "task_class": "docs",
+          "agent": "opencode",
+          "model": "gpt-5.6-sol",
+          "framework": "opencode",
+          "spec_level": null,
+          "snapshot_id": null,
+          "trace_id": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+          "pending": false,
+          "started_at": "2026-09-08T16:43:23.751Z",
+          "ended_at": "2026-09-08T16:44:11.992Z",
+          "canonical_model": "gpt-5.6-sol",
+          "canonical_agent": "opencode",
+          "background_models": [],
+          "session_summary": "Audited eight documentation pages across architecture and identity domains, identifying three high-priority candidates for Quick/Deep Dive tiering (nl-realm.md, trust-boundaries.md, iac-choice.md) based on line count, audience split, and summary-ability, while recommending five pages remain untiered due to low…",
+          "variant": null,
+          "repeat": null,
+          "terminal_state": null,
+          "skip_reason": null,
+          "rerun_of": null,
+          "base_variant": null,
+          "origin_span_id": null,
+          "execution_mode": null,
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+              "timestamp": "2026-09-08T16:44:24.961Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+              "timestamp": "2026-09-08T16:59:09.725Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:59:09.725Z",
+        "updatedAt": "2026-09-08T16:59:09.725Z",
+        "validFrom": "2026-09-08T16:59:09.725Z"
+      }
+    },
+    {
+      "key": "01a081e8-1207-7499-b2ca-edc738d2f2f8",
+      "attributes": {
+        "id": "01a081e8-1207-7499-b2ca-edc738d2f2f8",
+        "name": "ses_f7e18dd35ffegiZb7A4BCBD9Nl-outcome",
+        "entityType": "Outcome",
+        "layer": "evidence",
+        "description": "v0 token-totals + closed-state stub",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+          "totalTokens": 61715,
+          "inputTokens": 60212,
+          "outputTokens": 1503,
+          "reasoningTokens": 1612,
+          "closedState": "closed",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+              "timestamp": "2026-09-08T16:44:24.961Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+              "timestamp": "2026-09-08T16:59:09.725Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:59:09.727Z",
+        "updatedAt": "2026-09-08T16:59:09.727Z",
+        "validFrom": "2026-09-08T16:59:09.727Z"
+      }
+    },
+    {
+      "key": "01a081e8-120e-7401-8e3b-23564ce501e3",
+      "attributes": {
+        "id": "01a081e8-120e-7401-8e3b-23564ce501e3",
+        "name": "ses_f7e18dd35ffegiZb7A4BCBD9Nl-route",
+        "entityType": "Route",
+        "layer": "evidence",
+        "description": "Audit documentation for Quick-Dive tiering candidates",
+        "metadata": {
+          "domain": "experiment",
+          "run_task_id": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+          "loop_count": null,
+          "edit_revert_count": null,
+          "redundant_read_count": null,
+          "abandoned_tool_count": null,
+          "total_step_count": null,
+          "wallclock_per_step": null,
+          "goal_sentence": "Audit documentation for Quick-Dive tiering candidates",
+          "provenance": {
+            "createdBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+              "timestamp": "2026-09-08T16:44:24.961Z"
+            },
+            "lastConfirmedBy": {
+              "provider": "coding-measure-stop",
+              "model": "n/a",
+              "runId": "ses_f7e18dd35ffegiZb7A4BCBD9Nl",
+              "timestamp": "2026-09-08T16:59:09.725Z"
+            },
+            "confirmationCount": 8
+          }
+        },
+        "createdAt": "2026-09-08T16:59:09.730Z",
+        "updatedAt": "2026-09-08T16:59:09.730Z",
+        "validFrom": "2026-09-08T16:59:09.730Z"
       }
     }
   ],
@@ -331967,6 +333611,270 @@
         "from": "01a080e0-3e60-762f-a933-dadb130b5460",
         "to": "01a080e0-3eae-7da2-9334-5f357c3dd67a",
         "key": "01a080e0-3e60-762f-a933-dadb130b5460:tookRoute:01a080e0-3eae-7da2-9334-5f357c3dd67a"
+      }
+    },
+    {
+      "key": "01a080f3-33c6-7517-90a4-aeadaa37c5e8:produces:01a080f3-33ea-7ffc-b6de-4ce501eede3e",
+      "source": "01a080f3-33c6-7517-90a4-aeadaa37c5e8",
+      "target": "01a080f3-33ea-7ffc-b6de-4ce501eede3e",
+      "attributes": {
+        "type": "produces",
+        "from": "01a080f3-33c6-7517-90a4-aeadaa37c5e8",
+        "to": "01a080f3-33ea-7ffc-b6de-4ce501eede3e",
+        "key": "01a080f3-33c6-7517-90a4-aeadaa37c5e8:produces:01a080f3-33ea-7ffc-b6de-4ce501eede3e"
+      }
+    },
+    {
+      "key": "01a080f3-33c6-7517-90a4-aeadaa37c5e8:tookRoute:01a080f3-3411-72b2-a905-bf436ff73547",
+      "source": "01a080f3-33c6-7517-90a4-aeadaa37c5e8",
+      "target": "01a080f3-3411-72b2-a905-bf436ff73547",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a080f3-33c6-7517-90a4-aeadaa37c5e8",
+        "to": "01a080f3-3411-72b2-a905-bf436ff73547",
+        "key": "01a080f3-33c6-7517-90a4-aeadaa37c5e8:tookRoute:01a080f3-3411-72b2-a905-bf436ff73547"
+      }
+    },
+    {
+      "key": "01a080f5-627c-7fb2-bddd-3a5c3efeb387:produces:01a080f5-6298-72f5-b622-a20b23be69da",
+      "source": "01a080f5-627c-7fb2-bddd-3a5c3efeb387",
+      "target": "01a080f5-6298-72f5-b622-a20b23be69da",
+      "attributes": {
+        "type": "produces",
+        "from": "01a080f5-627c-7fb2-bddd-3a5c3efeb387",
+        "to": "01a080f5-6298-72f5-b622-a20b23be69da",
+        "key": "01a080f5-627c-7fb2-bddd-3a5c3efeb387:produces:01a080f5-6298-72f5-b622-a20b23be69da"
+      }
+    },
+    {
+      "key": "01a080f5-627c-7fb2-bddd-3a5c3efeb387:tookRoute:01a080f5-62ba-7f67-8b8f-2c9b712f1520",
+      "source": "01a080f5-627c-7fb2-bddd-3a5c3efeb387",
+      "target": "01a080f5-62ba-7f67-8b8f-2c9b712f1520",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a080f5-627c-7fb2-bddd-3a5c3efeb387",
+        "to": "01a080f5-62ba-7f67-8b8f-2c9b712f1520",
+        "key": "01a080f5-627c-7fb2-bddd-3a5c3efeb387:tookRoute:01a080f5-62ba-7f67-8b8f-2c9b712f1520"
+      }
+    },
+    {
+      "key": "01a080f5-a5c5-72f0-8c9e-df1988d4a152:produces:01a080f5-a5ec-7dfc-8088-1ac93c79816c",
+      "source": "01a080f5-a5c5-72f0-8c9e-df1988d4a152",
+      "target": "01a080f5-a5ec-7dfc-8088-1ac93c79816c",
+      "attributes": {
+        "type": "produces",
+        "from": "01a080f5-a5c5-72f0-8c9e-df1988d4a152",
+        "to": "01a080f5-a5ec-7dfc-8088-1ac93c79816c",
+        "key": "01a080f5-a5c5-72f0-8c9e-df1988d4a152:produces:01a080f5-a5ec-7dfc-8088-1ac93c79816c"
+      }
+    },
+    {
+      "key": "01a080f5-a5c5-72f0-8c9e-df1988d4a152:tookRoute:01a080f5-a61c-7a82-97a1-207703cad6f9",
+      "source": "01a080f5-a5c5-72f0-8c9e-df1988d4a152",
+      "target": "01a080f5-a61c-7a82-97a1-207703cad6f9",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a080f5-a5c5-72f0-8c9e-df1988d4a152",
+        "to": "01a080f5-a61c-7a82-97a1-207703cad6f9",
+        "key": "01a080f5-a5c5-72f0-8c9e-df1988d4a152:tookRoute:01a080f5-a61c-7a82-97a1-207703cad6f9"
+      }
+    },
+    {
+      "key": "01a080f5-e710-7d43-8905-c38ff15cbfdd:produces:01a080f5-e735-70bd-a9b0-01d17e61d8eb",
+      "source": "01a080f5-e710-7d43-8905-c38ff15cbfdd",
+      "target": "01a080f5-e735-70bd-a9b0-01d17e61d8eb",
+      "attributes": {
+        "type": "produces",
+        "from": "01a080f5-e710-7d43-8905-c38ff15cbfdd",
+        "to": "01a080f5-e735-70bd-a9b0-01d17e61d8eb",
+        "key": "01a080f5-e710-7d43-8905-c38ff15cbfdd:produces:01a080f5-e735-70bd-a9b0-01d17e61d8eb"
+      }
+    },
+    {
+      "key": "01a080f5-e710-7d43-8905-c38ff15cbfdd:tookRoute:01a080f5-e75c-7984-a3c2-a26f3d739711",
+      "source": "01a080f5-e710-7d43-8905-c38ff15cbfdd",
+      "target": "01a080f5-e75c-7984-a3c2-a26f3d739711",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a080f5-e710-7d43-8905-c38ff15cbfdd",
+        "to": "01a080f5-e75c-7984-a3c2-a26f3d739711",
+        "key": "01a080f5-e710-7d43-8905-c38ff15cbfdd:tookRoute:01a080f5-e75c-7984-a3c2-a26f3d739711"
+      }
+    },
+    {
+      "key": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7:produces:01a0810a-518a-7024-8ff1-72cb726b2626",
+      "source": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7",
+      "target": "01a0810a-518a-7024-8ff1-72cb726b2626",
+      "attributes": {
+        "type": "produces",
+        "from": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7",
+        "to": "01a0810a-518a-7024-8ff1-72cb726b2626",
+        "key": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7:produces:01a0810a-518a-7024-8ff1-72cb726b2626"
+      }
+    },
+    {
+      "key": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7:tookRoute:01a0810a-51d8-7e79-ad44-a418055b1ca4",
+      "source": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7",
+      "target": "01a0810a-51d8-7e79-ad44-a418055b1ca4",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7",
+        "to": "01a0810a-51d8-7e79-ad44-a418055b1ca4",
+        "key": "01a0810a-516c-7b4d-802f-a15ba2f8a7f7:tookRoute:01a0810a-51d8-7e79-ad44-a418055b1ca4"
+      }
+    },
+    {
+      "key": "01a0810a-9b51-7079-a754-f41237fadc77:produces:01a0810a-9b6d-792f-83d9-0c83ea87850d",
+      "source": "01a0810a-9b51-7079-a754-f41237fadc77",
+      "target": "01a0810a-9b6d-792f-83d9-0c83ea87850d",
+      "attributes": {
+        "type": "produces",
+        "from": "01a0810a-9b51-7079-a754-f41237fadc77",
+        "to": "01a0810a-9b6d-792f-83d9-0c83ea87850d",
+        "key": "01a0810a-9b51-7079-a754-f41237fadc77:produces:01a0810a-9b6d-792f-83d9-0c83ea87850d"
+      }
+    },
+    {
+      "key": "01a0810a-9b51-7079-a754-f41237fadc77:tookRoute:01a0810a-9b96-7102-8777-9e65080e74fd",
+      "source": "01a0810a-9b51-7079-a754-f41237fadc77",
+      "target": "01a0810a-9b96-7102-8777-9e65080e74fd",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a0810a-9b51-7079-a754-f41237fadc77",
+        "to": "01a0810a-9b96-7102-8777-9e65080e74fd",
+        "key": "01a0810a-9b51-7079-a754-f41237fadc77:tookRoute:01a0810a-9b96-7102-8777-9e65080e74fd"
+      }
+    },
+    {
+      "key": "01a081c7-9166-7618-8890-78e61ef67f68:produces:01a081c7-9184-72be-816b-40f3af6a02a8",
+      "source": "01a081c7-9166-7618-8890-78e61ef67f68",
+      "target": "01a081c7-9184-72be-816b-40f3af6a02a8",
+      "attributes": {
+        "type": "produces",
+        "from": "01a081c7-9166-7618-8890-78e61ef67f68",
+        "to": "01a081c7-9184-72be-816b-40f3af6a02a8",
+        "key": "01a081c7-9166-7618-8890-78e61ef67f68:produces:01a081c7-9184-72be-816b-40f3af6a02a8"
+      }
+    },
+    {
+      "key": "01a081c7-9166-7618-8890-78e61ef67f68:tookRoute:01a081c7-91a7-70ee-b296-a9152bfdd42e",
+      "source": "01a081c7-9166-7618-8890-78e61ef67f68",
+      "target": "01a081c7-91a7-70ee-b296-a9152bfdd42e",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a081c7-9166-7618-8890-78e61ef67f68",
+        "to": "01a081c7-91a7-70ee-b296-a9152bfdd42e",
+        "key": "01a081c7-9166-7618-8890-78e61ef67f68:tookRoute:01a081c7-91a7-70ee-b296-a9152bfdd42e"
+      }
+    },
+    {
+      "key": "01a081c9-79e6-7002-8df5-51cdbe573fbb:produces:01a081c9-7a08-71c3-b54c-278fb38bbf3d",
+      "source": "01a081c9-79e6-7002-8df5-51cdbe573fbb",
+      "target": "01a081c9-7a08-71c3-b54c-278fb38bbf3d",
+      "attributes": {
+        "type": "produces",
+        "from": "01a081c9-79e6-7002-8df5-51cdbe573fbb",
+        "to": "01a081c9-7a08-71c3-b54c-278fb38bbf3d",
+        "key": "01a081c9-79e6-7002-8df5-51cdbe573fbb:produces:01a081c9-7a08-71c3-b54c-278fb38bbf3d"
+      }
+    },
+    {
+      "key": "01a081c9-79e6-7002-8df5-51cdbe573fbb:tookRoute:01a081c9-7a2a-7c34-9878-d6f121ce0a20",
+      "source": "01a081c9-79e6-7002-8df5-51cdbe573fbb",
+      "target": "01a081c9-7a2a-7c34-9878-d6f121ce0a20",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a081c9-79e6-7002-8df5-51cdbe573fbb",
+        "to": "01a081c9-7a2a-7c34-9878-d6f121ce0a20",
+        "key": "01a081c9-79e6-7002-8df5-51cdbe573fbb:tookRoute:01a081c9-7a2a-7c34-9878-d6f121ce0a20"
+      }
+    },
+    {
+      "key": "01a081c9-8912-709d-b653-7f37cc6e33a7:produces:01a081c9-8934-77a4-bb92-a89254e7bb9f",
+      "source": "01a081c9-8912-709d-b653-7f37cc6e33a7",
+      "target": "01a081c9-8934-77a4-bb92-a89254e7bb9f",
+      "attributes": {
+        "type": "produces",
+        "from": "01a081c9-8912-709d-b653-7f37cc6e33a7",
+        "to": "01a081c9-8934-77a4-bb92-a89254e7bb9f",
+        "key": "01a081c9-8912-709d-b653-7f37cc6e33a7:produces:01a081c9-8934-77a4-bb92-a89254e7bb9f"
+      }
+    },
+    {
+      "key": "01a081c9-8912-709d-b653-7f37cc6e33a7:tookRoute:01a081c9-896d-7b76-bb3d-70d6aaa3664a",
+      "source": "01a081c9-8912-709d-b653-7f37cc6e33a7",
+      "target": "01a081c9-896d-7b76-bb3d-70d6aaa3664a",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a081c9-8912-709d-b653-7f37cc6e33a7",
+        "to": "01a081c9-896d-7b76-bb3d-70d6aaa3664a",
+        "key": "01a081c9-8912-709d-b653-7f37cc6e33a7:tookRoute:01a081c9-896d-7b76-bb3d-70d6aaa3664a"
+      }
+    },
+    {
+      "key": "01a081c9-97d4-74a1-b94b-aeddf82ce96a:produces:01a081c9-97f4-7621-8492-719bf8d98599",
+      "source": "01a081c9-97d4-74a1-b94b-aeddf82ce96a",
+      "target": "01a081c9-97f4-7621-8492-719bf8d98599",
+      "attributes": {
+        "type": "produces",
+        "from": "01a081c9-97d4-74a1-b94b-aeddf82ce96a",
+        "to": "01a081c9-97f4-7621-8492-719bf8d98599",
+        "key": "01a081c9-97d4-74a1-b94b-aeddf82ce96a:produces:01a081c9-97f4-7621-8492-719bf8d98599"
+      }
+    },
+    {
+      "key": "01a081c9-97d4-74a1-b94b-aeddf82ce96a:tookRoute:01a081c9-981d-7b54-ae57-e81e43f22373",
+      "source": "01a081c9-97d4-74a1-b94b-aeddf82ce96a",
+      "target": "01a081c9-981d-7b54-ae57-e81e43f22373",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a081c9-97d4-74a1-b94b-aeddf82ce96a",
+        "to": "01a081c9-981d-7b54-ae57-e81e43f22373",
+        "key": "01a081c9-97d4-74a1-b94b-aeddf82ce96a:tookRoute:01a081c9-981d-7b54-ae57-e81e43f22373"
+      }
+    },
+    {
+      "key": "01a081d5-30fd-71e2-a332-4f0e479bc1ad:produces:01a081d5-3119-7a0e-bf06-49bb759c05e1",
+      "source": "01a081d5-30fd-71e2-a332-4f0e479bc1ad",
+      "target": "01a081d5-3119-7a0e-bf06-49bb759c05e1",
+      "attributes": {
+        "type": "produces",
+        "from": "01a081d5-30fd-71e2-a332-4f0e479bc1ad",
+        "to": "01a081d5-3119-7a0e-bf06-49bb759c05e1",
+        "key": "01a081d5-30fd-71e2-a332-4f0e479bc1ad:produces:01a081d5-3119-7a0e-bf06-49bb759c05e1"
+      }
+    },
+    {
+      "key": "01a081d5-30fd-71e2-a332-4f0e479bc1ad:tookRoute:01a081d5-3159-7f9c-bf9a-7c6f5751dd1b",
+      "source": "01a081d5-30fd-71e2-a332-4f0e479bc1ad",
+      "target": "01a081d5-3159-7f9c-bf9a-7c6f5751dd1b",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a081d5-30fd-71e2-a332-4f0e479bc1ad",
+        "to": "01a081d5-3159-7f9c-bf9a-7c6f5751dd1b",
+        "key": "01a081d5-30fd-71e2-a332-4f0e479bc1ad:tookRoute:01a081d5-3159-7f9c-bf9a-7c6f5751dd1b"
+      }
+    },
+    {
+      "key": "01a081e8-1201-759d-bdc2-47eec844b467:produces:01a081e8-1207-7499-b2ca-edc738d2f2f8",
+      "source": "01a081e8-1201-759d-bdc2-47eec844b467",
+      "target": "01a081e8-1207-7499-b2ca-edc738d2f2f8",
+      "attributes": {
+        "type": "produces",
+        "from": "01a081e8-1201-759d-bdc2-47eec844b467",
+        "to": "01a081e8-1207-7499-b2ca-edc738d2f2f8",
+        "key": "01a081e8-1201-759d-bdc2-47eec844b467:produces:01a081e8-1207-7499-b2ca-edc738d2f2f8"
+      }
+    },
+    {
+      "key": "01a081e8-1201-759d-bdc2-47eec844b467:tookRoute:01a081e8-120e-7401-8e3b-23564ce501e3",
+      "source": "01a081e8-1201-759d-bdc2-47eec844b467",
+      "target": "01a081e8-120e-7401-8e3b-23564ce501e3",
+      "attributes": {
+        "type": "tookRoute",
+        "from": "01a081e8-1201-759d-bdc2-47eec844b467",
+        "to": "01a081e8-120e-7401-8e3b-23564ce501e3",
+        "key": "01a081e8-1201-759d-bdc2-47eec844b467:tookRoute:01a081e8-120e-7401-8e3b-23564ce501e3"
       }
     }
   ]

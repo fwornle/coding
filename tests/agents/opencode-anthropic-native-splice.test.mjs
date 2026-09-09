@@ -139,10 +139,10 @@ test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE unset → a provider block with ban
   // the plugins case. The empty-object branch of _oc_splice_config is still
   // exercised — it is the branch this very splice takes first.
   const parsed = JSON.parse(renderOpenCodeConfigContent({ INSIDE_CN: 'false' }));
-  assert.deepEqual(Object.keys(parsed), ['provider'],
-    'with no model override and no plugins, the band variants must be the only content');
-  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy'],
-    'no anthropic entry may appear while OPENCODE_ANTHROPIC_NATIVE is unset');
+  assert.deepEqual(Object.keys(parsed).sort(), ['command', 'provider']);
+  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy']);
+  assert.equal(parsed.command?.sl?.description, 'Load recent session logs for continuity');
+  assert.match(parsed.command?.sl?.template ?? '', /\.claude\/commands\/sl\.md/);
   for (const [id, model] of Object.entries(parsed.provider['rapid-proxy'].models)) {
     assert.deepEqual(Object.keys(model.variants), ['cheap', 'standard', 'deep'],
       `${id} must offer the three band variants`);
@@ -176,7 +176,7 @@ test('opencode.sh: CODING_OPENCODE_MODEL is the one way a model id reaches the b
   // WHOLE blob, because the band variants are spliced unconditionally. What must
   // still hold is that it is the only path by which a model id appears — a
   // network branch reintroducing a pin is the regression this file defends.
-  assert.deepEqual(Object.keys(parsed).sort(), ['model', 'provider']);
+  assert.deepEqual(Object.keys(parsed).sort(), ['command', 'model', 'provider']);
   assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy']);
 });
 
@@ -245,8 +245,7 @@ test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE=1 on the bare {} → no trailing co
   });
   assert.doesNotThrow(() => JSON.parse(rendered),
     `splicing onto the bare {} must not emit a trailing comma; got: ${rendered}`);
-  assert.deepEqual(Object.keys(JSON.parse(rendered)), ['provider'],
-    'the provider entry must be the only key when nothing else is spliced');
+  assert.deepEqual(Object.keys(JSON.parse(rendered)).sort(), ['command', 'provider']);
 });
 
 test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE=1 → CODING_OPENCODE_MODEL survives the splice', () => {
@@ -313,6 +312,7 @@ test('opencode.sh: plugins spliced (CODING_REPO set) + flag unset → still no a
   // And the splice must actually have happened, or this test proves nothing.
   assert.ok(Array.isArray(parsed.plugin) && parsed.plugin.length > 0,
     'precondition: CODING_REPO set must splice the wrapper-scoped plugins');
+  assert.equal(parsed.command?.sl?.description, 'Load recent session logs for continuity');
 });
 
 test('opencode.sh: all three splices coexist — plugins, provider and the model override', () => {

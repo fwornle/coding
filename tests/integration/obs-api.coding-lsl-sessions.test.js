@@ -13,10 +13,10 @@
  *
  * The handler walks the directory pointed at by env var OBSERVATIONS_LSL_HISTORY_DIR
  * (or `.specstory/history` when the env var is unset), parsing the Phase 51
- * filename convention:
- *   {YYYY-MM-DD}_{HHHH-HHHH}_{hash}.md                (parent session)
- *   {YYYY-MM-DD}_{HHHH-HHHH}-{idx}_{hash}.md          (sub-agent variant 1)
- *   {YYYY-MM-DD}_{HHHH-HHHH}_S{slot}-{idx}-{hash}.md  (sub-agent variant 2)
+ * filename convention in both legacy Markdown and current Pi JSONL formats:
+ *   {YYYY-MM-DD}_{HHHH-HHHH}_{hash}.{md,jsonl}                (parent session)
+ *   {YYYY-MM-DD}_{HHHH-HHHH}-{idx}_{hash}.{md,jsonl}          (sub-agent variant 1)
+ *   {YYYY-MM-DD}_{HHHH-HHHH}_S{slot}-{idx}-{hash}.{md,jsonl}  (sub-agent variant 2)
  * Optional `-part{N}` suffix supported on any variant.
  */
 
@@ -54,13 +54,16 @@ describe('GET /api/coding/lsl/sessions — LslSession[] envelope (Phase 55 Plan 
     // obs-api module is imported.
     process.env.OBSERVATIONS_LSL_HISTORY_DIR = lslDir;
 
-    // Seed three sessions across two months:
+    // Seed both transcript formats across two months:
     //   - 2026-06-09 16-17 (parent)            → "today"
     //   - 2026-06-08 09-10 (parent + sub-agent)
     //   - 2026-05-30 14-15 (parent, older — should be filtered by ?since)
     const seedFiles = [
       // (path-from-root, content)
       ['2026/06/2026-06-09_1600-1700_abc123.md', '# session 1\n'],
+      ['2026/06/2026-06-09_1800-1900_new789.jsonl', '{"type":"session"}\n'],
+      // A migrated duplicate must not render a second tick.
+      ['2026/06/2026-06-09_1800-1900_new789.md', '# legacy copy\n'],
       ['2026/06/2026-06-08_0900-1000_def456.md', '# session 2\n'],
       ['2026/06/2026-06-08_0900-1000-1_def456.md', '# session 2 sub-agent\n'],
       ['2026/05/2026-05-30_1400-1500_zzz999.md', '# old session\n'],
@@ -148,9 +151,10 @@ describe('GET /api/coding/lsl/sessions — LslSession[] envelope (Phase 55 Plan 
     }
   });
 
-  test('finds all 4 seeded sessions when ?since=2026-05-01', async () => {
+  test('finds legacy Markdown and current JSONL sessions', async () => {
     const { body } = await httpGet('/api/coding/lsl/sessions?since=2026-05-01T00:00:00Z&limit=200');
-    expect(body.data.sessions.length).toBe(4);
+    expect(body.data.sessions.length).toBe(5);
+    expect(body.data.sessions.some((s) => s.id === 'new789')).toBe(true);
   });
 
   test('sessions are sorted desc by startAt (newest first)', async () => {
@@ -165,7 +169,7 @@ describe('GET /api/coding/lsl/sessions — LslSession[] envelope (Phase 55 Plan 
 
   test('?since=2026-06-08T00:00:00Z filters out the May session', async () => {
     const { body } = await httpGet('/api/coding/lsl/sessions?since=2026-06-08T00:00:00Z&limit=200');
-    expect(body.data.sessions.length).toBe(3);
+    expect(body.data.sessions.length).toBe(4);
     for (const s of body.data.sessions) {
       expect(s.startAt >= '2026-06-08').toBe(true);
     }
@@ -177,11 +181,11 @@ describe('GET /api/coding/lsl/sessions — LslSession[] envelope (Phase 55 Plan 
   });
 
   test('returns total = full pre-slice count even when limit caps the array (N<M)', async () => {
-    // Phase 61 Plan 01 (D-02): 4 seeded sessions, capped at limit=2 ->
-    // sessions.length===2 but total===4. This N<M case drives the badge.
+    // Phase 61 Plan 01 (D-02): 5 seeded sessions, capped at limit=2 ->
+    // sessions.length===2 but total===5. This N<M case drives the badge.
     const { body } = await httpGet('/api/coding/lsl/sessions?since=2026-05-01T00:00:00Z&limit=2');
     expect(body.data.sessions.length).toBe(2);
-    expect(body.data.total).toBe(4);
+    expect(body.data.total).toBe(5);
     expect(body.data.limit).toBe(2);
   });
 
@@ -191,8 +195,8 @@ describe('GET /api/coding/lsl/sessions — LslSession[] envelope (Phase 55 Plan 
     // 2026-06-08 09-10 session window contains only an 'auto'-source entity
     // -> source==='online'.
     const { body } = await httpGet('/api/coding/lsl/sessions?since=2026-05-01T00:00:00Z&limit=200');
-    const batchSession = body.data.sessions.find((s) => s.startAt.startsWith('2026-06-09'));
-    const onlineSession = body.data.sessions.find((s) => s.startAt.startsWith('2026-06-08'));
+    const batchSession = body.data.sessions.find((s) => s.id === 'abc123');
+    const onlineSession = body.data.sessions.find((s) => s.id === 'def456');
     expect(batchSession).toBeDefined();
     expect(batchSession.source).toBe('batch');
     expect(onlineSession).toBeDefined();

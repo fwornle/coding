@@ -194,6 +194,37 @@ _feature_enabled() {
   esac
 }
 
+# Is coding-services ready to serve the features that are actually enabled?
+#
+# This used to be a single `curl -sf localhost:8080/health` (vkb-server). That
+# server was retired and its port is no longer published, so the gate could
+# never pass again: every launch waited the full 30s and aborted, with the
+# container sitting there healthy. Probe the services the enabled features
+# actually depend on instead, so the check cannot outlive the thing it checks.
+#
+# Ports come from .env.ports (sourced by _load_env_files), never hardcoded.
+_coding_services_ready() {
+  if _feature_enabled knowledge; then
+    curl -sf --max-time 5 "http://localhost:${SEMANTIC_ANALYSIS_SSE_PORT:-3848}/health" \
+      >/dev/null 2>&1 || return 1
+  fi
+
+  if _feature_enabled constraints; then
+    curl -sf --max-time 5 "http://localhost:${CONSTRAINT_MONITOR_SSE_PORT:-3849}/health" \
+      >/dev/null 2>&1 || return 1
+  fi
+
+  # graphify speaks MCP only and has no /health route. A bare GET is rejected at
+  # the JSON-RPC layer (400), which still proves the server is listening — so
+  # accept any HTTP reply here and fail only when the connection itself fails.
+  if _feature_enabled codegraph; then
+    curl -s --max-time 5 -o /dev/null "http://localhost:${GRAPHIFY_MCP_PORT:-3851}/mcp" \
+      >/dev/null 2>&1 || return 1
+  fi
+
+  return 0
+}
+
 # Check and start Docker — required only when a feature actually needs it.
 #
 # This used to be unconditional, and the hard exit below is why a proxy-only or
@@ -236,7 +267,7 @@ _recover_stale_container() {
   docker compose -f "$docker_dir/docker-compose.yml" up -d --force-recreate coding-services 2>/dev/null
 
   for j in $(seq 1 "$max_wait"); do
-    if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+    if _coding_services_ready; then
       _agent_log "✅ Recovered after port conflict resolution (${j}s)"
       return 0
     fi
@@ -340,7 +371,7 @@ _start_services() {
 
   # Fast path: already healthy and ports are bound
   # (skip this shortcut after --force, since we just tore everything down)
-  if [ "$CODING_FORCE_CLEAN" != "true" ] && curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+  if [ "$CODING_FORCE_CLEAN" != "true" ] && _coding_services_ready; then
     _agent_log "✅ coding-services already running and healthy - reusing existing containers"
   else
     # Detect stale container (running but ports not bound to host) — common after
@@ -364,7 +395,7 @@ _start_services() {
     _agent_log "⏳ Waiting for coding-services to be healthy..."
     local max_wait=30
     for i in $(seq 1 $max_wait); do
-      if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+      if _coding_services_ready; then
         _agent_log "✅ coding-services healthy after ${i}s"
         break
       fi
@@ -700,6 +731,11 @@ launch_agent() {
   AGENT_DISPLAY_NAME="${AGENT_DISPLAY_NAME:-$AGENT_NAME}"
   AGENT_SESSION_PREFIX="${AGENT_SESSION_PREFIX:-$AGENT_NAME}"
   AGENT_ENABLE_PIPE_CAPTURE="${AGENT_ENABLE_PIPE_CAPTURE:-false}"
+  # Agent configs may add native command/skill loading flags. Expand an absent
+  # array to no words so the launcher stays compatible with the other agents.
+  if ! declare -p AGENT_COMMAND_ARGS >/dev/null 2>&1; then
+    AGENT_COMMAND_ARGS=()
+  fi
 
   # Override the log function so agent-common-setup.sh messages also use our prefix
   log() {
@@ -830,5 +866,5 @@ launch_agent() {
   # 19. Launch via tmux session wrapper
   _agent_log "Launching ${AGENT_DISPLAY_NAME}..."
   source "$SCRIPT_DIR/tmux-session-wrapper.sh"
-  tmux_session_wrapper "$AGENT_COMMAND" "$@"
+  tmux_session_wrapper "$AGENT_COMMAND" "${AGENT_COMMAND_ARGS[@]}" "$@"
 }

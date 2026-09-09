@@ -127,6 +127,25 @@ _pi_install_extensions() {
   return 0
 }
 
+# Install the canonical /sl prompt template where pi discovers slash commands.
+# The wrapper config directory is owned by coding, but in global mode leave an
+# existing user-authored prompt untouched.
+_pi_install_session_log_prompt() {
+  local cfg_dir="$1"
+  local scope="$2"
+  local source="${CODING_REPO:-}/.claude/commands/sl.md"
+  local target="$cfg_dir/prompts/sl.md"
+  [ -f "$source" ] || return 0
+
+  mkdir -p "$cfg_dir/prompts"
+  if [ "$scope" = "global" ] && [ -f "$target" ] && ! cmp -s "$source" "$target"; then
+    _agent_log "pi: leaving user-authored /sl prompt alone"
+    return 0
+  fi
+  cp "$source" "$target"
+  _agent_log "pi: /sl prompt installed in $cfg_dir/prompts"
+}
+
 # State the search convention the extension enforces.
 #
 # $1 = the pi config directory.
@@ -519,6 +538,7 @@ agent_pre_launch() {
 
   _pi_write_models_json "$_pi_cfg_dir"
   _pi_install_extensions "$_pi_cfg_dir"
+  _pi_install_session_log_prompt "$_pi_cfg_dir" "${_pi_scope:-wrapper}"
   _pi_write_append_system "$_pi_cfg_dir" "${_pi_scope:-wrapper}"
 
   # Deny the direct-provider escape hatch.

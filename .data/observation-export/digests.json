@@ -105485,37 +105485,6 @@
     "project": "coding"
   },
   {
-    "id": "e612a3c1-0f13-4669-8987-0b3302a51d2d",
-    "date": "2026-08-31",
-    "theme": "Counting Letter \"R\" Occurrences in Words",
-    "summary": "The developer queried the agent (pi) to count occurrences of the letter `\"r\"` in two words back-to-back. The approach in both cases was manual character-by-character spelling to ensure accuracy.\n\n- `\"strawberry\"` → **3** instances of `\"r\"`\n- `\"milk\"` → **0** instances of `\"r\"`\n\nNo artifacts were produced; these were purely analytical/linguistic counting tasks.",
-    "observationIds": [],
-    "agents": [
-      "pi"
-    ],
-    "filesTouched": [],
-    "quality": "normal",
-    "createdAt": "2026-09-01T13:11:52.449Z",
-    "metadata": {
-      "sourceCount": 2,
-      "date": "2026-08-31",
-      "theme": "Counting Letter \"R\" Occurrences in Words",
-      "summary": "The developer queried the agent (pi) to count occurrences of the letter `\"r\"` in two words back-to-back. The approach in both cases was manual character-by-character spelling to ensure accuracy.\n\n- `\"strawberry\"` → **3** instances of `\"r\"`\n- `\"milk\"` → **0** instances of `\"r\"`\n\nNo artifacts were produced; these were purely analytical/linguistic counting tasks.",
-      "observation_ids": [
-        "5f2f68f6-2800-4602-965b-65b394c4d174",
-        "b63fa286-9206-4636-8ce9-21dc04d11e66"
-      ],
-      "agents": [
-        "pi"
-      ],
-      "files_touched": [],
-      "project": "a2a",
-      "quality": "normal",
-      "createdAt": "2026-09-01T13:11:52.449Z"
-    },
-    "project": "a2a"
-  },
-  {
     "id": "de9e486b-4135-4061-a28e-f6cc77e7d19c",
     "date": "2026-09-01",
     "theme": "CI Pipeline Diagnosis, Fixes, and Test Recovery",
@@ -105606,6 +105575,37 @@
       "createdAt": "2026-09-01T12:14:26.855Z"
     },
     "project": "coding"
+  },
+  {
+    "id": "e612a3c1-0f13-4669-8987-0b3302a51d2d",
+    "date": "2026-08-31",
+    "theme": "Counting Letter \"R\" Occurrences in Words",
+    "summary": "The developer queried the agent (pi) to count occurrences of the letter `\"r\"` in two words back-to-back. The approach in both cases was manual character-by-character spelling to ensure accuracy.\n\n- `\"strawberry\"` → **3** instances of `\"r\"`\n- `\"milk\"` → **0** instances of `\"r\"`\n\nNo artifacts were produced; these were purely analytical/linguistic counting tasks.",
+    "observationIds": [],
+    "agents": [
+      "pi"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-01T13:11:52.449Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-08-31",
+      "theme": "Counting Letter \"R\" Occurrences in Words",
+      "summary": "The developer queried the agent (pi) to count occurrences of the letter `\"r\"` in two words back-to-back. The approach in both cases was manual character-by-character spelling to ensure accuracy.\n\n- `\"strawberry\"` → **3** instances of `\"r\"`\n- `\"milk\"` → **0** instances of `\"r\"`\n\nNo artifacts were produced; these were purely analytical/linguistic counting tasks.",
+      "observation_ids": [
+        "5f2f68f6-2800-4602-965b-65b394c4d174",
+        "b63fa286-9206-4636-8ce9-21dc04d11e66"
+      ],
+      "agents": [
+        "pi"
+      ],
+      "files_touched": [],
+      "project": "a2a",
+      "quality": "normal",
+      "createdAt": "2026-09-01T13:11:52.449Z"
+    },
+    "project": "a2a"
   },
   {
     "id": "93e8122c-288c-4901-aafb-1441541e1ef3",
@@ -114372,6 +114372,708 @@
       "project": "a2a-xpr",
       "quality": "high",
       "createdAt": "2026-09-08T11:46:22.368Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "afaa858f-249c-43f9-954a-ec47e45d9002",
+    "date": "2026-09-08",
+    "theme": "vkb component retirement and PR merge",
+    "summary": "- Goal: fully retire the vkb component, verify no remaining references, and merge the PR\n- Audited codebase for live vkb references; fixed broken method calls from incomplete copy (missing coordinator URL and task-id validator methods)\n- Removed uncommitted vkb entries from service configs and docker files\n- Fixed installer/startup scripts still referencing the deleted server\n- Made CI gating test platform-aware to pass on Ubuntu\n- Result: PR #8 merged, CI failures reduced from 40 to 0\n- Noted pre-existing Windows `daemon-backends` failure (`process.getuid` on launchd path), deferred to a separate change",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T12:17:23.533Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "vkb component retirement and PR merge",
+      "summary": "- Goal: fully retire the vkb component, verify no remaining references, and merge the PR\n- Audited codebase for live vkb references; fixed broken method calls from incomplete copy (missing coordinator URL and task-id validator methods)\n- Removed uncommitted vkb entries from service configs and docker files\n- Fixed installer/startup scripts still referencing the deleted server\n- Made CI gating test platform-aware to pass on Ubuntu\n- Result: PR #8 merged, CI failures reduced from 40 to 0\n- Noted pre-existing Windows `daemon-backends` failure (`process.getuid` on launchd path), deferred to a separate change",
+      "observation_ids": [
+        "60efe326-b73f-447e-a1b3-acf56780579f"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T12:17:23.533Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "2549252d-af8d-4e2e-9d61-aa976cf56ca7",
+    "date": "2026-09-08",
+    "theme": "Commit, push, and merge outstanding coding project changes",
+    "summary": "- Goal: achieve a clean repo state by committing/pushing all pending work and merging PRs\n- Pushed `semantic-analysis` submodule first so parent PR references a fetchable commit\n- Committed knowledge-management insights (237 regenerated UKB wave-analysis files) and experiment data after a secret scan confirmed no leaks (only legitimate home-directory path redactions)\n- Rebased feature branch onto `main`, pushed, and ran lint successfully\n- Result: all changes committed/pushed, branch rebased and clean, lint passing",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T12:17:23.533Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Commit, push, and merge outstanding coding project changes",
+      "summary": "- Goal: achieve a clean repo state by committing/pushing all pending work and merging PRs\n- Pushed `semantic-analysis` submodule first so parent PR references a fetchable commit\n- Committed knowledge-management insights (237 regenerated UKB wave-analysis files) and experiment data after a secret scan confirmed no leaks (only legitimate home-directory path redactions)\n- Rebased feature branch onto `main`, pushed, and ran lint successfully\n- Result: all changes committed/pushed, branch rebased and clean, lint passing",
+      "observation_ids": [
+        "dcdd16bf-1e52-45b1-aac9-d4edd8c4f404"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T12:17:23.533Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "7c747566-18ee-4e1a-9777-9bc09b5baf85",
+    "date": "2026-09-08",
+    "theme": "Investigate race condition in copilot events tail watcher",
+    "summary": "- Goal: investigate (no code changes) a race condition causing intermittent failure of Test 11 (\"Stop drains in-flight writes\") in CI\n- Focus: `copilot-events-tail.mjs`, specifically `tailEventsFile` and `getStats()` internals\n- Suspected race: `watching_sessions` counter incremented before `lastSize` `stat()` call, so an append between these steps is never observed\n- Asked to identify exact line numbers, async gaps, and define a correct \"tail is truly armed\" signal\n- Result: investigation reported confirming the race window in the attach path, per request, with no fixes applied",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T12:17:23.533Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Investigate race condition in copilot events tail watcher",
+      "summary": "- Goal: investigate (no code changes) a race condition causing intermittent failure of Test 11 (\"Stop drains in-flight writes\") in CI\n- Focus: `copilot-events-tail.mjs`, specifically `tailEventsFile` and `getStats()` internals\n- Suspected race: `watching_sessions` counter incremented before `lastSize` `stat()` call, so an append between these steps is never observed\n- Asked to identify exact line numbers, async gaps, and define a correct \"tail is truly armed\" signal\n- Result: investigation reported confirming the race window in the attach path, per request, with no fixes applied",
+      "observation_ids": [
+        "3f9df89f-6d73-4dbf-83ef-e45c9f171659"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-08T12:17:23.533Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "9d3ece21-bb85-409d-a22c-d8427ce403e4",
+    "date": "2026-09-08",
+    "theme": "Reformat Thomas's entry evidence bullet points",
+    "summary": "- Goal: reformat Thomas's personal entry in the rec project so bullet points are retained in the evidence column.\n- Approach (opencode): locate Thomas's entry and its current evidence formatting, then update only the affected content and verify rendered structure.\n- Status: no file changes made yet; task identified and file location in progress, but no edits applied.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T12:17:23.533Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Reformat Thomas's entry evidence bullet points",
+      "summary": "- Goal: reformat Thomas's personal entry in the rec project so bullet points are retained in the evidence column.\n- Approach (opencode): locate Thomas's entry and its current evidence formatting, then update only the affected content and verify rendered structure.\n- Status: no file changes made yet; task identified and file location in progress, but no edits applied.",
+      "observation_ids": [
+        "ecc50ea6-4c3a-4112-b729-7e16e6234b72"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "rec",
+      "quality": "normal",
+      "createdAt": "2026-09-08T12:17:23.533Z"
+    },
+    "project": "rec"
+  },
+  {
+    "id": "d1f50d4e-d7a0-4663-a3b3-1b607ad0ba0e",
+    "date": "2026-09-08",
+    "theme": "Fix km-core findRelations key and stale edges",
+    "summary": "- Goal: fix the `km-core` `findRelations` key issue and drop stale edges so the viewer reflects a reduced, useful set of nodes and relations.\n- Agent `claude` acknowledged the request and began working on the `findRelations` fix as the first of two planned tasks.\n- No code changes were made yet; work was just starting.\n- Open question raised: when will the reduced node/relation counts be available to make the viewer useful again.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T12:17:23.533Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Fix km-core findRelations key and stale edges",
+      "summary": "- Goal: fix the `km-core` `findRelations` key issue and drop stale edges so the viewer reflects a reduced, useful set of nodes and relations.\n- Agent `claude` acknowledged the request and began working on the `findRelations` fix as the first of two planned tasks.\n- No code changes were made yet; work was just starting.\n- Open question raised: when will the reduced node/relation counts be available to make the viewer useful again.",
+      "observation_ids": [
+        "9078d63f-3830-455d-bf2e-8abb912ac487"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T12:17:23.533Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "81ec2c0d-1c20-4c82-9300-b42825f8fc46",
+    "date": "2026-09-08",
+    "theme": "Exploring normalization-main repo to update NL realm docs",
+    "summary": "- Goal: review the `normalization-main` repo to see how NL realm docs evolved beyond the original LDU-only focus, in order to update the PoC docs (copying `docs/` to `docs-updated/`)\n- Started by reading existing `nl-realm.md`, `index.md`, and the normalization-main README and design doc to establish baseline understanding\n- Expanded exploration into `modules/regression-ops/`, running `find`/`ls` to list all files, then reading README, deployspec, `modules.yaml`, `modulestack.yaml`, and manifests\n- Aim was to understand the regression-ops module's pipeline, database schema, metrics, HTML report structure, session lists, and scheduling\n- Both observations represent the exploration phase only — no artifacts produced yet, groundwork laid for subsequent doc updates",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T12:39:21.514Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Exploring normalization-main repo to update NL realm docs",
+      "summary": "- Goal: review the `normalization-main` repo to see how NL realm docs evolved beyond the original LDU-only focus, in order to update the PoC docs (copying `docs/` to `docs-updated/`)\n- Started by reading existing `nl-realm.md`, `index.md`, and the normalization-main README and design doc to establish baseline understanding\n- Expanded exploration into `modules/regression-ops/`, running `find`/`ls` to list all files, then reading README, deployspec, `modules.yaml`, `modulestack.yaml`, and manifests\n- Aim was to understand the regression-ops module's pipeline, database schema, metrics, HTML report structure, session lists, and scheduling\n- Both observations represent the exploration phase only — no artifacts produced yet, groundwork laid for subsequent doc updates",
+      "observation_ids": [
+        "dfe2e8db-3e24-4334-a9b6-b696ef2f5745",
+        "4a39d9b8-ea9d-4315-aa5e-fa3aa4383990"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T12:39:21.514Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "19706111-97ae-463a-9e56-98ebb84082d0",
+    "date": "2026-09-08",
+    "theme": "Preparing and starting David Raehles feedback meeting",
+    "summary": "- Goal: prepare for and begin the feedback meeting with David Raehles.\n- The assistant first updated David's personal development file, selecting `funktionsmatrix-software-engineering` as his new FuMa, recording the decision dated 2026-09-08 and removing obsolete provisional wording, based on the personal-development record, staff roster, and candidate mapping.\n- Next, started the feedback meeting recording using the meeting-recording skill via `rapidscribe-meeting start`, configured for exactly 2 speakers (min=2, max=2).\n- Verified via a session-state script that the recorder entered a running state successfully.\n- Result: personal file updated with authoritative FuMa decision, and meeting recording running in preparation for the feedback discussion.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T12:39:21.514Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Preparing and starting David Raehles feedback meeting",
+      "summary": "- Goal: prepare for and begin the feedback meeting with David Raehles.\n- The assistant first updated David's personal development file, selecting `funktionsmatrix-software-engineering` as his new FuMa, recording the decision dated 2026-09-08 and removing obsolete provisional wording, based on the personal-development record, staff roster, and candidate mapping.\n- Next, started the feedback meeting recording using the meeting-recording skill via `rapidscribe-meeting start`, configured for exactly 2 speakers (min=2, max=2).\n- Verified via a session-state script that the recorder entered a running state successfully.\n- Result: personal file updated with authoritative FuMa decision, and meeting recording running in preparation for the feedback discussion.",
+      "observation_ids": [
+        "5f6aeb8a-4f72-42b3-9d30-930e9fee96be",
+        "d8feed83-7cd2-45aa-a9bf-c48a01186207"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "rec",
+      "quality": "high",
+      "createdAt": "2026-09-08T12:39:21.514Z"
+    },
+    "project": "rec"
+  },
+  {
+    "id": "be1d12f7-7bb0-4e39-95aa-f9226ce2fa75",
+    "date": "2026-09-08",
+    "theme": "Provenance edge visibility toggle in viewer",
+    "summary": "- Goal: add a toggle to hide/show provenance edges in the graph viewer, hidden by default.\n- Approach: defined a provenance relation-type set alongside existing relation-type logic, then seeded the viewer store's hidden relation types from this set.\n- Result: provenance edges are now hidden by default via the viewer store; sets groundwork for a future \"go\" toggle to show/hide them on demand.\n- Files touched: relation-types definition file and the viewer store wiring (no specific paths given).",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T12:39:21.514Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Provenance edge visibility toggle in viewer",
+      "summary": "- Goal: add a toggle to hide/show provenance edges in the graph viewer, hidden by default.\n- Approach: defined a provenance relation-type set alongside existing relation-type logic, then seeded the viewer store's hidden relation types from this set.\n- Result: provenance edges are now hidden by default via the viewer store; sets groundwork for a future \"go\" toggle to show/hide them on demand.\n- Files touched: relation-types definition file and the viewer store wiring (no specific paths given).",
+      "observation_ids": [
+        "951ffa20-77d3-4047-b3c5-9ebce68a84cd"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T12:39:21.514Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "c06d5c66-2018-4bc6-a4a1-c7be3bf36f7b",
+    "date": "2026-09-08",
+    "theme": "Deep dive into normalization conversion pipeline architecture",
+    "summary": "- Agent `opencode` performed a read-only, evidence-based exploration of the `normalization-main` repo's conversion pipeline.\n- Scope covered the complete Step Functions state machine, container/ECR build and promotion flow, and command-line differences between doer/LDU and nrm/NormaLisa.\n- Also examined output formats and bucket layout, post-lambda events, batch compute sizing, and s3fs vs mountpoint usage.\n- Approach: systematically read Terraform modules (orchestration state machine, docker/batch job, prep/post/retry lambdas, ECR + replication modules), the shared `conversion-prep-lib`, config/env files, and deployment workflows; grepped for key flags and branching points.\n- Result: produced a factual, file:line-backed report documenting the two pipeline generations (legacy vs nrm) with no code changes made; notes recorded in `personal-development.md`.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/raehles-david/personal-development.md"
+    ],
+    "quality": "normal",
+    "createdAt": "2026-09-08T13:41:30.690Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Deep dive into normalization conversion pipeline architecture",
+      "summary": "- Agent `opencode` performed a read-only, evidence-based exploration of the `normalization-main` repo's conversion pipeline.\n- Scope covered the complete Step Functions state machine, container/ECR build and promotion flow, and command-line differences between doer/LDU and nrm/NormaLisa.\n- Also examined output formats and bucket layout, post-lambda events, batch compute sizing, and s3fs vs mountpoint usage.\n- Approach: systematically read Terraform modules (orchestration state machine, docker/batch job, prep/post/retry lambdas, ECR + replication modules), the shared `conversion-prep-lib`, config/env files, and deployment workflows; grepped for key flags and branching points.\n- Result: produced a factual, file:line-backed report documenting the two pipeline generations (legacy vs nrm) with no code changes made; notes recorded in `personal-development.md`.",
+      "observation_ids": [
+        "cb84bf19-fa62-4d95-850b-0f9679c3f765"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/raehles-david/personal-development.md"
+      ],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-08T13:41:30.690Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "3303c4a5-17f3-403c-b3dc-f601eb49887e",
+    "date": "2026-09-08",
+    "theme": "Reprocessing David's feedback meeting transcript",
+    "summary": "- Stopped an ongoing meeting recording session by invoking the recording tool's stop command and a session-state helper script (`personal-development.md` edited).\n- Re-analyzed the poor-quality transcript from the feedback meeting with David (session `session-20260908-143652-A8171E77`), switching from Luna to Opus 4.8 fast for better quality, aiming to produce a stronger summary with calendar context per feedback-note rules.\n- Resumed the feedback-processing session, re-grounding by re-reading the governing skill, feedback files, and transcript; found that `personal-development.md` had a document-update Log entry but was missing substantive meeting content.\n- Corrected a factual error: the weekend A2A tutorial was built by the manager as an onboarding template, not by David.\n- Updated `/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/raehles-david/personal-development.md`: revised status row and Next-actions table to reflect the confirmed process (manager sends table → David self-fills evidence → joint review), and appended a new conversation Log entry capturing the meeting's content.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/raehles-david/personal-development.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-08T13:41:30.690Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-08",
+      "theme": "Reprocessing David's feedback meeting transcript",
+      "summary": "- Stopped an ongoing meeting recording session by invoking the recording tool's stop command and a session-state helper script (`personal-development.md` edited).\n- Re-analyzed the poor-quality transcript from the feedback meeting with David (session `session-20260908-143652-A8171E77`), switching from Luna to Opus 4.8 fast for better quality, aiming to produce a stronger summary with calendar context per feedback-note rules.\n- Resumed the feedback-processing session, re-grounding by re-reading the governing skill, feedback files, and transcript; found that `personal-development.md` had a document-update Log entry but was missing substantive meeting content.\n- Corrected a factual error: the weekend A2A tutorial was built by the manager as an onboarding template, not by David.\n- Updated `/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/raehles-david/personal-development.md`: revised status row and Next-actions table to reflect the confirmed process (manager sends table → David self-fills evidence → joint review), and appended a new conversation Log entry capturing the meeting's content.",
+      "observation_ids": [
+        "e8b0c8b4-0daa-401d-829f-439f96e55910",
+        "b6589a0a-93c8-445a-a82b-9e00438ad5a5",
+        "77b707d6-b56e-43d7-84e6-745f7b6b3b4d"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/raehles-david/personal-development.md"
+      ],
+      "project": "rec",
+      "quality": "high",
+      "createdAt": "2026-09-08T13:41:30.690Z"
+    },
+    "project": "rec"
+  },
+  {
+    "id": "db5abe62-b691-48ef-9e38-c43eadb4be1e",
+    "date": "2026-09-08",
+    "theme": "Investigate dashboard API entity display issues",
+    "summary": "- Goal: diagnose three issues visible in a screenshot of a local API/entities dashboard\n- Approach: `claude` fetched the entity API endpoint via `curl` and began parsing the JSON response using a Python script\n- Result: investigation was still in progress when the session ended; no fixes proposed yet",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T13:41:30.690Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Investigate dashboard API entity display issues",
+      "summary": "- Goal: diagnose three issues visible in a screenshot of a local API/entities dashboard\n- Approach: `claude` fetched the entity API endpoint via `curl` and began parsing the JSON response using a Python script\n- Result: investigation was still in progress when the session ended; no fixes proposed yet",
+      "observation_ids": [
+        "ad07393c-4198-4c14-bed7-e9467b7e16ee"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T13:41:30.690Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "3005eda3-24f1-4a53-99c2-2b04b404b8e1",
+    "date": "2026-09-08",
+    "theme": "Fixing anomaly detection docs and PR workflow in a2a-xpr",
+    "summary": "- Goal: correct mischaracterized documentation of the Anomaly Detection agent (should be NN-based unusual-data detection checked against DQ rule base, not converter-regression reasoning) and properly land docs changes via git/PR workflow.\n- opencode checked git status, confirmed nothing had been committed/pushed yet; built agent/build/ chapters already matched correct design, only the assistant's own session edits were wrong.\n- Attempted commit/push/PR for pending docs work in `a2a-xpr`: created branch from `origin/main`, staged and committed docs changes, but found the target PR was already merged and branch was stale, requiring a rebase onto main.\n- Developer clarified correct scope: two separate updates needed — update the PoC's own `docs/` in place, and separately propose updates to the original normalization repo's docs (not commingled in `docs-updated/`).\n- Discovered PR #28 had been merged immediately after opening with the wrong `docs-updated/` structure, so a follow-up PR is now needed to undo that merge and re-land the changes correctly into `docs/`.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T15:36:32.695Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-08",
+      "theme": "Fixing anomaly detection docs and PR workflow in a2a-xpr",
+      "summary": "- Goal: correct mischaracterized documentation of the Anomaly Detection agent (should be NN-based unusual-data detection checked against DQ rule base, not converter-regression reasoning) and properly land docs changes via git/PR workflow.\n- opencode checked git status, confirmed nothing had been committed/pushed yet; built agent/build/ chapters already matched correct design, only the assistant's own session edits were wrong.\n- Attempted commit/push/PR for pending docs work in `a2a-xpr`: created branch from `origin/main`, staged and committed docs changes, but found the target PR was already merged and branch was stale, requiring a rebase onto main.\n- Developer clarified correct scope: two separate updates needed — update the PoC's own `docs/` in place, and separately propose updates to the original normalization repo's docs (not commingled in `docs-updated/`).\n- Discovered PR #28 had been merged immediately after opening with the wrong `docs-updated/` structure, so a follow-up PR is now needed to undo that merge and re-land the changes correctly into `docs/`.",
+      "observation_ids": [
+        "b0e67179-a410-4232-ad86-af146564b6b4",
+        "acd36f5f-a0a6-4c3c-ba31-c1ce949c05fd",
+        "378ddc7b-672e-4baa-bfdf-dfbbf01c787c"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T15:36:32.695Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "1cc3d919-6986-4ad8-83c6-7340435270b8",
+    "date": "2026-09-08",
+    "theme": "Constraint monitor service outage and config fix",
+    "summary": "- Diagnosed why the constraint monitor service (port 3031) stopped responding\n- Root cause: features-snapshot mismatch — runtime snapshot declared `profile: logging-only` while live config resolved all nine features enabled\n- Fixed by regenerating the runtime snapshot and restarting the container, edited `repo-router.mjs`\n- Verified recovery via HTTP health check (200 OK) and `supervisorctl status` showing all 8 services running\n- Follow-up investigation began on the strength of file-path signals for a2a-xpr entities, touching numerous frontend/backend files (`registry.mjs`, `ApiClient.ts`, `TeamsFilter.tsx`, `FilterRail.tsx`, `HierarchyNavigator.tsx`, `UnifiedViewer.tsx`, and related tests)",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/attribution/repo-router.mjs",
+      "/Users/<USER_ID_REDACTED>/.claude/plans/playful-coalescing-comet.md",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/config/teams/view-groups.json",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/teams/registry.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/teams/registry.test.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/api/ApiClient.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/team-groups.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/TeamsFilter.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/FilterRail.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/team-groups.test.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/TeamsFilter.test.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/hierarchy-parents.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/hierarchy-parents.test.ts",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/coding/HierarchyNavigator.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/routes/UnifiedViewer.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/group-kgbench-run-anchors.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/FilterRail.test.tsx",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/e2e/unified-viewer/teams-tree-and-hierarchy.spec.ts"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-08T16:10:59.791Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "Constraint monitor service outage and config fix",
+      "summary": "- Diagnosed why the constraint monitor service (port 3031) stopped responding\n- Root cause: features-snapshot mismatch — runtime snapshot declared `profile: logging-only` while live config resolved all nine features enabled\n- Fixed by regenerating the runtime snapshot and restarting the container, edited `repo-router.mjs`\n- Verified recovery via HTTP health check (200 OK) and `supervisorctl status` showing all 8 services running\n- Follow-up investigation began on the strength of file-path signals for a2a-xpr entities, touching numerous frontend/backend files (`registry.mjs`, `ApiClient.ts`, `TeamsFilter.tsx`, `FilterRail.tsx`, `HierarchyNavigator.tsx`, `UnifiedViewer.tsx`, and related tests)",
+      "observation_ids": [
+        "d26c66fd-2c6d-4fa0-ad15-5fa7e00fd51e",
+        "1ba0face-322f-45f3-aa9a-a61c810bf9d3"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/attribution/repo-router.mjs",
+        "/Users/<USER_ID_REDACTED>/.claude/plans/playful-coalescing-comet.md",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/config/teams/view-groups.json",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/teams/registry.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/teams/registry.test.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/observations-api-server.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/api/ApiClient.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/team-groups.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/TeamsFilter.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/FilterRail.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/team-groups.test.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/filters/TeamsFilter.test.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/hierarchy-parents.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/graph/hierarchy-parents.test.ts",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/coding/HierarchyNavigator.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/routes/UnifiedViewer.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/group-kgbench-run-anchors.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/integrations/unified-viewer/src/panels/FilterRail.test.tsx",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/e2e/unified-viewer/teams-tree-and-hierarchy.spec.ts"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-08T16:10:59.791Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2949b1ea-160e-4bc2-8215-a8aedef92f33",
+    "date": "2026-09-08",
+    "theme": "Resume dev workflow after API limit reset and obs-api restart",
+    "summary": "- After an API limit reset, checked project state: test suite passing at 856 tests\n- Diagnosed that `obs-api` service had been killed by a prior kickstart command (not OOM) and restarted it\n- Resumed wiring the headline into the detail panel with service health confirmed",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T16:10:59.791Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Resume dev workflow after API limit reset and obs-api restart",
+      "summary": "- After an API limit reset, checked project state: test suite passing at 856 tests\n- Diagnosed that `obs-api` service had been killed by a prior kickstart command (not OOM) and restarted it\n- Resumed wiring the headline into the detail panel with service health confirmed",
+      "observation_ids": [
+        "975a4af9-af26-4236-b2b4-1d7860643dc6"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T16:10:59.791Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "afd78026-104a-4062-97ed-f19b36c35e0e",
+    "date": "2026-09-08",
+    "theme": "Attribution router module implementation (Part 3)",
+    "summary": "- Completed Part 3 of a multi-part implementation: writing the attribution router module\n- Preceded by a background service restart to ensure a clean test environment\n- Created `lib/attribution/repo-router.mjs` handling routing logic for the attribution system, completing the routing layer",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/attribution/repo-router.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-08T16:10:59.791Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Attribution router module implementation (Part 3)",
+      "summary": "- Completed Part 3 of a multi-part implementation: writing the attribution router module\n- Preceded by a background service restart to ensure a clean test environment\n- Created `lib/attribution/repo-router.mjs` handling routing logic for the attribution system, completing the routing layer",
+      "observation_ids": [
+        "d54ce9dc-4c9e-4c38-a8c0-34ca7fa6d4d0"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/attribution/repo-router.mjs"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-08T16:10:59.791Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "223ce4f1-1266-4636-9c07-488d512f6e1d",
+    "date": "2026-09-08",
+    "theme": "coding --copilot launcher health check timeout diagnosis",
+    "summary": "- Investigated why `coding --copilot` fails with a health check timeout despite the `coding-services` Docker container reporting healthy\n- Probed launcher's health check endpoint (`localhost:8080/health`), container port mappings in `docker/docker-compose.yml`, and recent git history\n- Found a configuration drift: the launcher's hardcoded probe doesn't match the container's actual exposed port/endpoint, causing a 30-second timeout and forced shutdown\n- Resolution requires aligning the launcher's probe target with the container's real configuration",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T16:10:59.791Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "coding --copilot launcher health check timeout diagnosis",
+      "summary": "- Investigated why `coding --copilot` fails with a health check timeout despite the `coding-services` Docker container reporting healthy\n- Probed launcher's health check endpoint (`localhost:8080/health`), container port mappings in `docker/docker-compose.yml`, and recent git history\n- Found a configuration drift: the launcher's hardcoded probe doesn't match the container's actual exposed port/endpoint, causing a 30-second timeout and forced shutdown\n- Resolution requires aligning the launcher's probe target with the container's real configuration",
+      "observation_ids": [
+        "d4a5856a-66b9-47bf-bf7b-5245a2ff7c61"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-08T16:10:59.791Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "0dd3502f-b875-4d12-9c81-6891298ecb4c",
+    "date": "2026-09-08",
+    "theme": "Attribution routing repair and entity-filter fixes",
+    "summary": "- Goal: fix KB attribution routing and entity surfacing issues, plus stale infra state.\n- Approach: built deterministic path-based repo-router (`lib/attribution/repo-router.mjs`) replacing embedding-similarity voting; wrote conservative repair script (`scripts/repair-team-attribution.mjs`) that abstained on 1,201 ambiguous cases and fixed 96 false positives via three precision guards (install.sh basename collision, models.ts false match, REQUIREMENTS.md double-citation).\n- Also fixed History sidebar entity-type classifier to include Batch-sourced entities, and resolved constraint-monitor failures by restarting to clear stale VirtioFS inodes and reapplying `coding-features snapshot`.\n- Result: 96 observations re-filed correctly across teams, coding entity count 2,151→2,241, Views 291→203, History now shows 55 batch entities, all 8 services RUNNING with healthy `/api/health`.\n- Files: `lib/attribution/repo-router.mjs`, `tests/attribution/repo-router.test.mjs`, `scripts/repair-team-attribution.mjs`.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/attribution/repo-router.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/attribution/repo-router.test.mjs",
+      "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/repair-team-attribution.mjs"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-08T16:26:05.205Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Attribution routing repair and entity-filter fixes",
+      "summary": "- Goal: fix KB attribution routing and entity surfacing issues, plus stale infra state.\n- Approach: built deterministic path-based repo-router (`lib/attribution/repo-router.mjs`) replacing embedding-similarity voting; wrote conservative repair script (`scripts/repair-team-attribution.mjs`) that abstained on 1,201 ambiguous cases and fixed 96 false positives via three precision guards (install.sh basename collision, models.ts false match, REQUIREMENTS.md double-citation).\n- Also fixed History sidebar entity-type classifier to include Batch-sourced entities, and resolved constraint-monitor failures by restarting to clear stale VirtioFS inodes and reapplying `coding-features snapshot`.\n- Result: 96 observations re-filed correctly across teams, coding entity count 2,151→2,241, Views 291→203, History now shows 55 batch entities, all 8 services RUNNING with healthy `/api/health`.\n- Files: `lib/attribution/repo-router.mjs`, `tests/attribution/repo-router.test.mjs`, `scripts/repair-team-attribution.mjs`.",
+      "observation_ids": [
+        "ef387b61-4a08-45cf-ae99-07e5ce86592d"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/lib/attribution/repo-router.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/tests/attribution/repo-router.test.mjs",
+        "/Users/<USER_ID_REDACTED>/Agentic/coding/scripts/repair-team-attribution.mjs"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-08T16:26:05.205Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "e740d283-c193-4307-a60b-369abf6568c5",
+    "date": "2026-09-08",
+    "theme": "Cross-agent /sl command rollout and VKB port cleanup",
+    "summary": "- Goal (opencode): reconnect context via transcripts, enable `/sl` (Session Logs) command across claude, copilot, opencode, and pi agents, and flag leftover VKB cleanup items.\n- Approach: mapped each agent's command/skill registration surface — Claude (`.claude/commands`), Copilot (GitHub instructions), opencode (`opencode.json`), pi (extensions).\n- Result: no code changes yet; investigation only. Identified two deferred cleanup tasks: remove retired `VKB_PORT=8080` from `.env.ports`, and fix `scripts/test-coding.sh` which still probes the retired VKB service on port 8080.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T16:26:05.205Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Cross-agent /sl command rollout and VKB port cleanup",
+      "summary": "- Goal (opencode): reconnect context via transcripts, enable `/sl` (Session Logs) command across claude, copilot, opencode, and pi agents, and flag leftover VKB cleanup items.\n- Approach: mapped each agent's command/skill registration surface — Claude (`.claude/commands`), Copilot (GitHub instructions), opencode (`opencode.json`), pi (extensions).\n- Result: no code changes yet; investigation only. Identified two deferred cleanup tasks: remove retired `VKB_PORT=8080` from `.env.ports`, and fix `scripts/test-coding.sh` which still probes the retired VKB service on port 8080.",
+      "observation_ids": [
+        "debfbcaf-25be-447b-803e-2c0eac08a0a2"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-08T16:26:05.205Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "036c0291-7155-4303-b170-ad96ad2cfeb9",
+    "date": "2026-09-08",
+    "theme": "Read-only audit of a2a-xpr/PoC documentation for consistency",
+    "summary": "- Goal: review the a2a-xpr/PoC MkDocs documentation for readability, terminology, and architectural consistency without making edits.\n- Approach: traced published pages and cross-referenced them against `nl-realm.md` and other key source files (`architecture-proposal.md` tiers, `adp-internal-a2a.md`, `coder-platform.md`, `trust-boundaries.md`, `identity.md`, `open-items.md`, `system-topology.mmd`) to detect conflated concepts, stale claims, and diagram gaps.\n- Key finding: documents conflate **data-source class** (LDU vs CFD, actually two parallel sources) with **implementation generation** (Doer vs Normalisa, coexisting converters with a planned migration, not sequential old/new).\n- Additional issues found: undefined acronyms before expansion, editorial prose inconsistent with technical tone, heading numbering errors, missing Normalization realm swim lane in `system-topology.mmd`, ambiguous \"central OAO bus\" language conflicting with per-realm event bridge details, stale \"DQ agent\" placement claims in `coder-platform.md` vs `open-items.md`, and unmarked regression harness data flow vs `trust-boundaries.md`.\n- Result: comprehensive prioritized findings compiled with exact file:line references and minimal fix recommendations (23 inconsistencies in the deepest audit), all read-only — no edits made yet; corrections require realm structure/OaO event bus diagrams to be added or revised across chapters.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-08T16:26:05.205Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-08",
+      "theme": "Read-only audit of a2a-xpr/PoC documentation for consistency",
+      "summary": "- Goal: review the a2a-xpr/PoC MkDocs documentation for readability, terminology, and architectural consistency without making edits.\n- Approach: traced published pages and cross-referenced them against `nl-realm.md` and other key source files (`architecture-proposal.md` tiers, `adp-internal-a2a.md`, `coder-platform.md`, `trust-boundaries.md`, `identity.md`, `open-items.md`, `system-topology.mmd`) to detect conflated concepts, stale claims, and diagram gaps.\n- Key finding: documents conflate **data-source class** (LDU vs CFD, actually two parallel sources) with **implementation generation** (Doer vs Normalisa, coexisting converters with a planned migration, not sequential old/new).\n- Additional issues found: undefined acronyms before expansion, editorial prose inconsistent with technical tone, heading numbering errors, missing Normalization realm swim lane in `system-topology.mmd`, ambiguous \"central OAO bus\" language conflicting with per-realm event bridge details, stale \"DQ agent\" placement claims in `coder-platform.md` vs `open-items.md`, and unmarked regression harness data flow vs `trust-boundaries.md`.\n- Result: comprehensive prioritized findings compiled with exact file:line references and minimal fix recommendations (23 inconsistencies in the deepest audit), all read-only — no edits made yet; corrections require realm structure/OaO event bus diagrams to be added or revised across chapters.",
+      "observation_ids": [
+        "73370a9b-7f5c-4889-97b6-2ac81ba82539",
+        "8c114b2b-40c1-4ced-81bf-77d9b5f06cd0",
+        "931e12da-5984-48d3-9748-a573ee9c4ef1"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-08T16:26:05.205Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "25d4a26e-fd69-4b1c-ab90-0c66f8ae47c7",
+    "date": "2026-09-08",
+    "theme": "PoC documentation review and architecture corrections",
+    "summary": "- Goal: audit and correct the PoC document for accuracy and consistency around data sources and architecture.\n- opencode reviewed docs, fixing inaccuracies re: LDU/CFD as parallel data-source classes (not legacy), doer→Normalisa migration status, realm structure, and OaO event-bus architecture.\n- Added new source/realm/event-flow diagrams and expanded target topology (Ingest, NL, OaO boundaries); corrected relay placement, OIDC status, Agent Stack ownership.\n- Validated via MkDocs strict mode, 72 passing documentation tests, and Mermaid rendering.\n- Changes committed on a new feature branch, pushed, and opened as PR #30 against `main` in the a2a-xpr project, all tests passing before push.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T16:44:59.711Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-08",
+      "theme": "PoC documentation review and architecture corrections",
+      "summary": "- Goal: audit and correct the PoC document for accuracy and consistency around data sources and architecture.\n- opencode reviewed docs, fixing inaccuracies re: LDU/CFD as parallel data-source classes (not legacy), doer→Normalisa migration status, realm structure, and OaO event-bus architecture.\n- Added new source/realm/event-flow diagrams and expanded target topology (Ingest, NL, OaO boundaries); corrected relay placement, OIDC status, Agent Stack ownership.\n- Validated via MkDocs strict mode, 72 passing documentation tests, and Mermaid rendering.\n- Changes committed on a new feature branch, pushed, and opened as PR #30 against `main` in the a2a-xpr project, all tests passing before push.",
+      "observation_ids": [
+        "e65e4a97-c0ac-400a-a0d0-4cdefa0d926b",
+        "cbb3b728-5df5-4649-9534-b3466cf80a14"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T16:44:59.711Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "c7aa9a37-f530-45ff-add9-9a835d71b5f3",
+    "date": "2026-09-08",
+    "theme": "Quick/Deep Dive tiering pattern for NL and other docs",
+    "summary": "- Goal: evaluate and apply the quick-read vs. deep-dive tabbed documentation pattern, starting with the lengthy NL realm page (~1,250 lines).\n- opencode confirmed NL page as a strong candidate, splitting intro concepts (realm explanation, data sources, OaO routing, converter migration, PoC consequences) into a quick tier while preserving detailed appendices in deep tier.\n- Extended scope: audit all published pages in `a2a-xpr/docs` for tiering suitability based on length, conceptual breadth, and audience segmentation, excluding already-tiered pages.\n- Read-only audit covered `nl-realm.md`, `iac-choice.md`, `trust-boundaries.md`, `identity.md`, `open-items.md`, `adp-internal-a2a.md`, `index.md`, `llm-access.md`, and style guides, producing a ranked candidate list with suggested Quick-tier headings and pages to leave untiered.\n- Plan is to implement tiering where genuinely valuable, verify structurally, and update PR #30 — implementation not yet performed, pending review.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-08T16:44:59.711Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-08",
+      "theme": "Quick/Deep Dive tiering pattern for NL and other docs",
+      "summary": "- Goal: evaluate and apply the quick-read vs. deep-dive tabbed documentation pattern, starting with the lengthy NL realm page (~1,250 lines).\n- opencode confirmed NL page as a strong candidate, splitting intro concepts (realm explanation, data sources, OaO routing, converter migration, PoC consequences) into a quick tier while preserving detailed appendices in deep tier.\n- Extended scope: audit all published pages in `a2a-xpr/docs` for tiering suitability based on length, conceptual breadth, and audience segmentation, excluding already-tiered pages.\n- Read-only audit covered `nl-realm.md`, `iac-choice.md`, `trust-boundaries.md`, `identity.md`, `open-items.md`, `adp-internal-a2a.md`, `index.md`, `llm-access.md`, and style guides, producing a ranked candidate list with suggested Quick-tier headings and pages to leave untiered.\n- Plan is to implement tiering where genuinely valuable, verify structurally, and update PR #30 — implementation not yet performed, pending review.",
+      "observation_ids": [
+        "761e8f26-1da3-4b11-bb1b-71682c955add",
+        "5c6dc612-aba3-4dde-bf37-f19dc8a8b7a5",
+        "097d5105-d76d-41b7-b77c-f93cca3ba17c"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-08T16:44:59.711Z"
     },
     "project": "a2a-xpr"
   }

@@ -11,6 +11,7 @@ AGENT_TRANSCRIPT_FMT="copilot"
 AGENT_ENABLE_PIPE_CAPTURE=true
 AGENT_PROMPT_REGEX='❯\s+([^\n\r]+)[\n\r]'
 AGENT_REQUIRES_COMMANDS="copilot"
+AGENT_COMMAND_ARGS=(--plugin-dir "$CODING_REPO/plugins/copilot")
 # No AGENT_INSTALL_COMMAND — copilot install is org-specific
 
 # Track HTTP adapter PID for cleanup
