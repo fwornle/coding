@@ -42,6 +42,7 @@ export interface JudgeBackend {
 
 /** The judge service's own report, or null when it could not be reached. */
 export interface Judge {
+  strategy: 'llm' | 'knn' | 'hybrid' | 'shadow'
   network: string
   backends: JudgeBackend[]
   /** The literal prompt the judge is sent. Editable. */
@@ -49,7 +50,24 @@ export interface Judge {
   /** Present only when the config file on disk is currently unusable. */
   configError?: string
   configSource: string
-  counts: { asked: number; answered: number; failed: number; byBand: Record<string, number> }
+  knn: {
+    modelPath: string
+    exists: boolean
+    loaded: boolean
+    examples: number
+    trainedAt: string | null
+    decision: Record<string, number> | null
+    evaluation: Record<string, unknown> | null
+    error: string | null
+  }
+  counts: {
+    asked: number
+    answered: number
+    failed: number
+    byBand: Record<string, number>
+    bySource?: Record<string, number>
+    knn?: { asked: number; accepted: number; abstained: number; failed: number; shadowDisagreed: number }
+  }
 }
 
 export interface ClassifierJudgeState {
@@ -63,6 +81,8 @@ export interface ClassifierJudgeState {
   draftRubric: string | null
   setDraftRubric: (v: string | null) => void
   setBackendEnabled: (id: string, on: boolean) => void
+  setStrategy: (strategy: Judge['strategy'] | null) => void
+  draftStrategy: Judge['strategy'] | null
   dirty: boolean
   saving: boolean
   error: string | null
@@ -77,6 +97,7 @@ export function useClassifierJudge(proxyBase: string, pollMs = 30_000): Classifi
   const [judgeUrl, setJudgeUrl] = useState<string | null>(null)
   const [draftRubric, setDraftRubric] = useState<string | null>(null)
   const [draftEnabled, setDraftEnabled] = useState<Record<string, boolean>>({})
+  const [draftStrategy, setDraftStrategy] = useState<Judge['strategy'] | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
@@ -90,7 +111,15 @@ export function useClassifierJudge(proxyBase: string, pollMs = 30_000): Classifi
         const r = await fetch(`${proxyBase}/api/llm/classifier`)
         const d = await r.json()
         if (cancelled) return
-        setJudge(d.judge ?? null)
+        const incoming = d.judge ?? null
+        setJudge(incoming ? {
+          strategy: 'llm',
+          knn: {
+            modelPath: '', exists: false, loaded: false, examples: 0,
+            trainedAt: null, decision: null, evaluation: null, error: null,
+          },
+          ...incoming,
+        } : null)
         setJudgeError(d.judgeError ?? null)
         setJudgeUrl(d.judgeUrl ?? null)
       } catch (e) {
@@ -120,12 +149,14 @@ export function useClassifierJudge(proxyBase: string, pollMs = 30_000): Classifi
   const dirty = useMemo(() => {
     if (!judge) return false
     if (draftRubric !== null && draftRubric !== judge.rubric) return true
+    if (draftStrategy !== null && draftStrategy !== judge.strategy) return true
     return judge.backends.some(b => b.id in draftEnabled && draftEnabled[b.id] !== b.enabled)
-  }, [judge, draftRubric, draftEnabled])
+  }, [judge, draftRubric, draftStrategy, draftEnabled])
 
   const revert = useCallback(() => {
     setDraftRubric(null)
     setDraftEnabled({})
+    setDraftStrategy(null)
     setError(null)
   }, [])
 
@@ -142,6 +173,7 @@ export function useClassifierJudge(proxyBase: string, pollMs = 30_000): Classifi
       const body: Record<string, unknown> = {}
       if (backends.length) body.backends = backends
       if (draftRubric !== null && draftRubric !== judge.rubric) body.rubric = draftRubric
+      if (draftStrategy !== null && draftStrategy !== judge.strategy) body.strategy = draftStrategy
 
       const res = await fetch(`${proxyBase}/api/llm/classifier`, {
         method: 'PATCH',
@@ -152,13 +184,14 @@ export function useClassifierJudge(proxyBase: string, pollMs = 30_000): Classifi
       if (!res.ok || out?.error) throw new Error(out?.error || `save failed (HTTP ${res.status})`)
       setDraftRubric(null)
       setDraftEnabled({})
+      setDraftStrategy(null)
       reload()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setSaving(false)
     }
-  }, [judge, draftEnabled, draftRubric, proxyBase, reload])
+  }, [judge, draftEnabled, draftRubric, draftStrategy, proxyBase, reload])
 
   // The backends as the panel should draw them: file config with pending edits
   // applied, runtime facts untouched. Merging the two is what this whole hook
@@ -175,6 +208,8 @@ export function useClassifierJudge(proxyBase: string, pollMs = 30_000): Classifi
     draftRubric,
     setDraftRubric,
     setBackendEnabled,
+    draftStrategy,
+    setStrategy: setDraftStrategy,
     dirty,
     saving,
     error,

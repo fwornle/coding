@@ -168,6 +168,9 @@ integrations/mcp-server-browserbase/
 # source: each file records where one machine's agents routed on one network at
 # one moment. The shareable form is the report built from them, not the JSON.
 .data/routing-proof/*
+# Trained semantic prompt-classifier artifacts. Generated from labelled data;
+# source labels/config stay tracked while machine-specific vectors do not.
+.data/prompt-classifier/
 !.data/kb-ab-sampler/specs/
 !.data/kb-ab-sampler/mine-specs/
 !.data/kb-ab-sampler/facts/

@@ -54,6 +54,7 @@ import { fileURLToPath } from 'node:url';
 import {
   parsePromptClassifierConfig, candidatesForNetwork, normalizeNetwork, describeBackends,
 } from './lib/prompt-classifier-config.mjs';
+import { PromptKnnClassifier, resolveKnnPaths } from './lib/prompt-classifier-knn.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -141,7 +142,15 @@ const BANDS = ['small', 'medium', 'high'];
 
 const log = (...a) => process.stdout.write(`[prompt-classifier] ${a.join(' ')}\n`);
 
-const counts = { asked: 0, answered: 0, failed: 0, byBand: { small: 0, medium: 0, high: 0 }, keepalives: 0 };
+const counts = {
+  asked: 0,
+  answered: 0,
+  failed: 0,
+  byBand: { small: 0, medium: 0, high: 0 },
+  bySource: { llm: 0, knn: 0 },
+  knn: { asked: 0, accepted: 0, abstained: 0, failed: 0, shadowDisagreed: 0 },
+  keepalives: 0,
+};
 
 /**
  * Per-backend runtime facts, keyed by id and kept OUT of the config object.
@@ -163,6 +172,18 @@ const runtimeOf = (id) => {
 let config = null;        // {backends, rubric}
 let configMtimeMs = 0;
 let configError = null;   // last load failure, surfaced on /health rather than thrown
+let knnClassifier = null;
+let knnSignature = '';
+
+function classifierFor(cfg) {
+  const paths = resolveKnnPaths(REPO, cfg.knn);
+  const signature = JSON.stringify(paths);
+  if (!knnClassifier || signature !== knnSignature) {
+    knnClassifier = new PromptKnnClassifier(paths);
+    knnSignature = signature;
+  }
+  return knnClassifier;
+}
 
 /**
  * The pre-2026-09-02 shape: one endpoint from env. Kept as the fallback for when
@@ -171,6 +192,12 @@ let configError = null;   // last load failure, surfaced on /health rather than 
  */
 function envFallbackConfig() {
   return {
+    strategy: 'llm',
+    knn: {
+      modelPath: '.data/prompt-classifier/knn-model.json',
+      cacheDir: '.data/fastembed-cache',
+      fallbackToLlm: true,
+    },
     backends: [{
       id: 'env',
       baseUrl: process.env.CLASSIFIER_BACKEND_URL
@@ -224,7 +251,12 @@ function loadConfig({ force = false } = {}) {
   try {
     const { parse } = requireYaml();
     const next = parsePromptClassifierConfig(parse(fs.readFileSync(CONFIG_PATH, 'utf8')));
-    const changed = !config || JSON.stringify(next) !== JSON.stringify({ backends: config.backends, rubric: config.rubric });
+    const changed = !config || JSON.stringify(next) !== JSON.stringify({
+      strategy: config.strategy,
+      knn: config.knn,
+      backends: config.backends,
+      rubric: config.rubric,
+    });
     config = { ...next, source: 'file' };
     configMtimeMs = st.mtimeMs;
     configError = null;
@@ -366,6 +398,63 @@ async function askAny(text) {
   throw lastError || new Error('every backend failed');
 }
 
+async function askKnn(text, cfg) {
+  counts.knn.asked += 1;
+  try {
+    const result = await classifierFor(cfg).classify(text);
+    if (result.accepted) counts.knn.accepted += 1;
+    else counts.knn.abstained += 1;
+    return result;
+  } catch (error) {
+    counts.knn.failed += 1;
+    return {
+      band: '',
+      accepted: false,
+      confidence: 0,
+      margin: 0,
+      nearestSimilarity: null,
+      neighbors: [],
+      reason: String(error?.message || error),
+      error: true,
+    };
+  }
+}
+
+/**
+ * Run the configured decision strategy while preserving one stable HTTP contract.
+ * A KNN abstention is not an answer. Hybrid falls back to the existing LLM judge;
+ * shadow always returns the LLM answer and only records KNN evidence.
+ */
+async function classifyText(text) {
+  const cfg = loadConfig();
+  const strategy = cfg.strategy;
+  const t0 = Date.now();
+
+  if (strategy === 'llm') {
+    const llm = await askAny(text);
+    return { band: parseBand(llm.raw), source: 'llm', strategy, llm };
+  }
+
+  const knn = await askKnn(text, cfg);
+  if (strategy === 'shadow') {
+    const llm = await askAny(text);
+    const band = parseBand(llm.raw);
+    if (knn.accepted && knn.band !== band) counts.knn.shadowDisagreed += 1;
+    return { band, source: 'llm', strategy, knn, llm };
+  }
+
+  if (knn.accepted) {
+    return { band: knn.band, source: 'knn', strategy, knn, latencyMs: Date.now() - t0 };
+  }
+
+  const mayFallback = strategy === 'hybrid' || cfg.knn.fallbackToLlm;
+  if (!mayFallback) {
+    throw new Error(`KNN abstained: ${knn.reason}`);
+  }
+  const llm = await askAny(text);
+  return { band: parseBand(llm.raw), source: 'llm', strategy, knn, llm };
+}
+
 /**
  * The band in a raw answer, or '' if there is not one.
  *
@@ -398,6 +487,11 @@ function parseBand(raw) {
 let warmedBackendId = null;
 async function warmUp(reason = 'boot') {
   const cfg = loadConfig();
+  if (cfg.strategy === 'knn' && !cfg.knn.fallbackToLlm) {
+    warmedBackendId = null;
+    log(`LLM warm-up skipped — strategy=${cfg.strategy}, fallback_to_llm=false (${reason})`);
+    return;
+  }
   const network = await currentNetwork();
   const [backend] = candidatesForNetwork(cfg.backends, network);
   if (!backend) {
@@ -438,9 +532,10 @@ function startKeepalive() {
     return;
   }
   const t = setInterval(async () => {
-    loadConfig();
+    const cfg = loadConfig();
+    if (cfg.strategy === 'knn' && !cfg.knn.fallbackToLlm) return;
     const network = await currentNetwork();
-    const [backend] = candidatesForNetwork(loadConfig().backends, network);
+    const [backend] = candidatesForNetwork(cfg.backends, network);
     if (!backend) return;
     // The network flipped, or the config changed which box answers. The new one
     // is cold regardless of how recently the old one was warm.
@@ -510,6 +605,11 @@ function applyConfigPatch(patch) {
   }
   const doc = parseDocument(fs.readFileSync(CONFIG_PATH, 'utf8'));
 
+  if (patch.strategy != null) {
+    if (typeof patch.strategy !== 'string') throw new Error('strategy must be a string');
+    doc.setIn(['strategy'], patch.strategy);
+  }
+
   if (patch.rubric != null) {
     if (typeof patch.rubric !== 'string' || !patch.rubric.trim()) {
       throw new Error('rubric must be a non-empty string');
@@ -560,6 +660,8 @@ const server = http.createServer(async (req, res) => {
       network,
       configPath: cfg.source === 'file' ? CONFIG_PATH : null,
       configSource: cfg.source,
+      strategy: cfg.strategy,
+      knn: classifierFor(cfg).status(),
       // Where secrets were looked for, and whether each backend's named variable
       // actually arrived. NEVER the value — `hasKey` is a boolean because the
       // question worth answering is "is it set", and a health endpoint that can
@@ -615,7 +717,13 @@ const server = http.createServer(async (req, res) => {
       log(`config saved — ${describeBackends(next.backends)}`);
       // The selected box may have changed; a cold one costs the next verdict.
       warmUp('config saved').catch(() => {});
-      return send(res, 200, { ok: true, backends: next.backends, rubric: next.rubric });
+      return send(res, 200, {
+        ok: true,
+        strategy: next.strategy,
+        knn: next.knn,
+        backends: next.backends,
+        rubric: next.rubric,
+      });
     } catch (e) {
       const msg = String(e?.message || e);
       log(`config patch rejected (nothing written): ${msg}`);
@@ -640,15 +748,33 @@ const server = http.createServer(async (req, res) => {
     counts.asked += 1;
     const t0 = Date.now();
     try {
-      const { raw, backend, latencyMs } = await askAny(text);
-      const band = parseBand(raw);
+      const result = await classifyText(text);
+      const band = result.band;
       if (!band) {
         counts.failed += 1;
-        return send(res, 502, { error: 'backend returned no recognisable band', backend: backend.id });
+        return send(res, 502, { error: 'classifier returned no recognisable band', strategy: result.strategy });
       }
       counts.answered += 1;
       counts.byBand[band] += 1;
-      return send(res, 200, { band, latencyMs, model: backend.model, backend: backend.id });
+      counts.bySource[result.source] += 1;
+      return send(res, 200, {
+        band,
+        source: result.source,
+        strategy: result.strategy,
+        latencyMs: result.latencyMs ?? result.llm?.latencyMs ?? (Date.now() - t0),
+        ...(result.llm ? { model: result.llm.backend.model, backend: result.llm.backend.id } : {}),
+        ...(result.knn ? {
+          knn: {
+            accepted: result.knn.accepted,
+            band: result.knn.band || null,
+            confidence: result.knn.confidence,
+            margin: result.knn.margin,
+            nearestSimilarity: result.knn.nearestSimilarity,
+            reason: result.knn.reason || null,
+            neighbors: result.knn.neighbors,
+          },
+        } : {}),
+      });
     } catch (e) {
       counts.failed += 1;
       // A reason, never a band. The proxy treats any non-answer as "keep the

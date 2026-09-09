@@ -182,7 +182,11 @@ Verified on a capture endpoint 2026-08-30, not inferred from the resulting band.
 `provider/model/variant` model string. Older comments claiming opencode sends an `x-complexity`
 header were wrong — it has no `headers` key on its provider block and never sent one.
 
-### The prompt classifier (`classifier:`, ships OFF)
+### The prompt classifier (`classifier:`)
+
+The classifier service can use the existing rubric judge, semantic KNN, a hybrid
+of both, or shadow KNN decisions before activation. Training and rollout are
+documented in [Prompt Classifier Training](./prompt-classifier-training.md).
 
 `from-caller` only helps when the caller declares something *useful*, and measurement showed two
 of the three agents did not: over one session on 2026-08-30, pi sent `medium` on all 11 turns
@@ -204,11 +208,11 @@ Cost is bounded by two free stages before any call: a turn already carrying tool
 never classified (74% of in-scope captured turns), then a cheap veto drops anything with code,
 paths or multi-step phrasing. `impl: http` is the injection point for your own service.
 
-**It is `enabled: false` and stays that way until `node scripts/eval-prompt-classifier.mjs`
-clears its gate.** The gate is *precision on `small`* — the only metric that matters, since
-downgrade-only means a wrong `medium`/`high` costs nothing and only a wrong `small` spends a
-real turn on a weaker model. As of 2026-08-30 the local-llm rubric measures **78% against a 90%
-bar**, so it is off.
+The classifier is enabled for the current `from-caller` foreground routes. `small` and `medium`
+are both emittable, so rollout is gated on the **worst per-band precision**, not aggregate
+accuracy. `scripts/eval-prompt-classifier.mjs` measures the live service strategy; KNN training
+uses the same asymmetric rule, where a cheaper-than-truth verdict is damage and a conservative
+verdict is only a missed saving.
 
 ---
 

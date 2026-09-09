@@ -34,7 +34,9 @@ const BACKEND_KEYS = new Set([
 ]);
 
 /** Top-level keys. Same reasoning. */
-const TOP_KEYS = new Set(['backends', 'rubric']);
+const TOP_KEYS = new Set(['strategy', 'knn', 'backends', 'rubric']);
+const KNN_KEYS = new Set(['model_path', 'cache_dir', 'fallback_to_llm']);
+const STRATEGIES = ['llm', 'knn', 'hybrid', 'shadow'];
 
 /**
  * The lowest timeout that can possibly be meant in milliseconds. A `timeout_ms:
@@ -68,7 +70,7 @@ const fail = (key, problem) => { throw new PromptClassifierConfigError(key, prob
 
 /**
  * @param {object} doc  the parsed YAML document (a plain object)
- * @returns {{backends: ClassifierBackend[], rubric: string}}
+ * @returns {{strategy: string, knn: object, backends: ClassifierBackend[], rubric: string}}
  * @throws {PromptClassifierConfigError} naming the offending key
  */
 export function parsePromptClassifierConfig(doc) {
@@ -81,6 +83,34 @@ export function parsePromptClassifierConfig(doc) {
       fail(k, `unknown key (expected one of ${[...TOP_KEYS].join(', ')})`);
     }
   }
+
+  const strategy = doc.strategy ?? 'llm';
+  if (!STRATEGIES.includes(strategy)) {
+    fail('strategy', `unknown strategy "${String(strategy)}" (expected one of ${STRATEGIES.join(', ')})`);
+  }
+
+  const rawKnn = doc.knn ?? {};
+  if (rawKnn == null || typeof rawKnn !== 'object' || Array.isArray(rawKnn)) {
+    fail('knn', 'must be a mapping');
+  }
+  for (const key of Object.keys(rawKnn)) {
+    if (!KNN_KEYS.has(key)) {
+      fail(`knn.${key}`, `unknown key (expected one of ${[...KNN_KEYS].join(', ')})`);
+    }
+  }
+  const modelPath = rawKnn.model_path ?? '.data/prompt-classifier/knn-model.json';
+  const cacheDir = rawKnn.cache_dir ?? '.data/fastembed-cache';
+  for (const [key, value] of [['model_path', modelPath], ['cache_dir', cacheDir]]) {
+    if (typeof value !== 'string' || !value.trim()) fail(`knn.${key}`, 'must be a non-empty path');
+  }
+  if (rawKnn.fallback_to_llm != null && typeof rawKnn.fallback_to_llm !== 'boolean') {
+    fail('knn.fallback_to_llm', 'must be true or false');
+  }
+  const knn = {
+    modelPath,
+    cacheDir,
+    fallbackToLlm: rawKnn.fallback_to_llm !== false,
+  };
 
   // ── rubric ────────────────────────────────────────────────────────────────
   // Refused when empty rather than defaulted to something. A judge asked
@@ -181,7 +211,7 @@ export function parsePromptClassifierConfig(doc) {
     backends.push({ id, baseUrl, model, apiKeyEnv, requireNetwork, enabled, timeoutMs });
   });
 
-  return { backends, rubric };
+  return { strategy, knn, backends, rubric };
 }
 
 /**

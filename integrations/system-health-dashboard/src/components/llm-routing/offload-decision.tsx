@@ -611,6 +611,19 @@ export function OffloadDecision({
               <div className="pl-[1.35rem] space-y-1.5 border-l-2 border-muted ml-[0.35rem]">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-muted-foreground">judged by:</span>
+                  {judge.judge && (
+                    <select
+                      aria-label="Classifier strategy"
+                      className="h-6 rounded border bg-background px-1 font-mono text-[10px]"
+                      value={judge.draftStrategy ?? judge.judge.strategy}
+                      onChange={e => judge.setStrategy(e.target.value as 'llm' | 'knn' | 'hybrid' | 'shadow')}
+                    >
+                      <option value="llm">llm</option>
+                      <option value="shadow">shadow</option>
+                      <option value="hybrid">hybrid</option>
+                      <option value="knn">knn</option>
+                    </select>
+                  )}
                   {judge.judge
                     ? <span className="font-mono">
                         {judge.judge.backends.find(b => b.selected)?.model ?? 'nothing on this network'}
@@ -635,6 +648,21 @@ export function OffloadDecision({
                   <div className="text-destructive">
                     prompt-classifier.yaml is unusable ({judge.judge.configError}) — the judge is
                     running on the last config that loaded.
+                  </div>
+                )}
+
+                {judge.judge && judge.judge.strategy !== 'llm' && (
+                  <div className="text-muted-foreground flex items-center gap-2 flex-wrap">
+                    <span className="font-mono">KNN</span>
+                    <span>{judge.judge.knn.examples} examples</span>
+                    <span>{judge.judge.knn.loaded ? 'loaded' : judge.judge.knn.exists ? 'not loaded' : 'artifact missing'}</span>
+                    {judge.judge.counts.knn && (
+                      <span>
+                        accepted {judge.judge.counts.knn.accepted} · abstained {judge.judge.counts.knn.abstained}
+                        {judge.judge.strategy === 'shadow' ? ` · disagreed ${judge.judge.counts.knn.shadowDisagreed}` : ''}
+                      </span>
+                    )}
+                    {judge.judge.knn.error && <span className="text-destructive">{judge.judge.knn.error}</span>}
                   </div>
                 )}
 

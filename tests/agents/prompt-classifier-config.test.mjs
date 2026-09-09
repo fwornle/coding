@@ -40,6 +40,12 @@ import {
 
 /** The shipping shape: one backend per network, cluster first. */
 const BOTH_NETWORKS = () => ({
+  strategy: 'llm',
+  knn: {
+    model_path: '.data/prompt-classifier/knn-model.json',
+    cache_dir: '.data/fastembed-cache',
+    fallback_to_llm: true,
+  },
   backends: [
     {
       id: 'qwen-local',
@@ -88,6 +94,8 @@ describe('the checked-in config is valid and says what it means to', () => {
     const p = path.resolve(import.meta.dirname, '../../config/prompt-classifier.yaml');
     const cfg = parsePromptClassifierConfig(parse(fs.readFileSync(p, 'utf8')));
     assert.equal(cfg.backends.length, 2);
+    assert.equal(cfg.strategy, 'llm');
+    assert.equal(cfg.knn.modelPath, '.data/prompt-classifier/knn-model.json');
     assert.deepEqual(candidatesForNetwork(cfg.backends, 'corporate').map(b => b.id), ['qwen-local']);
     assert.deepEqual(candidatesForNetwork(cfg.backends, 'public').map(b => b.id), ['qwen-laptop']);
   });
@@ -205,6 +213,12 @@ describe('refuses a config that can only mislead, naming the key', () => {
   it('an empty or missing rubric — the judge would be asked nothing', () => {
     throwsNaming(withDoc((d) => { d.rubric = '   '; }), /rubric/);
     throwsNaming(withDoc((d) => { delete d.rubric; }), /rubric/);
+  });
+
+  it('rejects an unknown strategy and malformed KNN settings', () => {
+    throwsNaming(withDoc((d) => { d.strategy = 'magic'; }), /strategy/);
+    throwsNaming(withDoc((d) => { d.knn.fallback_to_llm = 'yes'; }), /knn\.fallback_to_llm/);
+    throwsNaming(withDoc((d) => { d.knn.neighbours = 7; }), /knn\.neighbours/);
   });
 
   it('an empty backends list, and a non-list', () => {

@@ -48,6 +48,7 @@ const argv = process.argv.slice(2);
 const flag = (n, d) => argv.find((a) => a.startsWith(`--${n}=`))?.split('=').slice(1).join('=') ?? d;
 const has = (n) => argv.includes(`--${n}`);
 
+const SERVICE_URL = flag('service-url', process.env.CLASSIFIER_SERVICE_URL || 'http://127.0.0.1:12437');
 const BASE_URL = flag('base-url', process.env.CLASSIFIER_BASE_URL || 'http://127.0.0.1:8081/v1');
 const MODEL = flag('model', process.env.CLASSIFIER_MODEL || 'qwen3.8-27b-local');
 const TIMEOUT_MS = Number(flag('timeout', '20000'));
@@ -70,6 +71,17 @@ const pct = (n, d) => (d ? `${((100 * n) / d).toFixed(0)}%` : 'n/a');
 
 async function verdictFor(text) {
   const t0 = Date.now();
+  if (!has('direct')) {
+    const r = await fetch(`${SERVICE_URL.replace(/\/$/, '')}/classify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    return { band: String(j?.band || '').trim().toLowerCase(), ms: Date.now() - t0 };
+  }
   const r = await fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -247,7 +259,8 @@ async function runLabelled() {
   const measured = perBand.filter(s => s.precision !== null);
   const precision = measured.length ? Math.min(...measured.map(s => s.precision)) : 1;
 
-  process.stdout.write(`\nLabelled evaluation — ${BASE_URL} (${MODEL})\n${'='.repeat(66)}\n`);
+  const target = has('direct') ? `${BASE_URL} (${MODEL}, direct LLM)` : `${SERVICE_URL} (service strategy)`;
+  process.stdout.write(`\nLabelled evaluation — ${target}\n${'='.repeat(66)}\n`);
   for (const r of rows) {
     const mark = r.got === r.label ? 'ok  ' : (defects.includes(r) ? 'BAD ' : '~   ');
     process.stdout.write(`  ${mark} label=${String(r.label).padEnd(7)} got=${String(r.got).padEnd(11)} ${String(r.ms).padStart(5)}ms  ${r.text.slice(0, 58)}\n`);
