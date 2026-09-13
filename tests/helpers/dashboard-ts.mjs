@@ -51,6 +51,10 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 export const ROUTING_SRC = path.join(
   ROOT, 'integrations/system-health-dashboard/src/components/llm-routing');
 
+/** The cost model + settings dialog: the only copy of the price resolution. */
+export const COST_SRC = path.join(
+  ROOT, 'integrations/system-health-dashboard/src/components/cost');
+
 /**
  * esbuild, from the root install or the dashboard's.
  *
@@ -95,9 +99,14 @@ export function resolveEsbuild() {
  *   `entry` and everything it imports from this directory.
  * @param {string} o.entry    Which of `names` to import and return.
  * @param {string} o.prefix   mkdtemp prefix, for legible temp dirs.
+ * @param {string} [o.srcDir] Which dashboard source directory to read from.
+ *   Defaults to ROUTING_SRC, so the four original callers are unchanged; pass
+ *   COST_SRC (or another dir) for modules outside llm-routing. The whole point
+ *   of this helper is that there is ONE transpile path — add a directory here
+ *   rather than growing a fifth private copy of the twelve lines above.
  * @returns {Promise<object>} The imported module namespace.
  */
-export async function loadRoutingModules({ names, entry, prefix }) {
+export async function loadRoutingModules({ names, entry, prefix, srcDir = ROUTING_SRC }) {
   if (!names.includes(entry)) {
     throw new Error(`entry "${entry}" is not among names [${names.join(', ')}]`);
   }
@@ -105,7 +114,7 @@ export async function loadRoutingModules({ names, entry, prefix }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 
   for (const name of names) {
-    const ts = fs.readFileSync(path.join(ROUTING_SRC, `${name}.ts`), 'utf8');
+    const ts = fs.readFileSync(path.join(srcDir, `${name}.ts`), 'utf8');
     let { code } = esbuild.transformSync(ts, { loader: 'ts', format: 'esm' });
     for (const sibling of names) {
       code = code.replace(

@@ -78,7 +78,9 @@ export const DEFAULT_COST_CONFIG: CostConfig = {
   currency: { display: 'EUR', usdToEur: 0.92 },
   modelPrices: {
     'claude-haiku-4.5':  { in: 1,   out: 5,   cacheRead: 0.10,  cacheWrite: 1.25 },
+    'claude-sonnet-5':   { in: 3,   out: 15,  cacheRead: 0.30,  cacheWrite: 3.75 },
     'claude-sonnet-4.6': { in: 3,   out: 15,  cacheRead: 0.30,  cacheWrite: 3.75 },
+    'claude-opus-5':     { in: 5,   out: 25,  cacheRead: 0.50,  cacheWrite: 6.25 },
     'claude-opus-4.8':   { in: 5,   out: 25,  cacheRead: 0.50,  cacheWrite: 6.25 },
     'claude-fable-5':    { in: 10,  out: 50,  cacheRead: 1.00,  cacheWrite: 12.50 },
     'gpt-4o':            { in: 2.5, out: 10,  cacheRead: 1.25,  cacheWrite: 0 },
@@ -124,8 +126,8 @@ export function modelFamily(model: string): ModelFamily {
 // an exact model key is absent (e.g. claude-opus-4-8 → the opus row).
 const FAMILY_REPRESENTATIVE: Record<ModelFamily, string[]> = {
   haiku: ['claude-haiku-4.5'],
-  sonnet: ['claude-sonnet-4.6'],
-  opus: ['claude-opus-4.8', 'claude-opus-4.6'],
+  sonnet: ['claude-sonnet-5', 'claude-sonnet-4.6'],
+  opus: ['claude-opus-5', 'claude-opus-4.8', 'claude-opus-4.6'],
   fable: ['claude-fable-5'],
   'gpt-4o-mini': ['gpt-4o-mini'],
   'gpt-4o': ['gpt-4o'],
@@ -133,10 +135,52 @@ const FAMILY_REPRESENTATIVE: Record<ModelFamily, string[]> = {
   other: [],
 }
 
-export interface ResolvedPrice { price: ModelPrice; priced: boolean; source: 'exact' | 'family' | 'none' }
+// ---- Fast mode ----------------------------------------------------------
+// The proxy records a fast-mode turn under its own model id, suffixed `-fast`
+// (`claude-opus-4.8-fast`). Fast mode is the SAME model at up to 2.5x output
+// throughput and premium pricing, so it must not be priced at the standard
+// rate: `claude-opus-5` is $5/$25 per MTok, fast mode $10/$50 — exactly 2x.
+//
+// It is a RULE rather than two more rows because the suffix is orthogonal to
+// the model: every current and future fast-capable model would otherwise need
+// a hand-maintained twin, and a missing twin fails SILENTLY (the family
+// fallback happily prices `…-fast` at the standard rate, `priced: true`, no
+// warning). Multiplying the base row cannot go stale that way.
+//
+// $10/$50 is verified for Claude Opus 5. Opus 4.8 is the only other fast-mode
+// model and carries identical standard pricing, so the same 2x is assumed
+// rather than documented — if the two tiers ever diverge, give the divergent
+// one an explicit `<model>-fast` row, which wins on the exact-match path below.
+const FAST_MODE_SUFFIX = '-fast'
+const FAST_MODE_MULTIPLIER = 2
+
+function scalePrice(p: ModelPrice, factor: number): ModelPrice {
+  return {
+    in: p.in * factor,
+    out: p.out * factor,
+    cacheRead: p.cacheRead * factor,
+    cacheWrite: p.cacheWrite * factor,
+  }
+}
+
+export interface ResolvedPrice { price: ModelPrice; priced: boolean; source: 'exact' | 'family' | 'fast' | 'none' }
 export function priceForModel(model: string, prices: Record<string, ModelPrice>): ResolvedPrice {
   const normalized = model
   if (prices[normalized]) return { price: prices[normalized], priced: true, source: 'exact' }
+  // Fast mode, before the family fallback: strip the suffix, price the base
+  // model by the normal rules, then apply the premium. Checked after the exact
+  // match so an explicit `<model>-fast` row still overrides the rule.
+  if (normalized.toLowerCase().endsWith(FAST_MODE_SUFFIX)) {
+    const base = normalized.slice(0, -FAST_MODE_SUFFIX.length)
+    const resolved = priceForModel(base, prices)
+    if (resolved.priced) {
+      return {
+        price: scalePrice(resolved.price, FAST_MODE_MULTIPLIER),
+        priced: true,
+        source: 'fast',
+      }
+    }
+  }
   // family fallback: first the representative keys, then any key that matches the family
   const fam = modelFamily(model)
   for (const key of FAMILY_REPRESENTATIVE[fam]) {
