@@ -7,7 +7,7 @@
     "dev": "export $(grep '^SYSTEM_HEALTH_.*=' ../../.env.ports | sed 's/#.*//' | xargs) && vite --port $SYSTEM_HEALTH_DASHBOARD_PORT",
     "build": "tsc --noEmit && vite build",
     "preview": "export $(grep '^SYSTEM_HEALTH_.*=' ../../.env.ports | sed 's/#.*//' | xargs) && vite preview --port $SYSTEM_HEALTH_DASHBOARD_PORT",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "api": "export $(grep '^SYSTEM_HEALTH_.*=' ../../.env.ports | sed 's/#.*//' | xargs) && node server.js",
     "typecheck": "tsc --noEmit"
   },
