@@ -50,7 +50,6 @@ export function useCellLogPoll(
       cancelled = true
       clearInterval(timer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId, taskId, active, dispatch])
 
   return log
