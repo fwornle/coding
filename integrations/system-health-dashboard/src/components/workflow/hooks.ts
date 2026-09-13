@@ -39,33 +39,49 @@ export function useWorkflowDefinitions(workflowName?: string) {
     }
   }, [workflowName, initialized, dispatch])
 
-  // Return fallback values if not initialized
-  if (!initialized) {
-    return {
-      agents: WORKFLOW_AGENTS,
-      orchestrator: ORCHESTRATOR_NODE,
-      edges: MULTI_AGENT_EDGES,
-      stepToAgent: STEP_TO_AGENT,
-      stepToSubStep: STEP_TO_SUBSTEP,
-      agentSubSteps: AGENT_SUBSTEPS,
-      isLoading: true,
-      error: null
+  // Memoised because the three merges below are object SPREADS: without this the
+  // hook handed every caller a new `stepToAgent` / `stepToSubStep` /
+  // `agentSubSteps` on every render, and those feed the callers' own useMemos.
+  // In multi-agent-graph that cascaded — fresh stepToAgent -> the stepStatusMap
+  // memo recomputed -> getNodeStatus was new -> renderNode was new -> every node
+  // re-rendered, on every render, with two Logger.info calls firing each time.
+  // The nine selectors are plain property accessors on the slice
+  // (workflowConfigSlice.ts:213-222), so they are reference-stable and this memo
+  // only recomputes when the workflow config genuinely changes.
+  //
+  // BOTH branches live inside the ONE memo on purpose. The uninitialised case
+  // used to be an early `return` above; leaving it there and memoising only the
+  // second branch would call useMemo conditionally, which breaks the Rules of
+  // Hooks (the hook count would change on the render where config arrives).
+  return useMemo(() => {
+    // Fallback values if not initialized
+    if (!initialized) {
+      return {
+        agents: WORKFLOW_AGENTS,
+        orchestrator: ORCHESTRATOR_NODE,
+        edges: MULTI_AGENT_EDGES,
+        stepToAgent: STEP_TO_AGENT,
+        stepToSubStep: STEP_TO_SUBSTEP,
+        agentSubSteps: AGENT_SUBSTEPS,
+        isLoading: true,
+        error: null,
+      }
     }
-  }
 
-  // IMPORTANT: Merge API data with constants to ensure all mappings exist
-  // The API may return partial data, so we need constants as a safety net
-  // Constants take precedence for critical mappings (like operator_* → kg_operators)
-  return {
-    agents: agents?.length > 0 ? agents : WORKFLOW_AGENTS,
-    orchestrator: orchestrator || ORCHESTRATOR_NODE,
-    edges: edges?.length > 0 ? edges : MULTI_AGENT_EDGES,
-    stepToAgent: { ...STEP_TO_AGENT, ...(stepToAgent || {}) },  // Merge: constants first, API overrides
-    stepToSubStep: { ...STEP_TO_SUBSTEP, ...(stepToSubStep || {}) },  // Merge: constants first, API overrides
-    agentSubSteps: { ...AGENT_SUBSTEPS, ...(agentSubSteps || {}) },  // Merge: constants first, API overrides
-    isLoading,
-    error
-  }
+    // IMPORTANT: Merge API data with constants to ensure all mappings exist
+    // The API may return partial data, so we need constants as a safety net
+    // Constants take precedence for critical mappings (like operator_* → kg_operators)
+    return {
+      agents: agents?.length > 0 ? agents : WORKFLOW_AGENTS,
+      orchestrator: orchestrator || ORCHESTRATOR_NODE,
+      edges: edges?.length > 0 ? edges : MULTI_AGENT_EDGES,
+      stepToAgent: { ...STEP_TO_AGENT, ...(stepToAgent || {}) },  // Merge: constants first, API overrides
+      stepToSubStep: { ...STEP_TO_SUBSTEP, ...(stepToSubStep || {}) },  // Merge: constants first, API overrides
+      agentSubSteps: { ...AGENT_SUBSTEPS, ...(agentSubSteps || {}) },  // Merge: constants first, API overrides
+      isLoading,
+      error,
+    }
+  }, [initialized, agents, orchestrator, edges, stepToAgent, stepToSubStep, agentSubSteps, isLoading, error])
 }
 
 // Hook to preserve scroll position across re-renders
