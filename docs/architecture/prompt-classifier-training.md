@@ -3,7 +3,7 @@
 The prompt-classifier service supports four strategies while keeping the proxy contract unchanged: `POST /classify {text}` returns a `band`.
 
 | Strategy | Behavior |
-|---|---|
+| --- | --- |
 | `llm` | Existing local rubric judge. Shipping default. |
 | `knn` | Semantic KNN verdict; optionally asks the LLM when KNN abstains. |
 | `hybrid` | KNN when confident, existing LLM judge on abstention or model failure. |
