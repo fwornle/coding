@@ -115878,5 +115878,189 @@
       "createdAt": "2026-09-13T11:39:20.466Z"
     },
     "project": "a2a-xpr"
+  },
+  {
+    "id": "e86260af-61f2-45ec-acfe-e21aae6d221f",
+    "date": "2026-09-13",
+    "theme": "Push and PR for statusline headless fix",
+    "summary": "- Goal: land the statusline context gauge fix for headless run sessions without disrupting local uncommitted work on `main`.\n- Approach (claude): created and pushed branch `fix/statusline-headless-run-sessions` to origin at commit `976a8f490`, leaving `main`'s working tree with the uncommitted fix intact.\n- Followed up by opening PR #10 (https://github.com/fwornle/coding/pull/10) via GitHub CLI, with detailed description of symptom, measurements, code rationale, and edge cases.\n- Result: PR #10 changed 2 files (+277/−17), adding SQL predicate-based filter logic and six new tests; the live fix remains active in `main`'s working directory pending merge.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T11:54:05.210Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-13",
+      "theme": "Push and PR for statusline headless fix",
+      "summary": "- Goal: land the statusline context gauge fix for headless run sessions without disrupting local uncommitted work on `main`.\n- Approach (claude): created and pushed branch `fix/statusline-headless-run-sessions` to origin at commit `976a8f490`, leaving `main`'s working tree with the uncommitted fix intact.\n- Followed up by opening PR #10 (https://github.com/fwornle/coding/pull/10) via GitHub CLI, with detailed description of symptom, measurements, code rationale, and edge cases.\n- Result: PR #10 changed 2 files (+277/−17), adding SQL predicate-based filter logic and six new tests; the live fix remains active in `main`'s working directory pending merge.",
+      "observation_ids": [
+        "e34162b9-349b-464d-b3c9-a8f52b77bffc",
+        "d339a800-5738-4ac4-8175-60b44cda9289"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-13T11:54:05.210Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "298f8637-2a36-4774-aba3-90a5920df621",
+    "date": "2026-09-13",
+    "theme": "Investigate 164 test failures in a2a-xpr project",
+    "summary": "- Goal: diagnose and fix 164 failing tests in the `a2a-xpr` project.\n- Approach (claude): began by examining the test runner script to identify shared root causes rather than treating failures as isolated.\n- Result: diagnostic investigation started but not completed—no fixes implemented or findings reported yet.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-13T11:54:05.210Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-13",
+      "theme": "Investigate 164 test failures in a2a-xpr project",
+      "summary": "- Goal: diagnose and fix 164 failing tests in the `a2a-xpr` project.\n- Approach (claude): began by examining the test runner script to identify shared root causes rather than treating failures as isolated.\n- Result: diagnostic investigation started but not completed—no fixes implemented or findings reported yet.",
+      "observation_ids": [
+        "868f9f83-311d-4a92-b726-2a582d4ad0e7"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-13T11:54:05.210Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "de47ecf7-8817-410d-9b29-c2790ad54609",
+    "date": "2026-09-13",
+    "theme": "Commit and push pending changes across projects",
+    "summary": "- Goal: review and finalize pending changes across the `coding` project and the related `rapid-llm-proxy` project.\n- Approach: checked git status/diffs, identified a formatting issue in `proxy-bridge/server.mjs` to resolve before committing.\n- Files involved: `config/agents/opencode.sh`, `config/prompt-classifier.yaml`, `docs/architecture/prompt-classifier-training.md`, `tests/agents/opencode-anthropic-native-splice.test.mjs`, `proxy-bridge/routing-config.mjs`, `tests/unit/routing-config.test` files, `proxy-bridge/server.mjs`.\n- After committing, verified both repos were fast-forward only (no divergence) and pushed cleanly to `origin/main` for both projects.\n- Result: all pending changes committed and successfully pushed to remote main branches.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T11:54:05.210Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-13",
+      "theme": "Commit and push pending changes across projects",
+      "summary": "- Goal: review and finalize pending changes across the `coding` project and the related `rapid-llm-proxy` project.\n- Approach: checked git status/diffs, identified a formatting issue in `proxy-bridge/server.mjs` to resolve before committing.\n- Files involved: `config/agents/opencode.sh`, `config/prompt-classifier.yaml`, `docs/architecture/prompt-classifier-training.md`, `tests/agents/opencode-anthropic-native-splice.test.mjs`, `proxy-bridge/routing-config.mjs`, `tests/unit/routing-config.test` files, `proxy-bridge/server.mjs`.\n- After committing, verified both repos were fast-forward only (no divergence) and pushed cleanly to `origin/main` for both projects.\n- Result: all pending changes committed and successfully pushed to remote main branches.",
+      "observation_ids": [
+        "a0d43288-591f-4aca-a481-56c404e8dbd1",
+        "e7b7c67b-c744-42db-aa9e-47da2407cf35"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-13T11:54:05.210Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b70d63b1-3b3c-4730-8cd1-f872ce6ec54e",
+    "date": "2026-09-13",
+    "theme": "Open PR for opencode-sol-via-proxy feature branch",
+    "summary": "- Agent `claude` used GitHub CLI to create PR #31 (`feat/opencode-sol-via-proxy` → `main`) in the `rapid-llm-proxy` repo\n- Verified PR opened successfully in OPEN state\n- Confirmed required security/scanning checks auto-triggered: Wiz IaC, Secret, and Vulnerability scanners, started at 12:00:16\n- No code artifacts changed; purely a PR creation/verification task",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T12:40:58.252Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-13",
+      "theme": "Open PR for opencode-sol-via-proxy feature branch",
+      "summary": "- Agent `claude` used GitHub CLI to create PR #31 (`feat/opencode-sol-via-proxy` → `main`) in the `rapid-llm-proxy` repo\n- Verified PR opened successfully in OPEN state\n- Confirmed required security/scanning checks auto-triggered: Wiz IaC, Secret, and Vulnerability scanners, started at 12:00:16\n- No code artifacts changed; purely a PR creation/verification task",
+      "observation_ids": [
+        "39dd4a6a-97da-48d3-aac6-fa9553d93564"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-13T12:40:58.252Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "b30b46e8-fb8b-4657-b48a-5704aa23a833",
+    "date": "2026-09-13",
+    "theme": "Verifying CI test runs and Windows failure for PR11",
+    "summary": "- Goal: confirm test suite actually executed on PR11's CI run and diagnose a Windows-specific failure.\n- `claude` first questioned whether 2583 tests genuinely ran given the suspiciously fast 1m23s runtime for npm ci + builds + tests.\n- Investigation pivoted to a Windows platform failure (Image #3), confirming non-Windows jobs passed before isolating the Windows issue.\n- A background wait command for the Windows job returned exit code 8, initially suspected as a failure; log inspection via GitHub Actions revealed this was a false negative from `gh pr checks` reporting pending jobs.\n- Confirmed the `daemon-backends` job on `windows-latest` actually passed successfully, resolving concerns about test skipping/caching and the Windows failure.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-13T12:40:58.252Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-13",
+      "theme": "Verifying CI test runs and Windows failure for PR11",
+      "summary": "- Goal: confirm test suite actually executed on PR11's CI run and diagnose a Windows-specific failure.\n- `claude` first questioned whether 2583 tests genuinely ran given the suspiciously fast 1m23s runtime for npm ci + builds + tests.\n- Investigation pivoted to a Windows platform failure (Image #3), confirming non-Windows jobs passed before isolating the Windows issue.\n- A background wait command for the Windows job returned exit code 8, initially suspected as a failure; log inspection via GitHub Actions revealed this was a false negative from `gh pr checks` reporting pending jobs.\n- Confirmed the `daemon-backends` job on `windows-latest` actually passed successfully, resolving concerns about test skipping/caching and the Windows failure.",
+      "observation_ids": [
+        "e778c93d-2b09-498a-9eb2-5553815bf70d",
+        "58ca2a0c-7c15-459b-8772-fbc6c4a24801",
+        "91899203-1aaf-4545-aaa6-bbb9215a0d9b"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-13T12:40:58.252Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "c20454ee-5ef8-4808-8f8f-54324712be3e",
+    "date": "2026-09-13",
+    "theme": "Closing issue and merging PR11",
+    "summary": "- Following successful CI validation, `claude` closed the associated issue and merged PR11 in the `a2a-xpr` repository using GitHub API/bash commands.\n- Also explained the manual GitHub UI workflow for closing issues: clicking \"Close\" on the issue page, or referencing it in a commit/PR with keywords like \"closes #N\" or \"fixes #N\".",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T12:40:58.252Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-13",
+      "theme": "Closing issue and merging PR11",
+      "summary": "- Following successful CI validation, `claude` closed the associated issue and merged PR11 in the `a2a-xpr` repository using GitHub API/bash commands.\n- Also explained the manual GitHub UI workflow for closing issues: clicking \"Close\" on the issue page, or referencing it in a commit/PR with keywords like \"closes #N\" or \"fixes #N\".",
+      "observation_ids": [
+        "ca22f0f9-f7c2-4090-8b45-ea9a3d9958e8"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-13T12:40:58.252Z"
+    },
+    "project": "a2a-xpr"
   }
 ]
