@@ -70,7 +70,7 @@ export function initTheme(): void {
     // addEventListener is the modern API; older Safari used addListener.
     if (mq.addEventListener) mq.addEventListener('change', onChange)
     else if ((mq as MediaQueryList & { addListener?: (cb: () => void) => void }).addListener) {
-      ;(mq as MediaQueryList & { addListener: (cb: () => void) => void }).addListener(onChange)
+      (mq as MediaQueryList & { addListener: (cb: () => void) => void }).addListener(onChange)
     }
   }
 }

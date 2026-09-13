@@ -17,7 +17,7 @@ export const apiMiddleware: Middleware = (store) => (next) => (action: any) => {
   // Handle trigger verification action asynchronously
   if (action.type === triggerVerificationStart.type) {
     // Execute async operation without blocking
-    ;(async () => {
+    (async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/verify`, {
           method: 'POST',

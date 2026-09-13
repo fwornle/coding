@@ -39,5 +39,5 @@ export const useReduxStore = () => store
 
 // Development helper to expose store globally in dev mode
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  ;(window as any).__REDUX_STORE__ = store
+  (window as any).__REDUX_STORE__ = store
 }
