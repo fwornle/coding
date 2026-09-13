@@ -90,7 +90,9 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
             <section>
               <h3 className="text-sm font-semibold mb-2">Model prices — USD / 1M tokens</h3>
               <div className="text-xs text-muted-foreground mb-2">
-                Opus 4.8 seeded at $5 / $25 — confirm against your actual model tier.
+                Seeded at published rates — Opus $5 / $25, Sonnet $3 / $15. A <code>-fast</code>{' '}
+                model id has no row of its own: it prices at 2&times; its base model, so{' '}
+                <code>claude-opus-5-fast</code> is $10 / $50. Confirm against your actual model tier.
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
