@@ -690,7 +690,17 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
 
   // Newest-first ordering (see runSortTs). Sort a COPY — the selector's array is
   // frozen/shared state.
-  const sortedRuns = [...filtered].sort((a, b) => runSortTs(b).localeCompare(runSortTs(a)))
+  //
+  // Memoised on `filtered`, which IS stable (selectFilteredRuns is a createSelector,
+  // performanceSlice.ts). Without this the bare [...].sort() handed a NEW array to
+  // the three useMemos below on every render, so all of them recomputed every time —
+  // grouping the whole filtered set, on every render, while their memoisation looked
+  // like it was doing something. Everything downstream of here has to stay memoised
+  // for the same reason, or the chain goes dead again from whichever link breaks.
+  const sortedRuns = useMemo(
+    () => [...filtered].sort((a, b) => runSortTs(b).localeCompare(runSortTs(a))),
+    [filtered],
+  )
 
   // Group the FULL filtered set by experiment so EVERY experiment surfaces as a compact
   // parent row regardless of how many ambient rows exist — the 77 opencode / 35 claude
@@ -701,9 +711,12 @@ export function RunsTable({ onCompare }: { onCompare?: () => void } = {}) {
   const allGroups = useMemo(() => groupRunsByExperiment(sortedRuns), [sortedRuns])
   const expGroups = useMemo(() => allGroups.filter((g) => g.key !== OTHER_GROUP_KEY), [allGroups])
   const otherGroup = useMemo(() => allGroups.find((g) => g.key === OTHER_GROUP_KEY) ?? null, [allGroups])
-  const visibleExpGroups = expGroups.slice(0, visibleCount)
+  const visibleExpGroups = useMemo(() => expGroups.slice(0, visibleCount), [expGroups, visibleCount])
   const remaining = expGroups.length - visibleExpGroups.length
-  const runGroups = otherGroup ? [...visibleExpGroups, otherGroup] : visibleExpGroups
+  const runGroups = useMemo(
+    () => (otherGroup ? [...visibleExpGroups, otherGroup] : visibleExpGroups),
+    [visibleExpGroups, otherGroup],
+  )
   // Expanded-group set. Default COLLAPSED (empty set) — the operator asked for one
   // entry per experiment, opened on demand. "Expand all / Collapse all" toggles all.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())

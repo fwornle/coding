@@ -804,12 +804,72 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }, [activeCurrentProcess, singleStepMode, stepPaused, pausedAtStep])
 
+  // Declared here, ABOVE the effects that list them as dependencies: a dep array
+  // is evaluated during render, so leaving these further down the component body
+  // would put them in their temporal dead zone and throw on the first render.
+  // useCallback (rather than a bare arrow) is what makes depending on them safe at
+  // all — each one fetches AND dispatches, so a new identity every render would
+  // re-fire the effect, dispatch, re-render, and loop.
+  const loadHistoricalWorkflows = useCallback(async () => {
+    Logger.debug(LogCategories.API, 'Loading historical workflows')
+    dispatch(fetchHistoryStart())
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/ukb/history?limit=${HISTORY_PAGE_SIZE}`)
+      const result = await response.json()
+      if (result.status === 'success') {
+        const total = typeof result.total === 'number' ? result.total : result.data?.length || 0
+        Logger.info(
+          LogCategories.UKB,
+          `Loaded ${result.data?.length || 0} of ${total} historical workflows`,
+        )
+        if (total > (result.data?.length || 0)) {
+          // Visible rather than silent: a truncated list is how the batch-analysis
+          // reports became unreachable in the first place.
+          Logger.warn(
+            LogCategories.UKB,
+            `Workflow history truncated at ${HISTORY_PAGE_SIZE}; ${total} reports exist. ` +
+              'Older runs are not reachable from this list — raise HISTORY_PAGE_SIZE.',
+          )
+        }
+        dispatch(fetchHistorySuccess({ workflows: result.data, total }))
+      } else {
+        Logger.warn(LogCategories.API, 'Failed to load historical workflows', { message: result.message })
+        dispatch(fetchHistoryFailure('Failed to load workflows'))
+      }
+    } catch (error) {
+      Logger.error(LogCategories.API, 'Error fetching historical workflows', error)
+      dispatch(fetchHistoryFailure(String(error)))
+    }
+  }, [apiBaseUrl, dispatch])
+
+  const loadHistoricalWorkflowDetail = useCallback(async (workflowId: string) => {
+    Logger.debug(LogCategories.API, `Loading workflow detail: ${workflowId}`)
+    dispatch(fetchDetailStart())
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/ukb/history/${workflowId}`)
+      const result = await response.json()
+      if (result.status === 'success') {
+        Logger.info(LogCategories.UKB, `Workflow detail loaded: ${workflowId}`, {
+          steps: result.data?.steps?.length || 0,
+          status: result.data?.status
+        })
+        dispatch(fetchDetailSuccess(result.data))
+      } else {
+        Logger.warn(LogCategories.API, 'Failed to load workflow detail', { workflowId, message: result.message })
+        dispatch(fetchDetailFailure('Failed to load workflow detail'))
+      }
+    } catch (error) {
+      Logger.error(LogCategories.API, 'Error fetching workflow detail', { workflowId, error })
+      dispatch(fetchDetailFailure(String(error)))
+    }
+  }, [apiBaseUrl, dispatch])
+
   // Fetch historical workflows when history tab is selected
   useEffect(() => {
     if (open && activeTab === 'history') {
       loadHistoricalWorkflows()
     }
-  }, [open, activeTab])
+  }, [open, activeTab, loadHistoricalWorkflows])
 
   // Auto-select orchestrator/coordinator when modal opens with active workflows
   // This ensures the sidebar is visible immediately showing workflow overview
@@ -842,13 +902,29 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // In single-step mode, use pausedAtStep as the source of truth
   // Users can still manually click to view other steps, but the next step change
   // will switch the sidebar back to the new running step
+  //
+  // These two are hoisted as PRIMITIVES so the effect below can depend on them
+  // instead of on `activeCurrentProcess` itself. That object gets a new identity
+  // on every poll tick (healthRefreshMiddleware stamps a fresh `_refreshKey`), so
+  // depending on it would re-run this effect continuously.
+  //
+  // They are kept SEPARATE on purpose. The effect's two-stage guard is not
+  // redundant: stage one asks "is there a process at all", stage two asks "did we
+  // resolve a step from either source". Collapsing them into one `!currentStepId`
+  // check would break single-step mode, where `pausedAtStep` SUBSTITUTES for an
+  // empty `currentStep` — a real state, because the process record derives
+  // `currentStep` from `currentSubstepId || currentStepName` (undefined at the
+  // very first pause) while `pausedAtStep` is set independently from `pausedAt`.
+  const hasActiveProcess = activeCurrentProcess !== null
+  const currentStepId = activeCurrentProcess?.currentStep
+
   useEffect(() => {
-    if (!open || activeTab !== 'active' || !activeCurrentProcess) return
+    if (!open || activeTab !== 'active' || !hasActiveProcess) return
 
     // In single-step mode, prefer pausedAtStep over currentStep
     const effectiveStep = (singleStepMode && pausedAtStep)
       ? pausedAtStep
-      : activeCurrentProcess.currentStep
+      : currentStepId
 
     if (!effectiveStep) return
 
@@ -913,7 +989,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         previousAgentRef.current = agentId
       }
     }
-  }, [open, activeTab, activeCurrentProcess?.currentStep, singleStepMode, pausedAtStep, expandedSubStepsAgent, dispatch, stepToAgent, stepToSubStep, agentSubSteps])
+  }, [open, activeTab, hasActiveProcess, currentStepId, singleStepMode, pausedAtStep, expandedSubStepsAgent, dispatch, stepToAgent, stepToSubStep, agentSubSteps])
 
   // Reset step tracking ref when modal closes
   useEffect(() => {
@@ -922,59 +998,6 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }, [open])
 
-  const loadHistoricalWorkflows = async () => {
-    Logger.debug(LogCategories.API, 'Loading historical workflows')
-    dispatch(fetchHistoryStart())
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/ukb/history?limit=${HISTORY_PAGE_SIZE}`)
-      const result = await response.json()
-      if (result.status === 'success') {
-        const total = typeof result.total === 'number' ? result.total : result.data?.length || 0
-        Logger.info(
-          LogCategories.UKB,
-          `Loaded ${result.data?.length || 0} of ${total} historical workflows`,
-        )
-        if (total > (result.data?.length || 0)) {
-          // Visible rather than silent: a truncated list is how the batch-analysis
-          // reports became unreachable in the first place.
-          Logger.warn(
-            LogCategories.UKB,
-            `Workflow history truncated at ${HISTORY_PAGE_SIZE}; ${total} reports exist. ` +
-              'Older runs are not reachable from this list — raise HISTORY_PAGE_SIZE.',
-          )
-        }
-        dispatch(fetchHistorySuccess({ workflows: result.data, total }))
-      } else {
-        Logger.warn(LogCategories.API, 'Failed to load historical workflows', { message: result.message })
-        dispatch(fetchHistoryFailure('Failed to load workflows'))
-      }
-    } catch (error) {
-      Logger.error(LogCategories.API, 'Error fetching historical workflows', error)
-      dispatch(fetchHistoryFailure(String(error)))
-    }
-  }
-
-  const loadHistoricalWorkflowDetail = async (workflowId: string) => {
-    Logger.debug(LogCategories.API, `Loading workflow detail: ${workflowId}`)
-    dispatch(fetchDetailStart())
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/ukb/history/${workflowId}`)
-      const result = await response.json()
-      if (result.status === 'success') {
-        Logger.info(LogCategories.UKB, `Workflow detail loaded: ${workflowId}`, {
-          steps: result.data?.steps?.length || 0,
-          status: result.data?.status
-        })
-        dispatch(fetchDetailSuccess(result.data))
-      } else {
-        Logger.warn(LogCategories.API, 'Failed to load workflow detail', { workflowId, message: result.message })
-        dispatch(fetchDetailFailure('Failed to load workflow detail'))
-      }
-    } catch (error) {
-      Logger.error(LogCategories.API, 'Error fetching workflow detail', { workflowId, error })
-      dispatch(fetchDetailFailure(String(error)))
-    }
-  }
 
   // Fetch detail when a historical workflow is selected
   // Auto-select orchestrator to show the workflow overview sidebar
@@ -984,7 +1007,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       dispatch(setSelectedNode('orchestrator'))
       dispatchSetSelectedSubStep(null)
     }
-  }, [selectedHistoricalWorkflowState, dispatchSetSelectedSubStep])
+  }, [selectedHistoricalWorkflowState, dispatchSetSelectedSubStep, dispatch, loadHistoricalWorkflowDetail])
 
   const handleNodeClick = (agentId: string) => {
     Logger.info(LogCategories.AGENT, `Agent node clicked: ${agentId}`, {

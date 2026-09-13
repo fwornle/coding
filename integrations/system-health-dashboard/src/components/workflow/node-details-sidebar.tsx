@@ -688,11 +688,15 @@ function OrchestratorDetailsSidebar({
   // Derive batch step count from workflow config instead of hardcoding
   const BATCH_STEP_COUNT = process.batchPhaseStepCount || 14
   const BATCH_WEIGHT = 0.85    // Batch phase is ~85% of total work
+  // Declared here rather than at the render site below (its other use) so the
+  // memo's dep array can name a plain identifier. The `as any` cast is what the
+  // rule could not key on statically ("complex expression in the dependency
+  // array"), and a dep it cannot key on is one it cannot check for staleness.
+  const batchProgress = (process as any).batchProgress
 
   const progressPercent = useMemo(() => {
     if (process.totalSteps === 0) return 0
 
-    const batchProgress = (process as any).batchProgress
     // During batch phase: use batch progress as primary indicator
     if (batchProgress && batchProgress.totalBatches > 0) {
       const batchPhaseProgress = (batchProgress.currentBatch / batchProgress.totalBatches) * BATCH_WEIGHT
@@ -711,7 +715,7 @@ function OrchestratorDetailsSidebar({
 
     // Fallback for non-batch workflows or early stages
     return Math.round((process.completedSteps / process.totalSteps) * 100)
-  }, [process.completedSteps, process.totalSteps, (process as any).batchProgress])
+  }, [process.completedSteps, process.totalSteps, batchProgress, BATCH_STEP_COUNT])
 
   // Calculate total duration from steps
   const totalDuration = process.steps?.reduce((acc, step) => acc + (step.duration || 0), 0) || 0
@@ -728,7 +732,6 @@ function OrchestratorDetailsSidebar({
   const canCancel = process.status === 'running' || process.status === 'pending' || health === 'stale' || health === 'frozen'
   const isFrozenOrStale = health === 'stale' || health === 'frozen'
 
-  const batchProgress = (process as any).batchProgress
   const batchIterations = (process as any).batchIterations
 
   return (
@@ -1452,7 +1455,7 @@ export function UKBNodeDetailsSidebar({
         error: stepInfo.error,
       })
     }
-  }, [agentId, agent?.name, resolvedStatus, stepInfo, agent?.llmModel, agent?.techStack, process.workflowName])
+  }, [agentId, agent, resolvedStatus, stepInfo, process.workflowName])
 
   // Handle orchestrator node specially - after hooks
   if (agentId === 'orchestrator') {

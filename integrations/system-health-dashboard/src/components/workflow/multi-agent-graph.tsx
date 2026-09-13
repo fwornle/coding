@@ -275,6 +275,15 @@ const WAVE_AGENTS = [
   'ontology_classification', 'persistence', 'kg_operators', 'insight_generation',
 ]
 
+// KG operator child agents that should aggregate to parent kg_operators.
+// Module scope, like WAVE_AGENTS above: the contents are static, so declaring it
+// inside the component rebuilt the array every render and made it a dependency
+// of the status memo below — which would have defeated that memo entirely.
+const KG_OPERATOR_CHILDREN = [
+  'context_convolution', 'entity_aggregation', 'node_embedding',
+  'deduplication_operator', 'edge_prediction', 'structure_merge',
+]
+
 export function MultiAgentGraph({
   process,
   aggregatedSteps,
@@ -583,12 +592,6 @@ export function MultiAgentGraph({
     }
   }, [agents, orchestrator])
 
-  // KG operator child agents that should aggregate to parent kg_operators
-  const KG_OPERATOR_CHILDREN = [
-    'context_convolution', 'entity_aggregation', 'node_embedding',
-    'deduplication_operator', 'edge_prediction', 'structure_merge'
-  ]
-
   // Build step status map and count steps per agent
   // CRITICAL: Use process.currentStep to determine running agent, not just step.status
   // This ensures graph stays in sync with sidebar when currentStep updates before step status
@@ -766,7 +769,7 @@ export function MultiAgentGraph({
       onSubStepSelect(agentId, null)
     }
     handleNodeSelection?.(selectedNode === agentId ? null : agentId)
-  }, [handleNodeSelection, selectedNode, expandedSubStepsAgent, onSubStepSelect, selectedSubStepId])
+  }, [handleNodeSelection, selectedNode, expandedSubStepsAgent, setExpandedSubStepsAgent, onSubStepSelect, selectedSubStepId])
 
   // Node dimensions
   const nodeWidth = 80
@@ -1057,7 +1060,7 @@ export function MultiAgentGraph({
         )}
       </g>
     )
-  }, [getPosition, nodeWidth, nodeHeight, areAdjacentInRing, layout.centerX, layout.centerY, layout.radius, pal])
+  }, [getPosition, nodeWidth, nodeHeight, areAdjacentInRing, layout.centerX, layout.centerY, pal])
 
   // Render a node
   const renderNode = useCallback((position: { agent: AgentDefinition; x: number; y: number }) => {
@@ -1261,7 +1264,15 @@ export function MultiAgentGraph({
 
           </g>
     )
-  }, [getNodeStatus, getStepCount, selectedNode, wigglingNode, handleNodeClickInternal, handleNodeMouseEnter, handleNodeMouseLeave, nodeWidth, nodeHeight, expandedSubStepsAgent, pal])
+    // effectiveAgentSubSteps / llmState / the three handlers are read at 1130,
+    // 1171-1172 and 1202-1216. They are listed for honesty rather than to fix an
+    // observable bug: useWorkflowDefinitions (hooks.ts:58-68) returns fresh object
+    // literals every call, so stepToAgent churns -> the stepStatusMap memo
+    // recomputes -> getNodeStatus is new -> renderNode is ALREADY re-created on
+    // every render. The stale values can therefore never be more than one render
+    // old today. Memoise hooks.ts and that stops being true, at which point these
+    // deps are the only thing standing between you and a stale per-agent LLM chip.
+  }, [getNodeStatus, getStepCount, selectedNode, wigglingNode, handleNodeClickInternal, handleNodeMouseEnter, handleNodeMouseLeave, nodeWidth, nodeHeight, expandedSubStepsAgent, effectiveAgentSubSteps, handleNodeSelection, llmState.globalMode, llmState.perAgentOverrides, onSubStepSelect, setExpandedSubStepsAgent, pal])
 
   if (isLoading) {
     return (

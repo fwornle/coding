@@ -250,7 +250,7 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
   // draft is open — see the fetch below.
   const [draftDirty, setDraftDirty] = useState(false)
 
-  const load = useCallback(async (isAuto: boolean) => {
+  const load = useCallback(async (skipConfig: boolean) => {
     setError(null)
     try {
       // Traffic always refreshes; the config is skipped while a draft is
@@ -259,7 +259,11 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
       // routes/providers this tab passes DOWN to that card would shift beneath
       // an operator mid-edit, and a policy preview computed against
       // half-swapped config is a number nobody can account for.
-      const skipConfig = isAuto && draftDirty
+      //
+      // `skipConfig` is now a PARAMETER rather than `isAuto && draftDirty`
+      // computed in here. That is what keeps draftDirty out of this callback's
+      // closure, so `load` is stable and the effect below can depend on it
+      // honestly; `poll` applies the auto-path rule at the call site.
       const [b, c, rec] = await Promise.all([
         fetch(`${proxyBase}/api/llm/routing/behaviour?hours=${encodeURIComponent(hours)}`).then(r => r.json()),
         skipConfig ? Promise.resolve(null) : fetch(`${proxyBase}/api/llm/routing`).then(r => r.json()),
@@ -282,16 +286,29 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
     } catch (e) {
       setError(String((e as Error).message || e))
     }
-  }, [proxyBase, hours, draftDirty, scope])
+  }, [proxyBase, hours, scope])
 
   // Mount + whenever the window or a policy save invalidates everything.
-  useEffect(() => { void load(false) }, [proxyBase, hours, reloadNonce, scope])
+  // `load` carries proxyBase/hours/scope in its own deps, so depending on it is
+  // the same trigger set the explicit list used to spell out — plus reloadNonce,
+  // which is not one of load's inputs but must still force a refetch.
+  useEffect(() => { void load(false) }, [load, reloadNonce])
 
   // ...and on a timer thereafter. Everything on this tab is a record of what the
   // router just did, so a tab left open on a once-fetched frame is the one
   // failure mode it cannot afford. Paused while a policy draft is unsaved so an
   // edit is never interrupted, and while the browser tab is hidden.
-  const { countdown, refreshNow } = usePolledFetch(load, {
+  // The auto path — and only the auto path — may skip the config re-read. Keeping
+  // that rule here rather than inside `load` is what lets `load` stay stable.
+  // poll's own identity churns with draftDirty, which costs nothing: usePolledFetch
+  // reads its fetcher through a ref and deliberately excludes it from the interval
+  // deps, so this neither restarts the timer nor resets the countdown.
+  const poll = useCallback(
+    (isAuto: boolean) => load(isAuto && draftDirty),
+    [load, draftDirty],
+  )
+
+  const { countdown, refreshNow } = usePolledFetch(poll, {
     intervalMs: REFRESH_INTERVAL_MS,
     enabled: !draftDirty,
   })
