@@ -503,11 +503,11 @@ describeSqlite('opencode reader — Anthropic wire', () => {
       CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT, model TEXT,
                             parent_id TEXT, time_created INTEGER,
                             time_updated INTEGER, time_archived INTEGER,
-                            tokens_input INTEGER);
+                            permission TEXT, tokens_input INTEGER);
       CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT,
                             time_created INTEGER, data TEXT);
     `);
-    d.prepare('INSERT INTO session VALUES (?,?,?,?,?,?,?,?)').run(
+    d.prepare('INSERT INTO session VALUES (?,?,?,?,?,?,?,?,?)').run(
       session.id ?? 's1',
       session.directory ?? '/proj',
       session.model ?? '{"id":"claude-sonnet-5"}',
@@ -515,6 +515,7 @@ describeSqlite('opencode reader — Anthropic wire', () => {
       session.time_created ?? 100,
       session.time_updated ?? 100,
       session.time_archived ?? null,
+      session.permission ?? null,
       9999999,
     );
     const ins = d.prepare('INSERT INTO message VALUES (?,?,?,?)');
@@ -744,15 +745,15 @@ describeSqlite('opencode reader — which session belongs to this pane', () => {
       CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT, model TEXT,
                             parent_id TEXT, time_created INTEGER,
                             time_updated INTEGER, time_archived INTEGER,
-                            tokens_input INTEGER);
+                            permission TEXT, tokens_input INTEGER);
       CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT,
                             time_created INTEGER, data TEXT);
     `);
-    const si = d.prepare('INSERT INTO session VALUES (?,?,?,?,?,?,?,?)');
+    const si = d.prepare('INSERT INTO session VALUES (?,?,?,?,?,?,?,?,?)');
     for (const s of sessions) {
       si.run(s.id, s.directory ?? '/proj', '{"id":"claude-sonnet-5"}',
         s.parent_id ?? null, s.time_created, s.time_updated ?? s.time_created,
-        s.time_archived ?? null, 0);
+        s.time_archived ?? null, s.permission ?? null, 0);
     }
     const mi = d.prepare('INSERT INTO message VALUES (?,?,?,?)');
     for (const [sid, msgs] of Object.entries(messagesBySession)) {
@@ -915,6 +916,164 @@ describeSqlite('opencode reader — which session belongs to this pane', () => {
       });
       expect(r.usedPct).toBe(0);
       expect(r.source).toBe('opencode-db-fresh');
+    });
+  });
+
+  /**
+   * A permission override exactly as `opencode run` writes one, and the two
+   * shapes that must NOT be mistaken for it.
+   *
+   * Key order is the serialiser's, not the source literal's — the real database
+   * stores pattern before action while opencode's `run` writes action first —
+   * so the predicate must not depend on it. `[]` is what `run --interactive`
+   * supplies, and that is a pane.
+   */
+  const HEADLESS_RUN = JSON.stringify([
+    { permission: 'question', pattern: '*', action: 'deny' },
+    { permission: 'plan_enter', pattern: '*', action: 'deny' },
+    { permission: 'plan_exit', pattern: '*', action: 'deny' },
+  ]);
+  const AGENT_DEFAULTS = JSON.stringify([
+    { permission: '*', pattern: '*', action: 'allow' },
+    { permission: 'question', pattern: '*', action: 'deny' },
+    { permission: 'plan_enter', pattern: '*', action: 'deny' },
+    { permission: 'plan_exit', pattern: '*', action: 'deny' },
+    { permission: 'repo_clone', pattern: '*', action: 'deny' },
+  ]);
+
+  /**
+   * THE HEADLESS-RUN CASE: a live 72% pane driven to 0% by a probe.
+   *
+   * `opencode run "say OK"` in the pane's own directory creates a top-level,
+   * non-archived session stamped NOW, so every filter passes it, and its prompt
+   * is a user message, so it takes the tie-break too. Measured on the pane that
+   * reported this: the interactive session's last user message was 12:04:07,
+   * three probes landed at 12:31, 12:34 and 12:48, and the gauge followed each.
+   */
+  test('a headless `opencode run` in the same directory does not take the gauge', () => {
+    const db = path.join(tmp, 'oc-headless.db');
+    seedSessions(db, [
+      { id: 'pane', time_created: 6000, time_updated: 7000 },
+      { id: 'probe', time_created: 9000, time_updated: 9000, permission: HEADLESS_RUN },
+    ], {
+      pane: [user(6500), big(100000)],
+      // The probe outranks the pane on BOTH halves of max(created, last user
+      // message), so nothing but the permission stamp can separate them.
+      probe: [user(9000), big(1000)],
+    });
+    const repo = pane('coding-opencode-8', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-8',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  /**
+   * The reason this is a SQL predicate and not a .filter() on the result.
+   * OPENCODE_SESSION_CANDIDATES is 5 and the LIMIT is applied before any JS runs,
+   * so a burst of probes crowds the pane's own session out of the pool entirely.
+   * Five probes here — one more than the pool can hold alongside it.
+   */
+  test('a burst of probes cannot crowd the pane session out of the pool', () => {
+    const db = path.join(tmp, 'oc-headless-burst.db');
+    const sessions = [{ id: 'pane', time_created: 6000, time_updated: 7000 }];
+    const messages = { pane: [user(6500), big(100000)] };
+    for (let i = 0; i < 5; i++) {
+      sessions.push({
+        id: `probe${i}`, time_created: 9000 + i, time_updated: 9000 + i,
+        permission: HEADLESS_RUN,
+      });
+      messages[`probe${i}`] = [user(9000 + i), big(1000)];
+    }
+    seedSessions(db, sessions, messages);
+    const repo = pane('coding-opencode-9', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-9',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  test('`run --interactive` supplies [] and IS a pane — it keeps the gauge', () => {
+    const db = path.join(tmp, 'oc-run-interactive.db');
+    seedSessions(db, [
+      { id: 'older', time_created: 6000, time_updated: 7000 },
+      { id: 'interactive', time_created: 9000, time_updated: 9000, permission: '[]' },
+    ], {
+      older: [user(6500), big(190000)],
+      interactive: [user(9000), big(100000)],
+    });
+    const repo = pane('coding-opencode-10', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-10',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  test('the agent-level default permissions also deny plan_exit, and are kept', () => {
+    // Four denies among more than three entries. Matching on "denies plan_exit"
+    // alone would have silenced a real conversation.
+    const db = path.join(tmp, 'oc-agent-defaults.db');
+    seedSessions(db, [
+      { id: 'configured', time_created: 9000, time_updated: 9000, permission: AGENT_DEFAULTS },
+    ], { configured: [user(9000), big(100000)] });
+    const repo = pane('coding-opencode-11', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-11',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  test('a junk permission value is survivable — json_*() must not throw the query', () => {
+    // NULL and '' are covered by every other test in this block; this is the
+    // third input the CASE guard exists for.
+    const db = path.join(tmp, 'oc-permission-junk.db');
+    seedSessions(db, [
+      { id: 'junk', time_created: 9000, time_updated: 9000, permission: 'not json at all' },
+    ], { junk: [user(9000), big(100000)] });
+    const repo = pane('coding-opencode-12', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-12',
+      }).usedPct).toBeCloseTo(50, 5);
+    });
+  });
+
+  /**
+   * A schema without the column must degrade to today's behaviour, not to a
+   * hole. This is the fallback in opencodeSessionCandidates(), and the only way
+   * to exercise it is a fixture built the way this file's did before the filter.
+   */
+  test('a session table with no permission column still reads', () => {
+    const db = path.join(tmp, 'oc-no-permission-col.db');
+    const d = new Database(db);
+    d.exec(`
+      CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT, model TEXT,
+                            parent_id TEXT, time_created INTEGER,
+                            time_updated INTEGER, time_archived INTEGER,
+                            tokens_input INTEGER);
+      CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT,
+                            time_created INTEGER, data TEXT);
+    `);
+    d.prepare('INSERT INTO session VALUES (?,?,?,?,?,?,?,?)')
+      .run('only', '/proj', '{"id":"claude-sonnet-5"}', null, 6000, 7000, null, 0);
+    d.prepare('INSERT INTO message VALUES (?,?,?,?)')
+      .run('only-m0', 'only', 0, JSON.stringify(big(100000)));
+    d.close();
+    const repo = pane('coding-opencode-13', 5000);
+
+    withPane(repo, db, () => {
+      expect(gauge.readContextUsage({
+        agent: 'opencode', projectPath: '/proj', tmuxSession: 'coding-opencode-13',
+      }).usedPct).toBeCloseTo(50, 5);
     });
   });
 
