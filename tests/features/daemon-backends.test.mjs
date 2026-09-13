@@ -52,6 +52,15 @@ function recorder(responses = {}) {
  */
 const UID = 501;
 
+/**
+ * Pinned for the same reason as UID: launchd and systemd paths are built from
+ * the home directory, and reading the runner's would make the asserted command
+ * line differ per host — which is what forced the launchd assertion below to be
+ * a regex with `.*` where the plist path belongs. A fixed home lets it assert
+ * the whole string instead, on every OS.
+ */
+const HOME = '/Users/contract-test';
+
 describe('platform detection', () => {
   test('maps node platform names and accepts an override', () => {
     assert.equal(platform({ platform: 'darwin' }), 'macos');
@@ -183,7 +192,7 @@ describe('windows — Task Scheduler', () => {
 });
 
 describe('macos — launchd', () => {
-  const opts = (r) => ({ platform: 'macos', exec: r.exec, uid: UID });
+  const opts = (r) => ({ platform: 'macos', exec: r.exec, uid: UID, home: HOME });
 
   test('listRunning parses the third column of launchctl list', async () => {
     const r = recorder({
@@ -212,8 +221,40 @@ describe('macos — launchd', () => {
   test('start enables then bootstraps the plist', async () => {
     const r = recorder();
     await startForced('obs-api', opts(r));
-    assert.match(r.joined()[0], new RegExp(`launchctl enable gui/${UID}/com\\.coding\\.obs-api`));
-    assert.match(r.joined()[1], /launchctl bootstrap gui\/\d+ .*com\.coding\.obs-api\.plist/);
+    // Whole strings, not a regex with `.*` where the path goes. That looseness
+    // was covering for a plist path built with the HOST's separator, so on
+    // Windows it happily matched a `C:\Users\...\...plist` argument — the one
+    // place a wrong path could hide is the one place the assertion stopped
+    // looking. With home and uid both pinned there is nothing host-dependent
+    // left to tolerate.
+    assert.deepEqual(r.joined(), [
+      `launchctl enable gui/${UID}/com.coding.obs-api`,
+      `launchctl bootstrap gui/${UID} ${HOME}/Library/LaunchAgents/com.coding.obs-api.plist`,
+    ]);
+  });
+
+  test('a uid cannot be silently invented when the host has no getuid', async () => {
+    // The old fallback returned 0 here, which is ROOT's launchd domain — a
+    // different and privileged target, produced silently. Refusing is the only
+    // honest answer; production never reaches it, because this branch runs only
+    // when platform() is 'macos' and every Mac has process.getuid.
+    const real = process.getuid;
+    try {
+      delete process.getuid;
+      // Awaited, and the restore below therefore happens AFTER the call. Without
+      // the await the finally put process.getuid back before stop() had even
+      // reached guiUid, so the test asserted nothing and leaked a rejection.
+      await assert.rejects(
+        () => stop('obs-api', {
+          platform: 'macos',
+          exec: async () => ({ ok: true, stdout: '', stderr: '' }),
+          exists: () => true,
+        }),
+        /cannot resolve a uid/,
+      );
+    } finally {
+      if (real) process.getuid = real;
+    }
   });
 });
 
