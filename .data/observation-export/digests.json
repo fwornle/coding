@@ -106043,104 +106043,6 @@
     "project": "a2a"
   },
   {
-    "id": "eb07a43a-bcdb-402f-a7ec-e731612cb8c9",
-    "date": "2026-09-01",
-    "theme": "Token usage backfill idempotency and live run verification",
-    "summary": "- Goal: safely backfill missing Claude prompt text into the `token_usage` table by joining transcripts on upstream `requestId`.\n- Verified idempotency via sqlite3 queries and script inspection; identified risk of dropped rows from write-lock contention during best-effort proxy logging.\n- Mitigated by chunking commits (2000-row transaction batching); confirmed chunked output identical to baseline before running on live DB.\n- Executed live backfill: recovered prompts for 34,469 of 63,752 rows (54%), spanning August–September (June–July transcripts no longer exist).\n- Validated via 16 requestId parity checks (0 mismatches), double-run idempotency test, and 12 correctness test cases (no tool_result/caption confusion, per-turn isolation, no session leakage).\n- Fixed two production faults uncovered during the process: a redundant OR clause causing quadratic matching, and a partial index requiring explicit WHERE predicates to avoid full-table scans.\n- No data loss or service interruption occurred during the live run.",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-05T07:57:11.233Z",
-    "metadata": {
-      "sourceCount": 3,
-      "date": "2026-09-01",
-      "theme": "Token usage backfill idempotency and live run verification",
-      "summary": "- Goal: safely backfill missing Claude prompt text into the `token_usage` table by joining transcripts on upstream `requestId`.\n- Verified idempotency via sqlite3 queries and script inspection; identified risk of dropped rows from write-lock contention during best-effort proxy logging.\n- Mitigated by chunking commits (2000-row transaction batching); confirmed chunked output identical to baseline before running on live DB.\n- Executed live backfill: recovered prompts for 34,469 of 63,752 rows (54%), spanning August–September (June–July transcripts no longer exist).\n- Validated via 16 requestId parity checks (0 mismatches), double-run idempotency test, and 12 correctness test cases (no tool_result/caption confusion, per-turn isolation, no session leakage).\n- Fixed two production faults uncovered during the process: a redundant OR clause causing quadratic matching, and a partial index requiring explicit WHERE predicates to avoid full-table scans.\n- No data loss or service interruption occurred during the live run.",
-      "observation_ids": [
-        "3d5b7429-83af-4008-8061-339254e552c1",
-        "afb50166-f4a5-44ba-82fb-e03f20a2c6b4",
-        "42da9c11-f0e6-466d-b290-7ae13fbc1730"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [],
-      "project": "coding",
-      "quality": "high",
-      "createdAt": "2026-09-05T07:57:11.233Z"
-    },
-    "project": "coding"
-  },
-  {
-    "id": "32f6af1c-b9e5-4db4-a319-29793eb87a6c",
-    "date": "2026-09-01",
-    "theme": "Diagnosing and fixing proxy egress failures on corporate network",
-    "summary": "- Goal: diagnose why external LLM provider calls failed with `network_error` on the corporate network while on-prem (`qwen-local`) calls succeeded.\n- Root cause: proxy was started on a public network without `HTTPS_PROXY` set, baking in direct egress, and never re-pinned when the network changed to corporate.\n- Proposed three fixes: log hold states for egress visibility, retain multiple proxy candidates instead of one hardcoded fallback, and expose egress state on the dashboard.\n- Implemented all three in `rapid-llm-proxy`: launcher now seeds candidate proxies from real network probes, `server.mjs` tracks degraded state with recovery probes and remembered known-good proxies, and `/health`/routing endpoints expose degraded state; 330 tests passing with a 30-second cache timer to fix startup/coordinator sync races.\n- Next step: exercise the degraded path end-to-end by standing up a fake coordinator reporting all candidates as unhealthy; confirmed coordinator URL and proxy config are environment-overridable, enabling this controlled test before production deployment.",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-05T07:57:11.233Z",
-    "metadata": {
-      "sourceCount": 3,
-      "date": "2026-09-01",
-      "theme": "Diagnosing and fixing proxy egress failures on corporate network",
-      "summary": "- Goal: diagnose why external LLM provider calls failed with `network_error` on the corporate network while on-prem (`qwen-local`) calls succeeded.\n- Root cause: proxy was started on a public network without `HTTPS_PROXY` set, baking in direct egress, and never re-pinned when the network changed to corporate.\n- Proposed three fixes: log hold states for egress visibility, retain multiple proxy candidates instead of one hardcoded fallback, and expose egress state on the dashboard.\n- Implemented all three in `rapid-llm-proxy`: launcher now seeds candidate proxies from real network probes, `server.mjs` tracks degraded state with recovery probes and remembered known-good proxies, and `/health`/routing endpoints expose degraded state; 330 tests passing with a 30-second cache timer to fix startup/coordinator sync races.\n- Next step: exercise the degraded path end-to-end by standing up a fake coordinator reporting all candidates as unhealthy; confirmed coordinator URL and proxy config are environment-overridable, enabling this controlled test before production deployment.",
-      "observation_ids": [
-        "40c76063-75b3-4b74-ae10-7b0ddd3a3f2a",
-        "6b5a03fd-e2ea-4a2b-8539-d0c64e4c9069",
-        "0b69b4c6-f9c9-4002-8026-b97f49449472"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [],
-      "project": "coding",
-      "quality": "high",
-      "createdAt": "2026-09-05T07:57:11.233Z"
-    },
-    "project": "coding"
-  },
-  {
-    "id": "430f0a73-745a-42f6-9c56-fea9001230b5",
-    "date": "2026-09-01",
-    "theme": "Fix silent corporate proxy egress degradation",
-    "summary": "- Goal: diagnose and resolve a failed \"Wait for rehearsal to finish\" task (exit code 144) caused by silent egress routing degradation on corporate networks.\n- Root cause: corporate network transitions with no reachable proxy candidate failed silently, echoing a prior 2026-07-26 stranding incident caused by hardcoded proxy pins.\n- Implemented three fixes (claude):\n  - One-time-per-transition DEGRADED log line with reason and candidates tried\n  - Adaptive proxy candidate ordering, persisted to `.data/llm-proxy/last-corporate-proxy` instead of hardcoded\n  - Dashboard visibility: red `egress:` badge and degradation banner showing failure reason\n- Edited `/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_egress_direct_on_corporate.md`\n- Verified via forced-corporate coordinator test with all candidates unreachable: single DEGRADED log line, `/health` degraded flag with reason/timestamp, banner rendering confirmed. All 330 proxy tests pass, including prior VPN-drop sequence.",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [
-      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_egress_direct_on_corporate.md"
-    ],
-    "quality": "high",
-    "createdAt": "2026-09-05T08:03:26.764Z",
-    "metadata": {
-      "sourceCount": 1,
-      "date": "2026-09-01",
-      "theme": "Fix silent corporate proxy egress degradation",
-      "summary": "- Goal: diagnose and resolve a failed \"Wait for rehearsal to finish\" task (exit code 144) caused by silent egress routing degradation on corporate networks.\n- Root cause: corporate network transitions with no reachable proxy candidate failed silently, echoing a prior 2026-07-26 stranding incident caused by hardcoded proxy pins.\n- Implemented three fixes (claude):\n  - One-time-per-transition DEGRADED log line with reason and candidates tried\n  - Adaptive proxy candidate ordering, persisted to `.data/llm-proxy/last-corporate-proxy` instead of hardcoded\n  - Dashboard visibility: red `egress:` badge and degradation banner showing failure reason\n- Edited `/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_egress_direct_on_corporate.md`\n- Verified via forced-corporate coordinator test with all candidates unreachable: single DEGRADED log line, `/health` degraded flag with reason/timestamp, banner rendering confirmed. All 330 proxy tests pass, including prior VPN-drop sequence.",
-      "observation_ids": [
-        "c59f7e80-5462-4fa0-8da5-24ead7673e97"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [
-        "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_egress_direct_on_corporate.md"
-      ],
-      "project": "coding",
-      "quality": "high",
-      "createdAt": "2026-09-05T08:03:26.764Z"
-    },
-    "project": "coding"
-  },
-  {
     "id": "16844992-2dbf-4b63-8067-0deb094da964",
     "date": "2026-09-02",
     "theme": "Crash recovery and opencode daemon diagnostics",
@@ -106610,6 +106512,40 @@
     "project": "coding"
   },
   {
+    "id": "0312cc16-5046-405a-b157-f7f3ba234512",
+    "date": "2026-09-02",
+    "theme": "Building NumberClassifier utility class",
+    "summary": "- Agent `pi` developed a `NumberClassifier` Python class in `number_classifier.py` to classify numbers across many properties: positive/negative, even/odd, prime/composite, perfect square/cube, perfect number, Armstrong number, palindrome, and Fibonacci membership.\n- First pass created the initial class with a broad set of boolean classification flags.\n- Second pass refined the implementation: wrapped the value, added integer-only guards (treating whole-valued floats as integers), and added a `classify()` method to aggregate all checks into a single summary dictionary, plus `__repr__` and a `__main__` demo block.\n- Result: a complete, self-contained number classification utility ready for reuse.",
+    "observationIds": [],
+    "agents": [
+      "pi"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-03T07:37:50.276Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-02",
+      "theme": "Building NumberClassifier utility class",
+      "summary": "- Agent `pi` developed a `NumberClassifier` Python class in `number_classifier.py` to classify numbers across many properties: positive/negative, even/odd, prime/composite, perfect square/cube, perfect number, Armstrong number, palindrome, and Fibonacci membership.\n- First pass created the initial class with a broad set of boolean classification flags.\n- Second pass refined the implementation: wrapped the value, added integer-only guards (treating whole-valued floats as integers), and added a `classify()` method to aggregate all checks into a single summary dictionary, plus `__repr__` and a `__main__` demo block.\n- Result: a complete, self-contained number classification utility ready for reuse.",
+      "observation_ids": [
+        "c67b7237-beb4-4432-8ae4-03cc34913bab",
+        "b37b3e29-0420-4662-adaf-feb6c431f359",
+        "41658c96-4804-47c2-852e-336762d13574",
+        "38ff5e7c-5407-47a0-91fb-5bc455c07bc2",
+        "20ac8151-bbf1-44a7-b213-e98982717d1e"
+      ],
+      "agents": [
+        "pi"
+      ],
+      "files_touched": [],
+      "project": "a2a",
+      "quality": "high",
+      "createdAt": "2026-09-03T07:37:50.276Z"
+    },
+    "project": "a2a"
+  },
+  {
     "id": "d31567db-178c-48f5-a709-d7c87df49c35",
     "date": "2026-09-02",
     "theme": "PR #20 finalization and branch cleanup",
@@ -106913,40 +106849,6 @@
       "createdAt": "2026-09-02T19:23:53.256Z"
     },
     "project": "coding"
-  },
-  {
-    "id": "0312cc16-5046-405a-b157-f7f3ba234512",
-    "date": "2026-09-02",
-    "theme": "Building NumberClassifier utility class",
-    "summary": "- Agent `pi` developed a `NumberClassifier` Python class in `number_classifier.py` to classify numbers across many properties: positive/negative, even/odd, prime/composite, perfect square/cube, perfect number, Armstrong number, palindrome, and Fibonacci membership.\n- First pass created the initial class with a broad set of boolean classification flags.\n- Second pass refined the implementation: wrapped the value, added integer-only guards (treating whole-valued floats as integers), and added a `classify()` method to aggregate all checks into a single summary dictionary, plus `__repr__` and a `__main__` demo block.\n- Result: a complete, self-contained number classification utility ready for reuse.",
-    "observationIds": [],
-    "agents": [
-      "pi"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-03T07:37:50.276Z",
-    "metadata": {
-      "sourceCount": 2,
-      "date": "2026-09-02",
-      "theme": "Building NumberClassifier utility class",
-      "summary": "- Agent `pi` developed a `NumberClassifier` Python class in `number_classifier.py` to classify numbers across many properties: positive/negative, even/odd, prime/composite, perfect square/cube, perfect number, Armstrong number, palindrome, and Fibonacci membership.\n- First pass created the initial class with a broad set of boolean classification flags.\n- Second pass refined the implementation: wrapped the value, added integer-only guards (treating whole-valued floats as integers), and added a `classify()` method to aggregate all checks into a single summary dictionary, plus `__repr__` and a `__main__` demo block.\n- Result: a complete, self-contained number classification utility ready for reuse.",
-      "observation_ids": [
-        "c67b7237-beb4-4432-8ae4-03cc34913bab",
-        "b37b3e29-0420-4662-adaf-feb6c431f359",
-        "41658c96-4804-47c2-852e-336762d13574",
-        "38ff5e7c-5407-47a0-91fb-5bc455c07bc2",
-        "20ac8151-bbf1-44a7-b213-e98982717d1e"
-      ],
-      "agents": [
-        "pi"
-      ],
-      "files_touched": [],
-      "project": "a2a",
-      "quality": "high",
-      "createdAt": "2026-09-03T07:37:50.276Z"
-    },
-    "project": "a2a"
   },
   {
     "id": "b7991706-ca2d-4631-b747-e0bea99550d0",
@@ -107850,6 +107752,37 @@
     "project": "a2a"
   },
   {
+    "id": "692f5eba-de12-4d72-ba73-862f0b4b4dbf",
+    "date": "2026-09-03",
+    "theme": "Rename workspace to a2a-xpr for PPR/RPR PoC",
+    "summary": "- Goal: eliminate confusion between the PPR/RPR PoC and the platform PoC by aligning workspace naming with checkout directory path.\n- Approach: used `git mv` to rename `a2a.code-workspace` to `a2a-xpr.code-workspace`, preserving git history, then updated folder name entries inside the workspace JSON configuration.\n- Left protocol/package references unchanged since they belong to the A2A standard, not workspace-specific labeling.\n- Result: workspace file now named `a2a-xpr.code-workspace` with internal folder refs matching the directory; VS Code must be reopened from the new filename since the old Recent entry is invalidated.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-05T08:03:30.173Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-03",
+      "theme": "Rename workspace to a2a-xpr for PPR/RPR PoC",
+      "summary": "- Goal: eliminate confusion between the PPR/RPR PoC and the platform PoC by aligning workspace naming with checkout directory path.\n- Approach: used `git mv` to rename `a2a.code-workspace` to `a2a-xpr.code-workspace`, preserving git history, then updated folder name entries inside the workspace JSON configuration.\n- Left protocol/package references unchanged since they belong to the A2A standard, not workspace-specific labeling.\n- Result: workspace file now named `a2a-xpr.code-workspace` with internal folder refs matching the directory; VS Code must be reopened from the new filename since the old Recent entry is invalidated.",
+      "observation_ids": [
+        "571b4ccf-1445-4e24-b811-c514cb38a337",
+        "be57cc8a-af8b-47fe-a44d-5c6e5b9ca954"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-05T08:03:30.173Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
     "id": "1eca0d95-4dc2-4fd1-a6e4-4905d86da7f3",
     "date": "2026-09-03",
     "theme": "Restoring broken /sl command and docs skill",
@@ -108211,37 +108144,6 @@
       "project": "a2a-xpr",
       "quality": "high",
       "createdAt": "2026-09-04T05:53:03.277Z"
-    },
-    "project": "a2a-xpr"
-  },
-  {
-    "id": "692f5eba-de12-4d72-ba73-862f0b4b4dbf",
-    "date": "2026-09-03",
-    "theme": "Rename workspace to a2a-xpr for PPR/RPR PoC",
-    "summary": "- Goal: eliminate confusion between the PPR/RPR PoC and the platform PoC by aligning workspace naming with checkout directory path.\n- Approach: used `git mv` to rename `a2a.code-workspace` to `a2a-xpr.code-workspace`, preserving git history, then updated folder name entries inside the workspace JSON configuration.\n- Left protocol/package references unchanged since they belong to the A2A standard, not workspace-specific labeling.\n- Result: workspace file now named `a2a-xpr.code-workspace` with internal folder refs matching the directory; VS Code must be reopened from the new filename since the old Recent entry is invalidated.",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-05T08:03:30.173Z",
-    "metadata": {
-      "sourceCount": 1,
-      "date": "2026-09-03",
-      "theme": "Rename workspace to a2a-xpr for PPR/RPR PoC",
-      "summary": "- Goal: eliminate confusion between the PPR/RPR PoC and the platform PoC by aligning workspace naming with checkout directory path.\n- Approach: used `git mv` to rename `a2a.code-workspace` to `a2a-xpr.code-workspace`, preserving git history, then updated folder name entries inside the workspace JSON configuration.\n- Left protocol/package references unchanged since they belong to the A2A standard, not workspace-specific labeling.\n- Result: workspace file now named `a2a-xpr.code-workspace` with internal folder refs matching the directory; VS Code must be reopened from the new filename since the old Recent entry is invalidated.",
-      "observation_ids": [
-        "571b4ccf-1445-4e24-b811-c514cb38a337",
-        "be57cc8a-af8b-47fe-a44d-5c6e5b9ca954"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [],
-      "project": "a2a-xpr",
-      "quality": "high",
-      "createdAt": "2026-09-05T08:03:30.173Z"
     },
     "project": "a2a-xpr"
   },
@@ -109124,165 +109026,6 @@
     "project": "a2a-xpr"
   },
   {
-    "id": "ab73542e-6e32-4baf-9879-8cd0809d1d02",
-    "date": "2026-09-04",
-    "theme": "LSL session continuity summary loading",
-    "summary": "- Goal: establish context continuity by reviewing recent Live Session Logs (LSL) for the coding project.\n- Approach: located newest 2026/09 LSL tranche, parsed JSON session entries, synthesized activity across Sept 3–4 into thematic blocks.\n- Result: Summary identified three completed work threads—skill restoration (`CLAUDE.md`, `/sl` command, status line), portability sweep (de-hardcoding home paths in launchd plists, scripts, km-core submodule), and documentation tiering (Quick/Standard/Deep Dive structure across MkDocs pages, 8 staged commits).\n- All work merged to main with a clean working tree; no in-progress tasks.",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-05T07:57:20.459Z",
-    "metadata": {
-      "sourceCount": 1,
-      "date": "2026-09-04",
-      "theme": "LSL session continuity summary loading",
-      "summary": "- Goal: establish context continuity by reviewing recent Live Session Logs (LSL) for the coding project.\n- Approach: located newest 2026/09 LSL tranche, parsed JSON session entries, synthesized activity across Sept 3–4 into thematic blocks.\n- Result: Summary identified three completed work threads—skill restoration (`CLAUDE.md`, `/sl` command, status line), portability sweep (de-hardcoding home paths in launchd plists, scripts, km-core submodule), and documentation tiering (Quick/Standard/Deep Dive structure across MkDocs pages, 8 staged commits).\n- All work merged to main with a clean working tree; no in-progress tasks.",
-      "observation_ids": [
-        "55c51f02-34e2-48b3-b912-0d0990527555"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [],
-      "project": "coding",
-      "quality": "high",
-      "createdAt": "2026-09-05T07:57:20.459Z"
-    },
-    "project": "coding"
-  },
-  {
-    "id": "9b76728f-7aa2-4587-8f83-9c9e8dcf9d94",
-    "date": "2026-09-04",
-    "theme": "Fixing invalid claude-opus-4.6 model ID in rapid-llm-proxy",
-    "summary": "- Goal: fix `claude-opus-4.6`, found seven times in `rapid-llm-proxy` but not routable (missing from `available_models`, failing validation at boot).\n- Approach: audited config files, provider implementations, tests, and docs against live Anthropic/Copilot catalogues and `llm-routing.yaml`; confirmed the model was real but retired (3,268 historical usage rows through 2026-07-26).\n- Replaced all 10 occurrences of `claude-opus-4.6`/`claude-opus-4-6` with the current `claude-opus-5` ID; updated docs to explain the historical context.\n- Verified via `tsc` build and full test suite (412/412, later 496/496 after merging related PRs).\n- Final step: trial-merged three related PRs (model ID corrections, daemon alias maps, TypeScript test runner restoration), confirmed no conflicts, and opened them against main.\n- Outcome: Opus-5 now routes correctly through Anthropic and Copilot; floating alias reflects current catalogue; TypeScript test tier restored. Two pre-existing schema issues (missing `.models` entries in `llm-providers.yaml`, obsolete hardcoded-path grep) documented and pinned to fail-on-fix rather than masked.",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-05T07:57:20.459Z",
-    "metadata": {
-      "sourceCount": 3,
-      "date": "2026-09-04",
-      "theme": "Fixing invalid claude-opus-4.6 model ID in rapid-llm-proxy",
-      "summary": "- Goal: fix `claude-opus-4.6`, found seven times in `rapid-llm-proxy` but not routable (missing from `available_models`, failing validation at boot).\n- Approach: audited config files, provider implementations, tests, and docs against live Anthropic/Copilot catalogues and `llm-routing.yaml`; confirmed the model was real but retired (3,268 historical usage rows through 2026-07-26).\n- Replaced all 10 occurrences of `claude-opus-4.6`/`claude-opus-4-6` with the current `claude-opus-5` ID; updated docs to explain the historical context.\n- Verified via `tsc` build and full test suite (412/412, later 496/496 after merging related PRs).\n- Final step: trial-merged three related PRs (model ID corrections, daemon alias maps, TypeScript test runner restoration), confirmed no conflicts, and opened them against main.\n- Outcome: Opus-5 now routes correctly through Anthropic and Copilot; floating alias reflects current catalogue; TypeScript test tier restored. Two pre-existing schema issues (missing `.models` entries in `llm-providers.yaml`, obsolete hardcoded-path grep) documented and pinned to fail-on-fix rather than masked.",
-      "observation_ids": [
-        "cb074c54-2df4-47c8-88d6-04b1e99c8955",
-        "eb666fac-0479-4497-9c13-9af19df52694",
-        "16e9dd8d-85aa-4d98-b85d-a5c8d4a7eec8"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [],
-      "project": "coding",
-      "quality": "high",
-      "createdAt": "2026-09-05T07:57:20.459Z"
-    },
-    "project": "coding"
-  },
-  {
-    "id": "edb03915-3dd9-4499-b21a-dea628d3ff79",
-    "date": "2026-09-04",
-    "theme": "Documentation deployment and rendering verification",
-    "summary": "- Goal: complete documentation deployment after a background task/test suite finished.\n- Approach: verified page rendering via `mkdocs`, recovered from stale Chrome automation processes, confirmed visual correctness of a note admonition on the `llm-architecture` page.\n- Result: three documentation files staged, committed, and pushed to main ahead of the automated deploy-docs workflow.",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-05T07:57:20.459Z",
-    "metadata": {
-      "sourceCount": 1,
-      "date": "2026-09-04",
-      "theme": "Documentation deployment and rendering verification",
-      "summary": "- Goal: complete documentation deployment after a background task/test suite finished.\n- Approach: verified page rendering via `mkdocs`, recovered from stale Chrome automation processes, confirmed visual correctness of a note admonition on the `llm-architecture` page.\n- Result: three documentation files staged, committed, and pushed to main ahead of the automated deploy-docs workflow.",
-      "observation_ids": [
-        "24342be2-417f-41fe-bd50-7371fd49156f"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [],
-      "project": "coding",
-      "quality": "high",
-      "createdAt": "2026-09-05T07:57:20.459Z"
-    },
-    "project": "coding"
-  },
-  {
-    "id": "ce143117-3d1a-41f9-803a-0b7faecb3339",
-    "date": "2026-09-04",
-    "theme": "Session context continuity summary for a2a-xpr",
-    "summary": "- Claude loaded recent Live Session Logs (LSL) from `.specstory/history/2026/09` to reconstruct project continuity for **a2a-xpr**\n- Cross-referenced session metadata with `open-items.md` to summarize the day's four major prompts: IaC work, target realm agents, A2A delegation edge with cycle guards, Agent Stack registration, and DynamoDB task store fixes\n- Noted PR #12 merged at 18:03Z\n- Identified next priorities: `new_data_part()` helper, `verify-sdk-surface.py` signature checking, `OidcAuthMiddleware._verify` implementation\n- Flagged three open blockers: Agent Stack reachability, LLM-proxy ownership, on-prem Qwen3 connectivity",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-05T08:03:38.740Z",
-    "metadata": {
-      "sourceCount": 1,
-      "date": "2026-09-04",
-      "theme": "Session context continuity summary for a2a-xpr",
-      "summary": "- Claude loaded recent Live Session Logs (LSL) from `.specstory/history/2026/09` to reconstruct project continuity for **a2a-xpr**\n- Cross-referenced session metadata with `open-items.md` to summarize the day's four major prompts: IaC work, target realm agents, A2A delegation edge with cycle guards, Agent Stack registration, and DynamoDB task store fixes\n- Noted PR #12 merged at 18:03Z\n- Identified next priorities: `new_data_part()` helper, `verify-sdk-surface.py` signature checking, `OidcAuthMiddleware._verify` implementation\n- Flagged three open blockers: Agent Stack reachability, LLM-proxy ownership, on-prem Qwen3 connectivity",
-      "observation_ids": [
-        "25628969-81ec-4dd8-87b7-170c7d4b7e8c"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [],
-      "project": "a2a-xpr",
-      "quality": "high",
-      "createdAt": "2026-09-05T08:03:38.740Z"
-    },
-    "project": "a2a-xpr"
-  },
-  {
-    "id": "50936fe9-e3c4-4da3-9996-bc9c3f4063f8",
-    "date": "2026-09-04",
-    "theme": "Fix native data parts and SDK surface signature checks",
-    "summary": "- Goal: fix `artifacts.json_part` to emit native data parts and harden `verify-sdk-surface.py` to assert real signatures rather than superficial checks\n- Rewrote `json_part` in `src/a2a_adp/artifacts.py` to use `new_data_part(payload, \"application/json\")`, normalizing non-JSON-native types (datetime, Decimal, set) via `json.dumps` before construction; updated `request_payload` to read data parts first with text fallback\n- Rewrote `verify-sdk-surface.py` to check argument acceptance, no omitted required args, and first-arg type matching, plus oneof/enum/ABC conformance checks; mutation-tested against seven historical SDK-drift defect classes, all caught\n- Result: all 28 tests passing, zero new lint findings, clean mkdocs build, docs updated across three files\n- Rebased branch `fix/data-parts-and-sdk-surface-check` onto `main` via clean cherry-pick (no conflicts), verified build/tests, then pushed commit `2a4a209` to origin\n- Noted stale branch `feat/target-agents-and-agentstack` can be deleted (pre-rebase duplicate)\n- Opened/confirmed PR #13 (\"fix(a2a): native data parts, and an SDK check that asserts signatures\") at `DATAPRO/a2a-xpr` — 1 commit, 6 files changed (+578/−81), including root-cause analysis and noted scope limitation (SDK version 1.1.2 only, no semantic verification)",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [
-      "/Users/<USER_ID_REDACTED>/Agentic/_work/a2a-xpr/src/a2a_adp/artifacts.py"
-    ],
-    "quality": "high",
-    "createdAt": "2026-09-05T08:03:38.740Z",
-    "metadata": {
-      "sourceCount": 4,
-      "date": "2026-09-04",
-      "theme": "Fix native data parts and SDK surface signature checks",
-      "summary": "- Goal: fix `artifacts.json_part` to emit native data parts and harden `verify-sdk-surface.py` to assert real signatures rather than superficial checks\n- Rewrote `json_part` in `src/a2a_adp/artifacts.py` to use `new_data_part(payload, \"application/json\")`, normalizing non-JSON-native types (datetime, Decimal, set) via `json.dumps` before construction; updated `request_payload` to read data parts first with text fallback\n- Rewrote `verify-sdk-surface.py` to check argument acceptance, no omitted required args, and first-arg type matching, plus oneof/enum/ABC conformance checks; mutation-tested against seven historical SDK-drift defect classes, all caught\n- Result: all 28 tests passing, zero new lint findings, clean mkdocs build, docs updated across three files\n- Rebased branch `fix/data-parts-and-sdk-surface-check` onto `main` via clean cherry-pick (no conflicts), verified build/tests, then pushed commit `2a4a209` to origin\n- Noted stale branch `feat/target-agents-and-agentstack` can be deleted (pre-rebase duplicate)\n- Opened/confirmed PR #13 (\"fix(a2a): native data parts, and an SDK check that asserts signatures\") at `DATAPRO/a2a-xpr` — 1 commit, 6 files changed (+578/−81), including root-cause analysis and noted scope limitation (SDK version 1.1.2 only, no semantic verification)",
-      "observation_ids": [
-        "4b06ba64-93e3-43d8-918f-1a81c3c3ca26",
-        "a1188081-0a55-4681-a876-4208da7ea46d",
-        "7c84a92f-d0de-427c-a0d6-e17bb7ce6a51",
-        "43811eb3-6b2d-473a-867f-1c062ab08c7a"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [
-        "/Users/<USER_ID_REDACTED>/Agentic/_work/a2a-xpr/src/a2a_adp/artifacts.py"
-      ],
-      "project": "a2a-xpr",
-      "quality": "high",
-      "createdAt": "2026-09-05T08:03:38.740Z"
-    },
-    "project": "a2a-xpr"
-  },
-  {
     "id": "355aa503-a298-4a34-acbd-db0119c10cfc",
     "date": "2026-09-05",
     "theme": "Startup failure caused by ESM/CommonJS mismatch",
@@ -109835,6 +109578,263 @@
       "project": "a2a-xpr",
       "quality": "normal",
       "createdAt": "2026-09-05T07:26:21.550Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "eb07a43a-bcdb-402f-a7ec-e731612cb8c9",
+    "date": "2026-09-01",
+    "theme": "Token usage backfill idempotency and live run verification",
+    "summary": "- Goal: safely backfill missing Claude prompt text into the `token_usage` table by joining transcripts on upstream `requestId`.\n- Verified idempotency via sqlite3 queries and script inspection; identified risk of dropped rows from write-lock contention during best-effort proxy logging.\n- Mitigated by chunking commits (2000-row transaction batching); confirmed chunked output identical to baseline before running on live DB.\n- Executed live backfill: recovered prompts for 34,469 of 63,752 rows (54%), spanning August–September (June–July transcripts no longer exist).\n- Validated via 16 requestId parity checks (0 mismatches), double-run idempotency test, and 12 correctness test cases (no tool_result/caption confusion, per-turn isolation, no session leakage).\n- Fixed two production faults uncovered during the process: a redundant OR clause causing quadratic matching, and a partial index requiring explicit WHERE predicates to avoid full-table scans.\n- No data loss or service interruption occurred during the live run.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-05T07:57:11.233Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-01",
+      "theme": "Token usage backfill idempotency and live run verification",
+      "summary": "- Goal: safely backfill missing Claude prompt text into the `token_usage` table by joining transcripts on upstream `requestId`.\n- Verified idempotency via sqlite3 queries and script inspection; identified risk of dropped rows from write-lock contention during best-effort proxy logging.\n- Mitigated by chunking commits (2000-row transaction batching); confirmed chunked output identical to baseline before running on live DB.\n- Executed live backfill: recovered prompts for 34,469 of 63,752 rows (54%), spanning August–September (June–July transcripts no longer exist).\n- Validated via 16 requestId parity checks (0 mismatches), double-run idempotency test, and 12 correctness test cases (no tool_result/caption confusion, per-turn isolation, no session leakage).\n- Fixed two production faults uncovered during the process: a redundant OR clause causing quadratic matching, and a partial index requiring explicit WHERE predicates to avoid full-table scans.\n- No data loss or service interruption occurred during the live run.",
+      "observation_ids": [
+        "3d5b7429-83af-4008-8061-339254e552c1",
+        "afb50166-f4a5-44ba-82fb-e03f20a2c6b4",
+        "42da9c11-f0e6-466d-b290-7ae13fbc1730"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-05T07:57:11.233Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "32f6af1c-b9e5-4db4-a319-29793eb87a6c",
+    "date": "2026-09-01",
+    "theme": "Diagnosing and fixing proxy egress failures on corporate network",
+    "summary": "- Goal: diagnose why external LLM provider calls failed with `network_error` on the corporate network while on-prem (`qwen-local`) calls succeeded.\n- Root cause: proxy was started on a public network without `HTTPS_PROXY` set, baking in direct egress, and never re-pinned when the network changed to corporate.\n- Proposed three fixes: log hold states for egress visibility, retain multiple proxy candidates instead of one hardcoded fallback, and expose egress state on the dashboard.\n- Implemented all three in `rapid-llm-proxy`: launcher now seeds candidate proxies from real network probes, `server.mjs` tracks degraded state with recovery probes and remembered known-good proxies, and `/health`/routing endpoints expose degraded state; 330 tests passing with a 30-second cache timer to fix startup/coordinator sync races.\n- Next step: exercise the degraded path end-to-end by standing up a fake coordinator reporting all candidates as unhealthy; confirmed coordinator URL and proxy config are environment-overridable, enabling this controlled test before production deployment.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-05T07:57:11.233Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-01",
+      "theme": "Diagnosing and fixing proxy egress failures on corporate network",
+      "summary": "- Goal: diagnose why external LLM provider calls failed with `network_error` on the corporate network while on-prem (`qwen-local`) calls succeeded.\n- Root cause: proxy was started on a public network without `HTTPS_PROXY` set, baking in direct egress, and never re-pinned when the network changed to corporate.\n- Proposed three fixes: log hold states for egress visibility, retain multiple proxy candidates instead of one hardcoded fallback, and expose egress state on the dashboard.\n- Implemented all three in `rapid-llm-proxy`: launcher now seeds candidate proxies from real network probes, `server.mjs` tracks degraded state with recovery probes and remembered known-good proxies, and `/health`/routing endpoints expose degraded state; 330 tests passing with a 30-second cache timer to fix startup/coordinator sync races.\n- Next step: exercise the degraded path end-to-end by standing up a fake coordinator reporting all candidates as unhealthy; confirmed coordinator URL and proxy config are environment-overridable, enabling this controlled test before production deployment.",
+      "observation_ids": [
+        "40c76063-75b3-4b74-ae10-7b0ddd3a3f2a",
+        "6b5a03fd-e2ea-4a2b-8539-d0c64e4c9069",
+        "0b69b4c6-f9c9-4002-8026-b97f49449472"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-05T07:57:11.233Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "430f0a73-745a-42f6-9c56-fea9001230b5",
+    "date": "2026-09-01",
+    "theme": "Fix silent corporate proxy egress degradation",
+    "summary": "- Goal: diagnose and resolve a failed \"Wait for rehearsal to finish\" task (exit code 144) caused by silent egress routing degradation on corporate networks.\n- Root cause: corporate network transitions with no reachable proxy candidate failed silently, echoing a prior 2026-07-26 stranding incident caused by hardcoded proxy pins.\n- Implemented three fixes (claude):\n  - One-time-per-transition DEGRADED log line with reason and candidates tried\n  - Adaptive proxy candidate ordering, persisted to `.data/llm-proxy/last-corporate-proxy` instead of hardcoded\n  - Dashboard visibility: red `egress:` badge and degradation banner showing failure reason\n- Edited `/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_egress_direct_on_corporate.md`\n- Verified via forced-corporate coordinator test with all candidates unreachable: single DEGRADED log line, `/health` degraded flag with reason/timestamp, banner rendering confirmed. All 330 proxy tests pass, including prior VPN-drop sequence.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_egress_direct_on_corporate.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-05T08:03:26.764Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-01",
+      "theme": "Fix silent corporate proxy egress degradation",
+      "summary": "- Goal: diagnose and resolve a failed \"Wait for rehearsal to finish\" task (exit code 144) caused by silent egress routing degradation on corporate networks.\n- Root cause: corporate network transitions with no reachable proxy candidate failed silently, echoing a prior 2026-07-26 stranding incident caused by hardcoded proxy pins.\n- Implemented three fixes (claude):\n  - One-time-per-transition DEGRADED log line with reason and candidates tried\n  - Adaptive proxy candidate ordering, persisted to `.data/llm-proxy/last-corporate-proxy` instead of hardcoded\n  - Dashboard visibility: red `egress:` badge and degradation banner showing failure reason\n- Edited `/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_egress_direct_on_corporate.md`\n- Verified via forced-corporate coordinator test with all candidates unreachable: single DEGRADED log line, `/health` degraded flag with reason/timestamp, banner rendering confirmed. All 330 proxy tests pass, including prior VPN-drop sequence.",
+      "observation_ids": [
+        "c59f7e80-5462-4fa0-8da5-24ead7673e97"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/.claude/projects/-Users-<USER_ID_REDACTED>-Agentic-coding/memory/reference_egress_direct_on_corporate.md"
+      ],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-05T08:03:26.764Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ab73542e-6e32-4baf-9879-8cd0809d1d02",
+    "date": "2026-09-04",
+    "theme": "LSL session continuity summary loading",
+    "summary": "- Goal: establish context continuity by reviewing recent Live Session Logs (LSL) for the coding project.\n- Approach: located newest 2026/09 LSL tranche, parsed JSON session entries, synthesized activity across Sept 3–4 into thematic blocks.\n- Result: Summary identified three completed work threads—skill restoration (`CLAUDE.md`, `/sl` command, status line), portability sweep (de-hardcoding home paths in launchd plists, scripts, km-core submodule), and documentation tiering (Quick/Standard/Deep Dive structure across MkDocs pages, 8 staged commits).\n- All work merged to main with a clean working tree; no in-progress tasks.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-05T07:57:20.459Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-04",
+      "theme": "LSL session continuity summary loading",
+      "summary": "- Goal: establish context continuity by reviewing recent Live Session Logs (LSL) for the coding project.\n- Approach: located newest 2026/09 LSL tranche, parsed JSON session entries, synthesized activity across Sept 3–4 into thematic blocks.\n- Result: Summary identified three completed work threads—skill restoration (`CLAUDE.md`, `/sl` command, status line), portability sweep (de-hardcoding home paths in launchd plists, scripts, km-core submodule), and documentation tiering (Quick/Standard/Deep Dive structure across MkDocs pages, 8 staged commits).\n- All work merged to main with a clean working tree; no in-progress tasks.",
+      "observation_ids": [
+        "55c51f02-34e2-48b3-b912-0d0990527555"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-05T07:57:20.459Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "9b76728f-7aa2-4587-8f83-9c9e8dcf9d94",
+    "date": "2026-09-04",
+    "theme": "Fixing invalid claude-opus-4.6 model ID in rapid-llm-proxy",
+    "summary": "- Goal: fix `claude-opus-4.6`, found seven times in `rapid-llm-proxy` but not routable (missing from `available_models`, failing validation at boot).\n- Approach: audited config files, provider implementations, tests, and docs against live Anthropic/Copilot catalogues and `llm-routing.yaml`; confirmed the model was real but retired (3,268 historical usage rows through 2026-07-26).\n- Replaced all 10 occurrences of `claude-opus-4.6`/`claude-opus-4-6` with the current `claude-opus-5` ID; updated docs to explain the historical context.\n- Verified via `tsc` build and full test suite (412/412, later 496/496 after merging related PRs).\n- Final step: trial-merged three related PRs (model ID corrections, daemon alias maps, TypeScript test runner restoration), confirmed no conflicts, and opened them against main.\n- Outcome: Opus-5 now routes correctly through Anthropic and Copilot; floating alias reflects current catalogue; TypeScript test tier restored. Two pre-existing schema issues (missing `.models` entries in `llm-providers.yaml`, obsolete hardcoded-path grep) documented and pinned to fail-on-fix rather than masked.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-05T07:57:20.459Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-04",
+      "theme": "Fixing invalid claude-opus-4.6 model ID in rapid-llm-proxy",
+      "summary": "- Goal: fix `claude-opus-4.6`, found seven times in `rapid-llm-proxy` but not routable (missing from `available_models`, failing validation at boot).\n- Approach: audited config files, provider implementations, tests, and docs against live Anthropic/Copilot catalogues and `llm-routing.yaml`; confirmed the model was real but retired (3,268 historical usage rows through 2026-07-26).\n- Replaced all 10 occurrences of `claude-opus-4.6`/`claude-opus-4-6` with the current `claude-opus-5` ID; updated docs to explain the historical context.\n- Verified via `tsc` build and full test suite (412/412, later 496/496 after merging related PRs).\n- Final step: trial-merged three related PRs (model ID corrections, daemon alias maps, TypeScript test runner restoration), confirmed no conflicts, and opened them against main.\n- Outcome: Opus-5 now routes correctly through Anthropic and Copilot; floating alias reflects current catalogue; TypeScript test tier restored. Two pre-existing schema issues (missing `.models` entries in `llm-providers.yaml`, obsolete hardcoded-path grep) documented and pinned to fail-on-fix rather than masked.",
+      "observation_ids": [
+        "cb074c54-2df4-47c8-88d6-04b1e99c8955",
+        "eb666fac-0479-4497-9c13-9af19df52694",
+        "16e9dd8d-85aa-4d98-b85d-a5c8d4a7eec8"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-05T07:57:20.459Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "edb03915-3dd9-4499-b21a-dea628d3ff79",
+    "date": "2026-09-04",
+    "theme": "Documentation deployment and rendering verification",
+    "summary": "- Goal: complete documentation deployment after a background task/test suite finished.\n- Approach: verified page rendering via `mkdocs`, recovered from stale Chrome automation processes, confirmed visual correctness of a note admonition on the `llm-architecture` page.\n- Result: three documentation files staged, committed, and pushed to main ahead of the automated deploy-docs workflow.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-05T07:57:20.459Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-04",
+      "theme": "Documentation deployment and rendering verification",
+      "summary": "- Goal: complete documentation deployment after a background task/test suite finished.\n- Approach: verified page rendering via `mkdocs`, recovered from stale Chrome automation processes, confirmed visual correctness of a note admonition on the `llm-architecture` page.\n- Result: three documentation files staged, committed, and pushed to main ahead of the automated deploy-docs workflow.",
+      "observation_ids": [
+        "24342be2-417f-41fe-bd50-7371fd49156f"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-05T07:57:20.459Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "ce143117-3d1a-41f9-803a-0b7faecb3339",
+    "date": "2026-09-04",
+    "theme": "Session context continuity summary for a2a-xpr",
+    "summary": "- Claude loaded recent Live Session Logs (LSL) from `.specstory/history/2026/09` to reconstruct project continuity for **a2a-xpr**\n- Cross-referenced session metadata with `open-items.md` to summarize the day's four major prompts: IaC work, target realm agents, A2A delegation edge with cycle guards, Agent Stack registration, and DynamoDB task store fixes\n- Noted PR #12 merged at 18:03Z\n- Identified next priorities: `new_data_part()` helper, `verify-sdk-surface.py` signature checking, `OidcAuthMiddleware._verify` implementation\n- Flagged three open blockers: Agent Stack reachability, LLM-proxy ownership, on-prem Qwen3 connectivity",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-05T08:03:38.740Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-04",
+      "theme": "Session context continuity summary for a2a-xpr",
+      "summary": "- Claude loaded recent Live Session Logs (LSL) from `.specstory/history/2026/09` to reconstruct project continuity for **a2a-xpr**\n- Cross-referenced session metadata with `open-items.md` to summarize the day's four major prompts: IaC work, target realm agents, A2A delegation edge with cycle guards, Agent Stack registration, and DynamoDB task store fixes\n- Noted PR #12 merged at 18:03Z\n- Identified next priorities: `new_data_part()` helper, `verify-sdk-surface.py` signature checking, `OidcAuthMiddleware._verify` implementation\n- Flagged three open blockers: Agent Stack reachability, LLM-proxy ownership, on-prem Qwen3 connectivity",
+      "observation_ids": [
+        "25628969-81ec-4dd8-87b7-170c7d4b7e8c"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-05T08:03:38.740Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "50936fe9-e3c4-4da3-9996-bc9c3f4063f8",
+    "date": "2026-09-04",
+    "theme": "Fix native data parts and SDK surface signature checks",
+    "summary": "- Goal: fix `artifacts.json_part` to emit native data parts and harden `verify-sdk-surface.py` to assert real signatures rather than superficial checks\n- Rewrote `json_part` in `src/a2a_adp/artifacts.py` to use `new_data_part(payload, \"application/json\")`, normalizing non-JSON-native types (datetime, Decimal, set) via `json.dumps` before construction; updated `request_payload` to read data parts first with text fallback\n- Rewrote `verify-sdk-surface.py` to check argument acceptance, no omitted required args, and first-arg type matching, plus oneof/enum/ABC conformance checks; mutation-tested against seven historical SDK-drift defect classes, all caught\n- Result: all 28 tests passing, zero new lint findings, clean mkdocs build, docs updated across three files\n- Rebased branch `fix/data-parts-and-sdk-surface-check` onto `main` via clean cherry-pick (no conflicts), verified build/tests, then pushed commit `2a4a209` to origin\n- Noted stale branch `feat/target-agents-and-agentstack` can be deleted (pre-rebase duplicate)\n- Opened/confirmed PR #13 (\"fix(a2a): native data parts, and an SDK check that asserts signatures\") at `DATAPRO/a2a-xpr` — 1 commit, 6 files changed (+578/−81), including root-cause analysis and noted scope limitation (SDK version 1.1.2 only, no semantic verification)",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/Agentic/_work/a2a-xpr/src/a2a_adp/artifacts.py"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-05T08:03:38.740Z",
+    "metadata": {
+      "sourceCount": 4,
+      "date": "2026-09-04",
+      "theme": "Fix native data parts and SDK surface signature checks",
+      "summary": "- Goal: fix `artifacts.json_part` to emit native data parts and harden `verify-sdk-surface.py` to assert real signatures rather than superficial checks\n- Rewrote `json_part` in `src/a2a_adp/artifacts.py` to use `new_data_part(payload, \"application/json\")`, normalizing non-JSON-native types (datetime, Decimal, set) via `json.dumps` before construction; updated `request_payload` to read data parts first with text fallback\n- Rewrote `verify-sdk-surface.py` to check argument acceptance, no omitted required args, and first-arg type matching, plus oneof/enum/ABC conformance checks; mutation-tested against seven historical SDK-drift defect classes, all caught\n- Result: all 28 tests passing, zero new lint findings, clean mkdocs build, docs updated across three files\n- Rebased branch `fix/data-parts-and-sdk-surface-check` onto `main` via clean cherry-pick (no conflicts), verified build/tests, then pushed commit `2a4a209` to origin\n- Noted stale branch `feat/target-agents-and-agentstack` can be deleted (pre-rebase duplicate)\n- Opened/confirmed PR #13 (\"fix(a2a): native data parts, and an SDK check that asserts signatures\") at `DATAPRO/a2a-xpr` — 1 commit, 6 files changed (+578/−81), including root-cause analysis and noted scope limitation (SDK version 1.1.2 only, no semantic verification)",
+      "observation_ids": [
+        "4b06ba64-93e3-43d8-918f-1a81c3c3ca26",
+        "a1188081-0a55-4681-a876-4208da7ea46d",
+        "7c84a92f-d0de-427c-a0d6-e17bb7ce6a51",
+        "43811eb3-6b2d-473a-867f-1c062ab08c7a"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/Agentic/_work/a2a-xpr/src/a2a_adp/artifacts.py"
+      ],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-05T08:03:38.740Z"
     },
     "project": "a2a-xpr"
   },
@@ -111562,6 +111562,41 @@
     "project": "a2a-xpr"
   },
   {
+    "id": "db34914d-f7ec-4ebd-9e08-724adb592c23",
+    "date": "2026-09-06",
+    "theme": "Git branch cleanup: deleting merged branches locally and remotely",
+    "summary": "- Goal: clean up stale/merged git branches after switching to `main` and pulling latest changes.\n- claude first deleted the merged branch `docs/build-it-code-along` locally using `git branch --merged` to confirm safety.\n- Followed up by deleting the corresponding remote branch via `git push origin --delete`, verifying removal with `git ls-remote`, and pruning three stale remote-tracking refs.\n- Finally, identified and deleted eleven merged local branches using `git branch --merged main | grep -v ... | git branch -d`, ensuring only fully merged branches were removed (safe `-d` flag).\n- End state: repository left with only `main` (clean, in sync with origin) and one unmerged branch, `feat/target-agents-and-agentstack`, preserved for future work.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-07T06:27:30.097Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-06",
+      "theme": "Git branch cleanup: deleting merged branches locally and remotely",
+      "summary": "- Goal: clean up stale/merged git branches after switching to `main` and pulling latest changes.\n- claude first deleted the merged branch `docs/build-it-code-along` locally using `git branch --merged` to confirm safety.\n- Followed up by deleting the corresponding remote branch via `git push origin --delete`, verifying removal with `git ls-remote`, and pruning three stale remote-tracking refs.\n- Finally, identified and deleted eleven merged local branches using `git branch --merged main | grep -v ... | git branch -d`, ensuring only fully merged branches were removed (safe `-d` flag).\n- End state: repository left with only `main` (clean, in sync with origin) and one unmerged branch, `feat/target-agents-and-agentstack`, preserved for future work.",
+      "observation_ids": [
+        "2b0ff01f-2e20-4964-bfe4-6e777afc0832",
+        "f7bf736e-c4ba-453d-b0cd-0472208e96bf",
+        "70f5e53f-7452-40e7-a0ed-63c67ba6992b",
+        "ab4d98fa-ce11-4be4-b4f8-3637f60c54d1",
+        "a3987262-9c61-4ead-b4b0-c41b86a4d8de",
+        "91170688-14ae-46ee-a336-3f77d05a63e2"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-07T06:27:30.097Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
     "id": "a4e2bcae-11e9-49d6-8021-831b6beda549",
     "date": "2026-09-06",
     "theme": "Statusline PNG gauge rendering fixes and release",
@@ -112230,41 +112265,6 @@
       "project": "a2a-xpr",
       "quality": "high",
       "createdAt": "2026-09-07T05:50:18.427Z"
-    },
-    "project": "a2a-xpr"
-  },
-  {
-    "id": "db34914d-f7ec-4ebd-9e08-724adb592c23",
-    "date": "2026-09-06",
-    "theme": "Git branch cleanup: deleting merged branches locally and remotely",
-    "summary": "- Goal: clean up stale/merged git branches after switching to `main` and pulling latest changes.\n- claude first deleted the merged branch `docs/build-it-code-along` locally using `git branch --merged` to confirm safety.\n- Followed up by deleting the corresponding remote branch via `git push origin --delete`, verifying removal with `git ls-remote`, and pruning three stale remote-tracking refs.\n- Finally, identified and deleted eleven merged local branches using `git branch --merged main | grep -v ... | git branch -d`, ensuring only fully merged branches were removed (safe `-d` flag).\n- End state: repository left with only `main` (clean, in sync with origin) and one unmerged branch, `feat/target-agents-and-agentstack`, preserved for future work.",
-    "observationIds": [],
-    "agents": [
-      "claude"
-    ],
-    "filesTouched": [],
-    "quality": "high",
-    "createdAt": "2026-09-07T06:27:30.097Z",
-    "metadata": {
-      "sourceCount": 3,
-      "date": "2026-09-06",
-      "theme": "Git branch cleanup: deleting merged branches locally and remotely",
-      "summary": "- Goal: clean up stale/merged git branches after switching to `main` and pulling latest changes.\n- claude first deleted the merged branch `docs/build-it-code-along` locally using `git branch --merged` to confirm safety.\n- Followed up by deleting the corresponding remote branch via `git push origin --delete`, verifying removal with `git ls-remote`, and pruning three stale remote-tracking refs.\n- Finally, identified and deleted eleven merged local branches using `git branch --merged main | grep -v ... | git branch -d`, ensuring only fully merged branches were removed (safe `-d` flag).\n- End state: repository left with only `main` (clean, in sync with origin) and one unmerged branch, `feat/target-agents-and-agentstack`, preserved for future work.",
-      "observation_ids": [
-        "2b0ff01f-2e20-4964-bfe4-6e777afc0832",
-        "f7bf736e-c4ba-453d-b0cd-0472208e96bf",
-        "70f5e53f-7452-40e7-a0ed-63c67ba6992b",
-        "ab4d98fa-ce11-4be4-b4f8-3637f60c54d1",
-        "a3987262-9c61-4ead-b4b0-c41b86a4d8de",
-        "91170688-14ae-46ee-a336-3f77d05a63e2"
-      ],
-      "agents": [
-        "claude"
-      ],
-      "files_touched": [],
-      "project": "a2a-xpr",
-      "quality": "high",
-      "createdAt": "2026-09-07T06:27:30.097Z"
     },
     "project": "a2a-xpr"
   },
@@ -115074,6 +115074,808 @@
       "project": "a2a-xpr",
       "quality": "high",
       "createdAt": "2026-09-08T16:44:59.711Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "da9aade0-025d-4a6a-a106-8b6982990a58",
+    "date": "2026-09-08",
+    "theme": "Cross-agent /sl command rollout and VKB port cleanup",
+    "summary": "- Goal: make `/sl` (session logs) command available across all 4 coding agents (Claude, Copilot, OpenCode, Pi), plus remove stale VKB port references causing false test failures.\n- Approach: registered `/sl` natively per agent—leveraged Claude's existing session plugin, wrapped for Copilot, injected into OpenCode config, installed as a prompt for Pi.\n- Removed obsolete `VKB_PORT` and visualizer port declarations from `.env.ports` and `test-coding.sh`, and stripped VKB startup/HTTP assertions from the test suite.\n- Result: `/sl` now works across all four agents; all 27 tests pass, shell syntax validated, Copilot plugin discovery confirms loadability. Changes uncommitted, pending review.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-09T05:48:18.674Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Cross-agent /sl command rollout and VKB port cleanup",
+      "summary": "- Goal: make `/sl` (session logs) command available across all 4 coding agents (Claude, Copilot, OpenCode, Pi), plus remove stale VKB port references causing false test failures.\n- Approach: registered `/sl` natively per agent—leveraged Claude's existing session plugin, wrapped for Copilot, injected into OpenCode config, installed as a prompt for Pi.\n- Removed obsolete `VKB_PORT` and visualizer port declarations from `.env.ports` and `test-coding.sh`, and stripped VKB startup/HTTP assertions from the test suite.\n- Result: `/sl` now works across all four agents; all 27 tests pass, shell syntax validated, Copilot plugin discovery confirms loadability. Changes uncommitted, pending review.",
+      "observation_ids": [
+        "04be0d92-a220-4ffe-bd34-d30f85479488"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-09T05:48:18.674Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "adc5d8d0-b07e-4999-ab27-a774a621b332",
+    "date": "2026-09-08",
+    "theme": "Fix empty insights timeline in coding viewer",
+    "summary": "- Goal: fix empty timeline of ingested insights at bottom of coding viewer.\n- Traced data flow from frontend API client through backend LSL session discovery; found regression where API server only scanned legacy `.md` transcript files after migration to `.jsonl`.\n- Fixed the file walker to accept both `.md` and `.jsonl` formats with deduplication of migrated pairs, added regression tests, restarted backend to reload logic.\n- Result: timeline now populates with 70 ticks (7-day view) from 97 discovered sessions (96 populated); all integration tests (11/11) and viewer tests (856/856) pass, production build verified.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-09T05:48:18.674Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Fix empty insights timeline in coding viewer",
+      "summary": "- Goal: fix empty timeline of ingested insights at bottom of coding viewer.\n- Traced data flow from frontend API client through backend LSL session discovery; found regression where API server only scanned legacy `.md` transcript files after migration to `.jsonl`.\n- Fixed the file walker to accept both `.md` and `.jsonl` formats with deduplication of migrated pairs, added regression tests, restarted backend to reload logic.\n- Result: timeline now populates with 70 ticks (7-day view) from 97 discovered sessions (96 populated); all integration tests (11/11) and viewer tests (856/856) pass, production build verified.",
+      "observation_ids": [
+        "ad1ce589-6e7e-4da0-b020-b3fec326049e"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-09T05:48:18.674Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "821cd8cc-e5de-44b3-ac66-6202de43ae6d",
+    "date": "2026-09-08",
+    "theme": "Session continuity review across projects",
+    "summary": "- Agent `pi` loaded and summarized recent Live Session Logs (LSL) to establish continuity between `second-brain-private` and `coding` projects.\n- Used `ls -d`/`ls -1r` discovery scoped to `.specstory/history`, prioritizing `.jsonl` format, cross-referencing timestamps across projects.\n- Found no LSL history yet for `second-brain-private`; `coding` had recent activity (18:00–19:00) covering a container health-check gate fix and rollout of the `/sl` slash command across 4 agents.\n- Result: produced a Session Continuity Summary noting uncommitted staged changes, a Copilot smoke test failing on GitHub auth, and next steps — re-authenticate Copilot, commit pending changes, fix `agent-startup-contract.test.js` incompatibility, verify auto-generated data files, and confirm LSL backfill in `second-brain-private`.",
+    "observationIds": [],
+    "agents": [
+      "pi"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-09T05:48:18.674Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-08",
+      "theme": "Session continuity review across projects",
+      "summary": "- Agent `pi` loaded and summarized recent Live Session Logs (LSL) to establish continuity between `second-brain-private` and `coding` projects.\n- Used `ls -d`/`ls -1r` discovery scoped to `.specstory/history`, prioritizing `.jsonl` format, cross-referencing timestamps across projects.\n- Found no LSL history yet for `second-brain-private`; `coding` had recent activity (18:00–19:00) covering a container health-check gate fix and rollout of the `/sl` slash command across 4 agents.\n- Result: produced a Session Continuity Summary noting uncommitted staged changes, a Copilot smoke test failing on GitHub auth, and next steps — re-authenticate Copilot, commit pending changes, fix `agent-startup-contract.test.js` incompatibility, verify auto-generated data files, and confirm LSL backfill in `second-brain-private`.",
+      "observation_ids": [
+        "07b35d66-1a14-4f57-9d0f-73bb01b56e72"
+      ],
+      "agents": [
+        "pi"
+      ],
+      "files_touched": [],
+      "project": "second-brain-private",
+      "quality": "high",
+      "createdAt": "2026-09-09T05:48:18.674Z"
+    },
+    "project": "second-brain-private"
+  },
+  {
+    "id": "5052bff3-114a-4734-ba51-603266cea8e0",
+    "date": "2026-09-09",
+    "theme": "Committing pending changes for agent session continuity",
+    "summary": "- Goal: commit all outstanding working directory changes to git.\n- Approach: verified state via `git status`/`git diff`, staged everything with `git add -A`, validated staged content before committing.\n- Result: committed with message \"fix(agents): restore session continuity and timeline\"; worktree left clean.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-09T05:48:22.847Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-09",
+      "theme": "Committing pending changes for agent session continuity",
+      "summary": "- Goal: commit all outstanding working directory changes to git.\n- Approach: verified state via `git status`/`git diff`, staged everything with `git add -A`, validated staged content before committing.\n- Result: committed with message \"fix(agents): restore session continuity and timeline\"; worktree left clean.",
+      "observation_ids": [
+        "bbfb8f0d-4198-4f5d-8275-84be1716bb00"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-09T05:48:22.847Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "916a8b93-58ad-40ba-965e-6ea20658d2aa",
+    "date": "2026-09-09",
+    "theme": "Researching complexity classification improvements for semantic router",
+    "summary": "- Goal: explore integrating external LLM router evaluation workshop criteria into the semantic router's complexity classification (`small`/`medium`/`high` categories).\n- Approach: read workflow docs, checked repo metadata via GitHub CLI, searched codebase for prompt-classifier and semantic-routing patterns to avoid extra inference calls.\n- Result: purely investigative — no code changes; identified relevant files that would need modification to incorporate improved classification thresholds.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-09T05:48:22.847Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-09",
+      "theme": "Researching complexity classification improvements for semantic router",
+      "summary": "- Goal: explore integrating external LLM router evaluation workshop criteria into the semantic router's complexity classification (`small`/`medium`/`high` categories).\n- Approach: read workflow docs, checked repo metadata via GitHub CLI, searched codebase for prompt-classifier and semantic-routing patterns to avoid extra inference calls.\n- Result: purely investigative — no code changes; identified relevant files that would need modification to incorporate improved classification thresholds.",
+      "observation_ids": [
+        "299f9ed8-eaeb-4399-b367-13b1411721d0"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-09T05:48:22.847Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2b51b5db-19f6-4833-b8d5-79b489fd673b",
+    "date": "2026-09-09",
+    "theme": "Agent authorization & LLM governance architecture design",
+    "summary": "- Designed extension to a2a-xpr architecture adding agent authorization controls, credential brokering, and finOps cost attribution\n- Established brokered credential model: agents never see raw LLM API keys, requests go through platform GATE service handling auth + cost tracking\n- Introduced hierarchical agent classes (monitoring, triggering, realm, platform) with graduated privileges and central admission-control plane\n- Key insight: authentication alone insufficient; separate policy layer must intercept agent calls before realm execution\n- Followed up by auditing repo state, creating a feature branch off the prior merged PR, validating tests, and opening a PR against `main` for the documentation covering this design (all tests passing, full audit trail verified)",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-09T09:34:15.207Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-09",
+      "theme": "Agent authorization & LLM governance architecture design",
+      "summary": "- Designed extension to a2a-xpr architecture adding agent authorization controls, credential brokering, and finOps cost attribution\n- Established brokered credential model: agents never see raw LLM API keys, requests go through platform GATE service handling auth + cost tracking\n- Introduced hierarchical agent classes (monitoring, triggering, realm, platform) with graduated privileges and central admission-control plane\n- Key insight: authentication alone insufficient; separate policy layer must intercept agent calls before realm execution\n- Followed up by auditing repo state, creating a feature branch off the prior merged PR, validating tests, and opening a PR against `main` for the documentation covering this design (all tests passing, full audit trail verified)",
+      "observation_ids": [
+        "6c63b544-ba9b-4ae7-b517-674e1ab0a479",
+        "55ad0e44-c7e6-4ece-ab3d-cd3a72251a86"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-09T09:34:15.207Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "b7a6befa-b2df-4e23-9fe4-020bf09ce06c",
+    "date": "2026-09-09",
+    "theme": "Producing Markdown/PDF report with architecture diagram",
+    "summary": "- Goal: write findings into a Markdown report under `docs/`, embed the architecture diagram image (under `docs/images/`), and render a PDF from the same source\n- Initial attempt failed: source image not found in repo, temp directories, or OpenCode attachment/cache locations\n- Follow-up: searched local directories and located the diagram image in `Downloads`, confirmed its dimensions\n- Next step planned: generate the Markdown report and PDF using the now-located image",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-09T09:34:15.207Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-09",
+      "theme": "Producing Markdown/PDF report with architecture diagram",
+      "summary": "- Goal: write findings into a Markdown report under `docs/`, embed the architecture diagram image (under `docs/images/`), and render a PDF from the same source\n- Initial attempt failed: source image not found in repo, temp directories, or OpenCode attachment/cache locations\n- Follow-up: searched local directories and located the diagram image in `Downloads`, confirmed its dimensions\n- Next step planned: generate the Markdown report and PDF using the now-located image",
+      "observation_ids": [
+        "53022cf6-ca39-4e35-90f1-317d8e202084",
+        "5c25a5eb-1ac4-4297-98d7-551c481f0792"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-09T09:34:15.207Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "e3f1ab6c-bb06-4c40-b438-213a143667c0",
+    "date": "2026-09-09",
+    "theme": "Hybrid KNN/embedding prompt classifier planning",
+    "summary": "- Goal: extend prompt classification services with a hybrid KNN/embedding strategy alongside the existing LLM judge classifier\n- Approach: configurable KNN strategy using local embedding models, confidence-based abstention with LLM fallback, plus training/import tooling, shadow telemetry, and tests — all without altering the proxy API contract\n- Shipping decision: continue using the current LLM classifier until a trained hybrid artifact passes precision gates\n- Result: research-only phase completed; reviewed existing prompt classifier config, embedding client, semantic classifier, tests, and `fastembed` package docs\n- Defined an end-to-end implementation plan (KNN strategy, local model loading, abstention logic, training tooling, operator docs) — no code changes yet\n- Agent involved: opencode",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-09T09:34:15.207Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-09",
+      "theme": "Hybrid KNN/embedding prompt classifier planning",
+      "summary": "- Goal: extend prompt classification services with a hybrid KNN/embedding strategy alongside the existing LLM judge classifier\n- Approach: configurable KNN strategy using local embedding models, confidence-based abstention with LLM fallback, plus training/import tooling, shadow telemetry, and tests — all without altering the proxy API contract\n- Shipping decision: continue using the current LLM classifier until a trained hybrid artifact passes precision gates\n- Result: research-only phase completed; reviewed existing prompt classifier config, embedding client, semantic classifier, tests, and `fastembed` package docs\n- Defined an end-to-end implementation plan (KNN strategy, local model loading, abstention logic, training tooling, operator docs) — no code changes yet\n- Agent involved: opencode",
+      "observation_ids": [
+        "97863e93-7a8f-468f-a5fc-e4f0050ea30f"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-09T09:34:15.207Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "7134e1bf-3a63-4c42-8602-88a3a9713e4e",
+    "date": "2026-09-09",
+    "theme": "Agent-Runtime diagram assessment vs ADP.Next/A2A",
+    "summary": "- Goal: analyze `Agent-Runtime.png` and assess alignment against ADP.Next control-plane and cross-platform A2A system targets.\n- Approach: verified image dimensions/checksum, authored a Markdown assessment covering alignment and gaps, then rendered a styled PDF using Pandoc + headless browser (landscape for diagram, portrait for body).\n- Result: produced a 357 KB PDF report at `docs/reports/adp-next-agent-runtime-alignment.pdf` detailing the assessment; source image left unchanged.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-09T19:34:12.606Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-09",
+      "theme": "Agent-Runtime diagram assessment vs ADP.Next/A2A",
+      "summary": "- Goal: analyze `Agent-Runtime.png` and assess alignment against ADP.Next control-plane and cross-platform A2A system targets.\n- Approach: verified image dimensions/checksum, authored a Markdown assessment covering alignment and gaps, then rendered a styled PDF using Pandoc + headless browser (landscape for diagram, portrait for body).\n- Result: produced a 357 KB PDF report at `docs/reports/adp-next-agent-runtime-alignment.pdf` detailing the assessment; source image left unchanged.",
+      "observation_ids": [
+        "a5a10439-bd9c-4424-9b53-e2e2cb4e76ae"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-09T19:34:12.606Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "a2d10d0d-7d72-4883-abb3-c1b4574c377e",
+    "date": "2026-09-09",
+    "theme": "Commit and push hybrid classifier feature",
+    "summary": "- Goal: commit and push pending repository changes.\n- Approach: separated stable feature artifacts (classifier implementation, configuration, documentation) from dynamic runtime exports, avoiding committing stale/conflicting auto-generated data.\n- Result: committed the hybrid semantic prompt classifier feature along with its dashboard UI, tests, config, and docs to `main`, then pushed successfully to `origin`.\n- Agent: opencode.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-09T19:34:12.606Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-09",
+      "theme": "Commit and push hybrid classifier feature",
+      "summary": "- Goal: commit and push pending repository changes.\n- Approach: separated stable feature artifacts (classifier implementation, configuration, documentation) from dynamic runtime exports, avoiding committing stale/conflicting auto-generated data.\n- Result: committed the hybrid semantic prompt classifier feature along with its dashboard UI, tests, config, and docs to `main`, then pushed successfully to `origin`.\n- Agent: opencode.",
+      "observation_ids": [
+        "a09cec4d-7a3e-4de0-a929-e8a90b1b8ead"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-09T19:34:12.606Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "cff00b48-7390-491e-a5be-bf39ab646796",
+    "date": "2026-09-09",
+    "theme": "GitHub Enterprise repo mirroring and access setup",
+    "summary": "- Goal: publish/mirror repositories to the company's GitHub Enterprise (GHE) instance.\n- [1] Started by making `second-brain-private` public on GHE, modeled after an existing public actions repo; inspected local git status (main branch, modified/untracked files) to prep for push.\n- [2] Separate task to mirror the claude.ai repository to GHE, independent of the second-brain/rec repos; assistant was still locating the source repo.\n- [3] Follow-up need: obtain OAuth authorization for the DATAPRO org on GHE to allow `gh` CLI repo creation; resolved by providing a single-use SSO authorization URL handling SAML login and org grant, after which repo creation commands can be retried.\n- Agent: pi throughout.",
+    "observationIds": [],
+    "agents": [
+      "pi"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-09T19:34:12.606Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-09",
+      "theme": "GitHub Enterprise repo mirroring and access setup",
+      "summary": "- Goal: publish/mirror repositories to the company's GitHub Enterprise (GHE) instance.\n- [1] Started by making `second-brain-private` public on GHE, modeled after an existing public actions repo; inspected local git status (main branch, modified/untracked files) to prep for push.\n- [2] Separate task to mirror the claude.ai repository to GHE, independent of the second-brain/rec repos; assistant was still locating the source repo.\n- [3] Follow-up need: obtain OAuth authorization for the DATAPRO org on GHE to allow `gh` CLI repo creation; resolved by providing a single-use SSO authorization URL handling SAML login and org grant, after which repo creation commands can be retried.\n- Agent: pi throughout.",
+      "observation_ids": [
+        "8aad0d90-4aab-454d-b923-d63c6cafcf3c",
+        "14ca1f3f-e1a9-4377-afaa-17c3c2a09eb8",
+        "edbbc426-0b9f-4c0a-885d-62808bcaeb0f"
+      ],
+      "agents": [
+        "pi"
+      ],
+      "files_touched": [],
+      "project": "second-brain-private",
+      "quality": "normal",
+      "createdAt": "2026-09-09T19:34:12.606Z"
+    },
+    "project": "second-brain-private"
+  },
+  {
+    "id": "d04d5285-3b55-456e-93e2-57df2483f505",
+    "date": "2026-09-09",
+    "theme": "Commit and push hybrid semantic prompt classifier",
+    "summary": "- Goal: commit and push completed work for the hybrid semantic prompt classifier feature.\n- Approach: staged implementation, dashboard UI, tests, config, and documentation files, deliberately excluding six live-generated `.data` runtime export files that had changed independently.\n- Result: commit `eff56d81e feat(routing): add hybrid semantic prompt classifier` pushed successfully to `origin/main`.\n- Six runtime export files left intentionally uncommitted.\n- Agent: opencode.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T07:01:09.009Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-09",
+      "theme": "Commit and push hybrid semantic prompt classifier",
+      "summary": "- Goal: commit and push completed work for the hybrid semantic prompt classifier feature.\n- Approach: staged implementation, dashboard UI, tests, config, and documentation files, deliberately excluding six live-generated `.data` runtime export files that had changed independently.\n- Result: commit `eff56d81e feat(routing): add hybrid semantic prompt classifier` pushed successfully to `origin/main`.\n- Six runtime export files left intentionally uncommitted.\n- Agent: opencode.",
+      "observation_ids": [
+        "dcdde7e1-55b8-4019-b979-9a8afb0d7401"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-13T07:01:09.009Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "492c6f2b-8cc8-4b5e-86ae-67b170d91920",
+    "date": "2026-09-09",
+    "theme": "Hybrid classifier deployment plan with KNN training workflow",
+    "summary": "- Goal: expand classification services and document a safe operational deployment path.\n- Approach: implemented a multi-strategy classifier (`llm`, `shadow`, `hybrid`, `knn`) using local MiniLM embeddings with weighted KNN voting, while keeping production on the conservative `llm` strategy.\n- Built a 7-step training/deployment workflow:\n  1. Generate objective scores from target models\n  2. Convert scores to band labels\n  3. Train KNN with cross-validation and threshold selection\n  4. Evaluate against 90% precision gates\n  5. Shadow-test to measure disagreements\n  6. Activate hybrid mode if evidence passes\n  7. Rollback to `llm` if needed\n- Result: hybrid semantic classifier with atomic model publication, per-band precision gates, and dashboard controls for strategy selection and KNN health counters.\n- Testing: 35 classifier tests plus full 1,467 node suite passing.\n- Current state: production remains on `strategy: llm` (89% small precision, failing 90% gate) pending labeled training data collection across small/medium/high bands.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T10:48:13.726Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-09",
+      "theme": "Hybrid classifier deployment plan with KNN training workflow",
+      "summary": "- Goal: expand classification services and document a safe operational deployment path.\n- Approach: implemented a multi-strategy classifier (`llm`, `shadow`, `hybrid`, `knn`) using local MiniLM embeddings with weighted KNN voting, while keeping production on the conservative `llm` strategy.\n- Built a 7-step training/deployment workflow:\n  1. Generate objective scores from target models\n  2. Convert scores to band labels\n  3. Train KNN with cross-validation and threshold selection\n  4. Evaluate against 90% precision gates\n  5. Shadow-test to measure disagreements\n  6. Activate hybrid mode if evidence passes\n  7. Rollback to `llm` if needed\n- Result: hybrid semantic classifier with atomic model publication, per-band precision gates, and dashboard controls for strategy selection and KNN health counters.\n- Testing: 35 classifier tests plus full 1,467 node suite passing.\n- Current state: production remains on `strategy: llm` (89% small precision, failing 90% gate) pending labeled training data collection across small/medium/high bands.",
+      "observation_ids": [
+        "98206116-2a7f-44c8-859e-98efce1cca05"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-13T10:48:13.726Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "30e311fd-bfc0-4a97-bbb8-0c90cf70bf72",
+    "date": "2026-09-10",
+    "theme": "Restructuring meeting skill extension and commits",
+    "summary": "- Extended the meeting-recording skill to support a new \"restructuring\" 1:1 meeting category, creating a parallel minutes document (`restructuring.md`) alongside existing `personal-development.md` records for transparency during a restructuring program.\n- Investigated skill definitions (feedback, meeting-recording, vault-routing) and templates to integrate the new document type into vault routing logic.\n- Committed the changes across both `second-brain` (public) and `second-brain-private` repos, since the `skills` directory is symlinked into both; staged only relevant files, leaving unrelated changes untouched.\n- Discovered the public `vault-routing` `SKILL.md` had been erroneously modified to include staff-development/timeline logic that should only live in the private `ef-412-feedback` skill.\n- Investigated git history to confirm the error and reaffirmed the architectural boundary: staff development/restructuring logic belongs only in `second-brain-private`.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-10T10:13:08.500Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-10",
+      "theme": "Restructuring meeting skill extension and commits",
+      "summary": "- Extended the meeting-recording skill to support a new \"restructuring\" 1:1 meeting category, creating a parallel minutes document (`restructuring.md`) alongside existing `personal-development.md` records for transparency during a restructuring program.\n- Investigated skill definitions (feedback, meeting-recording, vault-routing) and templates to integrate the new document type into vault routing logic.\n- Committed the changes across both `second-brain` (public) and `second-brain-private` repos, since the `skills` directory is symlinked into both; staged only relevant files, leaving unrelated changes untouched.\n- Discovered the public `vault-routing` `SKILL.md` had been erroneously modified to include staff-development/timeline logic that should only live in the private `ef-412-feedback` skill.\n- Investigated git history to confirm the error and reaffirmed the architectural boundary: staff development/restructuring logic belongs only in `second-brain-private`.",
+      "observation_ids": [
+        "c1b4fc64-6b4c-4c8f-98f9-a160afe89206",
+        "9cdf859a-f45c-4609-8338-edf67bfffbdd",
+        "01889630-0fc8-49a6-a596-4dace12c590a"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "second-brain-private",
+      "quality": "high",
+      "createdAt": "2026-09-10T10:13:08.500Z"
+    },
+    "project": "second-brain-private"
+  },
+  {
+    "id": "07f858ab-0cb9-4579-9af1-1766a70346de",
+    "date": "2026-09-10",
+    "theme": "Push/PR blocked by GHE connectivity from China",
+    "summary": "- Attempted to commit, push, and open a PR for work in `second-brain-private` and `second-brain` vaults.\n- Confirmed private vault has no remote by design (no push/PR needed per vault-routing rules); public vault branch `docs/fuma-to-private-vault` is 4 commits ahead of `origin/main` but push is blocked by a 502 error from `<COMPANY_NAME_REDACTED>.ghe.com`.\n- Root cause traced to VPN/proxy connectivity issues while developer is located in China (CN).\n- Diagnosed proxy settings, environment variables, and DNS/network reachability to `<COMPANY_NAME_REDACTED>.ghe.com` but no fix applied yet — issue remains pending restoration of VPN/proxy access.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-10T10:13:08.500Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-10",
+      "theme": "Push/PR blocked by GHE connectivity from China",
+      "summary": "- Attempted to commit, push, and open a PR for work in `second-brain-private` and `second-brain` vaults.\n- Confirmed private vault has no remote by design (no push/PR needed per vault-routing rules); public vault branch `docs/fuma-to-private-vault` is 4 commits ahead of `origin/main` but push is blocked by a 502 error from `<COMPANY_NAME_REDACTED>.ghe.com`.\n- Root cause traced to VPN/proxy connectivity issues while developer is located in China (CN).\n- Diagnosed proxy settings, environment variables, and DNS/network reachability to `<COMPANY_NAME_REDACTED>.ghe.com` but no fix applied yet — issue remains pending restoration of VPN/proxy access.",
+      "observation_ids": [
+        "13e63ab4-b4da-47fa-9ad7-1ac340a9cdfd",
+        "00c9a157-8cdf-49ee-a261-f6ef60bba2ea"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "second-brain-private",
+      "quality": "high",
+      "createdAt": "2026-09-10T10:13:08.500Z"
+    },
+    "project": "second-brain-private"
+  },
+  {
+    "id": "d8fa8a3d-0460-45ca-ab61-704ac90fda1f",
+    "date": "2026-09-10",
+    "theme": "Debugging GHE.com connectivity and proxy failure",
+    "summary": "- Goal: resolve inability to access `<COMPANY_NAME_REDACTED>.ghe.com` while on corporate network, blocking `gh auth refresh` and git push/PR creation.\n- Approach: agent (opencode) checked DNS resolvers, tested `curl` direct and proxied connections, inspected `gh` CLI host config, and examined local `proxydetox` proxy logs/config vs. corporate PAC file.\n- Found root cause: shell was hardcoded to use `proxydetox` (127.0.0.1:3128), which was failing with 502 Bad Gateway, while the PAC-specified proxy (`proxy.muc:8080`) worked correctly.\n- Result: switched environment to use the valid PAC proxy for all `git`/`gh` operations, successfully pushed pending commits and opened a new pull request against `main`, resolving the connectivity blocker.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-10T11:06:38.335Z",
+    "metadata": {
+      "sourceCount": 3,
+      "date": "2026-09-10",
+      "theme": "Debugging GHE.com connectivity and proxy failure",
+      "summary": "- Goal: resolve inability to access `<COMPANY_NAME_REDACTED>.ghe.com` while on corporate network, blocking `gh auth refresh` and git push/PR creation.\n- Approach: agent (opencode) checked DNS resolvers, tested `curl` direct and proxied connections, inspected `gh` CLI host config, and examined local `proxydetox` proxy logs/config vs. corporate PAC file.\n- Found root cause: shell was hardcoded to use `proxydetox` (127.0.0.1:3128), which was failing with 502 Bad Gateway, while the PAC-specified proxy (`proxy.muc:8080`) worked correctly.\n- Result: switched environment to use the valid PAC proxy for all `git`/`gh` operations, successfully pushed pending commits and opened a new pull request against `main`, resolving the connectivity blocker.",
+      "observation_ids": [
+        "ce713953-b0c6-4849-89b6-7a2c5dce9a6b",
+        "8d73b7ef-dfc8-4cda-afd3-38e840cc53d3",
+        "bb0ad53d-cf3c-43c8-ac23-9cc34dd00ca0"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "second-brain-private",
+      "quality": "normal",
+      "createdAt": "2026-09-10T11:06:38.335Z"
+    },
+    "project": "second-brain-private"
+  },
+  {
+    "id": "f8acf78c-a63e-4bed-817e-7e308f11a403",
+    "date": "2026-09-10",
+    "theme": "Start recording feedback meeting with Ahmed",
+    "summary": "- Used the `rapidscribe-meeting` skill to start audio capture for a one-on-one feedback session with Ahmed.\n- Speaker count explicitly pinned to 2 for accurate transcription.\n- Recording started successfully with session ID `session-20260910-130543-76885391`, output directed to the rapidscribe meetings directory.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-10T11:06:38.335Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-10",
+      "theme": "Start recording feedback meeting with Ahmed",
+      "summary": "- Used the `rapidscribe-meeting` skill to start audio capture for a one-on-one feedback session with Ahmed.\n- Speaker count explicitly pinned to 2 for accurate transcription.\n- Recording started successfully with session ID `session-20260910-130543-76885391`, output directed to the rapidscribe meetings directory.",
+      "observation_ids": [
+        "bae26d0f-2018-49c8-9203-8b2da92545bf"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "second-brain-private",
+      "quality": "high",
+      "createdAt": "2026-09-10T11:06:38.335Z"
+    },
+    "project": "second-brain-private"
+  },
+  {
+    "id": "0c27c777-1a51-42fb-b6c7-0d5e2caf6272",
+    "date": "2026-09-10",
+    "theme": "Diagnosing system-wide DNS resolution failure",
+    "summary": "- Goal: fix git clone failures (\"Repository not found\") and general internet connectivity issues on a corporate machine\n- Approach: ruled out GitHub-specific cause since generic hostname resolution also failed regardless of proxy; ran system-level network diagnostics on interfaces and routing tables\n- Result: root cause identified as broken DNS resolution system-wide — git errors and internet failures are secondary symptoms of this underlying connectivity/DNS misconfiguration\n- No file artifacts produced; diagnostic conclusion only",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-10T11:06:38.335Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-10",
+      "theme": "Diagnosing system-wide DNS resolution failure",
+      "summary": "- Goal: fix git clone failures (\"Repository not found\") and general internet connectivity issues on a corporate machine\n- Approach: ruled out GitHub-specific cause since generic hostname resolution also failed regardless of proxy; ran system-level network diagnostics on interfaces and routing tables\n- Result: root cause identified as broken DNS resolution system-wide — git errors and internet failures are secondary symptoms of this underlying connectivity/DNS misconfiguration\n- No file artifacts produced; diagnostic conclusion only",
+      "observation_ids": [
+        "c275565c-f819-4c6f-9987-cbc3c46d8e2c"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-10T11:06:38.335Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "345c901c-7645-4f1d-8b0d-eeed824fa532",
+    "date": "2026-09-10",
+    "theme": "Marcel Schneider feedback recording and file setup",
+    "summary": "- Session began with stopping a prior meeting recording via the `rapidscribe-meeting` CLI, with associated skill directory cleanup touching `funktionsmatrix-candidate-mapping.md`, `personal-development.md`, and `timeline.md`.\n- A new recording was started for a feedback session with Marcel, configured for exactly 2 speakers using `rapidscribe-meeting`.\n- Agent then attempted to locate Marcel's contact info, searching for a folder under his (assumed) surname; when not found, pivoted to checking the EF-412 staff roster to resolve his actual last name.\n- Identified as Marcel Schneider, agent created a proper feedback folder `EF-412/feedback/schneider-marcel/` mirroring the existing Thomas Kittel structure, adding `personal-development.md` and `timeline.md`.\n- Reverted unintended direct edits to the root-level `EF-412/funktionsmatrix-candidate-mapping.md` file, restoring it to its prior state.\n- All work performed by the `opencode` agent across a single continuous workflow culminating in a clean, correctly-structured feedback entry for Marcel Schneider.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [
+      "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/funktionsmatrix-candidate-mapping.md",
+      "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/schneider-marcel/personal-development.md",
+      "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/schneider-marcel/timeline.md"
+    ],
+    "quality": "high",
+    "createdAt": "2026-09-13T07:01:14.075Z",
+    "metadata": {
+      "sourceCount": 4,
+      "date": "2026-09-10",
+      "theme": "Marcel Schneider feedback recording and file setup",
+      "summary": "- Session began with stopping a prior meeting recording via the `rapidscribe-meeting` CLI, with associated skill directory cleanup touching `funktionsmatrix-candidate-mapping.md`, `personal-development.md`, and `timeline.md`.\n- A new recording was started for a feedback session with Marcel, configured for exactly 2 speakers using `rapidscribe-meeting`.\n- Agent then attempted to locate Marcel's contact info, searching for a folder under his (assumed) surname; when not found, pivoted to checking the EF-412 staff roster to resolve his actual last name.\n- Identified as Marcel Schneider, agent created a proper feedback folder `EF-412/feedback/schneider-marcel/` mirroring the existing Thomas Kittel structure, adding `personal-development.md` and `timeline.md`.\n- Reverted unintended direct edits to the root-level `EF-412/funktionsmatrix-candidate-mapping.md` file, restoring it to its prior state.\n- All work performed by the `opencode` agent across a single continuous workflow culminating in a clean, correctly-structured feedback entry for Marcel Schneider.",
+      "observation_ids": [
+        "8626c782-0b99-4cc2-8fd1-653b5e178a60",
+        "bebfc516-304f-4361-af59-9cb13c5845a0",
+        "589c2a1e-2110-41da-a373-a280e2f56f18",
+        "cce2ac5c-4228-4ca3-8a92-78da36a077c5"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [
+        "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/funktionsmatrix-candidate-mapping.md",
+        "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/schneider-marcel/personal-development.md",
+        "/Users/<USER_ID_REDACTED>/second-brain-private/EF-412/feedback/schneider-marcel/timeline.md"
+      ],
+      "project": "second-brain-private",
+      "quality": "high",
+      "createdAt": "2026-09-13T07:01:14.075Z"
+    },
+    "project": "second-brain-private"
+  },
+  {
+    "id": "586ae99c-6a32-45c0-97df-e944c6ac7fce",
+    "date": "2026-09-13",
+    "theme": "Diagnosing OpenCode proxy bypass issue",
+    "summary": "- Investigated why requests were bypassing the proxy/router instead of being classified and routed (e.g., to Gwen for \"small\" prompts).\n- Initial trace at 08:59:59 showed the request never reached the classifier or semantic router, pointing to an ingress/provider-selection issue rather than misclassification.\n- Follow-up investigation found the root cause: OpenCode's proxy routing only sets `ANTHROPIC_BASE_URL`, which is ineffective for the native `github-copilot` provider, causing GPT-5.6 Sol requests to bypass the proxy entirely.\n- Proposed fix: redefine OpenCode's `github-copilot` provider within the coding wrapper to route native requests through `/v1/opencode` on rapid-llm-proxy, ensuring proxy enforcement while preserving deliberate model selection and classifier behavior.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T10:48:21.274Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-13",
+      "theme": "Diagnosing OpenCode proxy bypass issue",
+      "summary": "- Investigated why requests were bypassing the proxy/router instead of being classified and routed (e.g., to Gwen for \"small\" prompts).\n- Initial trace at 08:59:59 showed the request never reached the classifier or semantic router, pointing to an ingress/provider-selection issue rather than misclassification.\n- Follow-up investigation found the root cause: OpenCode's proxy routing only sets `ANTHROPIC_BASE_URL`, which is ineffective for the native `github-copilot` provider, causing GPT-5.6 Sol requests to bypass the proxy entirely.\n- Proposed fix: redefine OpenCode's `github-copilot` provider within the coding wrapper to route native requests through `/v1/opencode` on rapid-llm-proxy, ensuring proxy enforcement while preserving deliberate model selection and classifier behavior.",
+      "observation_ids": [
+        "2f8f33c5-2ac7-4029-a831-cc25ff1c2d09",
+        "eb6c1620-8c92-4371-afe9-52e321a6259e"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-13T10:48:21.274Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "2cedaf99-2362-40b7-a767-d4dc11dd4968",
+    "date": "2026-09-13",
+    "theme": "Context window percentage display bug investigation",
+    "summary": "- Agent (opencode) investigated a sudden drop of the context window percentage display from ~70s to 0% during proxy session coding work.\n- Searched for files related to the context gauge rendering and token database state to determine whether the issue is a calculation/state bug or a proxy side effect.\n- Investigation was initiated but not completed; root cause not yet identified.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-13T10:48:21.274Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-13",
+      "theme": "Context window percentage display bug investigation",
+      "summary": "- Agent (opencode) investigated a sudden drop of the context window percentage display from ~70s to 0% during proxy session coding work.\n- Searched for files related to the context gauge rendering and token database state to determine whether the issue is a calculation/state bug or a proxy side effect.\n- Investigation was initiated but not completed; root cause not yet identified.",
+      "observation_ids": [
+        "10e034af-af2c-48c4-84e1-1d8e4e6d102e"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-13T10:48:21.274Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "545ab049-c637-4007-8500-4478a69b3732",
+    "date": "2026-09-13",
+    "theme": "Loading session logs for context continuity",
+    "summary": "- Agent (claude) ran a `/sl` session log discovery workflow for the `a2a-xpr` project to establish continuity with prior work.\n- Used only pre-allowed `ls -d` and `ls -1r` commands for tranche/file discovery plus `Read` for content, avoiding permission prompts.\n- Queried the opencode database for recent session activity and cross-referenced related coding project logs.\n- Goal was to synthesize a Session Continuity Summary covering time range, projects, recent work, state, and next steps.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-13T10:48:21.274Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-13",
+      "theme": "Loading session logs for context continuity",
+      "summary": "- Agent (claude) ran a `/sl` session log discovery workflow for the `a2a-xpr` project to establish continuity with prior work.\n- Used only pre-allowed `ls -d` and `ls -1r` commands for tranche/file discovery plus `Read` for content, avoiding permission prompts.\n- Queried the opencode database for recent session activity and cross-referenced related coding project logs.\n- Goal was to synthesize a Session Continuity Summary covering time range, projects, recent work, state, and next steps.",
+      "observation_ids": [
+        "7abb2606-4975-4d9d-be2e-bf6cb219e3da"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-13T10:48:21.274Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "834d6767-434d-4c25-bb8b-0252fe30698e",
+    "date": "2026-09-13",
+    "theme": "Enforcing proxy routing for GPT-5.6 Sol Responses API",
+    "summary": "- Goal: ensure all GPT-5.6 Sol requests route through `rapid-llm-proxy` instead of bypassing it, per project policy.\n- Diagnosis (opencode agent): OpenCode's native `github-copilot` provider used the `/responses` API rather than `/chat/completions`, which the proxy didn't support, allowing bypass.\n- Approach: rather than build a separate Sol-only router, normalized Sol's Responses API requests (input_text blocks, tool shapes) into the existing classifier/router pipeline, then reframed outputs back as Responses SSE events.\n- Covered all URL forms: `/v1/opencode/responses` and `/v1/opencode/t/<id>/responses`.\n- Added `/resolve` diagnostics, fail-closed validation, and config-authorized model profiles (high→Sol, medium→Sonnet, small→Haiku/Qwen).\n- Result: verified end-to-end — high-band Sol requests route correctly (`routing_source=live`), small-band requests downgrade to Haiku/Qwen, all recorded in token usage. Requires OpenCode session restart for wrapper base-URL changes to take effect.",
+    "observationIds": [],
+    "agents": [
+      "opencode"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T11:39:20.466Z",
+    "metadata": {
+      "sourceCount": 2,
+      "date": "2026-09-13",
+      "theme": "Enforcing proxy routing for GPT-5.6 Sol Responses API",
+      "summary": "- Goal: ensure all GPT-5.6 Sol requests route through `rapid-llm-proxy` instead of bypassing it, per project policy.\n- Diagnosis (opencode agent): OpenCode's native `github-copilot` provider used the `/responses` API rather than `/chat/completions`, which the proxy didn't support, allowing bypass.\n- Approach: rather than build a separate Sol-only router, normalized Sol's Responses API requests (input_text blocks, tool shapes) into the existing classifier/router pipeline, then reframed outputs back as Responses SSE events.\n- Covered all URL forms: `/v1/opencode/responses` and `/v1/opencode/t/<id>/responses`.\n- Added `/resolve` diagnostics, fail-closed validation, and config-authorized model profiles (high→Sol, medium→Sonnet, small→Haiku/Qwen).\n- Result: verified end-to-end — high-band Sol requests route correctly (`routing_source=live`), small-band requests downgrade to Haiku/Qwen, all recorded in token usage. Requires OpenCode session restart for wrapper base-URL changes to take effect.",
+      "observation_ids": [
+        "44482986-e491-4abc-9aeb-4ffd7bbf1308",
+        "cf44e701-43a1-4c8f-9132-faf8f129a80d"
+      ],
+      "agents": [
+        "opencode"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "high",
+      "createdAt": "2026-09-13T11:39:20.466Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "87a9a6df-252b-437a-8887-4f6c299f97dc",
+    "date": "2026-09-13",
+    "theme": "Loading recent Live Session Logs for context continuity",
+    "summary": "- Agent: claude, triggered by `/sl` command to load recent Live Session Logs (LSL) for continuity with prior work.\n- Approach: ran prescribed `ls` commands to find the most recent LSL tranche (2026/09), then used grep-based sampling of user turns/tool calls to gauge session content without full reads.\n- Result: discovery workflow was underway (tranche identified, files being sampled) but the summary/context load was not completed before the exchange ended.",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-13T11:39:20.466Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-13",
+      "theme": "Loading recent Live Session Logs for context continuity",
+      "summary": "- Agent: claude, triggered by `/sl` command to load recent Live Session Logs (LSL) for continuity with prior work.\n- Approach: ran prescribed `ls` commands to find the most recent LSL tranche (2026/09), then used grep-based sampling of user turns/tool calls to gauge session content without full reads.\n- Result: discovery workflow was underway (tranche identified, files being sampled) but the summary/context load was not completed before the exchange ended.",
+      "observation_ids": [
+        "71179bea-7e65-43c4-a39a-d323659a2bdb"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "coding",
+      "quality": "normal",
+      "createdAt": "2026-09-13T11:39:20.466Z"
+    },
+    "project": "coding"
+  },
+  {
+    "id": "d2e90237-2628-41c3-a012-b2bb2ab804c5",
+    "date": "2026-09-13",
+    "theme": "Filter logic investigation for opencode session",
+    "summary": "- Goal: implement a filter within the `currentOpencodeSession` function\n- Approach: investigated opencode database structure, test files, and session handling code, focusing on permission markers and session metadata\n- Result: contextual understanding gathered but no implementation applied; filter logic still needs to be written into the codebase",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "normal",
+    "createdAt": "2026-09-13T11:39:20.466Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-13",
+      "theme": "Filter logic investigation for opencode session",
+      "summary": "- Goal: implement a filter within the `currentOpencodeSession` function\n- Approach: investigated opencode database structure, test files, and session handling code, focusing on permission markers and session metadata\n- Result: contextual understanding gathered but no implementation applied; filter logic still needs to be written into the codebase",
+      "observation_ids": [
+        "bb07e383-045a-4645-a18d-e901909d4243"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "normal",
+      "createdAt": "2026-09-13T11:39:20.466Z"
+    },
+    "project": "a2a-xpr"
+  },
+  {
+    "id": "b2bf1dd0-9b3f-4bda-a62f-85e3af277462",
+    "date": "2026-09-13",
+    "theme": "Commit coordination concern on a2a-xpr repo",
+    "summary": "- Goal: commit uncommitted changes across config, tests, and data directories in the `a2a-xpr` project\n- Found repo on `main` branch with multiple uncommitted files\n- Raised concern about a parallel live session sharing the same HEAD, risking conflicts\n- Result: commit was withheld pending clarification on branching strategy",
+    "observationIds": [],
+    "agents": [
+      "claude"
+    ],
+    "filesTouched": [],
+    "quality": "high",
+    "createdAt": "2026-09-13T11:39:20.466Z",
+    "metadata": {
+      "sourceCount": 1,
+      "date": "2026-09-13",
+      "theme": "Commit coordination concern on a2a-xpr repo",
+      "summary": "- Goal: commit uncommitted changes across config, tests, and data directories in the `a2a-xpr` project\n- Found repo on `main` branch with multiple uncommitted files\n- Raised concern about a parallel live session sharing the same HEAD, risking conflicts\n- Result: commit was withheld pending clarification on branching strategy",
+      "observation_ids": [
+        "a078eb42-02dc-463f-ac99-16980bd59819"
+      ],
+      "agents": [
+        "claude"
+      ],
+      "files_touched": [],
+      "project": "a2a-xpr",
+      "quality": "high",
+      "createdAt": "2026-09-13T11:39:20.466Z"
     },
     "project": "a2a-xpr"
   }
