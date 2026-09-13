@@ -106,7 +106,6 @@ agent_pre_launch() {
     _agent_log "🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)"
   fi
 
-
   # OPT-IN (Phase 82, default OFF): anthropic-native provider entry that routes opencode's
   # @ai-sdk/anthropic path through the local rapid-llm-proxy /v1/messages, restoring prompt-cache
   # fidelity AND stamping token_usage agent='opencode' via the x-agent header (else the tap
@@ -158,14 +157,21 @@ agent_pre_launch() {
     [ -n "$_oc_models" ] && _oc_models="${_oc_models},"
     _oc_models="${_oc_models}\"${_m}\":{${_oc_variants}}"
   done
-  local _oc_provider_entries="\"rapid-proxy\":{\"models\":{${_oc_models}}}"
+  local _oc_proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
+  local _oc_shim_base="http://127.0.0.1:${_oc_proxy_port}/v1/opencode"
+  if [ -n "${TASK_ID:-}" ]; then
+    _oc_shim_base="${_oc_shim_base}/t/${TASK_ID}"
+  fi
+  # Keep OpenCode's native Copilot catalogue (including GPT-5.6 Sol), but move
+  # its wire endpoint onto our shim. Authentication remains OpenCode's own; the
+  # localhost shim ignores its placeholder bearer and uses the proxy-held OAuth.
+  local _oc_provider_entries="\"rapid-proxy\":{\"models\":{${_oc_models}}},\"github-copilot\":{\"options\":{\"baseURL\":\"${_oc_shim_base}\",\"headers\":{\"x-agent\":\"opencode\"}}}"
 
   # ONE `provider` fragment, built here and spliced once below. Two separate
   # _oc_splice_config calls would each prepend their own "provider" key, and a
   # duplicate key in one object silently drops whichever the parser resolves
   # second — so the opt-in block below adds to this string instead of splicing.
   if [ "${OPENCODE_ANTHROPIC_NATIVE:-0}" = "1" ]; then
-    local _oc_proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
     _oc_provider_entries="${_oc_provider_entries},\"anthropic\":{\"options\":{\"baseURL\":\"http://127.0.0.1:${_oc_proxy_port}/v1\",\"headers\":{\"x-task-id\":\"${TASK_ID:-}\",\"x-agent\":\"opencode\"}}}"
     _agent_log "🧪 opencode ANTHROPIC-NATIVE (opt-in) → proxy http://127.0.0.1:${_oc_proxy_port}/v1/messages (x-agent=opencode; x-task-id=${TASK_ID:-<ambient>})"
   fi
@@ -176,6 +182,22 @@ agent_pre_launch() {
   # Claude command file and have the command load it, so all agents follow one
   # continuity procedure rather than four copied versions that drift.
   _oc_splice_config '"command":{"sl":{"description":"Load recent session logs for continuity","template":"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: $ARGUMENTS"}}'
+
+  # A session can persist a model chosen from the global provider catalogue.
+  # That selection outranks the configured default on resume: the 2026-09-13
+  # session kept github-copilot/gpt-5.6-sol even though opencode.json defaulted
+  # to rapid-proxy/claude-sonnet-5. Native github-copilot never reaches :12435,
+  # so the classifier and semantic offload have no request to act on.
+  #
+  # Sessions launched through `coding` therefore expose only proxy-backed
+  # providers. `github-copilot` remains selectable (including GPT-5.6 Sol), but
+  # its base URL above now points at rapid-llm-proxy. A bare `opencode` still gets
+  # the user's unmodified direct-provider catalogue.
+  local _oc_enabled_providers='"rapid-proxy","github-copilot"'
+  if [ "${OPENCODE_ANTHROPIC_NATIVE:-0}" = "1" ]; then
+    _oc_enabled_providers='"rapid-proxy","github-copilot","anthropic"'
+  fi
+  _oc_splice_config "\"enabled_providers\":[${_oc_enabled_providers}]"
 
   # ───────────────────────────────────────────────────────────────────────────
   # Wrapper-scoped plugins (default since P2).

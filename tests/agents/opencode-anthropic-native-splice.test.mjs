@@ -44,6 +44,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,7 +69,7 @@ function renderOpenCodeConfigContent(overrideEnv = {}) {
 _agent_log() { :; }
 validate_agent_connectivity() { return 0; }
 source "${OPENCODE_SH}"
-agent_pre_launch
+agent_pre_launch || exit $?
 printf '%s' "$OPENCODE_CONFIG_CONTENT"
 `;
 
@@ -139,8 +140,10 @@ test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE unset → a provider block with ban
   // the plugins case. The empty-object branch of _oc_splice_config is still
   // exercised — it is the branch this very splice takes first.
   const parsed = JSON.parse(renderOpenCodeConfigContent({ INSIDE_CN: 'false' }));
-  assert.deepEqual(Object.keys(parsed).sort(), ['command', 'provider']);
-  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy']);
+  assert.deepEqual(Object.keys(parsed).sort(), ['command', 'enabled_providers', 'provider']);
+  assert.deepEqual(parsed.enabled_providers, ['rapid-proxy', 'github-copilot']);
+  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy', 'github-copilot']);
+  assert.equal(parsed.provider['github-copilot'].options.baseURL, 'http://127.0.0.1:12435/v1/opencode');
   assert.equal(parsed.command?.sl?.description, 'Load recent session logs for continuity');
   assert.match(parsed.command?.sl?.template ?? '', /\.claude\/commands\/sl\.md/);
   for (const [id, model] of Object.entries(parsed.provider['rapid-proxy'].models)) {
@@ -164,6 +167,16 @@ test('opencode.sh: no network branch — INSIDE_CN true and false render identic
     'opencode.sh must not branch on network; pi and copilot never have');
 });
 
+test('opencode.sh: native github-copilot models are retained but their endpoint is proxy-backed', () => {
+  const parsed = JSON.parse(renderOpenCodeConfigContent({ TASK_ID: 'task-1' }));
+  assert.deepEqual(parsed.enabled_providers, ['rapid-proxy', 'github-copilot']);
+  assert.equal(
+    parsed.provider['github-copilot'].options.baseURL,
+    'http://127.0.0.1:12435/v1/opencode/t/task-1',
+  );
+  assert.equal(parsed.provider['github-copilot'].options.headers['x-agent'], 'opencode');
+});
+
 test('opencode.sh: CODING_OPENCODE_MODEL is the one way a model id reaches the blob', () => {
   const rendered = renderOpenCodeConfigContent({
     INSIDE_CN: 'false',
@@ -176,8 +189,8 @@ test('opencode.sh: CODING_OPENCODE_MODEL is the one way a model id reaches the b
   // WHOLE blob, because the band variants are spliced unconditionally. What must
   // still hold is that it is the only path by which a model id appears — a
   // network branch reintroducing a pin is the regression this file defends.
-  assert.deepEqual(Object.keys(parsed).sort(), ['command', 'model', 'provider']);
-  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy']);
+  assert.deepEqual(Object.keys(parsed).sort(), ['command', 'enabled_providers', 'model', 'provider']);
+  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy', 'github-copilot']);
 });
 
 // ---------------------------------------------------------------------------
@@ -193,6 +206,7 @@ test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE=1 → rendered OPENCODE_CONFIG_CONT
     () => JSON.parse(rendered),
     `rendered content must parse as JSON; got: ${rendered}`,
   );
+  assert.deepEqual(JSON.parse(rendered).enabled_providers, ['rapid-proxy', 'github-copilot', 'anthropic']);
 });
 
 test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE=1 → provider.anthropic entry present with baseURL targeting proxy /v1', () => {
@@ -245,7 +259,7 @@ test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE=1 on the bare {} → no trailing co
   });
   assert.doesNotThrow(() => JSON.parse(rendered),
     `splicing onto the bare {} must not emit a trailing comma; got: ${rendered}`);
-  assert.deepEqual(Object.keys(JSON.parse(rendered)).sort(), ['command', 'provider']);
+  assert.deepEqual(Object.keys(JSON.parse(rendered)).sort(), ['command', 'enabled_providers', 'provider']);
 });
 
 test('opencode.sh: OPENCODE_ANTHROPIC_NATIVE=1 → CODING_OPENCODE_MODEL survives the splice', () => {
@@ -308,11 +322,14 @@ test('opencode.sh: plugins spliced (CODING_REPO set) + flag unset → still no a
   );
   // Both splices ran and produced ONE valid object — the duplicate-"provider"-key
   // bug this arrangement was restructured to avoid would show up right here.
-  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy']);
+  assert.deepEqual(Object.keys(parsed.provider), ['rapid-proxy', 'github-copilot']);
   // And the splice must actually have happened, or this test proves nothing.
   assert.ok(Array.isArray(parsed.plugin) && parsed.plugin.length > 0,
     'precondition: CODING_REPO set must splice the wrapper-scoped plugins');
   assert.equal(parsed.command?.sl?.description, 'Load recent session logs for continuity');
+  assert.deepEqual(parsed.enabled_providers, ['rapid-proxy', 'github-copilot']);
+  assert.match(parsed.provider['github-copilot'].options.baseURL, /127\.0\.0\.1:12435\/v1\/opencode/,
+    'coding wrapper must proxy the native provider instead of letting it bypass classification');
 });
 
 test('opencode.sh: all three splices coexist — plugins, provider and the model override', () => {
