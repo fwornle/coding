@@ -109,6 +109,8 @@ import {
   selectMockLLM,
   selectMockLLMExplicit,
   selectGlobalLLMModeExplicit,
+  resetMockLLMExplicit,
+  resetGlobalLLMModeExplicit,
   // LLM Mode state (per-agent control)
   setGlobalLLMMode,
   syncLLMStateFromServer,
@@ -1006,8 +1008,23 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   useEffect(() => {
     if (!open) {
       previousStepRef.current = null
+
+      // Hand control of the three operator overrides back to the server.
+      //
+      // Each *Explicit flag exists to stop the poll-driven derivations from
+      // overwriting a choice made in this toolbar, which means that once set it
+      // also stops the dashboard from ever REFLECTING a server-side change —
+      // for the rest of the session, because nothing cleared them. All three
+      // reset reducers have carried the comment "e.g., when modal closes or
+      // workflow ends" since they were written and had no caller; this is that
+      // caller. Closing the modal is the natural boundary: the operator has
+      // stopped looking, so the next thing they see should be the truth from
+      // the server rather than a stale preference from minutes ago.
+      dispatch(resetSingleStepExplicit())
+      dispatch(resetMockLLMExplicit())
+      dispatch(resetGlobalLLMModeExplicit())
     }
-  }, [open])
+  }, [open, dispatch])
 
 
   // Fetch detail when a historical workflow is selected

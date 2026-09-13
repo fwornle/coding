@@ -910,6 +910,11 @@ const ukbSlice = createSlice({
       state.mockLLMExplicit = false
     },
 
+    // Reset explicit flag (e.g., when modal closes or workflow ends)
+    resetGlobalLLMModeExplicit(state) {
+      state.globalLLMModeExplicit = false
+    },
+
     // ========================================
     // Sub-step UI actions (MVI: Single source of truth for visualization)
     // ========================================
@@ -1127,6 +1132,7 @@ export const {
   setMockLLM,
   syncMockLLMFromServer,
   resetMockLLMExplicit,
+  resetGlobalLLMModeExplicit,
   // Sub-step UI actions (MVI)
   setExpandedSubStepsAgent,
   setSelectedSubStep,
