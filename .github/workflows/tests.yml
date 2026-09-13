@@ -109,7 +109,12 @@ jobs:
           test -f dist/embedding/embedding-service.js \
             || { echo "BUILD DID NOT EMIT — dist/embedding/embedding-service.js missing"; exit 1; }
 
+      # The LAST setup step, and the gate the test steps hang off. Every setup
+      # step above is unconditional, so if any one of them fails the rest are
+      # skipped and this one's outcome is 'skipped' — never 'success'. That makes
+      # a single id enough to mean "the environment was actually built".
       - name: Verify km-core resolves
+        id: setup
         run: node -e "import('@fwornle/km-core').then(m=>console.log('km-core OK:', typeof m.GraphKMStore))"
 
       # Run the halves separately so the summary says WHICH one failed, and always
@@ -118,8 +123,26 @@ jobs:
       # Lint is a gate now that it passes. It was added to CI only after the 113
       # findings it reported on arrival were cleared — a step that fails on its
       # first run teaches everyone to ignore it.
+      #
+      # WHY THE GUARD IS `steps.setup.outcome == 'success'` AND NOT `!cancelled()`
+      # ALONE. `!cancelled()` is true after a FAILED step, not merely a red one
+      # upstream — so it also fires when the environment was never built. Measured,
+      # 2026-09-13: the km-core gitlink pointed at a commit that had never been
+      # pushed, `git fetch` died with "not our ref", and every unconditional setup
+      # step after it was skipped — npm ci, the @fwornle/km-core symlink, both
+      # builds. lint and node:test then ran anyway against a checkout with no
+      # node_modules and no dist/, and reported 164 failures: 69 "Cannot find
+      # package '@fwornle/km-core'", 43 js-yaml, 16 better-sqlite3, and assertion
+      # cascades behind them. Not one of them was a real test failure, and the one
+      # line that said so was eleven thousand lines up the log.
+      #
+      # A green environment is a precondition for a test result meaning anything.
+      # When it is absent the honest report is the setup error alone, so these
+      # steps skip and the job stays red on the step that actually broke.
+      # `!cancelled()` is kept alongside it for the property the comment above
+      # defends: jest going red must not hide the node:test result.
       - name: lint
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npm run lint
 
       - name: jest
@@ -127,5 +150,5 @@ jobs:
         run: npm run test:jest
 
       - name: node:test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npm run test:node

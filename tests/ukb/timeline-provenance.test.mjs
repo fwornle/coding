@@ -29,6 +29,10 @@ const colorFallback = readFileSync(
   path.join(REPO_ROOT, 'integrations', 'unified-viewer', 'src', 'graph', 'color-fallback.ts'),
   'utf8',
 );
+const learningSource = readFileSync(
+  path.join(REPO_ROOT, 'integrations', 'unified-viewer', 'src', 'graph', 'learning-source.ts'),
+  'utf8',
+);
 
 describe('timeline provenance', () => {
   test('wave-analysis counts as a BATCH writer', () => {
@@ -46,9 +50,36 @@ describe('timeline provenance', () => {
     assert.match(viewerHook, /'batch' = any matched entity tagged manual\/wave-analysis/);
   });
 
-  test('the graph treats only auto/online as online-learned', () => {
-    // Both surfaces must agree, or a node reads blue in the graph and pink on
-    // the timeline for the same run.
-    assert.match(colorFallback, /const isOnline = source === 'auto' \|\| source === 'online'/);
+  /**
+   * Both surfaces must agree, or a node reads blue in the graph and pink on the
+   * timeline for the same run. This used to be asserted by pinning the literal
+   * `const isOnline = source === 'auto' || source === 'online'` inside
+   * color-fallback.ts — which stopped being true, and rightly so: that check was
+   * measured leaving 138 online-learned entities in the blue batch palette,
+   * because the writers stamp 'online' far more often than 'auto' and 82 ETM
+   * records stamp no source at all. The rule moved into graph/learning-source.ts
+   * and grew the subsystem and digest-shape fallbacks that population needs.
+   *
+   * So the pin moved with it, and split in two. Naming the set where it is now
+   * defined is the weaker half; the half that actually buys the guarantee is the
+   * second test — a regex over one surface can pass while another surface
+   * quietly re-derives the rule and disagrees, which is the exact failure this
+   * suite exists to catch. One shared classifier cannot disagree with itself.
+   */
+  test('the online-learned source set is named in the shared classifier', () => {
+    assert.match(
+      learningSource,
+      /const ONLINE_SOURCES: ReadonlySet<string> = new Set\(\['auto', 'online'\]\)/,
+    );
+    assert.match(learningSource, /export function isOnlineLearned\b/);
+  });
+
+  test('the graph delegates to that classifier instead of re-deriving it', () => {
+    assert.match(colorFallback, /import \{ isOnlineLearned \} from '\.\/learning-source'/);
+    assert.match(colorFallback, /isOnlineLearned\(/);
+    // The re-derivation this suite was written to prevent. `isOnlineSource` is
+    // allowed to take a bare string, but it must forward to the shared rule
+    // rather than compare against 'auto' itself.
+    assert.doesNotMatch(colorFallback, /source === 'auto'/);
   });
 });

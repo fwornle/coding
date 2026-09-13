@@ -94,7 +94,12 @@ describe('the checked-in config is valid and says what it means to', () => {
     const p = path.resolve(import.meta.dirname, '../../config/prompt-classifier.yaml');
     const cfg = parsePromptClassifierConfig(parse(fs.readFileSync(p, 'utf8')));
     assert.equal(cfg.backends.length, 2);
-    assert.equal(cfg.strategy, 'llm');
+    // Pinned deliberately, and deliberately not read back from the same file the
+    // assertion is checking — that would agree with itself forever. `hybrid` is
+    // what feat(routing) shipped: the KNN decision path with the LLM fallback
+    // required by policy. Changing what this installation runs by default is a
+    // routing decision, so it costs one conscious edit here.
+    assert.equal(cfg.strategy, 'hybrid');
     assert.equal(cfg.knn.modelPath, '.data/prompt-classifier/knn-model.json');
     assert.deepEqual(candidatesForNetwork(cfg.backends, 'corporate').map(b => b.id), ['qwen-local']);
     assert.deepEqual(candidatesForNetwork(cfg.backends, 'public').map(b => b.id), ['qwen-laptop']);

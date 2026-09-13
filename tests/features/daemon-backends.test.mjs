@@ -36,7 +36,21 @@ function recorder(responses = {}) {
   return { exec, calls, joined: () => calls.map((c) => c.join(' ')) };
 }
 
-const UID = process.getuid ? process.getuid() : 0;
+/**
+ * Pinned, not read from the host.
+ *
+ * This was `process.getuid ? process.getuid() : 0`, mirroring a bare
+ * `process.getuid()` in the launchd backend. On windows-latest `process.getuid`
+ * is undefined, so the test quietly fell back to 0 while the implementation
+ * threw `TypeError: process.getuid is not a function` — the two launchd cases
+ * were the only failures in that CI job, on every run of it.
+ *
+ * A literal removes the ambient dependency entirely: the backend now takes the
+ * uid through `opts` like it already takes `platform` and `exec`, so this
+ * asserts a command line that is identical on every runner. 501 is macOS's
+ * first console user, so the string under test looks like the real thing.
+ */
+const UID = 501;
 
 describe('platform detection', () => {
   test('maps node platform names and accepts an override', () => {
@@ -169,7 +183,7 @@ describe('windows — Task Scheduler', () => {
 });
 
 describe('macos — launchd', () => {
-  const opts = (r) => ({ platform: 'macos', exec: r.exec });
+  const opts = (r) => ({ platform: 'macos', exec: r.exec, uid: UID });
 
   test('listRunning parses the third column of launchctl list', async () => {
     const r = recorder({
