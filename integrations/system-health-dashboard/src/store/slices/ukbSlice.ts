@@ -540,6 +540,13 @@ interface UKBState {
   mockLLMExplicit: boolean
   mockLLMDelay: number
 
+  // globalLLMModeExplicit: true once the operator has picked a mode from the
+  // Mock/Local/Cloud toolbar this session, which stops the server-derived value
+  // from overwriting it. Exactly the guarantee mockLLMExplicit already gives
+  // mockLLM — the global mode simply never had one, so every click was undone
+  // by the next poll (see the derivation in ukb-workflow-modal.tsx).
+  globalLLMModeExplicit: boolean
+
   // Sub-step UI state (MVI: Single source of truth for visualization)
   // expandedSubStepsAgent: Which agent's sub-steps arc is expanded (null = none)
   // selectedSubStep: Which sub-step is selected for sidebar display
@@ -621,6 +628,7 @@ const initialState: UKBState = {
   mockLLM: false,
   mockLLMExplicit: false,
   mockLLMDelay: 500,
+  globalLLMModeExplicit: false,
 
   // Sub-step UI state
   expandedSubStepsAgent: null,
@@ -1053,6 +1061,17 @@ const ukbSlice = createSlice({
     setGlobalLLMMode(state, action: PayloadAction<{ mode: LLMMode; explicit?: boolean }>) {
       state.llmState.globalMode = action.payload.mode
       state.llmState.updatedAt = new Date().toISOString()
+      // `explicit` has been in this payload type from the start but was never
+      // read, so the operator's click carried no weight and the poll-driven
+      // derivation reset it within a couple of seconds.
+      //
+      // Applied only when PRESENT: an explicit false is meaningful (the modal
+      // sends it when a failed POST reverts the mode, which should hand control
+      // back to the server), whereas the server-derived dispatch passes nothing
+      // and must not clear a choice the operator has made.
+      if (action.payload.explicit !== undefined) {
+        state.globalLLMModeExplicit = action.payload.explicit
+      }
     },
 
     // Set LLM mode for a specific agent (override)
@@ -1526,6 +1545,11 @@ export const selectMockLLM = createSelector(
 export const selectMockLLMExplicit = createSelector(
   [selectUkbState],
   (ukb) => ukb.mockLLMExplicit
+)
+
+export const selectGlobalLLMModeExplicit = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.globalLLMModeExplicit
 )
 
 export const selectMockLLMDelay = createSelector(

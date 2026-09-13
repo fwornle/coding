@@ -108,6 +108,7 @@ import {
   // LLM Mock mode selectors (MVI)
   selectMockLLM,
   selectMockLLMExplicit,
+  selectGlobalLLMModeExplicit,
   // LLM Mode state (per-agent control)
   setGlobalLLMMode,
   syncLLMStateFromServer,
@@ -439,6 +440,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // LLM Mock mode state (MVI: from Redux store)
   const mockLLM = useSelector(selectMockLLM)
   const mockLLMExplicit = useSelector(selectMockLLMExplicit)
+  const globalLLMModeExplicit = useSelector(selectGlobalLLMModeExplicit)
 
   // LLM Mode state (per-agent control)
   const globalLLMMode = useSelector(selectGlobalLLMMode)
@@ -713,13 +715,22 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       }
       // Sync global LLM mode from mockLLM flag — only when process is running
       // (completed processes may not carry mockLLM, don't reset to public)
-      if (processMockLLM === true) {
-        dispatch(setGlobalLLMMode({ mode: 'mock' }))
-      } else if (processMockLLM === false && activeProcess.status === 'running') {
-        dispatch(setGlobalLLMMode({ mode: 'public' }))
+      //
+      // Gated on globalLLMModeExplicit for the same reason the mockLLM sync
+      // above is gated on mockLLMExplicit: this runs on every poll, so without
+      // the guard it overwrote the operator's Mock/Local/Cloud choice within a
+      // couple of seconds. The click did dispatch, and the POST did succeed —
+      // it was simply undone before anyone could see it, which read as buttons
+      // that do nothing.
+      if (!globalLLMModeExplicit) {
+        if (processMockLLM === true) {
+          dispatch(setGlobalLLMMode({ mode: 'mock' }))
+        } else if (processMockLLM === false && activeProcess.status === 'running') {
+          dispatch(setGlobalLLMMode({ mode: 'public' }))
+        }
       }
     }
-  }, [activeProcesses, selectedProcessIndex, singleStepModeExplicit, mockLLMExplicit, dispatch])
+  }, [activeProcesses, selectedProcessIndex, singleStepModeExplicit, mockLLMExplicit, globalLLMModeExplicit, dispatch])
 
   // Active process at selected index (component-level for TraceModal access)
   // Bounded to valid range to handle when processes complete and list shrinks
