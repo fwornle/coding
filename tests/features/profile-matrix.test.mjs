@@ -60,14 +60,25 @@ let sandbox;
 const homes = {};
 
 /**
- * Two derived artifacts are regenerated IN THE REPO by the generators this
- * suite exercises, because both write to a fixed path under CODING_REPO. They
- * are saved here and restored in `after`, so a test run cannot leave this
- * machine's next launch with a minimal-profile MCP config and no hooks.
+ * Three derived artifacts are regenerated IN THE REPO by the code this suite
+ * exercises, because each writes to a fixed path under CODING_REPO while the
+ * profile it acts on comes from CODING_HOME. They are saved here and restored
+ * in `after`, so a test run cannot leave this machine's next launch with a
+ * minimal-profile MCP config and no hooks.
+ *
+ * The snapshot is the one that bites hardest and the one this list originally
+ * missed. `bin/coding --dry-run` resolves the SANDBOX home but writes
+ * $CODING_REPO/.coding/runtime/features.json, and the last launcher run below
+ * is logging-only — so a suite run used to leave the real repo claiming
+ * logging-only until the next launch or apply. Nothing notices: the container
+ * cannot resolve, so it just disables six programs and the only trace is an
+ * ECONNREFUSED loop in a log nobody reads. That happened, and it took about
+ * seventeen hours and a purpose-built staleness check to spot.
  */
 const REPO_ARTIFACTS = [
   join(REPO, 'claude-code-mcp-docker.json'),
   join(REPO, '.coding/runtime/claude-settings.json'),
+  join(REPO, '.coding/runtime/features.json'),
 ];
 const saved = new Map();
 
@@ -86,7 +97,14 @@ before(() => {
 
 after(() => {
   rmSync(sandbox, { recursive: true, force: true });
-  for (const [file, content] of saved) writeFileSync(file, content);
+  for (const file of REPO_ARTIFACTS) {
+    // Restoring only what we saved would still leave an artifact behind on a
+    // machine that has never launched — the file did not exist before, so
+    // there is nothing to restore and the sandbox-derived one survives. Absent
+    // is a real state (it is the pre-first-launch state), so put it back.
+    if (saved.has(file)) writeFileSync(file, saved.get(file));
+    else rmSync(file, { force: true });
+  }
 });
 
 async function run(cmd, args, profile, extraEnv = {}) {
