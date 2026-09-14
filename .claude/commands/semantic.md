@@ -74,9 +74,9 @@ semantic: no semantic-analysis service at http://localhost:3848
 ```
 
 means the container is not up: `cd docker && docker-compose up -d coding-services`. Check
-`docker exec coding-services supervisorctl status mcp-servers:semantic-analysis`.
+`docker exec coding-services supervisorctl status backend-services:semantic-analysis`.
 
 After changing TypeScript under `integrations/semantic-analysis/src/`, `dist/` is
 live-mounted read-only into the container, so `npm run build` plus
-`docker exec coding-services supervisorctl restart mcp-servers:semantic-analysis` is enough — no
+`docker exec coding-services supervisorctl restart backend-services:semantic-analysis` is enough — no
 image rebuild.

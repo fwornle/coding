@@ -95,7 +95,7 @@ If these fail after all retries → **Continue in DEGRADED mode with warning**
 When `CODING_DOCKER_MODE=true` (set by both `launch-claude.sh` and `launch-copilot.sh`), `start-services-robust.js` automatically skips launching standalone containers that are already provided by the `coding-services` Docker container:
 
 - **Constraint Monitor**: Skips `docker-compose up -d` for standalone Redis + Qdrant containers (they run inside `coding-services` as `coding-redis` and `coding-qdrant`)
-- **Graphify**: No standalone container — graphify runs inside `coding-services` as the `mcp-servers:graphify` supervisord program
+- **Graphify**: No standalone container — graphify runs inside `coding-services` as the `backend-services:graphify` supervisord program
 
 This prevents duplicate containers, port conflicts (both bind 6379, 6333), and ~540MB wasted RAM. Health checks in Docker mode verify the `coding-services` health endpoint or TCP port instead of counting standalone containers.
 

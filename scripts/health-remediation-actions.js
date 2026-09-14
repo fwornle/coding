@@ -30,7 +30,7 @@ const execAsync = promisify(exec);
  * Map of remediation actions to supervisord group:program names
  */
 const DOCKER_SERVICE_MAP = {
-  restart_constraint_monitor: 'mcp-servers:constraint-monitor',
+  restart_constraint_monitor: 'backend-services:constraint-monitor',
   restart_dashboard_server: 'web-services:health-dashboard-frontend',
   restart_health_api: 'web-services:health-dashboard',
   restart_health_frontend: 'web-services:health-dashboard-frontend',

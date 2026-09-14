@@ -1159,7 +1159,7 @@ class SystemHealthAPIServer {
             // Docker mode uses supervisorctl; native mode uses npm/bin commands.
             const isDocker = existsSync('/.dockerenv');
             const restartCommands = isDocker ? {
-                constraint_monitor: 'supervisorctl restart mcp-servers:constraint-monitor',
+                constraint_monitor: 'supervisorctl restart backend-services:constraint-monitor',
                 dashboard_server: 'supervisorctl restart web-services:health-dashboard-frontend',
                 health_dashboard_api: 'supervisorctl restart web-services:health-dashboard',
                 health_dashboard_frontend: 'supervisorctl restart web-services:health-dashboard-frontend',

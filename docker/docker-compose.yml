@@ -120,7 +120,7 @@ services:
       # node resolution prefers the closest copy, so it shadows the outer
       # mount above and surfaces a stale build that's missing newer exports
       # (isProject added Phase 57 — see Phase 57-01). Without this second
-      # mount, the dashboard reports `mcp-servers:semantic-analysis` FATAL
+      # mount, the dashboard reports `backend-services:semantic-analysis` FATAL
       # with `does not provide an export named 'isProject'` after any image
       # rebuild. Mount over the inner path so both resolution targets see
       # the live host km-core (Phase 57 single-source-of-truth principle).

@@ -69,7 +69,7 @@ async function run(cmd, args, timeout = 30000) {
 /**
  * supervisorctl status, as {program: {state, target}}, or null if unreachable.
  *
- * `target` keeps the GROUP-QUALIFIED name ("mcp-servers:graphify"). Programs in
+ * `target` keeps the GROUP-QUALIFIED name ("backend-services:graphify"). Programs in
  * this image all belong to a group, and supervisorctl rejects the bare name —
  * `supervisorctl start graphify` is "ERROR (no such process)". The bare name is
  * still the key, because that is what the feature mapping and supervisord.conf

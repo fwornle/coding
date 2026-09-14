@@ -49,7 +49,7 @@ All containers communicate over the `coding-network` bridge network using contai
 
 The `coding-services` container runs **supervisord** as PID 1, managing 10 services organized into 3 groups:
 
-### Group: mcp-servers (priority: 100)
+### Group: backend-services (priority: 100)
 
 MCP (Model Context Protocol) servers exposed via SSE (Server-Sent Events), consumed by Claude Code.
 
@@ -193,7 +193,7 @@ When violations are detected, remediation uses `supervisorctl`:
 
 ```
 restart_vkb_server        → supervisorctl restart web-services:vkb-server
-restart_constraint_monitor → supervisorctl restart mcp-servers:constraint-monitor
+restart_constraint_monitor → supervisorctl restart backend-services:constraint-monitor
 restart_health_api        → supervisorctl restart web-services:health-dashboard
 restart_health_frontend   → supervisorctl restart web-services:health-dashboard-frontend
 kill_lock_holder          → SKIPPED (VKB owns lock)

@@ -8,7 +8,7 @@ Static, file-based code knowledge graph built with tree-sitter. No database.
 |----------|-------|
 | Component | `graphify` |
 | Type | MCP Server (HTTP) |
-| Runs in | `coding-services` container (supervisord `mcp-servers:graphify`) |
+| Runs in | `coding-services` container (supervisord `backend-services:graphify`) |
 | MCP endpoint | `http://localhost:3851/mcp` |
 | Graph | `graph.json` (NetworkX node-link) at `.data/graphify/graphify-out/graph.json` |
 | Host CLI | `bin/graphify` shim (→ `docker exec coding-services graphify …`) |
