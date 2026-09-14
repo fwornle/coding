@@ -1093,7 +1093,10 @@ const ukbSlice = createSlice({
 
     // Sync LLM state from server
     syncLLMStateFromServer(state, action: PayloadAction<LLMState>) {
-      state.llmState = action.payload
+      state.llmState = {
+        ...action.payload,
+        perAgentOverrides: action.payload.perAgentOverrides || {},
+      }
     },
   },
 })

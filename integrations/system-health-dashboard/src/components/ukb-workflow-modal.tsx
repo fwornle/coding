@@ -113,7 +113,6 @@ import {
   resetGlobalLLMModeExplicit,
   // LLM Mode state (per-agent control)
   setGlobalLLMMode,
-  syncLLMStateFromServer,
   selectLLMState,
   selectGlobalLLMMode,
   // Phase 18: WorkflowState selector
@@ -621,10 +620,6 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       const data = await response.json()
       if (data.status === 'success') {
         Logger.info(LogCategories.UKB, `Global LLM mode set to: ${mode}`)
-        // Sync state from server
-        if (data.llmState) {
-          dispatch(syncLLMStateFromServer(data.llmState))
-        }
       } else {
         // Revert on failure
         dispatch(setGlobalLLMMode({ mode: previousMode, explicit: false }))

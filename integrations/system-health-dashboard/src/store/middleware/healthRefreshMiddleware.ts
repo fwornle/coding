@@ -268,7 +268,7 @@ class HealthRefreshManager {
     // Bridge config.llmMode to llmState format (handles edge cases where
     // state machine format leaks through without llmState field)
     if (!progress.llmState && progress.config?.llmMode) {
-      progress.llmState = { globalMode: progress.config.llmMode }
+      progress.llmState = { globalMode: progress.config.llmMode, perAgentOverrides: {} }
     }
 
     // CRITICAL: Sync llmState for Mock/Local/Public mode selection in dashboard
