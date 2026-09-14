@@ -36,6 +36,20 @@ export interface FeatureState {
   needsDocker: boolean
 }
 
+/**
+ * Verdict from lib/features/snapshot.cjs — does .coding/runtime/features.json
+ * still match what the config resolves to? What this page shows is a LIVE
+ * resolve; the container acts on the snapshot, and when the two disagree it is
+ * running the older answer with no way to know it.
+ */
+export interface SnapshotCheck {
+  state: 'fresh' | 'stale' | 'missing' | 'unknown'
+  generatedAt: string | null
+  differences: Array<{ id: string; snapshot: boolean | null; live: boolean }>
+  error: string | null
+  remedy: string | null
+}
+
 interface FeaturesSliceState {
   loading: boolean
   saving: boolean
@@ -49,6 +63,8 @@ interface FeaturesSliceState {
   disabled: FeatureId[]
   needsDocker: boolean
   warnings: string[]
+  /** Snapshot-vs-config drift; null until the first load, or if the API omits it. */
+  snapshot: SnapshotCheck | null
   /** profile name -> the feature ids it switches on */
   profiles: Record<string, FeatureId[]>
   /** Set after a save whose apply tier includes 'session'. */
@@ -67,6 +83,7 @@ const initialState: FeaturesSliceState = {
   disabled: [],
   needsDocker: true,
   warnings: [],
+  snapshot: null,
   profiles: {},
   restartNotice: null,
 }
@@ -114,6 +131,7 @@ const featuresSlice = createSlice({
       state.disabled = payload.disabled ?? []
       state.needsDocker = payload.needsDocker ?? true
       state.warnings = payload.warnings ?? []
+      state.snapshot = payload.snapshot ?? null
       if (payload.profiles) state.profiles = payload.profiles
       state.loaded = true
       state.error = null

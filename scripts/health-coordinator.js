@@ -44,6 +44,7 @@ import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
 import { loadFeatures, FeatureConfigError, loadProfiles, configPaths } from '../lib/features/index.mjs';
 import { setFeatures, setProfile } from '../lib/features/write.mjs';
+import { checkSnapshot } from '../lib/features/snapshot.cjs';
 import {
   reclassifyTimeoutAsUnknown, debounceDbStatus,
   classifyProxyHttpFailure, isProxyRestartActionable,
@@ -4073,6 +4074,11 @@ app.get('/features', (_req, res) => {
     res.json({
       ok: true,
       ...resolved,
+      // What this endpoint resolves is NOT what the container is running: the
+      // container reads the snapshot the last launch or apply wrote. Ship the
+      // comparison so the Features tab can say so, rather than showing a
+      // confident all-on next to six programs that are not started.
+      snapshot: checkSnapshot(),
       profiles: Object.fromEntries(
         Object.entries(profiles).map(([name, set]) => [
           name,

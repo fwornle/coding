@@ -50,7 +50,7 @@ function Toggle({ checked, disabled, onChange, label }: {
 export function FeaturesPage() {
   const dispatch = useAppDispatch()
   const {
-    features, profile, profiles, enabled, needsDocker, warnings,
+    features, profile, profiles, enabled, needsDocker, warnings, snapshot,
     loading, saving, error, loaded, restartNotice,
   } = useAppSelector(state => state.features)
 
@@ -384,6 +384,29 @@ export function FeaturesPage() {
           {profile && !dirty ? <> · profile <code>{profile}</code></> : null}
           {' '}· Docker {(dirty ? draftNeedsDocker : needsDocker) ? 'required' : 'not needed'}
         </div>
+        {snapshot && snapshot.state !== 'fresh' && snapshot.state !== 'unknown' && (
+          <div className="flex items-start gap-1.5 text-amber-600 dark:text-amber-500">
+            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>
+              {snapshot.state === 'missing' ? (
+                <>No feature snapshot on disk — the container falls back to all-on until one exists.</>
+              ) : (
+                <>
+                  The container is acting on a snapshot from{' '}
+                  <code>{snapshot.generatedAt}</code>, which still has{' '}
+                  {snapshot.differences.map((d, i) => (
+                    <span key={d.id}>
+                      {i > 0 ? ', ' : null}
+                      <code>{d.id}</code> {d.snapshot === null ? 'absent' : d.snapshot ? 'on' : 'off'}
+                    </span>
+                  ))}
+                  .
+                </>
+              )}
+              {snapshot.remedy ? <> To fix: {snapshot.remedy}.</> : null}
+            </span>
+          </div>
+        )}
         {warnings.map((w, i) => (
           <div key={i} className="flex items-start gap-1.5">
             <Info className="h-3 w-3 mt-0.5 shrink-0" /> <span>{w}</span>

@@ -30,7 +30,7 @@ import {
   envVarFor,
 } from '../lib/features/index.mjs';
 import { setFeatures, setProfile } from '../lib/features/write.mjs';
-import { writeSnapshot } from '../lib/features/snapshot.cjs';
+import { writeSnapshot, checkSnapshot } from '../lib/features/snapshot.cjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.CODING_REPO || resolve(__dirname, '..');
@@ -98,7 +98,9 @@ function resolveOrDie() {
 
 function printStatus(resolved, asJson) {
   if (asJson) {
-    process.stdout.write(`${JSON.stringify(resolved, null, 2)}\n`);
+    // Same verdict the human path prints below — a script gating on this
+    // output should not have to shell out again to learn the snapshot drifted.
+    process.stdout.write(`${JSON.stringify({ ...resolved, snapshot: checkSnapshot() }, null, 2)}\n`);
     return;
   }
 
@@ -118,6 +120,25 @@ function printStatus(resolved, asJson) {
 
   for (const w of resolved.warnings) {
     process.stdout.write(`${C.yellow}note:${C.reset} ${w}\n`);
+  }
+
+  // The container does not read this resolve — it reads the snapshot the last
+  // launch or apply wrote. When the two disagree it is acting on the older
+  // answer, and nothing in the container can tell that it is.
+  const snap = checkSnapshot();
+  if (snap.state === 'stale') {
+    const drift = snap.differences
+      .map((d) => `${d.id} ${d.snapshot === null ? 'absent' : (d.snapshot ? 'on' : 'off')}→${d.live ? 'on' : 'off'}`)
+      .join(', ');
+    process.stdout.write(
+      `${C.yellow}note:${C.reset} the container is acting on a stale snapshot `
+      + `(${snap.generatedAt}); it still has ${drift}. To fix: ${snap.remedy}.\n`,
+    );
+  } else if (snap.state === 'missing') {
+    process.stdout.write(
+      `${C.yellow}note:${C.reset} no feature snapshot on disk — the container falls back `
+      + `to all-on until one exists. To fix: ${snap.remedy}.\n`,
+    );
   }
 
   // Env overrides beat both files, so a user who set one and forgot will
