@@ -219,6 +219,11 @@ export interface UKBProcess {
   steps?: StepInfo[]
   _refreshKey?: string  // Server-generated key to force UI updates
   isInlineMCP?: boolean  // Flag for inline MCP-triggered workflows
+  // The LLM mode the server holds for this workflow, from llmState.globalMode or
+  // config.llmMode. Optional and never coerced: undefined means the server stated
+  // no mode, which is a different thing from it stating 'public'. The legacy
+  // boolean mockLLM cannot make that distinction, nor express 'local' at all.
+  llmMode?: LLMMode
   batchProgress?: {  // Batch workflow progress
     currentBatch: number
     totalBatches: number

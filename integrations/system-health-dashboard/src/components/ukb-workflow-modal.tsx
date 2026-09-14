@@ -710,8 +710,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           delay: processMockLLMDelay ?? 500
         }))
       }
-      // Sync global LLM mode from mockLLM flag — only when process is running
-      // (completed processes may not carry mockLLM, don't reset to public)
+      // Sync the global LLM mode from the server.
       //
       // Gated on globalLLMModeExplicit for the same reason the mockLLM sync
       // above is gated on mockLLMExplicit: this runs on every poll, so without
@@ -719,8 +718,22 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       // couple of seconds. The click did dispatch, and the POST did succeed —
       // it was simply undone before anyone could see it, which read as buttons
       // that do nothing.
+      //
+      // Prefer llmMode, which is three-valued and carries the mode the server
+      // actually holds. mockLLM is a boolean: it can only say mock-or-not, so
+      // deriving from it alone collapsed a local-mode workflow to Cloud on the
+      // very next poll, whatever the workflow was really configured with.
+      // The mockLLM branch remains as the fallback for payloads that predate
+      // llmState/config.llmMode, and keeps its status guard — that guard is
+      // there because mockLLM coerces a missing key to false, so "not running"
+      // is the only available proxy for "the server did not actually say
+      // public". llmMode does not coerce, so it needs no such proxy: undefined
+      // means the server stated no mode, and we leave the current one alone.
       if (!globalLLMModeExplicit) {
-        if (processMockLLM === true) {
+        const processLLMMode = activeProcess.llmMode
+        if (processLLMMode === 'mock' || processLLMMode === 'local' || processLLMMode === 'public') {
+          dispatch(setGlobalLLMMode({ mode: processLLMMode }))
+        } else if (processMockLLM === true) {
           dispatch(setGlobalLLMMode({ mode: 'mock' }))
         } else if (processMockLLM === false && activeProcess.status === 'running') {
           dispatch(setGlobalLLMMode({ mode: 'public' }))

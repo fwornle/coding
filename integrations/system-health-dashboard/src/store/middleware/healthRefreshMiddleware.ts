@@ -245,6 +245,11 @@ class HealthRefreshManager {
       pausedAtStep: progress.pausedAtStep || null,
       mockLLM: progress.mockLLM === true,
       mockLLMDelay: progress.mockLLMDelay || 500,
+      // Three-valued mode, carried alongside the boolean. mockLLM above coerces a
+      // missing key to false, which is why the modal needed a status guard to tell
+      // "server says public" from "server said nothing"; llmMode does not coerce,
+      // so undefined here genuinely means the server stated no mode.
+      llmMode: progress.llmState?.globalMode || progress.config?.llmMode || undefined,
       _refreshKey: `mcp-inline-${Date.now()}`, // Force React re-render
     }
 

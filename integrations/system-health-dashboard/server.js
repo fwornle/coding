@@ -1443,6 +1443,11 @@ class SystemHealthAPIServer {
                         // LLM Mock mode for frontend testing
                         mockLLM: workflowProgress.config?.mockLLM === true || workflowProgress.mockLLM === true,
                         mockLLMDelay: workflowProgress.mockLLMDelay || 500,
+                        // Three-valued mode. mockLLM above is a boolean and cannot
+                        // express 'local', so carry the real mode alongside it and
+                        // leave it undefined when the server states none — absence is
+                        // what tells the dashboard not to derive a mode at all.
+                        llmMode: workflowProgress.llmState?.globalMode || workflowProgress.config?.llmMode || undefined,
                         // Batch phase step count (derived from workflow YAML)
                         batchPhaseStepCount: workflowProgress.batchPhaseStepCount || null,
                     };
@@ -1766,6 +1771,8 @@ class SystemHealthAPIServer {
             pausedAtStep: state.pausedAtStep || (state.status === 'paused' && state.pausedAt ? state.pausedAt.step : null),
             mockLLM: config.mockLLM === true,
             mockLLMDelay: config.mockLLMDelay || 500,
+            // See the note on llmMode in the inline-process builder above.
+            llmMode: state.llmState?.globalMode || config.llmMode || undefined,
             // Wave-specific data for the trace modal
             currentWave: progress.currentWave,
             totalWaves: progress.totalWaves || 4,
