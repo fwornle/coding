@@ -113,7 +113,6 @@ import {
   resetGlobalLLMModeExplicit,
   // LLM Mode state (per-agent control)
   setGlobalLLMMode,
-  selectLLMState,
   selectGlobalLLMMode,
   // Phase 18: WorkflowState selector
   selectWorkflowState,
