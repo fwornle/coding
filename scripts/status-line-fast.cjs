@@ -11,7 +11,7 @@ const codingRepo = process.env.CODING_REPO || path.join(__dirname, '..');
 // which combined-status-line.js also uses — the two MUST agree on the filename
 // or this fast path silently never finds the cache the full render writes.
 const { paneIdentity, borrowTail } = require(path.join(codingRepo, 'lib', 'statusline', 'pane-cache-key.cjs'));
-const { projectPath, projectName, agent: paneAgent, paneWidth, features: paneFeatures, suffix: cacheSuffix } = paneIdentity();
+const { projectPath, projectName, agent: paneAgent, paneWidth, reserve: paneReserve, features: paneFeatures, suffix: cacheSuffix } = paneIdentity();
 const cacheFile = path.join(codingRepo, '.logs', `combined-status-line-cache${cacheSuffix}.txt`);
 
 // The `statusline` feature, off: print nothing and exit 0 before reading any
@@ -384,7 +384,7 @@ if (!cachedContent.trimEnd() && projectName) {
     // tail fixes both halves: fingerprinted panes can borrow from each other,
     // and a line carrying badges for features this pane has turned off can
     // never be adopted (an all-on `-w220.txt` no longer ends with `-w220-f7.txt`).
-    const tailSuffix = borrowTail({ paneWidth, features: paneFeatures });
+    const tailSuffix = borrowTail({ paneWidth, reserve: paneReserve, features: paneFeatures });
     const siblings = fs.readdirSync(logsDir)
       .filter(f => f.startsWith('combined-status-line-cache-') && f.endsWith(tailSuffix));
     for (const sib of siblings) {

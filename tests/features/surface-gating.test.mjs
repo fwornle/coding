@@ -17,6 +17,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const exec = promisify(execFile);
+// The SAME function the padder targets — not a second copy. A hand-rolled
+// width counter here was missing the 0x2300-0x23FF (⏰⏳) and 0x2600-0x27bf
+// (✅⚫❌❗❓) wide ranges, so whenever a badge went to a warning or timer
+// state it measured that profile 1 cell short per glyph and this suite failed
+// intermittently — blaming the padder for the test's own arithmetic.
+const { visibleCellWidth } = createRequire(import.meta.url)(
+  new URL('../../lib/statusline/visible-cell-width.cjs', import.meta.url).pathname,
+);
 const REPO = process.env.CODING_REPO || new URL('../..', import.meta.url).pathname.replace(/\/$/, '');
 
 let sandbox;
@@ -179,32 +187,29 @@ describe('status line', () => {
     // The historical "15:322" leftover-digit bug came from a padded line whose
     // visible width did not match what tmux reserved. Dropping badges must not
     // change the padded width.
+    //
+    // TMUX_SESSION_NAME is pinned empty on purpose: it feeds
+    // statusLeftReserveCells(), so an ambient value (this suite usually runs
+    // INSIDE tmux) would silently move the target off PANE and make the
+    // expected width un-assertable.
+    const PANE = 120;
     const widths = new Set();
     for (const profile of ['full', 'proxy-only', 'logging-only', 'minimal']) {
       const raw = await run('scripts/combined-status-line.js', homeWith(`profile: ${profile}\n`), {
         TRANSCRIPT_SOURCE_PROJECT: REPO,
         CODING_AGENT: 'claude',
-        TMUX_PANE_WIDTH: '120',
+        TMUX_PANE_WIDTH: String(PANE),
+        TMUX_SESSION_NAME: '',
       });
-      widths.add(visibleCells(raw.replace(/\n$/, '')));
+      widths.add(visibleCellWidth(raw.replace(/\n$/, '')));
     }
     assert.equal(widths.size, 1, `padded width varies by profile: ${[...widths].join(', ')}`);
+    // Equal-to-each-other is not enough: every profile silently skipping the
+    // padder would also be "equal". Pin the actual cell count tmux reserves.
+    assert.deepEqual([...widths], [PANE], 'padded width is not the pane width');
   });
 });
 
-/** tmux-style visible cell count: strip #[...] and score wide glyphs as 2. */
-function visibleCells(text) {
-  let w = 0;
-  for (const ch of text.replace(/#\[[^\]]*\]/g, '')) {
-    const cp = ch.codePointAt(0);
-    const wide = (cp >= 0x1100 && cp <= 0x115F) || (cp >= 0x2E80 && cp <= 0xA4CF)
-      || (cp >= 0xAC00 && cp <= 0xD7A3) || (cp >= 0xF900 && cp <= 0xFAFF)
-      || (cp >= 0xFE30 && cp <= 0xFE6F) || (cp >= 0xFF00 && cp <= 0xFF60)
-      || (cp >= 0x1F300 && cp <= 0x1FAFF);
-    w += wide ? 2 : 1;
-  }
-  return w;
-}
 
 describe('the statusline feature itself', () => {
   /**
@@ -314,6 +319,45 @@ describe('status-line cache key', () => {
     assert.ok(
       !'combined-status-line-cache-other-claude-w80.txt'.endsWith(allOn),
       'width must still be respected',
+    );
+  });
+
+  test('the status-left reserve is part of the key, and is not borrowable', () => {
+    // The renderer pads to (pane width - status-left reserve), and the reserve
+    // comes from the tmux SESSION NAME — which the key did not carry. Two
+    // claude panes on one project at one width whose pids differ in digit count
+    // resolve to different reserves, so they shared a cache entry and served
+    // each other a line padded one cell wrong. That one cell IS the
+    // leftover-digit residue this whole padding scheme exists to prevent.
+    const { paneIdentity, borrowTail, statusLeftReserveCells } = createRequire(import.meta.url)(
+      join(REPO, 'lib/statusline/pane-cache-key.cjs'),
+    );
+
+    const pane = (session) => paneIdentity({
+      CODING_REPO: REPO,
+      TRANSCRIPT_SOURCE_PROJECT: REPO,
+      CODING_AGENT: 'claude',
+      TMUX_PANE_WIDTH: '120',
+      TMUX_SESSION_NAME: session,
+    });
+
+    assert.equal(statusLeftReserveCells({ TMUX_SESSION_NAME: '' }), 0, 'no session must reserve nothing');
+    assert.equal(pane('').suffix, '-coding-claude-w120', 'a pane with no session keeps the historical filename');
+    assert.notEqual(
+      pane('coding-claude-7871').suffix, pane('coding-claude-78715').suffix,
+      'session names of different length must not share a cache entry',
+    );
+
+    // ...and the borrow path must refuse the same mismatch, for the same reason
+    // it refuses a differing width.
+    const tail = borrowTail({ paneWidth: '120', reserve: 22 });
+    assert.ok(
+      'combined-status-line-cache-other-claude-w120-r22.txt'.endsWith(tail),
+      'an equal reserve must stay borrowable',
+    );
+    assert.ok(
+      !'combined-status-line-cache-other-claude-w120-r21.txt'.endsWith(tail),
+      'a line padded for a different status-left must not be adopted',
     );
   });
 
