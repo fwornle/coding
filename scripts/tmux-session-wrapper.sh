@@ -75,7 +75,9 @@ tmux_session_wrapper() {
   local transcript_project="${TRANSCRIPT_SOURCE_PROJECT:-${CODING_PROJECT_DIR:-$(pwd)}}"
   # TMUX_SESSION_NAME + TMUX_STATUS_LEFT_LENGTH are what let the renderer reserve
   # the cells status-left occupies (statusLeftReserveCells() in
-  # combined-status-line.js). WITHOUT them the reserve silently evaluates to 0 and
+  # lib/statusline/pane-cache-key.cjs — it lives with the cache key because two
+  # panes that disagree on the reserve must not share a cached line). WITHOUT
+  # them the reserve silently evaluates to 0 and
   # status-right is padded to the FULL pane width, so status-left + status-right
   # exceeds window_width — tmux overruns the two and xterm.js leaks the previous
   # frame's rightmost cells as trailing residue (the "15:322" / "07:407"
