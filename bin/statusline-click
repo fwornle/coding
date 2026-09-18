@@ -26,6 +26,21 @@ PROXY="http://localhost:12435"
 
 note() { [ -n "$PANE" ] && tmux display-message -t "$PANE" "$*" || true; }
 
+# Every dispatch is recorded, tag included. A click that does nothing is
+# otherwise indistinguishable from a click tmux never reported: both leave no
+# trace at all, and telling those two apart is the whole first step of
+# debugging this — it decides whether to look at this script or at the binding
+# that calls it. One line per click; nothing else rotates this file, so it caps
+# itself rather than growing for the life of the install.
+: "${STATUSLINE_CLICK_LOG:=$CODING_REPO/.logs/statusline-click.log}"
+mkdir -p "$(dirname "$STATUSLINE_CLICK_LOG")" 2>/dev/null
+printf '%s tag=%s pane=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${TAG:-<empty>}" "${PANE:-<none>}" \
+  >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+if [ "$(wc -c <"$STATUSLINE_CLICK_LOG" 2>/dev/null || echo 0)" -gt 131072 ]; then
+  tail -n 500 "$STATUSLINE_CLICK_LOG" >"$STATUSLINE_CLICK_LOG.tmp" 2>/dev/null \
+    && mv "$STATUSLINE_CLICK_LOG.tmp" "$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+fi
+
 # The pane's own environment does NOT reach us: run-shell runs in the tmux
 # SERVER's environment, not the pane's, so CODING_AGENT / TMUX_SESSION_NAME /
 # TRANSCRIPT_SOURCE_PROJECT are all unset here however they were exported at
@@ -71,7 +86,7 @@ open_url() {
   # successful click would interrupt the very session it was meant to serve.
   # The return values are kept because they are useful when debugging this by
   # hand; they are simply not allowed to reach tmux.
-  osascript - "$url" "$prefix" >/dev/null 2>&1 <<'AS' || open -a "Google Chrome" "$url" >/dev/null 2>&1
+  osascript - "$url" "$prefix" >/dev/null 2>&1 <<'AS'
 on run argv
   set targetURL to item 1 of argv
   set matchPrefix to item 2 of argv
@@ -101,6 +116,27 @@ on run argv
   end tell
 end run
 AS
+  local rc=$?
+
+  # RAISING CHROME IS A SEPARATE STEP, and it is not optional.
+  #
+  # `activate` inside the AppleScript above is not enough. Issued from the tmux
+  # SERVER process it routinely loses macOS's focus-stealing check, and the
+  # result is the worst possible failure mode: the tab really is re-used and
+  # navigated, so nothing is broken and nothing is logged, but the window stays
+  # behind the terminal and the click reads as a dead no-op. That is the
+  # regression the tab-reuse rewrite introduced — the `open` call it replaced
+  # was raising the window as a side effect of going through LaunchServices.
+  #
+  # `open -a` with NO url is that same LaunchServices activation on its own: it
+  # wins focus where `activate` does not, and opens no tab, so it composes with
+  # the reuse above instead of undoing it. On the AppleScript failure path the
+  # url comes with it, since there is then no tab to raise.
+  if [ "$rc" -eq 0 ]; then
+    open -a "Google Chrome" >/dev/null 2>&1
+  else
+    open -a "Google Chrome" "$url" >/dev/null 2>&1
+  fi
 }
 
 # Show a report in a popup over the clicked pane. Held open until a keypress —
