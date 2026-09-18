@@ -698,6 +698,74 @@ app.post('/api/observations/patch-artifacts/recent', async (req, res) => {
 });
 
 /**
+ * POST /api/observations/patch-artifacts/by-id — set the artifacts of NAMED
+ * observations, each with its own file list.
+ * Body: { updates: [{ id, modifiedFiles }], dryRun?: boolean }
+ *
+ * The two endpoints around this one cannot do a re-extraction backfill, and the
+ * reason is worth stating because it is not obvious:
+ *
+ *   /recent     applies ONE file list to every matching row in a 4h window —
+ *               right for "the turn just edited these", wrong for a sweep,
+ *               where each row's files are its own.
+ *   /historical repairs rows whose metadata ALREADY holds modifiedFiles but
+ *               whose summary still says "Artifacts: none" — a summary/metadata
+ *               desync. It is a no-op when the metadata is empty too, which is
+ *               exactly the case when the EXTRACTOR was what missed the files.
+ *
+ * So a tool that re-derives artifacts from transcripts needs to name a row and
+ * hand it that row's own list. It reuses the same `patchArtifactsInPlace` and
+ * the same `putEntity(…, { skipOntologyCheck: true })` replay as the other two,
+ * so id, legacyId, createdAt and provenance survive verbatim; only the summary
+ * line and `metadata.modifiedFiles` (set-union, idempotent) change.
+ *
+ * `dryRun` reports what WOULD change and writes nothing.
+ */
+app.post('/api/observations/patch-artifacts/by-id', async (req, res) => {
+  try {
+    const { updates, dryRun } = req.body || {};
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: 'non-empty updates[] required' });
+    }
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+
+    const byId = new Map();
+    for (const e of await store.findByOntologyClass('Observation')) {
+      if (e?.id) byId.set(String(e.id), e);
+      const legacy = e?.metadata?.legacyId;
+      if (legacy) byId.set(String(legacy), e);
+    }
+
+    let patched = 0;
+    const missing = [];
+    for (const u of updates) {
+      const entity = byId.get(String(u?.id ?? ''));
+      if (!entity) { missing.push(u?.id ?? null); continue; }
+      const files = Array.isArray(u.modifiedFiles) ? u.modifiedFiles.filter(Boolean) : [];
+      if (files.length === 0) continue;
+      if (dryRun) {
+        // Same predicate patchArtifactsInPlace applies, without mutating.
+        const summary = typeof entity.metadata?.summary === 'string'
+          ? entity.metadata.summary
+          : (typeof entity.description === 'string' ? entity.description : '');
+        if (/Artifacts:\s*none/i.test(summary)) patched += 1;
+        continue;
+      }
+      if (patchArtifactsInPlace(entity, files)) {
+        await store.putEntity(entity, { skipOntologyCheck: true });
+        patched += 1;
+      }
+    }
+    if (!dryRun) _stalenessCache.invalidate();
+    res.json({ patched, requested: updates.length, missing: missing.length, dryRun: !!dryRun });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /patch-artifacts/by-id error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Failed to patch artifacts by id' });
+  }
+});
+
+/**
  * POST /api/observations/patch-artifacts/historical — one-time pass over
  * up to 500 historical rows: if metadata has modifiedFiles but summary
  * still says "Artifacts: none", fix the summary in place.

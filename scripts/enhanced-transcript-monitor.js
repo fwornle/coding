@@ -113,6 +113,196 @@ const MODIFY_TOOL_NAMES = new Set([
   'create_file', 'insert_edit_into_file', 'createfile',
 ]);
 const READ_TOOL_NAMES = new Set(['read', 'readfile', 'read_file']);
+const SHELL_TOOL_NAMES = new Set(['bash', 'shell', 'run_command', 'runcommand', 'run_in_terminal']);
+
+/**
+ * Every key an agent has been observed to hand a file path under.
+ *
+ * `notebook_path` is NOT decoration: `notebookedit` sits in MODIFY_TOOL_NAMES
+ * above, but its path rides on `notebook_path`, so the old three-key lookup
+ * (file_path / filePath / path) matched the tool and then dropped every notebook
+ * edit on the floor — a tool that could never contribute an artifact.
+ */
+const PATH_ARG_KEYS = ['file_path', 'filePath', 'path', 'notebook_path', 'notebookPath'];
+
+/**
+ * Tool-call arguments, whichever shape the reader for this agent produced.
+ *
+ * The three readers disagree and always have:
+ *   StreamingTranscriptReader / AdaptiveExchangeExtractor (claude, opencode)
+ *       → `input`, already an object.
+ *   PiSessionReader (pi)
+ *       → `{ name, type, content }` where `content` is JSON.stringify(arguments)
+ *         and there is NO `input` key at all.
+ *
+ * Reading only `input` therefore made pi structurally incapable of reporting an
+ * artifact — measured: 0 of 21 pi observations since 2026-09-01 carry one, and
+ * no pi session in the corpus could have produced one whatever it edited. This
+ * returns {} rather than null so callers can index it unconditionally.
+ */
+function toolCallArgs(tc) {
+  if (tc?.input && typeof tc.input === 'object') return tc.input;
+  for (const raw of [tc?.arguments, tc?.content]) {
+    if (raw && typeof raw === 'object') return raw;
+    if (typeof raw === 'string' && raw.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch { /* a tool result's prose, not arguments — keep looking */ }
+    }
+  }
+  return {};
+}
+
+/** Throwaway locations: real writes, but never artifacts of the work. */
+const SCRATCH_PATH_RE = /^(?:\/private)?\/tmp\/|^(?:\/private)?\/var\/folders\/|\/scratchpad\//;
+
+/**
+ * Shell redirection targets that are worth calling artifacts.
+ *
+ * WHY THIS IS DELIBERATELY NARROW. Bash dominates the tool mix (1667 of the
+ * sampled calls in this repo's transcripts), so it is tempting to treat it as
+ * the big missing artifact source. Measured against that corpus, it is not: only
+ * 136 commands carry any write signal at all, and the unfiltered matches are
+ * dominated by two kinds of junk —
+ *
+ *   - scratchpad and /tmp throwaways (`/tmp/sl-fail.txt`, `…/scratchpad/probe.py`),
+ *     which are writes but not artifacts; and
+ *   - heredoc bodies and shell keywords parsed as filenames (`EOF`, `for`, `idx`,
+ *     `0x1100`, `-rf`) — a commit message written through `git commit -F - <<'EOF'`
+ *     contains arbitrary prose, including redirection characters.
+ *
+ * An Artifacts line full of `/tmp` paths and the word `EOF` is strictly worse
+ * than "none", so every rule here is high-confidence or absent. Heredoc bodies
+ * are removed BEFORE scanning, which is what makes the rest safe.
+ *
+ * Covered: `> f`, `>> f`, `tee [-a] f`, `sed -i … f`. Not covered, on purpose:
+ * `cp`/`mv` destinations (indistinguishable from their many flag forms without a
+ * real parser) and anything reached through a variable.
+ */
+function bashWriteTargets(command) {
+  const cmd = String(command || '');
+  if (!cmd) return [];
+
+  // Drop heredoc bodies: everything from `<<WORD` / `<<'WORD'` to the line that
+  // is exactly WORD. Without this the body's prose is scanned as shell.
+  let text = cmd;
+  const heredoc = /<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/g;
+  let m;
+  const cuts = [];
+  while ((m = heredoc.exec(cmd)) !== null) {
+    const bodyStart = cmd.indexOf('\n', m.index);
+    if (bodyStart < 0) { cuts.push([m.index, cmd.length]); continue; }
+    const end = cmd.indexOf(`\n${m[2]}`, bodyStart);
+    cuts.push([bodyStart, end < 0 ? cmd.length : end + m[2].length + 1]);
+  }
+  for (const [s, e] of cuts.reverse()) text = text.slice(0, s) + '\n' + text.slice(e);
+
+  const out = [];
+  const add = (p) => {
+    if (!p) return;
+    const clean = p.replace(/^['"]|['"]$/g, '');
+    // A target must look like a path and must not be computed at run time.
+    if (!clean || clean.includes('$') || clean.includes('`') || clean.includes('*')) return;
+    if (clean.startsWith('/dev/') || clean.startsWith('&')) return;
+    // Nothing a turn does writes an artifact into a system directory, and these
+    // paths DO turn up as bare words next to a redirect — `/bin/bash -n script`
+    // in a command that also redirects elsewhere. Treating an interpreter path
+    // as a file the turn edited is the most misleading artifact of all.
+    if (/^\/(?:bin|sbin|usr|etc|opt|System|Library|Applications|Volumes)\//.test(clean)) return;
+    // A sed script that reached here as a bare word: `s/old/new/g`. It is an
+    // argument, not a destination.
+    if (/^[a-z]\/.*\/.*\/[a-z]*$/.test(clean)) return;
+    if (clean.endsWith('/')) return;                  // a directory, not a file
+    if (/(^|\/)\.git(\/|$)/.test(clean)) return;      // git internals
+    // Build/test output captured for reading back. A real write, but a
+    // transcript of a command — not a thing the turn authored.
+    if (/\.log$/.test(clean) || clean.startsWith('.logs/')) return;
+    if (!clean.includes('/') && !/\.[A-Za-z0-9]+$/.test(clean)) return; // EOF, idx, for
+    if (SCRATCH_PATH_RE.test(clean)) return;
+    if (!out.includes(clean)) out.push(clean);
+  };
+
+  // Redirections are scanned with quoted spans blanked out, because a `>` inside
+  // a quoted argument is somebody else's operator, not a shell redirect:
+  // `awk 'length>80'`, `grep -n "fetcherRef.current("`, and every `x => x.id` in
+  // a `node -e '…'` or `gsd-browser eval '…'` script. Measured on the transcript
+  // corpus, those were the whole remaining false-positive population — blanking
+  // quotes took 175 targets down to 15, with no true positive lost.
+  //
+  // The cost is a redirect whose target is itself quoted (`cat > 'my file.md'`),
+  // which is dropped. That is the right side to err on: a missed artifact is a
+  // gap, an invented one is a lie. `sed` is matched on the UNBLANKED text below
+  // precisely because its script argument is always quoted.
+  // Command substitutions are blanked FIRST. `"$(wc -l < "$F" | tr -d ' ')"`
+  // nests a quote inside a quote, which slides the naive pair-matching below out
+  // of phase for the rest of the line and lets operators leak out of the region
+  // that was supposed to hide them.
+  let flat = text;
+  for (let i = 0; i < 4; i++) {
+    const next = flat.replace(/\$\([^()]*\)/g, (s) => ' '.repeat(s.length));
+    if (next === flat) break;
+    flat = next;
+  }
+  const unquoted = flat.replace(/'[^']*'|"[^"]*"/g, (q) => ' '.repeat(q.length));
+  for (const r of unquoted.matchAll(/(?<![0-9&=])>>?\s*(?![&|])([\w./~@+-]+)/g)) add(r[1]);
+  for (const r of unquoted.matchAll(/\btee\b\s+(?:-a\s+)?([\w./~@+-]+)/g)) add(r[1]);
+  // `sed -i` (GNU) and `sed -i ''` (BSD/macOS): the file is the last bare word.
+  for (const r of text.matchAll(/\bsed\b\s+(?:-[^\s]+\s+|''\s+|""\s+)*-i[^\s]*\s+(?:''\s+|""\s+)?(?:-[^\s]+\s+)*(?:'[^']*'|"[^"]*"|[^\s;|&]+)\s+(['"]?[\w./~@+-]+['"]?)/g)) add(r[1]);
+
+  return out;
+}
+
+/**
+ * Files an exchange touched: Edit/Write-family → modified, Read → read, and a
+ * shell call's redirection targets → modified.
+ *
+ * A FREE FUNCTION, not just a method, because the backfill tools must derive
+ * artifacts with EXACTLY the rules the live tap uses. They each used to inline a
+ * weaker copy (Edit/Write only, `file_path`/`filePath` only), so re-deriving a
+ * row's artifacts could disagree with the daemon that originally wrote it.
+ * `_extractFileChanges` delegates here and stays the monitor's entry point.
+ *
+ * Order preserved, de-duplicated.
+ *
+ * @param {object[]} exchanges
+ * @returns {{ modifiedFiles: string[], readFiles: string[] }}
+ */
+function extractFileChanges(exchanges) {
+  const modifiedFiles = [];
+  const readFiles = [];
+  for (const exchange of exchanges || []) {
+    if (!exchange?.toolCalls) continue;
+    for (const tc of exchange.toolCalls) {
+      const args = toolCallArgs(tc);
+      const toolName = String(tc.name || '').toLowerCase();
+
+      // A shell call carries its work in a command string, not a path argument,
+      // so it is resolved before the path lookup below — which would otherwise
+      // see no `file_path` and skip the call entirely.
+      if (SHELL_TOOL_NAMES.has(toolName)) {
+        for (const p of bashWriteTargets(args.command || args.cmd || args.script)) {
+          if (!modifiedFiles.includes(p)) modifiedFiles.push(p);
+        }
+        continue;
+      }
+
+      const filePath = PATH_ARG_KEYS.map((k) => args[k]).find(Boolean);
+      if (!filePath) continue;
+      // Agent-agnostic tool-name matching. Claude emits capitalized names
+      // (Edit/Write/Read); opencode maps `part.tool` verbatim → lowercase
+      // (edit/write/read); other agents (copilot/pi) vary too. Match
+      // case-insensitively across the known file-mutation / read tool variants
+      // so artifacts are captured regardless of which agent produced the turn.
+      if (MODIFY_TOOL_NAMES.has(toolName)) {
+        if (!modifiedFiles.includes(filePath)) modifiedFiles.push(filePath);
+      } else if (READ_TOOL_NAMES.has(toolName)) {
+        if (!readFiles.includes(filePath)) readFiles.push(filePath);
+      }
+    }
+  }
+  return { modifiedFiles, readFiles };
+}
 
 // CR-02: stamp a message timestamp WITHOUT ever throwing. An absent/unparseable
 // exchange.timestamp makes new Date(...).toISOString() throw
@@ -1236,27 +1426,7 @@ class EnhancedTranscriptMonitor {
   }
 
   _extractFileChanges(exchanges) {
-    const modifiedFiles = [];
-    const readFiles = [];
-    for (const exchange of exchanges || []) {
-      if (!exchange?.toolCalls) continue;
-      for (const tc of exchange.toolCalls) {
-        const filePath = tc.input?.file_path || tc.input?.filePath || tc.input?.path;
-        if (!filePath) continue;
-        // Agent-agnostic tool-name matching. Claude emits capitalized names
-        // (Edit/Write/Read); opencode maps `part.tool` verbatim → lowercase
-        // (edit/write/read); other agents (copilot/pi) vary too. Match
-        // case-insensitively across the known file-mutation / read tool variants
-        // so artifacts are captured regardless of which agent produced the turn.
-        const name = String(tc.name || '').toLowerCase();
-        if (MODIFY_TOOL_NAMES.has(name)) {
-          if (!modifiedFiles.includes(filePath)) modifiedFiles.push(filePath);
-        } else if (READ_TOOL_NAMES.has(name)) {
-          if (!readFiles.includes(filePath)) readFiles.push(filePath);
-        }
-      }
-    }
-    return { modifiedFiles, readFiles };
+    return extractFileChanges(exchanges);
   }
 
   /**
@@ -5246,3 +5416,6 @@ runIfMain(import.meta.url, () => {
 });
 
 export default EnhancedTranscriptMonitor;
+// Pure helpers behind _extractFileChanges, exported so the artifact tests can
+// drive them directly rather than through a stubbed monitor instance.
+export { toolCallArgs, bashWriteTargets, extractFileChanges };

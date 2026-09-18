@@ -130,4 +130,31 @@ describe('encodeCwd is the inverse of the decoder it sits beside', () => {
     const { encodeCwd } = await import(path.join(REPO, 'lib/lsl/adapters/claude-jsonl-tree.mjs'));
     expect(encodeCwd('/a/b')).not.toMatch(/--$/);
   });
+
+  // Underscore and dot are separators too. This is not hypothetical: every
+  // project under `~/Agentic/_work/` encodes to `...-Agentic--work-...`, and
+  // while encodeCwd rewrote only '/' it returned `-Agentic-_work-` — a
+  // directory that does not exist — so every caller that builds a transcript
+  // path for one of those projects died with ENOENT. The two assertions that
+  // already lived here both used underscore-free paths, which is exactly why
+  // they passed throughout.
+  test('underscore and dot are separators, like the slash', async () => {
+    const { encodeCwd } = await import(path.join(REPO, 'lib/lsl/adapters/claude-jsonl-tree.mjs'));
+    expect(encodeCwd('/Users/you/Agentic/_work/rec')).toBe('-Users-you-Agentic--work-rec');
+    expect(encodeCwd('/Users/you/my.project')).toBe('-Users-you-my-project');
+  });
+
+  // The token path carries its own copy of the rule (it cannot import this
+  // module). They must agree character-for-character or artifacts land under a
+  // slug the reader never looks in.
+  test('the stop-adapter-registry copy agrees with this one', async () => {
+    const { encodeCwd } = await import(path.join(REPO, 'lib/lsl/adapters/claude-jsonl-tree.mjs'));
+    const src = fs.readFileSync(path.join(REPO, 'lib/lsl/token/stop-adapter-registry.mjs'), 'utf8');
+    const m = src.match(/function encodeCwd\(cwd\) \{[\s\S]*?return cwd\.replace\((\/\[[^\]]+\]\/g)/);
+    expect(m).toBeTruthy();
+    const twin = new Function(`return (cwd) => cwd.replace(${m[1]}, '-')`)();
+    for (const p of ['/Users/you/Agentic/_work/rec', '/Users/you/my.project', '/a/b']) {
+      expect(twin(p)).toBe(encodeCwd(p));
+    }
+  });
 });

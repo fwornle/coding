@@ -15,7 +15,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import EnhancedTranscriptMonitor from '../../scripts/enhanced-transcript-monitor.js';
+import EnhancedTranscriptMonitor, { bashWriteTargets } from '../../scripts/enhanced-transcript-monitor.js';
 
 const proto = EnhancedTranscriptMonitor.prototype;
 
@@ -136,4 +136,86 @@ test('fix (b): _sweepRecentArtifactPatches re-applies fresh entries and prunes s
   assert.equal(calls[0].agent, 'claude', 'sweep passes the buffered agent (loop-safe)');
   assert.ok(!stub._recentArtifactPatches.has('claude::old.js'), 'stale entry pruned');
   assert.ok(stub._recentArtifactPatches.has('claude::a.js'), 'fresh entry retained for further retries');
+});
+
+// ---------------------------------------------------------------------------
+// (c) the three ways a real file change used to go unrecorded
+// ---------------------------------------------------------------------------
+
+test('_extractFileChanges: notebook edits carry notebook_path, not file_path', () => {
+  // `notebookedit` was already in MODIFY_TOOL_NAMES, so the tool matched and the
+  // path lookup then missed — a tool that could never produce an artifact.
+  const { modifiedFiles } = proto._extractFileChanges.call({}, [
+    exchange({ tools: [{ name: 'NotebookEdit', input: { notebook_path: 'notebooks/eda.ipynb' } }] }),
+  ]);
+  assert.deepEqual(modifiedFiles, ['notebooks/eda.ipynb']);
+});
+
+test('_extractFileChanges: pi tool calls carry arguments as a JSON string in `content`', () => {
+  // PiSessionReader pushes { name, type, content } and never sets `input`, so
+  // reading only `input` made pi structurally unable to report an artifact.
+  const { modifiedFiles, readFiles } = proto._extractFileChanges.call({}, [
+    exchange({ tools: [
+      { name: 'edit', type: 'toolCall', content: JSON.stringify({ file_path: 'src/a.ts' }) },
+      { name: 'read', type: 'toolCall', content: JSON.stringify({ path: 'src/b.ts' }) },
+      // A tool RESULT carries prose in the same field; it must not be parsed.
+      { name: 'edit', type: 'toolResult', content: 'wrote 3 lines to somewhere' },
+    ] }),
+  ]);
+  assert.deepEqual(modifiedFiles, ['src/a.ts']);
+  assert.deepEqual(readFiles, ['src/b.ts']);
+});
+
+test('_extractFileChanges: a shell write counts as an artifact', () => {
+  const { modifiedFiles } = proto._extractFileChanges.call({}, [
+    exchange({ tools: [
+      { name: 'Bash', input: { command: "cat > docs/guide.md <<'EOF'\nhello > world\nEOF" } },
+      { name: 'Bash', input: { command: "sed -i '' 's|a|b|g' docs/related.md" } },
+    ] }),
+  ]);
+  assert.deepEqual(modifiedFiles, ['docs/guide.md', 'docs/related.md']);
+});
+
+test('bashWriteTargets: records real writes', () => {
+  assert.deepEqual(bashWriteTargets('cat > lib/a.js <<EOF\nx\nEOF'), ['lib/a.js']);
+  assert.deepEqual(bashWriteTargets('echo hi >> notes/log.md'), ['notes/log.md']);
+  assert.deepEqual(bashWriteTargets('generate | tee config/features.yaml'), ['config/features.yaml']);
+  assert.deepEqual(bashWriteTargets("sed -i '' 's/a/b/' src/x.ts"), ['src/x.ts']);
+});
+
+test('bashWriteTargets: invents nothing from the shapes that used to fool it', () => {
+  // Arrow functions and quoted comparison operators inside inline scripts.
+  assert.deepEqual(bashWriteTargets("gsd-browser eval 'els.map(x => x.id)'"), []);
+  assert.deepEqual(bashWriteTargets("awk 'length>80 { print }' f.md"), []);
+  assert.deepEqual(bashWriteTargets('grep -n "fetcherRef.current(" src/h.ts'), []);
+  // A heredoc BODY is prose — a commit message may contain anything.
+  assert.deepEqual(bashWriteTargets("git commit -F - <<'EOF'\nfix: make a > b\nEOF"), []);
+  // Throwaway locations are writes, but never artifacts.
+  assert.deepEqual(bashWriteTargets('node x.mjs > /tmp/out.txt'), []);
+  assert.deepEqual(bashWriteTargets('node x.mjs > /private/tmp/claude-1/sess/scratchpad/p.py'), []);
+  assert.deepEqual(bashWriteTargets('cmd > /dev/null 2>&1'), []);
+  // Redirections that are not file targets.
+  assert.deepEqual(bashWriteTargets('cmd 2>&1 | head'), []);
+  // Run-time-computed targets cannot be named.
+  assert.deepEqual(bashWriteTargets('echo x > "$SP/out.json"'), []);
+});
+
+test('bashWriteTargets: rejects things that are arguments, not destinations', () => {
+  // An interpreter path next to an unrelated redirect.
+  assert.deepEqual(bashWriteTargets('echo "v: $(/bin/bash --version)" > /dev/null; /bin/bash -n bin/x'), []);
+  // A sed script that survived as a bare word.
+  assert.ok(!bashWriteTargets('sed -i s/a/b/g f.md').includes('s/a/b/g'));
+  // Directories, git internals and command logs are writes, not artifacts.
+  assert.deepEqual(bashWriteTargets('cp -r a b/'), []);
+  assert.deepEqual(bashWriteTargets('gh pr view > .git/PR_BODY.md'), []);
+  assert.deepEqual(bashWriteTargets('npm test > jest.log'), []);
+  assert.deepEqual(bashWriteTargets('npm test > .logs/run.log'), []);
+});
+
+test('bashWriteTargets: nested command substitution does not unbalance the quote scan', () => {
+  // `"$(wc -l < "$F")"` puts a quote inside a quote; before command
+  // substitutions were blanked first, everything after it was scanned as bare
+  // shell and leaked operands from later in the line.
+  const cmd = 'printf "%s\\n" "$(wc -l < "$SB/hooklog")" >/dev/null 2>&1; /bin/bash bin/tool';
+  assert.deepEqual(bashWriteTargets(cmd), []);
 });
