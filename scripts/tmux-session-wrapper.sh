@@ -106,6 +106,34 @@ tmux_session_wrapper() {
     tmux set-option -t "$target_session" status-style "bg=default,fg=default"
     tmux set-option -t "$target_session" status-right "#(${status_cmd} 2>/dev/null || echo '[Status Offline]')"
     tmux set-option -t "$target_session" mouse on
+    _bind_status_clicks
+  }
+
+  # Make the status-line fields clickable.
+  #
+  # lib/statusline/clickable.cjs wraps each field in `#[range=user|TAG]`; tmux
+  # reports TAG in #{mouse_status_range} when that span is clicked, and this
+  # binding hands it to bin/statusline-click.
+  #
+  # Three things about this that are easy to get wrong:
+  #
+  #   • KEY TABLES ARE SERVER-WIDE. There is no per-session binding, so this
+  #     runs once per session setup but applies to every session on the server.
+  #     That is why the default window behaviour has to be preserved explicitly
+  #     below instead of being left alone — rebinding MouseDown1Status would
+  #     otherwise stop clicks on a window name from switching to that window.
+  #
+  #   • `set-option` DOES NOT EXPAND FORMATS in a value, so the tag cannot be
+  #     stashed in a user option and read back. `run-shell` does expand them,
+  #     which is why the tag is passed as an argument.
+  #
+  #   • The pane id has to travel with it: display-popup reached from a shell
+  #     has no client context of its own and needs to be told where to draw.
+  _bind_status_clicks() {
+    tmux bind-key -T root MouseDown1Status \
+      if-shell -F '#{==:#{mouse_status_range},window}' \
+        'switch-client -t =' \
+        "run-shell -b \"CODING_REPO='${coding_repo}' '${coding_repo}/bin/statusline-click' '#{mouse_status_range}' '#{pane_id}'\""
   }
 
   # Record which agent owns this tmux session, where, and since when.
