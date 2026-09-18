@@ -155,6 +155,33 @@ function deriveSummary(state) {
             }
         }
     }
+    // A pipeline that has stopped WRITING is not the same thing as a service
+    // that has stopped RUNNING, and until now only the second could turn this
+    // line red. On 2026-09-16 observations stopped for ~31h while obs_api
+    // stayed up and answering, so every check above passed and the operator
+    // was told "All systems operational" for the whole outage — the stall was
+    // noticed by hand, a day later. The coordinator knew the entire time
+    // (knowledge_pipeline.status, health-coordinator.js pollKnowledgePipeline);
+    // nothing here was reading it.
+    //
+    // ONLY 'stalled' is an issue, and deliberately so:
+    //   • 'stale' is the coordinator's word for "probably just idle" (no
+    //     active session inside OBS_FRESH_MS) — flagging it would fire on
+    //     every quiet afternoon and train the reader to ignore this line.
+    //   • 'busy' is a blocked event loop during consolidation, and 'unreachable'
+    //     is already reported by the services[] loop above, which also heals
+    //     it. Flagging either here re-creates the false "service obs_api
+    //     stopped" alarm that loop's OK_SERVICE_STATUSES exists to prevent,
+    //     and double-reports the real outage.
+    //   • 'disabled' means no rows in any table yet — a fresh install.
+    // 'stalled' is the one verdict a blocked or dead obs_api cannot manufacture:
+    // it is derived from a lastObservationAt timestamp obs_api itself returned,
+    // so reaching it proves the service answered AND had nothing recent to say.
+    if (state && state.knowledge_pipeline && state.knowledge_pipeline.status === 'stalled') {
+        const ageMs = state.knowledge_pipeline.obsAgeMs;
+        const age = Number.isFinite(ageMs) ? ` (${Math.floor(ageMs / 3600000)}h)` : '';
+        issues.push(`observations stalled${age}`);
+    }
     return {
         overallStatus: issues.length === 0 ? 'healthy' : 'unhealthy',
         issues,
