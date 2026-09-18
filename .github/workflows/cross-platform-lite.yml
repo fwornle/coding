@@ -148,6 +148,78 @@ jobs:
           echo "no leftover unit"
 
   # ───────────────────────────────────────────────────────────────────────────
+  # The status-line click handler's browser openers.
+  #
+  # bin/statusline-click runs wherever the status line does — the tmux binding
+  # is not platform-gated — and for a while it called macOS's `open` on every
+  # platform. On Linux that is not a command, stderr was discarded, and a
+  # dashboard click was a silent no-op: nothing opened, nothing logged, nothing
+  # said. It was found by a user on a Mac reasoning about portability, not by
+  # anything that ran.
+  #
+  # Same two tiers as daemon-backends above:
+  #
+  #   contract — stubs each opener on PATH and asserts the exact command line,
+  #              so Linux and Windows dispatch are gated from every runner
+  #              (including the macOS one). This is the HARD gate.
+  #   live     — on Linux only, installs real xdg-utils and a stub browser and
+  #              drives the whole path, proving the chain actually reaches a
+  #              browser rather than merely selecting a name.
+  # ───────────────────────────────────────────────────────────────────────────
+  browser-openers:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Contract — every platform's opener dispatch, from every OS
+        run: node --test tests/integration/statusline-click-browser-target.test.mjs
+
+      - name: Contract — the macOS-only gsd-browser bundle split
+        run: node --test tests/integration/gsd-browser-bundle-split.test.mjs
+
+      # The live tier needs a real xdg-open and something for it to launch.
+      # BROWSER is what xdg-open consults outside a desktop session; without it
+      # xdg-open on a headless runner has nothing to hand the URL to, which
+      # would test the runner's lack of a desktop rather than this dispatch.
+      - name: Live — real xdg-open reaches a real browser (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          set -e
+          sudo apt-get -qq update && sudo apt-get -qq install -y xdg-utils
+          printf '#!/bin/sh\necho LAUNCHED "$@" >> /tmp/browser.txt\n' | sudo tee /usr/local/bin/x-www-browser >/dev/null
+          sudo chmod +x /usr/local/bin/x-www-browser
+          BROWSER=x-www-browser STATUSLINE_CLICK_LOG=/tmp/click.log \
+            CODING_REPO="$PWD" bin/statusline-click health ""
+          grep -q 'via=xdg-open' /tmp/click.log || { echo "::error::did not select xdg-open"; cat /tmp/click.log; exit 1; }
+          grep -q 'LAUNCHED http://localhost:3032/' /tmp/browser.txt \
+            || { echo "::error::xdg-open never reached the browser"; cat /tmp/browser.txt 2>/dev/null; exit 1; }
+          echo "live: xdg-open -> browser, with the url intact"
+
+      # A click must never fail the shell tmux runs it in: tmux renders a
+      # non-zero run-shell in a view the user has to dismiss with ESC. On the
+      # Windows and macOS runners there is no xdg-open, so this also covers the
+      # "no opener at all" path on a machine where it is genuinely absent.
+      - name: A click never exits non-zero, even with nothing to open with
+        run: |
+          set -e
+          STATUSLINE_CLICK_LOG="${RUNNER_TEMP:-/tmp}/click2.log" \
+            STATUSLINE_CLICK_PLATFORM=unknown CODING_REPO="$PWD" bin/statusline-click health ""
+          echo "exit 0 on an unknown platform"
+
+  # ───────────────────────────────────────────────────────────────────────────
   # --dry-run must be exactly as inert as it claims.
   #
   # This is cheap and catches a specific, plausible regression: someone adds a

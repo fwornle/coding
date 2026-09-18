@@ -246,6 +246,25 @@ Runs on every pull request and on manual dispatch.
 | `portability` | ubuntu, macOS, Windows (Git Bash) | Every tracked `*.sh` is valid bash; `install.sh` detects the OS; `--ci` gates warn-and-continue instead of aborting; `test-coding.sh --ci` exits 0 |
 | `dry-run-is-inert` | ubuntu | `install.sh --ci --dry-run` exits 0 and mutates **nothing** — neither the working tree nor `$HOME` |
 | `real-install` | ubuntu | A real `./install.sh --ci` completes, `bin/coding --help` works, and shared agent configs are byte-identical afterwards |
+| `daemon-backends` | ubuntu, macOS, Windows | launchd / systemd `--user` / Task Scheduler: exact command lines with the executor substituted (hard gate), then a live install→start→stop round-trip where the runner can host a user service |
+| `browser-openers` | ubuntu, macOS, Windows | `bin/statusline-click` picks the right browser opener per platform, with each opener stubbed on a hermetic `PATH` (hard gate); on ubuntu a live tier drives real `xdg-open` through to a browser |
+
+`browser-openers` exists because the status-line click handler called macOS's
+`open` on every platform for weeks. The tmux binding that makes those fields
+clickable is not platform-gated, so the script runs wherever the status line
+does; on Linux `open` is not a command, stderr was discarded, and a dashboard
+click was a silent no-op — nothing opened, nothing logged, nothing said. Nothing
+in CI ran it off a Mac, and it was eventually noticed by a user *reasoning* about
+portability rather than by anything that executed.
+
+Its contract tier stubs each opener on a **hermetic** `PATH` — only the stubs and
+the handful of coreutils the script needs. Keeping `/usr/bin` on the path was not
+enough: a real `gio` won the fallback race on macOS (homebrew) and again on
+Debian (`/usr/bin/gio`), so the ordering assertions silently tested nothing on
+both. A stub that records how it was called is also what catches the
+argument-level mistakes this dispatch is prone to, such as dropping the empty
+title argument from `cmd.exe /c start ""` — without it the URL becomes the
+window title and no browser opens, which fails exactly like success.
 
 `real-install` is the job that catches what sourcing cannot. Before it existed,
 CI only *sourced* `install.sh` and called `detect_platform` /
