@@ -155,7 +155,7 @@ repo|$CODING_REPO/.specstory/history/|clone or init|no|private session-history c
 home|~/.coding/features.yaml|create|yes|which parts of coding you chose to install (not written for the default, `full`)
 home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
 home|$SHELL_RC|one marker block|yes|exports CODING_REPO and adds bin/ to PATH
-home|~/.gsd-browser/|create|yes|gsd-browser CLI, the mandated browser-automation tool; installer reuses a system Chrome when present and otherwise downloads Chrome for Testing
+home|~/.gsd-browser/|create|yes|gsd-browser CLI, the mandated browser-automation tool; installer reuses a system Chrome when present and otherwise downloads Chrome for Testing. On macOS also writes config.toml [browser] path + a chromium.app symlink, pinning automation to Chrome for Testing so it cannot intercept AppleScript aimed at your own Chrome
 global|~/.claude/settings.json|merge hooks|yes|OPT-IN: adds hooks that run for EVERY claude session, in every project
 global|~/.claude.json|merge mcpServers|yes|OPT-IN: MCP servers visible to bare `claude` everywhere
 global|~/.claude/commands/|copy skills|yes|OPT-IN: slash commands available to bare `claude` everywhere
@@ -1399,6 +1399,71 @@ _install_codegraph_support() {
 #
 # Failure is NEVER fatal. Every other install step still produces a working
 # repo, and a missing browser tool costs UI verification, not the install.
+# Keep gsd-browser's Chrome out of the user's own Chrome bundle (macOS only).
+#
+# gsd-browser's installer REUSES a system Chrome when it finds one, which on a
+# Mac means both the automation browser and the user's browser run as bundle id
+# com.google.Chrome. Apple Events are addressed by bundle id, so the two are
+# indistinguishable to AppleScript and the automation instance answers FIRST:
+# every `tell application "Google Chrome"` on the machine is silently retargeted
+# into the headless automation profile.
+#
+# That is not theoretical. It broke bin/statusline-click, which found a dashboard
+# tab, navigated it and reported success against a browser nobody could see —
+# for hours, with no error anywhere, and it defeated its own verification because
+# asking AppleScript what happened asks the wrong browser too. gsd-browser's
+# daemon also leaks, so a single screenshot run shadows every AppleScript on the
+# box until the next reboot.
+#
+# ONLY macOS. Linux and Windows have no Apple Event routing, so two Chrome
+# instances there cannot intercept one another and reusing a system Chrome is
+# exactly right — pinning a second browser would just cost disk.
+pin_gsd_browser_bundle_split() {
+    [[ "$PLATFORM" == "macos" ]] || return 0
+
+    local cfg="${HOME}/.gsd-browser/config.toml"
+    # Idempotent, and never overrides a deliberate choice: any existing `path`
+    # under [browser] is the user's, whatever it points at.
+    if [[ -f "$cfg" ]] && grep -qE '^[[:space:]]*path[[:space:]]*=' "$cfg"; then
+        return 0
+    fi
+
+    # Playwright's "Google Chrome for Testing" is bundle id
+    # com.google.chrome.for.testing, and the repo already depends on Playwright,
+    # so on most machines this is already on disk and costs nothing.
+    local app=""
+    local candidate
+    for candidate in "${HOME}"/Library/Caches/ms-playwright/chromium-*/chrome-mac*/"Google Chrome for Testing.app"; do
+        [[ -d "$candidate" ]] && app="$candidate"   # last match wins = newest revision
+    done
+
+    if [[ -z "$app" ]]; then
+        warning "gsd-browser will share the com.google.Chrome bundle with your own Chrome"
+        info "  On macOS that lets automation intercept AppleScript aimed at your browser."
+        info "  Fix after installing Playwright's browsers (npx playwright install chromium):"
+        info "    ln -sfn ~/Library/Caches/ms-playwright/chromium-*/chrome-mac*/\"Google Chrome for Testing.app\" ~/.gsd-browser/chromium.app"
+        info "    then add to ~/.gsd-browser/config.toml, under [browser]:"
+        info "      path = \"\$HOME/.gsd-browser/chromium.app/Contents/MacOS/Google Chrome for Testing\""
+        INSTALLATION_WARNINGS+=("gsd-browser: shares the Chrome bundle id with your browser; AppleScript automation may hit the wrong one")
+        return 0
+    fi
+
+    # Symlink the .app, NOT the binary inside it: Chrome resolves ../Frameworks
+    # from argv[0]'s directory, so a symlink straight to the executable dies with
+    # a dlopen error for its own framework. The indirection also means a
+    # Playwright upgrade (which prunes old revisions) is a one-line re-point.
+    mkdir -p "${HOME}/.gsd-browser"
+    ln -sfn "$app" "${HOME}/.gsd-browser/chromium.app"
+
+    # The key is `path` under [browser] — it mirrors GSD_BROWSER_BROWSER_PATH.
+    # `browser_path` parses fine and is then IGNORED, which looks identical to
+    # working until you check which binary actually launched.
+    [[ -f "$cfg" ]] || printf '# gsd-browser configuration.\n' > "$cfg"
+    grep -q '^\[browser\]' "$cfg" || printf '\n[browser]\n' >> "$cfg"
+    printf 'path = "%s/.gsd-browser/chromium.app/Contents/MacOS/Google Chrome for Testing"\n' "$HOME" >> "$cfg"
+    success "gsd-browser pinned to Chrome for Testing (separate bundle id from your Chrome)"
+}
+
 install_gsd_browser() {
     echo -e "\n${CYAN}🌐 Installing gsd-browser (browser automation)...${NC}"
 
@@ -1412,6 +1477,7 @@ install_gsd_browser() {
     # the user's call, not the installer's.
     if [[ -x "$gsd_bin" ]] && "$gsd_bin" --version >/dev/null 2>&1; then
         success "gsd-browser already installed ($("$gsd_bin" --version 2>/dev/null | head -1))"
+        pin_gsd_browser_bundle_split
         return 0
     fi
 
@@ -1434,6 +1500,7 @@ install_gsd_browser() {
     if curl -fsSL https://install.gsd.build/browser 2>/dev/null | bash >/dev/null 2>&1; then
         if [[ -x "$gsd_bin" ]] && "$gsd_bin" --version >/dev/null 2>&1; then
             success "gsd-browser installed ($("$gsd_bin" --version 2>/dev/null | head -1))"
+            pin_gsd_browser_bundle_split
         else
             # Installer exited 0 but produced nothing usable — report it rather
             # than let the first UI check fail with a bare 127 much later.
