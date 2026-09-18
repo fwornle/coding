@@ -448,6 +448,103 @@ The ETM (`enhanced-transcript-monitor.js`) detects **broken transcript discovery
 
 ---
 
+## Clickable Fields
+
+Every field except the clock is a mouse target. The chain is: a range marker in the rendered
+string → a tmux key binding → a dispatcher script.
+
+### Ranges
+
+`lib/statusline/clickable.cjs` wraps each field in `#[range=user|TAG] … #[norange]`. tmux
+reports `TAG` in `#{mouse_status_range}` when the span is clicked. Ranges emitted from a
+`#(...)` command are honoured — range parsing happens at draw time, on the final expanded
+string — so the fields work despite the bar being produced by a script.
+
+Tagging happens in one pass at the join, driven by a rule table keyed on each field's leading
+badge glyph, rather than at the ~30 push sites. The context gauge and the UKB counter are the
+exceptions: the gauge has no fixed leading glyph, and the UKB counter opens with the same
+`[🧠` as the proxy badge, so both are tagged where they are pushed.
+
+Two constraints that are easy to violate silently:
+
+- **`TAG` is capped at 15 bytes.** tmux drops a longer range with no error anywhere — the field
+  simply stops responding. Project tags are therefore `p:` plus a possibly-truncated project
+  name, resolved by prefix against the coordinator's project list.
+- **Tags must be lowercase.** The fast path re-applies the underline and repaints lifecycle
+  icons by matching UPPERCASE abbreviations, guarded by lookaround on both sides so that an
+  abbreviation only matches as a whole token — no uppercase letter immediately before or after
+  it. An uppercase letter inside a range tag would sit in those guards' blind spot and could be
+  rewritten as if it were a project bubble.
+
+Range markers cost **zero cells**: `visibleCellWidth()` strips `#[...]` before counting, so the
+padding maths is unchanged and the right-edge residue bug stays shut.
+
+### Binding
+
+Key tables are **server-wide** — there is no per-session binding — so `MouseDown1Status` is
+rebound once during session setup and must preserve the default window behaviour explicitly:
+
+```tmux
+bind -n MouseDown1Status \
+  if-shell -F '#{==:#{mouse_status_range},window}' \
+    'switch-client -t =' \
+    'run-shell -b "<repo>/bin/statusline-click #{mouse_status_range} #{pane_id}"'
+```
+
+`set-option` does **not** expand formats in a value, so the tag cannot be stashed in a user
+option and read back; `run-shell` does expand them, which is why the tag travels as an
+argument. The pane id travels with it because `display-popup` reached from a shell has no
+client context of its own.
+
+### Dispatcher
+
+`bin/statusline-click` maps a tag to an action. Every action is read-only, because a status
+line is glanced at far more often than it is deliberately clicked.
+
+| Tag | Action |
+|-----|--------|
+| `health` | Dashboard root |
+| `lsl` | Dashboard `/sessions` |
+| `obs` | Dashboard `/observations` |
+| `ukb` | Dashboard `/performance` |
+| `constraints` | Constraint dashboard on `:3030` |
+| `p:<project>` | That project's `origin` remote, converted to a browsable URL |
+| `net`, `semantic`, `ctx` | A report in a `display-popup` |
+
+Two things do not reach the dispatcher and have to be recovered:
+
+- **The pane's environment.** `run-shell` executes in the tmux *server's* environment, so
+  `CODING_AGENT` / `TMUX_SESSION_NAME` are unset however they were exported at launch. They are
+  read back from the session name plus `.data/agent-sessions/<session>.json` — the same record
+  the context gauge already uses, so this cannot drift from what the bar displays.
+- **Silence.** `run-shell` renders *any* stdout in a view the user must dismiss with ESC, and
+  AppleScript prints its handler's return value. Both stdout and stderr are discarded, or a
+  successful click interrupts the session it was meant to serve.
+
+### Tab reuse
+
+Pages are opened through AppleScript rather than `open`, matching an existing tab by URL
+prefix — the origin for dashboards, the full URL for a repository. A matching tab is navigated
+to the requested route (this is what selects the sub-tab); a tab already on the target is
+focused without reloading, preserving scroll position and filters. Any scripting failure falls
+through to a plain open, so a refused automation prompt still gets the page.
+
+Only top-level routes are addressable. Nested tabs inside Token Usage and Performance are
+component state with no URL, so deep-linking them would require adding URL state to the
+dashboard.
+
+### When a click does nothing
+
+| Symptom | Cause |
+|---------|-------|
+| No field responds | `mouse` is off for the session, or the binding was never installed |
+| One field stopped responding | Its tag exceeded 15 bytes |
+| A click opens a duplicate tab | Chrome automation was refused — the fallback open ran |
+| Text appears and needs ESC | Something on the dispatcher path wrote to stdout |
+| Fields respond but the bar looks stale | A long-lived session is serving an older cache; ranges arrive with the next full render |
+
+---
+
 ## Architecture
 
 ### 6-Layer Health System

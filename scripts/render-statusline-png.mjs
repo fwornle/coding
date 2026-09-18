@@ -15,6 +15,7 @@
  * Usage:
  *   node scripts/render-statusline-png.mjs [--cache <file>] --spans   # MkDocs markup
  *   node scripts/render-statusline-png.mjs [--cache <file>] --out <file.html>
+ *   node scripts/render-statusline-png.mjs --popup net --out x.html     # a click popup
  *   echo '<status-right output>' | node scripts/render-statusline-png.mjs --out x.html
  *
  * Then screenshot it:
@@ -23,6 +24,7 @@
  */
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const REPO = process.env.CODING_REPO || process.cwd();
@@ -148,11 +150,49 @@ function toSpans(line) {
   return `<span class="statusline">${out}</span>`;
 }
 
+
+/**
+ * A clickable field's popup, rendered for the docs.
+ *
+ * Same contract as the bar above: run the REAL report and paint its REAL output,
+ * so a screenshot cannot drift from what a click actually shows. The frame
+ * imitates tmux's popup border because a bare block of text in a doc does not
+ * read as "this appeared over your session".
+ *
+ * The reports are plain text, not tmux markup, so they need no style parsing —
+ * only the same monospace treatment and a heading row for the popup title.
+ */
+function renderPopup(which) {
+  const body = execFileSync(
+    'node',
+    [join(REPO, 'scripts', 'statusline-click-report.mjs'), which],
+    { encoding: 'utf8', env: { ...process.env, CODING_REPO: REPO } },
+  ).replace(/\n+$/, '');
+  const titles = { net: ' Network and LLM routing ', semantic: ' Semantic readiness ', ctx: ' Context window ' };
+  return `<!doctype html><meta charset="utf-8"><style>
+  body { margin: 0; background: #1c1c1c; padding: 18px; }
+  .popup { display: inline-block; background: #1c1c1c; color: #d0d0d0;
+           border: 1px solid #6c6c6c; border-radius: 4px; padding: 0 0 8px;
+           font: 15px/1.45 "SFMono-Regular", "JetBrains Mono", Menlo, monospace; }
+  .title { color: #1c1c1c; background: #6c6c6c; padding: 1px 10px; font-weight: 700; }
+  pre { margin: 8px 16px 0; white-space: pre; }
+</style><div class="popup"><div class="title">${escapeHtml(titles[which] || which)}</div>
+<pre>${escapeHtml(body)}</pre></div>
+`;
+}
+
 const argv = process.argv.slice(2);
 const argOf = (name) => { const i = argv.indexOf(name); return i === -1 ? null : argv[i + 1]; };
 const spansOnly = argv.includes('--spans');
+const popup = argOf('--popup');
 const out = argOf('--out');
 if (!out && !spansOnly) { process.stderr.write('--out <file.html> or --spans is required\n'); process.exit(2); }
+
+if (popup) {
+  writeFileSync(out, renderPopup(popup));
+  process.stdout.write(`${out}\n`);
+  process.exit(0);
+}
 
 const cacheArg = argOf('--cache');
 const raw = cacheArg ? readFileSync(cacheArg, 'utf8') : newestCache();

@@ -26,6 +26,26 @@ something broken?" questions into a glance.
     Each badge belongs to a feature, and a feature you have switched off contributes no badge
     at all — see [Composing What Runs](features.md).
 
+    ## The badges are clickable
+
+    Clicking a badge opens the thing it describes. Two kinds of target: a **page**, which
+    reuses the browser tab you already have open, and a **popup** over your pane, dismissed
+    with any key.
+
+    | Click | Opens |
+    |-------|-------|
+    | `[🏥●]` | The health dashboard |
+    | one project bubble | **that** project's repository page — not the underlined one |
+    | `[🔒72%●7]` | The constraint dashboard |
+    | `[📚●]` | The observations tab |
+    | `[N:OPEN P:AUTO]` | Popup: where your traffic goes right now |
+    | `[🧠●]` | Popup: why the semantic badge is the colour it is |
+    | the gauge | Popup: context in tokens, not just a percentage |
+    | `[📋8-9]` | The sessions tab |
+
+    The clock is deliberately inert. Every action is read-only — a stray click cannot restart,
+    toggle or write anything.
+
     ## Two absences that are good news
 
     `[LSL●]` appears only when session logging for **this pane** is unhealthy — no badge means it
@@ -87,6 +107,43 @@ something broken?" questions into a glance.
     | `[L:n]` | No completions served locally |
     | `[D:n]` | The prompt classifier is off, or nothing was downgraded |
     | `●N` in the constraint badge | No violations |
+
+    ## Clicking a badge
+
+    tmux can make a span of the status line a mouse target, so each field is wrapped in a range
+    carrying its own tag; a click reports that tag to a binding, which hands it to a small
+    dispatcher. The clock carries no range, which is why it does nothing.
+
+    **Pages reuse a tab.** A status line is clicked often, so opening a new tab each time would
+    bury the browser in duplicates. The dispatcher looks for a tab already showing the
+    dashboard and navigates *that* one to the route you asked for — which is also how the
+    sub-tab gets selected. A tab already on the target is focused without reloading, so scroll
+    position and filters survive.
+
+    Only the top-level tabs are routes and therefore addressable this way. The nested tabs
+    inside Token Usage and Performance are component state, not URLs, so a click lands on the
+    page and not on the inner tab.
+
+    **Popups answer the question the badge raises.** A two-cell badge can say *that* something
+    is wrong but never *what*, so the three fields whose subject has no page of its own open a
+    report instead.
+
+    The network badge answers where your traffic actually goes — which is not obvious from
+    `[N:OPEN P:ON]`, and changes with the network:
+
+    ![Network and routing popup](../images/status-line-click-network.png)
+
+    The semantic badge explains its own colour. `recent-real-traffic` is the healthy case — the
+    coordinator saw genuine traffic succeed and skipped its probe — which reads like a fault
+    until something says so:
+
+    ![Semantic readiness popup](../images/status-line-click-semantic.png)
+
+    The gauge popup gives the context in tokens against the real window, and explains why it
+    reads higher than the raw percentage: Claude Code reserves ~16.5% of the window for
+    auto-compaction, and the gauge measures against the usable remainder:
+
+    ![Context window popup](../images/status-line-click-context.png)
 
     ## When the bar itself is wrong
 
