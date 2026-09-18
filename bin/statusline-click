@@ -70,12 +70,46 @@ fi
 # bubble, so two different repos still get a tab each. A tab already sitting on
 # the exact target is focused WITHOUT being reloaded, which keeps its scroll
 # position and any filter the user had set.
+# Is an AUTOMATION Chrome running — gsd-browser, Playwright, Puppeteer?
+#
+# This decides whether the tab-reuse script below can be trusted at all, and it
+# is not a detail. Apple Events are addressed by BUNDLE ID, and an automation
+# browser is the same bundle as the user's, distinguished only by its own
+# --user-data-dir. When one is running it answers `tell application "Google
+# Chrome"` FIRST, so the reuse script drives the automation profile instead of
+# the browser on the user's screen — it finds a tab, navigates it, reports
+# success, and the user sees nothing change. That is not hypothetical: it is
+# what shipped, and what made the fault so hard to see, because verifying the
+# fix by asking AppleScript what happened asks the WRONG browser both times.
+#
+# Raising the user's Chrome first does not help — Apple Events do not follow
+# frontmost-ness (measured). LaunchServices `open` does route to the user's
+# default-profile instance, so that is the safe path whenever an automation
+# browser is up.
+#
+# The test is "any Chrome with an explicit --user-data-dir", not "gsd-browser"
+# specifically: every automation runner sets one and the user's own never does,
+# so this covers Playwright and Puppeteer too. Erring toward "automation is
+# running" costs only a duplicate tab; erring the other way loses the click.
+automation_chrome_running() {
+  pgrep -f 'Google Chrome\.app/Contents/MacOS/Google Chrome.*--user-data-dir=' >/dev/null 2>&1
+}
+
 open_url() {
   local url="$1" prefix="${2:-$1}"
   # Test seam: the suites (and a human checking a mapping) need to see WHICH url
   # a tag resolves to without a browser window appearing on someone's screen.
   if [ -n "${STATUSLINE_CLICK_DRYRUN:-}" ]; then echo "would open: $url (reuse prefix: $prefix)"; return; fi
   if [ ! -d "/Applications/Google Chrome.app" ]; then open "$url" >/dev/null 2>&1; return; fi
+
+  if automation_chrome_running; then
+    # Correctness over tidiness: a new tab in the RIGHT browser beats a reused
+    # tab in one the user cannot see. `open` both routes and raises.
+    printf '%s   open_url url=%s via=launchservices (automation chrome up)\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$url" >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+    open "$url" >/dev/null 2>&1
+    return
+  fi
 
   # A first run prompts for permission to control Chrome; a refusal (or a
   # scripting error of any kind) must still get the user their page, so every
@@ -86,7 +120,13 @@ open_url() {
   # successful click would interrupt the very session it was meant to serve.
   # The return values are kept because they are useful when debugging this by
   # hand; they are simply not allowed to reach tmux.
-  osascript - "$url" "$prefix" >/dev/null 2>&1 <<'AS'
+  # The AppleScript's verdict is CAPTURED, not discarded. It is the only place
+  # that knows which of the three paths ran and which tab it picked, and a click
+  # that lands on the wrong tab looks identical from outside to one that worked.
+  # It still must not reach tmux's stdout (run-shell renders any output in a
+  # view the user has to dismiss with ESC), so it goes to the same log.
+  local verdict
+  verdict="$(osascript - "$url" "$prefix" 2>&1 <<'AS'
 on run argv
   set targetURL to item 1 of argv
   set matchPrefix to item 2 of argv
@@ -106,7 +146,7 @@ on run argv
           set active tab index of w to idx
           set index of w to 1
           activate
-          return "reused"
+          return "reused idx=" & idx & " active=" & (active tab index of w) & " wins=" & (count of windows)
         end if
       end repeat
     end repeat
@@ -116,7 +156,11 @@ on run argv
   end tell
 end run
 AS
+)"
   local rc=$?
+  printf '%s   open_url url=%s rc=%s verdict=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$url" "$rc" "${verdict//$'\n'/ }" \
+    >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
 
   # RAISING CHROME IS A SEPARATE STEP, and it is not optional.
   #
