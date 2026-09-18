@@ -102,6 +102,21 @@ test('a coordinator with no knowledge_pipeline key at all stays green', async ()
   assert.match(await hookSays(HEALTHY_BASE), /All systems operational/);
 });
 
+test("a project expected to have an ETM but absent reports as 'missing'", async () => {
+  // The rollup's other hole: lsl_by_project is built from sessions that have
+  // heartbeated, so an ETM that never came up contributes no key and every
+  // consumer reads absence as health. The coordinator now emits 'missing' for a
+  // project that qualifies for an ETM but has none; this asserts the hook's
+  // existing !== 'healthy' loop surfaces it, since that is the whole reason
+  // 'missing' enters through the rollup rather than a field of its own.
+  const line = await hookSays({
+    ...HEALTHY_BASE,
+    lsl_by_project: { coding: 'healthy', sketcher: 'missing' },
+  });
+  assert.match(line, /^⚠️ System Health:/);
+  assert.match(line, /LSL sketcher missing/);
+});
+
 test('a stall does not mask a stopped service — both are reported', async () => {
   const line = await hookSays({
     ...HEALTHY_BASE,

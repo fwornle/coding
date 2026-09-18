@@ -2608,6 +2608,10 @@ function ensureEtmForActiveProjects(opts = {}) {
     candidates.add(only);
   }
 
+  // Names that clear every gate below. Used after the loop to prune expectations
+  // for projects that no longer qualify — see the prune at the end.
+  const qualified = new Set();
+
   for (const projectPath of candidates) {
     const projectName = path.basename(projectPath);
     if (coveredProjects.has(projectName)) continue;
@@ -2668,6 +2672,11 @@ function ensureEtmForActiveProjects(opts = {}) {
       }
     }
 
+    // Qualified. From here the project is EXPECTED to have a beating ETM, and
+    // stays expected across sweeps until it either beats or stops qualifying.
+    qualified.add(projectName);
+    if (!_etmExpected.has(projectName)) _etmExpected.set(projectName, { since: now, path: projectPath });
+
     log(`spawning ETM for active project ${projectName} (${projectPath})`, 'INFO');
     const childLog = openEtmChildLog(projectName);
     try {
@@ -2701,6 +2710,23 @@ function ensureEtmForActiveProjects(opts = {}) {
       if (childLog !== null) { try { fs.closeSync(childLog); } catch { /* already closed */ } }
     }
   }
+
+  // Prune expectations down to what still qualifies. Without this a project
+  // whose session simply closed would keep its expectation forever and start
+  // reporting 'missing' 90s later — an alarm about work nobody is doing, which
+  // is worse than the silence this whole change exists to fix.
+  //
+  // Full sweeps ONLY. A targeted request replaced `candidates` with the single
+  // project a launcher just opened, so its `qualified` set says nothing about
+  // any other project; pruning against it would drop every genuine expectation
+  // on the machine. The early returns above (startup grace, rate limit, lsl
+  // off) never reach here at all, which is correct for the same reason: no
+  // enumeration happened, so there is no evidence to prune on.
+  if (!only) {
+    for (const name of [..._etmExpected.keys()]) {
+      if (!qualified.has(name)) _etmExpected.delete(name);
+    }
+  }
 }
 
 /**
@@ -2713,6 +2739,32 @@ function ensureEtmForActiveProjects(opts = {}) {
  * and re-qualifies the project.
  */
 const _reapedProjects = new Map(); // projectName -> reapedAt (ms)
+
+/**
+ * How long a project may qualify for an ETM without any running heartbeat
+ * before the rollup calls it 'missing'. Derived from the spawn interval rather
+ * than picked: the sweep only gets one chance every ETM_SPAWN_INTERVAL_MS, and
+ * a freshly spawned ETM needs a moment to come up and beat, so anything under
+ * two sweeps would flag the normal startup path. Three is one sweep of slack
+ * on top of that.
+ */
+const ETM_MISSING_MS = 3 * ETM_SPAWN_INTERVAL_MS;
+
+/**
+ * Projects that QUALIFY for an ETM (live tmux, fresh transcript, or OpenCode
+ * activity) and when they first did, whether or not one is actually beating.
+ *
+ * This is the set `lsl_by_project` could not see. That rollup is built purely
+ * from sessions that have already heartbeated, so a project whose ETM never
+ * came up — crash-loop, singleton defer, a wedged holder — contributes NO key
+ * at all, and every consumer reads absence as health. That is how a project can
+ * sit at [LSL🔴] while the health line says "All systems operational": there is
+ * nothing to be unhealthy, because there is nothing.
+ *
+ * Rebuilt (not merely appended to) on every full sweep, so a project whose
+ * session closed stops being expected instead of reporting 'missing' forever.
+ */
+const _etmExpected = new Map(); // projectName -> { since: ms, path: string }
 
 /**
  * Stop ETMs whose session has gone away, so a closed project leaves the
@@ -2852,7 +2904,14 @@ function killEtmEntry(key, e, why) {
     try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
   }
   delete currentState.lsl[key];
-  if (e.projectName) _reapedProjects.set(e.projectName, Date.now());
+  if (e.projectName) {
+    _reapedProjects.set(e.projectName, Date.now());
+    // A reap is a DECISION, not a failure: the session went away, or `lsl` was
+    // switched off. Keeping the expectation would turn every closed session
+    // into a 'missing' alarm 90s later. The spawner re-creates it the moment
+    // the project qualifies again.
+    _etmExpected.delete(e.projectName);
+  }
   log(`lsl: reaped ETM for '${e.projectName}' — ${why} (pid=${pid || 'unknown'})`, 'INFO');
 }
 
@@ -2889,6 +2948,26 @@ function refreshLslStaleness() {
       rollup[name] = 'degraded';
     }
   }
+
+  // Projects that SHOULD be beating and are not present at all.
+  //
+  // Everything above is derived from sessions that have heartbeated, so the one
+  // failure it structurally cannot express is "no session ever appeared". A
+  // project whose ETM crash-loops on startup produces no `lsl` entry, therefore
+  // no rollup key, therefore no issue for any consumer — the statusline shows
+  // [LSL🔴] from its own signals while the health line reads green. 'missing'
+  // is that gap, and it enters through the SAME rollup every surface already
+  // reads rather than a new field each of them would have to learn.
+  for (const [name, exp] of [..._etmExpected]) {
+    if (rollup[name] === 'healthy') { _etmExpected.delete(name); continue; }
+    // Present but unhealthy ('degraded') is already reported by every consumer,
+    // and the expectation is deliberately KEPT: if that stopped session is later
+    // evicted (EVICT_AFTER_STOPPED_MS) the project falls out of the rollup
+    // entirely, and this is what catches it on the way down.
+    if (name in rollup) continue;
+    if (now - exp.since > ETM_MISSING_MS) rollup[name] = 'missing';
+  }
+
   currentState.lsl_by_project = rollup;
 }
 
