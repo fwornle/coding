@@ -20,6 +20,7 @@ import contextGauge from '../lib/statusline/context-gauge.cjs';
 import paneCacheKey from '../lib/statusline/pane-cache-key.cjs';
 import featureGate from '../lib/statusline/feature-gate.cjs';
 import { visibleCellWidth } from '../lib/statusline/visible-cell-width.cjs';
+import { markClickable, buildProjectTag, decorate as decorateClickable } from '../lib/statusline/clickable.cjs';
 import { loadFeatures } from '../lib/features/index.mjs';
 
 const { statusLeftReserveCells } = paneCacheKey;
@@ -2363,10 +2364,16 @@ class CombinedStatusLine {
             // Add agent type prefix for non-Claude agents (pi, opencode, copilot)
             const agentType = health.details ? this.extractAgentType(health.details) : null;
             const agentPrefix = agentType && this.agentDisplay[agentType] ? this.agentDisplay[agentType].prefix : '';
+            // Each bubble is its own mouse target: the range wraps ONE project,
+            // so a click resolves to the project under the pointer instead of
+            // whichever one happens to be underlined. The range markers sit
+            // OUTSIDE the abbrev+icon pair that status-line-fast.cjs rewrites
+            // (underline re-application, lifecycle repaint), leaving both of
+            // its regexes looking at exactly the text they looked at before.
             if ((health.status === 'warning' || health.status === 'unhealthy') && health.reason) {
-              return `${agentPrefix}${displayAbbrev}${health.icon}(${health.reason})`;
+              return markClickable(buildProjectTag(project), `${agentPrefix}${displayAbbrev}${health.icon}(${health.reason})`);
             }
-            return `${agentPrefix}${displayAbbrev}${health.icon}`;
+            return markClickable(buildProjectTag(project), `${agentPrefix}${displayAbbrev}${health.icon}`);
           })
           .join('');
 
@@ -2696,7 +2703,7 @@ class CombinedStatusLine {
         overallColor = 'red';
       }
       ukbPart += ']';
-      parts.push(ukbPart);
+      parts.push(markClickable('ukb', ukbPart));
     }
     // Don't show anything when no UKB processes are running (cleaner status line)
 
@@ -2767,8 +2774,8 @@ class CombinedStatusLine {
           // the session that was running here BEFORE the last restart.
           tmuxSession: process.env.TMUX_SESSION_NAME,
         });
-        if (usage) parts.push(contextGauge.renderGauge(usage.usedPct));
-        else if (contextGauge.hasContextReader(paneAgent)) parts.push(contextGauge.GAUGE_ZERO);
+        if (usage) parts.push(markClickable('ctx', contextGauge.renderGauge(usage.usedPct)));
+        else if (contextGauge.hasContextReader(paneAgent)) parts.push(markClickable('ctx', contextGauge.GAUGE_ZERO));
       }
     } catch {
       // A status line must never fail because a context store was unreadable.
@@ -2805,7 +2812,12 @@ class CombinedStatusLine {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     parts.push(timeStr);
 
-    const joined = parts.join(' ');
+    // Mouse targets are applied here, once, rather than at ~30 push sites: the
+    // rule table in clickable.cjs keys off each field's leading badge glyph,
+    // and parts that already carry a range (the per-project bubbles) pass
+    // through untouched. Range markers are zero-width to visibleCellWidth(),
+    // so padStatusLine below measures exactly what it measured before.
+    const joined = parts.map(decorateClickable).join(' ');
     const statusText = padStatusLine(joined);
 
     // Since Claude Code doesn't support tooltips/clicks natively,

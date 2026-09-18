@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+#
+# Act on a click in the tmux status line.
+#
+# Invoked by the MouseDown1Status binding installed in
+# scripts/tmux-session-wrapper.sh, with the tag tmux reports in
+# #{mouse_status_range} (set by the `#[range=user|…]` markers that
+# lib/statusline/clickable.cjs writes into the line) plus the pane that was
+# active at the time — needed because display-popup has to be told where to
+# draw when it is reached from a shell rather than from a key binding.
+#
+# Every action is read-only: it opens a page or shows a report. Nothing here
+# restarts, toggles or writes anything, because a status line is glanced at far
+# more often than it is deliberately clicked, and a stray click must never be
+# able to change the system's state.
+set -uo pipefail
+
+TAG="${1:-}"
+PANE="${2:-}"
+CODING_REPO="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
+DASHBOARD="http://localhost:3032"
+CONSTRAINTS="http://localhost:3030"
+COORDINATOR="http://localhost:3034"
+PROXY="http://localhost:12435"
+
+note() { [ -n "$PANE" ] && tmux display-message -t "$PANE" "$*" || true; }
+
+# The pane's own environment does NOT reach us: run-shell runs in the tmux
+# SERVER's environment, not the pane's, so CODING_AGENT / TMUX_SESSION_NAME /
+# TRANSCRIPT_SOURCE_PROJECT are all unset here however they were exported at
+# launch. They are recovered from the session name tmux gives us plus the map
+# scripts/tmux-session-wrapper.sh writes at launch — the same record the context
+# gauge and the LSL badge already read, so this cannot drift from what the
+# status line itself is displaying.
+pane_session=""; pane_agent="claude"; pane_project="$CODING_REPO"
+if [ -n "$PANE" ]; then
+  pane_session="$(tmux display-message -p -t "$PANE" '#{session_name}' 2>/dev/null || true)"
+fi
+if [ -n "$pane_session" ] && [ -r "$CODING_REPO/.data/agent-sessions/$pane_session.json" ]; then
+  map="$CODING_REPO/.data/agent-sessions/$pane_session.json"
+  pane_agent="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("agent","claude"))' "$map" 2>/dev/null || echo claude)"
+  pane_project="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("projectPath",""))' "$map" 2>/dev/null || echo "")"
+fi
+
+# Chrome by name rather than `open <url>`: the dashboards keep per-origin state
+# (auth, tab position) that only lines up if they always land in the same
+# browser, whatever the OS default happens to be that week.
+#
+# REUSES AN EXISTING TAB. A status line is clicked often, and `open` would leave
+# a fresh duplicate tab behind every single time. The AppleScript below looks for
+# a tab whose URL starts with $2 — the ORIGIN for the dashboards, so any tab
+# already showing one is re-used and merely navigated to the route being asked
+# for (that is what selects the sub-tab), and the full repo URL for a project
+# bubble, so two different repos still get a tab each. A tab already sitting on
+# the exact target is focused WITHOUT being reloaded, which keeps its scroll
+# position and any filter the user had set.
+open_url() {
+  local url="$1" prefix="${2:-$1}"
+  # Test seam: the suites (and a human checking a mapping) need to see WHICH url
+  # a tag resolves to without a browser window appearing on someone's screen.
+  if [ -n "${STATUSLINE_CLICK_DRYRUN:-}" ]; then echo "would open: $url (reuse prefix: $prefix)"; return; fi
+  if [ ! -d "/Applications/Google Chrome.app" ]; then open "$url" >/dev/null 2>&1; return; fi
+
+  # A first run prompts for permission to control Chrome; a refusal (or a
+  # scripting error of any kind) must still get the user their page, so every
+  # failure path falls through to a plain open.
+  # stdout is DISCARDED, not just stderr. osascript prints the handler's return
+  # value ("reused" / "new-tab"), and tmux's run-shell renders ANY output from
+  # the command in a view the user then has to dismiss with ESC — so a
+  # successful click would interrupt the very session it was meant to serve.
+  # The return values are kept because they are useful when debugging this by
+  # hand; they are simply not allowed to reach tmux.
+  osascript - "$url" "$prefix" >/dev/null 2>&1 <<'AS' || open -a "Google Chrome" "$url" >/dev/null 2>&1
+on run argv
+  set targetURL to item 1 of argv
+  set matchPrefix to item 2 of argv
+  tell application "Google Chrome"
+    if (count of windows) is 0 then
+      make new window
+      set URL of active tab of front window to targetURL
+      activate
+      return "new-window"
+    end if
+    repeat with w in windows
+      set idx to 0
+      repeat with t in tabs of w
+        set idx to idx + 1
+        if (URL of t as string) starts with matchPrefix then
+          if (URL of t as string) is not targetURL then set URL of t to targetURL
+          set active tab index of w to idx
+          set index of w to 1
+          activate
+          return "reused"
+        end if
+      end repeat
+    end repeat
+    tell front window to make new tab with properties {URL:targetURL}
+    activate
+    return "new-tab"
+  end tell
+end run
+AS
+}
+
+# Show a report in a popup over the clicked pane. Held open until a keypress —
+# a popup that vanishes with its command is unreadable for anything longer than
+# one line.
+popup() {
+  local title="$1" cmd="$2"
+  # Same test seam as open_url: run the report to stdout instead of throwing a
+  # popup over whatever the user is actually doing.
+  if [ -n "${STATUSLINE_CLICK_DRYRUN:-}" ]; then
+    echo "would popup: $title"; eval "$cmd"; return
+  fi
+  if [ -z "$PANE" ]; then eval "$cmd"; return; fi
+  tmux display-popup -E -t "$PANE" -w 84% -h 60% -T " $title " \
+    "bash -lc $(printf '%q' "$cmd"'; printf "\n── any key to close ──"; read -rsn1')"
+}
+
+# Project name -> checkout path, from the health coordinator (the only place
+# that knows where each running session's project actually lives). Matched by
+# PREFIX: tmux caps a range tag at 15 bytes, so a long project name reaches us
+# truncated, and re-deriving the abbreviation here would mean a second copy of
+# getProjectAbbreviation() drifting against the one in the status line.
+project_path_for() {
+  curl -s --max-time 4 "$COORDINATOR/health/state" 2>/dev/null | python3 -c '
+import json, sys
+want = sys.argv[1].lower()
+try:
+    state = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+best = None
+for entry in (state.get("lsl") or {}).values():
+    name, path = (entry.get("projectName") or ""), entry.get("projectPath")
+    if not name or not path:
+        continue
+    if name.lower().startswith(want):
+        # Shortest match wins: "cod" must resolve to "coding", not "coding-experiments".
+        if best is None or len(name) < len(best[0]):
+            best = (name, path)
+if best:
+    print(best[1])
+' "$1" 2>/dev/null
+}
+
+# git remote -> browsable URL. Covers the three remote spellings in use here:
+# scp-style ssh (git@host:owner/repo.git), ssh:// URLs, and plain https.
+remote_web_url() {
+  git -C "$1" remote get-url origin 2>/dev/null | sed -E \
+    -e 's#^git@([^:]+):#https://\1/#' \
+    -e 's#^ssh://git@([^/]+)/#https://\1/#' \
+    -e 's#\.git$##'
+}
+
+case "$TAG" in
+  health)      open_url "$DASHBOARD/" "$DASHBOARD" ;;
+  lsl)         open_url "$DASHBOARD/sessions" "$DASHBOARD" ;;
+  obs)         open_url "$DASHBOARD/observations" "$DASHBOARD" ;;
+  ukb)         open_url "$DASHBOARD/performance" "$DASHBOARD" ;;
+  constraints) open_url "$CONSTRAINTS/" "$CONSTRAINTS" ;;
+
+  p:*)
+    name="${TAG#p:}"
+    path="$(project_path_for "$name")"
+    if [ -z "$path" ]; then
+      note "statusline: no running project matching '$name'"
+      exit 0
+    fi
+    url="$(remote_web_url "$path")"
+    if [ -z "$url" ]; then
+      note "statusline: $path has no 'origin' remote"
+      exit 0
+    fi
+    open_url "$url" "$url"
+    ;;
+
+  net)      popup "Network and LLM routing" "CODING_REPO='$CODING_REPO' node '$CODING_REPO/scripts/statusline-click-report.mjs' net" ;;
+  semantic) popup "Semantic readiness"        "CODING_REPO='$CODING_REPO' node '$CODING_REPO/scripts/statusline-click-report.mjs' semantic" ;;
+  ctx)      popup "Context window" \
+              "CODING_REPO='$CODING_REPO' CODING_AGENT='$pane_agent' \
+               TMUX_SESSION_NAME='$pane_session' TRANSCRIPT_SOURCE_PROJECT='$pane_project' \
+               node '$CODING_REPO/scripts/statusline-click-report.mjs' ctx" ;;
+
+  ''|window|pane|session) : ;;   # not one of ours — the binding handles these
+  *) note "statusline: unmapped field '$TAG'" ;;
+esac
