@@ -20,6 +20,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -95,6 +96,98 @@ for (const platform of ['macos', 'linux', 'wsl', 'windows']) {
   });
 }
 
+// Contract tier, in the sense scripts/test-daemon-backend.mjs uses: the opener
+// is SUBSTITUTED by a stub on PATH that records how it was called, so the exact
+// command line for Linux, WSL and Windows is asserted from any machine. Checking
+// only that `command -v` found something would have passed while passing the
+// wrong arguments — which is the one mistake this dispatch is prone to.
+// Utilities the script itself shells out to. They are symlinked into the stub
+// directory so PATH can be JUST that directory — see the note on hermeticity
+// below. `bash` is needed because the shebang is `/usr/bin/env bash`, and env
+// resolves bash through PATH.
+const NEEDED = ['bash', 'date', 'mkdir', 'uname', 'grep', 'wc', 'tail', 'mv', 'cat'];
+
+function whichTool(name) {
+  const r = spawnSync('sh', ['-c', `command -v ${name}`], { encoding: 'utf-8' });
+  return r.status === 0 ? r.stdout.trim() : null;
+}
+
+function runWithStubs(platform, stubs) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clickstub-'));
+  for (const t of NEEDED) {
+    const real = whichTool(t);
+    if (real) { try { fs.symlinkSync(real, path.join(dir, t)); } catch { /* already there */ } }
+  }
+  const rec = path.join(dir, 'called.txt');
+  for (const name of stubs) {
+    const f = path.join(dir, name);
+    // The stub records its own name LITERALLY rather than via basename "$0":
+    // PATH is hermetic, so basename would have to be symlinked in purely to let
+    // a stub say who it is.
+    fs.writeFileSync(f, `#!/bin/sh\nprintf '%s|%s\\n' ${JSON.stringify(name)} "$*" >> ${JSON.stringify(rec)}\n`);
+    fs.chmodSync(f, 0o755);
+  }
+  const r = spawnSync(CLICK, ['health', ''], {
+    env: {
+      ...process.env,
+      // HERMETIC: this directory and nothing else. The host PATH must not leak,
+      // and keeping /usr/bin was not enough — a real `gio` silently won the
+      // fallback race on macOS (homebrew) and again on Debian (/usr/bin/gio),
+      // so the ordering test asserted nothing on either. The utilities the
+      // script needs are symlinked in above, so the ONLY openers reachable are
+      // the stubs this case declares.
+      PATH: dir,
+      STATUSLINE_CLICK_PLATFORM: platform,
+      CODING_REPO: REPO,
+      STATUSLINE_CLICK_LOG: path.join(dir, 'click.log'),
+    },
+    encoding: 'utf-8',
+  });
+  const called = fs.existsSync(rec) ? fs.readFileSync(rec, 'utf8').trim() : '';
+  fs.rmSync(dir, { recursive: true, force: true });
+  return { called, status: r.status };
+}
+
+const URL_RE = /http:\/\/localhost:3032\//;
+
+test('linux hands the url to xdg-open', () => {
+  const { called } = runWithStubs('linux', ['xdg-open']);
+  assert.match(called, /^xdg-open\|/);
+  assert.match(called, URL_RE);
+});
+
+test('linux falls through xdg-open → gio → firefox, in order', () => {
+  // `gio` takes a subcommand, so this also checks the multi-word entry expands
+  // to `gio open <url>` rather than `gio <url>`.
+  const gio = runWithStubs('linux', ['gio', 'firefox']);
+  assert.match(gio.called, /^gio\|open http:\/\/localhost:3032\//);
+  const ff = runWithStubs('linux', ['firefox']);
+  assert.match(ff.called, /^firefox\|http:\/\/localhost:3032\//);
+});
+
+test('xdg-open wins when several openers are installed', () => {
+  const { called } = runWithStubs('linux', ['xdg-open', 'gio', 'firefox']);
+  assert.equal(called.split('\n').length, 1, 'more than one opener ran');
+  assert.match(called, /^xdg-open\|/);
+});
+
+test('wsl prefers wslview, and its cmd.exe fallback keeps the empty title argument', () => {
+  const v = runWithStubs('wsl', ['wslview']);
+  assert.match(v.called, /^wslview\|http:\/\/localhost:3032\//);
+
+  // `start` consumes its FIRST quoted argument as the window title. Without the
+  // empty "" the URL becomes the title and no browser opens — a silent no-op,
+  // which is the whole failure class this dispatch exists to end.
+  const c = runWithStubs('wsl', ['cmd.exe']);
+  assert.match(c.called, /^cmd\.exe\|\/c start\s+http:\/\/localhost:3032\//,
+    'cmd.exe fallback lost the empty title argument');
+});
+
+test('windows uses start with the same empty title argument', () => {
+  const { called } = runWithStubs('windows', ['cmd']);
+  assert.match(called, /^cmd\|\/c start\s+http:\/\/localhost:3032\//);
+});
+
 test('a platform with no usable opener SAYS so rather than doing nothing', () => {
   // Driven through the windows branch on any non-Windows CI box: none of
   // cmd/powershell/start exist, which is precisely the "no opener" case.
@@ -109,6 +202,29 @@ test('a platform with no usable opener SAYS so rather than doing nothing', () =>
   } finally {
     fs.rmSync(log, { force: true });
   }
+});
+
+test('an unwritable log leaks nothing to stderr', () => {
+  // Found by running this script against a read-only bind mount in a container:
+  // `printf ... >>"$log" 2>/dev/null` applies redirections left to right, so the
+  // failing append was reported on a stderr that was still the terminal, and
+  // every click printed `bash: ...: Read-only file system`. tmux renders any
+  // run-shell output in a view the user must dismiss — so the debugging aid
+  // became the interruption it exists to prevent.
+  // /dev/null/... can never be created, on any platform and as any user.
+  const r = spawnSync(CLICK, ['health', ''], {
+    env: {
+      ...process.env,
+      STATUSLINE_CLICK_DRYRUN: '1',
+      STATUSLINE_CLICK_PLATFORM: 'linux',
+      CODING_REPO: REPO,
+      STATUSLINE_CLICK_LOG: '/dev/null/nope/click.log',
+    },
+    encoding: 'utf-8',
+  });
+  assert.equal(r.stderr, '', `leaked to stderr: ${r.stderr}`);
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /would open: /);
 });
 
 test('every platform branch is covered — an unknown one is reported, not ignored', () => {

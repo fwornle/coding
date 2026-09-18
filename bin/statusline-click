@@ -34,11 +34,28 @@ note() { [ -n "$PANE" ] && tmux display-message -t "$PANE" "$*" || true; }
 # itself rather than growing for the life of the install.
 : "${STATUSLINE_CLICK_LOG:=$CODING_REPO/.logs/statusline-click.log}"
 mkdir -p "$(dirname "$STATUSLINE_CLICK_LOG")" 2>/dev/null
-printf '%s tag=%s pane=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${TAG:-<empty>}" "${PANE:-<none>}" \
-  >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
-if [ "$(wc -c <"$STATUSLINE_CLICK_LOG" 2>/dev/null || echo 0)" -gt 131072 ]; then
-  tail -n 500 "$STATUSLINE_CLICK_LOG" >"$STATUSLINE_CLICK_LOG.tmp" 2>/dev/null \
-    && mv "$STATUSLINE_CLICK_LOG.tmp" "$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+
+# All logging goes through here, and the whole GROUP is redirected.
+#
+# `printf ... >>"$log" 2>/dev/null` does NOT do this. Redirections are applied
+# left to right, so when the append fails the shell reports it on stderr that is
+# still the terminal — the 2>/dev/null arrives too late to matter. On a
+# read-only checkout every click then printed
+#   bash: .logs/statusline-click.log: Read-only file system
+# and tmux renders any output from run-shell in a view the user must dismiss:
+# a diagnostic aid becoming the interruption it exists to prevent. Found by
+# running this script in a container with the repo mounted read-only.
+click_log() {
+  { printf '%s\n' "$*" >>"$STATUSLINE_CLICK_LOG"; } 2>/dev/null || true
+}
+
+click_log "$(date -u +%Y-%m-%dT%H:%M:%SZ) tag=${TAG:-<empty>} pane=${PANE:-<none>}"
+# Same left-to-right redirection trap as click_log: `wc -c <"$f" 2>/dev/null`
+# reports an unopenable $f on the stderr it has at that moment, which is still
+# the terminal. The group redirection is what actually silences it.
+if [ "$( { wc -c <"$STATUSLINE_CLICK_LOG"; } 2>/dev/null || echo 0)" -gt 131072 ]; then
+  { tail -n 500 "$STATUSLINE_CLICK_LOG" >"$STATUSLINE_CLICK_LOG.tmp" \
+      && mv "$STATUSLINE_CLICK_LOG.tmp" "$STATUSLINE_CLICK_LOG"; } 2>/dev/null || true
 fi
 
 # The pane's own environment does NOT reach us: run-shell runs in the tmux
@@ -124,14 +141,12 @@ try_openers() {
   for cmd in "$@"; do
     # shellcheck disable=SC2086 # deliberate: entries carry their own arguments
     if command -v ${cmd%% *} >/dev/null 2>&1; then
-      printf '%s   open_url url=%s via=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$url" "$cmd" \
-        >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+      click_log "$(date -u +%Y-%m-%dT%H:%M:%SZ)   open_url url=$url via=$cmd"
       eval "$cmd \"\$url\"" >/dev/null 2>&1
       return 0
     fi
   done
-  printf '%s   open_url url=%s NO OPENER (tried: %s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$url" "$*" \
-    >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+  click_log "$(date -u +%Y-%m-%dT%H:%M:%SZ)   open_url url=$url NO OPENER (tried: $*)"
   note "statusline: no way to open a browser here (tried: $*)"
   return 1
 }
@@ -168,8 +183,7 @@ open_url() {
   if automation_chrome_running; then
     # Correctness over tidiness: a new tab in the RIGHT browser beats a reused
     # tab in one the user cannot see. `open` both routes and raises.
-    printf '%s   open_url url=%s via=launchservices (automation chrome up)\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$url" >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+    click_log "$(date -u +%Y-%m-%dT%H:%M:%SZ)   open_url url=$url via=launchservices (automation chrome up)"
     open "$url" >/dev/null 2>&1
     return
   fi
@@ -221,9 +235,7 @@ end run
 AS
 )"
   local rc=$?
-  printf '%s   open_url url=%s rc=%s verdict=%s\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$url" "$rc" "${verdict//$'\n'/ }" \
-    >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+  click_log "$(date -u +%Y-%m-%dT%H:%M:%SZ)   open_url url=$url rc=$rc verdict=${verdict//$'\n'/ }"
 
   # RAISING CHROME IS A SEPARATE STEP, and it is not optional.
   #
