@@ -95,11 +95,74 @@ automation_chrome_running() {
   pgrep -f 'Google Chrome\.app/Contents/MacOS/Google Chrome.*--user-data-dir=' >/dev/null 2>&1
 }
 
+# Which platform's opener applies. STATUSLINE_CLICK_PLATFORM overrides it so the
+# suite can exercise every branch from one machine — without that seam the Linux
+# and Windows paths would only ever be checked by a user on those systems, which
+# is exactly how they came to be broken in the first place.
+click_platform() {
+  if [ -n "${STATUSLINE_CLICK_PLATFORM:-}" ]; then echo "$STATUSLINE_CLICK_PLATFORM"; return; fi
+  case "$(uname -s)" in
+    Darwin) echo macos ;;
+    # WSL reports Linux but has no working xdg-open by default and CAN reach the
+    # Windows shell, so it is its own case — same split install.sh makes.
+    Linux) if grep -qi microsoft /proc/version 2>/dev/null; then echo wsl; else echo linux; fi ;;
+    MINGW*|MSYS*|CYGWIN*) echo windows ;;
+    *) echo unknown ;;
+  esac
+}
+
+# Run the first opener that exists, and SAY SO when none does.
+#
+# The silence is the point. `open` does not exist on Linux, and with stderr
+# discarded a dashboard click there was a no-op that logged nothing and showed
+# nothing — the same failure shape as the automation-browser bug, and for the
+# same reason: a browser-opening path that cannot report its own failure. Every
+# branch here ends in either a launched browser or a message in the pane.
+try_openers() {
+  local url="$1"; shift
+  local cmd
+  for cmd in "$@"; do
+    # shellcheck disable=SC2086 # deliberate: entries carry their own arguments
+    if command -v ${cmd%% *} >/dev/null 2>&1; then
+      printf '%s   open_url url=%s via=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$url" "$cmd" \
+        >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+      eval "$cmd \"\$url\"" >/dev/null 2>&1
+      return 0
+    fi
+  done
+  printf '%s   open_url url=%s NO OPENER (tried: %s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$url" "$*" \
+    >>"$STATUSLINE_CLICK_LOG" 2>/dev/null || true
+  note "statusline: no way to open a browser here (tried: $*)"
+  return 1
+}
+
 open_url() {
   local url="$1" prefix="${2:-$1}"
+  local platform; platform="$(click_platform)"
   # Test seam: the suites (and a human checking a mapping) need to see WHICH url
   # a tag resolves to without a browser window appearing on someone's screen.
-  if [ -n "${STATUSLINE_CLICK_DRYRUN:-}" ]; then echo "would open: $url (reuse prefix: $prefix)"; return; fi
+  if [ -n "${STATUSLINE_CLICK_DRYRUN:-}" ]; then
+    echo "would open: $url (reuse prefix: $prefix) [$platform]"; return
+  fi
+
+  case "$platform" in
+    macos) ;;  # falls through to the Chrome/AppleScript path below
+    linux)
+      # No scripting bridge to Chrome here, so no tab reuse — a new tab is the
+      # honest ceiling rather than a silent miss.
+      try_openers "$url" xdg-open 'gio open' sensible-browser x-www-browser firefox; return ;;
+    wsl)
+      # wslview (wslu) hands the URL to the Windows default browser; cmd.exe is
+      # the fallback every WSL install has. The empty "" is the window TITLE
+      # argument start consumes — without it the URL becomes the title and
+      # nothing opens.
+      try_openers "$url" wslview 'cmd.exe /c start ""' 'powershell.exe -NoProfile Start-Process'; return ;;
+    windows)
+      try_openers "$url" 'cmd /c start ""' 'powershell -NoProfile Start-Process' start; return ;;
+    *)
+      note "statusline: unknown platform '$(uname -s)' — cannot open $url"; return ;;
+  esac
+
   if [ ! -d "/Applications/Google Chrome.app" ]; then open "$url" >/dev/null 2>&1; return; fi
 
   if automation_chrome_running; then
@@ -266,3 +329,10 @@ case "$TAG" in
   ''|window|pane|session) : ;;   # not one of ours — the binding handles these
   *) note "statusline: unmapped field '$TAG'" ;;
 esac
+
+# ALWAYS exit 0. tmux renders a failing `run-shell` in a view the user then has
+# to dismiss with ESC, so a click that could not find a browser would interrupt
+# the session it was meant to serve — punishing the user for a missing xdg-open.
+# Everything above reports its own failure through note()/the log, which is the
+# channel that belongs to this feature; the exit status belongs to tmux.
+exit 0

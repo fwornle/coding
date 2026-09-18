@@ -77,6 +77,44 @@ test('when an automation browser is up the click goes through LaunchServices, no
   assert.match(branch, /return/, 'the guarded branch must return before reaching the AppleScript');
 });
 
+// ---- platform reach -------------------------------------------------------
+// The tmux binding is NOT platform-gated, so this script runs wherever the
+// status line does. It used to call `open` on every platform: on Linux that is
+// not a command, stderr was discarded, and a dashboard click was a silent
+// no-op — the same failure shape as the automation-browser bug, from the same
+// cause (a browser-opening path that cannot report its own failure).
+
+const dryRun = (platform) => spawnSync(CLICK, ['health', ''], {
+  env: { ...process.env, STATUSLINE_CLICK_DRYRUN: '1', STATUSLINE_CLICK_PLATFORM: platform, CODING_REPO: REPO },
+  encoding: 'utf-8',
+}).stdout.trim();
+
+for (const platform of ['macos', 'linux', 'wsl', 'windows']) {
+  test(`the ${platform} branch resolves a url and names its platform`, () => {
+    assert.match(dryRun(platform), new RegExp(`^would open: http://localhost:3032/ .*\\[${platform}\\]$`));
+  });
+}
+
+test('a platform with no usable opener SAYS so rather than doing nothing', () => {
+  // Driven through the windows branch on any non-Windows CI box: none of
+  // cmd/powershell/start exist, which is precisely the "no opener" case.
+  const log = path.join(REPO, '.logs', `statusline-click-test-${process.pid}.log`);
+  try {
+    const r = spawnSync(CLICK, ['health', ''], {
+      env: { ...process.env, STATUSLINE_CLICK_PLATFORM: 'windows', CODING_REPO: REPO, STATUSLINE_CLICK_LOG: log },
+      encoding: 'utf-8',
+    });
+    assert.equal(r.status, 0, 'a missing opener must not fail the click handler');
+    assert.match(fs.readFileSync(log, 'utf8'), /NO OPENER \(tried: /);
+  } finally {
+    fs.rmSync(log, { force: true });
+  }
+});
+
+test('every platform branch is covered — an unknown one is reported, not ignored', () => {
+  assert.match(src, /note "statusline: unknown platform/);
+});
+
 test('the script still parses', () => {
   assert.equal(spawnSync('bash', ['-n', CLICK]).status, 0);
 });
