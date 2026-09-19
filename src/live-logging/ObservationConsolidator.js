@@ -1318,6 +1318,10 @@ export class ObservationConsolidator {
       };
       const entity = legacyDigestToEntity(row, this._runId, now);
       const digestMintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
+      // Anchor UP into the hierarchy. `derivedFrom` below points DOWN at the
+      // observations; without this edge nothing points at the Digest and it is
+      // structurally stranded. Same export-debounce envelope as the rest.
+      await this._anchorToProject(digestMintedId, row.project, 'contains');
       // ORPHAN-DIG-01 (Phase 59 D-02) — emit one `derivedFrom` edge per
       // observation_id referenced by this Digest, in the SAME try-block as
       // putEntity. The km-core JSON exporter's 5s debounce captures
@@ -2643,6 +2647,49 @@ export class ObservationConsolidator {
    * @param {boolean} [options.planOnly=false]    stop after grouping, no LLM
    * @returns {Promise<Object>} counts + per-group plan
    */
+  /**
+   * Attach `entityId` to its Project with one structural edge.
+   *
+   * THE INVARIANT: every knowledge row must carry at least one STRUCTURAL edge
+   * (`contains` / `parent-child` / `has_insight` / `includes`). Provenance
+   * edges do not count — `capturedBy` and `mentions` are 89% of this graph's
+   * edges and are hidden by default in the viewer precisely because they make
+   * the canvas unreadable, so a row whose only edges are provenance renders as
+   * a floating dot: connected in the data, stranded on screen.
+   *
+   * Digests were the worst case — 140 of 148 had no structural edge at all,
+   * only `derivedFrom` pointing DOWN at their observations. Nothing pointed at
+   * them, which is also why Digest-sourced roll-up parents had nothing to
+   * inherit.
+   *
+   * Returns true if an edge was written, false if it already existed or the
+   * project could not be resolved. Never throws — an anchor failure must not
+   * lose the row it was anchoring.
+   */
+  async _anchorToProject(entityId, projectName, type = 'contains') {
+    if (!entityId || !projectName) return false;
+    try {
+      const projects = await this._kmStore.findByOntologyClass('Project');
+      const proj = projects.find(
+        (p) => (p.name || '').toLowerCase() === String(projectName).toLowerCase(),
+      );
+      if (!proj) return false;
+      // addRelation is NOT idempotent on (from, to, type) — Shared Pattern A.
+      const existing = await this._kmStore.findRelations({ from: proj.id, to: entityId, type });
+      if (Array.isArray(existing) && existing.length > 0) return false;
+      await this._kmStore.addRelation({
+        from: proj.id,
+        to: entityId,
+        type,
+        metadata: { source: 'project-anchor', confidence: 1.0, addedAt: new Date().toISOString() },
+      });
+      return true;
+    } catch (err) {
+      process.stderr.write(`[Consolidator] project anchor ${projectName} -> ${entityId} failed (non-fatal): ${err.message}\n`);
+      return false;
+    }
+  }
+
   async rollUpInsights({
     project = 'coding',
     // Which ontology class to collapse. Defaults to 'Insight' — the original
