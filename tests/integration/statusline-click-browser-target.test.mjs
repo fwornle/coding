@@ -240,6 +240,33 @@ test('every platform branch is covered — an unknown one is reported, not ignor
   assert.match(src, /note "statusline: unknown platform/);
 });
 
+// ---- click feedback ------------------------------------------------------
+// tmux has no hover event (its mouse-key list has no MouseMove), so a field
+// cannot light up under the pointer. Naming the destination in the pane on
+// click is the affordance that IS available — and it doubles as delivery
+// confirmation, which this feature has needed twice: a click that opened a page
+// in an invisible browser, and a click on a platform with no `open`, were both
+// indistinguishable from a click that never registered.
+
+test('every page-opening field announces where it is going', () => {
+  const body = src.slice(src.indexOf('case "$TAG" in'));
+  const opens = [...body.matchAll(/^\s{2}(\w[\w:*]*)\)\s+open_/gm)].map((m) => m[1]);
+  assert.ok(opens.length >= 5, `expected the dashboard tags, found ${opens.join(',')}`);
+  for (const tag of opens) {
+    const line = body.split('\n').find((l) => l.trim().startsWith(`${tag})`));
+    assert.match(line, /open_named "/, `${tag} opens a page without naming it`);
+  }
+});
+
+test('the popups deliberately do NOT announce — the popup is the feedback', () => {
+  const body = src.slice(src.indexOf('case "$TAG" in'));
+  for (const tag of ['net', 'semantic', 'ctx']) {
+    const line = body.split('\n').find((l) => l.trim().startsWith(`${tag})`));
+    assert.ok(line, `${tag} branch missing`);
+    assert.doesNotMatch(line, /open_named/);
+  }
+});
+
 test('the script still parses', () => {
   assert.equal(spawnSync('bash', ['-n', CLICK]).status, 0);
 });
