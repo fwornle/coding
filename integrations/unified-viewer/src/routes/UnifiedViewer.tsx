@@ -35,7 +35,7 @@ import { D3GraphCanvas } from '@/graph/D3GraphCanvas'
 import { useGraphData, RELATIONS_KEY } from '@/graph/useGraphData'
 import { useVisibleEntityIds } from '@/graph/useVisibleEntityIds'
 import { useQuery } from '@tanstack/react-query'
-import { deriveLevel } from '@/graph/graph-builder'
+import { isEntityVisible } from '@/graph/visibility-predicate'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useViewerStore } from '@/store/viewer-store'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
@@ -278,65 +278,51 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   const selectedLayers = useViewerStore((s) => s.selectedLayers)
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
   const hideArchived = useViewerStore((s) => s.hideArchived)
+  // Needed so the footer count applies the SAME rules as the canvas — the
+  // hand-rolled reduce this replaced never read these three, so the count
+  // silently ignored the LSL session filter, the Observation/Digest debug
+  // shield and the hidden-node-type set.
+  const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
+  const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
+  const hiddenNodeTypes = useViewerStore((s) => s.hiddenNodeTypes)
+  // Footer count — "Showing N of M nodes". Delegates to isEntityVisible, the
+  // SAME predicate D3GraphCanvas.visibleEntities uses, plus the canvas's
+  // hiddenNodeTypes guard, so the number under the graph describes the graph.
+  //
+  // This used to be a hand-rolled reduce re-implementing every rule inline,
+  // and it had drifted from the predicate in five ways — each one a bug the
+  // user saw as "the count doesn't match what I'm looking at":
+  //   1. Observation/Digest were hidden unconditionally, ignoring the
+  //      showDebugEntityTypes shield.
+  //   2. The Teams filter was applied to structural backbone nodes
+  //      (System/Project/Component), which the predicate deliberately exempts.
+  //   3. Learning Source used a bare `source ∈ {auto,online}` test instead of
+  //      learningSourceOf(), mis-filing the ~138 entities that carry no source.
+  //   4. Layer used an inline Insight/Pattern→pattern rule instead of
+  //      deriveLayer(), so L2 inference never applied.
+  //   5. The LSL session filter was not applied at all.
+  // Collapsing onto the predicate fixes all five; the displayed number changes
+  // accordingly, and that change is the fix, not a regression.
   const visibleCount = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    return entities.reduce((n, e) => {
-      // [Raw] placeholders are not real knowledge — match D3 viewer's hide.
-      if (typeof e.name === 'string' && e.name.startsWith('[Raw]')) return n
-      // Observations + Digests are raw stream items — hide from the count
-      // since the D3 viewer hides them too.
-      const etype = (e as unknown as { entityType?: string }).entityType
-      if (etype === 'Observation' || etype === 'Digest') return n
-      const meta = (e.metadata as { team?: string; source?: string; layer?: string; doc?: boolean; archivedAt?: string | null } | undefined) ?? {}
-      // Archived (roll-up condensed view). NOTE: this whole reduce is a
-      // hand-rolled duplicate of isEntityVisible() — the canvas filters via
-      // the predicate, this counter re-implements the same rules inline, and
-      // the two drift. That is why adding hideArchived to the predicate alone
-      // left the footer reading "1745 of 2136" while the canvas had correctly
-      // dropped 681 nodes. Keeping the duplicate in sync here; collapsing this
-      // onto isEntityVisible is the real fix and wants its own change.
-      if (hideArchived && typeof meta.archivedAt === 'string' && meta.archivedAt) return n
-      // Teams
-      if (selectedTeams.size > 0) {
-        if (selectedTeams.has('__none__')) return n
-        const team = meta.team ?? 'coding'
-        if (!selectedTeams.has(team)) return n
-      }
-      // LearningSource (structural backbone exempt — same as graph-builder)
-      if (learningSource && learningSource !== 'combined') {
-        const ocls = e.ontologyClass
-        const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
-        if (!isStructural) {
-          const isAuto = meta.source === 'auto' || meta.source === 'online'
-          if (learningSource === 'online' && !isAuto) return n
-          if (learningSource === 'batch' && isAuto) return n
-        }
-      }
-      // Layer
-      if (selectedLayers.includes('__none__')) return n
-      if (selectedLayers.length > 0) {
-        const layer = meta.layer ?? (e as unknown as { layer?: string }).layer
-        const inferred = layer
-          ?? (e.ontologyClass === 'Insight' || e.ontologyClass === 'Pattern' ? 'pattern' : 'evidence')
-        if (!selectedLayers.includes(inferred)) return n
-      }
-      // Doc-nodes
-      if (hideDocNodes) {
-        const isDoc = meta.doc === true || e.ontologyClass === 'Documentation'
-        if (isDoc) return n
-      }
-      // Class + Level + Search
-      const level = e.level ?? deriveLevel(e.ontologyClass)
-      const levelOk = level !== undefined && visibleLevels.has(level)
-      const classOk =
-        typeof e.ontologyClass === 'string' && selectedClasses.has(e.ontologyClass)
-      const searchOk =
-        q.length === 0 ||
-        e.name.toLowerCase().includes(q) ||
-        (typeof e.description === 'string' && e.description.toLowerCase().includes(q))
-      return n + (levelOk && classOk && searchOk ? 1 : 0)
-    }, 0)
-  }, [entities, searchQuery, visibleLevels, selectedClasses, learningSource, selectedTeams, selectedLayers, hideDocNodes, hideArchived])
+    const filters = {
+      searchQueryLowered: q,
+      selectedTeams,
+      learningSource,
+      selectedLayers,
+      hideDocNodes,
+      hideArchived,
+      selectedClasses,
+      visibleLevels,
+      lslFilterEntityIds,
+      showDebugEntityTypes,
+    }
+    return entities.reduce(
+      (n, e) =>
+        n + (isEntityVisible(e, filters) && !hiddenNodeTypes.has(e.ontologyClass) ? 1 : 0),
+      0,
+    )
+  }, [entities, searchQuery, visibleLevels, selectedClasses, learningSource, selectedTeams, selectedLayers, hideDocNodes, hideArchived, lslFilterEntityIds, showDebugEntityTypes, hiddenNodeTypes])
 
   const canvas = (() => {
     if (isLoading) return <InitialLoadingState system={system} />
