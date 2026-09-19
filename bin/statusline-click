@@ -309,12 +309,32 @@ remote_web_url() {
     -e 's#\.git$##'
 }
 
+# Open a page AND say which one, in the pane.
+#
+# tmux has no hover event — its mouse-key list (MouseDown/Up/Drag/Wheel/Click)
+# has no MouseMove at all — so a field cannot light up under the pointer to
+# advertise that it is clickable. This is the affordance that is actually
+# available: the first time someone clicks a field, even by accident, the pane
+# says what it just did, and clickability is discovered from there.
+#
+# It doubles as delivery confirmation, which this feature has badly needed. A
+# click that opened a page in a browser the user could not see, or on a platform
+# with no `open`, was indistinguishable from a click that never registered —
+# twice over. A named message is the difference between "nothing happened" and
+# "it went somewhere I did not expect".
+#
+# Popups need none of this: the popup IS the feedback, immediately and on top.
+open_named() {
+  note "→ $1"
+  open_url "$2" "${3:-$2}"
+}
+
 case "$TAG" in
-  health)      open_url "$DASHBOARD/" "$DASHBOARD" ;;
-  lsl)         open_url "$DASHBOARD/sessions" "$DASHBOARD" ;;
-  obs)         open_url "$DASHBOARD/observations" "$DASHBOARD" ;;
-  ukb)         open_url "$DASHBOARD/performance" "$DASHBOARD" ;;
-  constraints) open_url "$CONSTRAINTS/" "$CONSTRAINTS" ;;
+  health)      open_named "System Health dashboard" "$DASHBOARD/" "$DASHBOARD" ;;
+  lsl)         open_named "Sessions (live session logs)" "$DASHBOARD/sessions" "$DASHBOARD" ;;
+  obs)         open_named "Observations" "$DASHBOARD/observations" "$DASHBOARD" ;;
+  ukb)         open_named "Performance (UKB)" "$DASHBOARD/performance" "$DASHBOARD" ;;
+  constraints) open_named "Constraints dashboard" "$CONSTRAINTS/" "$CONSTRAINTS" ;;
 
   p:*)
     name="${TAG#p:}"
@@ -328,7 +348,7 @@ case "$TAG" in
       note "statusline: $path has no 'origin' remote"
       exit 0
     fi
-    open_url "$url" "$url"
+    open_named "$name — $url" "$url" "$url"
     ;;
 
   net)      popup "Network and LLM routing" "CODING_REPO='$CODING_REPO' node '$CODING_REPO/scripts/statusline-click-report.mjs' net" ;;

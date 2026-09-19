@@ -29,6 +29,16 @@ import { fileURLToPath } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const install = fs.readFileSync(path.join(REPO, 'install.sh'), 'utf8');
 
+// This function runs on macOS and nowhere else — the guard is the first line of
+// its body and is itself asserted below. Its macOS BRANCH is still worth driving
+// on Linux (that is how the guard gets proven from the other side), but not on
+// Windows, where Git Bash's `ln -s` copies instead of linking: the symlink
+// assertions would be testing MSYS emulation rather than the installer. Skipped
+// with a reason, never silently.
+const NEEDS_SYMLINKS = process.platform === 'win32'
+  ? { skip: 'Git Bash `ln -s` copies rather than links; the macOS branch is covered on ubuntu + macOS' }
+  : {};
+
 /** The function under test, lifted out of install.sh so the rest never runs. */
 const FN = (() => {
   const m = install.match(/^pin_gsd_browser_bundle_split\(\) \{[\s\S]*?^\}$/m);
@@ -60,10 +70,18 @@ function runPin({ platform, withPlaywright, presetPath }) {
     env: { ...process.env, HOME: home, PLATFORM: platform }, encoding: 'utf-8',
   });
   const link = path.join(home, '.gsd-browser/chromium.app');
+  // lstat first: Git Bash's `ln -s` produces a copy rather than a link, so
+  // readlink on it throws EINVAL and every case died on the plumbing instead of
+  // reporting what it was actually checking.
+  let symlink = null;
+  try {
+    if (fs.lstatSync(link).isSymbolicLink()) symlink = fs.readlinkSync(link);
+    else symlink = '<present but not a symlink>';
+  } catch { /* absent — stays null */ }
   return {
     home, res,
     config: fs.existsSync(cfg) ? fs.readFileSync(cfg, 'utf8') : null,
-    symlink: fs.existsSync(link) ? fs.readlinkSync(link) : null,
+    symlink,
     warnings: Number((res.stdout.match(/WARNCOUNT=(\d+)/) || [])[1] ?? -1),
   };
 }
@@ -75,13 +93,13 @@ test('on Linux it does nothing at all — there is no Apple Event routing to def
   assert.equal(r.warnings, 0, 'warned on Linux, where there is nothing to warn about');
 });
 
-test('on macOS it pins [browser] path to Chrome for Testing', () => {
+test('on macOS it pins [browser] path to Chrome for Testing', NEEDS_SYMLINKS, () => {
   const r = runPin({ platform: 'macos', withPlaywright: true, presetPath: false });
   assert.match(r.config ?? '', /^\[browser\]$/m);
   assert.match(r.config ?? '', /^path = ".*chromium\.app\/Contents\/MacOS\/Google Chrome for Testing"$/m);
 });
 
-test('the symlink targets the .app, never the binary inside it', () => {
+test('the symlink targets the .app, never the binary inside it', NEEDS_SYMLINKS, () => {
   // Chrome resolves ../Frameworks from argv[0]'s directory: a symlink straight
   // to the executable makes it die with a dlopen error for its own framework.
   const r = runPin({ platform: 'macos', withPlaywright: true, presetPath: false });
@@ -97,7 +115,7 @@ test("a path the user already chose is never overwritten", () => {
   assert.equal(r.symlink, null, 'touched the symlink despite a user-chosen path');
 });
 
-test('re-running appends nothing — one path line, always', () => {
+test('re-running appends nothing — one path line, always', NEEDS_SYMLINKS, () => {
   const r = runPin({ platform: 'macos', withPlaywright: true, presetPath: false });
   const again = spawnSync('bash', ['-c',
     ['warning(){ :; }; info(){ :; }; success(){ :; }', 'INSTALLATION_WARNINGS=()', FN,

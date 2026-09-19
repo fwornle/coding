@@ -65,10 +65,13 @@ async function hookSays(state) {
 test('a stalled pipeline turns the line amber, with the age that makes it actionable', async () => {
   const line = await hookSays({
     ...HEALTHY_BASE,
-    knowledge_pipeline: { status: 'stalled', obsAgeMs: 31 * 3600_000 },
+    knowledge_pipeline: { status: 'stalled', obsAgeMs: 31 * 3600_000, activeStallMs: 7 * 3600_000 },
   });
   assert.match(line, /^⚠️ System Health:/);
-  assert.match(line, /observations stalled \(31h\)/);
+  // ACTIVE hours, not the 31h wall-clock age: the wall-clock number counts the
+  // nights and weekends inside the window and tells the operator nothing.
+  assert.match(line, /observations stalled \(7h of active work unrecorded\)/);
+  assert.doesNotMatch(line, /31h/);
 });
 
 test('a stall with no age still reports, without an empty bracket', async () => {

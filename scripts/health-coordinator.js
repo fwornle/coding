@@ -635,7 +635,25 @@ function ingestSignal(signal) {
 //   'disabled'     — obs_api reachable but no rows in any table yet
 const OBS_API_URL = process.env.OBS_API_URL || 'http://localhost:12436';
 const OBS_FRESH_MS = 15 * 60 * 1000;     // 15 min — counts as fresh
-const OBS_STALL_MS = 6 * 60 * 60 * 1000; // 6 h — considered stalled
+const OBS_STALL_MS = 6 * 60 * 60 * 1000; // 6 h of ACTIVE time — considered stalled
+
+// The stall clock counts time the user was WORKING, not wall-clock time.
+//
+// An idle machine and a dead pipeline look identical from the outside: no
+// observations either way. Measured against wall-clock, every overnight gap
+// crosses a 6h threshold, so the health line went amber every morning — and a
+// line that is amber every morning is one nobody reads on the day it is right.
+// That is not hypothetical either: the wall-clock version shipped on
+// 2026-09-18 and cried wolf on its first night.
+//
+// userActiveNow() (above) is the discriminator already used to gate every
+// deferrable background LLM call: coding-session freshness AND human HID
+// presence. Six hours of THAT with nothing written means the pipeline is dead,
+// which is exactly what the 2026-09-16 outage looked like — the user coded all
+// day while nothing was recorded — and is exactly what a night is not.
+let _obsStallAnchor = null;   // the lastObservationAt this clock is measured against
+let _obsActiveStallMs = 0;    // active time accumulated since that observation
+let _obsStallPolledAt = 0;    // previous poll, to measure real elapsed time
 
 // obs_api auto-heal — restart when unreachable for 2+ consecutive probes (~10s).
 // Simpler than the proxy FSM: no sliding window, just a consecutive-failure gate
@@ -994,15 +1012,32 @@ async function pollKnowledgePipeline() {
   const digAge = ageMs(body.lastDigestAt);
   const insAge = ageMs(body.lastInsightAt);
 
+  // Advance (or reset) the active-time stall clock before deciding anything.
+  // A new observation resets it outright; otherwise only time the user was
+  // actually working counts. Elapsed is measured between polls rather than
+  // assumed to be TICK_MS, so a slow or delayed tick cannot inflate it.
+  const sinceLastPoll = _obsStallPolledAt ? Math.max(0, now - _obsStallPolledAt) : 0;
+  _obsStallPolledAt = now;
+  if (body.lastObservationAt !== _obsStallAnchor) {
+    _obsStallAnchor = body.lastObservationAt;
+    _obsActiveStallMs = 0;
+  } else if (currentState.user_active === true) {
+    _obsActiveStallMs += sinceLastPoll;
+  }
+
   let status;
   if (body.totalObs === 0 && body.totalDigests === 0 && body.totalInsights === 0) {
     status = 'disabled';
   } else if (obsAge === null) {
     // No observation rows yet — treat as stale, not stalled.
     status = 'stale';
-  } else if (obsAge > OBS_STALL_MS) {
+  } else if (_obsActiveStallMs > OBS_STALL_MS) {
+    // Six hours of the user actually working, with nothing written.
     status = 'stalled';
   } else if (obsAge > OBS_FRESH_MS) {
+    // Wall-clock, deliberately: 'stale' only means "nothing recent", which is
+    // what the [📚] badge wants to show. It is not an alarm, so it does not
+    // need to tell idle from dead.
     status = 'stale';
   } else {
     status = 'healthy';
@@ -1014,6 +1049,9 @@ async function pollKnowledgePipeline() {
     lastDigestAt: body.lastDigestAt,
     lastInsightAt: body.lastInsightAt,
     obsAgeMs: obsAge,
+    // Wall-clock age is for display; THIS is what the 'stalled' verdict is made
+    // of, and what any consumer should quote when reporting one.
+    activeStallMs: _obsActiveStallMs,
     digAgeMs: digAge,
     insAgeMs: insAge,
     totals: {
