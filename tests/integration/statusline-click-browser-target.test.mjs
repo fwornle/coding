@@ -85,9 +85,18 @@ test('when an automation browser is up the click goes through LaunchServices, no
 // no-op — the same failure shape as the automation-browser bug, from the same
 // cause (a browser-opening path that cannot report its own failure).
 
-const dryRun = (platform) => spawnSync(CLICK, ['health', ''], {
-  env: { ...process.env, STATUSLINE_CLICK_DRYRUN: '1', STATUSLINE_CLICK_PLATFORM: platform, CODING_REPO: REPO },
-  encoding: 'utf-8',
+// ALWAYS through `bash <script>`, never by executing the script directly.
+// Windows cannot exec a shebang, so spawnSync(CLICK) there returns a failed
+// child whose stdout is undefined — which surfaced as
+// "Cannot read properties of undefined (reading 'trim')" on the windows runner
+// rather than as anything resembling the real assertion.
+const IS_WINDOWS = process.platform === 'win32';
+const runClick = (args, env) => spawnSync('bash', [CLICK, ...args], {
+  env: { ...process.env, CODING_REPO: REPO, ...env }, encoding: 'utf-8',
+});
+
+const dryRun = (platform) => runClick(['health', ''], {
+  STATUSLINE_CLICK_DRYRUN: '1', STATUSLINE_CLICK_PLATFORM: platform,
 }).stdout.trim();
 
 for (const platform of ['macos', 'linux', 'wsl', 'windows']) {
@@ -127,7 +136,8 @@ function runWithStubs(platform, stubs) {
     fs.writeFileSync(f, `#!/bin/sh\nprintf '%s|%s\\n' ${JSON.stringify(name)} "$*" >> ${JSON.stringify(rec)}\n`);
     fs.chmodSync(f, 0o755);
   }
-  const r = spawnSync(CLICK, ['health', ''], {
+  const logPath = path.join(dir, 'click.log');
+  const r = spawnSync('bash', [CLICK, 'health', ''], {
     env: {
       ...process.env,
       // HERMETIC: this directory and nothing else. The host PATH must not leak,
@@ -139,24 +149,34 @@ function runWithStubs(platform, stubs) {
       PATH: dir,
       STATUSLINE_CLICK_PLATFORM: platform,
       CODING_REPO: REPO,
-      STATUSLINE_CLICK_LOG: path.join(dir, 'click.log'),
+      STATUSLINE_CLICK_LOG: logPath,
     },
     encoding: 'utf-8',
   });
   const called = fs.existsSync(rec) ? fs.readFileSync(rec, 'utf8').trim() : '';
+  const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : '';
   fs.rmSync(dir, { recursive: true, force: true });
-  return { called, status: r.status };
+  return { called, log, status: r.status };
 }
 
 const URL_RE = /http:\/\/localhost:3032\//;
 
-test('linux hands the url to xdg-open', () => {
+// A hermetic PATH cannot be built under Git Bash: its utilities are .exe with
+// DLL dependencies and symlinks need privilege, so the directory would be
+// missing the tools the script shells out to. Skipped LOUDLY rather than
+// quietly weakened — every assertion below still runs on ubuntu and macOS,
+// which is where the Linux and WSL dispatch they cover actually matters.
+const HERMETIC = IS_WINDOWS
+  ? { skip: 'hermetic PATH is not constructible under Git Bash; covered on ubuntu + macOS' }
+  : {};
+
+test('linux hands the url to xdg-open', HERMETIC, () => {
   const { called } = runWithStubs('linux', ['xdg-open']);
   assert.match(called, /^xdg-open\|/);
   assert.match(called, URL_RE);
 });
 
-test('linux falls through xdg-open → gio → firefox, in order', () => {
+test('linux falls through xdg-open → gio → firefox, in order', HERMETIC, () => {
   // `gio` takes a subcommand, so this also checks the multi-word entry expands
   // to `gio open <url>` rather than `gio <url>`.
   const gio = runWithStubs('linux', ['gio', 'firefox']);
@@ -165,13 +185,13 @@ test('linux falls through xdg-open → gio → firefox, in order', () => {
   assert.match(ff.called, /^firefox\|http:\/\/localhost:3032\//);
 });
 
-test('xdg-open wins when several openers are installed', () => {
+test('xdg-open wins when several openers are installed', HERMETIC, () => {
   const { called } = runWithStubs('linux', ['xdg-open', 'gio', 'firefox']);
   assert.equal(called.split('\n').length, 1, 'more than one opener ran');
   assert.match(called, /^xdg-open\|/);
 });
 
-test('wsl prefers wslview, and its cmd.exe fallback keeps the empty title argument', () => {
+test('wsl prefers wslview, and its cmd.exe fallback keeps the empty title argument', HERMETIC, () => {
   const v = runWithStubs('wsl', ['wslview']);
   assert.match(v.called, /^wslview\|http:\/\/localhost:3032\//);
 
@@ -183,25 +203,19 @@ test('wsl prefers wslview, and its cmd.exe fallback keeps the empty title argume
     'cmd.exe fallback lost the empty title argument');
 });
 
-test('windows uses start with the same empty title argument', () => {
+test('windows uses start with the same empty title argument', HERMETIC, () => {
   const { called } = runWithStubs('windows', ['cmd']);
   assert.match(called, /^cmd\|\/c start\s+http:\/\/localhost:3032\//);
 });
 
-test('a platform with no usable opener SAYS so rather than doing nothing', () => {
-  // Driven through the windows branch on any non-Windows CI box: none of
-  // cmd/powershell/start exist, which is precisely the "no opener" case.
-  const log = path.join(REPO, '.logs', `statusline-click-test-${process.pid}.log`);
-  try {
-    const r = spawnSync(CLICK, ['health', ''], {
-      env: { ...process.env, STATUSLINE_CLICK_PLATFORM: 'windows', CODING_REPO: REPO, STATUSLINE_CLICK_LOG: log },
-      encoding: 'utf-8',
-    });
-    assert.equal(r.status, 0, 'a missing opener must not fail the click handler');
-    assert.match(fs.readFileSync(log, 'utf8'), /NO OPENER \(tried: /);
-  } finally {
-    fs.rmSync(log, { force: true });
-  }
+test('a platform with no usable opener SAYS so rather than doing nothing', HERMETIC, () => {
+  // Hermetic, with ZERO stubs declared — the only way to be certain nothing is
+  // reachable. Asserting this by driving the windows branch on a non-Windows
+  // box was wrong: GitHub's macOS runner ships `powershell`, so it selected
+  // that and the no-opener path was never exercised there.
+  const { log, status } = runWithStubs('windows', []);
+  assert.equal(status, 0, 'a missing opener must not fail the click handler');
+  assert.match(log, /NO OPENER \(tried: /);
 });
 
 test('an unwritable log leaks nothing to stderr', () => {
@@ -212,15 +226,10 @@ test('an unwritable log leaks nothing to stderr', () => {
   // run-shell output in a view the user must dismiss — so the debugging aid
   // became the interruption it exists to prevent.
   // /dev/null/... can never be created, on any platform and as any user.
-  const r = spawnSync(CLICK, ['health', ''], {
-    env: {
-      ...process.env,
-      STATUSLINE_CLICK_DRYRUN: '1',
-      STATUSLINE_CLICK_PLATFORM: 'linux',
-      CODING_REPO: REPO,
-      STATUSLINE_CLICK_LOG: '/dev/null/nope/click.log',
-    },
-    encoding: 'utf-8',
+  const r = runClick(['health', ''], {
+    STATUSLINE_CLICK_DRYRUN: '1',
+    STATUSLINE_CLICK_PLATFORM: 'linux',
+    STATUSLINE_CLICK_LOG: '/dev/null/nope/click.log',
   });
   assert.equal(r.stderr, '', `leaked to stderr: ${r.stderr}`);
   assert.equal(r.status, 0);
