@@ -2789,7 +2789,33 @@ export class ObservationConsolidator {
     }
 
     // ── 3. Synthesize one parent per group, archive the children ──────────
-    let rolledUp = 0; let archived = 0;
+    //
+    // Structural edges get MIRRORED from the children onto the new parent.
+    // Without this a roll-up parent is born an orphan: the children keep their
+    // `contains` / `parent-child` / `has_insight` anchors but are archived, so
+    // the moment the condensed view is on, the canvas shows a summary node
+    // attached to nothing and the subsystem it summarises loses its link to it.
+    //
+    // This is why the orphan count climbed as the corpus was rolled up (14 ->
+    // 59 on the coding graph). Parents written earlier in the day DID have
+    // edges, but only because the background MentionsClassifier and the
+    // consolidator's has_insight pass had since run over them — luck and
+    // timing, not design, which is also why the count drifted back down on its
+    // own. An aggregate that is not attached where its members were is not an
+    // aggregation, it is a second pile.
+    const STRUCTURAL_EDGE_TYPES = new Set(['contains', 'parent-child', 'has_insight']);
+    const inboundByTo = new Map();
+    if (!dryRun) {
+      // One O(E) sweep up front — findRelations scans every edge per call, so
+      // probing per child would be O(E x children x groups).
+      for (const r of await kmStore.findRelations({})) {
+        if (!STRUCTURAL_EDGE_TYPES.has(r.type)) continue;
+        if (!inboundByTo.has(r.to)) inboundByTo.set(r.to, []);
+        inboundByTo.get(r.to).push(r);
+      }
+    }
+
+    let rolledUp = 0; let archived = 0; let anchored = 0;
     for (const g of groups) {
       const members = g.ids.map((id) => byId.get(id));
       const block = members
@@ -2852,6 +2878,51 @@ export class ObservationConsolidator {
       if (g.bucket !== 'Unbucketed') parentEntity.entityType = g.bucket;
       const parentId = await kmStore.putEntity(parentEntity, { skipOntologyCheck: true });
 
+      // Mirror the children's structural anchors onto the parent, deduped on
+      // (from, type): 25 children of one subsystem typically share a handful
+      // of parents, so this is a few edges, not 25.
+      const childIdSet = new Set(members.map((e) => e.id));
+      const anchors = new Map();
+      for (const child of members) {
+        for (const r of inboundByTo.get(child.id) ?? []) {
+          if (childIdSet.has(r.from)) continue; // never anchor to a sibling
+          anchors.set(`${r.from}|${r.type}`, { from: r.from, type: r.type });
+        }
+      }
+      if (anchors.size === 0) {
+        // Digest-sourced parents land here: digests were never linked into the
+        // hierarchy, so there is nothing to inherit. Fall back to the project
+        // anchor every written insight gets, rather than minting an orphan.
+        try {
+          const projects = await kmStore.findByOntologyClass('Project');
+          const proj = projects.find(
+            (x) => (x.name || '').toLowerCase() === String(project).toLowerCase(),
+          );
+          if (proj) anchors.set(`${proj.id}|has_insight`, { from: proj.id, type: 'has_insight' });
+        } catch (err) {
+          process.stderr.write(`[RollUp] project-anchor lookup failed: ${err.message}\n`);
+        }
+      }
+      for (const a of anchors.values()) {
+        try {
+          // addRelation is NOT idempotent on (from, to, type) — Shared Pattern
+          // A. The parent id is freshly minted so this can only match on a
+          // retry, but the probe is what lets the backfill reuse this shape.
+          const existing = await kmStore.findRelations({ from: a.from, to: parentId, type: a.type });
+          if (Array.isArray(existing) && existing.length > 0) continue;
+          await kmStore.addRelation({
+            from: a.from,
+            to: parentId,
+            type: a.type,
+            metadata: { source: 'insight-rollup', rollUpBucket: g.bucket, mirroredFromChildren: true },
+          });
+          anchored++;
+        } catch (err) {
+          process.stderr.write(`[RollUp] anchor ${a.type} -> parent failed: ${err.message}\n`);
+        }
+      }
+      process.stderr.write(`[RollUp] anchored parent with ${anchors.size} structural edge(s)\n`);
+
       for (const e of members) {
         try {
           await kmStore.mergeAttributes(e.id, {
@@ -2870,7 +2941,7 @@ export class ObservationConsolidator {
     }
 
     return {
-      project, sourceClass, groups: groups.length, rolledUp, archived, dryRun, plan,
+      project, sourceClass, groups: groups.length, rolledUp, archived, anchored, dryRun, plan,
       buckets: Object.fromEntries([...buckets].map(([k, v]) => [k, v.length])),
       projectedCorpus: live.length - archived + rolledUp,
     };

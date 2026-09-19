@@ -131,8 +131,19 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
   // test, transient store-init race) must still cause the exclusion to
   // fire — the safer default for a security-shaped shield.
   if (filters.showDebugEntityTypes !== true) {
-    const etype = (e as unknown as { entityType?: string }).entityType
-    if (etype === 'Observation' || etype === 'Digest') return false
+    // Check BOTH fields. The classifier may relabel a raw row's ontologyClass
+    // to 'Detail' while entityType stays 'Observation' — that is why this used
+    // to read entityType only. Roll-up parents are the mirror image: a Digest
+    // roll-up parent carries ontologyClass 'Digest' but entityType is the
+    // subsystem bucket ('LiveLoggingSystem'), so an entityType-only shield let
+    // 8 of them onto a canvas where every actual Digest is hidden — visible
+    // summaries of invisible rows, and orphans besides, since digests carry no
+    // structural edges for the parent to inherit. Either field naming a raw
+    // stream type is enough to shield it.
+    const raw = e as unknown as { entityType?: string; ontologyClass?: string }
+    for (const field of [raw.entityType, raw.ontologyClass]) {
+      if (field === 'Observation' || field === 'Digest') return false
+    }
   }
 
   const meta = (e.metadata as {
