@@ -2645,6 +2645,13 @@ export class ObservationConsolidator {
    */
   async rollUpInsights({
     project = 'coding',
+    // Which ontology class to collapse. Defaults to 'Insight' — the original
+    // and only behaviour until now. 'Detail' and 'Digest' are the other two
+    // populations big enough to make the graph unreadable (448 and 134 live
+    // rows against 920 insights on the coding corpus), and neither had any
+    // aggregation path at all. The parent is written back into the SAME class
+    // so a roll-up never migrates rows between typed views.
+    sourceClass = 'Insight',
     dryRun = true,
     minGroupSize = 3,
     maxGroupSize = 25,
@@ -2658,7 +2665,7 @@ export class ObservationConsolidator {
     }
     const kmStore = this._kmStore;
 
-    const entities = await kmStore.findByOntologyClass('Insight');
+    const entities = await kmStore.findByOntologyClass(sourceClass);
     const live = entities.filter((e) => {
       const m = e.metadata ?? {};
       if ((m.project ?? 'unknown') !== project) return false;
@@ -2668,9 +2675,11 @@ export class ObservationConsolidator {
       return true;
     });
 
-    process.stderr.write(`[RollUp] ${live.length} live insight(s) in project=${project}\n`);
+    process.stderr.write(
+      `[RollUp] ${live.length} live ${sourceClass} row(s) in project=${project}\n`
+    );
     if (live.length < minGroupSize) {
-      return { project, groups: 0, rolledUp: 0, archived: 0, dryRun, buckets: {} };
+      return { project, sourceClass, groups: 0, rolledUp: 0, archived: 0, dryRun, buckets: {} };
     }
 
     // ── 1. Bucket by subsystem ────────────────────────────────────────────
@@ -2772,7 +2781,7 @@ export class ObservationConsolidator {
 
     if (planOnly || groups.length === 0) {
       return {
-        project, groups: groups.length, rolledUp: 0, archived: 0, dryRun, plan,
+        project, sourceClass, groups: groups.length, rolledUp: 0, archived: 0, dryRun, plan,
         buckets: Object.fromEntries([...buckets].map(([k, v]) => [k, v.length])),
         wouldArchive: groups.reduce((n, g) => n + g.ids.length, 0),
         projectedCorpus: live.length - groups.reduce((n, g) => n + g.ids.length - 1, 0),
@@ -2834,10 +2843,13 @@ export class ObservationConsolidator {
       // parent you cannot read is worse than no roll-up. Keep ontologyClass
       // 'Insight' so the parent stays discoverable, and carry the subsystem on
       // entityType so the graph still clusters by it. The OR-gate matches both.
-      if (g.bucket !== 'Unbucketed') {
-        parentEntity.entityType = g.bucket;
-        parentEntity.ontologyClass = 'Insight';
-      }
+      // A roll-up parent stays in its SOURCE class: collapsing 25 Details
+      // must not mint an Insight, or the roll-up quietly rewrites what the
+      // corpus claims to know. Set unconditionally — the 'Unbucketed' branch
+      // used to leave the mapper's default in place, which was only correct
+      // while the source class was always 'Insight'.
+      parentEntity.ontologyClass = sourceClass;
+      if (g.bucket !== 'Unbucketed') parentEntity.entityType = g.bucket;
       const parentId = await kmStore.putEntity(parentEntity, { skipOntologyCheck: true });
 
       for (const e of members) {
@@ -2858,7 +2870,7 @@ export class ObservationConsolidator {
     }
 
     return {
-      project, groups: groups.length, rolledUp, archived, dryRun, plan,
+      project, sourceClass, groups: groups.length, rolledUp, archived, dryRun, plan,
       buckets: Object.fromEntries([...buckets].map(([k, v]) => [k, v.length])),
       projectedCorpus: live.length - archived + rolledUp,
     };

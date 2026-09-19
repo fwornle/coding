@@ -10,6 +10,11 @@
  *   node scripts/rollup-insights.mjs --apply      # write parents + archive children
  *   node scripts/rollup-insights.mjs --strategy=bucket --chunk-size=25
  *   node scripts/rollup-insights.mjs --project=rec --min-group-size=4
+ *   node scripts/rollup-insights.mjs --source-class=Detail --project=unknown
+ *
+ * --source-class (default Insight) picks which population to collapse. Detail
+ * and Digest rows carry no `project`, so they need --project=unknown: the
+ * candidate filter reads `metadata.project ?? 'unknown'`.
  *
  * Strategies:
  *   cluster (default) — collapse only lexically near-duplicate insights. Safe;
@@ -61,6 +66,7 @@ try {
       ...(args.strategy ? { strategy: String(args.strategy) } : {}),
       ...(args['chunk-size'] ? { chunkSize: Number(args['chunk-size']) } : {}),
       ...(args['max-groups'] ? { maxGroups: Number(args['max-groups']) } : {}),
+      ...(args['source-class'] ? { sourceClass: String(args['source-class']) } : {}),
       ...(args['min-group-size'] ? { minGroupSize: Number(args['min-group-size']) } : {}),
       ...(args['max-group-size'] ? { maxGroupSize: Number(args['max-group-size']) } : {}),
     }),

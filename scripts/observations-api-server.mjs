@@ -671,6 +671,7 @@ function runRollUp(options = {}) {
       await consolidator.init();
       const result = await consolidator.rollUpInsights({
         project: options.project || 'coding',
+        ...(options.sourceClass ? { sourceClass: String(options.sourceClass) } : {}),
         dryRun: options.dryRun !== false,
         planOnly: !!options.planOnly,
         ...(options.strategy ? { strategy: String(options.strategy) } : {}),
@@ -2116,7 +2117,7 @@ app.post('/api/insights/compact', (req, res) => {
 
 /**
  * POST /api/insights/rollup — hierarchical roll-up.
- * Body: { project?, dryRun?, planOnly?, minGroupSize?, maxGroupSize? }
+ * Body: { project?, sourceClass?, dryRun?, planOnly?, minGroupSize?, maxGroupSize? }
  * Defaults to dryRun:true. Refuses while consolidation or compaction is in
  * flight — all three write Insight rows.
  */
