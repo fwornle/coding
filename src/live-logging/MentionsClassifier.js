@@ -336,6 +336,60 @@ function deriveDescription(e) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Hard ceiling on catalog entries per request. 400 x (name + 120 chars of
+ * description) lands around 40KB — comfortably under the size that produced
+ * ECONNRESET at 103KB, with headroom for the summary itself.
+ */
+const MAX_CANDIDATES = Number(process.env.MENTIONS_MAX_CANDIDATES) > 0
+  ? Number(process.env.MENTIONS_MAX_CANDIDATES)
+  : 400;
+
+/** Per-candidate description budget (chars). */
+const DESC_BUDGET = 120;
+
+/** Tokens too generic to signal a real mention. */
+const RANK_STOP = new Set([
+  'the', 'and', 'for', 'with', 'from', 'into', 'this', 'that', 'system',
+  'service', 'config', 'file', 'data', 'code', 'coding', 'project', 'pipeline',
+]);
+
+function rankTokens(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 4 && !RANK_STOP.has(t))
+  );
+}
+
+/**
+ * Order candidates by how plausibly the summary mentions them, best first.
+ *
+ * Score = number of distinct name tokens that appear in the summary, with a
+ * smaller weight for description tokens (a description match is weak evidence
+ * — many entities share vocabulary). Stable: equal scores keep catalog order,
+ * so a given (summary, catalog) always yields the same prompt.
+ *
+ * @param {string} summary
+ * @param {Array<{name:string, description:string}>} candidates
+ * @returns {Array<object>} same objects, reordered
+ */
+export function rankCandidatesByRelevance(summary, candidates) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  const hay = rankTokens(summary);
+  if (hay.size === 0) return [...list];
+  return list
+    .map((c, i) => {
+      let score = 0;
+      for (const t of rankTokens(c && c.name)) if (hay.has(t)) score += 10;
+      for (const t of rankTokens(c && c.description)) if (hay.has(t)) score += 1;
+      return { c, i, score };
+    })
+    .sort((a, b) => (b.score - a.score) || (a.i - b.i))
+    .map((x) => x.c);
+}
+
+/**
  * Build the proxy request body. Two-part system message per D-02.1:
  *   (a) ontology hint — frames candidates by layer (Component /
  *       SubComponent / Detail), so the LLM knows the L1+L2+L3 vertical
@@ -356,11 +410,38 @@ export function buildMentionsPrompt(insightSummary, candidates) {
   const safeSummary = typeof insightSummary === 'string' ? insightSummary : String(insightSummary ?? '');
   const list = Array.isArray(candidates) ? candidates : [];
 
-  const catalog = list
+  // Relevance-ranked cap. The catalog is UNBOUNDED by construction — it is the
+  // whole L1+L2+L3 vertical, and the docblock above still says "645
+  // candidates ... ~10K tokens" from Phase 58. The graph has since grown to
+  // 19 Components + 315 SubComponents + 707 Details = 1041, which renders a
+  // ~103KB body that the proxy drops mid-flight:
+  //
+  //   mentions classify failed: fetch failed — ECONNRESET: read ECONNRESET
+  //     (endpoint=.../api/complete, payload=103KB, timeout=60000ms)
+  //
+  // Because _pushInsightToKG fail-fasts on a classifier error, the Insight is
+  // never written, its digest stays uncovered, and the next consolidation
+  // re-synthesizes it — 105 failures across 45 insights, forever.
+  //
+  // A blind head(N) would drop candidates arbitrarily. Rank by lexical overlap
+  // with the summary first: a genuine mention nearly always shares a token
+  // with the entity name, so the entities actually worth picking survive the
+  // cut and only implausible ones are dropped. Ties keep catalog order, so the
+  // selection is deterministic for a given (summary, catalog).
+  const ranked = rankCandidatesByRelevance(safeSummary, list);
+  const kept = ranked.slice(0, MAX_CANDIDATES);
+  if (ranked.length > kept.length) {
+    process.stderr.write(
+      `[MentionsClassifier] candidate catalog capped: ${ranked.length} -> ${kept.length} `
+      + `(MAX_CANDIDATES=${MAX_CANDIDATES}); dropped the lowest-relevance entries\n`
+    );
+  }
+
+  const catalog = kept
     .map((c) => {
       const name = (c && typeof c.name === 'string') ? c.name : '';
       const desc = (c && typeof c.description === 'string') ? c.description : '';
-      return `- ${name}: ${desc.slice(0, 120)}`;
+      return `- ${name}: ${desc.slice(0, DESC_BUDGET)}`;
     })
     .join('\n');
 
