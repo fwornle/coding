@@ -270,3 +270,45 @@ describe('isEntityVisible — hiddenNodeTypes (legend click-to-toggle)', () => {
     expect(isEntityVisible(node, f())).toBe(true)
   })
 })
+
+describe('isEntityVisible — aggregatesOnly (the roll-up layer alone)', () => {
+  // Roll-up parents carry ontologyClass 'Insight' like any other insight, so
+  // no class/level/team filter can isolate them. metadata.rollUpOf is the only
+  // thing that distinguishes an aggregate from a row nobody has rolled up.
+  const f = (o: Partial<VisibilityFilters> = {}) => baseFilters({ aggregatesOnly: true, ...o })
+  const parent = { id: 'p1', name: 'KnowledgeManagement — consolidated', ontologyClass: 'Insight',
+    metadata: { rollUpOf: ['c1', 'c2', 'c3'] } } as unknown as Entity
+  const plain = { id: 'i1', name: 'An ordinary insight', ontologyClass: 'Insight',
+    metadata: {} } as unknown as Entity
+
+  it('keeps a roll-up parent', () => {
+    expect(isEntityVisible(parent, f())).toBe(true)
+  })
+
+  it('hides an insight that was never rolled up', () => {
+    expect(isEntityVisible(plain, f())).toBe(false)
+  })
+
+  it('keeps the structural backbone so parents hang off the architecture', () => {
+    for (const cls of ['System', 'Project', 'Component']) {
+      const node = { id: `s-${cls}`, name: cls, ontologyClass: cls, metadata: {} } as unknown as Entity
+      expect(isEntityVisible(node, f({ selectedClasses: new Set([cls]) }))).toBe(true)
+    }
+  })
+
+  it('hides SubComponent — it is scaffolding, not an aggregate', () => {
+    const sub = { id: 'sc1', name: 'LoggingModule', ontologyClass: 'SubComponent',
+      metadata: {} } as unknown as Entity
+    expect(isEntityVisible(sub, f({ selectedClasses: new Set(['SubComponent']) }))).toBe(false)
+  })
+
+  it('an empty rollUpOf is not an aggregate', () => {
+    const empty = { id: 'e1', name: 'x', ontologyClass: 'Insight',
+      metadata: { rollUpOf: [] } } as unknown as Entity
+    expect(isEntityVisible(empty, f())).toBe(false)
+  })
+
+  it('OFF changes nothing — a plain insight stays visible', () => {
+    expect(isEntityVisible(plain, baseFilters())).toBe(true)
+  })
+})

@@ -53,6 +53,24 @@ export interface VisibilityFilters {
    */
   hiddenNodeTypes?: ReadonlySet<string>
   /**
+   * Aggregates-only view: render ONLY roll-up parents plus the structural
+   * backbone (System/Project/Component).
+   *
+   * The roll-up folds ~25 granular rows into one subsystem-level parent, but
+   * the parent is written with `ontologyClass: 'Insight'` — deliberately, see
+   * repair-rollup-parent-class.mjs: setting it to the subsystem made the
+   * parent match neither the typed view nor the class filter and it vanished
+   * from the Insights page entirely. The consequence is that no class, level
+   * or team filter can separate "the 64 aggregates" from "the 219 rows nobody
+   * has rolled up yet" — the aggregation layer exists in the data and is
+   * unaddressable from the UI, which is why a corpus condensed 678 -> 40 still
+   * renders as a hairball.
+   *
+   * Parents are identifiable by `metadata.rollUpOf` (their child id list).
+   * This flag is the filter over that field.
+   */
+  aggregatesOnly?: boolean
+  /**
    * Phase 60 Plan 01 (G1): ontology registry (subset shape — `name` +
    * extends-chain `parent`) consumed by `deriveLayer` for L2 inference.
    * Optional so existing call sites compile until the registry is threaded
@@ -123,7 +141,20 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
     layer?: string
     doc?: boolean
     archivedAt?: string | null
+    rollUpOf?: unknown
   } | undefined) ?? {}
+
+  // Aggregates-only — structural backbone exempt so the parents hang off the
+  // architecture instead of floating. Everything else must BE a roll-up
+  // parent: a non-empty `metadata.rollUpOf`.
+  if (filters.aggregatesOnly === true) {
+    const ocls = e.ontologyClass
+    const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
+    if (!isStructural) {
+      const rollUpOf = (meta as { rollUpOf?: unknown }).rollUpOf
+      if (!Array.isArray(rollUpOf) || rollUpOf.length === 0) return false
+    }
+  }
 
   // Teams predicate — structural backbone (System/Project/Component) exempt.
   if (filters.selectedTeams.size > 0) {

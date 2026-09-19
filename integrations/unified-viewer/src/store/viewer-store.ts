@@ -310,6 +310,12 @@ export interface ViewerState {
    * the box in Filters -> Graph Toggles to see the full corpus again.
    */
   hideArchived: boolean
+  /**
+   * Aggregates-only view — render only roll-up parents + the architecture
+   * backbone. The condensed corpus still carries every row the roll-up never
+   * reached; this is the switch that shows the aggregation layer ALONE.
+   */
+  aggregatesOnly: boolean
   // Phase 60 Plan 03 (G3) — D-09..D-11: when true, the visibility predicate
   // skips the Observation/Digest hard-exclusion branch so operators can debug
   // those types. Default false (architecture-bleed shield ON). Non-persistent
@@ -349,6 +355,7 @@ export interface ViewerState {
   setSelectedOntologyClasses: (classes: string[]) => void
   toggleHideDocNodes: () => void
   toggleHideArchived: () => void
+  toggleAggregatesOnly: () => void
   // Phase 60 Plan 03 (G3) — D-09..D-11: flips showDebugEntityTypes.
   toggleShowDebugEntityTypes: () => void
 
@@ -915,6 +922,9 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   // ON by default — see the field doc above. A roll-up that leaves both parent
   // and children on the canvas reads as "nothing happened".
   hideArchived: true,
+  // OFF by default: an operator who has not run a roll-up would otherwise get
+  // an almost-empty canvas with no explanation.
+  aggregatesOnly: false,
   // Phase 60 Plan 03 (G3) — D-11: NOT persisted (no localStorage). Resets every
   // page load so operators must consciously re-enable Observation/Digest debug.
   showDebugEntityTypes: false,
@@ -1043,6 +1053,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
 
   toggleHideDocNodes: () => set((s) => ({ hideDocNodes: !s.hideDocNodes })),
   toggleHideArchived: () => set((s) => ({ hideArchived: !s.hideArchived })),
+  toggleAggregatesOnly: () => set((s) => ({ aggregatesOnly: !s.aggregatesOnly })),
   // Phase 60 Plan 03 (G3) — D-09..D-11: toggle the showDebugEntityTypes flag.
   toggleShowDebugEntityTypes: () =>
     set((s) => ({ showDebugEntityTypes: !s.showDebugEntityTypes })),

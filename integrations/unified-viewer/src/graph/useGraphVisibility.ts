@@ -57,6 +57,9 @@ export function useGraphVisibility(): VisibilityPredicate {
   // Default OFF (architecture-bleed shield).
   const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
   const hiddenNodeTypes = useViewerStore((s) => s.hiddenNodeTypes)
+  // Aggregates-only: roll-up parents + architecture backbone. See the
+  // VisibilityFilters doc for why no existing filter could express this.
+  const aggregatesOnly = useViewerStore((s) => s.aggregatesOnly)
 
   return useMemo<VisibilityPredicate>(() => {
     const filters = {
@@ -71,6 +74,7 @@ export function useGraphVisibility(): VisibilityPredicate {
       lslFilterEntityIds,
       showDebugEntityTypes,
       hiddenNodeTypes,
+      aggregatesOnly,
     }
     return (e: Entity) => isEntityVisible(e, filters)
   }, [
@@ -85,5 +89,6 @@ export function useGraphVisibility(): VisibilityPredicate {
     lslFilterEntityIds,
     showDebugEntityTypes,
     hiddenNodeTypes,
+    aggregatesOnly,
   ])
 }

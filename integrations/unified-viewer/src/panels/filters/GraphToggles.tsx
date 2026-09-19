@@ -4,10 +4,13 @@
 // (showEdges), Labels (showRelationLabels), Show Clusters (showClusters) and
 // Merged Only (showMergedOnly). None were consumed by the D3GraphCanvas (edges
 // + relation labels always render; clusters/merged-only were never wired), so
-// they were pure dead UI (operator confirmed 2026-06-19). The two FUNCTIONAL
-// toggles remain: Hide Documentation (hideDocNodes — consumed by
-// useVisibleEntityIds) and Show debug entity types (showDebugEntityTypes —
-// Plan 60-03 Observation/Digest shield).
+// they were pure dead UI (operator confirmed 2026-06-19). The FUNCTIONAL
+// toggles remain: Hide Documentation (hideDocNodes), Hide archived
+// (hideArchived — the condensed roll-up view, default ON), Aggregates only
+// (aggregatesOnly — roll-up parents + backbone) and Show debug entity types
+// (showDebugEntityTypes — Plan 60-03 Observation/Digest shield). All four go
+// through useGraphVisibility, so the canvas, the footer count and the bucket
+// list cannot disagree about them.
 
 import { useViewerStore } from '@/store/viewer-store'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -26,6 +29,9 @@ export function GraphToggles() {
   // Roll-up condensed view: hide insights archived behind a subsystem parent.
   const hideArchived = useViewerStore((s) => s.hideArchived)
   const toggleHideArchived = useViewerStore((s) => s.toggleHideArchived)
+  // Aggregates-only: the roll-up layer on its own.
+  const aggregatesOnly = useViewerStore((s) => s.aggregatesOnly)
+  const toggleAggregatesOnly = useViewerStore((s) => s.toggleAggregatesOnly)
 
   return (
     <div className="space-y-1" data-testid="filter-graph-toggles-section">
@@ -78,6 +84,34 @@ export function GraphToggles() {
           data-testid="graph-toggle-hide-archived-hint"
         >
           Hides insights the roll-up pass folded into a subsystem-level parent. Leaves the condensed corpus on the canvas; archived rows stay queryable.
+        </p>
+      )}
+
+      <label
+        className="flex items-center gap-2 text-xs cursor-pointer"
+        data-testid="graph-toggle-aggregates-only"
+      >
+        <Checkbox
+          checked={aggregatesOnly}
+          onCheckedChange={() => {
+            toggleAggregatesOnly()
+            Logger.info(
+              Logger.Categories.FILTERS,
+              `GraphToggles: aggregatesOnly → ${!aggregatesOnly}`,
+            )
+          }}
+          aria-label="Aggregates only (roll-up parents)"
+        />
+        Aggregates only (roll-up parents)
+      </label>
+      {aggregatesOnly && (
+        <p
+          className="text-[10px] ml-6 leading-tight italic text-muted-foreground"
+          data-testid="graph-toggle-aggregates-only-hint"
+        >
+          Shows only subsystem-level roll-up parents plus the Project/Component
+          backbone. Rows the roll-up has not reached yet are hidden — if this
+          view looks sparse, that is the corpus telling you what is aggregated.
         </p>
       )}
 
