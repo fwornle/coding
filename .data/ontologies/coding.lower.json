@@ -75,6 +75,90 @@
       "parent": "SubComponent",
       "description": "Enhanced Transcript Monitor — launchd-managed com.coding.etm daemon under LiveLoggingSystem that watches transcripts and emits observations",
       "relationships": {}
+    },
+    "BenchmarkHarness": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "kgbench / graphify-vs-grep code-retrieval benchmarking: run lifecycle, arms, agents, models, token attribution and reporting",
+      "relationships": {}
+    },
+    "AgentIntegration": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "Coding-agent integration seams — claude, copilot, opencode and pi launchers, headless invocation, model catalogues and per-agent capture",
+      "relationships": {}
+    },
+    "ExperimentFramework": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "A/B and cross-agent experiment runner — avenues, variants, KB-injection cells, judging, scoring and comparison reports",
+      "relationships": {}
+    },
+    "GsdWorkflow": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "GSD planning workflow — milestones, phases, plan/execute/verify skills and the .planning artefact tree",
+      "relationships": {}
+    },
+    "HealthDashboard": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "system-health-dashboard frontend and server.js API — observations, digests, insights, coverage and token-usage views",
+      "relationships": {}
+    },
+    "StatusLine": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "tmux status line and its click handlers — field rendering, width accounting, colour ramps and browser dispatch",
+      "relationships": {}
+    },
+    "CodeGraph": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "graphify code knowledge graph — indexing, incremental rebuild, ignore logic, corpus cache and the MCP query surface",
+      "relationships": {}
+    },
+    "TokenAccounting": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "token usage capture and cost attribution across agents and providers — wire differences, cache splits and reconciliation",
+      "relationships": {}
+    },
+    "OntologyAndViewer": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "ontology layout and the unified VKB viewer — upper/lower classes, entity levels, graph rendering and history panels",
+      "relationships": {}
+    },
+    "ContinuousIntegration": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "GitHub Actions CI — cross-platform runners, workflow definitions and host-assumption failures",
+      "relationships": {}
+    },
+    "DocumentationSystem": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "MkDocs documentation, PlantUML/Mermaid diagram generation and the documentation style guide",
+      "relationships": {}
+    },
+    "InstallAndBootstrap": {
+      "extends": "Component",
+      "level": 2,
+      "parent": "Component",
+      "description": "install.sh and project bootstrap — dependency gating, agent scoping, feature resolution and first-run setup",
+      "relationships": {}
     }
   }
 }

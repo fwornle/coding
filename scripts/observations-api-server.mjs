@@ -592,6 +592,110 @@ function runConsolidation(options = {}) {
   return _consolidationPromise;
 }
 
+// ── Insight compaction runner ──────────────────────────────────────────────
+// Periodic corpus-wide compaction (cluster → MERGE / FACET / SEPARATE).
+// Runs IN-PROCESS for the same reason the consolidator and the LSL resolver
+// do: km-core's LevelDB is SINGLE-OWNER, so a standalone CLI cannot open the
+// store while obs-api holds it. scripts/compact-insights.mjs used to build
+// its own ObservationConsolidator with no kmStore and threw on every
+// invocation ("km-core not configured"), which is why the corpus has never
+// once been compacted. That script is now a thin client of this route.
+let _compactionPromise = null;
+let _compactionStartedAt = null;
+let _compactionJobCounter = 0;
+let _lastCompactionJobId = null;
+let _lastCompactionResult = null;
+let _lastCompactionError = null;
+let _lastCompactionFinishedAt = null;
+
+function runCompaction(options = {}) {
+  if (_compactionPromise) return _compactionPromise;
+
+  _compactionStartedAt = new Date().toISOString();
+  _compactionJobCounter += 1;
+  _lastCompactionJobId = _compactionJobCounter;
+
+  _compactionPromise = (async () => {
+    const kmStore = await ensureKMStore();
+    const consolidator = new ObservationConsolidator({ kmStore });
+    try {
+      await consolidator.init();
+      const result = await consolidator.compactInsights({
+        project: options.project || 'coding',
+        dryRun: options.dryRun !== false,
+        clustersOnly: !!options.clustersOnly,
+        ...(Number(options.maxClusterSize) > 0
+          ? { maxClusterSize: Number(options.maxClusterSize) }
+          : {}),
+      });
+      _lastCompactionResult = result;
+      _lastCompactionError = null;
+      return { ok: true, ...result };
+    } catch (err) {
+      _lastCompactionError = { message: err?.message || String(err) };
+      _lastCompactionResult = null;
+      throw err;
+    } finally {
+      _lastCompactionFinishedAt = new Date().toISOString();
+      try { consolidator.close(); } catch { /* best-effort */ }
+      _compactionStartedAt = null;
+      _compactionPromise = null;
+    }
+  })();
+
+  return _compactionPromise;
+}
+
+// ── Insight roll-up runner ─────────────────────────────────────────────────
+// Hierarchical abstraction: many granular Detail insights -> few
+// SubComponent-level insights, children archived (reversible), never deleted.
+// In-process for the same single-owner reason as consolidation + compaction.
+let _rollUpPromise = null;
+let _rollUpStartedAt = null;
+let _rollUpJobCounter = 0;
+let _lastRollUpJobId = null;
+let _lastRollUpResult = null;
+let _lastRollUpError = null;
+let _lastRollUpFinishedAt = null;
+
+function runRollUp(options = {}) {
+  if (_rollUpPromise) return _rollUpPromise;
+  _rollUpStartedAt = new Date().toISOString();
+  _rollUpJobCounter += 1;
+  _lastRollUpJobId = _rollUpJobCounter;
+
+  _rollUpPromise = (async () => {
+    const kmStore = await ensureKMStore();
+    const consolidator = new ObservationConsolidator({ kmStore });
+    try {
+      await consolidator.init();
+      const result = await consolidator.rollUpInsights({
+        project: options.project || 'coding',
+        dryRun: options.dryRun !== false,
+        planOnly: !!options.planOnly,
+        ...(options.strategy ? { strategy: String(options.strategy) } : {}),
+        ...(Number(options.chunkSize) > 0 ? { chunkSize: Number(options.chunkSize) } : {}),
+        ...(Number(options.maxGroups) > 0 ? { maxGroups: Number(options.maxGroups) } : {}),
+        ...(Number(options.minGroupSize) > 0 ? { minGroupSize: Number(options.minGroupSize) } : {}),
+        ...(Number(options.maxGroupSize) > 0 ? { maxGroupSize: Number(options.maxGroupSize) } : {}),
+      });
+      _lastRollUpResult = result;
+      _lastRollUpError = null;
+      return { ok: true, ...result };
+    } catch (err) {
+      _lastRollUpError = { message: err?.message || String(err) };
+      _lastRollUpResult = null;
+      throw err;
+    } finally {
+      _lastRollUpFinishedAt = new Date().toISOString();
+      try { consolidator.close(); } catch { /* best-effort */ }
+      _rollUpStartedAt = null;
+      _rollUpPromise = null;
+    }
+  })();
+  return _rollUpPromise;
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -1977,6 +2081,86 @@ app.post('/api/consolidation/run', (req, res) => {
   });
 });
 
+/**
+ * POST /api/insights/compact — corpus-wide insight compaction.
+ * Body: { project?: string, dryRun?: boolean, clustersOnly?: boolean }
+ * Defaults to dryRun:true — a caller must opt IN to writes, matching the
+ * CLI's long-standing "default = dry run" contract.
+ *
+ * Refuses while a consolidation is in flight: both passes write Insight
+ * entities, and merging insights underneath a synthesis pass would let the
+ * synthesizer re-create a row compaction just absorbed.
+ */
+app.post('/api/insights/compact', (req, res) => {
+  if (_shuttingDown) {
+    return res.status(503).json({ error: 'Server is shutting down' });
+  }
+  if (_consolidationPromise) {
+    return res.status(409).json({
+      error: 'Consolidation in flight — refusing to compact concurrently',
+      retryAfterMs: 60_000,
+    });
+  }
+  const attached = !!_compactionPromise;
+  runCompaction(req.body || {}).catch(err => {
+    process.stderr.write(`[obs-api] /insights/compact async error: ${err.message}\n`);
+  });
+  res.status(202).json({
+    success: true,
+    accepted: true,
+    attached,
+    jobId: _lastCompactionJobId,
+    startedAt: _compactionStartedAt,
+  });
+});
+
+/**
+ * POST /api/insights/rollup — hierarchical roll-up.
+ * Body: { project?, dryRun?, planOnly?, minGroupSize?, maxGroupSize? }
+ * Defaults to dryRun:true. Refuses while consolidation or compaction is in
+ * flight — all three write Insight rows.
+ */
+app.post('/api/insights/rollup', (req, res) => {
+  if (_shuttingDown) return res.status(503).json({ error: 'Server is shutting down' });
+  if (_consolidationPromise) {
+    return res.status(409).json({ error: 'Consolidation in flight — refusing to roll up concurrently' });
+  }
+  if (_compactionPromise) {
+    return res.status(409).json({ error: 'Compaction in flight — refusing to roll up concurrently' });
+  }
+  const attached = !!_rollUpPromise;
+  runRollUp(req.body || {}).catch(err => {
+    process.stderr.write(`[obs-api] /insights/rollup async error: ${err.message}\n`);
+  });
+  res.status(202).json({ success: true, accepted: true, attached, jobId: _lastRollUpJobId, startedAt: _rollUpStartedAt });
+});
+
+app.get('/api/insights/rollup/status', (_req, res) => {
+  res.json({
+    inflight: _rollUpPromise ? { jobId: _lastRollUpJobId, startedAt: _rollUpStartedAt } : null,
+    lastJob: _lastRollUpJobId === null ? null : {
+      id: _lastRollUpJobId,
+      finishedAt: _lastRollUpFinishedAt,
+      result: _lastRollUpResult,
+      error: _lastRollUpError,
+    },
+  });
+});
+
+app.get('/api/insights/compact/status', (_req, res) => {
+  res.json({
+    inflight: _compactionPromise
+      ? { jobId: _lastCompactionJobId, startedAt: _compactionStartedAt }
+      : null,
+    lastJob: _lastCompactionJobId === null ? null : {
+      id: _lastCompactionJobId,
+      finishedAt: _lastCompactionFinishedAt,
+      result: _lastCompactionResult,
+      error: _lastCompactionError,
+    },
+  });
+});
+
 app.get('/api/consolidation/status', async (_req, res) => {
   try {
     const store = await ensureKMStore();
@@ -2559,9 +2743,17 @@ kmRouter.get('/entities/:id/confidence', async (req, res) => {
 // so we preserve that ceiling.
 const TYPED_VIEW_DEFAULT_LIMIT = 50;
 const TYPED_VIEW_MAX_LIMIT = 200;
+// Insights are a curated, bounded corpus (hundreds, not thousands) and the
+// dashboard renders the FULL list client-side — it asks for limit=1000 and
+// then filters/deep-links within what it received. Clamping that request to
+// the generic 200-row typed-view cap silently truncated the page to the 200
+// highest-confidence rows, so every lower-confidence insight became
+// unreachable and its `#insight-<id>` deep link scrolled nowhere. Observations
+// (thousands of rows) keep the tighter cap.
+const INSIGHTS_MAX_LIMIT = 5000;
 
-function parseLimitOffset(req, defaultLimit = TYPED_VIEW_DEFAULT_LIMIT) {
-  const limit = Math.min(parseInt(req.query.limit) || defaultLimit, TYPED_VIEW_MAX_LIMIT);
+function parseLimitOffset(req, defaultLimit = TYPED_VIEW_DEFAULT_LIMIT, maxLimit = TYPED_VIEW_MAX_LIMIT) {
+  const limit = Math.min(parseInt(req.query.limit) || defaultLimit, maxLimit);
   const offset = Math.max(parseInt(req.query.offset) || 0, 0);
   return { limit, offset };
 }
@@ -2782,7 +2974,7 @@ app.get('/api/coding/insights', async (_req, res) => {
     }
     const req = _req;
     const { topic, q, project, includeArchived } = req.query;
-    const { limit, offset } = parseLimitOffset(req);
+    const { limit, offset } = parseLimitOffset(req, TYPED_VIEW_DEFAULT_LIMIT, INSIGHTS_MAX_LIMIT);
 
     const entities = await collectByOntologyClass('Insight');
     // For insights we also need access to the underlying metadata.archivedAt

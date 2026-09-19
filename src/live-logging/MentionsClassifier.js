@@ -191,12 +191,32 @@ async function callProxy(body) {
   // Pace through the global gate so a batch of mentions calls doesn't saturate
   // the OAuth-haiku rate limit (see MENTIONS_MIN_INTERVAL_MS).
   return _paced(async () => {
-    const resp = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
+    const payload = JSON.stringify(body);
+    let resp;
+    try {
+      resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (err) {
+      // undici collapses every socket-level failure into the bare message
+      // "fetch failed" and hides the real reason on err.cause. Callers log
+      // err.message only, so 105 consecutive failures in obs-api.log all read
+      // "fetch failed" with nothing to act on. Re-throw with the cause chain,
+      // the endpoint and the payload size folded into the message.
+      const cause = err?.cause;
+      const detail = cause
+        ? `${cause.code || cause.name || 'cause'}: ${cause.message || String(cause)}`
+        : (err?.name || 'unknown');
+      const e = new Error(
+        `${err.message} — ${detail} (endpoint=${endpoint}, `
+        + `payload=${Math.round(payload.length / 1024)}KB, timeout=${REQUEST_TIMEOUT_MS}ms)`
+      );
+      e.cause = err;
+      throw e;
+    }
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
       throw new Error(`HTTP ${resp.status} ${resp.statusText}: ${text.slice(0, 300)}`);
