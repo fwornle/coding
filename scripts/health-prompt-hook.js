@@ -178,8 +178,15 @@ function deriveSummary(state) {
     // it is derived from a lastObservationAt timestamp obs_api itself returned,
     // so reaching it proves the service answered AND had nothing recent to say.
     if (state && state.knowledge_pipeline && state.knowledge_pipeline.status === 'stalled') {
-        const ageMs = state.knowledge_pipeline.obsAgeMs;
-        const age = Number.isFinite(ageMs) ? ` (${Math.floor(ageMs / 3600000)}h)` : '';
+        // Quote ACTIVE time, not wall-clock age. The verdict is made of active
+        // time (health-coordinator.js OBS_STALL_MS), and the two diverge wildly:
+        // the first wall-clock build of this reported "stalled (12h)" after an
+        // ordinary night, which says nothing about whether anything is wrong.
+        // "6h of working with nothing written" is the fact worth acting on.
+        const activeMs = state.knowledge_pipeline.activeStallMs;
+        const age = Number.isFinite(activeMs)
+            ? ` (${Math.floor(activeMs / 3600000)}h of active work unrecorded)`
+            : '';
         issues.push(`observations stalled${age}`);
     }
     return {

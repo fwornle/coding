@@ -73,6 +73,37 @@ test("'missing' never overwrites a project the rollup already reports", () => {
   assert.match(flat, /if \(now - exp\.since > ETM_MISSING_MS\) rollup\[name\] = 'missing';/);
 });
 
+// ---- the stall clock ------------------------------------------------------
+// The first build of the 'stalled' verdict measured WALL-CLOCK age, and went
+// amber after its first ordinary night: an idle machine and a dead pipeline
+// both produce no observations, so age alone cannot tell them apart. The clock
+// now counts only time userActiveNow() says the user was working.
+
+test('the stall verdict is made of ACTIVE time, never wall-clock age', () => {
+  assert.match(flat, /if \(_obsActiveStallMs > OBS_STALL_MS\) \{/);
+  // The old test. If this comes back, every night trips the alarm again.
+  assert.doesNotMatch(flat, /else if \(obsAge > OBS_STALL_MS\)/);
+});
+
+test('the clock only advances while the user is actually working', () => {
+  assert.match(flat, /else if \(currentState\.user_active === true\) \{ _obsActiveStallMs \+= sinceLastPoll; \}/);
+});
+
+test('a new observation resets the clock outright', () => {
+  assert.match(flat, /if \(body\.lastObservationAt !== _obsStallAnchor\) \{ _obsStallAnchor = body\.lastObservationAt; _obsActiveStallMs = 0; \}/);
+});
+
+test('elapsed is measured between polls, not assumed to be one tick', () => {
+  // A delayed or slow tick must not inflate the clock toward a false alarm.
+  assert.match(flat, /const sinceLastPoll = _obsStallPolledAt \? Math\.max\(0, now - _obsStallPolledAt\) : 0;/);
+});
+
+test('the active figure is published for consumers to quote', () => {
+  // The prompt hook reports active hours; wall-clock age would include the
+  // nights inside the window and mean nothing.
+  assert.match(flat, /activeStallMs: _obsActiveStallMs,/);
+});
+
 test('a healthy project clears its own expectation', () => {
   assert.match(flat, /if \(rollup\[name\] === 'healthy'\) \{ _etmExpected\.delete\(name\); continue; \}/);
 });
