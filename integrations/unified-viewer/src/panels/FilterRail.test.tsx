@@ -96,6 +96,7 @@ describe('FilterRail', () => {
       selectedDomains: [],
       selectedOntologyClasses: [],
       hideDocNodes: false,
+    hideArchived: false,
       theme: 'light',
       filterRailCollapsed: false,
     })

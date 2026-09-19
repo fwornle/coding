@@ -25,6 +25,16 @@ export interface VisibilityFilters {
   learningSource: 'combined' | 'online' | 'batch' | string
   selectedLayers: readonly string[]
   hideDocNodes: boolean
+  /**
+   * Hide insights that the roll-up pass archived behind a subsystem-level
+   * parent (`metadata.archivedAt`). Archiving is an obs-api TYPED-VIEW
+   * concept — `/api/coding/insights` filters it — but the viewer reads
+   * `/api/v1/*`, which is km-core's generic router and knows nothing about
+   * it. So a corpus rolled up from 678 insights to 40 still renders all 678
+   * here. Default OFF: archived rows stay queryable and visible unless the
+   * operator asks for the condensed view.
+   */
+  hideArchived: boolean
   selectedClasses: ReadonlySet<string>
   visibleLevels: ReadonlySet<0 | 1 | 2 | 3>
   lslFilterEntityIds: ReadonlySet<string> | null
@@ -95,6 +105,7 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
     source?: string
     layer?: string
     doc?: boolean
+    archivedAt?: string | null
   } | undefined) ?? {}
 
   // Teams predicate — structural backbone (System/Project/Component) exempt.
@@ -135,6 +146,13 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
       filters.ontologyRegistry,
     )
     if (!filters.selectedLayers.includes(inferred)) return false
+  }
+
+  // Archived hide toggle — the roll-up's condensed view. A child archived
+  // behind a roll-up parent carries metadata.archivedAt; the parent does not,
+  // so hiding these leaves exactly the rolled-up corpus on the canvas.
+  if (filters.hideArchived === true && typeof meta.archivedAt === 'string' && meta.archivedAt) {
+    return false
   }
 
   // Doc-nodes hide toggle.

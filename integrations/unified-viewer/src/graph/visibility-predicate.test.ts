@@ -21,6 +21,7 @@ function baseFilters(overrides: Partial<VisibilityFilters> = {}): VisibilityFilt
     learningSource: 'combined',
     selectedLayers: [],
     hideDocNodes: false,
+    hideArchived: false,
     selectedClasses: new Set<string>(['Insight', 'Pattern', 'OnlineInsight', 'Component']),
     visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
     lslFilterEntityIds: null,
@@ -133,6 +134,7 @@ describe('isEntityVisible — showDebugEntityTypes gate (Phase 60-03 G3)', () =>
       learningSource: 'combined',
       selectedLayers: [],
       hideDocNodes: false,
+      hideArchived: false,
       selectedClasses: new Set<string>(['Component', 'Detail', 'Observation', 'Digest']),
       visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
       lslFilterEntityIds: null,
@@ -191,5 +193,53 @@ describe('isEntityVisible — showDebugEntityTypes gate (Phase 60-03 G3)', () =>
     expect(
       isEntityVisible(e, partial as VisibilityFilters),
     ).toBe(false)
+  })
+})
+
+describe('isEntityVisible — hideArchived gate (roll-up condensed view)', () => {
+  function f(overrides: Partial<VisibilityFilters> = {}): VisibilityFilters {
+    return {
+      searchQueryLowered: '',
+      selectedTeams: new Set<string>(),
+      learningSource: 'combined',
+      selectedLayers: [],
+      hideDocNodes: false,
+      hideArchived: false,
+      selectedClasses: new Set<string>(['Insight']),
+      visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
+      lslFilterEntityIds: null,
+      showDebugEntityTypes: false,
+      ...overrides,
+    }
+  }
+
+  function insight(archivedAt: string | null): Entity {
+    return {
+      id: `ins-${archivedAt ?? 'live'}`,
+      name: 'an insight',
+      ontologyClass: 'Insight',
+      entityType: 'Insight',
+      metadata: { archivedAt },
+    } as unknown as Entity
+  }
+
+  it('shows archived insights when the toggle is OFF (default)', () => {
+    expect(isEntityVisible(insight('2026-09-19T10:00:00Z'), f())).toBe(true)
+  })
+
+  it('hides archived insights when the toggle is ON', () => {
+    expect(
+      isEntityVisible(insight('2026-09-19T10:00:00Z'), f({ hideArchived: true })),
+    ).toBe(false)
+  })
+
+  it('keeps roll-up PARENTS visible when the toggle is ON (no archivedAt)', () => {
+    // The parent is what should remain on the canvas — this is the whole point
+    // of the condensed view.
+    expect(isEntityVisible(insight(null), f({ hideArchived: true }))).toBe(true)
+  })
+
+  it('treats an empty-string archivedAt as not archived', () => {
+    expect(isEntityVisible(insight(''), f({ hideArchived: true }))).toBe(true)
   })
 })

@@ -161,6 +161,7 @@ describe('LayerFilter', () => {
       learningSource: 'combined' as const,
       selectedLayers: [layer],
       hideDocNodes: false,
+    hideArchived: false,
       selectedClasses: new Set<string>(['Component', 'Pattern', 'OnlineInsight']),
       visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
       lslFilterEntityIds: null,

@@ -289,6 +289,7 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   const learningSource = useViewerStore((s) => s.learningSource)
   const selectedLayers = useViewerStore((s) => s.selectedLayers)
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
+  const hideArchived = useViewerStore((s) => s.hideArchived)
   // Phase 60 Plan 03 (G3 — D-09..D-11): when ON, the visibility predicate
   // skips the Observation/Digest hard-exclusion branch so those types
   // re-appear in the rendered graph. Default OFF (architecture-bleed shield).
@@ -354,12 +355,13 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
       learningSource,
       selectedLayers,
       hideDocNodes,
+      hideArchived,
       selectedClasses,
       visibleLevels,
       lslFilterEntityIds,
       showDebugEntityTypes,
     }) && !hiddenNodeTypes.has(e.ontologyClass))
-  }, [entities, selectedTeams, selectedClasses, visibleLevels, searchQuery, learningSource, selectedLayers, hideDocNodes, lslFilterEntityIds, showDebugEntityTypes, hiddenNodeTypes])
+  }, [entities, selectedTeams, selectedClasses, visibleLevels, searchQuery, learningSource, selectedLayers, hideDocNodes, hideArchived, lslFilterEntityIds, showDebugEntityTypes, hiddenNodeTypes])
 
   const visibleIds = useMemo(() => {
     const s = new Set<string>()

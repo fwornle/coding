@@ -23,6 +23,9 @@ export function GraphToggles() {
   const toggleShowDebugEntityTypes = useViewerStore(
     (s) => s.toggleShowDebugEntityTypes,
   )
+  // Roll-up condensed view: hide insights archived behind a subsystem parent.
+  const hideArchived = useViewerStore((s) => s.hideArchived)
+  const toggleHideArchived = useViewerStore((s) => s.toggleHideArchived)
 
   return (
     <div className="space-y-1" data-testid="filter-graph-toggles-section">
@@ -49,6 +52,32 @@ export function GraphToggles() {
           data-testid="graph-toggle-hide-doc-hint"
         >
           Hides green business/doc nodes (Decision, Requirement, DocumentSource, etc.)
+        </p>
+      )}
+
+      <label
+        className="flex items-center gap-2 text-xs cursor-pointer"
+        data-testid="graph-toggle-hide-archived"
+      >
+        <Checkbox
+          checked={hideArchived}
+          onCheckedChange={() => {
+            toggleHideArchived()
+            Logger.info(
+              Logger.Categories.FILTERS,
+              `GraphToggles: hideArchived → ${!hideArchived}`,
+            )
+          }}
+          aria-label="Hide archived (rolled-up)"
+        />
+        Hide archived (rolled-up)
+      </label>
+      {hideArchived && (
+        <p
+          className="text-[10px] ml-6 leading-tight italic text-muted-foreground"
+          data-testid="graph-toggle-hide-archived-hint"
+        >
+          Hides insights the roll-up pass folded into a subsystem-level parent. Leaves the condensed corpus on the canvas; archived rows stay queryable.
         </p>
       )}
 

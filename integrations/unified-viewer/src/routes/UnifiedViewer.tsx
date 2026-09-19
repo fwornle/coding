@@ -277,6 +277,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   const selectedTeams = useViewerStore((s) => s.selectedTeams)
   const selectedLayers = useViewerStore((s) => s.selectedLayers)
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
+  const hideArchived = useViewerStore((s) => s.hideArchived)
   const visibleCount = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return entities.reduce((n, e) => {
@@ -286,7 +287,15 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
       // since the D3 viewer hides them too.
       const etype = (e as unknown as { entityType?: string }).entityType
       if (etype === 'Observation' || etype === 'Digest') return n
-      const meta = (e.metadata as { team?: string; source?: string; layer?: string; doc?: boolean } | undefined) ?? {}
+      const meta = (e.metadata as { team?: string; source?: string; layer?: string; doc?: boolean; archivedAt?: string | null } | undefined) ?? {}
+      // Archived (roll-up condensed view). NOTE: this whole reduce is a
+      // hand-rolled duplicate of isEntityVisible() — the canvas filters via
+      // the predicate, this counter re-implements the same rules inline, and
+      // the two drift. That is why adding hideArchived to the predicate alone
+      // left the footer reading "1745 of 2136" while the canvas had correctly
+      // dropped 681 nodes. Keeping the duplicate in sync here; collapsing this
+      // onto isEntityVisible is the real fix and wants its own change.
+      if (hideArchived && typeof meta.archivedAt === 'string' && meta.archivedAt) return n
       // Teams
       if (selectedTeams.size > 0) {
         if (selectedTeams.has('__none__')) return n
@@ -327,7 +336,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
         (typeof e.description === 'string' && e.description.toLowerCase().includes(q))
       return n + (levelOk && classOk && searchOk ? 1 : 0)
     }, 0)
-  }, [entities, searchQuery, visibleLevels, selectedClasses, learningSource, selectedTeams, selectedLayers, hideDocNodes])
+  }, [entities, searchQuery, visibleLevels, selectedClasses, learningSource, selectedTeams, selectedLayers, hideDocNodes, hideArchived])
 
   const canvas = (() => {
     if (isLoading) return <InitialLoadingState system={system} />

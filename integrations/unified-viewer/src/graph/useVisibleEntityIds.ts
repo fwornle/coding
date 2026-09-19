@@ -48,6 +48,7 @@ export function useVisibleEntityIds(apiClient: ApiClient, system: System): Reado
   const learningSource = useViewerStore((s) => s.learningSource)
   const selectedLayers = useViewerStore((s) => s.selectedLayers)
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
+  const hideArchived = useViewerStore((s) => s.hideArchived)
   const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
   // Phase 60 Plan 03 (G3 — D-09..D-11): when ON, the predicate skips the
   // Observation/Digest hard-exclusion branch so those types re-appear in
@@ -64,6 +65,7 @@ export function useVisibleEntityIds(apiClient: ApiClient, system: System): Reado
         learningSource,
         selectedLayers,
         hideDocNodes,
+        hideArchived,
         selectedClasses,
         visibleLevels,
         lslFilterEntityIds,
@@ -82,6 +84,7 @@ export function useVisibleEntityIds(apiClient: ApiClient, system: System): Reado
     learningSource,
     selectedLayers,
     hideDocNodes,
+    hideArchived,
     lslFilterEntityIds,
     showDebugEntityTypes,
   ])
