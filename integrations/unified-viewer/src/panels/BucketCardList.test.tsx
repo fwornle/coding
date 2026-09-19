@@ -302,7 +302,9 @@ describe('BucketCardList (Plan 56.1-04 Task 1)', () => {
     expect(txt).toContain('3 items')
     expect(txt).toContain('1 visible')
     expect(txt).toContain('2 hidden by')
-    expect(txt).toContain('Show debug entity types')
+    // Copy names no single filter: the debug shield was the only reachable
+    // cause while useVisibleEntityIds ignored hiddenNodeTypes; it no longer is.
+    expect(txt).toContain('hidden by the current filters')
   })
 
   test('Gap D Test 2: no breakdown when all visible (debug toggle ON)', () => {
@@ -386,7 +388,7 @@ describe('BucketCardList (Plan 56.1-04 Task 1)', () => {
     renderPanel()
     const hint = document.querySelector('[data-testid="bucket-card-hidden-hint-e2"]')
     expect(hint).not.toBeNull()
-    expect(hint!.textContent).toMatch(/hidden — toggle Show debug entity types/)
+    expect(hint!.textContent).toMatch(/hidden by the current filters/)
   })
 
   test('Gap E Test 4: hovering a VISIBLE row shows NO hidden hint', () => {

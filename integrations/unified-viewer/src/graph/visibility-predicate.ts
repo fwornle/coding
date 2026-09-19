@@ -39,6 +39,20 @@ export interface VisibilityFilters {
   visibleLevels: ReadonlySet<0 | 1 | 2 | 3>
   lslFilterEntityIds: ReadonlySet<string> | null
   /**
+   * Legend click-to-toggle: ontologyClass names the operator switched off in
+   * the LegendPanel. Lives INSIDE the filter object on purpose.
+   *
+   * It used to be a separate `&& !hiddenNodeTypes.has(e.ontologyClass)` guard
+   * bolted onto each `isEntityVisible` call. That made it forgettable, and it
+   * was duly forgotten: `useVisibleEntityIds` omitted it, so the LSL strip and
+   * the bucket list disagreed with the canvas about every hidden type. A rule
+   * that must be remembered at each call site is a rule that will drift.
+   *
+   * Optional so a partial test filter compiles; `undefined` = nothing hidden,
+   * identical to the empty-Set default the store starts with.
+   */
+  hiddenNodeTypes?: ReadonlySet<string>
+  /**
    * Phase 60 Plan 01 (G1): ontology registry (subset shape — `name` +
    * extends-chain `parent`) consumed by `deriveLayer` for L2 inference.
    * Optional so existing call sites compile until the registry is threaded
@@ -84,6 +98,9 @@ export interface VisibilityFilters {
 export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean {
   // Hide raw-stub placeholders (LLM-failure transcript rows).
   if (typeof e.name === 'string' && e.name.startsWith('[Raw]')) return false
+
+  // Legend click-to-toggle — an ontologyClass switched off in the LegendPanel.
+  if (filters.hiddenNodeTypes && filters.hiddenNodeTypes.has(e.ontologyClass)) return false
 
   // Phase 60 Plan 03 (G3 — D-09..D-11): Hide raw stream rows
   // (Observation / Digest) UNLESS the operator has flipped the

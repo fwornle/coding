@@ -205,15 +205,20 @@ export function BucketCardList({ apiClient, system }: BucketCardListProps) {
         <p className="text-xs text-muted-foreground mt-0.5" data-testid="selected-count">
           {items.length} item{items.length === 1 ? '' : 's'}
           {/* Plan 60-08 Gap D: when the canvas filters some selected entities
-              out of the rendered set (Observation/Digest hidden by the
-              showDebugEntityTypes shield), surface the split so the operator
-              knows WHY the halo count is lower than the selected count.
-              Suppressed when nothing is hidden (no noise on the clean path). */}
+              out of the rendered set, surface the split so the operator knows
+              WHY the halo count is lower than the selected count. Suppressed
+              when nothing is hidden (no noise on the clean path).
+
+              The copy used to name "Show debug entity types" as the cause.
+              That was the only reachable cause while `useVisibleEntityIds`
+              ignored `hiddenNodeTypes` — now that it applies the same rules as
+              the canvas, a legend node-type toggle (or any other filter) puts
+              entities in this bucket too, and naming one filter would send the
+              operator to the wrong switch. */}
           {hiddenSelectedCount > 0 && (
             <>
               {' · '}{visibleSelectedCount} visible{' · '}
-              {hiddenSelectedCount} hidden by{' '}
-              <span className="font-medium">&quot;Show debug entity types&quot;</span>
+              {hiddenSelectedCount} hidden by the current filters
             </>
           )}
         </p>
@@ -265,13 +270,16 @@ export function BucketCardList({ apiClient, system }: BucketCardListProps) {
                 </div>
                 {/* Plan 60-08 Gap E: when the operator hovers a row whose entity
                     is filtered OFF the canvas, the graph can't reciprocate the
-                    pulse — tell them why instead of leaving a dead hover. */}
+                    pulse — tell them why instead of leaving a dead hover.
+                    Names no specific filter: since `useVisibleEntityIds` began
+                    applying the canvas's full rule set, a row can land here via
+                    the legend, Teams, Layer or the debug shield. */}
                 {hoveredNodeId === item.id && !visibleIds.has(item.id) && (
                   <div
                     data-testid={`bucket-card-hidden-hint-${item.id}`}
                     className="mt-1 text-[10px] text-amber-600 dark:text-amber-400"
                   >
-                    hidden — toggle Show debug entity types to reveal
+                    hidden by the current filters
                   </div>
                 )}
               </button>

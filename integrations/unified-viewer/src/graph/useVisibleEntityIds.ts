@@ -5,28 +5,32 @@
 // graph WOULD render so its `onTickClick` handler can resolve bucket
 // entities to the closest graph-visible ancestor (round-4 phantom-id fix).
 //
-// This hook computes the SAME filter the D3GraphCanvas `visibleEntities`
-// useMemo computes (D3GraphCanvas.tsx:244-337), expressed as a pure
-// predicate, and returns the result as a `ReadonlySet<string>` of ids.
-// Co-locating the predicate here lets future consumers (sidebar deep-link,
-// search-jump-to-node, etc.) reuse it without duplicating the filter
-// chain.
+// This hook returns the ids of the entities the D3 canvas renders, as a
+// `ReadonlySet<string>`. It does NOT decide visibility itself: it calls
+// `useGraphVisibility()`, the same bound predicate D3GraphCanvas filters
+// with, so "what the strip thinks is on screen" and "what is on screen"
+// are the same computation rather than two that agree by maintenance.
 //
-// Why not lift the existing memo in D3GraphCanvas verbatim:
-//   - The existing memo returns `Entity[]` (used downstream for D3 data
-//     binding). The strip only needs the Set<string> of ids.
-//   - The D3 memo's dep list has 10 inputs; sharing the array directly
-//     means dragging all those subscriptions into the strip.
-//   - The audit-locked contract (PATTERNS.md #3 viewport stability)
-//     requires `visibleEntities` to be reference-stable on identical-
-//     content writes. Splitting the predicate into a pure function lets
-//     us derive a NEW memo here without coupling reference stability
-//     across consumers — each useMemo independently preserves its own
-//     reference on identical-content writes.
+// It used to build the `VisibilityFilters` literal itself, and that copy
+// had drifted: it omitted `hiddenNodeTypes`. Switching an ontologyClass
+// off in the legend removed those nodes from the canvas while this hook
+// kept reporting them visible, so `onTickClick` resolved bucket entities
+// to ancestors that were no longer rendered — the phantom-id class of bug
+// this hook exists to prevent, reintroduced through the back door.
+//
+// Why this still returns ids rather than reusing the canvas's array:
+//   - D3GraphCanvas.visibleEntities returns `Entity[]` for D3 data binding
+//     and must stay reference-stable across identical-content writes or the
+//     force simulation restarts and the viewport jumps (PATTERNS Locked
+//     Contract #3, gates G9/G13). Sharing that array would couple this
+//     consumer's reference stability to the canvas's.
+//   - The strip only needs the id Set. Deriving it in a separate memo off
+//     the SHARED predicate gives both the same rules and each its own
+//     independent reference stability.
 //
 // Contract:
 //   useVisibleEntityIds(apiClient, system): ReadonlySet<string>
-//     - Reads the same store fields as D3GraphCanvas.visibleEntities
+//     - Visibility decided by useGraphVisibility() — identical to the canvas
 //     - Returns a Set of entity ids the D3 graph WOULD render
 //     - Reference-stable across renders with identical content (cheap to
 //       use as a dep)
@@ -35,57 +39,18 @@ import { useMemo } from 'react'
 
 import type { ApiClient } from '@/api/ApiClient'
 import type { System } from '@/config/system-endpoints'
-import { useViewerStore } from '@/store/viewer-store'
 import { useGraphData } from './useGraphData'
-import { isEntityVisible } from './visibility-predicate'
+import { useGraphVisibility } from './useGraphVisibility'
 
 export function useVisibleEntityIds(apiClient: ApiClient, system: System): ReadonlySet<string> {
   const { entities } = useGraphData(apiClient, system)
-  const selectedTeams = useViewerStore((s) => s.selectedTeams)
-  const visibleLevels = useViewerStore((s) => s.visibleLevels)
-  const selectedClasses = useViewerStore((s) => s.selectedClasses)
-  const searchQuery = useViewerStore((s) => s.searchQuery)
-  const learningSource = useViewerStore((s) => s.learningSource)
-  const selectedLayers = useViewerStore((s) => s.selectedLayers)
-  const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
-  const hideArchived = useViewerStore((s) => s.hideArchived)
-  const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
-  // Phase 60 Plan 03 (G3 — D-09..D-11): when ON, the predicate skips the
-  // Observation/Digest hard-exclusion branch so those types re-appear in
-  // the graph. Default OFF (architecture-bleed shield).
-  const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
+  const isVisible = useGraphVisibility()
 
   return useMemo<ReadonlySet<string>>(() => {
     const ids = new Set<string>()
-    const q = searchQuery.trim().toLowerCase()
     for (const e of entities) {
-      if (isEntityVisible(e, {
-        searchQueryLowered: q,
-        selectedTeams,
-        learningSource,
-        selectedLayers,
-        hideDocNodes,
-        hideArchived,
-        selectedClasses,
-        visibleLevels,
-        lslFilterEntityIds,
-        showDebugEntityTypes,
-      })) {
-        ids.add(e.id)
-      }
+      if (isVisible(e)) ids.add(e.id)
     }
     return ids
-  }, [
-    entities,
-    selectedTeams,
-    visibleLevels,
-    selectedClasses,
-    searchQuery,
-    learningSource,
-    selectedLayers,
-    hideDocNodes,
-    hideArchived,
-    lslFilterEntityIds,
-    showDebugEntityTypes,
-  ])
+  }, [entities, isVisible])
 }

@@ -61,7 +61,7 @@ import { computeAncestryPath, type AncestryPathResult } from './ancestry'
 // without forcing the strip to subscribe to all 10 store fields the
 // memo here depends on. Predicate is bit-identical to the prior inline
 // body — G1-G5 + G9-G13 source-grep gates continue to pass.
-import { isEntityVisible } from './visibility-predicate'
+import { useGraphVisibility } from './useGraphVisibility'
 // 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction): graph node
 // click reads the pre-built reverse-lookup index to populate the
 // `selectedBucketKeys` halo atomically with the node selection. The hook
@@ -280,30 +280,20 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // the SVG or restart the force simulation. See PATTERNS-LOCK.md
   // Contract #3 amendment shipped alongside this change.
   const selectionSource = useViewerStore((s) => s.selectionSource)
-  const selectedTeams = useViewerStore((s) => s.selectedTeams)
-  const visibleLevels = useViewerStore((s) => s.visibleLevels)
-  const selectedClasses = useViewerStore((s) => s.selectedClasses)
-  // 2026-06-11: full filter set — user reported text + learningSource
-  // didn't affect the D3 canvas because the predicate omitted them.
-  const searchQuery = useViewerStore((s) => s.searchQuery)
-  const learningSource = useViewerStore((s) => s.learningSource)
-  const selectedLayers = useViewerStore((s) => s.selectedLayers)
-  const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
-  const hideArchived = useViewerStore((s) => s.hideArchived)
-  // Phase 60 Plan 03 (G3 — D-09..D-11): when ON, the visibility predicate
-  // skips the Observation/Digest hard-exclusion branch so those types
-  // re-appear in the rendered graph. Default OFF (architecture-bleed shield).
-  const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
-  // Legend click-to-toggle (operator request 2026-06-19): hide an edge type /
-  // node (ontologyClass) type clicked off in the LegendPanel. Folded into the
-  // visibleEntities / visibleRelations memos below (NOT the main-effect dep
-  // list, which the G9 viewport-stability gate locks verbatim).
+  // Entity visibility — every filter the FilterRail and the LegendPanel
+  // expose, bound into one predicate by `useGraphVisibility`. The eleven
+  // store subscriptions and the VisibilityFilters literal used to sit here
+  // inline and were copied into two other consumers; see useGraphVisibility
+  // for what that cost. `isVisible` is memoised on the same eleven fields
+  // this memo used to list directly, so the recompute cadence — and with it
+  // the viewport-stability contract — is unchanged.
+  const isVisible = useGraphVisibility()
+  // Legend click-to-toggle (operator request 2026-06-19): hide an edge type
+  // clicked off in the LegendPanel. Folded into the visibleRelations memo
+  // below (NOT the main-effect dep list, which the G9 viewport-stability
+  // gate locks verbatim). The node-type half of this pair now travels
+  // inside the visibility predicate.
   const hiddenRelationTypes = useViewerStore((s) => s.hiddenRelationTypes)
-  const hiddenNodeTypes = useViewerStore((s) => s.hiddenNodeTypes)
-  // 2026-06-12: LSL timeline tick produces this — when non-null, the
-  // graph dims to only those entities (plus 1-hop neighbors so the
-  // session's anchor still shows context). null = no filter.
-  const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
 
   // 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction): pre-built
   // `nodeId → Set<bucketKey>` reverse lookup map. The graph click handler
@@ -343,25 +333,19 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // viewers honour the FilterRail consistently. Done client-side here
   // because d3's data binding wants pre-filtered arrays.
   //
-  // 2026-06-13 (Phase 56-04 round 4): the predicate body is now in
+  // 2026-06-13 (Phase 56-04 round 4): the predicate body moved to
   // `visibility-predicate.ts` so the LSL strip's `useVisibleEntityIds`
-  // hook can share it. The memo's dep list is unchanged — viewport
-  // stability contract (G9 + G13 source-grep gates) preserved verbatim.
-  const visibleEntities = useMemo<Entity[]>(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return entities.filter((e) => isEntityVisible(e, {
-      searchQueryLowered: q,
-      selectedTeams,
-      learningSource,
-      selectedLayers,
-      hideDocNodes,
-      hideArchived,
-      selectedClasses,
-      visibleLevels,
-      lslFilterEntityIds,
-      showDebugEntityTypes,
-    }) && !hiddenNodeTypes.has(e.ontologyClass))
-  }, [entities, selectedTeams, selectedClasses, visibleLevels, searchQuery, learningSource, selectedLayers, hideDocNodes, hideArchived, lslFilterEntityIds, showDebugEntityTypes, hiddenNodeTypes])
+  // hook could share it — but each consumer still assembled the filter
+  // object itself, and they drifted. The store reads and that literal now
+  // live in `useGraphVisibility`; this memo just applies the result.
+  // Dep list is equivalent by construction: `isVisible` changes exactly
+  // when one of the eleven filter fields changes, so viewport stability
+  // (G9 + G13 source-grep gates, which lock the MAIN effect's dep list)
+  // is preserved.
+  const visibleEntities = useMemo<Entity[]>(
+    () => entities.filter(isVisible),
+    [entities, isVisible],
+  )
 
   const visibleIds = useMemo(() => {
     const s = new Set<string>()

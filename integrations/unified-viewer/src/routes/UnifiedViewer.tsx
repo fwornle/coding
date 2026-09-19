@@ -35,7 +35,7 @@ import { D3GraphCanvas } from '@/graph/D3GraphCanvas'
 import { useGraphData, RELATIONS_KEY } from '@/graph/useGraphData'
 import { useVisibleEntityIds } from '@/graph/useVisibleEntityIds'
 import { useQuery } from '@tanstack/react-query'
-import { isEntityVisible } from '@/graph/visibility-predicate'
+import { useGraphVisibility } from '@/graph/useGraphVisibility'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useViewerStore } from '@/store/viewer-store'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
@@ -235,8 +235,6 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   }, [entities])
 
   const searchQuery = useViewerStore((s) => s.searchQuery)
-  const visibleLevels = useViewerStore((s) => s.visibleLevels)
-  const selectedClasses = useViewerStore((s) => s.selectedClasses)
 
   // Auto-populate selectedClasses on first load. Plan 03 checkpoint
   // round 2 flipped the filter semantic from "empty Set = all visible"
@@ -268,26 +266,9 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
     }
   }, [classOptions])
 
-  // Visible-count predicate — mirrors the FULL D3GraphCanvas filter
-  // pipeline so the Footer "Showing X of Y" actually changes when the
-  // user toggles LearningSource / Teams / Layer / HideDocNodes. The
-  // previous version only saw level/class/search, which is why every
-  // other filter looked like it had no effect.
-  const learningSource = useViewerStore((s) => s.learningSource)
-  const selectedTeams = useViewerStore((s) => s.selectedTeams)
-  const selectedLayers = useViewerStore((s) => s.selectedLayers)
-  const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
-  const hideArchived = useViewerStore((s) => s.hideArchived)
-  // Needed so the footer count applies the SAME rules as the canvas — the
-  // hand-rolled reduce this replaced never read these three, so the count
-  // silently ignored the LSL session filter, the Observation/Digest debug
-  // shield and the hidden-node-type set.
-  const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
-  const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
-  const hiddenNodeTypes = useViewerStore((s) => s.hiddenNodeTypes)
-  // Footer count — "Showing N of M nodes". Delegates to isEntityVisible, the
-  // SAME predicate D3GraphCanvas.visibleEntities uses, plus the canvas's
-  // hiddenNodeTypes guard, so the number under the graph describes the graph.
+  // Footer count — "Showing N of M nodes". Delegates to useGraphVisibility,
+  // the SAME bound predicate D3GraphCanvas filters its render set with, so the
+  // number under the graph describes the graph by construction.
   //
   // This used to be a hand-rolled reduce re-implementing every rule inline,
   // and it had drifted from the predicate in five ways — each one a bug the
@@ -296,33 +277,18 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   //      showDebugEntityTypes shield.
   //   2. The Teams filter was applied to structural backbone nodes
   //      (System/Project/Component), which the predicate deliberately exempts.
-  //   3. Learning Source used a bare `source ∈ {auto,online}` test instead of
+  //   3. Learning Source used a bare `source in {auto,online}` test instead of
   //      learningSourceOf(), mis-filing the ~138 entities that carry no source.
-  //   4. Layer used an inline Insight/Pattern→pattern rule instead of
+  //   4. Layer used an inline Insight/Pattern->pattern rule instead of
   //      deriveLayer(), so L2 inference never applied.
   //   5. The LSL session filter was not applied at all.
   // Collapsing onto the predicate fixes all five; the displayed number changes
   // accordingly, and that change is the fix, not a regression.
-  const visibleCount = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    const filters = {
-      searchQueryLowered: q,
-      selectedTeams,
-      learningSource,
-      selectedLayers,
-      hideDocNodes,
-      hideArchived,
-      selectedClasses,
-      visibleLevels,
-      lslFilterEntityIds,
-      showDebugEntityTypes,
-    }
-    return entities.reduce(
-      (n, e) =>
-        n + (isEntityVisible(e, filters) && !hiddenNodeTypes.has(e.ontologyClass) ? 1 : 0),
-      0,
-    )
-  }, [entities, searchQuery, visibleLevels, selectedClasses, learningSource, selectedTeams, selectedLayers, hideDocNodes, hideArchived, lslFilterEntityIds, showDebugEntityTypes, hiddenNodeTypes])
+  const isVisible = useGraphVisibility()
+  const visibleCount = useMemo(
+    () => entities.reduce((n, e) => n + (isVisible(e) ? 1 : 0), 0),
+    [entities, isVisible],
+  )
 
   const canvas = (() => {
     if (isLoading) return <InitialLoadingState system={system} />

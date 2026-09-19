@@ -243,3 +243,30 @@ describe('isEntityVisible — hideArchived gate (roll-up condensed view)', () =>
     expect(isEntityVisible(insight(''), f({ hideArchived: true }))).toBe(true)
   })
 })
+
+describe('isEntityVisible — hiddenNodeTypes (legend click-to-toggle)', () => {
+  // This rule used to live OUTSIDE the predicate, as a
+  // `&& !hiddenNodeTypes.has(e.ontologyClass)` tacked onto each call site.
+  // Two of the three call sites remembered it; useVisibleEntityIds did not,
+  // so the LSL strip and the bucket list resolved clicks to nodes the canvas
+  // had already removed. Folding it in makes omission impossible.
+  const f = (overrides: Partial<VisibilityFilters> = {}) => baseFilters(overrides)
+  const node = entity({ id: 'i1', name: 'An insight', ontologyClass: 'Insight' })
+
+  it('hides an entity whose ontologyClass is switched off in the legend', () => {
+    expect(isEntityVisible(node, f({ hiddenNodeTypes: new Set(['Insight']) }))).toBe(false)
+  })
+
+  it('leaves other classes visible', () => {
+    const comp = entity({ id: 'c1', name: 'A component', ontologyClass: 'Component' })
+    expect(isEntityVisible(comp, f({ hiddenNodeTypes: new Set(['Insight']) }))).toBe(true)
+  })
+
+  it('an empty set hides nothing (store default)', () => {
+    expect(isEntityVisible(node, f({ hiddenNodeTypes: new Set<string>() }))).toBe(true)
+  })
+
+  it('an omitted set hides nothing — partial filters stay backward-compatible', () => {
+    expect(isEntityVisible(node, f())).toBe(true)
+  })
+})
