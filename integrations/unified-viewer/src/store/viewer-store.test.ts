@@ -1224,3 +1224,24 @@ describe('hiddenRelationTypes default (2026-09-08)', () => {
     expect(hidden.has('capturedBy')).toBe(true)
   })
 })
+
+describe('useViewerStore — hideArchived defaults to the condensed view', () => {
+  it('starts ON so a roll-up is visible as aggregation, not addition', () => {
+    // With this OFF the canvas renders roll-up parents AND their archived
+    // children, so every roll-up pass makes the graph BIGGER (1748 -> 1775 on
+    // the coding corpus) and the operator who asked for aggregation sees the
+    // opposite. Archived rows are never deleted — the Graph Toggles checkbox
+    // brings the full corpus back.
+    expect(useViewerStore.getInitialState().hideArchived).toBe(true)
+  })
+
+  it('reset() does not clobber it back to the expanded view', () => {
+    useViewerStore.getState().toggleHideArchived()
+    expect(useViewerStore.getState().hideArchived).toBe(false)
+    useViewerStore.getState().reset()
+    // reset() is the in-system clear button; filter defaults persist across it.
+    expect(useViewerStore.getState().hideArchived).toBe(false)
+    useViewerStore.getState().toggleHideArchived()
+    expect(useViewerStore.getState().hideArchived).toBe(true)
+  })
+})

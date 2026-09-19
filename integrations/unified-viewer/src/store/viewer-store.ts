@@ -299,7 +299,16 @@ export interface ViewerState {
   selectedDomains: string[]
   selectedOntologyClasses: string[] // NEW canonical, replaces selectedClasses
   hideDocNodes: boolean
-  /** Hide roll-up-archived insights (metadata.archivedAt) — the condensed view. */
+  /**
+   * Hide roll-up-archived rows (`metadata.archivedAt`) — the condensed view.
+   *
+   * Defaults ON. The roll-up pass folds ~25 granular rows into one
+   * subsystem-level parent and archives the children; with this OFF the canvas
+   * renders parents AND children, so every roll-up makes the graph LARGER
+   * (1748 -> 1775 on the coding corpus) and the aggregation is invisible to
+   * the operator who asked for it. Archived rows are never deleted — untick
+   * the box in Filters -> Graph Toggles to see the full corpus again.
+   */
   hideArchived: boolean
   // Phase 60 Plan 03 (G3) — D-09..D-11: when true, the visibility predicate
   // skips the Observation/Digest hard-exclusion branch so operators can debug
@@ -903,7 +912,9 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selectedDomains: [],
   selectedOntologyClasses: [],
   hideDocNodes: false,
-  hideArchived: false,
+  // ON by default — see the field doc above. A roll-up that leaves both parent
+  // and children on the canvas reads as "nothing happened".
+  hideArchived: true,
   // Phase 60 Plan 03 (G3) — D-11: NOT persisted (no localStorage). Resets every
   // page load so operators must consciously re-enable Observation/Digest debug.
   showDebugEntityTypes: false,
