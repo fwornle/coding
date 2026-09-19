@@ -14,7 +14,7 @@
  *
  * const system = await createOntologySystem({
  *   enabled: true,
- *   upperOntologyPath: '.data/ontologies/upper/development-knowledge-ontology.json',
+ *   upperOntologyPath: '.data/ontologies/development-knowledge-ontology.json',
  *   team: 'RaaS',
  *   lowerOntologyPath: '.data/ontologies/lower/raas-ontology.json',
  *   validation: { mode: 'strict' },

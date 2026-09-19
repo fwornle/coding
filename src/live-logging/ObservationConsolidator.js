@@ -19,6 +19,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { ObservationSanitizer } from './ObservationSanitizer.js';
 import Redis from 'ioredis';
@@ -493,9 +494,11 @@ export class ObservationConsolidator {
   _getOntologyClasses() {
     if (this._ontologyClasses !== undefined) return this._ontologyClasses;
     this._ontologyClasses = null;
+    // Declared OUTSIDE the try so the catch below can name the file it
+    // failed on (a const inside the try is not in scope in the handler).
+    const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+    const ontPath = path.join(projectRoot, '.data/ontologies/development-knowledge-ontology.json');
     try {
-      const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
-      const ontPath = path.join(projectRoot, '.data/ontologies/upper/development-knowledge-ontology.json');
       const raw = JSON.parse(fs.readFileSync(ontPath, 'utf8'));
       const entities = raw.entities || {};
       // Drop the JSON's `_comment_*` placeholders. Build the search
@@ -513,7 +516,17 @@ export class ObservationConsolidator {
       }
       this._ontologyClasses = out;
     } catch (err) {
-      process.stderr.write(`[Consolidator] Ontology unavailable (non-fatal): ${err.message}\n`);
+      // LOUD on purpose. This used to read "non-fatal" and nothing else, so
+      // when commit 6dd8408df (2026-05-23) flattened the ontology layout and
+      // this path stopped resolving, every insight silently classified as
+      // 'Knowledge' with confidence 0 for ~4 months. A classifier that
+      // degrades to a single constant is not a working classifier — say so
+      // in terms that are greppable and name the file we could not read.
+      process.stderr.write(
+        `[Consolidator] ONTOLOGY LOAD FAILED — every insight will classify as `
+        + `'Knowledge' (confidence 0) until this is fixed. Path: ${ontPath}. `
+        + `Cause: ${err.message}\n`
+      );
     }
     return this._ontologyClasses;
   }
@@ -2602,6 +2615,318 @@ export class ObservationConsolidator {
   }
 
   /**
+   * Hierarchical roll-up: collapse many true-but-granular Detail insights into
+   * few SubComponent-level insights, archiving the originals behind them.
+   *
+   * WHY this and not deletion/compaction. Measured on the coding corpus:
+   * 536 of 678 insights verify as fresh (>=0.7 truthfulness) — they are not
+   * wrong, just too granular. So retirement bottoms out near 241 and only gets
+   * there by destroying correct knowledge, and a full compaction pass yields
+   * 19 MERGE verdicts = 29 rows = 3%. The corpus needs ABSTRACTION: three true
+   * statements about Graphify ignore logic becoming one.
+   *
+   * Children are ARCHIVED (metadata.archivedAt + rolledUpInto), never deleted.
+   * The typed-view already hides archived rows unless includeArchived=true, so
+   * the visible corpus shrinks while every original stays queryable — and the
+   * whole pass is reversible by clearing those two metadata keys.
+   *
+   * Bucketing uses the EXISTING closed subsystem vocabulary (classifyL2 over
+   * coding.lower.json) rather than a new taxonomy. Clustering runs strictly
+   * WITHIN a bucket, which is also what prevents the single-linkage chaining
+   * that produced a 172-member cross-subsystem cluster in compactInsights.
+   *
+   * @param {Object} [options]
+   * @param {string}  [options.project='coding']
+   * @param {boolean} [options.dryRun=true]       preview only, no writes
+   * @param {number}  [options.minGroupSize=3]    below this, leave insights alone
+   * @param {number}  [options.maxGroupSize=25]   above this, split rather than roll up
+   * @param {boolean} [options.planOnly=false]    stop after grouping, no LLM
+   * @returns {Promise<Object>} counts + per-group plan
+   */
+  async rollUpInsights({
+    project = 'coding',
+    dryRun = true,
+    minGroupSize = 3,
+    maxGroupSize = 25,
+    planOnly = false,
+    strategy = 'cluster',
+    chunkSize = 20,
+    maxGroups = 0,
+  } = {}) {
+    if (!this._kmStore) {
+      throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    }
+    const kmStore = this._kmStore;
+
+    const entities = await kmStore.findByOntologyClass('Insight');
+    const live = entities.filter((e) => {
+      const m = e.metadata ?? {};
+      if ((m.project ?? 'unknown') !== project) return false;
+      if (m.archivedAt) return false;       // already archived
+      if (m.rolledUpInto) return false;     // already a child of a roll-up
+      if (m.rollUpOf) return false;         // is itself a roll-up parent
+      return true;
+    });
+
+    process.stderr.write(`[RollUp] ${live.length} live insight(s) in project=${project}\n`);
+    if (live.length < minGroupSize) {
+      return { project, groups: 0, rolledUp: 0, archived: 0, dryRun, buckets: {} };
+    }
+
+    // ── 1. Bucket by subsystem ────────────────────────────────────────────
+    const { classifyL2 } = await this._loadL2Classifier();
+    const bucketOf = new Map();
+    for (const e of live) {
+      const m = e.metadata ?? {};
+      const topic = m.topic || e.name || '';
+      const summary = m.summary || e.description || '';
+      let hit = null;
+      if (classifyL2) {
+        for (const parent of ['Component', 'SubComponent', 'Detail']) {
+          hit = classifyL2(topic, summary, parent);
+          if (hit) break;
+        }
+      }
+      bucketOf.set(e.id, hit || 'Unbucketed');
+    }
+
+    const buckets = new Map();
+    for (const e of live) {
+      const b = bucketOf.get(e.id);
+      if (!buckets.has(b)) buckets.set(b, []);
+      buckets.get(b).push(e);
+    }
+    process.stderr.write(
+      `[RollUp] buckets: ${[...buckets].map(([k, v]) => `${k}=${v.length}`).join(' ')}\n`
+    );
+
+    // ── 2. Group within each bucket ───────────────────────────────────────
+    // Two strategies, because they answer different questions:
+    //
+    //   'cluster' (default, conservative) — connected components over topic
+    //     Jaccard. Only collapses insights that are LEXICALLY near-duplicate.
+    //     Measured: 678 -> 533 (21%). Safe, but it cannot reach a readable
+    //     corpus because most of a subsystem's insights are genuinely
+    //     different facts that simply belong under one heading.
+    //
+    //   'bucket' (aggressive) — ignore lexical similarity and chunk the whole
+    //     subsystem into groups of `chunkSize`, highest-confidence first, so
+    //     each chunk becomes one subsystem-level entry. This is what actually
+    //     produces a ~40-node graph; chunkSize is the dial (20 -> ~47 parents,
+    //     25 -> ~40). Use it when the goal is a corpus a human will read.
+    const groups = [];
+    if (strategy === 'bucket') {
+      for (const [bucket, members] of buckets) {
+        if (members.length < minGroupSize) continue;
+        const ordered = [...members].sort(
+          (a, b) => ((b.metadata?.confidence) || 0) - ((a.metadata?.confidence) || 0)
+        );
+        for (let i = 0; i < ordered.length; i += chunkSize) {
+          const chunk = ordered.slice(i, i + chunkSize);
+          if (chunk.length >= minGroupSize) groups.push({ bucket, ids: chunk.map((e) => e.id) });
+        }
+      }
+    } else
+    for (const [bucket, members] of buckets) {
+      const tokens = new Map(
+        members.map((e) => [e.id, this._tokeniseTopic((e.metadata?.topic) || e.name || '')])
+      );
+      const adj = new Map(members.map((e) => [e.id, new Set()]));
+      for (let i = 0; i < members.length; i++) {
+        for (let j = i + 1; j < members.length; j++) {
+          const a = members[i].id, b = members[j].id;
+          if (this._jaccard(tokens.get(a), tokens.get(b)) >= INSIGHT_TOPIC_JACCARD_FACET) {
+            adj.get(a).add(b); adj.get(b).add(a);
+          }
+        }
+      }
+      const seen = new Set();
+      for (const e of members) {
+        if (seen.has(e.id)) continue;
+        const queue = [e.id]; const comp = [];
+        while (queue.length) {
+          const cur = queue.shift();
+          if (seen.has(cur)) continue;
+          seen.add(cur); comp.push(cur);
+          for (const n of adj.get(cur) || []) if (!seen.has(n)) queue.push(n);
+        }
+        if (comp.length >= minGroupSize && comp.length <= maxGroupSize) {
+          groups.push({ bucket, ids: comp });
+        }
+      }
+    }
+
+    groups.sort((a, b) => b.ids.length - a.ids.length);
+    // Incremental roll-up: process only the N largest groups this pass. Lets a
+    // big corpus be collapsed a few subsystems at a time, reviewing as you go,
+    // instead of one irreversible-feeling 37-group run.
+    if (maxGroups > 0 && groups.length > maxGroups) groups.length = maxGroups;
+    const byId = new Map(live.map((e) => [e.id, e]));
+    process.stderr.write(`[RollUp] ${groups.length} roll-up group(s) (size ${minGroupSize}-${maxGroupSize})\n`);
+
+    const plan = groups.map((g) => ({
+      bucket: g.bucket,
+      size: g.ids.length,
+      topics: g.ids.map((id) => (byId.get(id).metadata?.topic) || byId.get(id).name),
+    }));
+
+    if (planOnly || groups.length === 0) {
+      return {
+        project, groups: groups.length, rolledUp: 0, archived: 0, dryRun, plan,
+        buckets: Object.fromEntries([...buckets].map(([k, v]) => [k, v.length])),
+        wouldArchive: groups.reduce((n, g) => n + g.ids.length, 0),
+        projectedCorpus: live.length - groups.reduce((n, g) => n + g.ids.length - 1, 0),
+      };
+    }
+
+    // ── 3. Synthesize one parent per group, archive the children ──────────
+    let rolledUp = 0; let archived = 0;
+    for (const g of groups) {
+      const members = g.ids.map((id) => byId.get(id));
+      const block = members
+        .map((e) => `### ${(e.metadata?.topic) || e.name}\n${(e.metadata?.summary) || e.description || ''}`)
+        .join('\n\n---\n\n');
+      const prompt = this._buildRollUpPrompt({ bucket: g.bucket, project, memberBlock: block, count: members.length });
+
+      let parsed = null;
+      try {
+        const resp = await this._callLLM(prompt, 'consolidator-rollup');
+        if (resp) parsed = this._parseInsights(resp, [])[0] || null;
+      } catch (err) {
+        process.stderr.write(`[RollUp] LLM failed for ${g.bucket} (${g.ids.length}): ${err.message}\n`);
+      }
+      if (!parsed || !parsed.summary) {
+        process.stderr.write(`[RollUp] skipping ${g.bucket} group — no usable synthesis\n`);
+        continue;
+      }
+
+      process.stderr.write(
+        `[RollUp] ${dryRun ? 'WOULD roll up' : 'rolled up'} ${members.length} -> "${(parsed.topic || '').slice(0, 60)}" [${g.bucket}]\n`
+      );
+      rolledUp++;
+      if (dryRun) continue;
+
+      // Parent carries the subsystem as its ontology class so the graph
+      // clusters by subsystem instead of one flat 'Insight' blob.
+      const childLegacyIds = members.map((e) => (e.metadata?.legacyId) || e.id);
+      const now = new Date().toISOString();
+      const parentRow = {
+        id: crypto.randomUUID(),
+        topic: this._redact(parsed.topic || `${g.bucket} — consolidated`),
+        summary: this._redact(parsed.summary),
+        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.8,
+        digest_ids: [...new Set(members.flatMap((e) => (e.metadata?.digest_ids) || []))],
+        last_updated: now,
+        created_at: now,
+        project,
+        metadata: {
+          rollUpOf: childLegacyIds,
+          rollUpBucket: g.bucket,
+          rollUpAt: now,
+          ontology: { ontologyName: 'coding.lower', class: g.bucket, classificationMethod: 'l2-keyword' },
+        },
+      };
+      const parentEntity = legacyInsightToEntity(parentRow, this._runId, now);
+      // findByOntologyClass is an OR-gate (entityType === cls || ontologyClass
+      // === cls, GraphKMStore.ts:577). Setting BOTH fields to the subsystem
+      // made roll-up parents match neither 'Insight' nor the typed view, so
+      // they vanished from /api/coding/insights entirely — a roll-up whose
+      // parent you cannot read is worse than no roll-up. Keep ontologyClass
+      // 'Insight' so the parent stays discoverable, and carry the subsystem on
+      // entityType so the graph still clusters by it. The OR-gate matches both.
+      if (g.bucket !== 'Unbucketed') {
+        parentEntity.entityType = g.bucket;
+        parentEntity.ontologyClass = 'Insight';
+      }
+      const parentId = await kmStore.putEntity(parentEntity, { skipOntologyCheck: true });
+
+      for (const e of members) {
+        try {
+          await kmStore.mergeAttributes(e.id, {
+            metadata: {
+              ...(e.metadata ?? {}),
+              archivedAt: now,
+              archiveReason: `rolled up into "${parentRow.topic}"`,
+              rolledUpInto: parentId,
+            },
+          });
+          archived++;
+        } catch (err) {
+          process.stderr.write(`[RollUp] archive failed for ${e.id}: ${err.message}\n`);
+        }
+      }
+    }
+
+    return {
+      project, groups: groups.length, rolledUp, archived, dryRun, plan,
+      buckets: Object.fromEntries([...buckets].map(([k, v]) => [k, v.length])),
+      projectedCorpus: live.length - archived + rolledUp,
+    };
+  }
+
+  /** Lazily import the shared deterministic L2 subsystem classifier. */
+  async _loadL2Classifier() {
+    if (this._l2 !== undefined) return this._l2;
+    this._l2 = { classifyL2: null };
+    try {
+      // Same projectRoot derivation as _getOntologyClasses (dbPath's parent's
+      // parent) — the class has no projectRoot field.
+      const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
+      const mod = await import(
+        pathToFileURL(path.join(
+          projectRoot,
+          'integrations/semantic-analysis/dist/agents/l2-subsystem-classifier.js'
+        )).href
+      );
+      this._l2 = { classifyL2: mod.classifyL2 };
+    } catch (err) {
+      process.stderr.write(
+        `[RollUp] L2 classifier unavailable — every insight buckets as 'Unbucketed'. `
+        + `Build the submodule (npm run build in integrations/semantic-analysis). Cause: ${err.message}\n`
+      );
+    }
+    return this._l2;
+  }
+
+  /** Prompt for collapsing N granular insights into one subsystem-level insight. */
+  _buildRollUpPrompt({ bucket, project, memberBlock, count }) {
+    // _callLLM sends { system, user } as two chat messages — returning a bare
+    // string makes both message contents `undefined`, which the proxy rejects
+    // with "messages.0.content: Field required".
+    return {
+      system: `You are the long-term memory of a software project. You are ABSTRACTING many narrow knowledge entries into one durable, subsystem-level entry.
+
+Every entry you are given is believed ACCURATE. Your job is not to fact-check or discard — it is to abstract, so a developer could read your single entry instead of all ${count} and lose no operationally important fact.
+
+RULES:
+- Write at the level of the subsystem, not the individual call site.
+- PRESERVE every concrete, load-bearing detail: file paths, ports, env vars, function names, thresholds, failure signatures, command invocations.
+- DROP repetition, narrative history, and anything true only of one past incident.
+- Prefer a durable statement of how the subsystem works and how it fails over a changelog.
+- Do NOT invent anything that is not present in the entries given.
+
+OUTPUT FORMAT — exactly one block:
+
+<insight>
+<topic>A specific, stable name for this subsystem-level insight</topic>
+<confidence>0.0-1.0</confidence>
+<summary>
+## Purpose
+## Architecture
+## Key Files
+## Usage
+## Troubleshooting
+</summary>
+</insight>`,
+      user: `Subsystem: ${bucket}
+Project: ${project}
+Entries to consolidate: ${count}
+
+${memberBlock}`,
+    };
+  }
+
+  /**
    * Periodic compaction pass over the entire insights corpus.
    *
    * Unlike synthesizeInsights() — which only sees freshly-unsynthesized
@@ -2619,7 +2944,7 @@ export class ObservationConsolidator {
    * @param {boolean} [options.clustersOnly=false]  stop after clustering, no LLM calls
    * @returns {Promise<{ clusters: number, merges: number, facets: number, separated: number, dryRun: boolean, clusterTopics?: string[][] }>}
    */
-  async compactInsights({ project = 'coding', dryRun = true, clustersOnly = false } = {}) {
+  async compactInsights({ project = 'coding', dryRun = true, clustersOnly = false, maxClusterSize = 20 } = {}) {
     if (!this._kmStore) throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
     const kmStore = this._kmStore;
 
@@ -2723,7 +3048,28 @@ export class ObservationConsolidator {
       if (cluster.length >= 2) clusters.push(cluster);
     }
 
-    process.stderr.write(`[Compaction] Found ${clusters.length} multi-insight cluster(s)\n`);
+    // Single-linkage guard. Clustering above is connected-components, so
+    // similarity is TRANSITIVE: "Dashboard — A" ~ "Dashboard — B" ~
+    // "Observations Dashboard" ~ "Observations Pipeline" chains unrelated
+    // insights into one component. On the coding corpus this produced a
+    // 172-member cluster spanning the dashboard, CodeGraph, VirtioFS and
+    // token accounting — a single MERGE verdict there would collapse a
+    // third of the corpus into one row, and the prompt alone would be
+    // enormous. Oversized components are reported, never acted on; they
+    // need a tighter clustering algorithm, not a bigger LLM call.
+    const oversized = clusters.filter((c) => c.length > maxClusterSize);
+    const actionable = clusters.filter((c) => c.length <= maxClusterSize);
+    if (oversized.length) {
+      process.stderr.write(
+        `[Compaction] SKIPPING ${oversized.length} oversized cluster(s) `
+        + `(sizes: ${oversized.map((c) => c.length).sort((a, b) => b - a).join(', ')}; `
+        + `cap=${maxClusterSize}) — single-linkage chaining, needs manual review\n`
+      );
+    }
+    clusters.length = 0;
+    clusters.push(...actionable);
+
+    process.stderr.write(`[Compaction] Found ${clusters.length} actionable multi-insight cluster(s)\n`);
     if (clusters.length === 0) {
       return { clusters: 0, merges: 0, facets: 0, separated: 0, dryRun };
     }
@@ -2742,6 +3088,8 @@ export class ObservationConsolidator {
         separated: 0,
         dryRun,
         clusterTopics,
+        oversizedSkipped: oversized.length,
+        oversizedSizes: oversized.map((c) => c.length).sort((a, b) => b - a),
       };
     }
 
@@ -2855,7 +3203,15 @@ export class ObservationConsolidator {
     process.stderr.write(
       `[Compaction] ${dryRun ? '(dry run)' : 'applied'}: ${merges} merge(s), ${facets} facet group(s), ${separated} false-positive(s)\n`
     );
-    return { clusters: clusters.length, merges, facets, separated, dryRun };
+    return {
+      clusters: clusters.length,
+      merges,
+      facets,
+      separated,
+      dryRun,
+      oversizedSkipped: oversized.length,
+      oversizedSizes: oversized.map((c) => c.length).sort((a, b) => b - a),
+    };
   }
 
   /**
@@ -3720,9 +4076,22 @@ export class ObservationConsolidator {
     const now = new Date().toISOString();
     const newSummary = this._redact(replacement.summary);
     const newTopic = this._redact(replacement.topic || insight.topic);
-    const newConfidence = typeof replacement.confidence === 'number'
+    // An Update must never demote an insight on the LLM's self-assessment
+    // alone. Re-synthesis routinely restates still-true content, and the
+    // model's confidence number is a fresh guess with no memory of the
+    // prior value — which is how a 95% insight came back 72% and, because
+    // the insights list is sorted by confidence DESC and capped, dropped
+    // out of the rendered page entirely (taking its #insight-<id> deep
+    // link with it). The pre-verify pass is the only evidence of genuine
+    // degradation: when it found stale claims the LLM's number stands;
+    // when it found none, the prior confidence is the floor.
+    const llmConfidence = typeof replacement.confidence === 'number'
       ? Math.max(0.3, Math.min(1, replacement.confidence))
       : Math.max(insight.confidence, 0.7);
+    const hadStaleClaims = (preVerify.staleClaims?.length || 0) > 0;
+    const newConfidence = hadStaleClaims
+      ? llmConfidence
+      : Math.max(llmConfidence, insight.confidence || 0);
 
     // Clear stale-drag + auto-archive bookkeeping — the content is brand
     // new, so any prior penalty/archive state is no longer applicable.

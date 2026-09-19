@@ -552,6 +552,10 @@ export function InsightsPage() {
   }, [])
 
   const [consolidationError, setConsolidationError] = useState<string | null>(null)
+  // A `#insight-<id>` deep link that resolves to no rendered card. Previously
+  // the scroll effect just `return`ed, so a dead link was indistinguishable
+  // from a working one that happened to already be in view.
+  const [deepLinkMiss, setDeepLinkMiss] = useState<string | null>(null)
 
   const runConsolidation = useCallback(async () => {
     setConsolidating(true)
@@ -603,7 +607,13 @@ export function InsightsPage() {
     // Defer one tick so card refs are mounted in the DOM.
     const handle = window.requestAnimationFrame(() => {
       const el = document.getElementById(targetId)
-      if (!el) return
+      if (!el) {
+        // Not a silent no-op any more: say so, so a broken deep link is
+        // visible instead of looking like a click that did nothing.
+        setDeepLinkMiss(targetId.replace(/^insight-/, ''))
+        return
+      }
+      setDeepLinkMiss(null)
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
       el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-background')
       window.setTimeout(() => {
@@ -722,6 +732,16 @@ export function InsightsPage() {
           </Button>
         )}
       </div>
+
+      {deepLinkMiss && (
+        <div className="mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-sm flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>
+            Insight <code className="px-1 py-0.5 bg-muted rounded text-xs">{deepLinkMiss}</code> isn't in the
+            current list — it may be archived, filtered out, or beyond the fetch limit.
+          </span>
+        </div>
+      )}
 
       {status?.inflight && <ConsolidationProgress inflight={status.inflight} />}
 

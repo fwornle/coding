@@ -1599,13 +1599,28 @@ export class ObservationWriter {
         }) || null;
       }
       if (existing && existing.id) {
+        // createdAt is IMMUTABLE across an upsert. Callers stamp
+        // row.created_at = now on every push (ObservationConsolidator
+        // _pushInsightToKG does this unconditionally), and
+        // legacyInsightToEntity maps that onto metadata.createdAt — so the
+        // spread below would silently re-date an insight that already
+        // exists. The VKB history sidebar sorts AND labels by createdAt
+        // (HistorySidebar.tsx), so a re-dated row resurfaces as "learned
+        // just now" even on a run that created nothing. Pin the original
+        // creation stamp; updatedAt above already carries "when it changed".
+        const preservedCreatedAt =
+          (existing.metadata && existing.metadata.createdAt) || existing.createdAt || ts;
         await kmStore.mergeAttributes(existing.id, {
           name: entity.name,
           description: entity.description,
           ontologyClass: entity.ontologyClass,
           entityType: entity.entityType,
           updatedAt: ts,
-          metadata: { ...(existing.metadata || {}), ...entity.metadata },
+          metadata: {
+            ...(existing.metadata || {}),
+            ...entity.metadata,
+            createdAt: preservedCreatedAt,
+          },
         });
         mintedId = existing.id;
       } else {
