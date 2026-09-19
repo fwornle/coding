@@ -59,6 +59,7 @@ import https from 'node:https';
 import os from 'node:os';
 import ProcessStateManager from './process-state-manager.js';
 import { getTimeWindow, utcToLocalTime } from './timezone-utils.js';
+import { fetchAndAudit } from '../lib/knowledge/structural-anchors.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -222,6 +223,29 @@ const currentState = {
     lastDigestAt: null,
     lastInsightAt: null,
     totals: null,
+    last_probe_end: null
+  },
+  // Structural-anchor invariant over the knowledge graph: every knowledge row
+  // must carry at least one structural edge (contains / parent-child /
+  // has_insight / includes). Provenance does NOT count — capturedBy + mentions
+  // are 89% of the edges and are hidden by default in the viewer, so a row
+  // holding only those is connected in the data and a floating dot on screen.
+  //
+  // `orphans` (degree 0) and `stranded` (provenance-only) are reported
+  // SEPARATELY on purpose: the viewer header shows the first, the operator
+  // sees the second, and conflating them is what let ~81 visible strays hide
+  // behind "orphans 14" for weeks.
+  //
+  // Probed on its own slow interval — it reads the whole graph (~2k entities,
+  // ~28k relations), far too heavy for the 5s tick.
+  // Status: 'unknown' before first probe · 'healthy' (invariant holds) ·
+  // 'degraded' (violations) · 'unreachable' (obs-api did not answer).
+  graph_integrity: {
+    status: 'unknown',
+    unanchored: null,
+    orphans: null,
+    stranded: null,
+    by_class: null,
     last_probe_end: null
   },
   // Phase 51 Plan 11 — sub-agent capture freshness across all four agents.
@@ -3490,6 +3514,53 @@ async function pollNetworkStatus() {
    log(`network: location=${netState.location} proxy_enabled=${proxyEnabledByUser} port_listening=${effectivePortListening} proxy_running=${netState.proxy_running} proxy_functional=${netState.proxy_functional} internet=${netState.internet_reachable}`);
 }
 
+// ---------------------------------------------------------------------------
+// Graph integrity — structural-anchor invariant
+// ---------------------------------------------------------------------------
+// Deliberately slow: the audit reads every entity and every relation. At the
+// 5s tick that would be a self-inflicted load test on obs-api, and the answer
+// changes on the timescale of consolidation runs, not seconds.
+const GRAPH_INTEGRITY_INTERVAL_MS = parseInt(
+  process.env.HEALTH_GRAPH_INTEGRITY_INTERVAL_MS || String(10 * 60_000), 10);
+
+async function pollGraphIntegrity() {
+  const now = Date.now();
+  const last = pollGraphIntegrity._lastRunAt ?? 0;
+  if (now - last < GRAPH_INTEGRITY_INTERVAL_MS) return; // not due yet
+  // Skip while consolidation is hammering obs-api — a heavyweight read there
+  // competes with the write path, and a timeout would be reported as a graph
+  // problem when it is a scheduling one.
+  if (typeof obsApiBusyNow === 'function' && obsApiBusyNow()) return;
+  pollGraphIntegrity._lastRunAt = now;
+
+  try {
+    const audit = await fetchAndAudit(OBS_API_URL, { timeoutMs: 30_000 });
+    currentState.graph_integrity = {
+      status: audit.unanchored === 0 ? 'healthy' : 'degraded',
+      unanchored: audit.unanchored,
+      orphans: audit.orphans,
+      stranded: audit.stranded,
+      by_class: audit.byClass,
+      last_probe_end: new Date().toISOString()
+    };
+    if (audit.unanchored > 0) {
+      log(`graph_integrity: ${audit.unanchored} row(s) without a structural edge `
+        + `(${audit.orphans} orphaned, ${audit.stranded} stranded) `
+        + `${JSON.stringify(audit.byClass)} — repair with `
+        + `scripts/anchor-unstructured-entities.mjs --apply`, 'WARN');
+    }
+  } catch (err) {
+    // SPEC R6: never substitute 'healthy'. An unreachable store says nothing
+    // about the invariant, so the slice says exactly that.
+    currentState.graph_integrity = {
+      ...currentState.graph_integrity,
+      status: 'unreachable',
+      reason: err.message,
+      last_probe_end: new Date().toISOString()
+    };
+  }
+}
+
 async function runAllChecks() {
   // Detect sleep/wake transitions — forces immediate network re-probe
   detectWakeFromSleep();
@@ -3615,6 +3686,19 @@ async function runAllChecks() {
       lastDigestAt: null,
       lastInsightAt: null,
       totals: null,
+      last_probe_end: new Date().toISOString()
+    };
+  }
+
+  // ----- Graph integrity: structural-anchor invariant (slow interval) -----
+  try {
+    await pollGraphIntegrity();
+  } catch (err) {
+    log(`graph_integrity probe threw: ${err.message}`, 'ERROR');
+    currentState.graph_integrity = {
+      ...currentState.graph_integrity,
+      status: 'unreachable',
+      reason: err.message,
       last_probe_end: new Date().toISOString()
     };
   }

@@ -42,13 +42,13 @@
 const OBS_API = process.env.OBS_API_URL || 'http://localhost:12436';
 const APPLY = process.argv.includes('--apply');
 const CHECK = process.argv.includes('--check');
-const STRUCTURAL = new Set(['contains', 'parent-child', 'has_insight', 'includes']);
-/** Classes that must be anchored. Observations are deliberately excluded —
- *  they are raw stream, shielded from the canvas, and `capturedBy` is their
- *  real relationship. */
-const ANCHORED_CLASSES = new Set([
-  'Insight', 'OnlineInsight', 'Digest', 'OnlineDigest', 'Detail', 'SubComponent', 'Component',
-]);
+import {
+  ANCHORED_CLASSES,
+  auditStructuralAnchors,
+  classOf,
+  projectSlug,
+} from '../lib/knowledge/structural-anchors.mjs';
+
 const out = (m = '') => process.stdout.write(`${m}\n`);
 
 const get = async (path) => {
@@ -60,63 +60,37 @@ const get = async (path) => {
 const entities = await get('/api/v1/entities?limit=10000');
 const relations = await get('/api/v1/relations?limit=100000');
 
-// Read API spells edges source/target; write API spells them from/to.
-const eFrom = (r) => r.from ?? r.source;
-const eTo = (r) => r.to ?? r.target;
-const eType = (r) => r.type ?? r.attributes?.type;
-const clsOf = (e) => e.ontologyClass ?? e.entityType;
+// ONE definition of a violation, shared with the health coordinator's
+// graph_integrity slice — the guard and the repair must never disagree.
+const audit = auditStructuralAnchors(entities, relations);
+const unanchored = audit.rows.map((r) => entities.find((e) => e.id === r.id)).filter(Boolean);
 
-const structDeg = new Map();
-const anyDeg = new Map();
-for (const r of relations) {
-  const structural = STRUCTURAL.has(eType(r));
-  for (const v of [eFrom(r), eTo(r)]) {
-    anyDeg.set(v, (anyDeg.get(v) ?? 0) + 1);
-    if (structural) structDeg.set(v, (structDeg.get(v) ?? 0) + 1);
-  }
-}
-
-/**
- * Project entities are CamelCase (`A2aXpr`, `SecondBrainPrivate`) while
- * `metadata.project` is the slug (`a2a-xpr`, `second-brain-private`). A plain
- * lowercase compare misses every multi-word project — 136 rows on the first
- * run, reported as "project does not resolve" when the project was right
- * there. Fold both to alphanumerics before comparing.
- */
-const slug = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const projectsByName = new Map();
 for (const e of entities) {
-  if (clsOf(e) === 'Project') projectsByName.set(slug(e.name), e);
+  if (classOf(e) === 'Project') projectsByName.set(projectSlug(e.name), e);
 }
 
-const unanchored = entities.filter(
-  (e) => ANCHORED_CLASSES.has(clsOf(e)) && (structDeg.get(e.id) ?? 0) === 0,
-);
-const strandedNow = unanchored.filter((e) => (anyDeg.get(e.id) ?? 0) > 0).length;
-
-out(`unanchored (no structural edge): ${unanchored.length}`);
-out(`  true orphans (degree 0)      : ${unanchored.length - strandedNow}`);
-out(`  stranded (provenance only)   : ${strandedNow}`);
-const byClass = {};
-for (const e of unanchored) byClass[clsOf(e)] = (byClass[clsOf(e)] ?? 0) + 1;
-out(`  by class: ${JSON.stringify(byClass)}`);
+out(`unanchored (no structural edge): ${audit.unanchored}`);
+out(`  true orphans (degree 0)      : ${audit.orphans}`);
+out(`  stranded (provenance only)   : ${audit.stranded}`);
+out(`  by class: ${JSON.stringify(audit.byClass)}`);
 
 if (CHECK) {
   out('');
-  if (unanchored.length === 0) { out('OK — structural-anchor invariant holds.'); process.exit(0); }
-  out(`FAIL — ${unanchored.length} row(s) carry no structural edge.`);
+  if (audit.unanchored === 0) { out('OK — structural-anchor invariant holds.'); process.exit(0); }
+  out(`FAIL — ${audit.unanchored} row(s) carry no structural edge.`);
   process.exit(1);
 }
 
 let written = 0; const unresolved = {};
 for (const e of unanchored) {
   const projectName = (e.metadata ?? {}).project ?? e.project;
-  const project = projectsByName.get(slug(projectName));
+  const project = projectsByName.get(projectSlug(projectName));
   if (!project) {
     unresolved[String(projectName)] = (unresolved[String(projectName)] ?? 0) + 1;
     continue;
   }
-  const type = clsOf(e).endsWith('Insight') ? 'has_insight' : 'contains';
+  const type = classOf(e).endsWith('Insight') ? 'has_insight' : 'contains';
   if (!APPLY) { written++; continue; }
   const r = await fetch(`${OBS_API}/api/v1/relations`, {
     method: 'POST',
