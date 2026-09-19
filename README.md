@@ -2,6 +2,8 @@
 
 A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting Claude Code, GitHub Copilot CLI, OpenCode, and Pi. **Zero-cost LLM routing** via existing Claude Code and GitHub Copilot subscriptions.
 
+View the published online documentation [here](https://fwornle.github.io/coding/).
+
 ---
 
 ## 🚀 Quick Start
