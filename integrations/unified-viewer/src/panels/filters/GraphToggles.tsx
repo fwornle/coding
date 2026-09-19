@@ -32,6 +32,13 @@ export function GraphToggles() {
   // Aggregates-only: the roll-up layer on its own.
   const aggregatesOnly = useViewerStore((s) => s.aggregatesOnly)
   const toggleAggregatesOnly = useViewerStore((s) => s.toggleAggregatesOnly)
+  // SubComponent collapse + the per-Component expanders.
+  const collapseSubComponents = useViewerStore((s) => s.collapseSubComponents)
+  const toggleCollapseSubComponents = useViewerStore((s) => s.toggleCollapseSubComponents)
+  const expandedComponentIds = useViewerStore((s) => s.expandedComponentIds)
+  const toggleComponentExpanded = useViewerStore((s) => s.toggleComponentExpanded)
+  const collapseAllComponents = useViewerStore((s) => s.collapseAllComponents)
+  const componentSummary = useViewerStore((s) => s.componentSummary)
 
   return (
     <div className="space-y-1" data-testid="filter-graph-toggles-section">
@@ -113,6 +120,65 @@ export function GraphToggles() {
           backbone. Rows the roll-up has not reached yet are hidden — if this
           view looks sparse, that is the corpus telling you what is aggregated.
         </p>
+      )}
+
+      <label
+        className="flex items-center gap-2 text-xs cursor-pointer"
+        data-testid="graph-toggle-collapse-subcomponents"
+      >
+        <Checkbox
+          checked={collapseSubComponents}
+          onCheckedChange={() => {
+            toggleCollapseSubComponents()
+            Logger.info(
+              Logger.Categories.FILTERS,
+              `GraphToggles: collapseSubComponents → ${!collapseSubComponents}`,
+            )
+          }}
+          aria-label="Collapse sub-components"
+        />
+        Collapse sub-components
+      </label>
+      {collapseSubComponents && (
+        <div className="ml-6 mt-1 space-y-1" data-testid="component-expander-list">
+          <p className="text-[10px] leading-tight italic text-muted-foreground">
+            Sub-components are the architecture skeleton, not knowledge — hidden
+            until you open the component that owns them.
+          </p>
+          {componentSummary.length === 0 ? (
+            <p className="text-[10px] italic text-muted-foreground">Loading components…</p>
+          ) : (
+            <>
+              {componentSummary.map((c) => (
+                <label
+                  key={c.id}
+                  className="flex items-center gap-2 text-[11px] cursor-pointer"
+                  data-testid={`component-expander-${c.id}`}
+                >
+                  <Checkbox
+                    checked={expandedComponentIds.has(c.id)}
+                    onCheckedChange={() => toggleComponentExpanded(c.id)}
+                    aria-label={`Expand ${c.name}`}
+                  />
+                  <span className="truncate">{c.name}</span>
+                  <span className="ml-auto tabular-nums text-muted-foreground">
+                    {c.childCount}
+                  </span>
+                </label>
+              ))}
+              {expandedComponentIds.size > 0 && (
+                <button
+                  type="button"
+                  className="text-[10px] underline text-muted-foreground hover:text-foreground"
+                  onClick={collapseAllComponents}
+                  data-testid="component-expander-collapse-all"
+                >
+                  collapse all ({expandedComponentIds.size} open)
+                </button>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {/*

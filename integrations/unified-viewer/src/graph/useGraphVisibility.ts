@@ -60,6 +60,11 @@ export function useGraphVisibility(): VisibilityPredicate {
   // Aggregates-only: roll-up parents + architecture backbone. See the
   // VisibilityFilters doc for why no existing filter could express this.
   const aggregatesOnly = useViewerStore((s) => s.aggregatesOnly)
+  // SubComponent collapse — the rule needs a parent lookup the predicate
+  // cannot do itself, so the resolved map rides along with the flags.
+  const collapseSubComponents = useViewerStore((s) => s.collapseSubComponents)
+  const expandedComponentIds = useViewerStore((s) => s.expandedComponentIds)
+  const hierarchyParents = useViewerStore((s) => s.hierarchyParents)
 
   return useMemo<VisibilityPredicate>(() => {
     const filters = {
@@ -75,6 +80,9 @@ export function useGraphVisibility(): VisibilityPredicate {
       showDebugEntityTypes,
       hiddenNodeTypes,
       aggregatesOnly,
+      collapseSubComponents,
+      expandedComponentIds,
+      hierarchyParents,
     }
     return (e: Entity) => isEntityVisible(e, filters)
   }, [
@@ -90,5 +98,8 @@ export function useGraphVisibility(): VisibilityPredicate {
     showDebugEntityTypes,
     hiddenNodeTypes,
     aggregatesOnly,
+    collapseSubComponents,
+    expandedComponentIds,
+    hierarchyParents,
   ])
 }

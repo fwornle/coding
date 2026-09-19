@@ -312,3 +312,48 @@ describe('isEntityVisible — aggregatesOnly (the roll-up layer alone)', () => {
     expect(isEntityVisible(plain, baseFilters())).toBe(true)
   })
 })
+
+describe('isEntityVisible — collapseSubComponents (architecture drill-down)', () => {
+  // SubComponents are 63% of the condensed view and must NOT be rolled up —
+  // they are structure, not knowledge. They collapse behind their Component
+  // instead, which needs a parent lookup the predicate cannot do itself.
+  const COMPONENT = 'comp-1'
+  const parents = new Map([['sub-1', COMPONENT], ['sub-2', COMPONENT]])
+  const f = (expanded: string[] = []) => baseFilters({
+    collapseSubComponents: true,
+    hierarchyParents: parents,
+    expandedComponentIds: new Set(expanded),
+    selectedClasses: new Set(['SubComponent', 'Component', 'Insight']),
+  })
+  const sub = (id: string) => ({ id, name: id, ontologyClass: 'SubComponent', metadata: {} }) as unknown as Entity
+
+  it('hides a SubComponent while its Component is closed', () => {
+    expect(isEntityVisible(sub('sub-1'), f())).toBe(false)
+  })
+
+  it('shows it once that Component is expanded', () => {
+    expect(isEntityVisible(sub('sub-1'), f([COMPONENT]))).toBe(true)
+  })
+
+  it('expanding one Component does not open another', () => {
+    const other = { id: 'sub-x', name: 'x', ontologyClass: 'SubComponent', metadata: {} } as unknown as Entity
+    expect(isEntityVisible(other, f([COMPONENT]))).toBe(false)
+  })
+
+  it('hides a SubComponent with no resolvable parent — nothing could open it', () => {
+    const orphan = { id: 'sub-orphan', name: 'ProgressFireTrigger', ontologyClass: 'SubComponent', metadata: {} } as unknown as Entity
+    expect(isEntityVisible(orphan, f([COMPONENT]))).toBe(false)
+  })
+
+  it('leaves the Component itself alone', () => {
+    const comp = { id: COMPONENT, name: 'LiveLoggingSystem', ontologyClass: 'Component', metadata: {} } as unknown as Entity
+    expect(isEntityVisible(comp, f())).toBe(true)
+  })
+
+  it('OFF restores every SubComponent regardless of expansion', () => {
+    expect(isEntityVisible(sub('sub-1'), baseFilters({
+      collapseSubComponents: false,
+      selectedClasses: new Set(['SubComponent']),
+    }))).toBe(true)
+  })
+})

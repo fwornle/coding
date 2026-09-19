@@ -316,6 +316,31 @@ export interface ViewerState {
    * reached; this is the switch that shows the aggregation layer ALONE.
    */
   aggregatesOnly: boolean
+  /**
+   * Collapse SubComponents under their Component. After the roll-up work the
+   * 315 SubComponents are ~63% of the default view — the single largest block
+   * left, and the one thing roll-up must NOT touch: they are the architecture
+   * skeleton (LoggingModule, CircuitBreakerManager), not knowledge. Summarising
+   * them would destroy structure rather than condense it, so they get hidden
+   * behind their parent and opened on demand instead.
+   *
+   * The Level filter is not a substitute: dropping L2 takes SubComponents out
+   * but dropping L3 takes every Insight with it (measured 1067 -> 360 -> 39),
+   * so there is no level that shows "backbone + knowledge".
+   */
+  collapseSubComponents: boolean
+  /** Components the operator has opened. Independent of SELECTION on purpose —
+   * see the note on toggleComponentExpanded. */
+  expandedComponentIds: ReadonlySet<string>
+  /**
+   * child id -> parent id over the hierarchy classes, from
+   * `graph/hierarchy-parents.deriveParents`. Derived data, kept in the store so
+   * there is ONE writer and every visibility consumer reads the same map —
+   * the predicate is pure per-entity and cannot resolve a parent itself.
+   */
+  hierarchyParents: ReadonlyMap<string, string>
+  /** Components with their SubComponent counts, for the expander UI. */
+  componentSummary: readonly { id: string; name: string; childCount: number }[]
   // Phase 60 Plan 03 (G3) — D-09..D-11: when true, the visibility predicate
   // skips the Observation/Digest hard-exclusion branch so operators can debug
   // those types. Default false (architecture-bleed shield ON). Non-persistent
@@ -356,6 +381,13 @@ export interface ViewerState {
   toggleHideDocNodes: () => void
   toggleHideArchived: () => void
   toggleAggregatesOnly: () => void
+  toggleCollapseSubComponents: () => void
+  toggleComponentExpanded: (id: string) => void
+  collapseAllComponents: () => void
+  setHierarchyParents: (
+    parents: ReadonlyMap<string, string>,
+    summary: readonly { id: string; name: string; childCount: number }[],
+  ) => void
   // Phase 60 Plan 03 (G3) — D-09..D-11: flips showDebugEntityTypes.
   toggleShowDebugEntityTypes: () => void
 
@@ -925,6 +957,11 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   // OFF by default: an operator who has not run a roll-up would otherwise get
   // an almost-empty canvas with no explanation.
   aggregatesOnly: false,
+  // ON by default — this is the point of the collapse.
+  collapseSubComponents: true,
+  expandedComponentIds: new Set<string>(),
+  hierarchyParents: new Map<string, string>(),
+  componentSummary: [],
   // Phase 60 Plan 03 (G3) — D-11: NOT persisted (no localStorage). Resets every
   // page load so operators must consciously re-enable Observation/Digest debug.
   showDebugEntityTypes: false,
@@ -1054,6 +1091,26 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   toggleHideDocNodes: () => set((s) => ({ hideDocNodes: !s.hideDocNodes })),
   toggleHideArchived: () => set((s) => ({ hideArchived: !s.hideArchived })),
   toggleAggregatesOnly: () => set((s) => ({ aggregatesOnly: !s.aggregatesOnly })),
+  toggleCollapseSubComponents: () =>
+    set((s) => ({ collapseSubComponents: !s.collapseSubComponents })),
+  /**
+   * Expansion is its OWN state, deliberately not derived from selection.
+   * Driving it off `selectedNodeIds` would be the nicer gesture (click a
+   * Component, its children appear) but it would make the rendered set change
+   * on every selection — exactly what Locked Contract #3 forbids, and the same
+   * mistake that made drill-down "zoom all the way out and lose the focal
+   * node" in Plan 06. Selection must never resize the canvas.
+   */
+  toggleComponentExpanded: (id) =>
+    set((s) => {
+      const next = new Set(s.expandedComponentIds)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return { expandedComponentIds: next }
+    }),
+  collapseAllComponents: () => set({ expandedComponentIds: new Set<string>() }),
+  setHierarchyParents: (parents, summary) =>
+    set({ hierarchyParents: parents, componentSummary: summary }),
   // Phase 60 Plan 03 (G3) — D-09..D-11: toggle the showDebugEntityTypes flag.
   toggleShowDebugEntityTypes: () =>
     set((s) => ({ showDebugEntityTypes: !s.showDebugEntityTypes })),

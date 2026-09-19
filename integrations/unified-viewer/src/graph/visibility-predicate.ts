@@ -71,6 +71,17 @@ export interface VisibilityFilters {
    */
   aggregatesOnly?: boolean
   /**
+   * Collapse SubComponents behind their Component. A SubComponent is visible
+   * only while its parent Component is in `expandedComponentIds`.
+   *
+   * The parent lookup cannot happen in here — this predicate sees one entity
+   * and knows nothing about edges — so the resolved map is passed in. See
+   * `hierarchyParents` in the store for who builds it.
+   */
+  collapseSubComponents?: boolean
+  expandedComponentIds?: ReadonlySet<string>
+  hierarchyParents?: ReadonlyMap<string, string>
+  /**
    * Phase 60 Plan 01 (G1): ontology registry (subset shape — `name` +
    * extends-chain `parent`) consumed by `deriveLayer` for L2 inference.
    * Optional so existing call sites compile until the registry is threaded
@@ -165,6 +176,17 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
       const rollUpOf = (meta as { rollUpOf?: unknown }).rollUpOf
       if (!Array.isArray(rollUpOf) || rollUpOf.length === 0) return false
     }
+  }
+
+  // SubComponent collapse — hidden unless its Component is expanded. A
+  // SubComponent with no resolvable parent stays hidden too: it cannot be
+  // reached by opening anything, so showing it would put an unexplained
+  // fragment on a canvas the operator just asked to condense. (There are 6
+  // such nodes today — extraction artifacts never attached to a Component;
+  // they show up in the orphan count, which is where they should be fixed.)
+  if (filters.collapseSubComponents === true && e.ontologyClass === 'SubComponent') {
+    const parentId = filters.hierarchyParents?.get(e.id)
+    if (!parentId || !filters.expandedComponentIds?.has(parentId)) return false
   }
 
   // Teams predicate — structural backbone (System/Project/Component) exempt.

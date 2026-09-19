@@ -36,6 +36,7 @@ import { useGraphData, RELATIONS_KEY } from '@/graph/useGraphData'
 import { useVisibleEntityIds } from '@/graph/useVisibleEntityIds'
 import { useQuery } from '@tanstack/react-query'
 import { useGraphVisibility } from '@/graph/useGraphVisibility'
+import { deriveParents } from '@/graph/hierarchy-parents'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useViewerStore } from '@/store/viewer-store'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
@@ -284,6 +285,32 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   //   5. The LSL session filter was not applied at all.
   // Collapsing onto the predicate fixes all five; the displayed number changes
   // accordingly, and that change is the fix, not a regression.
+  // Sole writer of the hierarchy parent map. The SubComponent collapse needs
+  // "which Component owns this SubComponent", which lives in edges
+  // (`contains` ~1367, `parent-child` ~54), not on the entity — no writer has
+  // ever set metadata.parent. deriveParents applies the ranking that picks ONE
+  // parent deterministically; doing it here, once, is what keeps the canvas,
+  // the footer count and the bucket list from each resolving it differently.
+  const setHierarchyParents = useViewerStore((s) => s.setHierarchyParents)
+  useEffect(() => {
+    if (entities.length === 0) return
+    const parents = deriveParents(
+      entities as unknown as { id: string; name: string; ontologyClass: string }[],
+      relations as unknown as { from: string; to: string; type?: string }[],
+    )
+    const childCount = new Map<string, number>()
+    for (const [child, parent] of parents) {
+      const cls = entities.find((e) => e.id === child)?.ontologyClass
+      if (cls !== 'SubComponent') continue
+      childCount.set(parent, (childCount.get(parent) ?? 0) + 1)
+    }
+    const summary = entities
+      .filter((e) => e.ontologyClass === 'Component')
+      .map((e) => ({ id: e.id, name: e.name ?? e.id, childCount: childCount.get(e.id) ?? 0 }))
+      .sort((a, b) => b.childCount - a.childCount || a.name.localeCompare(b.name))
+    setHierarchyParents(parents, summary)
+  }, [entities, relations, setHierarchyParents])
+
   const isVisible = useGraphVisibility()
   const visibleCount = useMemo(
     () => entities.reduce((n, e) => n + (isVisible(e) ? 1 : 0), 0),
