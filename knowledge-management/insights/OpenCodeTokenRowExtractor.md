@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Two token-capture strategies coexist for different agents: per-message SQLite extraction for OpenCode (opencode-token-rows.mjs) vs. per-session events.jsonl tailing for Copilot (copilot-events-tail.mjs) — divergence driven by what each upstream CLI actually persists to disk.; opencode-token-rows.mjs depends on token-db.mjs only for shared constants (ADAPTER_USER_HASH_OPENCODE, DIRECT_ROUTING_SOURCE), not for its own DB access — it manages its own `better-sqlite3` connection to a separate database file (opencode.db vs. token-usage.db).; Provider-gating logic (BYPASS_PROVIDERS) is the sole mechanism preventing double-counted tokens between the proxy's own capture and this adapter's reconstruction — a single-point-of-truth for an otherwise easy-to-violate invariant.; The component is decoupled from the OperationalLogger/live-logging-coordinator class hierarchy referenced in the parent entity's CGR evidence, suggesting the parent Detail groups token-capture code alongside logging code by directory/purpose rather than by actual call graph.
-
 # OpenCodeTokenRowExtractor — Technical Insight Document
 
 ## What It Is

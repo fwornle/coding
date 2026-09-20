@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] scripts/start-services-robust.js:20-31 - imports startServiceWithRetry, createHttpHealthCheck, createPidHealthCheck, isPortListening, isTcpPortListening, isProcessRunning, sleep from lib/service-starter.js; scripts/start-services-robust.js - waitForPortBindable() throwaway net.createServer().listen() probe to avoid burning maxRetries on kernel TIME_WAIT; scripts/start-services-robust.js - killProcessOnPortAndWait() SIGTERM-then-SIGKILL escalation with polling against lsof -ti; scripts/start-services-robust.js - isProcessRunningByScript() three-tier PSM/OS pgrep idempotency check used inside SERVICE_CONFIGS.transcriptMonitor.startFn and SERVICE_CONFIGS.liveLoggingCoordinator.startFn; tests/features/service-gating.test.mjs - 'a required failure blocks, so downstream services do not start' sets SERVICE_CONFIGS.transcriptMonitor.maxRetries = 1 to bypass real exponential backoff cost; tests/features/service-gating.test.mjs - 'a disabled service is not reported as degraded' and 'a disabled feature skips the service without starting it' assert startFn is never invoked when a feature is off; tests/features/service-gating.test.mjs - 'an unknown feature on a config is a loud failure, not a silent skip' asserts startOneService rejects with /unknown feature 'nope'/; docker/entrypoint.sh - PROGRAM_FEATURES mapping and node -e snippet treating an unmatched feature key as enabled (fail-open), contrasted with the host-side fail-closed unknown-feature test
-
 # RetryWithDeadlineStarter
 
 ## What It Is

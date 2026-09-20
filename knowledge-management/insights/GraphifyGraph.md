@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] GraphifyGraph replaces a live Memgraph/Cypher connection with a static, periodically-regenerated JSON artifact — trading real-time mutation capability for deployment simplicity (no DB process) and fast repeated reads; CodeGraphAgent preserves the full legacy public API (including a now-meaningless checkMemgraphConnection) purely for backward compatibility with unmodified downstream consumers; Semantic typing (entity kind/name) is derived at read time from a label string rather than stored as explicit typed data, creating implicit coupling between graphify's output format and GraphifyGraph's parsing functions with no shared type definition enforcing the contract; The knowledge graph's ontology has evolved toward a small number of canonical top-level types (System/Project/Pattern in migrate-graph-db-entity-types.js; the hierarchy palette's Project/Component/SubComponent/Detail/System in color-fallback.ts), suggesting a system-wide trend toward simpler, more stable taxonomies over time; Graph connectivity (no orphan nodes) is enforced procedurally in application code (wave-controller.ts's anchor-fallback logic) rather than structurally by the storage layer, making it dependent on every write path's discipline rather than a database-level guarantee
-
 # GraphifyGraph — Technical Insight Document
 
 ## What It Is

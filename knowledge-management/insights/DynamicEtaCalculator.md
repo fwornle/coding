@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] calculateDynamicEta() in integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx implements a two-regime estimator that switches behavior based on process.batchProgress.currentBatch versus totalBatches: when currentBatch < totalBatches it is in the 'BATCH PHASE' and computes remainingBatches * learnedAvgBatchMs plus workflowStats?.avgFinalizationDurationMs (defaulting to 60000ms), then further refines by estimating time-left-in-current-batch using the fraction of completed steps in the last entry of batchIterations. When currentBatch >= totalBatches && totalBatches > 0 it switches to 'FINALIZATION PHASE' and instead sums getStepMedianDuration() per pending/running step from process.steps, applying a flat 50% completion assumption for any step in 'running' status. This is a hand-rolled piecewise model with no shared abstraction between the two phases — the finalization branch does not reuse learnedAvgBatchMs at all, and the batch branch does not use per-step medians, so the two estimation strategies could silently diverge in units or accuracy without either one being tested against the other.
-
 # DynamicEtaCalculator — Technical Insight Document
 
 ## What It Is

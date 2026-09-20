@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] config/agents/copilot.sh - agent_pre_launch() unsets COPILOT_PROVIDER_* env, defers BYOK wiring to configure_proxy_routing(); config/agents/opencode.sh - _oc_splice_config() centralizes JSON fragment merging into OPENCODE_CONFIG_CONTENT; config/agents/opencode.sh - agent_pre_launch() builds per-model 'variants' (cheap/standard/deep) mapped to reasoningEffort for band-based routing; config/agents/pi-extensions/no-unbounded-fs-scan.ts - offendingRoot() and findRoots() parse `find` argv to detect whole-filesystem scans; config/agents/pi-extensions/no-unbounded-fs-scan.ts - pi.on('tool_call', ...) handler blocks bash calls with a reason string, terminate: false; config/agents/pi.sh - agent_check_requirements() resolves symlinks via python3 realpath to verify the `pi` binary's provenance; config/agents/pi.sh - _pi_install_extensions() and _pi_write_append_system() use marker-comment checks to avoid overwriting user-authored files in global scope; integrations/system-health-dashboard/batch-provenance.mjs - selectBatchesForReport() attributes batches to reports via completedAt time-window + team match; integrations/system-health-dashboard/batch-provenance.mjs - toEpoch() safely parses ISO timestamps, returning null on failure rather than throwing
-
 # Insights — Technical Insight Document
 
 ## What It Is

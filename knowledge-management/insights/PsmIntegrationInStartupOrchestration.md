@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] PSM registration in scripts/api-service.js and scripts/dashboard-service.js is architecturally disconnected from lib/service-starter.js's health-check-driven startServiceWithRetry() — the two coexist as parallel, non-communicating bookkeeping systems for the same class of child processes; docker/entrypoint.sh's feature-gating decision (which supervisord programs autostart) happens upstream of and independently from PSM registration, so PSM cannot distinguish a disabled service from an unregistered/failed one; No shared abstraction exists between the container-level fail-open policy (entrypoint.sh) and the process-level fail-open policy (PSM try/catch in the wrapper scripts), despite both encoding the same underlying design philosophy; withDeadline()'s timeout-safety fix in lib/service-starter.js is not propagated to the PSM calls in api-service.js/dashboard-service.js, leaving an inconsistency in timeout protection across the startup/shutdown orchestration surface; MCP tool surface reduction (scripts/generate-docker-mcp-config.sh) and PSM's passive-registry role both reflect a project-wide tendency to treat auxiliary visibility/tooling as optional overhead rather than mandatory infrastructure
-
 # PsmIntegrationInStartupOrchestration
 
 ## What It Is

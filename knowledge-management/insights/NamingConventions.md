@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:79-95 - analyzeEntityPatterns() orchestrates Layer 1 artifact extraction and matching; src/ontology/heuristics/EntityPatternAnalyzer.ts:128-146 - extractArtifacts() regex including the *Service|*Agent|*Manager|*Engine|*Handler|*Analyzer|*Classifier|*Filter|*Monitor class-name pattern; src/ontology/heuristics/EntityPatternAnalyzer.ts:154-165 - checkLocalArtifact() assigns 0.9 confidence for direct team-directory path matches; src/ontology/heuristics/EntityPatternAnalyzer.ts:172-190 - matchArtifactPattern() assigns 0.75 confidence for suffix/prefix pattern matches against artifactPatterns; src/ontology/heuristics/EntityPatternAnalyzer.ts:205-215 (truncated) - inferEntityClass() teamMappings duplicate the entityClassMap data per team; scripts/knowledge-management/verify-patterns.sh:38-42 - console.log vs Logger.* usage counts to gate ConditionalLoggingPattern compliance; scripts/knowledge-management/verify-patterns.sh:100-108 - dynamic pattern list pulled from $SHARED_MEMORY via jq select on entityType == 'TransferablePattern' and significance >= 8; scripts/knowledge-management/verify-patterns.sh:175-181 - compliance score computed and written back into $SHARED_MEMORY.metadata.pattern_compliance_score; integrations/graphify/tests/fixtures/xaml_viewmodel/ViewModels/DesignViewModel.cs:1-5 - MVVM *ViewModel suffix convention, unrecognized by EntityPatternAnalyzer's TS-centric patterns; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml:1-8 - *View naming paired with its ViewModel, outside the file-extension set extractArtifacts() matches
-
 # NamingConventions
 
 ## What It Is

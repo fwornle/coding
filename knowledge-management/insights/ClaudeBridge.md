@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] hooks-api.js's EVENT_MAPPINGS.claude table and claude-bridge.js's own EVENT_MAP disagree on which native Claude events exist/are supported, suggesting hook-manager.js (imported dynamically by claude-bridge.js as getHookManager()/executeHooks()) is a divergent, more current implementation than the abstract HooksManager/triggerHook() sketched in hooks-api.js; Tight coupling between claude-bridge.js and the shape of Claude's native stdin payload — transformContext() spreads the entire raw payload into metadata, so any addition to Claude's native hook payload silently propagates to every registered hook handler without an explicit allow-list; Registration-time validation (registerHook()) is fail-closed/throwing, while execution-time errors (triggerHook(), main()) are fail-open/swallowing — an architectural inconsistency in how the same subsystem handles two different failure phases; The bridge script is a standalone Node entrypoint (`if (process.argv[1] === fileURLToPath(import.<COMPANY_NAME_REDACTED>.url)) main();`) that also exports main/transformContext/transformResponse/EVENT_MAP, so it doubles as both a CLI invoked by Claude Code's hook runner and an importable module for testing
-
 # ClaudeBridge: Technical Insight Document
 
 ## What It Is

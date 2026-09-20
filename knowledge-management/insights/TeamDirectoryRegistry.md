@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:34-100 - teamDirectories Map and artifactPatterns array literal definitions in the constructor; src/ontology/heuristics/EntityPatternAnalyzer.ts:~150 - analyzeEntityPatterns two-step resolution (checkLocalArtifact then matchArtifactPattern) with hardcoded 0.9/0.75 confidence; src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts private method: four regex passes accumulated into a Set<string>; src/ontology/heuristics/EntityPatternAnalyzer.ts - checkLocalArtifact private method using Map.entries() and Array.some(startsWith); src/ontology/heuristics/EntityPatternAnalyzer.ts - inferEntityClass private method's teamMappings record (Coding/RaaS/ReSi/Agentic/UI), duplicating entityClassMap; scripts/knowledge-management/verify-patterns.sh:~130-140 - jq-based atomic patch of $SHARED_MEMORY metadata.last_pattern_verification / pattern_compliance_score; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - d:DataContext design-time binding fixture, unrelated to team classification
-
 # TeamDirectoryRegistry — Technical Insight Document
 
 ## What It Is

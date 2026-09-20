@@ -2,8 +2,6 @@
 
 **Type:** Component
 
-[LLM] LiveLoggingSystem's logging behavior should be understood in contrast with the simpler, general-purpose logging utility in integrations/semantic-analysis/src/logging.ts, which uses an asynchronous buffered write pattern (FLUSH_INTERVAL_MS=100, MAX_BUFFER_SIZE=50) to append entries to dated files like `${CODING_REPO}/.data/logs/semantic-analysis-<date>.log`. While both systems share the broader convention of writing logs relative to CODING_REPO/.data/logs, LiveLoggingSystem's responsibilities are considerably more complex: it must handle session windowing (grouping related conversation turns), file routing (directing output to per-user or per-session files), and content classification/redaction — none of which the semantic-analysis logger needs to do. Developers should not conflate the two; reusing the simple buffered-flush logger pattern for LSL's transcript capture would miss essential session-boundary and redaction handling that LSLConfigValidator is specifically designed to verify is correctly configured.
-
 # LiveLoggingSystem — Technical Insight Document
 
 ## What It Is

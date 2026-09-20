@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] CopilotLiveTail (copilot-events-tail.mjs) sits downstream of Copilot CLI's own on-disk event log (~/.copilot/session-state/<uuid>/events.jsonl), which it does not control and cannot enrich — it can only forward what Copilot chooses to persist; Deliberately does not import the generic Phase 50 LSL primitives (window.mjs, scan-and-convert.mjs), instead depending on Copilot-specific adapters (../adapters/copilot-events.mjs) and the shared TranscriptNormalizer.js parser; Tight coupling to a stale-lock convention (`inuse.<pid>.lock`, 10-minute grace) as the sole liveness signal — no direct process-liveness check (e.g., PID existence) is performed; Failure isolation boundary explicitly separates optional token-accounting emission (onTokenRow) from the primary subagent lifecycle error path (onError), preventing telemetry failures from affecting core LSL capture; Known, accepted architectural gap: no live mitigation path exists for Copilot's missing inner-reasoning data — the design compensates via metadata flags (lsl_incomplete) rather than data recovery
-
 # CopilotLiveTail — Technical Insight Document
 
 ## What It Is

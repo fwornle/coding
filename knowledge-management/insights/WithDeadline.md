@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Design trade-off: Promise.race() as implemented by withDeadline() does not actually cancel or abort the underlying work promise when the timeout wins — it only stops waiting on it. If startFn() (e.g. spawning a Docker container or child process, as described in the parent's service-starter.js abstraction) is still executing after the deadline fires, that work continues in the background even though the caller has already moved on to a retry or failure state. This is a common but real limitation of Promise.race-based deadline patterns versus true cancellation (e.g. AbortController-based), and could cause duplicate/orphaned service-start attempts if not otherwise guarded against by idempotency checks (such as the PSM 'already-running' checks visible in start-services-robust.js's transcriptMonitor.startFn).
-
 # WithDeadline — Technical Insight Document
 
 ## What It Is

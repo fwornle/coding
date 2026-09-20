@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] no-unbounded-fs-scan.ts is decomposed into pure, exported helper functions (`offendingRoot`, `findRoots`, implicitly `unboundedRoots`) separated from the side-effecting `pi.on('tool_call', ...)` handler, making the security-relevant parsing logic unit-testable independent of the pi extension runtime; The guard operates purely on the shell command string and `cwd` passed via the tool-call event — it has no access to and does not attempt to inspect actual filesystem state, making it a static/lexical policy check rather than a runtime sandboxing mechanism; Configuration and installation of the guard is entirely owned by config/agents/pi.sh's shell functions (`_pi_install_extensions`, `_pi_write_append_system`), not by the TypeScript extension itself — the extension is passive source that only becomes active once copied into pi's discovered `extensions/` directory; Scope-awareness is threaded through the installer (`CODING_AGENT_SCOPE=global` vs wrapper-local) so the same guard source can be deployed either narrowly (wrapper-owned scratch dir, always overwritten) or globally (`~/.pi/agent`, user-owned, marker-gated to avoid clobbering user customizations); The guard is agent-specific (pi only) — copilot.sh and opencode.sh have no equivalent filesystem-scan protection, showing the security-hardening layer is applied per-agent rather than as a shared cross-agent hook, consistent with each agent file's self-contained `agent_check_requirements`/`agent_pre_launch`/`agent_cleanup` hook triad
-
 # NoUnboundedFsScanGuard: Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Failure handling inside the probe's Promise executor is asymmetric but deliberate: `probe.once('error', () => resolve(false))` treats ANY bind error as 'not bindable yet' without inspecting the error code (e.g. distinguishing `EADDRINUSE` from `EACCES` or `EADDRNOTAVAIL`), and the synchronous `try { probe.listen(port, host); } catch { resolve(false); }` wrapper additionally guards against a throw during the synchronous phase of `.listen()`. This is a fail-toward-retry design: rather than fail fast on an unrecoverable error (e.g. permission denied on a privileged port), it will keep polling until `maxWaitMs` and then simply return `false`, letting the caller's own retry/backoff policy in `startServiceWithRetry` decide what happens next.
-
 # PortBindableProbe: Technical Insight Document
 
 ## What It Is

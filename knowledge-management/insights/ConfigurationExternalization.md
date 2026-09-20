@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:1-40 - class fields teamDirectories and artifactPatterns define the externalized classification rules; src/ontology/heuristics/EntityPatternAnalyzer.ts (analyzeEntityPatterns) - orchestrates extractArtifacts → checkLocalArtifact → matchArtifactPattern with confidence scoring (0.9 vs 0.75); src/ontology/heuristics/EntityPatternAnalyzer.ts (extractArtifacts) - regex-based extraction hardcodes the '*Manager/*Service/*Handler' suffix convention; src/ontology/heuristics/EntityPatternAnalyzer.ts (inferEntityClass) - duplicate team/entity-class mapping including an 'Agentic' team absent from teamDirectories; scripts/knowledge-management/verify-patterns.sh:1-30 - CLAUDE_REPO resolution via CODING_TOOLS_PATH/CODING_REPO/DEFAULT_REPO fallback chain; scripts/knowledge-management/verify-patterns.sh (ConditionalLoggingPattern check) - rg-based console.log vs Logger.* count comparison feeding compliance score
-
 # ConfigurationExternalization
 
 ## What It Is

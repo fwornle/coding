@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Two structurally divergent startup paths coexist: start-services.sh's ROBUST_MODE=true execs scripts/start-services-robust.js (graduated, verified port cleanup); ROBUST_MODE=false falls back to legacy bash kill_port (unconditional kill -9, no verification); Port-cleanup logic (killProcessOnPortAndWait, waitForPortBindable) is decoupled from the PSM-based already-running detection used in SERVICE_CONFIGS startFn implementations — it appears to be a fallback safety net rather than the primary duplicate-instance guard; checkPortInUse() and isProcessRunningByScript() both shell out via child_process exec/execSync rather than using a Node-native port/process API, coupling correctness to `lsof`/`pgrep` availability on the host; No automated test coverage exists for the PortCleanup functions themselves, in contrast to the thorough structural/behavioral tests in service-gating.test.mjs for the feature-gating layer
-
 # PortCleanup — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architectural Patterns] Second-writer/compensating-write pattern: adapters reconstruct missing token rows in a database owned by another process (the rapid-llm-proxy) rather than intercepting calls at the network layer; Best-effort, non-throwing error isolation (D-08): insertTokenRow and onTokenRow callbacks are wrapped so instrumentation/accounting failures can never propagate into or crash the primary observation/session pipeline; Provider/source allowlist gating to prevent double-counting (BYPASS_PROVIDERS in opencode-token-rows.mjs) — a manual, hardcoded invariant rather than a derived one; Defensive schema introspection: token-db.mjs probes PRAGMA table_info at runtime (insertShapeFor) to adapt its own INSERT shape to a schema it doesn't control; Optimistic-id-allocation with disambiguated retry: MAX(id)+1 followed by constraint-driven retry/dedup logic in insertTokenRow; uid-ownership file access guard duplicated across adapters (isOwnedByMe / ownedDbPath) for defense-in-depth against reading another user's session state; Explicit degraded-mode data modeling: buildStubObservation() and the locked lsl_incomplete flag encode a permanent capability gap directly into the data contract rather than hiding or silently working around it
-
 # TokenUsageAdapters — Technical Insight Document
 
 ## What It Is

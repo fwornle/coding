@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Persistence is modeled as three UI-declared, LLM-free sub-steps (w1/w2/w3) whose semantics (e.g. w3's merge behavior) are encoded only in free-text techNote strings, not structured, type-checked fields — a latent drift risk if persistence logic changes.; ukbSlice.ts's WaveGroup/StepInfo types carry both current and legacy telemetry shapes simultaneously via optional fields, meaning every UI consumer must defensively handle undefined itemsCompleted/itemsTotal.; ETA computation (ukb-workflow-modal.tsx) is entirely a client-side statistical reconstruction from raw per-step durations; the persistence agent itself surfaces no progress signal, pushing all forecasting complexity into calculateDynamicEta.; D3GraphCanvas.tsx exhibits a dual source-of-truth resolution pattern (store pathToSelected vs inline BFS) explicitly introduced to fix a prior 'duplicated source-of-truth' audit finding (S3), indicating the graph rendering layer was previously inconsistent across two rendering engines (D3 and Sigma).; color-fallback.ts contains two independently-evolved color resolution functions (classColor vs nodeFillColor) with different provenance semantics (fill-encodes-source vs ring-encodes-source) — the file's own comments flag this as an intentional but overlapping transition, not a clean single API.
-
 # WavePersistSubsteps — Technical Insight Document
 
 ## What It Is

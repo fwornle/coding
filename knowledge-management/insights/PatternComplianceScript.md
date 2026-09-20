@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] scripts/knowledge-management/verify-patterns.sh contains a latent portability bug at the compliance-score computation block: `TOTAL_CHECKS=$((TOTAL_CHECKS + 1))` followed by `[ "$CONSOLE_LOG_COUNT" -eq 0 ] && ((PASSED_CHECKS++))`, repeated for the Redux, NetworkAwareInstallationPattern, and Documentation checks. Under `set -euo pipefail`, `((PASSED_CHECKS++))` returns the PRE-increment value as its exit status, so incrementing from 0 evaluates to `((0))` which bash treats as a failing (non-zero) status. On bash 5 (the default on Linux and modern macOS via Homebrew), this trips `errexit` and kills the script silently the very first time a check passes from a fresh `PASSED_CHECKS=0` — meaning the script's SUCCESS path is fragile in exactly the environments (Linux CI) where automated pattern-compliance enforcement matters most, while working by accident on legacy bash 3.2 (<COMPANY_NAME_REDACTED>'s shipped default) where the same construct doesn't errexit.
-
 # PatternComplianceScript — Technical Insight Document
 
 ## What It Is

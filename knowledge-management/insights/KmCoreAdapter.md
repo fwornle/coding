@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Dashboard visualization layers (multi-agent-graph.tsx, D3GraphCanvas.tsx) are decoupled from and lag behind backend storage migrations described in parent observations, creating stale documentation/tech notes; Heavy reliance on full-dataset reprocessing for simplicity (history API parsing all reports; GraphifyGraph re-parsing whole graph.json) is a recurring trade-off pattern across the codebase; Ontology/class hierarchy normalization is implemented independently in the frontend (color-fallback.ts) and backend (GraphifyGraph kindOf/nameOf, migrate-graph-db-entity-types.js) without a shared type definition, risking drift; Wave-based persistence is a cross-cutting concept spanning backend (wave-controller.ts) and frontend (persistence AGENT_SUBSTEPS w1/w2/w3)
-
 # KmCoreAdapter — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] scripts/knowledge-management/verify-patterns.sh:6 - `set -euo pipefail` establishes strict-mode baseline; scripts/knowledge-management/verify-patterns.sh (CONSOLE_LOG_COUNT/LOGGER_COUNT block) - `|| echo "0"` fallback guards against ripgrep's no-match exit code; scripts/knowledge-management/verify-patterns.sh (SHARED_MEMORY update block near end) - atomic `.tmp` + `mv` write pattern for JSON persistence; scripts/knowledge-management/verify-patterns.sh (SCORE calculation) - `SCORE=$((PASSED_CHECKS * 100 / TOTAL_CHECKS))` lacks an explicit divide-by-zero guard; src/ontology/heuristics/EntityPatternAnalyzer.ts - `analyzeEntityPatterns()` method implementing layered fallback (0.9 then 0.75 confidence); src/ontology/heuristics/EntityPatternAnalyzer.ts - `extractArtifacts()` private method combining four regex passes into a deduplicated Set; src/ontology/heuristics/EntityPatternAnalyzer.ts - `checkLocalArtifact()` and `matchArtifactPattern()` private methods implementing the two-step Layer 1 lookup
-
 # ResilienceWrappers — Technical Insight Document
 
 ## What It Is

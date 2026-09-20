@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Tight coupling to filesystem conventions of a third-party CLI (Copilot's `~/.copilot/session-state/<uuid>/events.jsonl` and `inuse.<pid>.lock` layout) rather than an API or IPC contract; Reuses parsing/adapter helpers from a sibling module (`../adapters/copilot-events.mjs`) and a shared transcript normalizer (`../../../src/live-logging/TranscriptNormalizer.js`) rather than duplicating parsing logic, but does NOT reuse Phase 50 primitives (`lib/lsl/window.mjs`, `lib/lsl/scan-and-convert.mjs`) by explicit design choice (D-Reuse); Liveness/ownership checks favor availability over strict correctness (fail-open on non-POSIX uid checks, 10-minute stale-lock grace window) rather than fail-closed; Two-tier callback failure isolation: subagent dispatch failures go through a shared `onError` path while the newer `onTokenRow` failures are isolated to a dedicated stderr channel, reflecting an architectural subordination of token/observability code to the core session-logging path
-
 # CopilotEventsTailWatcher — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The 'LearningSourceClassifier' concept is not embodied by a single dedicated file in the evidence provided but is realized as a distributed convention enforced across at least three files: `isOnlineLearned()` imported into D3GraphCanvas.tsx and color-fallback.ts, and referenced implicitly by the 'Learning Source' filter mentioned in useGraphVisibility comments. color-fallback.ts explicitly documents that this classifier replaced an earlier, narrower `source === 'auto'` string check because 'the data stamps ETM/consolidator output as online far more often than auto', meaning the classification logic itself absorbed real-world data drift rather than being fixed at design time.
-
 # LearningSourceClassifier — Technical Insight Document
 
 ## What It Is

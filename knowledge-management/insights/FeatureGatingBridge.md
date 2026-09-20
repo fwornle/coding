@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] docker/entrypoint.sh:60-79 - .env loading loop with *_API_KEY|*_TOKEN|*_MANAGEMENT_KEY allowlist-by-exclusion tied to T2 egress lockdown; docker/entrypoint.sh:104-152 - feature-gating block: FEATURES_SNAPSHOT read, PROGRAM_FEATURES list, per-program node -e enablement check, disabled.conf generation; lib/service-starter.js: withDeadline() - Promise.race + finally-clearTimeout deadline wrapper reused for both startFn() and healthCheckFn() timeouts; lib/service-starter.js: startServiceWithRetry() - retry loop combining exponential backoff (retryDelay * Math.pow(2, attempt-1)), withDeadline-based timeout, and post-start health verification with SIGTERM/SIGKILL on failure; scripts/api-service.js:16-30 - CODING_REPO/API_SERVER_PATH resolution and existsSync guard before spawn; scripts/dashboard-service.js:26-34 - spawn() call with hardcoded NEXT_PUBLIC_API_BASE_URL: 'http://localhost:3031' not derived from CONSTRAINT_API_PORT; scripts/api-service.js:70-90 and scripts/dashboard-service.js:70-90 - fire-and-forget async IIFE registering the spawned child with ProcessStateManager after the synchronous 'Started (PID: ...)' log; scripts/generate-docker-mcp-config.sh:29-36 - CODEGRAPH_ENABLED gate via `bin/coding-features enabled codegraph`; scripts/generate-docker-mcp-config.sh:39-49 - two-tier code-graph MCP entry resolution: code-graph-config.mjs registry lookup then literal graphify JSON fallback with WARNING log
-
 # FeatureGatingBridge — Technical Insight Document
 
 ## What It Is

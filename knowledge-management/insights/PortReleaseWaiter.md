@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] scripts/start-services-robust.js - killProcessOnPortAndWait() — SIGTERM-then-SIGKILL escalation with active port polling; scripts/start-services-robust.js - checkPortInUse() (inline helper) — lsof -ti:<port> check with fail-open on error; scripts/start-services-robust.js - waitForPortBindable() — throwaway net.createServer() probe to distinguish bindable vs merely-not-HTTP-responding; scripts/start-services-robust.js - isProcessRunningByScript() — pgrep-based orphan detection used alongside PSM lookups; start-services.sh - kill_port() — legacy single kill -9 + fixed sleep 1, no verification of release; tests/features/service-gating.test.mjs - startOneService()/SERVICE_CONFIGS usage — consumer of port-clearing results during service startup
-
 # PortReleaseWaiter — Technical Insight Document
 
 ## What It Is

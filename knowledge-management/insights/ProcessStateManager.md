@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] The parent-context observation that wrapper scripts (`scripts/api-service.js`, `scripts/dashboard-service.js`) call `registerService()` 'against the global ProcessStateManager (PSM) immediately after spawn' describes a DIFFERENT call path than the one visible in `start-services-robust.js`, where `psm.registerService` is only invoked defensively, inside the orphan-recovery branch, not as the normal post-spawn step for the transcript monitor (the normal path simply returns `{ pid: child.pid, service: 'transcript-monitor' }` without an explicit `psm.registerService` call visible in the shown code). This suggests either registration happens implicitly elsewhere (inside `startServiceWithRetry` from `lib/service-starter.js`, imported at the top of the file) or there is an inconsistency between how Express/Next.js wrapper-managed services register with PSM versus how directly-spawned services like the transcript monitor do — worth confirming against `lib/service-starter.js` before assuming uniform registration behavior across all services.
-
 # ProcessStateManager: Technical Insight Document
 
 ## What It Is

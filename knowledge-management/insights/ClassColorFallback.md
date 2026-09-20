@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The file maintains two structurally parallel but logically distinct resolvers for the same visual property: `classColor()` (source+class, both palettes, legacy/`ontologyClass`-only view) versus `nodeFillColor()` (class+registry parent-walk, source-independent, `BATCH_PALETTE`-only). `nodeFillColor()` is annotated as the 'canonical' resolver in a 2026-06-28 block comment describing an operator-mandated 'Hybrid' scheme: fill color must be source-INDEPENDENT (walks `ClassRegistryEntry.parent` chains up to 3 fallback tiers — registry `display.color`, then `BATCH_PALETTE`, then `DEFAULT_BATCH` slate), while online-learned provenance is rendered separately as `ONLINE_RING_COLOR` (#f472b6, a ring overlay). This means `classColor()` and `nodeFillColor()` now encode two different, previously-conflated design decisions in the same module, with `classColor()` implicitly left in place for callers not yet migrated to the ring-based scheme (no caller of `classColor` is visible in the provided files, suggesting it may be legacy/unused-but-retained).
-
 # ClassColorFallback: Technical Insight Document
 
 ## What It Is

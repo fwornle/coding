@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Because `_ACK_PHRASES` is declared as a `static` class field (`ObservationWriter._ACK_PHRASES`), it is shared across every writer instance in a process rather than being per-configuration — this is efficient (one Set allocation regardless of how many `ObservationWriter` instances obs-api or the ETM construct) but also means the gate's behavior cannot vary between instances even if callers wanted, e.g., a stricter gate for one project and a looser one for another. Given the broader pattern in the file of instance-scoped state (the module-level `_observationEmitter` singleton is explicitly justified in the header comments as a deliberate 'trading encapsulation purity for lifecycle simplicity' choice), the ack-phrase set follows the same non-instance-scoped convention for a different resource type, suggesting a house style of using module/class statics for anything that is logically global config rather than per-instance state.
-
 # AckPhraseGate — Technical Insight Document
 
 ## What It Is

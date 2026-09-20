@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] startServiceWithRetry (lib/service-starter.js) is the single generic retry/backoff primitive; scripts/start-services-robust.js supplies it with service-specific startFn/healthCheckFn pairs rather than embedding retry logic per service; Feature gating for host-side services (loadFeatures() in start-services-robust.js) is structurally and behaviorally distinct from container-side gating (the snapshot-driven supervisord include in docker/entrypoint.sh) — same policy intent, two independent implementations that tests/features/service-gating.test.mjs and (per parent context) tests/features/container-gating.test.mjs each verify in isolation; start-services-robust.js layers OS-level process detection (pgrep via isProcessRunningByScript) and PSM-based tracking as parallel, redundant sources of truth about what's already running, rather than relying on a single source; start-services.sh is a thin dispatcher: it either execs into the Node.js-based start-services-robust.js (default) or falls through to a large, independently-maintained bash implementation of similar concerns (legacy mode), producing two non-shared implementations of port-cleanup and Docker lifecycle logic
-
 # StartServiceWithRetry — Technical Insight Document
 
 ## What It Is

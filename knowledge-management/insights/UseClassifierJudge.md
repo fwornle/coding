@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:29-45 - JudgeBackend interface separating enabled (config) from reachable (runtime); integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:150-176 - diff-based save() sending only changed backends/rubric/strategy; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:129-138 - setInterval poll loop kept alive during open drafts; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:178-183 - merged memo overlaying draft.enabled onto polled judge/backends; integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx:186 - const judge = useClassifierJudge(proxyBase) instantiation alongside useOffloadPolicyDraft; integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx:225-227 - cls = policy.classifier kept separate from p (offload policy) to avoid cross-redraw
-
 # UseClassifierJudge — Technical Insight Document
 
 ## What It Is

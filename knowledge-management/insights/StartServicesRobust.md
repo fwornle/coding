@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architectural Patterns] Configuration-table/dispatch pattern — SERVICE_CONFIGS keyed by service name with startFn/healthCheckFn/feature/required fields, iterated via SERVICE_ORDER; Fail-open vs fail-closed asymmetry — display/config surfaces (entrypoint.sh gating, prompt-classifier config reload) fail open to 'run everything' or 'keep last good'; process-starting surfaces (required services in start-services-robust.js) fail closed by blocking startup; Idempotent registration / duplicate-detection cascade — layered checks (PSM global → PSM per-project → OS pgrep) before spawning a new process instance; Structural drift-prevention via enumerated-diff tests — tests assert two independently maintained lists/mappings are exact set-equal (service configs vs. order; supervisord programs vs. feature mapping); Escalating termination policy — SIGTERM then poll then SIGKILL with a hard deadline in killProcessOnPortAndWait(); Snapshot-based cross-boundary configuration handoff — host writes a flat JSON snapshot for a container that cannot run the full feature resolver itself
-
 # StartServicesRobust — Technical Insight Document
 
 ## What It Is

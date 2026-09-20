@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The 'Pattern Compliance Score' section is the single point where all four independently-computed check variables (`CONSOLE_LOG_COUNT`, `REDUX_COUNT`/`USESTATE_COUNT`, `NETWORK_CHECK`, `UNDOCUMENTED_FUNCTIONS`) converge into one scalar via `SCORE=$((PASSED_CHECKS * 100 / TOTAL_CHECKS))`. Because `TOTAL_CHECKS` is incremented conditionally (Redux check only runs `if [ -f "package.json" ] && grep -q "react" package.json`, network check only `if [ -f "install.sh" ]`), the denominator itself varies per-repo, meaning a 100% score on a non-React, non-install.sh repo (2/2 checks) is not comparable to a 100% score on a repo with both files present (4/4 checks) — the report presents both as an undifferentiated percentage with no indication of how many checks were actually eligible to run, which is a genericity/comparability trade-off worth flagging for anyone consuming this score across repos.
-
 # VerificationReportGenerator — Technical Insight Document
 
 ## What It Is

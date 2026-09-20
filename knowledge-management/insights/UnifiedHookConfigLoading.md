@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Decoupling by plain-data contract: HooksManager.constructor() accepts a plain HookConfig object (userConfigPath/projectConfigPath/bridgeScriptPath/enableLogging) rather than depending on HookConfigLoader as a class, so the loader and the runtime registry are connected only by an implicit shape agreement; Asymmetric validation strictness across the config→registration boundary: lenient warning-only validation at config load time (HookConfigLoader, per parent-entity observations) versus throw-on-invalid at handler registration time (HooksManager.registerHook); Duplicated, independently-maintained event-name translation tables (EVENT_MAPPINGS in hooks-api.js vs EVENT_MAP in claude-bridge.js) with inconsistent unknown-event fallback behavior (throw vs. silent lowercase passthrough); Multi-layer fail-open error handling: per-handler catch inside triggerHook(), plus a top-level catch in claude-bridge.js's main(), both defaulting to 'allow' with no shared correlation id between their respective log entries; No bounds/type validation on RegisteredHook.priority before it is used in a numeric sort comparator, creating a latent NaN-ordering risk if upstream config validation (HookConfigLoader) is as lenient as the parent-entity observations describe
-
 # UnifiedHookConfigLoading — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Component
 
-[LLM] BaseAgent (base-agent.ts) enforces a rigid template-method pattern across all agents in the pipeline (SemanticAnalysisAgent, OntologyClassificationAgent, the code-graph agent, etc.) via its execute() method, which sequences process() → calculateConfidence() → detectIssues() → generateRouting() → applyCorrections() → buildMetadata(), and wraps the result in a standardized AgentResponse envelope produced by createAgentResponse(). This means any new agent added to the pipeline need only implement process() and the confidence/issue-detection hooks—orchestration code that consumes agent output can treat all agents uniformly, calling .execute() and trusting a consistent response shape regardless of whether the underlying agent is doing git analysis, ontology classification, or code-graph traversal. This uniformity is what allows the orchestrator to compose heterogeneous agents into pipelines without per-agent glue code.
-
 # SemanticAnalysis — Technical Insight Document
 
 ## What It Is

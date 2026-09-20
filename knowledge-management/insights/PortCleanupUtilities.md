@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Port-cleanup logic bypasses ProcessStateManager entirely, operating on raw OS primitives (pgrep, lsof, kill, net.createServer) — PSM and OS/kernel state can diverge and are only reconciled by these utilities, not by PSM itself; Duplicated implementations of the same concern (port cleanup) exist in bash (start-services.sh, legacy) and Node.js (scripts/start-services-robust.js, robust) with materially different reliability guarantees, coupled only by a runtime env-var switch (ROBUST_MODE); `killProcessOnPortAndWait` and `waitForPortBindable` are complementary but structurally independent — one confirms a port is no longer occupied, the other confirms it can be freshly bound — and callers must invoke both to get a complete pre-spawn guarantee; Shell command construction in `isProcessRunningByScript` uses string interpolation into `exec()` rather than `execFile()` with an argument array, which is currently safe only because all call sites pass hardcoded literals
-
 # PortCleanupUtilities — Technical Insight Document
 
 ## What It Is

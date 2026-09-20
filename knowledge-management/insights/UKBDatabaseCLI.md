@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/ukb-database/cli.js:15-16 - imports DatabaseManager and UKBDatabaseWriter for direct DB writes; lib/ukb-database/cli.js:33-40 - isVKBRunning() liveness probe with 1000ms timeout; lib/ukb-database/cli.js:44-59 - sendToVKB() unguarded response.json() error parsing; lib/ukb-database/cli.js:64-101 - initializeDatabase() composite SQLite+Qdrant+graph DB setup and singleton caching; lib/ukb-database/cli.js:97-100 - process.exit(1) on database init failure; lib/ukb-database/cli.js:170-186 - displayStatus() reads databaseManager.getHealth() per-subsystem; lib/ukb-database/cli.js:190-260 - addEntityFromStdin/addRelationFromStdin/updateEntityFromStdin stdin handlers; lib/ukb-unified/cli.js:14-19 - imports TeamCheckpointManager, GapAnalyzer, ConfigManager, WorkflowOrchestrator; lib/ukb-unified/cli.js:150-260 - defaultCommand() checkpoint/gap-analysis state machine; lib/ukb-unified/core/VkbApiClient.js:18-31 - isServerAvailable() 2000ms timeout, ignores graph health field; lib/ukb-unified/core/VkbApiClient.js:105-119 - updateEntity() PUT counterpart to cli.js's local update path
-
 # UKBDatabaseCLI — Technical Insight Document
 
 ## What It Is

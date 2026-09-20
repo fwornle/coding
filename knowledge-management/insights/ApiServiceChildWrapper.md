@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] docker/entrypoint.sh — PROGRAM_FEATURES loop and node -e snippet computing `enabled` from features.json; docker/entrypoint.sh — wait_for_service() function performing TCP readiness polling for Qdrant/Redis; scripts/start-services-robust.js:isProcessRunningByScript() — OS-level pgrep-based orphan detection; scripts/start-services-robust.js:killProcessOnPortAndWait() — SIGTERM/SIGKILL escalation with lsof polling; scripts/start-services-robust.js:waitForPortBindable() — throwaway net.createServer() probe for kernel-held sockets; scripts/start-services-robust.js:SERVICE_CONFIGS.transcriptMonitor.startFn — three-layer PSM/OS liveness check before spawn; scripts/prompt-classifier-service.mjs:loadConfig() — mtime-based hot reload with last-good-config fallback; scripts/prompt-classifier-service.mjs:envFallbackConfig() — pre-2026-09-02 single-endpoint legacy config shape; scripts/prompt-classifier-service.mjs — top-level empty-env-var sanitization before process.loadEnvFile(ENV_FILE); start-services.sh — ROBUST_MODE branch exec'ing into scripts/start-services-robust.js vs legacy Docker/constraint-monitor bash block; tests/features/service-gating.test.mjs — 'SERVICE_ORDER and SERVICE_CONFIGS cover each other exactly' and 'the live-logging pair still starts before everything else' assertions; tests/features/service-gating.test.mjs — 'a disabled service is not reported as degraded' test distinguishing disabled vs degraded outcomes
-
 # ApiServiceChildWrapper — Technical Insight Document
 
 ## What It Is

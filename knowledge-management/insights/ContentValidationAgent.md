@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] ContentValidationAgent (integrations/semantic-analysis/src/agents/content-validation-agent.ts) is described as using regex-based filePathPatterns and commandPatterns to extract file/command references from entity observations, then cross-checking them against GitStalenessDetector and CommitEntityCorrelation for staleness scoring. This is a text-mining-over-structured-metadata design: rather than requiring entities to declare typed, machine-readable pointers to the code they describe, the agent infers those pointers by pattern-matching free-text observation strings. The trade-off is clear — authoring an observation stays as simple as writing a sentence, but the accuracy of staleness detection is bounded by how well the regexes generalize across phrasing (e.g. backticked paths, inline code spans, shell snippets with flags). Any observation that references a file or command in a way the patterns don't anticipate silently escapes validation, producing false negatives rather than errors — consistent with the broader constraint-system philosophy noted in the parent context of favoring non-blocking degradation over hard failures.
-
 # ContentValidationAgent — Technical Insight Document
 
 ## What It Is

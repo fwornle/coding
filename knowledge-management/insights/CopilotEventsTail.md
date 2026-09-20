@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] No shared base class or utility module for the uid-ownership check — isOwnedByMe() and ownedDbPath() are separately implemented, duplicating logic across copilot-events-tail.mjs and opencode-token-rows.mjs; Two structurally incompatible watcher models (polled push-like tail vs. on-demand SQLite pull) coexist under a single conceptual 'live transcript capture' umbrella with no common interface; Tight coupling to on-disk artifact formats owned by external processes (Copilot's events.jsonl, OpenCode's opencode.db) rather than an internal abstraction, meaning any upstream schema change (e.g., Copilot CLI persisting more fields) requires direct changes to this parsing code; Deliberate separation of 'live' vs 'backfill/sweep' responsibilities via a strict forward-only read boundary in tailEventsFile(), requiring a separate out-of-band process (the Plan 51-04 sweep) for full historical coverage; Cross-module reuse via explicit imports from lib/lsl/adapters/copilot-events.mjs (parseWorkspaceYaml, projectFromWorkspace, stripToolCallIdPrefix) labeled 'D-Reuse', showing intentional avoidance of duplicating the Phase 51-04 parsing logic even while duplicating the ownership-check logic
-
 # CopilotEventsTail — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] `tests/features/service-gating.test.mjs` treats `SERVICE_ORDER` and `SERVICE_CONFIGS` as two halves of one contract that must never drift independently: the test `'SERVICE_ORDER and SERVICE_CONFIGS cover each other exactly'` sorts and diffs `SERVICE_ORDER.map((o) => o.key)` against `Object.keys(SERVICE_CONFIGS)`, which catches both directions of the bug class named in the file's header comment — a service registered in `SERVICE_CONFIGS` but forgotten in `SERVICE_ORDER` (never started), and the inverse (an order entry pointing at a config that no longer exists, throwing at runtime instead of at CI time). A second test, `'the live-logging pair still starts before everything else'`, pins `SERVICE_ORDER.slice(0, 2)` to `['transcriptMonitor', 'liveLoggingCoordinator']` specifically because — per the test's own comment — 'the transcript monitor and its coordinator are what later services register against.' This makes ordering a first-class, tested invariant rather than an implicit consequence of array literal order in `start-services-robust.js`.
-
 # SERVICE_ORDER_Contract: Technical Insight Document
 
 ## What It Is

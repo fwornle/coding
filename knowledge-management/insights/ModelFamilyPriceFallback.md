@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Tight coupling between model-naming conventions and correctness: modelFamily()'s substring matching and priceForModel()'s FAST_MODE_SUFFIX string convention both assume model ids follow an unenforced lexical pattern (family name as substring, '-fast' suffix) with no schema/type-level guarantee; Single-direction data flow: cellCostUsd() consumes only `.price` from ResolvedPrice, discarding the `.priced`/`.source` fields that would let a caller distinguish confident vs. guessed pricing — an architectural seam where cost-model.ts computes more information than its current caller uses; Config-driven fallback ordering: FAMILY_REPRESENTATIVE is a hardcoded priority list co-located with, but structurally separate from, the DEFAULT_COST_CONFIG.modelPrices map it queries against — the two must be kept in sync by hand when new model generations are added; Convergent design philosophy across modules: both cost-model.ts's family-fallback and model-limits.cjs's byModel voting index solve the same underlying problem (resolve an id that doesn't have an exact catalogue/price entry) with independently-implemented but philosophically similar fallback+tie-break strategies, suggesting this is a recurring pattern in the codebase worth extracting if a third instance appears
-
 # ModelFamilyPriceFallback — Technical Insight Document
 
 ## What It Is

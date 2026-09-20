@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] LSLConfigValidator's identity is purely a JS class (validate-lsl-config.js), while LiveLoggingSystem's conceptual/semantic identity is defined declaratively in ontology JSON — these are two separate 'sources of truth' a developer must reconcile; Config validated by LSLConfigValidator (lsl-config.json, redaction-config.yaml) has downstream consumers in entirely different files/subsystems (ConfigurableRedactor.js, lib/lsl/window.mjs) with no shared schema type enforcing the contract between validator and consumer; Per-agent capability differences (e.g., Copilot's degraded lifecycle-only event stream in copilot-events-tail.mjs) exist outside LSLConfigValidator's validation surface — config correctness and agent capability correctness are validated by entirely separate mechanisms; The 6-character truncated-hash identity scheme recurs in two independent places (LSLConfigValidator's userHashLength bound and token-db.mjs's ADAPTER_USER_HASH_* constants / proxy's user_hash charset) without a single shared constant or validator tying them together; Multiple LSL-adjacent writers (ObservationWriter.js, token-db.mjs's insertTokenRow) are built around 'never throw / best-effort' semantics, implying LSLConfigValidator's role is to catch misconfiguration upfront since downstream code is deliberately permissive at runtime
-
 # LSLConfigValidator — Technical Insight Document
 
 ## What It Is

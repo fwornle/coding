@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architectural Patterns] Reconciliation/diff pattern between client-predicted and server-resolved state (offload-decision.tsx's configRungs.disagreements); Bounded-concurrency pool pattern for rate-limiting fan-out HTTP calls (pooled() in offload-decision.tsx); Optimistic-concurrency partial-PATCH pattern to avoid poll-vs-edit races (use-classifier-judge.ts's save()); Config-per-concern / failure-domain isolation pattern (separate YAML files and separate React hooks for offload policy vs classifier judge); Derived-rule-over-lookup-table pattern to prevent silent staleness (cost-model.ts's fast-mode pricing multiplier); Boiled-down derived cache invalidated by mtime+size, sourced from an external system-of-record (model-limits.cjs); Tri-state runtime-vs-config field separation for health signaling (JudgeBackend.reachable vs .enabled)
-
 # OffloadPolicyMirrorCheck — Technical Insight Document
 
 ## What It Is

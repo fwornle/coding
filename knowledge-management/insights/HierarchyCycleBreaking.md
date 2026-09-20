@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Cycle-breaking logic is implemented twice with identical shape (nodeFillColor, nodeShapeFor) instead of being factored into one generic ancestry-walker — a missed consolidation opportunity given this codebase's stated preference for unifying divergent per-consumer logic (see color-fallback.ts's own header commentary on the D3/Sigma/Legend color unification); No explicit error signaling on cycle detection — degrades to the same default path used for legitimately-unstyled classes, so data-quality bugs in the ontology registry are invisible at runtime; Selection-ancestry safety (D3GraphCanvas.tsx) and ontology-class-ancestry safety (color-fallback.ts) are two independent defensive mechanisms in the same rendering subsystem, not a shared hierarchy-traversal utility
-
 # HierarchyCycleBreaking — Technical Insight Document
 
 ## What It Is

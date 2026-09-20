@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] Because OntologyClassificationAgent 'constructs an OntologyRegistry (@fwornle/km-core) directly and wraps it with LegacyOntologyAdapter,' this creates a layered dependency: OntologyClassificationAgent -> LegacyOntologyAdapter -> OntologyRegistry (km-core) -> (consumed indirectly by) OntologyValidator/OntologyClassifier. This is architecturally significant because it means the 'legacy' consumers never talk to km-core's registry directly; they are fully insulated by the adapter's EntityDefinition/OntologyType/PropertyDefinition-shaped interface. Any future change to km-core's OntologyRegistry API should, in principle, only require updating LegacyOntologyAdapter.ts rather than every legacy call site — a clear separation-of-concerns benefit, though it also means the adapter is a single point of failure/staleness risk if km-core's registry evolves faster than the adapter is maintained.
-
 # LegacyOntologyAdapter — Technical Insight Document
 
 ## What It Is

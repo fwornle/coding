@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] QA/validation logic in this codebase is split between deterministic code gates (no-unbounded-fs-scan.ts) and narrowly-scoped correctness fixes in aggregation logic (batch-provenance.mjs), rather than being centralized in one 'QualityAssurance' module; Fail-open vs. fail-closed is treated as a deliberate per-guard architectural decision rather than a blanket rule — safety/availability guards fail open, data-integrity guards (as described for ontology hierarchy validation) fail closed; Agent launch scripts (copilot.sh, opencode.sh, pi.sh) share a common lifecycle contract (`agent_check_requirements`, `agent_pre_launch`, `agent_cleanup`) sourced by a shared `launch-agent-common.sh`, but each implements validation depth independently rather than through a shared base validator; Config file mutation for external tools (pi's config dir) uses an explicit ownership-marker convention instead of relying on gitignore or directory scoping alone to prevent overwriting user data; Rationale and incident history are pushed into source comments adjacent to the code they justify, rather than into external documentation, functioning as a form of executable/co-located QA documentation
-
 # QualityAssurance — Technical Insight Document
 
 ## What It Is

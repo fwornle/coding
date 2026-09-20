@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] verify-patterns.sh relies on environment variables for repo-root resolution but hardcodes its own operational thresholds and color/formatting configuration, diverging from the project's broader config-file-driven idiom; EntityPatternAnalyzer favors compile-time TypeScript data structures over externalized YAML/JSON for team/pattern mappings, unlike the <AWS_SECRET_REDACTED> convention described in parent context; Eager constructor initialization in EntityPatternAnalyzer is appropriate given the low cost of the data being initialized, consistent with the project's general lazy-init-for-heavy-resources convention; verify-patterns.sh silently degrades (no error) when $SHARED_MEMORY is unset, reflecting the informal, unvalidated nature of environment-variable-driven configuration called out in the parent context; No shared schema or validator exists across the two configuration idioms observed (runtime env vars vs. static in-code registries), so consistency depends entirely on developer discipline rather than tooling
-
 # EnvironmentVariableConfiguration — Technical Insight Document
 
 ## What It Is

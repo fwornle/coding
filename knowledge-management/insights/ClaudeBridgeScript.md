@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks/claude-bridge.js:36-44 - EVENT_MAP native-to-unified event translation table; lib/agent-api/hooks/claude-bridge.js:47-70 - readStdin() with 1000ms fallback timeout resolving to {}; lib/agent-api/hooks/claude-bridge.js:76-101 - transformContext() spreading raw claudeContext into metadata; lib/agent-api/hooks/claude-bridge.js:106-112 - transformResponse() collapsing messages[] into single message string; lib/agent-api/hooks/claude-bridge.js:118-159 - main() dynamic import of hook-manager.js, lazy initialize(), fail-open catch block; lib/agent-api/hooks-api.js:36-54 - EVENT_MAPPINGS table with null entries for unsupported claude/copilot events; lib/agent-api/hooks-api.js:100-115 - HooksManager constructor throwing on direct instantiation via new.target check; lib/agent-api/hooks-api.js:180-197 - registerHook() sorting eventHooks by priority on every call; lib/agent-api/hooks-api.js:230-266 - triggerHook() accumulating messages[] and allow across handlers
-
 # ClaudeBridgeScript — Technical Insight Document
 
 ## What It Is

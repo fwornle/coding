@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] DMRProvider is architecturally a backend implementation behind a shared OpenAI-shaped interface, not a standalone client — this minimizes provider-specific surface area at the cost of coupling DMR's behavior to OpenAI's response contract; Availability/health state for DMR is decoupled from the request path via caching, following the same 'don't add synchronous checks to the hot path' principle that should generalize to any new local/self-hosted provider; Runtime mode switching (mock/local/public) is state-file-driven (.data/workflow-progress.json) rather than environment-variable-driven, enabling per-agent overrides without restarting the process — DMRProvider's activation is therefore dynamic and externally controllable mid-run; Legacy state (progress.mockLLM) is preserved via sustained dual-write rather than a hard migration cutover, indicating unknown/undocumented external consumers of that flag outside the LLM abstraction module's own boundary
-
 # DMRProvider — Technical Insight Document
 
 ## What It Is

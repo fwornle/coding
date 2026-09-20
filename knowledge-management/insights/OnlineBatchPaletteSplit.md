@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - calculateDynamicEta() dynamic batch-duration learning with linear-ETA sanity clamp; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - calculateStepAwareEta() legacy delegation shim kept for call-site compatibility; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts - WorkflowExecutionState vs WorkflowPreferencesState interfaces and initial*State constants; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts - singleStepModeExplicit/mockLLMExplicit fields and sync*FromServer/reset*Explicit actions; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx - AGENT_SUBSTEPS['persistence'] w1/w2/w3 techNote distinguishing plain storage from direct attribute merge; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx - WAVE_AGENTS and KG_OPERATOR_CHILDREN module-scope arrays; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx - deriveAncestryFromStorePath() prunes inline BFS to store's authoritative pathToSelected set; integrations/unified-viewer/src/graph/color-fallback.ts - classColor() using isOnlineLearned() to select BATCH_PALETTE vs ONLINE_PALETTE; integrations/unified-viewer/src/graph/color-fallback.ts - nodeFillColor() and nodeShapeFor() ancestor-chain resolvers with ONLINE_RING_COLOR ring overlay for provenance
-
 # OnlineBatchPaletteSplit — Technical Insight Document
 
 ## What It Is

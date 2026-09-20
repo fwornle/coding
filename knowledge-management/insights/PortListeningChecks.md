@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The two health-check functions encode different failure semantics that a caller must understand before choosing one. isPortListening() treats any request-level error (client.on('error')) or timeout as false, but also implicitly treats any non-2xx status code (e.g. 500, 404) as unhealthy via the strict `res.statusCode >= 200 && res.statusCode < 300` range check — so a service that is up but returning 503 during its own warmup would read as fully down to startServiceWithRetry(), triggering the SIGTERM/SIGKILL cleanup path even though the process might have recovered given more time. isTcpPortListening(), by contrast, only proves a listener exists on the port — it resolves true purely from the socket 'connect' event with no protocol-level verification, so a TCP-accepting-but-application-broken process (e.g. a Node process that bound the port before crashing in its request handler) would pass this check yet still be non-functional. Choosing the wrong one of these two for a given service could produce either false negatives (aggressive killing of a slow-starting service) or false positives (declaring 'success' on a process that never becomes truly usable).
-
 # PortListeningChecks — Technical Insight Document
 
 ## What It Is

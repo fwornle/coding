@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] TranscriptAdapter is an abstract base in lib/agent-api/transcript-api.js; concrete implementations are expected under lib/agent-api/transcripts/ (e.g. claude-parser.js) but the shown ClaudeParser does not visibly extend it, suggesting either truncation or a wrapper adapter not shown; Two independent staleness/freshness mechanisms coexist: TTL session cache (transcript-api.js, cacheTimeout) vs. mtime-based maxSessionAge (claude-parser.js) — not unified; Claude Code's on-disk transcript directory convention is hardcoded in ClaudeParser rather than injected via the generic TranscriptConfig.transcriptDir option, creating tight coupling to Claude's specific naming scheme; The dashboard's lsl-sessions.mjs is a fully separate read path over already-persisted LSL files, not a consumer of the live TranscriptAdapter/watchTranscripts mechanism; LSLEntryType enum and LSLMetadata shape (transcript-api.js) form the contract boundary that all adapter output must satisfy before flowing into the parent LiveLoggingSystem's mandatory classification/redaction schema
-
 # TranscriptAdapterFramework — Technical Insight Document
 
 ## What It Is

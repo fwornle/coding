@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The core of this component, `deriveAncestryFromStorePath()` in integrations/unified-viewer/src/graph/D3GraphCanvas.tsx, implements a fast-path/slow-path reconciliation between two independently-computed ancestry sets: the store's authoritative `pathToSelected` set (written by every selection writer — graph click, history click, timeline tick) and a local re-run of `computeAncestryPath()` (imported from './ancestry'). The fast path short-circuits when `inline.nodeDepths.size === storePath.size` and every inline key exists in `storePath`, avoiding the more expensive pruning logic on the common case where both traversals agree. When they disagree, the function does not simply trust one source — it builds a `prunedNodeDepths` map giving store-only nodes a synthetic `maxDepth` slot (so they render at the dimmest end of the gradient rather than being dropped), while dropping BFS-only nodes entirely and filtering `prunedEdges` down to edges whose endpoints both survive. This is a deliberate 'writer's intent wins, but degrade gracefully' policy rather than a simple source-of-truth swap.
-
 # ComputeAncestryPathExtraction — Technical Insight Document
 
 ## What It Is

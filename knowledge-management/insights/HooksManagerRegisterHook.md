@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks-api.js - HooksManager.registerHook(): push + eventHooks.sort((a,b) => a.priority - b.priority) on every registration; lib/agent-api/hooks-api.js - HooksManager.triggerHook(): fullContext spreads ...context last, allowing override of computed agentType/agentEvent/sessionId; lib/agent-api/hooks-api.js - HooksManager.triggerHook(): per-handler try/catch pushes 'Hook error (<id>): <message>' and continues the loop; lib/agent-api/hooks-api.js - HooksManager.unregisterHook(): iterates this.hooks.entries() + hooks.findIndex(h => h.id === hookId); lib/agent-api/hooks-api.js - HooksManager.getRegisteredHooks(): allHooks.push(...hooks) flattens per-event arrays without a global re-sort; lib/agent-api/hooks-api.js - HooksManager constructor: if (new.target === HooksManager) throw ...; and abstract method throws in getAgentType/loadNativeHooks/saveNativeHooks; lib/agent-api/hooks/claude-bridge.js - main(): try/catch wraps entire bridge execution, catch writes {decision:'allow', message:'Hook bridge error: ...'} and process.exit(0); lib/agent-api/hooks/claude-bridge.js - readStdin(): setTimeout(() => { if (!data) resolve({}) }, 1000) guards against a hanging stdin read
-
 # HooksManagerRegisterHook — Technical Insight Document
 
 ## What It Is

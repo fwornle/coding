@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Classification universe is externalized to .data/ontologies/coding.lower.json, decoupling 'what L2 classes exist' from the classifier's own code, but the eligibility gate (REFINABLE_L1_PARENTS) remains hardcoded in ontology-classification-agent.ts, producing a split source of truth; Failure handling favors silent degradation (return L1 parent) over explicit error signaling, which trades debuggability/observability for pipeline robustness; No structured-output contract is enforced on the LLM response; correctness depends on a regex-based scan rather than a schema-validated payload; Test strategy is integration-first against fixture copies of the production ontology rather than mocks, trading test speed/isolation for fidelity to real malformed-data failure modes; The component under analysis (ClosedVocabularyRefinement / ontology-classification-agent.ts) is not represented in the supplied code files or code_graph, so architecture claims here rest on the parent entity's observations rather than on directly inspected source in this pass
-
 # ClosedVocabularyRefinement: Technical Insight Document
 
 ## What It Is

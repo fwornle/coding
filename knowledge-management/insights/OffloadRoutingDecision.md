@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx - OffloadDecision component, mode toggle and configRungs/disagreements logic; integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx - pooled() bounded-concurrency fetch helper; integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx - queryFor() route-key to resolve-query mapping; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts - useClassifierJudge hook, JudgeBackend.enabled vs reachable distinction; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts - save() diff-based PATCH construction; integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx - onDirtyChange effect reporting draft state to parent
-
 # OffloadRoutingDecision — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/unified-viewer/src/graph/color-fallback.ts:36-43 - BATCH_PALETTE five-tier hierarchy color table; integrations/unified-viewer/src/graph/color-fallback.ts:49-56 - ONLINE_PALETTE red/pink hierarchy color table; integrations/unified-viewer/src/graph/color-fallback.ts - nodeFillColor() parent-walk resolver (registry.display.color → BATCH_PALETTE → ancestor); integrations/unified-viewer/src/graph/color-fallback.ts - nodeShapeFor() parent-walk resolver (registry.display.shape → SHAPE_PALETTE → ancestor); integrations/unified-viewer/src/graph/color-fallback.ts - SHAPE_PALETTE 16-class shape lookup table; integrations/unified-viewer/src/graph/color-fallback.ts - classColor() DEPRECATED dual-palette (batch/online) function retained for tests; integrations/unified-viewer/src/graph/color-fallback.ts - borderStyleFallback()/pulseRuleFallback() UI-SPEC §14 fallback helpers; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx - registryMap construction from useGraphData() ontology array, passed into nodeFillColor; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx - D3Node interface, ontologyClass vs entityType distinction comment; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx - AGENT_SUBSTEPS llmUsage tiers consumed by TIER_COLORS
-
 # OntologyHierarchyColorPalette — Technical Insight Document
 
 ## What It Is

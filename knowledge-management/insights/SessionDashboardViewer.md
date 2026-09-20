@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Session identity in the dashboard is chain-based, not file-based — `chainId()`/`parseChainId()` group rotation parts into one logical unit to avoid exposing headerless mid-token fragments to the viewer; Dual transcript format support (`.jsonl` pi-native and `.md` legacy) is handled via format detection (`format: 'pi' | 'markdown' | 'mixed'`) rather than a unified on-disk schema, reflecting a corpus mid-migration; Tool name aliasing (`RENDER_TOOL_ALIASES` in `lsl-sessions.mjs`) is applied strictly at render time, leaving stored entries with the agent's original tool names — a deliberate separation between display and persisted data; Cross-cutting inconsistency: `ClaudeParser.parseFile()`'s raw-username `userHash` assignment does not match the SHA-256-hash-then-truncate convention documented for LSL's `validateUserEnvironment()`, suggesting the transcript-adapter layer and the config-validation layer evolved independently without a shared hashing utility; Frontend/backend split is clean but network-coupled: `lsl-sessions.tsx` polls `SYSTEM_HEALTH_API_PORT` (default 3033) via both a 30s interval and a `visibilitychange` listener, meaning dashboard freshness depends entirely on that HTTP API being reachable rather than any push mechanism
-
 # SessionDashboardViewer — Technical Insight Document
 
 ## What It Is

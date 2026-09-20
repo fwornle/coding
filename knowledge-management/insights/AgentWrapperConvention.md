@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:69 - analyzeEntityPatterns() two-step (local artifact, then pattern) team classification entry point; src/ontology/heuristics/EntityPatternAnalyzer.ts:104 - extractArtifacts() regex extraction of file paths, npm scopes, Manager/Classifier-suffixed class names, and directory prefixes; src/ontology/heuristics/EntityPatternAnalyzer.ts:141 - checkLocalArtifact() directory-prefix match against teamDirectories, confidence 0.9; src/ontology/heuristics/EntityPatternAnalyzer.ts:161 - matchArtifactPattern() regex match against artifactPatterns, confidence 0.75; src/ontology/heuristics/EntityPatternAnalyzer.ts (teamMappings 'Agentic' block) - unreachable team mapping not wired to teamDirectories or artifactPatterns; scripts/knowledge-management/verify-patterns.sh:1 - set -euo pipefail combined with post-increment PASSED_CHECKS arithmetic (potential early-exit bug); scripts/knowledge-management/verify-patterns.sh (High-Significance Pattern Usage section) - case-statement stub defaulting USAGE_INDICATOR=0 for any pattern name not matching *Logging*/*Redux*|*State*; scripts/knowledge-management/verify-patterns.sh (SHARED_MEMORY write-back) - jq-based read of TransferablePattern entities and write of metadata.pattern_compliance_score into the same JSON file
-
 # AgentWrapperConvention — Technical Insight Document
 
 ## What It Is

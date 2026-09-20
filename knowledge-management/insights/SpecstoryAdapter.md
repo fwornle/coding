@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Abstract base class (TranscriptAdapter) enforces implementation of five abstract methods via runtime Error throws rather than compile-time interfaces, since the codebase is plain JS with JSDoc typing; Mandatory classification/redaction schema gate (per parent LiveLoggingSystem observations) implies all adapters, including SpecstoryAdapter, must route output through classification-validated paths rather than writing directly to session storage; Format heterogeneity (pi/.jsonl vs specstory/markdown) is handled downstream in the dashboard (lsl-sessions.mjs) via live in-memory conversion rather than upstream normalization at ingestion time, creating two places where format-specific logic must stay in sync; Fixed six-value LSLEntryType enum constrains all adapters to a lowest-common-denominator entry vocabulary, pushing format-specific richness into generic metadata/tool fields; Cursor/diffing for live-watch is entry-count-based rather than id- or timestamp-based, a fragility noted as a recurring dedup bug source elsewhere in the LSL subsystem
-
 # SpecstoryAdapter — Technical Insight Document
 
 ## What It Is

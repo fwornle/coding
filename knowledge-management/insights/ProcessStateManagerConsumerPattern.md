@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] scripts/start-services-robust.js:44 - `const psm = new ProcessStateManager();` module-level singleton instantiation; scripts/start-services-robust.js (transcriptMonitor.startFn) - triple liveness check: `psm.isServiceRunning('transcript-monitor','global')`, `psm.isServiceRunning('enhanced-transcript-monitor','per-project',{projectPath})`, `isProcessRunningByScript('enhanced-transcript-monitor.js')`; scripts/start-services-robust.js (transcriptMonitor.startFn, orphan branch) - `psm.registerService({name:'transcript-monitor', pid: osCheck.pid, type:'global', script:'scripts/enhanced-transcript-monitor.js'})`; scripts/start-services-robust.js (liveLoggingCoordinator.startFn) - two-step check `psm.isServiceRunning('live-logging-coordinator','global')` + `isProcessRunningByScript('live-logging-coordinator.js')`, no per-project variant; scripts/start-services-robust.js:63-77 - `isProcessRunningByScript(scriptPattern)` OS-level `pgrep -lf` fallback used by all PSM consumers in this file; start-services.sh - `node scripts/psm-register.js --check transcript-monitor global` bash-level PSM consumer via CLI wrapper; docker/entrypoint.sh - independent `/coding/.coding/runtime/features.json` snapshot mechanism, no PSM involvement, gates supervisord `autostart` instead; tests/features/service-gating.test.mjs - stubs `SERVICE_CONFIGS.transcriptMonitor.startFn` directly, bypassing any real PSM call during required-service-blocks-startup assertions
-
 # ProcessStateManagerConsumerPattern
 
 ## What It Is

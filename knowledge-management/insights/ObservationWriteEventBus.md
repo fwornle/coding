@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The event bus only fires on a *successful* write (per the `'written'` event documentation, payload mirrors the persisted `obsRow`), meaning it is a post-commit notification hook, not a pre-write interceptor — it has no ability to veto or transform a write, and any consumer is inherently eventually-consistent with respect to km-core's `GraphKMStore` (the writer's actual persistence target per the file's own header comments on Phase 44's SQLite→km-core cutover). Because the bus lives in the same file as the km-core write path but is architecturally independent of it, a future change to how/where observations are persisted (e.g. another storage backend) would not need to touch the event bus contract at all — the two are only coupled by the shape of `obsRow` at the emit call site, which the code excerpt truncates before showing.
-
 # ObservationWriteEventBus — Technical Insight Document
 
 ## What It Is

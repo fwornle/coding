@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] D3GraphCanvas.tsx is a near-verbatim port of a component from a separate integration (memory-visualizer), coupling its force-layout tuning to an external visual reference rather than this codebase's own data characteristics; Viewport-stability is treated as a 'locked contract' enforced by keeping certain store subscriptions (selectionSource) out of the main render useEffect's dependency list even when new behavior needs them; color-fallback.ts accumulates three generations of color-resolution logic (classColor/_classHue, isOnlineSource, nodeFillColor/nodeShapeFor) simultaneously live for backward compatibility; multi-agent-graph.tsx bundles a large embedded static data schema (AGENT_SUBSTEPS) with rendering-performance-critical hoisted constants in the same file, without an explicit YAML-derivation mechanism unlike ukbSlice.ts's batchPhaseSteps; ukb-workflow-modal.tsx colocates non-rendering statistical estimation logic (calculateDynamicEta, getStepMedianDuration, calculateMedian) with graph-modal UI code because both consume the same Redux-derived UKBProcess/WorkflowTimingStats state
-
 # ForceDirectedLayout — Technical Insight Document
 
 ## What It Is

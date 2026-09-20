@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Because directory-prefix matching (`checkLocalArtifact`, confidence 0.9) is tried before class-name/regex pattern matching (`matchArtifactPattern`, confidence 0.75) inside `analyzeEntityPatterns()`'s per-artifact loop, an artifact string that happens to satisfy both a directory prefix and a regex pattern (e.g., a path under `src/ontology` that also contains a class name matching `/Knowledge(Entity|Retriever|Extractor)/i`) will always resolve via the cheaper prefix check and never reach the regex path — the two matching strategies are not merged or compared for best-confidence; the first successful match short-circuits the loop entirely, which is a correctness trade-off explicitly favoring speed over exhaustiveness.
-
 # TeamDirectoryPrefixMatching — Technical Insight Document
 
 ## What It Is

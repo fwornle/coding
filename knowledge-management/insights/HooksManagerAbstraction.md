@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks-api.js - HooksManager constructor throws if instantiated directly via new.target check; lib/agent-api/hooks-api.js - EVENT_MAPPINGS.claude sets STARTUP and SHUTDOWN to null ('Handled by launcher script' / 'EXIT trap'); lib/agent-api/hooks-api.js - registerHook() re-sorts eventHooks by priority on every call (`eventHooks.sort((a, b) => a.priority - b.priority)`); lib/agent-api/hooks-api.js - triggerHook() wraps each hook.handler() call in try/catch, pushing `Hook error (${hook.id}): ${error.message}` and continuing the loop; lib/agent-api/hooks/claude-bridge.js - EVENT_MAP maps 'Startup'->'startup' and 'Shutdown'->'shutdown', contradicting hooks-api.js's null mappings for the same events; lib/agent-api/hooks/claude-bridge.js - readStdin() resolves to {} after a 1000ms setTimeout fallback if no data received; lib/agent-api/hooks/claude-bridge.js - main() dynamically imports './hook-manager.js' and calls manager.initialize(projectPath) only if !manager.initialized; lib/agent-api/hooks/claude-bridge.js - transformResponse() collapses multiple unified messages into one via `unifiedResult.messages?.join('\n')`; lib/agent-api/hooks/claude-bridge.js - main()'s catch block returns {decision: 'allow', message: `Hook bridge error: ${error.message}`} and calls process.exit(0)
-
 # HooksManagerAbstraction — Technical Insight Document
 
 ## What It Is

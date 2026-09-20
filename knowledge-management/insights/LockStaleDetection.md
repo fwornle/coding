@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The 10-minute grace window is a magic number with only a comment, not a config value or environment override, tying deployment-time tunability to a code edit and redeploy: `const LOCK_STALE_GRACE_MS = 10 * 60 * 1000;` sits directly above `findLiveLockFile`, justified only by the inline reference to 'RESEARCH landmine #5: a hard-crashed Copilot session leaves the lock orphaned.' Because `findLiveLockFile` is a pure function of `Date.now()` and `fs.statSync`, the component has no way to distinguish 'session idle 11 minutes between turns' from 'process hard-crashed 11 minutes ago' — both produce an identical `null` return and both are silently excluded from `scanForLiveSessions()`'s live list. This is a precision/recall trade-off baked into a single constant: shortening the window increases the risk of dropping a legitimately-idle live session (false negative on liveness), while lengthening it increases the risk of tailing a dead session's lock file well past its actual death (false positive), and the code offers no mid-run adaptive signal (e.g., re-checking after the initial miss) to recover from either failure mode.
-
 # LockStaleDetection
 
 ## What It Is

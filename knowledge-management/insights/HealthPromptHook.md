@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] hooks-api.js's HooksManager is an abstract class enforced at runtime via `new.target` checks rather than TypeScript's compile-time abstract keyword, since the file is plain JS with JSDoc typing; Two parallel hook-registry implementations exist in this codebase area (hooks-api.js's HooksManager.hooks and the parent-referenced hook-manager.js's UnifiedHookManager) with structurally similar but not identical registration/sort/trigger logic — worth checking for whether one supersedes the other or both are actively used by different code paths; Tight coupling between claude-bridge.js and hook-manager.js: the bridge dynamically imports `./hook-manager.js` inside main() and calls `getHookManager()` + `manager.initialize()` + `manager.executeHooks()`, meaning claude-bridge.js's own EVENT_MAP is only the first of two translation layers before a handler actually runs; No sanitization boundary inside the bridge layer itself — transformContext() passes raw tool_input/context through unfiltered, pushing all privacy/security filtering responsibility onto downstream consumers such as ViolationCaptureService.sanitizeParams(), which is an implicit cross-file contract not enforced by types or runtime checks in the files shown
-
 # HealthPromptHook — Technical Insight Document
 
 ## What It Is

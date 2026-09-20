@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The module's `export { main, transformContext, transformResponse, EVENT_MAP }` at the bottom of claude-bridge.js, combined with the `if (process.argv[1] === fileURLToPath(import.<COMPANY_NAME_REDACTED>.url)) { main(); }` guard, deliberately makes this file dual-purpose: directly executable as a CLI hook bridge AND importable as a library of pure translation functions (`transformContext`, `transformResponse`) for unit testing without invoking the stdin-reading, process-exiting `main()`. This is the standard 'testable CLI entrypoint' pattern, but it also means EVENT_MAP (the Claude-side event name table) and hooks-api.js's EVENT_MAPPINGS.claude (the unified-side event name table) are two independently maintained, differently-shaped mappings between overlapping but non-identical vocabularies (EVENT_MAP has PrePrompt/PostPrompt/Error entries that EVENT_MAPPINGS.claude explicitly maps to `null`), so a change to one has no compiler or test-time link forcing an update to the other.
-
 # ClaudeBridgeEventTranslation
 
 ## What It Is

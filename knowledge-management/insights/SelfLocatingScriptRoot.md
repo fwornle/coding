@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Root resolution is hardcoded to a fixed directory depth (2 levels up from `scripts/knowledge-management/`) rather than using a tool like `git rev-parse --show-toplevel`, making it positionally fragile; No cross-validation exists between the self-located `$CLAUDE_REPO` and the externally-supplied `$SHARED_MEMORY` path — they are assumed, not verified, to belong to the same project instance; Mutation targets (`$VERIFICATION_REPORT`, `$SHARED_MEMORY.tmp`) are placed outside the self-located root tree, limiting the impact of a miscomputed root; The self-locating idiom is duplicated per-script rather than centralized in a shared sourced library, per the parent context's claim of structural mirroring with `config/agents/*.sh`; Strict mode (`set -euo pipefail`) is only inconsistently guarded against known non-zero exit codes from `rg`/pipelines, an incomplete application of the defensive pattern
-
 # SelfLocatingScriptRoot — Technical Insight Document
 
 ## What It Is

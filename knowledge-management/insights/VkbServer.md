@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] VKBServer (index.js) is externally monitored and restartable via health-remediation-actions.js's restartVKBServer, implying it participates in the health-coordinator's automated recovery loop; Two independent CLI surfaces (lib/ukb-database/cli.js, lib/ukb-unified/cli.js via VkbApiClient) both speak to the VKB server over HTTP on a hardcoded localhost:8080 default, with no shared client library between them; Entity/relation writes can occur through two different paths (direct DatabaseManager/UKBDatabaseWriter vs. VKB server HTTP API), creating potential cache/state divergence given the parent component's caching layer; Dashboard visualization layer (system-health-dashboard) maintains its own hardcoded model of the backend pipeline's agents/substeps/storage targets, decoupled from and potentially drifting from the actual backend implementation (e.g., stale 'GraphDB + LevelDB' references post-KMCore migration); ETA/ timing estimation logic lives client-side in the dashboard rather than being computed and served by the workflow backend
-
 # VkbServer — Technical Insight Document
 
 ## What It Is

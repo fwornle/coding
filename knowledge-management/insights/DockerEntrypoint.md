@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] entrypoint.sh treats database readiness as advisory (always returns 0), deferring actual failure handling to supervisord's restart policy rather than aborting container startup; Feature gating is intentionally fail-open on unknown/missing config (unknown feature = enabled, missing snapshot = start everything), inverting the fail-closed posture used for anything that starts a process elsewhere in the project; Tight coupling between dashboard-service.js and api-service.js's port number via a hardcoded literal (localhost:3031) rather than a shared config source, creating a silent drift risk if CONSTRAINT_API_PORT is overridden; PSM registration is decoupled from process lifecycle correctness — it's best-effort telemetry/visibility, not a gating dependency, in both wrapper scripts; MCP tool surface generation (generate-docker-mcp-config.sh) and container process supervision (entrypoint.sh) both consume the same class of feature-flag snapshot but apply it to different subsystems (agent tool schema vs. supervisord autostart), duplicating the feature-check logic across a bash script and a Node CLI invocation rather than sharing one implementation; supervisord is used as an in-container multi-process manager, with entrypoint.sh as a pre-flight script that execs into it via `exec "$@"`, preserving PID 1 signal handling semantics for the container runtime
-
 # DockerEntrypoint — Technical Insight Document
 
 ## What It Is

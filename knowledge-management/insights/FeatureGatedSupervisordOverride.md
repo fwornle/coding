@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] docker/entrypoint.sh - wait_for_service() TCP probe that always returns 0 ('Don't fail - let supervisord handle it'); docker/entrypoint.sh - PROGRAM_FEATURES mapping and the node -e evaluator producing enabled/disabled via FEATURES_SNAPSHOT; docker/entrypoint.sh - FEATURES_DIR=/etc/supervisor/features.d and disabled.conf generation with autostart=false; tests/features/service-gating.test.mjs - 'a disabled feature skips the service without starting it' test asserting results.disabled vs results.degraded separation; tests/features/service-gating.test.mjs - 'an unknown feature on a config is a loud failure, not a silent skip' test asserting rejection on SERVICE_CONFIGS.observationsApi.feature = 'nope'; scripts/start-services-robust.js - SERVICE_CONFIGS.transcriptMonitor.healthCheckFn short-circuiting to true when result.skipRegistration is set; scripts/start-services-robust.js - killProcessOnPortAndWait() SIGTERM-then-SIGKILL escalation at maxWaitMs/2; scripts/start-services-robust.js - waitForPortBindable() using net.createServer() to distinguish a crash-held socket from a truly free port; scripts/prompt-classifier-service.mjs - currentNetwork() treating the proxy's /health endpoint as an upstream network <COMPANY_NAME_REDACTED>; start-services.sh - ROBUST_MODE=${ROBUST_MODE:-true} branch selecting between scripts/start-services-robust.js and the LEGACY MODE block below it
-
 # FeatureGatedSupervisordOverride: Technical Insight Document
 
 ## What It Is

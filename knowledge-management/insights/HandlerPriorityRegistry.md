@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The component name 'HandlerPriorityRegistry' does not correspond to any class, function, or export literally present in the provided code files (hooks-api.js, claude-bridge.js, hooks.ts, usePolledFetch.ts, cli-and-rules-gating.test.mjs) or in the parent's code graph evidence, which is empty for this component. The closest conceptual match is the priority-sorted 'eventHooks' array inside HooksManager.registerHook() in lib/agent-api/hooks-api.js, where hooks are pushed into a Map<event, RegisteredHook[]> and immediately re-sorted via eventHooks.sort((a, b) => a.priority - b.priority). This suggests HandlerPriorityRegistry is likely a documentation/summary label for that in-memory priority-sorted structure rather than a distinct class, and a developer should verify whether it maps to hooks-api.js's Map or to a similarly named construct in hook-manager.js (not shown here).
-
 # HandlerPriorityRegistry — Technical Insight Document
 
 ## What It Is

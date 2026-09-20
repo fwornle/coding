@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The parent context's observations describe a JSON-file-backed ontology (.data/ontologies/coding.lower.json) that governs L2 classification, but none of the provided code files actually implement or reference the OntologyRegistry/OntologyClassifier machinery described (ontology-classification-agent.ts, loadL2Classes(), buildL2RefinementPrompt(), extractL2FromLLMResponse()). The supplied files are unrelated agent-launcher shell scripts (copilot.sh, opencode.sh, pi.sh) and a batch-provenance module, suggesting this 'CodingLowerOntologySource' Detail node's actual implementation lives elsewhere in the repo and was not surfaced in this code slice.
-
 # CodingLowerOntologySource — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] opencode.sh centralizes what used to be duplicated JSON-splicing logic into a single helper (_oc_splice_config), reducing the surface area for the trailing-comma / duplicate-key bug class; Routing decisions are consolidated into llm-routing.yaml + rapid-llm-proxy's semantic_routing; opencode.sh explicitly retired a parallel network-based model-pinning mechanism to prevent two authorities disagreeing; Model catalogue used in variant splicing (_oc_models) is cross-validated by an external script (scripts/audit-agent-model-catalogue.mjs), coupling shell config generation to a Node-based CI check; Per-agent config generation (opencode.sh, pi.sh) is independent code that converges on shared design principles (effort-to-band mapping, scope-gated writes) without a shared abstraction layer between the two shell files; TASK_ID-based header binding (x-agent, x-task-id) threads per-launch identity into the proxy for both opencode's shim and pi's header interpolation, enabling per-call/per-cell token attribution
-
 # OpenCodeVariantBandSplicing
 
 ## What It Is

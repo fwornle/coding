@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Cross-process caching is achieved via disk (JSON file), not shared memory or IPC, because each status-line tick is a brand-new OS process — a design constraint imposed by the surrounding statusline architecture, not chosen for this module in isolation; User-level config (opencode.json) is layered ABOVE a derived public catalogue, establishing an override precedence: explicit local declaration > majority-vote inference > absence (null); The module treats an external tool's cache (opencode's models.json) as an upstream read-only data source and never writes to it, keeping ownership boundaries clean between opencode and the statusline tooling; Test seams (OPENCODE_MODELS_JSON, OPENCODE_CONFIG env vars, and _resetForTests()) are threaded through explicitly rather than mocked via module replacement, indicating a deliberate design for CommonJS-style dependency injection without a mocking framework
-
 # ModelContextLimits — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Port-liveness/port-availability logic is triplicated across bash (docker/entrypoint.sh, start-services.sh) and Node (scripts/start-services-robust.js, lib/service-starter.js) with no shared implementation or constants file; Two conceptually opposite probes ('is this port already occupied by a healthy service' vs 'has this port actually been released after a kill') are implemented with different tools (HTTP/TCP client probes vs a throwaway server bind) inside the same file, scripts/start-services-robust.js; Timeout/retry budgets for port readiness are hardcoded per call site rather than centralized, creating inconsistent tuning between the container entrypoint and the host-side service starter; Legacy (start-services.sh) and current (scripts/start-services-robust.js) startup paths coexist behind the ROBUST_MODE flag, each with its own independent port-check implementation (lsof-based vs net/http-based)
-
 # PortProbes — Technical Insight Document
 
 ## What It Is

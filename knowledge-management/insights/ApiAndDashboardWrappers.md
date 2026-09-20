@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Two parallel service-startup implementations coexist by design: start-services-robust.js (default, ROBUST_MODE=true) and a legacy inline bash path in start-services.sh (ROBUST_MODE=false) — the legacy path does not share the retry/timeout/health-probe abstractions the robust path uses.; Feature gating spans host and container asymmetrically: the host resolves ~/.coding/features.yaml via the full resolver, but the container only ever sees a flattened, read-only JSON snapshot (features.json) and cannot re-derive gating decisions itself — coupling docker/entrypoint.sh's PROGRAM_FEATURES map to the host's feature catalogue by convention, not by shared code.; Structural test coverage is used as the drift-prevention mechanism instead of runtime validation: tests/features/service-gating.test.mjs asserts SERVICE_ORDER and SERVICE_CONFIGS 'cover each other exactly' and that every service names a real feature, catching config drift at test time rather than at service-start time.; prompt-classifier-service.mjs deliberately has zero agent-awareness (no knowledge of claude/opencode/copilot/pi) so that a single classification service can serve every agent uniformly — an intentional constraint documented directly in its module header.; Secret handling for launchd-managed Node daemons is standardized on 'load .env inside the module' rather than 'inject via the plist', established first by bin/start-llm-proxy.sh and explicitly replicated (with a documented incident/rationale) in prompt-classifier-service.mjs.
-
 # ApiAndDashboardWrappers — Technical Insight Document
 
 ## What It Is

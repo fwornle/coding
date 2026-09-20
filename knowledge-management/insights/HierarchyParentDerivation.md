@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] No shared rendering abstraction, node/edge type, or color resolver exists between the static SVG workflow graph (multi-agent-graph.tsx) and the dynamic D3 knowledge graph (D3GraphCanvas.tsx), despite both being described in code comments as 'graph' components; color-fallback.ts and learning-source.ts form a de facto shared visual-classification layer consumed across canvas, legend, filter, and sidebar components — a convergent single-source-of-truth achieved only after multiple divergence bugs were observed; Business/estimation logic (ETA calculation in ukb-workflow-modal.tsx) is colocated with UI rendering code rather than extracted into hooks/utilities, coupling numeric model changes to component file changes; Selection/viewport behavior in D3GraphCanvas.tsx is governed by an explicitly 'locked' contract enforced through comments and careful dependency-array management rather than through a testable abstraction
-
 # HierarchyParentDerivation — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] integrations/system-health-dashboard/src/components/cost/cost-model.ts:60-67 - budgetForMonth() overlay lookup; integrations/system-health-dashboard/src/components/cost/cost-model.ts:143-166 - priceForModel() fast-mode multiplier rule; integrations/system-health-dashboard/src/components/cost/cost-model.ts:220-234 - freshInputTokens() retired-compensation identity function; integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx:1-25 - two-mode (Configuration vs Recorded) card and mirror-checked-against-proxy comment; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:1-19 - two-hook/two-file separation rationale; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:33-45 - JudgeBackend.enabled vs .reachable distinction; lib/statusline/model-limits.cjs:1-30 - regex-table failure incident (188K tokens rendered 94% instead of 19%); lib/statusline/model-limits.cjs:210-235 - catalogueContextWindow() precedence: user config > byPair > byModel > null; integrations/system-health-dashboard/src/store/provider.tsx:1-38 - ReduxProvider with dev-only window.__REDUX_STORE__ exposure
-
 # LLMMockService — Technical Insight Document
 
 ## What It Is

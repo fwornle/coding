@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Two parallel hook runtime paths may coexist: HooksManager (hooks-api.js, class-based, per-agent subclassing) vs hook-manager.js's getHookManager()/executeHooks() (function-based singleton, actually invoked by claude-bridge.js) — the parent context flags this as unresolved duplication; HookConfigLoader (hook-config.js) is a standalone config-merge module with no visible subclassing contract, feeding initial/merged config into whichever manager (HooksManager or UnifiedHookManager) actually consumes it — consumption path is unconfirmed from code graph evidence alone; claude-bridge.js couples security-relevant behavior (whether an operation is blocked) to a fail-open exception handler, so config-loading failures inside manager.initialize() degrade silently to 'allow' with no distinct error signal reaching Claude Code; hooks-api.js's HookEvent enum and EVENT_MAPPINGS table define the abstraction boundary between unified events and agent-native events (e.g. 'pre-tool' -> 'PreToolUse' for claude, 'preToolUse' for copilot), but claude-bridge.js maintains its own separate EVENT_MAP constant duplicating this translation for the claude side only; triggerHook()'s allow-state accumulation is monotonic-toward-false (only ever sets allow=false, never resets true), which is safer than the parent context's initial framing but still leaves message ordering decoupled from which specific hook produced the block decision
-
 # HookConfigMigrationTool — Technical Insight Document
 
 ## What It Is

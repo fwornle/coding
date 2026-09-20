@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Redaction enforcement appears centralized in ObservationWriter.js via ConfigurableRedactor, not distributed to every LSL data-producing module (copilot-events-tail.mjs and opencode-token-rows.mjs show no redactor import); Configuration validation (LSLConfigValidator, per parent context) and configuration consumption (ConfigurableRedactor inside ObservationWriter) are architecturally separate stages with no visible runtime cross-check in these files; ObservationWriter.js deliberately retains `dbPath` as a string-only config path post-SQLite-cutover, purely to derive `projectRoot` for the redactor — a legacy field repurposed rather than removed; Token-usage adapters (token-db.mjs, opencode-token-rows.mjs) write to a shared SQLite store owned by another process (the rapid-llm-proxy), using isolated ID namespaces — a coupling risk if that external schema changes; No SQLite handle exists anymore in ObservationWriter (per its own Phase 44 Plan 13 comments) — all persistence goes through km-core's GraphKMStore, meaning any redaction-related metadata must survive translation through the legacy-ingest adapters
-
 # RedactionConfigManager — Technical Insight Document
 
 ## What It Is

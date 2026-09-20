@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] scripts/start-services-robust.js:58-77 - isProcessRunningByScript() OS-level pgrep fallback for orphaned processes; scripts/start-services-robust.js:88-149 - killProcessOnPortAndWait() graduated SIGTERM/SIGKILL port-release logic; scripts/start-services-robust.js:161-176 - waitForPortBindable() throwaway net.createServer() probe distinct from HTTP-level isPortListening(); scripts/start-services-robust.js SERVICE_CONFIGS.transcriptMonitor.startFn - triple-layer duplicate detection (PSM global, PSM per-project, OS-level pgrep re-registration); start-services.sh:9-16 - ROBUST_MODE env var toggling between robust (Node) and legacy (bash) startup implementations; start-services.sh:56-260 (approx) - legacy bash re-implementation of Docker/Qdrant/Redis/constraint-monitor startup, parallel to start-services-robust.js; tests/features/service-gating.test.mjs:38-63 - structural assertions that every SERVICE_CONFIGS entry declares a valid feature and SERVICE_ORDER/SERVICE_CONFIGS key sets match exactly; tests/features/service-gating.test.mjs:57-62 - assertion that transcriptMonitor and liveLoggingCoordinator must remain the first two entries in SERVICE_ORDER; tests/features/service-gating.test.mjs:98-104 - test distinguishing 'disabled' vs 'degraded' outcomes for a service whose feature is off; docker/entrypoint.sh:~95-140 - PROGRAM_FEATURES mapping and node -e snippet reading /coding/.coding/runtime/features.json to generate supervisord autostart=false includes
-
 # RobustServiceOrchestrator — Technical Insight Document
 
 ## What It Is

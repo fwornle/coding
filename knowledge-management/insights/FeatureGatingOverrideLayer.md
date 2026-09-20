@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Hard-coded PROGRAM_FEATURES mapping in docker/entrypoint.sh must be manually kept in sync with supervisord.conf's [program:...] sections and lib/features/catalogue.cjs — only tests/features/container-gating.test.mjs (not shown) enforces this, creating a drift risk documented directly in the script's own comments; Security boundary for credential filtering (T2 egress lockdown) is implemented as a bash glob pattern-match at container entrypoint time, not a dedicated secrets broker — a naming-convention-dependent guarantee; Dual/duplicate service-startup implementations coexist: start-services.sh's LEGACY MODE (raw docker run, ad hoc kill_port) vs. start-services-robust.js's retry/backoff contract via lib/service-starter.js — the legacy path bypasses shared deadline-safe helpers entirely; prompt-classifier-service.mjs deliberately decouples network-sensing from itself, deferring to the proxy's cached /health .networkMode rather than re-deriving network state, avoiding a second source of truth; Secrets loading for launchd-managed Node services is standardized to happen in the module itself (process.loadEnvFile from repo .env), not the launchd plist's EnvironmentVariables block, following the convention set by bin/start-llm-proxy.sh; Test suite (service-gating.test.mjs) cross-validates two independently-maintained sources of truth (SERVICE_CONFIGS feature declarations vs. lib/features/catalogue.cjs FEATURE_IDS) to catch drift at test time rather than runtime
-
 # FeatureGatingOverrideLayer — Technical Insight Document
 
 ## What It Is

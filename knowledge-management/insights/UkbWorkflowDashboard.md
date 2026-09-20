@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx:HISTORY_PAGE_SIZE — page-size bug that made a report permanently unreachable at position ~51; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx:calculateDynamicEta — ETA clamped to 0.3x-2.0x of linearEtaMs; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx:calculateStepAwareEta — legacy delegate kept for call-site compatibility; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts:UKBProcess.llmMode — optional/uncoerced LLM mode field distinguishing 'no mode stated' from 'public'; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts:WorkflowExecutionState — parallel event-driven state tree alongside legacy UKBProcess; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx:WAVE_AGENTS, KG_OPERATOR_CHILDREN — module-scope constants to preserve memo dependency stability; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx:AGENT_SUBSTEPS — per-substep llmUsage tier declarations across 11 agents; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx:deriveAncestryFromStorePath — fast/slow-path reconciliation between local BFS and store's pathToSelected; integrations/unified-viewer/src/graph/color-fallback.ts:nodeFillColor, nodeShapeFor — parent-chain walk over ClassRegistryEntry with cycle guard; integrations/unified-viewer/src/graph/color-fallback.ts:isOnlineSource — deprecated in favor of isOnlineLearned from ./learning-source
-
 # UkbWorkflowDashboard: Architectural Insight Document
 
 ## What It Is

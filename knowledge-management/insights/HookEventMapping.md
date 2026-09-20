@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks/claude-bridge.js:EVENT_MAP - native-to-unified event translation table; lib/agent-api/hooks/claude-bridge.js:transformContext() - spreads raw claudeContext into metadata unsanitized; lib/agent-api/hooks/claude-bridge.js:readStdin() - dangling 1000ms timeout without clearTimeout; lib/agent-api/hooks/claude-bridge.js:main() - dynamic import of hook-manager.js inside try/catch, fail-open on any error; lib/agent-api/hooks/claude-bridge.js:transformResponse() - flattens {allow, messages} into Claude's {decision, message}; lib/agent-api/hooks-api.js:EVENT_MAPPINGS.claude - null entries for STARTUP/SHUTDOWN/PRE_PROMPT/POST_PROMPT/ERROR; lib/agent-api/hooks-api.js:HooksManager.registerHook() - priority defaults to 100, resorts array on every insert; lib/agent-api/hooks-api.js:HooksManager.triggerHook() - try/catch per handler, continues iterating on error
-
 # HookEventMapping — Technical Insight Document
 
 ## What It Is

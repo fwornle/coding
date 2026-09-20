@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Redaction coverage is demonstrably non-uniform across the three LSL producer paths visible in these files. ObservationWriter.js is the only one that imports and presumably applies `ConfigurableRedactor`. In contrast, lib/lsl/token/opencode-token-rows.mjs's `buildOpencodeTokenRows()` builds `prompt_preview` via `activityFor(rec.id)` → `summarizeParts(parsed)`, which truncates to 240 chars via `snip()` but performs no redaction — the file's imports (`ADAPTER_USER_HASH_OPENCODE`, `DIRECT_ROUTING_SOURCE` from `./token-db.mjs`, plus `better-sqlite3`) contain no reference to any redactor. Similarly, lib/lsl/live/copilot-events-tail.mjs's `buildStubObservation()` embeds `agentDescription.slice(0, 200)` directly into both `summary` and the assistant message `content` field with no redaction call in the visible function body. Since `prompt_preview` and stub-observation content both persist free-text potentially containing file paths, commands, or pasted content, this is a genuine asymmetric-coverage risk: length-capping is not redaction, and two of three producer paths only length-cap.
-
 # ConfigurableRedactorBinding — Technical Insight Document
 
 ## What It Is

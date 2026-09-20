@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The two listening-probe implementations in this component diverge sharply on failure-handling philosophy despite solving the same 'is this port up' problem. isTcpPortListening/isPortListening in lib/service-starter.js resolve(false) on failure and let the CALLER (startServiceWithRetry) decide whether that's fatal — required services throw, optional ones degrade. wait_for_service() in entrypoint.sh, by contrast, always `return 0` even after exhausting max_attempts, per the parent observations' note about deferring 'liveness enforcement to supervisord's own restart policy.' This is not an oversight but a consequence of where each probe sits: the Node-level probes feed a retry/kill/backoff state machine that can act on failure, while the bash-level probe runs under `set -e` where a genuine failure return would abort the whole container boot — so its only safe design is fail-open.
-
 # PortListeningProbes: Technical Insight Document
 
 ## What It Is

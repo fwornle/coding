@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks/claude-bridge.js:120-159 - main() fail-open exit(0) on both success and error paths; lib/agent-api/hooks/claude-bridge.js:47-68 - readStdin() 1000ms timeout race against stdin 'end' event; lib/agent-api/hooks/claude-bridge.js:80-101 - transformContext() spreads raw claudeContext into metadata unfiltered; lib/agent-api/hooks/claude-bridge.js:33-41 - EVENT_MAP flat object for Claude-native to unified event translation; lib/agent-api/hooks-api.js:~108-110 - HooksManager constructor throws if instantiated directly via new.target check; lib/agent-api/hooks-api.js:35-52 - EVENT_MAPPINGS nested table with per-agent null gaps for unsupported events; lib/agent-api/hooks-api.js:140-148 - translateEvent() throws on missing agent mapping, returns null on missing event; lib/agent-api/hooks-api.js - registerHook()/eventHooks.sort() priority-sort-on-insert; unregisterHook() linear id search; lib/agent-api/hooks-api.js - triggerHook() per-handler try/catch appending 'Hook error (id): message' to messages array; integrations/system-health-dashboard/src/components/workflow/hooks.ts - useWorkflowDefinitions() Redux selectors + constants fallback merge; integrations/system-health-dashboard/src/hooks/usePolledFetch.ts - visibility-aware polling with enabled flag to protect unsaved drafts
-
 # UnifiedHookConfigLoader — Technical Insight Document
 
 ## What It Is

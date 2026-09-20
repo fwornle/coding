@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architectural Patterns] Strategy/lookup-table pattern for color resolution — classColor()/nodeFillColor()/nodeShapeFor() resolve visual attributes via ordered fallback chains (registry override → palette table → ancestor walk → default) rather than conditional branching; Single-source-of-truth predicate extraction — isOnlineLearned() shared across D3GraphCanvas, color-fallback, legend, filter rail, and history sidebar to prevent classification drift; Provenance-as-overlay pattern — online/batch learning source rendered as a ring decoration layered on top of a source-independent class-hue fill, separating 'what kind of entity' from 'how it was learned'; Component porting/strangler pattern — D3GraphCanvas.tsx deliberately keeps VKB's force-simulation physics verbatim while swapping the state layer (Redux → Zustand) and data-fetch layer (custom hook); Redux Toolkit slice pattern with tri-state mode flags — LLMMode ('mock'|'local'|'public') plus optional llmMode to distinguish 'unset' from any concrete state; Module-scope constant hoisting to preserve memoization identity — WAVE_AGENTS/KG_OPERATOR_CHILDREN kept outside the component to avoid defeating a useMemo dependency
-
 # OnlineLearning — Technical Insight Document
 
 ## What It Is

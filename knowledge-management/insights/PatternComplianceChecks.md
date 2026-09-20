@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] scripts/knowledge-management/verify-patterns.sh:1-8 - set -euo pipefail combined with SCRIPT_DIR/DEFAULT_REPO/CLAUDE_REPO layered path resolution; scripts/knowledge-management/verify-patterns.sh - ConditionalLoggingPattern check via CONSOLE_LOG_COUNT/LOGGER_COUNT rg counts; scripts/knowledge-management/verify-patterns.sh - PATTERNS jq loop reading TransferablePattern entities with significance >= 8 from $SHARED_MEMORY; scripts/knowledge-management/verify-patterns.sh - TOTAL_CHECKS/PASSED_CHECKS/SCORE compliance scoring block using ((PASSED_CHECKS++)); scripts/knowledge-management/verify-patterns.sh - final jq --arg timestamp/score atomic update of $SHARED_MEMORY via tempfile + mv; src/ontology/heuristics/EntityPatternAnalyzer.ts - analyzeEntityPatterns() two-step dispatch to checkLocalArtifact() (confidence 0.9) and matchArtifactPattern() (confidence 0.75); src/ontology/heuristics/EntityPatternAnalyzer.ts - teamDirectories Map (Coding/RaaS/ReSi/UI) vs inferEntityClass()'s teamMappings object (adds unreachable 'Agentic' key); src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts() regex set for file paths, npm packages, Service/Agent/Manager/etc. class names, and bare directories; integrations/graphify/tests/fixtures/xaml_viewmodel/ViewModels/DesignViewModel.cs - empty stub class, no CLI surface, unrelated to CLIWrapperPattern; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - design-time DataContext binding to DesignViewModel, graphify parser fixture only
-
 # PatternComplianceChecks
 
 ## What It Is

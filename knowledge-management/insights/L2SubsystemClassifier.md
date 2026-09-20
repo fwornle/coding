@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] Failure handling in the L2 refinement path is graceful-degradation-by-design rather than fail-fast: when extractL2FromLLMResponse() cannot find any registered L2 name in the LLM's response, it does not raise an error or leave the observation unclassified — it silently returns the original L1 parent class. Combined with the upstream hard-root-guard in classifySingleObservation() (which bypasses the LLM entirely for the five HIERARCHY_ROOTS names), this creates a three-tier classification funnel: (1) exact structural match on known roots — no LLM call, (2) LLM-assisted refinement constrained to a closed L2 vocabulary, (3) fallback to the coarser L1 classification when the LLM's answer can't be matched. Each tier trades precision for reliability, ensuring the pipeline never outright fails at the cost of sometimes under-classifying.
-
 # L2SubsystemClassifier: Technical Insight Document
 
 ## What It Is

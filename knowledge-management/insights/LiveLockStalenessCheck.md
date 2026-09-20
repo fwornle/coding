@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] LiveLockStalenessCheck is not a class or named component in the code — it is the `findLiveLockFile()` function plus the `LOCK_STALE_GRACE_MS` constant, both private to lib/lsl/live/copilot-events-tail.mjs; Ownership check (`isOwnedByMe`) and staleness check (`findLiveLockFile`) are independently defined but composed sequentially inside `scanForLiveSessions`, with ownership evaluated first and short-circuiting staleness evaluation; No liveness confirmation via pid inspection (e.g., signal-0 check) — mtime-window heuristic is the entire mechanism, trusting whatever external process maintains the lock file's timestamp; Staleness is checked only once, at session-discovery time; the 200ms polling tail (`tailEventsFile`) has no mechanism shown here to re-invoke the staleness check for a session already being tailed; Tight coupling to the `inuse.<pid>.lock` filename convention (parsed only by regex shape, not by extracting/using the embedded pid) — a convention shared with whatever process (outside this file) creates and touches the lock
-
 # LiveLockStalenessCheck — Technical Insight Document
 
 ## What It Is

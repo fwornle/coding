@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Fail-open vs fail-closed is applied asymmetrically and deliberately by location: the container's supervisord feature gate fails OPEN on unknown features (starts everything) to avoid an older snapshot disabling a newer program, while the host's `startOneService()` fails CLOSED (throws) on an unknown feature name to catch config typos loudly — same 'feature gating' concern, opposite defaults, chosen per blast radius; Dual verification layers for 'is it running': registry-based (PSM) and OS-based (`pgrep`) checks are both present in `start-services-robust.js`, with the OS-level check acting as a repair mechanism for registry drift rather than merely a fallback query; Two parallel service-orchestration implementations coexist in `start-services.sh` (bash legacy vs Node.js robust) as a live migration seam gated by `ROBUST_MODE`, not fully retired code; Test suite (`tests/features/service-gating.test.mjs`) functions as the single point of truth enforcing agreement between three independently-editable artifacts: `SERVICE_CONFIGS`, `SERVICE_ORDER`, and `lib/features/catalogue.cjs`'s `FEATURE_IDS` — matching the same drift-prevention role the container's `tests/features/container-gating.test.mjs` plays for `PROGRAM_FEATURES` vs `supervisord.conf`; Port-cleanup-before-spawn is a two-phase defensive sequence (`killProcessOnPortAndWait` then `waitForPortBindable`) rather than a single check, reflecting an empirically-observed kernel-level race rather than a theoretical concern
-
 # DashboardServiceWrapper — Technical Insight Document
 
 ## What It Is

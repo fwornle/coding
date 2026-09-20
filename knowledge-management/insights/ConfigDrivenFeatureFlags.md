@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts - constructor: hardcoded teamDirectories and artifactPatterns as in-memory config; src/ontology/heuristics/EntityPatternAnalyzer.ts - analyzeEntityPatterns(): two-step confidence-tiered match with early return; src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts(): four regex extraction passes accumulated into a Set; scripts/knowledge-management/verify-patterns.sh - CLAUDE_REPO resolution: CODING_TOOLS_PATH:-${CODING_REPO:-$DEFAULT_REPO}; scripts/knowledge-management/verify-patterns.sh - PATTERNS=$(jq -r '.entities[] | select(.entityType == "TransferablePattern" and .significance >= 8) | .name' "$SHARED_MEMORY"); scripts/knowledge-management/verify-patterns.sh - SCORE=$((PASSED_CHECKS * 100 / TOTAL_CHECKS)) and ((PASSED_CHECKS++)) under set -euo pipefail; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - d:DataContext binding to vm:DesignViewModel (unrelated fixture)
-
 # ConfigDrivenFeatureFlags — Technical Insight Document
 
 ## What It Is

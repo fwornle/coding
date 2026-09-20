@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] The resolveKmCoreOntologyDir() function in ObservationWriter.js implements a two-tier fallback (defaultOntologyDir() first, then an import.<COMPANY_NAME_REDACTED>.resolve walk-up) to locate the km-core ontology JSON files — the same files the parent context says define LiveLoggingSystem's L2 classification. This ties ObservationWriter's runtime correctness directly to the ontology file layout described earlier (upper.json → coding-ontology.json → coding.lower.json chain); a misconfigured or missing ontology directory would silently degrade to null, per the comment 'should never fire' — an optimistic assumption worth scrutinizing given how critical ontologyDir is (per the CLAUDE.md mandatory rule cited in the same file).
-
 # ObservationWriter — Technical Insight Document
 
 ## What It Is

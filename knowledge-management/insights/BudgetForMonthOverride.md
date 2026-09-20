@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The parent-context observation draws a direct architectural analogy between BudgetConfig's month-scoped override and the dual-write concern in setGlobalLLMMode() — both are framed as 'temporal/versioning integrity' problems where mutating a value in place would corrupt other readers' historical interpretation. Unlike setGlobalLLMMode() (not present in the supplied code, so this is inference from the parent summary rather than direct code graph evidence), BudgetConfig solves this with an explicit override map rather than a dual-write mechanism, suggesting the project uses different mechanical patterns (append-only override maps vs. dual-write) depending on whether the value being protected is a discrete monthly figure or a continuously-read runtime flag.
-
 # BudgetForMonthOverride: Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Distinct write pipelines exist for normalized transcript data (ObservationWriter → km-core) versus raw batched session/token logs (implied TokenUsageDbWriter/logging.ts, token-db.mjs); Multiple independent token-usage writers exist (proxy daemon, Claude/Copilot/OpenCode adapters) coordinated via distinct user_hash namespaces to avoid id collisions; Config/schema drift risk is a recurring theme: writers depend on externally-owned configs (lsl-config.json) or schemas (proxy's token_usage table) they do not control; No direct evidence in code files of OperationalLogger/EnhancedOperationalLogger classes referenced in code graph — parent's CGR links are external to the inspected file set
-
 # TokenUsageDbWriter — Technical Insight Document
 
 ## What It Is

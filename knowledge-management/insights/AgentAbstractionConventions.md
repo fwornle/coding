@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts - teamDirectories map and artifactPatterns array define declarative team-ownership rules; src/ontology/heuristics/EntityPatternAnalyzer.ts - analyzeEntityPatterns() method: Layer-1 entry point returning LayerResult with confidence/evidence; src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts() private method: regex-based file path/npm package/class name extraction; src/ontology/heuristics/EntityPatternAnalyzer.ts - checkLocalArtifact() and matchArtifactPattern() private methods: two-tier confidence match logic; src/ontology/heuristics/EntityPatternAnalyzer.ts - inferEntityClass() teamMappings object: contains 'Agentic' team entry absent from teamDirectories/artifactPatterns; scripts/knowledge-management/verify-patterns.sh - SCRIPT_DIR/DEFAULT_REPO/CLAUDE_REPO resolution block: relocatable path convention; scripts/knowledge-management/verify-patterns.sh - jq query against $SHARED_MEMORY for TransferablePattern entities driving dynamic pattern checks
-
 # AgentAbstractionConventions
 
 ## What It Is

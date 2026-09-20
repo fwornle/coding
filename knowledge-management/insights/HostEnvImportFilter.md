@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Two independent gating mechanisms in entrypoint.sh (env-key suffix denylist vs. feature-snapshot enable/disable) share a fail-open philosophy but differ in whether the absence of their input file is logged; HostEnvImportFilter enforces the T2 egress-lockdown boundary entirely in shell (bash case-statement glob matching), with no corresponding automated test referenced in-file, unlike the PROGRAM_FEATURES mapping a few sections later; Environment merge ordering (compose env vars > .env file > unset) is implemented via bash indirect parameter expansion (`${!key}`) rather than a dedicated dotenv library
-
 # HostEnvImportFilter — Technical Insight Document
 
 ## What It Is

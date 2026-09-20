@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks-api.js:107-119 - HooksManager abstract constructor guard (new.target check); lib/agent-api/hooks-api.js:39-59 - EVENT_MAPPINGS nested per-agent translation table; lib/agent-api/hooks-api.js:172-197 - registerHook() priority-sort-on-insert logic; lib/agent-api/hooks-api.js:225-266 - triggerHook() fail-soft per-handler try/catch loop; lib/agent-api/hooks/claude-bridge.js:37-45 - flat EVENT_MAP for Claude-native events; lib/agent-api/hooks/claude-bridge.js:79-99 - transformContext() unguarded metadata spread; lib/agent-api/hooks/claude-bridge.js:128-152 - main() lazy manager.initialize() and executeHooks() call; lib/agent-api/hooks/claude-bridge.js:154-164 - outer try/catch fail-open default to decision:'allow'; integrations/system-health-dashboard/src/components/workflow/hooks.ts:186-230 - shared-subscriber polling store (unrelated subsystem); integrations/system-health-dashboard/src/hooks/usePolledFetch.ts:60-77 - visibility-based pause/resume polling logic (unrelated subsystem); tests/features/cli-and-rules-gating.test.mjs:26-33 - GUARDED CLI-to-feature map (unrelated subsystem)
-
 # HandlerRegistry — Technical Insight Document
 
 ## What It Is

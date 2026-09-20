@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] docker/entrypoint.sh:15-30 - wait_for_service() TCP readiness polling for Qdrant/Redis; docker/entrypoint.sh:56-64 - .env loader case statement excluding *_API_KEY|*_TOKEN|*_MANAGEMENT_KEY; docker/entrypoint.sh:100-138 - feature-snapshot-to-supervisord-override generation using PROGRAM_FEATURES and node -e; scripts/start-services-robust.js:64-77 - isProcessRunningByScript() pgrep-based orphan detection; scripts/start-services-robust.js:88-150 - killProcessOnPortAndWait() SIGTERM-then-SIGKILL escalation with polling; scripts/start-services-robust.js:159-179 - waitForPortBindable() throwaway net.createServer probe; scripts/start-services-robust.js:205-260 - transcriptMonitor SERVICE_CONFIGS entry with PSM + OS-level double-check and re-registration; start-services.sh:9-20 - ROBUST_MODE gate dispatching to scripts/start-services-robust.js; tests/features/service-gating.test.mjs:33-48 - service catalogue coverage tests (every service declares/uses a real feature); tests/features/service-gating.test.mjs:58-64 - SERVICE_ORDER first-two-entries pinning test for <AWS_SECRET_REDACTED>; tests/features/service-gating.test.mjs:85-92 - assertion that disabled services are never counted as degraded; scripts/prompt-classifier-service.mjs - loadConfig() keep-last-good-config-on-parse-failure and currentNetwork() fail-open-to-public
-
 # ContainerEntrypoint — Technical Insight Document
 
 ## What It Is

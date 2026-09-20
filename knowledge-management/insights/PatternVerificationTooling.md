@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:60-96 - analyzeEntityPatterns two-step artifact classification with confidence 0.9/0.75; src/ontology/heuristics/EntityPatternAnalyzer.ts:106-127 - extractArtifacts regex extraction including Manager/Classifier/Analyzer suffix pattern; src/ontology/heuristics/EntityPatternAnalyzer.ts:135-149 - checkLocalArtifact direct team-directory prefix match; src/ontology/heuristics/EntityPatternAnalyzer.ts:157-172 - matchArtifactPattern regex-table fallback match; src/ontology/heuristics/EntityPatternAnalyzer.ts:180-210 - inferEntityClass per-team prefix-to-entityClass mapping table; scripts/knowledge-management/verify-patterns.sh:34-51 - ConditionalLoggingPattern check via rg console.log vs Logger.* counts; scripts/knowledge-management/verify-patterns.sh:87-100 - NetworkAwareInstallationPattern check against install.sh; scripts/knowledge-management/verify-patterns.sh:120-145 - TransferablePattern usage check driven by $SHARED_MEMORY jq query; scripts/knowledge-management/verify-patterns.sh:170-190 - compliance score arithmetic using ((PASSED_CHECKS++)) under set -euo pipefail; scripts/knowledge-management/verify-patterns.sh:196-205 - $SHARED_MEMORY.tmp && mv atomic update of last_pattern_verification/pattern_compliance_score
-
 # PatternVerificationTooling — Technical Insight Document
 
 ## What It Is

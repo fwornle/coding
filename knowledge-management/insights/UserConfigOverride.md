@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] lib/statusline/model-limits.cjs:catalogueContextWindow() sequences three tiers of authority in strict order: user override (userConfigContextWindow) > exact catalogue provider/model pair (limits().byPair) > catalogue model-id fallback vote (limits().byModel) > null; Two independent invalidation strategies coexist in one module: content-identity (mtimeMs+size) invalidation for the derived catalogue cache in limits(), versus no invalidation/no persistence at all for the user override in userConfigContextWindow(); The override function is provider-gated (`if (!provider) return null`) which architecturally partitions it from the byModel fallback in deriveLimits(), preventing the two 'unknown/custom provider' resolution mechanisms from overlapping or conflicting; _resetForTests() clears both `_memo` and `_userMemo` together, treating the two independently-designed caches as one testing surface despite their different persistence and invalidation semantics
-
 # UserConfigOverride — Technical Insight Document
 
 ## What It Is

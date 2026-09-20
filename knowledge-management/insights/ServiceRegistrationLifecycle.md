@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] PSM is treated as a best-effort cache of process state, not a source of truth, requiring OS-level pgrep fallback verification; Two independent gating layers exist: PSM-based host process gating (start-services-robust.js) and supervisord-based container gating (docker/entrypoint.sh), with no visible cross-linkage; Registration writes to PSM appear only in exceptional/orphan paths in the shown code, suggesting normal-path registration may live in lib/service-starter.js (startServiceWithRetry), an unverified assumption; Test coverage (service-gating.test.mjs) validates orchestration-layer contracts (SERVICE_ORDER, blocking, feature gating) but leaves PSM's internal registration/query correctness untested; start-services.sh and start-services-robust.js form a legacy/modern dual-path architecture switched by the ROBUST_MODE environment variable
-
 # ServiceRegistrationLifecycle
 
 ## What It Is

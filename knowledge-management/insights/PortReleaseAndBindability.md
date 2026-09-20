@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] scripts/start-services-robust.js's waitForPortBindable() and killProcessOnPortAndWait() encode two separate theories of what 'the port is free' means, and the comment on waitForPortBindable() explicitly justifies why a second check is needed even after killProcessOnPortAndWait() reports success: a throwaway net.createServer().listen() probe on host '0.0.0.0' detects kernel-level TIME_WAIT-style unavailability that isPortListening() (an HTTP-level check per lib/service-starter.js) cannot see, since a crashed process leaves no HTTP listener to probe against but may still leave the socket held by the kernel. This means a caller that only uses killProcessOnPortAndWait() and then immediately spawns a new service risks an EADDRINUSE crash that silently consumes one of startServiceWithRetry()'s maxRetries slots — the two functions are not redundant, they cover disjoint failure windows in the same port-release lifecycle.
-
 # PortReleaseAndBindability
 
 ## What It Is

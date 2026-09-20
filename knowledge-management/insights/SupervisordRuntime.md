@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Dual generations of the host service-startup path coexist behind a ROBUST_MODE flag (start-services.sh legacy bash vs scripts/start-services-robust.js), with the legacy path untested and prone to silent drift from the declarative SERVICE_CONFIGS; Container-side feature gating (docker/entrypoint.sh) and host-side feature gating (start-services-robust.js via SERVICE_CONFIGS[].feature) are two independently-implemented enforcement points reading from different sources (a JSON snapshot mounted read-only vs an in-process loadFeatures()), coupled only by convention (PROGRAM_FEATURES mapping vs FEATURE_IDS catalogue) and cross-checked by tests, not by shared code; Tight coupling between supervisord.conf's [program:...] section names and entrypoint.sh's PROGRAM_FEATURES mapping, guarded only by tests/features/container-gating.test.mjs rather than a single source of truth; Process liveness/identity is tracked redundantly across ProcessStateManager (JSON-backed) and OS-level pgrep, with the latter used to self-heal drift in the former; Security boundary (no raw provider secrets in-container) is enforced by string-matching env var key suffixes in entrypoint.sh rather than an explicit allowlist, making it pattern-fragile to new secret naming conventions
-
 # SupervisordRuntime — Technical Insight Document
 
 ## What It Is

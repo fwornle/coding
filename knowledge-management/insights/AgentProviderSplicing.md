@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Cost, routing, and classifier concerns are split into narrowly-scoped hooks/modules (cost-model.ts, use-classifier-judge.ts, offload-gates.ts) rather than a single monolithic dashboard state, mirroring the LLM abstraction layer's modular separation of mock-mode, DMR, and proxy-bypass concerns.; Both the dashboard and the LLM abstraction layer favor local derived/cached representations of remote or expensive sources (model-limits.cjs's catalogue cache, DMR's health-check cache) instead of hitting the source on every operation.; Defensive/forensic code comments explaining removed compensations or preserved legacy fields (freshInputTokens, dual-write in setGlobalLLMMode) indicate a project convention of documenting historical bug fixes directly in code to prevent regression.; UI components (offload-decision.tsx) actively cross-validate their local computed state against a live backend service rather than trusting client-side restatement, extending the reliability-layer philosophy seen in parse-llm-json.ts to the frontend.
-
 # AgentProviderSplicing — Technical Insight Document
 
 ## What It Is

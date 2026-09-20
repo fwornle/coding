@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The withDeadlineHelper (lib/service-starter.js, function withDeadline) wraps Promise.race() with a try/finally that unconditionally calls clearTimeout(timer). The critical detail is that `timer` is declared via `let timer;` outside the Promise.race array and assigned inside the executor function passed to `new Promise((_, reject) => { timer = setTimeout(...) })`. This means the finally block always has access to the timer handle regardless of which branch of the race wins, closing a subtle bug class where a naive implementation would only clear the timer on the reject path (or not at all), leaving a dangling setTimeout that holds the Node.js event loop open for the full duration `ms` even after the wrapped work resolved successfully.
-
 # WithDeadlineHelper — Technical Insight Document
 
 ## What It Is

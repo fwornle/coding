@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] tests/features/service-gating.test.mjs:34-38 - 'SERVICE_ORDER and SERVICE_CONFIGS cover each other exactly' structural diff test; tests/features/service-gating.test.mjs:83-89 - 'a REQUIRED service whose feature is off does not block startup' assertion; tests/features/service-gating.test.mjs:100-114 - 'a required failure blocks, so downstream services do not start' assertion; tests/features/service-gating.test.mjs:117-127 - unknown feature on a config throws rather than silently skipping; scripts/start-services-robust.js:54-72 - isProcessRunningByScript() pgrep-based orphan detection; scripts/start-services-robust.js:85-146 - killProcessOnPortAndWait() SIGTERM/SIGKILL escalation with polling; scripts/start-services-robust.js:156-171 - waitForPortBindable() TCP bind probe distinct from HTTP-based isPortListening(); scripts/start-services-robust.js:194-224 - transcriptMonitor.startFn three-tier PSM/OS duplicate-detection cascade with orphan re-registration; docker/entrypoint.sh:96-150 - PROGRAM_FEATURES mapping and node -e feature snapshot read with fail-open unknown-feature/missing-snapshot semantics; start-services.sh:12-20 - ROBUST_MODE dispatch to scripts/start-services-robust.js, else legacy bash path
-
 # ServiceOrderRegistry: Technical Insight Document
 
 ## What It Is
