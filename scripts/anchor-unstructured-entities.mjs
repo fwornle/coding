@@ -152,7 +152,29 @@ for (const e of unanchored) {
     project = { id: newId, name: declared[0] };
     projectsByName.set(projectSlug(declared[0]), project);
     created.add(declared[0]);
-    out(`  created Project entity "${declared[0]}"`);
+
+    // Link the new Project UP to the System root. Anchoring its children to it
+    // is only half the job: a Project with children but no parent is itself
+    // unattached, and in any view that hides its children (the condensed
+    // roll-up view hid all nine of UI's) it renders as a floating node. 19 of
+    // the 20 Projects already hang off CollectiveKnowledge; the one created
+    // without this edge was the exception, and it showed.
+    const systemRoot = entities.find((x) => classOf(x) === 'System');
+    if (systemRoot) {
+      const sr = await fetch(`${OBS_API}/api/v1/relations`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: systemRoot.id, to: newId, type: 'parent-child',
+          metadata: { source: 'anchor-unstructured-entities', confidence: 1.0 },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      out(sr.ok
+        ? `  created Project entity "${declared[0]}" and linked it to ${systemRoot.name}`
+        : `  created Project entity "${declared[0]}" but FAILED to link it to the System root: ${sr.status}`);
+    } else {
+      out(`  created Project entity "${declared[0]}" — no System root found to link it to`);
+    }
   }
   const type = classOf(e).endsWith('Insight') ? 'has_insight' : 'contains';
   if (!APPLY) { written++; continue; }

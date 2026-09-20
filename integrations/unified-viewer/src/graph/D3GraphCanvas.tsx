@@ -62,6 +62,7 @@ import { computeAncestryPath, type AncestryPathResult } from './ancestry'
 // memo here depends on. Predicate is bit-identical to the prior inline
 // body — G1-G5 + G9-G13 source-grep gates continue to pass.
 import { useGraphVisibility } from './useGraphVisibility'
+import { buildRehomeEdges } from './rehome-edges'
 // 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction): graph node
 // click reads the pre-built reverse-lookup index to populate the
 // `selectedBucketKeys` halo atomically with the node selection. The hook
@@ -294,6 +295,9 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // gate locks verbatim). The node-type half of this pair now travels
   // inside the visibility predicate.
   const hiddenRelationTypes = useViewerStore((s) => s.hiddenRelationTypes)
+  // child -> parent over the hierarchy classes; UnifiedViewer is its sole
+  // writer. Used to re-home nodes whose real parent the filters removed.
+  const hierarchyParents = useViewerStore((s) => s.hierarchyParents)
 
   // 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction): pre-built
   // `nodeId → Set<bucketKey>` reverse lookup map. The graph click handler
@@ -354,9 +358,22 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   }, [visibleEntities])
 
   const visibleRelations = useMemo<Relation[]>(() => {
-    return relations.filter((r) =>
+    const real = relations.filter((r) =>
       visibleIds.has(r.from) && visibleIds.has(r.to) && !hiddenRelationTypes.has(r.type))
-  }, [relations, visibleIds, hiddenRelationTypes])
+
+    // Re-home whatever the filters stranded. Every rendered node IS anchored in
+    // the data (the health coordinator's graph_integrity slice enforces that
+    // and reads 0 orphans), but hiding an intermediate level detaches
+    // everything below it: collapse SubComponents and their Details float, even
+    // though the Component above is right there. A collapse should re-parent
+    // what it hides, so a stranded node attaches to its nearest VISIBLE
+    // ancestor. Nodes with no visible ancestor get nothing — there is no honest
+    // edge to draw.
+    const connected = new Set<string>()
+    for (const r of real) { connected.add(r.from); connected.add(r.to) }
+    const rehomed = buildRehomeEdges(visibleIds, connected, hierarchyParents)
+    return rehomed.length === 0 ? real : [...real, ...(rehomed as unknown as Relation[])]
+  }, [relations, visibleIds, hiddenRelationTypes, hierarchyParents])
 
   // Dimensions — watch the container, no Redux involvement.
   useLayoutEffect(() => {
