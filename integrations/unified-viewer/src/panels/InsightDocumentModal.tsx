@@ -13,6 +13,7 @@
 // previous URL onto a back stack so the user can step back. External
 // links and non-.md links open in a new tab as before.
 
+import { createPortal } from 'react-dom'
 import { useEffect, useState, useCallback } from 'react'
 import type { AnchorHTMLAttributes, MouseEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -137,6 +138,15 @@ export function InsightDocumentModal({ url, title, onClose }: InsightDocumentMod
     : decodeURIComponent(currentUrl.substring(currentUrl.lastIndexOf('/') + 1))
 
   return (
+    // Portalled to document.body deliberately. This modal is hand-rolled rather
+    // than built on the Radix dialog every other overlay here uses, and Radix
+    // portals for exactly this reason: rendered in place it lives inside
+    // EntityDetailPanel -> SidePanel, so `fixed inset-0` is resolved against
+    // whatever stacking context an ancestor happens to create, and the backdrop
+    // stops short of the sticky NavBar/StatsBar instead of covering the
+    // viewport. Portalling puts it in the root stacking context, where z-50
+    // genuinely outranks the bars' z-20.
+    createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -202,6 +212,8 @@ export function InsightDocumentModal({ url, title, onClose }: InsightDocumentMod
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
+  )
   )
 }

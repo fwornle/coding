@@ -191,7 +191,11 @@ export function StatsBar({ apiClient, system }: StatsBarProps) {
     <div
       data-testid="stats-bar"
       className={
-        'sticky top-16 z-19 h-10 bg-card flex items-center px-6 gap-6 text-xs ' +
+        // z-[19], not z-19: the latter is not a Tailwind scale value (0/10/20/30/40/50)
+        // and is not defined in the config, so it compiled to NOTHING and this bar
+        // has been sitting at z-index auto. Arbitrary-value syntax keeps the intent
+        // — one below the NavBar's z-20 — and actually emits it.
+        'sticky top-16 z-[19] h-10 bg-card flex items-center px-6 gap-6 text-xs ' +
         (hasError
           ? 'border-b border-destructive'
           : 'border-b border-border')
