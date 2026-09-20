@@ -19,9 +19,23 @@ export type System = 'coding' | 'okb'
 
 export const VALID_SYSTEMS: readonly System[] = ['coding', 'okb'] as const
 
+// 127.0.0.1, not `localhost`. These are loopback-only services, and naming
+// them by hostname puts a name-resolution and proxy-policy step in front of a
+// socket that never leaves the machine. On this machine that step failed:
+// Chrome hung forever on http://localhost:12436 while reaching BOTH
+// http://127.0.0.1:12436 and http://[::1]:12436 in ~2ms, so the viewer's
+// graph queries were never issued and it sat on "Loading coding graph… ·
+// Showing 0 of 0 nodes" with no console error and no failed request — the
+// requests did not exist. curl was unaffected, which is why the server always
+// looked healthy. Adjacent port 12435 resolved fine over `localhost`, so this
+// is not simply DNS or the corporate PAC; the literal address sidesteps the
+// whole question.
+//
+// It is also the convention the rest of the stack already follows for
+// loopback (the proxy pin, opencode's BYOK baseURL, qwen-laptop).
 export const SYSTEM_ENDPOINTS: Record<System, string> = {
-  coding: import.meta.env.VITE_BACKEND_CODING_URL ?? 'http://localhost:12436',
-  okb:    import.meta.env.VITE_BACKEND_OKB_URL    ?? 'http://localhost:8090',
+  coding: import.meta.env.VITE_BACKEND_CODING_URL ?? 'http://127.0.0.1:12436',
+  okb:    import.meta.env.VITE_BACKEND_OKB_URL    ?? 'http://127.0.0.1:8090',
 } as const
 
 // 2026-06-11: tab labels switched from 'Coding'/'OKB' to 'VKB'/'VOKB' per

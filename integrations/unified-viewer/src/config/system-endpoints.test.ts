@@ -45,14 +45,26 @@ describe('SYSTEM_ENDPOINTS (Phase 55)', () => {
     }
   })
 
-  test('okb endpoint falls back to http://localhost:8090 (OKM Express, D-55-01a)', () => {
+  test('okb endpoint falls back to http://127.0.0.1:8090 (OKM Express, D-55-01a)', () => {
     // The fallback applies when VITE_BACKEND_OKB_URL is not set.
     // Under vitest the env var is unset by default, so we read the live value.
-    expect(SYSTEM_ENDPOINTS.okb).toBe('http://localhost:8090')
+    expect(SYSTEM_ENDPOINTS.okb).toBe('http://127.0.0.1:8090')
   })
 
-  test('coding endpoint falls back to http://localhost:12436 (obs-api, preserved from Phase 45)', () => {
-    expect(SYSTEM_ENDPOINTS.coding).toBe('http://localhost:12436')
+  test('coding endpoint falls back to http://127.0.0.1:12436 (obs-api)', () => {
+    expect(SYSTEM_ENDPOINTS.coding).toBe('http://127.0.0.1:12436')
+  })
+
+  // Both defaults are literal loopback addresses on purpose. `localhost` put a
+  // name-resolution and proxy-policy step in front of a socket that never
+  // leaves the machine, and on 2026-09-20 that step hung Chrome indefinitely
+  // against obs-api — the viewer showed "Showing 0 of 0 nodes" with no error
+  // and no failed request, because the requests were never issued. Keep these
+  // numeric; a hostname here is a regression, not a cleanup.
+  test('loopback defaults are literal addresses, never a hostname', () => {
+    for (const slug of VALID_SYSTEMS) {
+      expect(SYSTEM_ENDPOINTS[slug]).toMatch(/^https?:\/\/(?:127\.0\.0\.1|\[::1\]):\d+$/)
+    }
   })
 
   test('SYSTEM_ENDPOINTS has exactly 2 keys (no cap)', () => {
