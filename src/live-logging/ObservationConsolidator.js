@@ -635,12 +635,19 @@ export class ObservationConsolidator {
       id: entry.topic,
       topic: entry.topic,
       summary: entry.summary || entry.topic,
-      // entityType/ontologyClass on the row are aspirational — the mapper
-      // currently hardcodes 'Insight' for both. The Task 1 guard preserves
-      // 'Insight' (not the old 'Detail' clobber); the L2 classification
-      // (entityClass) is recorded in metadata.ontology for audit.
-      entityType: entityClass,
-      ontologyClass: entityClass,
+      // This row IS an Insight; the L2 classification says what it is ABOUT.
+      // Those are different facts and they now live in different fields.
+      //
+      // Until 2026-09-20 the subsystem went into `entityType`, which made
+      // `entityType` disagree with `ontologyClass` on 39 rows and put a
+      // subsystem name where every reader expects an artifact class. It was
+      // never read there: the viewer's class filter tests `ontologyClass`
+      // only (visibility-predicate.ts:247), the pruner passes literal
+      // 'Observation'/'Digest', and no caller queries a subsystem through
+      // `findByOntologyClass`'s entityType OR-gate. So the value was carried
+      // in a field that could only mislead.
+      entityType: 'Insight',
+      ontologyClass: 'Insight',
       team: project,
       source: 'online',
       confidence: entry.confidence,
@@ -654,6 +661,12 @@ export class ObservationConsolidator {
         project,
         confidence: entry.confidence,
         digest_ids: entry._digestIds || [],
+        // The L2 subsystem this insight is about — the field that used to be
+        // smuggled through `entityType`. `subsystem` is already the key the
+        // rest of the graph uses for this (wave entities carry it), so a
+        // reader asking "which insights concern AgentIntegration" has one
+        // place to look regardless of which system wrote the row.
+        subsystem: entityClass,
         ontology: {
           ontologyName: 'development-knowledge-ontology',
           classificationMethod: 'heuristic-token-overlap',
