@@ -50,8 +50,35 @@ const ALL = args.has('--all');
 const out = (m = '') => process.stdout.write(`${m}\n`);
 const die = (m) => { process.stderr.write(`${m}\n`); process.exit(1); };
 
-/** Classes this script is willing to repair automatically. */
+/** Classes where entityType is unambiguously the correct value. */
 const WRITER_OWNED = new Set(['Observation', 'Digest']);
+
+/**
+ * Artifact classes — what a row IS, as opposed to what it is ABOUT.
+ *
+ * Two rules follow from this set:
+ *
+ *   - BOTH fields name an artifact class and they disagree ('Insight' vs
+ *     'Detail') → two claims about the same fact. Migrating 'Insight' into
+ *     `metadata.subsystem` would be nonsense, so it is reported for a human
+ *     decision rather than guessed at.
+ *   - `ontologyClass` names one and `entityType` does NOT → the class field
+ *     is holding a tag: an L2 subsystem ('AgentIntegration'), an
+ *     upper-ontology descriptor ('Process', 'File'), or an unregistered label
+ *     ('TransferablePattern'). The tag MIGRATES to `metadata.subsystem` and
+ *     entityType is set to match the class, so nothing is lost.
+ *
+ * The migration is safe because nothing reads the tag through
+ * `findByOntologyClass`'s entityType OR-gate: the viewer's class filter tests
+ * `ontologyClass` only (visibility-predicate.ts:247), the pruner passes
+ * literal 'Observation'/'Digest', and every other caller names a literal
+ * artifact class.
+ */
+const ARTIFACT_CLASSES = new Set([
+  'System', 'Project', 'Component', 'SubComponent', 'Detail',
+  'Observation', 'Digest', 'Insight',
+  'OnlineObservation', 'OnlineDigest', 'OnlineInsight',
+]);
 
 // ---------------------------------------------------------------------------
 // Ontology registry — the same union obs-api loads (KG_ONTOLOGY_DIR).
@@ -112,7 +139,8 @@ try {
 }
 out(`entities scanned : ${entities.length}`);
 
-const repairable = [];
+const repairable = [];   // ontologyClass := entityType
+const migratable = [];   // entityType -> metadata.subsystem, then entityType := ontologyClass
 const foreign = [];
 const unknownClass = [];
 
@@ -120,12 +148,17 @@ for (const e of entities) {
   const et = e.entityType;
   const oc = e.ontologyClass;
   if (!et || !oc || et === oc) continue;
-  if (!parent.has(et) || !parent.has(oc)) {
-    unknownClass.push(e);
-    continue;
-  }
-  if (chainOf(et, parent).includes(oc)) continue; // ontologyClass IS an ancestor — legal
-  (WRITER_OWNED.has(et) ? repairable : foreign).push(e);
+  const known = parent.has(et) && parent.has(oc);
+  if (known && chainOf(et, parent).includes(oc)) continue; // legal IS-A
+  if (known && WRITER_OWNED.has(et)) { repairable.push(e); continue; }
+  // Two artifact classes disagreeing is a claim conflict, not a misplaced
+  // tag — never guess which wins.
+  if (ARTIFACT_CLASSES.has(et)) { foreign.push(e); continue; }
+  // entityType is a subsystem, an upper-ontology descriptor, or an unknown
+  // tag (TransferablePattern, Pattern) — the same shape in every case: a
+  // non-class value sitting in the class field. Migrate it.
+  if (ARTIFACT_CLASSES.has(oc)) { migratable.push(e); continue; }
+  (known ? foreign : unknownClass).push(e);
 }
 
 const tally = (rows) => {
@@ -137,9 +170,11 @@ const tally = (rows) => {
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 };
 
-out(`violations       : ${repairable.length + foreign.length}`);
-out(`  repairable here: ${repairable.length}`);
+out(`violations       : ${repairable.length + migratable.length + foreign.length + unknownClass.length}`);
+out(`  class := type  : ${repairable.length}`);
 for (const [k, n] of tally(repairable)) out(`      ${String(n).padStart(5)}  ${k}`);
+out(`  tag -> metadata: ${migratable.length}  (entityType moves to metadata.subsystem)`);
+for (const [k, n] of tally(migratable)) out(`      ${String(n).padStart(5)}  ${k}`);
 
 if (foreign.length) {
   out(`  other producers: ${foreign.length}  (reported only — not repaired)`);
@@ -151,30 +186,50 @@ if (unknownClass.length) {
   if (ALL) for (const [k, n] of tally(unknownClass)) out(`      ${String(n).padStart(5)}  ${k}`);
 }
 
-if (!repairable.length) {
+const work = repairable.length + migratable.length;
+if (!work) {
   out('\nNothing to repair.\n');
   process.exit(0);
 }
 
 if (!APPLY) {
-  out('\nWould set ontologyClass := entityType on the repairable rows.');
+  out(`\nWould set ontologyClass := entityType on ${repairable.length} rows,`);
+  out(`and move entityType into metadata.subsystem on ${migratable.length} rows.`);
   out('Re-run with --apply to write.\n');
   process.exit(0);
 }
 
 let ok = 0;
 const failures = [];
+
+const put = (id, body) =>
+  api(`/api/v1/entities/${id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
 for (const e of repairable) {
   try {
-    // Send ONLY ontologyClass. mergeAttributes is a shallow merge, so passing
+    // ONLY ontologyClass. mergeAttributes is a shallow merge, so passing
     // `metadata` here would replace the row's whole metadata object.
-    await api(`/api/v1/entities/${e.id}`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ontologyClass: e.entityType }),
-    });
+    await put(e.id, { ontologyClass: e.entityType });
     ok += 1;
-    if (ok % 50 === 0) out(`  … ${ok}/${repairable.length}`);
+    if (ok % 50 === 0) out(`  … ${ok}/${work}`);
+  } catch (err) {
+    failures.push({ id: e.id, name: e.name, error: err.message });
+  }
+}
+
+for (const e of migratable) {
+  try {
+    // Shallow merge again: send the row's EXISTING metadata plus the new key,
+    // or the write drops every other metadata field on the row.
+    const meta = { ...(e.metadata ?? {}) };
+    if (!meta.subsystem) meta.subsystem = e.entityType;
+    await put(e.id, { entityType: e.ontologyClass, metadata: meta });
+    ok += 1;
+    if (ok % 50 === 0) out(`  … ${ok}/${work}`);
   } catch (err) {
     failures.push({ id: e.id, name: e.name, error: err.message });
   }
