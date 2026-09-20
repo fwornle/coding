@@ -21,8 +21,10 @@ providers:
     timeout: 120000
     models:
       fast: "claude-haiku-4.5"
-      standard: "claude-sonnet-4.6"    # Updated: 4.6 available via enterprise
-      premium: "claude-opus-4.6"
+      standard: "claude-sonnet-5"      # 4.6 retired by the enterprise endpoint (400 model_not_available)
+      premium: "claude-opus-5"
+    defaultModel: "claude-sonnet-5"   # tier=default bypasses models{}; without this the
+                                     # provider falls back to its hardcoded retired 4.6 id
     quotaTracking:
       enabled: true
       softLimitPerHour: 100
