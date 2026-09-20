@@ -139,10 +139,92 @@ try {
 }
 out(`entities scanned : ${entities.length}`);
 
+// Structural parents, for the conflict arbitration. `contains`/`parent-child`
+// mean "member of the hierarchy"; `has_insight` means "learning artifact
+// hanging off a project" and deliberately does NOT count as a hierarchy parent.
+let relations = [];
+try {
+  relations = (await api('/api/v1/relations?limit=1000000')).data ?? [];
+} catch (e) {
+  die(`cannot read relations: ${e.message}`);
+}
+const byId = new Map(entities.map((e) => [e.id, e]));
+const hierarchyParents = new Map();
+for (const r of relations) {
+  const type = r.attributes?.type ?? r.type;
+  if (type !== 'contains' && type !== 'parent-child') continue;
+  const target = r.target ?? r.to;
+  const source = r.source ?? r.from;
+  if (!hierarchyParents.has(target)) hierarchyParents.set(target, []);
+  hierarchyParents.get(target).push(source);
+}
+const parentClassesOf = (id) =>
+  (hierarchyParents.get(id) ?? [])
+    .map((pid) => byId.get(pid)?.ontologyClass)
+    .filter(Boolean);
+out(`relations scanned: ${relations.length}`);
+
 const repairable = [];   // ontologyClass := entityType
 const migratable = [];   // entityType -> metadata.subsystem, then entityType := ontologyClass
+const conflicts = [];    // both fields name an artifact class — arbitrated below
 const foreign = [];
 const unknownClass = [];
+
+const HIERARCHY_CLASSES = ['Project', 'Component', 'SubComponent', 'Detail'];
+const HIERARCHY_SET = new Set(HIERARCHY_CLASSES);
+
+/**
+ * Arbitrate a row whose two fields both name an artifact class.
+ *
+ * THE RULE: the edge that attaches a row decides which family it belongs to.
+ * A row held by `contains`/`parent-child` is a member of the hierarchy and its
+ * class must be a hierarchy class — one level below its parent's. A row held
+ * only by `has_insight` hangs off a Project as a learning artifact and can
+ * never be a `Detail`, whatever its fields claim.
+ *
+ * Derived from the graph, not chosen: all 43 conflicting rows split cleanly
+ * along that line — 32 attached by `has_insight` alone, 11 by `contains`.
+ *
+ * `metadata.hierarchyLevel` is deliberately NOT the arbiter. It looks like the
+ * obvious authority and it is not: on the 36 rows where level and class
+ * disagree, actual depth in the `contains` tree backed the level 3 times and
+ * the class 13 times. An attaching edge is a fact; that field is a claim.
+ *
+ * Within the artifact family, `digest_ids` + `topic` + `decayBreakdown` are
+ * the Insight signature — synthesized from digests, keyed by topic, carrying
+ * the confidence-decay record. Nothing else in the family has them.
+ *
+ * @returns {string|null} the class to write, or null when it cannot be decided
+ */
+function arbitrate(e, parentClasses) {
+  const md = e.metadata ?? {};
+  const inHierarchy = parentClasses.length > 0;
+
+  if (inHierarchy) {
+    // The row is in the hierarchy, so of the two claims the hierarchy class is
+    // the true one. Take it directly from whichever field holds it.
+    //
+    // NOT "one level below the parent". That refinement reads plausible and
+    // misfires here: 385 `Project -contains-> Detail` edges are normal in this
+    // graph, so deriving the class from the parent would promote those
+    // children to Component and invent a top-level component per row. Depth is
+    // a separate problem from class, and this script is not fixing depth.
+    if (HIERARCHY_SET.has(e.entityType) !== HIERARCHY_SET.has(e.ontologyClass)) {
+      return HIERARCHY_SET.has(e.entityType) ? e.entityType : e.ontologyClass;
+    }
+    // Both or neither is a hierarchy class — the attaching edge cannot
+    // separate them. Leave it for a human.
+    return null;
+  }
+
+  // Learning artifact: a hierarchy class is impossible here.
+  const hasDigests = Array.isArray(md.digest_ids ?? md.digestIds) || md.decayBreakdown != null;
+  if (hasDigests || md.topic) return 'Insight';
+  for (const c of [e.entityType, e.ontologyClass]) {
+    if (c && !HIERARCHY_SET.has(c)) return c;
+  }
+  return null;
+}
 
 for (const e of entities) {
   const et = e.entityType;
@@ -152,8 +234,13 @@ for (const e of entities) {
   if (known && chainOf(et, parent).includes(oc)) continue; // legal IS-A
   if (known && WRITER_OWNED.has(et)) { repairable.push(e); continue; }
   // Two artifact classes disagreeing is a claim conflict, not a misplaced
-  // tag — never guess which wins.
-  if (ARTIFACT_CLASSES.has(et)) { foreign.push(e); continue; }
+  // tag. Arbitrate it on the attaching edge (see `arbitrate`).
+  if (ARTIFACT_CLASSES.has(et)) {
+    const resolved = arbitrate(e, parentClassesOf(e.id));
+    if (resolved) conflicts.push({ entity: e, resolved });
+    else foreign.push(e);
+    continue;
+  }
   // entityType is a subsystem, an upper-ontology descriptor, or an unknown
   // tag (TransferablePattern, Pattern) — the same shape in every case: a
   // non-class value sitting in the class field. Migrate it.
@@ -175,6 +262,15 @@ out(`  class := type  : ${repairable.length}`);
 for (const [k, n] of tally(repairable)) out(`      ${String(n).padStart(5)}  ${k}`);
 out(`  tag -> metadata: ${migratable.length}  (entityType moves to metadata.subsystem)`);
 for (const [k, n] of tally(migratable)) out(`      ${String(n).padStart(5)}  ${k}`);
+out(`  arbitrated     : ${conflicts.length}  (artifact vs artifact, decided by the attaching edge)`);
+{
+  const m = new Map();
+  for (const c of conflicts) {
+    const k = `${c.entity.entityType} vs ${c.entity.ontologyClass}  ->  ${c.resolved}`;
+    m.set(k, (m.get(k) ?? 0) + 1);
+  }
+  for (const [k, n] of [...m].sort((a, b) => b[1] - a[1])) out(`      ${String(n).padStart(5)}  ${k}`);
+}
 
 if (foreign.length) {
   out(`  other producers: ${foreign.length}  (reported only — not repaired)`);
@@ -186,7 +282,7 @@ if (unknownClass.length) {
   if (ALL) for (const [k, n] of tally(unknownClass)) out(`      ${String(n).padStart(5)}  ${k}`);
 }
 
-const work = repairable.length + migratable.length;
+const work = repairable.length + migratable.length + conflicts.length;
 if (!work) {
   out('\nNothing to repair.\n');
   process.exit(0);
@@ -194,7 +290,8 @@ if (!work) {
 
 if (!APPLY) {
   out(`\nWould set ontologyClass := entityType on ${repairable.length} rows,`);
-  out(`and move entityType into metadata.subsystem on ${migratable.length} rows.`);
+  out(`move entityType into metadata.subsystem on ${migratable.length} rows,`);
+  out(`and set both fields to the arbitrated class on ${conflicts.length} rows.`);
   out('Re-run with --apply to write.\n');
   process.exit(0);
 }
@@ -228,6 +325,19 @@ for (const e of migratable) {
     const meta = { ...(e.metadata ?? {}) };
     if (!meta.subsystem) meta.subsystem = e.entityType;
     await put(e.id, { entityType: e.ontologyClass, metadata: meta });
+    ok += 1;
+    if (ok % 50 === 0) out(`  … ${ok}/${work}`);
+  } catch (err) {
+    failures.push({ id: e.id, name: e.name, error: err.message });
+  }
+}
+
+for (const { entity: e, resolved } of conflicts) {
+  try {
+    // Both fields become the arbitrated class. Nothing is squirreled into
+    // metadata here: unlike the tag case, the losing value was a wrong claim
+    // about the same fact, not a different fact worth keeping.
+    await put(e.id, { entityType: resolved, ontologyClass: resolved });
     ok += 1;
     if (ok % 50 === 0) out(`  … ${ok}/${work}`);
   } catch (err) {

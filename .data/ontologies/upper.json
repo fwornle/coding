@@ -2,7 +2,7 @@
   "meta": {
     "name": "upper",
     "version": "1.0.0",
-    "description": "Upper ontology for software systems organized in six facets: Structure (what it is), Behavior (what it does), Operations (how it runs), Resilience (what goes wrong), Quality (how good it is), Evolution (how it changed). Complements the Development Knowledge Ontology which covers patterns, insights, and decisions."
+    "description": "obs-api curated upper: host upper + LearningArtifact (Gap A — L1/L2 + writer classes in one registry)"
   },
   "classes": {
     "File": {
@@ -485,6 +485,33 @@
             "in-progress",
             "planned"
           ]
+        }
+      }
+    },
+    "LearningArtifact": {
+      "defaultLayer": "evidence",
+      "description": "Abstract upper class for online-learning artifacts (Observation/Digest/Insight tiers).",
+      "relationships": {},
+      "properties": {
+        "id": {
+          "type": "string",
+          "required": true
+        },
+        "project": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "required": true
+        },
+        "validFrom": {
+          "type": "string"
+        },
+        "validUntil": {
+          "type": "string"
+        },
+        "quality": {
+          "type": "string"
         }
       }
     }
