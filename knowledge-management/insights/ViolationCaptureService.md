@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] ViolationCaptureService is decoupled from the hook system's own session identity (CLAUDE_SESSION_ID/COPILOT_SESSION_ID) by minting its own session-${Date.now()}-${random} IDs, creating a correlation gap between violation records and live agent sessions; Dual-store persistence (append log + aggregate) trades write complexity for crash durability and dashboard read performance, with no evident reconciliation path if the two drift; Violation capture sits in the synchronous dispatch path of pre-tool/post-tool hooks, coupling monitoring-layer latency/failure to live tool execution unless isolated by the try/catch in triggerHook(); Redaction in sanitizeParams() is pattern-name-based, not structural, leaving it vulnerable to sensitive data under unrecognized field names — consistent with a project-wide redaction gap noted elsewhere
-
 # ViolationCaptureService — Technical Insight Document
 
 ## What It Is

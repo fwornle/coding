@@ -2,8 +2,6 @@
 
 **Type:** Component
 
-[LLM] parse-llm-json.ts addresses a common failure mode in LLM JSON-mode outputs: providers may emit malformed JSON due to unescaped control characters inside string literals, or truncate output entirely when hitting an output-token ceiling. The two-stage repair pipeline first runs escapeControlCharsInStrings(), which performs a string-state-tracking walk over the raw text (tracking whether the parser cursor is inside a string literal) to escape raw control characters only where they'd break JSON parsing, avoiding corruption of characters outside string contexts. The second stage, truncateToLastCompleteElement(), handles the case where the provider's response was cut off mid-structure (e.g., mid-array or mid-object) by walking backward to find the last syntactically complete element and discarding the incomplete tail, salvaging partial results rather than failing the entire parse. This utility is depended on by all downstream consumers doing JSON-mode LLM parsing, making it a de facto reliability layer between raw provider output and typed application data.
-
 # LLMAbstraction — Technical Insight Document
 
 ## What It Is

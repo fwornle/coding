@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] hooks-api.js defines an abstract HooksManager contract but the concrete UnifiedHookManager in hook-manager.js (per code graph) appears to expose a divergent API (`executeHooks` vs `triggerHook`), suggesting incomplete reconciliation between two abstraction layers; Agent-specific behavior (event name translation, native config persistence) is isolated to subclass overrides and bridge scripts (claude-bridge.js), keeping the core trigger/register/unregister logic agent-agnostic; Error handling favors non-blocking degradation over correctness signaling at every layer (handler-level catch in triggerHook, process-level catch in claude-bridge.js main), trading observability for robustness; No persistence layer is visible in hooks-api.js itself — loadNativeHooks/saveNativeHooks are abstract stubs, meaning all durability logic lives entirely in subclasses not shown in this component
-
 # HooksApiAbstraction — Technical Insight Document
 
 ## What It Is

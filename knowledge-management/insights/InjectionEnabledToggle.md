@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Hook systems across the codebase (claude-bridge.js, hooks-api.js, knowledge-injection-hook.js) consistently prioritize non-blocking behavior over strict validation, exiting 0/allow on any internal error.; Configuration for hook behavior is often environment-variable based (CODING_KNOWLEDGE_INJECTION, CODING_EXPERIMENT_TASK_ID, PI_CODING_AGENT_DIR) rather than passed through structured config objects, unlike the CLI feature-gating system which uses a YAML-based catalogue (lib/features/catalogue.cjs).; No direct code-graph-confirmed coupling exists between the InjectionEnabledToggle's described functions and the provided files; relationships are inferred by architectural analogy only.; The hooks-api.js HooksManager abstraction (registerHook/triggerHook) provides a manager-level fail-open safety net independent of any individual hook's own error handling, implying potential redundancy if injection hooks are registered through this system.
-
 # InjectionEnabledToggle: Technical Insight Document
 
 ## What It Is

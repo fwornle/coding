@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The two guards are wired into structurally different call sites with different blast radii. `isOwnedByMe` gates directory *traversal* inside `scanForLiveSessions(sessionStateDir, myUid)`: a failed check causes one session directory among potentially many under `~/.copilot/session-state/` to be skipped, logged via `process.stderr.write(`[live-copilot] skipping non-owned session ${sessionId}\n`)`, and the scan continues to the next entry. `ownedDbPath` instead gates a single *file open* — the entire `opencode.db` SQLite store — inside `buildOpencodeTokenRows(dbPath, ctx)`; a failure there short-circuits the whole function to `return []`, discarding all token rows for that call rather than skipping one item in a loop. The same idiom therefore produces a partial-skip failure mode in one caller and a total-abstention failure mode in the other, purely as a consequence of what it's nested inside.
-
 # IsOwnedByMeGuard — Technical Insight Document
 
 ## What It Is

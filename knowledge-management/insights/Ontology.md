@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] Read together, the parent context's description of the classification pipeline (hard-root-guard → closed-vocabulary L2 classifier → token-boundary regex fallback) and the code graph's viewer-side elements (OntologyFilter, ApiClient's OntologyClass type, useViewerStore) suggest the Ontology component has two distinct halves with different risk profiles: a write-side/classification half where correctness matters because misclassification cascades into the whole hierarchy (hence the LLM-fallback and hard-coded escape hatches noted in the parent), and a read-side/presentation half where the same class vocabulary is consumed for filtering and display, and where a mismatch (e.g. a new L2 class added to coding.lower.json but not reflected in VOKB_SCHEMA) would produce a silent UI gap — a filterable class that classification can assign but the viewer can never select — rather than a hard failure, since neither side appears to validate the other's vocabulary against a single shared source at build or runtime.
-
 # Ontology — Technical Insight Document
 
 ## What It Is

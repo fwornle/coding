@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Hardcoded TypeScript literals (teamDirectories, artifactPatterns, teamMappings) instead of YAML/JSON-driven configuration, inconsistent with the prompt-classifier.yaml 'data not code' philosophy elsewhere in the system; Entity-class inference (inferEntityClassFromPattern) is decoupled from the specific RegExp that matched, only from the matched team's static entityClassMap; Dead/unreachable 'Agentic' team branch in inferEntityClass() with no producing code path in this file, suggesting partial removal or unfinished integration; String-prefix directory matching (startsWith) with no path-boundary normalization, relying on convention rather than enforcement to avoid false-positive prefix collisions; verify-patterns.sh couples unrelated concerns (logging compliance, Redux usage, install.sh network-awareness, doc coverage, and knowledge-base pattern usage) into one monolithic script with a hardcoded case-statement that does not scale to new TransferablePattern entities
-
 # TwoStepArtifactAttribution — Technical Insight Document
 
 ## What It Is

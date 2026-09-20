@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Positioned alongside `VkbApiClient.js` in the same `lib/ukb-unified/core/` directory, WorkflowOrchestrator is one of at least three core/ collaborators (`TeamCheckpointManager`, `GapAnalyzer`, `ConfigManager`, `WorkflowOrchestrator`) imported directly into `cli.js` with no dependency-injection container or factory — each is `new`'d individually in the `UKBCli` constructor or lazily in `defaultCommand()`. Given the parent-context observation that VKB's entity-mutation logic has an asymmetry (creates go direct to the DB, updates prefer the live server), and that `VkbApiClient`/`ukb-database/cli.js` independently reimplement the same HTTP contract, it's plausible WorkflowOrchestrator's incremental-workflow execution eventually funnels through one of these parallel VKB clients for persistence — but no call edge to `VkbApiClient` or `sendToVKB` is visible in the code graph or in the truncated source, so this remains an inference rather than a confirmed dependency.
-
 # WorkflowOrchestrator — Technical Insight Document
 
 ## What It Is

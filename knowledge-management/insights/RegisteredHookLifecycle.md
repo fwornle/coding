@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks-api.js — `@typedef {Object} RegisteredHook` JSDoc block defining id/event/handler/priority/source; lib/agent-api/hooks-api.js — HooksManager constructor: `for (const event of Object.values(HookEvent)) { this.hooks.set(event, []) }`; lib/agent-api/hooks-api.js registerHook() — `const hook = { id, event, handler, priority, source }; eventHooks.push(hook); eventHooks.sort((a, b) => a.priority - b.priority)`; lib/agent-api/hooks-api.js unregisterHook() — `for (const [event, hooks] of this.hooks.entries()) { const index = hooks.findIndex(h => h.id === hookId); ... hooks.splice(index, 1) }`; lib/agent-api/hooks-api.js triggerHook() — `for (const hook of eventHooks) { try { const result = await hook.handler(fullContext) ... } catch (error) { ... } }`; lib/agent-api/hooks-api.js getRegisteredHooks() — `for (const hooks of this.hooks.values()) { allHooks.push(...hooks) }`; lib/agent-api/hooks/claude-bridge.js main() — `const manager = getHookManager(); ... const result = await manager.executeHooks(unifiedContext.event, unifiedContext, 'claude')`; lib/agent-api/hooks/claude-bridge.js EVENT_MAP vs lib/agent-api/hooks-api.js EVENT_MAPPINGS.claude — divergent null/non-null mappings for STARTUP/SHUTDOWN/PRE_PROMPT/POST_PROMPT/ERROR
-
 # RegisteredHookLifecycle — Technical Insight Document
 
 ## What It Is

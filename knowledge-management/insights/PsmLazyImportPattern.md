@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] scripts/start-services-robust.js:38 - `import ProcessStateManager from './process-state-manager.js';` (static, eager top-level import); scripts/start-services-robust.js:~42 - `const psm = new ProcessStateManager();` (module-scope singleton, not lazily constructed); scripts/start-services-robust.js (transcriptMonitor.startFn) - `await psm.isServiceRunning('transcript-monitor', 'global')` (deferred call site, not deferred import); scripts/start-services-robust.js (transcriptMonitor.startFn) - `await psm.isServiceRunning('enhanced-transcript-monitor', 'per-project', { projectPath: TARGET_PROJECT_PATH })`; start-services.sh - `node scripts/psm-register.js --check transcript-monitor global` (subprocess CLI access from bash, no JS import possible); tests/features/service-gating.test.mjs - imports only `startOneService, SERVICE_CONFIGS, SERVICE_ORDER`, never `ProcessStateManager` directly; docker/entrypoint.sh - `FEATURES_SNAPSHOT`/`PROGRAM_FEATURES` gating logic, an unrelated boot-time enablement mechanism with no relation to PSM's import pattern
-
 # PsmLazyImportPattern: Technical Insight Document
 
 ## What It Is

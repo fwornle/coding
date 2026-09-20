@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] docker/entrypoint.sh implements a fail-open feature-gating override rather than a rewrite of docker/supervisord.conf: it reads a flat host-written snapshot at /coding/.coding/runtime/features.json (mounted read-only) and, for each entry in the PROGRAM_FEATURES mapping (e.g. 'semantic-analysis:knowledge', 'constraint-monitor:constraints', 'health-dashboard-frontend:health'), shells out to `node -e` (not jq, which the comment notes isn't installed in the image) to check `snap.features?.[feature]`. Any program whose feature reads `false` gets an autostart=false stanza written into /etc/supervisor/features.d/disabled.conf, which supervisord includes alongside the main config. Critically, an unknown/missing feature key resolves to 'true' by design ('a snapshot written by an older host cannot silently switch a program off'), and a missing/unreadable snapshot file leaves the entire features.d directory empty, starting every program — the pre-existing historical behavior. This directly implements the DockerizedServices principle from the parent context that supervisord.conf is the single source of truth for in-container processes, while this script is merely an additive filter over it.
-
 # DockerComposeOrchestration — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] teamDirectories is populated once in the constructor and treated as immutable (`readonly`) for the lifetime of the EntityPatternAnalyzer instance — no runtime mutation API exists; Team ownership resolution is O(teams × prefixes-per-team) linear scan via Array.some over Map.entries, not an indexed/trie structure; The four-team shape of teamDirectories (Coding, RaaS, ReSi, UI) is inconsistent with the five-team shape of inferEntityClass's teamMappings (adds 'Agentic'), meaning the extra team is unreachable through the directory-based resolution path; No validation exists to detect overlapping/colliding prefixes across different teams' entries; ambiguity would be silently resolved by Map insertion order; verify-patterns.sh is fully decoupled from EntityPatternAnalyzer.ts — no shared code, data, or invocation path between the two files despite both governing 'pattern compliance'
-
 # TeamDirectoryTable: Technical Insight Document
 
 ## What It Is

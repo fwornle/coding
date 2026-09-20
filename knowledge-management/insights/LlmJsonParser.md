@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] parse-llm-json.ts is a shared utility layer positioned between raw provider output (from both SDK-managed and raw-fetch call paths) and typed application data consumers; No direct code graph edges are available for this component in the current analysis (code_graph was empty), so dependency claims here are derived from the parent entity's observations rather than static graph evidence; The parser's guarantees are orthogonal to and reused by both call paths described upstream (llm-with-process.ts's proxy-bypass fetch wrapper and the SDK's LLMService.complete()), making it a convergence point in an otherwise bifurcated request architecture; Sequential, fixed-order pipeline execution (escape-then-truncate) is a coupling point: correctness of the second stage can depend on the first stage's handling of string-boundary state near a truncation point
-
 # LlmJsonParser — Technical Insight Document
 
 ## What It Is

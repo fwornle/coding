@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Every one of the eight HTTP methods in `lib/ukb-unified/core/VkbApiClient.js` — `getEntities`, `deleteEntity`, `createEntity`, `updateEntity`, `getRelations`, `deleteRelation`, `createRelation`, `exportTeam` — independently repeats the identical five-step boilerplate: build URL, `fetch()` with `AbortSignal.timeout(this.timeout)`, check `!response.ok`, parse the error body via `response.json()`, and throw `new Error(error.message || 'Failed to X')`. There is no shared `#request()` or `_fetch()` private helper, so the class has eight near-identical fetch call sites instead of one parametrized one. This duplication means a cross-cutting change (auth headers, retry-on-5xx, exponential backoff, consistent error typing/status codes) requires eight coordinated edits, and any one of them drifting (e.g. a future method forgetting the `!response.ok` check) would silently swallow HTTP errors as a successful `.json()` parse of an error payload.
-
 # VkbApiClient: Technical Insight Document
 
 ## What It Is

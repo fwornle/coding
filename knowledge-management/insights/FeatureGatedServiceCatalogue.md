@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The test suite pays an explicit performance cost to test the required-failure-blocks path: 'a required failure blocks, so downstream services do not start' overrides SERVICE_CONFIGS.transcriptMonitor.maxRetries from its production value down to 1, with the comment 'the real value costs six seconds of exponential waiting.' This is a test-only mutation of production config performed via a try/finally that restores originalRetries afterward, revealing that startServiceWithRetry() (imported from lib/service-starter.js per start-services-robust.js's import block, though not shown in the truncated excerpt) implements exponential backoff whose total wait time scales with maxRetries in a way that's expensive enough to matter in a test suite's runtime. This pattern — temporarily monkey-patching a module-level config object's field for the duration of one test — is fragile because SERVICE_CONFIGS is a shared, mutable singleton imported directly rather than injected, so parallel test execution (if node:test ever ran files concurrently within the same process) could see cross-test interference; the try/finally mitigates this only for sequential execution.
-
 # FeatureGatedServiceCatalogue — Technical Insight Document
 
 ## What It Is

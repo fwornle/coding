@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] docker/entrypoint.sh reveals a second, feature-gating layer that sits upstream of any health probing: PROGRAM_FEATURES maps supervisord program names (semantic-analysis, embedding-listener, graphify, constraint-monitor, constraint-dashboard, constraint-dashboard-api, health-dashboard, health-dashboard-frontend) to feature IDs, and generates a supervisord include file (/etc/supervisor/features.d/disabled.conf) that sets autostart=false for disabled programs. This means ServiceProbe/service-probe.js's 'stopped' vs 'unknown' distinction must be interpreted differently depending on whether a program was never started (feature disabled — expected, not a fault) versus started and then crashed (feature enabled but failing — a real fault). The entrypoint script does not communicate feature-disabled state to the probing layer directly; it only prevents supervisord from launching the process, so any probe-based health system must independently know which features are enabled to avoid alerting on intentionally-off services. This is corroborated by tests/features/service-gating.test.mjs's explicit distinction between results.disabled and results.degraded on the host side — the same disabled-vs-degraded semantic split exists in both the container gating (entrypoint.sh) and host-side gating (start-services-robust.js), suggesting a deliberate, mirrored architecture rather than coincidence.
-
 # ServiceProbe — Technical Insight Document
 
 ## What It Is

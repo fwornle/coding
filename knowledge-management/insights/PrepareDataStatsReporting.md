@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] [LLM] The requested component 'PrepareDataStatsReporting' is not present in any supplied Code File, and <code_graph> is empty — this analysis is necessarily incomplete and should not be treated as authoritative on that component's implementation; [LLM] The parent context's own observations (DataProcessor.prepareData(), exportOnlineKnowledge(), createCombinedView() in lib/vkb-server/data-processor.js) remain the only grounded description of the parent's behavior; none of it could be cross-checked against source in this request; [LLM] Supplied files span two unrelated subsystems (dashboard UKB-workflow visualization vs. UKB CLI/database persistence), suggesting the retrieval step for this request pulled from the wrong slice of the codebase for a 'PrepareDataStatsReporting' Detail entity
-
 # PrepareDataStatsReporting — Technical Insight Document
 
 ## What It Is

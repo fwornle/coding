@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architectural Patterns] Additive override / filter layer pattern — entrypoint.sh generates a supplementary supervisord include (disabled.conf) rather than rewriting the canonical config, keeping supervisord.conf as single source of truth; Fail-open-by-default with layered redundant safety nets — entrypoint.sh stacks three independent fallback paths (ternary default, subprocess-failure fallback, missing-file fallback) all converging on 'enable'; Escalating retry / graceful-then-forceful shutdown pattern — killProcessOnPortAndWait's SIGTERM-then-SIGKILL-after-half-timeout in scripts/start-services-robust.js; Active probing over passive inference — waitForPortBindable uses a real bind attempt instead of inferring kernel socket state from logs or listener checks; Three-layer duplicate-detection cascade — transcriptMonitor's startFn checks PSM-global, PSM-per-project, then OS-level pgrep before spawning, self-healing PSM's bookkeeping via re-registration; Strategy/mode toggle via env var with unreachable legacy path — start-services.sh's ROBUST_MODE gate and `exec` guarantee; Hot-reload-on-mtime config pattern — prompt-classifier-service.mjs's loadConfig mirrors llm-routing.yaml's convention, keeping last-good config on parse failure; Structural coverage tests as an architectural safety net — tests/features/service-gating.test.mjs enforces catalogue/config/order consistency independent of runtime behavior tests
-
 # FeatureGatingScript — Technical Insight Document
 
 ## What It Is

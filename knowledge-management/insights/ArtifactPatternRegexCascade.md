@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts - analyzeEntityPatterns() two-step cascade with hardcoded 0.9/0.75 confidence; src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts() four independent regex passes (filePathPattern, npmPattern, classPattern, dirPattern) merged into a Set; src/ontology/heuristics/EntityPatternAnalyzer.ts - checkLocalArtifact() O(teams) startsWith scan over teamDirectories Map; src/ontology/heuristics/EntityPatternAnalyzer.ts - matchArtifactPattern() iterates artifactPatterns array of per-team RegExp arrays; src/ontology/heuristics/EntityPatternAnalyzer.ts - inferEntityClass() teamMappings object contains orphaned 'Agentic' key unreachable from checkLocalArtifact()'s four active teams; scripts/knowledge-management/verify-patterns.sh - ConditionalLoggingPattern check via rg console.log vs Logger.* counts, feeding SCORE calculation; integrations/graphify/tests/fixtures/xaml_viewmodel/ViewModels/DesignViewModel.cs - class name/extension outside EntityPatternAnalyzer's detection vocabulary; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - .xaml extension absent from filePathPattern's extension alternation
-
 # ArtifactPatternRegexCascade
 
 ## What It Is

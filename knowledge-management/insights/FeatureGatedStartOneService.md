@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Container feature gating (docker/entrypoint.sh) and host feature gating (scripts/start-services-robust.js via lib/features/index.mjs) are two independently implemented gating mechanisms crossing the host/container boundary via a mounted JSON snapshot file, not shared code or environment variables passed at container-create time; docker/entrypoint.sh has no runtime cross-check against supervisord.conf's actual [program:...] sections; consistency is enforced only by an external test (tests/features/container-gating.test.mjs), not by the entrypoint script itself; start-services-robust.js couples networking-layer defensive code (waitForPortBindable, killProcessOnPortAndWait) to business-layer retry economics (maxRetries budget) via inline comments rather than a shared abstraction; start-services.sh's legacy path duplicates orchestration logic (docker-compose lifecycle, container health polling, port cleanup) that scripts/start-services-robust.js reimplements more structurally, creating two independent sources of truth for 'how to start constraint-monitor'; Environment variable filtering in docker/entrypoint.sh (excluding *_API_KEY|*_TOKEN|*_MANAGEMENT_KEY) is a shell-level security boundary that is separate from and complementary to any network-level egress lockdown; tests/features/service-gating.test.mjs directly mutates shared module singleton state (SERVICE_CONFIGS) for test isolation instead of dependency injection, relying on convention (try/finally) rather than enforcement
-
 # FeatureGatedStartOneService — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx — AGENT_SUBSTEPS['code_graph'] 'query' sub-step techNote: 'Cypher queries on Memgraph' (stale relative to the GraphifyGraph migration); integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx — AGENT_SUBSTEPS['code_graph'] 'analyze' sub-step llmUsage: 'standard', the only LLM-touching sub-step in the code_graph agent definition; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts — StepInfo interface, no field for graph-source staleness/dataAsOf despite downstream GraphifyGraph's mtime-cache semantics; integrations/unified-viewer/src/graph/color-fallback.ts — nodeFillColor()/nodeShapeFor() parent-walk pattern, architecturally analogous to GraphifyGraph's label-derived kindOf()/nameOf() parsing; integrations/semantic-analysis/src/agents/graphify-graph.ts (per parent context) — mtime-based lazy caching, kindOf()/nameOf() helpers, mapRelation() normalization (referenced, not shown in provided code files); integrations/semantic-analysis/src/agents/code-graph-agent.ts (per parent context) — checkMemgraphConnection compatibility shim (referenced, not shown in provided code files)
-
 # CodeGraphAgent — Technical Insight Document
 
 ## What It Is

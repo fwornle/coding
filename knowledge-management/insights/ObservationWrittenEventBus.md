@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/live-logging/ObservationWriter.js — const _observationEmitter = new EventEmitter(); (module-level bus declaration); src/live-logging/ObservationWriter.js — _observationEmitter.setMaxListeners(32); (capacity override with inline justification comment); src/live-logging/ObservationWriter.js — export function subscribeObservationWritten(listener) { ... _observationEmitter.on('written', listener); return () => { ... _observationEmitter.off('written', listener); }; }; src/live-logging/ObservationWriter.js — export function _resetObservationEmitterForTests() { _observationEmitter.removeAllListeners('written'); }; src/live-logging/ObservationWriter.js — export function _emitObservationWrittenForTests(row) { _observationEmitter.emit('written', row); }; [CGR] ObservationWriter.js (module) in ObservationWriter.js — code-graph node distinguishing module scope from the ObservationWriter class node
-
 # ObservationWrittenEventBus
 
 ## What It Is

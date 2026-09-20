@@ -2,8 +2,6 @@
 
 **Type:** Component
 
-[LLM] ViolationCaptureService (scripts/violation-capture-service.js) is responsible for both privacy-sensitive sanitization and long-term storage discipline. Its sanitizeParams() function redacts values for keys matching password/token/key/secret/auth via string matching before any violation record is written to disk, which is a critical security boundary — new hook handlers or constraint checks that pass raw tool parameters through this service should never bypass sanitizeParams() by writing directly to the JSONL log. Complementing this, updateViolationHistory() caps the persisted .mcp-sync/violation-history.json file at 1000 entries using array slicing, an FIFO-style truncation that trades historical completeness for bounded disk usage and fast load times — this is a deliberate design tradeoff a developer should know about before relying on this file for long-term audit trails.
-
 # ConstraintSystem: Technical Insight Document
 
 ## What It Is

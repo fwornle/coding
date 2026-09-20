@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] priceForModel() in integrations/system-health-dashboard/src/components/cost/cost-model.ts implements the ModelFamilyFallback logic as a three-tier resolution chain: exact key match against `prices[normalized]`, then a fast-mode branch that strips the `-fast` suffix (FAST_MODE_SUFFIX) and recurses into priceForModel() on the base model before applying FAST_MODE_MULTIPLIER via scalePrice(), and only then the family fallback that walks FAMILY_REPRESENTATIVE[modelFamily(model)] before falling back further to `Object.keys(prices).find(k => modelFamily(k) === fam)`. The ordering is deliberate and load-bearing: fast-mode is checked before the family fallback specifically so an explicit `<model>-fast` row in modelPrices can still override the multiplier rule via the exact-match path on the recursive call, and the comments explicitly document that reversing this order would let the family fallback silently mis-price fast-mode rows at the standard rate with no warning (`priced: true` either way).
-
 # ModelFamilyFallback — Technical Insight Document
 
 ## What It Is

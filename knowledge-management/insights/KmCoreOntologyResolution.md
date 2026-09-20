@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The component's namesake concern — km-core ontology resolution — is implemented entirely inside `resolveKmCoreOntologyDir()` in src/live-logging/ObservationWriter.js, a two-tier fallback: it first calls the package-exported `defaultOntologyDir()` from `@fwornle/km-core`, and only on throw falls back to an `import.<COMPANY_NAME_REDACTED>.resolve`-style manual path walk (`path.dirname(fileURLToPath(import.<COMPANY_NAME_REDACTED>.url))` up through `../../lib/km-core/.data/ontologies`). The function is annotated as enforcing a 'CLAUDE.md mandatory rule' traced to commits 87bc2f567/fd35c5350 — any GraphKMStore construction without `ontologyDir` throws `opts.classes omitted but store has no ontology registry`. This makes ontology-dir resolution a defensive, single-purpose helper rather than a general path-resolution utility, and its fallback branch is explicitly documented as 'should never fire', meaning it exists purely as a defence-in-depth measure against an older/mismatched km-core dist.
-
 # KmCoreOntologyResolution — Technical Insight Document
 
 ## What It Is

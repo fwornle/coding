@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] EntityPatternAnalyzer has no constructor dependency injection — teamDirectories and artifactPatterns are hardcoded literals built inline, not passed in or loaded from config; Naming convention (Service/Agent/Manager/Engine/Handler/Analyzer/Classifier/Filter/Monitor suffixes) is duplicated in three places: the classPattern regex in extractArtifacts(), the artifactPatterns regex alternations, and verify-patterns.sh's implicit assumptions — tight, unenforced coupling to a project-wide naming convention; Data-model drift: inferEntityClass()'s private teamMappings object defines an 'Agentic' team entry with no corresponding entry in the constructor-built teamDirectories or artifactPatterns, making that branch unreachable from the public analyzeEntityPatterns() entry point; verify-patterns.sh and EntityPatternAnalyzer.ts are architecturally parallel but disconnected — no shared module, shared regex source, or cross-reference between the shell-level and TypeScript-level pattern registries
-
 # TeamArtifactPatternTable: Technical Insight Document
 
 ## What It Is

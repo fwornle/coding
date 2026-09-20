@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] projectMatches() has no direct dependency on filesystem or session-lock state — it is a pure function over (workspaceYaml, projectRoot), decoupled from scanForLiveSessions()'s I/O-bound discovery logic; Session-state reads (readWorkspace) and identity resolution (projectFromWorkspace) are separated into distinct single-purpose functions, allowing the filter predicate itself to remain synchronous and side-effect free; Cross-module coupling: copilot-events-tail.mjs relies on ../adapters/copilot-events.mjs for both YAML parsing and project-name derivation, making that adapter the single source of truth for 'what project does this Copilot session belong to'; No caching layer for workspace.yaml reads — readWorkspace() re-reads and re-parses the file on each invocation rather than memoizing per sessionDir, though this is only called once per session during the discovery scan rather than per poll cycle
-
 # ProjectFiltering — Technical Insight Document
 
 ## What It Is

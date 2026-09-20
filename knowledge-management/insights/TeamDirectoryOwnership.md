@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts - teamDirectories Map defines directory-to-team ownership; src/ontology/heuristics/EntityPatternAnalyzer.ts - artifactPatterns array, regex-based team pattern matching with per-team entityClassMap; src/ontology/heuristics/EntityPatternAnalyzer.ts - analyzeEntityPatterns() two-step match cascade (checkLocalArtifact confidence 0.9, matchArtifactPattern confidence 0.75); src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts() four-regex artifact harvesting (filePathPattern, npmPattern, classPattern, dirPattern); scripts/knowledge-management/verify-patterns.sh - ConditionalLoggingPattern check comparing console.log vs Logger.(log|debug|info|warn|error) call counts; scripts/knowledge-management/verify-patterns.sh - compliance score computation (TOTAL_CHECKS/PASSED_CHECKS, conditional on package.json/install.sh presence); integrations/graphify/tests/fixtures/xaml_viewmodel/ViewModels/DesignViewModel.cs - cross-language ViewModel suffix convention; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - DesignInstance binding to DesignViewModel via vm: namespace
-
 # TeamDirectoryOwnership: Technical Insight Document
 
 ## What It Is

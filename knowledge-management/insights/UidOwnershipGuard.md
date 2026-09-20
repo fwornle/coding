@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] The uid-ownership check is NOT a single shared utility — it is reimplemented per-module (isOwnedByMe in copilot-events-tail.mjs vs ownedDbPath in opencode-token-rows.mjs) with different granularity (per-directory skip vs whole-call short-circuit) and different uid-resolution strategies (caller-supplied parameter vs inline process.getuid()).; Ownership guards are purely advisory/read-gating — they never mutate or repair the non-owned resource, consistent with a defense-in-depth rather than defense-in-primary security posture.; Platform detection (`myUid == null` / `typeof process.getuid === 'function'`) is used as an implicit Windows-vs-POSIX branch, with Windows deployments receiving no uid-based traversal protection from this layer.; Failure isolation is structural: a rejected/non-owned resource produces a stderr diagnostic and a skip, never an exception that could propagate into the caller's control flow — mirroring the same D-08 non-fatal-failure discipline documented for token-write hooks in copilot-events-tail.mjs and token-db.mjs.
-
 # UidOwnershipGuard — Technical Insight Document
 
 ## What It Is

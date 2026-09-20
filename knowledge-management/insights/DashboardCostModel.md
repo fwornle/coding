@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] freshInputTokens() is a documented case of a fix that had to remove a compensation instead of adding one: the function used to subtract cache_read_tokens for OpenAI-wire providers (copilot/opencode) because prompt_tokens on that wire included cached tokens, but once the upstream proxy (openAIFreshInputTokens() in rapid-llm-proxy, per the parent context's LLM notes) started subtracting at the parse boundary and a backfill script corrected historical rows, the local subtraction became a double-compensation that zeroed out legitimately fresh input on corrected rows (the comment gives a concrete example: input=135, cache_read=23264 → old code returned 0). This mirrors the project's own [reference_llm_output_cap_truncation]/backfill-style incidents catalogued in memory — a defect fixed at its source must have its downstream compensating code removed in lockstep, and isOpenAIWireProvider() is kept only as documentation of the now-irrelevant distinction, not as active logic.
-
 # DashboardCostModel — Technical Insight Document
 
 ## What It Is

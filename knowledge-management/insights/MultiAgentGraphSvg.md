@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx:52 - AGENT_SUBSTEPS static schema definition; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx - WAVE_AGENTS and KG_OPERATOR_CHILDREN module-scope hoisting with memoization-defeat comment; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx - useWorkflowColors() import from @/lib/colors, dark-mode rationale comment; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - calculateDynamicEta, getStepMedianDuration, calculateMedian ETA estimation logic; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - import of MultiAgentGraph as UKBWorkflowGraph, AGENT_SUBSTEPS from ./workflow; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts - UKBProcess.batchPhaseStepCount comment 'Derived from workflow YAML'; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx - deriveAncestryFromStorePath fast-path/slow-path reconciliation; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx - selectionSource subscription and Locked Contract #3 viewport-stability comment; integrations/unified-viewer/src/graph/color-fallback.ts - nodeFillColor parent-walk resolver, ONLINE_RING_COLOR; integrations/unified-viewer/src/graph/color-fallback.ts - isOnlineSource DEPRECATED shim vs isOnlineLearned from ./learning-source
-
 # MultiAgentGraphSvg — Technical Insight Document
 
 ## What It Is

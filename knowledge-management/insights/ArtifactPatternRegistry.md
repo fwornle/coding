@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:constructor - teamDirectories Map and artifactPatterns array defined as in-memory literals; src/ontology/heuristics/EntityPatternAnalyzer.ts:analyzeEntityPatterns() - two-step checkLocalArtifact()/matchArtifactPattern() fallback with first-match short-circuit; src/ontology/heuristics/EntityPatternAnalyzer.ts:extractArtifacts() - four regex patterns (filePathPattern, npmPattern, classPattern, dirPattern) merged into a Set; src/ontology/heuristics/EntityPatternAnalyzer.ts:inferEntityClass() - teamMappings includes an unreachable 'Agentic' branch not present in teamDirectories; scripts/knowledge-management/verify-patterns.sh:5 - set -euo pipefail combined with ((PASSED_CHECKS++)) usage later in the script; scripts/knowledge-management/verify-patterns.sh - CLAUDE_REPO="${CODING_TOOLS_PATH:-${CODING_REPO:-$DEFAULT_REPO}}" three-tier fallback for repo root; scripts/knowledge-management/verify-patterns.sh - PATTERNS=$(jq -r '.entities[] | select(.entityType == "TransferablePattern" and .significance >= 8) | .name' "$SHARED_MEMORY") dynamic pattern load not reflected in SCORE calculation; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - d:DataContext binding to DesignViewModel.cs, unrelated fixture pulled into this sample
-
 # ArtifactPatternRegistry — Technical Insight Document
 
 ## What It Is

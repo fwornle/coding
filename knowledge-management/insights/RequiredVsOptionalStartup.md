@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architectural Patterns] Retry-with-escalation pattern: startOneService() retries up to maxRetries before either blocking (required) or degrading (optional); Config-driven capability table (SERVICE_CONFIGS/SERVICE_ORDER) validated by structural coverage tests rather than by convention; Fail-open vs fail-closed asymmetry by responsibility: process-starting code (start-services-robust.js) fails closed/loud on bad config; display/apply-shim code (entrypoint.sh) fails open on missing/stale data; Layered gating: feature-flag layer (on/off) sits above required/optional retry semantics, so 'required' is conditional on the feature being enabled; Strangler/fallback pattern: ROBUST_MODE flag lets start-services.sh switch wholesale between a modern orchestrator and a legacy bash implementation; Throwaway-probe pattern: waitForPortBindable() uses a disposable net.createServer() to test real OS socket availability instead of trusting a higher-level listening check
-
 # RequiredVsOptionalStartup — Technical Insight Document
 
 ## What It Is

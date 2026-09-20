@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - calculateDynamicEta() dynamic-learning estimator with three-tier fallback; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - sanity clamp: etaMs = Math.max(linearEtaMs * 0.3, Math.min(linearEtaMs * 2.0, etaMs)); integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - MIN_ETA_MS/MAX_ETA_MS absolute bounds (1s / 30min); integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - calculateMedian() and getStepMedianDuration() used in the finalization-phase branch; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - calculateStepAwareEta() legacy delegate to calculateDynamicEta(); integrations/system-health-dashboard/src/store/slices/ukbSlice.ts - WorkflowPreferencesState (singleStepMode, mockLLM) not consumed by the ETA estimator; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts - UKBProcess.batchIterations shape consumed by calculateDynamicEta()
-
 # DynamicEtaLearning — Technical Insight Document
 
 ## What It Is

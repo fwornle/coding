@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/ukb-unified/cli.js:33-39 - UKBCli constructor, eager sub-manager init + null orchestrator placeholder; lib/ukb-unified/cli.js:157-243 - defaultCommand() staged checkpoint/gap/execute pipeline; lib/ukb-unified/cli.js:178-186 - hardcoded dry-run seven-step agent list; lib/ukb-unified/core/VkbApiClient.js:18-33 - isServerAvailable() health-check-not-graph-gated logic; lib/ukb-unified/core/VkbApiClient.js:83-131 - createEntity/updateEntity duplicated fetch/error-unwrap boilerplate; lib/ukb-database/cli.js:29-38 - isVKBRunning() 1000ms-timeout health check; lib/ukb-database/cli.js:255-266 - updateEntityFromStdin() single up-front vkbRunning check; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx:53-73 - HISTORY_PAGE_SIZE=500 rationale comment; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx:130-230 - calculateDynamicEta() three-branch estimator with self-clamp
-
 # UKBUnifiedCLI — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] docker/entrypoint.sh — PROGRAM_FEATURES mapping and per-feature `node -e` lookup loop writing /etc/supervisor/features.d/disabled.conf; docker/entrypoint.sh — .env loading loop with `case "$key" in *_API_KEY|*_TOKEN|*_MANAGEMENT_KEY) continue ;;` (T2 egress lockdown); scripts/start-services-robust.js — SERVICE_CONFIGS.transcriptMonitor.startFn triple-check (psm global, psm per-project, isProcessRunningByScript); scripts/start-services-robust.js — killProcessOnPortAndWait() SIGTERM-then-SIGKILL escalation at maxWaitMs/2; scripts/start-services-robust.js — waitForPortBindable() using net.createServer().listen() polling, distinct from isPortListening() in lib/service-starter.js; tests/features/service-gating.test.mjs — 'every service declares a feature' and 'every declared feature is a real one' structural assertions against lib/features/catalogue.cjs FEATURE_IDS; tests/features/service-gating.test.mjs — 'a disabled service is not reported as degraded' and 'a REQUIRED service whose feature is off does not block startup'; start-services.sh — ROBUST_MODE gate (`exec node scripts/start-services-robust.js` vs LEGACY MODE raw docker-compose/docker run block with no feature gating)
-
 # FeatureGatingSnapshot
 
 ## What It Is

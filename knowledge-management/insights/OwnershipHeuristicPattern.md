@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:1-40 - class declaration, teamDirectories Map, artifactPatterns array definitions; src/ontology/heuristics/EntityPatternAnalyzer.ts - analyzeEntityPatterns() - two-step (a)/(b) cascade with confidence 0.9 vs 0.75; src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts() - four regex passes (file paths, npm scopes, class-name suffixes, directory prefixes) merged into a Set; src/ontology/heuristics/EntityPatternAnalyzer.ts - checkLocalArtifact() and matchArtifactPattern() - private team-resolution helpers returning ArtifactMatch; src/ontology/heuristics/EntityPatternAnalyzer.ts - inferEntityClass() (truncated) - contains an orphaned 'Agentic' teamMappings entry not present elsewhere in the class; scripts/knowledge-management/verify-patterns.sh:30-45 - ConditionalLoggingPattern check via rg console.log vs Logger.* counts; scripts/knowledge-management/verify-patterns.sh - SHARED_MEMORY jq update writing pattern_compliance_score metadata; integrations/graphify/tests/fixtures/xaml_viewmodel/ViewModels/DesignViewModel.cs - minimal design-time ViewModel fixture; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - d:DataContext binding fixture for graphify's XAML parser tests
-
 # OwnershipHeuristicPattern
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] EntityPatternAnalyzer has no external dependencies beyond its own types module (LayerResult, ArtifactMatch from ../types.js) and performs no I/O — all state (teamDirectories, artifactPatterns) is constructed in-memory in the constructor, making it a pure, synchronous, stateless-after-construction analyzer suited to the documented '<1ms response time' budget; Team-to-convention knowledge is duplicated across at least three structures in the same class (teamDirectories Map, artifactPatterns[].entityClassMap, and the teamMappings object inside inferEntityClass) rather than being centralized in one lookup table; verify-patterns.sh and EntityPatternAnalyzer.ts are architecturally parallel but disconnected: both encode 'suffix/keyword implies convention compliance or ownership' logic independently, in different languages (bash+ripgrep vs. TypeScript regex), with no shared source of truth for what the canonical patterns are; The XAML/C# fixture pair is isolated inside a test-fixtures directory of a submodule (integrations/graphify), architecturally separated from the production ontology heuristics in src/ontology/heuristics/ — it validates a structurally analogous but independently-implemented pattern-detection capability in graphify rather than reusing EntityPatternAnalyzer
-
 # ArtifactPatternMatching — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Tight process-boundary coupling: claude-bridge.js is re-spawned as a fresh Node process per Claude tool-call event, relying on UnifiedHookManager's internal idempotent-initialization guard (`manager.initialized`) rather than any cross-process cache; Two structurally similar but non-inheriting hook manager implementations coexist (HooksManager in hooks-api.js vs UnifiedHookManager referenced from hook-manager.js), duplicating priority-sort-on-registration logic without a shared base class link visible in this bundle; No sanitization boundary at the bridge layer: transformContext() spreads raw, potentially sensitive claudeContext fields directly into unified hook metadata with no redaction call before handoff to manager.executeHooks(); Duplicated, oppositely-keyed event-mapping tables (EVENT_MAP vs EVENT_MAPPINGS) create a synchronization hazard for any new lifecycle event addition; Dynamic import of hook-manager.js deferred until after stdin parsing, decoupling pure transformation logic (unit-testable via named exports) from the stateful manager dependency
-
 # ClaudeBridgeAdapter — Technical Insight Document
 
 ## What It Is

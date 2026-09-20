@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] scripts/start-services-robust.js - killProcessOnPortAndWait() implements graduated SIGTERM→SIGKILL escalation with lsof polling; scripts/start-services-robust.js - waitForPortBindable() uses a throwaway net.createServer().listen() probe distinct from isPortListening(); scripts/start-services-robust.js - SERVICE_CONFIGS.transcriptMonitor.startFn performs triple-check (global PSM, per-project PSM, isProcessRunningByScript pgrep fallback); docker/entrypoint.sh - PROGRAM_FEATURES mapping and node -e one-liner resolving features.json, defaulting unknown features to enabled; start-services.sh - ROBUST_MODE branch execs scripts/start-services-robust.js; ROBUST_MODE=false branch retains a full independent legacy implementation; tests/features/service-gating.test.mjs - 'a REQUIRED service whose feature is off does not block startup' test asserting conditional required-ness; tests/features/service-gating.test.mjs - 'a disabled service is not reported as degraded' test enforcing disabled/degraded state separation; tests/features/service-gating.test.mjs - 'an unknown feature on a config is a loud failure, not a silent skip' test asserting /unknown feature 'nope'/ rejection
-
 # ServiceGatingContract — Technical Insight Document
 
 ## What It Is

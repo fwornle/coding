@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] OntologyValidator is decoupled from raw ontology JSON/km-core registry access — it depends on pre-resolved ResolvedEntityDefinition objects via LegacyOntologyAdapter, isolating it from upstream ontology-chain resolution changes; Validation is configurable at the call site via ValidationOptions rather than being a fixed, one-size-fits-all check; Two co-located class definitions of the same name (ontology.ts vs OntologyValidator.ts) suggest a legacy-compatibility boundary within the ontology module that should be treated as intentional, not a duplication bug; Metrics collection (OntologyMetrics) is imported alongside validation types, indicating instrumentation is wired directly into the validator rather than added externally via middleware or decorators; The validator's typed error model (ValidationError/OntologyValidationError) enables downstream consumers like OntologyClassificationAgent to branch on structured failure reasons rather than string-matching error messages
-
 # OntologyValidator — Technical Insight Document
 
 ## What It Is

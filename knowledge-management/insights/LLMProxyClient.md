@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] The LLM proxy's routing/classifier control surface is HTTP-based (proxyBase + /api/llm/routing/resolve, /api/llm/classifier) and consumed by React hooks (useOffloadPolicyDraft, useClassifierJudge) that separately poll and separately save, rather than a unified LLM client SDK; Two independently-evolving config files (llm-routing.yaml for offload policy, config/prompt-classifier.yaml for the judge) both feed one composite UI card (OffloadDecision), creating a documented tension between UX cohesion and failure-domain isolation; Dashboard-side route resolution logic (evaluateOffload/rungOfReason in offload-gates.ts, referenced but not shown) duplicates proxy-side logic and requires active reconciliation rather than being derived from a shared source of truth; cost-model.ts is intentionally framework-free ('Pure cost/budget logic... No React here'), isolating pricing/budget math from the React data-fetching layer that supplies CostRow[] and CostConfig; model-limits.cjs treats opencode's own models.dev cache as the canonical context-window source rather than hardcoding limits, explicitly to avoid the kind of stale-table bug documented in its own file header; Legacy/compatibility dual-write pattern (per parent context, setGlobalLLMMode() writing both llmState and progress.mockLLM) recurs structurally in cost-model.ts's now-removed OpenAI-wire cache subtraction, both cases showing the risk of a compensating consumer outliving the producer-side bug it compensated for
-
 # LLMProxyClient — Technical Insight Document
 
 ## What It Is

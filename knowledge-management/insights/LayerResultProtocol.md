@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:constructor - hardcoded teamDirectories Map and artifactPatterns array literal; src/ontology/heuristics/EntityPatternAnalyzer.ts:analyzeEntityPatterns() - two-step per-artifact loop with early return on first match; src/ontology/heuristics/EntityPatternAnalyzer.ts:extractArtifacts() - four regex passes (filePathPattern, npmPattern, classPattern, dirPattern) merged into a Set<string>; src/ontology/heuristics/EntityPatternAnalyzer.ts:checkLocalArtifact() - directory-prefix match via teamDirectories, confidence 0.9, calls inferEntityClass(); src/ontology/heuristics/EntityPatternAnalyzer.ts:matchArtifactPattern() - regex match via artifactPatterns, confidence 0.75, calls inferEntityClassFromPattern(); src/ontology/heuristics/EntityPatternAnalyzer.ts:inferEntityClass() - truncated; local teamMappings Record<string,Record<string,string>> built per-call
-
 # LayerResultProtocol — Technical Insight Document
 
 ## What It Is

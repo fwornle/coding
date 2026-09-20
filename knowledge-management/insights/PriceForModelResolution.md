@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/system-health-dashboard/src/components/cost/cost-model.ts:150-179 — priceForModel(): exact match, fast-mode suffix recursion, family fallback ladder; integrations/system-health-dashboard/src/components/cost/cost-model.ts:127-137 — scalePrice() and FAST_MODE_SUFFIX/FAST_MODE_MULTIPLIER constants; integrations/system-health-dashboard/src/components/cost/cost-model.ts:96-108 — FAMILY_REPRESENTATIVE map used by the family-fallback branch; integrations/system-health-dashboard/src/components/cost/cost-model.ts:83-94 — modelFamily() classification feeding both fast-mode and family fallback; integrations/system-health-dashboard/src/components/cost/cost-model.ts:216-230 — freshInputTokens(): retained identity function with historical-defect warning comment; integrations/system-health-dashboard/src/components/cost/cost-model.ts:236-249 — cellCostUsd(): composes priceForModel, budgetProvider, and providerScale; integrations/system-health-dashboard/src/components/cost/cost-model.ts:56-62 — budgetForMonth(): hasOwnProperty check distinguishing explicit null override from absent month key; integrations/system-health-dashboard/src/components/cost/cost-model.ts:69-77 — isSynthetic(): upstream filter that priceForModel() implicitly depends on
-
 # PriceForModelResolution
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks-api.js:registerHook — pushes then sorts eventHooks by priority on every registration; lib/agent-api/hooks-api.js:HooksManager constructor — `if (new.target === HooksManager) throw ...` construction-time contract enforcement; lib/agent-api/hooks-api.js:getAgentType/loadNativeHooks/saveNativeHooks — abstract methods that throw if not overridden by a subclass; lib/agent-api/hooks-api.js:EVENT_MAPPINGS — per-agent (claude vs copilot) event translation table with explicit null entries; lib/agent-api/hooks-api.js:translateEvent — `return mapping[event] || null`; lib/agent-api/hooks-api.js:triggerHook — per-hook try/catch that logs and continues rather than aborting the loop; lib/agent-api/hooks/claude-bridge.js:main() — outer try/catch that always resolves to `{decision:'allow', ...}` plus `process.exit(0)` on failure; lib/agent-api/hooks/claude-bridge.js:readStdin — 1000ms timeout resolving to `{}` instead of rejecting; tests/features/cli-and-rules-gating.test.mjs:GUARDED — map of hook-gated CLIs to the feature each requires; tests/features/cli-and-rules-gating.test.mjs:'a disabled feature refuses with exit 2 and an actionable message' — asserts exit code 2 and empty stdout on refusal; tests/features/cli-and-rules-gating.test.mjs:'the guard never blocks when it cannot resolve' — asserts require-feature.sh's fail-open early returns; integrations/system-health-dashboard/src/hooks/usePolledFetch.ts:paused/wasPaused — visibility-driven pause with immediate refresh on tab return; integrations/system-health-dashboard/src/components/workflow/hooks.ts:useWorkflowDefinitions — Redux-data-with-constants-fallback merge strategy
-
 # KnowledgeInjectionHookGating — Technical Insight Document
 
 ## What It Is

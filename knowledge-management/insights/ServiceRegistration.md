@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] scripts/start-services-robust.js:41 - `const psm = new ProcessStateManager();` module-scope singleton instantiation; scripts/start-services-robust.js:47-66 - `isProcessRunningByScript()` independent pgrep-based OS reconciliation, bypassing PSM; scripts/start-services-robust.js (transcriptMonitor.startFn) - `psm.isServiceRunning('transcript-monitor', 'global')` then `psm.isServiceRunning('enhanced-transcript-monitor', 'per-project', { projectPath: TARGET_PROJECT_PATH })` dual-scope check; scripts/start-services-robust.js (transcriptMonitor.startFn) - `psm.registerService({ name: 'transcript-monitor', pid: osCheck.pid, type: 'global', script: 'scripts/enhanced-transcript-monitor.js' })` wrapped in a non-fatal try/catch; docker/entrypoint.sh - `PROGRAM_FEATURES` mapping and `node -e` snippet reading `/coding/.coding/runtime/features.json` to write `/etc/supervisor/features.d/disabled.conf`; start-services.sh - `node scripts/psm-register.js --check transcript-monitor global` legacy bash-invoked PSM check; tests/features/service-gating.test.mjs - `startOneService`, `SERVICE_CONFIGS`, `SERVICE_ORDER` exercised without any assertion on `ProcessStateManager` calls
-
 # ServiceRegistration — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Tight coupling between health semantics and the specific shell tool invoked (pgrep, lsof, /dev/tcp, docker-compose ps) rather than a shared cross-platform abstraction; start-services-robust.js's ordering dependency (transcriptMonitor, liveLoggingCoordinator must be first two in SERVICE_ORDER) is enforced only by a dedicated test, not by an explicit dependency graph in the code; Legacy start-services.sh is dead-code-in-waiting behind ROBUST_MODE flag rather than deleted, creating latent drift risk if robust mode is ever disabled; docker/entrypoint.sh's feature gate deliberately fails open (missing/unreadable features.json => start everything) while start-services-robust.js's required-service gate fails closed (a required startFn failure sets blocked=true) — same 'feature gating' concept, opposite default-safety direction depending on host vs container context; No shared module between docker/entrypoint.sh, scripts/start-services-robust.js, and start-services.sh for TCP/port/process readiness checks — each maintains its own bash or Node implementation
-
 # ServiceStarterHealthPrimitives — Technical Insight Document
 
 ## What It Is

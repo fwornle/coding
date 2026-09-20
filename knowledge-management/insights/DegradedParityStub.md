@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/lsl/live/copilot-events-tail.mjs - COPILOT_LSL_INCOMPLETE_REASON and COPILOT_LSL_INCOMPLETE_NOTE constants documenting the degraded-parity contract; lib/lsl/live/copilot-events-tail.mjs - buildStubObservation() synthesizes a two-message stub exchange instead of a real transcript; lib/lsl/live/copilot-events-tail.mjs - findLiveLockFile() and LOCK_STALE_GRACE_MS (10 minutes) implement the stale-lock liveness heuristic; lib/lsl/live/copilot-events-tail.mjs - isOwnedByMe() and scanForLiveSessions() implement the uid-ownership + liveness filter; lib/lsl/live/copilot-events-tail.mjs - tailEventsFile() seeds lastSize via fs.statSync and deliberately skips pre-existing content; lib/lsl/live/copilot-events-tail.mjs - onTokenRow hook isolation via a dedicated non-fatal stderr line, distinct from onError; lib/lsl/token/opencode-token-rows.mjs - ownedDbPath() mirrors the same uid-check-and-fail-closed pattern for opencode.db; lib/lsl/token/token-db.mjs - insertTokenRow() never-throw, best-effort insert with INSERT_ID_RETRY_ATTEMPTS and stderr-only failure reporting
-
 # DegradedParityStub — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Mode/state configuration is centralized in a single JSON file (.data/workflow-progress.json) read by multiple functions rather than passed through a config service or DI container; Environment variables (CODING_ROOT) are given precedence over explicit function parameters to reconcile host/container path differences under Docker bind mounts — an implicit rather than explicit contract; The LLM abstraction layer favors parallel/bypass implementations (llm-with-process.ts) over extending the underlying SDK when the SDK lacks a required field, trading duplicated logic for lower risk of SDK modification; Error-handling philosophy is asymmetric by design: DMR/local-inference paths favor graceful degradation (cached health checks, singleton reuse) while JSON parsing favors fail-loud correctness (only a narrowly scoped repair, no general leniency); No dependency injection is evident for the LLM client construction — dmrClient is a module-level singleton, and mode resolution reads directly from environment/filesystem rather than an injected configuration object
-
 # ProcessAwareLLMClient — Technical Insight Document
 
 ## What It Is

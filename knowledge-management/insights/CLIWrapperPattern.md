@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] scripts/knowledge-management/verify-patterns.sh:9-13 - CLAUDE_REPO resolution via SCRIPT_DIR/DEFAULT_REPO env-var cascade; scripts/knowledge-management/verify-patterns.sh:30-42 - ConditionalLoggingPattern check via rg console.log vs Logger.* counts; scripts/knowledge-management/verify-patterns.sh:56-69 - ReduxStateManagementPattern check via useState vs useSelector/useDispatch/createSlice counts; scripts/knowledge-management/verify-patterns.sh:113-135 - generic TransferablePattern loop reading $SHARED_MEMORY via jq; scripts/knowledge-management/verify-patterns.sh:170-186 - PASSED_CHECKS/TOTAL_CHECKS compliance score with unguarded `((PASSED_CHECKS++))` under set -euo pipefail; src/ontology/heuristics/EntityPatternAnalyzer.ts:100-135 - analyzeEntityPatterns() two-step dispatch (checkLocalArtifact then matchArtifactPattern) with 0.9/0.75 confidence tiers; src/ontology/heuristics/EntityPatternAnalyzer.ts:143-166 - extractArtifacts() regex extraction of file paths, npm packages, and *Service/*Agent/*Manager class names; integrations/graphify/tests/fixtures/xaml_viewmodel/ViewModels/DesignViewModel.cs:1-5 - empty stub class, likely unrelated test fixture noise
-
 # CLIWrapperPattern — Technical Insight Document
 
 ## What It Is

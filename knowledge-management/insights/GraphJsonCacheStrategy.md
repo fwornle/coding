@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The cost model of a stale-cache read is asymmetric depending on downstream consumer complexity: for GraphJsonCacheStrategy, a stale graph.json means GraphifyGraph serves an outdated but still internally consistent node-link graph (bounded blast radius — one full JSON snapshot). By contrast, ukbSlice.ts's WorkflowExecutionState and multi-agent-graph.tsx's getNodeStatus/shouldShowEdge derive live UI state from many small incremental Redux actions (fetchHistorySuccess, syncStepPauseFromServer, etc.); a partial or interleaved update there risks internally *inconsistent* state (e.g. mismatched stepStatuses vs. currentStep) rather than a uniformly stale-but-consistent snapshot, illustrating why coarse whole-file caching can actually be a more robust consistency strategy than fine-grained incremental state sync, at the cost of freshness.
-
 # GraphJsonCacheStrategy — Technical Insight Document
 
 ## What It Is

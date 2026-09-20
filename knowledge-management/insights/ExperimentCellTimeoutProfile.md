@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The parent context describes an ExperimentCellTimeoutProfile behavior where IS_EXPERIMENT_CELL detection (via '--' presence in CODING_EXPERIMENT_TASK_ID) doubles SAFETY_TIMEOUT_MS and RETRIEVE_TIMEOUT_MS for batch runs. This is a config-driven feature-flag pattern similar to isInjectionEnabled() in knowledge-injection-hook.js, which also reads an environment variable (CODING_KNOWLEDGE_INJECTION) with a default-enabled/opt-out semantics. Both mechanisms rely on process.env as the sole configuration surface, meaning behavior is entirely determined at process startup with no runtime reconfiguration path, which simplifies testing (as seen in tests/features/cli-and-rules-gating.test.mjs) but requires subprocess-level isolation to validate different flag states.
-
 # ExperimentCellTimeoutProfile: Technical Insight Document
 
 ## What It Is

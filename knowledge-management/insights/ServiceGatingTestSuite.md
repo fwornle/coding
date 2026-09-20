@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] tests/features/service-gating.test.mjs:24-49 - featureSet() and emptyResults() test fixture helpers; tests/features/service-gating.test.mjs:38-63 - 'service catalogue coverage' describe block: feature declaration, FEATURE_IDS validity, SERVICE_ORDER/SERVICE_CONFIGS set-equality, live-logging pair ordering; tests/features/service-gating.test.mjs:66-77 - 'a disabled feature skips the service without starting it' test; tests/features/service-gating.test.mjs:79-86 - 'a disabled service is not reported as degraded' test; tests/features/service-gating.test.mjs:88-94 - 'a REQUIRED service whose feature is off does not block startup' test; tests/features/service-gating.test.mjs:96-111 - 'a required failure blocks, so downstream services do not start' test with maxRetries override; tests/features/service-gating.test.mjs:113-123 - 'an unknown feature on a config is a loud failure, not a silent skip' test; scripts/start-services-robust.js:174-193 - waitForPortBindable() TCP bindability probe; scripts/start-services-robust.js:76-146 - killProcessOnPortAndWait() graduated SIGTERM/SIGKILL termination; docker/entrypoint.sh:100-141 - fail-open feature-gating override generation via PROGRAM_FEATURES and node -e
-
 # ServiceGatingTestSuite: Technical Insight Document
 
 ## What It Is

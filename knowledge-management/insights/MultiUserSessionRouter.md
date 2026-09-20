@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Clear separation between routing/config validation (LSLConfigValidator per parent context) and downstream consumption (lsl-sessions.mjs), with no direct code coupling — routing bugs surface as data anomalies, not exceptions, in the reader; Raw (unhashed) usernames transiently exist in ClaudeParser.parseFile()'s metadata.userHash (process.env.USER) before any downstream re-hashing into the pseudonymized LSL scheme described in parent observations — a potential boundary worth confirming is closed before data reaches persistent storage; Format-agnostic router design: both .jsonl (pi) and .md (legacy) transcript formats coexist under the same user/date/window directory structure, requiring readers to format-detect and branch (isLsl(), format detection in listSessions()); Logging is uniformly routed through categorized createLogger() calls (transcript-api.js, claude-parser.js) rather than console.*, aligning with the project's centralized logging-config.json and constraint-monitor enforcement; No shared schema-validation call is evident between the write-side (transcript-api.js formatAsMarkdown) and read-side (lsl-sessions.mjs/PiSessionWriter.js) markdown serializers, meaning schema drift would only be caught by manual testing or by LSLConfigValidator at a different layer entirely
-
 # MultiUserSessionRouter — Technical Insight Document
 
 ## What It Is

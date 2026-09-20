@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] A structurally analogous 'interpreted vs. stored, and now possibly stale' pattern exists in `integrations/unified-viewer/src/graph/color-fallback.ts`'s `nodeFillColor()`/`nodeShapeFor()`, which walk a `ClassRegistryEntry` parent chain against `BATCH_PALETTE`/`SHAPE_PALETTE` hardcoded tables (Project/Component/SubComponent/Detail/System) rather than reading live registry display data first in all cases. Both `AGENT_SUBSTEPS.code_graph.query.techNote` and these hardcoded palettes are cases of a small, static, colocated lookup table describing a backend/ontology concept that was designed once and is trusted implicitly thereafter — the difference is that the palette's drift risk is cosmetic (wrong color/shape) while the techNote's drift risk is informational (an operator forms an incorrect mental model of what the code_graph agent is doing at runtime, which is a more consequential kind of staleness given this is diagnostic UI surfaced during live/historical workflow debugging).
-
 # StaleCypherTechNoteDrift — Technical Insight Document
 
 ## What It Is

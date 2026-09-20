@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] EntityPatternAnalyzer.ts has no external dependencies beyond its own types.js import — all classification data (directories, regex patterns, class maps) is inlined in the constructor rather than loaded from config, contrasting with the config-driven design attributed to <AWS_SECRET_REDACTED> in the parent context; Confidence scores (0.9 direct match, 0.75 pattern match) are hardcoded constants in the method bodies rather than named class constants or config values; verify-patterns.sh performs its own ad hoc metrics gathering (ripgrep counts) and writes results directly into a shared JSON file via jq, without going through EntityPatternAnalyzer or any shared classification component — indicating no shared code path between the TS classification logic and the shell-script compliance checks despite both being nominally under 'knowledge-management'; Performance is explicitly tracked in analyzeEntityPatterns via `performance.now()` deltas attached to the returned LayerResult, suggesting this analyzer is one 'layer' in a multi-layer pipeline (the file's own header comment says 'Layer 1: File/Artifact Detection'), implying sibling Layer 2+ analyzers exist elsewhere but are not present in the provided code files
-
 # AdapterRegistryPattern — Technical Insight Document
 
 ## What It Is

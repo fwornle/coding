@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] copilot-events-tail.mjs documents and accepts a permanent capability gap rather than attempting a workaround: because Copilot CLI persists only subagent.started/completed/failed lifecycle events (never the sub-agent's actual messages/tool calls) to events.jsonl, every observation it produces is stamped `lsl_incomplete: true` with a locked note constant (COPILOT_LSL_INCOMPLETE_NOTE = 'Copilot CLI emits only lifecycle bookends'). The function buildStubObservation() synthesizes a fake 2-message user/assistant exchange purely from spawn metadata (agentName, agentDescription, started_at, completed_at, completion_status) to satisfy the shape LSL observations expect, rather than leaving a gap in the transcript. This is a deliberate 'honest degradation' design: the system chooses to produce a clearly-marked incomplete artifact over silently dropping the sub-agent's activity, and Plan 51-11 surfaces this degradation via a `lsl_incomplete_marker_present` heartbeat field rather than hiding it.
-
 # LiveTranscriptWatchers — Technical Insight Document
 
 ## What It Is

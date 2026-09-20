@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx:34-40 - useWorkflowColors() central theme-aware palette import; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx (AGENT_SUBSTEPS) - static per-agent substep schema for ~11 pipeline agents; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx (WAVE_AGENTS, KG_OPERATOR_CHILDREN) - module-scope hoisting to preserve memo stability; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx (calculateDynamicEta, getStepMedianDuration, calculateMedian) - ETA estimation logic colocated with graph modal; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx (deriveAncestryFromStorePath) - reconciliation of inline BFS ancestry vs. store's pathToSelected; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx (d3NodesRef, selectionSource subscription) - retracted-then-scoped viewport centering behavior; integrations/unified-viewer/src/graph/color-fallback.ts (nodeFillColor, nodeShapeFor) - canonical parent-walking color/shape resolver shared across render paths; integrations/unified-viewer/src/graph/color-fallback.ts (BATCH_PALETTE, ONLINE_PALETTE, ONLINE_RING_COLOR) - two-axis hierarchy/provenance visual encoding; integrations/unified-viewer/src/graph/color-fallback.ts (isOnlineSource, deprecated) vs ./learning-source isOnlineLearned - superseded classifier still retained for string-only callers; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts (UKBProcess.batchPhaseStepCount) - YAML-derived value contrasted with hardcoded AGENT_SUBSTEPS
-
 # GraphVisualRendering — Technical Insight Document
 
 ## What It Is

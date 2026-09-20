@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architectural Patterns] Second-writer pattern: token-db.mjs writes into a SQLite database owned and primarily written by a separate daemon (rapid-llm-proxy), using namespaced identity (user_hash) and defensive schema probing to avoid conflicting with the owner's writes; Fail-closed ownership/security gate: identical uid-check-and-bail pattern (isOwnedByMe / ownedDbPath) applied independently to two different external file stores to prevent reading another user's session state; No-double-count provenance gating: BYPASS_PROVIDERS set (opencode-token-rows.mjs) and analogous logic implied for Copilot restrict adapter row reconstruction to only the traffic provably not already captured by the primary capture path (the proxy); Best-effort/never-throw write boundary: insertTokenRow() and ensureCacheColumns() catch all failures internally and degrade to a stderr diagnostic plus a boolean/no-op return, isolating adapter failures from the ingestion/LSL hot path; Schema-probe memoization: insertShapeFor(db) uses a WeakMap keyed by db handle to cache a one-time PRAGMA table_info probe result, trading schema-drift staleness for per-insert performance; Idempotent self-migration: ensureCacheColumns() unilaterally ALTER TABLEs a database it does not own, guarded by swallowed 'duplicate column' errors on every open; Hard-cutover / no-dual-write discipline: ObservationWriter.js explicitly forbids a feature-flag/dual-write compromise when migrating its own write path from SQLite to km-core, architecturally paralleling (but structurally separate from) the token adapters' single-source discipline
-
 # TokenDbInsertShape — Technical Insight Document
 
 ## What It Is

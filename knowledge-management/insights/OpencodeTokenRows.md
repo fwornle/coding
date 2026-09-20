@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Database access in opencode-token-rows.mjs is read-only and heavily bounded: `new Database(resolved, { readonly: true, timeout: 5000 })` opens the OpenCode SQLite store defensively, and the message query is capped via `ORDER BY rowid DESC LIMIT ?` with MESSAGE_SCAN_LIMIT=4000 rather than a time-range WHERE clause — the actual time-window filtering is deferred to a downstream `withinSpanWindow` (referenced in comments but not present in the truncated excerpt), meaning this function intentionally over-fetches a bounded set and lets the caller narrow it, trading a fixed worst-case scan cost for query simplicity. The `partStmt` prepared statement for per-message tool-call summaries is wrapped in its own try/catch so an OpenCode store predating the `part` table (schema drift) degrades to empty summaries rather than crashing the whole adapter — the same defensive-against-schema-drift posture noted in token-db.mjs's `insertShapeFor`.
-
 # OpencodeTokenRows — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] There's a structural ordering dependency between the EnvFileImportFilter and entrypoint.sh's later feature-gating block: the .env loop runs first and is a simple bash `while` loop with no error handling beyond the `case`/`continue` skip, while the feature-gating section (PROGRAM_FEATURES) is comment-documented as reading a *different* file (/coding/.coding/runtime/features.json) via `node -e`. The two mechanisms are independent env-mutation strategies inside the same script — one filters and exports raw shell variables from .env, the other reads structured JSON and writes supervisord conf stanzas — yet both exist for the same underlying policy goal (fail-open / least-surprise container boot) documented in the parent context.
-
 # EnvFileImportFilter — Technical Insight Document
 
 ## What It Is

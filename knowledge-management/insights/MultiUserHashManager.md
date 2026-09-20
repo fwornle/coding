@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] No single 'MultiUserHashManager' class exists in the provided code — the responsibility is split across at least three independent mechanisms: OS-uid ownership checks (copilot-events-tail.mjs, opencode-token-rows.mjs), static per-adapter hash constants (token-db.mjs), and per-process runId stamping (ObservationWriter.js); token-db.mjs positions itself as a 'second writer' on a SQLite database it does not own or create (`fileMustExist: true` in openTokenDb), imposing an asymmetric trust relationship where the adapter must defensively probe schema and retry on id races rather than assuming exclusive write access; Ownership/ hash-based isolation is applied inconsistently across the codebase's live-capture surfaces: copilot-events-tail.mjs and opencode-token-rows.mjs both perform uid checks independently rather than sharing a common ownership-check utility, suggesting duplicated (not centralized) enforcement of the multi-user boundary; The three ADAPTER_USER_HASH_* constants are hardcoded string literals rather than derived/generated values, meaning the 'hash manager' concept here is closer to a fixed enum/namespace registry than a true hashing algorithm (contrast with the SHA256-based OS-username hashing described in the parent LiveLoggingSystem context)
-
 # MultiUserHashManager — Technical Insight Document
 
 ## What It Is

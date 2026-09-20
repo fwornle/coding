@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] token-db.mjs is documented as 'the ONLY host-side file that touches the proxy-owned .data/llm-proxy/token-usage.db' — a single choke point for all second-writer access to that database, consumed by both copilot-events-tail.mjs and opencode-token-rows.mjs; Ownership boundary is enforced by convention (fileMustExist: true, never creating the DB, not re-asserting journal_mode) rather than by a shared contract or schema-version check between the proxy process and the adapter module; Failure isolation is a repeated top-level design decision (D-08 in token-db.mjs; D-08 again in copilot-events-tail.mjs's onTokenRow callback) — token/accounting code is architecturally subordinate to, and walled off from, the primary LSL/observation pipeline it instruments; Column-list drift is guarded against by exporting ROUTING_COLUMNS from token-db.mjs so tests assert against the live list rather than a copy, an explicit anti-duplication decision called out in the module's own comments; opencode-token-rows.mjs depends directly on token-db.mjs's exported constants (ADAPTER_USER_HASH_OPENCODE, DIRECT_ROUTING_SOURCE), making token-db.mjs a shared foundation module rather than a leaf consumer within the second-writer subsystem
-
 # TokenDbWriter — Technical Insight Document
 
 ## What It Is

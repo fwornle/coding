@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:1-9 - file header documents 'Layer 1: File/Artifact Detection' and '<1ms response time' contract, unenforced at runtime; src/ontology/heuristics/EntityPatternAnalyzer.ts:29-58 - constructor hardcodes teamDirectories Map and artifactPatterns array for exactly 5 teams; src/ontology/heuristics/EntityPatternAnalyzer.ts:~130-170 - analyzeEntityPatterns() early-return loop over extracted artifacts, first match wins regardless of confidence; src/ontology/heuristics/EntityPatternAnalyzer.ts:~180-210 - extractArtifacts() four regex passes (filePathPattern, npmPattern, classPattern, dirPattern) merged into one Set; src/ontology/heuristics/EntityPatternAnalyzer.ts:~215-230 - checkLocalArtifact() directory-prefix match via dirs.some(artifact.startsWith(dir)); src/ontology/heuristics/EntityPatternAnalyzer.ts:~235-255 - matchArtifactPattern() regex-array match via pattern.test(artifact), returns on first hit; src/ontology/heuristics/EntityPatternAnalyzer.ts:~260+ - inferEntityClass() teamMappings duplicate prefix→class table (truncated in provided excerpt)
-
 # ArtifactPatternMatcher — Technical Insight Document
 
 ## What It Is

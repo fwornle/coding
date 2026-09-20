@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] No single 'OwnedDbPathGuard' module exists — the responsibility is realized independently in opencode-token-rows.mjs (`ownedDbPath`), copilot-events-tail.mjs (`isOwnedByMe`), and (referenced but not shown) copilot-token-rows.mjs (`readOwnedFile`); token-db.mjs's `openTokenDb` is architecturally weaker than the other two guards — it relies on `fileMustExist: true` with no uid check, deferring any ownership failure to a later, less-specific error path inside `insertTokenRow`; Guard strength is not uniform: `isOwnedByMe` explicitly allows non-POSIX platforms to bypass the check via an early `myUid == null` return, while `ownedDbPath` performs the stat first and only conditionally checks uid afterward; No shared utility import exists between copilot-events-tail.mjs and opencode-token-rows.mjs for this logic — both re-derive `fs.statSync` + `process.getuid()` from scratch, confirming zero coupling between the two files despite identical intent
-
 # OwnedDbPathGuard: Technical Insight Document
 
 ## What It Is

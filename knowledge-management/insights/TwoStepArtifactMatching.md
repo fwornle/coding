@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts - analyzeEntityPatterns(): two-step loop over extracted artifacts, confidence 0.9 vs 0.75; src/ontology/heuristics/EntityPatternAnalyzer.ts - checkLocalArtifact(): dirs.some((dir) => artifact.startsWith(dir)) prefix match against teamDirectories; src/ontology/heuristics/EntityPatternAnalyzer.ts - matchArtifactPattern(): nested loop over artifactPatterns[].patterns RegExp array; src/ontology/heuristics/EntityPatternAnalyzer.ts - inferEntityClass(): teamMappings Record including unreachable 'Agentic' key; src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts(): filePathPattern, npmPattern, classPattern, dirPattern accumulated into a Set<string>; scripts/knowledge-management/verify-patterns.sh:9-12 - SCRIPT_DIR/DEFAULT_REPO/CLAUDE_REPO env-var fallback chain; scripts/knowledge-management/verify-patterns.sh - CONSOLE_LOG_COUNT/LOGGER_COUNT rg pipelines with `|| echo "0"` fallback under set -euo pipefail; scripts/knowledge-management/verify-patterns.sh - SHARED_MEMORY jq query and case "$pattern" in *Logging*|*Redux*|*State*) usage-indicator switch; integrations/graphify/tests/fixtures/xaml_viewmodel/ViewModels/DesignViewModel.cs - unrelated fixture, no extension match in EntityPatternAnalyzer's filePathPattern
-
 # TwoStepArtifactMatching: Technical Insight Document
 
 ## What It Is

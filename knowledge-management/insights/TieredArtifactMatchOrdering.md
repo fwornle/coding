@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The tiered ordering is a deliberate cost/precision trade-off: `checkLocalArtifact()` iterates `teamDirectories.entries()` doing `String.prototype.startsWith()` checks, which is cheap but only fires for artifacts whose path is a *file path* under a known team directory — it cannot match bare class names like `LSLSession` since those don't start with `src/ontology` etc. `matchArtifactPattern()` is the only tier capable of matching on class-name-shaped artifacts via `artifactPatterns`' regexes. So the ordering isn't purely a performance shortcut for the same signal at two confidence levels — the two tiers actually cover largely disjoint artifact shapes (path-based vs. name-based), and the 'always try local first' rule mostly matters for artifacts that are file paths, since name-shaped artifacts will fail tier 1 unconditionally before reaching tier 2.
-
 # TieredArtifactMatchOrdering: Technical Insight Document
 
 ## What It Is

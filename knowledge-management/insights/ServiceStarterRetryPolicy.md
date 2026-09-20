@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architectural Patterns] Declarative service-registry pattern: SERVICE_CONFIGS + SERVICE_ORDER as a single source of truth consumed by both the starter and its test suite, replacing per-service hand-written start blocks; Layered liveness verification (defense-in-depth checks): global PSM → project-scoped PSM → OS-level pgrep fallback, each with self-healing re-registration on the OS-level branch; Bounded polling instead of fixed sleeps: waitForPortBindable() and killProcessOnPortAndWait() both replace a single sleep() with a poll-until-deadline loop plus a final synchronous check; Graduated/escalating termination: SIGTERM first, SIGKILL only after exceeding half the timeout budget, in killProcessOnPortAndWait(); Asymmetric fail-open vs fail-loud gating: entrypoint.sh fails open on missing/unknown feature config; service-gating.test.mjs enforces fail-loud on an unknown feature *name* in code; Result-bucket state machine (successful/degraded/disabled/failed) that separates 'off by design' from 'on but broken' to avoid false-positive monitoring alerts; Legacy-path preservation via mode flag (ROBUST_MODE) rather than deletion, isolating an old implementation that does not receive new bugfixes; Fail-toward-last-known-good config reload: a failed parse skips adopting the new mtime so the next poll retries automatically, applied in prompt-classifier-service.mjs's loadConfig()
-
 # ServiceStarterRetryPolicy — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:29-43 - JudgeBackend interface with enabled (config) vs reachable (runtime) fields; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:6-18 - header comment documenting the 2026-09-02 incident that motivated the split; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:169-173 - merged memo overlaying only `enabled` from draft, never `reachable`; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:141-146 - save() diff-patch limited to changed enabled fields only; integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts:117-123 - setInterval poll comment explaining it must not freeze during an edit; integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx:238-241 - cls kept separate from p to avoid judge state redrawing gate-ladder counts
-
 # JudgeBackendEnabledReachableSplit
 
 ## What It Is

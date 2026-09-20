@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Port cleanup logic is split across three files with no shared abstraction: scripts/start-services-robust.js (Node, primary/robust path), start-services.sh (bash, legacy path gated by ROBUST_MODE=false), and docker/entrypoint.sh (bash, container-side external-dependency wait — a different concern, checking reachability rather than freeing a local port); killProcessOnPortAndWait() and waitForPortBindable() are complementary but not composed anywhere in the visible source — no caller chains 'kill then confirm bindable' as a single guaranteed operation; The robust-mode port cleanup (killProcessOnPortAndWait) is strictly more conservative than the legacy bash cleanup (kill_port) — SIGTERM-then-SIGKILL with polling vs. immediate SIGKILL with a fixed sleep — yet both remain live/reachable via a runtime env var toggle rather than the safer implementation fully replacing the other; isPortListening() (HTTP-level, imported from lib/service-starter.js) and waitForPortBindable() (kernel bind-level, defined locally) are intentionally two different checks of 'is this port usable', reflecting a documented gap between HTTP-responsiveness and actual socket availability; Container-level readiness (docker/entrypoint.sh wait_for_service) always fails open (returns 0 regardless of outcome), while host-level orchestration (start-services-robust.js SERVICE_CONFIGS.required) can block startup — the two layers have different failure-handling philosophies for conceptually similar 'wait for X to be ready' operations
-
 # PortCleanupLogic — Technical Insight Document
 
 ## What It Is

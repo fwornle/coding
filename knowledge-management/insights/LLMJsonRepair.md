@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] LLMJsonRepair (parse-llm-json.ts) is stateless and pure, in contrast to sibling modules in LLMAbstraction (llm-mock-service.ts, dmr-provider.ts) which hold module-level mutable state (mode cache, singleton client, health-check timestamps); Acts as a shared post-processing chokepoint for completions coming from at least three distinct backends (mock, local DMR, proxied public providers via llm-with-process.ts), centralizing JSON-repair logic rather than duplicating it per provider; Deliberately does not implement general lenient JSON parsing — scope is constrained to one documented failure mode (unescaped control characters in string literals) to preserve fail-loud semantics for genuinely malformed output; Two-stage parse (JSON.parse then targeted repair) minimizes cost on the common case of well-formed output and isolates repair logic to only the failure path
-
 # LLMJsonRepair — Technical Insight Document
 
 ## What It Is

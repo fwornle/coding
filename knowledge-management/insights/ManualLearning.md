@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx:HISTORY_PAGE_SIZE - documented rationale for raising history page size from 50 to 500; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx:calculateDynamicEta - dynamic/adaptive ETA learning from in-run batch durations with sanity-check clamps; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx:calculateStepAwareEta - legacy delegate retained for call-site compatibility; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx:WAVE_AGENTS - module-scope invariant fixing a historical edge-filtering bug in history mode; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx:KG_OPERATOR_CHILDREN - module-scope constant fixing a memoization-defeating re-render bug; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx:deriveAncestryFromStorePath - reconciles inline BFS ancestry computation against the store's authoritative pathToSelected; integrations/unified-viewer/src/graph/color-fallback.ts:nodeFillColor - canonical parent-walking color resolver unifying three previously divergent implementations; integrations/unified-viewer/src/graph/color-fallback.ts:_classHue - deprecated FNV hue function retained solely to anchor a regression test contract
-
 # ManualLearning — Technical Insight Document
 
 ## What It Is

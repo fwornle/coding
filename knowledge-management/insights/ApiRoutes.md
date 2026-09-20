@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] Cross-referencing the client-side evidence against the `ApiRoutes` class name strongly implies a request/response contract that is informally versioned and duplicated on the CONSUMING side rather than centrally documented on the SERVING side. `VkbApiClient.js` implements `getEntities`, `createEntity`, `updateEntity`, `deleteEntity`, `getRelations`, `createRelation`, `deleteRelation`, and `exportTeam` against this presumed route surface, while `lib/ukb-database/cli.js` reimplements a parallel, lower-fidelity client (`isVKBRunning()`, `sendToVKB()`) against the same routes with different timeouts (1000ms vs. `VkbApiClient`'s 2000ms for health checks, 10000ms default for data operations). Because `ApiRoutes` is the single source of truth for the actual contract (status codes, error envelope shape, required fields), any route change in `api-routes.js` risks silently breaking one of these two independently-maintained clients without the other noticing, since neither shares a schema or OpenAPI-style definition with `ApiRoutes`.
-
 # ApiRoutes — Technical Insight Document
 
 ## What It Is

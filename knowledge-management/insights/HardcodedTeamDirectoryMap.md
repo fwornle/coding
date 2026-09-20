@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts - constructor: hardcoded teamDirectories Map and artifactPatterns array; src/ontology/heuristics/EntityPatternAnalyzer.ts - analyzeEntityPatterns(): two-step confidence-tiered resolution over extracted artifacts; src/ontology/heuristics/EntityPatternAnalyzer.ts - extractArtifacts(): four regex patterns merged into a Set, losing extraction-source ranking; src/ontology/heuristics/EntityPatternAnalyzer.ts - checkLocalArtifact(): directory-prefix match, confidence 0.9; src/ontology/heuristics/EntityPatternAnalyzer.ts - matchArtifactPattern(): regex-based match, confidence 0.75; src/ontology/heuristics/EntityPatternAnalyzer.ts - inferEntityClass(): second, divergent teamMappings literal including an unrecognized 'Agentic' team; scripts/knowledge-management/verify-patterns.sh - CLAUDE_REPO resolution: CODING_TOOLS_PATH:-${CODING_REPO:-$DEFAULT_REPO}; scripts/knowledge-management/verify-patterns.sh - PATTERNS sourcing via jq against $SHARED_MEMORY for TransferablePattern entities with significance >= 8; scripts/knowledge-management/verify-patterns.sh - hardcoded thresholds: USESTATE_COUNT -gt 20, UNDOCUMENTED_FUNCTIONS -lt 10; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - d:DataContext binding to vm:DesignViewModel, unrelated to team-directory classification
-
 # HardcodedTeamDirectoryMap — Technical Insight Document
 
 ## What It Is

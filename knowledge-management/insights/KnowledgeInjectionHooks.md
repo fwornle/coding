@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] lib/agent-api/hooks-api.js:constructor - throws if HooksManager is instantiated directly (new.target check); lib/agent-api/hooks-api.js:registerHook - pushes hook then re-sorts full array by priority on every call; lib/agent-api/hooks-api.js:triggerHook - per-handler try/catch, continues on individual hook failure; lib/agent-api/hooks-api.js:EVENT_MAPPINGS - claude vs copilot event-name translation table with null entries for unsupported events; lib/agent-api/hooks/claude-bridge.js:main - top-level try/catch resolves to decision:'allow' and process.exit(0) on any failure; lib/agent-api/hooks/claude-bridge.js:readStdin - 1000ms timeout fallback to {} if no stdin data arrives; integrations/system-health-dashboard/src/hooks/usePolledFetch.ts:usePolledFetch - visibilitychange listener pauses/resumes interval, immediate refresh on tab return; integrations/system-health-dashboard/src/components/workflow/hooks.ts:useWorkflowDefinitions - useMemo wraps both initialized/uninitialized branches to satisfy Rules of Hooks; integrations/system-health-dashboard/src/components/workflow/hooks.ts:subscribe/notifySubscribers - shared module-level polling interval for useRecentCalls consumers; tests/features/cli-and-rules-gating.test.mjs:GUARDED - maps each hook-gated CLI to the feature it requires; tests/features/cli-and-rules-gating.test.mjs:'a disabled feature refuses with exit 2' - asserts exit code 2 and stderr-only messaging contract
-
 # KnowledgeInjectionHooks — Technical Insight Document
 
 ## What It Is

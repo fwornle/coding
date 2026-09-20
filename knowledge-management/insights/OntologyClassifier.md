@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] OntologyClassifier depends on shared ontology/types.ts contracts (ClassificationOptions, OntologyClassification, ValidationOptions) that are also consumed by OntologyValidator, indicating a shared type boundary between classification and validation rather than each owning its own DTOs; OntologyClassifier does not appear to depend directly on km-core's OntologyRegistry — that dependency is indirected through LegacyOntologyAdapter, decoupling the classifier from the km-core migration; Metrics collection (OntologyMetrics/startTimer) is embedded at the OntologyClassifier level, below the OntologyClassificationAgent's hard-root-guard, so agent-level short-circuits are invisible to classifier-level metrics; L1 classification (OntologyClassifier's responsibility) and L2 refinement (OntologyClassificationAgent's responsibility, per parent context) are architecturally separated across two layers rather than unified in one classification abstraction; HeuristicClassifier is a first-class imported collaborator, not an inline fallback, suggesting it is independently testable/mockable from OntologyClassifier
-
 # OntologyClassifier — Technical Insight Document
 
 ## What It Is

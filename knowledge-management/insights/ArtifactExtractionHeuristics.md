@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:constructor - hardcoded teamDirectories Map and artifactPatterns array; src/ontology/heuristics/EntityPatternAnalyzer.ts:analyzeEntityPatterns() - two-step checkLocalArtifact()/matchArtifactPattern() resolution with early return; src/ontology/heuristics/EntityPatternAnalyzer.ts:extractArtifacts() - four regex patterns accumulated into a Set; src/ontology/heuristics/EntityPatternAnalyzer.ts:inferEntityClass() - teamMappings record duplicating entityClassMap logic; scripts/knowledge-management/verify-patterns.sh:CONSOLE_LOG_COUNT/PASSED_CHECKS - compliance scoring via rg counts and arithmetic; scripts/knowledge-management/verify-patterns.sh:CLAUDE_REPO - three-tier environment variable fallback for repo root; scripts/knowledge-management/verify-patterns.sh:PATTERNS - jq-driven read of $SHARED_MEMORY feeding a hardcoded case statement; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml:d:DataContext - cross-file binding to DesignViewModel.cs
-
 # ArtifactExtractionHeuristics: Technical Insight Document
 
 ## What It Is

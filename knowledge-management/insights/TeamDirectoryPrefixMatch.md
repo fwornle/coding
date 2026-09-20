@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] TeamDirectoryPrefixMatch corresponds to the private `checkLocalArtifact()` method in `src/ontology/heuristics/EntityPatternAnalyzer.ts`, which is invoked as step (a) inside `analyzeEntityPatterns()`. Its implementation is a simple O(teams × dirs-per-team) nested scan: for each `[team, dirs]` entry in the `teamDirectories` Map, it calls `dirs.some((dir) => artifact.startsWith(dir))`. Because JavaScript `Map` iteration order is insertion order, and the Map is constructed with `Coding` first, `RaaS` second, `ReSi` third, `UI` fourth, any artifact string whose prefix could theoretically satisfy more than one team's directory list would always resolve to whichever team was inserted first — in practice a non-issue today since the four directory lists (`src/ontology`/`src/knowledge-management`/... vs `raas-service`/... vs `virtual-target`/... vs `curriculum-alignment`/...) do not share prefixes, but it is a latent ordering dependency that a naive future edit (e.g. adding a short/generic prefix like `src/` to a second team) could silently break.
-
 # TeamDirectoryPrefixMatch — Technical Insight Document
 
 ## What It Is

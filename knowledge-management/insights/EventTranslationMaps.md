@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] lib/agent-api/hooks-api.js - EVENT_MAPPINGS object mapping unified HookEvent values to claude/copilot native event names; lib/agent-api/hooks-api.js - HooksManager.translateEvent() consuming EVENT_MAPPINGS; lib/agent-api/hooks-api.js - HooksManager constructor new.target check enforcing abstract class contract; lib/agent-api/hooks-api.js - HooksManager.registerHook() sorting eventHooks by priority on every call; lib/agent-api/hooks-api.js - HooksManager.triggerHook() sequential per-handler try/catch with continue-on-block semantics; lib/agent-api/hooks/claude-bridge.js - EVENT_MAP flat native-to-unified event table; lib/agent-api/hooks/claude-bridge.js - transformContext() using EVENT_MAP with toLowerCase() fallback; lib/agent-api/hooks/claude-bridge.js - transformResponse() inline allow/block ternary (not table-driven); lib/agent-api/hooks/claude-bridge.js - main() catch block producing fail-open decision:'allow' response; lib/agent-api/hooks/claude-bridge.js - main() importing getHookManager from './hook-manager.js' and calling manager.executeHooks(); integrations/system-health-dashboard/src/components/workflow/hooks.ts - useWorkflowDefinitions() constants/API merge pattern analogous to config cascading
-
 # EventTranslationMaps: Technical Insight Document
 
 ## What It Is

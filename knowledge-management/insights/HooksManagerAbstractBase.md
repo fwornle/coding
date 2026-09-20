@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] hooks-api.js's HooksManager is the generic/abstract layer; agent-specific behavior (reading ~/.claude/settings.json vs .github/hooks/hooks.json) is delegated entirely to unseen concrete subclasses via loadNativeHooks/saveNativeHooks; Registry initialization is eager and total: constructor seeds an empty array for every HookEvent enum value up front, so `this.hooks.get(event)` is never undefined for a valid event; No runtime type/shape validation on registerHook's options object beyond event-membership and handler-is-function checks — priority and id are trusted as-given; triggerHook's context-building spread (`...context` overriding base fields) creates an unguarded override surface for <AWS_SECRET_REDACTED>; Two independent, uncoordinated implementations of the same unified-event-translation concept exist: hooks-api.js's EVENT_MAPPINGS (claude events mapped to null) vs claude-bridge.js's EVENT_MAP (same events mapped to real names) — a sync risk noted in the parent context
-
 # HooksManagerAbstractBase: Technical Insight Document
 
 ## What It Is

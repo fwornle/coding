@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The filter's guard is combined with a second, independent condition: `if [ -z "${!key}" ]; then export "$key=$value"; fi`, using indirect parameter expansion to check whether docker-compose already set the variable. This means SecureEnvImportFilter is layered on top of a 'docker-compose wins' precedence rule — even a variable that survives the secret-suffix filter is only imported from `.env` if docker-compose did not already define it, making `.env` a fallback source rather than an override source. A key implication: if docker-compose *did* set an `*_API_KEY` variable directly (bypassing this loop entirely, since the loop only processes lines from the file), that value is untouched by this filter — the filter only polices the bind-mounted file ingestion path, not all routes environment variables can enter the container by.
-
 # SecureEnvImportFilter — Technical Insight Document
 
 ## What It Is

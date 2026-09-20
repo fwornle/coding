@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] The HooksManager base class in lib/agent-api/hooks-api.js (registerHook/unregisterHook/triggerHook) re-sorts its eventHooks array by priority on every registerHook() call, mirroring the exact pattern described for UnifiedHookManager in hook-manager.js. This duplication across two files (hooks-api.js and hook-manager.js) suggests either a historical refactor-in-progress where hook-manager.js superseded HooksManager, or two parallel hook systems co-existing — a new developer should determine whether HookConfigLoader's merged config is consumed by both managers or only one, since inconsistent consumption would let user/project settings silently apply to only part of the system.
-
 # HookConfigLoader — Technical Insight Document
 
 ## What It Is

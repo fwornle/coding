@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] EntityPatternAnalyzer diverges from the parent's stated Manager convention: no init/start/stop, no per-request mutable state — it's a pure function-like classifier over data frozen in the constructor.; Layer 1 labeling (`layer: 1, layerName: 'EntityPatternAnalyzer'` in returned LayerResult) implies this class is one stage in a larger multi-layer classification pipeline not fully shown in the provided files.; Data-model drift: 'Agentic' team exists in inferEntityClass's teamMappings but is absent from teamDirectories/artifactPatterns, making that branch unreachable via the public analyzeEntityPatterns() entry point.; verify-patterns.sh couples shell-level static analysis (ripgrep counts) directly to a JSON knowledge store (SHARED_MEMORY) via jq, both reading pattern definitions and writing back a compliance score — a tight coupling between the verification script and the knowledge graph's on-disk format.; Confidence values (0.9 for direct match, 0.75 for pattern match) are hardcoded numeric literals rather than configuration, contrasting with the config-driven <AWS_SECRET_REDACTED> approach described elsewhere in the parent context.
-
 # ManagerPattern: Technical Insight Document
 
 ## What It Is

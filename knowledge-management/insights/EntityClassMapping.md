@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Team ownership inference is data-driven via two parallel structures in EntityPatternAnalyzer.ts (teamDirectories Map and artifactPatterns array with nested entityClassMap), with no single canonical registry — the same keyword-to-class mapping is duplicated across entityClassMap and inferEntityClass()'s local teamMappings.; Confidence scores are hardcoded constants (0.9 for direct path match, 0.75 for regex pattern match) rather than computed from match specificity or ambiguity, so a highly ambiguous substring match receives the same confidence as an unambiguous one.; verify-patterns.sh's compliance scoring is a standalone bash implementation independent of the TS ontology layer, meaning the 'canonical class name' convention (e.g. Logger) is verified through simple grep/rg counting rather than through any shared parser or the entityClassMap structures used elsewhere in the ontology.; extractArtifacts() constrains file-path detection to a fixed extension whitelist (ts/js/cpp/java/tsx/jsx/py/go/rs), creating a scope boundary that excludes fixture/demo files in other languages (e.g. .cs, .xaml) from ever being classified by this analyzer even when they follow an equivalent naming convention.
-
 # EntityClassMapping — Technical Insight Document
 
 ## What It Is

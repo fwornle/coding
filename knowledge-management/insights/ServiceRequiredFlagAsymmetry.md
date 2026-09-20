@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] scripts/start-services-robust.js:transcriptMonitor.required=true, maxRetries=3 — required-service declaration; scripts/start-services-robust.js:liveLoggingCoordinator.required=true, maxRetries=3 — second required-service declaration; scripts/start-services-robust.js:waitForPortBindable() — service-agnostic port-bind probe used regardless of required/optional; scripts/start-services-robust.js:killProcessOnPortAndWait() — SIGTERM→SIGKILL escalation, also service-agnostic; scripts/start-services-robust.js:isProcessRunningByScript() — OS-level pgrep fallback used inside transcriptMonitor.startFn and liveLoggingCoordinator.startFn; tests/features/service-gating.test.mjs:'the live-logging pair still starts before everything else' — asserts SERVICE_ORDER.slice(0,2) === ['transcriptMonitor','liveLoggingCoordinator']; tests/features/service-gating.test.mjs:'a REQUIRED service whose feature is off does not block startup' — proves required-ness is conditional on feature state; tests/features/service-gating.test.mjs:'an unknown feature on a config is a loud failure, not a silent skip' — fail-closed host-side default; docker/entrypoint.sh:PROGRAM_FEATURES node -e one-liner — `value === false ? "false" : "true"`, fail-open container-side default; start-services.sh:ROBUST_MODE="${ROBUST_MODE:-true}" and the legacy CONSTRAINT_MONITOR_STATUS string-state block — coarser, non-equivalent required/optional model
-
 # ServiceRequiredFlagAsymmetry
 
 ## What It Is

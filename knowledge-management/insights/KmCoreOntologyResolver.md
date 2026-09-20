@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The `resolveKmCoreOntologyDir()` function in `src/live-logging/ObservationWriter.js` implements a two-tier fallback strategy for locating the km-core ontology directory: it first tries the package-exported `defaultOntologyDir()` helper (imported from `@fwornle/km-core`), and only on failure falls back to a hand-rolled `import.<COMPANY_NAME_REDACTED>.resolve`-style walk-up that computes `path.resolve(here, '..', '..', 'lib', 'km-core', '.data', 'ontologies')` from `fileURLToPath(import.<COMPANY_NAME_REDACTED>.url)`. The comment explicitly labels this fallback path as one that 'should never fire' — an optimistic assumption that deserves scrutiny given the function's own docstring cites a CLAUDE.md mandatory rule (Phase 41 lesson, commits 87bc2f567/fd35c5350) stating that ANY host-side process constructing `GraphKMStore` MUST pass `ontologyDir`, since omitting it throws `opts.classes omitted but store has no ontology registry`.
-
 # KmCoreOntologyResolver — Technical Insight Document
 
 ## What It Is

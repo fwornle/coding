@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] hooks-api.js separates a unified, agent-agnostic hook vocabulary (HookEvent, HookContext) from agent-native event names via a translation table (EVENT_MAPPINGS), isolating agent-specific quirks (e.g. copilot lacking POST_PROMPT) from the core dispatch logic; claude-bridge.js is a thin, stateless process-per-invocation adapter that lazily imports the shared hook-manager singleton (`getHookManager()`) rather than holding its own hook state, so hook registration lives centrally and the bridge is purely a protocol translator; Construction-time contract violations (abstract class misuse) are treated as unrecoverable programmer errors (hard throw), while runtime hook execution failures are treated as recoverable operational events (logged, collected as messages, execution continues) — a deliberate two-tier reliability policy within the same file; The bridge's exit-0-always behavior for a tool-invocation gate creates an inherent security/safety trade-off: correctness bugs in the entire hook chain (from stdin parsing through handler execution) can never block a tool call, only warn about it after the fact
-
 # UnifiedHookManagerHandlerRegistry — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architectural Patterns] Shared predicate/single-source-of-truth pattern (`isOnlineLearned`) to prevent classification drift across render surfaces; Deprecation-in-place: old function (`isOnlineSource`) retained for legacy callers while new logic migrates elsewhere; Fast-path/slow-path reconciliation between locally-recomputed derived state and store-authoritative state (`deriveAncestryFromStorePath`); Memoization/dependency-list gating to decouple cheap visual overlays from expensive simulation rebuilds (Locked Contract #3); Progressive/incremental type migration: optional new enum field coexisting with legacy boolean field (`llmMode` vs `mockLLM`); Self-correcting online-learning estimator with sanity-clamping against a static baseline (`calculateDynamicEta`); Ontology parent-chain walk / inheritance-based fallback resolution (`nodeFillColor`, `nodeShapeFor`)
-
 # BatchOnlinePaletteResolver — Technical Insight Document
 
 ## What It Is

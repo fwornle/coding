@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] In scripts/api-service.js, the sequence of operations after spawn() returns is: attach child.on('error'), attach child.on('exit', async ...), attach process.on('SIGTERM'/'SIGINT') handlers, log '[API Service] Started (PID: ...)', and only then kick off the async IIFE that does `new ProcessStateManager()` -> `psm.initialize()` -> `psm.registerService(...)`. Because `psm.initialize()` is itself async (almost certainly opening a LevelDB/file handle or similar), there is a real window between the child process existing (and thus eligible to crash or exit near-instantly) and the PSM registration IIFE resolving. If the wrapped process (integrations/constraint-monitor/src/dashboard-server.js) fails fast — e.g., port 3031 already bound — `child.on('exit')` can fire and attempt `psm.unregisterService('constraint-api-child', 'global')` before `registerService` for the same name has ever run, meaning the unregister is a no-op against a service that was never actually recorded, and the subsequent registerService call (if it still fires after exit) would register a PID that is already dead.
-
 # WrapperPsmRegistrationRace
 
 ## What It Is

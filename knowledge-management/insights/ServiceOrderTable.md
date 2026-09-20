@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] docker/entrypoint.sh cannot run the host's feature resolver directly (~/.coding/features.yaml is never mounted); it depends on a pre-resolved, read-only snapshot (.coding/runtime/features.json) written by the host at launch — a one-way, host-to-container data flow with no feedback path; start-services-robust.js's per-service required/optional distinction (SERVICE_CONFIGS[...].required) is orthogonal to and composed with feature gating: a required service whose feature is off does not block startup (verified by the test 'a REQUIRED service whose feature is off does not block startup'), meaning 'required' only applies once a feature is confirmed enabled; Tight coupling between test infrastructure and production code: tests/features/service-gating.test.mjs directly monkey-patches SERVICE_CONFIGS.*.startFn and .feature in place (with try/finally restoration) rather than injecting mocks, meaning the exported SERVICE_CONFIGS object is treated as mutable shared state across the test run; start-services.sh's legacy branch performs direct docker-compose orchestration for constraint-monitor, duplicating logic that presumably exists elsewhere in the constraint-monitor submodule's own startup tooling, creating two independent sources of truth for how that service's databases get started; The prompt-classifier-service.mjs's network-awareness (currentNetwork() delegating to the proxy's /health rather than sensing locally) establishes the proxy as the single source of truth for network mode across independently-run services — a cross-service dependency not visible from SERVICE_CONFIGS alone
-
 # ServiceOrderTable — Technical Insight Document
 
 ## What It Is

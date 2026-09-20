@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] [LLM] No file in this set implements or references a prompt-classifier-specific backend fallback; documentation or a parent entity asserting otherwise should be cross-checked against scripts/prompt-classifier-service.mjs and config/prompt-classifier.yaml.; [LLM] Resilience logic (retry, backoff, timeout, degrade) is concentrated in lib/service-starter.js and not uniformly applied — scripts/api-service.js and scripts/dashboard-service.js bypass it entirely, creating two different failure-handling tiers within the same service-startup subsystem.; [LLM] docker/entrypoint.sh and scripts/generate-docker-mcp-config.sh both implement independent 'feature enabled?' checks (one via a JSON snapshot + Node inline script, the other via `bin/coding-features enabled codegraph`), which is a duplicated-authority risk if the two ever diverge on how an unknown/missing feature should be treated.; [LLM] The `withDeadline` timer-leak fix in lib/service-starter.js is a good candidate for extraction into a shared utility if other components (e.g. a classifier health-check) need the same race-without-leak semantics.
-
 # PromptClassifierBackendFallback — Technical Insight Document
 
 ## What It Is

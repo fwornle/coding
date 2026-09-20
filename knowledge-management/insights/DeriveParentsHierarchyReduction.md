@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The component's namesake operation is the parent-walking loop implemented twice, nearly identically, in integrations/unified-viewer/src/graph/color-fallback.ts — once in `nodeFillColor()` and once in `nodeShapeFor()`. Both functions take a `className`, a `ReadonlyMap<string, ClassRegistryEntry>` registry, and walk `cur = reg?.parent ?? undefined` in a `while (cur && !seen.has(cur))` loop, checking a registry override first, then a static palette (`BATCH_PALETTE`/`SHAPE_PALETTE`), before ascending to the parent. This is a hierarchy-reduction pattern: an entity's own ontology class is reduced to whichever ancestor is the nearest one carrying an actual color/shape assignment, so `LiveLoggingSystem` (a Component subtype) inherits Component's blue rather than falling through to a generic slate default. The duplication of the walk (two near-identical `while` loops differing only in what table they consult) is a direct structural echo of the reconciliation-duplication pattern already documented for `deriveAncestryFromStorePath()` in D3GraphCanvas.tsx — this codebase repeatedly solves 'derive X from ancestor chain' by writing a fresh loop per consumer rather than a single generic reducer.
-
 # DeriveParentsHierarchyReduction — Technical Insight Document
 
 ## What It Is

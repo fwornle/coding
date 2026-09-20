@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The `ArtifactPatternRegexTable` — the `artifactPatterns` array literal in `EntityPatternAnalyzer.ts`'s constructor — is a hardcoded four-team lookup table (Coding, RaaS, ReSi, UI) that pairs an array of case-insensitive `RegExp` objects with a parallel `entityClassMap`. Each team entry's patterns and map keys are maintained by hand and only loosely coupled: for example the UI team's `entityClassMap` includes a `Redux` key mapped to `ReduxState`, and the corresponding pattern `/React(Component)?|Redux/i` does match bare 'Redux' mentions, but `inferEntityClassFromPattern` (referenced but truncated in the visible file) must still correctly extract 'Redux' as the map key from an arbitrary matched substring like 'ReduxState' or 'useReduxHook' — a fragile string-prefix inference rather than a captured regex group.
-
 # ArtifactPatternRegexTable: Technical Insight Document
 
 ## What It Is

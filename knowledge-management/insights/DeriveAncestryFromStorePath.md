@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Two independently-maintained rendering engines (D3/SVG canvas here, and Sigma/WebGL 'graph-builder.ts' referenced only in comments) share one Zustand selection model (`pathToSelected`, `selectedNodeIds`, `focalNodeId`) but do not share a single ancestry-traversal implementation, forcing this reconciliation function to exist as a consistency patch; Ancestry/ selection logic is duplicated by design: `computeAncestryPath` (imported from './ancestry') is both the fallback producer inside `deriveAncestryFromStorePath` and presumably duplicated in the Sigma path, rather than being the sole authority; The main render `useEffect` has a hard dependency-list contract ('Locked Contract #3' / viewport-stability) that `selectionSource` and other selection-driven state are explicitly barred from entering, constraining how and when ancestry reconciliation functions like this one can be invoked; No divergence telemetry: the function silently absorbs store/BFS mismatches with no logging or counter, making it hard to detect from outside how often the slow-path pruning actually triggers in production
-
 # DeriveAncestryFromStorePath — Technical Insight Document
 
 ## What It Is

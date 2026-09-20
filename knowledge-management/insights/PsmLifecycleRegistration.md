@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Both scripts/api-service.js and scripts/dashboard-service.js couple wrapper process lifecycle entirely to child process lifecycle — the wrapper has no independent exit path outside the existsSync guard and spawn 'error' handler; dashboard-service.js has an undocumented compile-time coupling to api-service.js's port configuration via a hardcoded NEXT_PUBLIC_API_BASE_URL, breaking the otherwise consistent env-var-driven configuration pattern; docker/entrypoint.sh cannot execute the host's actual feature resolver (features.yaml is host-only, unmounted) so it reimplements a partial, flat mirror (PROGRAM_FEATURES) whose correctness depends on an external test (tests/features/container-gating.test.mjs) rather than any in-script invariant; lib/service-starter.js separates port/HTTP-health checking (isPortListening), raw TCP checking (isTcpPortListening), and PID liveness (isProcessRunning) into distinct single-purpose helpers composed by startServiceWithRetry(); Unhealthy-process cleanup (SIGTERM→SIGKILL escalation) in startServiceWithRetry() only triggers on a false health check return, not on a thrown exception, leaving an asymmetric leak risk on the exception path
-
 # PsmLifecycleRegistration — Technical Insight Document
 
 ## What It Is

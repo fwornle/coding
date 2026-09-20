@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architectural Patterns] Override/decorator pattern: features.d/disabled.conf is generated as an additive override layer on top of the static supervisord.conf rather than templating or rewriting the base config; Fail-open-by-default with layered defaults: optional chaining, strict-equality-to-false checks, and shell-level `|| echo true` fallback all independently bias toward 'enabled' on ambiguous input; Snapshot/live-object duality: container consumes a flat pre-resolved JSON snapshot written by the host, while host-side code consumes a richer live-resolved features object — same concept, two representations at a process boundary; Legacy escape-hatch pattern: start-services.sh keeps a full secondary bash implementation dead-code behind a `ROBUST_MODE=false` flag rather than deleting it once the JS orchestrator was proven; Structural CI enforcement of catalogue coverage: tests assert that two independently-maintained tables (SERVICE_ORDER/SERVICE_CONFIGS, and by analogy PROGRAM_FEATURES/supervisord.conf) cover each other exactly, catching drift only at test time rather than at runtime; Status-taxonomy separation ('disabled' vs 'degraded'): the orchestrator's result buckets encode intent (off) vs. failure (wanted-but-broken) as distinct states rather than collapsing them into a single failure signal
-
 # FeatureGatingOverride — Technical Insight Document
 
 ## What It Is

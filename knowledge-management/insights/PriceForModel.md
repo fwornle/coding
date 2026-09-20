@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/system-health-dashboard/src/components/cost/cost-model.ts - priceForModel(model, prices): three-tier resolution cascade (exact/fast/family); integrations/system-health-dashboard/src/components/cost/cost-model.ts - scalePrice(p, factor): pure multiplicative price transform, sole code-graph edge from priceForModel; integrations/system-health-dashboard/src/components/cost/cost-model.ts - FAST_MODE_SUFFIX / FAST_MODE_MULTIPLIER: constants governing the fast-mode rule branch; integrations/system-health-dashboard/src/components/cost/cost-model.ts - cellCostUsd(r, cfg): consumer of priceForModel's .price field, ignores .priced/.source; integrations/system-health-dashboard/src/components/cost/cost-model.ts - FAMILY_REPRESENTATIVE / modelFamily(): family-fallback data and classifier used in the third resolution tier
-
 # PriceForModel — Technical Insight Document
 
 ## What It Is

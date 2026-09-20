@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] `lib/ukb-database/cli.js` reimplements the exact same two responsibilities found in `VkbApiClient.js` — server-liveness probing (`isVKBRunning()`) and raw request dispatch (`sendToVKB(method, path, body, team)`) — as free functions rather than importing the client class. The duplication is not just structural but behaviorally divergent: `isVKBRunning()` uses a 1000ms timeout against `/api/health` versus the client's 2000ms in `isServerAvailable()`, and `sendToVKB()`'s error branch (`error.message || 'HTTP ${response.status}: ${response.statusText}'`) differs from every per-method message in `VkbApiClient.js` (`'Failed to X'` fallback). Two independent callers guessing slightly different timeout/error conventions against the same undocumented HTTP contract (`/api/health`, `/api/entities`, `/api/relations`) is a maintenance hazard if the server's actual health-check latency or error-body shape ever changes — one caller could silently start failing while the other keeps working.
-
 # VKBServerCLI — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Temporal/informational decoupling: the TCP-wait step executes before, and has no data channel into, the later feature-gating block in the same file, so it probes databases without knowing which features actually need them; No persistence of probe outcome — unlike the feature-gating mechanism in the same script, which writes its decision to a supervisord include file, wait_for_service()'s result is stdout-only and lost once the function returns; Three independent, non-shared health/readiness implementations coexist in this codebase for overlapping concerns (entrypoint.sh's /dev/tcp check, start-services.sh's lsof/docker-compose polling, service-probe.js's structured three-state probe); Asymmetric fail-open design consistent with project-wide convention: this is a starting-pathway component (runs before `exec "$@"` launches supervisord) yet is deliberately fail-open rather than fail-closed, an explicit carve-out matching the same carve-out documented for the feature-gating block later in the file
-
 # EntrypointTcpWaitForService — Technical Insight Document
 
 ## What It Is

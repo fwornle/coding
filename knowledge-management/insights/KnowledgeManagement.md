@@ -2,8 +2,6 @@
 
 **Type:** Component
 
-[LLM] The wave-controller.ts anchoring logic addresses a subtle orphan-entity bug in the knowledge graph: when persisting Insight entities from analysis runs, the code must call queryIncomingRelations(e.name, e.entityType) — explicitly parameterized by entity type — rather than just by name, because the graph can contain multiple entities sharing the same name but differing in type (e.g., a Pattern named 'X' and an Insight named 'X'), and a name-only lookup previously caused incorrect relation matching or duplicate creation. The anchor pass then falls back through findBestParent(...) and, if that yields nothing, defaults to a hardcoded projectAnchorName of 'Coding', guaranteeing that every Insight node ends up connected to the graph via an explicit edge (e.g., has_insight, contains) rather than being left as a disconnected node — this orphan-prevention invariant is essential because disconnected nodes would be unreachable via graph traversal queries even though they still exist in storage.
-
 # KnowledgeManagement — Technical Insight Document
 
 ## What It Is

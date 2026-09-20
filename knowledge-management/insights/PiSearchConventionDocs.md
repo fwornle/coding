@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The `no-unbounded-fs-scan.ts` extension and `pi.sh`'s `_pi_write_append_system()` implement the same search-boundary convention through two independent enforcement layers rather than one. `offendingRoot()` (in the extension) is the deterministic runtime gate that blocks a `find` call rooted at `/`, `/Users`, `$HOME`, etc., while `_pi_write_append_system()` writes an `APPEND_SYSTEM.md` heredoc into `$cfg_dir` stating the same rule in prose ('Never search from `/`, `~`, `/Users`...'). The code comment in `_pi_write_append_system()` explicitly frames this redundancy as intentional: the prose layer exists 'to stop the model SPENDING a tool call to discover the gate' — i.e., the extension is the enforcement backstop and the system-prompt text is a cost optimization that tries to make the backstop unnecessary in the common case, since 'a blocked call costs a round trip; a model that never tries costs nothing.'
-
 # PiSearchConventionDocs — Technical Insight Document
 
 ## What It Is

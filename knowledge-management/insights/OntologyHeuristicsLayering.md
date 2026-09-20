@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[LLM] `scripts/knowledge-management/verify-patterns.sh` implements a structurally separate, shell-based pattern-compliance checker that overlaps in intent with the TypeScript ontology heuristics but shares no code with them: it uses `rg` (ripgrep) to count `console.log` vs `Logger.*` calls, `useState` vs Redux hooks, and greps `install.sh` for network-detection keywords, then computes a percentage 'Pattern Compliance Score' and writes it back into a JSON file referenced as `$SHARED_MEMORY` via `jq`. Unlike `EntityPatternAnalyzer`, which classifies knowledge *content* by team ownership with confidence scores, this script measures codebase *compliance* against named patterns (ConditionalLoggingPattern, ReduxStateManagementPattern, NetworkAwareInstallationPattern) and persists a single aggregate score rather than per-artifact evidence — two independent 'pattern detection' subsystems exist in this project with no shared abstraction between them.
-
 # OntologyHeuristicsLayering — Technical Insight Document
 
 ## What It Is

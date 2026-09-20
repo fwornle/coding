@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Tight coupling to Copilot's undocumented on-disk lock/session-state layout (~/.copilot/session-state/<uuid>/inuse.<pid>.lock, workspace.yaml) with no abstraction layer shielding the rest of LSL from that shape; opencode-token-rows.mjs directly imports the better-sqlite3 driver and issues raw SQL (SELECT ... ORDER BY rowid DESC LIMIT ?) against a foreign process's live database (~/.local/share/opencode/opencode.db) rather than going through any OpenCode-provided API; No shared base class or interface unifies the two watcher implementations — 'watcher' is a documentation-level concept only, each file independently reimplements ownership checks, fail-closed error handling, and stderr diagnostics; Cross-file reuse does exist selectively: copilot-events-tail.mjs imports parseWorkspaceYaml/projectFromWorkspace/stripToolCallIdPrefix from ../adapters/copilot-events.mjs (a Plan 51-04 artifact) and parseCopilot from src/live-logging/TranscriptNormalizer.js, showing partial but not full architectural convergence; token-db.mjs's schema-shape detection (insertShapeFor(), probing PRAGMA table_info at runtime, cached per-db via a WeakMap) decouples the adapter from a hard dependency on the proxy's routing-column migration having run, at the cost of a per-open runtime introspection query; ObservationWriter.js shows the write-side consumer of these observations routes through km-core's GraphKMStore rather than SQLite directly (Phase 44 cutover), meaning the LiveSessionScanner's stub/real observations ultimately funnel into a different persistence system than the raw token rows in token-db.mjs — two separate storage backends for related telemetry
-
 # LiveSessionScanner — Technical Insight Document
 
 ## What It Is

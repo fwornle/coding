@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Duplicated HTTP client logic between lib/ukb-unified/core/VkbApiClient.js and lib/ukb-database/cli.js's sendToVKB()/isVKBRunning() — two independent implementations of the same VKB-server integration concern; Server availability is treated as HTTP-reachability, not full-stack health — VkbApiClient.isServerAvailable() ignores the `graph` health flag by design; Persistence is split across three backends reachable from this integration layer: SQLite (analytics), Qdrant (vector, optional), and a graph DB path — all wired through a single DatabaseManager instance; State durability for incremental workflows relies on a git-tracked checkpoint file (.data/ukb-last-run.json) rather than solely on the VKB server's own storage; Dashboard-side ETA/history logic (ukb-workflow-modal.tsx) is decoupled from the server integration itself, consuming Redux-selected state (WorkflowTimingStats, UKBProcess) rather than calling VkbApiClient directly
-
 # DataProcessorServerIntegration — Technical Insight Document
 
 ## What It Is

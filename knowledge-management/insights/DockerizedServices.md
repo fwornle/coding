@@ -2,8 +2,6 @@
 
 **Type:** Component
 
-[LLM] The DockerizedServices layer is architected around a dual-mode execution model: services can run either as supervisord-managed processes inside a single Docker container (per docker/docker-compose.yml, Dockerfile.coding-services, supervisord.conf) or as host-native Node subprocesses managed by lib/service-starter.js and PID-tracked via ProcessStateManager. This duality means developers must understand that 'starting a service' has two entirely separate code paths depending on deployment target, and that health-checking logic (service-probe.js) is written to be agnostic to which path is in effect — it only cares about HTTP/TCP reachability, not process ownership. This design avoids needing separate health-monitoring logic for containerized vs local services, but it also means Docker-specific failures (e.g., supervisord misconfiguration killing a service inside the container) surface identically to host-side crashes, requiring log inspection to disambiguate.
-
 # DockerizedServices — Technical Insight Document
 
 ## What It Is

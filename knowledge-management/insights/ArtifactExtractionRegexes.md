@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[LLM] The 'ArtifactExtractionRegexes' component centers on extractArtifacts() in src/ontology/heuristics/EntityPatternAnalyzer.ts, which runs four independent regex passes over free-text knowledge content into a single Set<string>: a file-path pattern (`/[a-z-]+\/[a-z-]+\/[a-zA-Z0-9_\-\/]+\.(ts|js|cpp|java|tsx|jsx|py|go|rs)/g`), an npm-scope pattern (`/@[a-z-]+\/[a-z-]+/g`), the Service/Agent/Manager/... class-suffix pattern, and a bare directory-prefix pattern (`/[a-z-]+\/[a-z-]+\//g`). Because all four write into the same untyped Set, a single substring like 'src/ontology/types.ts' can simultaneously satisfy the file-path pattern AND (via prefix overlap) get partially re-matched by the directory pattern, producing near-duplicate artifacts ('src/ontology/types.ts' and 'src/ontology/') that are then independently re-checked against teamDirectories and artifactPatterns in the analyzeEntityPatterns() loop — meaning the same underlying reference can be scored twice with different confidence values depending on which regex-extracted variant happens to hit a match first.
-
 # ArtifactExtractionRegexes — Technical Insight Document
 
 ## What It Is

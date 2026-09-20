@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] integrations/unified-viewer/src/graph/D3GraphCanvas.tsx - deriveAncestryFromStorePath() reconciliation of inline BFS vs store pathToSelected; integrations/unified-viewer/src/graph/D3GraphCanvas.tsx - d3NodesRef and selectionSource restored narrowly for Layer 0→Layer 1 fit-to-bounds transition; integrations/unified-viewer/src/graph/color-fallback.ts - nodeFillColor() and nodeShapeFor() parent-walking resolvers, BATCH_PALETTE/ONLINE_PALETTE/SHAPE_PALETTE tables; integrations/unified-viewer/src/graph/color-fallback.ts - ONLINE_RING_COLOR ring-overlay design replacing prior fill-color conflation of learning provenance; integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx - WAVE_AGENTS and KG_OPERATOR_CHILDREN module-scope constants for useMemo stability; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts - LLMState.perAgentOverrides and UKBProcess.llmMode optional tri-state design; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - calculateDynamicEta() blended ETA estimation with sanity clamping; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - calculateStepAwareEta() legacy delegate function; integrations/system-health-dashboard/src/components/ukb-workflow-modal.tsx - HISTORY_PAGE_SIZE constant and incident comment describing truncated history list
-
 # GraphViewerHierarchy — Technical Insight Document
 
 ## What It Is

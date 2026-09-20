@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Presentation-layer taxonomy (AGENT_SUBSTEPS in multi-agent-graph.tsx) appears decoupled from the actual execution/routing config (llm-routing.yaml), creating a manual-sync burden between what the dashboard displays and what the pipeline actually runs; Batch completion state is persisted independently of any single report/run (.data/batch-checkpoints.json), requiring downstream consumers like batch-provenance.mjs to reconstruct provenance via time-window matching rather than direct foreign-key-style linkage; Distinct substep topologies coexist under one taxonomy abstraction: linear chains (git_history, kg_operators) vs. stateful/resumable cycles (batch_scheduler, observation_generation), suggesting the taxonomy type may need to be a discriminated union rather than a flat list shape; No code-graph evidence was available to confirm the internal implementation of AGENT_SUBSTEPS itself — analysis here is limited to what the parent observations state and to structurally analogous, verified code in batch-provenance.mjs
-
 # AgentSubstepTaxonomy — Technical Insight Document
 
 ## What It Is

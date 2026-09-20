@@ -2,8 +2,6 @@
 
 **Type:** Component
 
-[LLM] Constructor and initialization conventions recur across storage adapters and agent implementations, favoring lazy initialization over eager setup—for example, connection or client objects (like proxy clients keyed by LLM_PROXY_URL) are typically instantiated on first use rather than in constructors, reducing startup cost for CLI scripts in bin/ that may not need every subsystem. This idiom, paired with concurrency helpers scattered through the codebase (e.g., promise-based queuing or throttling utilities referenced in wave-controller.ts-style orchestration), reflects a broader convention: heavier resources (network clients, browser instances via GSD_BROWSER_BROWSER_PATH) are deferred until actually required, and shared utility functions rather than deep inheritance hierarchies are used to implement concurrency control, keeping the adapter/facade layers thin wrappers around vendor-specific logic.
-
 # CodingPatterns: Architectural Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] Tight structural coupling without code sharing: hooks-api.js's HookContext/fullContext shape and claude-bridge.js's transformContext() output are field-for-field similar but independently constructed — no shared type or builder function is visible in this bundle; Duplicated event-mapping tables across at least two files (EVENT_MAP in claude-bridge.js, EVENT_MAPPINGS in hooks-api.js) with inverted key/value directions, a maintenance and correctness risk beyond simple duplication; Unverified inheritance relationship between hooks-api.js's HooksManager (abstract base) and hook-manager.js's UnifiedHookManager (referenced only via getHookManager() import in claude-bridge.js, not shown in this bundle); No sanitization boundary at the bridge layer — claude-bridge.js's transformContext() spreads raw claudeContext into metadata with no redaction, pushing that responsibility downstream to UnifiedHookManager or violation-capture logic; System-wide fail-open philosophy spanning both the per-handler level (HooksManager.triggerHook()'s try/catch) and the per-process level (claude-bridge.js's outer try/catch defaulting to decision:'allow'); Per-invocation process spawn model: claude-bridge.js runs as a fresh Node process on every Claude tool call, making its lazy dynamic import() and the manager's initialized guard meaningful performance optimizations rather than incidental code style
-
 # HookMigrationTool: Technical Insight Document
 
 ## What It Is

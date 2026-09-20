@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] integrations/system-health-dashboard/src/components/cost/cost-model.ts:130-133 - FAST_MODE_SUFFIX and FAST_MODE_MULTIPLIER constants with rationale comment; integrations/system-health-dashboard/src/components/cost/cost-model.ts:136-142 - scalePrice() applies the multiplier uniformly across in/out/cacheRead/cacheWrite; integrations/system-health-dashboard/src/components/cost/cost-model.ts:144-166 - priceForModel() resolution order: exact match, fast-mode suffix recursion, family fallback, none; integrations/system-health-dashboard/src/components/cost/cost-model.ts:189-204 - cellCostUsd() consumes priceForModel()'s resolved price without any fast-mode-specific branching; integrations/system-health-dashboard/src/components/cost/cost-model.ts:38-41 - DEFAULT_COST_CONFIG.modelPrices holds only base model rows, no explicit -fast rows, confirming the multiplier is the sole source of fast-mode prices
-
 # FastModePricingRule — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] ModeResolutionSystem is a thin coordination layer: it decides WHICH backend (mock/DMR/public) serves a request but contains no provider-specific request/response logic itself; Config-driven behavior is split across two mechanisms: JSON state in .data/workflow-progress.json for mode selection, YAML (dmr-config.yaml) for DMR connection/health-check parameters — these are not unified into one config source; Defensive path/environment resolution is a recurring cross-cutting concern (CODING_ROOT precedence, loadDMRConfig's 3-path search, resolveProxyCompleteUrl's 4-tier order) — reflects the host/container/submodule deployment reality of the broader coding monorepo rather than being specific to any one file; llm-with-process.ts represents an intentional architectural crack: a second code path to the LLM proxy that exists solely because the primary SDK is missing one field, which is a maintenance liability if the SDK later adds 'process' support and this path isn't retired; parse-llm-json.ts enforces a strict boundary invariant (fail loudly on genuine malformation) that other parts of the mode-resolution system do not — most other modules here favor graceful multi-source fallback, while this one deliberately does not extend that same leniency to JSON correctness
-
 # ModeResolutionSystem — Technical Insight Document
 
 ## What It Is

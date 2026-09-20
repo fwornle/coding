@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] src/ontology/heuristics/EntityPatternAnalyzer.ts:constructor - hardcoded teamDirectories Map and artifactPatterns array for 4 teams; src/ontology/heuristics/EntityPatternAnalyzer.ts:extractArtifacts() - four independent regex passes merged into one Set, losing match-source provenance; src/ontology/heuristics/EntityPatternAnalyzer.ts:checkLocalArtifact() - unguarded startsWith prefix match against teamDirectories values; src/ontology/heuristics/EntityPatternAnalyzer.ts:matchArtifactPattern() - RegExp.test loop with /i-flagged alternation patterns of varying specificity; src/ontology/heuristics/EntityPatternAnalyzer.ts:inferEntityClass() - truncated method containing orphaned 'Agentic' team key unreachable via checkLocalArtifact's four active teams; scripts/knowledge-management/verify-patterns.sh:CONSOLE_LOG_COUNT - rg-based console.log vs Logger.* count driving ConditionalLoggingPattern compliance; scripts/knowledge-management/verify-patterns.sh - writes .metadata.last_pattern_verification and .metadata.pattern_compliance_score back into $SHARED_MEMORY via jq; integrations/graphify/tests/fixtures/xaml_viewmodel/Views/DesignView.xaml - d:DataContext design-time binding fixture, unrelated to extractArtifacts()'s supported extensions
-
 # ArtifactExtractionPipeline — Technical Insight Document
 
 ## What It Is

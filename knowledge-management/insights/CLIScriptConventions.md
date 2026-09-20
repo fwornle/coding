@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] verify-patterns.sh computes DEFAULT_REPO two directory levels above its own location, coupling its correctness to the script remaining at scripts/knowledge-management/ — moving the file would silently break repo-root resolution unless CODING_REPO is set; Conditional TOTAL_CHECKS accumulation means the compliance percentage is not normalized across environments, undermining cross-run comparability of pattern_compliance_score; The script both reads and writes $SHARED_MEMORY (a JSON knowledge store) using a read-modify-write via a temp file (`jq ... > "$SHARED_MEMORY.tmp" && mv`), a common safe-write pattern but with no locking against concurrent writers; Generated remediation commands (sed-based console.log→Logger.log rewrite) are emitted as text in a report rather than executed, keeping the script read-only/non-destructive despite auditing for a mutation
-
 # CLIScriptConventions — Technical Insight Document
 
 ## What It Is

@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Code References] docker/entrypoint.sh - FEATURES_SNAPSHOT/PROGRAM_FEATURES loop generating /etc/supervisor/features.d/disabled.conf; docker/entrypoint.sh - inline `node -e` script implementing `value === false ? "false" : "true"` unknown-feature-as-enabled logic; scripts/start-services-robust.js:isProcessRunningByScript() - OS-level pgrep sweep for orphaned processes; scripts/start-services-robust.js:killProcessOnPortAndWait() - graceful-then-forceful SIGTERM/SIGKILL port clearing with polling; scripts/start-services-robust.js:waitForPortBindable() - throwaway net.createServer() probe distinguishing bindable vs HTTP-responding ports; scripts/start-services-robust.js:SERVICE_CONFIGS.transcriptMonitor.startFn - three-tier dedup check (global PSM, per-project PSM, pgrep fallback); scripts/prompt-classifier-service.mjs:loadConfig() - mtime-based hot reload with fail-toward-last-good-config on parse error; scripts/prompt-classifier-service.mjs:envFallbackConfig() - pre-2026-09-02 single-endpoint fallback shape; start-services.sh - ROBUST_MODE branch exec'ing scripts/start-services-robust.js vs. retained legacy bash path; tests/features/service-gating.test.mjs:featureSet() - synthetic loadFeatures() fixture built from FEATURE_IDS; tests/features/service-gating.test.mjs - 'a disabled service is not reported as degraded' test enforcing disabled/degraded distinction
-
 # HostServiceFeatureGate — Technical Insight Document
 
 ## What It Is

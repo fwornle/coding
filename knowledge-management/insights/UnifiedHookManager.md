@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] claude-bridge.js is a stateless, per-invocation Node process (spawned per Claude tool call) that delegates core logic to the singleton returned by getHookManager() in hook-manager.js; Potential duplication/divergence between HooksManager (lib/agent-api/hooks-api.js, abstract base class) and UnifiedHookManager (lib/agent-api/hooks/hook-manager.js, concrete manager) — both implement priority-sorted registries independently; No sanitization of tool input/metadata occurs at the bridge layer (claude-bridge.js transformContext), pushing that responsibility downstream to UnifiedHookManager or ViolationCaptureService; Event-name mapping is duplicated across at least two files (claude-bridge.js EVENT_MAP, hooks-api.js EVENT_MAPPINGS), creating a synchronization burden when adding new hook events; System-wide fail-open philosophy: hook/bridge errors degrade to 'allow' rather than blocking agent tool execution, prioritizing availability over strict enforcement
-
 # UnifiedHookManager: Technical Insight Document
 
 ## What It Is

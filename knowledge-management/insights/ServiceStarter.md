@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Code References] scripts/start-services-robust.js - SERVICE_CONFIGS.transcriptMonitor.startFn: triple-tier PSM/OS orphan detection; scripts/start-services-robust.js - waitForPortBindable(): kernel-level port bind probing distinct from isPortListening(); scripts/start-services-robust.js - killProcessOnPortAndWait(): SIGTERM->SIGKILL escalation with polling; docker/entrypoint.sh - PROGRAM_FEATURES mapping and fail-open feature snapshot handling; tests/features/service-gating.test.mjs - 'SERVICE_ORDER and SERVICE_CONFIGS cover each other exactly' structural assertion; tests/features/service-gating.test.mjs - disabled vs degraded status distinction tests; start-services.sh - hardcoded PORT=3030/3031 legacy manual container startup path; scripts/prompt-classifier-service.mjs - ENV_FILE loading and empty-string env var deletion before process.loadEnvFile()
-
 # ServiceStarter — Technical Insight Document
 
 ## What It Is

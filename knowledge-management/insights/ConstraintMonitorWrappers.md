@@ -2,8 +2,6 @@
 
 **Type:** SubComponent
 
-[Architecture Notes] Two parallel startup implementations coexist for the same services: a legacy bash path (start-services.sh) and a structured Node.js path (scripts/start-services-robust.js), switched via the ROBUST_MODE env var, with materially different degradation and registration behavior for constraint-monitor specifically; Container-level feature gating (docker/entrypoint.sh) and host-level service gating (scripts/start-services-robust.js + tests/features/service-gating.test.mjs) are two independent enforcement points reading from different snapshot/config sources, requiring the PROGRAM_FEATURES mapping and SERVICE_CONFIGS.feature declarations to be kept in sync by convention/tests rather than a shared schema; Secret handling is asymmetric across services: docker/entrypoint.sh blanket-denies provider keys into the container env, while prompt-classifier-service.mjs deliberately loads secrets from a repo-local .env rather than the launchd plist — the constraint-monitor wrappers should be checked against which of these two models they actually follow; Tight coupling between test suite and implementation internals: tests/features/service-gating.test.mjs directly imports and mutates `SERVICE_CONFIGS[...].startFn`/`.feature`/`.maxRetries` on the live module object, meaning the production module must export these as mutable references for testability
-
 # ConstraintMonitorWrappers — Technical Insight Document
 
 ## What It Is

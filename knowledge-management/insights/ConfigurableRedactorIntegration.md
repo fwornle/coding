@@ -2,8 +2,6 @@
 
 **Type:** Detail
 
-[Architecture Notes] ConfigurableRedactor is consumed, not defined, in every file reviewed — its internal rule sets, regex patterns, and PII categories are entirely opaque from this evidence set; Redaction is documented as occurring inside init() (construction-time), positioning it as a gate that must succeed before any write, but no call site in the excerpt confirms it runs per-observation rather than once globally; The redaction guarantee is a property of the code path (writeObservation) rather than the EventEmitter itself — bypassing writeObservation (e.g., via _emitObservationWrittenForTests or a future direct-emit caller) structurally bypasses redaction; Content-sensitivity handling is fragmented across at least three independent mechanisms in the reviewed codebase: ConfigurableRedactor (ObservationWriter), truncation-only snip() (opencode-token-rows.mjs), and parameterized-binding/type-coalescion (token-db.mjs) — these are not interchangeable, and only the first targets PII/secrets specifically; Agent-path asymmetry: Copilot's degraded-parity stub observations (metadata-only) structurally cannot leak conversational PII, while opencode/claude-derived observations carry full transcript content that depends on ConfigurableRedactor actually being invoked
-
 # ConfigurableRedactorIntegration — Technical Insight Document
 
 ## What It Is
