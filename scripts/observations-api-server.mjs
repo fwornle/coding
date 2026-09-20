@@ -3423,8 +3423,22 @@ app.get('/api/workflows/wave-analysis/status', (_req, res) => {
 // directly via supertest-style in-process fetch.
 const _autostart = process.env.OBSERVATIONS_API_NO_AUTOSTART !== '1';
 const server = _autostart
-  ? app.listen(PORT, '0.0.0.0', () => {
-      process.stderr.write(`[obs-api] listening on http://0.0.0.0:${PORT} (km-core data root: ${path.dirname(KG_DB_PATH)})\n`);
+  // '::' not '0.0.0.0'. Node binds an unspecified IPv6 address dual-stack by
+  // default (ipv6Only=false), so this accepts BOTH families on the same
+  // interfaces '0.0.0.0' already covered — no new exposure, one family more.
+  //
+  // Why it matters: browsers resolve `localhost` to ::1 first. Bound to
+  // 0.0.0.0 only, nothing answered there, so every browser request to
+  // http://localhost:12436 hung while curl (which falls back to IPv4 fast)
+  // and http://127.0.0.1:12436 both worked. The unified viewer's default
+  // endpoint is `http://localhost:12436` (system-endpoints.ts), so its graph
+  // queries never completed and it sat on "Loading coding graph… · Showing 0
+  // of 0 nodes" forever, with no console error and no failed request to see —
+  // the requests were never issued. The health API on :3033 was already
+  // dual-stack, which is why that one worked from the same page and made the
+  // failure look like an obs-api outage rather than an address-family gap.
+  ? app.listen(PORT, '::', () => {
+      process.stderr.write(`[obs-api] listening on http://[::]:${PORT} (dual-stack; km-core data root: ${path.dirname(KG_DB_PATH)})\n`);
       // Warm the writer first (opens DB rw + FTS triggers + WAL), then warm
       // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
       // doesn't pay a multi-second cold start.
