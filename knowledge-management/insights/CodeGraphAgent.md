@@ -1,119 +1,66 @@
 # CodeGraphAgent
 
-**Type:** Detail
+**Type:** SubComponent
 
-The CodeGraphAgent is mentioned in the context of integrations/semantic-analysis/src/agents/code-graph-agent.ts, indicating its role in code analysis.
+[Code References] integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx — AGENT_SUBSTEPS['code_graph'] 'query' sub-step techNote: 'Cypher queries on Memgraph' (stale relative to the GraphifyGraph migration); integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx — AGENT_SUBSTEPS['code_graph'] 'analyze' sub-step llmUsage: 'standard', the only LLM-touching sub-step in the code_graph agent definition; integrations/system-health-dashboard/src/store/slices/ukbSlice.ts — StepInfo interface, no field for graph-source staleness/dataAsOf despite downstream GraphifyGraph's mtime-cache semantics; integrations/unified-viewer/src/graph/color-fallback.ts — nodeFillColor()/nodeShapeFor() parent-walk pattern, architecturally analogous to GraphifyGraph's label-derived kindOf()/nameOf() parsing; integrations/semantic-analysis/src/agents/graphify-graph.ts (per parent context) — mtime-based lazy caching, kindOf()/nameOf() helpers, mapRelation() normalization (referenced, not shown in provided code files); integrations/semantic-analysis/src/agents/code-graph-agent.ts (per parent context) — checkMemgraphConnection compatibility shim (referenced, not shown in provided code files)
 
-## What It Is  
+# CodeGraphAgent — Technical Insight Document
 
-The **CodeGraphAgent** lives in the source tree at  
+## What It Is
 
-```
-integrations/semantic-analysis/src/agents/code-graph-agent.ts
-```  
+CodeGraphAgent is implemented in `integrations/semantic-analysis/src/agents/code-graph-agent.ts`, where it serves as a backend shim that presents a legacy, Memgraph-era public API surface while internally delegating all graph operations to GraphifyGraph, its sibling component under the shared parent KnowledgeManagement. Rather than issuing Cypher queries against a live Memgraph instance, CodeGraphAgent now reads from a static `graph.json` artifact — a NetworkX node-link export produced by the graphify analysis pipeline. The component retains method names like `checkMemgraphConnection` purely for API-surface compatibility, even though the method performs no real database check. This is a preserved-name, changed-behavior shim — the kind of subtle trap that makes downstream code believe old semantics are still in effect.
 
-and is the concrete implementation that performs code‑graph analysis for the broader **OnlineLearning** capability.  In the surrounding documentation the agent is repeatedly referenced together with two environment variables – `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` – which indicate that the agent either exposes or consumes a service that follows a Retrieval‑Augmented Generation (RAG) pattern.  Within the **OnlineLearning** hierarchy the agent is listed as a child component, meaning that the learning pipelines can call into it to transform raw repository contents into structured knowledge entities (e.g., symbols, dependencies, call graphs).  
+## Architecture and Design
 
-In short, the CodeGraphAgent is the dedicated code‑analysis service that sits inside the *semantic‑analysis* integration and is leveraged by the OnlineLearning subsystem to turn source code into a graph‑based representation that downstream AI components can consume.
+CodeGraphAgent is a concrete instance of the Strangler Fig pattern that appears to be a house style across this codebase, mirrored by the LevelDbMigrationScripts sibling's sequential entity-type and storage migrations. The old interface is kept intact while the implementation underneath is fully swapped for GraphifyGraph's file-based reader.
 
----
+![CodeGraphAgent — Architecture](images/code-graph-agent-architecture.png)
 
-## Architecture and Design  
+Structurally, this migration pattern is visible at three layers: the backend shim itself; the dashboard's `AGENT_SUBSTEPS['code_graph']` metadata in `integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx`, which still models sub-steps as Code Indexing → Graph Querying → Code Analysis with Cypher/Memgraph framing baked into the 'query' step's `techNote`; and the broader knowledge-graph migration scripts (`migrate-graph-db-entity-types.js`, `migrate-leveldb-to-kmcore.mjs`) that apply the same "change the storage, keep the interface" philosophy elsewhere in KnowledgeManagement. This drift is precisely captured by CodeGraphAgent's child component, StaleCypherTechNoteDrift, which pinpoints the exact stale `techNote: 'Cypher queries on Memgraph'` string versus the sibling `index` sub-step's accurate `'AST parsing via tree-sitter'` note — a partial, not total, documentation drift.
 
-### Agent‑Oriented Design  
-The file path `.../agents/code-graph-agent.ts` makes it clear that the system adopts an **agent** style of encapsulation: each distinct responsibility (e.g., code graph construction, semantic analysis, online learning) is packaged as an independent, self‑contained unit.  This encourages loose coupling – the OnlineLearning component can invoke the CodeGraphAgent through a well‑defined interface without needing to know the internal parsing logic.
+Because GraphifyGraph (the parent-level component this shim delegates to) uses mtime-based lazy caching to avoid re-parsing a potentially tens-of-megabyte `graph.json` file on every read, CodeGraphAgent inherits a batch-consistency model rather than real-time mutation visibility — a direct trade-off of read performance for staleness risk.
 
-### Service‑Boundary via Ports  
-The presence of the two environment variables `CODE_GRAPH_RAG_SSE_PORT` and `CODE_GRAPH_RAG_PORT` signals a **port‑based communication boundary**.  The agent likely runs as a separate process (or container) that listens on one of those ports, exposing either a standard HTTP API (`CODE_GRAPH_RAG_PORT`) or a Server‑Sent Events stream (`CODE_GRAPH_RAG_SSE_PORT`).  This design isolates the heavy‑weight graph construction work from the rest of the application, allowing the OnlineLearning subsystem to remain responsive while the agent does its work asynchronously.
+## Implementation Details
 
-### Retrieval‑Augmented Generation (RAG) Integration  
-The suffix “RAG” in the port names hints that the agent participates in a **retrieval‑augmented generation** workflow.  In practice this means that after the CodeGraphAgent builds the graph, it can serve pieces of that graph on demand to a downstream LLM or reasoning engine, which then augments its generated answers with concrete code‑level evidence.  The architecture therefore couples static analysis (graph building) with dynamic AI‑driven inference through a clear service contract.
+The actual parsing mechanics live in GraphifyGraph, on which CodeGraphAgent depends: `kindOf()` and `nameOf()` derive type and name from graphify's raw `label` field, an "interpreted schema" approach architecturally analogous to `nodeFillColor()`/`nodeShapeFor()` in `integrations/unified-viewer/src/graph/color-fallback.ts`, which parent-walk an ontology registry to derive visual attributes. Both patterns compute semantics at read time from indirect lookups rather than storing them as flat, queryable fields — a recurring tension between compact storage and richer consumer-side semantic needs.
 
-### Hierarchical Relationship  
-Within the **OnlineLearning** hierarchy the CodeGraphAgent is a child.  Its sibling agents (if any) would handle complementary concerns such as documentation extraction or test‑case generation.  The parent OnlineLearning orchestrates these agents, sequencing calls (e.g., first run CodeGraphAgent, then feed its output into a knowledge‑base builder).  This hierarchical composition keeps the overall learning pipeline modular and extensible.
+Similarly, `mapRelation()` performs lossy edge-normalization, collapsing graphify's fine-grained relation vocabulary (e.g., `indirect_call`, `re_exports`) into six canonical `CodeRelationship` types — a read-time compression that mirrors the one-time, persisted-graph consolidation performed by `migrate-graph-db-entity-types.js` (collapsing `TransferablePattern`/`WorkflowPattern`/`TechnicalIssue` into System/Project/Pattern). Both are irreversible simplifications that trade fine-grained recoverability for a smaller, more stable downstream vocabulary.
 
----
+On the UI side, `AGENT_SUBSTEPS['code_graph']` assigns `llmUsage: 'none'` to indexing and querying but `llmUsage: 'standard'` to the 'analyze' sub-step, confirming that CodeGraphAgent's mechanical read layer is LLM-free — an LLM is only invoked afterward, to interpret the results of an otherwise deterministic graph read.
 
-## Implementation Details  
+## Integration Points
 
-The only concrete implementation artifact we have is the TypeScript file `code-graph-agent.ts`.  From its location we can infer a typical Node/TS setup:
+CodeGraphAgent sits within KnowledgeManagement alongside GraphifyGraph (its actual execution engine), KmCoreAdapter, LevelDbMigrationScripts, and UkbWorkflowDashboard. Its query results surface through the dashboard's live workflow visualization — `multi-agent-graph.tsx` rendered via `ukb-workflow-modal.tsx` — which drives per-step status (<AWS_SECRET_REDACTED>) through Redux state in `ukbSlice.ts`'s `WorkflowExecutionState.stepStatuses`, updated near-real-time via WebSocket/event-driven mode.
 
-* **Exported Class / Function** – The file most likely exports a class named `CodeGraphAgent` (matching the file name) that implements a standard `Agent` interface used across the *semantic‑analysis* integration.  This interface probably defines lifecycle methods such as `initialize()`, `processRepository(repoPath: string)`, and `shutdown()`.
+![CodeGraphAgent — Relationship](images/code-graph-agent-relationship.png)
 
-* **Port Configuration** – Inside the module the two environment variables are read, e.g.:
+This creates an unaddressed interaction: a workflow step can be marked "completed" in the UI while its underlying graph data reflects a `graph.json` snapshot older than the most recent graphify re-index, because `StepInfo` in `ukbSlice.ts` has no `graphStaleness` or `dataAsOf` field to distinguish fresh from cached reads. This is the same category of file-mtime staleness issue GraphifyGraph faces more broadly.
 
-  ```ts
-  const ragPort = Number(process.env.CODE_GRAPH_RAG_PORT);
-  const ssePort = Number(process.env.CODE_GRAPH_RAG_SSE_PORT);
-  ```
+## Usage Guidelines
 
-  These values are then passed to an HTTP server (Express, Fastify, or similar) and an SSE endpoint, respectively.  The server routes expose endpoints such as `/graph/:repoId` (returning JSON) and `/graph/stream/:repoId` (pushing incremental graph updates).
+Developers should not trust `AGENT_SUBSTEPS['code_graph']`'s `techNote` fields as documentation of CodeGraphAgent's actual backend — the 'query' sub-step's Cypher/Memgraph reference is stale and tracked explicitly as StaleCypherTechNoteDrift; it should be corrected to describe GraphifyGraph's static-file read path. Method names on CodeGraphAgent, notably `checkMemgraphConnection`, should not be assumed to perform their literal described action — verify actual behavior rather than trusting the name. When building UI or monitoring around code-graph queries, account for the mtime-cache staleness window inherited from GraphifyGraph, and consider adding staleness metadata to `StepInfo` to make cache freshness visible to operators. Finally, treat `mapRelation()`'s canonical relationship types as a one-way compression: original fine-grained relation types from graphify cannot be recovered downstream, so any consumer needing finer granularity must intercept data before this normalization.
 
-* **Graph Construction Logic** – Although not visible, the agent’s core responsibility is to parse source files, resolve imports, and emit a graph structure (nodes for symbols, edges for relationships).  The output format is probably a serializable JSON model that downstream components can ingest directly.
-
-* **RAG Service Hooks** – The agent may also expose a retrieval API that accepts queries like “find all callers of `Foo.bar`” and returns the matching sub‑graph.  This aligns with the RAG naming and enables the LLM‑based components to request precise code context on demand.
-
-Because no additional symbols were discovered, the above implementation details remain high‑level but are directly tied to the observed file path and configuration variables.
-
----
-
-## Integration Points  
-
-1. **OnlineLearning (Parent)** – The OnlineLearning subsystem imports the `CodeGraphAgent` and invokes its public methods as part of the learning pipeline.  The parent likely provides the repository location and receives the generated graph for further processing (e.g., knowledge‑entity extraction).
-
-2. **RAG Service Consumers** – Downstream AI services that perform Retrieval‑Augmented Generation consume the HTTP/SSE endpoints exposed on `CODE_GRAPH_RAG_PORT` and `CODE_GRAPH_RAG_SSE_PORT`.  These consumers may be separate micro‑services or in‑process modules that request graph fragments to enrich generated explanations.
-
-3. **Configuration Layer** – The two port variables are injected via the environment, meaning that deployment scripts (Docker Compose, Kubernetes manifests, or CI pipelines) must set them consistently.  Changing a port value requires a restart of the CodeGraphAgent process, but the rest of the system can remain untouched as long as the contract is honored.
-
-4. **Potential Sibling Agents** – While not enumerated, any other agents under `integrations/semantic-analysis/src/agents/` would share the same server bootstrap logic and could be co‑hosted on the same process, reusing the port configuration pattern.
-
----
-
-## Usage Guidelines  
-
-* **Initialize Once, Reuse** – Create a single instance of `CodeGraphAgent` at application start‑up (e.g., in the OnlineLearning bootstrap) and keep it alive for the lifetime of the service.  Re‑instantiating per request would waste the cost of opening the HTTP/SSE listeners repeatedly.
-
-* **Respect Port Configuration** – Never hard‑code the ports; always read `process.env.CODE_GRAPH_RAG_PORT` and `process.env.CODE_GRAPH_RAG_SSE_PORT`.  This ensures the agent can be deployed in varied environments (local dev, staging, production) without code changes.
-
-* **Prefer Asynchronous Calls** – Because the agent may be performing heavyweight static analysis, its public API should be awaited asynchronously.  When consuming the SSE stream, attach listeners early and handle back‑pressure to avoid memory spikes.
-
-* **Error Handling** – The agent’s HTTP endpoints should return standard error codes (4xx for client misuse, 5xx for internal failures).  Callers in OnlineLearning must implement retry logic for transient failures, especially when the graph generation is triggered on large repositories.
-
-* **Version Compatibility** – If the graph schema evolves, downstream consumers must validate the version field (if present) in the JSON payload.  Maintaining backward compatibility in the agent’s response format will reduce breakage across releases.
-
----
-
-### Architectural Patterns Identified  
-
-1. **Agent‑Oriented Modularity** – Each functional piece (code graph building) is encapsulated in a dedicated agent.  
-2. **Port‑Based Service Boundary** – Communication through configurable ports (HTTP + SSE) isolates the agent from its callers.  
-3. **Retrieval‑Augmented Generation (RAG) Integration** – The agent supplies structured knowledge to AI components on demand.
-
-### Design Decisions & Trade‑offs  
-
-* **Isolation vs. Latency** – Running the CodeGraphAgent as a separate service isolates resource‑intensive analysis but adds network latency for each request.  
-* **SSE for Incremental Updates** – Streaming graph updates via SSE reduces the need for polling but requires consumers to manage streaming lifecycles.  
-* **Environment‑Driven Configuration** – Using env vars simplifies deployment but couples runtime behavior to external configuration, demanding strict DevOps discipline.
-
-### System Structure Insights  
-
-The overall system is a **hierarchical pipeline**: OnlineLearning (parent) orchestrates a set of agents (children) that each expose a port‑based API.  The CodeGraphAgent sits at the intersection of static code analysis and AI‑driven retrieval, acting as a data provider for downstream RAG services.
-
-### Scalability Considerations  
-
-* **Horizontal Scaling** – Because the agent listens on a port, multiple instances can be load‑balanced behind a reverse proxy, allowing parallel processing of many repositories.  
-* **Resource Management** – Graph construction can be CPU‑ and memory‑intensive; container limits and autoscaling policies should be tuned accordingly.  
-* **Streaming Efficiency** – SSE streams should be throttled or chunked to prevent overwhelming network bandwidth when large graphs are emitted.
-
-### Maintainability Assessment  
-
-The agent’s **clear separation of concerns** (analysis logic vs. transport layer) and **environment‑driven configuration** make it straightforward to update or replace individual pieces.  However, the reliance on external port contracts means that any change to the API surface must be coordinated with all RAG consumers, necessitating versioned endpoints or backward‑compatible response formats to keep the ecosystem stable.
 
 ## Hierarchy Context
 
 ### Parent
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning may use the CodeAnalysisAgent in integrations/semantic-analysis/src/agents/code-graph-agent.ts to analyze code repositories and extract insights
+- [KnowledgeManagement](./KnowledgeManagement.md) -- [LLM] The GraphifyGraph reader (integrations/semantic-analysis/src/agents/graphify-graph.ts) represents a deliberate architectural simplification: rather than maintaining a live graph database connection (Memgraph via Cypher), the component now treats a static graph.json artifact produced by the graphify service as the source of truth for code-structure knowledge. This file, a NetworkX node-link JSON export, can be tens of megabytes, so GraphifyGraph implements mtime-based lazy caching — it stat()s the file and only re-parses when the mtime has changed since the last load. This pattern trades real-time graph mutation capability for drastically simpler deployment (no separate DB process) and fast repeated reads, at the cost of only picking up graph changes when the underlying analysis pipeline re-writes graph.json.
+
+### Children
+- [StaleCypherTechNoteDrift](./StaleCypherTechNoteDrift.md) -- [LLM] The stale tech-note lives at a single, precisely locatable point: `AGENT_SUBSTEPS['code_graph']` in integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx, specifically the `query` sub-step object (`id: 'query', name: 'Graph Querying', ... techNote: 'Cypher queries on Memgraph'`). This is static, hand-authored metadata — not derived from any runtime introspection of CodeGraphAgent — so nothing in the build or type system would catch the fact that it describes a backend (live Memgraph + Cypher) that the parent-context migration already replaced with GraphifyGraph's static graph.json reader. The sibling `index` sub-step's techNote ('AST parsing via tree-sitter') is accurate and unaffected, which makes this a partial, not total, drift: two of the three code_graph sub-step descriptions could be correct while the middle one silently lies.
+
+### Siblings
+- [GraphifyGraph](./GraphifyGraph.md) -- [LLM] GraphifyGraph (integrations/semantic-analysis/src/agents/graphify-graph.ts) inverts the conventional graph-database architecture by treating a flat, periodically-regenerated graph.json file as the system of record instead of a live queryable store. The mtime-based lazy-caching strategy — stat() the file, compare against the last-seen mtime, and only re-parse the (potentially tens-of-megabytes) NetworkX node-link export when it changes — is a classic read-heavy optimization, but it also means GraphifyGraph is fundamentally a batch-consistency component: it cannot see a code-structure change until the separate graphify analysis pipeline finishes a full re-write of the JSON artifact. This is architecturally similar to the mtime/staleness problem the dashboard integration explicitly worked around elsewhere in this codebase (system-health-dashboard's bind-mount VirtioFS caching required a forced container restart to invalidate a stale read) — both are instances of 'a file on disk is the API' trading real-time correctness for operational simplicity.
+- [KmCoreAdapter](./KmCoreAdapter.md) -- [LLM] The provided code files (ukb-workflow-modal.tsx, multi-agent-graph.tsx, ukbSlice.ts, D3GraphCanvas.tsx, color-fallback.ts) belong to system-health-dashboard and unified-viewer, not directly to the KmCoreAdapter/GraphifyGraph pipeline described in the parent observations. This suggests KmCoreAdapter's output (graph.json, entity types, relationship taxonomy) is consumed downstream by visualization layers like D3GraphCanvas and the AGENT_SUBSTEPS 'code_graph' definitions in multi-agent-graph.tsx, which explicitly reference 'Cypher queries on Memgraph' as a techNote — a stale artifact from before the GraphifyGraph migration described in the parent context, meaning the UI's descriptive text has not been updated to reflect the Memgraph-to-graphify strangler-fig migration.
+- [LevelDbMigrationScripts](./LevelDbMigrationScripts.md) -- [LLM] The two migration scripts referenced in the parent context — migrate-graph-db-entity-types.js and migrate-leveldb-to-kmcore.mjs — represent sequential, non-idempotent phases of the same underlying transition: first a taxonomy simplification (collapsing TransferablePattern/WorkflowPattern/TechnicalIssue into System/Project/Pattern) performed in-place against the live Graphology in-memory graph, then a structural re-platforming that assigns UUIDv7 identifiers, a layer='evidence' classification, and a legacyId.system='B' backward-reference tag to every entity. Because the second script depends on entities already conforming to the three-category taxonomy (any code still testing for the old fine-grained type strings would silently fail), these scripts form an implicit ordering contract that is not enforced by any shared orchestration file — a developer running migrate-leveldb-to-kmcore.mjs before migrate-graph-db-entity-types.js has completed would migrate stale/incorrect type data into the new km-core shape with no runtime error to signal the mistake.
+- [WaveInsightPersistence](./WaveInsightPersistence.md) -- [LLM] The 'persistence' entry in AGENT_SUBSTEPS (integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx) models WaveInsightPersistence as three explicit, sequential sub-steps — w1 ('Wave 1 Persist', L0 Project + L1 Component entities), w2 ('Wave 2 Persist', L2 SubComponent entities), and w3 ('Wave 3 Persist', L3 Detail entities plus operator-refined fields and embeddings). All three declare llmUsage: 'none' and techNote: 'GraphDB + LevelDB storage', confirming that persistence itself is a pure storage operation with no LLM calls — the LLM work (pattern discovery, entity extraction, classification) happens upstream in kg_operators/semantic_analysis/insight_generation, and persistence's job is purely to commit already-synthesized entities. Notably w3's techNote uniquely adds 'direct attribute merge', implying Wave 3 does not simply insert new nodes but merges operator-enriched fields (e.g. embeddings) onto entities that may already exist from earlier waves — a detail not present in w1/w2, suggesting Wave 3 is where duplicate-entity reconciliation actually happens rather than at insight-generation time.
+- [ManualLearning](./ManualLearning.md) -- [LLM] The ukb-workflow-modal.tsx file documents its own evolution through inline comments rather than commit messages — the HISTORY_PAGE_SIZE constant carries a multi-paragraph comment explaining that raising it from 50 to 500 was 'close to free' because /api/ukb/history parses every report regardless of limit and only slices at the end. This is a case of manual/institutional learning being encoded directly in source as a durable artifact: a future maintainer who considers lowering this constant for 'performance' will read the comment and understand the tradeoff (response size vs. server work) before making that mistake again, effectively preventing regression of a fix that had no automated test to catch it.
+- [OnlineLearning](./OnlineLearning.md) -- [LLM] The 'OnlineLearning' distinction is implemented as a data-driven color/shape overlay rather than a structural entity type: `integrations/unified-viewer/src/graph/color-fallback.ts` defines two parallel palettes, `BATCH_PALETTE` (teal/blue shades keyed by hierarchy depth: System/Project/Component/SubComponent/Detail) and `ONLINE_PALETTE` (red/pink shades for the same hierarchy levels), and `classColor()` picks between them purely based on whether `isOnlineLearned({ metadata: { source } })` returns true. This means 'online-learned' is not a first-class ontology class but a metadata flag (`source: 'auto'` or `'online'`) riding along on any entity, decoupled from what class/type that entity otherwise has.
+- [GraphViewerHierarchy](./GraphViewerHierarchy.md) -- [LLM] D3GraphCanvas.tsx (integrations/unified-viewer/src/graph/D3GraphCanvas.tsx) is an explicit, well-documented port of a Redux-based component (memory-visualizer's GraphVisualization.tsx) into a Zustand-store-driven architecture, but it does not simply swap state libraries — it re-derives a large amount of selection/ancestry logic to keep two independently-maintained rendering paths (this D3/SVG canvas and a parallel Sigma/WebGL canvas referenced in comments as 'graph-builder.ts') in sync. The `deriveAncestryFromStorePath()` function is the clearest evidence of this: rather than trusting either the store's `pathToSelected` set or its own inline `computeAncestryPath()` BFS in isolation, it runs both and reconciles them with a 'writer's intent wins' rule — nodes the store claims are in-path but the local BFS can't reach get a synthetic max-depth slot so they still render, while nodes the BFS finds but the store doesn't tag are dropped. This reconciliation is a symptom of maintaining two rendering engines against one shared selection model without a shared traversal implementation.
+- [GraphVisualRendering](./GraphVisualRendering.md) -- [LLM] The GraphVisualRendering surface is split across two independently-evolved implementations that never share code: `integrations/system-health-dashboard/src/components/workflow/multi-agent-graph.tsx` renders the UKB workflow pipeline as a fixed-topology SVG (`WAVE_AGENTS`, `KG_OPERATOR_CHILDREN`, `MULTI_AGENT_EDGES` from `./constants`), while `integrations/unified-viewer/src/graph/D3GraphCanvas.tsx` renders the knowledge graph itself as a force-directed D3 simulation (`d3.forceSimulation` + `d3.forceLink(150)` + `d3.forceManyBody(-500)`). The former is a static, hand-authored process diagram; the latter is a dynamic layout engine over live entity/relation data pulled through `useGraphData`. They happen to share the word 'graph' and the general shape of node/edge rendering, but there is no common rendering abstraction, color resolver, or type between them — any visual-consistency fix (e.g. dark-mode palette) has to be applied twice.
+- [UkbWorkflowDashboard](./UkbWorkflowDashboard.md) -- [LLM] The HISTORY_PAGE_SIZE constant in ukb-workflow-modal.tsx (currently 500, previously 50) documents a concrete production incident in its own comment block: with the old cap, `/api/ukb/history` silently truncated the report list at 50 entries even though 119+ reports existed, making the single most important run — the batch-analysis run whose Pipeline Totals card shows commits/sessions/entity counts — permanently unreachable from the UI because it sat at position ~51. The fix works because the API route reads and parses every report on every call regardless of `limit`, slicing only at the very end, so raising the page size costs response payload size (roughly 13 header fields per report) rather than server-side work. This is a case where a UI paging constant silently created a data-loss illusion — the data was never lost, just permanently unreachable — and the comment functions as a postmortem note baked directly into source rather than a separate incident doc.
+
 
 ---
 
-*Generated from 3 observations*
+*Generated from 9 observations*
