@@ -172,6 +172,16 @@ RUN for f in $(find integrations/*/node_modules/@rapid/llm-proxy/dist -name "net
       sed -i '1i // Network Detection Module (patched: broken JSDoc removed)' "$f"; \
     done 2>/dev/null || true
 
+# Align @rapid/llm-proxy's copilot model ids with what Copilot actually serves.
+# The SDK pins retired ids (claude-sonnet-4.6 / claude-opus-4.6); Copilot answers
+# those with a hard 400, and since `standard` is the tier semantic_analysis uses,
+# every Wave 3 call fell through to `[llm] All providers failed` and wrote a
+# shallow stub entity instead. Run EXPLICITLY here because the installs above
+# use --ignore-scripts, so the package.json `postinstall` never fires in-image.
+# No `|| true`: a silent miss costs a whole wave of degraded knowledge, which
+# only shows up hours later as unexplained ~600-char entity descriptions.
+RUN cd integrations/semantic-analysis && node scripts/align-copilot-model-ids.mjs
+
 # Rebuild native bindings for the container's architecture
 RUN npm rebuild better-sqlite3 classic-level 2>/dev/null || true
 
