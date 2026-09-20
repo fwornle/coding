@@ -1387,16 +1387,32 @@ export class ObservationWriter {
     };
     try {
       const entity = legacyObservationToEntity(obsRow, this._runId, nowISO);
-      // Ontology normalization (2026-06-11): the legacy adapter sets
-      // entityType='Observation' AND ontologyClass='Observation', which
-      // pollutes the 4-class hierarchy {Project, Component, SubComponent,
-      // Detail} that VKB + unified-viewer color/filter against. Keep
-      // entityType='Observation' as a free-form category tag, but force
-      // ontologyClass='Detail' so the node renders inside the hierarchy.
-      // Also stamp `metadata.source='auto'` so VKB's data-processor
-      // (lib/vkb-server/data-processor.js:175) maps it to the 'online'
-      // bucket → red dot, not blue.
-      entity.ontologyClass = 'Detail';
+      // NO ontologyClass rewrite here. The adapter sets entityType AND
+      // ontologyClass to 'Observation' and that is the truth: this row IS an
+      // Observation, and `Observation` is a real class in the registry this
+      // store loads (obs-api's curated dir, 61 classes — see KG_ONTOLOGY_DIR
+      // in observations-api-server.mjs).
+      //
+      // From 2026-06-11 to 2026-09-20 this line read `entity.ontologyClass =
+      // 'Detail'`, to force raw rows into the 4-class hierarchy the viewer
+      // coloured against. Both reasons it cited are now gone:
+      //
+      //   1. The viewer no longer needs it. `visibility-predicate.ts` checks
+      //      BOTH entityType and ontologyClass (its comment names this very
+      //      clobber as the reason it stopped reading entityType alone), so
+      //      Observations stay behind the `showDebugEntityTypes` shield with
+      //      or without the rewrite.
+      //   2. `lib/vkb-server/data-processor.js`, the other cited consumer,
+      //      no longer exists — vkb-server was retired and obs-api owns the
+      //      store.
+      //
+      // What it cost: 354 of the graph's 520 entityType/ontologyClass IS-A
+      // violations, i.e. rows claiming to be a Detail while being an
+      // Observation. Anything reasoning over the class — the ontology filter,
+      // roll-up candidate selection, the planned putEntity IS-A guard — was
+      // reading a lie. `metadata.source='auto'` below still marks the row as
+      // online-learned; that tag, not a falsified class, is what the
+      // learning-source filter reads.
       // Phase 75 (OBS-01): stamp task_id into the persisted entity metadata so
       // observations are queryable per Run. Only set a non-empty value so a
       // no-span fire doesn't pollute metadata with ''.
@@ -1488,8 +1504,9 @@ export class ObservationWriter {
     const ts = row.created_at || new Date().toISOString();
     try {
       const entity = legacyDigestToEntity(row, this._runId, ts);
-      // See writeObservation for the rationale.
-      entity.ontologyClass = 'Detail';
+      // No ontologyClass rewrite — see writeObservation for why the 'Detail'
+      // clobber was removed. `Digest` is a real registry class; the mapper
+      // already stamps it on both fields.
       entity.metadata = { ...entity.metadata, source: 'auto' };
       const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
       await this._anchorEntity(kmStore, mintedId);
@@ -1568,7 +1585,7 @@ export class ObservationWriter {
       // explicit row.ontologyClass-derived value through without it being
       // lost. Metadata.source: only stamp 'auto' when the mapper / caller
       // didn't already set one (e.g. consolidator passes source: 'online').
-      if (!entity.ontologyClass) entity.ontologyClass = 'Detail';
+      if (!entity.ontologyClass) entity.ontologyClass = 'Insight';
       entity.metadata = {
         ...entity.metadata,
         source: entity.metadata?.source ?? 'auto',

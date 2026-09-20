@@ -160,14 +160,20 @@ describe('ObservationWriter → km-core round-trip (Phase 44 Plan 12)', () => {
     expect(entity.legacyId).toBeDefined();
     expect(entity.legacyId.system).toBe('A');
     expect(entity.legacyId.id).toBe(obsId);
-    // entityType and ontologyClass deliberately DIVERGE (bc5fe8012, 2026-06-12).
-    // entityType stays the free-form category; ontologyClass is forced to 'Detail'
-    // so the node sits inside the 4-class hierarchy {Project, Component,
-    // SubComponent, Detail} that VKB and unified-viewer colour and filter against.
-    // Asserting both pins the split — the lookup above still finds it by category
-    // because findByOntologyClass ORs entityType and ontologyClass.
+    // entityType and ontologyClass AGREE. From bc5fe8012 (2026-06-12) to
+    // 2026-09-20 this asserted the opposite — ontologyClass forced to 'Detail'
+    // so raw rows sat inside the 4-class hierarchy the viewer coloured against.
+    // That divergence was removed because both of its reasons expired: the
+    // viewer's predicate now checks BOTH fields (visibility-predicate.ts:144),
+    // and lib/vkb-server/data-processor.js — the other consumer it named — was
+    // deleted with vkb-server.
+    //
+    // Keep these two assertions together and equal. A row whose class says
+    // 'Detail' while it is an Observation is a lie to every consumer that
+    // reasons over class, and it was 354 of the graph's 520 IS-A violations.
     expect(entity.entityType).toBe('Observation');
-    expect(entity.ontologyClass).toBe('Detail');
+    expect(entity.ontologyClass).toBe('Observation');
+    expect(entity.ontologyClass).toBe(entity.entityType);
     expect(entity.layer).toBe('evidence');
     expect(entity.createdBy).toBeDefined();
     expect(entity.createdBy.provider).toBe('observation-writer');
@@ -199,9 +205,10 @@ describe('ObservationWriter → km-core round-trip (Phase 44 Plan 12)', () => {
     expect(entity.legacyId).toBeDefined();
     expect(entity.legacyId.system).toBe('A');
     expect(entity.legacyId.id).toBe('digest-uuid-1');
-    // Same deliberate split as writeObservation above.
+    // Same agreement as writeObservation above — the writer never falsifies class.
     expect(entity.entityType).toBe('Digest');
-    expect(entity.ontologyClass).toBe('Detail');
+    expect(entity.ontologyClass).toBe('Digest');
+    expect(entity.ontologyClass).toBe(entity.entityType);
     expect(entity.layer).toBe('pattern');
     expect(entity.createdBy).toBeDefined();
     expect(entity.createdBy.provider).toBe('observation-writer');
