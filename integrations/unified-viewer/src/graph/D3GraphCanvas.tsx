@@ -295,9 +295,6 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
   // gate locks verbatim). The node-type half of this pair now travels
   // inside the visibility predicate.
   const hiddenRelationTypes = useViewerStore((s) => s.hiddenRelationTypes)
-  // child -> parent over the hierarchy classes; UnifiedViewer is its sole
-  // writer. Used to re-home nodes whose real parent the filters removed.
-  const hierarchyParents = useViewerStore((s) => s.hierarchyParents)
 
   // 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction): pre-built
   // `nodeId → Set<bucketKey>` reverse lookup map. The graph click handler
@@ -367,13 +364,17 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     // everything below it: collapse SubComponents and their Details float, even
     // though the Component above is right there. A collapse should re-parent
     // what it hides, so a stranded node attaches to its nearest VISIBLE
-    // ancestor. Nodes with no visible ancestor get nothing — there is no honest
-    // edge to draw.
-    const connected = new Set<string>()
-    for (const r of real) { connected.add(r.from); connected.add(r.to) }
-    const rehomed = buildRehomeEdges(visibleIds, connected, hierarchyParents)
+    // ancestor. Reachability, not degree: a PAIR that references only each
+    // other (CopiIntegration <-> CopiCliWrapper) has an edge apiece and still
+    // floats, so this works on connected COMPONENTS. Strays with no visible
+    // ancestor get nothing — there is no honest edge to draw.
+    // The ladder out of a stray component is the structural edges themselves —
+    // the same set the anchor invariant is stated over — INCLUDING the ones
+    // whose far end is currently hidden. That is what makes a hidden
+    // intermediate level traversable instead of a dead end.
+    const rehomed = buildRehomeEdges(visibleIds, real, relations)
     return rehomed.length === 0 ? real : [...real, ...(rehomed as unknown as Relation[])]
-  }, [relations, visibleIds, hiddenRelationTypes, hierarchyParents])
+  }, [relations, visibleIds, hiddenRelationTypes])
 
   // Dimensions — watch the container, no Redux involvement.
   useLayoutEffect(() => {

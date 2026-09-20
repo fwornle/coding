@@ -147,3 +147,36 @@ describe('health coordinator wiring', () => {
     assert.match(src, /anchor-unstructured-entities\.mjs --apply/);
   });
 });
+
+describe('anchors are DIRECTIONAL', () => {
+  const ent = (id, ontologyClass) => ({ id, name: id, ontologyClass });
+  const rel = (from, to, type) => ({ from, to, type });
+
+  test('a node that CONTAINS children but that nothing contains is a violation', () => {
+    // This counted both directions at first, and the bug hid itself: such a
+    // node scored as anchored while being exactly the dead end that strands
+    // its own subtree. Hide it and its children have no ladder up, because
+    // their parent has no parent. Three stranded nodes in the rendered view
+    // traced to it (FileWatchManager, SpecstoryIntegration) while the guard
+    // read 0 violations.
+    const a = auditStructuralAnchors(
+      [ent('sub', 'SubComponent'), ent('d1', 'Detail'), ent('d2', 'Detail')],
+      [rel('sub', 'd1', 'contains'), rel('sub', 'd2', 'contains')],
+    );
+    assert.equal(a.unanchored, 1, 'the SubComponent has no parent of its own');
+    assert.deepEqual(a.byClass, { SubComponent: 1 });
+  });
+
+  test('an inbound structural edge satisfies it', () => {
+    const a = auditStructuralAnchors(
+      [ent('comp', 'Component'), ent('sub', 'SubComponent')],
+      [rel('comp', 'sub', 'contains')],
+    );
+    assert.equal(a.byClass.SubComponent, undefined);
+  });
+
+  test('a self-edge does not let a node anchor itself', () => {
+    const a = auditStructuralAnchors([ent('x', 'Detail')], [rel('x', 'x', 'contains')]);
+    assert.equal(a.unanchored, 1);
+  });
+});
