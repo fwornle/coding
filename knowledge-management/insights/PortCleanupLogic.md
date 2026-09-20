@@ -1,0 +1,51 @@
+# PortCleanupLogic
+
+**Type:** Detail
+
+[Architecture Notes] Port cleanup logic is split across three files with no shared abstraction: scripts/start-services-robust.js (Node, primary/robust path), start-services.sh (bash, legacy path gated by ROBUST_MODE=false), and docker/entrypoint.sh (bash, container-side external-dependency wait — a different concern, checking reachability rather than freeing a local port); killProcessOnPortAndWait() and waitForPortBindable() are complementary but not composed anywhere in the visible source — no caller chains 'kill then confirm bindable' as a single guaranteed operation; The robust-mode port cleanup (killProcessOnPortAndWait) is strictly more conservative than the legacy bash cleanup (kill_port) — SIGTERM-then-SIGKILL with polling vs. immediate SIGKILL with a fixed sleep — yet both remain live/reachable via a runtime env var toggle rather than the safer implementation fully replacing the other; isPortListening() (HTTP-level, imported from lib/service-starter.js) and waitForPortBindable() (kernel bind-level, defined locally) are intentionally two different checks of 'is this port usable', reflecting a documented gap between HTTP-responsiveness and actual socket availability; Container-level readiness (docker/entrypoint.sh wait_for_service) always fails open (returns 0 regardless of outcome), while host-level orchestration (start-services-robust.js SERVICE_CONFIGS.required) can block startup — the two layers have different failure-handling philosophies for conceptually similar 'wait for X to be ready' operations
+
+# PortCleanupLogic — Technical Insight Document
+
+## What It Is
+
+PortCleanupLogic is a cross-cutting concern implemented in three separate places with no shared abstraction: `scripts/start-services-robust.js` (the Node-based "robust" path), `start-services.sh` (a legacy bash path), and `docker/entrypoint.sh` (a container-side dependency-readiness check that addresses a related but distinct concern). As a child concept of **RobustServiceOrchestrator**, its primary implementation lives in `killProcessOnPortAndWait(port, options)` and `waitForPortBindable(port, options)`, both defined in `scripts/start-services-robust.js`. Together they are meant to answer two different questions: "is something occupying this port, and can I make it stop?" and "has the kernel actually released this socket enough that I can bind to it?"
+
+## Architecture and Design
+
+The core architectural pattern is **graduated escalation**: `killProcessOnPortAndWait()` enumerates PIDs via `lsof -ti:${port}`, sends SIGTERM to all of them, then polls `checkPortInUse()` every `pollIntervalMs` (default 200ms), only escalating to SIGKILL after `maxWaitMs/2` has elapsed. This is a deliberate trade-off of best-case speed for avoiding SIGKILL-induced data loss. Layered on top is a **throwaway resource probe pattern** in `waitForPortBindable()`, which opens and immediately closes a real `net.createServer().listen()` socket purely to test kernel-level bindability — distinct from the HTTP-level `isPortListening()` imported from `lib/service-starter.js`. The documented rationale is that a crashed process can leave the kernel holding a socket even though HTTP probes report nothing listening, so relying on `isPortListening()` alone would risk "burning a maxRetries slot" in `startServiceWithRetry()`.
+
+Critically, these two functions are **complementary but never composed** — no code path calls both together as a single guaranteed "kill then confirm bindable" operation. This makes port cleanup a manual, fragile composition responsibility of each `SERVICE_CONFIGS.startFn`, rather than a single reliable primitive exposed by the orchestrator.
+
+A second major architectural issue is the **dual/legacy implementation toggle**: `start-services.sh`'s `check_port()`/`kill_port()` duplicate this responsibility using `lsof -i`/`kill -9` with a fixed `sleep 1`, selected via `ROBUST_MODE=${ROBUST_MODE:-true}`. This is flagged as a direct instance of the "NO PARALLEL VERSIONS" anti-pattern the project's own CLAUDE.md forbids, made worse by the fact that the legacy path is strictly less safe than the one it's meant to fall back to.
+
+Sibling component **ServiceGatingContract** shows the same structural fragility pattern at a different layer — three independently evolving gating mechanisms (`SERVICE_CONFIGS[key].feature`, entrypoint.sh's `PROGRAM_FEATURES`, and the test suite) that must stay in sync without shared code. PortCleanupLogic exhibits an analogous "multiple truths, no shared abstraction" structure.
+
+## Implementation Details
+
+`killProcessOnPortAndWait()` begins with an **early-exit optimization**: it calls `checkPortInUse()` once up front and returns `true` immediately if the port is already free, skipping PID enumeration, SIGTERM, and polling entirely. This is a second, redundant instance of "don't do destructive work unnecessarily," layered below the process-registry-level checks (`psm.isServiceRunning()`, `isProcessRunningByScript()`) that `SERVICE_CONFIGS` entries already perform before reaching a `startFn`'s cleanup phase.
+
+Process discovery relies on `lsof -ti:${port}`, wrapped in a 3000ms `execAsync` timeout, invoked up to three times per call (initial check, PID collection, final re-verification). Elsewhere, `isProcessRunningByScript()` uses `pgrep -lf "scriptPattern"` with a 5000ms timeout. Both share a **fail-open error-handling convention**: a caught `execAsync` exception yields "assume not running/free" (`catch { return false; }` / `catch (error) { return { running: false }; }`), silently converting uncertainty into an optimistic clean-state assumption — a consistent but risk-accepting design choice throughout the file.
+
+`docker/entrypoint.sh`'s `wait_for_service()` implements a conceptually adjacent but architecturally separate check: polling *external* dependency reachability (Qdrant on 6333, Redis on 6379) via `timeout 2 bash -c "echo >/dev/tcp/$host/$port"`, up to `max_attempts` (default 30) with fixed 2-second sleeps. It **always fails open** (`return 0` even on exhaustion, "Don't fail — let supervisord handle it"), a materially different risk posture from `SERVICE_CONFIGS`'s `required=true` gating, which can block startup.
+
+## Integration Points
+
+PortCleanupLogic integrates with `lib/service-starter.js` via imports of `startServiceWithRetry`, `createHttpHealthCheck`, `createPidHealthCheck`, `isPortListening`, `isTcpPortListening`, `isProcessRunning`, and `sleep` — confirming RobustServiceOrchestrator is a thicker composition layer atop these primitives rather than a thin consumer, since it also defines significant local logic (`isProcessRunningByScript`, `killProcessOnPortAndWait`, `waitForPortBindable`) not delegated downward. The retry budget enforced by `startServiceWithRetry()` is the direct consumer that `waitForPortBindable()` protects from wasted attempts. The bash-vs-node duality is selected entirely by the `ROBUST_MODE` environment variable checked in `start-services.sh`.
+
+## Usage Guidelines
+
+Developers should treat `killProcessOnPortAndWait()` and `waitForPortBindable()` as two steps that must be explicitly chained by callers — never assume killing a port's process guarantees immediate bindability. New `SERVICE_CONFIGS.startFn` implementations should call both in sequence. The legacy `start-services.sh` cleanup path should be treated as deprecated/unsafe and candidate for removal per CLAUDE.md's no-parallel-versions rule; any new reliability work should go into the robust Node path only. Do not rely on `isPortListening()` alone as proof of port availability — it is an HTTP-level check that can miss lingering kernel socket states. Finally, be aware that fail-open exec error handling silently reports "not running" on transient shell failures, so this logic should not be used where false negatives (assuming a port is free when it may not be) carry serious consequences — a distinction it shares in spirit with `docker/entrypoint.sh`'s deliberate fail-open external-dependency check, but with a different blast radius since PortCleanupLogic guards local bind attempts rather than deferring to supervisord.
+
+
+## Hierarchy Context
+
+### Parent
+- [RobustServiceOrchestrator](./RobustServiceOrchestrator.md) -- [LLM] The parent-context observations describe a wrapper-based process-management architecture (api-service.js, dashboard-service.js, lib/service-starter.js) that is largely superseded in the actual files shown here by scripts/start-services-robust.js, which implements its own retry/backoff logic directly rather than delegating entirely to lib/service-starter.js's startServiceWithRetry(). start-services-robust.js does import startServiceWithRetry, createHttpHealthCheck, createPidHealthCheck, isPortListening, isTcpPortListening, isProcessRunning, and sleep from '../lib/service-starter.js', confirming the layering described in the parent context, but it also defines significant orchestration logic locally (isProcessRunningByScript, killProcessOnPortAndWait, waitForPortBindable), suggesting RobustServiceOrchestrator is a thicker composition layer on top of the primitives rather than a thin consumer.
+
+### Siblings
+- [ServiceGatingContract](./ServiceGatingContract.md) -- [LLM] The ServiceGatingContract is not one mechanism but three independently-evolving gating layers that must stay in agreement without any shared code: (1) `SERVICE_CONFIGS[key].feature` checked inside `startOneService` in scripts/start-services-robust.js against `loadFeatures()`, (2) the bash-side `PROGRAM_FEATURES` string in docker/entrypoint.sh mapped through a `node -e` one-liner reading `/coding/.coding/runtime/features.json`, and (3) the structural test suite in tests/features/service-gating.test.mjs that only validates layer (1) against `lib/features/catalogue.cjs`'s `FEATURE_IDS`. There is no test asserting that entrypoint.sh's `PROGRAM_FEATURES` mapping stays consistent with either the host feature catalogue or the container's own supervisord.conf `[program:...]` sections apart from the comment's claim of `tests/features/container-gating.test.mjs` — meaning the host-side and container-side gating vocabularies could drift silently if `lib/features/catalogue.cjs` gains a feature id that is never added to the bash string.
+
+
+---
+
+*Generated from 9 observations*

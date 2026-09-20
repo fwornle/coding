@@ -68,9 +68,13 @@ function declaredProjects() {
 }
 const APPLY = process.argv.includes('--apply');
 const CHECK = process.argv.includes('--check');
+// Opt-in. `--check` keeps its exact meaning (edge invariant only) so anything
+// already wired to it cannot start failing because a SECOND invariant shipped.
+const CHECK_PARENTS = process.argv.includes('--check-parents');
 import {
   ANCHORED_CLASSES,
   auditStructuralAnchors,
+  auditParentMetadata,
   classOf,
   projectSlug,
   resolveProjectKey,
@@ -90,6 +94,9 @@ const relations = await get('/api/v1/relations?limit=100000');
 // ONE definition of a violation, shared with the health coordinator's
 // graph_integrity slice — the guard and the repair must never disagree.
 const audit = auditStructuralAnchors(entities, relations);
+// The parent-METADATA invariant, from the same shared module for the same
+// reason: the guard and the coordinator must not drift apart.
+const parents = auditParentMetadata(entities);
 const unanchored = audit.rows.map((r) => entities.find((e) => e.id === r.id)).filter(Boolean);
 
 const projectsByName = new Map();
@@ -101,11 +108,25 @@ out(`unanchored (no structural edge): ${audit.unanchored}`);
 out(`  true orphans (degree 0)      : ${audit.orphans}`);
 out(`  stranded (provenance only)   : ${audit.stranded}`);
 out(`  by class: ${JSON.stringify(audit.byClass)}`);
+out(`missing parent metadata        : ${parents.missingParent}`);
+out(`parent names nothing in graph  : ${parents.danglingParent}`);
+out(`  of checked                   : ${parents.checked}`);
+out(`  by class: ${JSON.stringify(parents.byClass)}`);
 
 if (CHECK) {
   out('');
-  if (audit.unanchored === 0) { out('OK — structural-anchor invariant holds.'); process.exit(0); }
-  out(`FAIL — ${audit.unanchored} row(s) carry no structural edge.`);
+  const parentViolations = parents.missingParent + parents.danglingParent;
+  const parentFails = CHECK_PARENTS && parentViolations > 0;
+  if (audit.unanchored === 0 && !parentFails) {
+    out('OK — structural-anchor invariant holds.');
+    if (CHECK_PARENTS) out('OK — parent-metadata invariant holds.');
+    process.exit(0);
+  }
+  if (audit.unanchored > 0) out(`FAIL — ${audit.unanchored} row(s) carry no structural edge.`);
+  if (parentFails) {
+    out(`FAIL — ${parents.missingParent} row(s) without metadata.parentEntityName, `
+      + `${parents.danglingParent} naming a parent that is not in the graph.`);
+  }
   process.exit(1);
 }
 

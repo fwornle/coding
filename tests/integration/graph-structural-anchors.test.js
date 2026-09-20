@@ -21,8 +21,10 @@ import path from 'node:path';
 
 import {
   auditStructuralAnchors,
+  auditParentMetadata,
   projectSlug,
   ANCHORED_CLASSES,
+  HIERARCHY_CLASSES,
   STRUCTURAL_EDGE_TYPES,
 } from '../../lib/knowledge/structural-anchors.mjs';
 
@@ -178,5 +180,118 @@ describe('anchors are DIRECTIONAL', () => {
   test('a self-edge does not let a node anchor itself', () => {
     const a = auditStructuralAnchors([ent('x', 'Detail')], [rel('x', 'x', 'contains')]);
     assert.equal(a.unanchored, 1);
+  });
+});
+
+
+/**
+ * The parent-METADATA invariant.
+ *
+ * This is a SECOND, independent invariant. The one above asks "does anything
+ * CONTAIN this row" (edges); this one asks "does it declare a parent that
+ * exists" (metadata). They were conflated once in review and the separation is
+ * the whole point: on the day this shipped the graph held 17 edge violations
+ * and 749 metadata ones, so summing them would have flipped graph_integrity to
+ * degraded permanently and trained everyone to ignore the slice.
+ */
+describe('parent-metadata invariant', () => {
+  const ents = [
+    { id: 'a', name: 'A', ontologyClass: 'Component', metadata: { parentEntityName: 'Root' } },
+    { id: 'b', name: 'B', ontologyClass: 'SubComponent', metadata: {} },
+    { id: 'c', name: 'C', ontologyClass: 'Detail', metadata: { parentEntityName: 'Ghost' } },
+    { id: 'r', name: 'Root', ontologyClass: 'Project', metadata: {} },
+    { id: 's', name: 'Sys', ontologyClass: 'System', metadata: {} },
+    { id: 'i', name: 'I', ontologyClass: 'Insight', metadata: {} },
+    { id: 'd', name: 'D', ontologyClass: 'Digest', metadata: {} },
+    { id: 'od', name: 'OD', ontologyClass: 'OnlineDigest', metadata: {} },
+    { id: 'raw', name: '[Raw] junk', ontologyClass: 'Detail', metadata: {} },
+  ];
+
+  test('a parentEntityName naming an existing entity is clean', () => {
+    const r = auditParentMetadata(ents);
+    assert.ok(!r.rows.some((x) => x.name === 'A'));
+  });
+
+  test('a missing parentEntityName is NOT counted as unanchored', () => {
+    // The separation test. B has no parent metadata but IS contained by Root,
+    // so the edge invariant is satisfied and only the metadata one is not.
+    const rels = [{ from: 'r', to: 'b', type: 'contains' }];
+    const anchors = auditStructuralAnchors(ents, rels);
+    const parents = auditParentMetadata(ents);
+    assert.equal(anchors.rows.some((x) => x.name === 'B'), false,
+      'B has a contains edge — the edge invariant holds for it');
+    assert.equal(parents.missingParent, 1);
+    assert.equal(parents.rows.find((x) => x.name === 'B').reason, 'missing');
+  });
+
+  test('a parentEntityName naming nothing is dangling, counted separately', () => {
+    const r = auditParentMetadata(ents);
+    assert.equal(r.danglingParent, 1);
+    const row = r.rows.find((x) => x.name === 'C');
+    assert.equal(row.reason, 'dangling');
+    assert.equal(row.parentEntityName, 'Ghost');
+  });
+
+  test('Insight / Digest / OnlineDigest are exempt — they have no hierarchy', () => {
+    // Measured on the live store: Insight 0/912, Digest 0/176, OnlineDigest
+    // 0/8 carry parentEntityName. The online consolidator anchors by
+    // has_insight / includes edges and has no parent notion at all, so holding
+    // those ~1096 rows to this invariant reports a permanent non-violation.
+    assert.ok(!HIERARCHY_CLASSES.has('Insight'));
+    assert.ok(!HIERARCHY_CLASSES.has('Digest'));
+    assert.ok(!HIERARCHY_CLASSES.has('OnlineDigest'));
+    const r = auditParentMetadata(ents);
+    assert.ok(!r.rows.some((x) => ['I', 'D', 'OD'].includes(x.name)));
+  });
+
+  test('Project and System are exempt — the roots legitimately have no parent', () => {
+    assert.ok(!HIERARCHY_CLASSES.has('Project'));
+    assert.ok(!HIERARCHY_CLASSES.has('System'));
+    const r = auditParentMetadata(ents);
+    assert.ok(!r.rows.some((x) => ['Root', 'Sys'].includes(x.name)));
+  });
+
+  test('[Raw] rows are skipped here too — their repair is deletion', () => {
+    const r = auditParentMetadata(ents);
+    assert.ok(!r.rows.some((x) => x.name.startsWith('[Raw]')));
+    assert.equal(r.checked, 3, 'A, B and C only');
+  });
+
+  test('a row failing BOTH invariants counts once in each', () => {
+    const rels = [];
+    const anchors = auditStructuralAnchors(ents, rels);
+    const parents = auditParentMetadata(ents);
+    assert.ok(anchors.rows.some((x) => x.name === 'B'));
+    assert.ok(parents.rows.some((x) => x.name === 'B'));
+    assert.equal(anchors.orphans + anchors.stranded, anchors.unanchored,
+      'the edge invariant\'s own arithmetic still holds');
+  });
+});
+
+describe('parent-metadata wiring', () => {
+  const src = readFileSync(path.join(REPO, 'scripts/health-coordinator.js'), 'utf8');
+  const cli = readFileSync(path.join(REPO, 'scripts/anchor-unstructured-entities.mjs'), 'utf8');
+
+  test('the slice reports the new counters', () => {
+    assert.match(src, /missing_parent:/);
+    assert.match(src, /dangling_parent:/);
+  });
+
+  test('strict mode is opt-in via env, not a code change', () => {
+    assert.match(src, /HEALTH_GRAPH_PARENT_STRICT/);
+  });
+
+  test('by DEFAULT status still keys on the EDGE invariant', () => {
+    // If this regresses, every machine goes degraded on the next deploy.
+    const probe = src.slice(src.indexOf('async function pollGraphIntegrity'),
+      src.indexOf('async function runAllChecks'));
+    assert.match(probe, /audit\.unanchored === 0/);
+    assert.match(probe, /!GRAPH_PARENT_STRICT \|\| parentViolations === 0/);
+  });
+
+  test('the CLI guard shares the audit and keeps --check edge-only', () => {
+    assert.match(cli, /auditParentMetadata/);
+    assert.match(cli, /--check-parents/);
+    assert.match(cli, /CHECK_PARENTS && parentViolations > 0/);
   });
 });

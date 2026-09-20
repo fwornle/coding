@@ -1,0 +1,51 @@
+# ServiceGatingTestSuite
+
+**Type:** Detail
+
+[Code References] tests/features/service-gating.test.mjs:24-49 - featureSet() and emptyResults() test fixture helpers; tests/features/service-gating.test.mjs:38-63 - 'service catalogue coverage' describe block: feature declaration, FEATURE_IDS validity, SERVICE_ORDER/SERVICE_CONFIGS set-equality, live-logging pair ordering; tests/features/service-gating.test.mjs:66-77 - 'a disabled feature skips the service without starting it' test; tests/features/service-gating.test.mjs:79-86 - 'a disabled service is not reported as degraded' test; tests/features/service-gating.test.mjs:88-94 - 'a REQUIRED service whose feature is off does not block startup' test; tests/features/service-gating.test.mjs:96-111 - 'a required failure blocks, so downstream services do not start' test with maxRetries override; tests/features/service-gating.test.mjs:113-123 - 'an unknown feature on a config is a loud failure, not a silent skip' test; scripts/start-services-robust.js:174-193 - waitForPortBindable() TCP bindability probe; scripts/start-services-robust.js:76-146 - killProcessOnPortAndWait() graduated SIGTERM/SIGKILL termination; docker/entrypoint.sh:100-141 - fail-open feature-gating override generation via PROGRAM_FEATURES and node -e
+
+# ServiceGatingTestSuite: Technical Insight Document
+
+## What It Is
+
+ServiceGatingTestSuite is implemented at `tests/features/service-gating.test.mjs` and functions as the test-side guarantor of correctness for its parent component, ServiceProbe, specifically for the host-side service orchestration logic in `scripts/start-services-robust.js`. Rather than testing isolated units, it validates a *catalogue* — the combination of `SERVICE_CONFIGS` and `SERVICE_ORDER` — imported live (not from fixtures) alongside `FEATURE_IDS` from `lib/features/catalogue.cjs`. Its own docstring frames its purpose plainly: "ten hand-written start blocks were ten chances to forget a gate." This is a suite built to catch an entire *class* of historical failure (silently missing feature gates), not a single regression.
+
+## Architecture and Design
+
+The suite embodies a "structural/<COMPANY_NAME_REDACTED> test" pattern: its `describe('service catalogue coverage')` block (lines 38–63) doesn't test behavior so much as test the shape of configuration itself — every service declares a feature, every declared feature is real, `SERVICE_ORDER` and `SERVICE_CONFIGS` cover each other exactly, and the live-logging pair retains its required start-order precedence. Because these imports are live rather than fixture-based, the assertions can never silently drift out of sync with the real catalogue that `ServiceStarterRetryPolicy`'s declarative fields (`required`, `maxRetries`, `timeout`, `startFn`, `healthCheckFn`) populate.
+
+A second major architectural theme is the deliberate asymmetry between fail-open and fail-loud behavior for the *same* class of problem — an unrecognized feature key. The parent ServiceProbe's `docker/entrypoint.sh` (sibling FeatureGatingOverride) treats an unknown feature key as fail-open, defaulting to enabled so an old host snapshot never silently disables a newer container. `startOneService()`, by contrast, treats an unknown feature string in `SERVICE_CONFIGS` as a code-authoring bug and must throw synchronously (validated by `an unknown feature on a config is a loud failure, not a silent skip`, lines 113–123). These two layers are structurally parallel but independently implemented and independently tested — a fix to one gating semantic does not propagate to the other.
+
+## Implementation Details
+
+The `featureSet()` helper (lines 24–49) constructs a synthetic object shaped exactly like `loadFeatures()`'s real output (`{features, enabled, disabled, warnings}`), defaulting every `FEATURE_IDS` entry to enabled and flipping only the ones under test, e.g. `featureSet({ observations: false })`. This ties the suite's fixture generation directly to the feature catalogue rather than requiring hand-maintained parallel lists.
+
+The suite enforces a semantic distinction in `startOneService()`'s result buckets: "disabled" (intentionally off) versus "degraded" (on but failed). The test `a disabled service is not reported as degraded` (lines 79–86) validates this against `llmCliProxy`, asserting `results.degraded.length === 0` and `results.disabled.length === 1`. Another test, `a REQUIRED service whose feature is off does not block startup` (lines 88–94), probes the interaction between `required: true` and feature gating, defensively asserting its own fixture's precondition (`SERVICE_CONFIGS.transcriptMonitor.required === true`) before testing the behavior, guarding against silent invalidation from future refactors.
+
+The blocking-contract test (lines 96–111) temporarily lowers `SERVICE_CONFIGS.transcriptMonitor.maxRetries` to 1 to avoid the six-second cost of real exponential backoff — a documented trade-off between fidelity (of `ServiceStarterRetryPolicy`'s real retry timing) and suite runtime. All such mutations to shared module-level state (`startFn`, `maxRetries`, `feature`) are restored in `finally` blocks, since `SERVICE_CONFIGS` is a mutable singleton, not deep-cloned per test.
+
+## Integration Points
+
+The suite couples directly to two catalogues: `SERVICE_CONFIGS`/`SERVICE_ORDER` from `scripts/start-services-robust.js` and `FEATURE_IDS` from `lib/features/catalogue.cjs`. This dual coupling is what allows the suite to catch drift automatically rather than requiring manual synchronization. It sits alongside — but does not test — sibling components ServiceStarterRetryPolicy (whose retry fields it validates structurally, not behaviorally) and PortBindableProbe, whose `waitForPortBindable()` and the related `killProcessOnPortAndWait()` (lines 174–193 and 76–146 respectively) remain untested by this suite, marking a clear coverage boundary between the well-tested orchestration/gating layer and the untested process-management primitives beneath it.
+
+Its counterpart at the container layer, FeatureGatingOverride (`docker/entrypoint.sh`, lines 100–141), is deliberately not exercised by this suite — that logic has its own `container-gating.test.mjs`. The two form parallel but separately-maintained gating implementations sharing only a conceptual contract, not code.
+
+## Usage Guidelines
+
+Developers modifying `SERVICE_CONFIGS` or `FEATURE_IDS` should expect this suite to fail loudly on any drift — that's its purpose. New services must declare a valid `feature` string present in `FEATURE_IDS`, or the suite's unknown-feature test class will apply. When adding tests that mutate shared singleton state, follow the established try/finally restoration convention to avoid cross-test contamination. Retry-related tests should favor overriding `maxRetries` down rather than exercising true backoff timing, per the existing trade-off precedent. Finally, remember the fail-open/fail-loud asymmetry is intentional: don't "fix" the unknown-feature-in-config throw to fail open by analogy with `entrypoint.sh` — the two represent different classes of unknowns (authoring bug vs. operational version skew) and must remain distinct.
+
+
+## Hierarchy Context
+
+### Parent
+- [ServiceProbe](./ServiceProbe.md) -- [LLM] docker/entrypoint.sh implements a fail-open feature-gating layer that sits strictly between the host's feature resolver and supervisord: it reads a flat JSON snapshot at /coding/.coding/runtime/features.json (written by the host, never by the container) and, for each entry in the PROGRAM_FEATURES mapping (e.g. 'semantic-analysis:knowledge', 'constraint-monitor:constraints', 'health-dashboard:health'), uses `node -e` (not jq, since jq isn't installed in the image) to decide whether to emit an `autostart=false` override into /etc/supervisor/features.d/disabled.conf. Critically, the script comments explain the asymmetric fail-open design: a missing or unparseable snapshot leaves the override directory empty, which starts EVERYTHING, because the authors judged that a container silently running nothing due to a late-arriving JSON file would be a much harder failure mode to diagnose than one that over-starts. An unknown feature key in the snapshot also reads as enabled by default, guarding against an old host snapshot silently disabling a newer program it doesn't know about.
+
+### Siblings
+- [FeatureGatingOverride](./FeatureGatingOverride.md) -- entrypoint.sh reads FEATURES_SNAPSHOT=/coding/.coding/runtime/features.json, mounted read-only, and writes overrides to FEATURES_DIR=/etc/supervisor/features.d/disabled.conf
+- [ServiceStarterRetryPolicy](./ServiceStarterRetryPolicy.md) -- [LLM] scripts/start-services-robust.js's SERVICE_CONFIGS entries (e.g. transcriptMonitor, liveLoggingCoordinator) encode a retry policy through a small set of declarative fields — `required`, `maxRetries`, `timeout`, `startFn`, `healthCheckFn` — rather than each service hand-writing its own loop. This is consumed by `startServiceWithRetry()` (imported from lib/service-starter.js) and orchestrated by `startOneService()`/`SERVICE_ORDER`, which tests/features/service-gating.test.mjs asserts is the exhaustive list of started services. The docstring's framing — 'ten hand-written start blocks were ten chances to forget a gate' — makes explicit that the retry policy's real value is structural: a service literally cannot start without declaring a `feature`, because the config object is the single place both the starter and the test suite read from.
+- [PortBindableProbe](./PortBindableProbe.md) -- [LLM] The `waitForPortBindable()` function in scripts/start-services-robust.js implements a socket-level readiness probe that is deliberately more primitive than `isPortListening()` from lib/service-starter.js. It constructs a throwaway `net.createServer()`, calls `.unref()` immediately so the probe never keeps the Node event loop alive if the parent process were to exit mid-poll, and races `error`/`listening` events inside a Promise to convert the socket's callback API into a simple boolean. This is a narrow, single-purpose primitive — it answers exactly one question ('can I bind this port right now') and nothing else, refusing to conflate that with HTTP-level readiness the way a naive health check might.
+
+
+---
+
+*Generated from 10 observations*
