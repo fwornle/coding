@@ -39,7 +39,33 @@
  * silently rotting between releases.
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 const OBS_API = process.env.OBS_API_URL || 'http://localhost:12436';
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * Projects DECLARED in config/teams/*.json with kind:'project'. A declared
+ * project that has no Project entity is a gap in the graph, not an unknown
+ * owner — the consolidator already auto-creates these anchors (the `General`
+ * Project entity says so in its own description). Creating one here follows
+ * that precedent; inventing a parent for an UNDECLARED name would not, which
+ * is why only declared names are eligible.
+ */
+function declaredProjects() {
+  const dir = path.join(REPO, 'config/teams');
+  const out = new Map();
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith('.json') || f === 'view-groups.json') continue;
+    try {
+      const cfg = JSON.parse(readFileSync(path.join(dir, f), 'utf8'));
+      if (cfg.kind === 'project' && cfg.team) out.set(String(cfg.team), cfg);
+    } catch { /* a malformed team file must not stop the repair */ }
+  }
+  return out;
+}
 const APPLY = process.argv.includes('--apply');
 const CHECK = process.argv.includes('--check');
 import {
@@ -47,6 +73,7 @@ import {
   auditStructuralAnchors,
   classOf,
   projectSlug,
+  resolveProjectKey,
 } from '../lib/knowledge/structural-anchors.mjs';
 
 const out = (m = '') => process.stdout.write(`${m}\n`);
@@ -82,13 +109,50 @@ if (CHECK) {
   process.exit(1);
 }
 
-let written = 0; const unresolved = {};
+const DECLARED = declaredProjects();
+let written = 0; const unresolved = {}; const created = new Set();
 for (const e of unanchored) {
-  const projectName = (e.metadata ?? {}).project ?? e.project;
-  const project = projectsByName.get(projectSlug(projectName));
+  const projectName = resolveProjectKey(e);
+  let project = projectsByName.get(projectSlug(projectName));
   if (!project) {
-    unresolved[String(projectName)] = (unresolved[String(projectName)] ?? 0) + 1;
-    continue;
+    // A DECLARED project with no entity: create the anchor, same as the
+    // consolidator does for `general`.
+    const declared = [...DECLARED.entries()]
+      .find(([team]) => projectSlug(team) === projectSlug(projectName));
+    if (!declared) {
+      unresolved[String(projectName)] = (unresolved[String(projectName)] ?? 0) + 1;
+      continue;
+    }
+    if (!APPLY) { created.add(declared[0]); written++; continue; }
+    const body = {
+      name: declared[0],
+      entityType: 'Project',
+      ontologyClass: 'Project',
+      layer: 'evidence',
+      description: declared[1].description
+        || `Project anchor for the ${declared[0]} team — auto-created so its rows have a parent in the graph.`,
+      metadata: { source: 'anchor-unstructured-entities', team: projectSlug(declared[0]) },
+    };
+    const cr = await fetch(`${OBS_API}/api/v1/entities`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(60_000),
+    });
+    if (!cr.ok) {
+      out(`  FAILED to create Project ${declared[0]}: ${cr.status} ${(await cr.text()).slice(0, 140)}`);
+      unresolved[String(projectName)] = (unresolved[String(projectName)] ?? 0) + 1;
+      continue;
+    }
+    const createdEntity = (await cr.json()).data ?? (await Promise.resolve({})).data;
+    const newId = createdEntity?.id ?? createdEntity?.entityId;
+    if (!newId) {
+      out(`  FAILED to read id of created Project ${declared[0]}`);
+      unresolved[String(projectName)] = (unresolved[String(projectName)] ?? 0) + 1;
+      continue;
+    }
+    project = { id: newId, name: declared[0] };
+    projectsByName.set(projectSlug(declared[0]), project);
+    created.add(declared[0]);
+    out(`  created Project entity "${declared[0]}"`);
   }
   const type = classOf(e).endsWith('Insight') ? 'has_insight' : 'contains';
   if (!APPLY) { written++; continue; }
@@ -107,6 +171,7 @@ for (const e of unanchored) {
 
 out('');
 out(`${APPLY ? 'edges written' : 'edges that WOULD be written'}: ${written}`);
+if (created.size > 0) out(`Project entities ${APPLY ? 'created' : 'that WOULD be created'}: ${[...created].join(', ')}`);
 if (Object.keys(unresolved).length > 0) {
   out(`left alone — project does not resolve to an entity: ${JSON.stringify(unresolved)}`);
   out('  (a wrong parent is worse than a visible gap — fix the project entity, then re-run)');
