@@ -246,6 +246,11 @@ const currentState = {
     orphans: null,
     stranded: null,
     by_class: null,
+    // Parent-METADATA invariant — a separate question from the edge invariant
+    // above, reported alongside it and (by default) not driving `status`.
+    missing_parent: null,
+    dangling_parent: null,
+    parent_by_class: null,
     last_probe_end: null
   },
   // Phase 51 Plan 11 — sub-agent capture freshness across all four agents.
@@ -3523,6 +3528,12 @@ async function pollNetworkStatus() {
 const GRAPH_INTEGRITY_INTERVAL_MS = parseInt(
   process.env.HEALTH_GRAPH_INTEGRITY_INTERVAL_MS || String(10 * 60_000), 10);
 
+// Arms the parent-metadata invariant to drive `status`. Off by default: the
+// counter is report-only until a backfill has driven the historical population
+// down, because arming it on day one flips the slice to degraded and holds it
+// there, which trains everyone to ignore it.
+const GRAPH_PARENT_STRICT = process.env.HEALTH_GRAPH_PARENT_STRICT === '1';
+
 async function pollGraphIntegrity() {
   const now = Date.now();
   const last = pollGraphIntegrity._lastRunAt ?? 0;
@@ -3535,14 +3546,38 @@ async function pollGraphIntegrity() {
 
   try {
     const audit = await fetchAndAudit(OBS_API_URL, { timeoutMs: 30_000 });
+    // SEPARATE counters, deliberately. The edge invariant (does anything
+    // CONTAIN this row) and the metadata invariant (does it declare a parent
+    // that exists) are different questions; folding the second into
+    // `unanchored` would redefine what `healthy` means here. On the day this
+    // shipped 749 rows failed the metadata one, so it is REPORT-ONLY until a
+    // backfill lands — HEALTH_GRAPH_PARENT_STRICT=1 arms it without a code
+    // change.
+    const parentViolations = audit.parents.missingParent + audit.parents.danglingParent;
     currentState.graph_integrity = {
-      status: audit.unanchored === 0 ? 'healthy' : 'degraded',
+      status: audit.unanchored === 0 && (!GRAPH_PARENT_STRICT || parentViolations === 0)
+        ? 'healthy'
+        : 'degraded',
       unanchored: audit.unanchored,
       orphans: audit.orphans,
       stranded: audit.stranded,
       by_class: audit.byClass,
+      missing_parent: audit.parents.missingParent,
+      dangling_parent: audit.parents.danglingParent,
+      parent_by_class: audit.parents.byClass,
+      parent_strict: GRAPH_PARENT_STRICT,
       last_probe_end: new Date().toISOString()
     };
+    if (parentViolations > 0) {
+      // A SECOND, separate line — never merged into the unanchored WARN below.
+      // The two numbers count different things and reading them as one total
+      // is exactly the confusion this split exists to prevent.
+      log(`graph_integrity: ${audit.parents.missingParent} row(s) without `
+        + `metadata.parentEntityName, ${audit.parents.danglingParent} naming a `
+        + `parent that is not in the graph (of ${audit.parents.checked} checked) `
+        + `${JSON.stringify(audit.parents.byClass)}`,
+        GRAPH_PARENT_STRICT ? 'WARN' : 'INFO');
+    }
     if (audit.unanchored > 0) {
       log(`graph_integrity: ${audit.unanchored} row(s) without a structural edge `
         + `(${audit.orphans} orphaned, ${audit.stranded} stranded) `
