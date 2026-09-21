@@ -294,10 +294,19 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   const setHierarchyParents = useViewerStore((s) => s.setHierarchyParents)
   useEffect(() => {
     if (entities.length === 0) return
+    // `metadata` rides along so deriveParents can read stage 4's explicit
+    // placement (`metadata.parentId`), which outranks every edge — an Insight's
+    // only edge is `has_insight` from its Project, which is ownership, not
+    // position.
     const parents = deriveParents(
-      entities as unknown as { id: string; name: string; ontologyClass: string }[],
+      entities as unknown as {
+        id: string; name: string; ontologyClass: string
+        metadata?: { parentId?: string }
+      }[],
       relations as unknown as { from: string; to: string; type?: string }[],
     )
+    const classes = new Map<string, string>()
+    for (const e of entities) classes.set(e.id, e.ontologyClass)
     const childCount = new Map<string, number>()
     for (const [child, parent] of parents) {
       const cls = entities.find((e) => e.id === child)?.ontologyClass
@@ -308,7 +317,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
       .filter((e) => e.ontologyClass === 'Component')
       .map((e) => ({ id: e.id, name: e.name ?? e.id, childCount: childCount.get(e.id) ?? 0 }))
       .sort((a, b) => b.childCount - a.childCount || a.name.localeCompare(b.name))
-    setHierarchyParents(parents, summary)
+    setHierarchyParents(parents, summary, classes)
   }, [entities, relations, setHierarchyParents])
 
   const isVisible = useGraphVisibility()

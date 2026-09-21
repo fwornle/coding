@@ -65,6 +65,15 @@ export function useGraphVisibility(): VisibilityPredicate {
   const collapseSubComponents = useViewerStore((s) => s.collapseSubComponents)
   const expandedComponentIds = useViewerStore((s) => s.expandedComponentIds)
   const hierarchyParents = useViewerStore((s) => s.hierarchyParents)
+  // Ancestor class lookup for the transitive collapse. Memoised on the map
+  // itself so `isVisible` keeps the reference stability the canvas viewport
+  // depends on (Locked Contract #3) — an inline arrow here would rebuild the
+  // predicate every render and restart the force simulation.
+  const hierarchyClasses = useViewerStore((s) => s.hierarchyClasses)
+  const hierarchyClassOf = useMemo(
+    () => (id: string): string | undefined => hierarchyClasses.get(id),
+    [hierarchyClasses],
+  )
 
   return useMemo<VisibilityPredicate>(() => {
     const filters = {
@@ -83,6 +92,7 @@ export function useGraphVisibility(): VisibilityPredicate {
       collapseSubComponents,
       expandedComponentIds,
       hierarchyParents,
+      hierarchyClassOf,
     }
     return (e: Entity) => isEntityVisible(e, filters)
   }, [
@@ -101,5 +111,11 @@ export function useGraphVisibility(): VisibilityPredicate {
     collapseSubComponents,
     expandedComponentIds,
     hierarchyParents,
+    // Both: `hierarchyClassOf` is what the predicate takes, `hierarchyClasses`
+    // is what it is memoised on. The source-grep gate in the test file checks
+    // every `useViewerStore` read appears here by name, and it cannot see
+    // through the derivation.
+    hierarchyClasses,
+    hierarchyClassOf,
   ])
 }

@@ -339,6 +339,9 @@ export interface ViewerState {
    * the predicate is pure per-entity and cannot resolve a parent itself.
    */
   hierarchyParents: ReadonlyMap<string, string>
+  /** id → ontologyClass, for the predicate's transitive-collapse walk. Built
+   *  from the same entities as hierarchyParents, so the two cannot disagree. */
+  hierarchyClasses: ReadonlyMap<string, string>
   /** Components with their SubComponent counts, for the expander UI. */
   componentSummary: readonly { id: string; name: string; childCount: number }[]
   // Phase 60 Plan 03 (G3) — D-09..D-11: when true, the visibility predicate
@@ -387,6 +390,7 @@ export interface ViewerState {
   setHierarchyParents: (
     parents: ReadonlyMap<string, string>,
     summary: readonly { id: string; name: string; childCount: number }[],
+    classes?: ReadonlyMap<string, string>,
   ) => void
   // Phase 60 Plan 03 (G3) — D-09..D-11: flips showDebugEntityTypes.
   toggleShowDebugEntityTypes: () => void
@@ -961,6 +965,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   collapseSubComponents: true,
   expandedComponentIds: new Set<string>(),
   hierarchyParents: new Map<string, string>(),
+  hierarchyClasses: new Map<string, string>(),
   componentSummary: [],
   // Phase 60 Plan 03 (G3) — D-11: NOT persisted (no localStorage). Resets every
   // page load so operators must consciously re-enable Observation/Digest debug.
@@ -1109,8 +1114,12 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       return { expandedComponentIds: next }
     }),
   collapseAllComponents: () => set({ expandedComponentIds: new Set<string>() }),
-  setHierarchyParents: (parents, summary) =>
-    set({ hierarchyParents: parents, componentSummary: summary }),
+  setHierarchyParents: (parents, summary, classes) =>
+    set({
+      hierarchyParents: parents,
+      componentSummary: summary,
+      ...(classes ? { hierarchyClasses: classes } : {}),
+    }),
   // Phase 60 Plan 03 (G3) — D-09..D-11: toggle the showDebugEntityTypes flag.
   toggleShowDebugEntityTypes: () =>
     set((s) => ({ showDebugEntityTypes: !s.showDebugEntityTypes })),

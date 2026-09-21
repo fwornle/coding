@@ -82,6 +82,15 @@ export interface VisibilityFilters {
   expandedComponentIds?: ReadonlySet<string>
   hierarchyParents?: ReadonlyMap<string, string>
   /**
+   * Ontology class of an ANCESTOR id, for the transitive collapse walk. The
+   * predicate is handed one entity and cannot look another up, and the walk
+   * needs to know which ancestor is the SubComponent. Optional: when absent
+   * the collapse degrades to the immediate-parent behaviour it had before,
+   * which is wrong but not broken — the same fail-toward-visible choice the
+   * rest of this file makes.
+   */
+  hierarchyClassOf?: (id: string) => string | undefined
+  /**
    * Phase 60 Plan 01 (G1): ontology registry (subset shape — `name` +
    * extends-chain `parent`) consumed by `deriveLayer` for L2 inference.
    * Optional so existing call sites compile until the registry is threaded
@@ -124,6 +133,52 @@ export interface VisibilityFilters {
  * unhide those types. The flag is read defensively (`!== true`) so an
  * undefined runtime value behaves identically to false.
  */
+/**
+ * Classes the SubComponent collapse governs — everything at or below the
+ * collapse frontier. Backbone classes (System/Project/Component) are never
+ * collapsed by it; they ARE the aggregated view.
+ *
+ * `Insight` is here for the same reason `Detail` is: it is a leaf-level
+ * artifact, so at the aggregated level it is below the frontier no matter
+ * which parent it belongs to.
+ *
+ * THAT INDEPENDENCE IS THE POINT. An Insight's placement comes from
+ * `metadata.parentId`, which stage 4 chose by a rarity heuristic over the
+ * mentions edges and which its own write-up calls "a mechanical prior... not
+ * a semantic parent assignment". A rule that hid a row only when its parentId
+ * pointed at a collapsed SubComponent would have made the headline node count
+ * depend on that heuristic being RIGHT — and would have left every row the
+ * heuristic could not place (12 of 88 under Coding) visible precisely because
+ * it was unplaceable. Keying on the row's own level instead means the count is
+ * the same whether the placement is good, bad or missing; `parentId` decides
+ * only WHERE a row reappears when you expand, which is the right blast radius
+ * for a mechanical prior.
+ *
+ * Unreachable therefore means hidden, not visible — the same call the
+ * SubComponent branch already made for a SubComponent with no resolvable
+ * parent: it cannot be reached by opening anything, so showing it puts an
+ * unexplained fragment on a canvas the operator just asked to condense.
+ */
+/**
+ * Raw stream rows, in BOTH vocabularies. The batch/UKB side writes
+ * `Observation`/`Digest`; the online side writes `OnlineObservation`/
+ * `OnlineDigest` for the same kinds of row. A shield that names only one
+ * spelling shields only half the corpus.
+ */
+const RAW_STREAM_CLASSES: ReadonlySet<string> = new Set([
+  'Observation',
+  'Digest',
+  'OnlineObservation',
+  'OnlineDigest',
+])
+
+const COLLAPSIBLE_LEVEL: ReadonlySet<string> = new Set([
+  'SubComponent',
+  'Detail',
+  'Insight',
+  'OnlineInsight',
+])
+
 export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean {
   // Hide raw-stub placeholders (LLM-failure transcript rows).
   if (typeof e.name === 'string' && e.name.startsWith('[Raw]')) return false
@@ -153,7 +208,14 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
     // stream type is enough to shield it.
     const raw = e as unknown as { entityType?: string; ontologyClass?: string }
     for (const field of [raw.entityType, raw.ontologyClass]) {
-      if (field === 'Observation' || field === 'Digest') return false
+      // RAW_STREAM_CLASSES, not two string literals. The shield matched
+      // 'Observation' and 'Digest' exactly, and the online population spells
+      // the same two things `OnlineObservation` and `OnlineDigest` — so 12 raw
+      // rows walked straight through a shield whose entire purpose is to keep
+      // raw rows off the canvas, and rendered under no project at all. That is
+      // the audit's own "two vocabularies below the upper that still disagree"
+      // showing up as a rendering bug rather than as a classification one.
+      if (RAW_STREAM_CLASSES.has(field ?? '')) return false
     }
   }
 
@@ -184,9 +246,57 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
   // fragment on a canvas the operator just asked to condense. (There are 6
   // such nodes today — extraction artifacts never attached to a Component;
   // they show up in the orphan count, which is where they should be fixed.)
-  if (filters.collapseSubComponents === true && e.ontologyClass === 'SubComponent') {
-    const parentId = filters.hierarchyParents?.get(e.id)
-    if (!parentId || !filters.expandedComponentIds?.has(parentId)) return false
+  // The collapse is TRANSITIVE: hiding a SubComponent hides what hangs under
+  // it. It was not until 2026-09-21, and the result was the canvas's largest
+  // single population — 152 Details whose parents were collapsed stayed on
+  // screen with nothing to attach to, rendering as free-floating dots. A
+  // collapse that leaves the children behind is not a collapse; it is a
+  // deletion of the one edge that explained them.
+  //
+  // The walk goes up the same `hierarchyParents` map the canvas lays out by,
+  // so "is an ancestor collapsed" can only disagree with "is that ancestor
+  // drawn" if the map itself is wrong. It stops at the first SubComponent: a
+  // node is hidden when ANY ancestor is a collapsed SubComponent, not only
+  // when its immediate parent is.
+  //
+  // `seen` is belt-and-braces. deriveParents already breaks cycles, but this
+  // runs per entity per render and a cycle here would freeze the tab rather
+  // than misdraw it.
+  if (filters.collapseSubComponents === true && COLLAPSIBLE_LEVEL.has(e.ontologyClass)) {
+    const parents = filters.hierarchyParents
+    const classOf = (id: string): string | undefined =>
+      id === e.id ? e.ontologyClass : filters.hierarchyClassOf?.(id)
+
+    // Walk to the nearest ancestor the operator can actually open. Reaching a
+    // SubComponent means "visible while its Component is expanded"; reaching a
+    // Component directly means "visible while that Component is expanded".
+    //
+    // Exhausting the walk without finding either means NOTHING the operator
+    // could open would bring this row back — so it stays visible. Hiding it
+    // would be the failure mode this whole audit is about: a row that is
+    // invisible because nothing placed it, and therefore never looked at
+    // again. An unplaced row stays on the canvas and counts against the node
+    // budget, which puts the pressure where it belongs — on placing it.
+    let reachable = true
+    const seen = new Set<string>()
+    for (let cur: string | undefined = e.id; cur !== undefined && !seen.has(cur); cur = parents?.get(cur)) {
+      seen.add(cur)
+      const cls = classOf(cur)
+      if (cls === 'SubComponent') {
+        const owner = parents?.get(cur)
+        reachable = owner !== undefined && filters.expandedComponentIds?.has(owner) === true
+        break
+      }
+      if (cur !== e.id && cls === 'Project') {
+        // Reached the top without passing anything collapsible.
+        break
+      }
+      if (cls === 'Component') {
+        reachable = filters.expandedComponentIds?.has(cur) === true
+        break
+      }
+    }
+    if (!reachable) return false
   }
 
   // Teams predicate — structural backbone (System/Project/Component) exempt.
