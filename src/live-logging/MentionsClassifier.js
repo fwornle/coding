@@ -454,16 +454,21 @@ export function buildMentionsPrompt(insightSummary, candidates) {
         content:
           'You classify which architectural entities an Insight discusses.\n' +
           'Pick a subset of entities from the catalog below whose subjects are clearly discussed in the Insight summary.\n' +
-          'Reply with ONLY a JSON array of entity names, e.g. ["EtmDaemon", "LiveLoggingSystem"]. No prose, no markdown fences.\n' +
+          'Then name the ONE entity the Insight is PRIMARILY about — its main subject, not merely something it\'s\n' +
+          'mentioned alongside. Prefer the most specific entity that still covers the whole Insight. If the Insight\n' +
+          'is not mainly about any single one of them, return null for it rather than guessing.\n' +
+          'Reply with ONLY a JSON object, no prose and no markdown fences, shaped exactly:\n' +
+          '  {"mentions": ["EtmDaemon", "LiveLoggingSystem"], "primary": "EtmDaemon"}\n' +
+          '"primary" MUST be one of the names in "mentions", or null.\n' +
           'Reject hallucinated names — only emit names that appear VERBATIM in the catalog below.\n' +
-          'Return an empty array [] if no entity in the catalog clearly matches the Insight.\n' +
+          'Return {"mentions": [], "primary": null} if no entity in the catalog clearly matches the Insight.\n' +
           'The catalog covers the L1+L2+L3 architectural vertical (entityType in {Component, SubComponent, Detail}).\n\n' +
           'Candidate catalog:\n' +
           catalog,
       },
       {
         role: 'user',
-        content: `Insight summary:\n${safeSummary}\n\nReturn the mentions JSON array.`,
+        content: `Insight summary:\n${safeSummary}\n\nReturn the mentions JSON object.`,
       },
     ],
   };
@@ -556,8 +561,67 @@ export function extractMentionsFromLLMResponse(rawText, candidates) {
  *
  * @param {string} insightSummary
  * @param {Array<{id:string,name:string,description:string}>} candidates
- * @returns {Promise<string[]>} ids (possibly empty, possibly up to SANITY_CAP)
+ * @returns {Promise<{ids: string[], primaryId: string|null}>} ids (possibly
+ *   empty, possibly up to SANITY_CAP) plus the single entity the insight is
+ *   primarily about, or null when the model declines to pick one.
  */
+/**
+ * Extract both answers from one classifier response.
+ *
+ * Accepts TWO response shapes on purpose:
+ *   {"mentions": [...], "primary": "Name"|null}   the shape the prompt asks for
+ *   ["Name", ...]                                  the shape it asked for before
+ *
+ * The bare array is not legacy tolerance for its own sake — an LLM drops back
+ * to it under load or after a prompt regression, and when it does, the correct
+ * behaviour is to keep the mentions and lose only the primary. Treating that as
+ * a parse failure would discard a usable classification and, via the caller's
+ * fail-fast, refuse to write the Insight at all.
+ *
+ * `primary` is held to the same closed set as the mentions and must be one of
+ * them; anything else (a hallucinated name, an entity it did not list) becomes
+ * null and the caller falls back to its own rule.
+ *
+ * @param {string} rawText
+ * @param {Array<{id:string,name:string,description:string}>} candidates
+ * @returns {{ids: string[], primaryId: string|null}}
+ */
+export function extractMentionsResult(rawText, candidates) {
+  const text = typeof rawText === 'string' ? rawText : '';
+  const list = Array.isArray(candidates) ? candidates : [];
+
+  let primaryName = null;
+  let mentionsText = text;
+
+  const stripped = text.replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+  if (stripped.startsWith('{')) {
+    try {
+      const obj = JSON.parse(stripped);
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        if (Array.isArray(obj.mentions)) mentionsText = JSON.stringify(obj.mentions);
+        if (typeof obj.primary === 'string') primaryName = obj.primary;
+      }
+    } catch {
+      // Fall through: the array extractor's token scan still salvages names
+      // from a truncated or malformed object.
+    }
+  }
+
+  // One closed-set gate for both answers — the existing extractor already
+  // rejects anything not in the catalog, so reuse it rather than re-deriving
+  // the rule and letting the two drift.
+  const ids = extractMentionsFromLLMResponse(mentionsText, list);
+
+  let primaryId = null;
+  if (primaryName) {
+    const hit = list.find((c) => c && c.name === primaryName);
+    // Must be a real candidate AND one this insight actually mentions.
+    if (hit && ids.includes(hit.id)) primaryId = hit.id;
+  }
+
+  return { ids, primaryId };
+}
+
 export async function classifyMentions(insightSummary, candidates) {
   const body = buildMentionsPrompt(insightSummary, candidates);
   let response;
@@ -568,7 +632,7 @@ export async function classifyMentions(insightSummary, candidates) {
     throw err;
   }
   const content = (response && typeof response.content === 'string') ? response.content : '';
-  return extractMentionsFromLLMResponse(content, candidates);
+  return extractMentionsResult(content, candidates);
 }
 
 // ---------------------------------------------------------------------------

@@ -10,7 +10,8 @@
  *   Test 6  — SANITY_CAP clamps 50-element response to 20 ids
  *   Test 7  — Dedup: repeated names → single id
  *   Test 8  — loadMentionCandidates fetches 3 ontology classes + caches per kmStore
- *   Test 9  — classifyMentions wires fetch + body taskType correctly
+ *   Test 9  — classifyMentions wires fetch + body taskType correctly, and
+ *             returns {ids, primaryId} (primaryId null for a bare-array reply)
  *   Test 10 — classifyMentions throws Error containing '500' on non-2xx (D-04.1)
  *
  * Test framework: node:test + node:assert/strict (matches scripts/
@@ -242,8 +243,12 @@ describe('MentionsClassifier — classifyMentions (orchestrator)', () => {
       text: async () => '',
     }));
 
-    const ids = await classifyMentions('I changed the EtmDaemon writer', CANDIDATES);
+    // classifyMentions returns BOTH answers since the primary-subject change.
+    // The stub replies in the historical bare-array shape, so the mentions
+    // must still land and the primary must be null rather than a guess.
+    const { ids, primaryId } = await classifyMentions('I changed the EtmDaemon writer', CANDIDATES);
     assert.deepEqual(ids, ['i1']);
+    assert.equal(primaryId, null);
     assert.equal(record.calls, 1);
     assert.match(String(record.lastUrl), /\/api\/complete$/, 'URL must end in /api/complete');
     assert.equal(record.lastBody.taskType, 'mentions-classification', 'body taskType routes to claude-haiku');

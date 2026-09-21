@@ -971,6 +971,43 @@ describe('ObservationConsolidator._resolveInsightParent — stage 4 placement', 
     assert.equal(p.hierarchyLevel, 3);
   });
 
+  // ---- the classifier's own answer, added 2026-09-21 --------------------
+  //
+  // Rarity fixed the distribution but never read the insight. The classifier
+  // does, and now returns a primary subject; these pin that it WINS, that the
+  // rarity prior survives untouched as the fallback, and that which rule fired
+  // is recorded rather than inferred.
+
+  it('prefers the classifier primary over the rarity prior', async () => {
+    const c = consolidatorWith(makeStore());
+    // Rarity alone would pick sub-mid (1 mention) over sub-hub (3).
+    const p = await c._resolveInsightParent(['sub-hub', 'sub-mid'], 'sub-hub');
+    assert.equal(p.parentId, 'sub-hub', 'the classifier read the text; the prior did not');
+    assert.equal(p.parentSource, 'classifier');
+  });
+
+  it('falls back to rarity when the classifier declines to pick', async () => {
+    const c = consolidatorWith(makeStore());
+    const p = await c._resolveInsightParent(['sub-hub', 'sub-mid'], null);
+    assert.equal(p.parentId, 'sub-mid');
+    assert.equal(p.parentSource, 'rarity');
+  });
+
+  it('falls back to rarity when the primary cannot be a parent', async () => {
+    const c = consolidatorWith(makeStore());
+    // comp-1 is a Component: a real entity, mentioned, but not a parent here.
+    const p = await c._resolveInsightParent(['sub-hub', 'sub-mid'], 'comp-1');
+    assert.equal(p.parentId, 'sub-mid');
+    assert.equal(p.parentSource, 'rarity');
+  });
+
+  it('a classifier primary still derives its level from the parent', async () => {
+    const c = consolidatorWith(makeStore());
+    const p = await c._resolveInsightParent(['sub-deep', 'sub-mid'], 'sub-deep');
+    assert.equal(p.parentId, 'sub-deep');
+    assert.equal(p.hierarchyLevel, 4, 'level-3 parent yields a level-4 child');
+  });
+
   it('never adopts a Component or any non-SubComponent mention', async () => {
     const c = consolidatorWith(makeStore());
     assert.equal(await c._resolveInsightParent(['comp-1']), null);
