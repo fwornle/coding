@@ -1,5 +1,5 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include _standard-style.puml
 
 package "mcp-constraint-monitor" {
     component "SemanticConstraintDetector" as scd <<core>>

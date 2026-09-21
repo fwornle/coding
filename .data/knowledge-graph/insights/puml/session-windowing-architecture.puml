@@ -1,5 +1,5 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include _standard-style.puml
 
 package "Transcript Pipeline" {
     component "TranscriptAdapter" as ta <<api>>

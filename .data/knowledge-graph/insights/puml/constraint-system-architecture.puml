@@ -1,5 +1,5 @@
 @startuml
-!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+!include _standard-style.puml
 
 package "Configuration Layer" {
   component "HookConfigLoader" as loader <<core>>

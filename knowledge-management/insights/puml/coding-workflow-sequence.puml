@@ -1,5 +1,5 @@
 @startuml
-!include /relative/path/to/_standard-style.puml
+!include _standard-style.puml
 
 title CodingWorkflow MCP Agent Architecture
 

@@ -1,5 +1,5 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include _standard-style.puml
 
 package "MCP Integration Root" {
   component "README.md\n(Tool Interface Entry Point)" as readme <<api>>
