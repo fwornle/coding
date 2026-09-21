@@ -43,6 +43,7 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { ObservationWriter } from './ObservationWriter.js';
 import { ObservationConsolidator } from './ObservationConsolidator.js';
@@ -782,5 +783,55 @@ describe('ObservationWriter — KM_INSIGHT_RESOLVER mode gate', () => {
     const w = Object.create(ObservationWriter.prototype);
     w._insightDedup = { dedup: async () => { throw new Error('model exploded'); } };
     assert.equal(await w._resolveInsightFuzzy(kmStoreWith([candidate]), probe), null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fastembed cache dir — the env var is a TRAP (2026-09-21)
+//
+// km-core folds KM_FASTEMBED_CACHE_DIR into a module-level const evaluated at
+// IMPORT time (FastembedEmbeddingClient.ts:69). Every `process.env.X ||= ...`
+// written after an import of km-core is therefore a no-op — and in obs-api
+// km-core is imported at boot for GraphKMStore, so the const is frozen long
+// before the resolver ever runs. The symptom is not an error: the client
+// silently resolves the package-root dir, fastembed DOWNLOADS 88MB there, and
+// on a machine where that download fails (corporate proxy → bare
+// AggregateError) the resolver's own catch swallows it and returns null
+// forever. A dry-run log then says nothing, which is indistinguishable from
+// "this corpus has no duplicates".
+//
+// This is a source-shape assertion on purpose. The runtime tests above inject
+// `_insightDedup` so no model loads, which means construction — where the bug
+// lives — is never exercised by them; and a test that did exercise it would
+// have to download the weights to fail. The bug has recurred twice (the fix on
+// 2026-09-21 was itself the env-var form, and the stray 88MB copy reappeared
+// the same night), so the shape is what gets pinned.
+// ---------------------------------------------------------------------------
+
+describe('ObservationWriter — fastembed weights are located by cacheDir, not env', () => {
+  const SRC = readFileSync(new URL('./ObservationWriter.js', import.meta.url), 'utf8');
+
+  it('constructs FastembedEmbeddingClient with an explicit cacheDir', () => {
+    const ctor = SRC.match(/new\s+km\.FastembedEmbeddingClient\(([\s\S]{0,200}?)\)/);
+    assert.ok(ctor, 'expected the resolver to construct a FastembedEmbeddingClient');
+    assert.match(
+      ctor[1],
+      /cacheDir\s*:/,
+      'FastembedEmbeddingClient must be given an explicit cacheDir — km-core reads ' +
+        'KM_FASTEMBED_CACHE_DIR once, at import time, so setting it here is too late',
+    );
+  });
+
+  it('does not try to set KM_FASTEMBED_CACHE_DIR after importing km-core', () => {
+    assert.doesNotMatch(
+      SRC,
+      /process\.env\.KM_FASTEMBED_CACHE_DIR\s*(\|\||\?\?)?=/,
+      'assigning KM_FASTEMBED_CACHE_DIR in this file is a no-op — pass cacheDir instead',
+    );
+  });
+
+  it('points at the repo copy under .data, not the km-core package root', () => {
+    assert.match(SRC, /'fastembed-cache'/);
+    assert.match(SRC, /'\.data'/);
   });
 });
