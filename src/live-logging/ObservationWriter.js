@@ -62,6 +62,38 @@ import { resolveLiveTaskIdSafe } from '../../lib/lsl/token/task-id.mjs';
 // processing. The SSE handler wraps its res.write in a try/catch per
 // `subscribeObservationWritten` documentation.
 const _observationEmitter = new EventEmitter();
+
+/**
+ * Where a `capturedBy` edge points.
+ *
+ * ANCHOR_ROOT is the original single target and remains the fallback: the
+ * edge exists to stop every Observation/Digest/Insight landing as a km-core
+ * orphan (the 2026-06-15 drift that orphaned 22 Insights), and that guarantee
+ * outranks the provenance refinement below. A missing subsystem node costs
+ * precision, never the tether.
+ *
+ * ANCHOR_FOR_KIND is the refinement. Every one of the 1,244 capturedBy edges
+ * pointed at ANCHOR_ROOT until 2026-09-21 — one distinct target, so an edge
+ * named "captured by" answered nothing that the node it pointed at did not
+ * already imply. The split below is not a heuristic: measured over all 1,244,
+ * every Observation carried an `obs-writer` runId and every Insight a
+ * consolidation one (`obs-consolidator`, or `insight-resynthesize` which is
+ * the same subsystem re-running one row). Nothing crossed over, which is why
+ * the caller can state the kind rather than the writer having to infer it.
+ *
+ * Deliberately NOT one node per run. `_runId` regenerates in the constructor,
+ * so a node per run mints one on every service restart forever: 500 runs
+ * already describe 2,398 entities, 401 of them covering three rows or fewer.
+ * The exact run stays on `metadata.provenance` and is queryable through
+ * `/api/v1/graph/runs` and `/api/v1/entities?runId=` — an edge is the wrong
+ * place for an unbounded key.
+ */
+const ANCHOR_ROOT = 'LiveLoggingSystem';
+const ANCHOR_FOR_KIND = {
+  observation: 'ObservationWriter',
+  digest: 'ObservationConsolidator',
+  insight: 'ObservationConsolidator',
+};
 // Defensive cap — production has at most ~2 SSE clients (the unified-viewer
 // dev server + one tab). The default Node EventEmitter cap of 10 is fine,
 // but bump to 32 to silence the warning under brief multi-client conditions.
@@ -282,6 +314,11 @@ export class ObservationWriter {
     // anchor edge is a best-effort, never break the write hot path).
     this._anchorId = null;
     this._anchorResolveAttempted = false;
+    /** Resolved anchor ids by node name. The anchor is no longer a single
+     *  node: an Observation is captured by a different subsystem than an
+     *  Insight, and the edge now says which. See ANCHOR_FOR_KIND. */
+    this._anchorIds = new Map();
+    this._anchorMissLogged = new Set();
   }
 
   /**
@@ -518,17 +555,42 @@ export class ObservationWriter {
    * (a fresh km-core with no project hierarchy yet); callers MUST treat
    * null as "skip anchoring" rather than failing the write.
    */
-  async _resolveAnchorId(kmStore) {
-    if (this._anchorId) return this._anchorId;
+  async _resolveAnchorId(kmStore, anchorName = ANCHOR_ROOT) {
+    const cached = this._anchorIds.get(anchorName);
+    if (cached) return cached;
     try {
-      const components = await kmStore.findByOntologyClass('Component');
-      const lsl = components.find((e) => e && e.name === 'LiveLoggingSystem');
-      if (lsl && lsl.id) {
-        this._anchorId = lsl.id;
+      // Component first (the root anchor), then SubComponent (the per-writer
+      // anchors, which are children of it). Two lookups rather than one
+      // because findByOntologyClass is class-scoped and the anchors
+      // deliberately sit at different levels of the same hierarchy.
+      let hit = null;
+      for (const cls of ['Component', 'SubComponent']) {
+        const pool = await kmStore.findByOntologyClass(cls);
+        hit = pool.find((e) => e && e.name === anchorName);
+        if (hit && hit.id) break;
+      }
+      if (hit && hit.id) {
+        this._anchorIds.set(anchorName, hit.id);
+        if (anchorName === ANCHOR_ROOT) this._anchorId = hit.id;
         process.stderr.write(
-          `[ObservationWriter] anchor resolved: LiveLoggingSystem = ${lsl.id}\n`
+          `[ObservationWriter] anchor resolved: ${anchorName} = ${hit.id}\n`
         );
-        return lsl.id;
+        return hit.id;
+      }
+
+      // A per-writer anchor that is not there yet falls back to the root.
+      // NEVER return null here: the tether is what stops these rows landing
+      // as orphans, and a missing provenance refinement must not cost the
+      // guarantee the edge exists for. This is the path a fresh checkout
+      // takes until the repoint script has minted the subsystem nodes.
+      if (anchorName !== ANCHOR_ROOT) {
+        if (!this._anchorMissLogged.has(anchorName)) {
+          this._anchorMissLogged.add(anchorName);
+          process.stderr.write(
+            `[ObservationWriter] anchor '${anchorName}' not found — falling back to ${ANCHOR_ROOT}\n`
+          );
+        }
+        return this._resolveAnchorId(kmStore, ANCHOR_ROOT);
       }
       // Anchor genuinely missing this attempt — log once per `(process lifetime, missing)`
       // transition so steady-state writes don't spam stderr while preserving signal
@@ -553,14 +615,21 @@ export class ObservationWriter {
   }
 
   /**
-   * Attach a `capturedBy` edge from the just-written entity to the
-   * LiveLoggingSystem anchor. Best-effort: any failure (anchor missing,
+   * Attach a `capturedBy` edge from the just-written entity to the subsystem
+   * that captured it. Best-effort: any failure (anchor missing,
    * duplicate-edge race, store error) logs to stderr and returns — the
    * observation/digest/insight write is already durable.
+   *
+   * `kind` selects the anchor via ANCHOR_FOR_KIND. Until 2026-09-21 every
+   * row pointed at `LiveLoggingSystem` instead, which made the edge a pure
+   * anti-orphan tether wearing a provenance name: 1,244 edges, exactly ONE
+   * distinct target, so "captured by" answered nothing. The measured split
+   * is total — every Observation came from the writer path and every Insight
+   * from the consolidation path — so the caller always knows which to pass.
    */
-  async _anchorEntity(kmStore, fromId, relationType = 'capturedBy') {
+  async _anchorEntity(kmStore, fromId, relationType = 'capturedBy', kind = 'observation') {
     if (!fromId) return;
-    const anchorId = await this._resolveAnchorId(kmStore);
+    const anchorId = await this._resolveAnchorId(kmStore, ANCHOR_FOR_KIND[kind] ?? ANCHOR_ROOT);
     if (!anchorId) return;
 
     // Idempotency — Shared Pattern A, the same probe `_emitMentionsEdges`
@@ -1572,7 +1641,7 @@ export class ObservationWriter {
         ...(metadata.turnKey ? { turnKey: metadata.turnKey } : {}),
       };
       const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
-      await this._anchorEntity(kmStore, mintedId);
+      await this._anchorEntity(kmStore, mintedId, 'capturedBy', 'observation');
     } catch (err) {
       process.stderr.write(
         `[ObservationWriter] km-core putEntity (observation) failed: ${err.message}\n`
@@ -1652,7 +1721,7 @@ export class ObservationWriter {
       // already stamps it on both fields.
       entity.metadata = { ...entity.metadata, source: 'auto' };
       const mintedId = await kmStore.putEntity(entity, { skipOntologyCheck: true });
-      await this._anchorEntity(kmStore, mintedId);
+      await this._anchorEntity(kmStore, mintedId, 'capturedBy', 'digest');
       return row.id;
     } catch (err) {
       process.stderr.write(
@@ -1821,7 +1890,7 @@ export class ObservationWriter {
       // same try-block as putEntity. The km-core JSON exporter debounce
       // (5s) batches putEntity + every addRelation into one export tick.
       await this._emitMentionsEdges(kmStore, mintedId, mentionsTargetIds);
-      await this._anchorEntity(kmStore, mintedId);
+      await this._anchorEntity(kmStore, mintedId, 'capturedBy', 'insight');
       return { legacyId: row.id, mintedId };
     } catch (err) {
       process.stderr.write(
