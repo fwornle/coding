@@ -18,12 +18,11 @@
  * it gets a switch: this runs the real km-core orchestrator over the live
  * graph and prints every pair it WOULD merge. It writes nothing.
  *
- * LAYER CHOICE. Jaccard only, by default. It is the layer that runs first in
- * production, it is free and deterministic, and it answers the question this
- * report is for. The embedding layer exists but note its cost shape:
- * CosineEmbeddingMatcher re-embeds the entity AND every candidate on each
- * call, so a pairwise sweep of the 924-Insight pool is ~854k embeddings. That
- * layer wants a cached-vector pass, not this loop.
+ * LAYERS. Jaccard by default — free, deterministic, and the layer that runs
+ * first in production. `--embed` adds km-core's cosine layer on top, behind a
+ * memoizing embedding client: CosineEmbeddingMatcher re-embeds the probe AND
+ * every candidate per call, so an all-pairs sweep of the Insight pool would be
+ * ~774k embeddings without the memo and one per entity with it.
  *
  * THIN CLIENT — the km-core LevelDB is single-owner (obs-api). Reads go over
  * HTTP; this process never opens the store.
@@ -32,11 +31,60 @@
  *   node scripts/report-entity-resolution.mjs
  *   node scripts/report-entity-resolution.mjs --threshold=0.75
  *   node scripts/report-entity-resolution.mjs --class=Insight --limit=40
+ *   node scripts/report-entity-resolution.mjs --class=Insight --embed
+ *   node scripts/report-entity-resolution.mjs --class=Insight --embed --embed-threshold=0.93
  */
 
-import { LayeredDeduplicator, JaccardNameMatcher } from '@fwornle/km-core';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  LayeredDeduplicator,
+  JaccardNameMatcher,
+  CosineEmbeddingMatcher,
+  FastembedEmbeddingClient,
+} from '@fwornle/km-core';
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OBS_API = process.env.OBS_API_URL || 'http://127.0.0.1:12436';
+
+// The repo's copy of the ONNX weights. km-core reads KM_FASTEMBED_CACHE_DIR
+// when a caller passes no cacheDir; set it here so the default construction
+// below finds the model instead of trying to download it (which fails behind
+// the corporate proxy as an empty AggregateError).
+process.env.KM_FASTEMBED_CACHE_DIR ??= path.join(REPO_ROOT, '.data', 'fastembed-cache');
+
+/**
+ * Embedding client that embeds each distinct text ONCE.
+ *
+ * CosineEmbeddingMatcher re-embeds the probe entity AND every candidate on
+ * every call, which is the right shape for one-at-a-time ingestion and the
+ * wrong shape for an all-pairs sweep: the 880-Insight pool would be ~774k
+ * embeddings instead of 880. Memoizing underneath the matcher keeps km-core's
+ * real code path — the matcher, its threshold, its cosine — while paying the
+ * model cost once per entity.
+ */
+class MemoizingEmbeddingClient {
+  constructor(inner) {
+    this.inner = inner;
+    this.cache = new Map();
+    this.calls = 0;
+    this.misses = 0;
+  }
+
+  async embed(text) {
+    this.calls += 1;
+    const hit = this.cache.get(text);
+    if (hit) return hit;
+    this.misses += 1;
+    const vec = await this.inner.embed(text);
+    this.cache.set(text, vec);
+    return vec;
+  }
+
+  async embedBatch(texts) {
+    return Promise.all(texts.map((t) => this.embed(t)));
+  }
+}
 
 const args = Object.fromEntries(
   process.argv.slice(2).map((a) => {
@@ -47,6 +95,14 @@ const args = Object.fromEntries(
 const THRESHOLD = Number(args.threshold) > 0 ? Number(args.threshold) : 0.85;
 const ONLY_CLASS = typeof args.class === 'string' ? args.class : null;
 const LIMIT = Number(args.limit) > 0 ? Number(args.limit) : 25;
+const EMBED = args.embed === true || args.embed === 'true';
+const EMBED_THRESHOLD = Number(args['embed-threshold']) > 0 ? Number(args['embed-threshold']) : 0.90;
+// What text represents an entity to the embedder. The km-core default is
+// `name + description`, which is wrong for this corpus: insight descriptions
+// have a median length of 2,354 chars against all-MiniLM-L6-v2's ~256-token
+// window, so every row embeds its truncated '## Purpose ...' preamble and
+// unrelated insights score 0.99+ against each other.
+const EMBED_TEXT = args['embed-text'] === 'name+desc' ? 'name+desc' : 'name';
 
 const out = (m = '') => process.stdout.write(`${m}\n`);
 const die = (m) => { process.stderr.write(`${m}\n`); process.exit(1); };
@@ -55,7 +111,7 @@ const die = (m) => { process.stderr.write(`${m}\n`); process.exit(1); };
 
 out('\n=== entity-resolution report (read-only) ===');
 out(`obs-api  : ${OBS_API}`);
-out(`layer    : JaccardNameMatcher, threshold ${THRESHOLD}`);
+out(`layers   : Jaccard@${THRESHOLD}${EMBED ? ` → cosine@${EMBED_THRESHOLD} on ${EMBED_TEXT}` : ' (cosine off — pass --embed)'}`);
 out(`scope    : ${ONLY_CLASS ?? 'every ontologyClass'}\n`);
 
 let entities;
@@ -83,9 +139,22 @@ for (const e of active) {
 out(`active   : ${active.length}  (archived rows excluded)`);
 out(`pools    : ${pools.size}\n`);
 
-const dedup = new LayeredDeduplicator({
-  exactName: new JaccardNameMatcher({ threshold: THRESHOLD }),
-});
+let memo = null;
+const layers = { exactName: new JaccardNameMatcher({ threshold: THRESHOLD }) };
+if (EMBED) {
+  memo = new MemoizingEmbeddingClient(new FastembedEmbeddingClient());
+  layers.embedding = new CosineEmbeddingMatcher({
+    client: memo,
+    threshold: EMBED_THRESHOLD,
+    textOf: EMBED_TEXT === 'name'
+      ? (e) => String(e.name ?? '')
+      : (e) => `${e.name}\n\n${e.description ?? ''}`.trim(),
+  });
+}
+// shortCircuit stays at its production default (true): the cheap layer wins
+// when it fires, exactly as it would in the write path. The point is to see
+// what production would do, not to audit every layer's opinion.
+const dedup = new LayeredDeduplicator(layers);
 
 /** Pairs already reported, keyed by the unordered id pair. */
 const seen = new Set();
@@ -102,7 +171,13 @@ for (const [cls, pool] of [...pools].sort((a, b) => b[1].length - a[1].length)) 
     const key = [entity.id, result.survivor.id].sort().join('|');
     if (seen.has(key)) continue;
     seen.add(key);
-    findings.push({ cls, confidence: result.confidence ?? 0, a: entity, b: result.survivor });
+    findings.push({
+      cls,
+      confidence: result.confidence ?? 0,
+      layer: result.matchedLayer ?? 'exactName',
+      a: entity,
+      b: result.survivor,
+    });
   }
 }
 
@@ -118,7 +193,7 @@ for (const [cls, n] of [...byClass].sort((a, b) => b[1] - a[1])) {
 if (findings.length) {
   out(`\n=== top ${Math.min(LIMIT, findings.length)} by confidence ===`);
   for (const f of findings.slice(0, LIMIT)) {
-    out(`\n  [${f.confidence.toFixed(3)}] ${f.cls}`);
+    out(`\n  [${f.confidence.toFixed(3)} via ${f.layer}] ${f.cls}`);
     out(`    A  ${String(f.a.name).slice(0, 88)}`);
     out(`    B  ${String(f.b.name).slice(0, 88)}`);
   }
@@ -135,4 +210,14 @@ const alreadyUnified = findings.filter((f) => {
 out('\n=== contrast with the current online resolver ===');
 out(`  pairs exact topic+project already unifies : ${alreadyUnified.length}`);
 out(`  NEW merges if this is adopted             : ${findings.length - alreadyUnified.length}`);
+const byLayer = new Map();
+for (const f of findings) byLayer.set(f.layer, (byLayer.get(f.layer) ?? 0) + 1);
+if (byLayer.size) {
+  out('\n=== which layer caught them ===');
+  for (const [l, n] of [...byLayer].sort((a, b) => b[1] - a[1])) out(`  ${String(n).padStart(5)}  ${l}`);
+}
+if (memo) {
+  out(`\nembeddings: ${memo.misses} computed for ${memo.calls} matcher requests ` +
+      `(${(100 - (memo.misses / Math.max(memo.calls, 1)) * 100).toFixed(1)}% served from memo)`);
+}
 out('\nRead-only. Nothing was written.\n');
