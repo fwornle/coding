@@ -48,11 +48,15 @@ import {
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OBS_API = process.env.OBS_API_URL || 'http://127.0.0.1:12436';
 
-// The repo's copy of the ONNX weights. km-core reads KM_FASTEMBED_CACHE_DIR
-// when a caller passes no cacheDir; set it here so the default construction
-// below finds the model instead of trying to download it (which fails behind
-// the corporate proxy as an empty AggregateError).
-process.env.KM_FASTEMBED_CACHE_DIR ??= path.join(REPO_ROOT, '.data', 'fastembed-cache');
+// The repo's copy of the ONNX weights, passed as `cacheDir` rather than set
+// as an env var. km-core folds KM_FASTEMBED_CACHE_DIR into a module-level
+// const at import time, and the `import` above is hoisted above every
+// statement in this file — so setting the env var here always ran too late
+// and this script silently used the package-root dir, re-downloading 88MB
+// into lib/km-core/.fastembed-cache on 2026-09-21 despite that copy having
+// been deleted the same night. `cacheDir` is first in km-core's precedence
+// order and cannot be defeated by import ordering.
+const FASTEMBED_CACHE_DIR = path.join(REPO_ROOT, '.data', 'fastembed-cache');
 
 /**
  * Embedding client that embeds each distinct text ONCE.
@@ -156,7 +160,9 @@ out(`pools    : ${pools.size}\n`);
 let memo = null;
 const layers = { exactName: new JaccardNameMatcher({ threshold: THRESHOLD }) };
 if (EMBED) {
-  memo = new MemoizingEmbeddingClient(new FastembedEmbeddingClient());
+  memo = new MemoizingEmbeddingClient(
+    new FastembedEmbeddingClient({ cacheDir: FASTEMBED_CACHE_DIR }),
+  );
   layers.embedding = new CosineEmbeddingMatcher({
     client: memo,
     threshold: EMBED_THRESHOLD,

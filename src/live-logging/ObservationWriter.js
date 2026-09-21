@@ -439,12 +439,26 @@ export class ObservationWriter {
         // it defaults to an empty package-root dir and fastembed tries to
         // DOWNLOAD the model, which behind the corporate proxy fails as a
         // bare AggregateError with an empty message.
-        process.env.KM_FASTEMBED_CACHE_DIR ||= path.join(
-          path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'),
-          '.data',
-          'fastembed-cache',
-        );
-        const inner = new km.FastembedEmbeddingClient();
+        //
+        // PASS IT, DON'T SET IT. km-core reads KM_FASTEMBED_CACHE_DIR into a
+        // MODULE-LEVEL const (FastembedEmbeddingClient.ts:69), evaluated when
+        // the module is first imported. Setting the env var here ran AFTER
+        // that — and in obs-api, km-core is already imported at boot for
+        // GraphKMStore, so the const was frozen long before this line. The
+        // assignment was a no-op: obs-api resolved the package-root dir,
+        // re-downloaded the weights there (88MB, gitignored), and only worked
+        // by accident. On a clean checkout the download fails, the catch
+        // below swallows it, and the resolver silently returns null forever —
+        // a dry-run log that says nothing, which reads exactly like a corpus
+        // with no duplicates. `cacheDir` is first in km-core's own precedence
+        // order and is immune to import ordering.
+        const inner = new km.FastembedEmbeddingClient({
+          cacheDir: path.join(
+            path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'),
+            '.data',
+            'fastembed-cache',
+          ),
+        });
         const cache = new Map();
         const memo = {
           embed: async (text) => {
