@@ -136,6 +136,24 @@ const insights = entities.filter(
 out(`insights       : ${insights.length}`);
 out(`subcomponents  : ${tally.size}`);
 
+/**
+ * Nearest ancestor that can hold a leaf artifact. Bounded and cycle-guarded;
+ * mirrors ObservationConsolidator._climbToEligibleParent — the two must agree,
+ * or the write path and the backfill place the same insight differently.
+ */
+function climbToEligibleParent(startId, parents, eligibleSet, maxHops = 4) {
+  const seen = new Set([startId]);
+  let cur = startId;
+  for (let hop = 0; hop < maxHops; hop += 1) {
+    const up = parents.get(cur);
+    if (!up || seen.has(up)) return null;
+    if (eligibleSet.has(up)) return up;
+    seen.add(up);
+    cur = up;
+  }
+  return null;
+}
+
 /** The rarity prior, unchanged — now the fallback rather than the rule. */
 function rarityBest(mentioned) {
   let best = null;
@@ -153,7 +171,31 @@ function rarityBest(mentioned) {
 // because km-core's LevelDB is single-owner and obs-api holds it.
 const candidates = entities
   .filter((e) => ['Component', 'SubComponent', 'Detail'].includes(clsOf(e)))
-  .map((e) => ({ id: e.id, name: e.name ?? '', description: e.description ?? '' }));
+  .map((e) => ({
+    id: e.id,
+    name: e.name ?? '',
+    description: e.description ?? '',
+    // The prompt marks each entry with its class so the model can be told
+    // that only a Component or SubComponent may own an insight.
+    entityType: e.entityType ?? clsOf(e),
+  }));
+
+// Parent-eligible entities and each one's depth. Components are eligible but
+// stay OUT of `tally`: they are mentioned far too often to win a rarest-name
+// contest, which is a reason to keep them out of the PRIOR, not the hierarchy.
+const eligible = new Map();
+for (const e of entities) {
+  const c = clsOf(e);
+  if (c === 'SubComponent' || c === 'Component') eligible.set(e.id, (e.metadata ?? {}).hierarchyLevel);
+}
+// Detail -> its containing parent, so a classifier primary that names a Detail
+// resolves to where that Detail lives. Mirrors
+// ObservationConsolidator._resolveInsightParent; the two must not drift.
+const parentOf = new Map();
+for (const r of relations) {
+  if (r.attributes?.type !== 'contains') continue;
+  if (r.target && r.source && !parentOf.has(r.target)) parentOf.set(r.target, r.source);
+}
 
 // Pass 1 — everything the rarity prior alone can decide, no LLM involved.
 const pending = [];
@@ -191,6 +233,7 @@ let classifierAgreed = 0;
 let classifierOverrode = 0;
 let classifierDeclined = 0;
 let classifierFailed = 0;
+let viaDetailCount = 0;
 
 const plan = [];
 for (let i = 0; i < pending.length; i++) {
@@ -203,13 +246,22 @@ for (let i = 0; i < pending.length; i++) {
     try {
       const { primaryId } = await classifyMentions(summary, candidates);
       asked += 1;
-      if (primaryId && tally.has(primaryId)) {
-        if (primaryId === rarity.id) classifierAgreed += 1;
+      // A Detail is a sibling of an insight, not a home for one — but where
+      // it LIVES is a home. One hop up, never onto itself.
+      let resolved = primaryId;
+      let viaDetail = false;
+      if (resolved && !eligible.has(resolved)) {
+        resolved = climbToEligibleParent(resolved, parentOf, eligible);
+        viaDetail = Boolean(resolved);
+      }
+      if (resolved && eligible.has(resolved)) {
+        if (resolved === rarity.id) classifierAgreed += 1;
         else classifierOverrode += 1;
-        chosen = { id: primaryId, n: tally.get(primaryId) };
-        parentSource = 'classifier';
+        if (viaDetail) viaDetailCount += 1;
+        chosen = { id: resolved, n: tally.get(resolved) ?? 0 };
+        parentSource = viaDetail ? 'classifier-detail-parent' : 'classifier';
       } else {
-        // Declined, or named a Component/Detail that cannot be a parent.
+        // Declined, or named something with no usable home.
         classifierDeclined += 1;
       }
     } catch (e) {
@@ -221,7 +273,7 @@ for (let i = 0; i < pending.length; i++) {
     if ((i + 1) % 25 === 0) out(`  ...${i + 1}/${classifyCount}`);
   }
 
-  const parentLevel = levelOf.get(chosen.id);
+  const parentLevel = levelOf.has(chosen.id) ? levelOf.get(chosen.id) : eligible.get(chosen.id);
   plan.push({
     insight: ins,
     parentId: chosen.id,
@@ -241,6 +293,7 @@ if (asked > 0) {
   out(`  answered           : ${decided}  (${((100 * decided) / asked).toFixed(0)}% of asked)`);
   out(`    agreed w/ rarity : ${classifierAgreed}`);
   out(`    overrode rarity  : ${classifierOverrode}`);
+  out(`    via a Detail hop : ${viaDetailCount}  (named a Detail; placed where that Detail lives)`);
   out(`  declined / unusable: ${classifierDeclined}  (kept the rarity placement)`);
   if (classifierFailed) out(`  call failed        : ${classifierFailed}  (kept the rarity placement)`);
   out('');
@@ -265,7 +318,7 @@ out('  Ranking is by RARITY, so a popular hub never adopts an insight that');
 out('  named anything more specific. Concentration well above ~10% here would');
 out('  mean the mentions themselves have collapsed onto a few names.\n');
 
-const overrides = plan.filter((p) => p.parentSource === 'classifier' && p.parentId !== p.rarityId);
+const overrides = plan.filter((p) => p.parentSource.startsWith('classifier') && p.parentId !== p.rarityId);
 if (overrides.length > 0) {
   out('=== where the classifier disagreed with the prior ===\n');
   out(`  ${'insight'.padEnd(44)}  ${'rarity would say'.padEnd(24)}  classifier says`);
