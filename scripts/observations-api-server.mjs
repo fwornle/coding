@@ -2663,6 +2663,51 @@ async function composeViewerStats(store) {
     ? 1 - (orphanCount / nodeCount)
     : 1;
 
+  // Hierarchy coverage: how much of what BELONGS in the tree is actually in
+  // it, as `metadata.hierarchyLevel`.
+  //
+  // The denominator is the point. Measured against every node, coverage reads
+  // 39% and looks like a catastrophe — but 534 of those nodes are Observations
+  // and Digests, which are the raw material insights are distilled FROM. They
+  // roll up into an Insight; they were never meant to hang off a SubComponent,
+  // and filing them there would hand the roll-up hundreds of children that say
+  // nothing about the subsystem. Counting them as misses measures the wrong
+  // thing and, worse, makes the number unimprovable — so it would be quietly
+  // ignored, which is how the 0-file LSL scan survived for six months.
+  //
+  // Eligible = the architectural vertical plus the knowledge artifacts that
+  // hang off it. Everything else is reported separately rather than hidden,
+  // because "excluded from the denominator" must never mean "invisible".
+  const HIERARCHY_ELIGIBLE = new Set([
+    'Project', 'Component', 'SubComponent', 'Detail', 'Insight',
+  ]);
+  const RAW_MATERIAL = new Set([
+    'Observation', 'Digest', 'OnlineObservation', 'OnlineDigest',
+  ]);
+  let hierarchyEligible = 0;
+  let hierarchyPlaced = 0;
+  let rawMaterialCount = 0;
+  const unplacedByClass = {};
+  for (const id of live) {
+    const attrs = graph.getNodeAttributes(id) || {};
+    const cls = attrs.entityType || attrs.ontologyClass;
+    if (RAW_MATERIAL.has(cls)) { rawMaterialCount += 1; continue; }
+    if (!HIERARCHY_ELIGIBLE.has(cls)) continue;
+    hierarchyEligible += 1;
+    const level = (attrs.metadata || {}).hierarchyLevel;
+    if (Number.isInteger(level)) hierarchyPlaced += 1;
+    else unplacedByClass[cls] = (unplacedByClass[cls] || 0) + 1;
+  }
+  const hierarchyCoverage = {
+    eligible: hierarchyEligible,
+    placed: hierarchyPlaced,
+    unplaced: hierarchyEligible - hierarchyPlaced,
+    ratio: hierarchyEligible > 0 ? hierarchyPlaced / hierarchyEligible : 1,
+    unplacedByClass,
+    // Not a miss, and not swept under the rug either.
+    excludedRawMaterial: rawMaterialCount,
+  };
+
   // lastUpdated: maximum createdAt across all known ontology classes.
   // Falls back to "now" on a completely empty store so the
   // unified-viewer StatsBar never renders a missing-field state.
@@ -2710,6 +2755,7 @@ async function composeViewerStats(store) {
     capturedByTargetCount: capturedByTargets.size,
     componentCount,
     connectivity,
+    hierarchyCoverage,
     lastUpdated,
     activeSnapshot,
   };
