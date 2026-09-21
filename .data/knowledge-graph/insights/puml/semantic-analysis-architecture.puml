@@ -1,41 +1,41 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Data Sources" {
-  component "Git History" as git <<external>>
-  component "LSL Session Data" as lsl <<external>>
-}
-
 package "Agent Pipeline" {
   component "BaseAgent" as base <<core>>
   component "SemanticAnalysisAgent" as saa <<agent>>
   component "OntologyClassificationAgent" as oca <<agent>>
-  component "L2 Subsystem Classifier" as l2 <<agent>>
-  component "LLMService" as llm <<external>>
 }
 
-package "Ontology & Storage" {
-  component "OntologyRegistry" as reg <<core>>
-  component "LegacyOntologyAdapter" as adapter <<core>>
-  database "Knowledge Graph" as kg <<storage>>
-  component "coding.lower.json" as codingjson <<storage>>
+package "Classification Logic" {
+  component "Hard-Root-Guard" as hrg <<core>>
+  component "L2 Refinement\n(buildL2RefinementPrompt)" as l2ref <<core>>
+  component "extractL2FromLLMResponse" as l2extract <<core>>
+  component "OntologyClassifier" as classifier <<core>>
 }
 
-git --> saa : "code/commit analysis"
-lsl --> saa : "vibe/session analysis"
-saa --> llm : "generates semantic insights"
-base --> saa : "execute() pipeline"
-base --> oca : "execute() pipeline"
+package "Data & Ontology Sources" {
+  database "coding.lower.json\n(L2 Classes)" as l2json <<storage>>
+  database "HIERARCHY_ROOTS\n(@fwornle/km-core)" as roots <<external>>
+  database "Trace Logs\n(logs/semantic-analysis-trace-*.json)" as trace <<storage>>
+}
 
-saa --> oca : "observations"
-oca --> reg : "constructs"
-reg --> adapter : "wrapped by"
-oca --> llm : "LLM-backed classification"
-oca --> l2 : "refines L1 classes"
-l2 --> codingjson : "loadL2Classes()"
-l2 --> llm : "buildL2RefinementPrompt()"
+cloud "LLM Service" as llm <<external>>
 
-oca --> kg : "persists classified entities"
-adapter --> kg : "validates/classifies"
+base --> saa : "template method\nexecute()"
+base --> oca : "template method\nexecute()"
+
+saa --> trace : "writes input snapshot"
+saa --> llm : "requests semanticInsights"
+saa --> saa : "merge heuristic +\nLLM patterns"
+
+oca --> hrg : "checks observation name"
+hrg --> roots : "matches root set"
+oca --> classifier : "delegates if no guard match"
+classifier --> l2ref : "builds closed-vocab prompt"
+l2ref --> l2json : "reads REFINABLE_L1_PARENTS"
+l2ref --> llm : "sends prompt"
+llm --> l2extract : "free-text response"
+l2extract --> classifier : "regex-matched L2 name\nor fallback to L1"
 
 @enduml

@@ -1,0 +1,32 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Upstream Sources" {
+  component "opencode models.json" as modelsJson <<external>>
+  component "opencode.json (user config)" as userConfig <<external>>
+}
+
+package "model-limits.cjs" {
+  component "catalogueSourcePath/\ncatalogueCachePath" as paths <<core>>
+  component "deriveLimits()\n(byPair/byModel index)" as derive <<core>>
+  component "userConfigContextWindow()" as userWindow <<core>>
+  component "limits()\n(mtime+size cache check)" as limitsFn <<core>>
+  component "catalogueContextWindow()" as publicApi <<api>>
+  database "derived cache\n.logs/model-context-limits.json" as cacheFile <<storage>>
+}
+
+package "Consumer" {
+  component "context-gauge.cjs" as gauge <<agent>>
+}
+
+paths --> limitsFn : "resolve source/cache paths"
+modelsJson --> limitsFn : "read raw catalogue (33ms parse)"
+limitsFn --> cacheFile : "temp+rename atomic write"
+cacheFile --> limitsFn : "read-through if mtime+size match"
+limitsFn --> derive : "on cache miss"
+derive --> publicApi : "byPair/byModel indexes"
+userConfig --> userWindow : "read fresh per call"
+userWindow --> publicApi : "overrides catalogue result"
+publicApi --> gauge : "context window or null"
+
+@enduml

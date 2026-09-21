@@ -11,9 +11,10 @@ title Hierarchy Context: CodingPatterns
 [KnowledgeManagement] as knowledge_management #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[NamingConventions] as naming_conventions #E8F5E8
-[ConfigDrivenDesign] as config_driven_design #E8F5E8
-[ResilienceWrappers] as resilience_wrappers #E8F5E8
+[AgentAbstractionConventions] as agent_abstraction_conventions #E8F5E8
+[CLIScriptConventions] as cliscript_conventions #E8F5E8
+[ConfigDrivenFeatureFlags] as config_driven_feature_flags #E8F5E8
+[EnvironmentVariableConfiguration] as environment_variable_configuration #E8F5E8
 
 coding --> coding_patterns
 live_logging_system -[hidden]- coding_patterns
@@ -22,8 +23,9 @@ dockerized_services -[hidden]- coding_patterns
 knowledge_management -[hidden]- coding_patterns
 constraint_system -[hidden]- coding_patterns
 semantic_analysis -[hidden]- coding_patterns
-coding_patterns --> naming_conventions
-coding_patterns --> config_driven_design
-coding_patterns --> resilience_wrappers
+coding_patterns --> agent_abstraction_conventions
+coding_patterns --> cliscript_conventions
+coding_patterns --> config_driven_feature_flags
+coding_patterns --> environment_variable_configuration
 
 @enduml

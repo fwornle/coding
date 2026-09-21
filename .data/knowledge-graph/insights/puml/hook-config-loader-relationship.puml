@@ -6,16 +6,20 @@ title Hierarchy Context: HookConfigLoader
 [ConstraintSystem] as constraint_system #FFFFDD
 [HookConfigLoader] as hook_config_loader #LightBlue
 [UnifiedHookManager] as unified_hook_manager #F0F0F0
-[ViolationCaptureService] as violation_capture_service #F0F0F0
-[ContentValidationAgent] as content_validation_agent #F0F0F0
 [KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
 [HealthPromptHook] as health_prompt_hook #F0F0F0
+[UnifiedHookConfigLoader] as unified_hook_config_loader #E8F5E8
+[EventTranslationMaps] as event_translation_maps #E8F5E8
+[HookConfigMigrationTool] as hook_config_migration_tool #E8F5E8
+[HandlerPriorityRegistry] as handler_priority_registry #E8F5E8
 
 constraint_system --> hook_config_loader
 unified_hook_manager -[hidden]- hook_config_loader
-violation_capture_service -[hidden]- hook_config_loader
-content_validation_agent -[hidden]- hook_config_loader
 knowledge_injection_hooks -[hidden]- hook_config_loader
 health_prompt_hook -[hidden]- hook_config_loader
+hook_config_loader --> unified_hook_config_loader
+hook_config_loader --> event_translation_maps
+hook_config_loader --> hook_config_migration_tool
+hook_config_loader --> handler_priority_registry
 
 @enduml

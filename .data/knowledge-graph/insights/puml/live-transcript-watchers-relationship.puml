@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LiveTranscriptWatchers
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[LiveTranscriptWatchers] as live_transcript_watchers #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[MultiUserHashManager] as multi_user_hash_manager #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[CopilotEventsTail] as copilot_events_tail #E8F5E8
+[LiveSessionScanner] as live_session_scanner #E8F5E8
+[OpencodeTokenRows] as opencode_token_rows #E8F5E8
+
+live_logging_system --> live_transcript_watchers
+lslconfig_validator -[hidden]- live_transcript_watchers
+redaction_config_manager -[hidden]- live_transcript_watchers
+multi_user_hash_manager -[hidden]- live_transcript_watchers
+token_usage_adapters -[hidden]- live_transcript_watchers
+observation_writer -[hidden]- live_transcript_watchers
+live_transcript_watchers --> copilot_events_tail
+live_transcript_watchers --> live_session_scanner
+live_transcript_watchers --> opencode_token_rows
+
+@enduml

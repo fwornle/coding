@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LevelDbMigrationScripts
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[LevelDbMigrationScripts] as level_db_migration_scripts #LightBlue
+[GraphifyGraph] as graphify_graph #F0F0F0
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphViewerHierarchy] as graph_viewer_hierarchy #F0F0F0
+[GraphVisualRendering] as graph_visual_rendering #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+
+knowledge_management --> level_db_migration_scripts
+graphify_graph -[hidden]- level_db_migration_scripts
+code_graph_agent -[hidden]- level_db_migration_scripts
+km_core_adapter -[hidden]- level_db_migration_scripts
+wave_insight_persistence -[hidden]- level_db_migration_scripts
+manual_learning -[hidden]- level_db_migration_scripts
+online_learning -[hidden]- level_db_migration_scripts
+graph_viewer_hierarchy -[hidden]- level_db_migration_scripts
+graph_visual_rendering -[hidden]- level_db_migration_scripts
+ukb_workflow_dashboard -[hidden]- level_db_migration_scripts
+
+@enduml

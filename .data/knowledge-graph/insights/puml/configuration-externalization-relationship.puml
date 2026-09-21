@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConfigurationExternalization
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ConfigurationExternalization] as configuration_externalization #LightBlue
+[NamingConventions] as naming_conventions #F0F0F0
+[CLIWrapperPattern] as cliwrapper_pattern #F0F0F0
+[OntologyHeuristicsLayering] as ontology_heuristics_layering #F0F0F0
+[TeamDirectoryTable] as team_directory_table #E8F5E8
+[ArtifactPatternRegistry] as artifact_pattern_registry #E8F5E8
+[TwoStepArtifactMatching] as two_step_artifact_matching #E8F5E8
+
+coding_patterns --> configuration_externalization
+naming_conventions -[hidden]- configuration_externalization
+cliwrapper_pattern -[hidden]- configuration_externalization
+ontology_heuristics_layering -[hidden]- configuration_externalization
+configuration_externalization --> team_directory_table
+configuration_externalization --> artifact_pattern_registry
+configuration_externalization --> two_step_artifact_matching
+
+@enduml

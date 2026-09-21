@@ -11,10 +11,16 @@ title Hierarchy Context: KnowledgeManagement
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
+[GraphifyGraph] as graphify_graph #E8F5E8
+[CodeGraphAgent] as code_graph_agent #E8F5E8
+[KmCoreAdapter] as km_core_adapter #E8F5E8
+[LevelDbMigrationScripts] as level_db_migration_scripts #E8F5E8
+[WaveInsightPersistence] as wave_insight_persistence #E8F5E8
 [ManualLearning] as manual_learning #E8F5E8
 [OnlineLearning] as online_learning #E8F5E8
-[VkbServer] as vkb_server #E8F5E8
-[UkbUnifiedCli] as ukb_unified_cli #E8F5E8
+[GraphViewerHierarchy] as graph_viewer_hierarchy #E8F5E8
+[GraphVisualRendering] as graph_visual_rendering #E8F5E8
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #E8F5E8
 
 coding --> knowledge_management
 live_logging_system -[hidden]- knowledge_management
@@ -23,9 +29,15 @@ dockerized_services -[hidden]- knowledge_management
 coding_patterns -[hidden]- knowledge_management
 constraint_system -[hidden]- knowledge_management
 semantic_analysis -[hidden]- knowledge_management
+knowledge_management --> graphify_graph
+knowledge_management --> code_graph_agent
+knowledge_management --> km_core_adapter
+knowledge_management --> level_db_migration_scripts
+knowledge_management --> wave_insight_persistence
 knowledge_management --> manual_learning
 knowledge_management --> online_learning
-knowledge_management --> vkb_server
-knowledge_management --> ukb_unified_cli
+knowledge_management --> graph_viewer_hierarchy
+knowledge_management --> graph_visual_rendering
+knowledge_management --> ukb_workflow_dashboard
 
 @enduml

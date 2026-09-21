@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Ontology Heuristics" {
+  component "EntityPatternAnalyzer" as epa <<core>>
+  component "In-Memory teamDirectories/artifactPatterns\n(hardcoded config)" as inmem <<storage>>
+  component "analyzeEntityPatterns()\n(confidence-tiered fallback)" as analyze <<core>>
+  component "extractArtifacts()\n(4 regex passes -> Set)" as extract <<core>>
+}
+
+package "Compliance Auditing" {
+  component "verify-patterns.sh" as verify <<cli>>
+  component "Repo Path Resolver\n(CODING_TOOLS_PATH fallback)" as pathres <<core>>
+  component "SCORE calculation\n(set -euo pipefail risk)" as score <<core>>
+}
+
+package "External Config Sources" {
+  database "$SHARED_MEMORY\n(knowledge-base JSON)" as sharedmem <<storage>>
+  cloud "jq query engine" as jq <<external>>
+}
+
+epa --> inmem : "constructs from"
+epa --> analyze : "invokes"
+analyze --> extract : "uses"
+extract --> analyze : "returns artifacts (order-dependent)"
+
+verify --> pathres : "resolves repo root"
+verify --> score : "computes compliance %"
+verify --> jq : "queries patterns"
+jq --> sharedmem : "reads TransferablePattern entities"
+
+inmem ..> sharedmem : "deviates from\n(hardcoded vs config-driven)"
+
+@enduml

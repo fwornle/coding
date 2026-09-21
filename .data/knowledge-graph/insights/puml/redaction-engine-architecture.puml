@@ -1,30 +1,32 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Configuration" {
-  component "redaction-config.yaml" as config <<storage>>
+package "Write Path (Full Fidelity)" {
+  component "ObservationWriter" as ow <<core>>
+  component "ConfigurableRedactor" as redactor <<core>>
+  database "km-core GraphKMStore" as kmcore <<storage>>
+  component "_observationEmitter (SSE bus)" as emitter <<core>>
 }
 
-package "Transcript Pipeline" {
-  component "readTranscripts()" as reader <<api>>
-  component "convertToLSL()" as converter <<core>>
-  component "RedactionEngine" as engine <<core>>
-  component "LSL Output Files" as lsl <<storage>>
+package "Agent Sources" {
+  component "opencode/claude transcripts" as fullagents <<agent>>
+  component "copilot-events-tail\n(buildStubObservation)" as copilottail <<agent>>
 }
 
-package "Transcript Adapters" {
-  component "ClaudeCode Adapter" as claude <<agent>>
-  component "Other Agent Adapters" as others <<agent>>
+package "Token Usage Path" {
+  component "opencode-token-rows\n(summarizeParts/snip)" as tokrows <<core>>
+  component "token-db\n(insertTokenRow/baseValues)" as tokdb <<core>>
+  database "token-usage.db" as tokdbstore <<storage>>
 }
 
-component "transcript-api.js" as transcriptApi <<api>>
+fullagents --> ow : "raw transcript content"
+copilottail --> ow : "metadata-only stub\n(lsl_incomplete: true)"
 
-config --> engine : "loads rules"
-reader --> converter : "raw transcripts"
-claude --> reader
-others --> reader
-converter --> engine : "LSL typed format"
-transcriptApi --> converter
-engine --> lsl : "sanitized output"
+ow --> redactor : "invokes at init()\n(gate-before-persist)"
+redactor --> kmcore : "sanitized writes"
+ow --> emitter : "emit('written', row)\nafter redaction"
+
+tokrows --> tokdb : "prompt_preview\n(truncated, not redacted)"
+tokdb --> tokdbstore : "parameterized ? binds\n(T-69-sql)"
 
 @enduml

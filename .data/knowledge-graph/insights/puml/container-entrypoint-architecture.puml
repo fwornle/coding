@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Container Entrypoint" {
+  component "entrypoint.sh\nwait_for_service()" as waitsvc <<core>>
+  component ".env loader\n(excludes *_API_KEY/*_TOKEN)" as envloader <<core>>
+  component "features.json snapshot" as featsnap <<storage>>
+  component "supervisord.d/disabled.conf\ngenerator (node -e)" as gengen <<core>>
+  component "supervisord.conf" as supervisord <<core>>
+}
+
+package "Service Orchestration" {
+  component "start-services.sh\n(ROBUST_MODE gate)" as dispatcher <<cli>>
+  component "start-services-robust.js" as robust <<core>>
+  component "lib/service-starter.js\nstartServiceWithRetry" as starter <<core>>
+  component "killProcessOnPortAndWait /\nwaitForPortBindable" as portcheck <<core>>
+  component "PSM registry +\npgrep orphan re-registration" as psm <<core>>
+}
+
+package "External / Verification" {
+  database "Qdrant / Redis" as datastores <<storage>>
+  cloud "llm-cli-proxy :12435" as proxy <<external>>
+  component "container-gating.test.mjs\nservice-gating.test.mjs" as tests <<cli>>
+}
+
+waitsvc --> datastores : "TCP probe /dev/tcp"
+envloader ..> proxy : "forces calls via host proxy\n(no raw keys in container)"
+featsnap --> gengen : "host-written snapshot"
+gengen --> supervisord : "autostart=false overrides"
+
+dispatcher --> robust : "exec (ROBUST_MODE=true)"
+robust --> starter : "delegates orchestration"
+starter --> portcheck : "pre-spawn race checks"
+starter --> psm : "liveness verification"
+psm --> starter : "self-heal orphan drift"
+
+supervisord ..> tests : "PROGRAM_FEATURES sync\ndrift risk"
+starter ..> tests : "SERVICE_ORDER /\nSERVICE_CONFIGS coverage"
+
+@enduml

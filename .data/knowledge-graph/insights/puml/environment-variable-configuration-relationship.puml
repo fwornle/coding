@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EnvironmentVariableConfiguration
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[EnvironmentVariableConfiguration] as environment_variable_configuration #LightBlue
+[AgentAbstractionConventions] as agent_abstraction_conventions #F0F0F0
+[CLIScriptConventions] as cliscript_conventions #F0F0F0
+[ConfigDrivenFeatureFlags] as config_driven_feature_flags #F0F0F0
+
+coding_patterns --> environment_variable_configuration
+agent_abstraction_conventions -[hidden]- environment_variable_configuration
+cliscript_conventions -[hidden]- environment_variable_configuration
+config_driven_feature_flags -[hidden]- environment_variable_configuration
+
+@enduml

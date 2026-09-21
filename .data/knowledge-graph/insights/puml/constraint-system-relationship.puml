@@ -13,8 +13,6 @@ title Hierarchy Context: ConstraintSystem
 [SemanticAnalysis] as semantic_analysis #F0F0F0
 [HookConfigLoader] as hook_config_loader #E8F5E8
 [UnifiedHookManager] as unified_hook_manager #E8F5E8
-[ViolationCaptureService] as violation_capture_service #E8F5E8
-[ContentValidationAgent] as content_validation_agent #E8F5E8
 [KnowledgeInjectionHooks] as knowledge_injection_hooks #E8F5E8
 [HealthPromptHook] as health_prompt_hook #E8F5E8
 
@@ -27,8 +25,6 @@ coding_patterns -[hidden]- constraint_system
 semantic_analysis -[hidden]- constraint_system
 constraint_system --> hook_config_loader
 constraint_system --> unified_hook_manager
-constraint_system --> violation_capture_service
-constraint_system --> content_validation_agent
 constraint_system --> knowledge_injection_hooks
 constraint_system --> health_prompt_hook
 

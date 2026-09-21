@@ -1,39 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Classification" {
-  component "OntologyClassificationAgent" as agent <<agent>>
-  component "OntologyClassifier (LLM)" as llmClassifier <<agent>>
-  component "HIERARCHY_ROOTS Guards" as roots <<core>>
+package "Path Resolution & Config" {
+  component "ontologyPathResolver.ts" as resolver <<core>>
+  component "OntologyConfigManager.ts" as configMgr <<core>>
+  component "OntologyPathNotFoundError" as pathErr <<core>>
 }
 
-package "L2 Refinement" {
-  component "L2 Refinement Layer" as l2 <<core>>
-  component "loadL2Classes" as loadL2 <<core>>
-  component "buildL2RefinementPrompt" as buildPrompt <<core>>
-  component "extractL2FromLLMResponse" as extractL2 <<core>>
-  database "coding.lower.json" as lowerJson
+package "Classification & API" {
+  component "OntologyClassificationAgent" as classifier <<agent>>
+  component "ApiClient.ts" as apiClient <<api>>
+  component "OntologyClass / Entity Types" as typedApi <<api>>
 }
 
-package "Validation & Storage" {
-  component "OntologyValidator" as validator <<core>>
-  component "GraphKMStore.ontology()" as graphStore <<storage>>
-  database "Ontology Registry" as registry
+package "Viewer / UI" {
+  component "OntologyFilter.tsx" as filterUI <<external>>
+  component "VOKB_SCHEMA" as schema <<core>>
+  component "viewer-store.ts" as viewerStore <<core>>
 }
 
-agent --> llmClassifier : "delegates classification"
-agent --> roots : "checks closed-set entities"
-agent --> l2 : "requests L2 refinement"
+database "Ontology JSON Files\n(upper/coding.lower/coding)" as ontJson
 
-l2 --> loadL2 : "loads subsystem classes"
-l2 --> buildPrompt : "constructs LLM prompt"
-l2 --> extractL2 : "parses LLM response"
-loadL2 --> lowerJson : "reads"
-extractL2 ..> lowerJson : "graceful degradation if absent"
+configMgr --> resolver : "resolves paths via"
+resolver --> ontJson : "cached filesystem lookup"
+resolver --> pathErr : "throws on missing file"
+classifier --> configMgr : "loads ontology definitions"
+classifier --> ontJson : "closed-vocabulary classification"
 
-agent --> validator : "submits entity for validation"
-validator --> lowerJson : "validates against class/hierarchy"
-validator --> graphStore : "accepts entity"
-graphStore --> registry : "persists ontology data"
+apiClient --> typedApi : "exposes"
+apiClient --> classifier : "surfaces classified entities"
+
+filterUI --> schema : "imports"
+filterUI --> viewerStore : "persists selection via useViewerStore"
+filterUI --> typedApi : "consumes OntologyClass metadata"
+
+schema ..> ontJson : "should mirror (no shared-source enforcement)"
 
 @enduml

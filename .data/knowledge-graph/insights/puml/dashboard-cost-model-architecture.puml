@@ -1,0 +1,35 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Stateful UI/Data Layer" {
+  component "use-classifier-judge.ts" as judge <<agent>>
+  component "offload-decision.tsx" as offload <<agent>>
+  component "Cost/Settings APIs" as api <<api>>
+}
+
+package "Pure Cost Domain (cost-model.ts)" {
+  component "budgetForMonth()" as budgetForMonth <<core>>
+  component "priceForModel()" as priceForModel <<core>>
+  component "scalePrice() / FAST_MODE" as scalePrice <<core>>
+  component "freshInputTokens()" as freshInputTokens <<core>>
+  component "budgetProvider()" as budgetProvider <<core>>
+  component "isSynthetic() / monthlySeries()" as monthlySeries <<core>>
+}
+
+package "Upstream Fix Source" {
+  component "rapid-llm-proxy\nopenAIFreshInputTokens()" as proxy <<external>>
+}
+
+judge --> api : "fetch/poll"
+offload --> api : "fetch/dirty-state"
+api ..> monthlySeries : "CostRow[] input"
+
+monthlySeries --> budgetForMonth : "evaluate monthly cap"
+monthlySeries --> priceForModel : "compute cell cost"
+priceForModel --> scalePrice : "fast-mode multiply"
+monthlySeries --> budgetProvider : "normalize provider"
+monthlySeries --> freshInputTokens : "adjust token counts"
+
+proxy ..> freshInputTokens : "invariant enforced upstream\n(now identity fn)"
+
+@enduml

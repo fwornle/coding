@@ -1,0 +1,43 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Data Plane" {
+  component "llm-with-process.ts" as llmproc <<core>>
+  component "resolveProxyCompleteUrl()" as resolveurl <<api>>
+}
+
+package "Control Plane (Dashboard)" {
+  component "OffloadDecision" as offload <<agent>>
+  component "pooled()/queryFor()" as pooled <<core>>
+  component "offload-gates.ts (ladder)" as ladder <<core>>
+  component "useClassifierJudge" as judge <<agent>>
+  component "cost-model.ts" as costmodel <<core>>
+}
+
+package "Proxy HTTP Surface" {
+  component "rapid-llm-proxy /api/complete" as apicomplete <<external>>
+  component "/api/llm/routing/resolve" as routeresolve <<api>>
+  component "/api/llm/classifier" as classifierapi <<api>>
+}
+
+database "llm-routing.yaml" as routingyaml
+database "prompt-classifier.yaml" as classifieryaml
+
+llmproc --> resolveurl : "layered env-var precedence"
+resolveurl --> apicomplete : "process telemetry call"
+
+offload --> pooled : "resolve up to 39 routes"
+pooled --> routeresolve : "bounded concurrency (width=8)"
+offload --> ladder : "local ladder evaluation"
+offload ..> routeresolve : "diff proxy vs local answer"
+routeresolve --> routingyaml : "reads policy"
+
+judge --> classifierapi : "GET/PATCH rubric"
+classifierapi --> classifieryaml : "reads/writes config"
+judge --> judge : "diff-only PATCH (avoid race)"
+
+costmodel ..> apicomplete : "prices -fast model ids"
+
+offload ..> llmproc : "governs dispatch policy"
+
+@enduml

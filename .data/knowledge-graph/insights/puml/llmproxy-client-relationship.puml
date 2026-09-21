@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMProxyClient
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMProxyClient] as llmproxy_client #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[LlmJsonParser] as llm_json_parser #F0F0F0
+[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[OffloadRoutingDecision] as offload_routing_decision #F0F0F0
+[ModelContextLimits] as model_context_limits #F0F0F0
+[AgentProviderSplicing] as agent_provider_splicing #F0F0F0
+[OffloadPolicyMirrorCheck] as offload_policy_mirror_check #E8F5E8
+
+llmabstraction --> llmproxy_client
+llmmock_service -[hidden]- llmproxy_client
+dmrprovider -[hidden]- llmproxy_client
+llm_json_parser -[hidden]- llmproxy_client
+dashboard_cost_model -[hidden]- llmproxy_client
+offload_routing_decision -[hidden]- llmproxy_client
+model_context_limits -[hidden]- llmproxy_client
+agent_provider_splicing -[hidden]- llmproxy_client
+llmproxy_client --> offload_policy_mirror_check
+
+@enduml

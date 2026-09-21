@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Adapter & Verification Scripts" {
+  component "config/agents/*.sh" as agentScripts <<cli>>
+  component "verify-patterns.sh" as verifyScript <<cli>>
+  component "SCRIPT_DIR resolution" as pathResolve <<core>>
+  component "Env fallback chain\n(CODING_TOOLS_PATH/LLM_PROXY_URL)" as envFallback <<core>>
+}
+
+package "Declarative Config Sources" {
+  database "$SHARED_MEMORY JSON" as sharedMemory <<storage>>
+  component "config/agent-profiles.json" as agentProfiles <<storage>>
+  component "config/feature-profiles.yaml" as featureProfiles <<storage>>
+  component "config/prompt-classifier.yaml" as promptClassifier <<storage>>
+}
+
+package "EntityPatternAnalyzer (Heuristic Layer)" {
+  component "analyzeEntityPatterns()" as analyzeEntry <<core>>
+  component "extractArtifacts()" as extractArtifacts <<core>>
+  component "checkLocalArtifact()\nmatchArtifactPattern()" as twoTierMatch <<core>>
+  component "teamDirectories /\nartifactPatterns /\nteamMappings" as teamTables <<storage>>
+}
+
+agentScripts --> envFallback : "resolves via"
+verifyScript --> pathResolve : "resolves own root"
+verifyScript --> envFallback : "CODING_TOOLS_PATH fallback"
+verifyScript --> sharedMemory : "jq query TransferablePattern"
+sharedMemory --> verifyScript : "drives compliance checks"
+
+agentScripts ..> agentProfiles : "registry-driven capabilities"
+verifyScript ..> featureProfiles : "declarative config idiom"
+verifyScript ..> promptClassifier : "declarative config idiom"
+
+analyzeEntry --> extractArtifacts : "regex extraction"
+extractArtifacts --> twoTierMatch : "candidate artifacts"
+twoTierMatch --> teamTables : "lookup team ownership"
+teamTables ..> agentProfiles : "registry/catalog pattern (parallel idiom)"
+
+@enduml

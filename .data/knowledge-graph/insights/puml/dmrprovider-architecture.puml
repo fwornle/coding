@@ -1,31 +1,34 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "LLM Mode Resolution" {
-  component "getLLMMode()" as mode <<core>>
-  component "isMockLLMEnabled()" as mock <<core>>
+package "Backend Selection Layer" {
+  component "llm-mock-service\ngetLLMMode()" as mockSvc <<core>>
+  database "workflow-progress.json" as progressFile <<storage>>
 }
 
-package "Offload Decision Layer" {
-  component "OffloadDecision" as decision <<core>>
-  component "evaluateOffload()" as evaluate <<core>>
-  component "OffloadTarget.provider" as target <<core>>
-}
-
-package "Inference Providers" {
+package "DMR Provider" {
   component "DMRProvider" as dmr <<agent>>
-  component "OpenAI-Compatible Client Interface" as iface <<api>>
-  cloud "Remote Provider" as remote <<external>>
+  component "checkDMRAvailability()" as health <<core>>
+  component "loadDMRConfig()" as config <<core>>
+  database "dmr-config.yaml" as cfgFile <<storage>>
+  cloud "Docker Model Runner\n(OpenAI-compatible API)" as dockerMR <<external>>
 }
 
-mock --> mode : "resolves mode"
-mode --> decision : "non-mock local mode"
-decision --> evaluate : "requireNetwork gate"
-evaluate --> target : "selects local target"
-target --> dmr : "references as local target"
-dmr --> iface : "implements"
-iface ..> remote : "substitutable without\nchanging call sites"
-evaluate --> remote : "requires network egress"
-dmr --> evaluate : "no network egress needed"
+package "Shared LLM Utilities" {
+  component "parse-llm-json.ts\n(repair pipeline)" as jsonRepair <<core>>
+  component "llm-with-process.ts\nresolveProxyCompleteUrl()" as proxyResolver <<core>>
+}
+
+mockSvc --> progressFile : "dual-write\nllmState + mockLLM"
+mockSvc --> dmr : "routes calls when\nmode = local/DMR"
+
+dmr --> config : "load config"
+config --> cfgFile : "multi-path search +\nexpandEnvVars()"
+dmr --> health : "cached liveness\nprobe"
+health --> dockerMR : "periodic\nhealth check"
+dmr --> dockerMR : "OpenAI-shape\nrequest/response"
+
+dmr ..> jsonRepair : "JSON-mode output\nrepair"
+config ..> proxyResolver : "shared env-var\nprecedence pattern"
 
 @enduml

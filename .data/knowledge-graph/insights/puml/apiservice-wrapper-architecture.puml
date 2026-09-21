@@ -1,0 +1,45 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Container Boot Layer" {
+  component "entrypoint.sh" as entrypoint <<core>>
+  component "features.json snapshot" as snapshot <<external>>
+  component "supervisord.conf" as supervisord <<core>>
+  component "disabled.conf override" as disabledconf <<core>>
+}
+
+package "Orchestration Layer" {
+  component "start-services.sh (legacy)" as startsh <<cli>>
+  component "start-services-robust.js" as robust <<core>>
+  component "service-starter.js\n(retry/backoff)" as starter <<core>>
+  component "ProcessStateManager (PSM)" as psm <<core>>
+  component "SERVICE_CONFIGS / SERVICE_ORDER" as configs <<core>>
+}
+
+package "Service Wrapper Layer" {
+  component "APIServiceWrapper" as apiwrap <<api>>
+  component "transcriptMonitor" as transcript <<agent>>
+  component "liveLoggingCoordinator" as livelog <<agent>>
+  component "prompt-classifier-service.mjs" as classifier <<api>>
+}
+
+cloud "Proxy /health" as proxy <<external>>
+
+snapshot --> entrypoint : "read at boot"
+entrypoint --> disabledconf : "emit autostart=false"
+disabledconf --> supervisord : "override stanza"
+
+startsh --> robust : "ROBUST_MODE=true (exec)"
+robust --> configs : "validate feature ids"
+robust --> starter : "startServiceWithRetry/withDeadline"
+robust --> psm : "isServiceRunning() / registerService()"
+robust --> apiwrap : "spawn/manage lifecycle"
+
+apiwrap --> transcript : "start first"
+apiwrap --> livelog : "start second"
+transcript ..> psm : "OS pgrep orphan reconcile"
+
+classifier --> proxy : "poll network mode"
+robust ..> classifier : "shared service pattern"
+
+@enduml

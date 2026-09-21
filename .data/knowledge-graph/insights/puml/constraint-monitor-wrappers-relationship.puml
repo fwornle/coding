@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConstraintMonitorWrappers
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ConstraintMonitorWrappers] as constraint_monitor_wrappers #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[RobustServiceOrchestrator] as robust_service_orchestrator #F0F0F0
+[ContainerEntrypoint] as container_entrypoint #F0F0F0
+[FeatureGatingEntrypoint] as feature_gating_entrypoint #E8F5E8
+[ApiServiceWrapper] as api_service_wrapper #E8F5E8
+[DashboardServiceWrapper] as dashboard_service_wrapper #E8F5E8
+
+dockerized_services --> constraint_monitor_wrappers
+service_starter -[hidden]- constraint_monitor_wrappers
+service_probe -[hidden]- constraint_monitor_wrappers
+process_state_manager -[hidden]- constraint_monitor_wrappers
+robust_service_orchestrator -[hidden]- constraint_monitor_wrappers
+container_entrypoint -[hidden]- constraint_monitor_wrappers
+constraint_monitor_wrappers --> feature_gating_entrypoint
+constraint_monitor_wrappers --> api_service_wrapper
+constraint_monitor_wrappers --> dashboard_service_wrapper
+
+@enduml

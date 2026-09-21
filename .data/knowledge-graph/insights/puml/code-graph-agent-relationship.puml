@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CodeGraphAgent
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[CodeGraphAgent] as code_graph_agent #LightBlue
+[GraphifyGraph] as graphify_graph #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[LevelDbMigrationScripts] as level_db_migration_scripts #F0F0F0
+[WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphViewerHierarchy] as graph_viewer_hierarchy #F0F0F0
+[GraphVisualRendering] as graph_visual_rendering #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+[StaleCypherTechNoteDrift] as stale_cypher_tech_note_drift #E8F5E8
+
+knowledge_management --> code_graph_agent
+graphify_graph -[hidden]- code_graph_agent
+km_core_adapter -[hidden]- code_graph_agent
+level_db_migration_scripts -[hidden]- code_graph_agent
+wave_insight_persistence -[hidden]- code_graph_agent
+manual_learning -[hidden]- code_graph_agent
+online_learning -[hidden]- code_graph_agent
+graph_viewer_hierarchy -[hidden]- code_graph_agent
+graph_visual_rendering -[hidden]- code_graph_agent
+ukb_workflow_dashboard -[hidden]- code_graph_agent
+code_graph_agent --> stale_cypher_tech_note_drift
+
+@enduml

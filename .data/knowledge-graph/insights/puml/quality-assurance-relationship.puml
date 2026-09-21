@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: QualityAssurance
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[QualityAssurance] as quality_assurance #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[UnboundedFsScanGate] as unbounded_fs_scan_gate #E8F5E8
+[PiSearchConventionDocs] as pi_search_convention_docs #E8F5E8
+
+semantic_analysis --> quality_assurance
+pipeline -[hidden]- quality_assurance
+ontology -[hidden]- quality_assurance
+insights -[hidden]- quality_assurance
+quality_assurance --> unbounded_fs_scan_gate
+quality_assurance --> pi_search_convention_docs
+
+@enduml

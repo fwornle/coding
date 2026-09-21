@@ -1,0 +1,45 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Static Content Classification" {
+  component "EntityPatternAnalyzer" as epa <<core>>
+  component "extractArtifacts" as extract <<core>>
+  component "checkLocalArtifact" as local <<core>>
+  component "matchArtifactPattern" as pattern <<core>>
+  component "inferEntityClass" as infer <<core>>
+}
+
+package "Config Tables" {
+  component "teamDirectories Map" as teamdirs <<storage>>
+  component "artifactPatterns Table" as artpatterns <<storage>>
+  component "entity ClassMap" as classmap <<storage>>
+}
+
+package "Live Repo Compliance Auditing" {
+  component "verify-patterns.sh" as verify <<cli>>
+  component "ConditionalLoggingPattern Check" as logcheck <<core>>
+  component "NetworkAwareInstallationPattern Check" as netcheck <<core>>
+  component "TransferablePattern Check" as transcheck <<core>>
+}
+
+database "$SHARED_MEMORY JSON" as sharedmem
+database "Pattern Report (/tmp/*.md)" as report
+
+epa --> extract : "mines candidate artifacts"
+extract --> local : "feeds string into"
+local --> teamdirs : "prefix match (0.9)"
+local ..> pattern : "fallback"
+pattern --> artpatterns : "regex match (0.75)"
+pattern --> classmap : "derives entity Class"
+local --> infer : "derives entity Class"
+
+verify --> logcheck : "runs"
+verify --> netcheck : "runs"
+verify --> transcheck : "runs"
+transcheck --> sharedmem : "jq query entities"
+verify --> report : "writes timestamped report"
+verify --> sharedmem : "read-modify-write (tmp+mv)"
+
+epa ..> verify : "complementary verification mode"
+
+@enduml

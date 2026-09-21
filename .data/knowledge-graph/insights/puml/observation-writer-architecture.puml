@@ -1,0 +1,41 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Upstream Fan-in" {
+  component "repo-router.mjs\n(routeFromArtifacts)" as router <<external>>
+  component "task-id.mjs\n(resolveLiveTaskIdSafe)" as taskid <<external>>
+  component "window.mjs\n(getLSLWindow)" as window <<external>>
+  component "ConfigurableRedactor.js" as redactor <<external>>
+  component "MentionsClassifier.js" as classifier <<external>>
+}
+
+package "ObservationWriter Core" {
+  component "ObservationWriter" as ow <<core>>
+  component "resolveKmCoreOntologyDir()" as ontology <<core>>
+  component "_observationEmitter\n(module singleton)" as emitter <<core>>
+  component "Anchor-edge cache\n(_anchorId)" as anchor <<core>>
+}
+
+package "Consumers & Monitoring" {
+  component "ObservationConsolidator" as consolidator <<agent>>
+  component "health-coordinator.js\n(fetchLastObservationWriterCallAge)" as health <<agent>>
+  database "km-core putEntity" as kmcore <<storage>>
+  component "SSE /api/coding/observations/stream" as sse <<api>>
+}
+
+router --> ow : "attribution routing"
+taskid --> ow : "task-id resolution"
+window --> ow : "LSL window"
+redactor --> ow : "redaction"
+classifier --> ow : "classification"
+
+ow --> ontology : "resolves ontology dir"
+ow --> anchor : "lazy anchor resolution"
+ow --> emitter : "emits write events"
+ow --> kmcore : "putEntity"
+
+emitter --> sse : "pub/sub tap"
+consolidator --> ow : "_ensureObservationWriter"
+health ..> ow : "polls call recency"
+
+@enduml

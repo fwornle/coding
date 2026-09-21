@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: RobustServiceOrchestrator
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[RobustServiceOrchestrator] as robust_service_orchestrator #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[ConstraintMonitorWrappers] as constraint_monitor_wrappers #F0F0F0
+[ContainerEntrypoint] as container_entrypoint #F0F0F0
+[PortCleanupLogic] as port_cleanup_logic #E8F5E8
+[ServiceGatingContract] as service_gating_contract #E8F5E8
+
+dockerized_services --> robust_service_orchestrator
+service_starter -[hidden]- robust_service_orchestrator
+service_probe -[hidden]- robust_service_orchestrator
+process_state_manager -[hidden]- robust_service_orchestrator
+constraint_monitor_wrappers -[hidden]- robust_service_orchestrator
+container_entrypoint -[hidden]- robust_service_orchestrator
+robust_service_orchestrator --> port_cleanup_logic
+robust_service_orchestrator --> service_gating_contract
+
+@enduml

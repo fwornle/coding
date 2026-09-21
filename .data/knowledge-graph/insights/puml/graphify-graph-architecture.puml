@@ -1,0 +1,48 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Legacy Compatibility Layer" {
+  component "CodeGraphAgent" as cga <<agent>>
+  component "checkMemgraphConnection\n(stub)" as stub <<api>>
+}
+
+package "GraphifyGraph Core" {
+  component "GraphifyGraph" as gg <<core>>
+  component "kindOf()/nameOf()\n(label parsing)" as kindof <<core>>
+  component "mapRelation()\n(edge normalization)" as maprel <<core>>
+  component "mtime cache" as cache <<core>>
+}
+
+package "Data Sources" {
+  database "graph.json\n(NetworkX node-link)" as graphjson <<storage>>
+}
+
+package "Downstream Consumers" {
+  component "wave-controller.ts\n(anchor invariant)" as wave <<agent>>
+  component "color-fallback.ts" as colorfb <<external>>
+  component "D3GraphCanvas.tsx" as d3canvas <<external>>
+}
+
+package "Migration Tooling" {
+  component "migrate-graph-db-entity-types.js" as migold <<cli>>
+  component "migrate-leveldb-to-kmcore.mjs" as mignew <<cli>>
+  database "LevelDB" as leveldb <<storage>>
+}
+
+cga --> gg : "delegates real calls to"
+cga --> stub : "exposes legacy API"
+
+gg --> cache : "checks mtime before parse"
+cache --> graphjson : "stat()/read on change"
+gg --> kindof : "derives type from label"
+gg --> maprel : "normalizes edge vocabulary"
+
+wave --> gg : "queryIncomingRelations(name, entity Type)"
+colorfb ..> kindof : "same derive-from-string pattern"
+d3canvas ..> kindof : "entity Type vs ontologyClass hazard"
+
+mignew --> leveldb : "reads legacy blobs"
+mignew --> graphjson : "produces km-core evidence layer"
+migold --> graphjson : "in-memory Graphology mutation"
+
+@enduml

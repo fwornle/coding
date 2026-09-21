@@ -1,0 +1,31 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Entry Point" {
+  component "start-services.sh" as shell <<cli>>
+}
+
+package "Robust Startup" {
+  component "start-services-robust.js" as robust <<core>>
+  component "SERVICE_CONFIGS / SERVICE_ORDER" as config <<core>>
+  component "startOneService()" as starter <<core>>
+  component "killProcessOnPortAndWait()" as killer <<core>>
+  component "waitForPortBindable()" as bindable <<core>>
+}
+
+package "Legacy Path" {
+  component "Legacy Bash Startup" as legacy <<cli>>
+  database "constraint-monitor DBs" as cmdb
+}
+
+shell --> robust : "ROBUST_MODE=true"
+shell --> legacy : "ROBUST_MODE=false (fallback)"
+legacy --> cmdb : "docker-compose"
+
+robust --> config : "reads"
+robust --> starter : "iterates SERVICE_ORDER"
+starter --> killer : "frees port before start"
+killer --> bindable : "confirms port free"
+starter ..> config : "throws on unknown feature"
+
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TokenUsageAdapters
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TokenUsageAdapters] as token_usage_adapters #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[MultiUserHashManager] as multi_user_hash_manager #F0F0F0
+[LiveTranscriptWatchers] as live_transcript_watchers #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[OpencodeTokenRows] as opencode_token_rows #E8F5E8
+[TokenDbWriter] as token_db_writer #E8F5E8
+[CopilotEventsTailWatcher] as copilot_events_tail_watcher #E8F5E8
+
+live_logging_system --> token_usage_adapters
+lslconfig_validator -[hidden]- token_usage_adapters
+redaction_config_manager -[hidden]- token_usage_adapters
+multi_user_hash_manager -[hidden]- token_usage_adapters
+live_transcript_watchers -[hidden]- token_usage_adapters
+observation_writer -[hidden]- token_usage_adapters
+token_usage_adapters --> opencode_token_rows
+token_usage_adapters --> token_db_writer
+token_usage_adapters --> copilot_events_tail_watcher
+
+@enduml

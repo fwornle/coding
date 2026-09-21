@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMJsonRepair
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMJsonRepair] as llmjson_repair #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[ProcessAwareLLMClient] as process_aware_llmclient #F0F0F0
+[ModeResolutionSystem] as mode_resolution_system #F0F0F0
+
+llmabstraction --> llmjson_repair
+dmrprovider -[hidden]- llmjson_repair
+process_aware_llmclient -[hidden]- llmjson_repair
+mode_resolution_system -[hidden]- llmjson_repair
+
+@enduml

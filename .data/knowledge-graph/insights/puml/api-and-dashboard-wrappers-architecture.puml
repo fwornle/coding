@@ -1,0 +1,39 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Container Boot Layer" {
+  component "docker/entrypoint.sh" as entrypoint <<core>>
+  database "features.json (snapshot)" as featjson <<storage>>
+  component "supervisord.conf" as supervisord <<core>>
+  component "features.d/disabled.conf" as disabledconf <<core>>
+}
+
+package "Service Orchestration" {
+  component "start-services-robust.js\n(SERVICE_CONFIGS/SERVICE_ORDER)" as robust <<core>>
+  component "start-services.sh\n(LEGACY MODE)" as legacy <<core>>
+  component "lib/service-starter.js\n(startServiceWithRetry, waitForPortBindable)" as starter <<core>>
+  component "service-gating.test.mjs" as gatetest <<cli>>
+}
+
+package "Runtime Services" {
+  component "prompt-classifier-service.mjs" as classifier <<agent>>
+  component "lib/utils/service-probe.js" as probe <<core>>
+  cloud "llm-cli-proxy :12435" as proxy <<external>>
+  database ".env (repo secrets)" as dotenv <<storage>>
+}
+
+featjson --> entrypoint : "read-only mount"
+entrypoint --> disabledconf : "generates (PROGRAM_FEATURES map)"
+disabledconf --> supervisord : "overrides autostart"
+
+robust --> starter : "uses retry/probe contract"
+legacy ..> starter : "bypasses (duplicate logic)"
+gatetest --> robust : "validates SERVICE_CONFIGS/SERVICE_ORDER"
+
+robust --> classifier : "starts & health-checks"
+classifier --> dotenv : "loads QWEN_LOCAL_API_KEY"
+classifier --> probe : "shares fail-toward-last-known-good philosophy"
+entrypoint --> proxy : "T2 egress lockdown routes LLM calls"
+classifier --> proxy : "routes model calls"
+
+@enduml

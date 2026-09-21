@@ -6,16 +6,20 @@ title Hierarchy Context: UnifiedHookManager
 [ConstraintSystem] as constraint_system #FFFFDD
 [UnifiedHookManager] as unified_hook_manager #LightBlue
 [HookConfigLoader] as hook_config_loader #F0F0F0
-[ViolationCaptureService] as violation_capture_service #F0F0F0
-[ContentValidationAgent] as content_validation_agent #F0F0F0
 [KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
 [HealthPromptHook] as health_prompt_hook #F0F0F0
+[UnifiedHookConfigLoader] as unified_hook_config_loader #E8F5E8
+[HandlerRegistry] as handler_registry #E8F5E8
+[ClaudeBridgeAdapter] as claude_bridge_adapter #E8F5E8
+[HookMigrationTool] as hook_migration_tool #E8F5E8
 
 constraint_system --> unified_hook_manager
 hook_config_loader -[hidden]- unified_hook_manager
-violation_capture_service -[hidden]- unified_hook_manager
-content_validation_agent -[hidden]- unified_hook_manager
 knowledge_injection_hooks -[hidden]- unified_hook_manager
 health_prompt_hook -[hidden]- unified_hook_manager
+unified_hook_manager --> unified_hook_config_loader
+unified_hook_manager --> handler_registry
+unified_hook_manager --> claude_bridge_adapter
+unified_hook_manager --> hook_migration_tool
 
 @enduml

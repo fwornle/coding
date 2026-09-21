@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Provider Call Paths" {
+  component "llm-with-process.ts\n(raw-fetch bypass)" as rawfetch <<core>>
+  component "SDK LLMService.complete()" as sdk <<core>>
+  component "dmr-provider.ts\n(OpenAI-compatible client)" as dmr <<core>>
+}
+
+package "LlmJsonParser (parse-llm-json.ts)" {
+  component "escapeControlCharsInStrings()" as escape <<core>>
+  component "truncateToLastCompleteElement()" as truncate <<core>>
+}
+
+package "Downstream Consumers" {
+  component "JSON-mode Consumers\n(batch extraction, insights/entities)" as consumers <<agent>>
+}
+
+package "Analogous Fail-Soft Patterns" {
+  component "cost-model.ts\npriceForModel()" as cost <<external>>
+  component "model-limits.cjs\ncatalogueContextWindow()" as limits <<external>>
+}
+
+rawfetch --> escape : "raw text output"
+sdk --> escape : "raw text output"
+dmr ..> sdk : "used by"
+
+escape --> truncate : "string-safe payload"
+truncate --> consumers : "best-effort typed result"
+
+escape ..> cost : "fail-soft philosophy"
+truncate ..> limits : "explicit-null-over-silent pattern"
+
+@enduml

@@ -1,0 +1,46 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Persistence Sub-Steps (multi-agent-graph.tsx)" {
+  component "Wave 1 Persist\n(Project+Component)" as w1 <<core>>
+  component "Wave 2 Persist\n(SubComponent)" as w2 <<core>>
+  component "Wave 3 Persist\n(Detail+Embeddings\nDirect Attribute Merge)" as w3 <<core>>
+}
+
+package "Storage" {
+  database "GraphDB" as graphdb <<storage>>
+  database "LevelDB" as leveldb <<storage>>
+}
+
+package "Dashboard Telemetry" {
+  component "ukbSlice (WaveGroup/StepInfo)" as ukbslice <<core>>
+  component "ukb-workflow-modal\ncalculateDynamicEta()" as etamodal <<core>>
+}
+
+package "Graph Visualization" {
+  component "D3GraphCanvas\n(deriveAncestryFromStorePath)" as d3canvas <<core>>
+  component "buildRehomeEdges" as rehome <<core>>
+  component "color-fallback.ts\n(node FillColor)" as colorfb <<core>>
+  component "Sigma-based Canvas" as sigma <<external>>
+}
+
+w1 --> graphdb : "write L0/L1 entities"
+w1 --> leveldb : "write"
+w2 --> graphdb : "write L2 entities"
+w2 --> leveldb : "write"
+w3 --> graphdb : "merge L3 + embeddings"
+w3 --> leveldb : "write"
+
+w1 --> ukbslice : "reports duration/entity Flow"
+w2 --> ukbslice : "reports duration/entity Flow"
+w3 --> ukbslice : "reports duration/entity Flow"
+
+ukbslice --> etamodal : "step.duration data"
+etamodal --> etamodal : "sanity clamp 0.3x-2.0x"
+
+graphdb --> d3canvas : "persisted graph data"
+d3canvas --> rehome : "repair orphaned nodes"
+d3canvas --> colorfb : "render by metadata.source"
+d3canvas --> sigma : "shared viewer-store"
+
+@enduml

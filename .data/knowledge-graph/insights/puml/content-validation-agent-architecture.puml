@@ -1,32 +1,31 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Hook Registration Layer" {
-  component "HooksManager\n(abstract)" as hooksApi <<core>>
-  component "UnifiedHookManager\n(concrete)" as unified <<core>>
-  component "HookConfigLoader" as loader <<core>>
+package "Semantic Analysis (offline/batch)" {
+  component "ContentValidationAgent" as cva <<agent>>
+  component "filePathPatterns / commandPatterns\n(regex extraction)" as patterns <<core>>
+  component "GitStalenessDetector" as gsd <<core>>
+  component "CommitEntityCorrelation" as cec <<core>>
+  database "Knowledge Graph\n(entity observations)" as kg
 }
 
-package "Agent Integration Layer" {
-  component "claude-bridge.js\n(main)" as bridge <<agent>>
-  component "migration-tool.js" as migration <<cli>>
+package "Git History" {
+  database "Repository Commit History" as gitrepo
 }
 
-package "Dashboard Observability" {
-  component "usePolledFetch.ts" as poll <<external>>
-  component "HealthRefreshManager" as refresh <<external>>
+package "Hook Dispatch Subsystem (decoupled)" {
+  component "HooksManager\n(hooks-api.js)" as hm <<api>>
+  component "claude-bridge.js\n(fail-open)" as bridge <<external>>
 }
 
-hooksApi ..> unified : "duplicated registry logic\n(should extend, doesn't)"
-loader --> unified : "loads user+project\nhooks.json config"
-unified --> bridge : "executeHooks()\nenabled/agents/stopOnError"
-bridge --> unified : "translates stdin JSON\nvia EVENT_MAP"
-bridge ..> hooksApi : "duplicates\nEVENT_MAPPINGS"
-migration ..> hooksApi : "duplicates\nEVENT_MAPPINGS"
-migration ..> bridge : "duplicates\nEVENT_MAP"
+kg --> cva : "entity observation text"
+cva --> patterns : "extracts file/command refs"
+patterns --> gsd : "candidate references"
+gsd --> cec : "correlate vs commits"
+cec --> gitrepo : "queries commit history"
+cec --> cva : "staleness score"
 
-bridge --> bridge : "fail-open:\nalways exit(0), decision=allow"
-
-poll --> refresh : "avoids CPU cost\nof backgrounded tab"
+hm ..> bridge : "priority-sorted dispatch\n(sibling subsystem)"
+cva ..> hm : "NOT wired into\nPreToolUse/PostToolUse"
 
 @enduml

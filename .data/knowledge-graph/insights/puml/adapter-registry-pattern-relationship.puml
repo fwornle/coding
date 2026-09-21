@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AdapterRegistryPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AdapterRegistryPattern] as adapter_registry_pattern #LightBlue
+[ManagerPattern] as manager_pattern #F0F0F0
+[AgentWrapperConvention] as agent_wrapper_convention #F0F0F0
+[OwnershipHeuristicPattern] as ownership_heuristic_pattern #F0F0F0
+[PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+[TeamDirectoryRegistry] as team_directory_registry #E8F5E8
+[ArtifactPatternRegistry] as artifact_pattern_registry #E8F5E8
+[EntityPatternAnalyzer] as entity_pattern_analyzer #E8F5E8
+
+coding_patterns --> adapter_registry_pattern
+manager_pattern -[hidden]- adapter_registry_pattern
+agent_wrapper_convention -[hidden]- adapter_registry_pattern
+ownership_heuristic_pattern -[hidden]- adapter_registry_pattern
+pattern_verification_tooling -[hidden]- adapter_registry_pattern
+adapter_registry_pattern --> team_directory_registry
+adapter_registry_pattern --> artifact_pattern_registry
+adapter_registry_pattern --> entity_pattern_analyzer
+
+@enduml

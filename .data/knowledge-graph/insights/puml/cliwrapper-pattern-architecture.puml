@@ -1,0 +1,35 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "scripts/knowledge-management" {
+  component "verify-patterns.sh" as vps <<cli>>
+  component "CLAUDE_REPO Resolution\n(env-var cascade)" as pathres <<core>>
+  component "Hardcoded Pattern Checks\n(ConditionalLogging/Redux)" as hardchecks <<core>>
+  component "Generic TransferablePattern Loop" as genloop <<core>>
+  component "Compliance Score Calc\n((PASSED_CHECKS++))" as score <<core>>
+}
+
+package "Shared Knowledge Store" {
+  database "SHARED_MEMORY.json" as shmem <<storage>>
+}
+
+package "Ontology Heuristics" {
+  component "EntityPatternAnalyzer.ts" as epa <<core>>
+  component "checkLocalArtifact()" as direct <<core>>
+  component "matchArtifactPattern()" as fallback <<core>>
+}
+
+vps --> pathres : "resolves root dir"
+vps --> hardchecks : "runs regex checks"
+vps --> genloop : "reads patterns"
+vps --> score : "computes score"
+genloop --> shmem : "jq query TransferablePattern"
+score --> shmem : "jq mutation"
+
+epa --> direct : "try direct match (0.9)"
+epa --> fallback : "fallback pattern match (0.75)"
+
+hardchecks ..> fallback : "same tiered-confidence idiom"
+vps ..> epa : "shared two-step dispatch shape"
+
+@enduml

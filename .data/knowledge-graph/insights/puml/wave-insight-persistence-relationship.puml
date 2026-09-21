@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: WaveInsightPersistence
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[WaveInsightPersistence] as wave_insight_persistence #LightBlue
+[GraphifyGraph] as graphify_graph #F0F0F0
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[LevelDbMigrationScripts] as level_db_migration_scripts #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphViewerHierarchy] as graph_viewer_hierarchy #F0F0F0
+[GraphVisualRendering] as graph_visual_rendering #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+[WavePersistSubsteps] as wave_persist_substeps #E8F5E8
+
+knowledge_management --> wave_insight_persistence
+graphify_graph -[hidden]- wave_insight_persistence
+code_graph_agent -[hidden]- wave_insight_persistence
+km_core_adapter -[hidden]- wave_insight_persistence
+level_db_migration_scripts -[hidden]- wave_insight_persistence
+manual_learning -[hidden]- wave_insight_persistence
+online_learning -[hidden]- wave_insight_persistence
+graph_viewer_hierarchy -[hidden]- wave_insight_persistence
+graph_visual_rendering -[hidden]- wave_insight_persistence
+ukb_workflow_dashboard -[hidden]- wave_insight_persistence
+wave_insight_persistence --> wave_persist_substeps
+
+@enduml

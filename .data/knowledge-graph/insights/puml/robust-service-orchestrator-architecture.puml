@@ -1,0 +1,44 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Entry Points" {
+  component "start-services.sh\n(ROBUST_MODE toggle)" as legacy <<cli>>
+  component "docker/entrypoint.sh" as entrypoint <<cli>>
+}
+
+package "Robust Orchestrator" {
+  component "start-services-robust.js" as orchestrator <<core>>
+  component "SERVICE_CONFIGS /\nSERVICE_ORDER" as configs <<core>>
+  component "killProcessOnPortAndWait()" as killport <<core>>
+  component "waitForPortBindable()" as waitport <<core>>
+  component "isProcessRunningByScript()" as pgrepfallback <<core>>
+}
+
+package "Primitives & State" {
+  component "lib/service-starter.js\n(startServiceWithRetry etc.)" as starter <<api>>
+  database "ProcessStateManager (PSM)" as psm <<storage>>
+  component "lib/features/catalogue.cjs\n(FEATURE_IDS)" as catalogue <<core>>
+  component "features.json snapshot" as featuresjson <<external>>
+}
+
+component "tests/features/service-gating.test.mjs" as tests <<agent>>
+
+legacy --> orchestrator : "ROBUST_MODE=true exec"
+legacy --> legacy : "ROBUST_MODE=false legacy bash path"
+entrypoint --> featuresjson : "reads snapshot"
+entrypoint --> entrypoint : "PROGRAM_FEATURES gating\n(supervisord autostart=false)"
+
+orchestrator --> configs : "defines"
+orchestrator --> starter : "imports primitives"
+orchestrator --> killport : "escalating SIGTERM/SIGKILL"
+orchestrator --> waitport : "throwaway net.createServer probe"
+orchestrator --> pgrepfallback : "OS-level fallback"
+
+pgrepfallback --> psm : "re-registers orphaned services"
+configs --> psm : "checks global + per-project state"
+configs --> catalogue : "feature key must resolve"
+
+tests --> configs : "asserts structural invariants"
+tests --> catalogue : "validates FEATURE_IDS mapping"
+
+@enduml

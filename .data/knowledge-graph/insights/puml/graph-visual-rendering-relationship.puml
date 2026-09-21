@@ -1,0 +1,37 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphVisualRendering
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphVisualRendering] as graph_visual_rendering #LightBlue
+[GraphifyGraph] as graphify_graph #F0F0F0
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[LevelDbMigrationScripts] as level_db_migration_scripts #F0F0F0
+[WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphViewerHierarchy] as graph_viewer_hierarchy #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+[ForceDirectedLayout] as force_directed_layout #E8F5E8
+[ClassColorFallback] as class_color_fallback #E8F5E8
+[MultiAgentGraphSvg] as multi_agent_graph_svg #E8F5E8
+[HierarchyParentDerivation] as hierarchy_parent_derivation #E8F5E8
+
+knowledge_management --> graph_visual_rendering
+graphify_graph -[hidden]- graph_visual_rendering
+code_graph_agent -[hidden]- graph_visual_rendering
+km_core_adapter -[hidden]- graph_visual_rendering
+level_db_migration_scripts -[hidden]- graph_visual_rendering
+wave_insight_persistence -[hidden]- graph_visual_rendering
+manual_learning -[hidden]- graph_visual_rendering
+online_learning -[hidden]- graph_visual_rendering
+graph_viewer_hierarchy -[hidden]- graph_visual_rendering
+ukb_workflow_dashboard -[hidden]- graph_visual_rendering
+graph_visual_rendering --> force_directed_layout
+graph_visual_rendering --> class_color_fallback
+graph_visual_rendering --> multi_agent_graph_svg
+graph_visual_rendering --> hierarchy_parent_derivation
+
+@enduml

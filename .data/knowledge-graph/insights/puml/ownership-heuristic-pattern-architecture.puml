@@ -1,0 +1,36 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "EntityPatternAnalyzer" {
+  component "analyzeEntityPatterns()" as analyze <<core>>
+  component "checkLocalArtifact()\n(conf 0.9)" as pathMatch <<core>>
+  component "matchArtifactPattern()\n(conf 0.75)" as regexMatch <<core>>
+  component "extractArtifacts()\n4 regex passes" as extract <<core>>
+  component "inferEntityClass()\n(orphaned 'Agentic')" as inferClass <<core>>
+}
+
+package "Static Registries" {
+  component "teamDirectories Map\n(Coding/RaaS/ReSi/UI)" as teamDirs <<storage>>
+  component "artifactPatterns Array\n(*Manager/*Classifier/*Analyzer)" as artifactPatterns <<storage>>
+}
+
+package "Adjacent Heuristic Tooling" {
+  component "verify-patterns.sh" as verifyScript <<cli>>
+  database "SHARED_MEMORY JSON" as sharedMem
+}
+
+component "Graphify XAML Fixtures\n(unrelated to ownership)" as xamlFixtures <<external>>
+
+analyze --> pathMatch : "step (a)"
+pathMatch --> teamDirs : "prefix match O(teams)"
+analyze --> regexMatch : "step (b) fallback"
+regexMatch --> artifactPatterns : "suffix regex match"
+extract --> analyze : "feeds artifact set"
+analyze --> inferClass : "resolves entity class"
+
+verifyScript --> sharedMem : "writes pattern_compliance_score"
+verifyScript ..> regexMatch : "same regex-count heuristic strategy"
+
+xamlFixtures ..> extract : "falls through both layers\n(unowned, .xaml/.cs unmatched)"
+
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ObservationWriter
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[ObservationWriter] as observation_writer #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[MultiUserHashManager] as multi_user_hash_manager #F0F0F0
+[LiveTranscriptWatchers] as live_transcript_watchers #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ObservationEventBus] as observation_event_bus #E8F5E8
+[AckPhraseGate] as ack_phrase_gate #E8F5E8
+[KmCoreOntologyResolver] as km_core_ontology_resolver #E8F5E8
+
+live_logging_system --> observation_writer
+lslconfig_validator -[hidden]- observation_writer
+redaction_config_manager -[hidden]- observation_writer
+multi_user_hash_manager -[hidden]- observation_writer
+live_transcript_watchers -[hidden]- observation_writer
+token_usage_adapters -[hidden]- observation_writer
+observation_writer --> observation_event_bus
+observation_writer --> ack_phrase_gate
+observation_writer --> km_core_ontology_resolver
+
+@enduml

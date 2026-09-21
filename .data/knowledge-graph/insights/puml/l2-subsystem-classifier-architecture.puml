@@ -1,36 +1,36 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "BaseAgent Pipeline" {
-  component "BaseAgent.execute()" as base <<core>>
-  component "OntologyClassificationAgent" as oca <<agent>>
-  component "classifySingleObservation()\n(hard-root-guard)" as guard <<core>>
-}
-
-package "L2 Refinement (LLM)" {
-  component "loadL2Classes()" as load <<core>>
+package "Classification Pipeline" {
+  component "classifySingleObservation()" as classify <<core>>
+  component "Hard-Root-Guard\n(HIERARCHY_ROOTS)" as rootguard <<core>>
+  component "L2SubsystemClassifier" as l2 <<agent>>
   component "buildL2RefinementPrompt()" as prompt <<core>>
   component "extractL2FromLLMResponse()" as extract <<core>>
+}
+
+package "Ontology Data" {
+  database "coding.lower.json" as lowerjson <<storage>>
+  component "loadL2Classes()" as loadl2 <<core>>
+  component "REFINABLE_L1_PARENTS\n(hardcoded)" as parents <<core>>
+}
+
+package "External / Test" {
   cloud "LLM Provider" as llm <<external>>
+  component "ontology-classification-agent.test.ts\n(tmpdir fixtures)" as tests <<cli>>
 }
 
-package "Fallback & Config" {
-  component "L2SubsystemClassifier\n(keyword-based)" as l2fallback <<core>>
-  database "coding.lower.json" as config <<storage>>
-}
-
-base --> oca : "invokes process()"
-oca --> guard : "checks HIERARCHY_ROOTS"
-guard --> load : "if L1 in REFINABLE_L1_PARENTS"
-load --> config : "reads (optional)"
-load --> prompt : "L2 class set"
-prompt --> llm : "sends prompt"
-llm --> extract : "raw response"
-extract --> oca : "L2 class or empty"
-
-oca ..> l2fallback : "fallback on LLM failure/timeout"
-l2fallback --> config : "reads (optional)"
-
-oca --> base : "returns AgentResponse"
+classify --> rootguard : "checks known roots"
+rootguard --> l2 : "bypass if match\notherwise refine"
+l2 --> loadl2 : "load candidate L2 classes"
+loadl2 --> lowerjson : "filter classCatalog"
+loadl2 --> parents : "filter by extends"
+l2 --> prompt : "build multiple-choice prompt"
+prompt --> llm : "send closed vocabulary prompt"
+llm --> extract : "free-text response"
+extract --> lowerjson : "token-boundary match"
+extract --> classify : "return L2 or fallback to L1"
+tests ..> l2 : "integration test"
+tests ..> lowerjson : "copies fixture"
 
 @enduml

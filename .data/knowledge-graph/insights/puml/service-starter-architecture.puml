@@ -1,35 +1,42 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Service Wrappers" {
-  component "api-service.js" as apiSvc <<cli>>
-  component "dashboard-service.js" as dashSvc <<cli>>
+package "Legacy Path" {
+  component "start-services.sh" as legacy <<cli>>
 }
 
-package "Orchestration Layer" {
-  component "ServiceStarter\n(startServiceWithRetry)" as starter <<core>>
-  component "withDeadline()" as deadline <<core>>
-  component "ProcessStateManager" as psm <<core>>
+package "Robust Path (Node)" {
+  component "start-services-robust.js" as robust <<core>>
+  component "SERVICE_CONFIGS / SERVICE_ORDER" as svcconf <<core>>
+  component "loadFeatures()" as loadfeat <<core>>
+  component "waitForPortBindable()" as portbind <<core>>
+  component "killProcessOnPortAndWait()" as killport <<core>>
+  component "isProcessRunningByScript()" as orphan <<core>>
+  component "ProcessStateManager" as psm <<storage>>
 }
 
-package "Container Supervision" {
-  component "entrypoint.sh" as entry <<cli>>
-  component "supervisord.conf" as supervisord <<external>>
-  cloud "Qdrant / Redis" as datastores <<external>>
+package "Container Path" {
+  component "docker/entrypoint.sh" as entrypoint <<cli>>
+  component "PROGRAM_FEATURES mapping" as progfeat <<core>>
+  component "features.json snapshot" as snapshot <<storage>>
 }
 
-apiSvc --> psm : "register/unregister PID"
-dashSvc --> psm : "register/unregister PID"
-dashSvc ..> apiSvc : "hardcoded\nNEXT_PUBLIC_API_BASE_URL"
+component "transcriptMonitor service" as transcript <<agent>>
+component "prompt-classifier-service.mjs" as classifier <<agent>>
 
-starter --> deadline : "start/health-check\n(deadline-guarded)"
-starter --> psm : "tracks spawned pid/port"
-starter --> starter : "SIGTERM->SIGKILL\non health-check failure"
+legacy --> robust : "ROBUST_MODE=true delegates to"
+robust --> svcconf : "iterates"
+svcconf --> loadfeat : "checks feature gate"
+svcconf --> transcript : "starts (required=true)"
+transcript --> orphan : "PSM+pgrep tri-check"
+orphan --> psm : "registerService/isServiceRunning"
+robust --> portbind : "verify port bindable"
+robust --> killport : "SIGTERM->SIGKILL escalation"
 
-entry --> supervisord : "autostart overrides\n(fail-open feature gating)"
-entry --> datastores : "wait_for_service()\n(fail-open readiness poll)"
+entrypoint --> progfeat : "maps features to services"
+entrypoint --> snapshot : "reads (fail-open if missing)"
+progfeat ..> svcconf : "must stay in sync (manual)"
 
-apiSvc ..> starter : "not yet adopted\n(inline spawn logic)"
-dashSvc ..> starter : "not yet adopted\n(inline spawn logic)"
+classifier ..> robust : "shares env-driven fail-open philosophy"
 
 @enduml

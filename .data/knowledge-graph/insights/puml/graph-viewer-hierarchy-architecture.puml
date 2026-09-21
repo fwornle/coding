@@ -1,0 +1,37 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Graph Rendering Layer" {
+  component "D3GraphCanvas.tsx" as d3canvas <<core>>
+  component "Sigma/WebGL graph-builder.ts" as sigma <<core>>
+  component "color-fallback.ts\n(node FillColor/node ShapeFor)" as colorfb <<core>>
+  component "useGraphVisibility /\nuseNodeToBucketsIndex" as sharedhooks <<core>>
+}
+
+package "Store & State" {
+  database "Zustand Graph Store\n(pathToSelected)" as zstore <<storage>>
+  database "ukbSlice.ts\n(UKBProcess / WorkflowExecutionState)" as ukbslice <<storage>>
+}
+
+package "Workflow UI" {
+  component "multi-agent-graph.tsx\n(WAVE_AGENTS, KG_OPERATOR_CHILDREN)" as magraph <<agent>>
+  component "ukb-workflow-modal.tsx\n(calculateDynamicEta,\nHISTORY_PAGE_SIZE)" as ukbmodal <<core>>
+}
+
+d3canvas --> zstore : "reads pathToSelected"
+d3canvas --> colorfb : "resolves node style"
+d3canvas ..> sigma : "must stay visually consistent with"
+sigma --> zstore : "reads shared state"
+sigma --> colorfb : "resolves node style"
+d3canvas --> sharedhooks : "uses"
+sigma --> sharedhooks : "uses"
+
+magraph --> zstore : "derives node status"
+magraph --> ukbslice : "reads workflow steps"
+
+ukbmodal --> ukbslice : "imports selectors/actions"
+ukbmodal --> ukbslice : "reads history via /api/ukb/history"
+
+zstore ..> colorfb : "provides overlay data"
+
+@enduml

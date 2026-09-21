@@ -1,39 +1,37 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Dashboard UI" {
-  component "ukb-workflow-modal.tsx" as modal <<core>>
-  component "calculateDynamicEta()" as dynEta <<core>>
-  component "calculateStepAwareEta()" as legacyEta <<core>>
-  component "multi-agent-graph.tsx" as graph <<core>>
-  component "AGENT_SUBSTEPS" as substeps <<core>>
-  component "WAVE_AGENTS" as waveAgents <<core>>
+package "Learning Source Classification" {
+  component "learning-source.ts\n(isOnlineLearned)" as source <<core>>
+  component "color-fallback.ts\n(classColor/node FillColor)" as colorfb <<core>>
+  component "BATCH_PALETTE /\nONLINE_PALETTE" as palettes <<storage>>
 }
 
-package "Knowledge Store Access Paths" {
-  component "ukb-database/cli.js" as dbCli <<cli>>
-  component "ukb-unified/cli.js (UKBCli)" as unifiedCli <<cli>>
-  component "VkbApiClient" as vkbClient <<api>>
+package "Graph Visualization" {
+  component "D3GraphCanvas.tsx\n(VKB port)" as canvas <<core>>
+  component "ONLINE_RING_COLOR\nring overlay" as ring <<core>>
+  component "Legend / Filter Rail /\nHistory Sidebar" as legend <<core>>
 }
 
-package "Backend Store" {
-  database "SQLite + Qdrant + GraphDB" as store
-  cloud "VKB Server (port 8080)" as vkbServer
+package "System Health Dashboard" {
+  component "ukbSlice.ts\n(LLMMode, llmMode?)" as slice <<core>>
+  component "multi-agent-graph.tsx\n(AGENT_SUBSTEPS, llmUsage)" as agentgraph <<agent>>
+  component "ukb-workflow-modal.tsx\n(HISTORY_PAGE_SIZE=500)" as modal <<api>>
 }
 
-modal --> dynEta : "computes batch-aware ETA"
-legacyEta --> dynEta : "delegates (legacy shim)"
-modal --> legacyEta : "some call sites use"
+database "/api/ukb/history" as historyApi
 
-graph --> substeps : "renders LLM-tier map"
-graph --> waveAgents : "fallback for historical view"
+colorfb --> source : "delegates classification"
+colorfb --> palettes : "resolves fill/ring colors"
+canvas --> source : "imports isOnlineLearned"
+canvas --> ring : "draws provenance ring"
+canvas --> legend : "shares classification"
+colorfb --> legend : "shares classification"
 
-dbCli --> store : "direct writes"
-unifiedCli --> store : "orchestrated incremental writes"
-vkbClient --> vkbServer : "HTTP CRUD + isServerAvailable()"
-vkbServer --> store : "enforces validation/decay"
+slice --> agentgraph : "propagates llmMode"
+agentgraph --> modal : "reports substep status"
+modal --> historyApi : "fetches paginated history"
 
-modal ..> unifiedCli : "reflects pipeline state"
-graph ..> unifiedCli : "visualizes agent pipeline"
+canvas ..> colorfb : "uses node FillColor/node ShapeFor"
 
 @enduml

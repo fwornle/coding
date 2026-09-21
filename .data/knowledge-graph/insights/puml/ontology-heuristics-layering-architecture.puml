@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Layer 1: Entity Pattern Analyzer" {
+  component "analyzeEntityPatterns()" as entry <<core>>
+  component "checkLocalArtifact()\nconfidence 0.9" as localArtifact <<core>>
+  component "matchArtifactPattern()\nconfidence 0.75" as regexMatch <<core>>
+  component "extractArtifacts()\n(missing 'Adapter' suffix)" as extract <<core>>
+  component "inferEntityClass()\n(orphaned 'Agentic' branch)" as inferClass <<core>>
+}
+
+package "Hardcoded Team Data" {
+  component "teamDirectories\n(4 teams)" as teamDirs <<storage>>
+  component "artifactPatterns\n(RegExp + entity ClassMap)" as artPatterns <<storage>>
+  component "teamMappings\n(5 teams incl. Agentic)" as teamMap <<storage>>
+}
+
+package "Independent Compliance Subsystem" {
+  component "verify-patterns.sh" as verifyScript <<cli>>
+  database "SHARED_MEMORY\n(Pattern Compliance Score)" as sharedMem <<storage>>
+}
+
+entry --> localArtifact : "1st: cheap prefix check"
+entry --> regexMatch : "2nd: fallback regex"
+localArtifact --> teamDirs : "startsWith() lookup"
+regexMatch --> artPatterns : "RegExp.test() loop"
+localArtifact --> inferClass : "resolved team"
+inferClass --> teamMap : "lookup (Agentic unreachable)"
+extract ..> teamDirs : "classify extracted artifacts"
+
+verifyScript --> sharedMem : "writes score via jq"
+verifyScript ..> entry : "no shared abstraction"
+
+@enduml

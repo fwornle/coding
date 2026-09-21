@@ -1,0 +1,33 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Agent Layer" {
+  component "OntologyClassificationAgent" as agent <<agent>>
+}
+
+package "Classification Core" {
+  component "OntologyClassifier" as classifier <<core>>
+  component "HeuristicClassifier" as heuristic <<core>>
+  component "UnifiedInferenceEngine" as llm <<core>>
+  component "OntologyValidator" as validator <<core>>
+}
+
+package "Support & Legacy Bridge" {
+  component "LegacyOntologyAdapter" as adapter <<adapter>>
+  database "km-core OntologyRegistry" as registry <<storage>>
+  component "OntologyMetrics / startTimer" as metrics <<external>>
+  component "ontology/types.ts" as types <<external>>
+}
+
+agent --> classifier : "classify(input, options)"
+classifier --> heuristic : "fast/deterministic path"
+classifier --> llm : "LLM/hybrid path"
+classifier --> validator : "validate(classification)"
+classifier --> metrics : "instrument classify()"
+classifier --> adapter : "legacy ontology access"
+adapter --> registry : "wraps upper/coding/lower json chain"
+classifier ..> types : "ClassificationOptions/OntologyClassification"
+validator ..> types : "ValidationOptions"
+agent --> agent : "L2 refinement (post-process)"
+
+@enduml

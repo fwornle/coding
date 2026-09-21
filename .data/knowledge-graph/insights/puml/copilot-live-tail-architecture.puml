@@ -1,0 +1,49 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Copilot CLI On-Disk State" {
+  component "events.jsonl" as events <<external>>
+  component "session-state/<uuid>/" as sessdir <<external>>
+  component "inuse.<pid>.lock" as lockfile <<external>>
+}
+
+package "CopilotLiveTail (copilot-events-tail.mjs)" {
+  component "scanForLiveSessions" as scan <<core>>
+  component "isOwnedByMe" as owned <<core>>
+  component "findLiveLockFile" as findlock <<core>>
+  component "tailEventsFile" as tail <<core>>
+  component "buildStubObservation" as stub <<core>>
+  component "onTokenRow" as tokenhook <<core>>
+}
+
+package "Adapters & Shared Parsers" {
+  component "copilot-events.mjs adapter" as adapter <<api>>
+  component "TranscriptNormalizer.js" as normalizer <<api>>
+}
+
+package "Downstream Sinks" {
+  component "LSL Observation Store" as lslstore <<storage>>
+  database "token-db.mjs (insertTokenRow)" as tokendb <<storage>>
+  component "opencode-token-rows.mjs" as opencodeadapter <<core>>
+}
+
+scan --> sessdir : "walks directories"
+scan --> owned : "filters by uid"
+scan --> findlock : "checks liveness"
+findlock --> lockfile : "reads mtime (10min grace)"
+
+tail --> events : "statSync-diff polling\n(forward-only)"
+tail --> adapter : "parseWorkspaceYaml,\nprojectFromWorkspace"
+tail --> normalizer : "parseCopilot"
+tail --> stub : "on missing transcript"
+stub --> lslstore : "writes lsl_incomplete stub"
+tail --> lslstore : "writes observations"
+
+tail --> tokenhook : "session.shutdown"
+tokenhook ..> tokendb : "best-effort write\n(non-fatal on failure)"
+
+opencodeadapter ..> tokendb : "shares D-08\nfailure isolation"
+
+owned ..> opencodeadapter : "shared ownership pattern"
+
+@enduml

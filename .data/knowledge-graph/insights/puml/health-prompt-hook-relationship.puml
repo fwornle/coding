@@ -7,15 +7,17 @@ title Hierarchy Context: HealthPromptHook
 [HealthPromptHook] as health_prompt_hook #LightBlue
 [HookConfigLoader] as hook_config_loader #F0F0F0
 [UnifiedHookManager] as unified_hook_manager #F0F0F0
-[ViolationCaptureService] as violation_capture_service #F0F0F0
-[ContentValidationAgent] as content_validation_agent #F0F0F0
 [KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
+[HooksManagerAbstractBase] as hooks_manager_abstract_base #E8F5E8
+[HookEventMapping] as hook_event_mapping #E8F5E8
+[RegisteredHookLifecycle] as registered_hook_lifecycle #E8F5E8
 
 constraint_system --> health_prompt_hook
 hook_config_loader -[hidden]- health_prompt_hook
 unified_hook_manager -[hidden]- health_prompt_hook
-violation_capture_service -[hidden]- health_prompt_hook
-content_validation_agent -[hidden]- health_prompt_hook
 knowledge_injection_hooks -[hidden]- health_prompt_hook
+health_prompt_hook --> hooks_manager_abstract_base
+health_prompt_hook --> hook_event_mapping
+health_prompt_hook --> registered_hook_lifecycle
 
 @enduml
