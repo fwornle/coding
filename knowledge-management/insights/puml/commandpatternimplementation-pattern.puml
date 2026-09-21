@@ -1,5 +1,5 @@
 @startuml commandpatternimplementation-pattern
-!include ../../../docs/puml/_standard-style.puml
+!include _standard-style.puml
 
 title Command Pattern Implementation - Design Patterns
 

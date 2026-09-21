@@ -1,5 +1,5 @@
 @startuml repositorypatternimplementation-architecture
-!include ../../../docs/puml/_standard-style.puml
+!include _standard-style.puml
 
 title Repository Pattern Implementation - Architecture Overview
 

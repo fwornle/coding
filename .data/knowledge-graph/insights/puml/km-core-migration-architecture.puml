@@ -1,5 +1,5 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include _standard-style.puml
 title "KM Core Migration Architecture\nv1.0 — 2026-05-25"
 
 ' Author: fradou7@gmail.com
@@ -12,7 +12,6 @@ title "KM Core Migration Architecture\nv1.0 — 2026-05-25"
 
 ```plantuml
 @startuml
-!include /coding/docs/puml/_standard-style.puml
 
 top to bottom direction
 

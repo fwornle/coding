@@ -1,5 +1,5 @@
 @startuml repositorypatternimplementation-workflow
-!include ../../../docs/puml/_standard-style.puml
+!include _standard-style.puml
 
 title Repository Pattern Implementation - Workflow
 

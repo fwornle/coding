@@ -1,5 +1,5 @@
 @startuml
-!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+!include _standard-style.puml
 
 package "Knowledge Management" {
     class KnowledgeManager <<service>> {
