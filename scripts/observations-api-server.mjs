@@ -2594,6 +2594,21 @@ async function composeViewerStats(store) {
     });
     if (!hasLiveEdge) orphanCount += 1;
   }
+  // Self-referential edges. No entity contains, or relates to, itself, so
+  // this is an integrity counter that should read 0 forever.
+  //
+  // It is here because the store carried 49 of them (28 `contains`, 21
+  // `related_to`) from a 2026-06 legacy backfill and NOTHING surfaced it:
+  // they are not orphans, they do not dent connectivity, and every one passed
+  // the store's own checks on the way in. They were found by accident, when a
+  // parent-description readback could not tell a self-parent from a bug.
+  // `GraphKMStore.addRelation` now refuses them at the write boundary; this
+  // counts them however they arrived, including through a restore.
+  let selfEdgeCount = 0;
+  graph.forEachEdge((_k, _attrs, source, target) => {
+    if (source === target) selfEdgeCount += 1;
+  });
+
   // Connectivity is the inverse density of orphans against the node
   // population — 1.0 means every node touches at least one edge.
   const connectivity = nodeCount > 0
@@ -2641,6 +2656,7 @@ async function composeViewerStats(store) {
     evidenceCount,
     patternCount,
     orphanCount,
+    selfEdgeCount,
     componentCount,
     connectivity,
     lastUpdated,
