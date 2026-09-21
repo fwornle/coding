@@ -572,6 +572,116 @@ export class ObservationConsolidator {
   }
 
   /**
+   * Corpus-wide mention count per SubComponent, plus each one's depth.
+   *
+   * Built once per consolidator instance: 360 entities and a scan of ~30k
+   * edges, which is milliseconds in-process but is not something to repeat
+   * on every insight write. A run adds mentions as it goes, so the tally is
+   * a snapshot from the start of the run — parents shift by single counts at
+   * most, and the alternative (re-tallying per write) buys nothing.
+   *
+   * @returns {Promise<{tally: Map<string, number>, levelOf: Map<string, number|undefined>}>}
+   */
+  async _subComponentMentionTally() {
+    if (this._subMentionTally) return this._subMentionTally;
+    const tally = new Map();
+    const levelOf = new Map();
+    const subs = await this._kmStore.findByOntologyClass('SubComponent');
+    for (const s of subs) {
+      if (!s?.id) continue;
+      tally.set(s.id, 0);
+      levelOf.set(s.id, (s.metadata ?? {}).hierarchyLevel);
+    }
+    const mentions = await this._kmStore.findRelations({ type: 'mentions' });
+    for (const r of mentions) {
+      if (tally.has(r.to)) tally.set(r.to, tally.get(r.to) + 1);
+    }
+    this._subMentionTally = { tally, levelOf };
+    return this._subMentionTally;
+  }
+
+  /**
+   * Which SubComponent should own this insight? (Stage 4)
+   *
+   * WHY THE MENTIONS EDGES AND NOT THE CLASSIFIER. The obvious candidate was
+   * `_classifyInsightByOntology`, and the revamp plan said to resolve its
+   * output to a SubComponent. It cannot be done: that classifier scores
+   * against `development-knowledge-ontology.json`, whose 14 classes are
+   * knowledge-artifact kinds (`Insight`, `Decision`, `Constraint`), not
+   * subsystems. Measured on the live graph, 2 of its 27 observed values
+   * matched a SubComponent name, and only 73 of 959 insights carried the
+   * field at all. Resolving it would have minted SubComponents called
+   * "Decision".
+   *
+   * The mentions classifier already answers the real question. It is an LLM
+   * pass over the actual entity catalogue, it has been running since June,
+   * and 880 of 959 insights mention at least one Component or SubComponent.
+   * Its output arrives here as `mentionsTargetIds` on the same call, so this
+   * costs one tally and no extra model time.
+   *
+   * WHY `metadata.parentId` AND NOT A `contains` EDGE. Stage 2 arbitrated 42
+   * ambiguous rows on the rule that `contains` means "member of the
+   * hierarchy" and `has_insight` means "learning artifact hanging off a
+   * Project" — see repair-writer-ontology-class.mjs:180. That partition is
+   * currently exact: all 959 insights are held by `has_insight` and none by
+   * `contains`. Emitting `contains` here would put ~767 rows on both sides of
+   * the line the repair script still arbitrates on. A field says where a row
+   * belongs without claiming it is something it is not.
+   *
+   * SELECTION: the LEAST-mentioned of the SubComponents this insight names,
+   * corpus-wide, ties broken on the lower id so a re-run is reproducible.
+   *
+   * Rarity, not popularity — the same intuition as IDF. Ranking by popularity
+   * was tried first and measured: it picks whichever hub happens to be
+   * mentioned most across the whole graph, which discards the specificity the
+   * mentions classifier produced. On the live corpus it put 231 of 767
+   * insights under `LoggingModule` and 44.7% under three parents, placing
+   * "MkDocs Documentation — Directory Layout" and "System Health Dashboard —
+   * server.js API Backend" both under `LoggingModule`. Rarity spreads the
+   * same 767 across 267 parents at 7.2% top-three, and sends those two to
+   * `ConstraintMonitoring` and `GraphDatabase` instead.
+   *
+   * A SubComponent mentioned by few insights is one this insight is
+   * distinctively about; a SubComponent mentioned by hundreds says only that
+   * it is popular. Stage 5 has to synthesise a parent description from its
+   * children, and it cannot do that from 231 unrelated ones.
+   *
+   * @param {string[]} mentionsTargetIds ids from the mentions classifier
+   * @returns {Promise<{parentId: string, hierarchyLevel: number, parentMentions: number}|null>}
+   */
+  async _resolveInsightParent(mentionsTargetIds) {
+    if (!Array.isArray(mentionsTargetIds) || mentionsTargetIds.length === 0) return null;
+    let tallyInfo;
+    try {
+      tallyInfo = await this._subComponentMentionTally();
+    } catch (err) {
+      // Placement is an enrichment, never a reason to lose an insight.
+      process.stderr.write(
+        `[Consolidator→KG] parent tally unavailable (non-fatal): ${err.message}\n`,
+      );
+      return null;
+    }
+    const { tally, levelOf } = tallyInfo;
+    let best = null;
+    for (const id of mentionsTargetIds) {
+      if (!tally.has(id)) continue; // not a SubComponent — Components and Details are not parents here
+      const n = tally.get(id);
+      // Fewest corpus-wide mentions wins: the rarest name this insight
+      // touches is the most specific thing it is about.
+      if (!best || n < best.n || (n === best.n && String(id) < String(best.id))) best = { id, n };
+    }
+    if (!best) return null;
+    const parentLevel = levelOf.get(best.id);
+    return {
+      parentId: best.id,
+      // A SubComponent is normally level 2, but 10 sit at 3 and 44 carry no
+      // level at all — derive from the parent rather than hardcoding 3.
+      hierarchyLevel: Number.isInteger(parentLevel) ? parentLevel + 1 : 3,
+      parentMentions: best.n,
+    };
+  }
+
+  /**
    * Push a synthesized insight into the KG as an online-learned entity.
    * The viewer renders these red/pink so the user can distinguish
    * auto-learned knowledge from the manual UKB pipeline output.
@@ -626,6 +736,11 @@ export class ObservationConsolidator {
     // project-anchor edge is emitted by the consolidator AFTER writeInsight
     // returns the minted id (the has_insight edge is consolidator-specific;
     // writeInsight emits capturedBy, not has_insight).
+    // Stage 4 — place the insight in the hierarchy off the mentions the
+    // classifier just produced. Never throws; a null parent leaves the row
+    // exactly as it was before this stage existed.
+    const parent = await this._resolveInsightParent(mentionsTargetIds);
+
     const writer = this._ensureObservationWriter();
     const row = {
       // The mapper's name field reads from row.topic||row.summary; the
@@ -667,6 +782,12 @@ export class ObservationConsolidator {
         // reader asking "which insights concern AgentIntegration" has one
         // place to look regardless of which system wrote the row.
         subsystem: entityClass,
+        // Stage 4 — hierarchy placement. Absent (rather than null) when no
+        // mentioned SubComponent resolved, so a reader can tell "never
+        // placed" from "placed nowhere".
+        ...(parent
+          ? { parentId: parent.parentId, hierarchyLevel: parent.hierarchyLevel }
+          : {}),
         ontology: {
           ontologyName: 'development-knowledge-ontology',
           classificationMethod: 'heuristic-token-overlap',
@@ -688,7 +809,8 @@ export class ObservationConsolidator {
 
     if (this._kgPushDebug) {
       process.stderr.write(
-        `[Consolidator→KG] ${entry.topic} → ${entityClass} (${classConf.toFixed(2)}) team=${project} mintedId=${mintedId} mentions=${mentionsTargetIds.length}\n`
+        `[Consolidator→KG] ${entry.topic} → ${entityClass} (${classConf.toFixed(2)}) team=${project} mintedId=${mintedId} mentions=${mentionsTargetIds.length} ` +
+          `parent=${parent ? `${parent.parentId}@L${parent.hierarchyLevel} (${parent.parentMentions} mentions)` : 'none'}\n`
       );
     }
 
