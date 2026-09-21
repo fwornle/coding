@@ -580,24 +580,88 @@ export class ObservationConsolidator {
    * a snapshot from the start of the run — parents shift by single counts at
    * most, and the alternative (re-tallying per write) buys nothing.
    *
-   * @returns {Promise<{tally: Map<string, number>, levelOf: Map<string, number|undefined>}>}
+   * Also carries what is needed to honour a classifier primary that is NOT a
+   * SubComponent — see `_resolveInsightParent`:
+   *   `eligible`  Components as well as SubComponents, both legitimate homes
+   *               for a leaf artifact, with their depth.
+   *   `parentOf`  the `contains` parent of every Detail, so a primary that
+   *               names a Detail resolves to where that Detail lives.
+   *
+   * @returns {Promise<{tally: Map<string, number>, levelOf: Map<string, number|undefined>,
+   *   eligible: Map<string, number|undefined>, parentOf: Map<string, string>}>}
    */
   async _subComponentMentionTally() {
     if (this._subMentionTally) return this._subMentionTally;
     const tally = new Map();
     const levelOf = new Map();
+    const eligible = new Map();
     const subs = await this._kmStore.findByOntologyClass('SubComponent');
     for (const s of subs) {
       if (!s?.id) continue;
       tally.set(s.id, 0);
       levelOf.set(s.id, (s.metadata ?? {}).hierarchyLevel);
+      eligible.set(s.id, (s.metadata ?? {}).hierarchyLevel);
     }
+    // Components are parents too. They are deliberately absent from `tally`:
+    // the rarity prior ranks by mention count and a Component is mentioned far
+    // too often to ever win that contest, which is exactly why it must not
+    // compete in it. It can still be named outright by the classifier.
+    let comps = [];
+    try {
+      comps = await this._kmStore.findByOntologyClass('Component');
+    } catch {
+      comps = []; // A store without Components is not an error here.
+    }
+    for (const c of comps) {
+      if (!c?.id) continue;
+      eligible.set(c.id, (c.metadata ?? {}).hierarchyLevel);
+    }
+
     const mentions = await this._kmStore.findRelations({ type: 'mentions' });
     for (const r of mentions) {
       if (tally.has(r.to)) tally.set(r.to, tally.get(r.to) + 1);
     }
-    this._subMentionTally = { tally, levelOf };
+
+    // Detail -> its containing parent.
+    const parentOf = new Map();
+    let contains = [];
+    try {
+      contains = await this._kmStore.findRelations({ type: 'contains' });
+    } catch {
+      contains = [];
+    }
+    for (const r of contains) {
+      if (r?.to && r?.from && !parentOf.has(r.to)) parentOf.set(r.to, r.from);
+    }
+
+    this._subMentionTally = { tally, levelOf, eligible, parentOf };
     return this._subMentionTally;
+  }
+
+  /**
+   * Nearest ancestor that can actually hold a leaf artifact.
+   *
+   * Returns null rather than guessing when the chain runs out — a Detail
+   * hanging off a Project (71 do) or off nothing at all (57 do) offers no
+   * home more specific than the one the insight already has.
+   *
+   * @param {string} startId
+   * @param {Map<string,string>} parentOf
+   * @param {Map<string,number|undefined>} eligible
+   * @param {number} [maxHops]
+   * @returns {string|null}
+   */
+  static _climbToEligibleParent(startId, parentOf, eligible, maxHops = 4) {
+    const seen = new Set([startId]);
+    let cur = startId;
+    for (let hop = 0; hop < maxHops; hop += 1) {
+      const up = parentOf.get(cur);
+      if (!up || seen.has(up)) return null; // dangling, or a cycle
+      if (eligible.has(up)) return up;
+      seen.add(up);
+      cur = up;
+    }
+    return null;
   }
 
   /**
@@ -672,14 +736,39 @@ export class ObservationConsolidator {
       );
       return null;
     }
-    const { tally, levelOf } = tallyInfo;
+    const { tally, levelOf, eligible, parentOf } = tallyInfo;
 
-    // The classifier's own answer, when it gave one and it can be a parent.
-    // `tally` holds SubComponents only, which is also the membership test.
+    // The classifier's own answer, resolved to something that can be a parent.
+    //
+    // Measured before this existed: of 12 probed insights the classifier named
+    // a primary for 11, and every one of them was a DETAIL — so a rule that
+    // accepted only SubComponents discarded 11 correct answers and fell back
+    // to the prior, an 8% usable rate that looked like the model declining.
+    // It was not declining; the catalogue it picks from is mostly Details,
+    // which are leaves and siblings of an insight rather than homes for one.
+    //
+    // A Detail therefore resolves UP one `contains` hop: this insight is about
+    // the same subject that Detail is about, so it belongs where that Detail
+    // belongs. 540 of 597 Details carry such a parent (397 SubComponent, 25
+    // Component). The rest, and any Detail whose parent is itself a Detail,
+    // fall through to the prior rather than inventing a placement.
     let best = null;
     let parentSource = 'classifier';
-    if (primaryTargetId && tally.has(primaryTargetId)) {
-      best = { id: primaryTargetId, n: tally.get(primaryTargetId) };
+    let resolvedPrimary = primaryTargetId;
+    if (resolvedPrimary && !eligible.has(resolvedPrimary)) {
+      // Walk `contains` upward to the nearest eligible home. Bounded and
+      // cycle-guarded: Details nest inside Details (36 of them do), so one
+      // hop misses those chains, while an unbounded walk on a graph that
+      // still carries dangling edges is a hang waiting to happen.
+      resolvedPrimary = ObservationConsolidator._climbToEligibleParent(
+        resolvedPrimary, parentOf, eligible,
+      );
+      if (resolvedPrimary) parentSource = 'classifier-detail-parent';
+    }
+    if (resolvedPrimary && eligible.has(resolvedPrimary)) {
+      // `tally` covers SubComponents only; a Component parent has no mention
+      // count and reports 0, which is honest rather than missing.
+      best = { id: resolvedPrimary, n: tally.get(resolvedPrimary) ?? 0 };
     }
 
     if (!best) {
@@ -693,7 +782,7 @@ export class ObservationConsolidator {
       }
     }
     if (!best) return null;
-    const parentLevel = levelOf.get(best.id);
+    const parentLevel = levelOf.has(best.id) ? levelOf.get(best.id) : eligible.get(best.id);
     return {
       parentId: best.id,
       // A SubComponent is normally level 2, but 10 sit at 3 and 44 carry no

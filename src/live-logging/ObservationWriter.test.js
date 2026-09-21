@@ -898,6 +898,9 @@ describe('ObservationConsolidator._resolveInsightParent — stage 4 placement', 
   const makeStore = ({ throwOnTally = false } = {}) => ({
     findByOntologyClass: async (cls) => {
       if (throwOnTally) throw new Error('store unavailable');
+      if (cls === 'Component') {
+        return [{ id: 'comp-1', name: 'KnowledgeManagement', metadata: { hierarchyLevel: 1 } }];
+      }
       if (cls !== 'SubComponent') return [];
       return [
         { id: 'sub-hub', name: 'LoggingModule', metadata: { hierarchyLevel: 2 } },
@@ -908,6 +911,14 @@ describe('ObservationConsolidator._resolveInsightParent — stage 4 placement', 
     },
     // sub-hub ×3, sub-mid ×1, sub-deep ×1, sub-nolevel ×1
     findRelations: async ({ type }) => {
+      if (type === 'contains') {
+        return [
+          // det-a lives under a SubComponent; det-orphan under nothing;
+          // det-nested under another Detail, which is not a usable home.
+          { from: 'sub-mid', to: 'det-a', type: 'contains' },
+          { from: 'det-a', to: 'det-nested', type: 'contains' },
+        ];
+      }
       if (type !== 'mentions') return [];
       return [
         { from: 'i1', to: 'sub-hub', type: 'mentions' },
@@ -993,11 +1004,67 @@ describe('ObservationConsolidator._resolveInsightParent — stage 4 placement', 
     assert.equal(p.parentSource, 'rarity');
   });
 
-  it('falls back to rarity when the primary cannot be a parent', async () => {
+  it('accepts a Component primary — a Component is a legitimate home', async () => {
+    // Components are absent from the rarity tally on purpose: they are
+    // mentioned far too often to ever win a rarest-name contest. That is a
+    // reason to keep them out of the PRIOR, not out of the hierarchy.
     const c = consolidatorWith(makeStore());
-    // comp-1 is a Component: a real entity, mentioned, but not a parent here.
     const p = await c._resolveInsightParent(['sub-hub', 'sub-mid'], 'comp-1');
+    assert.equal(p.parentId, 'comp-1');
+    assert.equal(p.parentSource, 'classifier');
+    assert.equal(p.hierarchyLevel, 2, 'a level-1 Component yields a level-2 child');
+  });
+
+  it('resolves a Detail primary up to the Detail\'s own parent', async () => {
+    // The 8%-answer-rate bug: the classifier named a Detail for 11 of 12
+    // probed insights and every one was discarded. A Detail is a sibling of
+    // an insight, not a home for one — but where it LIVES is a home.
+    const c = consolidatorWith(makeStore());
+    const p = await c._resolveInsightParent(['sub-hub'], 'det-a');
+    assert.equal(p.parentId, 'sub-mid', 'det-a lives under sub-mid');
+    assert.equal(p.parentSource, 'classifier-detail-parent');
+    assert.equal(p.hierarchyLevel, 3);
+  });
+
+  it('falls back to rarity when a Detail primary has no usable parent', async () => {
+    const c = consolidatorWith(makeStore());
+    const p = await c._resolveInsightParent(['sub-hub', 'sub-mid'], 'det-orphan');
     assert.equal(p.parentId, 'sub-mid');
+    assert.equal(p.parentSource, 'rarity');
+  });
+
+  it('climbs through a Detail-inside-a-Detail chain to the nearest home', async () => {
+    // 36 Details nest inside other Details, so a single hop misses them.
+    // det-nested -> det-a -> sub-mid.
+    const c = consolidatorWith(makeStore());
+    const p = await c._resolveInsightParent(['sub-hub'], 'det-nested');
+    assert.equal(p.parentId, 'sub-mid');
+    assert.equal(p.parentSource, 'classifier-detail-parent');
+  });
+
+  it('gives up rather than guessing when the chain has no home', async () => {
+    // A Detail hanging off a Project or off nothing offers no home more
+    // specific than the one the insight already has.
+    const c = consolidatorWith(makeStore());
+    const p = await c._resolveInsightParent(['sub-hub', 'sub-mid'], 'det-orphan');
+    assert.equal(p.parentSource, 'rarity');
+  });
+
+  it('a contains cycle terminates instead of hanging', async () => {
+    const cyclic = {
+      ...makeStore(),
+      findRelations: async ({ type }) => {
+        if (type === 'contains') {
+          return [
+            { from: 'det-x', to: 'det-y', type: 'contains' },
+            { from: 'det-y', to: 'det-x', type: 'contains' },
+          ];
+        }
+        return [{ from: 'i1', to: 'sub-hub', type: 'mentions' }];
+      },
+    };
+    const c = consolidatorWith(cyclic);
+    const p = await c._resolveInsightParent(['sub-hub', 'sub-mid'], 'det-x');
     assert.equal(p.parentSource, 'rarity');
   });
 
@@ -1029,9 +1096,14 @@ describe('ObservationConsolidator._resolveInsightParent — stage 4 placement', 
     };
     const c = consolidatorWith(counted);
     await c._resolveInsightParent(['sub-hub']);
+    // Placement now needs two edge scans — `mentions` for the rarity tally and
+    // `contains` to resolve a Detail primary to its home. Asserting the COUNT
+    // would just re-pin an implementation detail; what must hold is that
+    // neither scan repeats per write.
+    const afterFirst = scans;
     await c._resolveInsightParent(['sub-mid']);
     await c._resolveInsightParent(['sub-deep']);
-    assert.equal(scans, 1, 'the ~30k-edge scan must be memoized for the run');
+    assert.equal(scans, afterFirst, 'the ~30k-edge scans must be memoized for the run');
   });
 
   it('is non-fatal when the store cannot answer — an insight is never lost to placement', async () => {

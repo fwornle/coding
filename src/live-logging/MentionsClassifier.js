@@ -299,6 +299,10 @@ export async function loadMentionCandidates(kmStore) {
       id: e.id,
       name: e.name,
       description: deriveDescription(e),
+      // The prompt needs this to ask the primary-subject question properly:
+      // only a Component or SubComponent can HOLD an insight. A Detail is a
+      // leaf and a sibling of one.
+      entityType: e.entityType,
     }));
 
   _candidateCache.set(kmStore, flat);
@@ -441,7 +445,8 @@ export function buildMentionsPrompt(insightSummary, candidates) {
     .map((c) => {
       const name = (c && typeof c.name === 'string') ? c.name : '';
       const desc = (c && typeof c.description === 'string') ? c.description : '';
-      return `- ${name}: ${desc.slice(0, DESC_BUDGET)}`;
+      const cls = (c && typeof c.entityType === 'string') ? c.entityType : 'Detail';
+      return `- ${name} [${cls}]: ${desc.slice(0, DESC_BUDGET)}`;
     })
     .join('\n');
 
@@ -454,12 +459,16 @@ export function buildMentionsPrompt(insightSummary, candidates) {
         content:
           'You classify which architectural entities an Insight discusses.\n' +
           'Pick a subset of entities from the catalog below whose subjects are clearly discussed in the Insight summary.\n' +
-          'Then name the ONE entity the Insight is PRIMARILY about — its main subject, not merely something it\'s\n' +
-          'mentioned alongside. Prefer the most specific entity that still covers the whole Insight. If the Insight\n' +
-          'is not mainly about any single one of them, return null for it rather than guessing.\n' +
+          'Then name the ONE entity that should OWN this Insight in the architecture hierarchy — the\n' +
+          'subsystem it is mainly about, not merely something mentioned alongside.\n' +
+          '"primary" MUST be an entry marked [Component] or [SubComponent]. Entries marked [Detail] are\n' +
+          'leaves and can never own an Insight — if the Insight is mostly about a [Detail], name the\n' +
+          '[SubComponent] or [Component] that the Detail belongs to instead.\n' +
+          'Prefer the most specific owner that still covers the whole Insight. Return null rather than\n' +
+          'guessing when no listed [Component] or [SubComponent] genuinely owns it.\n' +
+          '"primary" does NOT have to appear in "mentions".\n' +
           'Reply with ONLY a JSON object, no prose and no markdown fences, shaped exactly:\n' +
-          '  {"mentions": ["EtmDaemon", "LiveLoggingSystem"], "primary": "EtmDaemon"}\n' +
-          '"primary" MUST be one of the names in "mentions", or null.\n' +
+          '  {"mentions": ["EtmDaemon", "LiveLoggingSystem"], "primary": "LiveLoggingSystem"}\n' +
           'Reject hallucinated names — only emit names that appear VERBATIM in the catalog below.\n' +
           'Return {"mentions": [], "primary": null} if no entity in the catalog clearly matches the Insight.\n' +
           'The catalog covers the L1+L2+L3 architectural vertical (entityType in {Component, SubComponent, Detail}).\n\n' +
@@ -614,9 +623,12 @@ export function extractMentionsResult(rawText, candidates) {
 
   let primaryId = null;
   if (primaryName) {
+    // Closed-set membership is the hallucination guard. Requiring the primary
+    // to ALSO appear in `mentions` was measured and rejected nothing (0 of 20
+    // probed), while ruling out the legitimate answer where an insight names
+    // only Details and is owned by the SubComponent above them.
     const hit = list.find((c) => c && c.name === primaryName);
-    // Must be a real candidate AND one this insight actually mentions.
-    if (hit && ids.includes(hit.id)) primaryId = hit.id;
+    if (hit) primaryId = hit.id;
   }
 
   return { ids, primaryId };

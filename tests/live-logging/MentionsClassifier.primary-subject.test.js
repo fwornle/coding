@@ -22,9 +22,9 @@ import {
 } from '../../src/live-logging/MentionsClassifier.js';
 
 const CANDIDATES = [
-  { id: 'id-etm', name: 'EtmDaemon', description: 'exchange transcript monitor' },
-  { id: 'id-lls', name: 'LiveLoggingSystem', description: 'session logging' },
-  { id: 'id-kg', name: 'KnowledgeGraph', description: 'graph store' },
+  { id: 'id-etm', name: 'EtmDaemon', description: 'exchange transcript monitor', entityType: 'SubComponent' },
+  { id: 'id-lls', name: 'LiveLoggingSystem', description: 'session logging', entityType: 'Component' },
+  { id: 'id-kg', name: 'KnowledgeGraph', description: 'graph store', entityType: 'SubComponent' },
 ];
 
 test('object form yields both the mentions and the primary', () => {
@@ -64,13 +64,15 @@ test('a hallucinated primary is refused', () => {
   assert.equal(primaryId, null);
 });
 
-test('a primary the insight does not mention is refused', () => {
-  // Closed set is necessary but not sufficient: the primary must be one of
-  // the entities the model itself said the insight discusses.
+test('a primary outside the mentions is accepted — it is the OWNER, not a mention', () => {
+  // Requiring primary ∈ mentions was measured against the live corpus and
+  // rejected nothing (0 of 20), while ruling out the common legitimate shape:
+  // an insight that names only Details but is owned by the SubComponent above
+  // them. Closed-set membership remains the hallucination guard.
   const raw = '{"mentions": ["EtmDaemon"], "primary": "KnowledgeGraph"}';
   const { ids, primaryId } = extractMentionsResult(raw, CANDIDATES);
   assert.deepEqual(ids, ['id-etm']);
-  assert.equal(primaryId, null);
+  assert.equal(primaryId, 'id-kg');
 });
 
 test('malformed JSON still salvages mentions via the token scan', () => {
@@ -83,9 +85,12 @@ test('malformed JSON still salvages mentions via the token scan', () => {
 test('the prompt actually asks for a single primary subject', () => {
   const body = buildMentionsPrompt('an insight about the ETM', CANDIDATES);
   const system = body.messages.find((m) => m.role === 'system').content;
-  assert.match(system, /PRIMARILY about/);
+  assert.match(system, /should OWN this Insight/);
   assert.match(system, /"primary"/);
-  assert.match(system, /or null/);
+  assert.match(system, /\[Component\] or \[SubComponent\]/);
+  assert.match(system, /never own an Insight/);
+  // The catalogue must actually carry the class the instruction refers to.
+  assert.match(system, /- EtmDaemon \[SubComponent\]:/);
   // The closed-set guard must survive the rewrite.
   assert.match(system, /VERBATIM/);
 });
