@@ -388,6 +388,107 @@ export class ObservationWriter {
   }
 
   /**
+   * Fuzzy Insight resolution via km-core's LayeredDeduplicator.
+   *
+   * MODE, from `KM_INSIGHT_RESOLVER`:
+   *   off      — never runs. (default)
+   *   dry-run  — runs, logs what it WOULD merge, merges nothing.
+   *   on       — runs, and a match becomes the upsert target.
+   *
+   * Default is `off` and the safe rung is `dry-run`, because a merge is
+   * destructive and this changes identity for a whole class. Measured on the
+   * live corpus at cosine 0.90 (scripts/report-entity-resolution.mjs): 12
+   * pairs, ~10 of them genuine, e.g.
+   *
+   *     UnifiedViewer visibleCount Logic  /  UnifiedViewer visibleCount Duplication
+   *
+   * which the exact `topic + project` key cannot see.
+   *
+   * WHY name-ONLY text. The matcher's default `textOf` is
+   * `name + description`, and insight descriptions run to a median 2,354
+   * characters against all-MiniLM-L6-v2's ~256-token window. Every row then
+   * embeds its shared '## Purpose …' preamble and the layer inverts —
+   * unrelated insights at 0.99+, a true pair at 0.970. Name-only took the
+   * same corpus from 93 matches to 12. A 200-char description slice was also
+   * measured: better recall, worse precision (~65% vs ~83%), and precision
+   * FALLS as the threshold rises because the slice leads with project
+   * identity rather than subject. Precision wins on a write path.
+   *
+   * WHY the memo. CosineEmbeddingMatcher re-embeds the probe AND every
+   * candidate per call — ~38ms each on this host, so a cold pass over ~147
+   * active Insights is ~5.6s. The memo is keyed on TEXT (not entity id), so
+   * it stays correct when a row is renamed, and it lives for the writer's
+   * lifetime: obs-api pays the cold pass once, then one embedding per write.
+   *
+   * Observations deliberately get NO fuzzy resolution. They are raw stream
+   * deduplicated on content_hash; 23 of them share the name '[Raw] 2 messages
+   * (1 user, 1 assistant). LLM summary unavailable.' across 23 DISTINCT
+   * hashes, so name similarity there destroys records rather than merging
+   * duplicates.
+   *
+   * @returns {Promise<{survivor: object, confidence: number, layer: string}|null>}
+   */
+  async _resolveInsightFuzzy(kmStore, entity) {
+    const mode = process.env.KM_INSIGHT_RESOLVER || 'off';
+    if (mode !== 'dry-run' && mode !== 'on') return null;
+
+    try {
+      if (!this._insightDedup) {
+        const km = await import('@fwornle/km-core');
+        // Point km-core at the repo's copy of the ONNX weights. Without this
+        // it defaults to an empty package-root dir and fastembed tries to
+        // DOWNLOAD the model, which behind the corporate proxy fails as a
+        // bare AggregateError with an empty message.
+        process.env.KM_FASTEMBED_CACHE_DIR ||= path.join(
+          path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'),
+          '.data',
+          'fastembed-cache',
+        );
+        const inner = new km.FastembedEmbeddingClient();
+        const cache = new Map();
+        const memo = {
+          embed: async (text) => {
+            const hit = cache.get(text);
+            if (hit) return hit;
+            const vec = await inner.embed(text);
+            cache.set(text, vec);
+            return vec;
+          },
+          embedBatch: async (texts) => Promise.all(texts.map((t) => memo.embed(t))),
+        };
+        this._insightDedup = new km.LayeredDeduplicator({
+          exactName: new km.JaccardNameMatcher({ threshold: 0.85 }),
+          embedding: new km.CosineEmbeddingMatcher({
+            client: memo,
+            threshold: 0.9,
+            textOf: (e) => String(e.name ?? ''),
+          }),
+        });
+      }
+
+      const pool = (await kmStore.findByOntologyClass('Insight')).filter(
+        (e) => e && e.id !== entity.id && !(e.metadata ?? {}).archivedAt,
+      );
+      if (pool.length === 0) return null;
+
+      const verdict = await this._insightDedup.dedup(entity, pool);
+      if (!verdict?.matched || !verdict.survivor) return null;
+      return {
+        survivor: verdict.survivor,
+        confidence: verdict.confidence ?? 0,
+        layer: verdict.matchedLayer ?? 'exactName',
+      };
+    } catch (err) {
+      // Never fail a durable write because fuzzy resolution broke. The exact
+      // keys above already produced a correct (if duplicate-prone) answer.
+      process.stderr.write(
+        `[ObservationWriter] insight resolver unavailable (non-fatal): ${err.message}\n`,
+      );
+      return null;
+    }
+  }
+
+  /**
    * Resolve (and cache) the id of the LiveLoggingSystem Component node — the
    * anchor every Observation/Digest/Insight gets a `capturedBy` edge to.
    * Without this anchor every new node lands as an orphan and the unified
@@ -1614,6 +1715,22 @@ export class ObservationWriter {
           const m = e.metadata ?? {};
           return m.topic === topic && (proj == null || (m.project ?? null) === proj);
         }) || null;
+      }
+      // Both exact keys missed. Ask the shared resolver whether this is a
+      // reworded duplicate of something already here. `dry-run` reports and
+      // changes nothing, so the row below is still created.
+      if (!existing) {
+        const fuzzy = await this._resolveInsightFuzzy(kmStore, entity);
+        if (fuzzy) {
+          const mode = process.env.KM_INSIGHT_RESOLVER;
+          process.stderr.write(
+            `[ObservationWriter] insight resolver ${mode}: ` +
+              `"${String(entity.name).slice(0, 60)}" ~ ` +
+              `"${String(fuzzy.survivor.name).slice(0, 60)}" ` +
+              `(${fuzzy.confidence.toFixed(3)} via ${fuzzy.layer})\n`,
+          );
+          if (mode === 'on') existing = fuzzy.survivor;
+        }
       }
       if (existing && existing.id) {
         // createdAt is IMMUTABLE across an upsert. Callers stamp

@@ -692,3 +692,95 @@ describe('ObservationConsolidator._pushInsightToKG — fail-fast on classifier e
     assert.equal(insightPuts.length, 0, 'no Insight putEntity calls');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fuzzy Insight resolution (KM_INSIGHT_RESOLVER) — 2026-09-21
+//
+// Stage 3 of the KM revamp routes Insight identity through km-core's
+// LayeredDeduplicator instead of the exact `topic + project` key. A merge is
+// destructive, so the switch has three rungs and the default is the one that
+// changes nothing.
+//
+// These tests drive `_resolveInsightFuzzy` through a stub deduplicator so no
+// model is loaded: the contract under test is the MODE GATE, not the matcher.
+// ---------------------------------------------------------------------------
+describe('ObservationWriter — KM_INSIGHT_RESOLVER mode gate', () => {
+  const KEY = 'KM_INSIGHT_RESOLVER';
+  let saved;
+
+  beforeEach(() => { saved = process.env[KEY]; });
+  afterEach(() => {
+    if (saved === undefined) delete process.env[KEY];
+    else process.env[KEY] = saved;
+  });
+
+  /** Writer with the dedup chain pre-stubbed, so no fastembed import happens. */
+  function writerWithStubDedup(verdict) {
+    const w = Object.create(ObservationWriter.prototype);
+    w._insightDedup = { dedup: async () => verdict };
+    return w;
+  }
+
+  const kmStoreWith = (pool) => ({ findByOntologyClass: async () => pool });
+  const candidate = { id: 'other-1', name: 'UnifiedViewer visibleCount Duplication', metadata: {} };
+  const probe = { id: 'probe-1', name: 'UnifiedViewer visibleCount Logic', metadata: {} };
+  const matched = { matched: true, survivor: candidate, confidence: 0.978, matchedLayer: 'embedding' };
+
+  it('returns null when the mode is unset — the default must change nothing', async () => {
+    delete process.env[KEY];
+    const w = writerWithStubDedup(matched);
+    assert.equal(await w._resolveInsightFuzzy(kmStoreWith([candidate]), probe), null);
+  });
+
+  it('returns null when the mode is explicitly off', async () => {
+    process.env[KEY] = 'off';
+    const w = writerWithStubDedup(matched);
+    assert.equal(await w._resolveInsightFuzzy(kmStoreWith([candidate]), probe), null);
+  });
+
+  it('reports a match in dry-run', async () => {
+    process.env[KEY] = 'dry-run';
+    const w = writerWithStubDedup(matched);
+    const r = await w._resolveInsightFuzzy(kmStoreWith([candidate]), probe);
+    assert.equal(r.survivor.id, 'other-1');
+    assert.equal(r.layer, 'embedding');
+    assert.ok(Math.abs(r.confidence - 0.978) < 1e-9);
+  });
+
+  it('reports the same match when on — the gate is at the CALL SITE, not here', async () => {
+    // _resolveInsightFuzzy answers "is there a match"; only writeInsight
+    // decides whether to act on it. Keeping the split means dry-run and on
+    // exercise one code path, so dry-run genuinely rehearses the live one.
+    process.env[KEY] = 'on';
+    const w = writerWithStubDedup(matched);
+    const r = await w._resolveInsightFuzzy(kmStoreWith([candidate]), probe);
+    assert.equal(r.survivor.id, 'other-1');
+  });
+
+  it('excludes self and archived rows from the candidate pool', async () => {
+    process.env[KEY] = 'dry-run';
+    let seen = null;
+    const w = Object.create(ObservationWriter.prototype);
+    w._insightDedup = { dedup: async (_e, pool) => { seen = pool; return { matched: false }; } };
+    const pool = [
+      probe,                                                        // self
+      { id: 'arch-1', name: 'archived one', metadata: { archivedAt: '2026-09-01' } },
+      candidate,
+    ];
+    await w._resolveInsightFuzzy(kmStoreWith(pool), probe);
+    assert.deepEqual(seen.map((e) => e.id), ['other-1']);
+  });
+
+  it('returns null rather than throwing when the pool is empty', async () => {
+    process.env[KEY] = 'dry-run';
+    const w = writerWithStubDedup(matched);
+    assert.equal(await w._resolveInsightFuzzy(kmStoreWith([]), probe), null);
+  });
+
+  it('swallows resolver failure — a durable write must not depend on it', async () => {
+    process.env[KEY] = 'on';
+    const w = Object.create(ObservationWriter.prototype);
+    w._insightDedup = { dedup: async () => { throw new Error('model exploded'); } };
+    assert.equal(await w._resolveInsightFuzzy(kmStoreWith([candidate]), probe), null);
+  });
+});
