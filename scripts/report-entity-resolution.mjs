@@ -33,6 +33,7 @@
  *   node scripts/report-entity-resolution.mjs --class=Insight --limit=40
  *   node scripts/report-entity-resolution.mjs --class=Insight --embed
  *   node scripts/report-entity-resolution.mjs --class=Insight --embed --embed-threshold=0.93
+ *   node scripts/report-entity-resolution.mjs --class=Insight --embed --embed-text=name+desc200
  */
 
 import path from 'node:path';
@@ -102,7 +103,20 @@ const EMBED_THRESHOLD = Number(args['embed-threshold']) > 0 ? Number(args['embed
 // have a median length of 2,354 chars against all-MiniLM-L6-v2's ~256-token
 // window, so every row embeds its truncated '## Purpose ...' preamble and
 // unrelated insights score 0.99+ against each other.
-const EMBED_TEXT = args['embed-text'] === 'name+desc' ? 'name+desc' : 'name';
+const EMBED_TEXT_MODES = {
+  // Name only. Short and distinctive, always inside the window.
+  name: (e) => String(e.name ?? ''),
+  // Name plus a slice of the description that fits the model's window
+  // alongside it. `## Purpose ` is 11 characters of shared preamble, so a
+  // 200-char slice is ~190 characters of actual content.
+  'name+desc200': (e) =>
+    `${e.name ?? ''}\n\n${String(e.description ?? '').slice(0, 200)}`.trim(),
+  // km-core's default. Kept so the broken configuration stays reproducible.
+  'name+desc': (e) => `${e.name}\n\n${e.description ?? ''}`.trim(),
+};
+const EMBED_TEXT = Object.hasOwn(EMBED_TEXT_MODES, args['embed-text'])
+  ? args['embed-text']
+  : 'name';
 
 const out = (m = '') => process.stdout.write(`${m}\n`);
 const die = (m) => { process.stderr.write(`${m}\n`); process.exit(1); };
@@ -146,9 +160,7 @@ if (EMBED) {
   layers.embedding = new CosineEmbeddingMatcher({
     client: memo,
     threshold: EMBED_THRESHOLD,
-    textOf: EMBED_TEXT === 'name'
-      ? (e) => String(e.name ?? '')
-      : (e) => `${e.name}\n\n${e.description ?? ''}`.trim(),
+    textOf: EMBED_TEXT_MODES[EMBED_TEXT],
   });
 }
 // shortCircuit stays at its production default (true): the cheap layer wins
