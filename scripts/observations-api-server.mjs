@@ -2609,6 +2609,24 @@ async function composeViewerStats(store) {
     if (source === target) selfEdgeCount += 1;
   });
 
+  // Duplicate edges: more than one edge sharing (source, target, type).
+  // km-core's addRelation is not idempotent on that triple, so any writer
+  // that re-writes an entity without probing first multiplies its edges.
+  //
+  // Measured 2026-09-21: capturedBy held 13,675 edges over 1,219 distinct
+  // pairs — 91% duplicates, worst single Insight 194 identical anchors —
+  // because `_anchorEntity` never probed while its sibling
+  // `_emitMentionsEdges` always had. Nothing surfaced it: duplicates are not
+  // orphans, they do not dent connectivity, and the edge count alone looks
+  // like a busy graph rather than a broken writer.
+  const edgeTriples = new Set();
+  let duplicateEdgeCount = 0;
+  graph.forEachEdge((_k, attrs, source, target) => {
+    const k = JSON.stringify([source, target, attrs && attrs.type]);
+    if (edgeTriples.has(k)) duplicateEdgeCount += 1;
+    else edgeTriples.add(k);
+  });
+
   // Connectivity is the inverse density of orphans against the node
   // population — 1.0 means every node touches at least one edge.
   const connectivity = nodeCount > 0
@@ -2657,6 +2675,7 @@ async function composeViewerStats(store) {
     patternCount,
     orphanCount,
     selfEdgeCount,
+    duplicateEdgeCount,
     componentCount,
     connectivity,
     lastUpdated,

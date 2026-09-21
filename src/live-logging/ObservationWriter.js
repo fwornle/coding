@@ -562,6 +562,34 @@ export class ObservationWriter {
     if (!fromId) return;
     const anchorId = await this._resolveAnchorId(kmStore);
     if (!anchorId) return;
+
+    // Idempotency — Shared Pattern A, the same probe `_emitMentionsEdges`
+    // has always done. This path never had it, and km-core's addRelation is
+    // NOT idempotent on the (from, to, type) triple, so EVERY re-write of an
+    // entity added another identical anchor edge.
+    //
+    // Measured 2026-09-21 before the fix: 13,675 capturedBy edges over 1,219
+    // distinct sources — 12,456 duplicates, 91%. One Insight
+    // ("Documentation Diagram Style Guide") carried 194 identical edges to
+    // the same anchor, one per consolidation that re-wrote it. `mentions`,
+    // which does probe, sat at 3%.
+    //
+    // Failure is non-fatal and falls through to the write, matching the
+    // sibling: a duplicate edge is better than a dropped anchor, which is
+    // what produced the 2026-06-15 orphan drift this method exists to stop.
+    try {
+      const existing = await kmStore.findRelations({
+        from: fromId,
+        to: anchorId,
+        type: relationType,
+      });
+      if (Array.isArray(existing) && existing.length > 0) return;
+    } catch (err) {
+      process.stderr.write(
+        `[ObservationWriter] anchor dedup probe ${fromId}->${anchorId} failed (non-fatal): ${err.message}\n`
+      );
+    }
+
     try {
       await kmStore.addRelation({
         from: fromId,
