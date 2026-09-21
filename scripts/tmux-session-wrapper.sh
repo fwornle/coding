@@ -140,6 +140,25 @@ tmux_session_wrapper() {
   # #{pane_in_mode} stays in the condition: once copy-mode is open, `send-keys -M`
   # is what routes the drag to the copy-mode table so the selection extends.
   #
+  # That restores a SELECTION, not the selection that was there before. tmux's
+  # is confined to the visible viewport of an alternate-screen TUI that repaints
+  # every second, so a drag over anything the agent redraws mid-gesture copies a
+  # fragment. The terminal's own selection has neither limit — it spans the
+  # scrollback and survives repaints — but it is unreachable while an app holds
+  # the mouse, unless the terminal offers a force-selection modifier:
+  #
+  #   VS Code / xterm.js  Option+drag, and ONLY when
+  #                       terminal.integrated.macOptionClickForcesSelection
+  #                       is true. It defaults to FALSE, which is why there was
+  #                       no way back to native selection at all.
+  #   iTerm2              Option+drag, on by default
+  #
+  # So `prefix + S` below drops the mouse outright for the current session. It
+  # is the honest trade rather than a third selection mechanism: with mouse off
+  # the terminal owns the mouse again and selection behaves exactly as it did
+  # before the clickable status line existed — and the status line stops being
+  # clickable until it is toggled back. Both halves are stated in the message.
+  #
   # KEY TABLES ARE SERVER-WIDE — same caveat as _bind_status_clicks below.
   _bind_mouse_copy() {
     # Copy to the system clipboard by an explicit pipe as well as via tmux's own
@@ -185,6 +204,15 @@ bind-key -T root TripleClick1Pane {
 }
 bind-key -T copy-mode    MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel${copy_pipe}
 bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel${copy_pipe}
+bind-key -T prefix S {
+  if-shell -F "#{mouse}" {
+    set-option mouse off
+    display-message -d 2500 "mouse OFF — drag selects natively (terminal's own copy). Status-line clicks are disabled. prefix+S restores."
+  } {
+    set-option mouse on
+    display-message -d 2500 "mouse ON — tmux drag-select to clipboard + clickable status line. prefix+S for native selection."
+  }
+}
 EOF_MOUSE_COPY
     tmux source-file "$snippet" 2>/dev/null
     rm -f "$snippet"
