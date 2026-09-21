@@ -107,6 +107,87 @@ tmux_session_wrapper() {
     tmux set-option -t "$target_session" status-right "#(${status_cmd} 2>/dev/null || echo '[Status Offline]')"
     tmux set-option -t "$target_session" mouse on
     _bind_status_clicks
+    _bind_mouse_copy
+  }
+
+  # Give drag-to-select back, which `mouse on` above takes away.
+  #
+  # `mouse on` is not optional here — it is what makes #{mouse_status_range}
+  # fire, so the clickable status line below depends on it. But it also hands
+  # tmux the mouse, and tmux's DEFAULT root bindings then defer to the running
+  # application whenever that application has asked for mouse reporting:
+  #
+  #   MouseDrag1Pane  if -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" \
+  #                     { send-keys -M } { copy-mode -M }
+  #
+  # #{mouse_any_flag} is 1 for every pane here — Claude Code, opencode and pi
+  # all enable SGR mouse reporting for their own click handling. So a drag took
+  # the `send-keys -M` branch and was forwarded to the agent, which does nothing
+  # with a drag; the selection never started and nothing reached the clipboard.
+  # Native terminal selection is gone too, because from the terminal's point of
+  # view tmux is the one holding the mouse. That is the whole "copy stopped
+  # working" symptom: no config changed, the AGENT started asking for the mouse.
+  #
+  # The fix drops #{mouse_any_flag} from the condition on the three bindings
+  # that select text, and leaves every other mouse binding at its default. That
+  # split is deliberate and is why this is surgical rather than `mouse off`:
+  #
+  #   • DRAG and double/triple click are how a human selects text. No TUI agent
+  #     here binds them to anything, so routing them to copy-mode costs nothing.
+  #   • CLICK (MouseDown1Pane) and WHEEL still honour #{mouse_any_flag} at their
+  #     defaults, so the agents keep the click and scroll handling they do use.
+  #
+  # #{pane_in_mode} stays in the condition: once copy-mode is open, `send-keys -M`
+  # is what routes the drag to the copy-mode table so the selection extends.
+  #
+  # KEY TABLES ARE SERVER-WIDE — same caveat as _bind_status_clicks below.
+  _bind_mouse_copy() {
+    # Copy to the system clipboard by an explicit pipe as well as via tmux's own
+    # OSC 52 (`set-clipboard`). OSC 52 needs the `clipboard` terminal-feature to
+    # be both present and honoured by the terminal, and it silently copies
+    # nothing when it is not; a local clipboard binary is the branch that can be
+    # verified. With no such binary the pipe is omitted and plain
+    # copy-pipe-and-cancel still sets the tmux buffer + OSC 52.
+    local copy_pipe=''
+    if command -v pbcopy >/dev/null 2>&1; then
+      copy_pipe=' "pbcopy"'                       # macOS
+    elif command -v wl-copy >/dev/null 2>&1; then
+      copy_pipe=' "wl-copy"'                      # Linux / Wayland
+    elif command -v xclip >/dev/null 2>&1; then
+      copy_pipe=' "xclip -selection clipboard"'   # Linux / X11
+    elif command -v xsel >/dev/null 2>&1; then
+      copy_pipe=' "xsel --clipboard --input"'     # Linux / X11 (alternative)
+    elif command -v clip.exe >/dev/null 2>&1; then
+      copy_pipe=' "clip.exe"'                     # WSL / Windows
+    fi
+
+    # Written out and sourced rather than run as `tmux bind-key ...` directly.
+    # These bindings chain two commands, and every way of passing a separator
+    # through the shell to bind-key gets it eaten: a quoted ';' argument ENDS
+    # the bind-key command, so the second half silently becomes a new top-level
+    # tmux command and the binding is left truncated to `select-pane -t =`.
+    # list-keys still prints a plausible-looking line, so the breakage does not
+    # announce itself. A brace block in a sourced file has no such ambiguity.
+    # mktemp -t means different things to BSD (prefix) and GNU coreutils
+    # (template, and it rejects one without X's) — and GNU's is first on PATH on
+    # plenty of Macs. An explicit template is the only spelling both accept.
+    local snippet
+    snippet="$(mktemp "${TMPDIR:-/tmp}/coding-mouse-copy.XXXXXX")" || return 0
+    cat > "$snippet" <<EOF_MOUSE_COPY
+bind-key -T root MouseDrag1Pane if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -M }
+bind-key -T root DoubleClick1Pane {
+  select-pane -t =
+  if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-word ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${copy_pipe} }
+}
+bind-key -T root TripleClick1Pane {
+  select-pane -t =
+  if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-line ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${copy_pipe} }
+}
+bind-key -T copy-mode    MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel${copy_pipe}
+bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel${copy_pipe}
+EOF_MOUSE_COPY
+    tmux source-file "$snippet" 2>/dev/null
+    rm -f "$snippet"
   }
 
   # Make the status-line fields clickable.
