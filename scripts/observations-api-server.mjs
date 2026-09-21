@@ -2627,6 +2627,36 @@ async function composeViewerStats(store) {
     else edgeTriples.add(k);
   });
 
+  // Anchor spread: how many `capturedBy` edges still terminate on the ROOT
+  // anchor, and how many distinct subsystems the rest name.
+  //
+  // `capturedBy` is an anti-orphan tether that wears a provenance name. Until
+  // 2026-09-21 all 1,244 of them pointed at the one `LiveLoggingSystem`
+  // Component, so the edge answered nothing that the node it pointed at did
+  // not already imply — and nothing surfaced that, because one target is not
+  // an orphan, not a duplicate and not a self-edge. It looks exactly like a
+  // working edge.
+  //
+  // `capturedByRootCount` is the regression signal: the writer picks a
+  // subsystem per row kind now, and falls back to the root when that
+  // subsystem is missing (the fallback is deliberate — a missing anchor must
+  // cost precision, never the tether). A non-zero count here means the
+  // fallback is firing in production, i.e. an anchor node was deleted or
+  // renamed and provenance is quietly collapsing back to one hub.
+  let capturedByRootCount = 0;
+  const capturedByTargets = new Set();
+  {
+    let rootId = null;
+    graph.forEachNode((id, attrs) => {
+      if (rootId === null && attrs && attrs.name === 'LiveLoggingSystem') rootId = id;
+    });
+    graph.forEachEdge((_k, attrs, _source, target) => {
+      if (!attrs || attrs.type !== 'capturedBy') return;
+      capturedByTargets.add(target);
+      if (rootId !== null && target === rootId) capturedByRootCount += 1;
+    });
+  }
+
   // Connectivity is the inverse density of orphans against the node
   // population — 1.0 means every node touches at least one edge.
   const connectivity = nodeCount > 0
@@ -2676,6 +2706,8 @@ async function composeViewerStats(store) {
     orphanCount,
     selfEdgeCount,
     duplicateEdgeCount,
+    capturedByRootCount,
+    capturedByTargetCount: capturedByTargets.size,
     componentCount,
     connectivity,
     lastUpdated,
