@@ -37,12 +37,27 @@
  * the graph (`POST /api/insights/compact` does the same). Re-running is safe:
  * an insight that already has a `parentId` is skipped unless --force.
  *
+ * ASK FIRST, INFER SECOND (2026-09-21). The rarity rule above is a prior over
+ * what an insight is about; it never reads the insight. The mentions
+ * classifier does, and now returns a primary subject, so this script asks it
+ * and keeps rarity only as the fallback — matching
+ * `ObservationConsolidator._resolveInsightParent` on the write path.
+ *
+ * That costs one LLM call per insight, so a DRY RUN CLASSIFIES A SAMPLE
+ * (--sample=25 by default) rather than the whole corpus: enough to see the two
+ * rules disagree and judge which is right, without paying for ~800 calls to
+ * produce a report. --apply classifies everything it is going to write.
+ *
  * Usage:
- *   node scripts/backfill-insight-parents.mjs                  # report only
+ *   node scripts/backfill-insight-parents.mjs                  # sampled dry run
+ *   node scripts/backfill-insight-parents.mjs --sample=0       # classify all, write nothing
+ *   node scripts/backfill-insight-parents.mjs --rarity-only    # no LLM at all
  *   node scripts/backfill-insight-parents.mjs --project=coding
  *   node scripts/backfill-insight-parents.mjs --apply
  *   node scripts/backfill-insight-parents.mjs --apply --force  # re-place existing
  */
+
+import { classifyMentions } from '../src/live-logging/MentionsClassifier.js';
 
 const OBS_API = process.env.OBS_API_URL || 'http://127.0.0.1:12436';
 
@@ -67,6 +82,9 @@ const PROJECT = typeof args.project === 'string' ? args.project : null;
  * from its candidate pool for the same reason.
  */
 const INCLUDE_ARCHIVED = args['include-archived'] === true || args['include-archived'] === 'true';
+const RARITY_ONLY = args['rarity-only'] === true || args['rarity-only'] === 'true';
+/** Insights to classify in a dry run. 0 = all. Ignored with --apply (always all). */
+const SAMPLE = args.sample !== undefined ? Number(args.sample) : 25;
 
 const out = (m = '') => process.stdout.write(`${m}\n`);
 const die = (m) => { process.stderr.write(`${m}\n`); process.exit(1); };
@@ -82,7 +100,8 @@ async function get(pathname) {
 out('\n=== insight hierarchy backfill (stage 4) ===');
 out(`obs-api : ${OBS_API}`);
 out(`mode    : ${APPLY ? 'APPLY — writes metadata.parentId' : 'DRY RUN — writes nothing'}${FORCE ? ' · force (re-place rows that already have a parent)' : ''}`);
-out(`scope   : ${PROJECT ?? 'every project'}${INCLUDE_ARCHIVED ? ' · INCLUDING archived' : ' · active only (archived excluded)'}\n`);
+out(`scope   : ${PROJECT ?? 'every project'}${INCLUDE_ARCHIVED ? ' · INCLUDING archived' : ' · active only (archived excluded)'}`);
+out(`rule    : ${RARITY_ONLY ? 'RARITY only (no LLM)' : 'classifier primary subject, rarity as fallback'}\n`);
 
 let entities, relations;
 try {
@@ -117,15 +136,8 @@ const insights = entities.filter(
 out(`insights       : ${insights.length}`);
 out(`subcomponents  : ${tally.size}`);
 
-const plan = [];
-let alreadyPlaced = 0;
-let noCandidate = 0;
-let archivedSkipped = 0;
-for (const ins of insights) {
-  const meta = ins.metadata ?? {};
-  if (meta.archivedAt && !INCLUDE_ARCHIVED) { archivedSkipped += 1; continue; }
-  if (meta.parentId && !FORCE) { alreadyPlaced += 1; continue; }
-  const mentioned = mentionsByInsight.get(ins.id) ?? [];
+/** The rarity prior, unchanged — now the fallback rather than the rule. */
+function rarityBest(mentioned) {
   let best = null;
   for (const id of mentioned) {
     if (!tally.has(id)) continue;
@@ -133,21 +145,109 @@ for (const ins of insights) {
     // Fewest corpus-wide mentions wins — see the header.
     if (!best || n < best.n || (n === best.n && String(id) < String(best.id))) best = { id, n };
   }
+  return best;
+}
+
+// The catalogue the classifier picks from, in the shape it expects. Built from
+// the entities already fetched rather than via loadMentionCandidates(kmStore),
+// because km-core's LevelDB is single-owner and obs-api holds it.
+const candidates = entities
+  .filter((e) => ['Component', 'SubComponent', 'Detail'].includes(clsOf(e)))
+  .map((e) => ({ id: e.id, name: e.name ?? '', description: e.description ?? '' }));
+
+// Pass 1 — everything the rarity prior alone can decide, no LLM involved.
+const pending = [];
+let alreadyPlaced = 0;
+let noCandidate = 0;
+let archivedSkipped = 0;
+for (const ins of insights) {
+  const meta = ins.metadata ?? {};
+  if (meta.archivedAt && !INCLUDE_ARCHIVED) { archivedSkipped += 1; continue; }
+  if (meta.parentId && !FORCE) { alreadyPlaced += 1; continue; }
+  const best = rarityBest(mentionsByInsight.get(ins.id) ?? []);
   if (!best) { noCandidate += 1; continue; }
-  const parentLevel = levelOf.get(best.id);
-  plan.push({
-    insight: ins,
-    parentId: best.id,
-    parentName: byId.get(best.id)?.name ?? '(unnamed)',
-    parentMentions: best.n,
-    hierarchyLevel: Number.isInteger(parentLevel) ? parentLevel + 1 : 3,
-  });
+  pending.push({ insight: ins, rarity: best });
 }
 
 out(`archived       : ${archivedSkipped}  (already rolled up — pass --include-archived to place them anyway)`);
 out(`already placed : ${alreadyPlaced}${FORCE ? ' (ignored — force)' : ' (skipped)'}`);
 out(`no candidate   : ${noCandidate}  (mention no SubComponent — left unplaced)`);
-out(`to place       : ${plan.length}\n`);
+out(`to place       : ${pending.length}\n`);
+
+// Pass 2 — ask the classifier which entity each insight is actually about.
+// APPLY classifies every row it will write; a dry run samples, because the
+// report is worth one call per sampled insight and not ~800.
+const classifyCount = RARITY_ONLY ? 0
+  : APPLY ? pending.length
+  : (SAMPLE > 0 ? Math.min(SAMPLE, pending.length) : pending.length);
+
+if (classifyCount > 0) {
+  out(`classifying    : ${classifyCount} of ${pending.length} insight(s) against ${candidates.length} candidates`);
+  out('                 (one LLM call each, haiku band — this is the slow part)\n');
+}
+
+let asked = 0;
+let classifierAgreed = 0;
+let classifierOverrode = 0;
+let classifierDeclined = 0;
+let classifierFailed = 0;
+
+const plan = [];
+for (let i = 0; i < pending.length; i++) {
+  const { insight: ins, rarity } = pending[i];
+  let chosen = rarity;
+  let parentSource = 'rarity';
+
+  if (i < classifyCount) {
+    const summary = ins.description || ins.name || '';
+    try {
+      const { primaryId } = await classifyMentions(summary, candidates);
+      asked += 1;
+      if (primaryId && tally.has(primaryId)) {
+        if (primaryId === rarity.id) classifierAgreed += 1;
+        else classifierOverrode += 1;
+        chosen = { id: primaryId, n: tally.get(primaryId) };
+        parentSource = 'classifier';
+      } else {
+        // Declined, or named a Component/Detail that cannot be a parent.
+        classifierDeclined += 1;
+      }
+    } catch (e) {
+      // Placement is an enrichment; a classifier outage must not cost us the
+      // rarity placement we already have.
+      classifierFailed += 1;
+      process.stderr.write(`  classify failed for ${String(ins.id).slice(0, 8)}: ${e.message}\n`);
+    }
+    if ((i + 1) % 25 === 0) out(`  ...${i + 1}/${classifyCount}`);
+  }
+
+  const parentLevel = levelOf.get(chosen.id);
+  plan.push({
+    insight: ins,
+    parentId: chosen.id,
+    parentName: byId.get(chosen.id)?.name ?? '(unnamed)',
+    parentMentions: chosen.n,
+    hierarchyLevel: Number.isInteger(parentLevel) ? parentLevel + 1 : 3,
+    parentSource,
+    rarityName: byId.get(rarity.id)?.name ?? '(unnamed)',
+    rarityId: rarity.id,
+  });
+}
+
+if (asked > 0) {
+  const decided = classifierAgreed + classifierOverrode;
+  out('\n=== classifier vs the rarity prior ===\n');
+  out(`  asked              : ${asked}`);
+  out(`  answered           : ${decided}  (${((100 * decided) / asked).toFixed(0)}% of asked)`);
+  out(`    agreed w/ rarity : ${classifierAgreed}`);
+  out(`    overrode rarity  : ${classifierOverrode}`);
+  out(`  declined / unusable: ${classifierDeclined}  (kept the rarity placement)`);
+  if (classifierFailed) out(`  call failed        : ${classifierFailed}  (kept the rarity placement)`);
+  out('');
+  out('  Agreement is not the goal — it only says the prior was already right');
+  out('  for that row. The overrides are what stage 2 buys, and they are the');
+  out('  ones worth reading in the sample below.\n');
+}
 
 if (plan.length === 0) { out('Nothing to do.\n'); process.exit(0); }
 
@@ -165,14 +265,30 @@ out('  Ranking is by RARITY, so a popular hub never adopts an insight that');
 out('  named anything more specific. Concentration well above ~10% here would');
 out('  mean the mentions themselves have collapsed onto a few names.\n');
 
+const overrides = plan.filter((p) => p.parentSource === 'classifier' && p.parentId !== p.rarityId);
+if (overrides.length > 0) {
+  out('=== where the classifier disagreed with the prior ===\n');
+  out(`  ${'insight'.padEnd(44)}  ${'rarity would say'.padEnd(24)}  classifier says`);
+  out(`  ${'-'.repeat(44)}  ${'-'.repeat(24)}  ${'-'.repeat(24)}`);
+  for (const p of overrides.slice(0, 15)) {
+    out(`  ${String(p.insight.name ?? '').slice(0, 42).padEnd(44)}  ${String(p.rarityName).slice(0, 22).padEnd(24)}  ${p.parentName}`);
+  }
+  if (overrides.length > 15) out(`  ... and ${overrides.length - 15} more`);
+  out('');
+}
+
 out('=== sample placements ===\n');
 for (const p of plan.slice(0, 8)) {
-  out(`  ${String(p.insight.name ?? '').slice(0, 46).padEnd(48)}→ ${p.parentName} @L${p.hierarchyLevel}`);
+  out(`  ${String(p.insight.name ?? '').slice(0, 42).padEnd(44)}→ ${p.parentName} @L${p.hierarchyLevel}  [${p.parentSource}]`);
 }
 out('');
 
 if (!APPLY) {
-  out(`DRY RUN — nothing written. Re-run with --apply to place ${plan.length} insights.\n`);
+  out(`DRY RUN — nothing written. Re-run with --apply to place ${plan.length} insights`);
+  if (!RARITY_ONLY && classifyCount < pending.length) {
+    out(`           (--apply classifies all ${pending.length}, not just the ${classifyCount} sampled here).`);
+  }
+  out('');
   process.exit(0);
 }
 
@@ -190,6 +306,9 @@ for (const p of plan) {
           ...(p.insight.metadata ?? {}),
           parentId: p.parentId,
           hierarchyLevel: p.hierarchyLevel,
+          // Same field the write path records, so "which rule placed this"
+          // has one answer across both producers.
+          parentSource: p.parentSource,
           placedBy: 'backfill-insight-parents',
           placedAt: new Date().toISOString(),
         },
