@@ -646,6 +646,96 @@ function runCompaction(options = {}) {
   return _compactionPromise;
 }
 
+// ── Parent-description synthesis runner (stage 5) ──────────────────────────
+// Gives every hierarchy parent a description synthesised FROM ITS CHILDREN,
+// replacing wave-controller's `observations[0]` verbatim copy. In-process for
+// the same reason as the consolidator and compaction: km-core's LevelDB is
+// single-owner and obs-api holds it.
+let _parentSynthPromise = null;
+let _parentSynthStartedAt = null;
+let _parentSynthJobCounter = 0;
+let _lastParentSynthJobId = null;
+let _lastParentSynthResult = null;
+let _lastParentSynthError = null;
+let _lastParentSynthFinishedAt = null;
+
+function runParentSynthesis(options = {}) {
+  if (_parentSynthPromise) return _parentSynthPromise;
+
+  _parentSynthStartedAt = new Date().toISOString();
+  _parentSynthJobCounter += 1;
+  _lastParentSynthJobId = _parentSynthJobCounter;
+
+  _parentSynthPromise = (async () => {
+    const kmStore = await ensureKMStore();
+    const consolidator = new ObservationConsolidator({ kmStore });
+    try {
+      await consolidator.init();
+      const result = await consolidator.synthesizeParentDescriptions({
+        dryRun: options.dryRun !== false,          // opt IN to writes, like compaction
+        onlyDirty: !!options.onlyDirty,
+        ...(Number(options.limit) > 0 ? { limit: Number(options.limit) } : {}),
+        ...(Array.isArray(options.classes) && options.classes.length ? { classes: options.classes } : {}),
+      });
+      _lastParentSynthResult = result;
+      _lastParentSynthError = null;
+      return { ok: true, ...result };
+    } catch (err) {
+      _lastParentSynthError = { message: err?.message || String(err) };
+      _lastParentSynthResult = null;
+      throw err;
+    } finally {
+      _lastParentSynthFinishedAt = new Date().toISOString();
+      try { consolidator.close(); } catch { /* best-effort */ }
+      _parentSynthStartedAt = null;
+      _parentSynthPromise = null;
+    }
+  })();
+
+  return _parentSynthPromise;
+}
+
+// The SCHEDULED pass is dirty-only and capped.
+//
+// Dirty-only is what makes it affordable: a full pass is 338 calls / 3.3M
+// tokens, while only ~22 parents have a changed child on a normal day. It is
+// also self-gating for AFK — parents go dirty because consolidation wrote
+// insights, so an idle machine produces no dirty parents and therefore no LLM
+// calls, without needing the coordinator's HID check in here.
+//
+// The cap exists for exactly one case: the FIRST tick after deploy, when no
+// parent has `rolledUpAt` and all 282 are dirty at once. Without it that lands
+// as a 338-call burst at whatever hour the interval happens to fire. Run the
+// one-off backfill deliberately instead; the schedule then only sees the delta.
+const PARENT_SYNTH_INTERVAL_MS = Number(process.env.PARENT_SYNTH_INTERVAL_MS || 6 * 60 * 60 * 1000);
+const PARENT_SYNTH_MAX_PER_TICK = Number(process.env.PARENT_SYNTH_MAX_PER_TICK || 25);
+const PARENT_SYNTH_ENABLED = process.env.PARENT_SYNTH_SCHEDULED !== 'off';
+let _parentSynthInterval = null;
+
+function scheduleParentSynthesis() {
+  if (_parentSynthInterval || !PARENT_SYNTH_ENABLED) return;
+  const tick = async () => {
+    // Never contend with a pass that is also writing Insight/parent rows.
+    if (_shuttingDown || _consolidationPromise || _compactionPromise || _rollUpPromise) return;
+    try {
+      const r = await runParentSynthesis({
+        dryRun: false, onlyDirty: true, limit: PARENT_SYNTH_MAX_PER_TICK,
+      });
+      if (r.selected > 0) {
+        process.stderr.write(`[obs-api] scheduled parent synthesis: ${JSON.stringify(r)}\n`);
+      }
+    } catch (err) {
+      process.stderr.write(`[obs-api] scheduled parent synthesis failed: ${err.message}\n`);
+    }
+  };
+  _parentSynthInterval = setInterval(() => { tick().catch(() => {}); }, PARENT_SYNTH_INTERVAL_MS);
+  _parentSynthInterval.unref?.();
+  process.stderr.write(
+    `[obs-api] parent synthesis scheduled every ${Math.round(PARENT_SYNTH_INTERVAL_MS / 60000)}min, ` +
+      `max ${PARENT_SYNTH_MAX_PER_TICK} parents/tick\n`,
+  );
+}
+
 // ── Insight roll-up runner ─────────────────────────────────────────────────
 // Hierarchical abstraction: many granular Detail insights -> few
 // SubComponent-level insights, children archived (reversible), never deleted.
@@ -2121,6 +2211,53 @@ app.post('/api/insights/compact', (req, res) => {
  * Defaults to dryRun:true. Refuses while consolidation or compaction is in
  * flight — all three write Insight rows.
  */
+/**
+ * POST /api/insights/parent-synthesis — describe every hierarchy parent from
+ * its children. Body: { dryRun?, onlyDirty?, limit?, classes? }.
+ * Defaults to dryRun:true — a caller opts IN to writes, matching compaction
+ * and the CLI convention.
+ *
+ * Refuses while consolidation, compaction or roll-up is in flight: all four
+ * write the same rows.
+ */
+app.post('/api/insights/parent-synthesis', (req, res) => {
+  if (_shuttingDown) return res.status(503).json({ error: 'Server is shutting down' });
+  if (_consolidationPromise) {
+    return res.status(409).json({ error: 'Consolidation in flight — refusing to synthesise parents concurrently' });
+  }
+  if (_compactionPromise) {
+    return res.status(409).json({ error: 'Compaction in flight — refusing to synthesise parents concurrently' });
+  }
+  if (_rollUpPromise) {
+    return res.status(409).json({ error: 'Roll-up in flight — refusing to synthesise parents concurrently' });
+  }
+  const attached = !!_parentSynthPromise;
+  runParentSynthesis(req.body || {}).catch(err => {
+    process.stderr.write(`[obs-api] /insights/parent-synthesis async error: ${err.message}\n`);
+  });
+  res.status(202).json({
+    success: true, accepted: true, attached,
+    jobId: _lastParentSynthJobId, startedAt: _parentSynthStartedAt,
+  });
+});
+
+app.get('/api/insights/parent-synthesis/status', (_req, res) => {
+  res.json({
+    inflight: _parentSynthPromise ? { startedAt: _parentSynthStartedAt } : null,
+    lastJob: {
+      id: _lastParentSynthJobId,
+      finishedAt: _lastParentSynthFinishedAt,
+      result: _lastParentSynthResult,
+      error: _lastParentSynthError,
+    },
+    schedule: {
+      enabled: PARENT_SYNTH_ENABLED,
+      intervalMs: PARENT_SYNTH_INTERVAL_MS,
+      maxPerTick: PARENT_SYNTH_MAX_PER_TICK,
+    },
+  });
+});
+
 app.post('/api/insights/rollup', (req, res) => {
   if (_shuttingDown) return res.status(503).json({ error: 'Server is shutting down' });
   if (_consolidationPromise) {
@@ -3443,7 +3580,7 @@ const server = _autostart
       // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
       // doesn't pay a multi-second cold start.
       ensureWriter()
-        .then(() => { ensureRetrieval(); ensurePruner(); ensureLslResolver(); })
+        .then(() => { ensureRetrieval(); ensurePruner(); ensureLslResolver(); scheduleParentSynthesis(); })
         .catch((err) => {
           process.stderr.write(`[obs-api] startup init failed: ${err.message}\n`);
         });
