@@ -23,21 +23,41 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SA = path.join(REPO, 'integrations/semantic-analysis/src');
 
-const analyser = readFileSync(path.join(SA, 'agents/semantic-analysis-agent.ts'), 'utf8');
-const controller = readFileSync(path.join(SA, 'agents/wave-controller.ts'), 'utf8');
-const insightGen = readFileSync(path.join(SA, 'agents/insight-generation-agent.ts'), 'utf8');
-const types = readFileSync(path.join(SA, 'types/wave-types.ts'), 'utf8');
-const wave3 = readFileSync(path.join(SA, 'agents/wave3-detail-agent.ts'), 'utf8');
-const wave2 = readFileSync(path.join(SA, 'agents/wave2-component-agent.ts'), 'utf8');
+/**
+ * `.github/workflows/tests.yml` checks out with `submodules: false` — the
+ * `integrations/*` submodules are PRIVATE and unreachable from the runner, so
+ * an uninitialised submodule leaves an empty directory. These reads used to
+ * run at module scope, which meant the IMPORT threw there and the whole file
+ * counted as a failure on every push while passing locally.
+ *
+ * Read through a helper that yields '' when the submodule is absent, and skip
+ * the suites rather than asserting against empty strings. The gate is the
+ * submodule's manifest, not the individual sources: where it IS checked out,
+ * a deleted or renamed file still fails, which is the drift this file exists
+ * to catch.
+ */
+const SA_CHECKED_OUT = existsSync(path.join(REPO, 'integrations/semantic-analysis/package.json'));
+const SKIP = SA_CHECKED_OUT
+  ? false
+  : 'integrations/semantic-analysis is not checked out (tests.yml uses submodules: false — private submodule)';
 
-describe('gate 1 — the evidence gap is structured, not prose', () => {
+const src = (rel) => (SA_CHECKED_OUT ? readFileSync(path.join(SA, rel), 'utf8') : '');
+
+const analyser = src('agents/semantic-analysis-agent.ts');
+const controller = src('agents/wave-controller.ts');
+const insightGen = src('agents/insight-generation-agent.ts');
+const types = src('types/wave-types.ts');
+const wave3 = src('agents/wave3-detail-agent.ts');
+const wave2 = src('agents/wave2-component-agent.ts');
+
+describe('gate 1 — the evidence gap is structured, not prose', { skip: SKIP }, () => {
   test('the analysis prompt asks for an evidenceGap boolean', () => {
     assert.match(analyser, /"evidenceGap"/);
     assert.match(analyser, /"evidenceGapReason"/);
@@ -82,7 +102,7 @@ describe('gate 1 — the evidence gap is structured, not prose', () => {
   });
 });
 
-describe('gate 2 — the model may decline', () => {
+describe('gate 2 — the model may decline', { skip: SKIP }, () => {
   test('the insight prompt sanctions INSUFFICIENT_EVIDENCE', () => {
     assert.match(insightGen, /INSUFFICIENT_EVIDENCE/);
     assert.match(insightGen, /complete, correct answer — not a failure/);

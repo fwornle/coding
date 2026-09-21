@@ -34,12 +34,32 @@ const SCRIPT = join(SA, 'scripts/align-copilot-model-ids.mjs');
 /** Ids Copilot has retired — naming any of these earns a hard 400. */
 const RETIRED = ['claude-sonnet-4.6', 'claude-opus-4.6'];
 
+/**
+ * Is the submodule actually on disk?
+ *
+ * `.github/workflows/tests.yml` checks out with `submodules: false` on
+ * purpose — the `integrations/*` submodules are PRIVATE and unreachable from
+ * the runner. An uninitialised submodule leaves an empty directory, so four
+ * of the tests below read files that cannot exist in CI and failed there on
+ * every push while passing locally.
+ *
+ * The gate is the submodule's own manifest, NOT each file under test. That
+ * keeps the guard honest: where the submodule IS checked out and the
+ * alignment script has been deleted or renamed, these still fail — which is
+ * the drift this file exists to catch.
+ */
+const SA_CHECKED_OUT = existsSync(join(SA, 'package.json'));
+const SKIP_REASON =
+  'integrations/semantic-analysis is not checked out (tests.yml uses submodules: false — private submodule)';
+
 describe('vendored copilot model ids', () => {
-  test('the alignment script exists', () => {
+  test('the alignment script exists', (t) => {
+    if (!SA_CHECKED_OUT) return t.skip(SKIP_REASON);
     assert.ok(existsSync(SCRIPT), `missing ${SCRIPT}`);
   });
 
-  test('it covers every id known to be retired', () => {
+  test('it covers every id known to be retired', (t) => {
+    if (!SA_CHECKED_OUT) return t.skip(SKIP_REASON);
     const src = readFileSync(SCRIPT, 'utf8');
     for (const dead of RETIRED) {
       assert.ok(
@@ -49,7 +69,8 @@ describe('vendored copilot model ids', () => {
     }
   });
 
-  test('its replacements never map onto another retired id', () => {
+  test('its replacements never map onto another retired id', (t) => {
+    if (!SA_CHECKED_OUT) return t.skip(SKIP_REASON);
     // A successor that is itself dead would swap one 400 for another.
     const src = readFileSync(SCRIPT, 'utf8');
     const pairs = [...src.matchAll(/\["'([^']+)'",\s*"'([^']+)'"\]/g)];
@@ -80,7 +101,8 @@ describe('vendored copilot model ids', () => {
     assert.ok(align > install, 'alignment must run after the last npm install, or it is undone');
   });
 
-  test('package.json wires it as postinstall for host installs', () => {
+  test('package.json wires it as postinstall for host installs', (t) => {
+    if (!SA_CHECKED_OUT) return t.skip(SKIP_REASON);
     const pkg = JSON.parse(readFileSync(join(SA, 'package.json'), 'utf8'));
     assert.match(pkg.scripts?.postinstall ?? '', /align-copilot-model-ids\.mjs/);
   });
