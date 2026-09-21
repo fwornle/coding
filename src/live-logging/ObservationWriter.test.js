@@ -267,6 +267,44 @@ describe('ObservationWriter.writeInsight — idempotency (Test 3)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test 3b — capturedBy anchor idempotency. The sibling of Test 3, and the one
+// that was missing: _emitMentionsEdges probed before writing, _anchorEntity
+// did not. Measured on the live store before the fix: 13,675 capturedBy edges
+// over 1,219 distinct sources (91% duplicates), worst single Insight 194.
+// ---------------------------------------------------------------------------
+
+describe('ObservationWriter.writeInsight — anchor idempotency (Test 3b)', () => {
+  it('does not multiply capturedBy edges on repeat writes', async () => {
+    const kmStore = createMockKmStore();
+    const writer = createWriter(kmStore);
+    const row = buildRow();
+
+    await writer.writeInsight(row, { mentionsTargetIds: [] });
+    assert.equal(
+      kmStore._relations.filter((r) => r.type === 'capturedBy').length,
+      1,
+      'first run anchors once',
+    );
+
+    await writer.writeInsight(row, { mentionsTargetIds: [] });
+    await writer.writeInsight(row, { mentionsTargetIds: [] });
+
+    const anchors = kmStore._relations.filter((r) => r.type === 'capturedBy');
+    assert.equal(anchors.length, 1, 'three writes still leave exactly one capturedBy edge');
+  });
+
+  it('still anchors an entity that has no capturedBy edge yet', async () => {
+    const kmStore = createMockKmStore();
+    const writer = createWriter(kmStore);
+
+    await writer.writeInsight(buildRow(), { mentionsTargetIds: [] });
+    const anchors = kmStore._relations.filter((r) => r.type === 'capturedBy');
+    assert.equal(anchors.length, 1, 'dedup must not suppress the FIRST anchor');
+    assert.equal(anchors[0].metadata.source, 'observation-writer');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Test 4 — Empty / missing mentionsTargetIds: no mentions addRelation
 // ---------------------------------------------------------------------------
 
