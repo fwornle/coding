@@ -55,6 +55,18 @@ const args = Object.fromEntries(
 const APPLY = args.apply === true || args.apply === 'true';
 const FORCE = args.force === true || args.force === 'true';
 const PROJECT = typeof args.project === 'string' ? args.project : null;
+/**
+ * Archived insights are EXCLUDED by default.
+ *
+ * 638 of the first 767 candidates turned out to be archived — rows the
+ * roll-up pass deliberately folded behind one of 8 parents (`rolledUpInto`)
+ * and which the viewer hides by default (`hideArchived`). Giving those a
+ * SubComponent parent as well would contradict the placement they already
+ * have and would hand stage 5 hundreds of hidden children to synthesise a
+ * description from. The consolidator's own resolver excludes archived rows
+ * from its candidate pool for the same reason.
+ */
+const INCLUDE_ARCHIVED = args['include-archived'] === true || args['include-archived'] === 'true';
 
 const out = (m = '') => process.stdout.write(`${m}\n`);
 const die = (m) => { process.stderr.write(`${m}\n`); process.exit(1); };
@@ -70,7 +82,7 @@ async function get(pathname) {
 out('\n=== insight hierarchy backfill (stage 4) ===');
 out(`obs-api : ${OBS_API}`);
 out(`mode    : ${APPLY ? 'APPLY — writes metadata.parentId' : 'DRY RUN — writes nothing'}${FORCE ? ' · force (re-place rows that already have a parent)' : ''}`);
-out(`scope   : ${PROJECT ?? 'every project'}\n`);
+out(`scope   : ${PROJECT ?? 'every project'}${INCLUDE_ARCHIVED ? ' · INCLUDING archived' : ' · active only (archived excluded)'}\n`);
 
 let entities, relations;
 try {
@@ -108,8 +120,10 @@ out(`subcomponents  : ${tally.size}`);
 const plan = [];
 let alreadyPlaced = 0;
 let noCandidate = 0;
+let archivedSkipped = 0;
 for (const ins of insights) {
   const meta = ins.metadata ?? {};
+  if (meta.archivedAt && !INCLUDE_ARCHIVED) { archivedSkipped += 1; continue; }
   if (meta.parentId && !FORCE) { alreadyPlaced += 1; continue; }
   const mentioned = mentionsByInsight.get(ins.id) ?? [];
   let best = null;
@@ -130,6 +144,7 @@ for (const ins of insights) {
   });
 }
 
+out(`archived       : ${archivedSkipped}  (already rolled up — pass --include-archived to place them anyway)`);
 out(`already placed : ${alreadyPlaced}${FORCE ? ' (ignored — force)' : ' (skipped)'}`);
 out(`no candidate   : ${noCandidate}  (mention no SubComponent — left unplaced)`);
 out(`to place       : ${plan.length}\n`);
