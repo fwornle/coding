@@ -1734,9 +1734,9 @@ export class ObservationWriter {
       // reworded duplicate of something already here. `dry-run` reports and
       // changes nothing, so the row below is still created.
       if (!existing) {
+        const mode = process.env.KM_INSIGHT_RESOLVER || 'off';
         const fuzzy = await this._resolveInsightFuzzy(kmStore, entity);
         if (fuzzy) {
-          const mode = process.env.KM_INSIGHT_RESOLVER;
           process.stderr.write(
             `[ObservationWriter] insight resolver ${mode}: ` +
               `"${String(entity.name).slice(0, 60)}" ~ ` +
@@ -1744,6 +1744,21 @@ export class ObservationWriter {
               `(${fuzzy.confidence.toFixed(3)} via ${fuzzy.layer})\n`,
           );
           if (mode === 'on') existing = fuzzy.survivor;
+        } else if (mode !== 'off') {
+          // LOG THE MISSES TOO. Logging only hits makes an empty log
+          // ambiguous between "probed, nothing matched" and "never probed" —
+          // and the second is a real failure mode: the resolver's catch is
+          // deliberately non-fatal, so a broken embedding client returns null
+          // forever and reads as a clean corpus. That ambiguity already cost
+          // one round (the KM_FASTEMBED_CACHE_DIR no-op, same file, 2026-09-21:
+          // the only evidence the matcher ran at all was a model-load line
+          // from km-core, which is not something this code controls).
+          // The rung fires only when both exact keys miss — 0-2 writes per
+          // consolidation — so one line per probe is not noise.
+          process.stderr.write(
+            `[ObservationWriter] insight resolver ${mode}: ` +
+              `"${String(entity.name).slice(0, 60)}" — no match\n`,
+          );
         }
       }
       if (existing && existing.id) {
