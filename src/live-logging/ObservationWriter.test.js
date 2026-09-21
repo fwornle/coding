@@ -835,3 +835,132 @@ describe('ObservationWriter — fastembed weights are located by cacheDir, not e
     assert.match(SRC, /'\.data'/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Stage 4 — hierarchy placement from the mentions edges (2026-09-21)
+//
+// The revamp plan said to resolve `_classifyInsightByOntology`'s output to a
+// SubComponent. Measured against the live graph that is not buildable: the
+// classifier scores against development-knowledge-ontology.json, whose 14
+// classes are artifact kinds (Insight, Decision, Constraint), not subsystems
+// — 2 of 27 observed values matched a SubComponent name and only 73 of 959
+// insights carried the field. The mentions classifier already answers the
+// real question against the live catalogue, so placement is derived from it.
+//
+// The edge type matters as much as the source. Stage 2 arbitrated 42 rows on
+// "contains = hierarchy member, has_insight = learning artifact"
+// (repair-writer-ontology-class.mjs:180) and that partition is currently
+// exact. These tests pin that placement stays a FIELD.
+// ---------------------------------------------------------------------------
+
+describe('ObservationConsolidator._resolveInsightParent — stage 4 placement', () => {
+  // Four SubComponents with different corpus-wide mention counts, plus a
+  // Component that must never be chosen as a parent. sub-hub is the popular
+  // one (3 mentions); the rest have 1 each.
+  const makeStore = ({ throwOnTally = false } = {}) => ({
+    findByOntologyClass: async (cls) => {
+      if (throwOnTally) throw new Error('store unavailable');
+      if (cls !== 'SubComponent') return [];
+      return [
+        { id: 'sub-hub', name: 'LoggingModule', metadata: { hierarchyLevel: 2 } },
+        { id: 'sub-mid', name: 'CodeGraph', metadata: { hierarchyLevel: 2 } },
+        { id: 'sub-deep', name: 'SpecstoryAdapter', metadata: { hierarchyLevel: 3 } },
+        { id: 'sub-nolevel', name: 'Orphaned', metadata: {} },
+      ];
+    },
+    // sub-hub ×3, sub-mid ×1, sub-deep ×1, sub-nolevel ×1
+    findRelations: async ({ type }) => {
+      if (type !== 'mentions') return [];
+      return [
+        { from: 'i1', to: 'sub-hub', type: 'mentions' },
+        { from: 'i2', to: 'sub-hub', type: 'mentions' },
+        { from: 'i3', to: 'sub-hub', type: 'mentions' },
+        { from: 'i4', to: 'sub-mid', type: 'mentions' },
+        { from: 'i5', to: 'sub-deep', type: 'mentions' },
+        { from: 'i6', to: 'sub-nolevel', type: 'mentions' },
+        { from: 'i7', to: 'comp-1', type: 'mentions' },
+      ];
+    },
+  });
+
+  const consolidatorWith = (kmStore) =>
+    new ObservationConsolidator({ kmStore, observationWriter: {}, runId: 'stage4-test' });
+
+  it('picks the LEAST-mentioned SubComponent — rarity means specificity', async () => {
+    const c = consolidatorWith(makeStore());
+    // sub-hub has 3 corpus-wide mentions, sub-mid 1. The rare one wins.
+    const p = await c._resolveInsightParent(['sub-hub', 'sub-mid']);
+    assert.equal(p.parentId, 'sub-mid');
+    assert.equal(p.parentMentions, 1);
+  });
+
+  it('never lets a popular hub adopt an insight that named anything rarer', async () => {
+    // The regression this rule exists to prevent: ranking by popularity put
+    // 231 of 767 live insights under one hub and 44.7% under three.
+    const c = consolidatorWith(makeStore());
+    const p = await c._resolveInsightParent(['sub-hub', 'sub-deep', 'sub-mid']);
+    assert.notEqual(p.parentId, 'sub-hub', 'the 3-mention hub must never win over a 1-mention name');
+  });
+
+  it('ranks corpus-wide, not by position in the mentions list', async () => {
+    const c = consolidatorWith(makeStore());
+    const first = await c._resolveInsightParent(['sub-hub', 'sub-mid']);
+    const second = await c._resolveInsightParent(['sub-mid', 'sub-hub']);
+    assert.equal(first.parentId, second.parentId, 'order of the ids must not decide the parent');
+    assert.equal(first.parentId, 'sub-mid');
+  });
+
+  it('breaks ties on the lower id so a re-run is reproducible', async () => {
+    const c = consolidatorWith(makeStore());
+    // sub-mid, sub-deep and sub-nolevel all have exactly 1 mention.
+    const a = await c._resolveInsightParent(['sub-mid', 'sub-deep', 'sub-nolevel']);
+    const b = await c._resolveInsightParent(['sub-nolevel', 'sub-deep', 'sub-mid']);
+    assert.equal(a.parentId, b.parentId);
+    assert.equal(a.parentId, 'sub-deep', 'lowest id wins a tie');
+  });
+
+  it('derives hierarchyLevel from the parent rather than hardcoding 3', async () => {
+    const c = consolidatorWith(makeStore());
+    const deep = await c._resolveInsightParent(['sub-deep']);
+    assert.equal(deep.hierarchyLevel, 4, 'a level-3 parent yields a level-4 child');
+    const mid = await c._resolveInsightParent(['sub-mid']);
+    assert.equal(mid.hierarchyLevel, 3);
+  });
+
+  it('falls back to level 3 when the parent carries no level', async () => {
+    const c = consolidatorWith(makeStore());
+    const p = await c._resolveInsightParent(['sub-nolevel']);
+    assert.equal(p.hierarchyLevel, 3);
+  });
+
+  it('never adopts a Component or any non-SubComponent mention', async () => {
+    const c = consolidatorWith(makeStore());
+    assert.equal(await c._resolveInsightParent(['comp-1']), null);
+    assert.equal(await c._resolveInsightParent(['detail-9', 'unknown-id']), null);
+  });
+
+  it('returns null for an insight that mentions nothing', async () => {
+    const c = consolidatorWith(makeStore());
+    assert.equal(await c._resolveInsightParent([]), null);
+    assert.equal(await c._resolveInsightParent(undefined), null);
+  });
+
+  it('tallies once per instance — placement must not rescan per write', async () => {
+    let scans = 0;
+    const store = makeStore();
+    const counted = {
+      ...store,
+      findRelations: async (f) => { scans += 1; return store.findRelations(f); },
+    };
+    const c = consolidatorWith(counted);
+    await c._resolveInsightParent(['sub-hub']);
+    await c._resolveInsightParent(['sub-mid']);
+    await c._resolveInsightParent(['sub-deep']);
+    assert.equal(scans, 1, 'the ~30k-edge scan must be memoized for the run');
+  });
+
+  it('is non-fatal when the store cannot answer — an insight is never lost to placement', async () => {
+    const c = consolidatorWith(makeStore({ throwOnTally: true }));
+    assert.equal(await c._resolveInsightParent(['sub-hub']), null);
+  });
+});
