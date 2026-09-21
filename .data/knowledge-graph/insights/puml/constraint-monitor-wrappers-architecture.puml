@@ -1,0 +1,47 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Container Gating" {
+  component "docker/entrypoint.sh" as entrypoint <<core>>
+  component "features.json snapshot" as snapshot <<storage>>
+  component "supervisord features.d" as supervisord <<core>>
+}
+
+package "Startup Paths" {
+  component "start-services.sh (legacy)" as legacy <<core>>
+  component "start-services-robust.js" as robust <<core>>
+  component "lib/service-starter.js" as starter <<core>>
+  component "ProcessStateManager (PSM)" as psm <<storage>>
+}
+
+package "Constraint Monitor Wrappers" {
+  component "constraint-monitor" as cm <<agent>>
+  component "constraint-dashboard" as dash <<agent>>
+  component "constraint-dashboard-api" as api <<api>>
+}
+
+component "service-gating.test.mjs" as tests <<cli>>
+component "prompt-classifier-service.mjs" as classifier <<agent>>
+
+entrypoint --> snapshot : "reads runtime snapshot"
+entrypoint --> supervisord : "writes autostart=false"
+supervisord --> cm : "gates via PROGRAM_FEATURES"
+supervisord --> dash : "gates via PROGRAM_FEATURES"
+supervisord --> api : "gates via PROGRAM_FEATURES"
+
+legacy --> cm : "docker-compose/manual fallback"
+legacy --> dash : "npm run dashboard (&)"
+legacy --> api : "npm run api (&)"
+
+robust --> starter : "startServiceWithRetry()"
+starter --> psm : "registers running services"
+starter --> cm : "required flag / retry logic"
+starter --> dash : "PSM-managed startup"
+starter --> api : "PSM-managed startup"
+
+tests --> starter : "asserts SERVICE_CONFIGS integrity"
+tests --> cm : "disabled vs degraded checks"
+
+classifier ..> entrypoint : "contrasts secret-loading discipline"
+
+@enduml

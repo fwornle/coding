@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Copilot Live Path" {
+  component "copilot-events-tail.mjs" as tail <<core>>
+  component "isOwnedByMe (uid guard)" as uidGuard <<core>>
+  component "projectMatches / workspace.yaml" as projMatch <<core>>
+  component "findLiveLockFile\n(stale lock check)" as lockCheck <<core>>
+  component "buildStubObservation" as stub <<core>>
+  database "events.jsonl" as eventsFile
+}
+
+package "OpenCode Pull Path" {
+  component "opencode-token-rows.mjs" as tokenRows <<core>>
+  component "ownedDbPath (uid guard)" as uidGuard2 <<core>>
+  database "opencode.db (SQLite)" as opencodeDb
+}
+
+package "Shared Sink" {
+  component "token-db.mjs\ninsertTokenRow" as tokenDb <<storage>>
+}
+
+eventsFile --> tail : "polled tail\n(200ms)"
+tail --> uidGuard : "checks ownership"
+tail --> lockCheck : "checks liveness"
+tail --> projMatch : "filters by project"
+tail --> stub : "on lifecycle-only events"
+stub --> tokenDb : "lsl_incomplete rows"
+
+opencodeDb --> tokenRows : "pull at stop-time"
+tokenRows --> uidGuard2 : "checks ownership"
+tokenRows --> tokenDb : "provider-gated rows\n(BYPASS_PROVIDERS)"
+
+@enduml

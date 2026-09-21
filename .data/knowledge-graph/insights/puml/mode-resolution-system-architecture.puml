@@ -1,0 +1,41 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Mode Resolution" {
+  component "getLLMMode()" as getMode <<core>>
+  database ".data/workflow-progress.json" as progress <<storage>>
+  component "CODING_ROOT Resolver" as codingRoot <<core>>
+}
+
+package "Backend Providers" {
+  component "dmr-provider.ts" as dmr <<core>>
+  component "dmrClient Singleton" as dmrClient <<core>>
+  component "checkDMRAvailability() TTL Cache" as ttl <<core>>
+  component "loadDMRConfig()" as loadCfg <<core>>
+  component "dmr-config.yaml" as yaml <<storage>>
+  component "llm-with-process.ts" as withProcess <<core>>
+  cloud "LLM Proxy /api/complete" as proxy <<external>>
+}
+
+package "Response Handling" {
+  component "parseLlmJson()" as parseJson <<core>>
+  component "escapeControlCharsInStrings()" as escapeChars <<core>>
+}
+
+getMode --> progress : "reads per-agent/global/legacy mode"
+getMode --> codingRoot : "resolves env override"
+getMode --> dmr : "selects backend mode"
+getMode --> withProcess : "selects backend mode"
+
+dmr --> dmrClient : "lazy singleton init"
+dmr --> ttl : "gates health checks"
+dmr --> loadCfg : "loads connection config"
+loadCfg --> yaml : "3-path search + expandEnvVars()"
+
+withProcess --> proxy : "direct POST bypassing SDK"
+withProcess --> codingRoot : "4-tier URL resolution"
+
+withProcess --> parseJson : "parses LLM response"
+parseJson --> escapeChars : "targeted repair on failure"
+
+@enduml

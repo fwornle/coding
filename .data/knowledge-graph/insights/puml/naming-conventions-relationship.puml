@@ -5,17 +5,17 @@ title Hierarchy Context: NamingConventions
 
 [CodingPatterns] as coding_patterns #FFFFDD
 [NamingConventions] as naming_conventions #LightBlue
-[ConfigDrivenDesign] as config_driven_design #F0F0F0
-[ResilienceWrappers] as resilience_wrappers #F0F0F0
-[ArtifactPatternMatching] as artifact_pattern_matching #E8F5E8
-[EntityClassMapping] as entity_class_mapping #E8F5E8
-[TeamDirectoryOwnership] as team_directory_ownership #E8F5E8
+[ConfigurationExternalization] as configuration_externalization #F0F0F0
+[CLIWrapperPattern] as cliwrapper_pattern #F0F0F0
+[OntologyHeuristicsLayering] as ontology_heuristics_layering #F0F0F0
+[TeamEntitySuffixMap] as team_entity_suffix_map #E8F5E8
+[ArtifactPatternRegistry] as artifact_pattern_registry #E8F5E8
 
 coding_patterns --> naming_conventions
-config_driven_design -[hidden]- naming_conventions
-resilience_wrappers -[hidden]- naming_conventions
-naming_conventions --> artifact_pattern_matching
-naming_conventions --> entity_class_mapping
-naming_conventions --> team_directory_ownership
+configuration_externalization -[hidden]- naming_conventions
+cliwrapper_pattern -[hidden]- naming_conventions
+ontology_heuristics_layering -[hidden]- naming_conventions
+naming_conventions --> team_entity_suffix_map
+naming_conventions --> artifact_pattern_registry
 
 @enduml

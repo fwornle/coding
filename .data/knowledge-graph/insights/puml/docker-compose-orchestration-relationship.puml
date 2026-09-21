@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DockerComposeOrchestration
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[DockerComposeOrchestration] as docker_compose_orchestration #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[HostServiceStarter] as host_service_starter #F0F0F0
+[ApiAndDashboardWrappers] as api_and_dashboard_wrappers #F0F0F0
+[FeatureGatingScript] as feature_gating_script #E8F5E8
+[EnvFileImportFilter] as env_file_import_filter #E8F5E8
+
+dockerized_services --> docker_compose_orchestration
+service_starter -[hidden]- docker_compose_orchestration
+service_probe -[hidden]- docker_compose_orchestration
+process_state_manager -[hidden]- docker_compose_orchestration
+host_service_starter -[hidden]- docker_compose_orchestration
+api_and_dashboard_wrappers -[hidden]- docker_compose_orchestration
+docker_compose_orchestration --> feature_gating_script
+docker_compose_orchestration --> env_file_import_filter
+
+@enduml

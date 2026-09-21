@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ConfigDrivenFeatureFlags
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ConfigDrivenFeatureFlags] as config_driven_feature_flags #LightBlue
+[AgentAbstractionConventions] as agent_abstraction_conventions #F0F0F0
+[CLIScriptConventions] as cliscript_conventions #F0F0F0
+[EnvironmentVariableConfiguration] as environment_variable_configuration #F0F0F0
+[HardcodedTeamDirectoryMap] as hardcoded_team_directory_map #E8F5E8
+[ArtifactPatternRegistry] as artifact_pattern_registry #E8F5E8
+[ArtifactExtractionHeuristics] as artifact_extraction_heuristics #E8F5E8
+
+coding_patterns --> config_driven_feature_flags
+agent_abstraction_conventions -[hidden]- config_driven_feature_flags
+cliscript_conventions -[hidden]- config_driven_feature_flags
+environment_variable_configuration -[hidden]- config_driven_feature_flags
+config_driven_feature_flags --> hardcoded_team_directory_map
+config_driven_feature_flags --> artifact_pattern_registry
+config_driven_feature_flags --> artifact_extraction_heuristics
+
+@enduml

@@ -1,37 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Gating Layer" {
-  component "docker/entrypoint.sh" as entrypoint <<core>>
-  component "supervisord" as supervisord <<core>>
+package "Orchestration Layer" {
+  component "start-services-robust.js" as orchestrator <<core>>
+  component "SERVICE_CONFIGS\n(transcriptMonitor.startFn)" as serviceConfigs <<core>>
+  component "service-starter.js\n(startServiceWithRetry)" as serviceStarter <<core>>
 }
 
-package "Wrapper Scripts" {
-  component "api-service.js" as apiService <<cli>>
-  component "dashboard-service.js" as dashboardService <<cli>>
+package "Process State Manager" {
+  component "ProcessStateManager\n(singleton psm)" as psm <<core>>
+  database "PID Registry\n(name+scope+projectPath)" as registry <<storage>>
 }
 
-package "Registry Core" {
-  component "ProcessStateManager" as psm <<core>>
+package "OS-Level Verification" {
+  component "isProcessRunningByScript\n(pgrep -lf)" as pgrep <<external>>
 }
 
-component "constraint-api child" as apiChild <<agent>>
-component "constraint-dashboard child" as dashChild <<agent>>
+package "Wrapper Services" {
+  component "api-service.js" as apiService <<agent>>
+  component "dashboard-service.js" as dashboardService <<agent>>
+}
 
-entrypoint --> supervisord : "feature-gates programs"
-supervisord --> apiService : "spawns (if enabled)"
-supervisord --> dashboardService : "spawns (if enabled)"
+component "service-gating.test.mjs\n(stubs startFn)" as tests <<cli>>
 
-apiService --> apiChild : "spawn"
-dashboardService --> dashChild : "spawn"
+orchestrator --> serviceConfigs : "defines"
+orchestrator --> psm : "instantiates\nconst psm = new ProcessStateManager()"
+serviceConfigs --> psm : "isServiceRunning(name, scope)"
+psm --> registry : "queries/updates"
+serviceConfigs --> pgrep : "fallback liveness check"
+pgrep ..> psm : "registerService()\n(orphan re-registration)"
 
-apiService ..> psm : "dynamic import + registerService('global')"
-dashboardService ..> psm : "dynamic import + registerService('global')"
+apiService --> psm : "registerService()\n(post-spawn)"
+dashboardService --> psm : "registerService()\n(post-spawn)"
+serviceStarter ..> psm : "possible implicit registration"
 
-apiChild ..> apiService : "exit event"
-dashChild ..> dashboardService : "exit event"
-
-apiService ..> psm : "unregisterService('global') on exit"
-dashboardService ..> psm : "unregisterService('global') on exit"
+tests ..> serviceConfigs : "stubs startFn\n(bypasses PSM)"
 
 @enduml

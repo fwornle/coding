@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CLIScriptConventions
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[CLIScriptConventions] as cliscript_conventions #LightBlue
+[AgentAbstractionConventions] as agent_abstraction_conventions #F0F0F0
+[ConfigDrivenFeatureFlags] as config_driven_feature_flags #F0F0F0
+[EnvironmentVariableConfiguration] as environment_variable_configuration #F0F0F0
+[PatternComplianceReportGenerator] as pattern_compliance_report_generator #E8F5E8
+
+coding_patterns --> cliscript_conventions
+agent_abstraction_conventions -[hidden]- cliscript_conventions
+config_driven_feature_flags -[hidden]- cliscript_conventions
+environment_variable_configuration -[hidden]- cliscript_conventions
+cliscript_conventions --> pattern_compliance_report_generator
+
+@enduml

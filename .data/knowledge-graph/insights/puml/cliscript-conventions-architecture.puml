@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Self-Location & Config" {
+  component "SCRIPT_DIR Resolution" as scriptdir <<cli>>
+  component "DEFAULT_REPO Derivation" as defaultrepo <<cli>>
+  component "CODING_TOOLS_PATH / CODING_REPO Env" as envoverride <<external>>
+}
+
+package "verify-patterns.sh" {
+  component "Regex Compliance Checks" as checks <<core>>
+  component "ConditionalLoggingPattern Check" as logcheck <<core>>
+  component "ReduxStateManagementPattern Check" as reduxcheck <<core>>
+  component "NetworkAwareInstallationPattern Check" as netcheck <<core>>
+  component "Compliance Score Calculator" as score <<core>>
+  component "Markdown Report Generator" as report <<cli>>
+}
+
+package "Shared State" {
+  database "$SHARED_MEMORY JSON Store" as sharedmem <<storage>>
+}
+
+scriptdir --> defaultrepo : "derives repo root"
+envoverride ..> defaultrepo : "overrides path"
+defaultrepo --> checks : "provides repo path"
+
+checks --> logcheck : "runs"
+checks --> reduxcheck : "runs (if react)"
+checks --> netcheck : "runs (if install.sh)"
+
+logcheck --> score : "PASSED/TOTAL"
+reduxcheck --> score : "PASSED/TOTAL"
+netcheck --> score : "PASSED/TOTAL"
+
+score --> report : "SCORE %"
+sharedmem ..> checks : "TransferablePattern lookup (jq)"
+score --> sharedmem : "read-modify-write via temp+mv"
+report ..> sharedmem : "guarded by [ -f $SHARED_MEMORY ]"
+
+@enduml

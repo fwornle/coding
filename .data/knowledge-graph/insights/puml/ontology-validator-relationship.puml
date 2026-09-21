@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologyValidator
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[OntologyValidator] as ontology_validator #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Insights] as insights #F0F0F0
+[BaseAgent] as base_agent #F0F0F0
+[L2SubsystemClassifier] as l2_subsystem_classifier #F0F0F0
+[OntologyClassifier] as ontology_classifier #F0F0F0
+
+semantic_analysis --> ontology_validator
+pipeline -[hidden]- ontology_validator
+ontology -[hidden]- ontology_validator
+insights -[hidden]- ontology_validator
+base_agent -[hidden]- ontology_validator
+l2_subsystem_classifier -[hidden]- ontology_validator
+ontology_classifier -[hidden]- ontology_validator
+
+@enduml

@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentProviderSplicing
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[AgentProviderSplicing] as agent_provider_splicing #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMProxyClient] as llmproxy_client #F0F0F0
+[LlmJsonParser] as llm_json_parser #F0F0F0
+[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[OffloadRoutingDecision] as offload_routing_decision #F0F0F0
+[ModelContextLimits] as model_context_limits #F0F0F0
+[PriceForModelResolution] as price_for_model_resolution #E8F5E8
+[ModelFamilyFallback] as model_family_fallback #E8F5E8
+[BudgetForMonthOverride] as budget_for_month_override #E8F5E8
+
+llmabstraction --> agent_provider_splicing
+llmmock_service -[hidden]- agent_provider_splicing
+dmrprovider -[hidden]- agent_provider_splicing
+llmproxy_client -[hidden]- agent_provider_splicing
+llm_json_parser -[hidden]- agent_provider_splicing
+dashboard_cost_model -[hidden]- agent_provider_splicing
+offload_routing_decision -[hidden]- agent_provider_splicing
+model_context_limits -[hidden]- agent_provider_splicing
+agent_provider_splicing --> price_for_model_resolution
+agent_provider_splicing --> model_family_fallback
+agent_provider_splicing --> budget_for_month_override
+
+@enduml

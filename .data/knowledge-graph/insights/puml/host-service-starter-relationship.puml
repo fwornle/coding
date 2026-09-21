@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: HostServiceStarter
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[HostServiceStarter] as host_service_starter #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[DockerComposeOrchestration] as docker_compose_orchestration #F0F0F0
+[ApiAndDashboardWrappers] as api_and_dashboard_wrappers #F0F0F0
+[ServiceOrderTable] as service_order_table #E8F5E8
+[PortCleanup] as port_cleanup #E8F5E8
+[RequiredVsOptionalStartup] as required_vs_optional_startup #E8F5E8
+
+dockerized_services --> host_service_starter
+service_starter -[hidden]- host_service_starter
+service_probe -[hidden]- host_service_starter
+process_state_manager -[hidden]- host_service_starter
+docker_compose_orchestration -[hidden]- host_service_starter
+api_and_dashboard_wrappers -[hidden]- host_service_starter
+host_service_starter --> service_order_table
+host_service_starter --> port_cleanup
+host_service_starter --> required_vs_optional_startup
+
+@enduml

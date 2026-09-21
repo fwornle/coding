@@ -1,0 +1,33 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "EntityPatternAnalyzer" {
+  component "teamDirectories\n(Map<string,string[]>)" as teamDirs <<core>>
+  component "artifactPatterns\n(RegExp rules)" as artifactPatterns <<core>>
+  component "extractArtifacts()" as extract <<core>>
+  component "checkLocalArtifact()\nconfidence 0.9" as checkLocal <<core>>
+  component "matchArtifactPattern()\nconfidence 0.75" as matchPattern <<core>>
+  component "inferEntityClass()\n(duplicate teamMappings)" as inferClass <<core>>
+}
+
+package "VerifyPatternsScript" {
+  component "verify-patterns.sh" as verifyScript <<cli>>
+  component "CLAUDE_REPO fallback\nresolution" as repoResolve <<external>>
+}
+
+database "$SHARED_MEMORY JSON" as sharedMem
+
+extract --> checkLocal : "candidate artifacts"
+checkLocal --> matchPattern : "if null"
+teamDirs --> checkLocal : "prefix lookup"
+artifactPatterns --> matchPattern : "regex match"
+checkLocal --> inferClass : "team resolved"
+matchPattern --> inferClass : "team resolved"
+inferClass ..> teamDirs : "duplicates mapping"
+inferClass ..> artifactPatterns : "duplicates mapping"
+
+repoResolve --> verifyScript : "resolves repo path"
+verifyScript --> sharedMem : "writes compliance score (jq)"
+verifyScript ..> extract : "complementary audit\n(aggregate vs per-artifact)"
+
+@enduml

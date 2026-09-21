@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "System Health Dashboard (Workflow Pipeline)" {
+  component "MultiAgentGraph\n(SVG static topology)" as mag <<core>>
+  component "useWorkflowColors()" as woc <<core>>
+  component "AGENT_SUBSTEPS /\nWAVE_AGENTS / MULTI_AGENT_EDGES" as consts <<core>>
+  component "ukb-workflow-modal.tsx\n(ETA estimation logic)" as etamodal <<core>>
+  component "ukbSlice.ts\n(UKBProcess, YAML-derived)" as ukbslice <<storage>>
+}
+
+package "Unified Viewer (Knowledge Graph)" {
+  component "D3GraphCanvas\n(force-directed simulation)" as d3 <<core>>
+  component "color-fallback.ts\n(node FillColor / node ShapeFor)" as colorfb <<core>>
+  component "learning-source.ts\n(isOnlineLearned)" as learnsrc <<core>>
+  component "LegendPanel" as legend <<core>>
+  component "useGraphData" as ugd <<api>>
+}
+
+mag --> woc : "centralized SVG coloring"
+mag --> consts : "hoisted for memo stability"
+etamodal --> ukbslice : "reads WorkflowTimingStats"
+etamodal ..> mag : "colocated modal, not rendering"
+
+d3 --> ugd : "loads live entity/relation data"
+d3 --> colorfb : "resolves fill/shape per node"
+colorfb --> learnsrc : "classifies online-learned provenance"
+legend --> colorfb : "shares canonical resolver"
+legend --> learnsrc : "Learning Source filter"
+
+d3 ..> mag : "no shared rendering abstraction"
+colorfb ..> woc : "independent color resolvers (drift risk)"
+
+@enduml

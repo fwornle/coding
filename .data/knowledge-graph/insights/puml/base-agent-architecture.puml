@@ -1,38 +1,42 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "CLI Agent Launch Configs" {
-  component "copilot.sh" as copilot <<cli>>
-  component "opencode.sh" as opencode <<cli>>
-  component "pi.sh" as pi <<cli>>
-  component "launch-agent-common.sh\nconfigure_proxy_routing()" as common <<core>>
+package "TypeScript Agent Pipeline" {
+  component "BaseAgent.execute()" as baseAgent <<core>>
+  component "OntologyClassificationAgent\n(hard-root-guard)" as ontologyAgent <<agent>>
+  component "SemanticAnalysisAgent\n(extractL2FromLLMResponse)" as semanticAgent <<agent>>
 }
 
-package "pi Extensions" {
-  component "no-unbounded-fs-scan.ts\ntool_call guard" as fsguard <<agent>>
+package "Shell Agent Launch Layer" {
+  component "launch-agent-common.sh" as launcher <<cli>>
+  component "opencode.sh\n(agent_pre_launch)" as opencode <<cli>>
+  component "copilot.sh\n(agent_pre_launch)" as copilot <<cli>>
+  component "pi.sh\n(thinkingLevelMap)" as pi <<cli>>
 }
 
-package "Shared Infrastructure" {
-  cloud "rapid-llm-proxy\n(port 12435)" as proxy <<external>>
+package "Config & Safety Gates" {
+  database "llm-routing.yaml" as routingConfig <<storage>>
+  database "coding.lower.json" as ontologyConfig <<storage>>
+  component "no-unbounded-fs-scan.ts\n(offendingRoot gate)" as fsGuard <<core>>
+  component "batch-provenance.mjs\n(selectBatchesForReport)" as provenance <<core>>
 }
 
-package "System Health Dashboard" {
-  component "agent-badge.tsx\nAGENT_COLORS map" as badge <<external>>
-}
+baseAgent --> ontologyAgent : "hook: detectIssues()"
+baseAgent --> semanticAgent : "hook: calculateConfidence()"
 
-copilot ..> common : "defers BYOK wiring"
-opencode --> common : "sourced lifecycle hooks"
-pi --> common : "sourced lifecycle hooks"
+launcher --> opencode : "invokes hooks"
+launcher --> copilot : "invokes hooks"
+launcher --> pi : "invokes hooks"
 
-copilot --> proxy : "routes LLM calls"
-opencode --> proxy : "routes LLM calls"
-pi --> proxy : "routes LLM calls"
+opencode ..> routingConfig : "bypasses via CODING_OPENCODE_MODEL"
+ontologyAgent ..> ontologyConfig : "bypasses via hard-root-guard"
 
-pi --> fsguard : "installs extension"
-fsguard ..> pi : "blocks unbounded find (fail-open)"
+pi --> routingConfig : "reasoning_effort banding"
+copilot --> routingConfig : "BYOK health-check gated"
 
-badge ..> copilot : "renders badge (fallback color)"
-badge ..> opencode : "renders badge (fallback color)"
-badge ..> pi : "renders badge (fallback color)"
+fsGuard ..> baseAgent : "PreToolUse deterministic gate"
+provenance ..> semanticAgent : "conservative degrade-not-fail"
+
+baseAgent -- launcher : "parallel template-method pattern"
 
 @enduml

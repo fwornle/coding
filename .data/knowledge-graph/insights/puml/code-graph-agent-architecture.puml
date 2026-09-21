@@ -1,0 +1,41 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Backend Agent Layer" {
+  component "CodeGraphAgent" as cga <<agent>>
+  component "checkMemgraphConnection\n(stub shim)" as shim <<core>>
+  component "GraphifyGraph" as gg <<core>>
+  component "kindOf() / nameOf()" as parse <<core>>
+  component "mapRelation()" as maprel <<core>>
+}
+
+package "Storage" {
+  database "graph.json" as graphjson <<storage>>
+}
+
+package "Dashboard / UI Layer" {
+  component "MultiAgentGraph\n(AGENT_SUBSTEPS)" as mag <<external>>
+  component "UkbWorkflowModal" as ukbmodal <<external>>
+  component "ukbSlice\n(WorkflowExecutionState)" as ukbslice <<external>>
+}
+
+package "Related Migration Patterns" {
+  component "migrate-graph-db-entity-types.js" as migrate <<external>>
+  component "color-fallback.ts\n(node FillColor/node ShapeFor)" as colorfb <<external>>
+}
+
+cga --> shim : "preserves legacy API"
+cga --> gg : "delegates reads"
+gg --> graphjson : "mtime-based lazy read"
+gg --> parse : "derives type/name from label"
+gg --> maprel : "normalizes relation vocabulary"
+
+mag --> cga : "renders sub-steps\n(stale: 'Cypher on Memgraph')"
+ukbmodal --> mag : "displays workflow graph"
+ukbslice --> mag : "drives step status\n(no staleness field)"
+gg ..> ukbslice : "cached data\nnot reflected as stale"
+
+maprel ..> migrate : "same lossy compression pattern"
+parse ..> colorfb : "same schema-on-read pattern"
+
+@enduml

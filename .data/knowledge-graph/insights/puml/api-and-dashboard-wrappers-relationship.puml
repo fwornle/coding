@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ApiAndDashboardWrappers
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ApiAndDashboardWrappers] as api_and_dashboard_wrappers #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[DockerComposeOrchestration] as docker_compose_orchestration #F0F0F0
+[HostServiceStarter] as host_service_starter #F0F0F0
+[FeatureGatingOverrideLayer] as feature_gating_override_layer #E8F5E8
+[ApiServiceWrapper] as api_service_wrapper #E8F5E8
+[DashboardServiceWrapper] as dashboard_service_wrapper #E8F5E8
+
+dockerized_services --> api_and_dashboard_wrappers
+service_starter -[hidden]- api_and_dashboard_wrappers
+service_probe -[hidden]- api_and_dashboard_wrappers
+process_state_manager -[hidden]- api_and_dashboard_wrappers
+docker_compose_orchestration -[hidden]- api_and_dashboard_wrappers
+host_service_starter -[hidden]- api_and_dashboard_wrappers
+api_and_dashboard_wrappers --> feature_gating_override_layer
+api_and_dashboard_wrappers --> api_service_wrapper
+api_and_dashboard_wrappers --> dashboard_service_wrapper
+
+@enduml

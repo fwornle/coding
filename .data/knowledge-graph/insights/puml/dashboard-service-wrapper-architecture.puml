@@ -1,0 +1,42 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Host Orchestration" {
+  component "start-services.sh\n(ROBUST_MODE seam)" as legacy <<cli>>
+  component "start-services-robust.js" as robust <<core>>
+  component "service-starter.js\nstartServiceWithRetry()" as starter <<core>>
+  component "SERVICE_CONFIGS /\nSERVICE_ORDER" as config <<core>>
+  database "PSM Registry" as psm <<storage>>
+}
+
+package "Verification & Self-Healing" {
+  component "waitForPortBindable()" as portcheck <<core>>
+  component "killProcessOnPortAndWait()" as killport <<core>>
+  component "isProcessRunningByScript()\n(pgrep orphan scan)" as orphan <<core>>
+}
+
+package "Feature Gating Contracts" {
+  component "lib/features/catalogue.cjs\nFEATURE_IDS" as catalogue <<core>>
+  component "service-gating.test.mjs\n(fail-closed)" as hosttest <<cli>>
+  component "docker/entrypoint.sh\nPROGRAM_FEATURES (fail-open)" as entrypoint <<external>>
+  component "container-gating.test.mjs" as containertest <<cli>>
+  database "features.json\n(mounted snapshot)" as snapshot <<storage>>
+}
+
+legacy --> robust : "ROBUST_MODE=true delegates"
+robust --> starter : "invokes per service"
+starter --> config : "reads required/optional,\nmaxRetries"
+starter --> psm : "registerService()"
+robust --> killport : "cleanup before spawn"
+killport --> portcheck : "then verify bindable"
+robust --> orphan : "reconcile drift"
+orphan --> psm : "re-register orphan"
+
+config --> catalogue : "declares feature"
+hosttest --> config : "asserts coverage"
+hosttest --> catalogue : "validates FEATURE_IDS"
+
+entrypoint --> snapshot : "reads host-written config"
+containertest --> entrypoint : "asserts PROGRAM_FEATURES\nvs supervisord.conf"
+
+@enduml

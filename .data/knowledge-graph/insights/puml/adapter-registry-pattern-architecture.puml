@@ -1,0 +1,30 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "EntityPatternAnalyzer (Layer 1)" {
+  component "teamDirectories Map" as teamDirs <<core>>
+  component "artifactPatterns Registry" as artifactPatterns <<core>>
+  component "analyzeEntityPatterns" as analyze <<core>>
+  component "checkLocalArtifact" as checkLocal <<core>>
+  component "matchArtifactPattern" as matchPattern <<core>>
+  component "extractArtifacts" as extract <<core>>
+  component "inferEntityClass\n(teamMappings dup)" as infer <<core>>
+}
+
+package "Compliance Tooling" {
+  component "verify-patterns.sh" as verify <<cli>>
+  database "SHARED_MEMORY JSON" as sharedMem <<storage>>
+}
+
+analyze --> checkLocal : "step 1: direct match (0.9)"
+checkLocal --> teamDirs : "prefix lookup"
+analyze --> matchPattern : "step 2: fallback (0.75)"
+matchPattern --> artifactPatterns : "regex match"
+extract --> analyze : "provides candidate artifacts"
+analyze --> infer : "resolves entity Class"
+infer ..> artifactPatterns : "duplicate lookup\n(entity ClassMap vs teamMappings)"
+
+verify --> sharedMem : "jq patch\npattern_compliance_score"
+verify ..> analyze : "no shared code path\n(unrelated concern)"
+
+@enduml

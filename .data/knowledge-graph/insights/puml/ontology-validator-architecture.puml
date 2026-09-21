@@ -1,0 +1,29 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Facade Layer" {
+  component "ontology.ts\n(facade)" as facade <<core>>
+  component "noopOntologyValidator" as noop <<core>>
+}
+
+package "Validation Core" {
+  component "OntologyValidator.ts\n(implementation)" as validatorImpl <<core>>
+  component "ontology/types.ts\n(EntityDefinition, PropertyDefinition,\nValidationOptions, ValidationResult,\nPropertyValidationResult, ValidationError,\nOntologyValidationError)" as types <<core>>
+}
+
+package "Adapters & Instrumentation" {
+  component "LegacyOntologyAdapter.ts" as adapter <<core>>
+  component "metrics.ts\n(OntologyMetrics)" as metrics <<core>>
+}
+
+component "OntologyClassificationAgent" as agent <<agent>>
+
+facade --> validatorImpl : "delegates to"
+facade --> noop : "exports fallback"
+validatorImpl --> types : "uses validation types"
+validatorImpl --> adapter : "consumes ResolvedEntityDefinition"
+validatorImpl --> metrics : "reports metrics"
+agent --> facade : "invokes validation"
+agent --> noop : "falls back when disabled"
+
+@enduml

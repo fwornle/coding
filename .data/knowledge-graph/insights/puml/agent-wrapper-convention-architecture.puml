@@ -1,0 +1,34 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "EntityPatternAnalyzer" {
+  component "analyzeEntityPatterns()" as entry <<core>>
+  component "extractArtifacts()" as extract <<core>>
+  component "checkLocalArtifact()\n(conf 0.9)" as localMatch <<core>>
+  component "matchArtifactPattern()\n(conf 0.75)" as patternMatch <<core>>
+  component "inferEntityClass()\nteamMappings" as infer <<core>>
+  database "teamDirectories Map\n(Coding, RaaS, ReSi, UI)" as teamDirs <<storage>>
+  database "artifactPatterns[]" as artPatterns <<storage>>
+}
+
+package "verify-patterns.sh Pipeline" {
+  component "verify-patterns.sh" as verify <<cli>>
+  component "Pattern Usage\nCase-Statement Stub" as usageStub <<core>>
+  database "$SHARED_MEMORY\nJSON Knowledge Store" as sharedMem <<storage>>
+}
+
+entry --> extract : "step 1: parse text"
+extract --> localMatch : "candidate artifacts"
+localMatch --> teamDirs : "directory-prefix match"
+localMatch ..> patternMatch : "fallback if no match"
+patternMatch --> artPatterns : "regex match"
+localMatch --> infer : "team result"
+patternMatch --> infer : "team result"
+infer ..> infer : "'Agentic' branch\n(unreachable)"
+
+verify --> sharedMem : "reads TransferablePattern\nentities (significance>=8)"
+verify --> usageStub : "computes usage indicators"
+usageStub ..> usageStub : "defaults to 0\nfor unmapped patterns"
+verify --> sharedMem : "writes back\npattern_compliance_score"
+
+@enduml

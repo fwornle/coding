@@ -1,38 +1,38 @@
 @startuml
-!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+!include ./docs/puml/_standard-style.puml
 
-package "CLI Entry Points" {
-  component "ukb-database/cli.js" as dbcli <<cli>>
-  component "ukb-unified/cli.js" as unicli <<cli>>
-  component "WorkflowOrchestrator" as orchestrator <<core>>
-  component "TeamCheckpointManager" as checkpoint <<core>>
-  component "GapAnalyzer" as gap <<core>>
+package "ukb-workflow-modal.tsx" {
+  component "HISTORY_PAGE_SIZE" as hps <<core>>
+  component "calculateDynamicEta" as dynEta <<core>>
+  component "calculateStepAwareEta" as legacyEta <<core>>
 }
 
-package "Knowledge Store Access" {
-  component "UKBDatabaseWriter" as writer <<core>>
-  component "VkbApiClient" as vkbclient <<api>>
-  database "SQLite + Qdrant" as db <<storage>>
-  cloud "VKB Server :8080" as vkbserver <<external>>
+package "multi-agent-graph.tsx" {
+  component "WAVE_AGENTS" as waveAgents <<core>>
+  component "KG_OPERATOR_CHILDREN" as kgChildren <<core>>
 }
 
-package "Dashboard UI" {
-  component "ukb-workflow-modal.tsx\n(calculateDynamicEta)" as modal <<agent>>
-  component "multi-agent-graph.tsx\n(WAVE_AGENTS)" as graph <<agent>>
+package "unified-viewer.D3GraphCanvas" {
+  component "D3GraphCanvas" as d3canvas <<core>>
+  component "deriveAncestryFromStorePath" as ancestry <<core>>
+  component "color-fallback.ts" as colorFallback <<core>>
+  component "node FillColor" as node FillColor <<core>>
+  component "_classHue" as classHue <<deprecated>>
 }
 
-dbcli --> writer : "storeEntity/storeRelation"
-dbcli ..> vkbserver : "isVKBRunning() check\n(update only)"
-writer --> db : "direct writes"
+database "Redux Store (ukbSlice.ts)" as store <<storage>>
 
-unicli --> checkpoint : "load .data/ukb-last-run.json"
-unicli --> gap : "getGapSummary"
-unicli --> orchestrator : "executeIncrementalWorkflow"
-orchestrator --> vkbclient : "createEntity/updateEntity"
-vkbclient --> vkbserver : "HTTP /api/health, /api/entity"
-vkbserver --> db : "server-mediated writes"
+legacyEta --> dynEta : "delegates to (Strangler Fig)"
+dynEta --> hps : "shares in-run learning philosophy"
 
-modal --> vkbserver : "GET /api/ukb/history"
-graph --> orchestrator : "reads execution steps"
+waveAgents --> kgChildren : "co-located guardrail constants"
+
+d3canvas --> ancestry : "reconciles inline BFS"
+ancestry --> store : "authoritative pathToSelected"
+d3canvas --> store : "subscribes via selectors"
+
+d3canvas --> colorFallback : "uses"
+colorFallback --> node FillColor : "canonical resolver"
+colorFallback --> classHue : "retained for regression contract"
 
 @enduml

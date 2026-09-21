@@ -1,0 +1,39 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Ontology Heuristics" {
+  component "EntityPatternAnalyzer" as epa <<core>>
+  component "teamDirectories Map" as td <<storage>>
+  component "artifactPatterns Array" as ap <<storage>>
+  component "checkLocalArtifact()" as cla <<core>>
+  component "matchArtifactPattern()" as map_ <<core>>
+  component "extractArtifacts()" as ea <<core>>
+  component "inferEntityClass()" as iec <<core>>
+}
+
+package "Verification Tooling" {
+  component "verify-patterns.sh" as vps <<cli>>
+  database "SHARED_MEMORY (Knowledge JSON)" as sm <<storage>>
+}
+
+package "Unrelated Test Fixtures" {
+  component "DesignViewModel.cs / .xaml" as fixtures <<external>>
+}
+
+epa --> td : "builds at construction"
+epa --> ap : "builds at construction"
+epa --> cla : "step 1 (0.9 confidence)"
+epa --> map_ : "step 2 (0.75 confidence)"
+cla --> td : "direct-match against"
+map_ --> ap : "regex-match against"
+epa --> ea : "extracts candidate artifacts"
+ea --> iec : "feeds classification"
+iec ..> td : "Agentic branch unreachable\n(no matching entry)"
+
+vps --> sm : "reads TransferablePattern entities\n(jq query, significance>=8)"
+vps --> sm : "writes back compliance score"
+vps ..> epa : "shell-level analog of\npattern-registry idiom"
+
+fixtures ..> epa : "surfaced by naming proximity\n(functionally unrelated)"
+
+@enduml

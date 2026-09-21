@@ -11,6 +11,14 @@ title Hierarchy Context: LLMAbstraction
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
+[LLMMockService] as llmmock_service #E8F5E8
+[DMRProvider] as dmrprovider #E8F5E8
+[LLMProxyClient] as llmproxy_client #E8F5E8
+[LlmJsonParser] as llm_json_parser #E8F5E8
+[DashboardCostModel] as dashboard_cost_model #E8F5E8
+[OffloadRoutingDecision] as offload_routing_decision #E8F5E8
+[ModelContextLimits] as model_context_limits #E8F5E8
+[AgentProviderSplicing] as agent_provider_splicing #E8F5E8
 
 coding --> llmabstraction
 live_logging_system -[hidden]- llmabstraction
@@ -19,5 +27,13 @@ knowledge_management -[hidden]- llmabstraction
 coding_patterns -[hidden]- llmabstraction
 constraint_system -[hidden]- llmabstraction
 semantic_analysis -[hidden]- llmabstraction
+llmabstraction --> llmmock_service
+llmabstraction --> dmrprovider
+llmabstraction --> llmproxy_client
+llmabstraction --> llm_json_parser
+llmabstraction --> dashboard_cost_model
+llmabstraction --> offload_routing_decision
+llmabstraction --> model_context_limits
+llmabstraction --> agent_provider_splicing
 
 @enduml

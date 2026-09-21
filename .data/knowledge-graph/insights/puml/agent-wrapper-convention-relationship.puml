@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentWrapperConvention
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentWrapperConvention] as agent_wrapper_convention #LightBlue
+[ManagerPattern] as manager_pattern #F0F0F0
+[AdapterRegistryPattern] as adapter_registry_pattern #F0F0F0
+[OwnershipHeuristicPattern] as ownership_heuristic_pattern #F0F0F0
+[PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+[TwoStepArtifactAttribution] as two_step_artifact_attribution #E8F5E8
+[HardcodedTeamDirectoryMap] as hardcoded_team_directory_map #E8F5E8
+[ArtifactPatternRegexTable] as artifact_pattern_regex_table #E8F5E8
+[ArtifactExtractionRegexes] as artifact_extraction_regexes #E8F5E8
+
+coding_patterns --> agent_wrapper_convention
+manager_pattern -[hidden]- agent_wrapper_convention
+adapter_registry_pattern -[hidden]- agent_wrapper_convention
+ownership_heuristic_pattern -[hidden]- agent_wrapper_convention
+pattern_verification_tooling -[hidden]- agent_wrapper_convention
+agent_wrapper_convention --> two_step_artifact_attribution
+agent_wrapper_convention --> hardcoded_team_directory_map
+agent_wrapper_convention --> artifact_pattern_regex_table
+agent_wrapper_convention --> artifact_extraction_regexes
+
+@enduml

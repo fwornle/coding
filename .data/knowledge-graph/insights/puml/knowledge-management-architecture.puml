@@ -1,37 +1,34 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Semantic Analysis Integration" {
-  component "code-graph-agent.ts" as codeGraphAgent <<agent>>
-  component "graphify-graph.ts" as graphify <<agent>>
+package "Consumer Layer" {
+  component "CodeGraphAgent" as cga <<agent>>
+  component "wave-controller" as wc <<agent>>
 }
 
-package "KnowledgeManagement" {
-  component "VKB Server" as vkb <<core>>
-  component "ukb-trace-report.ts" as traceReport <<cli>>
-  component "migrate-graph-db-entity-types.js" as migrateScript <<core>>
-  database "KMCore\n(Graph Database)" as kmcore <<storage>>
-  database "LevelDB\n(legacy)" as leveldb <<storage>>
+package "Graph Access Layer" {
+  component "GraphifyGraph" as gg <<core>>
+  component "kindOf/nameOf" as helpers <<core>>
+  component "mapRelation" as mapper <<core>>
 }
 
-package "Test & Validation" {
-  component "migrate-leveldb-to-kmcore.test.ts" as migrateTest <<cli>>
+package "Storage & Migration" {
+  database "graph.json" as gjson <<storage>>
+  database "GraphDatabaseService\n(Graphology/LevelDB)" as gds <<storage>>
+  component "migrate-graph-db-entity-types.js" as mig1 <<cli>>
+  component "migrate-leveldb-to-kmcore.mjs" as mig2 <<cli>>
 }
 
-cloud "Downstream Consumers\n(agents, cross-project sync)" as consumers <<external>>
+cga --> gg : "delegates all calls"
+gg --> gjson : "mtime-based lazy load"
+gg --> helpers : "derive type/name from label"
+gg --> mapper : "normalize edge types"
 
-codeGraphAgent --> graphify : "extracts entities"
-graphify --> vkb : "populates graph"
+wc --> gg : "queryIncomingRelations(name, entity Type)"
+wc --> gg : "anchor to 'Coding' if orphan"
 
-vkb --> kmcore : "query/store"
-vkb --> traceReport : "reports decay state"
-vkb ..> leveldb : "replaced by"
-
-migrateScript --> kmcore : "migrates schema"
-migrateScript --> leveldb : "reads legacy data"
-migrateTest --> migrateScript : "validates"
-migrateTest --> kmcore : "asserts schema"
-
-consumers --> vkb : "stable query API"
+mig1 --> gds : "consolidate entity types\n(System/Project/Pattern)"
+mig2 --> gds : "convert to km-core shape\n(UUIDv7, layer=evidence)"
+mig2 --> gjson : "source legacy blobs"
 
 @enduml

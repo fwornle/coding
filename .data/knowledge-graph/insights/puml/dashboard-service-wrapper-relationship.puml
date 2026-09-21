@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DashboardServiceWrapper
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[DashboardServiceWrapper] as dashboard_service_wrapper #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[APIServiceWrapper] as apiservice_wrapper #F0F0F0
+[SupervisordRuntime] as supervisord_runtime #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[StartServicesRobust] as start_services_robust #F0F0F0
+[ServiceRequiredFlagAsymmetry] as service_required_flag_asymmetry #E8F5E8
+[SERVICE_ORDER_Contract] as service_order_contract #E8F5E8
+[FeatureGatedStartOneService] as feature_gated_start_one_service #E8F5E8
+[DockerEntrypointFeatureSnapshot] as docker_entrypoint_feature_snapshot #E8F5E8
+
+dockerized_services --> dashboard_service_wrapper
+service_starter -[hidden]- dashboard_service_wrapper
+service_probe -[hidden]- dashboard_service_wrapper
+apiservice_wrapper -[hidden]- dashboard_service_wrapper
+supervisord_runtime -[hidden]- dashboard_service_wrapper
+process_state_manager -[hidden]- dashboard_service_wrapper
+start_services_robust -[hidden]- dashboard_service_wrapper
+dashboard_service_wrapper --> service_required_flag_asymmetry
+dashboard_service_wrapper --> service_order_contract
+dashboard_service_wrapper --> feature_gated_start_one_service
+dashboard_service_wrapper --> docker_entrypoint_feature_snapshot
+
+@enduml

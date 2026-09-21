@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OwnershipHeuristicPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[OwnershipHeuristicPattern] as ownership_heuristic_pattern #LightBlue
+[ManagerPattern] as manager_pattern #F0F0F0
+[AdapterRegistryPattern] as adapter_registry_pattern #F0F0F0
+[AgentWrapperConvention] as agent_wrapper_convention #F0F0F0
+[PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+[TeamDirectoryPrefixMatch] as team_directory_prefix_match #E8F5E8
+[ArtifactPatternRegexCascade] as artifact_pattern_regex_cascade #E8F5E8
+[ArtifactExtractionPipeline] as artifact_extraction_pipeline #E8F5E8
+
+coding_patterns --> ownership_heuristic_pattern
+manager_pattern -[hidden]- ownership_heuristic_pattern
+adapter_registry_pattern -[hidden]- ownership_heuristic_pattern
+agent_wrapper_convention -[hidden]- ownership_heuristic_pattern
+pattern_verification_tooling -[hidden]- ownership_heuristic_pattern
+ownership_heuristic_pattern --> team_directory_prefix_match
+ownership_heuristic_pattern --> artifact_pattern_regex_cascade
+ownership_heuristic_pattern --> artifact_extraction_pipeline
+
+@enduml

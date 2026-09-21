@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MultiUserHashManager
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[MultiUserHashManager] as multi_user_hash_manager #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[RedactionConfigManager] as redaction_config_manager #F0F0F0
+[LiveTranscriptWatchers] as live_transcript_watchers #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+
+live_logging_system --> multi_user_hash_manager
+lslconfig_validator -[hidden]- multi_user_hash_manager
+redaction_config_manager -[hidden]- multi_user_hash_manager
+live_transcript_watchers -[hidden]- multi_user_hash_manager
+token_usage_adapters -[hidden]- multi_user_hash_manager
+observation_writer -[hidden]- multi_user_hash_manager
+
+@enduml

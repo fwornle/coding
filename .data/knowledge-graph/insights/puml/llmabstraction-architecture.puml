@@ -1,38 +1,39 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Mode & Routing" {
+package "Mode Management" {
   component "llm-mock-service.ts" as mock <<core>>
-  database "workflow-progress.json" as wf
+  database ".data/workflow-progress.json" as state <<storage>>
 }
 
 package "Providers" {
   component "dmr-provider.ts" as dmr <<core>>
-  component "dmr-config.yaml loader" as dmrcfg <<core>>
-  cloud "Docker Model Runner" as dockermr <<external>>
+  component "dmr-config.yaml" as dmrconfig <<storage>>
+  cloud "Docker Model Runner" as dmrhost <<external>>
+  component "llm-with-process.ts" as proxywrap <<core>>
+  cloud "rapid-llm-proxy" as proxy <<external>>
 }
 
-package "Proxy Wrapper" {
-  component "llm-with-process.ts" as proxy <<core>>
-  cloud "@rapid/llm-proxy SDK" as sdk <<external>>
-  cloud "Anthropic / OpenAI / Groq" as extllm <<external>>
-}
-
-package "Response Hardening" {
+package "Reliability & Metrics" {
   component "parse-llm-json.ts" as parser <<core>>
+  component "MetricsTrackerLike" as metrics <<core>>
+  component "wave-controller.ts" as wave <<agent>>
 }
 
-mock --> wf : "reads/writes per-agent mode"
-mock --> dmr : "routes to local when mode=local"
-mock --> proxy : "routes to public when mode=public"
+mock --> state : "reads/writes LLMState\n(globalMode, perAgentOverrides)"
+mock --> state : "dual-writes legacy\nprogress.mockLLM"
 
-dmr --> dmrcfg : "loadDMRConfig()"
-dmr --> dockermr : "health-checked calls"
+dmr --> dmrconfig : "loadDMRConfig()\nexpandEnvVars()"
+dmr --> dmrhost : "OpenAI-compatible\nrequests"
+dmr ..> dmr : "cached checkDMRAvailability()"
 
-proxy --> sdk : "wraps, injects 'process' field"
-sdk --> extllm : "forwards completion requests"
+proxywrap --> proxy : "resolveProxyCompleteUrl()\nfetch /api/complete"
+proxywrap --> metrics : "populates via\nMetricsTrackerLike"
 
-dmr --> parser : "repairs malformed JSON"
-proxy --> parser : "repairs malformed JSON"
+mock --> proxywrap : "getLLMMode() precedence\nresolution"
+mock --> dmr : "mode toggle\n(mock/local/public)"
+
+parser --> proxywrap : "repairs JSON-mode\noutput"
+wave --> metrics : "getDetailedCalls()\ngetLLMMetrics()"
 
 @enduml

@@ -1,31 +1,37 @@
 @startuml
-!include /coding/docs/puml/_standard-style.puml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-top to bottom direction
-
-package "Agents / Callers" {
-  component "Legacy Callers" as callers <<agent>>
+package "Backend Ingestion" {
+  component "KmCoreAdapter" as kmcore <<core>>
+  component "GraphifyGraph" as graphify <<core>>
+  component "wave-controller.ts" as wavectl <<core>>
+  component "migrate-leveldb-to-kmcore.mjs" as migrate <<cli>>
+  database "graph.json" as graphjson
 }
 
-package "Legacy Write Paths (Deprecated)" {
-  component "GraphDatabaseAdapter" as gda <<storage>>
-  component "PersistenceAgent" as pa <<agent>>
+package "Dashboard Visualization" {
+  component "multi-agent-graph.tsx\n(AGENT_SUBSTEPS)" as magraph <<agent>>
+  component "ukb-workflow-modal.tsx" as ukbmodal <<api>>
+  component "ukbSlice.ts" as ukbslice <<core>>
+  component "D3GraphCanvas.tsx" as d3canvas <<core>>
+  component "color-fallback.ts" as colorfb <<core>>
 }
 
-package "Adapter Layer" {
-  component "KmCoreAdapter" as kca <<core>>
-  component "MEMGRAPH_BATCH_SIZE" as batchenv <<external>>
-}
+cloud "/api/ukb/history" as historyapi <<external>>
 
-package "Storage" {
-  database "km-core Storage Model" as kmcore <<storage>>
-}
+kmcore --> graphify : "delegates ingestion"
+migrate --> kmcore : "provenance stamping\n(layer=evidence)"
+wavectl --> migrate : "anchors wave persistence"
+graphify --> graphjson : "mtime-cached re-parse"
+graphjson --> d3canvas : "consumed for rendering"
 
-callers --> gda : "legacy write path"
-callers --> kca : "strangler-facade redirect"
-gda ..> kca : "superseded by"
-pa ..> kca : "superseded by\n(incl. ontologyClass mapping)"
-batchenv ..> kca : "configures throughput"
-kca --> kmcore : "entity writes"
+magraph ..> graphify : "stale techNote:\nCypher/Memgraph (drift)"
+magraph --> wavectl : "w1/w2/w3 persist substeps"
+
+ukbmodal --> historyapi : "full-parse then slice"
+ukbmodal --> ukbslice : "updates WorkflowExecutionState"
+
+d3canvas --> colorfb : "parent-walk normalization"
+d3canvas --> ukbslice : "store-authoritative path"
 
 @enduml

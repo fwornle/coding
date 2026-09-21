@@ -1,0 +1,35 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Cost & Pricing" {
+  component "cost-model.ts\npriceForModel" as priceModel <<core>>
+  component "freshInputTokens" as freshTokens <<core>>
+  component "BudgetConfig\nmonthlyEurByMonth" as budgetCfg <<storage>>
+}
+
+package "Statusline Caching" {
+  component "model-limits.cjs\nderiveLimits" as limitsCache <<storage>>
+  component "DMR checkDMRAvailability" as dmrCheck <<agent>>
+}
+
+package "LLM Routing & Offload" {
+  component "use-classifier-judge.ts" as classifierHook <<agent>>
+  component "use-offload-policy-draft" as offloadHook <<agent>>
+  component "offload-gates.ts" as offloadGates <<core>>
+  component "OffloadDecision (pooled)" as offloadUI <<api>>
+}
+
+cloud "rapid-llm-proxy\n/api/llm/routing/resolve" as proxy <<external>>
+
+priceModel --> freshTokens : "resolves price then\nnormalizes tokens"
+freshTokens ..> proxy : "trusts upstream\nparse boundary fix"
+budgetCfg --> priceModel : "constrains via\nmonth-scoped overrides"
+
+limitsCache ..> dmrCheck : "shares fail-soft\ncaching philosophy"
+
+classifierHook --> offloadHook : "kept separate to avoid\ncross-contamination"
+offloadGates --> offloadUI : "restates proxy logic\nfor fast UI render"
+offloadUI --> proxy : "pooled() verification\n(width=8)"
+offloadUI ..> offloadGates : "flags disagreement\nas destructive banner"
+
+@enduml

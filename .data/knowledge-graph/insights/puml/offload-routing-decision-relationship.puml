@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OffloadRoutingDecision
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[OffloadRoutingDecision] as offload_routing_decision #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMProxyClient] as llmproxy_client #F0F0F0
+[LlmJsonParser] as llm_json_parser #F0F0F0
+[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[ModelContextLimits] as model_context_limits #F0F0F0
+[AgentProviderSplicing] as agent_provider_splicing #F0F0F0
+[UseClassifierJudge] as use_classifier_judge #E8F5E8
+
+llmabstraction --> offload_routing_decision
+llmmock_service -[hidden]- offload_routing_decision
+dmrprovider -[hidden]- offload_routing_decision
+llmproxy_client -[hidden]- offload_routing_decision
+llm_json_parser -[hidden]- offload_routing_decision
+dashboard_cost_model -[hidden]- offload_routing_decision
+model_context_limits -[hidden]- offload_routing_decision
+agent_provider_splicing -[hidden]- offload_routing_decision
+offload_routing_decision --> use_classifier_judge
+
+@enduml

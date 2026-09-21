@@ -1,0 +1,40 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Runtime Guards" {
+  component "no-unbounded-fs-scan.ts" as fsguard <<core>>
+  component "tool_call handler\n(fail-open)" as toolcall <<core>>
+  component "AGENTS.md instruction" as agentsmd <<external>>
+}
+
+package "Aggregation Correctness" {
+  component "batch-provenance.mjs" as provenance <<core>>
+  component "selectBatchesForReport()" as selectbatch <<core>>
+  database "System Health Dashboard" as dashboard <<storage>>
+}
+
+package "Agent Launch Scripts" {
+  component "pi.sh" as pish <<agent>>
+  component "copilot.sh" as copilotsh <<agent>>
+  component "opencode.sh" as opencodesh <<agent>>
+  component "launch-agent-common.sh" as common <<core>>
+  component "Managed-file Marker\nConvention" as marker <<storage>>
+}
+
+fsguard --> toolcall : "registers"
+toolcall --> agentsmd : "defense-in-depth vs prompt-only guidance"
+toolcall ..> fsguard : "fail-open on error"
+
+provenance --> selectbatch : "implements"
+selectbatch --> dashboard : "time-window attribution\n(fail toward under-reporting)"
+
+pish --> common : "implements lifecycle contract"
+copilotsh --> common : "implements lifecycle contract"
+opencodesh --> common : "implements lifecycle contract"
+pish --> marker : "uses ownership marker\n(avoid clobbering user config)"
+pish ..> pish : "agent_check_requirements()\nresolves symlinks, validates binary"
+
+fsguard ..> provenance : "shared QA philosophy:\ndeterministic code over prose"
+common ..> fsguard : "incident-driven inline\ndocumentation as regression guard"
+
+@enduml

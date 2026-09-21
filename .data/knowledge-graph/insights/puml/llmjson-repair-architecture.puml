@@ -1,0 +1,33 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "LLM Backends" {
+  component "llm-mock-service.ts" as mock <<agent>>
+  component "dmr-provider.ts" as dmr <<agent>>
+  component "llm-with-process.ts" as proxy <<agent>>
+}
+
+package "LLMAbstraction Layer" {
+  component "LLMJsonRepair\n(parse-llm-json.ts)" as repair <<core>>
+  component "parseLlmJson()" as parseFn <<core>>
+  component "escapeControlCharsInStrings()" as escapeFn <<core>>
+}
+
+package "Downstream Consumers" {
+  component "Wave Agents" as agents <<agent>>
+  component "Analysis Pipelines" as pipeline <<core>>
+}
+
+mock --> parseFn : "completion text"
+dmr --> parseFn : "completion text"
+proxy --> parseFn : "completion text"
+
+parseFn --> escapeFn : "on JSON.parse() failure"
+escapeFn --> parseFn : "repaired string"
+
+repair --> agents : "parsed JSON"
+repair --> pipeline : "parsed JSON"
+
+parseFn ..> parseFn : "throws if still malformed"
+
+@enduml

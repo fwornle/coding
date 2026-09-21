@@ -1,46 +1,43 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Container Runtime" {
-  component "docker-compose.yml" as compose <<external>>
-  component "supervisord" as supervisord <<core>>
-  component "entrypoint.sh" as entrypoint <<core>>
+package "Container Mode" {
+  component "docker-compose.yml" as compose <<core>>
+  component "supervisord.conf" as supervisor <<core>>
+  component "Dockerfile.coding-services" as dockerfile <<core>>
 }
 
-package "Service Wrappers" {
-  component "api-service.js" as apiSvc <<api>>
-  component "dashboard-service.js" as dashSvc <<api>>
+package "Host Mode" {
   component "service-starter.js" as starter <<core>>
+  component "ProcessStateManager" as psm <<core>>
+  component "Wrapper Scripts\n(api-service.js, dashboard-service.js)" as wrappers <<agent>>
+}
+
+package "Health & State" {
   component "service-probe.js" as probe <<core>>
-  component "process-state-manager.js" as psm <<core>>
+  component "llm-mock-service.ts" as llmmock <<core>>
+  database ".data/workflow-progress.json" as progressjson
 }
 
-package "Shared State" {
-  component "llm-mock-service.ts" as llmMock <<core>>
-  database "workflow-progress.json" as progress <<storage>>
-  database "Redis / Memgraph" as datastores <<storage>>
-}
+component "Dashboard (Next.js)" as dashboard <<agent>>
+component "API Service" as api <<api>>
 
-entrypoint --> supervisord : "launches"
-supervisord --> apiSvc : "manages process"
-supervisord --> dashSvc : "manages process"
-compose --> entrypoint : "configures container"
+supervisor --> dockerfile : "managed inside container"
+compose --> supervisor : "orchestrates"
 
-starter --> apiSvc : "startServiceWithRetry()"
-starter --> dashSvc : "startServiceWithRetry()"
-starter --> probe : "delegates liveness checks"
+starter --> psm : "registers PID / tracks state"
+wrappers --> psm : "registerService()"
+starter --> wrappers : "spawns child process"
 
-apiSvc --> psm : "registers/unregisters child"
-dashSvc --> psm : "registers/unregisters child"
-probe --> psm : "combined with process state"
+probe --> starter : "health check (agnostic)"
+probe --> supervisor : "health check (agnostic)"
 
-dashSvc --> apiSvc : "NEXT_PUBLIC_API_BASE_URL"
+llmmock --> progressjson : "reads/writes llmState"
+llmmock --> compose : "CODING_ROOT override"
 
-apiSvc --> datastores : "connects"
-dashSvc --> datastores : "connects"
+wrappers --> dashboard : "wraps npm run dev"
+wrappers --> api : "wraps Express process"
 
-llmMock --> progress : "reads/writes CODING_ROOT path"
-apiSvc ..> llmMock : "queries LLM mode"
-dashSvc ..> llmMock : "queries LLM mode"
+dashboard --> api : "hardcoded localhost:3031"
 
 @enduml

@@ -3,36 +3,33 @@
 
 package "Validation Layer" {
   component "LSLConfigValidator" as validator <<core>>
-  component "lsl-config.json" as config <<storage>>
-  component "redaction-config.yaml" as redaction <<storage>>
-  component "logging-config.json" as loggingConfig <<storage>>
+  component "lsl-config.json" as lslConfig <<storage>>
+  component "redaction-config.yaml" as redactConfig <<storage>>
 }
 
-package "Transcript Pipeline" {
-  component "TranscriptAdapter\n(abstract base)" as adapter <<core>>
-  component "ClaudeParser" as parser <<agent>>
-  component "Logger.js" as logger <<core>>
+package "Live Logging Consumers" {
+  component "ObservationWriter" as obsWriter <<core>>
+  component "ConfigurableRedactor" as redactor <<core>>
+  component "getLSLWindow" as window <<core>>
 }
 
-package "Dashboard Consumers" {
-  component "lsl-sessions.mjs\n(discoverProjects, listSessions, peekMeta)" as sessions <<api>>
-  component "LslMarkdownParser\n(groupChains)" as chainParser <<core>>
-  component "lsl-sessions.tsx" as dashboardUI <<external>>
+package "Token Accounting Subsystem" {
+  component "token-db.mjs" as tokenDb <<storage>>
+  component "copilot-events-tail.mjs" as copilotTail <<agent>>
+  component "opencode-token-rows.mjs" as opencodeRows <<agent>>
 }
 
-validator --> config : "validates schema\n(5 mandatory sections)"
-validator --> redaction : "governs classification/redaction"
-validator ..> adapter : "no visible enforcement\n(gap: bypasses gate)"
+validator --> lslConfig : "validates directory/health/perf"
+validator --> redactConfig : "validates redaction schema"
 
-adapter --> parser : "concrete implementation"
-parser --> logger : "createLogger('transcript-api')"
-loggingConfig --> logger : "operational logging policy"
+redactConfig --> redactor : "consumed by (implicit contract)"
+obsWriter --> redactor : "instantiates for PII redaction"
+obsWriter --> window : "session windowing"
 
-parser --> sessions : "produces rotated\ntranscript files"
-config --> sessions : "fileManager.maxFileSize\nbounds rotation"
-config --> sessions : "operationalLogger.batchSize\nbounds chain length"
+validator ..> tokenDb : "userHashLength bound\nprotects user_hash charset"
+tokenDb --> opencodeRows : "shares uid-ownership pattern"
+copilotTail ..> validator : "degraded parity\noutside validation surface"
 
-sessions --> chainParser : "reassemble multi-part chains"
-chainParser --> dashboardUI : "fetchSessions() via API"
+lslConfig --> window : "directory structure assumed"
 
 @enduml

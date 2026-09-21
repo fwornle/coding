@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Mode & Config Resolution" {
+  component "llm-mock-service.ts\ngetLLMMode()" as modeService <<core>>
+  database ".data/workflow-progress.json" as progressJson <<storage>>
+}
+
+package "LLM Request Layer" {
+  component "llm-with-process.ts\nllmWithProcessComplete()" as procClient <<core>>
+  component "resolveProxyCompleteUrl()" as urlResolve <<core>>
+  cloud "@rapid/llm-proxy SDK\nLLMService.complete()" as sdk <<external>>
+  cloud "/api/complete endpoint" as proxyApi <<external>>
+}
+
+package "Local Inference & Parsing" {
+  component "dmr-provider.ts\ninitializeDMRClient()" as dmrClient <<core>>
+  component "checkDMRAvailability()" as dmrHealth <<core>>
+  component "loadDMRConfig()" as dmrConfig <<core>>
+  component "parse-llm-json.ts\nparseLlmJson()" as jsonParser <<core>>
+}
+
+modeService --> progressJson : "reads priority chain\n(per-agent/global/legacy/default)"
+modeService ..> sdk : "does not modify"
+
+procClient --> urlResolve : "resolves 4-tier URL"
+urlResolve --> proxyApi : "direct fetch POST"
+procClient ..> sdk : "bypasses (parallel path)"
+
+dmrClient --> dmrHealth : "checks cached availability"
+dmrClient --> dmrConfig : "loads 3-path config"
+
+procClient --> jsonParser : "parses LLM response"
+jsonParser ..> jsonParser : "fallback repair\n(escapeControlCharsInStrings)"
+
+modeService --> dmrClient : "selects backend mode"
+
+@enduml

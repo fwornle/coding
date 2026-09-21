@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphifyGraph
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphifyGraph] as graphify_graph #LightBlue
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[LevelDbMigrationScripts] as level_db_migration_scripts #F0F0F0
+[WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphViewerHierarchy] as graph_viewer_hierarchy #F0F0F0
+[GraphVisualRendering] as graph_visual_rendering #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+[GraphJsonCacheStrategy] as graph_json_cache_strategy #E8F5E8
+
+knowledge_management --> graphify_graph
+code_graph_agent -[hidden]- graphify_graph
+km_core_adapter -[hidden]- graphify_graph
+level_db_migration_scripts -[hidden]- graphify_graph
+wave_insight_persistence -[hidden]- graphify_graph
+manual_learning -[hidden]- graphify_graph
+online_learning -[hidden]- graphify_graph
+graph_viewer_hierarchy -[hidden]- graphify_graph
+graph_visual_rendering -[hidden]- graphify_graph
+ukb_workflow_dashboard -[hidden]- graphify_graph
+graphify_graph --> graph_json_cache_strategy
+
+@enduml

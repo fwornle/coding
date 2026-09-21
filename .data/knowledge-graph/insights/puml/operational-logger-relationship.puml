@@ -6,18 +6,26 @@ title Hierarchy Context: OperationalLogger
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [OperationalLogger] as operational_logger #LightBlue
 [LSLConfigValidator] as lslconfig_validator #F0F0F0
-[RedactionConfigManager] as redaction_config_manager #F0F0F0
-[MultiUserSessionRouter] as multi_user_session_router #F0F0F0
-[TranscriptAdapterFramework] as transcript_adapter_framework #F0F0F0
-[SessionDashboardViewer] as session_dashboard_viewer #F0F0F0
-[SpecstoryAdapter] as specstory_adapter #F0F0F0
+[MultiUserFileManager] as multi_user_file_manager #F0F0F0
+[RedactionEngine] as redaction_engine #F0F0F0
+[CopilotLiveTail] as copilot_live_tail #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[CopilotEventsTailWatcher] as copilot_events_tail_watcher #E8F5E8
+[TokenUsageDbWriter] as token_usage_db_writer #E8F5E8
+[OpenCodeTokenRowExtractor] as open_code_token_row_extractor #E8F5E8
+[ObservationWriteEventBus] as observation_write_event_bus #E8F5E8
 
 live_logging_system --> operational_logger
 lslconfig_validator -[hidden]- operational_logger
-redaction_config_manager -[hidden]- operational_logger
-multi_user_session_router -[hidden]- operational_logger
-transcript_adapter_framework -[hidden]- operational_logger
-session_dashboard_viewer -[hidden]- operational_logger
-specstory_adapter -[hidden]- operational_logger
+multi_user_file_manager -[hidden]- operational_logger
+redaction_engine -[hidden]- operational_logger
+copilot_live_tail -[hidden]- operational_logger
+token_usage_adapters -[hidden]- operational_logger
+observation_writer -[hidden]- operational_logger
+operational_logger --> copilot_events_tail_watcher
+operational_logger --> token_usage_db_writer
+operational_logger --> open_code_token_row_extractor
+operational_logger --> observation_write_event_bus
 
 @enduml

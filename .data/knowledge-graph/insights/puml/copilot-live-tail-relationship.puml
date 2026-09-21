@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CopilotLiveTail
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[CopilotLiveTail] as copilot_live_tail #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[MultiUserFileManager] as multi_user_file_manager #F0F0F0
+[RedactionEngine] as redaction_engine #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[LockStaleDetection] as lock_stale_detection #E8F5E8
+[ProjectFiltering] as project_filtering #E8F5E8
+[DegradedParityStub] as degraded_parity_stub #E8F5E8
+[UidOwnershipGuard] as uid_ownership_guard #E8F5E8
+
+live_logging_system --> copilot_live_tail
+lslconfig_validator -[hidden]- copilot_live_tail
+operational_logger -[hidden]- copilot_live_tail
+multi_user_file_manager -[hidden]- copilot_live_tail
+redaction_engine -[hidden]- copilot_live_tail
+token_usage_adapters -[hidden]- copilot_live_tail
+observation_writer -[hidden]- copilot_live_tail
+copilot_live_tail --> lock_stale_detection
+copilot_live_tail --> project_filtering
+copilot_live_tail --> degraded_parity_stub
+copilot_live_tail --> uid_ownership_guard
+
+@enduml

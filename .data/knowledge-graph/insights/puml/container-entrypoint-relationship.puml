@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ContainerEntrypoint
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[ContainerEntrypoint] as container_entrypoint #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[ConstraintMonitorWrappers] as constraint_monitor_wrappers #F0F0F0
+[RobustServiceOrchestrator] as robust_service_orchestrator #F0F0F0
+[FeatureGatingOverride] as feature_gating_override #E8F5E8
+
+dockerized_services --> container_entrypoint
+service_starter -[hidden]- container_entrypoint
+service_probe -[hidden]- container_entrypoint
+process_state_manager -[hidden]- container_entrypoint
+constraint_monitor_wrappers -[hidden]- container_entrypoint
+robust_service_orchestrator -[hidden]- container_entrypoint
+container_entrypoint --> feature_gating_override
+
+@enduml

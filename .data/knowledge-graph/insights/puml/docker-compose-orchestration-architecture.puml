@@ -1,0 +1,42 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Container Startup (fail-open)" {
+  component "docker/entrypoint.sh" as entrypoint <<core>>
+  database "features.json snapshot" as snapshot <<storage>>
+  component "features.d/disabled.conf" as disabled <<storage>>
+  component "supervisord.conf" as supervisord <<core>>
+}
+
+package "Robust Service Starter (fail-closed)" {
+  component "start-services-robust.js" as robust <<core>>
+  component "waitForPortBindable()" as bindprobe <<core>>
+  component "killProcessOnPortAndWait()" as killport <<core>>
+  component "transcriptMonitor startFn\n(PSM+pgrep cascade)" as tmon <<agent>>
+  component "service-gating.test.mjs" as tests <<cli>>
+  component "lib/features/catalogue.cjs" as catalogue <<core>>
+}
+
+package "Legacy Entry Point" {
+  component "start-services.sh" as legacyEntry <<cli>>
+  component "LEGACY MODE\n(docker-compose/docker run)" as legacy <<external>>
+}
+
+snapshot --> entrypoint : read-only mount
+entrypoint --> disabled : writes autostart=false
+disabled --> supervisord : included by
+
+legacyEntry --> robust : ROBUST_MODE=true (exec)
+legacyEntry --> legacy : ROBUST_MODE=false (fallback)
+
+robust --> bindprobe : port availability
+robust --> killport : SIGTERM->SIGKILL escalation
+robust --> tmon : orphan detection & spawn
+robust --> catalogue : validate feature IDs
+
+tests --> robust : enforces SERVICE_CONFIGS/SERVICE_ORDER
+tests --> catalogue : cross-checks FEATURE_IDS
+
+legacy ..> supervisord : bypasses robust abstractions
+
+@enduml

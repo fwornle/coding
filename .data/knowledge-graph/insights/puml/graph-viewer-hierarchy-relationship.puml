@@ -1,0 +1,39 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphViewerHierarchy
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphViewerHierarchy] as graph_viewer_hierarchy #LightBlue
+[GraphifyGraph] as graphify_graph #F0F0F0
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[KmCoreAdapter] as km_core_adapter #F0F0F0
+[LevelDbMigrationScripts] as level_db_migration_scripts #F0F0F0
+[WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphVisualRendering] as graph_visual_rendering #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+[DeriveAncestryFromStorePath] as derive_ancestry_from_store_path #E8F5E8
+[ComputeAncestryPathExtraction] as compute_ancestry_path_extraction #E8F5E8
+[DeriveParentsHierarchyReduction] as derive_parents_hierarchy_reduction #E8F5E8
+[HierarchyCycleBreaking] as hierarchy_cycle_breaking #E8F5E8
+[LearningSourceClassifier] as learning_source_classifier #E8F5E8
+
+knowledge_management --> graph_viewer_hierarchy
+graphify_graph -[hidden]- graph_viewer_hierarchy
+code_graph_agent -[hidden]- graph_viewer_hierarchy
+km_core_adapter -[hidden]- graph_viewer_hierarchy
+level_db_migration_scripts -[hidden]- graph_viewer_hierarchy
+wave_insight_persistence -[hidden]- graph_viewer_hierarchy
+manual_learning -[hidden]- graph_viewer_hierarchy
+online_learning -[hidden]- graph_viewer_hierarchy
+graph_visual_rendering -[hidden]- graph_viewer_hierarchy
+ukb_workflow_dashboard -[hidden]- graph_viewer_hierarchy
+graph_viewer_hierarchy --> derive_ancestry_from_store_path
+graph_viewer_hierarchy --> compute_ancestry_path_extraction
+graph_viewer_hierarchy --> derive_parents_hierarchy_reduction
+graph_viewer_hierarchy --> hierarchy_cycle_breaking
+graph_viewer_hierarchy --> learning_source_classifier
+
+@enduml

@@ -5,13 +5,21 @@ title Hierarchy Context: RedactionEngine
 
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [RedactionEngine] as redaction_engine #LightBlue
-[SessionWindowManager] as session_window_manager #F0F0F0
-[TranscriptAdapterRegistry] as transcript_adapter_registry #F0F0F0
-[PatternSanitizer] as pattern_sanitizer #E8F5E8
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[MultiUserFileManager] as multi_user_file_manager #F0F0F0
+[CopilotLiveTail] as copilot_live_tail #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[ConfigurableRedactorIntegration] as configurable_redactor_integration #E8F5E8
 
 live_logging_system --> redaction_engine
-session_window_manager -[hidden]- redaction_engine
-transcript_adapter_registry -[hidden]- redaction_engine
-redaction_engine --> pattern_sanitizer
+lslconfig_validator -[hidden]- redaction_engine
+operational_logger -[hidden]- redaction_engine
+multi_user_file_manager -[hidden]- redaction_engine
+copilot_live_tail -[hidden]- redaction_engine
+token_usage_adapters -[hidden]- redaction_engine
+observation_writer -[hidden]- redaction_engine
+redaction_engine --> configurable_redactor_integration
 
 @enduml

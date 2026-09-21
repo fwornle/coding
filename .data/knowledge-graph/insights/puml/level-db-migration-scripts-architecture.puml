@@ -1,0 +1,30 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Live Stores" {
+  component "Graphology In-Memory Graph" as graphology <<core>>
+  database "LevelDB" as leveldb <<storage>>
+}
+
+package "Migration Scripts" {
+  component "migrate-graph-db-entity-types.js" as typeMigration <<cli>>
+  component "migrate-leveldb-to-kmcore.mjs" as kmcoreMigration <<cli>>
+}
+
+package "km-core Evidence Layer" {
+  database "km-core Store" as kmcore <<storage>>
+}
+
+package "Unified Viewer" {
+  component "color-fallback.ts" as colorFallback <<external>>
+}
+
+typeMigration --> graphology : "collapses types in-place\n(TransferablePattern/WorkflowPattern/\nTechnicalIssue -> System/Project/Pattern)"
+graphology --> kmcoreMigration : "implicit ordering contract\n(must complete first)"
+leveldb --> kmcoreMigration : "reads legacy entities"
+kmcoreMigration --> kmcore : "writes UUIDv7 entities\nlayer='evidence'\nlegacyId.system='B'\nprovider='phase-42-migration'"
+kmcoreMigration ..> kmcoreMigration : "5% error-budget abort\n(no rollback/partial-commit)"
+
+kmcore ..> colorFallback : "layer concept echoed\nas evidence-vs-batch palette"
+
+@enduml

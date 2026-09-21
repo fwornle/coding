@@ -1,44 +1,40 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Configuration Validation" {
+package "Ontology Layer" {
+  component "OntologyRegistry" as registry <<core>>
+  component "coding.lower.json (L2 Classes)" as ontology <<storage>>
+}
+
+package "Classification Layer" {
+  component "L2SubsystemClassifier\n(classifyL2)" as classifier <<core>>
+  component "OntologyClassificationAgent" as agent <<agent>>
+  component "extractL2FromLLMResponse\n(regex boundary match)" as extractor <<core>>
+}
+
+package "Live Logging Configuration" {
   component "LSLConfigValidator" as validator <<core>>
-  component "validate-lsl-config.js" as script <<core>>
-  database "lsl-config.json" as configJson <<storage>>
-  database "redaction-config.yaml" as redactionYaml <<storage>>
+  database "lsl-config.json" as lslConfig <<storage>>
+  database "redaction-config.yaml" as redaction <<storage>>
+  component "validateUserEnvironment\n(SHA256 hash truncation)" as userhash <<core>>
 }
 
-package "Schema Domains" {
-  component "multiUser Schema" as multiUser <<core>>
-  component "fileManager Schema" as fileManager <<core>>
-  component "operationalLogger Schema" as opLogger <<core>>
-  component "classification Schema" as classification <<core>>
-}
+component "LiveLoggingSystem" as lls <<component>>
+component "Semantic Analysis Logger\n(buffered writer)" as semlogger <<external>>
 
-package "User Identity" {
-  component "validateUserEnvironment()" as userEnv <<core>>
-  component "FOREGROUND_USER_HASHES" as userHashes <<external>>
-}
+ontology --> registry : "loaded at runtime"
+registry --> lls : "materializes concept"
 
-package "Ontology Classification" {
-  component "OntologyClassificationAgent" as ontAgent <<agent>>
-  component "buildL2RefinementPrompt()" as promptBuilder <<core>>
-  component "extractL2FromLLMResponse()" as extractor <<core>>
-}
+classifier --> lls : "deterministic classification"
+agent --> classifier : "loadL2Classes()"
+agent --> extractor : "validates LLM output"
+extractor --> lls : "confirms exact match"
 
-script --> validator : "instantiates"
-validator --> configJson : "validates"
-validator --> redactionYaml : "validates"
-validator --> multiUser : "enforces"
-validator --> fileManager : "enforces"
-validator --> opLogger : "enforces"
-validator --> classification : "enforces"
+lls --> validator : "operational config check"
+validator --> lslConfig : "validates schema/bounds"
+validator --> redaction : "validates redaction rules"
+validator --> userhash : "hashes USER env var"
 
-validator --> userEnv : "delegates hashing"
-userEnv --> userHashes : "aligns with convention"
-
-ontAgent --> promptBuilder : "builds prompt"
-promptBuilder --> extractor : "parses response"
-extractor --> validator : "refines L2 classification"
+lls ..> semlogger : "contrasted with (session windowing,\nredaction not shared)"
 
 @enduml

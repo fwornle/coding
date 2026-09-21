@@ -1,0 +1,38 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "File-Level Ownership Guards" {
+  component "isOwnedByMe()\n(copilot-events-tail.mjs)" as isOwned <<core>>
+  component "ownedDbPath()\n(opencode-token-rows.mjs)" as ownedDb <<core>>
+  component "scanForLiveSessions" as scanSessions <<agent>>
+  component "buildOpencodeTokenRows" as buildRows <<agent>>
+}
+
+package "Row-Level Multi-Process Isolation" {
+  component "token-db.mjs" as tokenDb <<core>>
+  component "ADAPTER_USER_HASH_*\n(namespace constants)" as hashConst <<core>>
+  component "insertTokenRow()\nretry+dedup" as insertRow <<core>>
+  database "token-usage.db" as tokenUsageDb <<storage>>
+}
+
+package "In-Process Coordination" {
+  component "ObservationWriter" as obsWriter <<core>>
+  component "_writeLock\n(Promise mutex)" as writeLock <<core>>
+}
+
+scanSessions --> isOwned : "check uid before tail"
+buildRows --> ownedDb : "check uid before open"
+isOwned ..> scanSessions : "fail-closed: skip session"
+ownedDb ..> buildRows : "fail-closed: return []"
+
+tokenDb --> hashConst : "namespace by adapter"
+tokenDb --> insertRow : "cross-process write"
+insertRow --> tokenUsageDb : "SELECT MAX(id)+1, INSERT"
+insertRow ..> insertRow : "retry on SQLITE_CONSTRAINT\n(dedup by tool_call_id)"
+
+obsWriter --> writeLock : "serialize writeObservation"
+writeLock ..> obsWriter : "prevent TOCTOU on dedup check"
+
+ownedDb --> tokenUsageDb : "gate before shared DB access"
+
+@enduml

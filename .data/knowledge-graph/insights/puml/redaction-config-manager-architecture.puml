@@ -1,35 +1,31 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Ingestion Layer" {
-  component "ClaudeParser" as parser <<agent>>
-  component "TranscriptAdapter\n(abstract)" as adapter <<core>>
-  component "RedactionConfigManager" as redaction <<core>>
+package "Config Validation Stage" {
+  component "LSLConfigValidator" as validator <<core>>
+  database "redaction-config.yaml" as yamlcfg <<storage>>
 }
 
-package "Config Surfaces" {
-  component "lsl-config.json /\nredaction-config.yaml" as lslconfig <<external>>
-  component "logging-config.json" as logconfig <<external>>
+package "Observation Write Path" {
+  component "ObservationWriter" as writer <<core>>
+  component "ConfigurableRedactor" as redactor <<core>>
+  component "GraphKMStore\n(legacy-ingest adapters)" as kmstore <<storage>>
 }
 
-package "Presentation Layer" {
-  component "lsl-sessions.mjs\n(readSession/peekMeta)" as sessions <<core>>
-  component "lsl-sessions.tsx\n(RENDER_TOOL_ALIASES)" as tsx <<cli>>
+package "Secondary LSL Producers" {
+  component "copilot-events-tail\n(200-char slice)" as copilot <<agent>>
+  component "opencode-token-rows\n(240-char snip)" as opencode <<agent>>
+  component "token-db\n(isolated user_hash)" as tokendb <<storage>>
 }
 
-database "Session Transcripts\n(.md/.jsonl)" as store <<storage>>
+validator --> yamlcfg : "validates schema"
+yamlcfg ..> redactor : "assumed already loaded"
+writer --> redactor : "constructs at init (projectRoot from dbPath)"
+writer --> kmstore : "writes via legacyObservationToEntity"
+redactor --> kmstore : "redacted content persisted"
 
-parser --> adapter : "implements equivalent surface\n(convertToLSL seam)"
-parser --> store : "writes userHash\n(unhashed, RAW leak risk)"
-redaction ..> adapter : "should intercept\nconvertToLSL() output"
-redaction ..> lslconfig : "governed by\nclassification schema"
-logconfig ..> redaction : "separate concern,\nnot subsumed"
-
-store --> sessions : "read as chains\n(groupChains/concatChain)"
-sessions --> tsx : "rendered for display"
-tsx ..> store : "display-only,\nnever mutates source"
-
-redaction ..> store : "should enforce\nper-artifact redaction"
-sessions ..> redaction : "read-time conversion\nbypasses redaction (gap)"
+copilot ..> writer : "no redactor import (asymmetric coverage)"
+opencode --> tokendb : "insertTokenRow (no redaction)"
+tokendb ..> kmstore : "separate SQLite store\n(external proxy schema)"
 
 @enduml

@@ -1,0 +1,43 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "UI Layer" {
+  component "OffloadDecision\n(mode toggle: config/recorded)" as decision <<core>>
+  component "configRungs\n(disagreements diff)" as rungs <<core>>
+  component "offload-gates.ts\n(local mirror logic)" as gates <<core>>
+  component "offload-replay.ts\n(counterfactual/replay)" as replay <<core>>
+}
+
+package "State Hooks" {
+  component "useOffloadPolicyDraft" as policyHook <<agent>>
+  component "useClassifierJudge" as judgeHook <<agent>>
+}
+
+package "Network & Proxy" {
+  component "pooled()\nbounded-concurrency fetch" as pooled <<core>>
+  component "queryFor()" as queryFor <<core>>
+  cloud "Proxy API\n/api/llm/routing/resolve" as proxy <<external>>
+  database "llm-routing.yaml" as routingYaml <<storage>>
+  database "prompt-classifier.yaml" as classifierYaml <<storage>>
+}
+
+decision --> gates : "local evaluateOffload"
+decision --> rungs : "renders ladder"
+gates --> rungs : "local verdict"
+rungs --> queryFor : "resolve query"
+queryFor --> pooled : "batched fetch (width=8)"
+pooled --> proxy : "resolve route"
+proxy --> rungs : "actual band/provider"
+rungs --> rungs : "diff -> disagreements banner"
+
+decision --> policyHook : "policy draft state"
+decision --> judgeHook : "classifier config state"
+policyHook --> routingYaml : "save()"
+judgeHook --> classifierYaml : "diff-based PATCH save()"
+
+decision --> replay : "if dirty or override"
+replay --> proxy : "recorded offloadSkips/perRoute"
+
+decision ..> decision : "onDirtyChange -> parent poll suppression"
+
+@enduml

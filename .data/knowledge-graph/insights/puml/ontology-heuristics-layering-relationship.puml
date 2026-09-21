@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OntologyHeuristicsLayering
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[OntologyHeuristicsLayering] as ontology_heuristics_layering #LightBlue
+[NamingConventions] as naming_conventions #F0F0F0
+[ConfigurationExternalization] as configuration_externalization #F0F0F0
+[CLIWrapperPattern] as cliwrapper_pattern #F0F0F0
+[TieredArtifactMatchOrdering] as tiered_artifact_match_ordering #E8F5E8
+[TeamDirectoryPrefixMatching] as team_directory_prefix_matching #E8F5E8
+[ArtifactPatternRegistry] as artifact_pattern_registry #E8F5E8
+
+coding_patterns --> ontology_heuristics_layering
+naming_conventions -[hidden]- ontology_heuristics_layering
+configuration_externalization -[hidden]- ontology_heuristics_layering
+cliwrapper_pattern -[hidden]- ontology_heuristics_layering
+ontology_heuristics_layering --> tiered_artifact_match_ordering
+ontology_heuristics_layering --> team_directory_prefix_matching
+ontology_heuristics_layering --> artifact_pattern_registry
+
+@enduml

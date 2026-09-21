@@ -1,45 +1,36 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Bridge Layer" {
-  component "claude-bridge.js\nmain()" as bridge <<agent>>
-  component "transformContext()\nEVENT_MAP" as transform <<agent>>
+package "Claude Adapter Layer" {
+  component "claude-bridge.js" as bridge <<agent>>
+  component "EVENT_MAP" as eventMap <<core>>
+  component "transformContext()" as transform <<core>>
 }
 
 package "Unified Hook System" {
-  component "UnifiedHookManager" as uhm <<core>>
-  component "registerHandler()\nfindIndex+replace, sort" as register <<core>>
-  component "loadConfig()\nuser then project" as loadcfg <<core>>
-  component "executeHooks()\nenabled/agents filter\ndual stopOnError" as execute <<core>>
+  component "UnifiedHookManager" as manager <<core>>
+  database "Handler Registry\n(Map<event,Handler[]>)" as registry <<storage>>
 }
 
-package "Legacy Hook System" {
-  component "HooksManager\n(hooks-api.js)" as hooksapi <<core>>
-  component "registerHook()\nalways push, no dedup" as regnodup <<core>>
-  component "triggerHook()\nfail-open loop" as trigger <<core>>
+package "Legacy/Parallel System" {
+  component "HooksManager\n(hooks-api.js)" as legacy <<core>>
+  component "EVENT_MAPPINGS" as legacyMap <<core>>
 }
 
-package "Tooling" {
-  component "migration-tool.js\nwriteUnifiedConfig()" as migrate <<cli>>
-  database "hooks.json" as hooksjson
-}
+component "ViolationCaptureService" as violation <<api>>
 
-bridge --> transform : "translate agent-native event"
-transform --> uhm : "dynamic import()"
-bridge ..> bridge : "fail-open on error\n(decision:allow, exit 0)"
+bridge --> eventMap : "translates event names"
+bridge --> transform : "builds unifiedContext"
+transform --> manager : "spreads raw metadata (no sanitization)"
+bridge --> manager : "getHookManager().executeHooks()"
+manager --> registry : "priority-sorted lookup"
+manager ..> violation : "possible downstream sanitization?"
 
-uhm --> loadcfg : "initialize()"
-loadcfg --> register : "per handler entry"
-register --> uhm : "handlers Map<event,[]>"
-uhm --> execute : "dispatch on event"
-execute --> execute : "script/command/module\nstrategy dispatch"
+legacy --> legacyMap : "per-agentType translation"
+legacy --> registry : "parallel Map<event,Handler[]>"
+manager ..> legacy : "divergent implementation risk"
 
-hooksapi --> regnodup : "no ID guard"
-hooksapi --> trigger : "fail-open try/catch"
-
-migrate --> hooksjson : "direct JSON write\n(bypasses registerHandler)"
-loadcfg --> hooksjson : "reads project/user config"
-
-uhm ..> hooksapi : "structurally duplicated\n(no shared base class)"
+bridge ..> bridge : "fail-open: default 'allow' on error"
+legacy ..> legacy : "fail-soft: try/catch per handler"
 
 @enduml

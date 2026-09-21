@@ -1,0 +1,35 @@
+@startuml
+!include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Runtime Env Var Resolution" {
+  component "verify-patterns.sh" as vps <<cli>>
+  component "CODING_TOOLS_PATH / CODING_REPO Fallback Chain" as fallback <<external>>
+  component "$SHARED_MEMORY (undefined)" as sharedmem <<external>>
+}
+
+package "Static/Hardcoded Configuration" {
+  component "Hardcoded Thresholds\n(USESTATE_COUNT>20, etc.)" as thresholds <<core>>
+  component "Color Codes / Report Path" as colors <<core>>
+  component "rg-based Pattern Checks\n(ConditionalLoggingPattern)" as rgcheck <<core>>
+}
+
+package "In-Code Registry Configuration" {
+  component "EntityPatternAnalyzer" as epa <<core>>
+  component "teamDirectories Map" as teamdirs <<storage>>
+  component "artifactPatterns Array" as artpatterns <<storage>>
+}
+
+vps --> fallback : "resolves CLAUDE_REPO"
+vps --> sharedmem : "checks -f, silently no-ops if unset"
+vps --> thresholds : "uses hardcoded checks"
+vps --> colors : "uses hardcoded formatting"
+vps --> rgcheck : "runs static grep scans"
+
+epa --> teamdirs : "initializes eagerly"
+epa --> artpatterns : "initializes eagerly"
+epa --> epa : "two-step match:\ndirect (0.9) then regex (0.75)"
+
+fallback ..> sharedmem : "same informal env-var idiom"
+thresholds ..> teamdirs : "config-over-code violated\nin both idioms"
+
+@enduml

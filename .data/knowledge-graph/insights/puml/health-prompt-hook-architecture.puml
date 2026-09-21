@@ -1,36 +1,42 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Hook Abstractions (parallel tracks)" {
-  component "HooksManager" as hm <<core>>
-  component "UnifiedHookManager" as uhm <<core>>
+package "Agent-API Core" {
+  component "HooksManager\n(abstract base)" as hm <<core>>
+  component "EVENT_MAPPINGS" as em <<core>>
+  component "registerHook()" as rh <<api>>
+  component "triggerHook()" as th <<api>>
 }
 
-package "Bridge Layer" {
-  component "claude-bridge.js" as bridge <<api>>
-  component "migration-tool.js" as migrate <<cli>>
+package "Claude Bridge Layer" {
+  component "claude-bridge.js" as cb <<agent>>
+  component "EVENT_MAP" as evm <<core>>
+  component "readStdin()" as rs <<api>>
+  component "transformContext()" as tc <<api>>
+  component "main() fail-open" as mn <<api>>
 }
 
-package "Event Mapping Tables" {
-  component "EVENT_MAPPINGS" as em1 <<storage>>
-  component "EVENT_MAP" as em2 <<storage>>
-  component "CLAUDE_EVENT_MAP" as em3 <<storage>>
+package "Downstream Consumers" {
+  component "hook-manager.js\n(UnifiedHookManager)" as ugm <<core>>
+  component "ViolationCaptureService" as vcs <<external>>
 }
 
-package "Dashboard (unrelated)" {
-  component "usePolledFetch.ts" as poll <<external>>
-}
+hm --> rh : "seeds registry\nMap<event,[]>"
+rh --> th : "sorted by priority"
+hm ..> em : "agent-type mapping\n(stale vs EVENT_MAP)"
 
-bridge --> uhm : "getHookManager()\ntightly coupled"
-bridge --> em2 : "translate native events"
-migrate --> em3 : "translate for migration"
-hm --> em1 : "translate for HooksManager"
+cb --> rs : "reads stdin JSON"
+rs --> tc : "raw claudeContext"
+tc --> evm : "maps native event"
+evm ..> em : "diverges from"
+tc --> mn : "unfiltered metadata"
 
-hm ..> uhm : "no inheritance/composition\n(duplicate responsibility)"
-migrate ..> bridge : "risk: omits PrePrompt/PostPrompt/Error"
+mn --> ugm : "dynamic import\ngetHookManager()"
+ugm --> th : "structurally similar\nregistry logic"
+th --> mn : "fail-permissive\n(per-handler)"
+mn --> mn : "fail-open\n(per-process, exit 0)"
 
-bridge --> bridge : "fail-open catch\nexit(0) allow"
-
-poll ..> uhm : "naming overlap only\n(architecturally isolated)"
+tc --> vcs : "raw tool_input\n(no sanitization)"
+vcs ..> vcs : "sanitizeParams()\n(implicit contract)"
 
 @enduml

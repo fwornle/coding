@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentAbstractionConventions
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[AgentAbstractionConventions] as agent_abstraction_conventions #LightBlue
+[CLIScriptConventions] as cliscript_conventions #F0F0F0
+[ConfigDrivenFeatureFlags] as config_driven_feature_flags #F0F0F0
+[EnvironmentVariableConfiguration] as environment_variable_configuration #F0F0F0
+[SelfLocatingScriptRoot] as self_locating_script_root #E8F5E8
+
+coding_patterns --> agent_abstraction_conventions
+cliscript_conventions -[hidden]- agent_abstraction_conventions
+config_driven_feature_flags -[hidden]- agent_abstraction_conventions
+environment_variable_configuration -[hidden]- agent_abstraction_conventions
+agent_abstraction_conventions --> self_locating_script_root
+
+@enduml

@@ -3,19 +3,31 @@
 
 title Hierarchy Context: KmCoreAdapter
 
-[SemanticAnalysis] as semantic_analysis #FFFFDD
+[KnowledgeManagement] as knowledge_management #FFFFDD
 [KmCoreAdapter] as km_core_adapter #LightBlue
-[Pipeline] as pipeline #F0F0F0
-[Ontology] as ontology #F0F0F0
-[Insights] as insights #F0F0F0
-[OntologyRegistry] as ontology_registry #F0F0F0
-[EntityWritePathConsolidation] as entity_write_path_consolidation #E8F5E8
+[GraphifyGraph] as graphify_graph #F0F0F0
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[LevelDbMigrationScripts] as level_db_migration_scripts #F0F0F0
+[WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphViewerHierarchy] as graph_viewer_hierarchy #F0F0F0
+[GraphVisualRendering] as graph_visual_rendering #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+[OntologyHierarchyColorPalette] as ontology_hierarchy_color_palette #E8F5E8
+[HierarchyParentDerivation] as hierarchy_parent_derivation #E8F5E8
 
-semantic_analysis --> km_core_adapter
-pipeline -[hidden]- km_core_adapter
-ontology -[hidden]- km_core_adapter
-insights -[hidden]- km_core_adapter
-ontology_registry -[hidden]- km_core_adapter
-km_core_adapter --> entity_write_path_consolidation
+knowledge_management --> km_core_adapter
+graphify_graph -[hidden]- km_core_adapter
+code_graph_agent -[hidden]- km_core_adapter
+level_db_migration_scripts -[hidden]- km_core_adapter
+wave_insight_persistence -[hidden]- km_core_adapter
+manual_learning -[hidden]- km_core_adapter
+online_learning -[hidden]- km_core_adapter
+graph_viewer_hierarchy -[hidden]- km_core_adapter
+graph_visual_rendering -[hidden]- km_core_adapter
+ukb_workflow_dashboard -[hidden]- km_core_adapter
+km_core_adapter --> ontology_hierarchy_color_palette
+km_core_adapter --> hierarchy_parent_derivation
 
 @enduml

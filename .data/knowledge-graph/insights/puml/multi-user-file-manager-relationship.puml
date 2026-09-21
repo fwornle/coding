@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MultiUserFileManager
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[MultiUserFileManager] as multi_user_file_manager #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[OperationalLogger] as operational_logger #F0F0F0
+[RedactionEngine] as redaction_engine #F0F0F0
+[CopilotLiveTail] as copilot_live_tail #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[IsOwnedByMeGuard] as is_owned_by_me_guard #E8F5E8
+[OwnedDbPathGuard] as owned_db_path_guard #E8F5E8
+[LiveLockStalenessCheck] as live_lock_staleness_check #E8F5E8
+
+live_logging_system --> multi_user_file_manager
+lslconfig_validator -[hidden]- multi_user_file_manager
+operational_logger -[hidden]- multi_user_file_manager
+redaction_engine -[hidden]- multi_user_file_manager
+copilot_live_tail -[hidden]- multi_user_file_manager
+token_usage_adapters -[hidden]- multi_user_file_manager
+observation_writer -[hidden]- multi_user_file_manager
+multi_user_file_manager --> is_owned_by_me_guard
+multi_user_file_manager --> owned_db_path_guard
+multi_user_file_manager --> live_lock_staleness_check
+
+@enduml

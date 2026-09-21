@@ -1,35 +1,49 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Naming & Config Conventions" {
-  component "ProviderRegistryManager" as prm <<core>>
-  component "GraphDatabaseManager" as gdm <<core>>
-  component "config/features.yaml" as feat <<external>>
-  component "config/agent-profiles.json" as agentcfg <<external>>
+package "bin/ CLI Layer" {
+  component "bin/ckb" as ckb <<cli>>
+  component "bin/graphify" as graphify <<cli>>
+  component "bin/status" as status <<cli>>
 }
 
-package "Resilience Wrappers" {
-  component "CircuitBreakerManager" as cbm <<core>>
-  component "CachingMechanism" as cache <<core>>
-  component "LLMServiceProvider" as llm <<api>>
+package "Agent Adapter Layer" {
+  component "claude.sh" as claude <<agent>>
+  component "copilot.sh" as copilot <<agent>>
+  component "opencode.sh" as opencode <<agent>>
+  component "pi.sh" as pi <<agent>>
+  component "agent-profiles.json" as profiles <<storage>>
 }
 
-package "Monitoring & Constraints" {
-  component "ConstraintMonitoringService" as cms <<core>>
-  component "egress-lint-allowlist.json" as lint <<external>>
-  component "health-verification-rules.json" as health <<external>>
+package "Configuration & Orchestration" {
+  component "wave-controller.ts" as wave <<core>>
+  component "feature-profiles.yaml\nfeatures.yaml\ntask-taxonomy.yaml" as configs <<storage>>
+  component "OntologyClassifier" as ontology <<core>>
 }
 
-prm --> gdm : "manages"
-feat --> prm : "configures"
-agentcfg --> prm : "configures"
+cloud "Vendor LLM CLIs" as vendors <<external>>
 
-cbm --> llm : "wraps"
-cache --> llm : "wraps"
-llm --> gdm : "queries"
+ckb ..> configs : reads
+graphify ..> configs : reads
+status ..> profiles : queries
 
-cms --> lint : "enforces"
-cms --> health : "validates"
-cms --> cbm : "monitors"
+wave --> claude : invokes (env-driven)
+wave --> copilot : invokes (env-driven)
+wave --> opencode : invokes (env-driven)
+wave --> pi : invokes (env-driven)
+
+claude --> vendors : normalizes CLI
+copilot --> vendors : normalizes CLI
+opencode --> vendors : normalizes CLI
+pi --> vendors : normalizes CLI
+
+wave --> profiles : consults metadata
+profiles --> claude : declarative capabilities
+profiles --> copilot : declarative capabilities
+profiles --> opencode : declarative capabilities
+profiles --> pi : declarative capabilities
+
+configs --> ontology : drives classification
+ontology --> wave : informs dispatch
 
 @enduml

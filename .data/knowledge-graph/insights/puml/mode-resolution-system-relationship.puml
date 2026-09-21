@@ -1,0 +1,17 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ModeResolutionSystem
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ModeResolutionSystem] as mode_resolution_system #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[ProcessAwareLLMClient] as process_aware_llmclient #F0F0F0
+[LLMJsonRepair] as llmjson_repair #F0F0F0
+
+llmabstraction --> mode_resolution_system
+dmrprovider -[hidden]- mode_resolution_system
+process_aware_llmclient -[hidden]- mode_resolution_system
+llmjson_repair -[hidden]- mode_resolution_system
+
+@enduml

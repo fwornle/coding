@@ -1,40 +1,42 @@
 @startuml
 !include /Users/Q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Pipeline Orchestration" {
-  component "Coordinator Agent" as coord <<agent>>
-  component "BaseAgent" as base <<core>>
-  component "OntologyClassificationAgent" as onto <<agent>>
-  component "SemanticAnalysisAgent" as sem <<agent>>
+package "Agent Launch Config" {
+  component "copilot.sh" as copilot <<agent>>
+  component "opencode.sh" as opencode <<agent>>
+  component "pi.sh" as pi <<agent>>
+  component "no-unbounded-fs-scan.ts" as fsguard <<cli>>
+  component "llm-routing.yaml" as routing <<api>>
 }
 
-package "Analysis Stages" {
-  component "AgentResponse Envelope" as resp <<core>>
-  component "Observation Accumulator" as obs <<core>>
-  component "Deduplication Logic" as dedup <<core>>
+package "Code Graph Pipeline" {
+  component "extract.py" as extract <<core>>
+  component "build.py" as build <<core>>
+  component "cluster.py" as cluster <<core>>
+  component "detect.py" as detect <<core>>
+  component "export.py" as export <<core>>
+  component "report.py" as report <<core>>
 }
 
-package "Persistence" {
-  component "Persistence Agent" as persist <<agent>>
-  database "Knowledge Graph" as kg <<storage>>
+package "Orchestration Entry Points" {
+  component "pollKnowledgePipeline" as poll <<agent>>
+  component "full_pipeline" as full <<agent>>
+  component "batch-provenance.mjs" as prov <<core>>
 }
 
-coord --> base : "extends"
-onto --> base : "extends"
-sem --> base : "extends"
+copilot --> routing : "declares capabilities"
+opencode --> routing : "enumerated model list"
+pi --> routing : "thinkingLevelMap bands"
+fsguard --> pi : "deterministic gate (fail-open)"
 
-coord --> onto : "invokes"
-coord --> sem : "invokes"
+extract --> build : "collect_files"
+build --> cluster : "build_from_json"
+cluster --> detect : "score_all"
+detect --> export : "god_nodes/surprising_connections"
+export --> report : "to_json/to_obsidian"
 
-base --> resp : "wraps output"
-onto --> resp : "produces"
-sem --> resp : "produces"
-
-resp --> obs : "accumulates"
-obs --> dedup : "two-phase dedup"
-dedup --> kg : "merge"
-
-resp --> persist : "confidence/issue metadata"
-persist --> kg : "write or flag for review"
+poll --> extract : "invokes staged pipeline"
+full --> extract : "invokes staged pipeline"
+report --> prov : "informs provenance windows"
 
 @enduml
