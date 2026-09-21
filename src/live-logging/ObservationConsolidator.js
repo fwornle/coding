@@ -646,10 +646,21 @@ export class ObservationConsolidator {
    * it is popular. Stage 5 has to synthesise a parent description from its
    * children, and it cannot do that from 231 unrelated ones.
    *
+   * ASK FIRST, INFER SECOND. The rule below is a prior over what an insight is
+   * about; it is not an understanding of it. The classifier reads the actual
+   * text and now returns `primary` — the one entity the insight is mainly
+   * about — so when it answers, that answer wins and rarity is not consulted.
+   * Rarity remains the fallback for the cases the classifier declines: an
+   * insight about nothing in the catalog, a model that dropped back to the
+   * bare-array response, or a primary that is a Component or Detail rather
+   * than a SubComponent parent. `parentSource` records which rule fired, so
+   * the split is measurable instead of assumed.
+   *
    * @param {string[]} mentionsTargetIds ids from the mentions classifier
-   * @returns {Promise<{parentId: string, hierarchyLevel: number, parentMentions: number}|null>}
+   * @param {string|null} [primaryTargetId] the classifier's primary subject
+   * @returns {Promise<{parentId: string, hierarchyLevel: number, parentMentions: number, parentSource: string}|null>}
    */
-  async _resolveInsightParent(mentionsTargetIds) {
+  async _resolveInsightParent(mentionsTargetIds, primaryTargetId = null) {
     if (!Array.isArray(mentionsTargetIds) || mentionsTargetIds.length === 0) return null;
     let tallyInfo;
     try {
@@ -662,13 +673,24 @@ export class ObservationConsolidator {
       return null;
     }
     const { tally, levelOf } = tallyInfo;
+
+    // The classifier's own answer, when it gave one and it can be a parent.
+    // `tally` holds SubComponents only, which is also the membership test.
     let best = null;
-    for (const id of mentionsTargetIds) {
-      if (!tally.has(id)) continue; // not a SubComponent — Components and Details are not parents here
-      const n = tally.get(id);
-      // Fewest corpus-wide mentions wins: the rarest name this insight
-      // touches is the most specific thing it is about.
-      if (!best || n < best.n || (n === best.n && String(id) < String(best.id))) best = { id, n };
+    let parentSource = 'classifier';
+    if (primaryTargetId && tally.has(primaryTargetId)) {
+      best = { id: primaryTargetId, n: tally.get(primaryTargetId) };
+    }
+
+    if (!best) {
+      parentSource = 'rarity';
+      for (const id of mentionsTargetIds) {
+        if (!tally.has(id)) continue; // not a SubComponent — Components and Details are not parents here
+        const n = tally.get(id);
+        // Fewest corpus-wide mentions wins: the rarest name this insight
+        // touches is the most specific thing it is about.
+        if (!best || n < best.n || (n === best.n && String(id) < String(best.id))) best = { id, n };
+      }
     }
     if (!best) return null;
     const parentLevel = levelOf.get(best.id);
@@ -678,6 +700,7 @@ export class ObservationConsolidator {
       // level at all — derive from the parent rather than hardcoding 3.
       hierarchyLevel: Number.isInteger(parentLevel) ? parentLevel + 1 : 3,
       parentMentions: best.n,
+      parentSource,
     };
   }
 
@@ -721,9 +744,11 @@ export class ObservationConsolidator {
     // benign; throw is the fail-fast signal), the Insight is NOT written
     // and the next consolidation cycle re-tries naturally.
     let mentionsTargetIds = [];
+    let primaryTargetId = null;
     try {
       const candidates = await loadMentionCandidates(this._kmStore);
-      mentionsTargetIds = await classifyMentions(entry.summary || entry.topic, candidates);
+      ({ ids: mentionsTargetIds, primaryId: primaryTargetId } =
+        await classifyMentions(entry.summary || entry.topic, candidates));
     } catch (err) {
       process.stderr.write(`[Consolidator→KG] mentions classifier failed for ${entry.topic}: ${err.message}\n`);
       return; // D-04.1 — do NOT write a half-Insight
@@ -739,7 +764,7 @@ export class ObservationConsolidator {
     // Stage 4 — place the insight in the hierarchy off the mentions the
     // classifier just produced. Never throws; a null parent leaves the row
     // exactly as it was before this stage existed.
-    const parent = await this._resolveInsightParent(mentionsTargetIds);
+    const parent = await this._resolveInsightParent(mentionsTargetIds, primaryTargetId);
 
     const writer = this._ensureObservationWriter();
     const row = {
@@ -786,7 +811,14 @@ export class ObservationConsolidator {
         // mentioned SubComponent resolved, so a reader can tell "never
         // placed" from "placed nowhere".
         ...(parent
-          ? { parentId: parent.parentId, hierarchyLevel: parent.hierarchyLevel }
+          ? {
+              parentId: parent.parentId,
+              hierarchyLevel: parent.hierarchyLevel,
+              // Which rule placed this row. Without it, a corpus-wide
+              // "how good is the placement" question has no answer but
+              // re-running the classifier over everything.
+              parentSource: parent.parentSource,
+            }
           : {}),
         ontology: {
           ontologyName: 'development-knowledge-ontology',
@@ -810,7 +842,7 @@ export class ObservationConsolidator {
     if (this._kgPushDebug) {
       process.stderr.write(
         `[Consolidator→KG] ${entry.topic} → ${entityClass} (${classConf.toFixed(2)}) team=${project} mintedId=${mintedId} mentions=${mentionsTargetIds.length} ` +
-          `parent=${parent ? `${parent.parentId}@L${parent.hierarchyLevel} (${parent.parentMentions} mentions)` : 'none'}\n`
+          `parent=${parent ? `${parent.parentId}@L${parent.hierarchyLevel} (${parent.parentSource}, ${parent.parentMentions} mentions)` : 'none'}\n`
       );
     }
 
@@ -2418,7 +2450,7 @@ export class ObservationConsolidator {
       const summary = (insight.descriptionSegments?.[0]?.text) ?? insight.description ?? insight.name;
       let mentionIds = [];
       try {
-        mentionIds = await classifyMentions(summary, candidates);
+        ({ ids: mentionIds } = await classifyMentions(summary, candidates));
       } catch (err) {
         process.stderr.write(
           `[Consolidator] bridge: mentions classify for ${insight.id.slice(0, 8)} failed: ${err.message}\n`,

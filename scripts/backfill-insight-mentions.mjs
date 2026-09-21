@@ -645,7 +645,7 @@ async function main() {
       const stub = makeStubClassifierForInsight(insight.id);
       const classifierFn = stub != null
         ? stub
-        : async (summary, cands) => await classifyMentions(summary, cands);
+        : async (summary, cands) => (await classifyMentions(summary, cands)).ids;
 
       const record = await processInsight(insight, store ?? makeDryRunStore(), {
         classifier: classifierFn,
