@@ -964,3 +964,125 @@ describe('ObservationConsolidator._resolveInsightParent — stage 4 placement', 
     assert.equal(await c._resolveInsightParent(['sub-hub']), null);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Stage 5 — a parent is described BY ITS CHILDREN (2026-09-21)
+//
+// The bug being fixed: wave-controller.ts:1233 sets a parent's description to
+// `entity.observations[0]` — one arbitrary child, verbatim. So moving UP the
+// tree returned a detail instead of a summary. The verbatim-copy refusal below
+// is therefore a release gate, not a nicety.
+// ---------------------------------------------------------------------------
+
+describe('ObservationConsolidator.synthesizeParentDescriptions — stage 5', () => {
+  const ENTS = {
+    Project: [{ id: 'proj', name: 'Coding', ontologyClass: 'Project', metadata: {} }],
+    Component: [{ id: 'comp', name: 'KnowledgeManagement', ontologyClass: 'Component', metadata: {} }],
+    SubComponent: [{ id: 'sub', name: 'GraphStore', ontologyClass: 'SubComponent', metadata: {} }],
+    Detail: [
+      { id: 'd1', name: 'Graph reader', ontologyClass: 'Detail',
+        description: 'The GraphifyGraph reader loads graph.json and exposes node lookup.', metadata: {} },
+      { id: 'd2', name: 'Graph writer', ontologyClass: 'Detail',
+        description: 'The writer persists entities through km-core putEntity.', metadata: {} },
+    ],
+    Insight: [
+      { id: 'i1', name: 'placed insight', ontologyClass: 'Insight',
+        description: 'An online insight attached by parentId rather than an edge.',
+        metadata: { parentId: 'sub' } },
+    ],
+  };
+  const makeStore = (over = {}) => ({
+    findByOntologyClass: async (c) => ENTS[c] ?? [],
+    findRelations: async ({ type } = {}) =>
+      (!type || type === 'contains')
+        ? [{ from: 'comp', to: 'd1', type: 'contains' }, { from: 'comp', to: 'd2', type: 'contains' }]
+        : [],
+    mergeAttributes: async () => {},
+    ...over,
+  });
+  const make = (store, llm) => {
+    const c = new ObservationConsolidator({ kmStore: store, observationWriter: {}, runId: 'stage5' });
+    c._callLLM = llm;
+    return c;
+  };
+
+  it('reads children from BOTH contains edges and metadata.parentId', async () => {
+    const c = make(makeStore(), async () => 'x');
+    const kids = await c._collectHierarchyChildren(makeStore());
+    assert.deepEqual((kids.get('comp') ?? []).map((e) => e.id).sort(), ['d1', 'd2'], 'contains edges');
+    assert.deepEqual((kids.get('sub') ?? []).map((e) => e.id), ['i1'], 'stage 4 parentId field');
+  });
+
+  it('refuses a synthesis that is a verbatim copy of a child', async () => {
+    const copy = ENTS.Detail[0].description;
+    const c = make(makeStore(), async () => copy);
+    const r = await c.synthesizeParentDescriptions({ dryRun: true, classes: ['Component'] });
+    assert.equal(r.verbatimBlocked, 1, 'the exact bug this stage exists to fix must be refused');
+    assert.equal(r.synthesised, 0);
+  });
+
+  it('accepts a genuine generalisation', async () => {
+    const c = make(makeStore(), async () =>
+      'Knowledge management owns how graph data is read and written. It covers reading ' +
+      'graph.json and persisting entities through km-core, keeping both sides on one store.');
+    const r = await c.synthesizeParentDescriptions({ dryRun: true, classes: ['Component'] });
+    assert.equal(r.synthesised, 1);
+    assert.equal(r.verbatimBlocked, 0);
+  });
+
+  it('writes nothing in dry run', async () => {
+    let wrote = 0;
+    const c = make(makeStore({ mergeAttributes: async () => { wrote += 1; } }),
+      async () => 'A genuine generalisation about the component and its responsibilities here.');
+    await c.synthesizeParentDescriptions({ dryRun: true, classes: ['Component'] });
+    assert.equal(wrote, 0, 'dry run must not touch the store');
+  });
+
+  it('writes, and stamps rollUpOf + rolledUpAt, when applied', async () => {
+    const seen = [];
+    const c = make(makeStore({ mergeAttributes: async (id, attrs) => seen.push({ id, attrs }) }),
+      async () => 'A genuine generalisation about the component and its responsibilities here.');
+    const r = await c.synthesizeParentDescriptions({ dryRun: false, classes: ['Component'] });
+    assert.equal(r.synthesised, 1);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].id, 'comp');
+    assert.equal(seen[0].attrs.metadata.rollUpOf, 2);
+    assert.ok(seen[0].attrs.metadata.rolledUpAt);
+  });
+
+  it('onlyDirty skips a parent whose children predate its last synthesis', async () => {
+    const fresh = { ...ENTS.Component[0], metadata: { rolledUpAt: '2030-01-01T00:00:00.000Z' } };
+    const store = makeStore({
+      findByOntologyClass: async (c2) => (c2 === 'Component' ? [fresh] : (ENTS[c2] ?? [])),
+    });
+    const c = make(store, async () => 'should never be called');
+    const r = await c.synthesizeParentDescriptions({ dryRun: true, onlyDirty: true, classes: ['Component'] });
+    assert.equal(r.selected, 0, 'a parent newer than every child is not dirty');
+    assert.equal(r.calls, 0, 'and costs no LLM call — this is what makes the scheduled pass affordable');
+  });
+
+  it('strips the model preamble that would otherwise open the description', async () => {
+    const c = make(makeStore(), async () => "Here's a summary: The component coordinates graph reads and writes across km-core and the viewer.");
+    const r = await c.synthesizeParentDescriptions({ dryRun: true, classes: ['Component'] });
+    assert.equal(r.synthesised, 1);
+    // The preamble goes, the sentence stays. A GREEDY `[^\n.]*[.:]` used to run
+    // to the last period on the line and return '' — a silently blanked field.
+    const one = "Here's a summary: The component coordinates graph reads and writes across km-core.";
+    assert.equal(c._stripSynthesisPreamble(one), 'The component coordinates graph reads and writes across km-core.');
+    assert.equal(c._stripSynthesisPreamble('```markdown\nbody text that is long enough to survive the guard below ok\n```'),
+      'body text that is long enough to survive the guard below ok');
+    // The regression itself: a long synthesis must never come back empty.
+    const trap = "Here's a summary: " +
+      'The component coordinates graph reads and writes across km-core and the viewer. '.repeat(3);
+    assert.ok(c._stripSynthesisPreamble(trap).length > 40, 'a long synthesis must never be blanked');
+  });
+
+  it('asks the model to generalise upward, naming the parent and its child count', () => {
+    const c = make(makeStore(), async () => '');
+    const p = c._buildParentSynthesisPrompt({ parent: { name: 'KnowledgeManagement' }, cls: 'Component', childBlock: 'x', count: 125 });
+    assert.match(p.system, /Generalise upward/);
+    assert.match(p.system, /never restate one child/i);
+    assert.match(p.user, /KnowledgeManagement/);
+    assert.match(p.user, /125/);
+  });
+});

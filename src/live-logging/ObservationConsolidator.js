@@ -3154,6 +3154,246 @@ export class ObservationConsolidator {
   }
 
   /** Prompt for collapsing N granular insights into one subsystem-level insight. */
+  /**
+   * Collect the children of every hierarchy parent, from BOTH edges and field.
+   *
+   * `contains` is how the UKB hierarchy attaches Components and SubComponents;
+   * `metadata.parentId` is how stage 4 attaches online insights, deliberately
+   * NOT as an edge (see _resolveInsightParent). A roll-up that read only one
+   * of the two would summarise half a parent and call it the whole.
+   *
+   * One O(E) sweep, because findRelations scans every edge per call.
+   *
+   * @returns {Promise<Map<string, object[]>>} parent id -> child entities
+   */
+  async _collectHierarchyChildren(kmStore) {
+    const all = await kmStore.findByOntologyClass('Insight');
+    const byId = new Map();
+    for (const cls of ['Project', 'Component', 'SubComponent', 'Detail', 'Insight']) {
+      for (const e of await kmStore.findByOntologyClass(cls)) if (e?.id) byId.set(e.id, e);
+    }
+    for (const e of all) if (e?.id) byId.set(e.id, e);
+
+    const kids = new Map();
+    const push = (pid, child) => {
+      if (!pid || !child) return;
+      if (!kids.has(pid)) kids.set(pid, []);
+      kids.get(pid).push(child);
+    };
+    for (const r of await kmStore.findRelations({ type: 'contains' })) push(r.from, byId.get(r.to));
+    for (const e of byId.values()) {
+      const pid = (e.metadata ?? {}).parentId;
+      if (pid) push(pid, e);
+    }
+    return kids;
+  }
+
+  /**
+   * Give every hierarchy parent a description synthesised FROM ITS CHILDREN.
+   *
+   * THE DIRECTION IS THE POINT. `wave-controller.ts:1233` assigns a parent's
+   * description from `entity.observations[0]` — one arbitrary child's text,
+   * verbatim. So the KnowledgeManagement component is described by a paragraph
+   * about the GraphifyGraph reader, and moving UP the tree returns a detail
+   * rather than a summary. This pass replaces that with an actual aggregation
+   * and enforces the invariant the old code violated: a parent is never a
+   * verbatim copy of a child.
+   *
+   * CHUNKING. 16 of 282 parents carry more child text than one call can read
+   * (SemanticAnalysis has 116 children, the Coding project node 394). Those are
+   * summarised in chunks and then reduced over the chunk summaries, which is
+   * why the call count (338) exceeds the parent count.
+   *
+   * BUDGET. Routed as `consolidator-rollup`, pinned to `small` in
+   * llm-routing.yaml precisely so a pass over the whole graph cannot escalate
+   * band silently. Full pass measured at 338 calls / 3.3M tokens; with
+   * `onlyDirty` the steady state is ~22 calls/day.
+   *
+   * DRY RUN BY DEFAULT, like every other pass here that rewrites the graph.
+   *
+   * @param {object}  [opts]
+   * @param {boolean} [opts.dryRun=true]     report only
+   * @param {boolean} [opts.onlyDirty=false] skip parents whose children have not changed since the last synthesis
+   * @param {number}  [opts.limit=0]         cap the number of parents (0 = all)
+   * @param {string[]} [opts.classes]        which parent classes to visit
+   */
+  async synthesizeParentDescriptions({
+    dryRun = true,
+    onlyDirty = false,
+    limit = 0,
+    classes = ['Project', 'Component', 'SubComponent'],
+  } = {}) {
+    if (!this._kmStore) {
+      throw new Error('[ObservationConsolidator] km-core not configured — pass options.kmStore');
+    }
+    const kmStore = this._kmStore;
+    const kids = await this._collectHierarchyChildren(kmStore);
+
+    const parents = [];
+    for (const cls of classes) {
+      for (const e of await kmStore.findByOntologyClass(cls)) {
+        const children = (kids.get(e?.id) ?? []).filter((c) => c && !(c.metadata ?? {}).archivedAt);
+        if (children.length === 0) continue;
+        parents.push({ entity: e, cls, children });
+      }
+    }
+
+    // `onlyDirty` is what makes this affordable on a schedule: a full pass is
+    // 338 calls, the daily delta is ~22. A parent is dirty when any child has
+    // been updated since the parent was last synthesised.
+    const dirtyOf = (p) => {
+      const last = Date.parse((p.entity.metadata ?? {}).rolledUpAt ?? '');
+      if (!isFinite(last)) return true;
+      return p.children.some((c) => {
+        const t = Date.parse((c.metadata ?? {}).updatedAt ?? c.updatedAt ?? (c.metadata ?? {}).createdAt ?? '');
+        return isFinite(t) && t > last;
+      });
+    };
+    const selected = (onlyDirty ? parents.filter(dirtyOf) : parents)
+      .sort((a, b) => b.children.length - a.children.length);
+    const work = limit > 0 ? selected.slice(0, limit) : selected;
+
+    process.stderr.write(
+      `[ParentSynthesis] ${work.length} parent(s) to synthesise of ${parents.length} with children` +
+        `${onlyDirty ? ' (dirty only)' : ''}${dryRun ? ' — DRY RUN' : ''}\n`,
+    );
+
+    const CHUNK_CHARS = 60000; // ~15k tokens of child text per call
+    let synthesised = 0; let skipped = 0; let failed = 0; let calls = 0; let verbatimBlocked = 0;
+
+    for (const p of work) {
+      const blocks = p.children.map(
+        (c) => `### ${c.name ?? '(unnamed)'}\n${String(c.description ?? (c.metadata ?? {}).summary ?? '').slice(0, 4000)}`,
+      );
+      // Pack children into chunks that fit one call.
+      const chunks = [];
+      let cur = '';
+      for (const b of blocks) {
+        if (cur && cur.length + b.length > CHUNK_CHARS) { chunks.push(cur); cur = ''; }
+        cur += (cur ? '\n\n---\n\n' : '') + b;
+      }
+      if (cur) chunks.push(cur);
+
+      let description = null;
+      try {
+        const partials = [];
+        for (const chunk of chunks) {
+          const prompt = this._buildParentSynthesisPrompt({
+            parent: p.entity, cls: p.cls, childBlock: chunk,
+            count: p.children.length, partial: chunks.length > 1,
+          });
+          calls += 1;
+          const resp = await this._callLLM(prompt, 'consolidator-rollup');
+          if (resp) partials.push(String(resp).trim());
+        }
+        if (partials.length === 1) {
+          description = partials[0];
+        } else if (partials.length > 1) {
+          const prompt = this._buildParentSynthesisPrompt({
+            parent: p.entity, cls: p.cls,
+            childBlock: partials.map((t, i) => `### part ${i + 1}\n${t}`).join('\n\n---\n\n'),
+            count: p.children.length, partial: false, reduce: true,
+          });
+          calls += 1;
+          const resp = await this._callLLM(prompt, 'consolidator-rollup');
+          description = resp ? String(resp).trim() : partials[0];
+        }
+      } catch (err) {
+        failed += 1;
+        process.stderr.write(`[ParentSynthesis] LLM failed for ${p.entity.name}: ${err.message}\n`);
+        continue;
+      }
+
+      description = this._stripSynthesisPreamble(description);
+      if (!description || description.length < 40) { skipped += 1; continue; }
+
+      // THE INVARIANT. The bug being fixed was a parent whose description was
+      // one child's text verbatim, so "is this a copy of a child?" is a
+      // release gate here, not a nicety.
+      const norm = (t) => String(t).replace(/\s+/g, ' ').trim().toLowerCase();
+      const d = norm(description);
+      if (p.children.some((c) => { const cd = norm(c.description ?? ''); return cd.length > 60 && (cd === d || cd.includes(d) || d.includes(cd)); })) {
+        verbatimBlocked += 1;
+        process.stderr.write(`[ParentSynthesis] REFUSED ${p.entity.name} — synthesis is a verbatim child copy\n`);
+        continue;
+      }
+
+      if (dryRun) {
+        synthesised += 1;
+        process.stderr.write(
+          `[ParentSynthesis] would write ${p.cls} "${p.entity.name}" from ${p.children.length} children: ${description.slice(0, 90).replace(/\n/g, ' ')}…\n`,
+        );
+        continue;
+      }
+
+      try {
+        await kmStore.mergeAttributes(p.entity.id, {
+          description,
+          metadata: {
+            ...(p.entity.metadata ?? {}),
+            rolledUpAt: new Date().toISOString(),
+            rollUpOf: p.children.length,
+            synthesizedBy: 'parent-description-synthesis',
+          },
+        });
+        synthesised += 1;
+      } catch (err) {
+        failed += 1;
+        process.stderr.write(`[ParentSynthesis] write failed for ${p.entity.name}: ${err.message}\n`);
+      }
+    }
+
+    const result = {
+      candidates: parents.length, selected: work.length,
+      synthesised, skipped, failed, verbatimBlocked, calls, dryRun,
+    };
+    process.stderr.write(`[ParentSynthesis] ${JSON.stringify(result)}\n`);
+    return result;
+  }
+
+  /**
+   * Models like to open with "Here is a summary of…". That preamble would
+   * become the first line of a Component's description in the viewer.
+   */
+  _stripSynthesisPreamble(text) {
+    if (!text) return text;
+    const original = String(text).trim();
+    let t = original;
+    t = t.replace(/^```(?:markdown|md|text)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+    // LAZY, and bounded. A greedy `[^\n.]*[.:]` runs to the LAST colon or
+    // period on the line, which for "Here's a summary: <the whole paragraph>."
+    // consumed the entire description and left an empty string — a silent
+    // blanking of the field this pass exists to fill.
+    t = t.replace(/^(?:here(?:'s| is)[^\n.]{0,60}?[.:]|summary[:]|overview[:])\s*/i, '');
+    t = t.trim();
+    // Never let de-preambling destroy the content. If the strip removed
+    // essentially everything, the pattern matched something that was not a
+    // preamble — keep what the model actually said.
+    return t.length < 40 && original.length >= 40 ? original : t;
+  }
+
+  /**
+   * Prompt for one parent. `partial` marks a chunk of a large parent's
+   * children; `reduce` marks the pass that merges those chunk summaries.
+   */
+  _buildParentSynthesisPrompt({ parent, cls, childBlock, count, partial = false, reduce = false }) {
+    const what = cls === 'Project' ? 'project' : cls === 'Component' ? 'component' : 'sub-component';
+    const system =
+      'You summarise a software knowledge graph. You are given the child entries of one ' +
+      `${what} and must describe the ${what} ITSELF: what it is, what it is responsible for, ` +
+      'and the themes its children have in common. Generalise upward — never restate one ' +
+      'child as though it were the whole. Do not copy any child entry verbatim. No preamble, ' +
+      'no bullet list, no headings: 3-6 sentences of plain prose.';
+    const user = reduce
+      ? `The ${what} "${parent.name}" has ${count} child entries, summarised below in parts. ` +
+        `Merge these into ONE description of the ${what}.\n\n${childBlock}`
+      : partial
+        ? `Part of the child entries of the ${what} "${parent.name}" (${count} children in total). ` +
+          `Summarise what THIS PART says about the ${what}.\n\n${childBlock}`
+        : `Child entries of the ${what} "${parent.name}" (${count} children).\n\n${childBlock}`;
+    return { system, user };
+  }
+
   _buildRollUpPrompt({ bucket, project, memberBlock, count }) {
     // _callLLM sends { system, user } as two chat messages — returning a bare
     // string makes both message contents `undefined`, which the proxy rejects
