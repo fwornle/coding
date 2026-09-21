@@ -32,6 +32,9 @@ export interface HierarchyNode {
   id: string
   name: string
   ontologyClass: string
+  /** Stage 4's explicit placement. Read for `parentId` only — see the
+   *  metadata.parentId note in the ranking below. */
+  metadata?: { parentId?: string } | Record<string, unknown>
 }
 
 export interface HierarchyEdge {
@@ -51,6 +54,18 @@ export const HIERARCHY_LEVEL: Readonly<Record<string, number>> = {
   Component: 2,
   SubComponent: 3,
   Detail: 4,
+  // `Insight` sits at Detail's level, as a SubComponent's child.
+  //
+  // It was absent until 2026-09-21, which meant `deriveParents` never emitted
+  // a parent for one and the entire online-learning population — 975 Insights,
+  // 742 of them under Coding — could not participate in the hierarchy at all.
+  // They are not unparented in the data: each hangs off its Project by
+  // `has_insight`, and 147 carry an explicit `metadata.parentId` naming a
+  // SubComponent. The tree simply could not see either.
+  //
+  // Level 4 is not a choice made here: stage 4's backfill already derives an
+  // Insight's `hierarchyLevel` as its parent's + 1, and a SubComponent is 3.
+  Insight: 4,
 }
 
 export const HIERARCHY_CLASSES: ReadonlySet<string> = new Set(Object.keys(HIERARCHY_LEVEL))
@@ -60,7 +75,33 @@ const PARENT_EDGE_RANK: Readonly<Record<string, number>> = {
   'parent-child': 0,
   contains: 1,
   includes: 2,
+  // Last resort, and only because the alternative is worse. `has_insight` is
+  // ownership rather than position — stage 2 kept Insights out of `contains`
+  // precisely to preserve that distinction — but it is the ONLY attachment
+  // 828 of the 975 Insights have. Ranked below every containment edge and
+  // below `metadata.parentId`, so it never displaces a real placement; it
+  // just means an unplaced Insight hangs off its Project instead of falling
+  // out of the tree entirely and rendering as an unattributable dot.
+  has_insight: 3,
 }
+
+/**
+ * `metadata.parentId` outranks every edge.
+ *
+ * It is the only signal that states a PLACEMENT. The edge an Insight actually
+ * carries is `has_insight` from its Project, and that is an ownership tether,
+ * not a position — the same double duty `capturedBy` was doing before it was
+ * repointed. Stage 2 deliberately kept Insights out of `contains` so the
+ * hierarchy-member / learning-artifact partition stayed exact, and stage 4
+ * therefore wrote the placement to a field instead of an edge. Stage 5's
+ * synthesis already reads both sources when it rolls a parent up; this makes
+ * the tree agree with the roll-up that is computed over it.
+ *
+ * Ranked above `parent-child` rather than merged into the table because it is
+ * not an edge type: nothing can out-rank an explicit statement of where a row
+ * belongs.
+ */
+const EXPLICIT_PLACEMENT_RANK = -1
 
 function levelOf(e: HierarchyNode | undefined): number {
   if (!e) return Number.MAX_SAFE_INTEGER
@@ -86,6 +127,21 @@ export function deriveParents(
   // child id → best candidate so far, kept as a comparable tuple.
   const best = new Map<string, { key: [number, number, number, string]; parentId: string }>()
 
+  // Explicit placements first, so an edge can only ever be a fallback.
+  for (const child of byId.values()) {
+    const pid = (child.metadata as { parentId?: string } | undefined)?.parentId
+    if (!pid || pid === child.id) continue
+    const parent = byId.get(pid)
+    if (!parent) continue // names a row outside the hierarchy, or a dead id
+    const key: [number, number, number, string] = [
+      levelOf(parent) === levelOf(child) - 1 ? 0 : 1,
+      EXPLICIT_PLACEMENT_RANK,
+      levelOf(parent),
+      parent.name,
+    ]
+    best.set(child.id, { key, parentId: parent.id })
+  }
+
   for (const r of relations) {
     const rank = PARENT_EDGE_RANK[r.type ?? '']
     if (rank === undefined) continue
@@ -94,6 +150,10 @@ export function deriveParents(
     const parent = byId.get(r.from)
     const child = byId.get(r.to)
     if (!parent || !child) continue
+    // `has_insight` places an INSIGHT and nothing else. It is a Project's
+    // claim on a learning artifact, not a containment relation, so letting it
+    // parent a Component would invent hierarchy out of ownership.
+    if (r.type === 'has_insight' && child.ontologyClass !== 'Insight') continue
 
     const pLevel = levelOf(parent)
     const cLevel = levelOf(child)

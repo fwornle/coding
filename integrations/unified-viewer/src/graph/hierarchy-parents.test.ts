@@ -6,7 +6,7 @@
 
 import { describe, test, expect } from 'vitest'
 import type { Entity, Relation } from '@/api/ApiClient'
-import { deriveParents, HIERARCHY_CLASSES } from './hierarchy-parents'
+import { deriveParents, HIERARCHY_CLASSES, HIERARCHY_LEVEL } from './hierarchy-parents'
 
 const ent = (id: string, ontologyClass: string, name = id): Entity =>
   ({ id, name, ontologyClass }) as Entity
@@ -20,7 +20,8 @@ const ENTITIES: Entity[] = [
   ent('km', 'Component', 'KnowledgeManagement'),
   ent('sa', 'Component', 'SemanticAnalysis'),
   ent('detail', 'Detail', 'OntologyClassificationAgent'),
-  ent('insight', 'Insight', 'SomeInsight'), // not a hierarchy class
+  ent('insight', 'Insight', 'SomeInsight'), // level 4, placed by metadata.parentId
+  ent('obs', 'Observation', 'SomeObservation'), // genuinely not a hierarchy class
 ]
 
 describe('deriveParents', () => {
@@ -75,8 +76,44 @@ describe('deriveParents', () => {
   })
 
   test('edges touching a non-hierarchy class are ignored', () => {
-    const parents = deriveParents(ENTITIES, [rel('coding', 'insight', 'contains')])
-    expect(parents.has('insight')).toBe(false)
+    const parents = deriveParents(ENTITIES, [rel('coding', 'obs', 'contains')])
+    expect(parents.has('obs')).toBe(false)
+  })
+
+  // Insight joined the hierarchy on 2026-09-21. It was excluded, which meant
+  // deriveParents emitted no parent for any of the 975 Insights in the live
+  // graph and the whole online-learning population sat outside the tree.
+  test('an Insight is a hierarchy class at Detail level', () => {
+    expect(HIERARCHY_CLASSES.has('Insight')).toBe(true)
+    expect(HIERARCHY_LEVEL.Insight).toBe(HIERARCHY_LEVEL.Detail)
+  })
+
+  test('metadata.parentId places an Insight that has no containment edge', () => {
+    const entities = ENTITIES.map((e) =>
+      e.id === 'insight' ? { ...e, metadata: { parentId: 'sa' } } : e,
+    )
+    // has_insight is its only edge, and that is ownership, not position.
+    const parents = deriveParents(entities, [rel('coding', 'insight', 'has_insight')])
+    expect(parents.get('insight')).toBe('sa')
+  })
+
+  test('metadata.parentId outranks a containment edge', () => {
+    const entities = ENTITIES.map((e) =>
+      e.id === 'detail' ? { ...e, metadata: { parentId: 'sa' } } : e,
+    )
+    const parents = deriveParents(entities, [rel('km', 'detail', 'contains')])
+    expect(parents.get('detail')).toBe('sa')
+  })
+
+  test('a parentId naming an unknown or self id is ignored, not fatal', () => {
+    const ghost = ENTITIES.map((e) =>
+      e.id === 'detail' ? { ...e, metadata: { parentId: 'ghost' } } : e,
+    )
+    expect(deriveParents(ghost, [rel('km', 'detail', 'contains')]).get('detail')).toBe('km')
+    const selfish = ENTITIES.map((e) =>
+      e.id === 'detail' ? { ...e, metadata: { parentId: 'detail' } } : e,
+    )
+    expect(deriveParents(selfish, []).has('detail')).toBe(false)
   })
 
   test('a self-edge never roots a node in itself', () => {

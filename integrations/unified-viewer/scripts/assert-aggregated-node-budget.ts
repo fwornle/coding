@@ -67,9 +67,19 @@ const forPredicate = entities.map((e) => ({
 })) as unknown as Parameters<typeof isEntityVisible>[0][]
 
 const parents = deriveParents(
-  forPredicate as unknown as { id: string; name: string; ontologyClass: string }[],
+  forPredicate as unknown as {
+    id: string; name: string; ontologyClass: string
+    metadata?: { parentId?: string }
+  }[],
   relations.map((r) => ({ from: r.source, to: r.target, type: r.attributes?.type })),
 )
+// The transitive collapse walks ancestors and needs their class; the app builds
+// this in UnifiedViewer from the same entity list.
+const hierarchyClasses = new Map<string, string>()
+for (const e of forPredicate) {
+  const a = e as unknown as ApiEntity
+  if (a.ontologyClass) hierarchyClasses.set(a.id, a.ontologyClass)
+}
 
 // The store's seeded defaults, verbatim (viewer-store.ts ~519-973). A default
 // that changes there and not here would make this assert against a view no
@@ -101,6 +111,7 @@ const DEFAULT_FILTERS: VisibilityFilters = {
   collapseSubComponents: true,
   expandedComponentIds: new Set<string>(),
   hierarchyParents: parents,
+  hierarchyClassOf: (id: string) => hierarchyClasses.get(id),
   showDebugEntityTypes: false,
 }
 
@@ -175,7 +186,15 @@ for (const e of visible) {
   byClass.set(c, (byClass.get(c) ?? 0) + 1)
 }
 
-const overBudget = worst.nodes > BUDGET
+// Unrooted rows count against the budget too — they are ON the canvas, and a
+// check that ignores them can be satisfied by making rows unattributable
+// rather than by making the view smaller. That is not hypothetical: the first
+// run of the level-keyed collapse reported "PASS, Coding at 11" while 43 rows
+// rendered under no project at all, because an Insight whose placement
+// heuristic found no parent got no parent in the tree either and dropped out
+// of every project's total. The budget is per project; a row belonging to no
+// project is a failure of the hierarchy, not an exemption from it.
+const overBudget = worst.nodes > BUDGET || unrooted > 0
 const report = {
   worstProject: worst.name,
   worstProjectNodeCount: worst.nodes,
@@ -213,8 +232,13 @@ if (AS_JSON) {
   w('')
   w(
     overBudget
-      ? `FAIL — worst project "${worst.name}" is ${report.overBy} over a budget of ${BUDGET} (${report.projectsOverBudget}/${report.projectCount} projects over)`
-      : `PASS — worst project "${worst.name}" at ${worst.nodes} of ${BUDGET}`,
+      ? [
+          worst.nodes > BUDGET
+            ? `FAIL — worst project "${worst.name}" is ${report.overBy} over a budget of ${BUDGET} (${report.projectsOverBudget}/${report.projectCount} projects over)`
+            : `FAIL — every project is within ${BUDGET} (worst "${worst.name}" at ${worst.nodes})`,
+          unrooted > 0 ? `     — but ${unrooted} rendered rows belong to no project` : '',
+        ].filter(Boolean).join('\n')
+      : `PASS — worst project "${worst.name}" at ${worst.nodes} of ${BUDGET}, 0 rows unrooted`,
   )
 }
 
