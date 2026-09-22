@@ -413,8 +413,19 @@ export interface ViewerState {
   setEtmSheetOpen: (open: boolean) => void
 
   // ---------- Phase 55 — coding-only hierarchy / LSL slices ----------
-  /** Id of the hierarchy row the operator clicked. Identity + chip label only;
-   *  the canvas filters on `hierarchySubtreeIds`. */
+  /**
+   * What the canvas is focused on. Identity + chip label only; the canvas
+   * filters on `hierarchySubtreeIds`.
+   *
+   * Usually a hierarchy row id. Since 2026-09-22 it may also be a synthetic
+   * `file:<path>` key, set by the detail panel's "Code it touches" list — files
+   * are not entities and have no row id to name themselves with. Reusing this
+   * triple rather than adding a second focus is deliberate: the canvas is
+   * focused on ONE thing, and two focus fields would have to define what their
+   * intersection means. A synthetic key matches no row, so no rail row shows
+   * `aria-pressed` for a file focus, which is correct. Entity ids are UUIDs, so
+   * the prefix can never collide with one. See graph/intent-code-reach.ts.
+   */
   hierarchySubtreeFilter: string | null
   /** Name of that row, so the chip above the canvas can say what is focused
    *  without the chip having to re-derive either tree. */
@@ -429,8 +440,9 @@ export interface ViewerState {
    * a predicate that sees one entity at a time cannot walk either. Same
    * producer/consumer shape as `lslSessionFilter` → `lslFilterEntityIds`.
    *
-   * null = no subtree filter. A non-null set is always non-empty (it contains
-   * at least the clicked row), so there is no "empty means everything" trap.
+   * null = no subtree filter. A non-null set is always non-empty — it holds at
+   * least the clicked row, or, for a file focus, the lessons that named the
+   * file — so there is no "empty means everything" trap.
    */
   hierarchySubtreeIds: ReadonlySet<string> | null
   lslSessionFilter: string[]
