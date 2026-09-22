@@ -171,6 +171,9 @@ integrations/mcp-server-browserbase/
 # Trained semantic prompt-classifier artifacts. Generated from labelled data;
 # source labels/config stay tracked while machine-specific vectors do not.
 .data/prompt-classifier/
+# Intent-spine placement cache — a local answer cache keyed to this machine's
+# corpus state, rebuilt from the graph's own aggregates edges when absent.
+.data/intent-spine/
 !.data/kb-ab-sampler/specs/
 !.data/kb-ab-sampler/mine-specs/
 !.data/kb-ab-sampler/facts/
