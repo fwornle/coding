@@ -733,6 +733,34 @@
       "extends": "SubComponent",
       "level": 1,
       "relationships": {}
+    },
+    "Intent": {
+      "description": "A goal or standing concern that working sessions kept returning to — what someone was trying to ACHIEVE, as distinct from the code they achieved it in. Intent nodes are the reading spine of the knowledge base: they aggregate Insights, and reach the code via those Insights' own placement, so the code hierarchy (Component/SubComponent/Detail) remains the evidence layer rather than the spine. Derived from the Insight corpus, not authored by hand.",
+      "extends": "LearningArtifact",
+      "defaultLayer": "pattern",
+      "relationships": {
+        "aggregates": [
+          "Insight"
+        ]
+      },
+      "properties": {
+        "test": {
+          "type": "string",
+          "required": true,
+          "description": "The excludability test: one sentence saying what belongs here AND what does not. Required because a category that cannot REJECT a record is a catch-all — measured: a category broadened by a trailing clause (\"... and data infrastructure\") absorbed 65 of 122 placement disagreements on its own."
+        },
+        "summary": {
+          "type": "string"
+        },
+        "insightCount": {
+          "type": "number",
+          "description": "Insights aggregated at the time of derivation; a drift signal, not a live count."
+        },
+        "derivationRunId": {
+          "type": "string",
+          "description": "Which derivation produced this node. Intent taxonomies are re-derived, not edited, so provenance is how a stale node is recognised."
+        }
+      }
     }
   },
   "_legacy": {
