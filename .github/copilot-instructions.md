@@ -114,6 +114,7 @@ Symptom of the stale-cache bug: the dashboard backend exits with `SyntaxError: I
 
 - **Storage**: `.data/knowledge-graph/` (Graphology + LevelDB)
 - **Purge entities**: `node scripts/purge-knowledge-entities.js <YYYY-MM-DD> [--dry-run] [--team=coding] [--verbose]`
+- **Intent spine** (the `Intent` ─`aggregates`→ `Insight` tree the viewer's rail navigates): `node scripts/derive-intent-spine.mjs [--apply] [--derive]`. Dry-run by default; the taxonomy is COMMITTED data (`config/intent-taxonomy.json`, measured kappa 0.77 at cap 14-20 — wider caps make the model reproduce the code spine in different words), because re-deriving is an LLM call and is not reproducible. Re-runs are idempotent: placements seed from the graph's own `aggregates` edges and every edge is probed before adding. Archived Insights are INCLUDED (651 of 741) unless `--exclude-archived`. It never writes `metadata.parentId`, so deleting the Intents and their edges reverts it whole.
 
 ## Session Logging
 

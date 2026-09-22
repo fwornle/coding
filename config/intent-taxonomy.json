@@ -1,0 +1,82 @@
+{
+  "derivedAt": "2026-09-22",
+  "note": "see the header of scripts/derive-intent-spine.mjs",
+  "categories": [
+    {
+      "name": "Make backend, provider, and tool-capability selection explicit and auditable",
+      "test": "Applies to documenting which registry/backend/provider/skill is active and why, deliberate config omissions, pinned env vars, runtime tool allow-lists, and tool-preference-vs-availability declarations; excludes whether those backends actually work correctly at runtime."
+    },
+    {
+      "name": "Prevent silent loss, duplication, or corruption in the observation/knowledge-graph write path",
+      "test": "Applies to consolidator aggregation, KG-anchor writes, cold-store lag, ETM stalls/dedup, orphaned digest entities, and slot-based concurrency guards protecting shared write endpoints from conflicting writes; excludes benchmark scoring, UI rendering, or phase-gate logic."
+    },
+    {
+      "name": "Guard benchmark and experiment results against contamination, instability, or grading defects",
+      "test": "Applies to CONTAM/trap-phrase detection, cross-agent matrix run integrity, timeout/circuit-breaker safeguards, evaluator/grader disagreement fixes, and reproducible fixture-recording/replay rigs; excludes general token/routing attribution outside a benchmark."
+    },
+    {
+      "name": "Keep services, proxies, and tooling reachable and self-recovering across environment quirks",
+      "test": "Applies to container health-check/auto-heal sequences, provider fallback chains, fail-closed proxy dependencies, and diagnosing third-party CLI/OS quirks (quarantine, oversized-request crashes, CI-log verification) that silently block execution; excludes benchmark or dashboard correctness."
+    },
+    {
+      "name": "Make dashboard and frontend rendering reflect true underlying data",
+      "test": "Applies to layout regressions, dark-mode/tooltip fixes, dashboard UI fixtures, bulk-management UI, and recomputing displayed claims against raw results; excludes backend data-capture correctness or benchmark validity."
+    },
+    {
+      "name": "Attribute token, compute, and measurement data to the correct agent, model, and run",
+      "test": "Applies to route-attribution records, span-close pipelines, per-model token scoping, raw-body capture, foreground-token capture, and cross-surface measurement reconciliation; excludes whether the resulting benchmark score itself is contaminated."
+    },
+    {
+      "name": "Keep statuslines and badges truthful rather than stale or misleading",
+      "test": "Applies to tmux status-right badge rendering pipelines and per-project terminal health indicators showing genuinely live state; excludes full browser-based dashboard UIs."
+    },
+    {
+      "name": "Make knowledge-graph viewer canvas rendering and filtering correct",
+      "test": "Applies to graph-node color/legend derivation, filter panels, RCA-chain display, and selection/interaction bugs specifically inside a graph-viewer canvas; excludes dashboard web pages outside that viewer."
+    },
+    {
+      "name": "Keep git, submodule, and worktree operations reliable across repos and networks",
+      "test": "Applies to branch/lock cleanup after merges, pre-commit export guards, background-monitor git hazards, and SSH/HTTPS connectivity through restricted-network proxies; excludes benchmark validity or sensitive-content scrubbing."
+    },
+    {
+      "name": "Avoid wasted compute on idle, redundant, or already-known-good work",
+      "test": "Applies to idle-gate probe suppression, disk-growth sweep jobs, corpus-detection/container-rebuild caching, and event-driven terminal-state detection replacing fragile polling; excludes phase-completion or benchmark-scoring correctness."
+    },
+    {
+      "name": "Keep documentation structure, style, and source locations consistent and build-safe",
+      "test": "Applies to style-guide enforcement, link-integrity audits, size limits on generated reference files, and canonical directory/asset placement required for a strict-mode doc build; excludes the factual accuracy of the prose itself."
+    },
+    {
+      "name": "Ensure GSD phase or milestone state is accurately tracked and never marked advanced before genuinely complete",
+      "test": "Applies to discuss/plan/execute-phase gates, security-audit steps, XML/task completeness checks, milestone close-out, and canonical roadmap/execution-state tracking; excludes runtime service health or dashboard correctness."
+    },
+    {
+      "name": "Keep test suites reliable across module systems and runners",
+      "test": "Applies to ESM/jest-global injection issues, live-test gating/hang patterns, and install-script pass/fail validation; excludes production runtime bugs."
+    },
+    {
+      "name": "Restore session or project context and standing workflow rules across restarts",
+      "test": "Applies to loading the most recent live session log to reconstruct context and to persistent memory files preserving behavioral rules across session restarts; excludes how that history is later displayed on a dashboard."
+    },
+    {
+      "name": "Prevent sensitive or machine-generated artifacts from contaminating hand-curated repo state",
+      "test": "Applies to scrubbing OAuth tokens/PII from git history, keeping generated snapshot files out of version control, and preventing auto-generated exports from mixing with curated deliverables; excludes intentional long-term data-store migrations."
+    },
+    {
+      "name": "Prevent local tooling state from being lost, clobbered, or left in an unsafe condition across sessions and environments",
+      "test": "Belongs if the record's goal is making agent/launcher/config/terminal operations safe against crashes, concurrent writes, path assumptions, or environment quirks (atomic writes, lock-file checks, retry/idempotency, tmux/clipboard reliability, path portability); does not belong if the record merely describes what a tool does, reports a one-off unresolved bug with no hardening pattern, or is a catch-all bundling unrelated fixes."
+    },
+    {
+      "name": "Keep shared packages and native binaries reliable across build/runtime environments",
+      "test": "Applies to cross-project package abstraction layers, worker-pool subprocess reliability, packaging conventions, and native binaries surviving pruning steps; excludes routing/config selection logic."
+    },
+    {
+      "name": "Turn raw meeting or external material into structured downstream records",
+      "test": "Applies to converting meeting transcripts, Teams-channel history, or PDFs into structured filings, template-conformant feedback records, or machine-ingestible input; excludes automated telemetry/observation capture."
+    },
+    {
+      "name": "Know whether a stated insight or claim is actually verified, not just asserted",
+      "test": "Applies specifically to strict, unambiguous claim-verification status/color semantics distinguishing proven from unproven insights; excludes general dashboard rendering bugs or benchmark scoring mechanics."
+    }
+  ]
+}
