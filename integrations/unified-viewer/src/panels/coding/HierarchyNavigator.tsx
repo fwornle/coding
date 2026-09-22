@@ -67,6 +67,7 @@ import {
   HIERARCHY_CLASSES,
   HIERARCHY_LEVEL,
 } from '@/graph/hierarchy-parents'
+import { buildIntentSpine } from '@/graph/intent-spine'
 
 /** Synthetic root collecting hierarchy nodes with no containment edge. */
 export const UNPARENTED_ID = '__unparented__'
@@ -78,7 +79,21 @@ interface TreeNode {
   level: number
   children: TreeNode[]
   descendantCount: number
+  /** Intent spine only — the Components this intent's insights live in. */
+  codeEvidence?: { component: string; insights: number }[]
+  /** Intent spine only — what the category excludes. */
+  test?: string
 }
+
+/**
+ * Which tree is on screen.
+ *
+ * `code` answers "where does this live" and is the only half that can be
+ * checked against the filesystem. `intent` answers "why is it like this" —
+ * the descent a person actually makes, coarse to fine. They are separate
+ * trees joined at the Insight, so this is a switch and not a filter.
+ */
+type Spine = 'code' | 'intent'
 
 function buildTree(entities: readonly Entity[], relations: readonly HierarchyEdge[]): TreeNode[] {
   const filtered = entities.filter((e) => {
@@ -212,17 +227,36 @@ function TreeBranch({
           type="button"
           aria-label={ariaLabel}
           data-testid={`hierarchy-row-${node.id}`}
-          className="flex-1 text-left truncate hover:text-foreground text-foreground"
+          // `truncate` belongs on the NAME, not the button: an intent is a
+          // whole sentence, and truncating the button clipped the count off
+          // the end of every row — the one number that says how much of the
+          // corpus the row carries. min-w-0 lets the name shrink inside flex.
+          className="flex-1 min-w-0 text-left hover:text-foreground text-foreground"
+          title={node.name}
           onClick={(e) => {
             // Stop propagation so the accordion's own toggle doesn't intercept.
             e.stopPropagation()
             onSubtreeClick(node.id)
           }}
         >
-          <span className="text-foreground">{node.name}</span>
-          <span className="text-[10px] text-muted-foreground ml-1.5 tabular-nums">
-            ({node.descendantCount})
+          <span className="flex items-baseline gap-1.5">
+            <span className="truncate text-foreground">{node.name}</span>
+            <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+              ({node.descendantCount})
+            </span>
           </span>
+          {node.codeEvidence && node.codeEvidence.length > 0 && (
+            // The join between the trees, shown rather than described: which
+            // parts of the code this goal was pursued in. Derived from the
+            // insights' own placement, so it costs no extra classification.
+            <span
+              data-testid={`intent-evidence-${node.id}`}
+              className="block text-[10px] text-muted-foreground/80 truncate font-normal"
+            >
+              in {node.codeEvidence.slice(0, 3).map((e) => e.component).join(', ')}
+              {node.codeEvidence.length > 3 && ` +${node.codeEvidence.length - 3}`}
+            </span>
+          )}
         </button>
       </AccordionTrigger>
       {hasChildren && (
@@ -304,7 +338,23 @@ export default function HierarchyNavigator({
     }
   }
 
-  const tree = useMemo(() => buildTree(entities ?? [], relations), [entities, relations])
+  const [spine, setSpine] = useState<Spine>('code')
+
+  const tree = useMemo(
+    () =>
+      spine === 'intent'
+        ? (buildIntentSpine(entities ?? [], relations) as TreeNode[])
+        : buildTree(entities ?? [], relations),
+    [entities, relations, spine],
+  )
+
+  // Whether the store holds an intent spine at all. An empty result means two
+  // different things — "not derived yet" and "derived but empty" — and the
+  // toggle must not look broken in the first case.
+  const hasIntentSpine = useMemo(
+    () => (entities ?? []).some((e) => (e as { ontologyClass?: unknown }).ontologyClass === 'Intent'),
+    [entities],
+  )
 
   // Search filter — case-insensitive substring match on names; recursive
   // (a node matches if any descendant matches).
@@ -332,12 +382,52 @@ export default function HierarchyNavigator({
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Hierarchy
         </div>
+        {hasIntentSpine && (
+          <div
+            role="group"
+            aria-label="Choose which hierarchy to show"
+            data-testid="spine-toggle"
+            className="flex gap-1 pb-1"
+          >
+            {(['code', 'intent'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                data-testid={`spine-${s}`}
+                aria-pressed={spine === s}
+                onClick={() => {
+                  setSpine(s)
+                  Logger.info(Logger.Categories.PANELS, `Hierarchy spine: ${s}`)
+                }}
+                className={
+                  'text-[10px] px-2 py-0.5 rounded border transition-colors ' +
+                  (spine === s
+                    ? 'bg-accent text-accent-foreground border-accent'
+                    : 'text-muted-foreground border-border hover:text-foreground')
+                }
+              >
+                {s === 'code' ? 'Code' : 'Intent'}
+              </button>
+            ))}
+          </div>
+        )}
         <div
           data-testid="hierarchy-empty-state"
           className="text-xs text-muted-foreground px-1 py-2"
         >
-          <p>No hierarchy data yet.</p>
-          <p className="text-[10px] mt-0.5 italic">Run wave-analysis to populate.</p>
+          {spine === 'intent' ? (
+            <>
+              <p>No intents placed yet.</p>
+              <p className="text-[10px] mt-0.5 italic">
+                The intent spine is derived from the insight corpus, not from a wave run.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>No hierarchy data yet.</p>
+              <p className="text-[10px] mt-0.5 italic">Run wave-analysis to populate.</p>
+            </>
+          )}
         </div>
       </div>
     )
@@ -354,6 +444,35 @@ export default function HierarchyNavigator({
       <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
         Hierarchy
       </div>
+      {hasIntentSpine && (
+        <div
+          role="group"
+          aria-label="Choose which hierarchy to show"
+          data-testid="spine-toggle"
+          className="flex gap-1 pb-1"
+        >
+          {(['code', 'intent'] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              data-testid={`spine-${s}`}
+              aria-pressed={spine === s}
+              onClick={() => {
+                setSpine(s)
+                Logger.info(Logger.Categories.PANELS, `Hierarchy spine: ${s}`)
+              }}
+              className={
+                'text-[10px] px-2 py-0.5 rounded border transition-colors ' +
+                (spine === s
+                  ? 'bg-accent text-accent-foreground border-accent'
+                  : 'text-muted-foreground border-border hover:text-foreground')
+              }
+            >
+              {s === 'code' ? 'Code' : 'Intent'}
+            </button>
+          ))}
+        </div>
+      )}
       {searchOpen && (
         <input
           ref={searchInputRef}
