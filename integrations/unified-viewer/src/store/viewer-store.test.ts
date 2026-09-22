@@ -322,6 +322,63 @@ describe('useViewerStore — Phase 55 action setters (Task 2)', () => {
     expect(useViewerStore.getState().hierarchySubtreeFilter).toBeNull()
   })
 
+  test('setHierarchySubtreeFilter carries the resolved member set and the label', () => {
+    useViewerStore.getState().setHierarchySubtreeFilter('c1', new Set(['c1', 'd1']), 'LiveLoggingSystem')
+    const s = useViewerStore.getState()
+    expect(s.hierarchySubtreeFilter).toBe('c1')
+    expect(s.hierarchySubtreeLabel).toBe('LiveLoggingSystem')
+    expect([...(s.hierarchySubtreeIds ?? [])].sort()).toEqual(['c1', 'd1'])
+  })
+
+  test('null clears all three fields, not just the id', () => {
+    useViewerStore.getState().setHierarchySubtreeFilter('c1', new Set(['c1']), 'Comp')
+    useViewerStore.getState().setHierarchySubtreeFilter(null)
+    const s = useViewerStore.getState()
+    expect(s.hierarchySubtreeFilter).toBeNull()
+    expect(s.hierarchySubtreeLabel).toBeNull()
+    expect(s.hierarchySubtreeIds).toBeNull()
+  })
+
+  test('clearHierarchySubtreeFilter clears all three fields', () => {
+    useViewerStore.getState().setHierarchySubtreeFilter('c1', new Set(['c1']), 'Comp')
+    useViewerStore.getState().clearHierarchySubtreeFilter()
+    const s = useViewerStore.getState()
+    expect(s.hierarchySubtreeFilter).toBeNull()
+    expect(s.hierarchySubtreeLabel).toBeNull()
+    expect(s.hierarchySubtreeIds).toBeNull()
+  })
+
+  test('an identical-content member set preserves the Set reference', () => {
+    // `hierarchySubtreeIds` is in the useGraphVisibility dep list, so a fresh
+    // reference restarts the force simulation and the viewport jumps
+    // (PATTERNS Locked Contract #3). Re-resolving the same row must not.
+    useViewerStore.getState().setHierarchySubtreeFilter('c1', new Set(['c1', 'd1']), 'Comp')
+    const first = useViewerStore.getState().hierarchySubtreeIds
+    useViewerStore.getState().setHierarchySubtreeFilter('c1', new Set(['d1', 'c1']), 'Comp')
+    expect(useViewerStore.getState().hierarchySubtreeIds).toBe(first)
+    useViewerStore.getState().setHierarchySubtreeFilter('c1', new Set(['c1']), 'Comp')
+    expect(useViewerStore.getState().hierarchySubtreeIds).not.toBe(first)
+  })
+
+  test('a one-arg call clears the member set — it names a row but filters nothing', () => {
+    useViewerStore.getState().setHierarchySubtreeFilter('c1', new Set(['c1', 'd1']), 'Comp')
+    useViewerStore.getState().setHierarchySubtreeFilter('c2')
+    expect(useViewerStore.getState().hierarchySubtreeFilter).toBe('c2')
+    expect(useViewerStore.getState().hierarchySubtreeIds).toBeNull()
+  })
+
+  test('reset() clears the subtree filter — the Empty state Clear button must work', () => {
+    // The subtree focus can empty the canvas on its own, and EmptyFilterState's
+    // onClear calls reset(). A reset that left it set would show a button that
+    // cannot restore what it promises.
+    useViewerStore.getState().setHierarchySubtreeFilter('c1', new Set(['c1']), 'Comp')
+    useViewerStore.getState().reset()
+    const s = useViewerStore.getState()
+    expect(s.hierarchySubtreeFilter).toBeNull()
+    expect(s.hierarchySubtreeLabel).toBeNull()
+    expect(s.hierarchySubtreeIds).toBeNull()
+  })
+
   test("addLslSessionFilter('abc') from empty → ['abc']; re-adding is a no-op (no dup)", () => {
     useViewerStore.getState().addLslSessionFilter('abc')
     expect(useViewerStore.getState().lslSessionFilter).toEqual(['abc'])

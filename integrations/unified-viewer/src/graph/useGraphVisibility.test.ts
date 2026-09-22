@@ -64,6 +64,12 @@ describe('useGraphVisibility — single source of truth for canvas visibility', 
       'selectedTeams', 'visibleLevels', 'learningSource', 'selectedLayers',
       'hideDocNodes', 'hideArchived', 'lslFilterEntityIds',
       'showDebugEntityTypes', 'hiddenNodeTypes',
+      // The hierarchy subtree focus is a filter field like the rest: the
+      // navigator WRITES it, the canvas reads it through here. UnifiedViewer
+      // may read `hierarchySubtreeFilter`/`hierarchySubtreeLabel` — the row's
+      // identity and name, for the chip — but never the resolved id set, which
+      // is what actually filters.
+      'hierarchySubtreeIds',
     ]
     for (const rel of CONSUMERS) {
       const src = read(rel)

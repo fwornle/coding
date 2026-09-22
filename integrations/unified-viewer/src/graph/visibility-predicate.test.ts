@@ -357,3 +357,44 @@ describe('isEntityVisible — collapseSubComponents (architecture drill-down)', 
     }))).toBe(true)
   })
 })
+
+describe('isEntityVisible — hierarchy subtree focus', () => {
+  const f = (ids: ReadonlySet<string> | null) =>
+    baseFilters({
+      hierarchySubtreeIds: ids,
+      selectedClasses: new Set(['Insight', 'Component', 'Project', 'System']),
+    })
+  const ent = (id: string, ontologyClass: string) =>
+    ({ id, name: id, ontologyClass, metadata: {} }) as unknown as Entity
+
+  test('null admits everything — the filter is off, not empty', () => {
+    expect(isEntityVisible(ent('anything', 'Insight'), f(null))).toBe(true)
+  })
+
+  test('a member is visible, a non-member is not', () => {
+    const ids = new Set(['a', 'b'])
+    expect(isEntityVisible(ent('a', 'Insight'), f(ids))).toBe(true)
+    expect(isEntityVisible(ent('z', 'Insight'), f(ids))).toBe(false)
+  })
+
+  test('the structural backbone is NOT exempt', () => {
+    // Every other id-set filter in this file exempts System/Project/Component
+    // so the survivors stay anchored. This one must not: the anchors it wants
+    // are already IN the set (the resolver walks them in), and exempting the
+    // class would re-admit all 26 projects — the whole canvas the operator
+    // just asked to narrow.
+    const ids = new Set(['p-mine'])
+    expect(isEntityVisible(ent('p-mine', 'Project'), f(ids))).toBe(true)
+    expect(isEntityVisible(ent('p-other', 'Project'), f(ids))).toBe(false)
+    expect(isEntityVisible(ent('c-other', 'Component'), f(ids))).toBe(false)
+    expect(isEntityVisible(ent('s-other', 'System'), f(ids))).toBe(false)
+  })
+
+  test('an empty set hides everything rather than silently disabling itself', () => {
+    // The store never writes one (a resolved set always holds the clicked row),
+    // but "empty means everything" is the trap the LSL filter's `size > 0`
+    // guard has — if an empty set ever arrives here it must not un-filter the
+    // canvas behind the operator's back while the chip still says "focused".
+    expect(isEntityVisible(ent('a', 'Insight'), f(new Set()))).toBe(false)
+  })
+})

@@ -320,6 +320,17 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
     setHierarchyParents(parents, summary, classes)
   }, [entities, relations, setHierarchyParents])
 
+  // UI-SPEC §13.1 — the transient chip for the hierarchy navigator's subtree
+  // focus. The chip lives here rather than in the rail because it has to sit
+  // over the canvas it describes, and because it must stay reachable when the
+  // focus empties the canvas: `EmptyFilterState` replaces the graph, and a
+  // clear button that was inside the graph would go with it. Only the row's
+  // identity and name are read here — the id SET that does the filtering
+  // belongs to useGraphVisibility and is nobody else's business.
+  const hierarchySubtreeFilter = useViewerStore((s) => s.hierarchySubtreeFilter)
+  const hierarchySubtreeLabel = useViewerStore((s) => s.hierarchySubtreeLabel)
+  const clearHierarchySubtreeFilter = useViewerStore((s) => s.clearHierarchySubtreeFilter)
+
   const isVisible = useGraphVisibility()
   const visibleCount = useMemo(
     () => entities.reduce((n, e) => n + (isVisible(e) ? 1 : 0), 0),
@@ -422,6 +433,36 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             data-testid="viewer-canvas"
           >
             {canvas}
+            {hierarchySubtreeFilter !== null && (
+              // pointer-events-none on the positioner, auto on the chip: the
+              // chip floats over a canvas you still need to drag through.
+              <div
+                data-testid="subtree-filter-chip"
+                className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2"
+              >
+                <div className="pointer-events-auto flex max-w-[32rem] items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1 text-xs shadow-sm backdrop-blur">
+                  <span className="shrink-0 text-muted-foreground">Focused on</span>
+                  <span
+                    className="truncate font-medium"
+                    title={hierarchySubtreeLabel ?? hierarchySubtreeFilter}
+                  >
+                    {hierarchySubtreeLabel ?? hierarchySubtreeFilter}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Clear subtree filter"
+                    data-testid="subtree-filter-chip-clear"
+                    className="shrink-0 rounded-full px-1 leading-none text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      clearHierarchySubtreeFilter()
+                      Logger.info(Logger.Categories.FILTERS, 'Cleared subtree filter via chip')
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
           </main>
           <SidePanel apiClient={apiClient} system={system} />
         </div>

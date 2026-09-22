@@ -413,7 +413,26 @@ export interface ViewerState {
   setEtmSheetOpen: (open: boolean) => void
 
   // ---------- Phase 55 — coding-only hierarchy / LSL slices ----------
+  /** Id of the hierarchy row the operator clicked. Identity + chip label only;
+   *  the canvas filters on `hierarchySubtreeIds`. */
   hierarchySubtreeFilter: string | null
+  /** Name of that row, so the chip above the canvas can say what is focused
+   *  without the chip having to re-derive either tree. */
+  hierarchySubtreeLabel: string | null
+  /**
+   * The entity ids that row stands for — its subtree plus the code-tree
+   * ancestors that anchor it (see graph/subtree-members.ts).
+   *
+   * This field is the filter; `hierarchySubtreeFilter` is only its name. The
+   * split exists because the two spines resolve a row to entities by different
+   * edges — `contains`/`parent-child` for code, `aggregates` for intent — and
+   * a predicate that sees one entity at a time cannot walk either. Same
+   * producer/consumer shape as `lslSessionFilter` → `lslFilterEntityIds`.
+   *
+   * null = no subtree filter. A non-null set is always non-empty (it contains
+   * at least the clicked row), so there is no "empty means everything" trap.
+   */
+  hierarchySubtreeIds: ReadonlySet<string> | null
   lslSessionFilter: string[]
   // 2026-06-12: the entity-id set the LSL session filter resolves to.
   // Mirrors `lslSessionFilter` semantically (which is just IDs) so the
@@ -422,7 +441,19 @@ export interface ViewerState {
   // session has zero clickable entities — show nothing". The strip is
   // the producer; the graph + side panel are consumers.
   lslFilterEntityIds: ReadonlySet<string> | null
-  setHierarchySubtreeFilter: (rootId: string | null) => void
+  /**
+   * Set (or clear, with `null`) the subtree filter.
+   *
+   * `members` and `label` are optional so the 55-era one-arg call sites keep
+   * compiling; a call without them sets the row identity and clears the filter
+   * set, which is exactly the no-op-on-canvas behaviour those call sites had.
+   */
+  setHierarchySubtreeFilter: (
+    rootId: string | null,
+    members?: ReadonlySet<string> | null,
+    label?: string | null,
+  ) => void
+  clearHierarchySubtreeFilter: () => void
   setLslSessionFilter: (ids: string[]) => void
   addLslSessionFilter: (id: string) => void
   clearLslSessionFilter: () => void
@@ -940,6 +971,13 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       // WR-04 closure: these three were missing from the Phase 56 reset.
       lslSessionFilter: [],
       lslFilterEntityIds: null,
+      // The subtree filter belongs here too: it can empty the canvas on its
+      // own, and EmptyFilterState's "Clear filters" button calls reset(). A
+      // reset that left it set would offer the operator a button that cannot
+      // restore what it promises.
+      hierarchySubtreeFilter: null,
+      hierarchySubtreeLabel: null,
+      hierarchySubtreeIds: null,
       pathToSelected: new Set<string>(),
       // 2026-06-14 (Plan 06 gap-closure — Decision 1): mirror clearSelection
       // field coverage. WR-04 invariant: reset() and clearSelection() always
@@ -1153,10 +1191,36 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
 
   // ---------- Phase 55 — coding-only hierarchy / LSL ----------
   hierarchySubtreeFilter: null,
+  hierarchySubtreeLabel: null,
+  hierarchySubtreeIds: null,
   lslSessionFilter: [],
   lslFilterEntityIds: null,
 
-  setHierarchySubtreeFilter: (rootId) => set({ hierarchySubtreeFilter: rootId }),
+  // The `sameSetMembership` guard is the same one the LSL filter uses and is
+  // load-bearing for the same reason: `hierarchySubtreeIds` is in the
+  // `useGraphVisibility` dep list, so a fresh Set reference with identical
+  // content would rebuild the predicate, invalidate D3GraphCanvas's
+  // `visibleEntities` memo and restart the force simulation — the viewport
+  // jump described in PATTERNS Locked Contract #3. Re-clicking the row you
+  // are already focused on must not shake the canvas.
+  setHierarchySubtreeFilter: (rootId, members, label) =>
+    set((s) => {
+      const next = rootId === null ? null : (members ?? null)
+      return {
+        hierarchySubtreeFilter: rootId,
+        hierarchySubtreeLabel: rootId === null ? null : (label ?? null),
+        hierarchySubtreeIds: sameSetMembership(next, s.hierarchySubtreeIds)
+          ? s.hierarchySubtreeIds
+          : next,
+      }
+    }),
+
+  clearHierarchySubtreeFilter: () =>
+    set({
+      hierarchySubtreeFilter: null,
+      hierarchySubtreeLabel: null,
+      hierarchySubtreeIds: null,
+    }),
   setLslSessionFilter: (ids) => set({ lslSessionFilter: ids.slice() }),
 
   // Cmd/Ctrl+click multi-select pattern: idempotent add (no duplicate
