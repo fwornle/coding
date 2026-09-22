@@ -68,6 +68,48 @@ tmux_session_wrapper() {
   local coding_repo="${CODING_REPO:?CODING_REPO must be set}"
   local agent="${CODING_AGENT:-agent}"
   local session_name="coding-${agent}-$$"
+
+  # TAKE THE MOUSE BACK FROM THE AGENT. This is what makes text selection
+  # possible at all; everything in _bind_mouse_copy below is downstream of it.
+  #
+  # Claude Code and opencode enable ANY-EVENT mouse tracking (DECSET 1003) for
+  # their own click handling. That one fact breaks selection in both directions,
+  # and neither direction is obvious:
+  #
+  #   • With tmux `mouse off`, tmux does not take the mouse — but it still
+  #     FORWARDS the pane's own request to the outer terminal. The terminal is
+  #     therefore in mouse-reporting mode either way, so the native selection
+  #     that `mouse off` is supposed to hand back never comes back. The comment
+  #     that used to sit in _bind_mouse_copy claimed otherwise; it was wrong.
+  #
+  #   • With tmux `mouse on` (which the clickable status line needs, since
+  #     #{mouse_status_range} does not fire without it), tmux's own copy-mode
+  #     drag is supposed to fill the gap — and it cannot, for a reason that
+  #     never shows up in the bindings. Entering copy mode means no visible pane
+  #     holds MODE_MOUSE_ALL any more, so tmux downgrades the TERMINAL from 1003
+  #     to 1002 mid-gesture. xterm.js (VS Code's terminal) drops the in-flight
+  #     drag at that moment and reports no further motion until the next press.
+  #     Measured against the real agent binary: a 30-column drag copied 6 bytes,
+  #     cut off exactly at the first motion event. That is the whole "I can only
+  #     double-click a word" symptom — double-click never enters that path,
+  #     because it selects programmatically rather than by following the mouse.
+  #
+  # With the agent's grab gone, the pane never holds 1003, nothing is downgraded
+  # mid-drag, and BOTH selections work: tmux drag-select with `mouse on`
+  # (clickable status line kept), and the terminal's own with `mouse off` via
+  # prefix+S. Verified end to end: the same drag now copies all 26 characters.
+  #
+  # The cost is the agent's own mouse handling, wheel scrolling included, which
+  # the WheelUpPane/WheelDownPane bindings below hand back as PageUp/PageDown.
+  # Set CODING_AGENT_MOUSE=keep to leave the agent's mouse alone and accept that
+  # selection stops working — an explicit value here is never overridden.
+  if [ "${CODING_AGENT_MOUSE:-}" != "keep" ]; then
+    case "$agent" in
+      claude)   [ -z "${CLAUDE_CODE_DISABLE_MOUSE:-}" ] && export CLAUDE_CODE_DISABLE_MOUSE=1 ;;
+      opencode) [ -z "${OPENCODE_DISABLE_MOUSE:-}" ] && export OPENCODE_DISABLE_MOUSE=1 ;;
+      # pi and copilot never enable mouse reporting — nothing to switch off.
+    esac
+  fi
   # Pass project identity into status command so each session underlines its OWN project.
   # TMUX_PANE_WIDTH=#{pane_width} is expanded by tmux per pane on each substitution,
   # letting status-line-fast.cjs / combined-status-line.js size the right-pad to fit
@@ -110,54 +152,52 @@ tmux_session_wrapper() {
     _bind_mouse_copy
   }
 
-  # Give drag-to-select back, which `mouse on` above takes away.
+  # The mouse bindings that make a selection out of a drag.
   #
-  # `mouse on` is not optional here — it is what makes #{mouse_status_range}
-  # fire, so the clickable status line below depends on it. But it also hands
-  # tmux the mouse, and tmux's DEFAULT root bindings then defer to the running
-  # application whenever that application has asked for mouse reporting:
+  # These are only reachable because the agent's own mouse grab was switched
+  # off at the top of this file — read that comment first; without it every
+  # binding here still fires and still copies nothing, which is exactly how
+  # this looked while it was broken.
+  #
+  # `mouse on` hands tmux the mouse, and tmux's DEFAULT root bindings then defer
+  # to the running application whenever it has asked for mouse reporting:
   #
   #   MouseDrag1Pane  if -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" \
   #                     { send-keys -M } { copy-mode -M }
   #
-  # #{mouse_any_flag} is 1 for every pane here — Claude Code, opencode and pi
-  # all enable SGR mouse reporting for their own click handling. So a drag took
-  # the `send-keys -M` branch and was forwarded to the agent, which does nothing
-  # with a drag; the selection never started and nothing reached the clipboard.
-  # Native terminal selection is gone too, because from the terminal's point of
-  # view tmux is the one holding the mouse. That is the whole "copy stopped
-  # working" symptom: no config changed, the AGENT started asking for the mouse.
-  #
-  # The fix drops #{mouse_any_flag} from the condition on the three bindings
-  # that select text, and leaves every other mouse binding at its default. That
-  # split is deliberate and is why this is surgical rather than `mouse off`:
+  # #{mouse_any_flag} is 0 for these panes now, so the default would already
+  # take the copy-mode branch. It is still dropped from the condition below on
+  # purpose: an agent that starts asking for the mouse again — or one launched
+  # with CODING_AGENT_MOUSE=keep — must not silently take drag-select away with
+  # it a second time. The split is deliberate and is why this is surgical
+  # rather than `mouse off`:
   #
   #   • DRAG and double/triple click are how a human selects text. No TUI agent
   #     here binds them to anything, so routing them to copy-mode costs nothing.
-  #   • CLICK (MouseDown1Pane) and WHEEL still honour #{mouse_any_flag} at their
-  #     defaults, so the agents keep the click and scroll handling they do use.
+  #   • CLICK (MouseDown1Pane) stays at its default, so an agent that does use
+  #     clicks keeps them.
   #
   # #{pane_in_mode} stays in the condition: once copy-mode is open, `send-keys -M`
   # is what routes the drag to the copy-mode table so the selection extends.
   #
-  # That restores a SELECTION, not the selection that was there before. tmux's
-  # is confined to the visible viewport of an alternate-screen TUI that repaints
-  # every second, so a drag over anything the agent redraws mid-gesture copies a
-  # fragment. The terminal's own selection has neither limit — it spans the
-  # scrollback and survives repaints — but it is unreachable while an app holds
-  # the mouse, unless the terminal offers a force-selection modifier:
+  # WHEEL. Taking the mouse off the agent takes its wheel scrolling with it, and
+  # tmux's default sends the wheel straight back to an app that is no longer
+  # listening — the notch would simply do nothing. On the alternate screen there
+  # is no tmux scrollback to fall back to either (copy-mode -e would show only
+  # the current frame), so the wheel is translated to the key these full-screen
+  # agents document for scrolling: PageUp/PageDown. One page per notch. The
+  # `mouse_any_flag` branch is kept so an agent that DOES hold the mouse still
+  # receives its own wheel events.
   #
-  #   VS Code / xterm.js  Option+drag, and ONLY when
-  #                       terminal.integrated.macOptionClickForcesSelection
-  #                       is true. It defaults to FALSE, which is why there was
-  #                       no way back to native selection at all.
-  #   iTerm2              Option+drag, on by default
-  #
-  # So `prefix + S` below drops the mouse outright for the current session. It
-  # is the honest trade rather than a third selection mechanism: with mouse off
-  # the terminal owns the mouse again and selection behaves exactly as it did
-  # before the clickable status line existed — and the status line stops being
-  # clickable until it is toggled back. Both halves are stated in the message.
+  # WHAT THIS SELECTION IS NOT. tmux's selection is confined to the visible
+  # viewport of an alternate-screen TUI that repaints every second, so a drag
+  # over anything the agent redraws mid-gesture copies a fragment. The
+  # terminal's own selection has neither limit — it spans the scrollback and
+  # survives repaints. `prefix + S` below drops the mouse outright for the
+  # current session and hands selection back to the terminal; with the agent's
+  # grab gone that toggle finally does what it always claimed to do. The trade
+  # is that the status line stops being clickable until it is toggled back, and
+  # both halves are stated in the message.
   #
   # KEY TABLES ARE SERVER-WIDE — same caveat as _bind_status_clicks below.
   _bind_mouse_copy() {
@@ -202,12 +242,14 @@ bind-key -T root TripleClick1Pane {
   select-pane -t =
   if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-line ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${copy_pipe} }
 }
+bind-key -T root WheelUpPane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { if-shell -F "#{alternate_on}" { send-keys PageUp } { copy-mode -e } }
+bind-key -T root WheelDownPane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { if-shell -F "#{alternate_on}" { send-keys PageDown } { send-keys -M } }
 bind-key -T copy-mode    MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel${copy_pipe}
 bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel${copy_pipe}
 bind-key -T prefix S {
   if-shell -F "#{mouse}" {
     set-option mouse off
-    display-message -d 2500 "mouse OFF — drag selects natively (terminal's own copy). Status-line clicks are disabled. prefix+S restores."
+    display-message -d 2500 "mouse OFF — the terminal's own selection: spans scrollback, survives repaints. Status-line clicks are disabled. prefix+S restores."
   } {
     set-option mouse on
     display-message -d 2500 "mouse ON — tmux drag-select to clipboard + clickable status line. prefix+S for native selection."
@@ -316,6 +358,10 @@ EOF_MOUSE_COPY
     AGENT_ENABLE_PIPE_CAPTURE AGENT_PROMPT_REGEX SESSION_ID
     HTTP_PROXY HTTPS_PROXY http_proxy https_proxy NO_PROXY no_proxy
     OPENCODE_CONFIG_CONTENT
+    # The mouse opt-outs set above. They are exported into this shell, so they
+    # ride the same propagation list as everything else rather than being
+    # spliced into inner_cmd separately.
+    CLAUDE_CODE_DISABLE_MOUSE OPENCODE_DISABLE_MOUSE CODING_AGENT_MOUSE
     PI_CODING_AGENT_DIR PI_CODING_AGENT_SESSION_DIR PI_PROVIDER PI_MODEL
     PI_OFFLINE PI_TELEMETRY PI_SKIP_VERSION_CHECK
     TASK_ID
