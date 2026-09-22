@@ -431,4 +431,92 @@ describe('HierarchyNavigator', () => {
     // the run anchors are not top-level rows any more
     expect(screen.queryByLabelText(/Filter to Component: KgbenchTreeHomruf/)).toBeNull()
   })
+
+  // ---------------------------------------------------------------------------
+  // Intent → Component → Insight (2026-09-22)
+  //
+  // The intent spine's middle level. Before this the rail went goal → lesson and
+  // named the code only in a truncated subtitle read off `metadata.codeEvidence`
+  // — a field derived by a different rule than the tree it sat in, which omitted
+  // every lesson it could not place. These pin the replacement.
+  // ---------------------------------------------------------------------------
+
+  /** Intent int1 aggregating i1 (under c1) and i2 (under c2), plus an unplaced i3. */
+  function intentFixture() {
+    const entities = [
+      { id: 'p1', name: 'Coding', ontologyClass: 'Project', metadata: {} },
+      { id: 'c1', name: 'LiveLoggingSystem', ontologyClass: 'Component', metadata: {} },
+      { id: 'c2', name: 'KnowledgeManagement', ontologyClass: 'Component', metadata: {} },
+      { id: 'sc1', name: 'LoggingModule', ontologyClass: 'SubComponent', metadata: {} },
+      { id: 'i1', name: 'Never lose an observation', ontologyClass: 'Insight', metadata: {} },
+      { id: 'i2', name: 'Dedupe on the cursor', ontologyClass: 'Insight', metadata: {} },
+      { id: 'i3', name: 'Unplaced lesson', ontologyClass: 'Insight', metadata: {} },
+      { id: 'int1', name: 'Prevent silent loss', ontologyClass: 'Intent', metadata: {} },
+    ] as unknown as Entity[]
+    const relations = [
+      { from: 'int1', to: 'i1', type: 'aggregates' },
+      { from: 'int1', to: 'i2', type: 'aggregates' },
+      { from: 'int1', to: 'i3', type: 'aggregates' },
+    ]
+    // i1 sits under a SubComponent, so the walk has to pass through it.
+    const hierarchyParents = new Map([
+      ['c1', 'p1'],
+      ['c2', 'p1'],
+      ['sc1', 'c1'],
+      ['i1', 'sc1'],
+      ['i2', 'c2'],
+      ['i3', 'p1'],
+    ])
+    return { entities, relations, hierarchyParents }
+  }
+
+  function renderIntent() {
+    const { entities, relations, hierarchyParents } = intentFixture()
+    act(() => {
+      useViewerStore.setState({ hierarchyParents } as unknown as Parameters<
+        typeof useViewerStore.setState
+      >[0])
+    })
+    render(<HierarchyNavigator system="coding" entities={entities} relations={relations} />)
+    act(() => { fireEvent.click(screen.getByTestId('spine-intent')) })
+  }
+
+  test('an intent descends into the components its lessons were learned in', () => {
+    renderIntent()
+    // Radix unmounts collapsed content, so assert through the intent row's own
+    // count — it still owns all three lessons — then expand to see the level.
+    expect(screen.getByLabelText(/Filter to Intent: Prevent silent loss \(3 descendants\)/)).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByText('Prevent silent loss').closest('button')!.parentElement!) })
+    expect(screen.getByLabelText(/Filter to Component: LiveLoggingSystem \(1 descendants\)/)).toBeTruthy()
+    expect(screen.getByLabelText(/Filter to Component: KnowledgeManagement \(1 descendants\)/)).toBeTruthy()
+  })
+
+  test('a lesson that reaches no component is bucketed, not dropped', () => {
+    renderIntent()
+    act(() => { fireEvent.click(screen.getByText('Prevent silent loss').closest('button')!.parentElement!) })
+    // The whole reason the bucket exists: stored codeEvidence omitted these, so
+    // its component counts did not sum to the number on the intent row.
+    const bucket = screen.getByLabelText(/Not placed in code \(1 descendants\)/)
+    expect(bucket).toBeTruthy()
+    const counts = ['LiveLoggingSystem', 'KnowledgeManagement', 'Not placed in code']
+      .map((n) => Number(screen.getByLabelText(new RegExp(`${n} \\((\\d+) descendants`)).getAttribute('aria-label')!.match(/\((\d+) descendants/)![1]))
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(3)
+  })
+
+  test('clicking a component under an intent focuses that branch alone', () => {
+    renderIntent()
+    act(() => { fireEvent.click(screen.getByText('Prevent silent loss').closest('button')!.parentElement!) })
+    act(() => { fireEvent.click(screen.getByLabelText(/Filter to Component: LiveLoggingSystem/)) })
+    const ids = [...(useViewerStore.getState().hierarchySubtreeIds ?? [])].sort()
+    // c1 + its lesson + the chain that re-anchors it. NOT the sibling branch.
+    expect(ids).toEqual(['c1', 'i1', 'p1', 'sc1'])
+    expect(useViewerStore.getState().hierarchySubtreeLabel).toBe('LiveLoggingSystem')
+  })
+
+  test('the retired codeEvidence subtitle is gone from the row', () => {
+    renderIntent()
+    // It described a join the rows now make navigable — and described it with
+    // numbers derived by a different rule than this tree.
+    expect(document.querySelector('[data-testid^="intent-evidence-"]')).toBeNull()
+  })
 })

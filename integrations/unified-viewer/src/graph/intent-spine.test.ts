@@ -77,22 +77,8 @@ describe('buildIntentSpine', () => {
     expect(spine[0].children).toHaveLength(1)
   })
 
-  it('Test 5: codeEvidence and the excludability test reach the node', () => {
-    const spine = buildIntentSpine(
-      [
-        intent('i1', 'Goal', {
-          codeEvidence: [
-            { component: 'LiveLoggingSystem', insights: 7 },
-            { component: 'KnowledgeManagement', insights: 3 },
-          ],
-        }),
-      ],
-      [],
-    )
-    expect(spine[0].codeEvidence).toEqual([
-      { component: 'LiveLoggingSystem', insights: 7 },
-      { component: 'KnowledgeManagement', insights: 3 },
-    ])
+  it('Test 5: the excludability test reaches the node', () => {
+    const spine = buildIntentSpine([intent('i1', 'Goal')], [])
     expect(spine[0].test).toBe('what belongs in Goal')
   })
 
@@ -106,12 +92,15 @@ describe('buildIntentSpine', () => {
     expect(spine[0].descendantCount).toBe(0)
   })
 
-  it('Test 8: malformed codeEvidence degrades to empty instead of crashing the row', () => {
+  it('Test 8: stored codeEvidence is ignored, not rendered beside a tree built another way', () => {
+    // The field disagrees with `deriveParents` and omits every lesson it could
+    // not place, so the row would carry two contradicting numbers. The code
+    // join is derived in intent-code-reach instead; see that module's tests.
     const spine = buildIntentSpine(
-      [intent('i1', 'Goal', { codeEvidence: 'not-an-array' })],
+      [intent('i1', 'Goal', { codeEvidence: [{ component: 'LiveLoggingSystem', insights: 7 }] })],
       [],
     )
-    expect(spine[0].codeEvidence).toEqual([])
+    expect(spine[0]).not.toHaveProperty('codeEvidence')
   })
 
   it('Test 9: entityType is honoured when ontologyClass is absent', () => {

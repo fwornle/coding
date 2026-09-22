@@ -43,6 +43,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { MarkdownText } from '@/lib-domain/markdown-text'
 import { EmptyNodeDetailState } from '@/lib-domain/states'
 import { Logger } from '@/lib/logging'
+import CodeItTouches from './CodeItTouches'
+import { INTENT_EDGE } from '@/graph/intent-spine'
+import type { ReachInsight } from '@/graph/intent-code-reach'
 import { EntityIdentityHeader } from './EntityIdentityHeader'
 import { InsightDocumentModal } from './InsightDocumentModal'
 import {
@@ -659,6 +662,27 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
   const sourceRefs =
     (metadata.sourceRefs as Array<Record<string, unknown>> | undefined) ?? []
 
+  // The lessons whose file evidence "Code it touches" aggregates.
+  //
+  // Shape-driven, like every other section in this panel (see computeVisibility):
+  // an Intent resolves to the Insights it aggregates, an Insight to itself, and
+  // anything else to nothing — so the block appears exactly where file evidence
+  // can be derived, without a switch on ontologyClass.
+  const lessons: ReachInsight[] =
+    className === 'Intent'
+      ? (relations ?? [])
+          .filter((r) => (r.type ?? '') === INTENT_EDGE && r.from === entity.id)
+          .map((r) => entityById.get(r.to))
+          .filter((e): e is (typeof entities)[number] => Boolean(e))
+          .map((e) => ({
+            id: e.id,
+            name: e.name,
+            metadata: e.metadata as Record<string, unknown> | undefined,
+          }))
+      : className === 'Insight'
+        ? [{ id: entity.id, name: entity.name, metadata }]
+        : []
+
   // Pill bar — render the visible sub-tabs only.
   const tabs: Array<{ id: SubTab; label: string; visible: boolean }> = [
     { id: 'default', label: 'Default', visible: true },
@@ -890,9 +914,13 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
 
           {/* Sources & Evidence */}
           <Section title="Sources & Evidence" testId="entity-section-sources">
-            {sourceRefs.length === 0 ? (
+            {/* The code this row reaches, from the verifier's own resolved
+                claims. Renders itself away when there is no file evidence, so
+                it costs nothing on the rows that have none. */}
+            <CodeItTouches insights={lessons} totalLessons={lessons.length} />
+            {sourceRefs.length === 0 && lessons.length === 0 ? (
               <p className="text-sm text-muted-foreground italic">No sources.</p>
-            ) : (
+            ) : sourceRefs.length === 0 ? null : (
               <ul className="space-y-1 text-sm">
                 {(() => {
                   // Group by evidence type

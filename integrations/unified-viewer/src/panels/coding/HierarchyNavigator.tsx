@@ -77,6 +77,11 @@ import {
   HIERARCHY_LEVEL,
 } from '@/graph/hierarchy-parents'
 import { buildIntentSpine } from '@/graph/intent-spine'
+import {
+  groupByComponent,
+  NOT_PLACED_ID,
+  type ReachInsight,
+} from '@/graph/intent-code-reach'
 import { resolveSubtreeMembers } from '@/graph/subtree-members'
 
 /** Synthetic root collecting hierarchy nodes with no containment edge. */
@@ -89,8 +94,6 @@ interface TreeNode {
   level: number
   children: TreeNode[]
   descendantCount: number
-  /** Intent spine only — the Components this intent's insights live in. */
-  codeEvidence?: { component: string; insights: number }[]
   /** Intent spine only — what the category excludes. */
   test?: string
 }
@@ -187,6 +190,67 @@ function buildTree(entities: readonly Entity[], relations: readonly HierarchyEdg
   return roots
 }
 
+/**
+ * Insert the code level into the intent spine: Intent → Component → Insight.
+ *
+ * The spine module reads one edge type and stops; the Component a lesson sits
+ * under comes from the canvas's own parent map, so the rail can never name a
+ * component the graph drew the lesson somewhere else from. Until 2026-09-22 this
+ * join was a truncated subtitle ("in SemanticAnalysis, DockerizedServices +4")
+ * read off `metadata.codeEvidence` — a field written by a different derivation
+ * that disagreed with this tree and omitted every lesson it could not place. The
+ * rows say it now, and they are entities, so each one filters the canvas.
+ */
+function withComponentLevel(
+  roots: TreeNode[],
+  entities: readonly Entity[],
+  parents: ReadonlyMap<string, string>,
+): TreeNode[] {
+  // Names, classes and metadata all come off the entity itself rather than the
+  // store's `hierarchyClasses`. That map is written by the same pass as
+  // `hierarchyParents` and would normally agree, but it is a SECOND derivation
+  // of something the entity already states, and a walk that cannot tell a
+  // Component from anything else silently reports every lesson as unplaced —
+  // a wrong answer that looks like a finding. One source, no sync question.
+  const names = new Map<string, string>()
+  const classes = new Map<string, string>()
+  const metaById = new Map<string, Record<string, unknown> | undefined>()
+  for (const e of entities) {
+    names.set(e.id, e.name)
+    if (typeof e.ontologyClass === 'string') classes.set(e.id, e.ontologyClass)
+    metaById.set(e.id, e.metadata as Record<string, unknown> | undefined)
+  }
+
+  return roots.map((intent) => {
+    const insights: ReachInsight[] = intent.children.map((c) => ({
+      id: c.id,
+      name: c.name,
+      metadata: metaById.get(c.id),
+    }))
+    const groups = groupByComponent(insights, parents, classes, names)
+    return {
+      ...intent,
+      children: groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        // The bucket is not a Component and must not claim to be one — the
+        // class drives the row's aria label and its colour.
+        ontologyClass: g.id === NOT_PLACED_ID ? 'Unparented' : 'Component',
+        level: 1,
+        children: g.insights.map((i) => ({
+          id: i.id,
+          name: i.name,
+          ontologyClass: 'Insight',
+          level: 2,
+          children: [],
+          descendantCount: 0,
+        })),
+        descendantCount: g.insights.length,
+      })),
+    }
+  })
+}
+
 interface HierarchyNavigatorProps {
   system: 'coding' | 'okb'
   /**
@@ -274,18 +338,6 @@ function TreeBranch({
               ({node.descendantCount})
             </span>
           </span>
-          {node.codeEvidence && node.codeEvidence.length > 0 && (
-            // The join between the trees, shown rather than described: which
-            // parts of the code this goal was pursued in. Derived from the
-            // insights' own placement, so it costs no extra classification.
-            <span
-              data-testid={`intent-evidence-${node.id}`}
-              className="block text-[10px] text-muted-foreground/80 truncate font-normal"
-            >
-              in {node.codeEvidence.slice(0, 3).map((e) => e.component).join(', ')}
-              {node.codeEvidence.length > 3 && ` +${node.codeEvidence.length - 3}`}
-            </span>
-          )}
         </button>
       </AccordionTrigger>
       {hasChildren && (
@@ -394,9 +446,13 @@ export default function HierarchyNavigator({
   const tree = useMemo(
     () =>
       spine === 'intent'
-        ? (buildIntentSpine(entities ?? [], relations) as TreeNode[])
+        ? withComponentLevel(
+            buildIntentSpine(entities ?? [], relations) as TreeNode[],
+            entities ?? [],
+            hierarchyParents,
+          )
         : buildTree(entities ?? [], relations),
-    [entities, relations, spine],
+    [entities, relations, spine, hierarchyParents],
   )
 
   // Whether the store holds an intent spine at all. An empty result means two
