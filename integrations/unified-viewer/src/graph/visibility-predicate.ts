@@ -39,6 +39,21 @@ export interface VisibilityFilters {
   visibleLevels: ReadonlySet<0 | 1 | 2 | 3>
   lslFilterEntityIds: ReadonlySet<string> | null
   /**
+   * Hierarchy navigator subtree focus: the entity ids the clicked row stands
+   * for, resolved by `graph/subtree-members.ts` (the row, its subtree, and the
+   * code-tree ancestors that anchor them). `null` = no subtree focus.
+   *
+   * NO structural exemption, unlike the teams / learningSource / LSL rules
+   * above. Those filters narrow WHICH artifacts to look at and keep the
+   * backbone so the survivors stay attached; this one narrows WHICH PART OF
+   * THE BACKBONE to look at, so exempting System/Project/Component would
+   * re-admit all 26 projects and leave the filter with nothing to do. The
+   * anchoring those exemptions buy is bought here instead by the ancestor walk
+   * in the resolver — the chain above the clicked row is in the set, every
+   * other branch is not.
+   */
+  hierarchySubtreeIds?: ReadonlySet<string> | null
+  /**
    * Legend click-to-toggle: ontologyClass names the operator switched off in
    * the LegendPanel. Lives INSIDE the filter object on purpose.
    *
@@ -382,6 +397,9 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
     const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
     if (!isStructural && !filters.lslFilterEntityIds.has(e.id)) return false
   }
+
+  // Hierarchy subtree focus — membership only, no exemption. See the field doc.
+  if (filters.hierarchySubtreeIds && !filters.hierarchySubtreeIds.has(e.id)) return false
 
   return true
 }

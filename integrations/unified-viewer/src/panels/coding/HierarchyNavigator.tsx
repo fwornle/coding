@@ -43,10 +43,19 @@
 //     useKeyboardShortcuts.registerSequence (extended in this plan; closes
 //     plan-checker W-6).
 //
-// CLICK SEMANTICS:
-//   Click L1 row → setHierarchySubtreeFilter(l1.id) (UI-SPEC §13.1 transient
-//   filter chip rendered above canvas; the chip rendering itself lives in
-//   UnifiedViewer, not in this file).
+// CLICK SEMANTICS (UI-SPEC §13.1):
+//   Click any row → focus the canvas on that row's subtree, and render a
+//   transient filter chip above the canvas (the chip itself lives in
+//   UnifiedViewer, not in this file). Clicking the focused row again clears it.
+//
+//   Until 2026-09-22 this wrote `hierarchySubtreeFilter` and stopped: the field
+//   was written and never read — no predicate, no chip — so every row in both
+//   trees was clickable and did nothing, and the tests passed because they
+//   asserted the store value changed rather than that anything happened. The
+//   row is resolved to entity ids HERE because the two spines reach their
+//   members by different edges (`contains`/`parent-child` vs `aggregates`) and
+//   the canvas predicate sees one entity at a time; see graph/subtree-members.ts
+//   for what a subtree is taken to include and why the ancestors come with it.
 //
 // LOGGER DISCIPLINE: ZERO raw console.*
 
@@ -68,6 +77,7 @@ import {
   HIERARCHY_LEVEL,
 } from '@/graph/hierarchy-parents'
 import { buildIntentSpine } from '@/graph/intent-spine'
+import { resolveSubtreeMembers } from '@/graph/subtree-members'
 
 /** Synthetic root collecting hierarchy nodes with no containment edge. */
 export const UNPARENTED_ID = '__unparented__'
@@ -201,11 +211,13 @@ function TreeBranch({
   level,
   onSubtreeClick,
   matchesSearch,
+  focusedId,
 }: {
   node: TreeNode
   level: number
-  onSubtreeClick: (id: string) => void
+  onSubtreeClick: (n: TreeNode) => void
   matchesSearch: (n: TreeNode) => boolean
+  focusedId: string | null
 }) {
   // Filter by search at THIS level — only show node if it or any descendant
   // matches the search query.
@@ -213,6 +225,7 @@ function TreeBranch({
 
   const ariaLabel = `Filter to ${node.ontologyClass}: ${node.name} (${node.descendantCount} descendants)`
   const hasChildren = node.children.length > 0
+  const focused = focusedId === node.id
 
   return (
     <AccordionItem
@@ -222,25 +235,41 @@ function TreeBranch({
       aria-expanded={hasChildren ? false : undefined}
       className="border-b-0"
     >
-      <AccordionTrigger className="text-xs py-1.5 hover:no-underline">
+      {/* min-w-0 on the TRIGGER, not only on the button inside it. The trigger
+          is itself a flex item (`flex-1`) of the AccordionItem's header row, so
+          its min-width defaults to `auto` = the intrinsic width of its content.
+          With code-tree rows that is a PascalCase component name and nothing
+          shows; with intent rows it is a whole sentence, and the rail's content
+          box went to 755px inside a 255px aside — a sideways scroll the
+          operator never asked for, which the new focus-on-click then rode into
+          view. The `min-w-0` already on the inner button could not help: it
+          lets the button shrink, but nothing was shrinking the trigger. */}
+      <AccordionTrigger className="text-xs py-1.5 hover:no-underline min-w-0">
         <button
           type="button"
           aria-label={ariaLabel}
           data-testid={`hierarchy-row-${node.id}`}
+          // aria-pressed, not just a colour: the focused row is a toggle, and
+          // clicking it again clears the filter. A sighted user sees the accent;
+          // everyone else needs the state said out loud.
+          aria-pressed={focused}
           // `truncate` belongs on the NAME, not the button: an intent is a
           // whole sentence, and truncating the button clipped the count off
           // the end of every row — the one number that says how much of the
           // corpus the row carries. min-w-0 lets the name shrink inside flex.
-          className="flex-1 min-w-0 text-left hover:text-foreground text-foreground"
+          className={
+            'flex-1 min-w-0 text-left hover:text-foreground '
+            + (focused ? 'text-accent-foreground font-medium' : 'text-foreground')
+          }
           title={node.name}
           onClick={(e) => {
             // Stop propagation so the accordion's own toggle doesn't intercept.
             e.stopPropagation()
-            onSubtreeClick(node.id)
+            onSubtreeClick(node)
           }}
         >
           <span className="flex items-baseline gap-1.5">
-            <span className="truncate text-foreground">{node.name}</span>
+            <span className="truncate">{node.name}</span>
             <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
               ({node.descendantCount})
             </span>
@@ -268,6 +297,7 @@ function TreeBranch({
               level={level + 1}
               onSubtreeClick={onSubtreeClick}
               matchesSearch={matchesSearch}
+              focusedId={focusedId}
             />
           ))}
         </AccordionContent>
@@ -293,6 +323,14 @@ export default function HierarchyNavigator({
   )
   const relations: readonly HierarchyEdge[] = relationsProp ?? storeRelations ?? []
   const setHierarchySubtreeFilter = useViewerStore((s) => s.setHierarchySubtreeFilter)
+  const clearHierarchySubtreeFilter = useViewerStore((s) => s.clearHierarchySubtreeFilter)
+  const focusedId = useViewerStore((s) => s.hierarchySubtreeFilter)
+  // The canvas's own parent map, written once by UnifiedViewer over the whole
+  // entity set. Reusing it rather than re-deriving here is what guarantees the
+  // ancestors this filter admits are the ancestors the graph draws — a second
+  // derivation could rank a multi-parent node differently and the chain would
+  // point at a node the canvas had placed elsewhere.
+  const hierarchyParents = useViewerStore((s) => s.hierarchyParents)
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -340,6 +378,19 @@ export default function HierarchyNavigator({
 
   const [spine, setSpine] = useState<Spine>('code')
 
+  // Switching trees drops the focus. The filter is a resolved id set, so it
+  // would survive the switch intact — and then the chip above the canvas would
+  // name a row that is no longer anywhere in the rail, with no way to find it
+  // again except by switching back.
+  function onSpineChange(next: Spine) {
+    if (next === spine) return
+    setSpine(next)
+    if (useViewerStore.getState().hierarchySubtreeFilter !== null) {
+      clearHierarchySubtreeFilter()
+    }
+    Logger.info(Logger.Categories.PANELS, `Hierarchy spine: ${next}`)
+  }
+
   const tree = useMemo(
     () =>
       spine === 'intent'
@@ -365,9 +416,21 @@ export default function HierarchyNavigator({
     return node.children.some(matchesSearch)
   }
 
-  function onSubtreeClick(id: string) {
-    setHierarchySubtreeFilter(id)
-    Logger.info(Logger.Categories.PANELS, `Hierarchy filter set: ${id}`)
+  function onSubtreeClick(node: TreeNode) {
+    // Re-clicking the focused row clears it. The chip above the canvas is the
+    // primary way out; this is the second, at the place the operator's hand
+    // already is.
+    if (focusedId === node.id) {
+      clearHierarchySubtreeFilter()
+      Logger.info(Logger.Categories.PANELS, `Hierarchy filter cleared: ${node.id}`)
+      return
+    }
+    const members = resolveSubtreeMembers(node, hierarchyParents)
+    setHierarchySubtreeFilter(node.id, members, node.name)
+    Logger.info(
+      Logger.Categories.PANELS,
+      `Hierarchy filter set: ${node.id} (${members.size} entities, ${spine} spine)`,
+    )
   }
 
   if (tree.length === 0) {
@@ -395,10 +458,7 @@ export default function HierarchyNavigator({
                 type="button"
                 data-testid={`spine-${s}`}
                 aria-pressed={spine === s}
-                onClick={() => {
-                  setSpine(s)
-                  Logger.info(Logger.Categories.PANELS, `Hierarchy spine: ${s}`)
-                }}
+                onClick={() => onSpineChange(s)}
                 className={
                   'text-[10px] px-2 py-0.5 rounded border transition-colors ' +
                   (spine === s
@@ -457,10 +517,7 @@ export default function HierarchyNavigator({
               type="button"
               data-testid={`spine-${s}`}
               aria-pressed={spine === s}
-              onClick={() => {
-                setSpine(s)
-                Logger.info(Logger.Categories.PANELS, `Hierarchy spine: ${s}`)
-              }}
+              onClick={() => onSpineChange(s)}
               className={
                 'text-[10px] px-2 py-0.5 rounded border transition-colors ' +
                 (spine === s
@@ -498,6 +555,7 @@ export default function HierarchyNavigator({
             level={1}
             onSubtreeClick={onSubtreeClick}
             matchesSearch={matchesSearch}
+            focusedId={focusedId}
           />
         ))}
       </Accordion>

@@ -97,6 +97,9 @@ beforeEach(() => {
     theme: 'light',
     filterRailCollapsed: false,
     hierarchySubtreeFilter: null,
+    hierarchySubtreeLabel: null,
+    hierarchySubtreeIds: null,
+    hierarchyParents: new Map<string, string>(),
     ...({ entities: makeEntities(), relations: makeRelations() } as Record<string, unknown>),
   } as unknown as Parameters<typeof useViewerStore.setState>[0])
 })
@@ -145,6 +148,103 @@ describe('HierarchyNavigator', () => {
       fireEvent.click(l1Button)
     })
     expect(useViewerStore.getState().hierarchySubtreeFilter).toBe('p1')
+  })
+
+  // ---- the click has to reach the canvas, not just the store ----------------
+  //
+  // Until 2026-09-22 the assertion above was the ONLY thing the click was held
+  // to, and it passed for a year while the field it checks was read by nothing
+  // at all. These tests check the thing the operator sees: a resolved member
+  // set the canvas predicate can filter on.
+
+  test('clicking a row resolves the subtree the canvas filters on', () => {
+    render(<HierarchyNavigator system="coding" />)
+    act(() => {
+      fireEvent.click(screen.getByLabelText(/Filter to Project: Coding Project/))
+    })
+    const state = useViewerStore.getState()
+    expect([...(state.hierarchySubtreeIds ?? [])].sort()).toEqual(['c1', 'c2', 'd1', 'p1', 's1'])
+    expect(state.hierarchySubtreeLabel).toBe('Coding Project')
+  })
+
+  test('clicking the focused row again clears the filter', () => {
+    render(<HierarchyNavigator system="coding" />)
+    const row = screen.getByLabelText(/Filter to Project: Coding Project/)
+    act(() => { fireEvent.click(row) })
+    expect(useViewerStore.getState().hierarchySubtreeIds).not.toBeNull()
+    act(() => { fireEvent.click(row) })
+    const state = useViewerStore.getState()
+    expect(state.hierarchySubtreeFilter).toBeNull()
+    expect(state.hierarchySubtreeIds).toBeNull()
+  })
+
+  test('the focused row says so out loud (aria-pressed), not only in colour', () => {
+    render(<HierarchyNavigator system="coding" />)
+    const row = screen.getByLabelText(/Filter to Project: Coding Project/)
+    expect(row.getAttribute('aria-pressed')).toBe('false')
+    act(() => { fireEvent.click(row) })
+    expect(
+      screen.getByLabelText(/Filter to Project: Coding Project/).getAttribute('aria-pressed'),
+    ).toBe('true')
+  })
+
+  test('an intent row resolves to its insights AND the code they were learned in', () => {
+    // The two trees are joined at the Insight and nowhere else, so this is the
+    // one place the join has to actually happen. The parent map comes from the
+    // store — the same one UnifiedViewer writes and the canvas lays out by.
+    const entities = [
+      { id: 'p1', name: 'Coding', ontologyClass: 'Project', metadata: {} },
+      { id: 'c1', name: 'LiveLoggingSystem', ontologyClass: 'Component', metadata: {} },
+      { id: 'c2', name: 'KnowledgeManagement', ontologyClass: 'Component', metadata: {} },
+      { id: 'i1', name: 'Never lose an observation', ontologyClass: 'Insight', metadata: {} },
+      { id: 'i2', name: 'Dedupe on the cursor', ontologyClass: 'Insight', metadata: {} },
+      {
+        id: 'int1',
+        name: 'Prevent silent loss in the write path',
+        ontologyClass: 'Intent',
+        metadata: { codeEvidence: [{ component: 'LiveLoggingSystem', insights: 2 }] },
+      },
+    ] as unknown as Entity[]
+    const relations = [
+      { from: 'p1', to: 'c1', type: 'parent-child' },
+      { from: 'p1', to: 'c2', type: 'parent-child' },
+      { from: 'int1', to: 'i1', type: 'aggregates' },
+      { from: 'int1', to: 'i2', type: 'aggregates' },
+    ]
+    act(() => {
+      useViewerStore.setState({
+        hierarchyParents: new Map([
+          ['c1', 'p1'],
+          ['c2', 'p1'],
+          ['i1', 'c1'],
+          ['i2', 'c2'],
+        ]),
+      } as unknown as Parameters<typeof useViewerStore.setState>[0])
+    })
+    render(<HierarchyNavigator system="coding" entities={entities} relations={relations} />)
+    act(() => { fireEvent.click(screen.getByTestId('spine-intent')) })
+    act(() => { fireEvent.click(screen.getByLabelText(/Filter to Intent: Prevent silent loss/)) })
+    expect([...(useViewerStore.getState().hierarchySubtreeIds ?? [])].sort()).toEqual(
+      ['c1', 'c2', 'i1', 'i2', 'int1', 'p1'],
+    )
+  })
+
+  test('switching spine drops the focus rather than leaving an unfindable chip', () => {
+    const entities = [
+      { id: 'p1', name: 'Coding', ontologyClass: 'Project', metadata: {} },
+      { id: 'i1', name: 'An insight', ontologyClass: 'Insight', metadata: {} },
+      { id: 'int1', name: 'A goal', ontologyClass: 'Intent', metadata: {} },
+    ] as unknown as Entity[]
+    const relations = [
+      { from: 'p1', to: 'i1', type: 'has_insight' },
+      { from: 'int1', to: 'i1', type: 'aggregates' },
+    ]
+    render(<HierarchyNavigator system="coding" entities={entities} relations={relations} />)
+    act(() => { fireEvent.click(screen.getByLabelText(/Filter to Project: Coding/)) })
+    expect(useViewerStore.getState().hierarchySubtreeFilter).toBe('p1')
+    act(() => { fireEvent.click(screen.getByTestId('spine-intent')) })
+    expect(useViewerStore.getState().hierarchySubtreeFilter).toBeNull()
+    expect(useViewerStore.getState().hierarchySubtreeIds).toBeNull()
   })
 
   test('Test 6: Cmd/Ctrl+F while focus inside navigator opens text input above tree', () => {

@@ -52,6 +52,10 @@ export function useGraphVisibility(): VisibilityPredicate {
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
   const hideArchived = useViewerStore((s) => s.hideArchived)
   const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
+  // Hierarchy navigator subtree focus. Resolved to ids by the navigator (the
+  // producer) because the two spines walk different edge types; the predicate
+  // only does the membership test. Same shape as the LSL filter above.
+  const hierarchySubtreeIds = useViewerStore((s) => s.hierarchySubtreeIds)
   // Phase 60 Plan 03 (G3 — D-09..D-11): when ON, the predicate skips the
   // Observation/Digest hard-exclusion branch so those types re-appear.
   // Default OFF (architecture-bleed shield).
@@ -86,6 +90,7 @@ export function useGraphVisibility(): VisibilityPredicate {
       selectedClasses,
       visibleLevels,
       lslFilterEntityIds,
+      hierarchySubtreeIds,
       showDebugEntityTypes,
       hiddenNodeTypes,
       aggregatesOnly,
@@ -105,6 +110,7 @@ export function useGraphVisibility(): VisibilityPredicate {
     hideDocNodes,
     hideArchived,
     lslFilterEntityIds,
+    hierarchySubtreeIds,
     showDebugEntityTypes,
     hiddenNodeTypes,
     aggregatesOnly,
