@@ -380,7 +380,11 @@ async function applySpine(plan) {
         metadata: {
           test: cat.test,
           summary: cat.name,
-          insightCount: cat.insightIds.length,
+          // NO insightCount. A denormalised count goes stale the moment an edge
+          // is added — this script's own first --apply added 14 edges and left
+          // four intents claiming the old number — and nothing reads it: the
+          // viewer counts `aggregates` edges, which is the truth. Same trap as
+          // the codeEvidence field above, one size down.
           derivationRunId: RUN,
           team: PROJECT,
           project: PROJECT,
