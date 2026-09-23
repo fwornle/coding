@@ -22,6 +22,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { isRawFallbackSummary } from './raw-fallback.js';
 
 /** Default export directory relative to project root */
 const DEFAULT_EXPORT_DIR = '.data/observation-export';
@@ -29,6 +30,38 @@ const DEFAULT_EXPORT_DIR = '.data/observation-export';
 /** Parse JSON, returning {} on any failure. */
 function safeParseJson(s) {
   try { return JSON.parse(s); } catch { return {}; }
+}
+
+/**
+ * Does this observation belong in the JSON export?
+ *
+ * The export is not a debug dump — `/api/coding/observations` serves the
+ * dashboard from it through ColdStoreReader (`source: 'observation-export'`),
+ * so a row excluded here is invisible to every consumer outside the graph.
+ *
+ * `quality: 'low'` is the dud filter: rows the summariser judged to contain no
+ * work. A `[Raw]` fallback is NOT a dud — it is a receipt that a real turn WAS
+ * captured while the LLM proxy was unreachable, with the full messages kept in
+ * `metadata.messages` so it can be re-summarised later. It is classified 'low'
+ * only because it has no content YET.
+ *
+ * Conflating the two cost 26 turns (2026-09-23 audit): the writer's fallback
+ * worked perfectly, the row reached the graph, and this filter then kept it out
+ * of the only file anything reads. Seven of those turns had no successfully
+ * summarised counterpart, so they existed solely as a row nothing could see —
+ * including `scripts/backfill-raw-observations.mjs`, the tool whose whole job is
+ * to repair them.
+ *
+ * The exception is deliberately keyed on the summary, not on quality: quality
+ * stays 'low' so the consolidator keeps these contentless rows out of digests
+ * (ObservationConsolidator.js:1392,1687) and the dashboard keeps rendering them
+ * faintly. Promoting them to a quality of their own would have flipped both.
+ *
+ * @param {{quality?: string|null, summary?: string|null}} row
+ * @returns {boolean}
+ */
+function keepInExport(row) {
+  return row.quality !== 'low' || isRawFallbackSummary(row.summary);
 }
 
 export class ObservationExporter {
@@ -268,7 +301,7 @@ export class ObservationExporter {
             modifiedFiles: Array.isArray(m.modifiedFiles) ? m.modifiedFiles : null,
           };
         })
-        .filter((r) => r.quality !== 'low');
+        .filter(keepInExport);
       mapped.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
       return mapped;
     }
@@ -284,7 +317,7 @@ export class ObservationExporter {
              json_extract(metadata, '$.llmProvider') as llmProvider,
              json_extract(metadata, '$.modifiedFiles') as modifiedFiles
       FROM observations
-      WHERE quality != 'low'
+      WHERE quality != 'low' OR summary LIKE '[Raw]%'
       ORDER BY created_at ASC
     `).all();
     return rows.map((r) => ({
@@ -479,11 +512,11 @@ export class ObservationExporter {
     let obsCnt = 0, digestCnt = 0, insightCnt = 0;
     if (this.kmStore && this.kmStore.graph) {
       // km-core path — re-iterate is cheap (single pass over node names).
-      try { obsCnt = this._kmEntitiesByType('Observation').filter((r) => (r.attrs?.metadata?.quality !== 'low')).length; } catch { /* ok */ }
+      try { obsCnt = this._kmEntitiesByType('Observation').filter((r) => keepInExport({ quality: r.attrs?.metadata?.quality, summary: r.attrs?.description || r.attrs?.name || '' })).length; } catch { /* ok */ }
       try { digestCnt = this._kmEntitiesByType('Digest').length; } catch { /* ok */ }
       try { insightCnt = this._kmEntitiesByType('Insight').length; } catch { /* ok */ }
     } else if (this.db) {
-      try { obsCnt = this.db.prepare("SELECT COUNT(*) as c FROM observations WHERE quality != 'low'").get().c; } catch { /* ok */ }
+      try { obsCnt = this.db.prepare("SELECT COUNT(*) as c FROM observations WHERE quality != 'low' OR summary LIKE '[Raw]%'").get().c; } catch { /* ok */ }
       try { digestCnt = this.db.prepare('SELECT COUNT(*) as c FROM digests').get().c; } catch { /* ok */ }
       try { insightCnt = this.db.prepare('SELECT COUNT(*) as c FROM insights').get().c; } catch { /* ok */ }
     }
