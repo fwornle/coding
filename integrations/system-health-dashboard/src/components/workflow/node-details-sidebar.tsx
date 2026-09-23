@@ -37,8 +37,9 @@ import {
   Server,
   Cloud,
 } from 'lucide-react'
-import type { StepInfo, ProcessInfo } from './types'
-import { STEP_TO_AGENT, WORKFLOW_AGENTS } from './constants'
+import type { StepInfo, ProcessInfo, AgentDefinition } from './types'
+import { STEP_TO_AGENT, WORKFLOW_AGENTS, shortenModel } from './constants'
+import { useLLMBadgeForProcess } from './hooks'
 
 // Utility: Format duration in milliseconds to human readable format
 const formatDurationMs = (ms?: number): string => {
@@ -1174,7 +1175,8 @@ function ExecutionMetrics({
                 const models = llmUsage.modelsUsed || []
                 const providers = llmUsage.providersUsed || []
                 if (models.length > 0 && providers.length > 0) {
-                  // Format: model by provider (e.g., "llama-3.3-70b by groq")
+                  // Format: model by provider (e.g. "claude-sonnet-5 by gh-copilot").
+                  // Live values from token_usage — never a hardcoded example.
                   return models.map((m: string, i: number) =>
                     `${m}${providers[i] ? ` by ${providers[i]}` : ''}`
                   ).join(', ')
@@ -1349,6 +1351,30 @@ function StepExecutionDetails({
   )
 }
 
+/**
+ * What model this agent is actually using.
+ *
+ * Live first: `useLLMBadgeForProcess` reads the most recent token_usage rows for
+ * the agent's process tag, so this states the provider that answered rather than
+ * one a constant claimed. The static `llmModel` is only a fallback, and only for
+ * the entries that describe something real and non-routed — an embedder, a
+ * similarity metric, an external tool with its own provider config.
+ *
+ * Why it does not fall back to a provider name: every agent here used to carry
+ * `llmModel: 'Groq: llama-3.3-70b-versatile'`, and this panel printed it
+ * verbatim. Groq served 0 of 1,589 calls in the 24h that included this workflow
+ * — the work went to Claude on gh-copilot — and groq does not enter the route's
+ * chain until two accounts ahead of it have failed. Those literals are `null`
+ * now, so an agent with no live rows says "not yet called" instead of naming a
+ * provider nothing chose.
+ */
+function AgentLlmLabel({ agent }: { agent: AgentDefinition }) {
+  const live = useLLMBadgeForProcess(agent.processTag)
+  if (live) return <>{`${live.provider}: ${shortenModel(live.model)}`}</>
+  if (agent.llmModel) return <>{agent.llmModel}</>
+  return <span className="text-muted-foreground italic">{agent.usesLLM ? 'not yet called' : 'none'}</span>
+}
+
 export function UKBNodeDetailsSidebar({
   agentId,
   process,
@@ -1512,7 +1538,7 @@ export function UKBNodeDetailsSidebar({
                 LLM
               </span>
               <span className="text-right max-w-[160px] text-xs">
-                {agent.llmModel || 'none'}
+                <AgentLlmLabel agent={agent} />
               </span>
             </div>
 

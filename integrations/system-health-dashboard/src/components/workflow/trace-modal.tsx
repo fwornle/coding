@@ -5,9 +5,12 @@ import { useLLMBadgeForProcess, useRecentCalls } from './hooks'
 import { WORKFLOW_AGENTS } from './constants'
 
 // Phase 52 D-03 — terminal fallback label when neither live token-usage rows
-// nor the static llmModel literal yield a value. Mirrors rapid-llm-proxy's
-// preference-order chain (claude-code → copilot → groq → openai → anthropic).
-const TIER_FALLBACK_LABEL = 'auto: claude-code → copilot → groq'
+// nor the static llmModel literal yield a value. Defers to rapid-llm-proxy's
+// routing config, which this bundle does not read and must not restate: the
+// order changed on 2026-09-23 (background now resolves gh-copilot first, with
+// claude-code-max as its fallback) and a label hardcoding the old order was
+// wrong the moment the yaml was saved. Name the mechanism, not the providers.
+const TIER_FALLBACK_LABEL = 'auto (per routing config)'
 import {
   Dialog,
   DialogContent,
