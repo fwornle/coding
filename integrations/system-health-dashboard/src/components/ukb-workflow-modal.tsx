@@ -42,7 +42,7 @@ import {
   FlaskConical,
   Cloud,
 } from 'lucide-react'
-import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, TIER_COLORS, TIER_MODELS, useWorkflowDefinitions } from './workflow'
+import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, TIER_COLORS, useWorkflowDefinitions } from './workflow'
 import type { SubStep } from './workflow'
 import { UKBNodeDetailsSidebar } from './workflow'
 import type { RootState } from '@/store'
@@ -2765,15 +2765,25 @@ function SubStepDetailsSidebar({
       )
     }
 
-    // Fallback to static model name from tier mapping (color indicates tier)
+    // No runtime provider yet — the substep has not run, or reported no
+    // llmProvider. State the TIER, which is all that is actually known.
+    //
+    // This used to print a model name looked up from the tier, which is how the
+    // Relation Discovery badge came to read `llama-70b` for work that Claude on
+    // gh-copilot performed. The tier is a plan; naming a model the router never
+    // chose turns a pending badge into a false measurement.
     if (tier === 'none') {
       return <Badge variant="outline" className="text-gray-500">No LLM</Badge>
     }
-    const modelName = TIER_MODELS[tier]
-    if (modelName) {
-      return <Badge className={`${colors.bg} ${colors.text}`}>{modelName}</Badge>
-    }
-    return <Badge variant="outline">{tier}</Badge>
+    return (
+      <Badge
+        variant="outline"
+        className={`${colors.text === 'text-white' ? '' : colors.text} border-dashed`}
+        title={`${tier} tier — no model resolved yet; the provider appears here once the substep reports one`}
+      >
+        {tier} · pending
+      </Badge>
+    )
   }
 
   return (

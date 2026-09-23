@@ -610,14 +610,20 @@ export const TIER_COLORS: Record<string, { bg: string; text: string; bar: string
   none:     { bg: 'bg-gray-200',   text: 'text-gray-600', bar: 'bg-gray-300' },
 }
 
-// Short display names for the LLM model at each tier
-// Derived from model-tiers.yaml provider_priority + provider models
-export const TIER_MODELS: Record<string, string> = {
-  fast: 'llama-8b',
-  standard: 'llama-70b',
-  premium: 'sonnet',
-  none: 'none',
-}
+// NOTE: there is deliberately no TIER_MODELS map here any more.
+//
+// It used to translate a tier into a model name — standard -> 'llama-70b',
+// fast -> 'llama-8b', premium -> 'sonnet' — "derived from model-tiers.yaml
+// provider_priority", a file this stack no longer routes on. Every badge that
+// lacked live runtime data printed one of those names as if it were fact, so
+// the Relation Discovery substep advertised `llama-70b` while the actual route
+// (`defaults.background` -> llm-routing.yaml) had resolved to Claude on
+// gh-copilot and groq had served zero calls in 24 hours.
+//
+// A tier is a plan; a model is an outcome. The badge may state the tier it was
+// assigned, or the provider that actually answered when the runtime reports
+// one — never a model name inferred from the tier, because that is a guess
+// wearing the costume of a measurement.
 
 // Shorten model identifiers for compact badge display
 export const shortenModel = (model: string): string => {
