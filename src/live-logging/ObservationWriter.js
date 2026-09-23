@@ -37,6 +37,7 @@ import Redis from 'ioredis';
 import ConfigurableRedactor from './ConfigurableRedactor.js';
 import { getLSLWindow } from '../../lib/lsl/window.mjs';
 import { routeFromArtifacts } from '../../lib/attribution/repo-router.mjs';
+import { RAW_FALLBACK_PREFIX, isRawFallbackSummary } from './raw-fallback.js';
 // Phase 75 (OBS-01 / D-09): the shared single-span task_id reader. ETM stamps
 // metadata.task_id at the fire site; this is the best-effort fallback so direct
 // callers (without ETM) still link observations to the active Run. Never throws.
@@ -1128,7 +1129,7 @@ export class ObservationWriter {
       return acc;
     }, {});
     const roleSummary = Object.entries(roles).map(([r, c]) => `${c} ${r}`).join(', ');
-    return `[Raw] ${messages.length} messages (${roleSummary}). LLM summary unavailable.`;
+    return `${RAW_FALLBACK_PREFIX} ${messages.length} messages (${roleSummary}). LLM summary unavailable.`;
   }
 
   /**
@@ -1479,8 +1480,15 @@ export class ObservationWriter {
     const kmStore = await this._ensureKmStore();
 
     // Skip trivial and no-work observations (no value for learning)
-    // Note: [Raw] fallback summaries are NOT skipped — they are stored as quality='low'
-    // so observations are preserved even when the LLM proxy is unavailable.
+    //
+    // Note: [Raw] fallback summaries are NOT skipped — they are stored as
+    // quality='low' so the turn is preserved even when the LLM proxy is
+    // unavailable. That claim was HALF TRUE from this line's point of view and
+    // false from the user's: the row reached the graph, then
+    // ObservationExporter dropped every quality='low' row, and
+    // /api/coding/observations serves the dashboard from that export — so 26
+    // preserved turns were readable by nothing. Preservation is now a
+    // contract across both files; see ObservationExporter.keepInExport().
     //
     // THE SUMMARISER'S VERDICT IS ONLY TRUSTED WHEN THE TURN SHOWS NO EVIDENCE.
     //
@@ -1962,7 +1970,7 @@ export class ObservationWriter {
     miscategorized: 'reclassify', miscategor: 'reclassify',
     resuming: 'resume', resumed: 'resume', restore: 'resume', restoring: 'resume',
     recovering: 'resume', recover: 'resume', interrupted: 'resume',
-    crash: 'crash', crashed: 'crash', crashed: 'crash',
+    crash: 'crash', crashed: 'crash',
     observations: 'observation', observation: 'observation',
     frontend: 'frontend', dashboard: 'frontend',
     folder: 'folder', directory: 'folder',
@@ -2121,8 +2129,12 @@ export class ObservationWriter {
   _classifyQuality(summary) {
     const lower = summary.toLowerCase();
 
-    // Raw/failed summaries are always low
-    if (lower.startsWith('[raw]')) return 'low';
+    // Raw/failed summaries are always low: a proxy-failure placeholder has no
+    // content to judge. It keeps the 'low' value deliberately — the consolidator
+    // and the dashboard both read it to hold contentless rows back. What it must
+    // NOT do is vanish: ObservationExporter.keepInExport() carves these out of
+    // the dud filter so the row still reaches the cold store for repair.
+    if (isRawFallbackSummary(summary)) return 'low';
 
     // Low-value indicators
     const lowPatterns = [
