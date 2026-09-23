@@ -1481,15 +1481,48 @@ export class ObservationWriter {
     // Skip trivial and no-work observations (no value for learning)
     // Note: [Raw] fallback summaries are NOT skipped — they are stored as quality='low'
     // so observations are preserved even when the LLM proxy is unavailable.
+    //
+    // THE SUMMARISER'S VERDICT IS ONLY TRUSTED WHEN THE TURN SHOWS NO EVIDENCE.
+    //
+    // This gate used to test the summary TEXT alone. On 2026-09-23 haiku
+    // answered "No actionable content." — 22 characters — for a turn that made
+    // ~40 tool calls, wrote two commits and a merge, and the whole turn was
+    // dropped on that say-so. Nothing downstream noticed: the ETM had fired,
+    // obs-api had answered, and the next observation was 14 hours later.
+    //
+    // The pre-LLM triviality gate (see ObservationWriter.triviality-gate.test.js)
+    // already had this right — it fires "only when every user turn is a
+    // whole-message ack AND no files were touched". This one now asks the same
+    // question of the same kind of fact.
+    //
+    // Evidence is the tool-call count and the turn's modified files, NOT the
+    // files alone: `bashWriteTargets` strips heredoc bodies before scanning, so
+    // an edit made by `python3 - <<'PY' ...` reports zero modified files. A
+    // files-only floor would not have caught the turn that motivated this.
+    //
+    // Direction matters. This can only ever RETAIN an observation the old code
+    // dropped — a turn with no evidence still takes the original path — so it
+    // cannot newly discard anything.
     const lower = summary.toLowerCase();
-    if (
+    const saysNoWork =
       lower.includes('trivial exchange') ||
       lower.includes('no actionable content') ||
       lower.includes('no new work was performed') ||
-      (lower.includes('single-word check-in') && lower.includes('artifacts: none'))
-    ) {
-      process.stderr.write(`[ObservationWriter] Skipping low-value observation\n`);
-      return null;
+      (lower.includes('single-word check-in') && lower.includes('artifacts: none'));
+    if (saysNoWork) {
+      const toolCalls = Number(metadata.toolCallCount) || 0;
+      const touched = Array.isArray(metadata.modifiedFiles) ? metadata.modifiedFiles.length : 0;
+      if (toolCalls === 0 && touched === 0) {
+        process.stderr.write(`[ObservationWriter] Skipping low-value observation\n`);
+        return null;
+      }
+      // Kept deliberately. _classifyQuality already reads these same phrases and
+      // returns 'low', so the row lands marked for what it is rather than being
+      // lost — a thin record of real work beats no record of it.
+      process.stderr.write(
+        `[ObservationWriter] Summary claims no work, but the turn made ${toolCalls} tool call(s)`
+        + ` and touched ${touched} file(s) — keeping it (quality will be 'low')\n`
+      );
     }
 
     const agent = metadata.agent || null;

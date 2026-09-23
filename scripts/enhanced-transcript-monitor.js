@@ -1548,6 +1548,19 @@ class EnhancedTranscriptMonitor {
     const metadata = {
       agent: this.agentType,
       sessionId: this.sessionId || null,
+      // Evidence that the turn DID something, independent of what the summary
+      // LLM says about it. On 2026-09-23 a turn with ~40 tool calls and three
+      // commits was summarised as "No actionable content." (22 chars) and
+      // discarded by ObservationWriter's post-LLM gate, which tested only the
+      // summary text. The writer needs a fact to check that verdict against.
+      //
+      // Tool-call COUNT rather than modified files, because the two are not
+      // interchangeable: `bashWriteTargets` deliberately strips heredoc bodies
+      // before scanning (otherwise the body's prose parses as shell), so an
+      // edit made by `python3 - <<'PY' ... open(p,'w').write(s)` — the shape an
+      // agent in auto mode uses constantly — leaves modifiedFiles EMPTY. A
+      // floor keyed only on files would still have dropped that turn.
+      toolCallCount: allToolCalls.length,
       sourceFile: 'live-etm',
       project: path.basename(this.config.projectPath || ''),
       // Mid-turn progress snapshot tag — obs-api exempts kind:'progress' from the
