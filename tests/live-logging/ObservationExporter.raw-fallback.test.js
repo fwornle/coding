@@ -162,6 +162,70 @@ describe('ObservationExporter — [Raw] fallback rows reach the export', () => {
     expect(written.filter((r) => isRawFallbackSummary(r.summary))).toHaveLength(1);
   });
 
+  test('a repaired receipt does not leave its stale [Raw] copy behind', () => {
+    // The tail of the repair story. backfill-raw-observations.mjs re-summarises
+    // a receipt; if the answer is a genuine "No actionable content." the row
+    // becomes a real dud and correctly drops OUT of the export. The safety merge
+    // then saw an id it could not find in the current pass and restored the
+    // pre-repair copy from the previous file — pinning "[Raw] …" in the
+    // dashboard forever for a turn the graph had already resolved. Two rows
+    // entered exactly that state on 2026-09-23.
+    const exportDir = path.join(tmpDir, 'observation-export');
+    fs.mkdirSync(exportDir, { recursive: true });
+
+    // A previous export, written while the row was still an unrepaired receipt.
+    const stale = [
+      { id: 'good-1', summary: 'Intent: earlier work.', quality: 'high', createdAt: '2026-09-22T15:00:00.000Z' },
+      { id: 'raw-1', summary: '[Raw] 2 messages (1 user, 1 assistant). LLM summary unavailable.', quality: 'low', createdAt: '2026-09-22T15:58:55.698Z' },
+      { id: 'raw-2', summary: '[Raw] 2 messages (1 user, 1 assistant). LLM summary unavailable.', quality: 'low', createdAt: '2026-09-22T16:10:00.000Z' },
+    ];
+    fs.writeFileSync(path.join(exportDir, 'observations.json'), JSON.stringify(stale), 'utf-8');
+
+    // The graph after the backfill: raw-1 is a real observation now, raw-2 came
+    // back "No actionable content." and is a known dud.
+    const repaired = genuineDudEntity('raw-1', '2026-09-22T15:58:55.698Z');
+    repaired.description = 'Intent: resume the intent drill-down.\nResult: traced it.';
+    repaired.name = repaired.description.slice(0, 80);
+    repaired.metadata.quality = 'normal';
+
+    const exporter = new ObservationExporter({
+      kmStore: fakeKmStore([
+        goodEntity('good-1', '2026-09-22T15:00:00.000Z'),
+        repaired,
+        genuineDudEntity('raw-2', '2026-09-22T16:10:00.000Z'),
+      ]),
+      exportDir,
+    });
+    exporter.exportAll();
+
+    const written = JSON.parse(fs.readFileSync(path.join(exportDir, 'observations.json'), 'utf-8'));
+    // raw-2 is gone (a dud the graph still holds — excluded on purpose, not lost)
+    expect(written.map((r) => r.id).sort()).toEqual(['good-1', 'raw-1']);
+    // and raw-1 carries the REPAIRED text, not the resurrected placeholder.
+    expect(written.find((r) => r.id === 'raw-1').summary).not.toMatch(/^\[Raw\]/);
+  });
+
+  test('NEGATIVE: a row the store genuinely lost is still preserved', () => {
+    // The merge exists for real data loss (a reset or half-hydrated store), and
+    // that must keep working — the exclusion above is narrow, not a repeal.
+    const exportDir = path.join(tmpDir, 'observation-export');
+    fs.mkdirSync(exportDir, { recursive: true });
+    fs.writeFileSync(path.join(exportDir, 'observations.json'), JSON.stringify([
+      { id: 'gone-1', summary: 'Intent: from a store that no longer has it.', quality: 'high', createdAt: '2026-09-01T00:00:00.000Z' },
+      { id: 'gone-2', summary: 'Intent: likewise.', quality: 'high', createdAt: '2026-09-01T01:00:00.000Z' },
+      { id: 'good-1', summary: 'Intent: still here.', quality: 'high', createdAt: '2026-09-22T15:00:00.000Z' },
+    ]), 'utf-8');
+
+    const exporter = new ObservationExporter({
+      kmStore: fakeKmStore([goodEntity('good-1', '2026-09-22T15:00:00.000Z')]),
+      exportDir,
+    });
+    exporter.exportAll();
+
+    const written = JSON.parse(fs.readFileSync(path.join(exportDir, 'observations.json'), 'utf-8'));
+    expect(written.map((r) => r.id).sort()).toEqual(['gone-1', 'gone-2', 'good-1']);
+  });
+
   test('the legacy "[Raw] needs backfill" spelling counts too', () => {
     // The 2026-05-28 generation of these rows reads "[Raw] needs backfill".
     // They are in the export today only because they predate the quality rule;

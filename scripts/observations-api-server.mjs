@@ -1038,6 +1038,38 @@ app.post('/api/observations/resolve-lsl', async (req, res) => {
 });
 
 /**
+ * POST /api/observations/export — refresh the cold store from km-core.
+ *
+ * For OUT-OF-PROCESS writers that mutate observation entities through
+ * `/api/v1/entities/:id` (today: `scripts/backfill-raw-observations.mjs`,
+ * repairing "[Raw]" rows). km-core's own JSON export follows a graph mutation
+ * automatically; the OBSERVATION cold store does not — `scheduleExport()` fires
+ * on observation writes, deletes and boot, none of which an entity PUT is.
+ *
+ * Without this the repair lands in the graph and stays invisible to
+ * /api/coding/observations until the next unrelated write — the exact
+ * write-succeeds-but-nothing-can-read-it shape that made the [Raw] rows
+ * disappear in the first place (2026-09-23).
+ *
+ * In-process rewriters do not need it: `runLslResolveSweep()` calls
+ * `scheduleExport()` directly for the same reason. This is that call, reachable
+ * over HTTP. Debounced (30s) like every other trigger, so it is cheap to call
+ * once at the end of a batch. Returns 202: the export is scheduled, not done.
+ */
+app.post('/api/observations/export', async (_req, res) => {
+  try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    scheduleExport();
+    _stalenessCache.invalidate();
+    res.status(202).json({ scheduled: true, debounceMs: EXPORT_DEBOUNCE_MS });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /observations/export error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Failed to schedule export' });
+  }
+});
+
+/**
  * POST /api/observations/delete — delete observations by km-core entity id.
  *
  * Body: { ids: string[] } — the km-core graph ids (the v7 `019f…` ids the

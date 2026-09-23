@@ -165,6 +165,26 @@ export class ObservationExporter {
   // --- Internal ---
 
   /**
+   * Every Observation id the graph currently holds — INCLUDING the ones this
+   * pass deliberately excluded from the export.
+   *
+   * The safety merge below needs the difference between "the store lost this
+   * row" and "the store still has it and we chose not to export it". Only the
+   * first is data loss worth protecting against.
+   *
+   * Returns null when there is no km-core store (the legacy SQLite test path),
+   * which the merge reads as "cannot tell" and falls back to its old behaviour.
+   */
+  _knownObservationIds() {
+    if (!this.kmStore || !this.kmStore.graph) return null;
+    try {
+      return new Set(this._kmEntitiesByType('Observation').map(({ id }) => id));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Merge DB records with existing export files to prevent data loss.
    * If the existing export has records not in the DB (DB was reset),
    * those records are preserved and new DB records are appended.
@@ -173,6 +193,14 @@ export class ObservationExporter {
    * metadata.absorbed records A's id as a tombstone. Tombstoned IDs are
    * NEVER preserved — they were intentionally deleted and resurrecting
    * them would re-introduce the duplicate the consolidation removed.
+   *
+   * Deliberate exclusions are the same kind of exception. An observation the
+   * graph still holds but this pass filtered out (a [Raw] receipt repaired into
+   * a genuine "No actionable content." dud, say) is not lost data — it is a
+   * decision. Preserving the pre-repair copy would pin the OLD text in the
+   * export forever, and the dashboard would keep showing "[Raw] …" for a turn
+   * the graph has long since resolved. Measured 2026-09-23: exactly 2 rows
+   * entered that state the moment the backfill ran.
    */
   _mergeWithExisting(dbObs, dbDigests, dbInsights) {
     const result = { observations: dbObs, digests: dbDigests, insights: dbInsights };
@@ -205,9 +233,14 @@ export class ObservationExporter {
 
         const dbIds = new Set(dbRecords.map((r) => r.id));
         const dbContentKeys = new Set(dbRecords.map((r) => contentKey(filename, r)));
+        // Rows the store still holds but this pass excluded on purpose. Only
+        // observations: digests/insights have no equivalent filter, and their
+        // `knownIds` would be null anyway on the SQLite test path.
+        const knownIds = filename === 'observations.json' ? this._knownObservationIds() : null;
         const preserved = existing.filter((r) =>
           !dbIds.has(r.id) &&
           !tombstoned.has(r.id) &&
+          !(knownIds && knownIds.has(r.id)) &&
           !dbContentKeys.has(contentKey(filename, r)),
         );
         const resurrected = existing.filter((r) => !dbIds.has(r.id) && tombstoned.has(r.id));
