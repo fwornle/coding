@@ -6,20 +6,20 @@ title Hierarchy Context: DMRProvider
 [LLMAbstraction] as llmabstraction #FFFFDD
 [DMRProvider] as dmrprovider #LightBlue
 [LLMMockService] as llmmock_service #F0F0F0
-[LLMProxyClient] as llmproxy_client #F0F0F0
-[LlmJsonParser] as llm_json_parser #F0F0F0
+[LLMJsonRepairUtility] as llmjson_repair_utility #F0F0F0
+[ProxyClientWrapper] as proxy_client_wrapper #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
 [DashboardCostModel] as dashboard_cost_model #F0F0F0
-[OffloadRoutingDecision] as offload_routing_decision #F0F0F0
-[ModelContextLimits] as model_context_limits #F0F0F0
-[AgentProviderSplicing] as agent_provider_splicing #F0F0F0
+[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #F0F0F0
 
 llmabstraction --> dmrprovider
 llmmock_service -[hidden]- dmrprovider
-llmproxy_client -[hidden]- dmrprovider
-llm_json_parser -[hidden]- dmrprovider
+llmjson_repair_utility -[hidden]- dmrprovider
+proxy_client_wrapper -[hidden]- dmrprovider
+copilot_model_id_alignment -[hidden]- dmrprovider
 dashboard_cost_model -[hidden]- dmrprovider
-offload_routing_decision -[hidden]- dmrprovider
-model_context_limits -[hidden]- dmrprovider
-agent_provider_splicing -[hidden]- dmrprovider
+offload_routing_dashboard -[hidden]- dmrprovider
+model_context_limits_catalogue -[hidden]- dmrprovider
 
 @enduml

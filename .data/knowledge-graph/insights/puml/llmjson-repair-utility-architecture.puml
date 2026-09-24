@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+package "LLM Proxy Surface (Unverified)" {
+  component "parse-llm-json.ts\n(parent entity)" as parser <<core>>
+  component "LLMJsonRepairUtility\n(no grounding found)" as repair <<core>>
+  component "proxy-bridge/server.mjs" as proxy <<api>>
+}
+
+package "Defensive Analogues (Found, Unrelated)" {
+  component "copilot-model-ids.test.mjs\n(model-id drift guard)" as copilotGuard <<agent>>
+  component "cost-model.ts\n(token-count correction)" as costModel <<core>>
+}
+
+package "System Health Dashboard" {
+  component "offload-decision.tsx" as offload <<agent>>
+  component "use-classifier-judge.ts" as judge <<agent>>
+  component "provider.tsx\n(Redux store)" as store <<core>>
+}
+
+proxy --> parser : "serves completions to"
+parser ..> repair : "expected to invoke\n(unverified)"
+
+copilotGuard ..> repair : "thematically adjacent\n(model-id validation, not repair)"
+costModel ..> repair : "architectural analogue\n(defensive re-correction pattern)"
+
+offload --> judge : "uses classification result"
+judge --> store : "updates health state"
+store ..> proxy : "reflects proxy liveness"
+
+@enduml

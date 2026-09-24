@@ -1,28 +1,41 @@
 @startuml
 !include _standard-style.puml
 
-package "Application Layer" {
-  component "Callers" as callers <<external>>
+package "Config" {
+  component "knowledge-management.json\n(database.type/path/options)" as config <<external>>
 }
 
-package "GraphDatabaseService" {
+package "Graph Persistence (Inferred/Absent)" {
   component "GraphDatabaseService" as gds <<core>>
-  component "isDirty Flag" as dirty <<core>>
-  component "Graphology Graph" as graphology <<storage>>
-  component "_persistGraphToLevel()" as persist <<core>>
+  component "km-core-adapter.ts\n(findEntityByName,\nqueryIncomingRelations,\nstoreRelationship)" as adapter <<core>>
+  database "graphology-level\n(.data/knowledge-graph)" as leveldb <<storage>>
+  component "migrate-graph-db-entity-types.js" as migrateTypes <<cli>>
+  component "migrate-leveldb-to-kmcore.mjs" as migrateKmcore <<cli>>
 }
 
-package "LevelDB Storage" {
-  database "LevelDB" as leveldb <<storage>>
+package "Graph Consumption (Retrieved Code)" {
+  component "useGraphData(apiClient)" as apiClient <<api>>
+  component "D3GraphCanvas.tsx" as canvas <<agent>>
+  component "hierarchy-parents.test.ts\n(deriveParents)" as hierarchy <<agent>>
 }
 
-callers --> gds : "mutate / trigger flush"
-gds --> graphology : "in-memory mutations"
-gds --> dirty : "mark dirty on mutation"
-dirty ..> persist : "checked on flush"
-gds --> persist : "sole write path\n(explicit only)"
-persist --> graphology : "full serialize"
-persist --> leveldb : "write JSON blob\n(key: 'graph')"
-leveldb ..> graphology : "full deserialize on read"
+package "Workflow Telemetry (Unrelated)" {
+  component "ukbSlice.ts" as ukbSlice <<agent>>
+  component "ukb-workflow-modal.tsx" as ukbModal <<agent>>
+}
+
+config --> gds : "configures backend"
+gds --> leveldb : "opens/persists"
+gds --> adapter : "delegates entity/relation ops"
+adapter --> leveldb : "typed read/write"
+
+migrateTypes --> gds : "_persistGraphToLevel()"
+migrateKmcore --> leveldb : "migrates (--dry-run, 5% error budget)"
+
+apiClient --> gds : "fetches entities/relations"
+canvas --> apiClient : "renders graph"
+hierarchy --> apiClient : "derives ancestry"
+
+ukbModal --> ukbSlice : "reads workflow state"
 
 @enduml

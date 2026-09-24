@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ModelContextLimitsCatalogue
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMJsonRepairUtility] as llmjson_repair_utility #F0F0F0
+[ProxyClientWrapper] as proxy_client_wrapper #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
+[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
+[CatalogueDerivation] as catalogue_derivation #E8F5E8
+[UserConfigOverride] as user_config_override #E8F5E8
+[DerivedLimitsCache] as derived_limits_cache #E8F5E8
+
+llmabstraction --> model_context_limits_catalogue
+llmmock_service -[hidden]- model_context_limits_catalogue
+dmrprovider -[hidden]- model_context_limits_catalogue
+llmjson_repair_utility -[hidden]- model_context_limits_catalogue
+proxy_client_wrapper -[hidden]- model_context_limits_catalogue
+copilot_model_id_alignment -[hidden]- model_context_limits_catalogue
+dashboard_cost_model -[hidden]- model_context_limits_catalogue
+offload_routing_dashboard -[hidden]- model_context_limits_catalogue
+model_context_limits_catalogue --> catalogue_derivation
+model_context_limits_catalogue --> user_config_override
+model_context_limits_catalogue --> derived_limits_cache
+
+@enduml

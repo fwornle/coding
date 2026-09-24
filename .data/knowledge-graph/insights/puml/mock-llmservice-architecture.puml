@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+package "Test Double (Unverified)" {
+  component "MockLLMService\n(llm-mock-service.ts)" as mock <<core>>
+}
+
+package "LLM Routing Layer" {
+  cloud "Rapid-LLM-Proxy (RLP)" as rlp <<external>>
+  component "LanguageModelService" as lms <<core>>
+}
+
+package "Service Orchestration" {
+  component "start-services-robust.js\n(SERVICE_CONFIGS)" as starter <<core>>
+  component "entrypoint.sh\n(PROGRAM_FEATURES)" as entry <<cli>>
+  component "prompt-classifier-service.mjs" as classifier <<api>>
+  component "service-gating.test.mjs" as tests <<core>>
+}
+
+mock ..> rlp : "bypass or emulate\nresponse contract? (unconfirmed)"
+lms --> rlp : "routes real provider calls"
+starter ..> mock : "no MockLLMService entry\nfound in SERVICE_CONFIGS"
+entry --> starter : "feature-gated startup"
+tests --> starter : "asserts SERVICE_ORDER coverage"
+classifier ..> mock : "contrasts fail-closed\nvs fabricated answers"
+
+@enduml

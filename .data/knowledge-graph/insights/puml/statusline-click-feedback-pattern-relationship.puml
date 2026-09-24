@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: StatuslineClickFeedbackPattern
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[StatuslineClickFeedbackPattern] as statusline_click_feedback_pattern #LightBlue
+[EntityPatternAnalyzer] as entity_pattern_analyzer #F0F0F0
+[PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+
+coding_patterns --> statusline_click_feedback_pattern
+entity_pattern_analyzer -[hidden]- statusline_click_feedback_pattern
+pattern_verification_tooling -[hidden]- statusline_click_feedback_pattern
+
+@enduml

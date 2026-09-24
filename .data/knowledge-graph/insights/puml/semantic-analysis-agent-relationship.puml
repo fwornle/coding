@@ -1,0 +1,33 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SemanticAnalysisAgent
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[SemanticAnalysisAgent] as semantic_analysis_agent #LightBlue
+[Ontology] as ontology #F0F0F0
+[Pipeline] as pipeline #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyClassificationAgent] as ontology_classification_agent #F0F0F0
+[BaseAgentFramework] as base_agent_framework #F0F0F0
+[L2RefinementClassifier] as l2_refinement_classifier #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[AgentLauncherConfigs] as agent_launcher_configs #F0F0F0
+[NoUnboundedFsScanGuard] as no_unbounded_fs_scan_guard #F0F0F0
+[OntologySystemFactory] as ontology_system_factory #E8F5E8
+[OntologyClassRepair] as ontology_class_repair #E8F5E8
+
+semantic_analysis --> semantic_analysis_agent
+ontology -[hidden]- semantic_analysis_agent
+pipeline -[hidden]- semantic_analysis_agent
+insights -[hidden]- semantic_analysis_agent
+ontology_classification_agent -[hidden]- semantic_analysis_agent
+base_agent_framework -[hidden]- semantic_analysis_agent
+l2_refinement_classifier -[hidden]- semantic_analysis_agent
+health_coordinator -[hidden]- semantic_analysis_agent
+agent_launcher_configs -[hidden]- semantic_analysis_agent
+no_unbounded_fs_scan_guard -[hidden]- semantic_analysis_agent
+semantic_analysis_agent --> ontology_system_factory
+semantic_analysis_agent --> ontology_class_repair
+
+@enduml

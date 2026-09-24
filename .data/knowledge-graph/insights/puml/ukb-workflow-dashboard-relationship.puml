@@ -5,25 +5,29 @@ title Hierarchy Context: UkbWorkflowDashboard
 
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [UkbWorkflowDashboard] as ukb_workflow_dashboard #LightBlue
-[GraphifyGraph] as graphify_graph #F0F0F0
-[CodeGraphAgent] as code_graph_agent #F0F0F0
-[KmCoreAdapter] as km_core_adapter #F0F0F0
-[LevelDbMigrationScripts] as level_db_migration_scripts #F0F0F0
 [WaveInsightPersistence] as wave_insight_persistence #F0F0F0
-[ManualLearning] as manual_learning #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
 [OnlineLearning] as online_learning #F0F0F0
-[GraphViewerHierarchy] as graph_viewer_hierarchy #F0F0F0
-[GraphVisualRendering] as graph_visual_rendering #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[GraphifyGraph] as graphify_graph #F0F0F0
+[KmCoreMigration] as km_core_migration #F0F0F0
+[UnifiedViewerGraphRendering] as unified_viewer_graph_rendering #F0F0F0
+[WorkflowHistoryPagination] as workflow_history_pagination #E8F5E8
+[DynamicEtaCalculation] as dynamic_eta_calculation #E8F5E8
+[IntentToCodeDrillDown] as intent_to_code_drill_down #E8F5E8
+[IntentSpineDerivation] as intent_spine_derivation #E8F5E8
 
 knowledge_management --> ukb_workflow_dashboard
-graphify_graph -[hidden]- ukb_workflow_dashboard
-code_graph_agent -[hidden]- ukb_workflow_dashboard
-km_core_adapter -[hidden]- ukb_workflow_dashboard
-level_db_migration_scripts -[hidden]- ukb_workflow_dashboard
 wave_insight_persistence -[hidden]- ukb_workflow_dashboard
-manual_learning -[hidden]- ukb_workflow_dashboard
+graph_database_service -[hidden]- ukb_workflow_dashboard
 online_learning -[hidden]- ukb_workflow_dashboard
-graph_viewer_hierarchy -[hidden]- ukb_workflow_dashboard
-graph_visual_rendering -[hidden]- ukb_workflow_dashboard
+manual_learning -[hidden]- ukb_workflow_dashboard
+graphify_graph -[hidden]- ukb_workflow_dashboard
+km_core_migration -[hidden]- ukb_workflow_dashboard
+unified_viewer_graph_rendering -[hidden]- ukb_workflow_dashboard
+ukb_workflow_dashboard --> workflow_history_pagination
+ukb_workflow_dashboard --> dynamic_eta_calculation
+ukb_workflow_dashboard --> intent_to_code_drill_down
+ukb_workflow_dashboard --> intent_spine_derivation
 
 @enduml

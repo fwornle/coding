@@ -1,32 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "Upstream Sources" {
-  component "opencode models.json" as modelsJson <<external>>
-  component "opencode.json (user config)" as userConfig <<external>>
+package "Sources" {
+  database "models.dev catalogue" as catalogue <<external>>
+  component "opencode.json (user config)" as userconfig <<external>>
 }
 
 package "model-limits.cjs" {
-  component "catalogueSourcePath/\ncatalogueCachePath" as paths <<core>>
-  component "deriveLimits()\n(byPair/byModel index)" as derive <<core>>
-  component "userConfigContextWindow()" as userWindow <<core>>
-  component "limits()\n(mtime+size cache check)" as limitsFn <<core>>
-  component "catalogueContextWindow()" as publicApi <<api>>
-  database "derived cache\n.logs/model-context-limits.json" as cacheFile <<storage>>
+  component "limits()" as limits <<core>>
+  component "deriveLimits()" as derive <<core>>
+  component "byPair / byModel maps" as maps <<storage>>
+  component "FALLBACK_PROVIDERS" as fallback <<core>>
+  component "userConfigContextWindow()" as userwin <<core>>
+  component "catalogueContextWindow()" as catwin <<core>>
+  database "on-disk derived cache" as diskcache <<storage>>
 }
 
 package "Consumer" {
-  component "context-gauge.cjs" as gauge <<agent>>
+  component "status-line gauge (context-gauge.cjs)" as gauge <<cli>>
 }
 
-paths --> limitsFn : "resolve source/cache paths"
-modelsJson --> limitsFn : "read raw catalogue (33ms parse)"
-limitsFn --> cacheFile : "temp+rename atomic write"
-cacheFile --> limitsFn : "read-through if mtime+size match"
-limitsFn --> derive : "on cache miss"
-derive --> publicApi : "byPair/byModel indexes"
-userConfig --> userWindow : "read fresh per call"
-userWindow --> publicApi : "overrides catalogue result"
-publicApi --> gauge : "context window or null"
+catalogue --> limits : "stat mtime+size"
+limits --> diskcache : "read/write atomic temp+rename"
+limits --> derive : "on cache miss"
+derive --> fallback : "resolve custom provider ids"
+derive --> maps : "modal tie-break (favor larger)"
+
+userconfig --> userwin : "override lookup"
+maps --> catwin : "exact/modal fallback"
+userwin --> catwin : "tier 1 precedence"
+
+catwin --> gauge : "context size or null"
+gauge --> gauge : "regex fallback if null"
 
 @enduml

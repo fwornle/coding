@@ -1,0 +1,36 @@
+@startuml
+!include _standard-style.puml
+
+package "BaseAgent Lifecycle" {
+  component "BaseAgent<TInput,TOutput>" as base <<core>>
+  component "SemanticAnalysisAgent" as sem <<agent>>
+  component "ULTRA DEBUG Trace Writer" as trace <<core>>
+}
+
+package "Ontology Subsystem" {
+  component "OntologyClassificationAgent" as ontagent <<agent>>
+  component "createOntologySystem()" as ontfactory <<core>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  database "coding.lower.json" as lowerjson <<storage>>
+}
+
+package "Repair & Validation Tooling" {
+  component "repair-writer-ontology-class.mjs" as repair <<cli>>
+  cloud "obs-api (km-core HTTP)" as obsapi <<external>>
+  component "Taxonomy Stability Validator" as taxval <<core>>
+}
+
+base --> sem : "fixed execute() stages"
+sem --> trace : "writes non-fatal debug trace"
+sem ..> ontagent : "adjacent processing"
+ontagent --> lowerjson : "consumes (buggy emission)"
+ontfactory --> adapter : "wires"
+ontfactory ..> ontagent : "used by persistence-agent, not sem"
+
+sem --> taxval : "produces intent-derived taxonomy"
+taxval --> taxval : "re-derives from disjoint samples"
+
+repair --> obsapi : "HTTP client, single writer"
+repair ..> lowerjson : "reconciles ontologyClass/entity Type"
+
+@enduml

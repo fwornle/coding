@@ -14,8 +14,13 @@ title Hierarchy Context: SemanticAnalysis
 [Ontology] as ontology #E8F5E8
 [Pipeline] as pipeline #E8F5E8
 [Insights] as insights #E8F5E8
-[BaseAgent] as base_agent #E8F5E8
-[L2SubsystemClassifier] as l2_subsystem_classifier #E8F5E8
+[OntologyClassificationAgent] as ontology_classification_agent #E8F5E8
+[SemanticAnalysisAgent] as semantic_analysis_agent #E8F5E8
+[BaseAgentFramework] as base_agent_framework #E8F5E8
+[L2RefinementClassifier] as l2_refinement_classifier #E8F5E8
+[HealthCoordinator] as health_coordinator #E8F5E8
+[AgentLauncherConfigs] as agent_launcher_configs #E8F5E8
+[NoUnboundedFsScanGuard] as no_unbounded_fs_scan_guard #E8F5E8
 
 coding --> semantic_analysis
 live_logging_system -[hidden]- semantic_analysis
@@ -27,7 +32,12 @@ constraint_system -[hidden]- semantic_analysis
 semantic_analysis --> ontology
 semantic_analysis --> pipeline
 semantic_analysis --> insights
-semantic_analysis --> base_agent
-semantic_analysis --> l2_subsystem_classifier
+semantic_analysis --> ontology_classification_agent
+semantic_analysis --> semantic_analysis_agent
+semantic_analysis --> base_agent_framework
+semantic_analysis --> l2_refinement_classifier
+semantic_analysis --> health_coordinator
+semantic_analysis --> agent_launcher_configs
+semantic_analysis --> no_unbounded_fs_scan_guard
 
 @enduml

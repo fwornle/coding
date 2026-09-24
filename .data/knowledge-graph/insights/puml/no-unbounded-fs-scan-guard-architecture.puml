@@ -1,0 +1,30 @@
+@startuml
+!include _standard-style.puml
+
+package "Health Coordination" {
+  component "health-coordinator.js" as health <<core>>
+  component "ETM Expectation Lifecycle Test" as etmtest <<agent>>
+}
+
+package "Ontology Repair & System" {
+  component "repair-writer-ontology-class.mjs" as repair <<cli>>
+  component "OntologyClassificationAgent" as ocagent <<agent>>
+  component "createOntologySystem()" as ontsys <<core>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  component "OntologyValidator" as validator <<core>>
+  component "OntologyClassifier" as classifier <<core>>
+}
+
+package "External Store" {
+  database "obs-api (LevelDB-backed)" as obsapi <<external>>
+}
+
+health --> etmtest : "validates health-state contract"
+repair --> obsapi : "bounded HTTP-paginated reads\n(limit=100000/1000000)"
+ontsys --> adapter : "wires"
+ontsys --> validator : "wires"
+ontsys --> classifier : "wires"
+ocagent --> classifier : "delegates via hard-root guard"
+ocagent ..> ocagent : "L2 -> L1 fallback\n(extractL2FromLLMResponse)"
+
+@enduml

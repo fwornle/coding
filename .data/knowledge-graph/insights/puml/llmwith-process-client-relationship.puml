@@ -5,15 +5,19 @@ title Hierarchy Context: LLMWithProcessClient
 
 [LLMAbstraction] as llmabstraction #FFFFDD
 [LLMWithProcessClient] as llmwith_process_client #LightBlue
-[LLMMockService] as llmmock_service #F0F0F0
 [DMRProvider] as dmrprovider #F0F0F0
+[LlmJsonRepair] as llm_json_repair #F0F0F0
 [CostModel] as cost_model #F0F0F0
-[ProxyURLResolver] as proxy_urlresolver #F0F0F0
+[OffloadRouting] as offload_routing #F0F0F0
+[ClassifierJudge] as classifier_judge #F0F0F0
+[ModelContextLimits] as model_context_limits #F0F0F0
 
 llmabstraction --> llmwith_process_client
-llmmock_service -[hidden]- llmwith_process_client
 dmrprovider -[hidden]- llmwith_process_client
+llm_json_repair -[hidden]- llmwith_process_client
 cost_model -[hidden]- llmwith_process_client
-proxy_urlresolver -[hidden]- llmwith_process_client
+offload_routing -[hidden]- llmwith_process_client
+classifier_judge -[hidden]- llmwith_process_client
+model_context_limits -[hidden]- llmwith_process_client
 
 @enduml

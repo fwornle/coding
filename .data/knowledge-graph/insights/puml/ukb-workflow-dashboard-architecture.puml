@@ -1,43 +1,41 @@
 @startuml
 !include _standard-style.puml
 
-package "UKB Workflow Modal" {
-  component "ukb-workflow-modal.tsx" as modal <<core>>
-  component "HISTORY_PAGE_SIZE\n(/api/ukb/history)" as pagesize <<api>>
-  component "calculateDynamicEta" as eta <<core>>
-  component "calculateStepAwareEta\n(legacy delegate)" as etalegacy <<core>>
-  component "useWorkflowWebSocket" as ws <<api>>
+package "System Health Dashboard" {
+  component "UkbWorkflowModal\n(UkbWorkflowDashboard)" as modal <<core>>
+  component "History Tab" as history <<core>>
+  component "Progress/Statistics Tabs" as stats <<core>>
+  component "calculateDynamicEta()" as eta <<core>>
+  component "calculateStepAwareEta()\n(legacy shim)" as legacyEta <<core>>
+  component "ukbSlice (Redux)" as slice <<storage>>
 }
 
-package "Redux State Layer" {
-  component "ukbSlice.ts" as slice <<core>>
-  component "UKBProcess\n(legacy polling state)" as legacyState <<storage>>
-  component "WorkflowExecutionState\n(event-driven state)" as newState <<storage>>
-  component "shared/workflow-types" as sharedtypes <<external>>
+package "Workflow Subcomponents ('./workflow')" {
+  component "MultiAgentGraph\n(UKBWorkflowGraph)" as graph <<agent>>
+  component "WorkflowLegend" as legend <<core>>
+  component "TraceModal" as trace <<core>>
+  component "UKBNodeDetailsSidebar" as sidebar <<core>>
 }
 
-package "Workflow Visualization" {
-  component "MultiAgentGraph\n(multi-agent-graph.tsx)" as mag <<core>>
-  component "AGENT_SUBSTEPS" as substeps <<core>>
-  component "D3GraphCanvas" as d3 <<core>>
-  component "color-fallback.ts\n(node FillColor/node ShapeFor)" as colorfb <<core>>
-}
+cloud "/api/ukb/history" as api <<external>>
+database "Report Storage / Graph Nodes" as store <<storage>>
 
-modal --> pagesize : "fetches history"
-modal --> eta : "computes ETA"
-eta --> etalegacy : "delegates to"
-modal --> ws : "live updates"
+modal --> history : "renders"
+modal --> stats : "renders"
+modal --> graph : "composes"
+modal --> legend : "composes"
+modal --> trace : "composes"
+modal --> sidebar : "drill-down to code"
+
+history --> api : "fetches paginated\nHISTORY_PAGE_SIZE"
+api --> store : "parses ALL reports\n(limit only slices)"
+
+stats --> eta : "computes ETA"
+eta ..> legacyEta : "delegated by\n(compat shim)"
+
 modal --> slice : "reads/dispatches"
-modal --> mag : "renders"
+slice --> slice : "WorkflowExecutionState\nvs UKBProcess (dual state)"
 
-slice --> legacyState : "maintains"
-slice --> newState : "maintains"
-slice --> sharedtypes : "typed by"
-
-mag --> substeps : "configures agents"
-d3 --> colorfb : "resolves colors/shapes"
-mag ..> colorfb : "shares resolver"
-
-newState ..> legacyState : "parallel, unconsolidated"
+store ..> history : "Insight nodes must be\nstamped to be visible"
 
 @enduml

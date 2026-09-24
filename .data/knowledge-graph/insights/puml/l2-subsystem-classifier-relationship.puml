@@ -8,16 +8,14 @@ title Hierarchy Context: L2SubsystemClassifier
 [Ontology] as ontology #F0F0F0
 [Pipeline] as pipeline #F0F0F0
 [Insights] as insights #F0F0F0
-[BaseAgent] as base_agent #F0F0F0
-[ClosedVocabularyRefinement] as closed_vocabulary_refinement #E8F5E8
-[CodingLowerOntologySource] as coding_lower_ontology_source #E8F5E8
+[SemanticAnalysisAgent] as semantic_analysis_agent #F0F0F0
+[CanonicalMapper] as canonical_mapper #F0F0F0
 
 semantic_analysis --> l2_subsystem_classifier
 ontology -[hidden]- l2_subsystem_classifier
 pipeline -[hidden]- l2_subsystem_classifier
 insights -[hidden]- l2_subsystem_classifier
-base_agent -[hidden]- l2_subsystem_classifier
-l2_subsystem_classifier --> closed_vocabulary_refinement
-l2_subsystem_classifier --> coding_lower_ontology_source
+semantic_analysis_agent -[hidden]- l2_subsystem_classifier
+canonical_mapper -[hidden]- l2_subsystem_classifier
 
 @enduml

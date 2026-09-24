@@ -1,0 +1,49 @@
+@startuml
+!include _standard-style.puml
+
+package "Discovery" {
+  component "walkSubAgentJsonl()" as walk <<core>>
+  component "SUBAGENT_PATH_RE" as regex <<core>>
+  component "path helper functions\n(project/parentSession/agentId)" as helpers <<core>>
+}
+
+package "Row Construction" {
+  component "buildRow()" as buildRow <<core>>
+  component "uid-check gate" as uidgate <<core>>
+  component "isSidechain gate" as sidegate <<core>>
+  component "PROJECT_NAME_ALLOW gate" as allowgate <<core>>
+  component "computeSubIndexes()" as subidx <<core>>
+  component "readFirstAssistantRecord()" as firstrec <<core>>
+}
+
+package "Shared / Downstream" {
+  component "encodeCwd() (duplicated)" as encode <<core>>
+  component "stop-adapter-registry.mjs\nlocateMainSessionJsonl()" as registry <<external>>
+  component "convertTranscriptsToObservations()" as convert <<external>>
+  component "ObservationWriter" as writer <<external>>
+  component "/sl continuity command" as sl <<agent>>
+}
+
+walk --> regex : "filters candidates"
+regex --> helpers : "re-extracts capture groups"
+walk --> buildRow : "candidate path"
+
+buildRow --> uidgate : "stat uid check"
+buildRow --> sidegate : "peek first line"
+buildRow --> allowgate : "validate project name"
+uidgate ..> buildRow : "stderr on reject"
+sidegate ..> buildRow : "stderr on reject"
+allowgate ..> buildRow : "stderr on reject"
+
+buildRow --> subidx : "rows by parent_session_id"
+subidx --> firstrec : "bounded 10-line read"
+
+encode ..> registry : "duplicated (not shared)"
+buildRow --> convert : "sub-agent rows"
+convert --> writer : "observations"
+writer ..> writer : "silent Raw fallback drop"
+
+convert --> sl : "transcript universe"
+uidgate ..> sl : "silent gap on drop"
+
+@enduml

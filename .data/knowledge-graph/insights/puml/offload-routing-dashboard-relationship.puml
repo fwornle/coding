@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OffloadRoutingDashboard
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[OffloadRoutingDashboard] as offload_routing_dashboard #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMJsonRepairUtility] as llmjson_repair_utility #F0F0F0
+[ProxyClientWrapper] as proxy_client_wrapper #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
+[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #F0F0F0
+[ClassifierJudgeHook] as classifier_judge_hook #E8F5E8
+[CostModel] as cost_model #E8F5E8
+
+llmabstraction --> offload_routing_dashboard
+llmmock_service -[hidden]- offload_routing_dashboard
+dmrprovider -[hidden]- offload_routing_dashboard
+llmjson_repair_utility -[hidden]- offload_routing_dashboard
+proxy_client_wrapper -[hidden]- offload_routing_dashboard
+copilot_model_id_alignment -[hidden]- offload_routing_dashboard
+dashboard_cost_model -[hidden]- offload_routing_dashboard
+model_context_limits_catalogue -[hidden]- offload_routing_dashboard
+offload_routing_dashboard --> classifier_judge_hook
+offload_routing_dashboard --> cost_model
+
+@enduml

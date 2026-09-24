@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: UnifiedViewerGraphRendering
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[UnifiedViewerGraphRendering] as unified_viewer_graph_rendering #LightBlue
+[WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[GraphifyGraph] as graphify_graph #F0F0F0
+[KmCoreMigration] as km_core_migration #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+[HierarchyNavigatorDerivation] as hierarchy_navigator_derivation #E8F5E8
+[IntentSpineRendering] as intent_spine_rendering #E8F5E8
+[D3ForceGraphCanvas] as d3_force_graph_canvas #E8F5E8
+
+knowledge_management --> unified_viewer_graph_rendering
+wave_insight_persistence -[hidden]- unified_viewer_graph_rendering
+graph_database_service -[hidden]- unified_viewer_graph_rendering
+online_learning -[hidden]- unified_viewer_graph_rendering
+manual_learning -[hidden]- unified_viewer_graph_rendering
+graphify_graph -[hidden]- unified_viewer_graph_rendering
+km_core_migration -[hidden]- unified_viewer_graph_rendering
+ukb_workflow_dashboard -[hidden]- unified_viewer_graph_rendering
+unified_viewer_graph_rendering --> hierarchy_navigator_derivation
+unified_viewer_graph_rendering --> intent_spine_rendering
+unified_viewer_graph_rendering --> d3_force_graph_canvas
+
+@enduml

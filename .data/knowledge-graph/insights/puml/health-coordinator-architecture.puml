@@ -1,29 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "Health Coordination" {
-  component "Health Coordinator" as hc <<core>>
-  component "Service Probe Lib" as probe <<core>>
-  component "Health Verification Rules" as rules <<storage>>
+package "HealthCoordinator API" {
+  component "HTTP Gateway\n(0.0.0.0)" as http <<api>>
+  component "currentState\n(in-memory SoT)" as state <<core>>
 }
 
-package "Probe Targets" {
-  component "HTTP Health Probe" as httpProbe <<api>>
-  component "TCP Port Probe" as tcpProbe <<api>>
-  component "Dockerized Service Fleet" as fleet <<external>>
+package "Tick Scheduler" {
+  component "TICK_MS Loop\n(5s)" as tick <<core>>
+  component "Check Registry" as registry <<core>>
+  component "Slow Interval Probe\n(graph_integrity)" as slow <<core>>
 }
 
-package "Consumers" {
-  component "Global Service Coordinator" as gsc <<agent>>
+package "Config & Fault Injection" {
+  database "health-verification-rules.json" as rules <<storage>>
+  component "FORBIDDEN_RULE_NAMES\nGuard" as forbidden <<core>>
+  component "shouldInject()\n(env + Map flags)" as inject <<core>>
 }
 
-hc --> rules : "reads probe config\n(type, endpoint, thresholds)"
-hc --> probe : "invokes every 5s"
-probe --> httpProbe : "probeHttpHealth()"
-probe --> tcpProbe : "probeTcpPort()"
-httpProbe --> fleet : "checks"
-tcpProbe --> fleet : "checks"
-hc --> hc : "SPEC R6:\nconservative multi-check\nconfirmation"
-gsc --> hc : "queries aggregated\nhealth state"
+package "Contract Testing" {
+  component "health-coordinator-etm-expected.test.mjs" as tests <<cli>>
+}
+
+http --> state : "GET /health, /health/state"
+http --> state : "POST /signals, /health/refresh"
+tick --> registry : "iterates checks"
+registry --> rules : "loads rule config"
+registry --> forbidden : "filters skipped rules"
+tick --> state : "writes status per subsystem"
+slow --> state : "writes graph_integrity"
+inject --> tick : "fault injection hook"
+tests ..> tick : "regex-validates ETM invariants"
+tests ..> state : "regex-validates stall clock fields"
 
 @enduml

@@ -1,0 +1,34 @@
+@startuml
+!include _standard-style.puml
+
+package "Cold-Store Repair Concern" {
+  component "ColdStoreBackfill" as backfill <<core>>
+  database "Cold-Storage Observation Rows" as coldrows <<storage>>
+  component "Editing-Turn Data" as editturns <<external>>
+  component "Exact-Timestamp Matcher" as matcher <<core>>
+}
+
+package "Live Write Path (km-core, post Phase 44 cutover)" {
+  component "ObservationWriter.js" as writer <<core>>
+  component "_maybePatchArtifacts" as patcher <<core>>
+  database "km-core Entities" as kmcore <<storage>>
+}
+
+package "Sibling Adapters (analogous patterns only)" {
+  component "token-db.mjs\ninsertTokenRow" as tokendb <<core>>
+  component "opencode-token-rows.mjs" as opctoken <<external>>
+}
+
+backfill --> coldrows : "reads/repairs rows\nmissing Artifacts field"
+backfill --> matcher : "delegates matching"
+matcher --> editturns : "exact-timestamp match\n(avoids false positives)"
+matcher --> coldrows : "reconstructs Artifacts field"
+
+writer --> kmcore : "live writes\n(post-cutover)"
+writer --> patcher : "documents patch intent"
+patcher ..> coldrows : "thematically related\n(not implemented here)"
+
+tokendb ..> backfill : "analogous repair pattern\n(bounded retry, non-destructive)"
+opctoken ..> tokendb : "feeds token rows"
+
+@enduml

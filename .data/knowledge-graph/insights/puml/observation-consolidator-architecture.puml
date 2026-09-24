@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+package "Observation Consolidation" {
+  component "ObservationConsolidator" as consolidator <<core>>
+  component "ObservationSanitizer" as sanitizer <<core>>
+  component "ConfigurableRedactor" as redactor <<core>>
+  component "ObservationWriter" as writer <<core>>
+  component "Logger" as logger <<core>>
+}
+
+package "Mention Enrichment" {
+  component "MentionsClassifier" as classifier <<core>>
+  cloud "rapid-llm-proxy" as proxy <<external>>
+}
+
+database "Knowledge Graph Store" as kg <<storage>>
+
+consolidator --> sanitizer : "sanitizes observations"
+consolidator --> redactor : "redacts sensitive data"
+consolidator --> writer : "persists observations"
+consolidator --> logger : "logs progress"
+consolidator --> classifier : "enriches with entity mentions"
+
+classifier --> kg : "loadMentionCandidates()\n(STRICT_TYPES filter)"
+classifier --> proxy : "classifyMentions()\n(paced, 1000ms gate)"
+writer --> kg : "writes observations\n(dedup + snapshot promotion)"
+
+consolidator ..> kg : "dirty-parent-only\nre-consolidation"
+
+@enduml

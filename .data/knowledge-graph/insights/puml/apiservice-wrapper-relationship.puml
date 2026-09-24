@@ -6,22 +6,20 @@ title Hierarchy Context: APIServiceWrapper
 [DockerizedServices] as dockerized_services #FFFFDD
 [APIServiceWrapper] as apiservice_wrapper #LightBlue
 [ServiceStarter] as service_starter #F0F0F0
-[ServiceProbe] as service_probe #F0F0F0
 [DashboardServiceWrapper] as dashboard_service_wrapper #F0F0F0
+[MockLLMService] as mock_llmservice #F0F0F0
 [SupervisordRuntime] as supervisord_runtime #F0F0F0
-[ProcessStateManager] as process_state_manager #F0F0F0
-[StartServicesRobust] as start_services_robust #F0F0F0
-[FeatureGatingOverride] as feature_gating_override #E8F5E8
-[ApiServiceChildWrapper] as api_service_child_wrapper #E8F5E8
+[StartServicesOrchestrator] as start_services_orchestrator #F0F0F0
+[DashboardServerChildSpawn] as dashboard_server_child_spawn #E8F5E8
+[ConstraintApiPsmRegistration] as constraint_api_psm_registration #E8F5E8
 
 dockerized_services --> apiservice_wrapper
 service_starter -[hidden]- apiservice_wrapper
-service_probe -[hidden]- apiservice_wrapper
 dashboard_service_wrapper -[hidden]- apiservice_wrapper
+mock_llmservice -[hidden]- apiservice_wrapper
 supervisord_runtime -[hidden]- apiservice_wrapper
-process_state_manager -[hidden]- apiservice_wrapper
-start_services_robust -[hidden]- apiservice_wrapper
-apiservice_wrapper --> feature_gating_override
-apiservice_wrapper --> api_service_child_wrapper
+start_services_orchestrator -[hidden]- apiservice_wrapper
+apiservice_wrapper --> dashboard_server_child_spawn
+apiservice_wrapper --> constraint_api_psm_registration
 
 @enduml

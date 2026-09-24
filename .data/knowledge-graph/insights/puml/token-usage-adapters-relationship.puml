@@ -5,23 +5,25 @@ title Hierarchy Context: TokenUsageAdapters
 
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [TokenUsageAdapters] as token_usage_adapters #LightBlue
-[LSLConfigValidator] as lslconfig_validator #F0F0F0
-[RedactionConfigManager] as redaction_config_manager #F0F0F0
-[MultiUserHashManager] as multi_user_hash_manager #F0F0F0
-[LiveTranscriptWatchers] as live_transcript_watchers #F0F0F0
 [ObservationWriter] as observation_writer #F0F0F0
+[ObservationConsolidator] as observation_consolidator #F0F0F0
+[MentionsClassifier] as mentions_classifier #F0F0F0
+[EnhancedTranscriptMonitor] as enhanced_transcript_monitor #F0F0F0
+[ClaudeJsonlTreeAdapter] as claude_jsonl_tree_adapter #F0F0F0
+[StopAdapterRegistry] as stop_adapter_registry #E8F5E8
+[ClaudeJsonlTreeAdapter] as claude_jsonl_tree_adapter #E8F5E8
+[ClaudeTokenRows] as claude_token_rows #E8F5E8
 [OpencodeTokenRows] as opencode_token_rows #E8F5E8
-[TokenDbWriter] as token_db_writer #E8F5E8
-[CopilotEventsTailWatcher] as copilot_events_tail_watcher #E8F5E8
 
 live_logging_system --> token_usage_adapters
-lslconfig_validator -[hidden]- token_usage_adapters
-redaction_config_manager -[hidden]- token_usage_adapters
-multi_user_hash_manager -[hidden]- token_usage_adapters
-live_transcript_watchers -[hidden]- token_usage_adapters
 observation_writer -[hidden]- token_usage_adapters
+observation_consolidator -[hidden]- token_usage_adapters
+mentions_classifier -[hidden]- token_usage_adapters
+enhanced_transcript_monitor -[hidden]- token_usage_adapters
+claude_jsonl_tree_adapter -[hidden]- token_usage_adapters
+token_usage_adapters --> stop_adapter_registry
+token_usage_adapters --> claude_jsonl_tree_adapter
+token_usage_adapters --> claude_token_rows
 token_usage_adapters --> opencode_token_rows
-token_usage_adapters --> token_db_writer
-token_usage_adapters --> copilot_events_tail_watcher
 
 @enduml

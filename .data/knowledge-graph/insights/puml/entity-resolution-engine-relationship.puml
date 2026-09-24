@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EntityResolutionEngine
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[EntityResolutionEngine] as entity_resolution_engine #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[HierarchyParentResolution] as hierarchy_parent_resolution #E8F5E8
+[LearningSourceClassifier] as learning_source_classifier #E8F5E8
+
+knowledge_management --> entity_resolution_engine
+manual_learning -[hidden]- entity_resolution_engine
+online_learning -[hidden]- entity_resolution_engine
+entity_resolution_engine --> hierarchy_parent_resolution
+entity_resolution_engine --> learning_source_classifier
+
+@enduml

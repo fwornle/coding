@@ -1,35 +1,40 @@
 @startuml
 !include _standard-style.puml
 
-package "Stateful UI/Data Layer" {
-  component "use-classifier-judge.ts" as judge <<agent>>
-  component "offload-decision.tsx" as offload <<agent>>
-  component "Cost/Settings APIs" as api <<api>>
+package "Upstream Services" {
+  component "LLM CLI Proxy\n(launchd service)" as proxy <<external>>
+  component "GET /api/token-usage/cost" as costApi <<api>>
+  component "GET /api/llm/settings" as settingsApi <<api>>
 }
 
-package "Pure Cost Domain (cost-model.ts)" {
-  component "budgetForMonth()" as budgetForMonth <<core>>
-  component "priceForModel()" as priceForModel <<core>>
-  component "scalePrice() / FAST_MODE" as scalePrice <<core>>
-  component "freshInputTokens()" as freshInputTokens <<core>>
-  component "budgetProvider()" as budgetProvider <<core>>
-  component "isSynthetic() / monthlySeries()" as monthlySeries <<core>>
+package "cost-model.ts (Pure Module)" {
+  component "budgetForMonth()" as budgetFn <<core>>
+  component "priceForModel()" as priceFn <<core>>
+  component "freshInputTokens()" as freshFn <<core>>
+  component "isSynthetic()" as syntheticFn <<core>>
+  component "budgetProvider()/\nisOpenAIWireProvider()" as providerFn <<core>>
+  component "cellCostUsd()" as cellFn <<core>>
+  component "monthlySeries()" as monthlyFn <<core>>
 }
 
-package "Upstream Fix Source" {
-  component "rapid-llm-proxy\nopenAIFreshInputTokens()" as proxy <<external>>
+package "Consumer" {
+  component "Token Usage → Cost Tab" as dashboard <<agent>>
 }
 
-judge --> api : "fetch/poll"
-offload --> api : "fetch/dirty-state"
-api ..> monthlySeries : "CostRow[] input"
+proxy --> costApi : "usage logs"
+costApi --> cellFn : "CostRow[]"
+settingsApi --> budgetFn : "CostConfig / BudgetConfig"
+settingsApi --> priceFn : "DEFAULT_COST_CONFIG.prices"
 
-monthlySeries --> budgetForMonth : "evaluate monthly cap"
-monthlySeries --> priceForModel : "compute cell cost"
-priceForModel --> scalePrice : "fast-mode multiply"
-monthlySeries --> budgetProvider : "normalize provider"
-monthlySeries --> freshInputTokens : "adjust token counts"
+priceFn --> cellFn : "ResolvedPrice"
+freshFn --> cellFn : "fresh input tokens"
+providerFn --> cellFn : "providerScale key"
+providerFn --> budgetFn : "budget bucket"
 
-proxy ..> freshInputTokens : "invariant enforced upstream\n(now identity fn)"
+cellFn --> monthlyFn : "per-row EUR cost"
+syntheticFn --> monthlyFn : "filters demo/probe rows"
+budgetFn --> monthlyFn : "monthly cap check"
+
+monthlyFn --> dashboard : "aggregated series"
 
 @enduml

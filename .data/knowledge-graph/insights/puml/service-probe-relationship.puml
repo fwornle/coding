@@ -6,24 +6,22 @@ title Hierarchy Context: ServiceProbe
 [DockerizedServices] as dockerized_services #FFFFDD
 [ServiceProbe] as service_probe #LightBlue
 [ServiceStarter] as service_starter #F0F0F0
-[APIServiceWrapper] as apiservice_wrapper #F0F0F0
-[DashboardServiceWrapper] as dashboard_service_wrapper #F0F0F0
-[SupervisordRuntime] as supervisord_runtime #F0F0F0
 [ProcessStateManager] as process_state_manager #F0F0F0
-[StartServicesRobust] as start_services_robust #F0F0F0
-[EntrypointTcpWaitForService] as entrypoint_tcp_wait_for_service #E8F5E8
-[ServiceStarterHealthPrimitives] as service_starter_health_primitives #E8F5E8
-[WaitForPortBindable] as wait_for_port_bindable #E8F5E8
+[DockerEntrypoint] as docker_entrypoint #F0F0F0
+[DockerComposeStartupScript] as docker_compose_startup_script #F0F0F0
+[HttpHealthProbe] as http_health_probe #E8F5E8
+[TcpHealthProbe] as tcp_health_probe #E8F5E8
+[RetryWithDeadlineStarter] as retry_with_deadline_starter #E8F5E8
+[FeatureGatedSupervisorConfig] as feature_gated_supervisor_config #E8F5E8
 
 dockerized_services --> service_probe
 service_starter -[hidden]- service_probe
-apiservice_wrapper -[hidden]- service_probe
-dashboard_service_wrapper -[hidden]- service_probe
-supervisord_runtime -[hidden]- service_probe
 process_state_manager -[hidden]- service_probe
-start_services_robust -[hidden]- service_probe
-service_probe --> entrypoint_tcp_wait_for_service
-service_probe --> service_starter_health_primitives
-service_probe --> wait_for_port_bindable
+docker_entrypoint -[hidden]- service_probe
+docker_compose_startup_script -[hidden]- service_probe
+service_probe --> http_health_probe
+service_probe --> tcp_health_probe
+service_probe --> retry_with_deadline_starter
+service_probe --> feature_gated_supervisor_config
 
 @enduml

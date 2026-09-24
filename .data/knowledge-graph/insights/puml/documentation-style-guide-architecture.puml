@@ -1,0 +1,33 @@
+@startuml
+!include _standard-style.puml
+
+package "Documentation Style Guide (Rules)" {
+  component "Style Guide Policy" as guide <<core>>
+  component ".puml Sources\n(docs/puml/)" as pumlSrc <<storage>>
+  component "Rendered .png Outputs\n(docs/images/)" as pngOut <<storage>>
+  component "MkDocs Published Assets\n(docs-content/images/)" as mkdocsAssets <<storage>>
+}
+
+package "Verification Discipline" {
+  component "Post-Rewrite Render\nError Triage" as triage <<core>>
+  component "Baseline Reproduction\n(git stash / prior commit)" as baseline <<agent>>
+}
+
+package "Unrelated Candidate Tooling\n(no enforcement path)" {
+  component "EntityPatternAnalyzer.ts" as epa <<core>>
+  component "verify-patterns.sh" as vps <<cli>>
+  component "XAML ViewModel Fixtures" as xaml <<external>>
+}
+
+guide --> pumlSrc : "mandates location"
+guide --> pngOut : "mandates location"
+guide ..> mkdocsAssets : "must remain distinct from"
+pumlSrc ..> pngOut : "rendered separately"
+
+triage --> baseline : "requires reproduction before filing bug"
+
+vps ..> guide : "keyword collision only\n(no actual enforcement)"
+epa ..> guide : "no reference / unrelated"
+xaml ..> guide : "no reference / unrelated"
+
+@enduml

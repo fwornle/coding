@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: KnowledgeInjectionHook
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[KnowledgeInjectionHook] as knowledge_injection_hook #LightBlue
+[ContentValidationAgent] as content_validation_agent #F0F0F0
+[HealthPromptHook] as health_prompt_hook #F0F0F0
+[UnifiedHookManagementSystem] as unified_hook_management_system #F0F0F0
+[DashboardWorkflowHooks] as dashboard_workflow_hooks #F0F0F0
+
+constraint_system --> knowledge_injection_hook
+content_validation_agent -[hidden]- knowledge_injection_hook
+health_prompt_hook -[hidden]- knowledge_injection_hook
+unified_hook_management_system -[hidden]- knowledge_injection_hook
+dashboard_workflow_hooks -[hidden]- knowledge_injection_hook
+
+@enduml

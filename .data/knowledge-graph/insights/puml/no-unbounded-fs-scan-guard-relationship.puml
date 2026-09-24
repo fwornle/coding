@@ -1,0 +1,33 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: NoUnboundedFsScanGuard
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[NoUnboundedFsScanGuard] as no_unbounded_fs_scan_guard #LightBlue
+[Ontology] as ontology #F0F0F0
+[Pipeline] as pipeline #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyClassificationAgent] as ontology_classification_agent #F0F0F0
+[SemanticAnalysisAgent] as semantic_analysis_agent #F0F0F0
+[BaseAgentFramework] as base_agent_framework #F0F0F0
+[L2RefinementClassifier] as l2_refinement_classifier #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[AgentLauncherConfigs] as agent_launcher_configs #F0F0F0
+[OffendingRootDetector] as offending_root_detector #E8F5E8
+[PiExtensionInstaller] as pi_extension_installer #E8F5E8
+
+semantic_analysis --> no_unbounded_fs_scan_guard
+ontology -[hidden]- no_unbounded_fs_scan_guard
+pipeline -[hidden]- no_unbounded_fs_scan_guard
+insights -[hidden]- no_unbounded_fs_scan_guard
+ontology_classification_agent -[hidden]- no_unbounded_fs_scan_guard
+semantic_analysis_agent -[hidden]- no_unbounded_fs_scan_guard
+base_agent_framework -[hidden]- no_unbounded_fs_scan_guard
+l2_refinement_classifier -[hidden]- no_unbounded_fs_scan_guard
+health_coordinator -[hidden]- no_unbounded_fs_scan_guard
+agent_launcher_configs -[hidden]- no_unbounded_fs_scan_guard
+no_unbounded_fs_scan_guard --> offending_root_detector
+no_unbounded_fs_scan_guard --> pi_extension_installer
+
+@enduml

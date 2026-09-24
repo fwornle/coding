@@ -5,13 +5,25 @@ title Hierarchy Context: KmCoreMigration
 
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [KmCoreMigration] as km_core_migration #LightBlue
-[ManualLearning] as manual_learning #F0F0F0
+[WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
 [OnlineLearning] as online_learning #F0F0F0
-[OntologyClassificationSystem] as ontology_classification_system #F0F0F0
+[ManualLearning] as manual_learning #F0F0F0
+[GraphifyGraph] as graphify_graph #F0F0F0
+[UnifiedViewerGraphRendering] as unified_viewer_graph_rendering #F0F0F0
+[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
+[HierarchyParentDerivation] as hierarchy_parent_derivation #E8F5E8
+[InsightHierarchyPlacement] as insight_hierarchy_placement #E8F5E8
 
 knowledge_management --> km_core_migration
-manual_learning -[hidden]- km_core_migration
+wave_insight_persistence -[hidden]- km_core_migration
+graph_database_service -[hidden]- km_core_migration
 online_learning -[hidden]- km_core_migration
-ontology_classification_system -[hidden]- km_core_migration
+manual_learning -[hidden]- km_core_migration
+graphify_graph -[hidden]- km_core_migration
+unified_viewer_graph_rendering -[hidden]- km_core_migration
+ukb_workflow_dashboard -[hidden]- km_core_migration
+km_core_migration --> hierarchy_parent_derivation
+km_core_migration --> insight_hierarchy_placement
 
 @enduml

@@ -1,0 +1,40 @@
+@startuml
+!include _standard-style.puml
+
+package "system-health-dashboard" {
+
+  component "useClassifierJudge\n(polling hook)" as hook <<core>>
+  component "ClassifierJudgeState" as state <<core>>
+  component "JudgeBackend\n(enabled vs reachable)" as backend <<core>>
+  component "draft state\n(draftRubric/draftEnabled/draftStrategy)" as draft <<core>>
+  component "merged memo\n(overlay enabled onto polled)" as merged <<core>>
+  component "save()\ndiff-only PATCH" as save <<core>>
+  component "offload-decision.tsx\n(cls vs p separation)" as consumer <<component>>
+  component "useOffloadPolicyDraft" as offloadHook <<core>>
+}
+
+package "Config Files (two machines)" {
+  database "config/prompt-classifier.yaml\n(this repo)" as classifierYaml <<storage>>
+  database "llm-routing.yaml\n(rapid-llm-proxy)" as routingYaml <<storage>>
+}
+
+cloud "GET/PATCH\n/api/llm/classifier" as api <<external>>
+
+hook --> api : "poll load() every 30s"
+api --> classifierYaml : "reads/writes"
+hook --> state : "produces"
+hook --> backend : "tracks"
+hook --> draft : "holds pending edits"
+hook --> merged : "computes"
+draft --> merged : "overlay enabled only"
+backend --> merged : "runtime fields untouched"
+merged --> save : "diff against last snapshot"
+save --> api : "PATCH changed fields only"
+
+consumer --> hook : "judge = useClassifierJudge()"
+consumer --> offloadHook : "p = policy draft"
+offloadHook --> routingYaml : "reads/writes"
+
+consumer ..> merged : "cls (excluded from gate-ladder memo)"
+
+@enduml

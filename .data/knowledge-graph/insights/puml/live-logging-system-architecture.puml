@@ -1,40 +1,42 @@
 @startuml
 !include _standard-style.puml
 
-package "Ontology Layer" {
-  component "OntologyRegistry" as registry <<core>>
-  component "coding.lower.json (L2 Classes)" as ontology <<storage>>
+package "Capture & Persistence" {
+  component "ETM (Enhanced Transcript Monitor)" as etm <<core>>
+  component "ObservationWriter.js" as writer <<core>>
+  database "Observation Database" as db <<storage>>
 }
 
-package "Classification Layer" {
-  component "L2SubsystemClassifier\n(classifyL2)" as classifier <<core>>
-  component "OntologyClassificationAgent" as agent <<agent>>
-  component "extractL2FromLLMResponse\n(regex boundary match)" as extractor <<core>>
-}
-
-package "Live Logging Configuration" {
+package "Configuration" {
   component "LSLConfigValidator" as validator <<core>>
-  database "lsl-config.json" as lslConfig <<storage>>
-  database "redaction-config.yaml" as redaction <<storage>>
-  component "validateUserEnvironment\n(SHA256 hash truncation)" as userhash <<core>>
+  component "validateUserEnvironment()" as userenv <<core>>
 }
 
-component "LiveLoggingSystem" as lls <<component>>
-component "Semantic Analysis Logger\n(buffered writer)" as semlogger <<external>>
+package "Continuity & Recovery" {
+  component "/sl Command" as sl <<cli>>
+  component "LSL Transcript Files" as transcripts <<storage>>
+}
 
-ontology --> registry : "loaded at runtime"
-registry --> lls : "materializes concept"
+package "Ontology Classification" {
+  component "OntologyClassificationAgent" as ontagent <<agent>>
+  component "classifyL2 (l2-subsystem-classifier.js)" as classifier <<agent>>
+  component "session-facts.ts (buildSessionFactIndex)" as sessionfacts <<core>>
+}
 
-classifier --> lls : "deterministic classification"
-agent --> classifier : "loadL2Classes()"
-agent --> extractor : "validates LLM output"
-extractor --> lls : "confirms exact match"
+etm --> writer : "raw observations"
+writer --> db : "semantic dedup & snapshot promotion"
+writer ..> db : "[Raw] fallback logged as stored\n(silently fails to persist)"
 
-lls --> validator : "operational config check"
-validator --> lslConfig : "validates schema/bounds"
-validator --> redaction : "validates redaction rules"
-validator --> userhash : "hashes USER env var"
+validator --> userenv : "derives 6-char SHA-256\nuser hash"
+validator --> writer : "governs batching/rotation\nthresholds"
 
-lls ..> semlogger : "contrasted with (session windowing,\nredaction not shared)"
+sl --> transcripts : "reads"
+transcripts --> sl : "continuity summary"
+writer ..> transcripts : "feeds session logs"
+
+db --> ontagent : "observations tagged\nas generic Component"
+ontagent --> classifier : "invokes classification"
+classifier --> db : "promotes to\nLiveLoggingSystem L2"
+sessionfacts --> db : "anchors Insight nodes\nvia parentId"
 
 @enduml

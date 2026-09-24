@@ -1,49 +1,35 @@
 @startuml
 !include _standard-style.puml
 
-package "bin/ CLI Layer" {
-  component "bin/ckb" as ckb <<cli>>
-  component "bin/graphify" as graphify <<cli>>
-  component "bin/status" as status <<cli>>
+package "Root Level (Onboarding)" {
+  component "CLAUDE.md" as claude <<cli>>
+  component "README.md" as readme <<cli>>
+  component "INSTALL_WINDOWS.md" as install <<cli>>
+  component "docker/README.md" as dockerreadme <<cli>>
 }
 
-package "Agent Adapter Layer" {
-  component "claude.sh" as claude <<agent>>
-  component "copilot.sh" as copilot <<agent>>
-  component "opencode.sh" as opencode <<agent>>
-  component "pi.sh" as pi <<agent>>
-  component "agent-profiles.json" as profiles <<storage>>
+package "docs/architecture (Deep Concepts)" {
+  component "architecture/README.md (index)" as archindex <<core>>
+  component "llm-routing.md" as llmrouting <<core>>
+  component "memory-systems.md" as memsys <<core>>
+  component "system-overview.md" as sysoverview <<core>>
 }
 
-package "Configuration & Orchestration" {
-  component "wave-controller.ts" as wave <<core>>
-  component "feature-profiles.yaml\nfeatures.yaml\ntask-taxonomy.yaml" as configs <<storage>>
-  component "OntologyClassifier" as ontology <<core>>
+package "Diagram Source/Output Pairing" {
+  component "docs/puml/*.puml" as pumlsrc <<storage>>
+  component "docs/images/*.png" as pngout <<storage>>
+  component "docs-content/images/" as mkdocsimg <<storage>>
 }
 
-cloud "Vendor LLM CLIs" as vendors <<external>>
+claude --> archindex : "points to deep docs"
+readme --> claude : "references guidelines"
 
-ckb ..> configs : reads
-graphify ..> configs : reads
-status ..> profiles : queries
+archindex --> llmrouting : "indexes"
+archindex --> memsys : "indexes"
+archindex --> sysoverview : "indexes"
 
-wave --> claude : invokes (env-driven)
-wave --> copilot : invokes (env-driven)
-wave --> opencode : invokes (env-driven)
-wave --> pi : invokes (env-driven)
-
-claude --> vendors : normalizes CLI
-copilot --> vendors : normalizes CLI
-opencode --> vendors : normalizes CLI
-pi --> vendors : normalizes CLI
-
-wave --> profiles : consults metadata
-profiles --> claude : declarative capabilities
-profiles --> copilot : declarative capabilities
-profiles --> opencode : declarative capabilities
-profiles --> pi : declarative capabilities
-
-configs --> ontology : drives classification
-ontology --> wave : informs dispatch
+pumlsrc --> pngout : "rendered into"
+pngout ..> mkdocsimg : "distinct from (not mixed)"
+archindex ..> pumlsrc : "diagrams embedded via"
 
 @enduml

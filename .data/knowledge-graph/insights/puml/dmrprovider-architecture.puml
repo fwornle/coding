@@ -1,34 +1,32 @@
 @startuml
 !include _standard-style.puml
 
-package "Backend Selection Layer" {
-  component "llm-mock-service\ngetLLMMode()" as mockSvc <<core>>
-  database "workflow-progress.json" as progressFile <<storage>>
+package "Local Inference Tier (unverified)" {
+  component "DMRProvider" as dmr <<core>>
+  component "dmrClient" as dmrclient <<external>>
 }
 
-package "DMR Provider" {
-  component "DMRProvider" as dmr <<agent>>
-  component "checkDMRAvailability()" as health <<core>>
-  component "loadDMRConfig()" as config <<core>>
-  database "dmr-config.yaml" as cfgFile <<storage>>
-  cloud "Docker Model Runner\n(OpenAI-compatible API)" as dockerMR <<external>>
+package "LLM CLI Proxy" {
+  component "proxy-bridge/server.mjs" as proxy <<api>>
+  component "Model Catalogue" as catalogue <<core>>
 }
 
-package "Shared LLM Utilities" {
-  component "parse-llm-json.ts\n(repair pipeline)" as jsonRepair <<core>>
-  component "llm-with-process.ts\nresolveProxyCompleteUrl()" as proxyResolver <<core>>
+package "System Health Dashboard (sibling, not DMR)" {
+  component "ReduxProvider (store/provider.tsx)" as redux <<core>>
+  component "OffloadDecision" as offload <<agent>>
+  component "cost-model.ts" as cost <<core>>
+  component "useClassifierJudge" as judge <<agent>>
 }
 
-mockSvc --> progressFile : "dual-write\nllmState + mockLLM"
-mockSvc --> dmr : "routes calls when\nmode = local/DMR"
+dmr --> dmrclient : "manages"
+dmr ..> proxy : "would sit behind\n(local-inference tier)"
+proxy --> catalogue : "endpoint-gated\nmodel listing"
 
-dmr --> config : "load config"
-config --> cfgFile : "multi-path search +\nexpandEnvVars()"
-dmr --> health : "cached liveness\nprobe"
-health --> dockerMR : "periodic\nhealth check"
-dmr --> dockerMR : "OpenAI-shape\nrequest/response"
+redux --> offload : "mounts /\nerror boundary"
+offload --> proxy : "resolve() calls\n/api/llm/routing/resolve"
+offload --> judge : "uses"
+cost --> offload : "priceForModel\nbudgetProvider"
 
-dmr ..> jsonRepair : "JSON-mode output\nrepair"
-config ..> proxyResolver : "shared env-var\nprecedence pattern"
+offload ..> dmr : "NOT verified:\nno route resolves\nto DMR/local target"
 
 @enduml

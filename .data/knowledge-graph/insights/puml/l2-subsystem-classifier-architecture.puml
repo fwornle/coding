@@ -1,36 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "Classification Pipeline" {
-  component "classifySingleObservation()" as classify <<core>>
-  component "Hard-Root-Guard\n(HIERARCHY_ROOTS)" as rootguard <<core>>
-  component "L2SubsystemClassifier" as l2 <<agent>>
-  component "buildL2RefinementPrompt()" as prompt <<core>>
+package "L2 Classification Subsystem (documented, not retrieved)" {
+  component "ontology-classification-agent.ts" as agent <<core>>
+  component "loadL2Classes()" as loadL2 <<core>>
+  component "buildL2RefinementPrompt()" as buildPrompt <<core>>
   component "extractL2FromLLMResponse()" as extract <<core>>
+  component "classifySingleObservation()" as classify <<core>>
 }
 
-package "Ontology Data" {
-  database "coding.lower.json" as lowerjson <<storage>>
-  component "loadL2Classes()" as loadl2 <<core>>
-  component "REFINABLE_L1_PARENTS\n(hardcoded)" as parents <<core>>
+package "Pipeline Defect Context" {
+  component "CodingLowerOntologySource Emission" as bug <<core>>
+  component "Hard-Root-Guard (unrelated fix)" as guard <<core>>
 }
 
-package "External / Test" {
-  cloud "LLM Provider" as llm <<external>>
-  component "ontology-classification-agent.test.ts\n(tmpdir fixtures)" as tests <<cli>>
+package "Retrieved Files (mismatched cluster)" {
+  component "copilot.sh / opencode.sh / pi.sh" as launchers <<cli>>
+  component "no-unbounded-fs-scan.ts" as guardTool <<agent>>
+  component "batch-provenance.mjs" as dashboard <<external>>
 }
 
-classify --> rootguard : "checks known roots"
-rootguard --> l2 : "bypass if match\notherwise refine"
-l2 --> loadl2 : "load candidate L2 classes"
-loadl2 --> lowerjson : "filter classCatalog"
-loadl2 --> parents : "filter by extends"
-l2 --> prompt : "build multiple-choice prompt"
-prompt --> llm : "send closed vocabulary prompt"
-llm --> extract : "free-text response"
-extract --> lowerjson : "token-boundary match"
-extract --> classify : "return L2 or fallback to L1"
-tests ..> l2 : "integration test"
-tests ..> lowerjson : "copies fixture"
+agent --> loadL2 : "loads OntologyRegistry classes"
+agent --> buildPrompt : "builds refinement prompt"
+agent --> extract : "parses LLM response"
+classify --> agent : "invokes L2 refinement"
+extract --> classify : "fail-closed fallback to L1"
+
+classify ..> bug : "leaks CodingLowerOntologySource"
+guard ..> bug : "does not fix (distinct issue)"
+
+launchers ..> agent : "NOT related (retrieval mismatch)"
+guardTool ..> agent : "NOT related (retrieval mismatch)"
+dashboard ..> agent : "NOT related (retrieval mismatch)"
 
 @enduml

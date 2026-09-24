@@ -5,17 +5,15 @@ title Hierarchy Context: ContentValidationAgent
 
 [ConstraintSystem] as constraint_system #FFFFDD
 [ContentValidationAgent] as content_validation_agent #LightBlue
-[UnifiedHookManager] as unified_hook_manager #F0F0F0
-[HookConfigLoader] as hook_config_loader #F0F0F0
-[ViolationCaptureService] as violation_capture_service #F0F0F0
 [HealthPromptHook] as health_prompt_hook #F0F0F0
-[KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
+[UnifiedHookManagementSystem] as unified_hook_management_system #F0F0F0
+[KnowledgeInjectionHook] as knowledge_injection_hook #F0F0F0
+[DashboardWorkflowHooks] as dashboard_workflow_hooks #F0F0F0
 
 constraint_system --> content_validation_agent
-unified_hook_manager -[hidden]- content_validation_agent
-hook_config_loader -[hidden]- content_validation_agent
-violation_capture_service -[hidden]- content_validation_agent
 health_prompt_hook -[hidden]- content_validation_agent
-knowledge_injection_hooks -[hidden]- content_validation_agent
+unified_hook_management_system -[hidden]- content_validation_agent
+knowledge_injection_hook -[hidden]- content_validation_agent
+dashboard_workflow_hooks -[hidden]- content_validation_agent
 
 @enduml

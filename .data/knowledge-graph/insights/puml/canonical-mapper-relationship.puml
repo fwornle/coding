@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CanonicalMapper
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[CanonicalMapper] as canonical_mapper #LightBlue
+[Ontology] as ontology #F0F0F0
+[L2SubsystemClassifier] as l2_subsystem_classifier #F0F0F0
+[Pipeline] as pipeline #F0F0F0
+[Insights] as insights #F0F0F0
+[SemanticAnalysisAgent] as semantic_analysis_agent #F0F0F0
+
+semantic_analysis --> canonical_mapper
+ontology -[hidden]- canonical_mapper
+l2_subsystem_classifier -[hidden]- canonical_mapper
+pipeline -[hidden]- canonical_mapper
+insights -[hidden]- canonical_mapper
+semantic_analysis_agent -[hidden]- canonical_mapper
+
+@enduml

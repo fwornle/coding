@@ -1,35 +1,38 @@
 @startuml
 !include _standard-style.puml
 
-package "LLM Routing" {
-  component "LLMMockService\n(getLLMMode)" as mock <<core>>
-  component "use-classifier-judge.ts\n(enabled vs reachable)" as judge <<agent>>
-  component "use-offload-policy-draft" as offload <<agent>>
-  component "prompt-classifier.yaml" as classifierCfg <<external>>
-  component "llm-routing.yaml" as routingCfg <<external>>
+package "LLMMockService (llm-mock-service.ts)" {
+  component "getLLMMode()" as mode <<core>>
+  component "Per-agent override" as override <<core>>
+  component "Global mode setting" as global <<core>>
+  component "Legacy mockLLM boolean" as legacy <<core>>
+  component "Default 'public'" as default <<core>>
 }
 
-package "Cost & Status Tooling" {
-  component "cost-model.ts\n(budgetForMonth/priceForModel)" as cost <<core>>
-  component "model-limits.cjs\n(catalogueContextWindow)" as limits <<core>>
-  database "Catalogue Cache" as cache <<storage>>
+database ".data/workflow-progress.json" as state <<storage>>
+
+package "External Dependencies" {
+  component "CODING_ROOT path translation" as root <<core>>
+  cloud "proxy-bridge/server.mjs\n(com.coding.llm-cli-proxy)" as proxy <<external>>
 }
 
-package "Dashboard State" {
-  component "store/provider.tsx\n(Redux Provider)" as store <<core>>
+package "LLM Routing Dashboard (unrelated layer)" {
+  component "cost-model.ts" as cost <<core>>
+  component "offload-decision.tsx" as offload <<core>>
+  component "use-classifier-judge.ts" as judge <<core>>
 }
 
-mock --> judge : "same config-vs-runtime\nsplit pattern"
-judge --> classifierCfg : "reads/writes"
-offload --> routingCfg : "reads/writes"
-judge ..> offload : "kept separate\n(no shared save path)"
+override --> mode : "1st precedence"
+global --> mode : "2nd precedence"
+legacy --> mode : "3rd precedence"
+default --> mode : "fallback"
 
-mock --> cost : "dual-write/overlay\nphilosophy shared"
-cost --> limits : "multi-tier fallback\npattern shared"
-limits --> cache : "mtime+size\ninvalidation"
+mode --> state : "persists/reads mode"
+mode --> root : "Docker/host path resolution"
+mode --> proxy : "live/public mode routes calls"
 
-store --> mock : "hosts mock state"
-store --> judge : "hosts judge state"
-store --> cost : "hosts cost state"
+cost ..> mode : "thematically adjacent\n(no direct call)"
+offload ..> mode : "thematically adjacent\n(no direct call)"
+judge ..> mode : "thematically adjacent\n(no direct call)"
 
 @enduml

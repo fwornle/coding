@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DashboardWorkflowHooks
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[DashboardWorkflowHooks] as dashboard_workflow_hooks #LightBlue
+[ContentValidationAgent] as content_validation_agent #F0F0F0
+[HealthPromptHook] as health_prompt_hook #F0F0F0
+[UnifiedHookManagementSystem] as unified_hook_management_system #F0F0F0
+[KnowledgeInjectionHook] as knowledge_injection_hook #F0F0F0
+[WorkflowDefinitionsMemoization] as workflow_definitions_memoization #E8F5E8
+[WorkflowEdgeDispatchEffect] as workflow_edge_dispatch_effect #E8F5E8
+
+constraint_system --> dashboard_workflow_hooks
+content_validation_agent -[hidden]- dashboard_workflow_hooks
+health_prompt_hook -[hidden]- dashboard_workflow_hooks
+unified_hook_management_system -[hidden]- dashboard_workflow_hooks
+knowledge_injection_hook -[hidden]- dashboard_workflow_hooks
+dashboard_workflow_hooks --> workflow_definitions_memoization
+dashboard_workflow_hooks --> workflow_edge_dispatch_effect
+
+@enduml

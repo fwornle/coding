@@ -1,0 +1,38 @@
+@startuml
+!include _standard-style.puml
+
+package "Host-Side Config" {
+  component "features.yaml (host)" as hostyaml <<external>>
+  component "features.json snapshot" as snapshot <<external>>
+  component ".env (host)" as envfile <<external>>
+}
+
+package "docker/entrypoint.sh" {
+  component "wait_for_service()" as waitsvc <<core>>
+  component ".env Loader / Credential Filter" as envloader <<core>>
+  component "PROGRAM_FEATURES Mapping" as mapping <<core>>
+  component "Feature Snapshot Reader (node -e)" as reader <<core>>
+  component "disabled.conf Generator" as gen <<core>>
+}
+
+package "Container Runtime" {
+  component "supervisord" as supervisord <<core>>
+  component "llm-cli-proxy :12435" as proxy <<external>>
+  component "container-gating.test.mjs" as test <<cli>>
+}
+
+hostyaml --> snapshot : "resolved by host"
+snapshot --> reader : "mounted read-only"
+reader --> mapping : "checks feature flags"
+mapping --> gen : "drives autostart=false rules"
+gen --> supervisord : "writes features.d/disabled.conf"
+
+envfile --> envloader : "parsed line by line"
+envloader --> proxy : "credentials routed instead"
+envloader --> supervisord : "exports safe env vars"
+
+waitsvc --> supervisord : "fail-open readiness check"
+
+test ..> mapping : "asserts drift vs supervisord.conf"
+
+@enduml

@@ -1,56 +1,47 @@
 # CostModel
 
-**Type:** SubComponent
-
-Because it is pure computation logic, CostModel has no side effects on workflow-progress.json or network calls, keeping cost math testable in isolation
-
-# CostModel — Technical Insight Document
+**Type:** Detail
 
 ## What It Is
 
-CostModel is a subcomponent of LLMAbstraction responsible for translating token counts into monetary figures (€/$) using per-provider pricing tables. Unlike much of the surrounding LLM infrastructure—which deals with network calls, mode resolution, and process orchestration—CostModel is defined purely in terms of computation: it takes numeric token inputs and pricing data and produces cost outputs. No specific file paths or class names were identified in the current observations, suggesting this component's logic is either small, embedded within a broader LLM abstraction module, or not yet decomposed into named symbols that have been indexed.
-
-![CostModel — Architecture](images/cost-model-architecture.png)
+CostModel is implemented at `integrations/system-health-dashboard/src/components/cost/cost-model.ts` as a deliberately React-free module of pure functions over plain data types (`CostRow`, `CostConfig`, `BudgetConfig`). Its exports — `budgetForMonth`, `priceForModel`, `cellCostUsd`, `monthlySeries`, `isSynthetic`, `budgetProvider` — together implement pricing resolution, per-row USD cost aggregation, budget-cap lookup, and provider/synthetic-data classification for the system-health dashboard's cost tab. Unlike its dashboard neighbors, it contains zero fetch/useState/useEffect logic; all data acquisition (`GET /api/token-usage/cost`, `GET /api/llm/settings`) is left to an unseen caller.
 
 ## Architecture and Design
 
-The defining architectural characteristic of CostModel is its purity: it is implemented as a set of pure functions with no side effects. It does not write to workflow-progress.json, does not perform network calls, and does not depend on runtime state beyond its inputs (token counts and pricing tables). This is a deliberate design decision that isolates cost arithmetic from the more volatile, I/O-heavy parts of the LLM subsystem.
+The defining architectural choice is strict separation of pure domain logic from React state and data fetching — a pattern not found elsewhere in the supplied set, where `offload-decision.tsx` and `use-classifier-judge.ts` (ClassifierJudgeHook) both mix fetch/useState directly into their logic. This keeps CostModel's pricing math independently testable and reusable outside any component tree.
 
-This purity is what allows CostModel to serve as a shared calculation layer across divergent execution paths. Both the mock LLM path (governed by LLMMockService's getLLMMode() precedence chain) and the public/live LLM path route their token usage through CostModel, ensuring that budget figures are computed identically regardless of which provider actually served a given request. This is an important architectural safeguard: cost reporting integrity does not depend on whether a request was serviced by DMRProvider, routed through LLMWithProcessClient to rapid-llm-proxy, or resolved via ProxyURLResolver's environment-based endpoint selection—CostModel guarantees consistent cost semantics on top of an otherwise heterogeneous provider landscape.
+Several smaller patterns reinforce this design: a historical-override map (`BudgetConfig.monthlyEurByMonth`) instead of a single mutable budget scalar, so past months are judged against the cap actually in force at the time rather than today's number; an ordered fallback ladder in `priceForModel()` (exact → fast-suffix → family) with an explicit `source` tag for traceability; and provider-string normalization (`budgetProvider()`) collapsing many raw identities into a small fixed billing-bucket set. All of these favor auditability and correctness-by-construction over minimal code.
 
 ## Implementation Details
 
-Because CostModel operates on pricing tables keyed per provider, its core mechanic is a lookup-and-multiply pattern: given a token count and a provider identifier, it resolves the applicable rate table and computes a resulting cost. The absence of side effects means these functions can be invoked repeatedly, in any order, without concern for accumulated state or ordering effects—an important property given that LLM calls in this system can be dispatched through several different code paths (mock, DMR, proxy-based) depending on the mode-resolution hierarchy implemented in the sibling LLMMockService.
+`budgetForMonth()` looks up an exact month key in `monthlyEurByMonth` (honoring explicit `null` as "no cap that month") before falling back to `monthlyEur`, directly encoding the documented copilot budget history (300→600→1000).
 
-No specific class or function symbols were surfaced in the current code index for CostModel, which suggests the current insight is derived primarily from behavioral/architectural observation rather than direct source inspection. Future documentation passes should attempt to name the specific module and functions once they are indexed, to sharpen this section beyond the functional description provided by observations.
+`priceForModel()` resolves prices in a load-bearing order: exact match, then a fast-mode check stripping `-fast` and recursing before applying `FAST_MODE_MULTIPLIER` (2x), and only then family fallback via `modelFamily()`/`FAMILY_REPRESENTATIVE`. This ordering lets an explicit `<model>-fast` row override the multiplier and structurally prevents the failure mode of a missing fast-mode twin silently pricing at standard rate.
+
+`freshInputTokens(r: CostRow)` is now a one-line identity function, but its docstring preserves the history of a deleted compensation: it used to subtract `cache_read_tokens` for OpenAI-wire rows, which became wrong once the proxy's `openAIFreshInputTokens()` began doing that subtraction at the parse boundary (plus a backfill script fixing historical rows). Leaving the old logic in place would have re-zeroed already-corrected rows (example: input=135, cache_read=23264 → old code wrongly returned 0).
+
+`cellCostUsd()` is where this all cashes out into dollars — pricing fresh input, output, cache-read, and cache-write tokens separately against `ModelPrice`, then scaling by `cfg.providerScale[budgetProvider(r.provider)]`. `isSynthetic()` and `budgetProvider()` both bias toward under-counting real spend: excluding fake/demo rows, and collapsing non-copilot/github providers into a notional flat `'claude-max'` bucket.
 
 ## Integration Points
 
-CostModel sits underneath LLMAbstraction, the parent component that also houses LLMMockService (mode resolution), DMRProvider (Docker Model Runner's OpenAI-compatible surface), LLMWithProcessClient (direct fetch-based proxy calls), and ProxyURLResolver (environment-driven endpoint selection). While these siblings are concerned with *how* and *where* an LLM request is dispatched, CostModel is concerned with *what it costs* once token usage is known—making it a downstream consumer of token counts regardless of dispatch path.
+CostModel has no structural coupling to React or fetching — it expects a caller (outside this file) to supply `CostRow[]` and `CostConfig` already retrieved from `/api/token-usage/cost` and `/api/llm/settings`. Its documented dependency on the proxy's Anthropic-vs-OpenAI wire distinction is now entirely upstream: `freshInputTokens` trusts `r.input_tokens` unconditionally, meaning any regression in the proxy's cache-token accounting would silently mis-bill with no local defense.
 
-![CostModel — Relationship](images/cost-model-relationship.png)
-
-Its outputs likely feed the documented Token Usage Dashboard referenced in project documentation, positioning CostModel as the computational backbone for any budget-tracking or cost-visibility feature in the system. This dashboard connection, while not confirmed by direct code inspection, is a reasonable inference given that CostModel's sole purpose is producing cost figures that must surface somewhere for human consumption.
+Within the dashboard, CostModel sits alongside but is not called by `offload-decision.tsx` or ClassifierJudgeHook (`use-classifier-judge.ts`) — no import or call relationship exists despite shared directory proximity and overlapping proxy usage data. The parent entity "OffloadRoutingDashboard" has no concrete implementation in the supplied files; the closest thematic match is `OffloadDecision`, but this is a naming/retrieval mismatch rather than a structural relationship, so no genuine parent-child coupling should be assumed.
 
 ## Usage Guidelines
 
-Developers integrating with CostModel should preserve its purity: any new consumer should pass in token counts and provider identifiers and treat the return value as a deterministic function of those inputs, without expecting or introducing side effects. Because the mock and public LLM paths both rely on CostModel for consistent budget math, any changes to per-provider pricing tables must be validated against both paths to ensure the "consistent budget figures regardless of provider" guarantee continues to hold.
-
-Given its isolation from network calls and workflow-progress.json, CostModel is well-suited for unit testing in isolation—changes to pricing logic should be accompanied by targeted tests rather than relying on end-to-end LLM call testing. When debugging discrepancies in reported costs, developers should first confirm which LLM path (mock vs. public, and which provider under LLMMockService's mode-resolution precedence) generated the token counts before suspecting CostModel itself, since its logic is deterministic and provider-pricing-table-driven rather than a likely source of variable behavior.
+Any change to token-cost semantics should first ask whether the fix belongs upstream at the proxy's parse boundary rather than in `cellCostUsd()`, following the precedent set by `freshInputTokens`'s documented history — compensations must be deleted in lockstep with the defect they compensated for, not silently. When adjusting budgets, add entries to `monthlyEurByMonth` rather than overwriting `monthlyEur`, to preserve historical auditability. When adding model prices, respect the exact→fast→family resolution order in `priceForModel()`, since reordering it reintroduces the silent-mispricing failure mode it was built to eliminate. Finally, do not assume shared-directory files (`offload-decision.tsx`, `store/provider.tsx`, `copilot-model-ids.test.mjs`) are collaborators of CostModel merely due to proximity — this file set shows no such coupling.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- [LLM] The LLMAbstraction component implements a mode-resolution hierarchy that is critical for understanding how any given agent call is actually dispatched. getLLMMode() in llm-mock-service.ts checks, in strict order: a per-agent override (allowing individual agents to be pinned to mock/local/public independently of global state), then a global mode setting, then a legacy mockLLM boolean flag (retained for backward compatibility with older config schemas), and finally falls back to 'public' as the safe default. This layered precedence means a developer debugging unexpected LLM behavior for a specific agent must check all four levels rather than assuming the global setting applies uniformly—per-agent overrides silently win even if the global mode says otherwise, which is a common source of confusion during multi-agent experiments.
+- [OffloadRoutingDashboard](./OffloadRoutingDashboard.md) -- [LLM] No file in the supplied set defines, exports, or references a component literally named "OffloadRoutingDashboard." The closest thematic match is `OffloadDecision` in `integrations/system-health-dashboard/src/components/llm-routing/offload-decision.tsx`, which is a dashboard card for offload routing — it toggles between 'config' and 'recorded' modes, renders a gate ladder (`GATES`, `RUNG_OFFLOADED`), and surfaces disagreements between the UI's own policy evaluation and the proxy's live resolution. This is very likely the entity the retrieval was trying to surface, but under a different code identifier, so any claim that 'OffloadRoutingDashboard is implemented at line X' would be fabricated rather than observed.
 
 ### Siblings
-- [LLMMockService](./LLMMockService.md) -- getLLMMode() in llm-mock-service.ts implements a strict precedence chain: per-agent override, then global mode, then legacy mockLLM boolean, then 'public' default
-- [DMRProvider](./DMRProvider.md) -- DMRProvider wraps Docker Model Runner's OpenAI-compatible API surface, letting existing OpenAI-style request/response code reuse the same client shape
-- [LLMWithProcessClient](./LLMWithProcessClient.md) -- LLMWithProcessClient bypasses higher-level SDK abstractions in favor of a direct fetch() call to /api/complete on rapid-llm-proxy
-- [ProxyURLResolver](./ProxyURLResolver.md) -- ProxyURLResolver reads environment variables such as RAPID_LLM_PROXY_URL and LLM_CLI_PROXY_URL to decide which endpoint to use
+- [ClassifierJudgeHook](./ClassifierJudgeHook.md) -- [LLM] The component named "ClassifierJudgeHook" is concretely implemented as `useClassifierJudge(proxyBase, pollMs = 30_000)` in `integrations/system-health-dashboard/src/components/llm-routing/use-classifier-judge.ts`. It fetches `GET ${proxyBase}/api/llm/classifier`, unwraps `d.judge`, and merges it into local state with default `knn` sub-fields spread first so a partial payload from an older proxy still produces a well-formed `Judge` object rather than `undefined` sub-properties. This is a genuine implementation match, not a thematic neighbor — the file's own header comment explicitly frames it as 'the judge — who decides how hard a request is, and whether they are answering,' which is exactly the ClassifierJudgeHook responsibility.
 
 
 ---
 
-*Generated from 4 observations*
+*Generated from 10 observations*

@@ -1,23 +1,39 @@
 @startuml
 !include _standard-style.puml
 
-package "LLM Request Paths" {
-  component "Mock LLM Path" as mock <<agent>>
-  component "Public LLM Path" as public <<agent>>
+package "cost-model.ts (pure module)" {
+  component "priceForModel()" as price <<core>>
+  component "modelFamily() /\nFAMILY_REPRESENTATIVE" as family <<core>>
+  component "freshInputTokens()" as fresh <<core>>
+  component "budgetForMonth()" as budget <<core>>
+  component "budgetProvider()" as bucket <<core>>
+  component "isSynthetic()" as synth <<core>>
+  component "monthlySeries()" as series <<core>>
 }
 
-package "Cost Computation" {
-  component "CostModel" as costmodel <<core>>
-  component "Provider Pricing Tables" as pricing <<storage>>
+package "External Config / Data" {
+  component "CostRow[]" as rows <<external>>
+  component "CostConfig /\nBudgetConfig.monthlyEurByMonth" as config <<external>>
 }
 
-package "Reporting" {
-  component "Token Usage Dashboard" as dashboard <<api>>
+package "Upstream Systems" {
+  component "rapid-llm-proxy\nopenAIFreshInputTokens()" as proxy <<external>>
+  component "Model Catalogue\n(endpoint gating)" as catalogue <<external>>
 }
 
-mock --> costmodel : "token counts"
-public --> costmodel : "token counts"
-pricing --> costmodel : "per-provider rates"
-costmodel --> dashboard : "budget figures (€/$)"
+price --> family : "fallback when\nexact key misses"
+price ..> family : "fast-mode suffix\nstripping (FAST_MODE_MULTIPLIER)"
+
+series --> synth : "filter synthetic rows"
+synth --> rows : "reads CostRow[]"
+series --> price : "compute cost per row"
+series --> budget : "aggregate vs cap"
+
+budget --> config : "reads monthlyEurByMonth"
+bucket --> budget : "bucket provider →\ncopilot / claude-max"
+
+fresh ..> proxy : "compensation now\nlives upstream"
+
+price ..> catalogue : "parallel correctness\nconstraint (not enforced here)"
 
 @enduml

@@ -1,42 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "Container Boot" {
-  component "entrypoint.sh" as entry <<core>>
-  component "features.json snapshot" as snap <<storage>>
-  component "features.d/disabled.conf" as disabled <<storage>>
-  component "supervisord.conf [include]" as supconf <<core>>
-  component "supervisord programs\n(semantic-analysis, graphify, etc.)" as programs <<core>>
+package "Host Side" {
+  component "Feature Resolution\n(features.yaml)" as hostPolicy <<core>>
+  database "features.json\n(snapshot)" as snapshot <<storage>>
+  component "Host PSM Orchestrator\n(start-services-robust.js)" as psm <<agent>>
+}
+
+package "Container: entrypoint.sh" {
+  component "Snapshot Consumer\n(node -e evaluation)" as consumer <<core>>
+  component "PROGRAM_FEATURES\nMapping" as mapping <<core>>
+  component "features.d/disabled.conf\nGenerator" as overrideGen <<core>>
+  component ".env Loader\n(egress lockdown filter)" as envLoader <<core>>
+  component "wait_for_service()\n(Qdrant/Redis TCP poll)" as waiter <<core>>
+}
+
+package "Supervisord Layer" {
+  component "supervisord.conf\n(program definitions)" as supconf <<core>>
+  component "supervisord\n(process manager)" as supervisord <<core>>
   cloud "llm-cli-proxy :12435" as proxy <<external>>
 }
 
-package "Host Startup" {
-  component "start-services.sh (legacy)" as legacy <<cli>>
-  component "start-services-robust.js" as robust <<core>>
-  component "SERVICE_CONFIGS + startOneService()" as configs <<core>>
-  component "ProcessStateManager (PSM)" as psm <<storage>>
-  component "waitForPortBindable / killProcessOnPortAndWait" as portutil <<core>>
-}
+hostPolicy --> snapshot : "writes"
+snapshot ..> consumer : "read-only mount"
+consumer --> mapping : "evaluates feature keys"
+mapping --> overrideGen : "autostart=false stanzas"
+overrideGen --> supconf : "includes features.d/*.conf"
+envLoader --> supervisord : "exec \"$@\""
+waiter --> supervisord : "defers readiness enforcement"
+supconf --> supervisord : "defines programs/commands"
+envLoader ..> proxy : "enforces no direct egress"
 
-package "Test Contracts" {
-  component "service-gating.test.mjs" as test <<agent>>
-  component "lib/features/catalogue.cjs" as catalogue <<storage>>
-}
-
-snap --> entry : "read via node -e"
-entry --> disabled : "writes autostart=false"
-disabled --> supconf : "included directory"
-supconf --> programs : "controls autostart"
-entry --> proxy : "routes outbound LLM calls\n(secrets filtered from env)"
-
-legacy ..> robust : "ROBUST_MODE=true"
-robust --> configs
-configs --> psm : "isServiceRunning checks"
-configs --> portutil : "port reclamation"
-psm --> configs : "self-heal via pgrep fallback"
-
-test --> configs : "asserts feature coverage"
-test --> catalogue : "validates FEATURE_IDS"
-configs --> catalogue : "feature key lookup"
+psm ..> snapshot : "independent gating\n(non-integrated)"
 
 @enduml

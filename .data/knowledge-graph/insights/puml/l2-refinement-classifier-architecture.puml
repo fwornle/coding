@@ -1,0 +1,40 @@
+@startuml
+!include _standard-style.puml
+
+package "L2 Refinement (Undocumented / Missing)" {
+  component "L2RefinementClassifier" as l2 <<agent>>
+  component "loadL2Classes()" as load <<core>>
+  component "buildL2RefinementPrompt()" as prompt <<core>>
+  component "extractL2FromLLMResponse()" as extract <<core>>
+  component "coding.lower.json" as codinglower <<storage>>
+}
+
+package "Ontology System (src/ontology/index.ts)" {
+  component "createOntologySystem()" as factory <<core>>
+  component "OntologyValidator" as validator <<core>>
+  component "OntologyClassifier" as classifier <<core>>
+  component "LegacyOntologyAdapter" as adapter <<agent>>
+  component "InferenceEngine" as engine <<core>>
+}
+
+package "Downstream Tools" {
+  component "repair-writer-ontology-class.mjs" as repair <<cli>>
+  cloud "obs-api" as obsapi <<external>>
+}
+
+codinglower ..> load : "consumed by (unverified)"
+load ..> prompt : "feeds"
+prompt ..> extract : "LLM round-trip"
+extract ..> l2 : "produces L2 class"
+
+factory --> validator : "constructs"
+factory --> classifier : "constructs"
+classifier --> engine : "requires (fail-fast)"
+classifier --> adapter : "requires (fail-fast)"
+
+l2 ..> classifier : "no evidence of wiring"
+
+repair --> obsapi : "HTTP calls"
+repair ..> classifier : "post-hoc repair, unrelated"
+
+@enduml

@@ -1,0 +1,41 @@
+# PortReleaseWaiting
+
+**Type:** Detail
+
+## What It Is
+
+PortReleaseWaiting is implemented in `scripts/start-services-robust.js` as a pair of free-standing async functions — `killProcessOnPortAndWait(port, options)` and `waitForPortBindable(port, options)` — that together form a graceful-then-forceful handshake for freeing and re-acquiring TCP ports during service shutdown/restart. This is the child-facing behavior within its parent, ServiceStarter, which is the actual Node orchestrator wrapping `lib/service-starter.js` primitives into the declarative `SERVICE_CONFIGS` map. PortReleaseWaiting is distinct from, but conceptually overlapping with, its sibling PortHealthChecks (which describes the same two functions from a "port health" framing) and WithDeadlineRacing (a sibling whose name has no independent implementation — it resolves to these same two functions viewed as a race-avoidance pair).
+
+## Architecture and Design
+
+The core design pattern is graceful-then-forceful escalation: `killProcessOnPortAndWait` sends SIGTERM first, polls for actual release, and only escalates to SIGKILL after half of `maxWaitMs` has elapsed. This avoids killing processes that would exit cleanly on their own while still bounding total wait time. Its counterpart, `waitForPortBindable`, embodies a second pattern — two-tier readiness probing — by deliberately avoiding the HTTP-level `isPortListening` check from `lib/service-starter.js` in favor of a raw `net.createServer().listen()` probe, since a crashed process can leave a socket in a state where HTTP probes get no answer yet a real bind still throws EADDRINUSE.
+
+A third, architecturally distinct instance of "port waiting" exists in `docker/entrypoint.sh`'s `wait_for_service()`, which waits for a remote port to become *occupied* (Qdrant/Redis reachability) rather than *freed*, using a bash `/dev/tcp` probe, and is fail-open by design — logging a warning and returning 0 after `max_attempts` rather than blocking container boot. A fourth, legacy layer lives in `start-services.sh`'s `check_port`/`kill_port`, which is dead code under the default `ROBUST_MODE=true` gate but preserved as a backward-compatibility escape hatch. This results in three independently-maintained implementations of structurally similar "wait for network resource state to change" logic with no shared code.
+
+## Implementation Details
+
+`killProcessOnPortAndWait` checks occupancy via `lsof -ti:${port}`, sends SIGTERM to owning PIDs, then polls `checkPortInUse()` at `pollIntervalMs` (default 200ms) up to `maxWaitMs` (default 5000ms), escalating to SIGKILL only past the halfway mark. `waitForPortBindable` spins up a throwaway `net.createServer()`, attempts `.listen(port, host)`, treats the `'error'` event as not-yet-bindable and `'listening'` as success, closing the probe socket either way. Neither function is a class method or directly exported through `SERVICE_CONFIGS`; both are internal utilities presumably invoked from specific `startFn` implementations further down the truncated file, likely around PORTS-keyed services such as LLM_CLI_PROXY, OBSERVATIONS_API, or SYSTEM_HEALTH_API rather than the visible `transcriptMonitor`/`liveLoggingCoordinator` blocks.
+
+## Integration Points
+
+PortReleaseWaiting sits beneath ServiceStarter's declarative `SERVICE_CONFIGS` tuples (`{name, feature, psmPath, required, maxRetries, timeout, startFn, healthCheckFn}`), consumed indirectly by specific `startFn`s rather than applied uniformly across all entries. It complements — but does not share code with — `docker/entrypoint.sh`'s `wait_for_service` and the legacy `check_port`/`kill_port` in `start-services.sh`, the latter rendered unreachable by the `exec node .../start-services-robust.js` gate under `ROBUST_MODE=true`. It also stands apart from ServiceCatalogueGating, which layers feature-flag gating (`loadFeatures`, `writeSnapshot`) atop the same catalogue file.
+
+## Usage Guidelines
+
+Developers should treat `killProcessOnPortAndWait` and `waitForPortBindable` as a paired race-avoidance mechanism rather than generic pre-flight checks, and be aware that `waitForPortBindable`'s default bind to `0.0.0.0` may produce false readiness/unreadiness signals for services intending to bind only to `127.0.0.1`. Anyone modifying `ROBUST_MODE` behavior must remember the legacy `start-services.sh` port logic lacks SIGTERM-before-SIGKILL escalation and polling, so disabling robust mode changes shutdown semantics materially. Since fixes here won't propagate to `docker/entrypoint.sh`'s bash-native probe, any correction to timeout/retry logic must be applied in both places independently, given the current lack of shared implementation.
+
+
+## Hierarchy Context
+
+### Parent
+- [ServiceStarter](./ServiceStarter.md) -- [LLM] scripts/start-services-robust.js is the actual ServiceStarter implementation — a Node orchestrator that wraps lib/service-starter.js's startServiceWithRetry/createHttpHealthCheck/createPidHealthCheck primitives into a declarative SERVICE_CONFIGS map, each entry a {name, feature, psmPath, required, maxRetries, timeout, startFn, healthCheckFn} tuple. start-services.sh is a thin bash shim that execs this script when ROBUST_MODE=true (the default) and only falls back to an inline legacy bash startup path (manual docker-compose/lsof/kill logic) when ROBUST_MODE=false, meaning the legacy code in start-services.sh below the exec is dead in normal operation but kept for backward compatibility.
+
+### Siblings
+- [WithDeadlineRacing](./WithDeadlineRacing.md) -- [LLM] No file or function named "WithDeadlineRacing" appears anywhere in the supplied Code Files (docker/entrypoint.sh, scripts/prompt-classifier-service.mjs, scripts/start-services-robust.js, start-services.sh, tests/features/service-gating.test.mjs). The nearest thematic analogues are killProcessOnPortAndWait() and waitForPortBindable() in scripts/start-services-robust.js, which the parent context itself already describes as 'a graceful-then-forceful shutdown/startup race-avoidance pair' — but those two functions are the actual, differently-named implementation the parent observation refers to, not a distinct 'WithDeadlineRacing' entity.
+- [PortHealthChecks](./PortHealthChecks.md) -- [LLM] scripts/start-services-robust.js implements two complementary port-health primitives that form a graceful-then-forceful lifecycle pair: killProcessOnPortAndWait(port, options) first checks occupancy via `lsof -ti:${port}`, sends SIGTERM to any owning PIDs, polls port occupancy at pollIntervalMs (default 200ms) up to maxWaitMs (default 5000ms), and escalates to SIGKILL only after half the timeout has elapsed — a deliberate grace window rather than an immediate hard kill. Its counterpart, waitForPortBindable(port, options), does not trust any HTTP-level signal; it repeatedly spins up a throwaway `net.createServer()` and attempts `.listen(port, host)`, resolving true only on the 'listening' event and false on 'error', because the function's own comment explains the kernel can hold a socket in a post-crash window where nothing answers HTTP probes yet EADDRINUSE still fires on bind. Together these functions treat 'is this port usable' as two distinct, unrelated questions — release-after-kill and bind-capability-after-restart — rather than one boolean.
+- [ServiceCatalogueGating](./ServiceCatalogueGating.md) -- [LLM] scripts/start-services-robust.js implements the actual service catalogue: SERVICE_CONFIGS is a plain object keyed by service name (transcriptMonitor, liveLoggingCoordinator, and others truncated in the excerpt), each entry declaring a `feature` string, a `psmPath`, `required`, `maxRetries`, `timeout`, `startFn`, and `healthCheckFn`. Gating is layered on top of this catalogue rather than baked into each `startFn`: the file imports `loadFeatures` from `lib/features/index.mjs` and calls `writeSnapshot` from `lib/features/snapshot.cjs`, meaning the same process that decides which services to attempt locally is also the writer of the flat snapshot that `docker/entrypoint.sh` later reads to gate the container's supervisord programs — one Node process is upstream of two independent gating mechanisms (host loop, container supervisord).
+
+
+---
+
+*Generated from 9 observations*

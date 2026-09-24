@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: StartServicesOrchestrator
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[StartServicesOrchestrator] as start_services_orchestrator #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[APIServiceWrapper] as apiservice_wrapper #F0F0F0
+[DashboardServiceWrapper] as dashboard_service_wrapper #F0F0F0
+[MockLLMService] as mock_llmservice #F0F0F0
+[SupervisordRuntime] as supervisord_runtime #F0F0F0
+[PortCleanupLogic] as port_cleanup_logic #E8F5E8
+[ConstraintMonitorBootstrap] as constraint_monitor_bootstrap #E8F5E8
+[ContainerEntrypointFeatureGating] as container_entrypoint_feature_gating #E8F5E8
+[ServiceGatingRegistry] as service_gating_registry #E8F5E8
+
+dockerized_services --> start_services_orchestrator
+service_starter -[hidden]- start_services_orchestrator
+apiservice_wrapper -[hidden]- start_services_orchestrator
+dashboard_service_wrapper -[hidden]- start_services_orchestrator
+mock_llmservice -[hidden]- start_services_orchestrator
+supervisord_runtime -[hidden]- start_services_orchestrator
+start_services_orchestrator --> port_cleanup_logic
+start_services_orchestrator --> constraint_monitor_bootstrap
+start_services_orchestrator --> container_entrypoint_feature_gating
+start_services_orchestrator --> service_gating_registry
+
+@enduml

@@ -1,0 +1,38 @@
+@startuml
+!include _standard-style.puml
+
+package "OffloadRouting UI" {
+  component "OffloadDecision" as decision <<core>>
+  component "queryFor()\n(pseudo-route resolver)" as queryFor <<core>>
+  component "pooled()\n(bounded concurrency)" as pooled <<core>>
+  component "offload-gates.ts\n(GATES/RUNG ladder)" as gates <<core>>
+}
+
+package "Hooks / State" {
+  component "useOffloadPolicyDraft" as policyHook <<agent>>
+  component "useClassifierJudge" as judgeHook <<agent>>
+}
+
+package "External Services" {
+  component "rapid-llm-proxy\n/api/llm/routing/resolve" as proxy <<external>>
+  database "llm-routing.yaml" as policyFile
+  database "config/prompt-classifier.yaml" as judgeFile
+}
+
+decision --> gates : "compute config rungs"
+decision --> queryFor : "build defaults.* queries"
+queryFor --> pooled : "batch ~39 route resolutions"
+pooled --> proxy : "fetch route resolutions"
+
+decision --> policyHook : "read/save policy draft"
+decision --> judgeHook : "read/save judge rubric"
+policyHook --> policyFile : "save()"
+judgeHook --> judgeFile : "save()"
+
+proxy --> decision : "ground-truth resolution\n(offloadSkipped reason)"
+gates --> decision : "restated ladder rung"
+
+decision --> decision : "disagreement banner\n(config vs recorded)"
+policyHook --> decision : "onDirtyChange\n(pause parent poll)"
+
+@enduml

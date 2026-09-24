@@ -7,13 +7,29 @@ title Hierarchy Context: Insights
 [Insights] as insights #LightBlue
 [Ontology] as ontology #F0F0F0
 [Pipeline] as pipeline #F0F0F0
-[BaseAgent] as base_agent #F0F0F0
-[L2SubsystemClassifier] as l2_subsystem_classifier #F0F0F0
+[OntologyClassificationAgent] as ontology_classification_agent #F0F0F0
+[SemanticAnalysisAgent] as semantic_analysis_agent #F0F0F0
+[BaseAgentFramework] as base_agent_framework #F0F0F0
+[L2RefinementClassifier] as l2_refinement_classifier #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[AgentLauncherConfigs] as agent_launcher_configs #F0F0F0
+[NoUnboundedFsScanGuard] as no_unbounded_fs_scan_guard #F0F0F0
+[InsightCompactionPipeline] as insight_compaction_pipeline #E8F5E8
+[HierarchicalInsightRollup] as hierarchical_insight_rollup #E8F5E8
+[InsightFreshnessVerification] as insight_freshness_verification #E8F5E8
 
 semantic_analysis --> insights
 ontology -[hidden]- insights
 pipeline -[hidden]- insights
-base_agent -[hidden]- insights
-l2_subsystem_classifier -[hidden]- insights
+ontology_classification_agent -[hidden]- insights
+semantic_analysis_agent -[hidden]- insights
+base_agent_framework -[hidden]- insights
+l2_refinement_classifier -[hidden]- insights
+health_coordinator -[hidden]- insights
+agent_launcher_configs -[hidden]- insights
+no_unbounded_fs_scan_guard -[hidden]- insights
+insights --> insight_compaction_pipeline
+insights --> hierarchical_insight_rollup
+insights --> insight_freshness_verification
 
 @enduml

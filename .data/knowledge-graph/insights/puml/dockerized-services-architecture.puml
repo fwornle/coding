@@ -1,43 +1,39 @@
 @startuml
 !include _standard-style.puml
 
-package "Container Mode" {
-  component "docker-compose.yml" as compose <<core>>
-  component "supervisord.conf" as supervisor <<core>>
-  component "Dockerfile.coding-services" as dockerfile <<core>>
+package "Wrapper Scripts" {
+  component "api-service.js" as apiWrapper <<core>>
+  component "dashboard-service.js" as dashWrapper <<core>>
+  component "dashboard-server.js" as dashServer <<core>>
 }
 
-package "Host Mode" {
-  component "service-starter.js" as starter <<core>>
+package "Process Management" {
   component "ProcessStateManager" as psm <<core>>
-  component "Wrapper Scripts\n(api-service.js, dashboard-service.js)" as wrappers <<agent>>
+  component "service-starter.js\n(withDeadline)" as starter <<core>>
+  component "supervisord" as supervisor <<external>>
 }
 
-package "Health & State" {
-  component "service-probe.js" as probe <<core>>
-  component "llm-mock-service.ts" as llmmock <<core>>
-  database ".data/workflow-progress.json" as progressjson
+package "Health & Config" {
+  component "service-probe.js\n(running/stopped/unknown)" as probe <<api>>
+  component "llm-mock-service.ts\n(CODING_ROOT override)" as mockService <<agent>>
 }
 
-component "Dashboard (Next.js)" as dashboard <<agent>>
-component "API Service" as api <<api>>
+cloud "Docker Compose\nContainer Runtime" as docker <<external>>
 
-supervisor --> dockerfile : "managed inside container"
-compose --> supervisor : "orchestrates"
+apiWrapper --> dashServer : "spawns child process"
+apiWrapper --> psm : "registers PID\n'constraint-api-child'"
+dashWrapper --> dashServer : "wraps 'npm run dev'"
+dashWrapper --> apiWrapper : "hardcoded\nNEXT_PUBLIC_API_BASE_URL:3031"
 
-starter --> psm : "registers PID / tracks state"
-wrappers --> psm : "registerService()"
-starter --> wrappers : "spawns child process"
+supervisor --> apiWrapper : "manages lifecycle"
+supervisor --> dashWrapper : "manages lifecycle"
+docker --> supervisor : "docker-compose up -d"
 
-probe --> starter : "health check (agnostic)"
-probe --> supervisor : "health check (agnostic)"
+starter --> probe : "invokes health checks"
+probe --> supervisor : "reports health state"
 
-llmmock --> progressjson : "reads/writes llmState"
-llmmock --> compose : "CODING_ROOT override"
+mockService ..> docker : "reconciles host vs\ncontainer paths"
 
-wrappers --> dashboard : "wraps npm run dev"
-wrappers --> api : "wraps Express process"
-
-dashboard --> api : "hardcoded localhost:3031"
+docker --> probe : "post-restart\nverification baseline"
 
 @enduml

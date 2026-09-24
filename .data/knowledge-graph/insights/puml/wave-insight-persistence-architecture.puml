@@ -1,46 +1,31 @@
 @startuml
 !include _standard-style.puml
 
-package "Persistence Sub-Steps (multi-agent-graph.tsx)" {
-  component "Wave 1 Persist\n(Project+Component)" as w1 <<core>>
-  component "Wave 2 Persist\n(SubComponent)" as w2 <<core>>
-  component "Wave 3 Persist\n(Detail+Embeddings\nDirect Attribute Merge)" as w3 <<core>>
+package "Wave Analysis Pipeline" {
+  component "Wave 4 Batch Analysis" as wave4 <<core>>
+  component "WaveInsightPersistence" as wip <<core>>
+  component "km-core-adapter.ts\n(findEntityByName fix)" as kmadapter <<core>>
 }
 
-package "Storage" {
-  database "GraphDB" as graphdb <<storage>>
-  database "LevelDB" as leveldb <<storage>>
+package "Persistence Targets" {
+  database "Insight Document Store" as docstore <<storage>>
+  database "Knowledge Graph\n(Insight nodes)" as graph <<storage>>
 }
 
-package "Dashboard Telemetry" {
-  component "ukbSlice (WaveGroup/StepInfo)" as ukbslice <<core>>
-  component "ukb-workflow-modal\ncalculateDynamicEta()" as etamodal <<core>>
+package "Consumer Surfaces" {
+  component "History UI\n(entity Type='Insight' filter)" as historyui <<external>>
+  component "UKB Workflow Modal\n(HISTORY_PAGE_SIZE=50)" as ukbmodal <<external>>
+  component "hierarchy-parents.test.ts\n(deriveParents)" as hierarchytest <<external>>
 }
 
-package "Graph Visualization" {
-  component "D3GraphCanvas\n(deriveAncestryFromStorePath)" as d3canvas <<core>>
-  component "buildRehomeEdges" as rehome <<core>>
-  component "color-fallback.ts\n(node FillColor)" as colorfb <<core>>
-  component "Sigma-based Canvas" as sigma <<external>>
-}
+wave4 --> wip : "produces 73 insights"
+wip --> docstore : "writes insight documents"
+wip --> graph : "explicitly creates Insight nodes\n(source/subsystem='wave-analysis')"
+kmadapter --> graph : "type-qualified queryIncomingRelations\n/storeRelationship"
 
-w1 --> graphdb : "write L0/L1 entities"
-w1 --> leveldb : "write"
-w2 --> graphdb : "write L2 entities"
-w2 --> leveldb : "write"
-w3 --> graphdb : "merge L3 + embeddings"
-w3 --> leveldb : "write"
-
-w1 --> ukbslice : "reports duration/entity Flow"
-w2 --> ukbslice : "reports duration/entity Flow"
-w3 --> ukbslice : "reports duration/entity Flow"
-
-ukbslice --> etamodal : "step.duration data"
-etamodal --> etamodal : "sanity clamp 0.3x-2.0x"
-
-graphdb --> d3canvas : "persisted graph data"
-d3canvas --> rehome : "repair orphaned nodes"
-d3canvas --> colorfb : "render by metadata.source"
-d3canvas --> sigma : "shared viewer-store"
+graph --> historyui : "filtered by entity Type='Insight'"
+docstore ..> historyui : "invisible without graph node"
+graph --> hierarchytest : "975 Insight nodes\nneed parent derivation"
+docstore --> ukbmodal : "workflow reports\n(paginated)"
 
 @enduml

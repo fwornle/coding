@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TokenUsageDbWriter
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TokenUsageDbWriter] as token_usage_db_writer #LightBlue
+[LslConfigValidator] as lsl_config_validator #F0F0F0
+[ColdStoreBackfill] as cold_store_backfill #F0F0F0
+[LiveCopilotTailWatcher] as live_copilot_tail_watcher #F0F0F0
+[OpenCodeTokenExtraction] as open_code_token_extraction #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[LslSessionsApi] as lsl_sessions_api #F0F0F0
+
+live_logging_system --> token_usage_db_writer
+lsl_config_validator -[hidden]- token_usage_db_writer
+cold_store_backfill -[hidden]- token_usage_db_writer
+live_copilot_tail_watcher -[hidden]- token_usage_db_writer
+open_code_token_extraction -[hidden]- token_usage_db_writer
+observation_writer -[hidden]- token_usage_db_writer
+lsl_sessions_api -[hidden]- token_usage_db_writer
+
+@enduml

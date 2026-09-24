@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ColdStoreBackfill
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[ColdStoreBackfill] as cold_store_backfill #LightBlue
+[LslConfigValidator] as lsl_config_validator #F0F0F0
+[LiveCopilotTailWatcher] as live_copilot_tail_watcher #F0F0F0
+[OpenCodeTokenExtraction] as open_code_token_extraction #F0F0F0
+[TokenUsageDbWriter] as token_usage_db_writer #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[LslSessionsApi] as lsl_sessions_api #F0F0F0
+[MaybePatchArtifactsHelper] as maybe_patch_artifacts_helper #E8F5E8
+[ExactTimestampMatchDesign] as exact_timestamp_match_design #E8F5E8
+
+live_logging_system --> cold_store_backfill
+lsl_config_validator -[hidden]- cold_store_backfill
+live_copilot_tail_watcher -[hidden]- cold_store_backfill
+open_code_token_extraction -[hidden]- cold_store_backfill
+token_usage_db_writer -[hidden]- cold_store_backfill
+observation_writer -[hidden]- cold_store_backfill
+lsl_sessions_api -[hidden]- cold_store_backfill
+cold_store_backfill --> maybe_patch_artifacts_helper
+cold_store_backfill --> exact_timestamp_match_design
+
+@enduml

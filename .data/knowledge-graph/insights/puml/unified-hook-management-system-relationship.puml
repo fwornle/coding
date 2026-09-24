@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: UnifiedHookManagementSystem
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[UnifiedHookManagementSystem] as unified_hook_management_system #LightBlue
+[ContentValidationAgent] as content_validation_agent #F0F0F0
+[HealthPromptHook] as health_prompt_hook #F0F0F0
+[KnowledgeInjectionHook] as knowledge_injection_hook #F0F0F0
+[DashboardWorkflowHooks] as dashboard_workflow_hooks #F0F0F0
+[HealthPromptHook] as health_prompt_hook #E8F5E8
+[UnifiedHookManager] as unified_hook_manager #E8F5E8
+[ClaudeBridge] as claude_bridge #E8F5E8
+[HooksApiAbstraction] as hooks_api_abstraction #E8F5E8
+
+constraint_system --> unified_hook_management_system
+content_validation_agent -[hidden]- unified_hook_management_system
+health_prompt_hook -[hidden]- unified_hook_management_system
+knowledge_injection_hook -[hidden]- unified_hook_management_system
+dashboard_workflow_hooks -[hidden]- unified_hook_management_system
+unified_hook_management_system --> health_prompt_hook
+unified_hook_management_system --> unified_hook_manager
+unified_hook_management_system --> claude_bridge
+unified_hook_management_system --> hooks_api_abstraction
+
+@enduml

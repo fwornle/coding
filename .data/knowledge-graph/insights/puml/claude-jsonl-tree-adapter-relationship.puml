@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ClaudeJsonlTreeAdapter
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[ClaudeJsonlTreeAdapter] as claude_jsonl_tree_adapter #LightBlue
+[ObservationWriter] as observation_writer #F0F0F0
+[ObservationConsolidator] as observation_consolidator #F0F0F0
+[MentionsClassifier] as mentions_classifier #F0F0F0
+[EnhancedTranscriptMonitor] as enhanced_transcript_monitor #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[SubagentPathParser] as subagent_path_parser #E8F5E8
+[TranscriptTimestampReader] as transcript_timestamp_reader #E8F5E8
+[EncodeCwdConvention] as encode_cwd_convention #E8F5E8
+
+live_logging_system --> claude_jsonl_tree_adapter
+observation_writer -[hidden]- claude_jsonl_tree_adapter
+observation_consolidator -[hidden]- claude_jsonl_tree_adapter
+mentions_classifier -[hidden]- claude_jsonl_tree_adapter
+enhanced_transcript_monitor -[hidden]- claude_jsonl_tree_adapter
+token_usage_adapters -[hidden]- claude_jsonl_tree_adapter
+claude_jsonl_tree_adapter --> subagent_path_parser
+claude_jsonl_tree_adapter --> transcript_timestamp_reader
+claude_jsonl_tree_adapter --> encode_cwd_convention
+
+@enduml

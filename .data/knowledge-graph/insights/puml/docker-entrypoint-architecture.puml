@@ -1,42 +1,42 @@
 @startuml
 !include _standard-style.puml
 
-package "Entrypoint Pre-Flight" {
-  component "wait_for_service()\nTCP probe /dev/tcp" as waitsvc <<core>>
-  component ".env Loader\n(secrets denylist filter)" as envfilter <<core>>
-  component "Feature Gating Block\n(features.json → supervisord.d)" as featgate <<core>>
+package "Host Boundary" {
+  component ".env (host)" as envfile <<external>>
+  component "~/.coding/features.yaml" as featuresyaml <<external>>
+  component "llm-cli-proxy :12435" as proxy <<external>>
 }
 
-package "Runtime Supervision" {
+package "docker/entrypoint.sh" {
+  component "Env Loader\n(*_API_KEY/*_TOKEN filter)" as envloader <<core>>
+  component "wait_for_service()\nTCP poll, always returns 0" as waitfn <<core>>
+  component "Feature Gating Block\nPROGRAM_FEATURES" as gatefn <<core>>
+  component "exec \"$@\"" as exechandoff <<core>>
+}
+
+package "Container Runtime" {
+  database "runtime/features.json\n(read-only snapshot)" as snapshot <<storage>>
+  component "/etc/supervisor/features.d/disabled.conf" as disabledconf <<storage>>
+  component "supervisord.conf" as supervisorconf <<core>>
   component "supervisord" as supervisord <<core>>
-  component "api-service.js" as apisvc <<agent>>
-  component "dashboard-service.js" as dashsvc <<agent>>
-  component "service-starter.js\nwithDeadline / retry+backoff" as starter <<core>>
+  component "Qdrant / Redis" as qdredis <<external>>
 }
 
-database "Qdrant" as qdrant
-database "Redis" as redis
-component "ProcessStateManager" as psm <<core>>
-component "generate-docker-mcp-config.sh" as mcpgen <<cli>>
-cloud "llm-cli-proxy :12435" as proxy <<external>>
+featuresyaml --> snapshot : "flattened by host"
+envfile --> envloader : "imports vars"
+envloader ..> proxy : "forces LLM egress via"
 
-waitsvc ..> qdrant : "TCP probe (best-effort)"
-waitsvc ..> redis : "TCP probe (best-effort)"
-envfilter ..> proxy : "prevents SDK bypass"
-featgate --> supervisord : "writes autostart=false includes"
-envfilter --> supervisord : "exec \"$@\" handoff"
+snapshot --> gatefn : "read (fail-open if missing)"
+gatefn --> disabledconf : "generates autostart=false"
+disabledconf --> supervisorconf : "overrides autostart only"
 
-supervisord --> apisvc : "spawns"
-supervisord --> dashsvc : "spawns"
-supervisord --> starter : "invokes for managed services"
+waitfn --> qdredis : "polls readiness"
+waitfn --> supervisord : "defers failure to restarts"
 
-apisvc --> psm : "post-spawn registration (async)"
-dashsvc --> psm : "post-spawn registration (async)"
-dashsvc ..> apisvc : "hardcoded localhost:3031"
-
-starter --> qdrant : "health-check w/ deadline"
-starter --> redis : "health-check w/ deadline"
-
-mcpgen ..> featgate : "shares feature-flag snapshot logic"
+envloader --> waitfn : "setup complete"
+waitfn --> gatefn : "then gating"
+gatefn --> exechandoff : "features.d written"
+exechandoff --> supervisord : "PID 1 handoff"
+supervisorconf --> supervisord : "process config"
 
 @enduml

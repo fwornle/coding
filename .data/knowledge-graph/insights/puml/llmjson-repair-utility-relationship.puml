@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LLMJsonRepairUtility
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LLMJsonRepairUtility] as llmjson_repair_utility #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[ProxyClientWrapper] as proxy_client_wrapper #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
+[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #F0F0F0
+
+llmabstraction --> llmjson_repair_utility
+llmmock_service -[hidden]- llmjson_repair_utility
+dmrprovider -[hidden]- llmjson_repair_utility
+proxy_client_wrapper -[hidden]- llmjson_repair_utility
+copilot_model_id_alignment -[hidden]- llmjson_repair_utility
+dashboard_cost_model -[hidden]- llmjson_repair_utility
+offload_routing_dashboard -[hidden]- llmjson_repair_utility
+model_context_limits_catalogue -[hidden]- llmjson_repair_utility
+
+@enduml

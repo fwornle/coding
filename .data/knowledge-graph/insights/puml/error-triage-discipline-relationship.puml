@@ -1,0 +1,15 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ErrorTriageDiscipline
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[ErrorTriageDiscipline] as error_triage_discipline #LightBlue
+[DocumentationStyleGuide] as documentation_style_guide #F0F0F0
+[PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+
+coding_patterns --> error_triage_discipline
+documentation_style_guide -[hidden]- error_triage_discipline
+pattern_verification_tooling -[hidden]- error_triage_discipline
+
+@enduml

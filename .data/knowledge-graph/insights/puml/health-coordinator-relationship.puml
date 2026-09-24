@@ -3,21 +3,35 @@
 
 title Hierarchy Context: HealthCoordinator
 
-[DockerizedServices] as dockerized_services #FFFFDD
+[SemanticAnalysis] as semantic_analysis #FFFFDD
 [HealthCoordinator] as health_coordinator #LightBlue
-[ServiceStarter] as service_starter #F0F0F0
-[ServiceProbe] as service_probe #F0F0F0
-[ProcessStateManager] as process_state_manager #F0F0F0
-[LLMMockService] as llmmock_service #F0F0F0
-[ServiceWrapperScripts] as service_wrapper_scripts #F0F0F0
-[ServiceProbeMethods] as service_probe_methods #E8F5E8
+[Ontology] as ontology #F0F0F0
+[Pipeline] as pipeline #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyClassificationAgent] as ontology_classification_agent #F0F0F0
+[SemanticAnalysisAgent] as semantic_analysis_agent #F0F0F0
+[BaseAgentFramework] as base_agent_framework #F0F0F0
+[L2RefinementClassifier] as l2_refinement_classifier #F0F0F0
+[AgentLauncherConfigs] as agent_launcher_configs #F0F0F0
+[NoUnboundedFsScanGuard] as no_unbounded_fs_scan_guard #F0F0F0
+[InjectionFlagSystem] as injection_flag_system #E8F5E8
+[LslSessionStalenessTracking] as lsl_session_staleness_tracking #E8F5E8
+[EtmExpectationTracking] as etm_expectation_tracking #E8F5E8
+[ActiveTimeStallClock] as active_time_stall_clock #E8F5E8
 
-dockerized_services --> health_coordinator
-service_starter -[hidden]- health_coordinator
-service_probe -[hidden]- health_coordinator
-process_state_manager -[hidden]- health_coordinator
-llmmock_service -[hidden]- health_coordinator
-service_wrapper_scripts -[hidden]- health_coordinator
-health_coordinator --> service_probe_methods
+semantic_analysis --> health_coordinator
+ontology -[hidden]- health_coordinator
+pipeline -[hidden]- health_coordinator
+insights -[hidden]- health_coordinator
+ontology_classification_agent -[hidden]- health_coordinator
+semantic_analysis_agent -[hidden]- health_coordinator
+base_agent_framework -[hidden]- health_coordinator
+l2_refinement_classifier -[hidden]- health_coordinator
+agent_launcher_configs -[hidden]- health_coordinator
+no_unbounded_fs_scan_guard -[hidden]- health_coordinator
+health_coordinator --> injection_flag_system
+health_coordinator --> lsl_session_staleness_tracking
+health_coordinator --> etm_expectation_tracking
+health_coordinator --> active_time_stall_clock
 
 @enduml

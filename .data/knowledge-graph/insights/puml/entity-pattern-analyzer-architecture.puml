@@ -1,31 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "EntityPatternAnalyzer Module" {
+package "Layer 1: EntityPatternAnalyzer" {
   component "EntityPatternAnalyzer" as epa <<core>>
-  component "teamDirectories Map" as teamDirs <<core>>
-  component "artifactPatterns Array" as patterns <<core>>
   component "extractArtifacts()" as extract <<core>>
-  component "checkLocalArtifact()" as localCheck <<core>>
-  component "matchArtifactPattern()" as patternMatch <<core>>
+  component "checkLocalArtifact()\n(confidence 0.9)" as local <<core>>
+  component "matchArtifactPattern()\n(confidence 0.75)" as pattern <<core>>
+  component "inferEntityClass()\n(teamMappings)" as infer <<core>>
 }
 
-package "Team Regex Conventions" {
-  component "Coding / RaaS / ReSi / Agentic / UI" as teams <<agent>>
+package "Static Lookup Tables" {
+  component "teamDirectories\n(4 teams)" as dirs <<storage>>
+  component "artifactPatterns\n(4 teams)" as pats <<storage>>
+  component "'Agentic' mapping\n(unreachable)" as agentic <<storage>>
 }
 
-package "Dependencies" {
-  component "ontology/types.ts" as types <<external>>
-  database "LayerResult" as result <<storage>>
+package "Types & Downstream" {
+  component "LayerResult" as lr <<external>>
+  component "ArtifactMatch" as am <<external>>
+  component "Downstream Layers\n(Layer 2+)" as downstream <<agent>>
 }
 
-epa --> teamDirs : "owns mapping"
-epa --> patterns : "defines regex sets"
-epa --> extract : "step 1"
-extract --> localCheck : "confidence 0.9"
-localCheck --> patternMatch : "fallback confidence 0.75"
-patternMatch --> teams : "matches artifact patterns"
-epa --> types : "imports ArtifactMatch, LayerResult"
-epa --> result : "returns layer:1 result"
+epa --> extract : "runs 4 regex passes"
+extract --> local : "artifact Set, first-match-wins"
+local --> pattern : "on failure"
+local --> dirs : "prefix match"
+pattern --> pats : "regex match"
+local --> infer : "team value"
+pattern --> infer : "team value"
+infer ..> agentic : "unreachable"
+infer --> am : "produces"
+epa --> lr : "returns\nlayer=1"
+lr --> downstream : "feeds pipeline"
 
 @enduml

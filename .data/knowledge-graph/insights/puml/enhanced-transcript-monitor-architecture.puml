@@ -1,0 +1,46 @@
+@startuml
+!include _standard-style.puml
+
+package "Transcript Readers" {
+  component "StreamingTranscriptReader" as str <<core>>
+  component "AdaptiveExchangeExtractor" as aee <<core>>
+  component "PiSessionReader" as psr <<core>>
+}
+
+package "EnhancedTranscriptMonitor Core" {
+  component "EnhancedTranscriptMonitor" as etm <<core>>
+  component "extractFileChanges / toolCallArgs" as efc <<core>>
+  component "bashWriteTargets" as bwt <<core>>
+  component "resolveHostCodingPath" as rhcp <<core>>
+  component "singleton-reclaim.mjs" as sr <<core>>
+  component "progress-fire.mjs" as pf <<core>>
+}
+
+package "Persistence & Downstream" {
+  component "ObservationWriter" as ow <<core>>
+  component "ObservationApiClient" as oac <<api>>
+  database "Observation DB" as db <<storage>>
+  component "ConfigurableRedactor" as cr <<core>>
+  component "/sl Session Continuity" as sl <<cli>>
+}
+
+str --> etm : "tool-call input"
+aee --> etm : "tool-call input"
+psr --> etm : "stringified content"
+
+etm --> efc : "extract artifacts"
+efc --> bwt : "shell redirection heuristics"
+etm --> rhcp : "guard path leakage"
+etm --> sr : "stall detection / reclaim"
+etm --> pf : "in-progress firing"
+
+etm --> ow : "persist observations"
+ow --> db : "writes (mediated)"
+etm --> oac : "resolve task-id"
+etm --> cr : "redact sensitive data"
+
+ow ..> db : "Raw fallback may silently fail"
+
+etm --> sl : "LSL files consumed for continuity"
+
+@enduml

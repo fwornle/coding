@@ -1,37 +1,33 @@
 @startuml
 !include _standard-style.puml
 
-package "Agent Hook Layer" {
-  component "HooksManager" as hm <<core>>
-  component "EVENT_MAPPINGS" as em <<core>>
-  component "ClaudeBridge" as bridge <<agent>>
-  component "HookManager\n(hook-manager.js)" as mgr <<core>>
+package "Hook Abstraction Layer" {
+  component "HooksManager\n(abstract base)" as hooksApi <<core>>
+  component "registerHook()\npush-then-sort" as regHook <<core>>
+  component "HookEvent Map\n(eager pre-populate)" as hookMap <<storage>>
 }
 
-package "CLI Gating Layer" {
-  component "require-feature.sh" as guard <<cli>>
-  component "Guarded CLIs\n(semantic/graphify/constraints)" as clis <<cli>>
+package "Claude Bridge Process" {
+  component "claude-bridge.js\n(stdin/stdout)" as bridge <<external>>
+  component "EVENT_MAP\ntranslation table" as eventMap <<core>>
+  component "getHookManager()\n(hook-manager.js)" as hookManager <<core>>
 }
 
-package "Dashboard Hook Layer" {
-  component "usePolledFetch" as poll <<core>>
-  component "useRecentCalls\n(subscribers)" as sub <<core>>
-  component "Routing Tab UI" as routing <<external>>
+package "Adjacent / Unrelated Domains" {
+  component "Copilot EVENT_MAPPINGS\n(version-adaptive)" as copilotMap <<external>>
+  component "System-Health-Dashboard\nReact hooks (unrelated)" as reactHooks <<external>>
 }
 
-cloud "Claude Code stdin/stdout" as claude <<external>>
+hooksApi --> hookMap : "pre-populates on construct"
+hooksApi --> regHook : "validates + inserts"
+regHook --> hookMap : "sorted by priority"
 
-hm --> em : "translateEvent()"
-hm --> mgr : "registerHook/triggerHook"
-bridge --> mgr : "getHookManager() (dynamic import)"
-claude --> bridge : "hook JSON protocol"
-bridge --> claude : "decision: allow (fail-open)"
+bridge --> eventMap : "maps native events"
+eventMap --> hookManager : "dispatches unified event"
+bridge ..> hooksApi : "shares unified vocabulary"
 
-clis --> guard : "require_feature <name>"
-guard --> clis : "exit 2 if disabled\n(fail-open on guard error)"
+eventMap ..> copilotMap : "version-adaptive translation\n(POST_PROMPT unsupported)"
 
-poll --> sub : "shared interval pattern"
-routing --> poll : "enabled: !draftDirty"
-poll --> routing : "immediate refresh on resume"
+reactHooks ..> hooksApi : "naming collision only\n(no functional relation)"
 
 @enduml

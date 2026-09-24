@@ -7,19 +7,21 @@ title Hierarchy Context: KnowledgeInjectionHooks
 [KnowledgeInjectionHooks] as knowledge_injection_hooks #LightBlue
 [HookConfigLoader] as hook_config_loader #F0F0F0
 [UnifiedHookManager] as unified_hook_manager #F0F0F0
+[ViolationCaptureService] as violation_capture_service #F0F0F0
 [HealthPromptHook] as health_prompt_hook #F0F0F0
-[HooksManagerRegisterHook] as hooks_manager_register_hook #E8F5E8
-[UnifiedHookManagerHandlerRegistry] as unified_hook_manager_handler_registry #E8F5E8
-[ClaudeBridgeEventTranslation] as claude_bridge_event_translation #E8F5E8
-[KnowledgeInjectionHookGating] as knowledge_injection_hook_gating #E8F5E8
+[HooksManagerAbstractContract] as hooks_manager_abstract_contract #E8F5E8
+[EventMappingsTable] as event_mappings_table #E8F5E8
+[ClaudeBridgeTranslation] as claude_bridge_translation #E8F5E8
+[KnowledgeInjectionHookFiltering] as knowledge_injection_hook_filtering #E8F5E8
 
 constraint_system --> knowledge_injection_hooks
 hook_config_loader -[hidden]- knowledge_injection_hooks
 unified_hook_manager -[hidden]- knowledge_injection_hooks
+violation_capture_service -[hidden]- knowledge_injection_hooks
 health_prompt_hook -[hidden]- knowledge_injection_hooks
-knowledge_injection_hooks --> hooks_manager_register_hook
-knowledge_injection_hooks --> unified_hook_manager_handler_registry
-knowledge_injection_hooks --> claude_bridge_event_translation
-knowledge_injection_hooks --> knowledge_injection_hook_gating
+knowledge_injection_hooks --> hooks_manager_abstract_contract
+knowledge_injection_hooks --> event_mappings_table
+knowledge_injection_hooks --> claude_bridge_translation
+knowledge_injection_hooks --> knowledge_injection_hook_filtering
 
 @enduml

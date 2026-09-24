@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+package "LiveLoggingSystem" {
+  component "LslConfigValidator" as validator <<core>>
+  component "ObservationWriter" as writer <<core>>
+  component "CopilotEventsTail" as tail <<agent>>
+  component "TokenDb" as tokendb <<storage>>
+}
+
+package "Config Sources" {
+  component "lsl-config.json" as config <<external>>
+  component "redaction-config.yaml" as redaction <<external>>
+}
+
+package "Downstream Consumers" {
+  component "Session Continuity Bootstrap" as bootstrap <<agent>>
+  component "Cold-Store Backfill" as backfill <<agent>>
+}
+
+validator ..> config : "checks naming/rotation bounds"
+validator ..> redaction : "checks schema"
+validator ..> writer : "guards transcript schema (inferred)"
+
+writer --> tail : "receives observation rows"
+writer --> tokendb : "adjacent write routing"
+
+bootstrap --> writer : "reconstructs session state from transcripts"
+backfill ..> writer : "repairs drifted schema (downstream of validation gap)"
+
+@enduml

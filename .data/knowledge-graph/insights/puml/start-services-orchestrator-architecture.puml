@@ -1,0 +1,39 @@
+@startuml
+!include _standard-style.puml
+
+package "Entry Points" {
+  component "start-services.sh\n(ROBUST_MODE dispatch)" as entry <<cli>>
+}
+
+package "Orchestrator Core" {
+  component "SERVICE_CONFIGS /\nSERVICE_ORDER" as config <<core>>
+  component "startOneService" as starter <<core>>
+  component "startServiceWithRetry\n(lib/service-starter.js)" as retry <<core>>
+  component "waitForPortBindable()" as portcheck <<core>>
+  component "killProcessOnPortAndWait()" as killport <<core>>
+  component "transcriptMonitor.startFn\n(multi-layer liveness)" as tmon <<agent>>
+}
+
+package "Verification / Testing" {
+  component "service-gating.test.mjs" as gatetest <<core>>
+}
+
+package "Container Boundary" {
+  component "docker/entrypoint.sh\n(feature gating)" as entrypoint <<external>>
+  database "features.json snapshot" as features
+}
+
+entry --> config : "loads config"
+config --> starter : "drives startup order"
+starter --> retry : "delegates spawn+retry"
+retry --> portcheck : "avoids wasting retries"
+starter --> killport : "cleans stale port before spawn"
+starter --> tmon : "gated by required+feature"
+
+gatetest ..> config : "asserts structural invariants"
+gatetest ..> starter : "asserts blocked/disabled semantics"
+
+entrypoint --> features : "reads flat snapshot"
+entrypoint ..> config : "mirrors PROGRAM_FEATURES\n(fail-open)"
+
+@enduml

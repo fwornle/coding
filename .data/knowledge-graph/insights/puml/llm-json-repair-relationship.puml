@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: LlmJsonRepair
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[LlmJsonRepair] as llm_json_repair #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMWithProcessClient] as llmwith_process_client #F0F0F0
+[CostModel] as cost_model #F0F0F0
+[OffloadRouting] as offload_routing #F0F0F0
+[ClassifierJudge] as classifier_judge #F0F0F0
+[ModelContextLimits] as model_context_limits #F0F0F0
+
+llmabstraction --> llm_json_repair
+dmrprovider -[hidden]- llm_json_repair
+llmwith_process_client -[hidden]- llm_json_repair
+cost_model -[hidden]- llm_json_repair
+offload_routing -[hidden]- llm_json_repair
+classifier_judge -[hidden]- llm_json_repair
+model_context_limits -[hidden]- llm_json_repair
+
+@enduml

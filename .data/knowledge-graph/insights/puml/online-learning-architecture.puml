@@ -1,37 +1,40 @@
 @startuml
 !include _standard-style.puml
 
-package "Learning Source Classification" {
-  component "learning-source.ts\n(isOnlineLearned)" as source <<core>>
-  component "color-fallback.ts\n(classColor/node FillColor)" as colorfb <<core>>
-  component "BATCH_PALETTE /\nONLINE_PALETTE" as palettes <<storage>>
+package "Streaming Ingestion (Online)" {
+  component "Conversational Exchange Buffer" as buffer <<core>>
+  component "Streaming Config\n(bufferSize/debounceMs/minExchangeLength)" as config <<core>>
+  component "learning-source.ts\n(isOnlineLearned)" as learnsrc <<core>>
 }
 
-package "Graph Visualization" {
-  component "D3GraphCanvas.tsx\n(VKB port)" as canvas <<core>>
-  component "ONLINE_RING_COLOR\nring overlay" as ring <<core>>
-  component "Legend / Filter Rail /\nHistory Sidebar" as legend <<core>>
+package "Batch Ingestion (UKB/Wave)" {
+  component "UKB Workflow Modal" as modal <<agent>>
+  component "ukbSlice (batchIterations, WaveGroup)" as slice <<core>>
 }
 
-package "System Health Dashboard" {
-  component "ukbSlice.ts\n(LLMMode, llmMode?)" as slice <<core>>
-  component "multi-agent-graph.tsx\n(AGENT_SUBSTEPS, llmUsage)" as agentgraph <<agent>>
-  component "ukb-workflow-modal.tsx\n(HISTORY_PAGE_SIZE=500)" as modal <<api>>
+package "Shared Graph Store" {
+  database "Entity/Insight Graph" as graph <<storage>>
+  component "km-core-adapter.ts\n(entity Type-aware resolution)" as adapter <<core>>
+  component "hierarchy-parents.ts\n(deriveParents)" as hierarchy <<core>>
 }
 
-database "/api/ukb/history" as historyApi
+package "Visualization" {
+  component "D3GraphCanvas.tsx" as canvas <<api>>
+  component "vokb-palette\n(ONLINE_RING_COLOR)" as palette <<external>>
+}
 
-colorfb --> source : "delegates classification"
-colorfb --> palettes : "resolves fill/ring colors"
-canvas --> source : "imports isOnlineLearned"
-canvas --> ring : "draws provenance ring"
-canvas --> legend : "shares classification"
-colorfb --> legend : "shares classification"
+config --> buffer : "governs debounce/batch"
+buffer --> learnsrc : "flags entities as online-learned"
+learnsrc --> adapter : "writes without wave-analysis stamp"
 
-slice --> agentgraph : "propagates llmMode"
-agentgraph --> modal : "reports substep status"
-modal --> historyApi : "fetches paginated history"
+modal --> slice : "drives batch state"
+slice --> adapter : "writes with source='wave-analysis'"
 
-canvas ..> colorfb : "uses node FillColor/node ShapeFor"
+adapter --> graph : "storeRelationship (entity Type-safe)"
+
+graph --> hierarchy : "deriveParents (Insight @ Detail)"
+graph --> canvas : "renders entities"
+learnsrc --> canvas : "isOnlineLearned flag"
+palette --> canvas : "ring color"
 
 @enduml

@@ -1,29 +1,31 @@
 @startuml
 !include _standard-style.puml
 
-package "Client Layer" {
-  component "LLMWithProcessClient" as client <<core>>
-  component "ProxyURLResolver" as resolver <<core>>
+package "LLM Client Layer" {
+  component "LLMWithProcessClient\n(llm-with-process.ts)" as client <<core>>
+  component "llmWithProcessComplete()" as complete <<core>>
 }
 
-package "Configuration" {
-  component "RAPID_LLM_PROXY_URL" as envVar1 <<external>>
-  component "LLM_PROXY_URL" as envVar2 <<external>>
+package "Proxy / Provider Fallback" {
+  component "rapid-llm-proxy\n(proxy-bridge/server.mjs)" as proxy <<api>>
+  component "Tiered Provider Fallback Chain" as fallback <<external>>
+  component "LLM Model Catalogue\n(endpoint-gated)" as catalogue <<storage>>
 }
 
-package "External Service" {
-  cloud "rapid-llm-proxy" as proxy <<external>>
-  component "/api/complete" as endpoint <<api>>
+package "Downstream Consumers (unrelated subsystems)" {
+  component "cost-model.ts" as cost <<external>>
+  component "use-classifier-judge.ts" as judge <<external>>
+  component "offload-decision.tsx" as offload <<external>>
+  component "model-limits.cjs\n(statusline, unrelated)" as statusline <<external>>
 }
 
-client --> resolver : "resolves endpoint via"
-resolver --> envVar1 : "reads config"
-resolver --> envVar2 : "reads config"
-resolver --> proxy : "determines URL for"
+client --> complete : "builds process tag"
+complete --> proxy : "calls /api/complete\n(env-var precedence resolution)"
+proxy --> fallback : "routes via network-mode-aware\nfallback chain"
+fallback --> catalogue : "checks endpoint-gated\nmodel access"
 
-client --> endpoint : "direct fetch()"
-endpoint --> proxy : "hosted on"
-
-client ..> proxy : "attaches process\ntelemetry attribution"
+proxy ..> cost : "flat/object tokens shape\n(circumstantial)"
+proxy ..> judge : "polls routing surface\n(circumstantial)"
+offload ..> proxy : "observes routing decisions"
 
 @enduml

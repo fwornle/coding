@@ -1,34 +1,41 @@
 @startuml
 !include _standard-style.puml
 
-package "Source of Truth" {
-  component "rapid-llm-proxy :12435" as proxy <<external>>
-  database "token_usage.db" as tokendb <<storage>>
+package "Registry Core" {
+  component "STOP_ADAPTERS" as registry <<core>>
+  component "fallbackProcessFor" as fallback <<core>>
+  component "SUBAGENT_PROCESS" as subagent <<core>>
+  component "encodeCwd (registry)" as encodeReg <<core>>
 }
 
-package "Foreground Agents" {
-  component "Claude Code" as claude <<agent>>
-  component "Copilot CLI\n(events.jsonl)" as copilot <<agent>>
-  component "OpenCode\n(opencode.db)" as opencode <<agent>>
+package "Locators" {
+  component "locateMainSessionJsonl" as locClaude <<agent>>
+  component "locateCopilotSessionForSpan" as locCopilot <<agent>>
+  component "locateOpencodeStoreForSpan" as locOpencode <<agent>>
 }
 
-package "TokenUsageAdapters" {
-  component "token-db.mjs\n(insertTokenRow, insertShapeFor)" as tokendbmjs <<core>>
-  component "copilot-events-tail.mjs\n(buildStubObservation, onTokenRow)" as copiloptail <<core>>
-  component "opencode-token-rows.mjs\n(BYPASS_PROVIDERS)" as opencoderows <<core>>
+package "Downstream / External" {
+  component "captureForegroundTokens" as capture <<core>>
+  component "buildOpencodeTokenRows" as buildOpencode <<external>>
+  database "token_usage" as tokenDb <<storage>>
+  component "claude-jsonl-tree.mjs\nencodeCwd" as encodeTree <<external>>
 }
 
-proxy --> tokendb : "primary writer"
-claude --> proxy : "routed calls"
+capture --> registry : "reads mode per agent"
+registry --> locClaude : "claude: build/locate"
+registry --> locCopilot : "copilot: build/locate"
+registry --> locOpencode : "opencode: build/locate"
+registry ..> fallback : "tags unmatched rows"
+registry ..> subagent : "tags sub-agent rows"
 
-copilot --> copiloptail : "tails events.jsonl"
-copiloptail --> tokendbmjs : "onTokenRow (session.shutdown)"
+locClaude --> tokenDb : "writes transcript rows\n(GRACE_MS window)"
+locCopilot --> tokenDb : "writes transcript rows\n(GRACE_MS window)"
+locOpencode --> buildOpencode : "provider-gated\n(BYPASS_PROVIDERS)"
+buildOpencode --> tokenDb : "writes non-proxied rows"
 
-opencode --> opencoderows : "reads opencode.db"
-opencoderows --> tokendbmjs : "reconstructed rows\n(excl. BYPASS_PROVIDERS)"
+fallback --> tokenDb : "token-adapter-<agent>-fallback"
+subagent --> tokenDb : "token-adapter-claude-subagent"
 
-tokendbmjs --> tokendb : "compensating INSERT\n(id-space: cladpt/copadt/opnadt)"
-
-opencoderows ..> proxy : "assumes anthropic\nalready proxy-routed"
+encodeReg ..> encodeTree : "duplicated rule\n(kept identical)"
 
 @enduml

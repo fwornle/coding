@@ -7,21 +7,17 @@ title Hierarchy Context: ProcessStateManager
 [ProcessStateManager] as process_state_manager #LightBlue
 [ServiceStarter] as service_starter #F0F0F0
 [ServiceProbe] as service_probe #F0F0F0
-[APIServiceWrapper] as apiservice_wrapper #F0F0F0
-[DashboardServiceWrapper] as dashboard_service_wrapper #F0F0F0
-[SupervisordRuntime] as supervisord_runtime #F0F0F0
-[StartServicesRobust] as start_services_robust #F0F0F0
-[ServiceRegistrationLifecycle] as service_registration_lifecycle #E8F5E8
-[ProcessStateManagerConsumerPattern] as process_state_manager_consumer_pattern #E8F5E8
+[DockerEntrypoint] as docker_entrypoint #F0F0F0
+[DockerComposeStartupScript] as docker_compose_startup_script #F0F0F0
+[ServiceRegistration] as service_registration #E8F5E8
+[PsmConsumersInStartServicesRobust] as psm_consumers_in_start_services_robust #E8F5E8
 
 dockerized_services --> process_state_manager
 service_starter -[hidden]- process_state_manager
 service_probe -[hidden]- process_state_manager
-apiservice_wrapper -[hidden]- process_state_manager
-dashboard_service_wrapper -[hidden]- process_state_manager
-supervisord_runtime -[hidden]- process_state_manager
-start_services_robust -[hidden]- process_state_manager
-process_state_manager --> service_registration_lifecycle
-process_state_manager --> process_state_manager_consumer_pattern
+docker_entrypoint -[hidden]- process_state_manager
+docker_compose_startup_script -[hidden]- process_state_manager
+process_state_manager --> service_registration
+process_state_manager --> psm_consumers_in_start_services_robust
 
 @enduml

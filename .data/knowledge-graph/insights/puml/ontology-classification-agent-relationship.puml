@@ -3,11 +3,31 @@
 
 title Hierarchy Context: OntologyClassificationAgent
 
-[LiveLoggingSystem] as live_logging_system #FFFFDD
+[SemanticAnalysis] as semantic_analysis #FFFFDD
 [OntologyClassificationAgent] as ontology_classification_agent #LightBlue
-[SemanticLoggingBuffer] as semantic_logging_buffer #F0F0F0
+[Ontology] as ontology #F0F0F0
+[Pipeline] as pipeline #F0F0F0
+[Insights] as insights #F0F0F0
+[SemanticAnalysisAgent] as semantic_analysis_agent #F0F0F0
+[BaseAgentFramework] as base_agent_framework #F0F0F0
+[L2RefinementClassifier] as l2_refinement_classifier #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[AgentLauncherConfigs] as agent_launcher_configs #F0F0F0
+[NoUnboundedFsScanGuard] as no_unbounded_fs_scan_guard #F0F0F0
+[OntologyClassifierComposition] as ontology_classifier_composition #E8F5E8
+[OntologyClassContradictionRepair] as ontology_class_contradiction_repair #E8F5E8
 
-live_logging_system --> ontology_classification_agent
-semantic_logging_buffer -[hidden]- ontology_classification_agent
+semantic_analysis --> ontology_classification_agent
+ontology -[hidden]- ontology_classification_agent
+pipeline -[hidden]- ontology_classification_agent
+insights -[hidden]- ontology_classification_agent
+semantic_analysis_agent -[hidden]- ontology_classification_agent
+base_agent_framework -[hidden]- ontology_classification_agent
+l2_refinement_classifier -[hidden]- ontology_classification_agent
+health_coordinator -[hidden]- ontology_classification_agent
+agent_launcher_configs -[hidden]- ontology_classification_agent
+no_unbounded_fs_scan_guard -[hidden]- ontology_classification_agent
+ontology_classification_agent --> ontology_classifier_composition
+ontology_classification_agent --> ontology_class_contradiction_repair
 
 @enduml

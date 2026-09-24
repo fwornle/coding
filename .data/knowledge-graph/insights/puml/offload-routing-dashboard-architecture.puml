@@ -1,0 +1,35 @@
+@startuml
+!include _standard-style.puml
+
+package "System Health Dashboard" {
+  component "OffloadDecision" as od <<core>>
+  component "useOffloadPolicyDraft" as policyHook <<agent>>
+  component "useClassifierJudge" as judgeHook <<agent>>
+  component "offload-gates.ts\nevaluateOffload()" as gates <<core>>
+  component "cost-model.ts" as cost <<core>>
+}
+
+package "Local Config Files" {
+  database "prompt-classifier.yaml" as classifierCfg <<storage>>
+}
+
+package "Rapid LLM Proxy" {
+  component "proxy-bridge/server.mjs" as proxy <<external>>
+  database "llm-routing.yaml" as offloadCfg <<storage>>
+  component "/api/llm/routing/resolve" as resolveApi <<api>>
+}
+
+od --> policyHook : "owns offload policy state"
+od --> judgeHook : "owns classifier/judge state"
+od --> gates : "local rung evaluation"
+
+policyHook --> offloadCfg : "writes"
+judgeHook --> classifierCfg : "writes"
+
+gates --> resolveApi : "cross-check via pooled() (max 8 concurrent)"
+od --> resolveApi : "configRungs diff"
+resolveApi --> proxy : "resolves route"
+
+od ..> cost : "sibling dashboard tab\n(no direct import)"
+
+@enduml

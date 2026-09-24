@@ -1,0 +1,28 @@
+@startuml
+!include _standard-style.puml
+
+package "Tmux Statusline" {
+  component "Statusline Fields\n(health, lsl, obs, constraints, project bubble)" as fields <<cli>>
+  component "Click Event Handler" as clickHandler <<core>>
+  component "Click Feedback Renderer" as feedback <<core>>
+}
+
+package "Targeting Resolution" {
+  component "Identity-Matching Logic\n(title/URL/handle)" as identity <<core>>
+  component "Window Focus Resolver" as resolver <<core>>
+}
+
+package "External Constraints" {
+  cloud "Tmux Terminal Protocol\n(no MouseMove, <=3.6a)" as tmuxProto <<external>>
+  cloud "Chrome Tabs/Windows" as chrome <<external>>
+}
+
+fields --> clickHandler : "on click"
+clickHandler --> feedback : "emit visual/state change"
+clickHandler --> identity : "resolve target"
+identity --> resolver : "match window title/URL/handle"
+resolver --> chrome : "focus correct tab/window"
+
+tmuxProto ..> fields : "no hover support\n(architectural limitation)"
+
+@enduml

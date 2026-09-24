@@ -5,25 +5,21 @@ title Hierarchy Context: ManualLearning
 
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [ManualLearning] as manual_learning #LightBlue
-[GraphifyGraph] as graphify_graph #F0F0F0
-[CodeGraphAgent] as code_graph_agent #F0F0F0
-[KmCoreAdapter] as km_core_adapter #F0F0F0
-[LevelDbMigrationScripts] as level_db_migration_scripts #F0F0F0
 [WaveInsightPersistence] as wave_insight_persistence #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
 [OnlineLearning] as online_learning #F0F0F0
-[GraphViewerHierarchy] as graph_viewer_hierarchy #F0F0F0
-[GraphVisualRendering] as graph_visual_rendering #F0F0F0
+[GraphifyGraph] as graphify_graph #F0F0F0
+[KmCoreMigration] as km_core_migration #F0F0F0
+[UnifiedViewerGraphRendering] as unified_viewer_graph_rendering #F0F0F0
 [UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
 
 knowledge_management --> manual_learning
-graphify_graph -[hidden]- manual_learning
-code_graph_agent -[hidden]- manual_learning
-km_core_adapter -[hidden]- manual_learning
-level_db_migration_scripts -[hidden]- manual_learning
 wave_insight_persistence -[hidden]- manual_learning
+graph_database_service -[hidden]- manual_learning
 online_learning -[hidden]- manual_learning
-graph_viewer_hierarchy -[hidden]- manual_learning
-graph_visual_rendering -[hidden]- manual_learning
+graphify_graph -[hidden]- manual_learning
+km_core_migration -[hidden]- manual_learning
+unified_viewer_graph_rendering -[hidden]- manual_learning
 ukb_workflow_dashboard -[hidden]- manual_learning
 
 @enduml

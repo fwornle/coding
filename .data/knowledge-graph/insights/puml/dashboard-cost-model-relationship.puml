@@ -7,25 +7,21 @@ title Hierarchy Context: DashboardCostModel
 [DashboardCostModel] as dashboard_cost_model #LightBlue
 [LLMMockService] as llmmock_service #F0F0F0
 [DMRProvider] as dmrprovider #F0F0F0
-[LLMProxyClient] as llmproxy_client #F0F0F0
-[LlmJsonParser] as llm_json_parser #F0F0F0
-[OffloadRoutingDecision] as offload_routing_decision #F0F0F0
-[ModelContextLimits] as model_context_limits #F0F0F0
-[AgentProviderSplicing] as agent_provider_splicing #F0F0F0
+[LLMJsonRepairUtility] as llmjson_repair_utility #F0F0F0
+[ProxyClientWrapper] as proxy_client_wrapper #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
+[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #F0F0F0
 [BudgetConfig] as budget_config #E8F5E8
-[PriceForModel] as price_for_model #E8F5E8
-[ModelFamilyFallback] as model_family_fallback #E8F5E8
 
 llmabstraction --> dashboard_cost_model
 llmmock_service -[hidden]- dashboard_cost_model
 dmrprovider -[hidden]- dashboard_cost_model
-llmproxy_client -[hidden]- dashboard_cost_model
-llm_json_parser -[hidden]- dashboard_cost_model
-offload_routing_decision -[hidden]- dashboard_cost_model
-model_context_limits -[hidden]- dashboard_cost_model
-agent_provider_splicing -[hidden]- dashboard_cost_model
+llmjson_repair_utility -[hidden]- dashboard_cost_model
+proxy_client_wrapper -[hidden]- dashboard_cost_model
+copilot_model_id_alignment -[hidden]- dashboard_cost_model
+offload_routing_dashboard -[hidden]- dashboard_cost_model
+model_context_limits_catalogue -[hidden]- dashboard_cost_model
 dashboard_cost_model --> budget_config
-dashboard_cost_model --> price_for_model
-dashboard_cost_model --> model_family_fallback
 
 @enduml

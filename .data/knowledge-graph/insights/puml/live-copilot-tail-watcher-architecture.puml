@@ -1,0 +1,37 @@
+@startuml
+!include _standard-style.puml
+
+package "Session Discovery" {
+  component "scanForLiveSessions()" as scan <<core>>
+  component "isOwnedByMe()" as owner <<core>>
+  component "findLiveLockFile()" as lock <<core>>
+  component "projectMatches()" as projmatch <<core>>
+}
+
+package "Live Tailing" {
+  component "tailEventsFile()" as tail <<core>>
+  component "buildStubObservation()" as stub <<core>>
+  component "onTokenRow hook" as tokenrow <<core>>
+}
+
+package "Reused Primitives (D-Reuse)" {
+  component "copilot-events.mjs adapter\n(parseWorkspaceYaml,\nprojectFromWorkspace)" as adapter <<external>>
+  component "TranscriptNormalizer.js\n(parseCopilot)" as normalizer <<external>>
+}
+
+database "session-state/<uuid>/\nevents.jsonl" as sessdir <<storage>>
+
+scan --> owner : "uid check\nT-51-09-FI"
+scan --> lock : "check inuse.<pid>.lock\n(10m stale grace)"
+scan --> projmatch : "filter by project"
+projmatch --> adapter : "projectFromWorkspace()"
+scan --> tail : "hand off live session dirs"
+
+tail --> sessdir : "statSync poll\n200ms"
+tail --> normalizer : "parseCopilot(line)"
+tail --> stub : "lifecycle-only\n(no parity)"
+tail --> tokenrow : "session.shutdown row\n(isolated, non-fatal)"
+
+stub ..> sessdir : "lsl_incomplete: true"
+
+@enduml

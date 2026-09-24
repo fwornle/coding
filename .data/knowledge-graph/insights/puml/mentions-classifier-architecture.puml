@@ -1,0 +1,35 @@
+@startuml
+!include _standard-style.puml
+
+package "Consolidation Loop" {
+  component "ObservationConsolidator" as consolidator <<core>>
+}
+
+package "MentionsClassifier.js" {
+  component "loadMentionCandidates()" as loadCand <<core>>
+  component "buildMentionsPrompt()" as buildPrompt <<core>>
+  component "classifyMentions()" as classify <<core>>
+  component "extractMentionsFromLLMResponse()" as extract <<core>>
+  component "callProxy()" as proxy <<api>>
+  component "_paced() gate" as pace <<core>>
+  component "_candidateCache (WeakMap)" as cache <<storage>>
+}
+
+package "External / Storage" {
+  database "kmStore" as kmStore <<storage>>
+  cloud "rapid-llm-proxy (haiku)" as llmProxy <<external>>
+}
+
+consolidator --> classify : "invokes per Insight"
+classify --> loadCand : "get candidate catalog"
+loadCand --> kmStore : "findByOntologyClass()\n(STRICT_TYPES filter)"
+loadCand --> cache : "memoize per run"
+classify --> buildPrompt : "build prompt"
+classify --> pace : "serialize call"
+pace --> proxy : "enforce min interval"
+proxy --> llmProxy : "fetch() w/ 60s timeout"
+proxy --> extract : "raw LLM response"
+extract --> classify : "validated ids\n(SANITY_CAP=20)"
+classify --> consolidator : "propagate result or throw"
+
+@enduml

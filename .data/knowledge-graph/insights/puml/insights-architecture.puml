@@ -1,38 +1,42 @@
 @startuml
 !include _standard-style.puml
 
-package "Insights API Layer" {
-  component "server.js\nhandleGetInsights" as server <<api>>
-  component "ApiClient.ts\nlistInsights" as apiClient <<api>>
-  component "copilot-http-server.js\nanalyzeSessionForInsights" as copilotServer <<api>>
-  component "observations-api-server.mjs\nINSIGHTS_DIR" as obsServer <<storage>>
+package "UKB Pipeline" {
+  component "UKB Wave Pipeline" as wave <<core>>
+  component "Evidence Gate" as gate <<core>>
+  component "writeInsight" as write <<core>>
+  component "Embedding Dedup (dry-run)" as dedup <<core>>
 }
 
-package "Insights Core Processing" {
-  component "kb-ab-sample-tasks.mjs\nINSIGHTS" as kbTasks <<core>>
-  component "backfill-insight-mentions.mjs\nderiveInsightSummary" as deriveSummary <<core>>
-  component "backfill.ts\nreadInsights" as readInsights <<core>>
-  component "audit-knowledge-overlap.mjs\ninsights" as auditOverlap <<core>>
+package "Insight Processing Scripts" {
+  component "backfill-insight-parents.mjs" as backfillParents <<cli>>
+  component "backfill-insight-mentions.mjs" as backfillMentions <<cli>>
+  component "delete-wave-insight-stubs.mjs" as deleteStubs <<cli>>
+  component "compact-insights.mjs" as compact <<cli>>
+  component "Intent Spine Producer Script" as intentSpine <<core>>
 }
 
-package "Insights UI" {
-  component "App.tsx\nGatedInsights" as gatedInsights <<agent>>
-  component "online-mapper.test.ts\ninsights" as onlineMapper <<external>>
+package "UI / API" {
+  component "handleGetInsights" as apiHandler <<api>>
+  component "InsightsPage" as page <<agent>>
+  component "ConsolidationProgress" as progress <<agent>>
 }
 
-database "INSIGHTS_DIR" as insightsDB <<storage>>
+database "Knowledge Graph / KB" as kb <<storage>>
 
-apiClient --> server : "requests insights"
-server --> obsServer : "reads/writes"
-obsServer --> insightsDB : "persists"
+wave --> gate : "generates candidate insight"
+gate --> write : "passes evidence check"
+write --> dedup : "checked for near-duplicates"
+dedup --> kb : "writes Insight entity"
 
-readInsights --> insightsDB : "loads raw insights"
-deriveSummary --> readInsights : "summarizes"
-kbTasks --> deriveSummary : "consumes"
-auditOverlap --> insightsDB : "audits overlap"
+backfillParents --> kb : "links parent insights"
+backfillMentions --> kb : "derives insight summaries"
+deleteStubs --> kb : "removes empty stubs"
+compact --> kb : "consolidates insights"
+intentSpine --> kb : "clusters insights into Intents"
 
-copilotServer --> server : "session analysis"
-gatedInsights --> apiClient : "fetches insights"
-onlineMapper ..> apiClient : "test validation"
+apiHandler --> kb : "queries insights"
+page --> apiHandler : "fetches insights"
+page --> progress : "shows consolidation status"
 
 @enduml

@@ -1,0 +1,33 @@
+@startuml
+!include _standard-style.puml
+
+package "LLM Model Catalogue (existing axes)" {
+  component "Endpoint Gating\n(Responses vs /chat/completions)" as gating <<core>>
+  component "copilot-model-ids.test.mjs\n(retired-id drift guard)" as retiredGuard <<cli>>
+  component "align-copilot-model-ids.mjs\n(postinstall patch)" as alignScript <<cli>>
+  component "cost-model.ts\npriceForModel()/modelFamily()" as costModel <<core>>
+}
+
+package "LLM Routing (complexity band, out of scope)" {
+  component "offload-decision.tsx" as offload <<agent>>
+  component "use-classifier-judge.ts" as judge <<agent>>
+}
+
+package "Missing SubComponent" {
+  component "ModelContextLimitsCatalogue\n(NOT IMPLEMENTED)" as ctxLimits <<storage>>
+}
+
+cloud "LLM CLI Proxy\n(proxy-bridge/server.mjs)" as proxy <<external>>
+
+alignScript --> retiredGuard : "pins vendored\ncopilot defaults"
+retiredGuard ..> gating : "validates model id\n(not context length)"
+costModel ..> gating : "prices tokens\n(fallback: exact→family)"
+offload ..> judge : "routes by\ncomplexity band"
+
+gating ..> ctxLimits : "no data flow\n(component absent)"
+costModel ..> ctxLimits : "fallback shape reusable\nbut not implemented"
+judge ..> ctxLimits : "band ≠ context window"
+
+proxy ..> gating : "consulted for\nmodel routing"
+
+@enduml

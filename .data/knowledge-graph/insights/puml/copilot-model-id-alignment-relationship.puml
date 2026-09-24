@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: CopilotModelIdAlignment
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[CopilotModelIdAlignment] as copilot_model_id_alignment #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMJsonRepairUtility] as llmjson_repair_utility #F0F0F0
+[ProxyClientWrapper] as proxy_client_wrapper #F0F0F0
+[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #F0F0F0
+[AlignCopilotModelIdsScript] as align_copilot_model_ids_script #E8F5E8
+[CopilotModelIdsDriftTest] as copilot_model_ids_drift_test #E8F5E8
+
+llmabstraction --> copilot_model_id_alignment
+llmmock_service -[hidden]- copilot_model_id_alignment
+dmrprovider -[hidden]- copilot_model_id_alignment
+llmjson_repair_utility -[hidden]- copilot_model_id_alignment
+proxy_client_wrapper -[hidden]- copilot_model_id_alignment
+dashboard_cost_model -[hidden]- copilot_model_id_alignment
+offload_routing_dashboard -[hidden]- copilot_model_id_alignment
+model_context_limits_catalogue -[hidden]- copilot_model_id_alignment
+copilot_model_id_alignment --> align_copilot_model_ids_script
+copilot_model_id_alignment --> copilot_model_ids_drift_test
+
+@enduml

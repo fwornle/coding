@@ -1,39 +1,43 @@
 @startuml
 !include _standard-style.puml
 
-package "Path Resolution & Config" {
-  component "ontologyPathResolver.ts" as resolver <<core>>
-  component "OntologyConfigManager.ts" as configMgr <<core>>
-  component "OntologyPathNotFoundError" as pathErr <<core>>
+package "Ontology Factory" {
+  component "createOntologySystem" as factory <<core>>
+  component "OntologySystem" as system <<core>>
+  component "validateOntologyConfig" as validator <<core>>
+  component "LegacyOntologyAdapter" as adapter <<agent>>
+  component "OntologyClassifier" as classifier <<agent>>
+  component "createHeuristicClassifier" as heuristic <<agent>>
+  component "UnifiedInferenceEngine" as inference <<external>>
 }
 
-package "Classification & API" {
-  component "OntologyClassificationAgent" as classifier <<agent>>
-  component "ApiClient.ts" as apiClient <<api>>
-  component "OntologyClass / Entity Types" as typedApi <<api>>
+package "km-core Storage" {
+  database "OntologyRegistry" as registry <<storage>>
+  database "LevelDB (obs-api)" as leveldb <<storage>>
 }
 
-package "Viewer / UI" {
-  component "OntologyFilter.tsx" as filterUI <<external>>
-  component "VOKB_SCHEMA" as schema <<core>>
-  component "viewer-store.ts" as viewerStore <<core>>
+package "Repair & Pipeline Tools" {
+  component "repair-writer-ontology-class.mjs" as repair <<cli>>
+  component "arbitrate()" as arbitrate <<core>>
+  component "OntologyClassificationAgent" as pipeline <<agent>>
+  component "observations-api-server.mjs" as obsapi <<api>>
 }
 
-database "Ontology JSON Files\n(upper/coding.lower/coding)" as ontJson
+validator --> factory : "checked before"
+factory --> adapter : "wires"
+factory --> classifier : "wires"
+factory --> inference : "requires (hard-fail)"
+classifier --> heuristic : "composes"
+factory --> system : "returns"
+system --> adapter : "field: ontology"
+adapter --> registry : "wraps"
 
-configMgr --> resolver : "resolves paths via"
-resolver --> ontJson : "cached filesystem lookup"
-resolver --> pathErr : "throws on missing file"
-classifier --> configMgr : "loads ontology definitions"
-classifier --> ontJson : "closed-vocabulary classification"
+repair --> obsapi : "HTTP only"
+obsapi --> leveldb : "single-owner access"
+repair --> arbitrate : "resolves conflicts"
+arbitrate --> registry : "edge-type derived class"
 
-apiClient --> typedApi : "exposes"
-apiClient --> classifier : "surfaces classified entities"
-
-filterUI --> schema : "imports"
-filterUI --> viewerStore : "persists selection via useViewerStore"
-filterUI --> typedApi : "consumes OntologyClass metadata"
-
-schema ..> ontJson : "should mirror (no shared-source enforcement)"
+pipeline --> registry : "consumes coding.lower.json"
+pipeline ..> repair : "downstream inconsistencies"
 
 @enduml

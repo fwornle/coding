@@ -1,34 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "Consumer Layer" {
-  component "CodeGraphAgent" as cga <<agent>>
-  component "wave-controller" as wc <<agent>>
+package "Code Graph Layer" {
+  component "GraphifyGraph" as graphify <<core>>
+  component "CodeGraphAgent" as cgagent <<agent>>
+  database "graph.json" as graphjson
 }
 
-package "Graph Access Layer" {
-  component "GraphifyGraph" as gg <<core>>
-  component "kindOf/nameOf" as helpers <<core>>
-  component "mapRelation" as mapper <<core>>
+package "km-core Storage" {
+  component "km-core-adapter" as adapter <<core>>
+  component "GraphDatabaseService" as gdbservice <<core>>
+  database "LevelDB" as leveldb
 }
 
-package "Storage & Migration" {
-  database "graph.json" as gjson <<storage>>
-  database "GraphDatabaseService\n(Graphology/LevelDB)" as gds <<storage>>
-  component "migrate-graph-db-entity-types.js" as mig1 <<cli>>
-  component "migrate-leveldb-to-kmcore.mjs" as mig2 <<cli>>
+package "Migration Tools" {
+  component "migrate-graph-db-entity-types.js" as migtypes <<cli>>
+  component "migrate-leveldb-to-kmcore.mjs" as migkmcore <<cli>>
 }
 
-cga --> gg : "delegates all calls"
-gg --> gjson : "mtime-based lazy load"
-gg --> helpers : "derive type/name from label"
-gg --> mapper : "normalize edge types"
+component "History UI" as historyui <<api>>
 
-wc --> gg : "queryIncomingRelations(name, entity Type)"
-wc --> gg : "anchor to 'Coding' if orphan"
+cgagent --> graphify : delegates calls
+graphify --> graphjson : "lazy mtime-cached read"
 
-mig1 --> gds : "consolidate entity types\n(System/Project/Pattern)"
-mig2 --> gds : "convert to km-core shape\n(UUIDv7, layer=evidence)"
-mig2 --> gjson : "source legacy blobs"
+adapter --> leveldb : queryIncomingRelations/\nstoreRelationship (entity Type disambiguation)
+adapter --> historyui : creates Insight nodes\n(source=wave-analysis)
+
+migtypes --> gdbservice : consolidates types\n(System/Project/Pattern)
+gdbservice --> leveldb : _persistGraphToLevel()
+
+migkmcore --> leveldb : converts to canonical\nkm-core shape (UUIDv7, evidence)
+migkmcore ..> migkmcore : "--dry-run validates\n5% error budget"
+
+historyui ..> leveldb : filters entity Type='Insight'
 
 @enduml

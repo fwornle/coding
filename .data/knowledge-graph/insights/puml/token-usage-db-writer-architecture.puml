@@ -1,0 +1,33 @@
+@startuml
+!include _standard-style.puml
+
+package "Row-Building Adapters" {
+  component "buildOpencodeTokenRows()" as opencodeAdapter <<agent>>
+  component "Copilot Token-Row Adapter" as copilotAdapter <<agent>>
+}
+
+package "TokenUsageDbWriter" {
+  component "insertTokenRow()" as insertRow <<core>>
+  component "openTokenDb()" as openDb <<core>>
+  component "ensureCacheColumns()" as ensureCols <<core>>
+  component "insertShapeFor() [PRAGMA probe]" as shapeProbe <<core>>
+}
+
+package "Shared Storage" {
+  database "token_usage.db\n(proxy-owned)" as tokenDb <<storage>>
+}
+
+opencodeAdapter --> insertRow : "OpenCode rows\n(ADAPTER_USER_HASH_OPENCODE)"
+copilotAdapter --> insertRow : "Copilot rows\n(ADAPTER_USER_HASH_COPILOT)"
+
+insertRow --> openDb : "acquire connection"
+openDb --> tokenDb : "second-writer\nbusy_timeout=5000"
+insertRow --> ensureCols : "idempotent ALTER TABLE"
+insertRow --> shapeProbe : "adapt INSERT shape"
+ensureCols --> tokenDb : "duplicate-column\nsuppressed"
+shapeProbe --> tokenDb : "PRAGMA table_info"
+
+insertRow --> tokenDb : "INSERT w/ retry\n(MAX(id)+1, 3 attempts)"
+insertRow ..> insertRow : "on failure: log\n'insert failed (non-fatal)'\nreturn false"
+
+@enduml

@@ -13,12 +13,12 @@ title Hierarchy Context: LLMAbstraction
 [SemanticAnalysis] as semantic_analysis #F0F0F0
 [LLMMockService] as llmmock_service #E8F5E8
 [DMRProvider] as dmrprovider #E8F5E8
-[LLMProxyClient] as llmproxy_client #E8F5E8
-[LlmJsonParser] as llm_json_parser #E8F5E8
+[LLMJsonRepairUtility] as llmjson_repair_utility #E8F5E8
+[ProxyClientWrapper] as proxy_client_wrapper #E8F5E8
+[CopilotModelIdAlignment] as copilot_model_id_alignment #E8F5E8
 [DashboardCostModel] as dashboard_cost_model #E8F5E8
-[OffloadRoutingDecision] as offload_routing_decision #E8F5E8
-[ModelContextLimits] as model_context_limits #E8F5E8
-[AgentProviderSplicing] as agent_provider_splicing #E8F5E8
+[OffloadRoutingDashboard] as offload_routing_dashboard #E8F5E8
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #E8F5E8
 
 coding --> llmabstraction
 live_logging_system -[hidden]- llmabstraction
@@ -29,11 +29,11 @@ constraint_system -[hidden]- llmabstraction
 semantic_analysis -[hidden]- llmabstraction
 llmabstraction --> llmmock_service
 llmabstraction --> dmrprovider
-llmabstraction --> llmproxy_client
-llmabstraction --> llm_json_parser
+llmabstraction --> llmjson_repair_utility
+llmabstraction --> proxy_client_wrapper
+llmabstraction --> copilot_model_id_alignment
 llmabstraction --> dashboard_cost_model
-llmabstraction --> offload_routing_decision
-llmabstraction --> model_context_limits
-llmabstraction --> agent_provider_splicing
+llmabstraction --> offload_routing_dashboard
+llmabstraction --> model_context_limits_catalogue
 
 @enduml

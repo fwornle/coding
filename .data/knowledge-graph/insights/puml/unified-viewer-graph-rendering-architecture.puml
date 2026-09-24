@@ -1,0 +1,36 @@
+@startuml
+!include _standard-style.puml
+
+package "Rendering Layer" {
+  component "D3GraphCanvas.tsx" as canvas <<core>>
+  component "deriveAncestryFromStorePath" as ancestry <<core>>
+  component "Zustand Store\n(pathToSelected, selectionSource)" as store <<storage>>
+  component "Fit-to-Bounds Effect" as fitbounds <<core>>
+}
+
+package "Hierarchy Derivation" {
+  component "deriveParents\n(hierarchy-parents.test.ts)" as deriveParents <<core>>
+  component "HIERARCHY_CLASSES" as hclasses <<core>>
+  component "computeAncestryPath (BFS)" as bfs <<core>>
+}
+
+package "Upstream Data Sources" {
+  component "findEntityByName\n(anchoring)" as anchor <<agent>>
+  database "Provenance Graph\n(nodes & edges)" as graph <<storage>>
+}
+
+canvas --> ancestry : "reconciles fast/slow path"
+ancestry --> store : "reads pathToSelected (source of truth)"
+ancestry --> bfs : "computes inline BFS"
+canvas --> fitbounds : "subscribes selectionSource"
+fitbounds --> store : "narrow slice subscription"
+
+canvas --> deriveParents : "renders DAG-to-tree hierarchy"
+deriveParents --> hclasses : "classifies entity levels"
+deriveParents --> graph : "consumes containment edges"
+
+anchor --> graph : "may mis-attribute edges"
+graph --> deriveParents : "edges feed tie-break chain"
+hclasses ..> deriveParents : "Insight added 2026-09-21"
+
+@enduml

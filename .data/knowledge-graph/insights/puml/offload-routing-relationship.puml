@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OffloadRouting
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[OffloadRouting] as offload_routing #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMWithProcessClient] as llmwith_process_client #F0F0F0
+[LlmJsonRepair] as llm_json_repair #F0F0F0
+[CostModel] as cost_model #F0F0F0
+[ClassifierJudge] as classifier_judge #F0F0F0
+[ModelContextLimits] as model_context_limits #F0F0F0
+[OffloadGatesMirror] as offload_gates_mirror #E8F5E8
+[CallStripAndDetail] as call_strip_and_detail #E8F5E8
+[OffloadReplay] as offload_replay #E8F5E8
+[ClassifierJudgeIntegration] as classifier_judge_integration #E8F5E8
+
+llmabstraction --> offload_routing
+dmrprovider -[hidden]- offload_routing
+llmwith_process_client -[hidden]- offload_routing
+llm_json_repair -[hidden]- offload_routing
+cost_model -[hidden]- offload_routing
+classifier_judge -[hidden]- offload_routing
+model_context_limits -[hidden]- offload_routing
+offload_routing --> offload_gates_mirror
+offload_routing --> call_strip_and_detail
+offload_routing --> offload_replay
+offload_routing --> classifier_judge_integration
+
+@enduml

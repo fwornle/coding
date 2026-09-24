@@ -1,42 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "Agent-API Core" {
-  component "HooksManager\n(abstract base)" as hm <<core>>
-  component "EVENT_MAPPINGS" as em <<core>>
-  component "registerHook()" as rh <<api>>
-  component "triggerHook()" as th <<api>>
+package "Claude Hook Runtime" {
+  component "main()" as main <<core>>
+  component "checkHealthStatus()" as check <<core>>
+  component "deriveSummary()" as derive <<core>>
+  component "outputEnvelope()/outputHealthContext()" as envelope <<core>>
 }
 
-package "Claude Bridge Layer" {
-  component "claude-bridge.js" as cb <<agent>>
-  component "EVENT_MAP" as evm <<core>>
-  component "readStdin()" as rs <<api>>
-  component "transformContext()" as tc <<api>>
-  component "main() fail-open" as mn <<api>>
+package "Environment Detection" {
+  component "health-verifier.js existence check" as verifierCheck <<cli>>
 }
 
-package "Downstream Consumers" {
-  component "hook-manager.js\n(UnifiedHookManager)" as ugm <<core>>
-  component "ViolationCaptureService" as vcs <<external>>
+package "External Coordinator" {
+  cloud "/health/state endpoint" as coordinator <<external>>
 }
 
-hm --> rh : "seeds registry\nMap<event,[]>"
-rh --> th : "sorted by priority"
-hm ..> em : "agent-type mapping\n(stale vs EVENT_MAP)"
+package "Consumer Dashboards" {
+  component "Constraint-Monitor (Next.js)" as nextDash <<external>>
+  component "System-Health-Dashboard (Vite)" as viteDash <<external>>
+}
 
-cb --> rs : "reads stdin JSON"
-rs --> tc : "raw claudeContext"
-tc --> evm : "maps native event"
-evm ..> em : "diverges from"
-tc --> mn : "unfiltered metadata"
+component "health-prompt-hook-stall.test.mjs" as test <<agent>>
 
-mn --> ugm : "dynamic import\ngetHookManager()"
-ugm --> th : "structurally similar\nregistry logic"
-th --> mn : "fail-permissive\n(per-handler)"
-mn --> mn : "fail-open\n(per-process, exit 0)"
-
-tc --> vcs : "raw tool_input\n(no sanitization)"
-vcs ..> vcs : "sanitizeParams()\n(implicit contract)"
+main --> check : "invokes, catches all errors"
+check --> coordinator : "fetch()"
+check --> verifierCheck : "Q3 carve-out heuristic"
+check --> derive : "state.knowledge_pipeline.status"
+derive --> envelope : "summary (issue/no-issue)"
+check --> envelope : "unknown status (SPEC R6)"
+main --> envelope : "fallback on fatal error"
+envelope --> nextDash : "JSON envelope (SPEC R8)"
+envelope --> viteDash : "JSON envelope (SPEC R8)"
+test ..> derive : "asserts stalled vs stale/busy/unreachable/disabled"
 
 @enduml

@@ -1,36 +1,35 @@
 @startuml
 !include _standard-style.puml
 
-package "Claude Adapter Layer" {
-  component "claude-bridge.js" as bridge <<agent>>
-  component "EVENT_MAP" as eventMap <<core>>
-  component "transformContext()" as transform <<core>>
+package "Claude Code Integration" {
+  component "claude-bridge.js" as bridge <<core>>
+  component "EVENT_MAP\n(transformContext/transformResponse)" as eventmap <<core>>
 }
 
-package "Unified Hook System" {
-  component "UnifiedHookManager" as manager <<core>>
-  database "Handler Registry\n(Map<event,Handler[]>)" as registry <<storage>>
+package "Hook Manager Layer" {
+  component "getHookManager()\n(singleton accessor)" as accessor <<api>>
+  component "UnifiedHookManager\n(hook-manager.js)" as uhm <<core>>
+  component "HooksManager\n(hooks-api.js, abstract base)" as hooksapi <<core>>
 }
 
-package "Legacy/Parallel System" {
-  component "HooksManager\n(hooks-api.js)" as legacy <<core>>
-  component "EVENT_MAPPINGS" as legacyMap <<core>>
+package "HookManagementSystem (Session)" {
+  component "Statusline Click-Report\n(constraints focus)" as statusline <<core>>
+  component "Tmux Pane Badge\n(ETM entry selection)" as etm <<core>>
 }
 
-component "ViolationCaptureService" as violation <<api>>
+database "Hook Registry\n(Map<HookEvent, HookHandler[]>)" as registry <<storage>>
 
-bridge --> eventMap : "translates event names"
-bridge --> transform : "builds unifiedContext"
-transform --> manager : "spreads raw metadata (no sanitization)"
-bridge --> manager : "getHookManager().executeHooks()"
-manager --> registry : "priority-sorted lookup"
-manager ..> violation : "possible downstream sanitization?"
+bridge --> eventmap : "translate native events"
+eventmap --> accessor : "dynamic import ./hook-manager.js"
+accessor --> uhm : "lazy init"
+bridge --> uhm : "initialize(projectPath)"
+bridge --> uhm : "executeHooks(event, context, 'claude')"
+uhm --> registry : "register/sort/dispatch by priority"
+hooksapi ..> uhm : "shared idiom (pre-populate + push-sort)"
 
-legacy --> legacyMap : "per-agentType translation"
-legacy --> registry : "parallel Map<event,Handler[]>"
-manager ..> legacy : "divergent implementation risk"
+statusline ..> uhm : "adjacent UI dispatch"
+etm ..> uhm : "adjacent session-selection concern"
 
-bridge ..> bridge : "fail-open: default 'allow' on error"
-legacy ..> legacy : "fail-soft: try/catch per handler"
+bridge --> bridge : "fail-open catch\n(decision:allow, exit(0))"
 
 @enduml

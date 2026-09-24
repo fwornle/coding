@@ -1,45 +1,33 @@
 @startuml
 !include _standard-style.puml
 
-package "Container Boot Layer" {
-  component "entrypoint.sh" as entrypoint <<core>>
-  component "features.json snapshot" as snapshot <<external>>
-  component "supervisord.conf" as supervisord <<core>>
-  component "disabled.conf override" as disabledconf <<core>>
+package "Container Gating Layer" {
+  component "docker/entrypoint.sh\nPROGRAM_FEATURES" as entrypoint <<core>>
+  component "service-gating.test.mjs" as gatingtest <<core>>
 }
 
-package "Orchestration Layer" {
-  component "start-services.sh (legacy)" as startsh <<cli>>
-  component "start-services-robust.js" as robust <<core>>
-  component "service-starter.js\n(retry/backoff)" as starter <<core>>
-  component "ProcessStateManager (PSM)" as psm <<core>>
-  component "SERVICE_CONFIGS / SERVICE_ORDER" as configs <<core>>
+package "Service Wrappers" {
+  component "api-service.js\n(APIServiceWrapper)" as apiwrapper <<api>>
+  component "dashboard-server.js" as dashboard <<api>>
+  component "start-services-robust.js\nSERVICE_CONFIGS" as robust <<core>>
+  component "enhanced-transcript-monitor.js" as transcriptmon <<agent>>
 }
 
-package "Service Wrapper Layer" {
-  component "APIServiceWrapper" as apiwrap <<api>>
-  component "transcriptMonitor" as transcript <<agent>>
-  component "liveLoggingCoordinator" as livelog <<agent>>
-  component "prompt-classifier-service.mjs" as classifier <<api>>
+package "Process & Health Infrastructure" {
+  component "ProcessStateManager" as psm <<core>>
+  component "service-probe.js\n(probeHttpHealth/probeTcpPort)" as probe <<core>>
 }
 
-cloud "Proxy /health" as proxy <<external>>
+entrypoint --> apiwrapper : "autostart gating\n(supervisord override)"
+gatingtest ..> robust : "asserts feature/service\ntable invariants"
 
-snapshot --> entrypoint : "read at boot"
-entrypoint --> disabledconf : "emit autostart=false"
-disabledconf --> supervisord : "override stanza"
+apiwrapper --> dashboard : "spawns as child process"
+apiwrapper --> psm : "registers PID\n(type=global,\nname=constraint-api-child)"
 
-startsh --> robust : "ROBUST_MODE=true (exec)"
-robust --> configs : "validate feature ids"
-robust --> starter : "startServiceWithRetry/withDeadline"
-robust --> psm : "isServiceRunning() / registerService()"
-robust --> apiwrap : "spawn/manage lifecycle"
+robust --> transcriptmon : "spawn(detached)"
+robust --> psm : "registers PID\n(transcript-monitor,global)"
 
-apiwrap --> transcript : "start first"
-apiwrap --> livelog : "start second"
-transcript ..> psm : "OS pgrep orphan reconcile"
-
-classifier --> proxy : "poll network mode"
-robust ..> classifier : "shared service pattern"
+psm --> probe : "state queried via"
+probe --> apiwrapper : "running/stopped/unknown"
 
 @enduml

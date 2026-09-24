@@ -1,0 +1,38 @@
+@startuml
+!include _standard-style.puml
+
+package "Workflow Hooks (Vite: system-health-dashboard)" {
+  component "useWorkflowDefinitions" as wfdef <<core>>
+  component "useScrollPreservation" as scroll <<core>>
+  component "useRecentCalls\n(singleton poller)" as recent <<core>>
+  database "workflowConfigSlice\n(Redux)" as slice <<storage>>
+  component "Fallback Constants\n(WORKFLOW_AGENTS, STEP_TO_AGENT...)" as consts <<storage>>
+}
+
+package "Generalized Polling Primitive" {
+  component "usePolledFetch" as polled <<core>>
+  component "Routing/Flow/Cost Tabs" as tabs <<external>>
+}
+
+package "External Services" {
+  cloud "rapid-llm-proxy :12435\n/api/token-usage/recent" as proxy <<external>>
+}
+
+package "Unrelated 'hooks' (excluded)" {
+  component "health-prompt-hook.js\n(UserPromptSubmit)" as prompthook <<external>>
+}
+
+wfdef --> slice : "reads 9 selectors"
+wfdef --> consts : "merges (API overrides agents/edges,\nconstants-first for mappings)"
+
+scroll --> wfdef : "shares module (hooks.ts)"
+
+recent --> proxy : "polls every 30s"
+recent --> tabs : "shared LLM badge data"
+
+polled --> proxy : "generic polling"
+tabs --> polled : "uses (enabled: !draftDirty)"
+
+prompthook ..> proxy : "separate aggregator layer\n(no shared code path)"
+
+@enduml

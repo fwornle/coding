@@ -1,0 +1,36 @@
+@startuml error-triage-discipline-architecture
+!include _standard-style.puml
+
+package "Post-Rewrite Render Error Triage" {
+  component "Verification Discipline" as discipline <<core>>
+  component "Pre-Rewrite Baseline\n(git stash / prior commit / tag)" as baseline <<storage>>
+  component "Rewritten Codebase" as rewrite <<core>>
+  component "Render Output Comparison" as comparison <<core>>
+}
+
+package "Documentation Style Guide" {
+  component "docs/puml/ (sources)" as pumlSrc <<storage>>
+  component "docs/images/ (rendered)" as imgOut <<storage>>
+  component "docs-content/images/ (MkDocs)" as mkdocsImg <<storage>>
+}
+
+package "Auxiliary Components" {
+  component "EntityPatternAnalyzer.ts" as entityAnalyzer <<core>>
+  component "verify-patterns.sh" as verifyScript <<cli>>
+}
+
+discipline --> baseline : "reproduce error against"
+discipline --> rewrite : "reproduce error against"
+baseline --> comparison : "provides pre-rewrite result"
+rewrite --> comparison : "provides post-rewrite result"
+comparison --> discipline : "confirms regression vs pre-existing"
+
+discipline ..> pumlSrc : "checks source location"
+discipline ..> imgOut : "checks output location"
+pumlSrc ..> imgOut : "renders to"
+imgOut ..> mkdocsImg : "distinct from"
+
+entityAnalyzer ..> discipline : "misattributed by retrieval"
+verifyScript ..> discipline : "thematically adjacent, not implementing"
+
+@enduml

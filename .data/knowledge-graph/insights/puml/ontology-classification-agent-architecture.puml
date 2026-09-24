@@ -1,29 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "MCP Server - Semantic Analysis" {
-    component "OntologyClassificationAgent" as oca <<agent>>
-    component "SemanticLoggingBuffer" as slb <<core>>
+package "SemanticAnalysis Pipeline" {
+  component "SemanticAnalysisAgent" as saa <<agent>>
+  component "OntologyClassificationAgent" as oca <<agent>>
 }
 
-package "Storage" {
-    database ".data/logs/" as logfiles <<storage>>
+package "Ontology Assembly (src/ontology/index.ts)" {
+  component "createOntologySystem()" as factory <<core>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  component "OntologyValidator" as validator <<core>>
+  component "HeuristicClassifier" as heuristic <<core>>
+  component "InferenceEngine" as infer <<external>>
 }
 
-package "LLM & Ontology" {
-    cloud "LLM Service" as llm <<external>>
+package "Ontology Registry & Repair" {
+  database "coding.lower.json / upper.json / coding-ontology.json" as registry
+  component "repair-writer-ontology-class.mjs" as repair <<cli>>
 }
 
-package "Downstream Consumers" {
-    component "GraphKMStore" as gkm <<storage>>
-    component "Semantic Analysis Pipeline" as sap <<core>>
-}
+saa --> oca : "produces intent-derived taxonomy (L1/L2 spine)"
+oca --> factory : "consumes OntologySystem"
 
-slb --> logfiles : "writes LSL entries"
-oca --> logfiles : "reads persisted entries"
-oca --> llm : "invokes for classification"
-oca --> logfiles : "writes enriched entries\n(ontologyClass, confidence)"
-logfiles --> gkm : "consumed by"
-logfiles --> sap : "consumed by"
+factory --> adapter : "wires"
+factory --> validator : "wires"
+factory --> heuristic : "wires"
+factory --> infer : "requires (no mock fallback)"
+
+adapter --> registry : "bridges legacy interfaces to km-core"
+validator --> registry : "validates against"
+oca ..> registry : "loads coding.lower.json (known-bad CodingLowerOntologySource emission)"
+
+repair --> registry : "loadParentMap() / arbitrate()"
+repair ..> oca : "corrects post-hoc ontologyClass drift"
 
 @enduml

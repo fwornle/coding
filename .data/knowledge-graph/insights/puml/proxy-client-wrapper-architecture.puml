@@ -1,0 +1,37 @@
+@startuml
+!include _standard-style.puml
+
+package "Dashboard Consumers" {
+  component "offload-decision.tsx\n(queryFor/pooled)" as offload <<agent>>
+  component "cost-model.ts\n(isOpenAIWireProvider)" as costmodel <<core>>
+  component "use-classifier-judge.ts" as classifier <<core>>
+  component "provider.tsx\n(LLMServiceProvider)" as provider <<core>>
+}
+
+package "SDK / Wrapper Split" {
+  component "@rapid/llm-proxy SDK\n(LLMService)" as sdk <<external>>
+  component "llm-with-process.ts\n(parallel impl)" as parallelimpl <<core>>
+  component "ProxyClientWrapper\n(not evidenced)" as wrapper <<core>>
+  component "copilot-model-ids.test.mjs\n(drift guard)" as test <<cli>>
+}
+
+package "Proxy Service" {
+  component "rapid-llm-proxy\n/api/complete, /api/llm/routing/resolve" as proxy <<api>>
+  component "usage-cache.ts" as usagecache <<storage>>
+  cloud "com.coding.llm-cli-proxy\n(launchd persistent service)" as launchd <<external>>
+}
+
+offload --> proxy : "fetch /api/llm/routing/resolve\n(bounded concurrency 8)"
+costmodel --> usagecache : "wire-protocol token\nnormalization"
+classifier --> proxy : "enabled vs reachable checks"
+provider --> proxy : "configures LLM routing"
+
+sdk --> proxy : "vendored client calls"
+test --> sdk : "guards model-id drift"
+wrapper ..> proxy : "hypothetical HTTP wrapper\n(not found in files)"
+parallelimpl ..> sdk : "parallel, not replacement"
+
+proxy --> launchd : "runs as persistent service"
+proxy --> usagecache : "cache token semantics"
+
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EnhancedTranscriptMonitor
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[EnhancedTranscriptMonitor] as enhanced_transcript_monitor #LightBlue
+[ObservationWriter] as observation_writer #F0F0F0
+[ObservationConsolidator] as observation_consolidator #F0F0F0
+[MentionsClassifier] as mentions_classifier #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ClaudeJsonlTreeAdapter] as claude_jsonl_tree_adapter #F0F0F0
+[ArtifactExtraction] as artifact_extraction #E8F5E8
+[ProgressFireLogic] as progress_fire_logic #E8F5E8
+
+live_logging_system --> enhanced_transcript_monitor
+observation_writer -[hidden]- enhanced_transcript_monitor
+observation_consolidator -[hidden]- enhanced_transcript_monitor
+mentions_classifier -[hidden]- enhanced_transcript_monitor
+token_usage_adapters -[hidden]- enhanced_transcript_monitor
+claude_jsonl_tree_adapter -[hidden]- enhanced_transcript_monitor
+enhanced_transcript_monitor --> artifact_extraction
+enhanced_transcript_monitor --> progress_fire_logic
+
+@enduml

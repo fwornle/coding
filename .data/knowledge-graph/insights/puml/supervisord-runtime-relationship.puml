@@ -6,22 +6,20 @@ title Hierarchy Context: SupervisordRuntime
 [DockerizedServices] as dockerized_services #FFFFDD
 [SupervisordRuntime] as supervisord_runtime #LightBlue
 [ServiceStarter] as service_starter #F0F0F0
-[ServiceProbe] as service_probe #F0F0F0
 [APIServiceWrapper] as apiservice_wrapper #F0F0F0
 [DashboardServiceWrapper] as dashboard_service_wrapper #F0F0F0
-[ProcessStateManager] as process_state_manager #F0F0F0
-[StartServicesRobust] as start_services_robust #F0F0F0
-[FeatureGatingSnapshot] as feature_gating_snapshot #E8F5E8
-[EnvFileImportFilter] as env_file_import_filter #E8F5E8
+[MockLLMService] as mock_llmservice #F0F0F0
+[StartServicesOrchestrator] as start_services_orchestrator #F0F0F0
+[FeatureSnapshotGating] as feature_snapshot_gating #E8F5E8
+[EnvFileSecretFiltering] as env_file_secret_filtering #E8F5E8
 
 dockerized_services --> supervisord_runtime
 service_starter -[hidden]- supervisord_runtime
-service_probe -[hidden]- supervisord_runtime
 apiservice_wrapper -[hidden]- supervisord_runtime
 dashboard_service_wrapper -[hidden]- supervisord_runtime
-process_state_manager -[hidden]- supervisord_runtime
-start_services_robust -[hidden]- supervisord_runtime
-supervisord_runtime --> feature_gating_snapshot
-supervisord_runtime --> env_file_import_filter
+mock_llmservice -[hidden]- supervisord_runtime
+start_services_orchestrator -[hidden]- supervisord_runtime
+supervisord_runtime --> feature_snapshot_gating
+supervisord_runtime --> env_file_secret_filtering
 
 @enduml

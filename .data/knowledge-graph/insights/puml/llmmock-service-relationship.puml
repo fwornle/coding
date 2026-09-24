@@ -6,24 +6,28 @@ title Hierarchy Context: LLMMockService
 [LLMAbstraction] as llmabstraction #FFFFDD
 [LLMMockService] as llmmock_service #LightBlue
 [DMRProvider] as dmrprovider #F0F0F0
-[LLMProxyClient] as llmproxy_client #F0F0F0
-[LlmJsonParser] as llm_json_parser #F0F0F0
+[LLMJsonRepairUtility] as llmjson_repair_utility #F0F0F0
+[ProxyClientWrapper] as proxy_client_wrapper #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
 [DashboardCostModel] as dashboard_cost_model #F0F0F0
-[OffloadRoutingDecision] as offload_routing_decision #F0F0F0
-[ModelContextLimits] as model_context_limits #F0F0F0
-[AgentProviderSplicing] as agent_provider_splicing #F0F0F0
-[JudgeBackendEnabledReachableSplit] as judge_backend_enabled_reachable_split #E8F5E8
-[ClassifierJudgeDraftReconciliation] as classifier_judge_draft_reconciliation #E8F5E8
+[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #E8F5E8
+[OpencodeModelSplice] as opencode_model_splice #E8F5E8
+[PiModelsJsonMerge] as pi_models_json_merge #E8F5E8
+[ModelContextLimitsResolver] as model_context_limits_resolver #E8F5E8
 
 llmabstraction --> llmmock_service
 dmrprovider -[hidden]- llmmock_service
-llmproxy_client -[hidden]- llmmock_service
-llm_json_parser -[hidden]- llmmock_service
+llmjson_repair_utility -[hidden]- llmmock_service
+proxy_client_wrapper -[hidden]- llmmock_service
+copilot_model_id_alignment -[hidden]- llmmock_service
 dashboard_cost_model -[hidden]- llmmock_service
-offload_routing_decision -[hidden]- llmmock_service
-model_context_limits -[hidden]- llmmock_service
-agent_provider_splicing -[hidden]- llmmock_service
-llmmock_service --> judge_backend_enabled_reachable_split
-llmmock_service --> classifier_judge_draft_reconciliation
+offload_routing_dashboard -[hidden]- llmmock_service
+model_context_limits_catalogue -[hidden]- llmmock_service
+llmmock_service --> copilot_model_id_alignment
+llmmock_service --> opencode_model_splice
+llmmock_service --> pi_models_json_merge
+llmmock_service --> model_context_limits_resolver
 
 @enduml

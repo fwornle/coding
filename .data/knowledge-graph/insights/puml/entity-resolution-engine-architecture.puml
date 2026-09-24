@@ -1,0 +1,43 @@
+@startuml
+!include _standard-style.puml
+
+package "Entity Resolution Core" {
+  component "CosineEmbeddingMatcher" as matcher <<core>>
+  component "LayeredDeduplicator\n(proposed, not adopted)" as dedup <<core>>
+  component "Fastembed Embedding Client" as fastembed <<core>>
+  component "report-entity-resolution.mjs" as reportTool <<cli>>
+}
+
+package "Write Paths" {
+  component "writeInsight" as writeInsight <<api>>
+  component "writeObservation" as writeObs <<api>>
+}
+
+database "Cached Embedding Models" as cache
+
+package "Downstream Consumers (Read-Only)" {
+  component "multi-agent-graph.tsx\n(kg_operators: dedup label)" as multiAgent <<agent>>
+  component "color-fallback.ts\n(provenance rendering)" as colorFallback <<external>>
+  component "ukbSlice.ts\n(entity counts)" as ukbSlice <<external>>
+}
+
+fastembed --> cache : "locates/loads"
+matcher --> fastembed : "depends on embedding granularity"
+
+writeInsight --> matcher : "dry-run near-duplicate check"
+writeObs --> dedup : "separate resolution logic"
+
+dedup ..> matcher : "considered sharing (not adopted)"
+
+reportTool --> matcher : "audits thresholds\n(no writes)"
+
+matcher --> writeInsight : "match/merge candidates"
+matcher --> writeObs : "match/merge candidates"
+
+writeInsight --> colorFallback : "stamps metadata.source"
+writeObs --> colorFallback : "stamps metadata.source"
+
+matcher --> ukbSlice : "resolved entity counts"
+matcher --> multiAgent : "dedup stage output"
+
+@enduml

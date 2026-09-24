@@ -1,32 +1,25 @@
 @startuml
 !include _standard-style.puml
 
-package "Hook Dispatch Layer" {
-  component "HooksManager.triggerHook()" as trigger <<api>>
-  component "claude-bridge.js" as claudeBridge <<external>>
-}
-
 package "Violation Capture Core" {
-  component "getViolationCaptureService()" as factory <<core>>
   component "ViolationCaptureService" as vcs <<core>>
-  component "sanitizeParams()" as sanitize <<core>>
-  component "calculateStatistics()" as stats <<core>>
+  component "getViolationCaptureService" as accessor <<core>>
 }
 
-package "Persistence" {
-  database "session-violations.jsonl" as jsonl <<storage>>
-  database "violation-history.json" as history <<storage>>
+package "Constraint System" {
+  component "ConstraintSystem" as cs <<core>>
 }
 
-trigger --> factory : "invokes on PRE_TOOL/POST_TOOL"
-claudeBridge --> trigger : "sessionId (CLAUDE_SESSION_ID)"
-factory --> vcs : "returns shared singleton"
+package "Dashboards" {
+  component "constraint-monitor\n(Next.js)" as cm <<external>>
+  component "system-health-dashboard\n(Vite)" as shd <<external>>
+  component "tmux Statusline" as statusline <<cli>>
+}
 
-vcs --> sanitize : "redacts params (denylist)"
-sanitize --> jsonl : "append raw record"
-vcs --> stats : "update rolling stats"
-stats --> history : "write aggregate (24h window, 1000 cap)"
-
-vcs ..> jsonl : "mints own session-${Date.now()}-${random}"
+accessor --> vcs : "lazily instantiate/cache"
+cs --> vcs : "produces violation data"
+vcs --> cm : "feeds violation records"
+statusline --> cm : "click-through opens/focuses"
+cm ..> shd : "separate dashboard\n(architecturally distinct)"
 
 @enduml

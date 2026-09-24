@@ -1,0 +1,37 @@
+@startuml
+!include _standard-style.puml
+
+package "Agent Runtime Hook (Actual Code)" {
+  component "health-prompt-hook.js" as hook <<cli>>
+  component "deriveSummary()" as derive <<core>>
+  component "outputHealthContext()" as envelope <<core>>
+}
+
+package "Health Coordinator" {
+  component "/health/state endpoint" as healthApi <<api>>
+  database "knowledge_pipeline.status" as kpStatus
+}
+
+package "Test Contract" {
+  component "health-prompt-hook-stall.test.mjs" as test <<external>>
+}
+
+package "Dashboards (unrelated hooks)" {
+  component "usePolledFetch.ts" as polled <<agent>>
+  component "useWorkflowDefinitions (hooks.ts)" as workflow <<agent>>
+}
+
+hook --> healthApi : "fetches state"
+healthApi --> kpStatus : "reports"
+hook --> derive : "reduces state"
+derive --> kpStatus : "checks 'stalled'"
+derive --> envelope : "builds summary"
+envelope --> hook : "stdout envelope\n(exit 0 always)"
+
+test ..> hook : "execFile black-box\nassert stdout"
+test ..> envelope : "validates contract"
+
+hook ..> polled : "shared status aggregator\n(no direct code path)"
+hook ..> workflow : "consumed by dashboards"
+
+@enduml

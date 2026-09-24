@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MentionsClassifier
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[MentionsClassifier] as mentions_classifier #LightBlue
+[ObservationWriter] as observation_writer #F0F0F0
+[ObservationConsolidator] as observation_consolidator #F0F0F0
+[EnhancedTranscriptMonitor] as enhanced_transcript_monitor #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ClaudeJsonlTreeAdapter] as claude_jsonl_tree_adapter #F0F0F0
+[MentionsPromptBuilder] as mentions_prompt_builder #E8F5E8
+[MentionsResponseParser] as mentions_response_parser #E8F5E8
+[MentionsPacingGate] as mentions_pacing_gate #E8F5E8
+[MentionCandidateLoader] as mention_candidate_loader #E8F5E8
+
+live_logging_system --> mentions_classifier
+observation_writer -[hidden]- mentions_classifier
+observation_consolidator -[hidden]- mentions_classifier
+enhanced_transcript_monitor -[hidden]- mentions_classifier
+token_usage_adapters -[hidden]- mentions_classifier
+claude_jsonl_tree_adapter -[hidden]- mentions_classifier
+mentions_classifier --> mentions_prompt_builder
+mentions_classifier --> mentions_response_parser
+mentions_classifier --> mentions_pacing_gate
+mentions_classifier --> mention_candidate_loader
+
+@enduml

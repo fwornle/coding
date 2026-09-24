@@ -1,39 +1,34 @@
 @startuml
 !include _standard-style.puml
 
-package "Mode Management" {
-  component "llm-mock-service.ts" as mock <<core>>
-  database ".data/workflow-progress.json" as state <<storage>>
-}
-
-package "Providers" {
+package "LLM Abstraction Layer" {
+  component "getLLMMode()\n(llm-mock-service.ts)" as modeRes <<core>>
+  component "llm-with-process.ts" as wrapper <<core>>
   component "dmr-provider.ts" as dmr <<core>>
-  component "dmr-config.yaml" as dmrconfig <<storage>>
-  cloud "Docker Model Runner" as dmrhost <<external>>
-  component "llm-with-process.ts" as proxywrap <<core>>
-  cloud "rapid-llm-proxy" as proxy <<external>>
-}
-
-package "Reliability & Metrics" {
   component "parse-llm-json.ts" as parser <<core>>
-  component "MetricsTrackerLike" as metrics <<core>>
-  component "wave-controller.ts" as wave <<agent>>
 }
 
-mock --> state : "reads/writes LLMState\n(globalMode, perAgentOverrides)"
-mock --> state : "dual-writes legacy\nprogress.mockLLM"
+package "State & Catalogue" {
+  database "workflow-progress.json" as state
+  component "Model Catalogue\n(Endpoint-Gated Rules)" as catalogue <<storage>>
+}
 
-dmr --> dmrconfig : "loadDMRConfig()\nexpandEnvVars()"
-dmr --> dmrhost : "OpenAI-compatible\nrequests"
-dmr ..> dmr : "cached checkDMRAvailability()"
+package "External Services" {
+  cloud "proxy-bridge/server.mjs\n(llm-cli-proxy)" as proxy <<external>>
+  component "Docker Model Runner" as dmrClient <<external>>
+}
 
-proxywrap --> proxy : "resolveProxyCompleteUrl()\nfetch /api/complete"
-proxywrap --> metrics : "populates via\nMetricsTrackerLike"
+component "@rapid/llm-proxy SDK\n(LLMService)" as sdk <<external>>
 
-mock --> proxywrap : "getLLMMode() precedence\nresolution"
-mock --> dmr : "mode toggle\n(mock/local/public)"
-
-parser --> proxywrap : "repairs JSON-mode\noutput"
-wave --> metrics : "getDetailedCalls()\ngetLLMMetrics()"
+modeRes --> state : "reads/writes mode"
+wrapper --> proxy : "HTTP /api/complete"
+wrapper ..> sdk : "parallel impl, kept in sync"
+dmr --> dmrClient : "singleton client"
+dmr --> dmr : "healthCheckInterval cache"
+wrapper --> catalogue : "validates endpoint/model"
+proxy --> catalogue : "gates access"
+wrapper --> parser : "repairs malformed JSON"
+modeRes --> wrapper : "selects mode"
+modeRes --> dmr : "selects local tier"
 
 @enduml

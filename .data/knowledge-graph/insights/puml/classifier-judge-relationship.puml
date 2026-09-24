@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ClassifierJudge
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ClassifierJudge] as classifier_judge #LightBlue
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMWithProcessClient] as llmwith_process_client #F0F0F0
+[LlmJsonRepair] as llm_json_repair #F0F0F0
+[CostModel] as cost_model #F0F0F0
+[OffloadRouting] as offload_routing #F0F0F0
+[ModelContextLimits] as model_context_limits #F0F0F0
+
+llmabstraction --> classifier_judge
+dmrprovider -[hidden]- classifier_judge
+llmwith_process_client -[hidden]- classifier_judge
+llm_json_repair -[hidden]- classifier_judge
+cost_model -[hidden]- classifier_judge
+offload_routing -[hidden]- classifier_judge
+model_context_limits -[hidden]- classifier_judge
+
+@enduml

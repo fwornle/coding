@@ -5,19 +5,11 @@ title Hierarchy Context: PatternVerificationTooling
 
 [CodingPatterns] as coding_patterns #FFFFDD
 [PatternVerificationTooling] as pattern_verification_tooling #LightBlue
-[ManagerPattern] as manager_pattern #F0F0F0
-[AdapterRegistryPattern] as adapter_registry_pattern #F0F0F0
-[AgentWrapperConvention] as agent_wrapper_convention #F0F0F0
-[OwnershipHeuristicPattern] as ownership_heuristic_pattern #F0F0F0
-[EntityPatternAnalyzer] as entity_pattern_analyzer #E8F5E8
-[PatternComplianceScript] as pattern_compliance_script #E8F5E8
+[DocumentationStyleGuide] as documentation_style_guide #F0F0F0
+[ErrorTriageDiscipline] as error_triage_discipline #F0F0F0
 
 coding_patterns --> pattern_verification_tooling
-manager_pattern -[hidden]- pattern_verification_tooling
-adapter_registry_pattern -[hidden]- pattern_verification_tooling
-agent_wrapper_convention -[hidden]- pattern_verification_tooling
-ownership_heuristic_pattern -[hidden]- pattern_verification_tooling
-pattern_verification_tooling --> entity_pattern_analyzer
-pattern_verification_tooling --> pattern_compliance_script
+documentation_style_guide -[hidden]- pattern_verification_tooling
+error_triage_discipline -[hidden]- pattern_verification_tooling
 
 @enduml

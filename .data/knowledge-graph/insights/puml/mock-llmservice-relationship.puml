@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: MockLLMService
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[MockLLMService] as mock_llmservice #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[APIServiceWrapper] as apiservice_wrapper #F0F0F0
+[DashboardServiceWrapper] as dashboard_service_wrapper #F0F0F0
+[SupervisordRuntime] as supervisord_runtime #F0F0F0
+[StartServicesOrchestrator] as start_services_orchestrator #F0F0F0
+
+dockerized_services --> mock_llmservice
+service_starter -[hidden]- mock_llmservice
+apiservice_wrapper -[hidden]- mock_llmservice
+dashboard_service_wrapper -[hidden]- mock_llmservice
+supervisord_runtime -[hidden]- mock_llmservice
+start_services_orchestrator -[hidden]- mock_llmservice
+
+@enduml

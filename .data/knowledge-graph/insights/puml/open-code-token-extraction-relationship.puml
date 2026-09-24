@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: OpenCodeTokenExtraction
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[OpenCodeTokenExtraction] as open_code_token_extraction #LightBlue
+[LslConfigValidator] as lsl_config_validator #F0F0F0
+[ColdStoreBackfill] as cold_store_backfill #F0F0F0
+[LiveCopilotTailWatcher] as live_copilot_tail_watcher #F0F0F0
+[TokenUsageDbWriter] as token_usage_db_writer #F0F0F0
+[ObservationWriter] as observation_writer #F0F0F0
+[LslSessionsApi] as lsl_sessions_api #F0F0F0
+[TurnActivitySummary] as turn_activity_summary #E8F5E8
+[OpenCodeDbOwnershipGate] as open_code_db_ownership_gate #E8F5E8
+
+live_logging_system --> open_code_token_extraction
+lsl_config_validator -[hidden]- open_code_token_extraction
+cold_store_backfill -[hidden]- open_code_token_extraction
+live_copilot_tail_watcher -[hidden]- open_code_token_extraction
+token_usage_db_writer -[hidden]- open_code_token_extraction
+observation_writer -[hidden]- open_code_token_extraction
+lsl_sessions_api -[hidden]- open_code_token_extraction
+open_code_token_extraction --> turn_activity_summary
+open_code_token_extraction --> open_code_db_ownership_gate
+
+@enduml

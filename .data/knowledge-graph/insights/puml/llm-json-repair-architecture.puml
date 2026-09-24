@@ -1,0 +1,32 @@
+@startuml
+!include _standard-style.puml
+
+package "rapid-llm-proxy" {
+  component "Universal Agent Routing" as routing <<core>>
+  component "Worker Pool / Health" as pool <<core>>
+  component "Proxy Response Output" as proxyOut <<api>>
+}
+
+package "coding (client glue)" {
+  component "LlmJsonRepair\n(parse-llm-json.ts)" as repair <<core>>
+  component "escapeControlCharsInStrings()" as escape <<core>>
+  component "truncateToLastCompleteElement()" as truncate <<core>>
+  component "Agent Configs / Classifier Config" as clientGlue <<agent>>
+}
+
+package "system-health-dashboard (unrelated cluster)" {
+  component "cost-model.ts\npriceForModel()" as cost <<storage>>
+  component "use-classifier-judge.ts\nfetch().json()" as classifier <<api>>
+}
+
+proxyOut --> repair : "raw/truncated JSON completions"
+repair --> escape : "sanitize control chars"
+repair --> truncate : "salvage incomplete JSON"
+routing --> proxyOut : "shapes output"
+pool --> routing : "health/dispatch"
+clientGlue ..> repair : "must stay in sync with proxy changes"
+
+classifier ..> repair : "NOT related\n(plain fetch().json())"
+cost ..> repair : "NOT related\n(pricing logic only)"
+
+@enduml

@@ -5,23 +5,25 @@ title Hierarchy Context: ObservationWriter
 
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [ObservationWriter] as observation_writer #LightBlue
-[LSLConfigValidator] as lslconfig_validator #F0F0F0
-[RedactionConfigManager] as redaction_config_manager #F0F0F0
-[MultiUserHashManager] as multi_user_hash_manager #F0F0F0
-[LiveTranscriptWatchers] as live_transcript_watchers #F0F0F0
+[ObservationConsolidator] as observation_consolidator #F0F0F0
+[MentionsClassifier] as mentions_classifier #F0F0F0
+[EnhancedTranscriptMonitor] as enhanced_transcript_monitor #F0F0F0
 [TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ClaudeJsonlTreeAdapter] as claude_jsonl_tree_adapter #F0F0F0
+[RawFallbackPath] as raw_fallback_path #E8F5E8
+[AnchorEdgeWriter] as anchor_edge_writer #E8F5E8
 [ObservationEventBus] as observation_event_bus #E8F5E8
-[AckPhraseGate] as ack_phrase_gate #E8F5E8
-[KmCoreOntologyResolver] as km_core_ontology_resolver #E8F5E8
+[WriterPathUnification] as writer_path_unification #E8F5E8
 
 live_logging_system --> observation_writer
-lslconfig_validator -[hidden]- observation_writer
-redaction_config_manager -[hidden]- observation_writer
-multi_user_hash_manager -[hidden]- observation_writer
-live_transcript_watchers -[hidden]- observation_writer
+observation_consolidator -[hidden]- observation_writer
+mentions_classifier -[hidden]- observation_writer
+enhanced_transcript_monitor -[hidden]- observation_writer
 token_usage_adapters -[hidden]- observation_writer
+claude_jsonl_tree_adapter -[hidden]- observation_writer
+observation_writer --> raw_fallback_path
+observation_writer --> anchor_edge_writer
 observation_writer --> observation_event_bus
-observation_writer --> ack_phrase_gate
-observation_writer --> km_core_ontology_resolver
+observation_writer --> writer_path_unification
 
 @enduml

@@ -1,0 +1,28 @@
+@startuml
+!include _standard-style.puml
+
+package "Agent Launcher Config" {
+  component "copilot.sh\nagent_pre_launch" as copilot <<agent>>
+  component "opencode.sh\n_oc_splice_config" as opencode <<agent>>
+  component "pi.sh" as pi <<agent>>
+  component "no-unbounded-fs-scan.ts\noffendingRoot/findRoots" as fsguard <<core>>
+}
+
+package "System Health Dashboard" {
+  component "batch-provenance.mjs\nselectBatchesForReport" as batchprov <<core>>
+}
+
+package "Not Present (CanonicalMapper Scope)" {
+  component "CanonicalMapper" as cmapper <<core>>
+}
+
+pi --> fsguard : "invokes guard on tool_call"
+opencode --> opencode : "splices JSON fragments"
+copilot --> copilot : "wires BYOK env"
+
+batchprov --> batchprov : "time-window attribution\n(replaces name substring match)"
+
+cmapper ..> batchprov : "no import relationship\n(unrelated subsystem)"
+cmapper ..> fsguard : "no shared module boundary"
+
+@enduml

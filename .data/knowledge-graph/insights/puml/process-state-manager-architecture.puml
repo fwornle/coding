@@ -1,39 +1,43 @@
 @startuml
 !include _standard-style.puml
 
-package "Orchestration Layer" {
-  component "start-services-robust.js" as orchestrator <<core>>
-  component "SERVICE_CONFIGS\n(transcriptMonitor.startFn)" as serviceConfigs <<core>>
-  component "service-starter.js\n(startServiceWithRetry)" as serviceStarter <<core>>
+package "Startup Orchestration" {
+  component "start-services-robust.js" as ssr <<core>>
+  component "SERVICE_CONFIGS/ORDER" as sc <<core>>
 }
 
-package "Process State Manager" {
-  component "ProcessStateManager\n(singleton psm)" as psm <<core>>
-  database "PID Registry\n(name+scope+projectPath)" as registry <<storage>>
+package "Process State Layer" {
+  component "ProcessStateManager" as psm <<core>>
+  component "pgrep OS Scan" as pgrep <<external>>
 }
 
-package "OS-Level Verification" {
-  component "isProcessRunningByScript\n(pgrep -lf)" as pgrep <<external>>
+package "Parallel Gating Authority" {
+  component "entrypoint.sh" as ep <<cli>>
+  database "features.json" as feat
+  component "supervisord" as sup <<external>>
 }
 
-package "Wrapper Services" {
-  component "api-service.js" as apiService <<agent>>
-  component "dashboard-service.js" as dashboardService <<agent>>
+package "Managed Services" {
+  component "api-service.js / dashboard-service.js" as wrap <<agent>>
+  component "transcript-monitor" as tm <<agent>>
 }
 
-component "service-gating.test.mjs\n(stubs startFn)" as tests <<cli>>
+ssr --> sc : "reads service configs"
+ssr --> psm : "instantiates singleton"
+ssr --> psm : "isServiceRunning(name, scope, opts)"
+psm ..> pgrep : "falls back to raw scan\n(not sole source of truth)"
+ssr --> pgrep : "isProcessRunningByScript()"
+pgrep --> psm : "registerService() reconciles orphan"
+ssr --> tm : "spawns if not running"
 
-orchestrator --> serviceConfigs : "defines"
-orchestrator --> psm : "instantiates\nconst psm = new ProcessStateManager()"
-serviceConfigs --> psm : "isServiceRunning(name, scope)"
-psm --> registry : "queries/updates"
-serviceConfigs --> pgrep : "fallback liveness check"
-pgrep ..> psm : "registerService()\n(orphan re-registration)"
+wrap --> psm : "registerService() on spawn"
+wrap --> psm : "unregisterService() on exit"
+sup --> wrap : "tracks wrapper PID only"
 
-apiService --> psm : "registerService()\n(post-spawn)"
-dashboardService --> psm : "registerService()\n(post-spawn)"
-serviceStarter ..> psm : "possible implicit registration"
+ep --> feat : "reads snapshot"
+feat --> ep : "may drift to logging-only"
+ep --> sup : "autostart=false override"
 
-tests ..> serviceConfigs : "stubs startFn\n(bypasses PSM)"
+psm ..> ep : "no shown integration\n(parallel gating authority)"
 
 @enduml

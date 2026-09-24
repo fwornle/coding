@@ -1,42 +1,35 @@
 @startuml
 !include _standard-style.puml
 
-package "Host Orchestration" {
-  component "start-services.sh\n(ROBUST_MODE seam)" as legacy <<cli>>
-  component "start-services-robust.js" as robust <<core>>
-  component "service-starter.js\nstartServiceWithRetry()" as starter <<core>>
-  component "SERVICE_CONFIGS /\nSERVICE_ORDER" as config <<core>>
-  database "PSM Registry" as psm <<storage>>
+package "Docker Container Boundary" {
+  component "docker/entrypoint.sh" as entrypoint <<core>>
+  component "features.json snapshot" as snapshot <<storage>>
+  component "supervisord features.d overlay" as overlay <<core>>
 }
 
-package "Verification & Self-Healing" {
-  component "waitForPortBindable()" as portcheck <<core>>
-  component "killProcessOnPortAndWait()" as killport <<core>>
-  component "isProcessRunningByScript()\n(pgrep orphan scan)" as orphan <<core>>
+package "Service Launcher Layer" {
+  component "scripts/start-services-robust.js\n(SERVICE_CONFIGS)" as launcher <<core>>
+  component "ProcessStateManager" as psm <<core>>
+  component "tests/features/service-gating.test.mjs" as tests <<cli>>
 }
 
-package "Feature Gating Contracts" {
-  component "lib/features/catalogue.cjs\nFEATURE_IDS" as catalogue <<core>>
-  component "service-gating.test.mjs\n(fail-closed)" as hosttest <<cli>>
-  component "docker/entrypoint.sh\nPROGRAM_FEATURES (fail-open)" as entrypoint <<external>>
-  component "container-gating.test.mjs" as containertest <<cli>>
-  database "features.json\n(mounted snapshot)" as snapshot <<storage>>
+package "Dashboard Wrapper (inferred)" {
+  component "DashboardServiceWrapper\n(not found in supplied files)" as dsw <<agent>>
+  component "scripts/api-service.js\n(spawns dashboard-server.js)" as api <<core>>
+  component "scripts/dashboard-service.js\n(wraps npm run dev)" as dashsvc <<core>>
 }
 
-legacy --> robust : "ROBUST_MODE=true delegates"
-robust --> starter : "invokes per service"
-starter --> config : "reads required/optional,\nmaxRetries"
-starter --> psm : "registerService()"
-robust --> killport : "cleanup before spawn"
-killport --> portcheck : "then verify bindable"
-robust --> orphan : "reconcile drift"
-orphan --> psm : "re-register orphan"
+snapshot --> entrypoint : "read-only mount"
+entrypoint --> overlay : "generates autostart=false\nwhen health:false"
+overlay --> dsw : "gates supervised dashboard\n(if registered)"
 
-config --> catalogue : "declares feature"
-hosttest --> config : "asserts coverage"
-hosttest --> catalogue : "validates FEATURE_IDS"
+launcher --> psm : "registerService"
+launcher ..> dsw : "structurally same\nwrapper-process pattern"
+tests --> launcher : "asserts feature gating\nSERVICE_CONFIGS/SERVICE_ORDER"
 
-entrypoint --> snapshot : "reads host-written config"
-containertest --> entrypoint : "asserts PROGRAM_FEATURES\nvs supervisord.conf"
+dsw ..> api : "possible wrapper alias"
+dsw ..> dashsvc : "possible wrapper alias"
+
+snapshot ..> dsw : "drift causes silent\noutage (unresolved)"
 
 @enduml

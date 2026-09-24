@@ -1,47 +1,35 @@
 @startuml
 !include _standard-style.puml
-title "KM Core Migration Architecture\nv1.0 — 2026-05-25"
 
-' Author: fradou7@gmail.com
-' Purpose: Illustrates LevelDB + GraphDB → km-core migration pipeline
-```
-
----
-
-## ✅ Corrected PlantUML (Complete)
-
-```plantuml
-@startuml
-
-top to bottom direction
-
-package "Source Stores" {
-    database "LevelDB" as leveldb <<storage>>
-    database "Graph DB" as graphdb <<storage>>
+package "Migration Scripts (named, not retrieved)" {
+  component "migrate-graph-db-entity-types.js" as typeMap <<cli>>
+  component "migrate-leveldb-to-kmcore.mjs" as legacyMigrate <<cli>>
+  component "ENTITY_TYPE_MAPPING" as typeTable <<core>>
 }
 
-package "KmCoreMigration" {
-    component "migrate-leveldb-to-kmcore.mjs" as migrateLeveldb <<core>>
-    component "migrate-graph-db-entity-types.js" as migrateGraph <<core>>
-    component "UUIDv7 Key Assigner" as uuidAssigner <<core>>
-    component "Error Budget Enforcer" as errorBudget <<core>>
-    component "Dry-Run Preview" as dryRun <<cli>>
+package "km-core Storage Layer" {
+  component "GraphDatabaseService" as gds <<core>>
+  component "km-core-adapter.ts" as adapter <<core>>
+  database "graphology-level\n(.data/knowledge-graph)" as store <<storage>>
 }
 
-package "KnowledgeManagement / km-core" {
-    database "km-core Canonical Store" as kmcore <<storage>>
-    component "Entity Type Registry" as entity Registry <<core>>
+package "Data Integrity Concerns" {
+  component "Document Store\n(Insight docs)" as docStore <<storage>>
+  component "Graph Node Layer\n(Insight nodes)" as graphNodes <<storage>>
+  component "findEntityByName\n(bare-name lookup)" as nameResolve <<core>>
 }
 
-leveldb --> migrateLeveldb : "source records"
-graphdb --> migrateGraph : "entity types"
+typeMap --> typeTable : "consolidates legacy types"
+typeMap --> gds : "calls _persistGraphToLevel()"
+legacyMigrate --> gds : "dry-run / production migrate"
+legacyMigrate --> store : "enforces 5% error budget"
 
-migrateLeveldb --> uuidAssigner : "assigns UUIDv7 keys\n+ provenance stamps"
-uuidAssigner --> kmcore : "transformed records"
+gds --> store : "persists graph"
+adapter --> nameResolve : "must bind entity Type/endpointTypes"
+nameResolve ..> store : "unsafe: oldest-wins on duplicate names"
 
-migrateGraph --> errorBudget : "tracks failures\nvs. threshold"
-migrateGraph --> dryRun : "preview remappings\n(no writes)"
-errorBudget --> migrateGraph : "halt / skip signal"
-migrateGraph --> entity Registry : "remapped entity types"
+legacyMigrate --> docStore : "writes converted documents"
+legacyMigrate --> graphNodes : "must verify node write too"
+docStore ..> graphNodes : "NOT jointly guaranteed"
 
 @enduml

@@ -1,0 +1,39 @@
+@startuml
+!include _standard-style.puml
+
+package "BaseAgentFramework (unverified in this request)" {
+  component "BaseAgent<TInput,TOutput>" as base <<core>>
+  component "SemanticAnalysisAgent" as sem <<agent>>
+  component "OntologyClassificationAgent" as ocls <<agent>>
+}
+
+package "Ontology Plumbing" {
+  component "createOntologySystem()" as factory <<core>>
+  component "OntologyValidator" as validator <<core>>
+  component "OntologyClassifier" as classifier <<core>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  component "UnifiedInferenceEngine" as inference <<external>>
+}
+
+package "Unrelated Retrieved Files" {
+  component "health-coordinator.js" as health <<cli>>
+  component "repair-writer-ontology-class.mjs" as repair <<cli>>
+  component "copilot.sh (agent launcher)" as copilot <<cli>>
+}
+
+base ..> sem : "template method override"
+base ..> ocls : "template method override"
+ocls --> factory : "consumes"
+
+factory --> validator : wires
+factory --> classifier : wires
+factory --> adapter : wires
+factory --> inference : "requires (no mock fallback)"
+
+adapter ..> classifier : "wraps km-core OntologyRegistry"
+
+health ..> base : "no relation (health daemon)"
+repair ..> base : "no relation (data repair CLI)"
+copilot ..> base : "no relation (different 'agent' concept)"
+
+@enduml

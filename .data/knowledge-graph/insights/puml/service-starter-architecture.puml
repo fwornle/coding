@@ -1,42 +1,40 @@
 @startuml
 !include _standard-style.puml
 
-package "Legacy Path" {
-  component "start-services.sh" as legacy <<cli>>
+package "Entry Point" {
+  component "start-services.sh" as shim <<cli>>
+  component "start-services-robust.js" as orchestrator <<core>>
 }
 
-package "Robust Path (Node)" {
-  component "start-services-robust.js" as robust <<core>>
-  component "SERVICE_CONFIGS / SERVICE_ORDER" as svcconf <<core>>
-  component "loadFeatures()" as loadfeat <<core>>
-  component "waitForPortBindable()" as portbind <<core>>
-  component "killProcessOnPortAndWait()" as killport <<core>>
-  component "isProcessRunningByScript()" as orphan <<core>>
-  component "ProcessStateManager" as psm <<storage>>
+package "Service Starter Core" {
+  component "lib/service-starter.js" as libStarter <<core>>
+  component "SERVICE_CONFIGS / SERVICE_ORDER" as configs <<core>>
+  component "ProcessStateManager (PSM)" as psm <<storage>>
+  component "pgrep Orphan Detector" as pgrep <<agent>>
+  component "Port Shutdown/Startup Race Logic" as portlogic <<core>>
 }
 
-package "Container Path" {
+package "Container-Side Gating" {
   component "docker/entrypoint.sh" as entrypoint <<cli>>
-  component "PROGRAM_FEATURES mapping" as progfeat <<core>>
-  component "features.json snapshot" as snapshot <<storage>>
+  component "features.json snapshot" as features <<storage>>
+  component "supervisord.conf overrides" as supervisord <<external>>
 }
 
-component "transcriptMonitor service" as transcript <<agent>>
-component "prompt-classifier-service.mjs" as classifier <<agent>>
+component "service-gating.test.mjs" as tests <<agent>>
 
-legacy --> robust : "ROBUST_MODE=true delegates to"
-robust --> svcconf : "iterates"
-svcconf --> loadfeat : "checks feature gate"
-svcconf --> transcript : "starts (required=true)"
-transcript --> orphan : "PSM+pgrep tri-check"
-orphan --> psm : "registerService/isServiceRunning"
-robust --> portbind : "verify port bindable"
-robust --> killport : "SIGTERM->SIGKILL escalation"
+shim --> orchestrator : "execs when ROBUST_MODE=true"
+orchestrator --> configs : "declares service map"
+orchestrator --> libStarter : "startServiceWithRetry / health checks"
+orchestrator --> psm : "isServiceRunning checks"
+orchestrator --> pgrep : "fallback reconciliation"
+pgrep --> psm : "re-registers orphans"
+orchestrator --> portlogic : "SIGTERM->SIGKILL, TCP bind probe"
 
-entrypoint --> progfeat : "maps features to services"
-entrypoint --> snapshot : "reads (fail-open if missing)"
-progfeat ..> svcconf : "must stay in sync (manual)"
+entrypoint --> features : "reads read-only snapshot"
+entrypoint --> supervisord : "generates disabled.conf"
 
-classifier ..> robust : "shares env-driven fail-open philosophy"
+tests --> configs : "validates structural invariants"
+
+orchestrator ..> entrypoint : "parallel container-side gating"
 
 @enduml

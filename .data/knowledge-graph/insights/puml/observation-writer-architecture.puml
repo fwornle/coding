@@ -1,41 +1,33 @@
 @startuml
 !include _standard-style.puml
 
-package "Upstream Fan-in" {
-  component "repo-router.mjs\n(routeFromArtifacts)" as router <<external>>
-  component "task-id.mjs\n(resolveLiveTaskIdSafe)" as taskid <<external>>
-  component "window.mjs\n(getLSLWindow)" as window <<external>>
-  component "ConfigurableRedactor.js" as redactor <<external>>
-  component "MentionsClassifier.js" as classifier <<external>>
+package "Producers" {
+  component "enhanced-transcript-monitor.js" as etm <<agent>>
+  component "extractFileChanges/toolCallArgs" as extract <<core>>
 }
 
-package "ObservationWriter Core" {
+package "Observation Pipeline" {
   component "ObservationWriter" as ow <<core>>
-  component "resolveKmCoreOntologyDir()" as ontology <<core>>
-  component "_observationEmitter\n(module singleton)" as emitter <<core>>
-  component "Anchor-edge cache\n(_anchorId)" as anchor <<core>>
+  component "ObservationApiClient" as oac <<api>>
+  component "ObservationConsolidator" as oc <<core>>
+  component "MentionsClassifier" as mc <<core>>
 }
 
-package "Consumers & Monitoring" {
-  component "ObservationConsolidator" as consolidator <<agent>>
-  component "health-coordinator.js\n(fetchLastObservationWriterCallAge)" as health <<agent>>
-  database "km-core putEntity" as kmcore <<storage>>
-  component "SSE /api/coding/observations/stream" as sse <<api>>
+package "Persistence & Monitoring" {
+  database "Observation DB" as db
+  component "health-coordinator.js" as hc <<core>>
 }
 
-router --> ow : "attribution routing"
-taskid --> ow : "task-id resolution"
-window --> ow : "LSL window"
-redactor --> ow : "redaction"
-classifier --> ow : "classification"
+etm --> extract : normalizes tool-call payloads
+extract --> ow : "{modifiedFiles, readFiles}"
+etm --> ow : direct write path
+etm --> oac : API write path
+ow --> oc : "_ensureObservationWriter"
+oc --> mc : dirty-parent re-synthesis
+ow --> db : persist (dedup/snapshot/\nevidence-floor gated)
+oac --> db : persist via API
+hc ..> ow : "fetchLastObservationWriterCallAge"
 
-ow --> ontology : "resolves ontology dir"
-ow --> anchor : "lazy anchor resolution"
-ow --> emitter : "emits write events"
-ow --> kmcore : "putEntity"
-
-emitter --> sse : "pub/sub tap"
-consolidator --> ow : "_ensureObservationWriter"
-health ..> ow : "polls call recency"
+ow ..> db : "[Raw] fallback logs\n'storing' but may silently fail"
 
 @enduml

@@ -1,48 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "Health Probing Core" {
-  component "ServiceProbe\n(service-probe.js)" as probe <<core>>
-}
-
-package "Container Path" {
+package "Service Startup & Gating" {
   component "entrypoint.sh" as entrypoint <<core>>
-  component "wait_for_service()\n(/dev/tcp probe)" as tcpprobe <<core>>
-  component "PROGRAM_FEATURES\n+ supervisord gating" as progfeat <<core>>
-  component "container-gating.test.mjs" as ctest <<agent>>
+  component "PROGRAM_FEATURES" as progfeat <<core>>
+  component "features.json (snapshot)" as snapshot <<storage>>
+  component "supervisord" as supervisord <<external>>
 }
 
-package "Host Path" {
-  component "start-services-robust.js" as robust <<core>>
-  component "SERVICE_CONFIGS /\nSERVICE_ORDER" as svcconf <<core>>
-  component "waitForPortBindable()" as bindable <<core>>
-  component "killProcessOnPortAndWait()" as killport <<core>>
-  component "service-gating.test.mjs" as stest <<agent>>
+package "Health Checking Layer" {
+  component "start-services-robust.js" as startrobust <<core>>
+  component "SERVICE_CONFIGS.healthCheckFn" as healthfn <<core>>
+  component "service-starter.js\n(createHttpHealthCheck/createPidHealthCheck)" as starter <<core>>
+  component "ServiceProbe\n(lib/utils/service-probe.js)\n[NOT RETRIEVED]" as probe <<core>>
 }
 
-package "Legacy Path" {
-  component "start-services.sh\n(ROBUST_MODE toggle)" as legacy <<external>>
-  component "lsof/docker-compose\nhealth polling" as legacyhealth <<external>>
+package "Analog & Test Patterns" {
+  component "prompt-classifier-service.mjs\ncurrentNetwork()" as classifier <<agent>>
+  cloud "llm-cli-proxy /health" as proxyhealth <<external>>
+  component "service-gating.test.mjs" as gatingtest <<cli>>
 }
 
-database "features.json\n(FEATURES_SNAPSHOT)" as snapshot
+snapshot --> entrypoint : "read at startup"
+entrypoint --> progfeat : "maps feature->program"
+entrypoint --> supervisord : "generate autostart=false includes"
 
-entrypoint --> tcpprobe : "ad-hoc TCP check"
-entrypoint --> progfeat : "reads"
-progfeat --> snapshot : "reads (fail-open)"
-progfeat ..> ctest : "verified against\nsupervisord.conf"
+startrobust --> healthfn : "SERVICE_CONFIGS entries"
+healthfn --> starter : "createPidHealthCheck() / createHttpHealthCheck()"
+starter ..> probe : "expected to delegate to\n(unconfirmed - file absent)"
 
-robust --> svcconf : "enforces feature gating"
-robust --> bindable : "avoids false EADDRINUSE"
-robust --> killport : "SIGTERM/SIGKILL escalation"
-svcconf ..> stest : "structural drift checks"
+classifier --> proxyhealth : "poll with NETWORK_TTL_MS cache"
+classifier ..> probe : "structurally analogous pattern"
 
-probe ..> entrypoint : "reused by (containerized)"
-probe ..> robust : "reused by (host subprocess)"
-
-legacy --> legacyhealth : "duplicate health semantics"
-legacy ..> robust : "ROBUST_MODE=false fallback"
-
-svcconf --> snapshot : "mirrors container gating"
+gatingtest --> startrobust : "tests startOneService() gating"
 
 @enduml

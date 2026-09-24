@@ -1,35 +1,27 @@
 @startuml
 !include _standard-style.puml
 
-package "Configuration Layer" {
-  component "HookConfigLoader" as loader <<core>>
-  database "DEFAULT_CONFIG" as defaultCfg <<storage>>
-  database "~/.coding-tools/hooks.json" as userCfg <<storage>>
-  database ".coding/hooks.json" as projectCfg <<storage>>
+package "Hooks Subsystem" {
+  component "HookConfigLoader\n(hook-config.js, not retrieved)" as loader <<core>>
+  component "HooksManager\n(hooks-api.js, abstract)" as manager <<core>>
+  component "UnifiedHookManager\n(hook-manager.js)" as unified <<core>>
 }
 
-package "Runtime Hook Registries" {
-  component "HooksManager\n(hooks-api.js)" as hooksApi <<core>>
-  component "UnifiedHookManager\n(hook-manager.js)" as hookMgr <<core>>
+package "Bridge Layer" {
+  component "ClaudeBridge\n(claude-bridge.js)" as bridge <<agent>>
 }
 
-package "Bridge & Execution" {
-  component "claude-bridge.js\n(main)" as bridge <<agent>>
+package "External / Session Layer" {
+  component "Claude Code Native Hooks" as claude <<external>>
+  component "HookManagementSystem\n(statusline, ETM)" as hms <<agent>>
 }
 
-defaultCfg --> loader : "tier 1"
-userCfg --> loader : "tier 2"
-projectCfg --> loader : "tier 3"
-
-loader --> hooksApi : "merged config (uncertain)"
-loader --> hookMgr : "merged config feeds initialize()"
-
-bridge --> hookMgr : "getHookManager()/initialize()"
-hookMgr --> bridge : "executeHooks()"
-
-bridge ..> bridge : "fail-open catch\n(decision: allow)"
-
-hooksApi --> hooksApi : "registerHook()\npriority re-sort"
-hookMgr --> hookMgr : "registerHook()\npriority re-sort"
+claude --> bridge : "PreToolUse/PostToolUse events"
+bridge --> manager : "translates to unified vocabulary"
+manager --> loader : "config-driven registration (inferred)"
+manager --> unified : "shares push-then-sort idiom"
+loader --> unified : "validateConfig() fail-soft pattern"
+bridge --> unified : "fail-open philosophy (bridge layer)"
+hms --> unified : "monitors constraint/session state"
 
 @enduml

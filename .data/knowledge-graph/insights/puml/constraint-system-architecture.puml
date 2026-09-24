@@ -1,42 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "Configuration Layer" {
-  component "HookConfigLoader" as loader <<core>>
-  database "hooks.json (user/project)" as configFiles <<storage>>
+package "HookManagementSystem" {
+  component "hook-config.js\n(HookConfigLoader)" as config <<core>>
+  component "hook-manager.js\n(UnifiedHookManager)" as manager <<core>>
+  component "Statusline Click-Handler" as statusline <<cli>>
 }
 
-package "Hook Execution Layer" {
-  component "UnifiedHookManager" as manager <<core>>
-  component "HookHandler Registry (Map<event, HookHandler[]>)" as registry <<core>>
-}
-
-package "Violation & Reporting Layer" {
-  component "ViolationCaptureService" as violation <<core>>
+package "ConstraintCapture" {
+  component "violation-capture-service.js" as capture <<core>>
   component "sanitizeParams()" as sanitize <<core>>
-  database "violation-history.json (max 1000)" as history <<storage>>
-  component "calculateStatistics()" as stats <<core>>
+  database "Session JSONL Log" as jsonl
+  database "violation-history.json\n(capped 1000)" as history
 }
 
-package "Knowledge Validation Layer" {
-  component "ContentValidationAgent" as validator <<agent>>
-  component "GitStalenessDetector" as gitcache <<core>>
-  cloud "Filesystem / Codebase" as fs <<external>>
+package "HealthDashboards" {
+  component "health-prompt-hook.js\n(status aggregator)" as aggregator <<api>>
+  component "constraint-monitor dashboard\n(Next.js)" as dashboard <<api>>
+  component "system-health-dashboard\n(Vite)" as sysdash <<api>>
 }
 
-configFiles --> loader : "cascades: default < user < project"
-loader --> manager : "provides merged config"
-manager --> registry : "sorts by priority on register"
-registry --> violation : "dispatch triggers capture"
+config --> manager : "user + project config merge"
+manager --> capture : "dispatches violation events"
+capture --> sanitize : "redacts sensitive fields"
+sanitize --> jsonl : "append-only raw events"
+sanitize --> history : "rolling aggregate stats"
 
-violation --> sanitize : "redacts password/token/key/secret"
-sanitize --> history : "writes sanitized JSONL record"
-history --> stats : "aggregated on-demand"
+history --> aggregator : "feeds statistics"
+jsonl ..> aggregator : "recoverable history"
+aggregator --> dashboard : "constraint violations UI"
+aggregator --> sysdash : "operational metrics"
 
-validator --> fs : "cross-checks references"
-validator --> gitcache : "queries commit history (60s TTL)"
-gitcache --> fs : "git log/show"
-
-violation ..> validator : "parallel 'validate vs ground truth' pattern"
+statusline --> dashboard : "click opens/focuses tab"
+manager --> statusline : "violation state surfaced"
 
 @enduml

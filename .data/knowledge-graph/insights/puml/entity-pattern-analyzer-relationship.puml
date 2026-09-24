@@ -5,23 +5,19 @@ title Hierarchy Context: EntityPatternAnalyzer
 
 [CodingPatterns] as coding_patterns #FFFFDD
 [EntityPatternAnalyzer] as entity_pattern_analyzer #LightBlue
-[AgentWrapperScriptPattern] as agent_wrapper_script_pattern #F0F0F0
-[CliEntrypointPattern] as cli_entrypoint_pattern #F0F0F0
-[ConfigAsCodeConvention] as config_as_code_convention #F0F0F0
-[ExperimentDefinitionPattern] as experiment_definition_pattern #F0F0F0
-[SupervisorManagedContainerPattern] as supervisor_managed_container_pattern #F0F0F0
-[TeamDirectoryMap] as team_directory_map #E8F5E8
-[ArtifactPatternMatching] as artifact_pattern_matching #E8F5E8
-[AnalyzeEntityPatternsPipeline] as analyze_entity_patterns_pipeline #E8F5E8
+[PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+[StatuslineClickFeedbackPattern] as statusline_click_feedback_pattern #F0F0F0
+[ArtifactPatternTable] as artifact_pattern_table #E8F5E8
+[TeamDirectoryRegistry] as team_directory_registry #E8F5E8
+[ArtifactExtractionEngine] as artifact_extraction_engine #E8F5E8
+[TwoStepArtifactMatching] as two_step_artifact_matching #E8F5E8
 
 coding_patterns --> entity_pattern_analyzer
-agent_wrapper_script_pattern -[hidden]- entity_pattern_analyzer
-cli_entrypoint_pattern -[hidden]- entity_pattern_analyzer
-config_as_code_convention -[hidden]- entity_pattern_analyzer
-experiment_definition_pattern -[hidden]- entity_pattern_analyzer
-supervisor_managed_container_pattern -[hidden]- entity_pattern_analyzer
-entity_pattern_analyzer --> team_directory_map
-entity_pattern_analyzer --> artifact_pattern_matching
-entity_pattern_analyzer --> analyze_entity_patterns_pipeline
+pattern_verification_tooling -[hidden]- entity_pattern_analyzer
+statusline_click_feedback_pattern -[hidden]- entity_pattern_analyzer
+entity_pattern_analyzer --> artifact_pattern_table
+entity_pattern_analyzer --> team_directory_registry
+entity_pattern_analyzer --> artifact_extraction_engine
+entity_pattern_analyzer --> two_step_artifact_matching
 
 @enduml

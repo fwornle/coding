@@ -1,41 +1,46 @@
 @startuml
 !include _standard-style.puml
 
-package "Agent Pipeline" {
-  component "BaseAgent" as base <<core>>
-  component "SemanticAnalysisAgent" as saa <<agent>>
-  component "OntologyClassificationAgent" as oca <<agent>>
+package "Agent Core" {
+  component "BaseAgent<TInput,TOutput>" as base <<core>>
+  component "SemanticAnalysisAgent" as sem <<agent>>
+  component "OntologyClassificationAgent" as onto <<agent>>
 }
 
-package "Classification Logic" {
-  component "Hard-Root-Guard" as hrg <<core>>
-  component "L2 Refinement\n(buildL2RefinementPrompt)" as l2ref <<core>>
-  component "extractL2FromLLMResponse" as l2extract <<core>>
-  component "OntologyClassifier" as classifier <<core>>
+package "Classification Pipeline" {
+  component "L1 Classifier\n(heuristic/LLM/hybrid)" as l1 <<core>>
+  component "Hard-Root Guard" as guard <<core>>
+  component "L2 Refinement\n(loadL2Classes/buildPrompt/extract)" as l2 <<core>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
 }
 
 package "Data & Ontology Sources" {
-  database "coding.lower.json\n(L2 Classes)" as l2json <<storage>>
-  database "HIERARCHY_ROOTS\n(@fwornle/km-core)" as roots <<external>>
-  database "Trace Logs\n(logs/semantic-analysis-trace-*.json)" as trace <<storage>>
+  database "upper.json" as upper
+  database "coding-ontology.json" as codingOnt
+  database "coding.lower.json" as codingLower
+  component "OntologyRegistry (km-core)" as registry <<external>>
 }
 
-cloud "LLM Service" as llm <<external>>
+component "Debug Trace Logs\n(semantic-analysis-trace-*.json)" as trace <<external>>
 
-base --> saa : "template method\nexecute()"
-base --> oca : "template method\nexecute()"
+base --> sem : lifecycle contract
+base --> onto : lifecycle contract
 
-saa --> trace : "writes input snapshot"
-saa --> llm : "requests semanticInsights"
-saa --> saa : "merge heuristic +\nLLM patterns"
+sem --> trace : writes pre-processing payload (non-fatal)
+sem --> onto : delegates classification
 
-oca --> hrg : "checks observation name"
-hrg --> roots : "matches root set"
-oca --> classifier : "delegates if no guard match"
-classifier --> l2ref : "builds closed-vocab prompt"
-l2ref --> l2json : "reads REFINABLE_L1_PARENTS"
-l2ref --> llm : "sends prompt"
-llm --> l2extract : "free-text response"
-l2extract --> classifier : "regex-matched L2 name\nor fallback to L1"
+onto --> guard : checks closed-set roots first
+guard --> l1 : bypass if hard-rooted
+onto --> l1 : classify (if not guarded)
+l1 --> l2 : optional refinement
+l2 --> l2 : regex-match L2 name\nfallback to L1 on mismatch
+
+onto --> adapter : bridges legacy interfaces
+adapter --> registry : resolves ontology chain
+registry --> upper : loads
+registry --> codingOnt : loads
+registry --> codingLower : loads (may be missing)
+
+codingLower ..> l2 : supplies L2 classes\n(BUG: emits CodingLowerOntologySource\nunexpectedly)
 
 @enduml

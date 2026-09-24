@@ -1,31 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "Semantic Analysis (offline/batch)" {
+package "EF-412 Work Record (documented only)" {
   component "ContentValidationAgent" as cva <<agent>>
-  component "filePathPatterns / commandPatterns\n(regex extraction)" as patterns <<core>>
-  component "GitStalenessDetector" as gsd <<core>>
-  component "CommitEntityCorrelation" as cec <<core>>
-  database "Knowledge Graph\n(entity observations)" as kg
+  component "ContentValidator (record label)" as cv <<agent>>
+  component "Timeline Entries (second-brain-private vault)" as timeline <<storage>>
 }
 
-package "Git History" {
-  database "Repository Commit History" as gitrepo
+package "Rec Workspace Concerns" {
+  component "GHE Repo Mgmt (gh)" as gh <<external>>
+  component "rapidscribe-meeting Transcription" as rsm <<external>>
+  component "EF-412 Feedback Filing" as feedback <<core>>
 }
 
-package "Hook Dispatch Subsystem (decoupled)" {
-  component "HooksManager\n(hooks-api.js)" as hm <<api>>
-  component "claude-bridge.js\n(fail-open)" as bridge <<external>>
+package "Supplied Source (unrelated retrieval)" {
+  component "health-prompt-hook.js" as hook <<core>>
+  component "workflow/hooks.ts" as whooks <<core>>
+  component "usePolledFetch.ts" as poll <<core>>
+  component "cli-and-rules-gating.test.mjs" as cli <<cli>>
 }
 
-kg --> cva : "entity observation text"
-cva --> patterns : "extracts file/command refs"
-patterns --> gsd : "candidate references"
-gsd --> cec : "correlate vs commits"
-cec --> gitrepo : "queries commit history"
-cec --> cva : "staleness score"
+cva ..> cv : "same conceptual\nvalidator (label only)"
+cv --> timeline : "enforces conciseness\ncontract"
+feedback --> timeline : "files entries"
+rsm --> feedback : "produces transcripts"
+gh --> feedback : "adjacent workspace concern"
 
-hm ..> bridge : "priority-sorted dispatch\n(sibling subsystem)"
-cva ..> hm : "NOT wired into\nPreToolUse/PostToolUse"
+whooks ..> hook : "shares LLM-call poller"
+poll ..> whooks : "generic polling base"
+cli ..> hook : "unrelated: feature-gating tests"
+
+cva ..> hook : "NO evidence of reference"
+cva ..> whooks : "NO evidence of reference"
 
 @enduml

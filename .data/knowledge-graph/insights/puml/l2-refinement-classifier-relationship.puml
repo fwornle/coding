@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: L2RefinementClassifier
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[L2RefinementClassifier] as l2_refinement_classifier #LightBlue
+[Ontology] as ontology #F0F0F0
+[Pipeline] as pipeline #F0F0F0
+[Insights] as insights #F0F0F0
+[OntologyClassificationAgent] as ontology_classification_agent #F0F0F0
+[SemanticAnalysisAgent] as semantic_analysis_agent #F0F0F0
+[BaseAgentFramework] as base_agent_framework #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[AgentLauncherConfigs] as agent_launcher_configs #F0F0F0
+[NoUnboundedFsScanGuard] as no_unbounded_fs_scan_guard #F0F0F0
+
+semantic_analysis --> l2_refinement_classifier
+ontology -[hidden]- l2_refinement_classifier
+pipeline -[hidden]- l2_refinement_classifier
+insights -[hidden]- l2_refinement_classifier
+ontology_classification_agent -[hidden]- l2_refinement_classifier
+semantic_analysis_agent -[hidden]- l2_refinement_classifier
+base_agent_framework -[hidden]- l2_refinement_classifier
+health_coordinator -[hidden]- l2_refinement_classifier
+agent_launcher_configs -[hidden]- l2_refinement_classifier
+no_unbounded_fs_scan_guard -[hidden]- l2_refinement_classifier
+
+@enduml

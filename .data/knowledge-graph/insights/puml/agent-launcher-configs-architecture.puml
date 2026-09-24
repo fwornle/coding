@@ -1,0 +1,28 @@
+@startuml
+!include _standard-style.puml
+
+package "Agent Launcher Layer" {
+  component "launch-agent-common.sh" as common <<core>>
+  component "config/agents/copilot.sh" as copilot <<agent>>
+  component "AGENT_* Variables" as vars <<config>>
+  component "agent_pre_launch / agent_cleanup hooks" as hooks <<agent>>
+}
+
+package "Ontology System" {
+  component "src/ontology/index.ts" as ontidx <<core>>
+  component "createOntologySystem()" as factory <<core>>
+  component "LegacyOntologyAdapter" as adapter <<external>>
+  component "InferenceEngine" as inference <<external>>
+}
+
+common --> copilot : "sources agent definition"
+copilot --> vars : "declares"
+copilot --> hooks : "defines"
+
+ontidx --> factory : "exposes"
+factory --> adapter : "requires (hard fail if missing)"
+factory --> inference : "requires (hard fail if missing)"
+
+copilot ..> ontidx : "no direct coupling\n(thematic neighbor only)"
+
+@enduml

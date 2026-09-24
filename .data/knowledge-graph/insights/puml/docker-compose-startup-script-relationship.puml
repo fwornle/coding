@@ -1,0 +1,23 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DockerComposeStartupScript
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[DockerComposeStartupScript] as docker_compose_startup_script #LightBlue
+[ServiceStarter] as service_starter #F0F0F0
+[ServiceProbe] as service_probe #F0F0F0
+[ProcessStateManager] as process_state_manager #F0F0F0
+[DockerEntrypoint] as docker_entrypoint #F0F0F0
+[SupervisordFeatureGating] as supervisord_feature_gating #E8F5E8
+[EnvFileSecretFiltering] as env_file_secret_filtering #E8F5E8
+
+dockerized_services --> docker_compose_startup_script
+service_starter -[hidden]- docker_compose_startup_script
+service_probe -[hidden]- docker_compose_startup_script
+process_state_manager -[hidden]- docker_compose_startup_script
+docker_entrypoint -[hidden]- docker_compose_startup_script
+docker_compose_startup_script --> supervisord_feature_gating
+docker_compose_startup_script --> env_file_secret_filtering
+
+@enduml

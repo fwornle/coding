@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ObservationConsolidator
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[ObservationConsolidator] as observation_consolidator #LightBlue
+[ObservationWriter] as observation_writer #F0F0F0
+[MentionsClassifier] as mentions_classifier #F0F0F0
+[EnhancedTranscriptMonitor] as enhanced_transcript_monitor #F0F0F0
+[TokenUsageAdapters] as token_usage_adapters #F0F0F0
+[ClaudeJsonlTreeAdapter] as claude_jsonl_tree_adapter #F0F0F0
+[MentionsClassifier] as mentions_classifier #E8F5E8
+[ObservationWriterDelegation] as observation_writer_delegation #E8F5E8
+
+live_logging_system --> observation_consolidator
+observation_writer -[hidden]- observation_consolidator
+mentions_classifier -[hidden]- observation_consolidator
+enhanced_transcript_monitor -[hidden]- observation_consolidator
+token_usage_adapters -[hidden]- observation_consolidator
+claude_jsonl_tree_adapter -[hidden]- observation_consolidator
+observation_consolidator --> mentions_classifier
+observation_consolidator --> observation_writer_delegation
+
+@enduml

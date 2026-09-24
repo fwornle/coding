@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ProxyClientWrapper
+
+[LLMAbstraction] as llmabstraction #FFFFDD
+[ProxyClientWrapper] as proxy_client_wrapper #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
+[DMRProvider] as dmrprovider #F0F0F0
+[LLMJsonRepairUtility] as llmjson_repair_utility #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
+[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
+[ModelContextLimitsCatalogue] as model_context_limits_catalogue #F0F0F0
+
+llmabstraction --> proxy_client_wrapper
+llmmock_service -[hidden]- proxy_client_wrapper
+dmrprovider -[hidden]- proxy_client_wrapper
+llmjson_repair_utility -[hidden]- proxy_client_wrapper
+copilot_model_id_alignment -[hidden]- proxy_client_wrapper
+dashboard_cost_model -[hidden]- proxy_client_wrapper
+offload_routing_dashboard -[hidden]- proxy_client_wrapper
+model_context_limits_catalogue -[hidden]- proxy_client_wrapper
+
+@enduml

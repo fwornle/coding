@@ -1,42 +1,40 @@
 @startuml
 !include _standard-style.puml
 
-package "Agent Launch Config" {
-  component "copilot.sh" as copilot <<agent>>
-  component "opencode.sh" as opencode <<agent>>
-  component "pi.sh" as pi <<agent>>
-  component "no-unbounded-fs-scan.ts" as fsguard <<cli>>
-  component "llm-routing.yaml" as routing <<api>>
+package "SemanticAnalysis Pipeline (unresolved)" {
+  component "SemanticAnalysisAgent" as saa <<agent>>
+  component "OntologyClassificationAgent" as oca <<agent>>
+  component "CodingLowerOntologySource\n(unexpected emission)" as bugsrc <<core>>
 }
 
-package "Code Graph Pipeline" {
-  component "extract.py" as extract <<core>>
-  component "build.py" as build <<core>>
-  component "cluster.py" as cluster <<core>>
-  component "detect.py" as detect <<core>>
-  component "export.py" as export <<core>>
-  component "report.py" as report <<core>>
+package "Ontology Composition Root" {
+  component "createOntologySystem()" as factory <<core>>
+  component "OntologyValidator" as validator <<core>>
+  component "OntologyClassifier" as classifier <<core>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  database "km-core OntologyRegistry" as registry <<storage>>
 }
 
-package "Orchestration Entry Points" {
-  component "pollKnowledgePipeline" as poll <<agent>>
-  component "full_pipeline" as full <<agent>>
-  component "batch-provenance.mjs" as prov <<core>>
+package "Maintenance & Monitoring (unrelated)" {
+  component "repair-writer-ontology-class.mjs\n(arbitrate)" as repair <<cli>>
+  component "health-coordinator.js\n(pollKnowledgePipeline)" as health <<agent>>
+  cloud "obs-api / LevelDB" as obsapi <<external>>
 }
 
-copilot --> routing : "declares capabilities"
-opencode --> routing : "enumerated model list"
-pi --> routing : "thinkingLevelMap bands"
-fsguard --> pi : "deterministic gate (fail-open)"
+saa --> oca : "classifies intent"
+oca --> bugsrc : "emits (bug: contract violation)"
 
-extract --> build : "collect_files"
-build --> cluster : "build_from_json"
-cluster --> detect : "score_all"
-detect --> export : "god_nodes/surprising_connections"
-export --> report : "to_json/to_obsidian"
+factory --> validator : "wires"
+factory --> classifier : "wires"
+factory --> adapter : "wires"
+adapter --> registry : "wraps"
 
-poll --> extract : "invokes staged pipeline"
-full --> extract : "invokes staged pipeline"
-report --> prov : "informs provenance windows"
+repair --> obsapi : "fetch entities/relations"
+repair --> registry : "arbitrate() conflicts"
+
+health --> obsapi : "poll freshness"
+health ..> bugsrc : "unrelated (name collision only)"
+
+oca ..> factory : "conceptually adjacent\n(not same file)"
 
 @enduml

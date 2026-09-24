@@ -5,27 +5,19 @@ title Hierarchy Context: ModelContextLimits
 
 [LLMAbstraction] as llmabstraction #FFFFDD
 [ModelContextLimits] as model_context_limits #LightBlue
-[LLMMockService] as llmmock_service #F0F0F0
 [DMRProvider] as dmrprovider #F0F0F0
-[LLMProxyClient] as llmproxy_client #F0F0F0
-[LlmJsonParser] as llm_json_parser #F0F0F0
-[DashboardCostModel] as dashboard_cost_model #F0F0F0
-[OffloadRoutingDecision] as offload_routing_decision #F0F0F0
-[AgentProviderSplicing] as agent_provider_splicing #F0F0F0
-[UserConfigOverride] as user_config_override #E8F5E8
-[FastModePricingRule] as fast_mode_pricing_rule #E8F5E8
-[ModelFamilyPriceFallback] as model_family_price_fallback #E8F5E8
+[LLMWithProcessClient] as llmwith_process_client #F0F0F0
+[LlmJsonRepair] as llm_json_repair #F0F0F0
+[CostModel] as cost_model #F0F0F0
+[OffloadRouting] as offload_routing #F0F0F0
+[ClassifierJudge] as classifier_judge #F0F0F0
 
 llmabstraction --> model_context_limits
-llmmock_service -[hidden]- model_context_limits
 dmrprovider -[hidden]- model_context_limits
-llmproxy_client -[hidden]- model_context_limits
-llm_json_parser -[hidden]- model_context_limits
-dashboard_cost_model -[hidden]- model_context_limits
-offload_routing_decision -[hidden]- model_context_limits
-agent_provider_splicing -[hidden]- model_context_limits
-model_context_limits --> user_config_override
-model_context_limits --> fast_mode_pricing_rule
-model_context_limits --> model_family_price_fallback
+llmwith_process_client -[hidden]- model_context_limits
+llm_json_repair -[hidden]- model_context_limits
+cost_model -[hidden]- model_context_limits
+offload_routing -[hidden]- model_context_limits
+classifier_judge -[hidden]- model_context_limits
 
 @enduml

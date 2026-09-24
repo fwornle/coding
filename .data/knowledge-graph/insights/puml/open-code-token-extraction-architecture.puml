@@ -1,0 +1,32 @@
+@startuml
+!include _standard-style.puml
+
+package "OpenCode Store" {
+  database "opencode.db" as ocdb
+  component "ownedDbPath\n(uid-check gate)" as owned <<core>>
+}
+
+package "Extraction Layer" {
+  component "buildOpencodeTokenRows" as build <<core>>
+  component "BYPASS_PROVIDERS gate" as bypass <<core>>
+  component "extractTokens" as extract <<core>>
+  component "summarizeParts\n(part table query)" as summarize <<core>>
+}
+
+package "Shared Proxy DB" {
+  component "insertTokenRow" as insert <<core>>
+  component "ADAPTER_USER_HASH_OPENCODE\n('opnadt')" as hash <<core>>
+  database "token-usage.db" as tdb
+}
+
+owned --> ocdb : "reads if uid matches"
+build --> owned : "validates ownership"
+build --> ocdb : "scans rowid DESC\n(MESSAGE_SCAN_LIMIT=4000)"
+build --> bypass : "checks providerID"
+bypass --> extract : "allowed messages only"
+extract --> summarize : "per-turn activity"
+build --> insert : "emits TokenUsageRow"
+insert --> hash : "id-space allocation"
+insert --> tdb : "writes row\n(routing_source: direct)"
+
+@enduml

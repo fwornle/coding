@@ -1,0 +1,38 @@
+@startuml
+!include _standard-style.puml
+
+package "Missing / Gap" {
+  component "LslSessionsApi\n(NOT IMPLEMENTED)" as api <<api>>
+  component "currentOpencodeSession\n(unimplemented filter)" as filt <<core>>
+}
+
+package "Per-Agent Session Detection" {
+  component "copilot-events-tail.mjs\nscanForLiveSessions()" as copilotTail <<agent>>
+  component "findLiveLockFile()" as lockFile <<core>>
+  component "isOwnedByMe()" as ownedCheck <<core>>
+  component "/sl command\n(copilot-session-command)" as slCmd <<cli>>
+}
+
+package "Session/Token Data Stores" {
+  component "opencode-token-rows.mjs\nbuildOpencodeTokenRows()" as opencodeRows <<agent>>
+  database "opencode.db\n(SQLite)" as opencodeDb <<storage>>
+  component "token-db.mjs\nopenTokenDb()/insertTokenRow()" as tokenDb <<core>>
+  database "token-usage.db" as tokenUsageDb <<storage>>
+  component "ObservationWriter.js" as obsWriter <<core>>
+}
+
+copilotTail --> lockFile : "checks inuse.<pid>.lock"
+copilotTail --> ownedCheck : "checks uid"
+slCmd --> copilotTail : "reads .specstory/history/"
+
+opencodeRows --> opencodeDb : "SELECT message\nORDER BY rowid DESC"
+opencodeRows ..> tokenDb : "BYPASS_PROVIDERS gate\n(github-copilot)"
+tokenDb --> tokenUsageDb : "INSERT (adapter user_hash)"
+obsWriter ..> tokenUsageDb : "write path only"
+
+api ..> copilotTail : "gap: no unified\nsession enumeration"
+api ..> opencodeRows : "gap: reads foreign db,\nnot LSL's own"
+filt ..> opencodeDb : "planned: filter by\npermission markers"
+api ..> filt : "closest match,\nstill unimplemented"
+
+@enduml

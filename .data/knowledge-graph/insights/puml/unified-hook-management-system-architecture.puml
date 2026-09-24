@@ -1,0 +1,40 @@
+@startuml
+!include _standard-style.puml
+
+package "health-prompt-hook.js (actual)" {
+  component "main()" as main <<core>>
+  component "checkHealthStatus()" as check <<core>>
+  component "deriveSummary()" as derive <<core>>
+  component "outputEnvelope()" as envelope <<core>>
+}
+
+cloud "Health Coordinator\n/health/state" as coordinator <<external>>
+
+package "Dashboards (frontend)" {
+  component "constraint-monitor dashboard\n(Next.js)" as constraintDash <<external>>
+  component "system-health-dashboard\n(Vite)" as sysHealthDash <<external>>
+}
+
+package "Unrelated React Hooks" {
+  component "useWorkflowDefinitions()" as workflowHook <<agent>>
+  component "usePolledFetch()" as pollHook <<agent>>
+}
+
+component "Integration Test\n(hookSays subprocess)" as test <<cli>>
+
+main --> check : "invokes"
+check --> coordinator : "fetch /health/state\n(unless Q3 carve-out)"
+check --> derive : "raw state"
+derive --> envelope : "overallStatus + issues[]"
+envelope --> main : "process.exit(0)"
+
+constraintDash --> envelope : "aggregator status"
+sysHealthDash --> envelope : "aggregator status"
+
+test --> main : "spawns as child process"
+test --> coordinator : "stub HTTP server"
+
+workflowHook ..> sysHealthDash : "Redux data layer\n(unrelated to hook dispatch)"
+pollHook ..> sysHealthDash : "visibilitychange polling\n(unrelated to hook dispatch)"
+
+@enduml

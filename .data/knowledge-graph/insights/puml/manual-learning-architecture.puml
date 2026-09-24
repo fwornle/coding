@@ -1,38 +1,32 @@
 @startuml
 !include _standard-style.puml
 
-package "ukb-workflow-modal.tsx" {
-  component "HISTORY_PAGE_SIZE" as hps <<core>>
-  component "calculateDynamicEta" as dynEta <<core>>
-  component "calculateStepAwareEta" as legacyEta <<core>>
+package "KnowledgeManagement Neighborhood" {
+  component "ManualLearning" as ml <<core>>
+  component "ontology.classification\n(Layer0-Layer4)" as classification <<core>>
+  component "embeddings.local/remote" as embeddings <<core>>
 }
 
-package "multi-agent-graph.tsx" {
-  component "WAVE_AGENTS" as waveAgents <<core>>
-  component "KG_OPERATOR_CHILDREN" as kgChildren <<core>>
+package "Unified Viewer" {
+  component "D3GraphCanvas" as canvas <<agent>>
+  component "learning-source\n(isOnlineLearned)" as learningSource <<external>>
+  component "hierarchy-parents\n(deriveParents)" as hierarchy <<core>>
 }
 
-package "unified-viewer.D3GraphCanvas" {
-  component "D3GraphCanvas" as d3canvas <<core>>
-  component "deriveAncestryFromStorePath" as ancestry <<core>>
-  component "color-fallback.ts" as colorFallback <<core>>
-  component "node FillColor" as node FillColor <<core>>
-  component "_classHue" as classHue <<deprecated>>
+package "System Health Dashboard" {
+  component "ukb-workflow-modal" as ukbModal <<agent>>
+  component "ukbSlice (Redux)" as ukbSlice <<core>>
 }
 
-database "Redux Store (ukbSlice.ts)" as store <<storage>>
+database "Graph Database" as graphdb <<storage>>
 
-legacyEta --> dynEta : "delegates to (Strangler Fig)"
-dynEta --> hps : "shares in-run learning philosophy"
-
-waveAgents --> kgChildren : "co-located guardrail constants"
-
-d3canvas --> ancestry : "reconciles inline BFS"
-ancestry --> store : "authoritative pathToSelected"
-d3canvas --> store : "subscribes via selectors"
-
-d3canvas --> colorFallback : "uses"
-colorFallback --> node FillColor : "canonical resolver"
-colorFallback --> classHue : "retained for regression contract"
+canvas ..> learningSource : "resolves online-vs-manual\nlearning provenance (unconfirmed)"
+canvas --> graphdb : "renders nodes from"
+hierarchy --> graphdb : "derives parent chain"
+ml ..> classification : "no confirmed link"
+ml ..> embeddings : "no confirmed link"
+ml ..> hierarchy : "not present in\nHIERARCHY_CLASSES"
+ukbModal --> ukbSlice : "dispatches batch workflow"
+ukbSlice ..> graphdb : "writes UKB entities\n(entity Type discipline required)"
 
 @enduml
