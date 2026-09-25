@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ApiClient } from '@/api/ApiClient'
+import { fetchViewerStats, statsQueryKey } from './useViewerStats'
 import { Logger } from '@/lib/logging'
 import {
   Tooltip,
@@ -30,11 +31,46 @@ export interface ViewerStats {
   edgeCount: number
   evidenceCount: number
   patternCount: number
+  /** Nodes with ZERO live edges of any kind, whole store, server-side.
+   *  NOT the same as the rail's "unanchored" — that one is the rendered
+   *  subset with no STRUCTURAL ancestor, and a node with 87 outbound edges
+   *  can be unanchored while never being an orphan. Two numbers, two
+   *  questions; the quality panel labels both rather than merging them. */
   orphanCount: number
   componentCount: number
+  /** 1 - orphanCount/nodeCount. NOT the largest connected component, despite
+   *  what this field's tooltip said until 2026-09-25 — obs-api computes
+   *  orphan density (observations-api-server.mjs:2692) and shadows km-core's
+   *  real LCC walk (lib/km-core/src/api/handlers/query.ts:263). */
   connectivity: number
   lastUpdated: string
   activeSnapshot: { hash: string; message: string; date: string } | null
+
+  // ---------------------------------------------------------------------
+  // Quality metrics — computed and shipped since Plan 55-06, never read.
+  // ---------------------------------------------------------------------
+  // `composeViewerStats` (observations-api-server.mjs:2775-2792) has been
+  // returning all five of these on every /api/v1/stats and every SSE frame,
+  // and the viewer discarded them because the interface stopped above. They
+  // are the quality panel, already measured — declaring them is most of the
+  // work. Optional because an older obs-api will not send them and a missing
+  // metric must read as "not reported", never as zero.
+  /** Self-referential edges. Should read 0 forever; a legacy backfill made 49. */
+  selfEdgeCount?: number
+  /** Edges sharing (source, target, type) — measured 91% on `capturedBy`. */
+  duplicateEdgeCount?: number
+  /** Anchor-spread regression signal for the `capturedBy` repoint. */
+  capturedByRootCount?: number
+  capturedByTargetCount?: number
+  /** How much of the eligible corpus sits under a project at all. */
+  hierarchyCoverage?: {
+    eligible: number
+    placed: number
+    unplaced: number
+    ratio: number
+    unplacedByClass?: Record<string, number>
+    excludedRawMaterial?: number
+  }
 }
 
 export interface StatsBarProps {
@@ -70,7 +106,7 @@ const METRICS: ReadonlyArray<MetricSlot> = [
     id: 'connectivity',
     label: 'connectivity',
     icon: '⚙',
-    tooltip: 'Largest connected component as fraction of all nodes',
+    tooltip: 'Share of nodes with at least one edge (1 − orphan density). Not the largest connected component.',
     formatter: (s) => `${Math.round(s.connectivity * 100)}%`,
   },
 ]
@@ -87,16 +123,7 @@ interface ApiEnvelope<T> {
 }
 
 async function fetchStats({ apiClient, signal }: FetchStatsArgs): Promise<ViewerStats> {
-  const url = `${apiClient.base}/api/v1/stats`
-  const res = await fetch(url, { headers: { Accept: 'application/json' }, signal })
-  if (!res.ok) {
-    throw new Error(`${url} → HTTP ${res.status}`)
-  }
-  const body = (await res.json()) as ApiEnvelope<ViewerStats>
-  if (!body.success || !body.data) {
-    throw new Error(body.error || 'malformed /api/v1/stats response')
-  }
-  return body.data
+  return fetchViewerStats(apiClient, signal)
 }
 
 export function StatsBar({ apiClient, system }: StatsBarProps) {
@@ -111,7 +138,10 @@ export function StatsBar({ apiClient, system }: StatsBarProps) {
   // is a safety net per UI-SPEC § 12). When SSE pushes data, the
   // displayed value uses pushedStats; the poll just keeps the cache warm.
   const query = useQuery({
-    queryKey: ['stats', system, apiClient.base],
+    // Shared with the Graph quality panel — see useViewerStats.ts. Same key
+    // means one fetch and one cached payload, so the bar and the panel cannot
+    // print different numbers for the same metric.
+    queryKey: statsQueryKey(system, apiClient.base),
     queryFn: ({ signal }) => fetchStats({ apiClient, signal }),
     refetchInterval: 30_000,
     refetchOnWindowFocus: false,

@@ -8,7 +8,13 @@
 //   2. THIS FILE (Vitest mirror, viewer-side)
 //   3. .planning/phases/44-rest-api-git-snapshots/44-CONTEXT-amendment-4.md (the lock doc)
 import { describe, test, expect } from 'vitest'
-import { DigestSchema, InsightSchema, ObservationSchema } from './schemas'
+import {
+  DigestSchema,
+  InsightSchema,
+  ObservationSchema,
+  ConfidencePayloadSchema,
+  classifyConfidence,
+} from './schemas'
 
 // Verbatim lists from tests/integration/typed-views.test.js:35-63
 const REQUIRED_OBS_KEYS = [
@@ -125,5 +131,74 @@ describe('Phase 45 wire-shape lock — Plan 44-16 mirror', () => {
     for (const key of REQUIRED_OBS_KEYS) {
       expect(key in parsed).toBe(true)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Confidence — the fourth ratification site, added 2026-09-25
+// ---------------------------------------------------------------------------
+//
+// This endpoint had no lock, and that is the whole story of the "· NaN%" bug:
+// `ApiClient.getEntityConfidence` was a bare cast to a hand-written interface
+// that had never matched the wire. The server test
+// (tests/integration/obs-api.v1-confidence.test.js:147) asserted
+// `typeof data.overall === 'number'`; the client type said
+// `overall: {score, label}`. Both suites were green for months.
+//
+// The fixture below is the server's documented response, verbatim. If the
+// handler changes shape, this fails on the viewer side too — which is the
+// property every other payload in this file already had.
+describe('Confidence wire-shape lock (obs-api /api/v1/entities/:id/confidence)', () => {
+  const SERVER_RESPONSE = {
+    overall: 0.7,
+    bands: { high: 0, moderate: 1, low: 0 },
+    segments: [{ segmentId: 'seg-0', confidence: 0.9, source: 'run-A' }],
+  }
+
+  test('parses the shape the server actually sends', () => {
+    const parsed = ConfidencePayloadSchema.parse(SERVER_RESPONSE)
+    expect(parsed.overall).toBe(0.7)
+    expect(typeof parsed.overall).toBe('number')
+    expect(parsed.segments[0].segmentId).toBe('seg-0')
+    expect(parsed.segments[0].confidence).toBe(0.9)
+  })
+
+  test('segments may omit `source` — the handler only sets it when known', () => {
+    expect(() =>
+      ConfidencePayloadSchema.parse({ ...SERVER_RESPONSE, segments: [{ segmentId: 's', confidence: 0.5 }] }),
+    ).not.toThrow()
+  })
+
+  test('REJECTS the shape the client used to assume', () => {
+    // The exact literal the old ConfidencePayload declared. Parsing it must
+    // fail — if this ever passes again, the cast is back.
+    expect(() =>
+      ConfidencePayloadSchema.parse({
+        overall: { score: 0.82, label: 'High' },
+        segments: [{ runId: 'run-A', score: 0.9, label: 'High' }],
+      }),
+    ).toThrow()
+  })
+
+  test('rejects an out-of-range overall', () => {
+    // The handler clamps to [0,1]; a value outside it means the clamp is gone.
+    expect(() => ConfidencePayloadSchema.parse({ ...SERVER_RESPONSE, overall: 1.4 })).toThrow()
+  })
+
+  // Thresholds are duplicated between classifyConfidence() here and
+  // classifyConfidence() at observations-api-server.mjs:2940, because the
+  // client must label a scalar the server sends unlabelled. Pin the
+  // BOUNDARIES, which is where a silent drift would show up first.
+  test.each([
+    [1, 'High'], [0.8, 'High'], [0.7999, 'Moderate'],
+    [0.6, 'Moderate'], [0.5999, 'Low'], [0, 'Low'],
+  ] as const)('classifyConfidence(%s) === %s — mirrors the server', (score, label) => {
+    expect(classifyConfidence(score)).toBe(label)
+  })
+
+  test('a non-finite score reads Low rather than throwing', () => {
+    // It feeds a colour lookup and a label; an unusable score should read as
+    // untrustworthy, not take the panel down.
+    expect(classifyConfidence(NaN)).toBe('Low')
   })
 })

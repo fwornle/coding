@@ -11,7 +11,8 @@
 // array — we transparently map it to `[{name: s}]` so the graph renderer in Plan
 // 02 sees a uniform shape regardless of which side ships first.
 
-import type { Digest, Insight, Observation } from './schemas'
+import type { Digest, Insight, Observation, ConfidencePayload } from './schemas'
+import { ConfidencePayloadSchema } from './schemas'
 import { canonicalizeRelationType } from '@/graph/relation-types'
 
 interface ApiSuccess<T> { success: true; data: T }
@@ -117,16 +118,13 @@ export interface NeighborhoodPayload {
  * UI-SPEC §18 row 8. Backend wired in Plan 55-06; the EntityDetailPanel
  * Confidence sub-tab consumes this lazily and falls back to a client
  * heuristic on 404 / network error (UI-SPEC §16).
+ *
+ * 2026-09-25: the shape used to be DECLARED here as
+ * `{ overall: { score, label }, segments: [{ runId, score, label }] }` and had
+ * never matched the wire. It now comes from `api/schemas.ts`, derived from the
+ * handler, and is parsed rather than cast — see the note there.
  */
-export interface ConfidenceSegment {
-  runId: string
-  score: number
-  label: 'High' | 'Moderate' | 'Low'
-}
-export interface ConfidencePayload {
-  overall: { score: number; label: 'High' | 'Moderate' | 'Low' }
-  segments: ConfidenceSegment[]
-}
+export type { ConfidenceSegment, ConfidencePayload } from './schemas'
 
 /** Phase 44 typed-view envelope shape (matches Pitfall 2 envelope in typed-views.test.js). */
 export interface TypedViewEnvelope<T> {
@@ -134,6 +132,19 @@ export interface TypedViewEnvelope<T> {
   total: number
   limit: number
   offset: number
+}
+
+/** A failed entity write. `transient` marks the causes worth retrying —
+ *  today only obs-api's hydration gate, which answers 503 until the graph
+ *  store is open. A caller should say "starting up, try again" for those and
+ *  surface everything else as a real failure. */
+export class EntityUpdateError extends Error {
+  readonly transient: boolean
+  constructor(message: string, transient: boolean) {
+    super(message)
+    this.name = 'EntityUpdateError'
+    this.transient = transient
+  }
 }
 
 export class ApiClient {
@@ -185,6 +196,59 @@ export class ApiClient {
       throw new Error(body.error)
     }
     return body.data
+  }
+
+  /**
+   * Merge fields into one entity's metadata. THE FIRST WRITE THIS CLIENT MAKES.
+   *
+   * Every other method here is a GET, and that was true of the whole app until
+   * 2026-09-25. So the shape of this one sets a precedent, and it is kept as
+   * small as it can be:
+   *
+   *   - ONE endpoint. `PUT /api/v1/entities/:id` is live on obs-api (km-core
+   *     is mounted without `readOnly`, observations-api-server.mjs:2532-2547)
+   *     and merges via `mergeAttributes`, so a partial body is a partial
+   *     update and unrelated fields are untouched.
+   *   - NO optimistic update. The caller refetches. An optimistic write that
+   *     later fails leaves the UI asserting something the store does not
+   *     contain, and this app's whole problem right now is surfaces that
+   *     disagree with their data.
+   *   - 503 IS NOT FAILURE. `kmRouter` returns 503 until the store finishes
+   *     hydrating (observations-api-server.mjs:2504-2509). Rendering that as
+   *     an error teaches people the button is broken when it is merely early,
+   *     so it gets its own marker for the caller to branch on.
+   *
+   * @throws {EntityUpdateError} with `transient: true` on 503.
+   */
+  async updateEntityMetadata(
+    id: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    const safeId = encodeURIComponent(id)
+    const url = `${this.baseUrl}${this.apiPath(`/api/v1/entities/${safeId}`)}`
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ metadata }),
+    })
+    if (res.status === 503) {
+      throw new EntityUpdateError('The knowledge store is still starting up.', true)
+    }
+    if (!res.ok) {
+      throw new EntityUpdateError(`${url} → HTTP ${res.status}`, false)
+    }
+    const body = (await res.json()) as ApiSuccess<unknown> | ApiError
+    if (!body.success) {
+      throw new EntityUpdateError(body.error, false)
+    }
+    // The handler answers `{success:true, data:null}` for an id it does not
+    // hold, rather than 404 — deliberately, so a smoke probe can tell
+    // "route missing" from "row missing" (entities.ts:168-171). For a write
+    // that distinction inverts: a 200 that changed nothing is the one outcome
+    // a caller must not read as success.
+    if (body.data === null) {
+      throw new EntityUpdateError(`No entity ${id} — nothing was written.`, false)
+    }
   }
 
   listEntities(): Promise<Entity[]> {
@@ -318,9 +382,15 @@ export class ApiClient {
    * (404 / network), it falls back to the client heuristic per NodeDetails.tsx
    * :165-213 (UI-SPEC §16).
    */
-  getEntityConfidence(id: string): Promise<ConfidencePayload> {
+  async getEntityConfidence(id: string): Promise<ConfidencePayload> {
     const safeId = encodeURIComponent(id)
-    return this.get<ConfidencePayload>(`/api/v1/entities/${safeId}/confidence`)
+    const raw = await this.get<unknown>(`/api/v1/entities/${safeId}/confidence`)
+    // PARSED, not cast. A cast is what let the declared shape disagree with the
+    // server for months while both sides' tests passed. A parse failure here
+    // rejects, and the caller already treats a rejection as "use the client
+    // heuristic" — so a future wire change degrades to an approximate number
+    // instead of rendering NaN.
+    return ConfidencePayloadSchema.parse(raw)
   }
 
   // Phase 44 typed views (camelCase wire shape per Plan 44-16 lock).

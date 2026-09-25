@@ -344,11 +344,19 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   // footer diverge from the canvas in five ways.
   const hierarchyParentsMap = useViewerStore((s) => s.hierarchyParents)
   const hierarchyClassesMap = useViewerStore((s) => s.hierarchyClasses)
-  const unanchoredCount = useMemo(() => {
-    const visibleIds: string[] = []
-    for (const e of entities) if (isVisible(e)) visibleIds.push(e.id)
-    return countUnanchored(visibleIds, hierarchyParentsMap, (id) => hierarchyClassesMap.get(id))
-  }, [entities, isVisible, hierarchyParentsMap, hierarchyClassesMap])
+  // The rendered id set, computed ONCE and shared. `unanchoredCount` needs it,
+  // and so does the Graph quality panel, which explains the same rows this
+  // number counts — deriving it twice is how the two would come to disagree
+  // about which rows they mean.
+  const visibleIdSet = useMemo(() => {
+    const ids = new Set<string>()
+    for (const e of entities) if (isVisible(e)) ids.add(e.id)
+    return ids
+  }, [entities, isVisible])
+  const unanchoredCount = useMemo(
+    () => countUnanchored(visibleIdSet, hierarchyParentsMap, (id) => hierarchyClassesMap.get(id)),
+    [visibleIdSet, hierarchyParentsMap, hierarchyClassesMap],
+  )
 
   const canvas = (() => {
     if (isLoading) return <InitialLoadingState system={system} />
@@ -440,6 +448,7 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             entities={entities}
             relations={relations}
             visibleCount={visibleCount}
+            visibleIds={visibleIdSet}
             unanchoredCount={unanchoredCount}
             bottomSlot={<LegendPanel className="pt-2" entities={legendEntities} relations={relations} ontologyRegistry={ontology} hideLayers={system === 'coding'} defaultOpen />}
           />

@@ -276,24 +276,62 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
     expect(banner).not.toBeNull()
   })
 
-  test('Test 10: Confidence sub-tab — on 200, renders fetched bands; on 404, client heuristic', async () => {
+  // THE TEST THAT USED TO BE HERE COULD NOT FAIL.
+  //
+  // It mocked `getEntityConfidence` with `{overall:{score,label}, segments:
+  // [{runId,score,label}]}` — the shape the frontend WISHED the server sent —
+  // and asserted `/High|Moderate|Low/`, a regex that never touches the number.
+  // The server has always sent `{overall: <float>, bands, segments:
+  // [{segmentId, confidence}]}`, so the panel rendered "· NaN%" on every
+  // entity while this test stayed green for months. A mock of your own
+  // assumption tests the assumption, not the contract.
+  //
+  // The fixtures below are transcribed from the REAL handler
+  // (scripts/observations-api-server.mjs:2946-3001) and match the shape
+  // asserted by tests/integration/obs-api.v1-confidence.test.js:147
+  // (`typeof body.data.overall === 'number'`) — the assertion that contradicted
+  // the client type in plain sight. And the number is asserted, explicitly,
+  // including that it is not NaN.
+  test('Test 10: Confidence renders a real percentage from the SERVER wire shape', async () => {
     useViewerStore.getState().setSelectedNode('evo')
     const apiClient = {
       base: 'http://test.local',
       getEntityConfidence: vi.fn().mockResolvedValue({
-        overall: { score: 0.82, label: 'High' },
+        overall: 0.7,
+        bands: { high: 0, moderate: 1, low: 0 },
+        segments: [],
+      }),
+    } as unknown as ApiClient
+    renderPanel(apiClient)
+    fireEvent.click(screen.getByTestId('subtab-confidence'))
+    await waitFor(() => {
+      expect(screen.getByTestId('confidence-overall').textContent).toBe('Moderate · 70%')
+    })
+    expect(screen.getByTestId('subtab-content-confidence').textContent).not.toMatch(/NaN/)
+  })
+
+  test('Test 10a: per-segment rows label each scalar confidence', async () => {
+    useViewerStore.getState().setSelectedNode('evo')
+    const apiClient = {
+      base: 'http://test.local',
+      getEntityConfidence: vi.fn().mockResolvedValue({
+        overall: 0.85,
+        bands: { high: 1, moderate: 1, low: 0 },
         segments: [
-          { runId: 'run-A', score: 0.9, label: 'High' },
-          { runId: 'run-B', score: 0.7, label: 'Moderate' },
+          { segmentId: 'seg-0', confidence: 0.9, source: 'run-A' },
+          { segmentId: 'seg-1', confidence: 0.62 },
         ],
       }),
     } as unknown as ApiClient
     renderPanel(apiClient)
     fireEvent.click(screen.getByTestId('subtab-confidence'))
     await waitFor(() => {
-      const c = screen.getByTestId('subtab-content-confidence')
-      expect(c.textContent).toMatch(/High|Moderate|Low/)
+      expect(screen.getByTestId('confidence-overall').textContent).toBe('High · 85%')
     })
+    const text = screen.getByTestId('subtab-content-confidence').textContent ?? ''
+    expect(text).toContain('High · 90%')
+    expect(text).toContain('Moderate · 62%')
+    expect(text).not.toMatch(/NaN/)
   })
 
   test('Test 10b: Confidence 404 falls back to client heuristic — never throws', async () => {

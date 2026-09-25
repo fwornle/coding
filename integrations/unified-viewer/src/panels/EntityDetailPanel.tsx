@@ -30,10 +30,12 @@
 //   - descViewMode is LOCAL component state (UI-SPEC §8), reset on
 //     selectedNodeId change.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import type { ApiClient, ConfidencePayload } from '@/api/ApiClient'
+// The band thresholds, mirrored from the server. See schemas.ts.
+import { classifyConfidence } from '@/api/schemas'
 import type { System } from '@/config/system-endpoints'
 import { useGraphData } from '@/graph/useGraphData'
 import { headline, hasArticle } from '@/lib-domain/headline'
@@ -220,13 +222,27 @@ function clientHeuristicConfidence(
     Math.min(occurrences.length / 5, 1) * 0.33 +
     Math.min(confirmationCount / 3, 1) * 0.34
   const score = Math.min(signals, 1)
-  const label: 'High' | 'Moderate' | 'Low' =
-    score >= 0.7 ? 'High' : score >= 0.4 ? 'Moderate' : 'Low'
-  const segOut = segments.map((seg, i) => {
-    const runId = (seg.runId as string | undefined) ?? `seg-${i}`
-    return { runId, score, label }
-  })
-  return { overall: { score, label }, segments: segOut }
+  // Emits the SERVER's shape, not a private one. It used to return
+  // `{overall:{score,label}}` — the shape the panel wrongly believed the wire
+  // had — so the fallback path and the success path rendered from two
+  // different structures and only the fallback worked. One shape now, with the
+  // server's own banding applied by the renderer.
+  const segOut = segments.map((seg, i) => ({
+    segmentId: (seg.segmentId as string | undefined)
+      ?? (seg.runId as string | undefined)
+      ?? `seg-${i}`,
+    confidence: score,
+  }))
+  const band = classifyConfidence(score)
+  return {
+    overall: score,
+    bands: {
+      high: band === 'High' ? 1 : 0,
+      moderate: band === 'Moderate' ? 1 : 0,
+      low: band === 'Low' ? 1 : 0,
+    },
+    segments: segOut,
+  }
 }
 
 // =============================================================================
@@ -263,6 +279,23 @@ function EvolutionContent({ entity }: { entity: Record<string, unknown> }) {
       <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Description segments
       </h3>
+      {/*
+        The tab is visible when `segments.length > 0 || occurrences.length > 1
+        || confirmationCount > 0`, so a row confirmed twice with no segments
+        reaches here with nothing to list — and used to render this heading
+        over an empty <ul>. A heading promising content that is not there reads
+        as a broken panel rather than as an honest absence, so say which of the
+        two it is.
+      */}
+      {segments.length === 0 && (
+        <p
+          data-testid="evolution-segments-empty"
+          className="text-xs text-muted-foreground italic"
+        >
+          No description segments — this row has been confirmed, but no run has
+          recorded a revision of its text.
+        </p>
+      )}
       <ul className="space-y-2">
         {segments.map((seg, idx) => {
           const runId = (seg.runId as string | undefined) ?? 'unknown'
@@ -318,6 +351,27 @@ function ConfidenceContent({
   const [loading, setLoading] = useState(true)
   const entityId = entity.id as string
 
+  // The entity, reachable from the effect WITHOUT being a dependency.
+  //
+  // `entity` was a dep and is a fresh object on every `useGraphData` result,
+  // so the effect re-ran on renders where nothing about the entity had
+  // changed: each re-run aborts the in-flight request via `cancelled` and
+  // restarts it, and re-enters the "Loading confidence…" branch on the way.
+  // That contradicts the effect's own note below — "cached by selectedNodeId
+  // via component remount" — which describes one fetch per id.
+  //
+  // It is only read in the catch, to build the fallback heuristic, so a ref
+  // gives the effect the current value while letting the dep list mean what
+  // it says.
+  //
+  // NOT a hang, though it looks like one while you watch it. This was first
+  // written up as "the tab never settles", from sampling the DOM before a
+  // request had returned; it does settle. The cost is redundant fetches and a
+  // loading flicker, which is reason enough to fix and not reason to claim
+  // more than that.
+  const entityRef = useRef(entity)
+  entityRef.current = entity
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -338,7 +392,7 @@ function ConfidenceContent({
           Logger.Categories.API,
           `Confidence fetch fell back to client heuristic for ${entityId}: ${(err as Error).message}`,
         )
-        if (!cancelled) setPayload(clientHeuristicConfidence(entity))
+        if (!cancelled) setPayload(clientHeuristicConfidence(entityRef.current))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -347,7 +401,7 @@ function ConfidenceContent({
     return () => {
       cancelled = true
     }
-  }, [apiClient, entityId, entity])
+  }, [apiClient, entityId])
 
   if (loading) {
     return (
@@ -372,24 +426,38 @@ function ConfidenceContent({
     class: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
     dot: 'bg-gray-400',
   }
-  const overallStyle = CONFIDENCE_COLOR[payload.overall.label] ?? DEFAULT_CONFIDENCE_STYLE
+  // The wire sends a SCALAR score; the label is derived here with the server's
+  // own thresholds (schemas.ts `classifyConfidence`, mirroring
+  // observations-api-server.mjs:2940). This is where "· NaN%" came from: the
+  // declared type claimed `overall` was `{score,label}`, so both reads were
+  // `undefined` and `Math.round(undefined * 100)` is NaN. The grey dot below
+  // was the same bug wearing a different hat — the style lookup missed, and
+  // the defensive fallback turned a crash into a silent wrong number.
+  //
+  // `?? NaN` is deliberate rather than `?? 0`: parsing guarantees a number, so
+  // if one is ever missing again the percentage must look obviously broken
+  // instead of quietly reading 0%.
+  const overallScore = payload.overall ?? NaN
+  const overallLabel = classifyConfidence(overallScore)
+  const overallStyle = CONFIDENCE_COLOR[overallLabel] ?? DEFAULT_CONFIDENCE_STYLE
   return (
     <div data-testid="subtab-content-confidence" className="space-y-3">
       <div className={`inline-flex items-center gap-2 rounded px-2 py-1 ${overallStyle.class}`}>
         <span className={`inline-block w-2 h-2 rounded-full ${overallStyle.dot}`} />
-        <span className="text-sm font-medium">
-          {payload.overall.label} · {Math.round(payload.overall.score * 100)}%
+        <span className="text-sm font-medium" data-testid="confidence-overall">
+          {overallLabel} · {Math.round(overallScore * 100)}%
         </span>
       </div>
       <ul className="space-y-1">
         {payload.segments.map((seg, i) => {
-          const s = CONFIDENCE_COLOR[seg.label] ?? DEFAULT_CONFIDENCE_STYLE
+          const segLabel = classifyConfidence(seg.confidence)
+          const s = CONFIDENCE_COLOR[segLabel] ?? DEFAULT_CONFIDENCE_STYLE
           return (
             <li key={i} className="flex items-center gap-2 text-xs">
               <span className={`inline-block w-1.5 h-1.5 rounded-full ${s.dot}`} />
-              <span className="font-mono">{seg.runId}</span>
+              <span className="font-mono">{seg.segmentId}</span>
               <span className={`rounded px-1.5 py-0.5 ${s.class}`}>
-                {seg.label} · {Math.round(seg.score * 100)}%
+                {segLabel} · {Math.round(seg.confidence * 100)}%
               </span>
             </li>
           )
@@ -410,12 +478,27 @@ function TimelineContent({ entity }: { entity: Record<string, unknown> }) {
   const events: TimelineEvent[] = useMemo(() => {
     const metadata = (entity.metadata as Record<string, unknown> | undefined) ?? {}
     const out: TimelineEvent[] = []
-    const createdAt = (entity.createdAt as string | undefined) ?? undefined
+    // ONE SOURCE FOR THE CREATOR, because there were two and they disagreed.
+    // `computeVisibility` decides this tab is worth showing from
+    // `metadata.provenance.createdBy`, while this event was built from the
+    // TOP-LEVEL `entity.createdBy` — which the writers do not set. So every
+    // row that qualified via provenance rendered "Created by —": the predicate
+    // found a creator, the renderer looked somewhere else and found nothing.
+    // Prefer provenance (what the writers actually populate) and keep the
+    // top-level field as the fallback.
+    const provenance = (metadata.provenance as Record<string, unknown> | undefined) ?? {}
+    const createdByMeta = provenance.createdBy as Record<string, unknown> | undefined
+    const creator =
+      (createdByMeta?.provider as string | undefined)
+      ?? (entity.createdBy as string | undefined)
+    const createdAt =
+      (entity.createdAt as string | undefined)
+      ?? (createdByMeta?.timestamp as string | undefined)
     if (createdAt) {
       out.push({
         type: 'creation',
         timestamp: createdAt,
-        label: `Created by ${(entity.createdBy as string | undefined) ?? '—'}`,
+        label: creator ? `Created by ${creator}` : 'Created',
         icon: '🟢',
       })
     }
@@ -497,7 +580,7 @@ function TimelineContent({ entity }: { entity: Record<string, unknown> }) {
                   className="flex items-center gap-2 text-xs"
                 >
                   <span aria-hidden>{ev.icon}</span>
-                  <span className="tabular-nums text-muted-foreground">{ev.timestamp}</span>
+                  <span className="tabular-nums text-muted-foreground">{formatLocalTimestamp(ev.timestamp)}</span>
                   <span>{ev.label}</span>
                 </li>
               ))}
@@ -513,7 +596,7 @@ function TimelineContent({ entity }: { entity: Record<string, unknown> }) {
               className="flex items-center gap-2 text-xs"
             >
               <span aria-hidden>{ev.icon}</span>
-              <span className="tabular-nums text-muted-foreground">{ev.timestamp}</span>
+              <span className="tabular-nums text-muted-foreground">{formatLocalTimestamp(ev.timestamp)}</span>
               <span>{ev.label}</span>
             </li>
           ))}
