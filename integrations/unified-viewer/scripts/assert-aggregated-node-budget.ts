@@ -127,6 +127,12 @@ const DEFAULT_FILTERS: VisibilityFilters = {
   hierarchyParents: parents,
   hierarchyClassOf: (id: string) => hierarchyClasses.get(id),
   showDebugEntityTypes: false,
+  // The rail's default tree, so the gate measures the default view. The
+  // predicate reads `!== 'intent'`, so omitting this would still gate Intents
+  // out — but only by accident, and this file is exactly where an accident
+  // survives: `scripts/` is not in tsconfig's `include`, so the required field
+  // that made tsc name every other call site cannot name this one.
+  hierarchySpine: 'code',
 }
 
 const visible = forPredicate.filter((e) => isEntityVisible(e, DEFAULT_FILTERS))

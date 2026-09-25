@@ -29,6 +29,9 @@ function baseFilters(overrides: Partial<VisibilityFilters> = {}): VisibilityFilt
     // Phase 60 Plan 03 (G3): required field. Defaults to false (architecture-
     // bleed shield ON) so Layer-rule tests stay focused on layer semantics.
     showDebugEntityTypes: false,
+    // Required for the same reason. 'code' is the store default, so these
+    // layer tests see the tree an operator sees on load.
+    hierarchySpine: 'code',
     ...overrides,
   }
 }
@@ -141,6 +144,7 @@ describe('isEntityVisible — showDebugEntityTypes gate (Phase 60-03 G3)', () =>
       visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
       lslFilterEntityIds: null,
       showDebugEntityTypes: false,
+      hierarchySpine: 'code',
       ...overrides,
     }
   }
@@ -217,6 +221,7 @@ describe('isEntityVisible — archived rows: rolled-up vs stale', () => {
       visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
       lslFilterEntityIds: null,
       showDebugEntityTypes: false,
+      hierarchySpine: 'code',
       ...overrides,
     }
   }
@@ -448,5 +453,72 @@ describe('isEntityVisible — hierarchy subtree focus', () => {
     // guard has — if an empty set ever arrives here it must not un-filter the
     // canvas behind the operator's back while the chip still says "focused".
     expect(isEntityVisible(ent('a', 'Insight'), f(new Set()))).toBe(false)
+  })
+})
+
+describe('isEntityVisible — hierarchy spine: which of the two trees is on screen', () => {
+  // The coding KG carries two trees joined at the Insight and nowhere else.
+  // The rail switched between them and the canvas did not, so BOTH node
+  // populations rendered in either mode. At Overview that was visible as
+  // confetti: the detail level collapses the Insight layer — the joint — so
+  // all 19 Intents stayed on the canvas with every child hidden, and 12 had no
+  // drawn edge left. `buildRehomeEdges` walks UP over containment edges and an
+  // Intent has none inbound, so nothing could re-attach them.
+  //
+  // Tested in BOTH directions. A one-sided test is satisfied by a class filter
+  // that just deletes Intents, which is not what a switch does.
+  function f(overrides: Partial<VisibilityFilters> = {}): VisibilityFilters {
+    return {
+      searchQueryLowered: '',
+      selectedTeams: new Set<string>(),
+      learningSource: 'combined',
+      selectedLayers: [],
+      hideDocNodes: false,
+      hideRolledUp: false,
+      showStale: true,
+      selectedClasses: new Set<string>(['Intent', 'Insight', 'Component', 'Project']),
+      visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
+      lslFilterEntityIds: null,
+      showDebugEntityTypes: false,
+      hierarchySpine: 'code',
+      ...overrides,
+    }
+  }
+  const ent = (id: string, ontologyClass: string): Entity =>
+    ({ id, name: id, ontologyClass, metadata: {} }) as unknown as Entity
+
+  test("code spine hides Intent rows — they are not members of the code tree", () => {
+    // `HIERARCHY_LEVEL` in hierarchy-parents.ts has no Intent entry, so
+    // `deriveParents` never gives one a parent: in the code tree it is
+    // unplaceable, not merely unplaced.
+    expect(isEntityVisible(ent('int1', 'Intent'), f({ hierarchySpine: 'code' }))).toBe(false)
+  })
+
+  test('intent spine shows them', () => {
+    expect(isEntityVisible(ent('int1', 'Intent'), f({ hierarchySpine: 'intent' }))).toBe(true)
+  })
+
+  test('the switch touches ONLY Intent — it is not a filter over anything else', () => {
+    // If it moved any other class it would be a second, overlapping filter
+    // rather than a choice of derivation — the exact overlap the rail redesign
+    // was undoing.
+    for (const spine of ['code', 'intent'] as const) {
+      for (const cls of ['Insight', 'Component', 'Project']) {
+        expect(isEntityVisible(ent(`x-${cls}`, cls), f({ hierarchySpine: spine }))).toBe(true)
+      }
+    }
+  })
+
+  test('an Intent survives the Overview collapse in intent mode', () => {
+    // The mirror of the rule above, and the reason `Intent` was NOT simply
+    // added to COLLAPSIBLE_LEVEL — the smaller diff. That set is the collapse
+    // FRONTIER, so membership would hide Intents at Overview in INTENT mode
+    // too, blanking the tree the operator just asked for.
+    expect(
+      isEntityVisible(
+        ent('int1', 'Intent'),
+        f({ hierarchySpine: 'intent', collapseSubComponents: true, hideRolledUp: true }),
+      ),
+    ).toBe(true)
   })
 })

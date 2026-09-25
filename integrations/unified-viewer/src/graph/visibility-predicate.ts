@@ -124,6 +124,31 @@ export interface VisibilityFilters {
    */
   hierarchyClassOf?: (id: string) => string | undefined
   /**
+   * Which of the two trees is on screen — the rail's Code|Intent switch.
+   *
+   * `Intent` rows render only in `'intent'`. The two trees are joined at the
+   * Insight and nowhere else (graph/intent-spine.ts), so drawing both node
+   * populations on one canvas is the conflation the spine exists to remove.
+   *
+   * IT SHOWED UP AS CONFETTI, WHICH IS WHY THIS EXISTS. Overview collapses the
+   * Insight layer — the joint. The Intents kept rendering with every child
+   * gone: 19 visible, 12 of them with no drawn edge at all. `buildRehomeEdges`
+   * cannot save them either, and not by oversight — it walks UP over
+   * containment edges, and an Intent has zero inbound edges of any type while
+   * its 4-to-87 `aggregates` all point DOWN. Adding `aggregates` to
+   * ANCHOR_EDGE_TYPES would not help (still the wrong direction) and making
+   * the walk bidirectional would draw an Intent hanging off a Component by a
+   * synthetic `contains` that misstates the hierarchy — exactly what that
+   * module promises not to invent.
+   *
+   * REQUIRED, no `?`. `showDebugEntityTypes` is required for the same reason
+   * (checker W-2): a defaulted field is one a call site can forget, and the
+   * project-wide `tsc --noEmit` gate is the only thing that catches a
+   * half-deployed consumer. `useVisibleEntityIds`'s missing `hiddenNodeTypes`
+   * is the precedent — it drifted for exactly as long as it was optional.
+   */
+  hierarchySpine: 'code' | 'intent'
+  /**
    * Phase 60 Plan 01 (G1): ontology registry (subset shape — `name` +
    * extends-chain `parent`) consumed by `deriveLayer` for L2 inference.
    * Optional so existing call sites compile until the registry is threaded
@@ -251,6 +276,19 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
       if (RAW_STREAM_CLASSES.has(field ?? '')) return false
     }
   }
+
+  // Which tree is on screen. `Intent` is the intent spine's own class and
+  // belongs to that derivation only; in the code tree it is not a member at
+  // all — `HIERARCHY_LEVEL` (hierarchy-parents.ts) has no entry for it, so
+  // `deriveParents` never gives one a parent and nothing in the code tree can
+  // hold it. Rendering it there put an unplaceable node on the canvas that
+  // every re-home and every anchor count then had to explain away.
+  //
+  // NOT folded into COLLAPSIBLE_LEVEL below, which would have been the smaller
+  // diff: that set is the collapse FRONTIER, so an Intent would then vanish at
+  // Overview in intent mode too — hiding the tree the operator just asked for.
+  // The spine is a switch, so it is tested as one.
+  if (filters.hierarchySpine !== 'intent' && e.ontologyClass === 'Intent') return false
 
   const meta = (e.metadata as {
     team?: string

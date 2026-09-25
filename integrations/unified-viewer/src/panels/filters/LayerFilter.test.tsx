@@ -170,6 +170,9 @@ describe('LayerFilter', () => {
       // Phase 60 Plan 03 (G3): VisibilityFilters now requires this flag.
       // Default false keeps the architecture-bleed shield ON.
       showDebugEntityTypes: false,
+      // Likewise required. The badge/predicate parity this test asserts is a
+      // LAYER claim, so it is made on the default tree.
+      hierarchySpine: 'code' as const,
     })
     // Cast through unknown — the two Entity types diverge in `level`
     // (ApiClient: number; graph/types: 0|1|2|3). The fixtures above omit

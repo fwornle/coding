@@ -18,9 +18,14 @@
 // there must be ONE place that reads the filter store and builds the filter
 // object, and the consumers must go through it.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { act, renderHook } from '@testing-library/react'
+
+import { useViewerStore } from '@/store/viewer-store'
+import { useGraphVisibility } from './useGraphVisibility'
+import type { Entity } from './types'
 
 const SRC = join(__dirname, '..')
 const read = (rel: string) => readFileSync(join(SRC, rel), 'utf8')
@@ -70,6 +75,12 @@ describe('useGraphVisibility — single source of truth for canvas visibility', 
       // identity and name, for the chip — but never the resolved id set, which
       // is what actually filters.
       'hierarchySubtreeIds',
+      // Same producer/consumer split: HierarchyNavigator writes the spine (and
+      // reads it back for `aria-pressed`, which is why it is not a CONSUMER
+      // here); the canvas reads it through this hook. A consumer subscribing
+      // directly is how the rail and the canvas came to disagree in the first
+      // place — for the whole time it was `useState` local to the rail.
+      'hierarchySpine',
     ]
     for (const rel of CONSUMERS) {
       const src = read(rel)
@@ -92,5 +103,50 @@ describe('useGraphVisibility — single source of truth for canvas visibility', 
     for (const field of reads) {
       expect(deps, `${field} is read but missing from the dep list`).toContain(field)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The gates above are structural — they prove the consumers go through the
+// hook, not that the hook carries a given field all the way to the predicate.
+// `hierarchySpine` spent its whole life as `useState` inside the rail, so the
+// one thing worth asserting behaviourally is that a store write now lands on
+// the canvas.
+// ---------------------------------------------------------------------------
+describe('useGraphVisibility — the spine switch reaches the canvas', () => {
+  const intent = { id: 'int1', name: 'A goal', ontologyClass: 'Intent', metadata: {} } as unknown as Entity
+  const insight = { id: 'i1', name: 'A lesson', ontologyClass: 'Insight', metadata: {} } as unknown as Entity
+
+  beforeEach(() => {
+    useViewerStore.setState({
+      selectedClasses: new Set(['Intent', 'Insight']),
+      visibleLevels: new Set([0, 1, 2, 3]),
+      searchQuery: '',
+      hierarchySpine: 'code',
+      showStale: true,
+    } as unknown as Parameters<typeof useViewerStore.setState>[0])
+  })
+
+  it('hides Intent under the code spine and shows it under the intent spine', () => {
+    const { result, rerender } = renderHook(() => useGraphVisibility())
+    expect(result.current(intent)).toBe(false)
+    expect(result.current(insight)).toBe(true)
+
+    act(() => { useViewerStore.getState().setHierarchySpine('intent') })
+    rerender()
+    expect(result.current(intent)).toBe(true)
+    expect(result.current(insight)).toBe(true)
+  })
+
+  it('re-setting the same spine keeps the predicate reference', () => {
+    // `hierarchySpine` is in the dep list, so a write that changes nothing must
+    // not produce a new predicate: the canvas's `visibleEntities` memo would
+    // invalidate and the force simulation would restart — PATTERNS Locked
+    // Contract #3, the viewport jump.
+    const { result, rerender } = renderHook(() => useGraphVisibility())
+    const before = result.current
+    act(() => { useViewerStore.getState().setHierarchySpine('code') })
+    rerender()
+    expect(result.current).toBe(before)
   })
 })
