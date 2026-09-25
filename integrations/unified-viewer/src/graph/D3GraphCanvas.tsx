@@ -63,6 +63,7 @@ import { computeAncestryPath, type AncestryPathResult } from './ancestry'
 // body — G1-G5 + G9-G13 source-grep gates continue to pass.
 import { useGraphVisibility } from './useGraphVisibility'
 import { buildRehomeEdges } from './rehome-edges'
+import { explicitPlacementEdges } from './hierarchy-parents'
 // 2026-06-13 (Phase 56.1 Plan 05 — D-2 reverse direction): graph node
 // click reads the pre-built reverse-lookup index to populate the
 // `selectedBucketKeys` halo atomically with the node selection. The hook
@@ -354,6 +355,15 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     return s
   }, [visibleEntities])
 
+  // Real relations plus the explicit placements, memoised apart so the
+  // rehome input is stable while nothing about the data changes — the
+  // viewport-stability contract the `visibleRelations` memo below depends on
+  // (PATTERNS Locked Contract #3).
+  const anchorLadder = useMemo(
+    () => [...relations, ...explicitPlacementEdges(entities as unknown as Parameters<typeof explicitPlacementEdges>[0])],
+    [relations, entities],
+  )
+
   const visibleRelations = useMemo<Relation[]>(() => {
     const real = relations.filter((r) =>
       visibleIds.has(r.from) && visibleIds.has(r.to) && !hiddenRelationTypes.has(r.type))
@@ -372,9 +382,14 @@ export function D3GraphCanvas({ apiClient, system }: D3GraphCanvasProps) {
     // the same set the anchor invariant is stated over — INCLUDING the ones
     // whose far end is currently hidden. That is what makes a hidden
     // intermediate level traversable instead of a dead end.
-    const rehomed = buildRehomeEdges(visibleIds, real, relations)
+    // The ladder includes EXPLICIT placements, not just drawn edges. A row
+    // placed by writing `metadata.parentId` has a parent in the tree and no
+    // edge on the canvas, so without this it stays a free-floating dot while
+    // every count reports it as correctly attributed — 7 of 11 rows did
+    // exactly that when the quality panel first placed them.
+    const rehomed = buildRehomeEdges(visibleIds, real, anchorLadder)
     return rehomed.length === 0 ? real : [...real, ...(rehomed as unknown as Relation[])]
-  }, [relations, visibleIds, hiddenRelationTypes])
+  }, [anchorLadder, relations, visibleIds, hiddenRelationTypes])
 
   // Dimensions — watch the container, no Redux involvement.
   useLayoutEffect(() => {

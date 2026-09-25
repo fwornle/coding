@@ -202,3 +202,51 @@ function compare(
   if (a[2] !== b[2]) return a[2] - b[2]
   return a[3].localeCompare(b[3])
 }
+
+/**
+ * `metadata.parentId` rendered as edges, so the CANVAS can see a placement the
+ * TREE already honours.
+ *
+ * WHY THIS IS NEEDED AT ALL. `deriveParents` ranks an explicit `parentId`
+ * above every edge (EXPLICIT_PLACEMENT_RANK), so placing a row by writing that
+ * field is enough to give it a parent, a root, and a correct `countUnanchored`.
+ * It is NOT enough to draw anything: a field is not an edge, so the canvas has
+ * no line to render and `buildRehomeEdges` — which walks real containment
+ * edges — cannot reach it either.
+ *
+ * Measured after placing 11 rows from their recorded parents: the unanchored
+ * count fell 17 -> 6 exactly as intended, and 7 of those rows carried no edge
+ * of any kind, so they went on rendering as free-floating dots. The number
+ * improved and the picture did not, which is the failure this whole area keeps
+ * producing.
+ *
+ * So the placement is surfaced as what it has always meant: an edge from the
+ * parent to the child. Nothing is invented — `contains` is the same type
+ * `buildRehomeEdges` already emits for a containment the filters interrupted,
+ * and an EXPLICIT placement is a stronger warrant than the hidden chains it
+ * already honours.
+ *
+ * Deliberately NOT merged into the real relation list: these are anchors, not
+ * evidence. They go to `buildRehomeEdges` as part of the ladder it climbs, so
+ * a row with a genuine edge still draws that edge and only a row with nothing
+ * gets the synthetic one.
+ *
+ * @param entities rows to read `metadata.parentId` from.
+ * @returns one `contains` edge per explicit placement. Self-references and
+ *   placements naming a row outside `entities` are dropped — the first would
+ *   root a node in itself, the second cannot be drawn.
+ */
+export function explicitPlacementEdges(
+  entities: readonly HierarchyNode[],
+): HierarchyEdge[] {
+  const known = new Set<string>()
+  for (const e of entities) known.add(e.id)
+  const out: HierarchyEdge[] = []
+  for (const e of entities) {
+    const pid = (e.metadata as { parentId?: string } | undefined)?.parentId
+    if (typeof pid !== 'string' || pid.length === 0) continue
+    if (pid === e.id || !known.has(pid)) continue
+    out.push({ from: pid, to: e.id, type: 'contains' })
+  }
+  return out
+}

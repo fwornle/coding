@@ -110,3 +110,52 @@ describe('buildRehomeEdges', () => {
     expect(edges[0]).toMatchObject({ from: 'comp', to: 'detail' })
   })
 })
+
+describe('buildRehomeEdges — explicit placements are part of the ladder', () => {
+  // A row placed by writing `metadata.parentId` has a parent in the tree and
+  // NO edge on the canvas. Before the caller fed placements in, such a row was
+  // a stray component with an empty `anchorsOf`, so nothing was emitted and it
+  // rendered as a free-floating dot while every count called it attributed.
+  // `explicitPlacementEdges` (hierarchy-parents.ts) supplies the missing rung.
+  test('an edgeless placed row attaches to its recorded parent', () => {
+    const placement = e('comp', 'orphan') // what explicitPlacementEdges emits
+    const edges = buildRehomeEdges(
+      set('project', 'comp', 'orphan'),
+      [e('project', 'comp')],                       // drawn: orphan is alone
+      [e('project', 'comp'), placement],            // ladder: includes it
+    )
+    expect(edges).toHaveLength(1)
+    expect(edges[0]).toMatchObject({ from: 'comp', to: 'orphan', synthetic: true, hops: 1 })
+  })
+
+  test('without the placement in the ladder it stays adrift — the bug this fixes', () => {
+    expect(buildRehomeEdges(
+      set('project', 'comp', 'orphan'),
+      [e('project', 'comp')],
+      [e('project', 'comp')],
+    )).toHaveLength(0)
+  })
+
+  test('a placement whose parent is HIDDEN still reaches a visible ancestor', () => {
+    // The walk climbs through hidden endpoints, so a row placed under a
+    // collapsed Detail attaches to whatever is visible above it rather than
+    // being dropped.
+    const edges = buildRehomeEdges(
+      set('project', 'orphan'),                     // `comp` is hidden
+      [],
+      [e('project', 'comp'), e('comp', 'orphan')],
+    )
+    expect(edges).toHaveLength(1)
+    expect(edges[0]).toMatchObject({ from: 'project', to: 'orphan', hops: 2 })
+  })
+
+  test('a row with a REAL edge is unaffected — no duplicate synthetic edge', () => {
+    // Placements are anchors, not evidence: a row that already draws an edge
+    // is in the main component and must not also acquire a synthetic one.
+    expect(buildRehomeEdges(
+      set('project', 'comp', 'child'),
+      [e('project', 'comp'), e('comp', 'child')],
+      [e('project', 'comp'), e('comp', 'child'), e('comp', 'child')],
+    )).toHaveLength(0)
+  })
+})
