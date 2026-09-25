@@ -2,9 +2,19 @@
 //   + 55-08-PLAN.md Task 3 (Phase 55 rewire)
 //   + 55-PATTERNS.md § FilterRail mount order
 // CONTRACT: 45-UI-SPEC.md § Layout Contract row 3 (w-64 / w-12 collapsed)
-//   + 55-UI-SPEC.md § 6 (mount order:
-//     Search → LayerFilter → DomainFilter → OntologyFilter → GraphToggles
-//     → TrendingPanel (lazy, always) → HierarchyNavigator (lazy, coding only))
+//
+// MOUNT ORDER SUPERSEDED 2026-09-25. 55-UI-SPEC.md §6 pinned a flat order —
+// Search → LayerFilter → DomainFilter → OntologyFilter → GraphToggles →
+// TrendingPanel → HierarchyNavigator — and the rail grew to 1818px of content
+// in an 855px viewport: 53% below the fold, with the legend last and collapsed.
+// Eleven sections, five different collapse idioms, and four checkboxes that all
+// answered "how much detail?" with two opposite polarities.
+//
+// The order is now: Search → DetailLevel → Legend → Advanced → Navigators.
+// Nothing was removed. Everything previously in the rail is inside one of the
+// two accordions, which start collapsed, so the default view fits without
+// scrolling. Recording the supersession here rather than silently diverging
+// from the spec it names.
 //
 // Phase 45 → Phase 55 deltas:
 //   - The Phase 45 flat ClassList is REMOVED. The new VOKB-shape grouped
@@ -36,7 +46,14 @@ import {
   OntologyFilter,
   VOKB_SCHEMA,
 } from '@/panels/filters/OntologyFilter'
-import { GraphToggles } from '@/panels/filters/GraphToggles'
+import { ContentToggles, StructureToggles } from '@/panels/filters/GraphToggles'
+import { DetailLevel } from '@/panels/filters/DetailLevel'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 
 // Lazy mounts pinned by Plan 55-08 (closes plan-checker B-2 + B-3).
 // Plan 55-10 Task 1 OVERWRITES ./TrendingPanel; Plan 55-11 Task 1
@@ -70,6 +87,10 @@ export interface FilterRailProps {
   /** Phase 55 — slot for the LegendPanel (or any other end-of-rail surface).
    * Mounted at the BOTTOM of the vertical stack per UI-SPEC §6 row 12. */
   bottomSlot?: ReactNode
+  /** Nodes currently rendered — same predicate the canvas and footer use. */
+  visibleCount?: number
+  /** Rendered rows with no Project/System above them. See graph/unanchored.ts. */
+  unanchoredCount?: number
 }
 
 const LEVELS: ReadonlyArray<{ value: Level; label: string }> = [
@@ -87,6 +108,8 @@ export function FilterRail({
   entities,
   relations,
   bottomSlot,
+  visibleCount,
+  unanchoredCount,
 }: FilterRailProps) {
   const searchQuery = useViewerStore((s) => s.searchQuery)
   const setSearch = useViewerStore((s) => s.setSearch)
@@ -172,11 +195,29 @@ export function FilterRail({
         />
       </div>
 
-      {/* 2026-06-11: VKB-style Learning Source + Teams filters above the
-          Phase 45 Level/Layer/Ontology rail. computeNodeState reads them
-          alongside the legacy filters. */}
-      <LearningSourceFilter />
-      <TeamsFilter entities={entities} apiClient={apiClient} />
+      {/* ── ESSENTIALS — everything above the fold ────────────────────────
+          One question ("how much detail?"), then the key to the canvas. The
+          three switches DetailLevel writes live in Advanced > Structure. */}
+      <DetailLevel visibleCount={visibleCount} unanchoredCount={unanchoredCount} />
+
+      {/* The legend was the LAST thing in the rail and collapsed by default,
+          which put the key to the colours below ~960px of filters. It is what a
+          reader needs first, so it sits here now. */}
+      {bottomSlot}
+
+      {/* ── ADVANCED — one collapsed section, four groups ─────────────────
+          Everything that was previously stacked flat in the rail. Nothing was
+          removed; it is one click away instead of one scroll away. The rail
+          used to carry FIVE different collapse idioms (useState+triangle, a
+          useState record, shadcn Collapsible, shadcn Accordion and native
+          <details>); this is the one idiom for all of it. */}
+      <Accordion type="multiple" className="w-full" data-testid="filter-advanced">
+        <AccordionItem value="scope">
+          <AccordionTrigger className="text-xs py-2" data-testid="filter-advanced-scope">
+            Scope
+          </AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-1">
+            <TeamsFilter entities={entities} apiClient={apiClient} />
 
       {/* Level (Phase 45 BC) */}
       <div className="space-y-2">
@@ -222,70 +263,109 @@ export function FilterRail({
         </div>
       </div>
 
-      {/* ---- Phase 55 NEW filter components (UI-SPEC §6 order) ---- */}
+            {/* Layer (Evidence/Pattern) — the OKB/km-core LearningArtifact
+                `defaultLayer` axis, NOT a coding-KG-native concept (in VKB it
+                just means Insight=pattern, everything else=evidence). Hidden in
+                the VKB tab per operator 2026-06-19; kept for OKB/VOKB. */}
+            {system !== 'coding' && <LayerFilter entities={entities} />}
 
-      {/* Layer (Evidence/Pattern) — this is the OKB/km-core LearningArtifact
-          `defaultLayer` axis, NOT a coding-KG-native concept (in VKB it just
-          means Insight=pattern, everything else=evidence). Hidden in the VKB
-          tab per operator 2026-06-19; kept for OKB/VOKB where it's native. */}
-      {system !== 'coding' && <LayerFilter entities={entities} />}
+            {/* Renders nothing when the system has no domains — it used to
+                render the sentence "Domain filter not applicable for this
+                system", which is a filter-shaped hole in the rail. */}
+            <DomainFilter entities={entities} />
 
-      {/* Domain (NEW) */}
-      <DomainFilter entities={entities} />
+            {/* Ontology Class — grouped tree (REPLACES the Phase 45 flat
+                ClassList). Phase 60 (60-05): the coding tab uses the API-driven
+                L1->L2 path (no prop); OKB pins legacyGroupingSchema={VOKB_SCHEMA}
+                to keep its Upper/Lower groups (W-1 regression preservation). */}
+            <OntologyFilter
+              entities={entities}
+              apiClient={apiClient}
+              groupingSchema={legacyGroupingSchema}
+            />
+          </AccordionContent>
+        </AccordionItem>
 
-      {/* Ontology Class — grouped tree (NEW; REPLACES Phase 45 flat ClassList).
-          Phase 60 (60-05): coding tab now uses the API-driven L1->L2 path
-          (no prop); OKB tab pins legacyGroupingSchema={VOKB_SCHEMA} to keep
-          its Upper/Lower groups (W-1 regression preservation). */}
-      <OntologyFilter
-        entities={entities}
-        apiClient={apiClient}
-        groupingSchema={legacyGroupingSchema}
-      />
+        <AccordionItem value="source">
+          <AccordionTrigger className="text-xs py-2" data-testid="filter-advanced-source">
+            Knowledge source
+          </AccordionTrigger>
+          <AccordionContent className="pt-1">
+            <LearningSourceFilter />
+          </AccordionContent>
+        </AccordionItem>
 
-      {/* Graph Toggles (NEW; ported from VOKB LegendPanel toggle block) */}
-      <GraphToggles />
+        <AccordionItem value="content">
+          <AccordionTrigger className="text-xs py-2" data-testid="filter-advanced-content">
+            Content
+          </AccordionTrigger>
+          <AccordionContent className="pt-1">
+            <ContentToggles />
+          </AccordionContent>
+        </AccordionItem>
 
-      {/* Trending Patterns — lazy mount, always rendered. Plan 55-10 ships the
-          real component at ./TrendingPanel; until then a placeholder renders. */}
-      <Suspense
-        fallback={
-          <div
-            data-testid="trending-panel-fallback"
-            className="text-xs text-muted-foreground px-3 py-2"
-          >
-            Loading trending…
-          </div>
-        }
-      >
-        <TrendingPanel apiClient={apiClient} />
-      </Suspense>
+        <AccordionItem value="structure">
+          <AccordionTrigger className="text-xs py-2" data-testid="filter-advanced-structure">
+            Structure
+          </AccordionTrigger>
+          <AccordionContent className="pt-1">
+            <StructureToggles />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
-      {/* Hierarchy Navigator — lazy mount, coding-only. Plan 55-11 ships the
-          real component at ./coding/HierarchyNavigator; until then placeholder. */}
-      {system === 'coding' && (
-        <Suspense
-          fallback={
-            <div
-              data-testid="hierarchy-navigator-fallback"
-              className="text-xs text-muted-foreground px-3 py-2"
+      {/* ── NAVIGATORS — not filters; they move you around the graph ───────
+          Collapsed by default. Trending was ~500px of always-open list and the
+          hierarchy tree is unbounded, which is most of why the rail scrolled. */}
+      <Accordion type="multiple" className="w-full" data-testid="filter-navigators">
+        <AccordionItem value="trending">
+          <AccordionTrigger className="text-xs py-2" data-testid="filter-nav-trending">
+            Trending insights
+          </AccordionTrigger>
+          <AccordionContent className="pt-1">
+            <Suspense
+              fallback={
+                <div
+                  data-testid="trending-panel-fallback"
+                  className="text-xs text-muted-foreground px-3 py-2"
+                >
+                  Loading trending…
+                </div>
+              }
             >
-              Loading hierarchy…
-            </div>
-          }
-        >
-          {/* 2026-09-08: `entities` was never passed. The navigator's BC-shim
-              falls back to `useViewerStore(s => s.entities)`, and nothing has
-              ever written that key — so this surface rendered its "No hierarchy
-              data yet / Run wave-analysis to populate" empty state permanently,
-              on a graph with 2441 entities in it. FilterRail already receives
-              both arrays; pass them. */}
-          <HierarchyNavigator system={system} entities={entities} relations={relations} />
-        </Suspense>
-      )}
+              <TrendingPanel apiClient={apiClient} />
+            </Suspense>
+          </AccordionContent>
+        </AccordionItem>
 
-      {/* Phase 55 plan 07 — bottom slot for LegendPanel (UI-SPEC §6 row 12). */}
-      {bottomSlot}
+        {system === 'coding' && (
+          <AccordionItem value="hierarchy">
+            <AccordionTrigger className="text-xs py-2" data-testid="filter-nav-hierarchy">
+              Hierarchy
+            </AccordionTrigger>
+            <AccordionContent className="pt-1">
+              <Suspense
+                fallback={
+                  <div
+                    data-testid="hierarchy-navigator-fallback"
+                    className="text-xs text-muted-foreground px-3 py-2"
+                  >
+                    Loading hierarchy…
+                  </div>
+                }
+              >
+                {/* 2026-09-08: `entities` was never passed. The navigator's
+                    BC-shim falls back to `useViewerStore(s => s.entities)`, and
+                    nothing has ever written that key — so this surface rendered
+                    its "No hierarchy data yet" empty state permanently, on a
+                    graph with 2441 entities in it. */}
+                <HierarchyNavigator system={system} entities={entities} relations={relations} />
+              </Suspense>
+            </AccordionContent>
+          </AccordionItem>
+        )}
+      </Accordion>
+
     </aside>
   )
 }

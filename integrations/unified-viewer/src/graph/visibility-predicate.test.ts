@@ -21,7 +21,8 @@ function baseFilters(overrides: Partial<VisibilityFilters> = {}): VisibilityFilt
     learningSource: 'combined',
     selectedLayers: [],
     hideDocNodes: false,
-    hideArchived: false,
+    hideRolledUp: false,
+    showStale: true,
     selectedClasses: new Set<string>(['Insight', 'Pattern', 'OnlineInsight', 'Component']),
     visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
     lslFilterEntityIds: null,
@@ -134,7 +135,8 @@ describe('isEntityVisible — showDebugEntityTypes gate (Phase 60-03 G3)', () =>
       learningSource: 'combined',
       selectedLayers: [],
       hideDocNodes: false,
-      hideArchived: false,
+      hideRolledUp: false,
+      showStale: true,
       selectedClasses: new Set<string>(['Component', 'Detail', 'Observation', 'Digest']),
       visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
       lslFilterEntityIds: null,
@@ -196,7 +198,12 @@ describe('isEntityVisible — showDebugEntityTypes gate (Phase 60-03 G3)', () =>
   })
 })
 
-describe('isEntityVisible — hideArchived gate (roll-up condensed view)', () => {
+describe('isEntityVisible — archived rows: rolled-up vs stale', () => {
+  // `metadata.archivedAt` marks TWO unrelated populations and one flag used to
+  // hide both under a label naming only the first. Rolled-up rows have a parent
+  // standing in for them on the canvas; stale rows (archived because their code
+  // no longer exists) have nothing. Hiding the second under a checkbox that
+  // says "rolled-up" is how a row disappears and nobody goes looking for it.
   function f(overrides: Partial<VisibilityFilters> = {}): VisibilityFilters {
     return {
       searchQueryLowered: '',
@@ -204,7 +211,8 @@ describe('isEntityVisible — hideArchived gate (roll-up condensed view)', () =>
       learningSource: 'combined',
       selectedLayers: [],
       hideDocNodes: false,
-      hideArchived: false,
+      hideRolledUp: false,
+      showStale: true,
       selectedClasses: new Set<string>(['Insight']),
       visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
       lslFilterEntityIds: null,
@@ -213,34 +221,78 @@ describe('isEntityVisible — hideArchived gate (roll-up condensed view)', () =>
     }
   }
 
-  function insight(archivedAt: string | null): Entity {
+  /** A roll-up CHILD: archived, with a parent that represents it. */
+  function rolledUp(archivedAt: string | null): Entity {
     return {
-      id: `ins-${archivedAt ?? 'live'}`,
+      id: `ins-rolled-${archivedAt ?? 'live'}`,
       name: 'an insight',
       ontologyClass: 'Insight',
       entityType: 'Insight',
-      metadata: { archivedAt },
+      metadata: { archivedAt, rolledUpInto: 'parent-1' },
     } as unknown as Entity
   }
 
-  it('shows archived insights when the toggle is OFF (default)', () => {
-    expect(isEntityVisible(insight('2026-09-19T10:00:00Z'), f())).toBe(true)
+  /** A STALE row: archived by the ratio=0 sweep, nothing stands in for it. */
+  function stale(): Entity {
+    return {
+      id: 'ins-stale',
+      name: 'an insight whose code is gone',
+      ontologyClass: 'Insight',
+      entityType: 'Insight',
+      metadata: {
+        archivedAt: '2026-08-20T10:00:00Z',
+        archiveReason: 'stuck at verificationRatio=0 for 35 days',
+      },
+    } as unknown as Entity
+  }
+
+  /** A roll-up PARENT — carries neither key. */
+  function parent(): Entity {
+    return {
+      id: 'ins-parent',
+      name: 'a roll-up parent',
+      ontologyClass: 'Insight',
+      entityType: 'Insight',
+      metadata: { archivedAt: null, rollUpOf: ['a', 'b'] },
+    } as unknown as Entity
+  }
+
+  it('shows rolled-up children when hideRolledUp is OFF', () => {
+    expect(isEntityVisible(rolledUp('2026-09-19T10:00:00Z'), f())).toBe(true)
   })
 
-  it('hides archived insights when the toggle is ON', () => {
+  it('hides rolled-up children when hideRolledUp is ON', () => {
     expect(
-      isEntityVisible(insight('2026-09-19T10:00:00Z'), f({ hideArchived: true })),
+      isEntityVisible(rolledUp('2026-09-19T10:00:00Z'), f({ hideRolledUp: true })),
     ).toBe(false)
   })
 
-  it('keeps roll-up PARENTS visible when the toggle is ON (no archivedAt)', () => {
-    // The parent is what should remain on the canvas — this is the whole point
-    // of the condensed view.
-    expect(isEntityVisible(insight(null), f({ hideArchived: true }))).toBe(true)
+  it('keeps roll-up PARENTS visible when hideRolledUp is ON', () => {
+    // The parent is what should remain on the canvas — the whole point of the
+    // condensed view.
+    expect(isEntityVisible(parent(), f({ hideRolledUp: true }))).toBe(true)
   })
 
   it('treats an empty-string archivedAt as not archived', () => {
-    expect(isEntityVisible(insight(''), f({ hideArchived: true }))).toBe(true)
+    expect(isEntityVisible(rolledUp(''), f({ hideRolledUp: true }))).toBe(true)
+  })
+
+  it('SPLIT: hideRolledUp does NOT hide a stale row', () => {
+    // The regression this split exists to prevent. A stale row has no parent
+    // representing it, so the roll-up switch must not silently remove it.
+    expect(isEntityVisible(stale(), f({ hideRolledUp: true, showStale: true }))).toBe(true)
+  })
+
+  it('SPLIT: showStale=false hides a stale row even with hideRolledUp OFF', () => {
+    expect(isEntityVisible(stale(), f({ hideRolledUp: false, showStale: false }))).toBe(false)
+  })
+
+  it('SPLIT: showStale=false does NOT hide a rolled-up child', () => {
+    // The mirror of the above — the two switches must be independent in BOTH
+    // directions, or one of them is just the old flag under a new name.
+    expect(
+      isEntityVisible(rolledUp('2026-09-19T10:00:00Z'), f({ hideRolledUp: false, showStale: false })),
+    ).toBe(true)
   })
 })
 

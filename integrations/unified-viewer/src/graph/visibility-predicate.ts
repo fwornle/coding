@@ -26,15 +26,33 @@ export interface VisibilityFilters {
   selectedLayers: readonly string[]
   hideDocNodes: boolean
   /**
-   * Hide insights that the roll-up pass archived behind a subsystem-level
-   * parent (`metadata.archivedAt`). Archiving is an obs-api TYPED-VIEW
-   * concept — `/api/coding/insights` filters it — but the viewer reads
-   * `/api/v1/*`, which is km-core's generic router and knows nothing about
-   * it. So a corpus rolled up from 678 insights to 40 still renders all 678
-   * here. Default OFF: archived rows stay queryable and visible unless the
-   * operator asks for the condensed view.
+   * Hide rows the roll-up pass folded behind a subsystem-level parent:
+   * `metadata.archivedAt` AND `metadata.rolledUpInto`. Archiving is an obs-api
+   * TYPED-VIEW concept — `/api/coding/insights` filters it — but the viewer
+   * reads `/api/v1/*`, km-core's generic router, which knows nothing about it.
+   * So a corpus rolled up from 678 insights to 40 still renders all 678 here
+   * unless this is on.
+   *
+   * SPLIT FROM `hideArchived` (2026-09-25). One flag used to hide everything
+   * carrying `archivedAt`, under a label that named only one of the two
+   * populations that field marks. The distinction is not cosmetic:
+   *
+   *   rolled up  archivedAt + rolledUpInto   1,261 rows.  A parent stands in
+   *              for them on the canvas, so hiding them loses no information.
+   *   stale      archivedAt, no rolledUpInto     9 rows.  Archived by the
+   *              ratio=0 sweep — "code claims no longer exist". NOTHING stands
+   *              in for them; hiding them removes the row outright.
+   *
+   * Hiding the second silently, under a checkbox that says "rolled-up", is how
+   * a row disappears and nobody goes looking for it. See `showStale`.
    */
-  hideArchived: boolean
+  hideRolledUp: boolean
+  /**
+   * Show rows archived as stale (`archivedAt`, no `rolledUpInto`). Default
+   * FALSE — measured-wrong knowledge is out of the default view at every
+   * detail level, and reachable in one click from Advanced > Content.
+   */
+  showStale: boolean
   selectedClasses: ReadonlySet<string>
   visibleLevels: ReadonlySet<0 | 1 | 2 | 3>
   lslFilterEntityIds: ReadonlySet<string> | null
@@ -240,6 +258,7 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
     layer?: string
     doc?: boolean
     archivedAt?: string | null
+    rolledUpInto?: string | null
     rollUpOf?: unknown
   } | undefined) ?? {}
 
@@ -354,11 +373,19 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
     if (!filters.selectedLayers.includes(inferred)) return false
   }
 
-  // Archived hide toggle — the roll-up's condensed view. A child archived
-  // behind a roll-up parent carries metadata.archivedAt; the parent does not,
-  // so hiding these leaves exactly the rolled-up corpus on the canvas.
-  if (filters.hideArchived === true && typeof meta.archivedAt === 'string' && meta.archivedAt) {
-    return false
+  // Archived rows — TWO populations, two rules. A roll-up child carries
+  // archivedAt AND rolledUpInto; the parent carries neither, so hiding the
+  // children leaves exactly the condensed corpus on the canvas.
+  if (typeof meta.archivedAt === 'string' && meta.archivedAt) {
+    const rolledUp = typeof meta.rolledUpInto === 'string' && meta.rolledUpInto.length > 0
+    if (rolledUp) {
+      if (filters.hideRolledUp === true) return false
+    } else {
+      // Stale: archived because the code it describes is gone. No parent
+      // represents it, so this is a removal rather than a fold — which is why
+      // it gets its own switch instead of riding along with the roll-up one.
+      if (filters.showStale !== true) return false
+    }
   }
 
   // Doc-nodes hide toggle.

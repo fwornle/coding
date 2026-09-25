@@ -50,7 +50,10 @@ export function useGraphVisibility(): VisibilityPredicate {
   const learningSource = useViewerStore((s) => s.learningSource)
   const selectedLayers = useViewerStore((s) => s.selectedLayers)
   const hideDocNodes = useViewerStore((s) => s.hideDocNodes)
-  const hideArchived = useViewerStore((s) => s.hideArchived)
+  // Split 2026-09-25: `archivedAt` marks two unrelated populations, so the
+  // predicate takes two flags. See the VisibilityFilters docs.
+  const hideRolledUp = useViewerStore((s) => s.hideRolledUp)
+  const showStale = useViewerStore((s) => s.showStale)
   const lslFilterEntityIds = useViewerStore((s) => s.lslFilterEntityIds)
   // Hierarchy navigator subtree focus. Resolved to ids by the navigator (the
   // producer) because the two spines walk different edge types; the predicate
@@ -86,7 +89,8 @@ export function useGraphVisibility(): VisibilityPredicate {
       learningSource,
       selectedLayers,
       hideDocNodes,
-      hideArchived,
+      hideRolledUp,
+      showStale,
       selectedClasses,
       visibleLevels,
       lslFilterEntityIds,
@@ -108,7 +112,8 @@ export function useGraphVisibility(): VisibilityPredicate {
     learningSource,
     selectedLayers,
     hideDocNodes,
-    hideArchived,
+    hideRolledUp,
+    showStale,
     lslFilterEntityIds,
     hierarchySubtreeIds,
     showDebugEntityTypes,

@@ -50,6 +50,17 @@ export function DomainFilter({ entities }: DomainFilterProps) {
   const isSelected = (domain: string) =>
     selectedDomains.length === 0 || selectedDomains.includes(domain)
 
+  // Render NOTHING when the system has no domains.
+  //
+  // This used to render a collapsible section whose entire body was the
+  // sentence "Domain filter not applicable for this system" — a filter-shaped
+  // hole occupying rail space on the coding tab, where it is never applicable.
+  // Graceful degradation should degrade to absence, not to a control that
+  // announces its own uselessness. The okb/vokb path is unchanged: those
+  // systems have `.domain` on their entities, so `hasAnyDomainField` is true
+  // and the section renders exactly as before.
+  if (!hasAnyDomainField) return null
+
   return (
     <div className="space-y-1" data-testid="filter-domain-section">
       <button

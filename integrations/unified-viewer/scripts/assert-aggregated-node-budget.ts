@@ -20,11 +20,16 @@
 // Exits 1 when over budget, so CI and the health check can gate on it.
 
 import { isEntityVisible, type VisibilityFilters } from '@/graph/visibility-predicate'
+import { DETAIL_LEVEL_FLAGS } from '@/store/viewer-store'
 import { deriveParents } from '@/graph/hierarchy-parents'
 import { PROVENANCE_RELATION_TYPES } from '@/graph/relation-types'
 
 const OBS_API = process.env.OBS_API ?? 'http://127.0.0.1:12436'
 const BUDGET = Number(process.env.AGGREGATED_NODE_BUDGET ?? 40)
+// Which detail level to measure. The rail offers three and they have different
+// targets (overview <=40, summary <=10), so the gate has to be able to ask
+// about each rather than only the default.
+const LEVEL = (process.env.AGGREGATED_NODE_LEVEL ?? 'overview') as keyof typeof DETAIL_LEVEL_FLAGS
 const AS_JSON = process.argv.includes('--json')
 
 interface ApiEntity {
@@ -90,7 +95,18 @@ const DEFAULT_FILTERS: VisibilityFilters = {
   learningSource: 'combined',
   selectedLayers: [],
   hideDocNodes: false,
-  hideArchived: true,
+  // Seeded from the app's own preset table rather than by hand, so this script
+  // cannot drift from the default view it claims to measure. It did drift once
+  // already: when `hideArchived` was split into `hideRolledUp` + `showStale`
+  // (2026-09-25) this line still set the old key, leaving `hideRolledUp`
+  // undefined — nothing was hidden and the gate reported Coding 157 over
+  // budget. `npm run build` runs `tsc --noEmit 2>/dev/null`, so the type error
+  // that would have caught it was swallowed.
+  ...DETAIL_LEVEL_FLAGS[
+    (process.env.AGGREGATED_NODE_LEVEL as keyof typeof DETAIL_LEVEL_FLAGS) ?? 'overview'
+  ],
+  // Stale rows are out of the default view at every level.
+  showStale: false,
   // NOT the store's seeded value. `selectedClasses` starts as an empty Set,
   // and this predicate reads an empty Set as "nothing visible" — the opposite
   // of the empty-means-all sentinel every other filter here uses. The app
@@ -107,8 +123,6 @@ const DEFAULT_FILTERS: VisibilityFilters = {
   visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
   lslFilterEntityIds: null,
   hiddenNodeTypes: new Set<string>(),
-  aggregatesOnly: false,
-  collapseSubComponents: true,
   expandedComponentIds: new Set<string>(),
   hierarchyParents: parents,
   hierarchyClassOf: (id: string) => hierarchyClasses.get(id),

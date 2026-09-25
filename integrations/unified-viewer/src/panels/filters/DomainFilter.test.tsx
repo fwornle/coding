@@ -4,8 +4,12 @@
 //
 // Verifies:
 //   - On okb-shaped data (entities with .domain), renders RaaS/KPI-FW/General with counts
-//   - On coding-shaped data (no entities have .domain), renders italic muted
-//     "Domain filter not applicable for this system" (UI-SPEC §7 row 3 graceful degradation)
+//   - On coding-shaped data (no entities have .domain), renders NOTHING.
+//     2026-09-25: this used to render a collapsible section whose whole body
+//     was the sentence "Domain filter not applicable for this system" — a
+//     filter-shaped hole taking rail space on the tab where it is never
+//     applicable. Graceful degradation should degrade to absence, not to a
+//     control announcing its own uselessness.
 //   - Clicking RaaS calls store.toggleDomain('raas')
 //   - Empty selectedDomains = "all visible"
 
@@ -47,15 +51,16 @@ describe('DomainFilter', () => {
     expect(screen.getByTestId('filter-domain-count-general').textContent).toBe('1')
   })
 
-  test('on coding-tab data where NO entity has .domain, renders graceful degradation italic message', () => {
+  test('on coding-tab data where NO entity has .domain, renders nothing at all', () => {
     const entities = [
       { id: 'a', name: 'A', ontologyClass: 'Component' },
       { id: 'b', name: 'B', ontologyClass: 'Project' },
     ] as unknown as Entity[]
-    render(<DomainFilter entities={entities} />)
-    const msg = screen.getByTestId('filter-domain-not-applicable')
-    expect(msg.textContent).toMatch(/not applicable/i)
-    expect(msg.className).toMatch(/italic/)
+    const { container } = render(<DomainFilter entities={entities} />)
+    // No section, no header, no placeholder sentence — the rail gets the space.
+    expect(container.firstChild).toBeNull()
+    expect(screen.queryByTestId('filter-domain-section')).toBeNull()
+    expect(screen.queryByTestId('filter-domain-not-applicable')).toBeNull()
     // Does NOT throw, does NOT render the domain checkboxes
     expect(screen.queryByTestId('filter-domain-raas')).toBeNull()
   })
@@ -97,8 +102,18 @@ describe('DomainFilter', () => {
     expect(badge.className).toMatch(/text-\[10px\]/)
   })
 
-  test('empty entities list also renders the not-applicable message (no entities = no .domain anywhere)', () => {
-    render(<DomainFilter entities={[]} />)
-    expect(screen.getByTestId('filter-domain-not-applicable')).toBeInTheDocument()
+  test('empty entities list also renders nothing (no entities = no .domain anywhere)', () => {
+    const { container } = render(<DomainFilter entities={[]} />)
+    expect(container.firstChild).toBeNull()
+  })
+
+  test('okb-shaped data still renders the section (degradation is narrow)', () => {
+    // The guard must key on "this system has no domains", not on anything that
+    // could go true for okb — otherwise the change deletes a working filter.
+    const entities = [
+      { id: 'a', name: 'A', ontologyClass: 'X', domain: 'raas' },
+    ] as unknown as Entity[]
+    render(<DomainFilter entities={entities} />)
+    expect(screen.getByTestId('filter-domain-section')).toBeInTheDocument()
   })
 })

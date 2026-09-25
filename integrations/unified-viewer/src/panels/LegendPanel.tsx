@@ -166,6 +166,13 @@ export interface LegendPanelProps {
    *  matches the canvas. When omitted, deriveLayer falls back to a direct-class
    *  match and swatches fall back to the classColor/shapeFallback palette. */
   ontologyRegistry?: readonly OntologyClass[]
+  /**
+   * Render expanded. The legend used to be the LAST element in the rail and
+   * closed by default, which put the key to the canvas below ~960px of
+   * filters — the one thing a first-time reader needs, hidden behind the
+   * scroll. It sits near the top now and opens by default.
+   */
+  defaultOpen?: boolean
   /** Hide the LAYERS (Evidence/Pattern) section — it's the OKB/km-core
    *  LearningArtifact `defaultLayer` axis, not native to the coding KG. Set true
    *  for the VKB tab (operator 2026-06-19). */
@@ -180,6 +187,7 @@ export function LegendPanel({
   ontologyRegistry,
   hideLayers,
   className,
+  defaultOpen,
 }: LegendPanelProps) {
   // Legend click-to-toggle (operator request 2026-06-19): clicking a DOMAINS
   // (node type) or RELATIONSHIPS (edge type) row hides that type from the
@@ -294,11 +302,20 @@ export function LegendPanel({
     <details
       data-testid="viewer-legend-panel"
       className={'group ' + (className ?? '')}
+      open={defaultOpen}
     >
       <summary className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer select-none">
         Legend
       </summary>
-      <div className="mt-1.5 space-y-3">
+      {/*
+        Bounded, not truncated. Open and unbounded the legend was 596px of an
+        855px rail — on its own enough to put the Advanced sections back below
+        the fold, which is the problem this redesign exists to fix. Capping the
+        BODY (not the panel) keeps the header and the first rows in view and
+        scrolls the rest in place, so the rail itself still fits without
+        scrolling in the default view.
+      */}
+      <div className="mt-1.5 space-y-3 max-h-[33vh] overflow-y-auto pr-1">
         {/* D-08 ordering: DOMAINS → LAYERS → SOURCE → RELATIONSHIPS.
             D-07: skip rendering a Section when its derived array is empty. */}
 
