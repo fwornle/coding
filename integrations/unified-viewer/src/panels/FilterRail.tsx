@@ -61,6 +61,10 @@ import {
 // by those downstream plans — they only overwrite the imported files.
 const TrendingPanel = lazy(() => import('./TrendingPanel'))
 const HierarchyNavigator = lazy(() => import('./coding/HierarchyNavigator'))
+// Lazy like its neighbours: it categorises every rendered row against the whole
+// entity list, and it is collapsed by default, so none of that should run for
+// an operator who never opens it.
+const GraphQualityPanel = lazy(() => import('./GraphQualityPanel'))
 
 export interface FilterRailProps {
   apiClient: ApiClient
@@ -88,6 +92,10 @@ export interface FilterRailProps {
    * Mounted at the BOTTOM of the vertical stack per UI-SPEC §6 row 12. */
   bottomSlot?: ReactNode
   /** Nodes currently rendered — same predicate the canvas and footer use. */
+  /** Ids currently rendered. Passed rather than derived: UnifiedViewer already
+   *  computes this from `useGraphVisibility`, and a second derivation here
+   *  would be exactly the drift that hook exists to prevent. */
+  visibleIds?: ReadonlySet<string>
   visibleCount?: number
   /** Rendered rows with no Project/System above them. See graph/unanchored.ts. */
   unanchoredCount?: number
@@ -108,6 +116,7 @@ export function FilterRail({
   entities,
   relations,
   bottomSlot,
+  visibleIds,
   visibleCount,
   unanchoredCount,
 }: FilterRailProps) {
@@ -364,6 +373,32 @@ export function FilterRail({
             </AccordionContent>
           </AccordionItem>
         )}
+
+        <AccordionItem value="quality">
+          <AccordionTrigger className="text-xs py-2" data-testid="filter-nav-quality">
+            Graph quality
+          </AccordionTrigger>
+          <AccordionContent className="pt-1">
+            <Suspense
+              fallback={
+                <div
+                  data-testid="graph-quality-fallback"
+                  className="text-xs text-muted-foreground px-3 py-2"
+                >
+                  Loading quality…
+                </div>
+              }
+            >
+              <GraphQualityPanel
+                apiClient={apiClient}
+                system={system}
+                entities={entities}
+                relations={relations ?? []}
+                visibleIds={visibleIds ?? new Set<string>()}
+              />
+            </Suspense>
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
 
     </aside>

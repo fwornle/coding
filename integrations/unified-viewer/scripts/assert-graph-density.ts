@@ -32,6 +32,7 @@ import { isEntityVisible, type VisibilityFilters } from '@/graph/visibility-pred
 import { DETAIL_LEVEL_FLAGS } from '@/store/viewer-store'
 import { deriveParents } from '@/graph/hierarchy-parents'
 import { PROVENANCE_RELATION_TYPES } from '@/graph/relation-types'
+import { rootOf, categoriseUnattributed, CATEGORY_LABEL } from '@/graph/attribution'
 
 const OBS_API = process.env.OBS_API ?? 'http://127.0.0.1:12436'
 const BUDGET = Number(process.env.GRAPH_MAX_NODES_PER_PROJECT ?? 40)
@@ -174,36 +175,45 @@ for (const e of forPredicate) {
   nameOf.set(a.id, a.name ?? a.id)
 }
 
-// Returns the Project/System this node hangs under, or null when the walk
-// runs out of parents first. Null is NOT folded into a pseudo-project: doing
-// that reported "1/202 projects over budget", where 201 of those "projects"
-// were single unparented rows. They are counted separately below, because an
-// unrooted node is its own finding — it is on the canvas under no project at
-// all, which is the free-floating-dots problem the audit describes.
-const rootOf = (id: string): string | null => {
-  const seen = new Set<string>()
-  let cur = id
-  while (true) {
-    const cls = classOf.get(cur)
-    if (cls === 'Project' || cls === 'System') return cur
-    const next = parents.get(cur)
-    if (!next || seen.has(next)) return null
-    seen.add(next)
-    cur = next
-  }
-}
+// The Project/System a node hangs under, or null. Null is NOT folded into a
+// pseudo-project: doing that reported "1/202 projects over budget", where 201
+// of those "projects" were single unparented rows. They are counted separately
+// below, because an unrooted node is its own finding — it is on the canvas
+// under no project at all, which is the free-floating-dots problem the audit
+// describes.
+//
+// Imported, not re-implemented (2026-09-25). This file used to carry its own
+// copy of the walk while `countUnanchored` carried a second one and the panel
+// would have made a third. One question, three walks, is how the canvas and
+// the footer came to disagree in five different ways — see the header of
+// useGraphVisibility.ts. The shared module also carries the CATEGORIES, which
+// is what turns this script's bare `unrooted` number into something a person
+// can act on.
+const rootOfNode = (id: string): string | null =>
+  rootOf(id, parents, (nodeId) => classOf.get(nodeId))
 
 const perProject = new Map<string, number>()
 let unrooted = 0
 for (const e of visible) {
   const id = (e as unknown as ApiEntity).id
-  const root = rootOf(id)
+  const root = rootOfNode(id)
   if (root === null) {
     unrooted += 1
     continue
   }
   perProject.set(root, (perProject.get(root) ?? 0) + 1)
 }
+// Categorise the unrooted rows. `visible` is the right candidate set: this
+// script measures what the canvas draws, so it must explain the rows a person
+// would actually see, not every row in the store.
+const attribution = categoriseUnattributed(
+  visible as unknown as Parameters<typeof categoriseUnattributed>[0],
+  forPredicate as unknown as Parameters<typeof categoriseUnattributed>[1],
+  relations.map((r) => ({ from: r.source, to: r.target, type: r.attributes?.type })),
+  parents,
+  (id: string) => classOf.get(id),
+)
+
 const projectRows = [...perProject]
   .map(([id, n]) => ({ id, name: nameOf.get(id) ?? id, nodes: n }))
   .sort((a, b) => b.nodes - a.nodes)
@@ -233,6 +243,10 @@ const report = {
   projectsOverBudget: projectRows.filter((r) => r.nodes > BUDGET).length,
   projectCount: projectRows.length,
   unrootedNodeCount: unrooted,
+  unrootedByCategory: Object.fromEntries(
+    (['recordedParent', 'wrongClass', 'danglingRef', 'unclaimed'] as const)
+      .map((k) => [k, attribution.byCategory[k].length]),
+  ),
   renderedNodeCount: visible.length,
   renderedEdgeCount: visibleRelations.length,
   storeNodeCount: entities.length,
@@ -256,6 +270,20 @@ if (AS_JSON) {
   }
   w(`  ${String(unrooted).padStart(5)}  (no project root)`)
   w('')
+  // WHY those rows have no project, not just how many. The bare count was read
+  // as "rows nobody has placed yet" and for most of them that is wrong — they
+  // are placed, by a field or an edge the tree refuses to use. Same module the
+  // viewer's Graph quality panel renders from, so the two cannot disagree.
+  if (attribution.total > 0) {
+    w('  why they have no project')
+    for (const key of ['recordedParent', 'wrongClass', 'danglingRef', 'unclaimed'] as const) {
+      const n = attribution.byCategory[key].length
+      if (n === 0) continue
+      w(`  ${String(n).padStart(5)}  ${CATEGORY_LABEL[key].title}`)
+      w(`         ${CATEGORY_LABEL[key].cause}`)
+    }
+    w('')
+  }
   w('  by class (all projects)')
   for (const [cls, n] of Object.entries(report.byClass)) w(`  ${String(n).padStart(5)}  ${cls}`)
   w('')
