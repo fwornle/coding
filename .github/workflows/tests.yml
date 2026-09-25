@@ -152,3 +152,40 @@ jobs:
       - name: node:test
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npm run test:node
+
+      # The unified-viewer's ~1000 vitest tests ran NOWHERE until 2026-09-25, and
+      # nothing said so. Three things had to line up: it is a self-contained
+      # package (own package.json, own lock, not a workspace) so root `npm ci`
+      # never installs it; jest's testPathIgnorePatterns excludes `/integrations/`
+      # and its testMatch only takes `**/test/**/*.test.js`, so it collects none of
+      # them; and vitest is a third runner with no entry point in
+      # scripts/run-tests.mjs. A suite nobody runs is indistinguishable from a
+      # suite that passes.
+      #
+      # NOT added to `npm test`. run-tests.mjs would then need this package's
+      # node_modules present, so a contributor who has never touched the viewer
+      # would find the whole root suite broken on a fresh clone. The split here
+      # matches km-core above: the sub-package installs itself, in its own step.
+      #
+      # Its own install step is its own precondition, so this pair guards on
+      # `viewer-setup` rather than `setup` — the viewer needs neither km-core nor
+      # the root dist/, and skipping it because an unrelated build failed would
+      # lose a result that was still meaningful.
+      - name: Install unified-viewer dependencies
+        id: viewer-setup
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          cd integrations/unified-viewer
+          npm ci --no-audit --no-fund
+
+      # tsc is a GATE here, unlike the root `Build dist/` step above which tolerates
+      # pre-existing type debt. This package is clean, and its predicate contract
+      # relies on that: VisibilityFilters fields are deliberately REQUIRED so a
+      # half-deployed call site is a type error rather than a silent divergence.
+      # `npm run build` used to run `tsc --noEmit 2>/dev/null; vite build` — output
+      # discarded, and `;` so a failure could not propagate either — which is how
+      # the hideArchived split shipped with a key nothing read.
+      - name: unified-viewer (tsc + vitest)
+        if: ${{ !cancelled() && steps.viewer-setup.outcome == 'success' }}
+        run: npm run test:viewer
