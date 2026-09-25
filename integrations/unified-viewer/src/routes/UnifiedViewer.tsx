@@ -36,6 +36,7 @@ import { useGraphData, RELATIONS_KEY } from '@/graph/useGraphData'
 import { useVisibleEntityIds } from '@/graph/useVisibleEntityIds'
 import { useQuery } from '@tanstack/react-query'
 import { useGraphVisibility } from '@/graph/useGraphVisibility'
+import { countUnanchored } from '@/graph/unanchored'
 import { deriveParents } from '@/graph/hierarchy-parents'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useViewerStore } from '@/store/viewer-store'
@@ -337,6 +338,18 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
     [entities, isVisible],
   )
 
+  // Rendered rows with no Project/System above them. Computed here, off the
+  // SAME predicate and the SAME hierarchy map the canvas lays out by, so the
+  // rail's number cannot disagree with what is drawn — the drift that made the
+  // footer diverge from the canvas in five ways.
+  const hierarchyParentsMap = useViewerStore((s) => s.hierarchyParents)
+  const hierarchyClassesMap = useViewerStore((s) => s.hierarchyClasses)
+  const unanchoredCount = useMemo(() => {
+    const visibleIds: string[] = []
+    for (const e of entities) if (isVisible(e)) visibleIds.push(e.id)
+    return countUnanchored(visibleIds, hierarchyParentsMap, (id) => hierarchyClassesMap.get(id))
+  }, [entities, isVisible, hierarchyParentsMap, hierarchyClassesMap])
+
   const canvas = (() => {
     if (isLoading) return <InitialLoadingState system={system} />
     if (error) {
@@ -426,7 +439,9 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
             system={system}
             entities={entities}
             relations={relations}
-            bottomSlot={<LegendPanel className="pt-2" entities={legendEntities} relations={relations} ontologyRegistry={ontology} hideLayers={system === 'coding'} />}
+            visibleCount={visibleCount}
+            unanchoredCount={unanchoredCount}
+            bottomSlot={<LegendPanel className="pt-2" entities={legendEntities} relations={relations} ontologyRegistry={ontology} hideLayers={system === 'coding'} defaultOpen />}
           />
           <main
             className="flex-1 bg-background overflow-hidden relative"

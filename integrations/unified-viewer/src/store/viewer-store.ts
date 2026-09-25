@@ -37,6 +37,43 @@ import type { Observation } from '@/api/schemas'
 import { PROVENANCE_RELATION_TYPES } from '@/graph/relation-types'
 
 export type Level = 0 | 1 | 2 | 3
+
+/**
+ * Level-of-detail preset. `'custom'` is derived at read time, never stored.
+ */
+export type DetailLevel = 'full' | 'overview' | 'summary' | 'custom'
+
+/**
+ * The three presets, as the flag triples they expand to. Single source of
+ * truth: `setDetailLevel` writes from here and `deriveDetailLevel` matches
+ * against it, so the control can never disagree with the flags it set.
+ */
+export const DETAIL_LEVEL_FLAGS = {
+  full:     { hideRolledUp: false, collapseSubComponents: false, aggregatesOnly: false },
+  overview: { hideRolledUp: true,  collapseSubComponents: true,  aggregatesOnly: false },
+  summary:  { hideRolledUp: true,  collapseSubComponents: true,  aggregatesOnly: true  },
+} as const
+
+/**
+ * Which preset (if any) a flag triple corresponds to. Returns `'custom'` when
+ * the operator has built a combination no preset produces.
+ */
+export function deriveDetailLevel(f: {
+  hideRolledUp: boolean
+  collapseSubComponents: boolean
+  aggregatesOnly: boolean
+}): DetailLevel {
+  for (const [name, preset] of Object.entries(DETAIL_LEVEL_FLAGS)) {
+    if (
+      preset.hideRolledUp === f.hideRolledUp &&
+      preset.collapseSubComponents === f.collapseSubComponents &&
+      preset.aggregatesOnly === f.aggregatesOnly
+    ) {
+      return name as DetailLevel
+    }
+  }
+  return 'custom'
+}
 export type ThemePref = 'light' | 'dark'
 export type ViewerMode = 'kg' | 'triage'
 
@@ -300,16 +337,59 @@ export interface ViewerState {
   selectedOntologyClasses: string[] // NEW canonical, replaces selectedClasses
   hideDocNodes: boolean
   /**
-   * Hide roll-up-archived rows (`metadata.archivedAt`) — the condensed view.
+   * Hide ROLLED-UP rows — `metadata.archivedAt` AND `metadata.rolledUpInto`.
    *
    * Defaults ON. The roll-up pass folds ~25 granular rows into one
    * subsystem-level parent and archives the children; with this OFF the canvas
    * renders parents AND children, so every roll-up makes the graph LARGER
    * (1748 -> 1775 on the coding corpus) and the aggregation is invisible to
-   * the operator who asked for it. Archived rows are never deleted — untick
-   * the box in Filters -> Graph Toggles to see the full corpus again.
+   * the operator who asked for it. Rows are never deleted.
+   *
+   * SPLIT FROM `hideArchived` (2026-09-25). `archivedAt` has two unrelated
+   * writers and the old single flag hid both under a label naming only one:
+   *   - rolled up (1,261 rows): still true, said better by a parent that IS on
+   *     the canvas. Hiding them loses nothing.
+   *   - stale (9 rows): archived by the ratio=0 sweep, "code claims no longer
+   *     exist". NOTHING stands in for them — see `showStale`.
+   */
+  hideRolledUp: boolean
+  /**
+   * Show rows archived as STALE — `archivedAt` with no `rolledUpInto`.
+   *
+   * Defaults OFF: these were measured wrong (verificationRatio 0 for 30+ days,
+   * `ObservationConsolidator.js:4506`), so they stay out of the default view at
+   * every detail level. Off is not "unreachable" — the Advanced > Content row
+   * brings them back in one click, which is the difference between a filter and
+   * a deletion.
+   */
+  showStale: boolean
+  /**
+   * @deprecated Alias kept for one release so an external caller flipping the
+   * old flag does not silently do nothing. Reads/writes `hideRolledUp`. The
+   * predicate does NOT read this — see `graph/visibility-predicate.ts`.
    */
   hideArchived: boolean
+  /**
+   * Level-of-detail preset. Writes `hideRolledUp` / `collapseSubComponents` /
+   * `aggregatesOnly` together, because those three answer one question — "how
+   * much detail?" — that the UI used to ask as four unrelated checkboxes with
+   * two opposite polarities.
+   *
+   * Measured on the 2026-09-24 corpus (worst project = Coding):
+   *   full     198 nodes   — every row, nothing folded
+   *   overview  25 nodes   — rolled-up hidden + sub-components collapsed
+   *   summary   10 nodes   — roll-up parents + architecture backbone only
+   *
+   * `'custom'` is DERIVED, never stored: it is what the control reports when an
+   * operator sets the underlying flags to a combination no preset produces. The
+   * alternative — snapping them back to a preset — would make the Advanced
+   * switches lie about what is on.
+   *
+   * There is deliberately NO `detailLevel` field. Storing it would create a
+   * second source of truth that goes stale the moment someone toggles one of
+   * the three flags in Advanced: the stored value would still say "overview"
+   * while the flags rendered a summary. Read it with `deriveDetailLevel`.
+   */
   /**
    * Aggregates-only view — render only roll-up parents + the architecture
    * backbone. The condensed corpus still carries every row the roll-up never
@@ -382,7 +462,14 @@ export interface ViewerState {
   toggleOntologyClass: (cls: string) => void
   setSelectedOntologyClasses: (classes: string[]) => void
   toggleHideDocNodes: () => void
+  /** @deprecated use `toggleHideRolledUp`. */
   toggleHideArchived: () => void
+  toggleHideRolledUp: () => void
+  toggleShowStale: () => void
+  /** Apply a preset. Writes the three flags in ONE set() so the predicate
+   *  rebuilds once — three separate writes would restart the force simulation
+   *  three times and jump the viewport. */
+  setDetailLevel: (level: Exclude<DetailLevel, 'custom'>) => void
   toggleAggregatesOnly: () => void
   toggleCollapseSubComponents: () => void
   toggleComponentExpanded: (id: string) => void
@@ -1007,7 +1094,12 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   hideDocNodes: false,
   // ON by default — see the field doc above. A roll-up that leaves both parent
   // and children on the canvas reads as "nothing happened".
+  hideRolledUp: true,
+  // Deprecated alias, seeded to match so a reader of the old field is not lied
+  // to on first render.
   hideArchived: true,
+  // OFF by default — measured-wrong rows stay out of every detail level.
+  showStale: false,
   // OFF by default: an operator who has not run a roll-up would otherwise get
   // an almost-empty canvas with no explanation.
   aggregatesOnly: false,
@@ -1144,7 +1236,15 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   setHiddenNodeTypes: (types) => set({ hiddenNodeTypes: new Set(types) }),
 
   toggleHideDocNodes: () => set((s) => ({ hideDocNodes: !s.hideDocNodes })),
-  toggleHideArchived: () => set((s) => ({ hideArchived: !s.hideArchived })),
+  // Deprecated alias — keeps BOTH fields in step so a caller on the old name
+  // still moves the flag the predicate actually reads.
+  toggleHideArchived: () =>
+    set((s) => ({ hideRolledUp: !s.hideRolledUp, hideArchived: !s.hideRolledUp })),
+  toggleHideRolledUp: () =>
+    set((s) => ({ hideRolledUp: !s.hideRolledUp, hideArchived: !s.hideRolledUp })),
+  toggleShowStale: () => set((s) => ({ showStale: !s.showStale })),
+  setDetailLevel: (level) =>
+    set(() => ({ ...DETAIL_LEVEL_FLAGS[level], hideArchived: DETAIL_LEVEL_FLAGS[level].hideRolledUp })),
   toggleAggregatesOnly: () => set((s) => ({ aggregatesOnly: !s.aggregatesOnly })),
   toggleCollapseSubComponents: () =>
     set((s) => ({ collapseSubComponents: !s.collapseSubComponents })),

@@ -81,6 +81,20 @@ function renderRail(
   )
 }
 
+/**
+ * Open an Advanced / Navigators section.
+ *
+ * 2026-09-25: the rail no longer stacks every filter flat. Search, Detail level
+ * and the Legend are above the fold; everything else is inside a collapsed
+ * accordion, so reaching a control now costs one click. These tests assert
+ * REACHABILITY, not flat presence — the distinction the redesign introduces.
+ */
+function openSection(testId: string) {
+  fireEvent.click(screen.getByTestId(testId))
+}
+
+const openScope = () => openSection('filter-advanced-scope')
+
 describe('FilterRail', () => {
   beforeEach(() => {
     useViewerStore.setState({
@@ -116,6 +130,7 @@ describe('FilterRail', () => {
 
   test('Test 3 (BC): unchecking L2 calls toggleLevel(2)', () => {
     renderRail(makeApiClient())
+    openScope()
     expect(useViewerStore.getState().visibleLevels.has(2)).toBe(true)
     const wrapper = screen.getByTestId('filter-level-2')
     const cb = wrapper.querySelector('button[role="checkbox"]') as HTMLElement
@@ -173,13 +188,26 @@ describe('FilterRail', () => {
 
   test('LayerFilter (Evidence + Pattern) is visible in the okb tab', () => {
     renderRail(makeApiClient(), undefined, undefined, 'okb')
+    openScope()
     expect(screen.getByText('Evidence')).toBeInTheDocument()
     expect(screen.getByText('Pattern')).toBeInTheDocument()
   })
 
-  test('Phase 55-08: mounts DomainFilter (group header Domain visible)', () => {
+  test('mounts DomainFilter in Scope — visible on okb, absent on coding', () => {
+    // 2026-09-25: DomainFilter renders NOTHING when no entity carries .domain.
+    // On coding that is always, so the rail no longer shows a section whose
+    // only content was "Domain filter not applicable for this system".
     renderRail(makeApiClient())
-    expect(screen.getByText('Domain')).toBeInTheDocument()
+    openScope()
+    expect(screen.queryByTestId('filter-domain-section')).toBeNull()
+    cleanup()
+
+    const okbEntities = [
+      { id: 'a', name: 'A', ontologyClass: 'X', domain: 'raas' },
+    ] as unknown as Entity[]
+    renderRail(makeApiClient(), vi.fn(), [], 'okb', okbEntities)
+    openScope()
+    expect(screen.getByTestId('filter-domain-section')).toBeInTheDocument()
   })
 
   test('Phase 55-08: mounts OntologyFilter (group header Ontology Class visible)', async () => {
@@ -187,13 +215,20 @@ describe('FilterRail', () => {
     // Class" group header only renders after the fetch resolves and the
     // available-class intersection is non-empty. Wait for the fetch.
     renderRail(makeApiClient())
+    openScope()
     expect(await screen.findByText('Ontology Class')).toBeInTheDocument()
   })
 
-  test('Phase 55-08: mounts GraphToggles (functional toggles visible; dead no-ops removed)', () => {
+  test('mounts the toggles under Advanced > Content / Structure (dead no-ops still removed)', () => {
     renderRail(makeApiClient())
+    openSection('filter-advanced-content')
     expect(screen.getByLabelText('Hide Documentation')).toBeInTheDocument()
     expect(screen.getByLabelText('Show debug entity types')).toBeInTheDocument()
+    // The split: stale is its own switch, not folded into the roll-up one.
+    expect(screen.getByLabelText('Show stale (code gone)')).toBeInTheDocument()
+    openSection('filter-advanced-structure')
+    expect(screen.getByLabelText('Hide rolled-up rows')).toBeInTheDocument()
+    expect(screen.getByLabelText('Aggregates only (roll-up parents)')).toBeInTheDocument()
     expect(screen.queryByLabelText('Show All Relations')).toBeNull()
     expect(screen.queryByLabelText('Show Clusters')).toBeNull()
     expect(screen.queryByLabelText('Merged Only')).toBeNull()
@@ -216,6 +251,7 @@ describe('FilterRail', () => {
     // listOntologyClasses is called on the coding tab (API-driven path).
     const apiClient = makeApiClient()
     renderRail(apiClient, vi.fn(), [], 'coding', entities)
+    openScope()
     await waitFor(() => {
       expect(apiClient.listOntologyClasses).toHaveBeenCalled()
     })
@@ -230,12 +266,14 @@ describe('FilterRail', () => {
       { id: 'b', name: 'B', ontologyClass: 'RPU' } as Entity,
     ]
     renderRail(makeApiClient(), vi.fn(), [], 'okb', entities)
+    openScope()
     expect(screen.getByText('Upper Ontology')).toBeInTheDocument()
     expect(screen.getByText('Lower Ontology')).toBeInTheDocument()
   })
 
   test('Phase 55-08: TrendingPanel lazy mount is present (real component or fallback)', async () => {
     renderRail(makeApiClient())
+    openSection('filter-nav-trending')
     // 55-10 shipped the real TrendingPanel component (overwriting the
     // 55-08 placeholder). The Suspense fallback may render briefly; once
     // the lazy chunk resolves, the real `trending-panel` testid appears.
@@ -250,6 +288,7 @@ describe('FilterRail', () => {
 
   test('Phase 55-08: HierarchyNavigator lazy mount is PRESENT on coding', async () => {
     renderRail(makeApiClient(), vi.fn(), [], 'coding')
+    openSection('filter-nav-hierarchy')
     await waitFor(() => {
       // 55-11 overwrote the 55-08 placeholder with the real HierarchyNavigator
       // (testid="hierarchy-navigator"). The fallback can also win briefly under
