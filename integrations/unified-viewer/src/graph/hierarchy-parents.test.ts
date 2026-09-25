@@ -6,7 +6,7 @@
 
 import { describe, test, expect } from 'vitest'
 import type { Entity, Relation } from '@/api/ApiClient'
-import { deriveParents, HIERARCHY_CLASSES, HIERARCHY_LEVEL } from './hierarchy-parents'
+import { deriveParents, HIERARCHY_CLASSES, HIERARCHY_LEVEL, explicitPlacementEdges } from './hierarchy-parents'
 
 const ent = (id: string, ontologyClass: string, name = id): Entity =>
   ({ id, name, ontologyClass }) as Entity
@@ -163,5 +163,36 @@ describe('deriveParents', () => {
     expect(parents.get('kgbench')).toBe('sys')
     expect(parents.get('km')).toBe('coding')
     expect(parents.get('detail')).toBe('km')
+  })
+})
+
+describe('explicitPlacementEdges', () => {
+  const node = (id: string, metadata: Record<string, unknown> = {}) =>
+    ({ id, name: id, ontologyClass: 'Detail', metadata }) as Parameters<typeof explicitPlacementEdges>[0][number]
+
+  test('turns metadata.parentId into a contains edge the canvas can draw', () => {
+    // The whole point: `deriveParents` already honours this field, so the row
+    // counts as attributed while having no edge — attributed and invisible.
+    const edges = explicitPlacementEdges([node('parent'), node('child', { parentId: 'parent' })])
+    expect(edges).toEqual([{ from: 'parent', to: 'child', type: 'contains' }])
+  })
+
+  test('drops a placement naming a row that is not present', () => {
+    // Nothing to draw to. Emitting it would put an edge to a node the canvas
+    // never renders, which `buildRehomeEdges` would then treat as a hidden
+    // ancestor and walk through forever.
+    expect(explicitPlacementEdges([node('child', { parentId: 'ghost' })])).toEqual([])
+  })
+
+  test('drops a self-placement', () => {
+    expect(explicitPlacementEdges([node('a', { parentId: 'a' })])).toEqual([])
+  })
+
+  test('ignores rows with no placement, and a non-string one', () => {
+    expect(explicitPlacementEdges([
+      node('a'),
+      node('b', { parentId: '' }),
+      node('c', { parentId: 42 }),
+    ])).toEqual([])
   })
 })
