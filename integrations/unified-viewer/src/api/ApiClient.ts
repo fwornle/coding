@@ -222,9 +222,29 @@ export class ApiClient {
    */
   async updateEntityMetadata(
     id: string,
-    metadata: Record<string, unknown>,
+    patch: Record<string, unknown>,
   ): Promise<void> {
     const safeId = encodeURIComponent(id)
+    // READ-MODIFY-WRITE, and it is not optional.
+    //
+    // `mergeAttributes` merges TOP-LEVEL attributes, so `{metadata: {...}}`
+    // replaces the whole metadata object rather than merging into it. Sending
+    // just the field to change therefore DELETES every other key. Measured,
+    // the hard way: one PUT of `{metadata:{parentId}}` took an entity from 15
+    // metadata keys to 1, destroying `provenance`, `ontology`,
+    // `parentEntityName` and the rest. (Restored from a snapshot; the entity
+    // is intact. The lesson stays.)
+    //
+    // So read the current metadata and send the union. A GET-then-PUT is racy
+    // in principle, but the alternative is a write that is destructive by
+    // construction, and nothing else in this deployment writes entities.
+    const current = await this.get<{ metadata?: Record<string, unknown> } | null>(
+      this.apiPath(`/api/v1/entities/${safeId}`),
+    )
+    if (current === null) {
+      throw new EntityUpdateError(`No entity ${id} — nothing was written.`, false)
+    }
+    const metadata = { ...(current.metadata ?? {}), ...patch }
     const url = `${this.baseUrl}${this.apiPath(`/api/v1/entities/${safeId}`)}`
     const res = await fetch(url, {
       method: 'PUT',
@@ -248,6 +268,20 @@ export class ApiClient {
     // a caller must not read as success.
     if (body.data === null) {
       throw new EntityUpdateError(`No entity ${id} — nothing was written.`, false)
+    }
+    // VERIFY, because a 200 here does not mean the field landed. The handler
+    // answers `{success:true,data:null}` for an id it does not hold rather
+    // than 404, and a merge that silently dropped the patch would look
+    // identical to one that applied it. A write nobody checked is how this
+    // feature reported placing 11 rows while placing none.
+    const written = (body.data as { metadata?: Record<string, unknown> } | undefined)?.metadata ?? {}
+    for (const [key, value] of Object.entries(patch)) {
+      if (written[key] !== value) {
+        throw new EntityUpdateError(
+          `${id}: server accepted the write but ${key} did not change.`,
+          false,
+        )
+      }
     }
   }
 
