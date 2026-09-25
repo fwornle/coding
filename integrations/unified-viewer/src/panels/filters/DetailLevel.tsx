@@ -8,7 +8,7 @@
 // produced which view, so in practice nobody moved them.
 //
 // Measured on the 2026-09-24 corpus, worst project (Coding), using the same
-// seeding as scripts/assert-aggregated-node-budget.ts:
+// seeding as scripts/assert-graph-density.ts:
 //
 //   full      198 nodes   every row, nothing folded
 //   overview   25 nodes   rolled-up hidden + sub-components collapsed
