@@ -1,7 +1,7 @@
 // How many rendered rows hang under no Project/System.
 //
 // This is the half of the aggregated-node budget that fails silently. The gate
-// in scripts/assert-aggregated-node-budget.ts is
+// in scripts/assert-graph-density.ts is
 // `worst.nodes > BUDGET || unrooted > 0`, and its header records a run that
 // reported "PASS, Coding at 11" while 43 rows rendered under no project at all.
 // A count that only a CI script computes is a count nobody looks at, so the

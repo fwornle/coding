@@ -1,4 +1,13 @@
-// Aggregated-view node budget — verdict row 10 of the KB audit.
+// Graph density check — verdict row 10 of the KB audit.
+//
+// NOT A BUDGET IN THE COST SENSE. This repo has real budgets — tokens and
+// money, under Token Usage -> Cost — and this file used to be called
+// `assert-aggregated-node-budget.ts`, which put it in the same vocabulary as
+// them while measuring something entirely different. The unit here is NODES ON
+// SCREEN: how many rows one project's aggregated view draws. Nothing about it
+// touches tokens, money or time. Renamed 2026-09-25 for exactly that reason;
+// the env knobs went with it (`GRAPH_MAX_NODES_PER_PROJECT`,
+// `GRAPH_DETAIL_LEVEL`).
 //
 // The target is "<= 40 nodes in a project's aggregated view". It has been
 // failing at roughly 210, and the only thing that ever established that was
@@ -15,7 +24,7 @@
 // imports the real predicate and feeds it the store's seeded defaults, so it
 // can only disagree with the canvas if the canvas itself changed.
 //
-// Run:  npx vite-node scripts/assert-aggregated-node-budget.ts
+// Run:  npx vite-node scripts/assert-graph-density.ts
 //       OBS_API=http://127.0.0.1:12436 npx vite-node scripts/... --json
 // Exits 1 when over budget, so CI and the health check can gate on it.
 
@@ -25,11 +34,11 @@ import { deriveParents } from '@/graph/hierarchy-parents'
 import { PROVENANCE_RELATION_TYPES } from '@/graph/relation-types'
 
 const OBS_API = process.env.OBS_API ?? 'http://127.0.0.1:12436'
-const BUDGET = Number(process.env.AGGREGATED_NODE_BUDGET ?? 40)
+const BUDGET = Number(process.env.GRAPH_MAX_NODES_PER_PROJECT ?? 40)
 // Which detail level to measure. The rail offers three and they have different
 // targets (overview <=40, summary <=10), so the gate has to be able to ask
 // about each rather than only the default.
-const LEVEL = (process.env.AGGREGATED_NODE_LEVEL ?? 'overview') as keyof typeof DETAIL_LEVEL_FLAGS
+const LEVEL = (process.env.GRAPH_DETAIL_LEVEL ?? 'overview') as keyof typeof DETAIL_LEVEL_FLAGS
 const AS_JSON = process.argv.includes('--json')
 
 interface ApiEntity {
@@ -103,7 +112,7 @@ const DEFAULT_FILTERS: VisibilityFilters = {
   // budget. `npm run build` runs `tsc --noEmit 2>/dev/null`, so the type error
   // that would have caught it was swallowed.
   ...DETAIL_LEVEL_FLAGS[
-    (process.env.AGGREGATED_NODE_LEVEL as keyof typeof DETAIL_LEVEL_FLAGS) ?? 'overview'
+    (process.env.GRAPH_DETAIL_LEVEL as keyof typeof DETAIL_LEVEL_FLAGS) ?? 'overview'
   ],
   // Stale rows are out of the default view at every level.
   showStale: false,
@@ -235,11 +244,11 @@ if (AS_JSON) {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
 } else {
   const w = (m: string) => process.stdout.write(`${m}\n`)
-  w('\n=== aggregated-view node budget ===')
+  w('\n=== graph density check ===')
   w(`obs-api  : ${OBS_API}`)
   w(`in store : ${report.storeNodeCount} entities`)
   w(`rendered : ${report.renderedNodeCount} nodes, ${report.renderedEdgeCount} edges (all projects)`)
-  w(`budget   : ${BUDGET} per project`)
+  w(`limit    : ${BUDGET} nodes per project`)
   w('')
   w('  nodes  project')
   for (const r of report.perProject) {
