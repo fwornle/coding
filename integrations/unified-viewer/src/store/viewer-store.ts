@@ -513,6 +513,38 @@ export interface ViewerState {
    * `aria-pressed` for a file focus, which is correct. Entity ids are UUIDs, so
    * the prefix can never collide with one. See graph/intent-code-reach.ts.
    */
+  /**
+   * WHICH TREE IS ON SCREEN — the rail's Code|Intent switch, lifted into the
+   * store because the CANVAS needs it too.
+   *
+   * The coding KG carries two trees. `code` (System → Project → Component →
+   * SubComponent → Detail) answers "where does this live" and is derived from
+   * `contains`/`parent-child`/`includes`. `intent` (Intent → Insight) answers
+   * "why is it like this" and is derived from `aggregates` alone. They are
+   * separate trees joined at the Insight and nowhere else — see
+   * graph/intent-spine.ts, which says so and keeps one edge type per tree
+   * precisely so either can be reverted whole.
+   *
+   * WHY THE CANVAS READS IT (2026-09-25). It used to be `useState` local to
+   * HierarchyNavigator, so the rail switched trees and the canvas did not —
+   * it rendered BOTH populations at once, in either mode, with `aggregates`
+   * as just another edge type. That is the conflation the spine exists to
+   * remove, and at Overview it was visible as confetti: the detail level
+   * collapses the Insight layer, which IS the joint between the two trees, so
+   * all 19 Intents kept rendering with every child hidden and 12 of them had
+   * no drawn edge left at all. They could not be re-homed either —
+   * `buildRehomeEdges` walks UP over containment edges, and an Intent's only
+   * edges are `aggregates` pointing DOWN, with zero inbound of any type
+   * (derive-intent-spine.mjs deliberately never writes `metadata.parentId`).
+   *
+   * So the switch now governs the canvas as well: in `code` the predicate
+   * hides `Intent` rows, in `intent` it shows them. Nothing is removed — the
+   * other tree is one click away, which is what a switch means.
+   *
+   * NOT a filter, and deliberately not expressed as one: it does not narrow a
+   * population, it chooses which of two derivations is being looked at.
+   */
+  hierarchySpine: 'code' | 'intent'
   hierarchySubtreeFilter: string | null
   /** Name of that row, so the chip above the canvas can say what is focused
    *  without the chip having to re-derive either tree. */
@@ -553,6 +585,10 @@ export interface ViewerState {
     label?: string | null,
   ) => void
   clearHierarchySubtreeFilter: () => void
+  /** Switch trees. Clearing the subtree focus is the CALLER's job (the rail
+   *  does it) — a resolved id set survives the switch intact and would leave
+   *  the chip above the canvas naming a row no longer in the rail. */
+  setHierarchySpine: (spine: 'code' | 'intent') => void
   setLslSessionFilter: (ids: string[]) => void
   addLslSessionFilter: (id: string) => void
   clearLslSessionFilter: () => void
@@ -1302,6 +1338,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   setEtmSheetOpen: (open) => set({ etmSheetOpen: open }),
 
   // ---------- Phase 55 — coding-only hierarchy / LSL ----------
+  hierarchySpine: 'code',
   hierarchySubtreeFilter: null,
   hierarchySubtreeLabel: null,
   hierarchySubtreeIds: null,
@@ -1333,6 +1370,14 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       hierarchySubtreeLabel: null,
       hierarchySubtreeIds: null,
     }),
+
+  // No-op on an unchanged value. `hierarchySpine` is in the
+  // `useGraphVisibility` dep list, so writing the same value would rebuild the
+  // predicate, invalidate D3GraphCanvas's `visibleEntities` memo and restart
+  // the force simulation — the viewport jump of PATTERNS Locked Contract #3.
+  // Same reason `setHierarchySubtreeFilter` guards on set membership.
+  setHierarchySpine: (spine) =>
+    set((s) => (s.hierarchySpine === spine ? {} : { hierarchySpine: spine })),
   setLslSessionFilter: (ids) => set({ lslSessionFilter: ids.slice() }),
 
   // Cmd/Ctrl+click multi-select pattern: idempotent add (no duplicate

@@ -428,7 +428,12 @@ export default function HierarchyNavigator({
     }
   }
 
-  const [spine, setSpine] = useState<Spine>('code')
+  // In the STORE, not `useState` here (2026-09-25). The canvas renders by the
+  // same switch now — while this was local the rail changed trees and the
+  // canvas did not, drawing both node populations at once in either mode. See
+  // `hierarchySpine` in viewer-store.ts for what that looked like.
+  const spine = useViewerStore((s) => s.hierarchySpine) as Spine
+  const setSpine = useViewerStore((s) => s.setHierarchySpine)
 
   // Switching trees drops the focus. The filter is a resolved id set, so it
   // would survive the switch intact — and then the chip above the canvas would

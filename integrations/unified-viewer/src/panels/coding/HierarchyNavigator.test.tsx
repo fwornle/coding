@@ -99,6 +99,11 @@ beforeEach(() => {
     hierarchySubtreeFilter: null,
     hierarchySubtreeLabel: null,
     hierarchySubtreeIds: null,
+    // Store-backed since 2026-09-25 (the canvas reads it too), so it LEAKS
+    // between tests without this line. Several tests below click `spine-intent`
+    // and then assert on the switch; left at 'intent' by a predecessor, the
+    // click is a no-op and the assertion passes for the wrong reason.
+    hierarchySpine: 'code',
     hierarchyParents: new Map<string, string>(),
     ...({ entities: makeEntities(), relations: makeRelations() } as Record<string, unknown>),
   } as unknown as Parameters<typeof useViewerStore.setState>[0])

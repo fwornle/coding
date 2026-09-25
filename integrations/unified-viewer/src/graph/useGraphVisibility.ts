@@ -64,6 +64,12 @@ export function useGraphVisibility(): VisibilityPredicate {
   // Default OFF (architecture-bleed shield).
   const showDebugEntityTypes = useViewerStore((s) => s.showDebugEntityTypes)
   const hiddenNodeTypes = useViewerStore((s) => s.hiddenNodeTypes)
+  // Which of the two trees is on screen. A SWITCH, not a filter — it chooses
+  // which derivation is being looked at, so it gates the `Intent` class rather
+  // than narrowing a population. Lives in the store because the rail sets it
+  // and the canvas reads it; while it was `useState` inside HierarchyNavigator
+  // the canvas rendered both trees at once in either mode.
+  const hierarchySpine = useViewerStore((s) => s.hierarchySpine)
   // Aggregates-only: roll-up parents + architecture backbone. See the
   // VisibilityFilters doc for why no existing filter could express this.
   const aggregatesOnly = useViewerStore((s) => s.aggregatesOnly)
@@ -102,6 +108,7 @@ export function useGraphVisibility(): VisibilityPredicate {
       expandedComponentIds,
       hierarchyParents,
       hierarchyClassOf,
+      hierarchySpine,
     }
     return (e: Entity) => isEntityVisible(e, filters)
   }, [
@@ -122,6 +129,7 @@ export function useGraphVisibility(): VisibilityPredicate {
     collapseSubComponents,
     expandedComponentIds,
     hierarchyParents,
+    hierarchySpine,
     // Both: `hierarchyClassOf` is what the predicate takes, `hierarchyClasses`
     // is what it is memoised on. The source-grep gate in the test file checks
     // every `useViewerStore` read appears here by name, and it cannot see
