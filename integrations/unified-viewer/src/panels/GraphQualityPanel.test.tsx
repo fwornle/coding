@@ -167,3 +167,41 @@ describe('GraphQualityPanel', () => {
     expect(screen.getByTestId('graph-quality-attribution-clean')).toBeTruthy()
   })
 })
+
+describe('GraphQualityPanel — a write that cannot proceed must say so', () => {
+  test('a finding with no suggested parent throws rather than silently skipping', async () => {
+    // It used to `continue`. The mutation then issued no request, returned 0
+    // and reported success, leaving the button on "Placing…" with nothing
+    // anywhere explaining why. In a write path, a silent skip looks exactly
+    // like a write that worked.
+    const update = vi.fn()
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    // Same name on TWO rooted entities — the categoriser refuses to guess, so
+    // the row lands in `unclaimed`, not `recordedParent`. Build the ambiguity
+    // directly instead, by giving the row a name that resolves to nothing.
+    const entities: AttributionEntity[] = [
+      { id: 'proj', name: 'Coding', ontologyClass: 'Project', metadata: {} },
+      { id: 'x', name: 'Stray', ontologyClass: 'Detail', metadata: { parentEntityName: 'Ghost' } },
+    ]
+    useViewerStore.setState({
+      hierarchyParents: new Map(),
+      hierarchyClasses: new Map([['proj', 'Project'], ['x', 'Detail']]),
+    } as unknown as Parameters<typeof useViewerStore.setState>[0])
+    render(
+      <QueryClientProvider client={qc}>
+        <GraphQualityPanel
+          apiClient={makeClient({ updateEntityMetadata: update } as Partial<ApiClient>)}
+          system="coding"
+          entities={entities}
+          relations={[]}
+          visibleIds={new Set(['x'])}
+        />
+      </QueryClientProvider>,
+    )
+    // 'Ghost' names nothing, so this is NOT offered as a one-click fix — the
+    // action must be absent entirely rather than present and inert.
+    expect(screen.queryByTestId('graph-quality-category-recordedParent')).toBeNull()
+    expect(screen.getByTestId('graph-quality-category-unclaimed')).toBeTruthy()
+    expect(update).not.toHaveBeenCalled()
+  })
+})

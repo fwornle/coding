@@ -225,3 +225,77 @@ describe('ApiClient', () => {
     expect(new ApiClient('http://localhost:8090', 'legacy').supportsServerNeighbors()).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// updateEntityMetadata — the two bugs that shipped, and what stops them
+// ---------------------------------------------------------------------------
+//
+// 1. DESTRUCTIVE PAYLOAD. `mergeAttributes` merges top-level attributes, so
+//    `{metadata:{parentId}}` REPLACES the metadata object. Sending only the
+//    changed field deleted 14 of 15 keys on a live entity — provenance,
+//    ontology, parentEntityName, all of it.
+// 2. SILENT SUCCESS. The handler answers 200 for an id it does not hold, and a
+//    merge that dropped the patch looked exactly like one that applied it. The
+//    UI reported placing 11 rows while placing none.
+describe('ApiClient.updateEntityMetadata', () => {
+  const ENTITY = {
+    id: 'e1',
+    metadata: { parentEntityName: 'Comp', provenance: { confirmationCount: 2 }, team: 'coding' },
+  }
+
+  function mockFetch(putResponder: (body: Record<string, unknown>) => unknown) {
+    return vi.fn(async (url: string, init?: RequestInit) => {
+      if (!init || init.method !== 'PUT') {
+        return { ok: true, status: 200, json: async () => ({ success: true, data: ENTITY }) }
+      }
+      const sent = JSON.parse(String(init.body)) as Record<string, unknown>
+      return { ok: true, status: 200, json: async () => putResponder(sent) }
+    })
+  }
+
+  test('PRESERVES existing metadata — sends the union, not just the patch', async () => {
+    let sentMetadata: Record<string, unknown> = {}
+    const f = mockFetch((sent) => {
+      sentMetadata = (sent.metadata ?? {}) as Record<string, unknown>
+      return { success: true, data: { id: 'e1', metadata: sentMetadata } }
+    })
+    vi.stubGlobal('fetch', f)
+    const client = new ApiClient('http://test.local')
+    await client.updateEntityMetadata('e1', { parentId: 'p1' })
+    // The whole point: the keys that were there are still there.
+    expect(sentMetadata.parentId).toBe('p1')
+    expect(sentMetadata.parentEntityName).toBe('Comp')
+    expect(sentMetadata.team).toBe('coding')
+    expect(sentMetadata.provenance).toEqual({ confirmationCount: 2 })
+    vi.unstubAllGlobals()
+  })
+
+  test('THROWS when the server accepts the write but the field did not change', async () => {
+    // A 200 that changed nothing is the one outcome a caller must not read as
+    // success — it is what let the panel claim 11 placements and make none.
+    vi.stubGlobal('fetch', mockFetch(() => ({ success: true, data: { id: 'e1', metadata: {} } })))
+    const client = new ApiClient('http://test.local')
+    await expect(client.updateEntityMetadata('e1', { parentId: 'p1' })).rejects.toThrow(/did not change/)
+    vi.unstubAllGlobals()
+  })
+
+  test('THROWS when the id does not exist (handler answers 200 + data:null)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true, status: 200, json: async () => ({ success: true, data: null }),
+    })))
+    const client = new ApiClient('http://test.local')
+    await expect(client.updateEntityMetadata('nope', { parentId: 'p1' })).rejects.toThrow(/nothing was written/)
+    vi.unstubAllGlobals()
+  })
+
+  test('marks a 503 transient so the caller can say "still starting up"', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? { ok: false, status: 503, json: async () => ({}) }
+        : { ok: true, status: 200, json: async () => ({ success: true, data: ENTITY }) }))
+    const client = new ApiClient('http://test.local')
+    await expect(client.updateEntityMetadata('e1', { parentId: 'p1' }))
+      .rejects.toMatchObject({ transient: true })
+    vi.unstubAllGlobals()
+  })
+})

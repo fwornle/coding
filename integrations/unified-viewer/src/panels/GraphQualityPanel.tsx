@@ -32,6 +32,9 @@ import {
 import { Logger } from '@/lib/logging'
 import { useViewerStore } from '@/store/viewer-store'
 import { useViewerStats } from './useViewerStats'
+// The key the entity list is cached under — imported, not retyped, so a
+// rename cannot silently turn this invalidation into a no-op.
+import { ENTITIES_KEY } from '@/graph/useGraphData'
 
 export interface GraphQualityPanelProps {
   apiClient: ApiClient
@@ -103,7 +106,14 @@ export default function GraphQualityPanel({
       // message can name the row that broke.
       let applied = 0
       for (const f of findings) {
-        if (!f.suggestedParentId) continue
+        // THROW, do not skip. This used to `continue`, so a finding that had
+        // lost its suggestion produced a mutation that issued no request,
+        // returned 0 and reported success — the button sat on "Placing…" and
+        // nothing anywhere said why. A silent skip in a write path is
+        // indistinguishable from a write that worked.
+        if (!f.suggestedParentId) {
+          throw new Error(`${f.name}: no recorded parent to place it under — nothing was written.`)
+        }
         await apiClient.updateEntityMetadata(f.id, { parentId: f.suggestedParentId })
         applied += 1
       }
@@ -116,7 +126,12 @@ export default function GraphQualityPanel({
       // the whole entity list in UnifiedViewer, so a local edit would have to
       // reproduce that derivation to stay honest — and if it got it wrong the
       // panel would report a fix that had not happened.
-      void queryClient.invalidateQueries()
+      //
+      // SCOPED to the entity list. A bare `invalidateQueries()` invalidates
+      // every query in the app — including the 17MB entity payload AND the
+      // stats query this panel itself renders from — so one click triggered a
+      // refetch storm while the panel was still mounted mid-mutation.
+      void queryClient.invalidateQueries({ queryKey: [ENTITIES_KEY] })
     },
     onError: (e: unknown) => {
       const transient = e instanceof EntityUpdateError && e.transient
