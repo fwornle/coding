@@ -29,6 +29,14 @@ if pid == 0:
     os.environ['TERM'] = 'xterm-256color'
     os.execvp('tmux', ['tmux', '-L', SOCK, 'attach-session', '-t', 't'])
 
+def _absorb(data):
+    for m in re.finditer(rb'\x1b\[\?(1002|1003)([hl])', data):
+        on = m.group(2) == b'h'
+        state['tracking'] = on
+        if not on:
+            state['listener'] = False   # the gesture's motion listener is gone
+
+
 def drain(t=0.3):
     end = time.time() + t
     while time.time() < end:
@@ -39,13 +47,41 @@ def drain(t=0.3):
             data = os.read(fd, 65536)
         except OSError:
             return
-        for m in re.finditer(rb'\x1b\[\?(1002|1003)([hl])', data):
-            on = m.group(2) == b'h'
-            state['tracking'] = on
-            if not on:
-                state['listener'] = False   # the gesture's motion listener is gone
+        _absorb(data)
 
-drain(1.5)
+
+def settle(floor=0.15, quiet=0.2, cap=3.0):
+    """Drain until tmux has been silent for `quiet` seconds.
+
+    A fixed sleep between gesture steps is a guess about machine speed, and the
+    guess (0.25s) was wrong under load: running inside the full suite the `up`
+    could be handled before the motion event just before it, moving the
+    selection end one cell and copying "…dddd e" instead of "…dddd ". Waiting
+    for the pty to go QUIET ties the pacing to what tmux has actually finished
+    drawing rather than to how fast the machine happens to be.
+
+    `floor` still applies, because tmux is briefly silent before it starts
+    responding at all, and `cap` bounds the wait so a wedged server fails the
+    test rather than hanging it.
+    """
+    drain(floor)
+    end = time.time() + cap
+    last = time.time()
+    while time.time() < end:
+        r, _, _ = select.select([fd], [], [], 0.05)
+        if r:
+            try:
+                data = os.read(fd, 65536)
+            except OSError:
+                return
+            if data:
+                last = time.time()
+                _absorb(data)
+                continue
+        if time.time() - last >= quiet:
+            return
+
+settle(floor=1.0, quiet=0.3, cap=6.0)
 for step in STEPS.split(','):
     kind, col, row = step.split(':')
     col, row = int(col), int(row)
@@ -60,8 +96,8 @@ for step in STEPS.split(','):
     elif kind == 'up':
         os.write(fd, sgr(0, col, row, False))
         state['listener'] = False
-    drain(0.25)
-drain(0.8)
+    settle()
+settle(floor=0.3, quiet=0.3, cap=4.0)
 print(f"dropped={state['dropped']}")
 os.write(fd, b'\x02d')
 drain(0.5)

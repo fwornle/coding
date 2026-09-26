@@ -347,6 +347,17 @@ knowledge-management/insights/plantuml_errors.json
 package-lock.json
 **/package-lock.json
 
+# ...EXCEPT for any package CI installs with `npm ci`, which refuses to run
+# without a lockfile ("can only install with an existing package-lock.json").
+# Those were force-added past the rule above, which made the requirement
+# invisible: `ci(viewer)` added an `npm ci` step for unified-viewer on
+# 2026-09-25 and it failed on its first real run, because the lockfile the step
+# needs was silently ignored here. Listing them makes the rule legible instead.
+# Submodules (lib/km-core) are exempt — their lockfile lives in their own repo.
+!/package-lock.json
+!/lib/knowledge-api/package-lock.json
+!/integrations/unified-viewer/package-lock.json
+
 # Build and compiled files
 build/
 dist/
