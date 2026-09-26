@@ -275,7 +275,16 @@ export default function SystemHealthDashboard() {
       items.push({
         name: 'Stale PIDs',
         status: mapCheckStatus(stalePidsCheck),
-        description: 'Cleaned automatically',
+        // The check's OWN message, not a constant. This read
+        // `description: 'Cleaned automatically'` unconditionally, so a tile
+        // carrying a real warning badge sat next to text claiming the problem
+        // had already been fixed — and the actual message ("Stale heartbeat:
+        // PID 46655 alive but Infinitys old", which named a real bug in the
+        // coordinator) was reachable only by hovering. A status and a
+        // description that come from different places will eventually
+        // disagree, and when they do the hardcoded half always wins the
+        // reader's attention.
+        description: stalePidsCheck.detail || stalePidsCheck.message || 'No detail reported',
         tooltip: stalePidsCheck.message + (stalePidsCheck.recommendation ? ` - ${stalePidsCheck.recommendation}` : '')
       })
     }

@@ -883,9 +883,22 @@ class SystemHealthAPIServer {
                     if (!p || !p.name) continue;
                     const raw = p.status || 'unknown';
                     const ui = toUiStatus(raw);
-                    checks.push({ check: p.name, name: `process.${p.name}`, category: 'processes', status: ui, raw_status: raw, timestamp: stamp, message: `${p.name} ${raw}` });
+                    // Carry the coordinator's own `detail` through. Without it
+                    // the only thing that crossed this boundary was the
+                    // template `"<name> <status>"`, so a check that had gone to
+                    // the trouble of explaining itself — "Stale heartbeat: PID
+                    // 46655 alive but Infinitys old", which named a real bug —
+                    // arrived at the dashboard as "stale_pids warning" and the
+                    // reason was unrecoverable from the UI. The tile then
+                    // printed a hardcoded reassurance in the gap.
+                    checks.push({
+                        check: p.name, name: `process.${p.name}`, category: 'processes',
+                        status: ui, raw_status: raw, timestamp: stamp,
+                        detail: p.detail || undefined,
+                        message: p.detail ? `${p.name}: ${p.detail}` : `${p.name} ${raw}`,
+                    });
                     if (isHardFailure(raw)) {
-                        violations.push({ check: p.name, kind: `process.${p.name}`, severity: 'medium', detail: raw, message: `${p.name} ${raw}`, timestamp: stamp });
+                        violations.push({ check: p.name, kind: `process.${p.name}`, severity: 'medium', detail: p.detail || raw, message: p.detail ? `${p.name}: ${p.detail}` : `${p.name} ${raw}`, timestamp: stamp });
                     }
                 }
             }

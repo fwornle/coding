@@ -16,7 +16,22 @@
 
 import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+/**
+ * Async git, for the calls that are long enough to matter.
+ *
+ * `execFileSync` blocks the event loop for the whole life of the child. In a
+ * standalone CLI that is free; inside obs-api — which runs consolidation
+ * IN-PROCESS and is the single owner of the km-core LevelDB — it freezes every
+ * HTTP route and the 2s consolidation heartbeat along with it. Measured
+ * 2026-09-26: obs-api sat at 2.7% CPU, listening on :12436, answering nothing,
+ * with its heartbeat 7.5 minutes stale; `sample` put the main thread in
+ * `node::SyncProcessRunner::Spawn -> uv__io_poll` with a live `git` child.
+ * The health dashboard reported "Degraded" for it, which was correct.
+ */
+const execFileAsync = promisify(execFile);
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -2655,7 +2670,7 @@ export class ObservationConsolidator {
 
     const now = Date.now();
     const oldestLastUpdatedMs = parsed.reduce((min, p) => Math.min(min, p.lastUpdatedMs), now);
-    const churnIndex = this._computeChurnIndex(this._defaultSearchRoots(), oldestLastUpdatedMs);
+    const churnIndex = await this._computeChurnIndex(this._defaultSearchRoots(), oldestLastUpdatedMs);
 
     let adjusted = 0;
     let backfilled = 0;
@@ -2789,14 +2804,21 @@ export class ObservationConsolidator {
    * @param {number} sinceMs  oldest insight last_updated across the corpus
    * @returns {Map<string, Array<{ ts: number, files: Set<string> }>>}
    */
-  _computeChurnIndex(roots, sinceMs) {
+  /**
+   * ASYNC because it spawns one `git log` per search root, and a root with a
+   * long history can hold the child open for its full 8s timeout. Serialised
+   * (not Promise.all) on purpose: these are git processes over the same disk,
+   * and running a dozen at once buys little while making the failure harder to
+   * attribute. The point is that the event loop is free BETWEEN them.
+   */
+  async _computeChurnIndex(roots, sinceMs) {
     const index = new Map();
     const sinceIso = new Date(Math.max(0, sinceMs - 86400000)).toISOString();
 
     for (const root of roots) {
       const commits = [];
       try {
-        const out = execFileSync(
+        const { stdout: out } = await execFileAsync(
           'git',
           // \x00<unix-ts>\n<file>\n<file>\n...\x00<unix-ts>\n... — the
           // leading NUL terminates the previous commit's file block so
@@ -2804,7 +2826,6 @@ export class ObservationConsolidator {
           ['-C', root, 'log', '--since', sinceIso, '--pretty=format:%x00%ct', '--name-only'],
           {
             encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
             timeout: 8000,
             maxBuffer: 32 * 1024 * 1024,
           }
@@ -4042,16 +4063,18 @@ ${memberBlock}`,
   _gitFileBasenameExists(root, basename) {
     const b = String(basename || '').trim();
     if (!b || b.includes('/')) return false;
-    try {
-      const out = execFileSync(
-        'git', ['-C', root, 'ls-files'],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024 * 1024 }
-      );
-      for (const line of out.split('\n')) {
-        if (line === b) return true;
-        if (line.endsWith('/' + b)) return true;
-      }
-    } catch { /* not a repo or too large */ }
+    // Reads the CACHE, not a fresh spawn. `_gitTrackedFiles` exists precisely
+    // to stop this — see its comment, which records that per-claim `git
+    // ls-files` calls "ran past 120s and, being execFileSync, blocked the
+    // obs-api event loop / froze the dashboard the whole time". That cache was
+    // added and this caller was never switched over, so the freeze it was
+    // written to prevent kept happening through here instead.
+    const files = this._gitTrackedFiles(root);
+    if (!files) return false;
+    for (const line of files) {
+      if (line === b) return true;
+      if (line.endsWith('/' + b)) return true;
+    }
     return false;
   }
 
@@ -4063,21 +4086,19 @@ ${memberBlock}`,
   _gitDirBasenameExists(root, dirname) {
     const d = String(dirname || '').trim();
     if (!d || d.includes('/')) return false;
-    try {
-      const out = execFileSync(
-        'git', ['-C', root, 'ls-files'],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024 * 1024 }
-      );
+    // Same cache, same reason as _gitFileBasenameExists above.
+    const files = this._gitTrackedFiles(root);
+    if (files) {
       // Use String.includes for the common '/dirname/' case, then check
       // the top-level '<dirname>/' case explicitly so we don't miss
       // root-level directories.
       const slashed = '/' + d + '/';
       const topLevel = d + '/';
-      for (const line of out.split('\n')) {
+      for (const line of files) {
         if (line.includes(slashed)) return true;
         if (line.startsWith(topLevel)) return true;
       }
-    } catch { /* not a repo or too large */ }
+    }
     return false;
   }
 
@@ -4112,6 +4133,23 @@ ${memberBlock}`,
    */
   _gitGrepHasMatch(root, term) {
     if (!root || !term) return false;
+    // Memoised per (root, term). This one cannot read `_gitTrackedFiles` — it
+    // searches file CONTENT, not the path list — so the spawn is unavoidable,
+    // but repeating it is not. The verifier calls this once per claim and
+    // claims repeat heavily across a pass (the same identifier appears in many
+    // insights), so the same `git grep` was being re-run against the same repo
+    // for the same term dozens of times, each one blocking the event loop for
+    // up to its 5s timeout.
+    if (!this._gitGrepCache) this._gitGrepCache = new Map();
+    const cacheKey = `${root}\u0000${term}`;
+    if (this._gitGrepCache.has(cacheKey)) return this._gitGrepCache.get(cacheKey);
+    const result = this._gitGrepHasMatchUncached(root, term);
+    this._gitGrepCache.set(cacheKey, result);
+    return result;
+  }
+
+  /** The spawning half of `_gitGrepHasMatch`. Call that, not this. */
+  _gitGrepHasMatchUncached(root, term) {
     try {
       // git grep syntax: pattern BEFORE `--`, pathspecs AFTER. Earlier placement
       // ('-- pattern path...') makes git treat the pattern as a path and the
