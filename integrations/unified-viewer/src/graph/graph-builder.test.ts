@@ -1,7 +1,7 @@
 // Unit tests for the pure graph builder + state computation.
 
 import { describe, test, expect } from 'vitest'
-import { buildGraph, mergeIntoGraph, computeNodeState } from './graph-builder'
+import { buildGraph, computeNodeState } from './graph-builder'
 import type { Entity, OntologyClass, Relation } from './types'
 
 const ontology: OntologyClass[] = [
@@ -51,58 +51,28 @@ describe('buildGraph', () => {
   })
 })
 
-describe('mergeIntoGraph — idempotency (T-45-02-04 mitigation)', () => {
-  test('Test 4 (idempotency): re-merging the same node does NOT grow graph.order', () => {
-    const g = buildGraph(entities, relations, ontology, 'dark')
-    const orderBefore = g.order
-    const added = mergeIntoGraph(g, { entities: [entities[0]], relations: [] }, ontology, 'dark')
-    expect(added).toBe(0)
-    expect(g.order).toBe(orderBefore)
-  })
-
-  test('merging genuinely-new nodes does grow graph.order', () => {
-    const g = buildGraph(entities, relations, ontology, 'dark')
-    const orderBefore = g.order
-    const newEntity: Entity = { id: 'd', name: 'Delta', ontologyClass: 'Observation', level: 3 }
-    const added = mergeIntoGraph(g, { entities: [newEntity], relations: [] }, ontology, 'dark')
-    expect(added).toBe(1)
-    expect(g.order).toBe(orderBefore + 1)
-  })
-
-  test('merging new edges between existing nodes is idempotent on edge keys', () => {
-    const g = buildGraph(entities, relations, ontology, 'dark')
-    const sizeBefore = g.size
-    // Re-merge an existing edge — undirected merge is idempotent
-    mergeIntoGraph(g, { entities: [], relations: [{ from: 'a', to: 'b', type: 'derives_from' }] }, ontology, 'dark')
-    expect(g.size).toBe(sizeBefore)
-  })
-})
-
 // -----------------------------------------------------------------------
 // 2026-09-26 — the LIVE entity shape has no `level`.
 //
-// Every fixture above sets one explicitly, which is why the suite passed
-// through a merge path that wrote `level: e.level` straight to the node
-// attribute: the field is populated on 0 of 2809 real rows, so the value
-// written was always `undefined`, and computeNodeState reads `undefined` as
-// `filter-hidden` — anything mergeIntoGraph added was hidden on arrival.
+// Every fixture above sets one explicitly. Live data never does: the field is
+// populated on 0 of 2809 real rows. That mattered because computeNodeState
+// reads a `level` of `undefined` as `filter-hidden` with no appeal, so any
+// writer stamping the wire field straight through hid every node it touched.
+// mergeIntoGraph did exactly that, and the fixtures' explicit levels are why
+// the suite never saw it. It has since been deleted along with the expand
+// path that called it, leaving buildGraph as the only writer.
 //
-// The defect never reached an operator, and the reason is worth knowing before
-// anyone "verifies" it in a browser: mergeIntoGraph's only caller fetches
-// `/api/v1/entities/:id/neighbors`, which no backend mounts (404), so the
-// merge is unreachable today. That is exactly why these are unit tests at the
-// function boundary — the rendered canvas cannot currently exercise the path,
-// so the suite is the only place the contract can be pinned.
-//
-// These tests use the wire shape as the server actually sends it — no
-// `level` key at all. Do not "fix" them by adding one.
+// These tests use the wire shape as the server actually sends it — no `level`
+// key at all. Do not "fix" them by adding one.
 // -----------------------------------------------------------------------
 
-describe('level derivation — the two builders must agree (live wire shape)', () => {
+describe('level derivation — buildGraph is the only writer (live wire shape)', () => {
   const liveOntology: OntologyClass[] = [{ name: 'Observation' }, { name: 'Insight' }]
   // No `level` property. deriveLevel maps Observation -> 2, Insight -> 3.
-  const seed: Entity[] = [{ id: 'a', name: 'Alpha', ontologyClass: 'Observation' }]
-  const neighbour: Entity[] = [{ id: 'n1', name: 'Neighbour', ontologyClass: 'Insight' }]
+  const live: Entity[] = [
+    { id: 'a', name: 'Alpha', ontologyClass: 'Observation' },
+    { id: 'n1', name: 'Neighbour', ontologyClass: 'Insight' },
+  ]
 
   const allVisible = {
     focalNodeId: null,
@@ -111,30 +81,22 @@ describe('level derivation — the two builders must agree (live wire shape)', (
     selectedClasses: new Set<string>(['Observation', 'Insight']),
   }
 
-  test('buildGraph stamps a derived level when the entity carries none', () => {
-    const g = buildGraph(seed, [], liveOntology, 'dark')
+  test('stamps a derived level when the entity carries none', () => {
+    const g = buildGraph(live, [], liveOntology, 'dark')
     expect(g.getNodeAttribute('a', 'level')).toBe(2)
-  })
-
-  test('mergeIntoGraph stamps a derived level too — NOT undefined', () => {
-    const g = buildGraph(seed, [], liveOntology, 'dark')
-    mergeIntoGraph(g, { entities: neighbour, relations: [] }, liveOntology, 'dark')
     expect(g.getNodeAttribute('n1', 'level')).toBe(3)
   })
 
-  test('a merged node is visible with all Level boxes checked (regression)', () => {
-    const g = buildGraph(seed, [], liveOntology, 'dark')
-    mergeIntoGraph(g, { entities: neighbour, relations: [] }, liveOntology, 'dark')
-    // The bug: this was 'filter-hidden' while the seeded node was 'default'.
-    const merged = computeNodeState('n1', g.getNodeAttributes('n1') as never, allVisible)
-    const seeded = computeNodeState('a', g.getNodeAttributes('a') as never, allVisible)
-    expect({ merged, seeded }).toEqual({ merged: 'default', seeded: 'default' })
+  test('a level-less entity is VISIBLE with all Level boxes checked', () => {
+    const g = buildGraph(live, [], liveOntology, 'dark')
+    // The failure this guards: `undefined` here reads as 'filter-hidden'.
+    expect(computeNodeState('a', g.getNodeAttributes('a') as never, allVisible)).toBe('default')
+    expect(computeNodeState('n1', g.getNodeAttributes('n1') as never, allVisible)).toBe('default')
   })
 
-  test('an unchecked Level still hides a merged node — the filter keeps working', () => {
-    const g = buildGraph(seed, [], liveOntology, 'dark')
-    mergeIntoGraph(g, { entities: neighbour, relations: [] }, liveOntology, 'dark')
-    // Insight derives to L3; uncheck it and the merged node must go.
+  test('an unchecked Level still hides it — the filter keeps working', () => {
+    const g = buildGraph(live, [], liveOntology, 'dark')
+    // Insight derives to L3; uncheck it and that node must go, the other stay.
     const store = { ...allVisible, visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2]) }
     expect(computeNodeState('n1', g.getNodeAttributes('n1') as never, store)).toBe('filter-hidden')
     expect(computeNodeState('a', g.getNodeAttributes('a') as never, store)).toBe('default')

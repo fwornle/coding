@@ -13,38 +13,20 @@ const entities: Entity[] = [
 const relations: Relation[] = [{ from: 'a', to: 'b', type: 'derives_from' }]
 
 function makeDeps(extra?: {
-  neighborsResponse?: { entity: Entity; neighbors: Entity[]; relations: Relation[] }
-  /** Phase 61-02 — false simulates the okb (legacy) client-side expand path. */
-  supportsServerNeighbors?: boolean
-  /** Phase 61-02 — loaded relation set for the okb client-side 1-hop expand. */
+  /** The loaded relation set the 1-hop expand reads. */
   loadedRelations?: Relation[]
 }) {
   const setStoreSpy = vi.fn()
   const setHoveredSpy = vi.fn()
   const onMutated = vi.fn()
-  const getNeighborsSpy = vi
-    .fn()
-    .mockResolvedValue(
-      extra?.neighborsResponse ?? {
-        entity: entities[0],
-        neighbors: [],
-        relations: [],
-      },
-    )
   const graph = buildGraph(entities, relations, ontology, 'dark')
   return {
     graph,
-    apiClient: {
-      getNeighbors: getNeighborsSpy,
-      supportsServerNeighbors: () => extra?.supportsServerNeighbors ?? true,
-    } as never,
-    getOntology: () => ontology,
-    getTheme: () => 'dark' as const,
     getLoadedRelations: () => extra?.loadedRelations ?? relations,
     setStore: setStoreSpy,
     setHoveredNode: setHoveredSpy,
     onGraphMutated: onMutated,
-    spies: { setStoreSpy, setHoveredSpy, onMutated, getNeighborsSpy },
+    spies: { setStoreSpy, setHoveredSpy, onMutated },
   }
 }
 
@@ -89,50 +71,35 @@ describe('event handlers', () => {
     expect(c2.focalNodeId).toBe('a')
   })
 
-  test('handleDoubleClickNode calls apiClient.getNeighbors(node, 1) exactly once', async () => {
-    const d = makeDeps({
-      neighborsResponse: {
-        entity: entities[0],
-        neighbors: [{ id: 'c', name: 'Gamma', ontologyClass: 'Observation' }],
-        relations: [{ from: 'a', to: 'c', type: 'derives_from' }],
-      },
-    })
-    const h = makeEventHandlers(d)
-    const added = await h.handleDoubleClickNode('a')
-    expect(d.spies.getNeighborsSpy).toHaveBeenCalledTimes(1)
-    expect(d.spies.getNeighborsSpy).toHaveBeenCalledWith('a', 1)
-    expect(added).toBe(1)
-    expect(d.graph.order).toBe(3) // a, b, c
-  })
+  // 2026-09-26: the two tests that stood here asserted a server fetch — that
+  // `getNeighbors` was called once with ('a', 1), and that a second call was
+  // idempotent. Both passed against a SPY for as long as the method existed,
+  // which is precisely what made them worthless: no backend has ever mounted
+  // `/api/v1/entities/:id/neighbors`. They proved the client built a request,
+  // never that anything answered it. The path is gone; what remains below is
+  // the client-side expand, which now serves every backend.
 
-  test('T-45-02-04: second double-click on same node does NOT grow graph.order', async () => {
-    // First expansion adds c; second expansion returns same c; graph.order stays 3
-    const sameNeighbors = {
-      entity: entities[0],
-      neighbors: [{ id: 'c', name: 'Gamma', ontologyClass: 'Observation' }],
-      relations: [{ from: 'a', to: 'c', type: 'derives_from' }],
-    }
-    const d = makeDeps({ neighborsResponse: sameNeighbors })
+  test('T-45-02-04: a second double-click on the same node is idempotent', async () => {
+    const d = makeDeps()
     const h = makeEventHandlers(d)
-    await h.handleDoubleClickNode('a')
+    const first = await h.handleDoubleClickNode('a')
     const orderAfterFirst = d.graph.order
-    expect(orderAfterFirst).toBe(3)
-    const addedSecond = await h.handleDoubleClickNode('a')
-    expect(addedSecond).toBe(0) // idempotent
+    const second = await h.handleDoubleClickNode('a')
+    // The expand derives a selection from the loaded relations rather than
+    // adding nodes, so repeating it recomputes the same set.
+    expect(second).toBe(first)
     expect(d.graph.order).toBe(orderAfterFirst)
   })
 
-  test('Phase 61-02: okb (legacy) double-click computes 1-hop neighbors client-side, NOT via getNeighbors', async () => {
-    // okb path: supportsServerNeighbors=false. Loaded relations a→b means
-    // double-clicking 'a' selects {a, b} from the loaded set and never hits
-    // the server getNeighbors endpoint (OKM has none).
+  test('double-click computes the 1-hop neighborhood client-side, for every backend', async () => {
+    // Loaded relations a→b mean double-clicking 'a' selects {a, b} from the
+    // loaded set. This was the okb-only path until coding's server fetch was
+    // found to target a route no backend mounts.
     const d = makeDeps({
-      supportsServerNeighbors: false,
       loadedRelations: [{ from: 'a', to: 'b', type: 'derives_from' }],
     })
     const h = makeEventHandlers(d)
     const added = await h.handleDoubleClickNode('a')
-    expect(d.spies.getNeighborsSpy).not.toHaveBeenCalled() // no server call
     expect(added).toBe(1) // one neighbor (b) in the loaded set
     const call = d.spies.setStoreSpy.mock.calls.at(-1)?.[0] as {
       focalNodeId: string
@@ -143,14 +110,12 @@ describe('event handlers', () => {
     expect(call.selectedNodeIds.has('b')).toBe(true)
   })
 
-  test('Phase 61-02: okb double-click on a node with no incident loaded relation still selects the node (no silent no-op)', async () => {
+  test('double-click on a node with no incident loaded relation still selects it (no silent no-op)', async () => {
     const d = makeDeps({
-      supportsServerNeighbors: false,
       loadedRelations: [], // no edges loaded
     })
     const h = makeEventHandlers(d)
     const added = await h.handleDoubleClickNode('a')
-    expect(d.spies.getNeighborsSpy).not.toHaveBeenCalled()
     expect(added).toBe(0) // no neighbors, but...
     const call = d.spies.setStoreSpy.mock.calls.at(-1)?.[0] as {
       focalNodeId: string

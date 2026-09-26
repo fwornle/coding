@@ -99,22 +99,6 @@ describe('ApiClient', () => {
     })
   })
 
-  test('getNeighbors encodes the id and depth', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          success: true,
-          data: { entity: { id: 'a/b', name: 'x', ontologyClass: 'Observation' }, neighbors: [], relations: [] },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
-    const client = new ApiClient('http://localhost:12436')
-    await client.getNeighbors('a/b', 2)
-    const [url] = fetchSpy.mock.calls[0] as [string]
-    expect(url).toBe('http://localhost:12436/api/v1/entities/a%2Fb/neighbors?depth=2')
-  })
-
   // ── Phase 61-02 — okb-scoped apiVersion path-rewrite + relation cap ──
 
   test('apiVersion defaults to v1 — apiPath leaves /api/v1/ paths unchanged', () => {
@@ -219,11 +203,15 @@ describe('ApiClient', () => {
     expect(total).toBe(2500) // pre-cap (post-drop) count preserved for the honesty indicator
   })
 
-  test('supportsServerNeighbors is true for v1, false for legacy', () => {
-    expect(new ApiClient('http://localhost:12436').supportsServerNeighbors()).toBe(true)
-    expect(new ApiClient('http://localhost:12436', 'v1').supportsServerNeighbors()).toBe(true)
-    expect(new ApiClient('http://localhost:8090', 'legacy').supportsServerNeighbors()).toBe(false)
-  })
+  // 2026-09-26: `getNeighbors` and `supportsServerNeighbors` are gone, and
+  // their tests with them. Both are worth remembering as a pair of shapes to
+  // distrust. The getNeighbors test asserted the URL the client BUILT — it
+  // passed for as long as the method existed, and would have passed just the
+  // same if no server had ever mounted that path, which is exactly what was
+  // true. And supportsServerNeighbors answered a CAPABILITY question from a
+  // VERSION number: `apiVersion === 'v1'`. It returned true for coding for a
+  // year while the route 404'd. A capability check that never touches the
+  // thing it describes can only restate its own input.
 })
 
 // ---------------------------------------------------------------------------
