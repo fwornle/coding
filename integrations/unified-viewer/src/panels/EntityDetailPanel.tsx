@@ -49,6 +49,7 @@ import CodeItTouches from './CodeItTouches'
 import { INTENT_EDGE } from '@/graph/intent-spine'
 import type { ReachInsight } from '@/graph/intent-code-reach'
 import { EntityIdentityHeader } from './EntityIdentityHeader'
+import { readProvenance, formatStamp } from '@/lib-domain/provenance'
 import { resolveHierarchyIdentity, nameLookup } from '@/graph/hierarchy-identity'
 import { InsightDocumentModal } from './InsightDocumentModal'
 import {
@@ -186,9 +187,13 @@ function computeVisibility(entity: Record<string, unknown>) {
   const metadata = (entity.metadata as Record<string, unknown> | undefined) ?? {}
   const segments = (metadata.descriptionSegments as unknown[] | undefined) ?? []
   const occurrences = (metadata.occurrences as unknown[] | undefined) ?? []
-  const provenance = (metadata.provenance as Record<string, unknown> | undefined) ?? {}
-  const confirmationCount = (provenance.confirmationCount as number | undefined) ?? 0
-  const createdByMeta = provenance.createdBy as string | undefined
+  // One reader, one shape. This used to type `provenance.createdBy` as a
+  // `string` and test it with `!!`, while the Timeline RENDERER 300 lines below
+  // typed the same field as an object and read `.provider` off it. A row whose
+  // stamp is an object passed this predicate — so the pill appeared — and then
+  // rendered nothing at all, because the renderer's read found no `.provider`
+  // and there was no empty state to catch it.
+  const { createdBy: createdByMeta, confirmationCount } = readProvenance(metadata)
 
   // VERBATIM per 55-09-PLAN <interfaces> — does NOT include top-level
   // entity.createdBy, only metadata.provenance.createdBy. This matters because
@@ -208,6 +213,26 @@ function computeVisibility(entity: Record<string, unknown>) {
  * NodeDetails.tsx:165-213 (`computeSegmentConfidence`) — simple weighted blend
  * of segment count + confirmationCount + occurrence count.
  */
+/**
+ * Does this row carry any signal the heuristic can actually score?
+ *
+ * `clientHeuristicConfidence` sums three signals and caps at 1. When a row has
+ * none of them the sum is 0, and the tab rendered `Low · 0%` over an empty
+ * list — visually identical to a row that was measured and genuinely scored
+ * zero. Those are different facts and the operator cannot act on the first one
+ * without knowing which it is. The server endpoint that would supply a real
+ * breakdown (`/api/v1/entities/:id/confidence`) is not mounted by any backend,
+ * so on this corpus the heuristic is ALWAYS the path taken and this is the
+ * distinction that matters most.
+ */
+function hasConfidenceSignal(entity: Record<string, unknown>): boolean {
+  const metadata = (entity.metadata as Record<string, unknown> | undefined) ?? {}
+  const segments = (metadata.descriptionSegments as unknown[] | undefined) ?? []
+  const occurrences = (metadata.occurrences as unknown[] | undefined) ?? []
+  const { confirmationCount } = readProvenance(metadata)
+  return segments.length > 0 || occurrences.length > 0 || confirmationCount > 0
+}
+
 function clientHeuristicConfidence(
   entity: Record<string, unknown>,
 ): ConfidencePayload {
@@ -349,6 +374,10 @@ function ConfidenceContent({
   apiClient: ApiClient
 }) {
   const [payload, setPayload] = useState<ConfidencePayload | null>(null)
+  // Whether `payload` came from the server rather than the local heuristic. A
+  // server score of 0 IS a measurement and must not be replaced by the
+  // "not measurable" copy below.
+  const [serverScored, setServerScored] = useState(false)
   const [loading, setLoading] = useState(true)
   const entityId = entity.id as string
 
@@ -385,7 +414,10 @@ function ConfidenceContent({
           throw new Error('endpoint unavailable')
         }
         const data = await fetcher.call(apiClient, entityId)
-        if (!cancelled) setPayload(data)
+        if (!cancelled) {
+          setServerScored(true)
+          setPayload(data)
+        }
       } catch (err) {
         // T-55-09-04 mitigation — cached by selectedNodeId via component remount;
         // any 404 / network / endpoint-absent falls back to client heuristic.
@@ -393,7 +425,10 @@ function ConfidenceContent({
           Logger.Categories.API,
           `Confidence fetch fell back to client heuristic for ${entityId}: ${(err as Error).message}`,
         )
-        if (!cancelled) setPayload(clientHeuristicConfidence(entityRef.current))
+        if (!cancelled) {
+          setServerScored(false)
+          setPayload(clientHeuristicConfidence(entityRef.current))
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -441,6 +476,23 @@ function ConfidenceContent({
   const overallScore = payload.overall ?? NaN
   const overallLabel = classifyConfidence(overallScore)
   const overallStyle = CONFIDENCE_COLOR[overallLabel] ?? DEFAULT_CONFIDENCE_STYLE
+
+  // Say "not measurable" rather than paint a confident-looking 0%.
+  if (!serverScored && !hasConfidenceSignal(entity)) {
+    return (
+      <div data-testid="subtab-content-confidence" className="space-y-3">
+        <p
+          className="text-sm text-muted-foreground italic"
+          data-testid="confidence-unmeasurable"
+        >
+          Not enough signal to score — this row has no description segments, no
+          recorded occurrences and no confirmations. That is not a low score; it
+          is the absence of anything to score.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div data-testid="subtab-content-confidence" className="space-y-3">
       <div className={`inline-flex items-center gap-2 rounded px-2 py-1 ${overallStyle.class}`}>
@@ -487,14 +539,10 @@ function TimelineContent({ entity }: { entity: Record<string, unknown> }) {
     // found a creator, the renderer looked somewhere else and found nothing.
     // Prefer provenance (what the writers actually populate) and keep the
     // top-level field as the fallback.
-    const provenance = (metadata.provenance as Record<string, unknown> | undefined) ?? {}
-    const createdByMeta = provenance.createdBy as Record<string, unknown> | undefined
-    const creator =
-      (createdByMeta?.provider as string | undefined)
-      ?? (entity.createdBy as string | undefined)
+    const { createdBy: createdByMeta } = readProvenance(metadata)
+    const creator = formatStamp(createdByMeta)
     const createdAt =
-      (entity.createdAt as string | undefined)
-      ?? (createdByMeta?.timestamp as string | undefined)
+      (entity.createdAt as string | undefined) ?? createdByMeta?.timestamp
     if (createdAt) {
       out.push({
         type: 'creation',
@@ -564,6 +612,25 @@ function TimelineContent({ entity }: { entity: Record<string, unknown> }) {
     }
     return m
   }, [events])
+
+  // An empty timeline used to render a bare <ul> with no children: the pill was
+  // there, the operator clicked it, and the tab body was blank — no heading, no
+  // copy, not even a dash. The predicate that shows the pill and the builder
+  // that fills it read the same field differently (now fixed above), but a tab
+  // should say why it is empty rather than depend on that never recurring.
+  if (events.length === 0) {
+    return (
+      <div data-testid="subtab-content-timeline" className="space-y-2">
+        <p
+          className="text-sm text-muted-foreground italic"
+          data-testid="timeline-events-empty"
+        >
+          No timeline events — this row carries a provenance stamp, but nothing
+          has recorded a dated revision, occurrence or evidence link for it.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div data-testid="subtab-content-timeline" className="space-y-2">
@@ -744,19 +811,29 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
     return <EmptyNodeDetailState />
   }
 
-  // Provenance fields per Plan 44-16 camelCase lock.
   const description = (entity.description as string | null | undefined) ?? ''
-  const createdBy = (entity.createdBy as string | undefined) ?? '—'
-  const confirmationCount =
-    typeof entity.confirmationCount === 'number'
-      ? String(entity.confirmationCount)
-      : '—'
-  const lastConfirmedBy = (entity.lastConfirmedBy as string | undefined) ?? '—'
-  const lastSegment = (entity.lastSegment as string | undefined) ?? '—'
   const className = entity.ontologyClass ?? 'Unclassified'
 
   // Metadata-derived collections.
   const metadata = (entity.metadata as Record<string, unknown> | undefined) ?? {}
+
+  // Provenance. These four used to be read off the entity's TOP level
+  // (`entity.createdBy` and friends) — a shape the wire has never carried, so
+  // all four rows printed `—` on 96% of entities whose provenance was sitting
+  // in `metadata.provenance` the whole time. See lib-domain/provenance.ts.
+  //
+  // `lastSegment` has no wire field at all, under any spelling: the closest
+  // true fact is which run last confirmed the row, so that is what the row now
+  // shows, relabelled. Inventing a segment id would be worse than saying this.
+  const provenanceInfo = readProvenance(metadata)
+  const createdBy = formatStamp(provenanceInfo.createdBy) ?? '—'
+  const lastConfirmedBy = formatStamp(provenanceInfo.lastConfirmedBy) ?? '—'
+  const confirmationCount =
+    provenanceInfo.createdBy || provenanceInfo.lastConfirmedBy
+      ? String(provenanceInfo.confirmationCount)
+      : '—'
+  const lastRunId = provenanceInfo.lastConfirmedBy?.runId ?? '—'
+  const lastConfirmedAt = provenanceInfo.lastConfirmedBy?.timestamp
   const occurrences =
     (metadata.occurrences as Array<Record<string, unknown>> | undefined) ?? []
   const sourceRefs =
@@ -940,7 +1017,7 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
             <Kv label="Created" value={formatLocalTimestamp(entity.createdAt as string | undefined)} tabularNums />
             <Kv
               label="Last confirmed"
-              value={formatLocalTimestamp(entity.lastConfirmedAt as string | undefined)}
+              value={formatLocalTimestamp(lastConfirmedAt)}
               tabularNums
             />
           </Section>
@@ -949,7 +1026,7 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
             <Kv label="Created by" value={createdBy} valueMono />
             <Kv label="Confirmation count" value={confirmationCount} tabularNums />
             <Kv label="Last confirmed by" value={lastConfirmedBy} valueMono />
-            <Kv label="Last segment" value={lastSegment} valueMono />
+            <Kv label="Last run" value={lastRunId} valueMono />
           </Section>
 
           {/* Relationships breakdown (replaces Phase 45 flat Neighbors). */}

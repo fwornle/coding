@@ -8,26 +8,45 @@
 // across into `api/`. Keeping them duplicated-but-aligned is the price
 // for keeping graph/ dependency-free for fast vitest runs.
 
+/**
+ * What `/api/v1/entities` actually sends.
+ *
+ * MIRRORS km-core's `EntityWireSchema` (lib/km-core/src/api/contracts.ts:157) —
+ * nine keys, and provenance lives INSIDE `metadata.provenance`. That is not an
+ * accident of the serializer: `entityToWire()`
+ * (lib/km-core/src/adapters/wire-serializers.ts:68) strips every other
+ * top-level field and FOLDS a top-level `createdBy` into `metadata.provenance`.
+ * contracts.ts:148-153 states the contract in so many words.
+ *
+ * WHY THIS IS WRITTEN OUT RATHER THAN LOOSE. Until 2026-09-26 this interface
+ * declared seven fields the wire has never carried — `level`, `parent`,
+ * `createdBy`, `confirmationCount`, `lastConfirmedAt`, `lastConfirmedBy`,
+ * `lastSegment` — and omitted three it does. Four separate defects shipped on
+ * the strength of it: the identity header and IDENTITY block printed `—` for
+ * every row, `mergeIntoGraph` stamped `level: undefined` and the renderer hid
+ * everything it added, the Provenance block printed `—` for 96% of rows whose
+ * provenance was sitting in `metadata`, and `last confirmed` was `—` on every
+ * entity in both side panels. None of them could produce an error anywhere.
+ *
+ * THE INDEX SIGNATURE IS DELIBERATELY ABSENT. `[k: string]: unknown` used to
+ * sit here "so the Raw section can render additional server-side fields", and
+ * it is what made all four defects typecheck: with it, `entity.anythingAtAll`
+ * is legal. The Raw section reads `metadata`, which is already an open record,
+ * so the signature bought nothing the type did not already have — it only
+ * disabled the compiler on the one shape that most needed it. A genuinely
+ * untyped read should cast at its own call site and say why, rather than
+ * reopening this type for every reader.
+ */
 export interface Entity {
   id: string
   name: string
+  entityType?: string
   ontologyClass: string
-  level?: 0 | 1 | 2 | 3
+  layer?: 'evidence' | 'pattern'
   description?: string
-  metadata?: Record<string, unknown>
-  // Phase 39 DATA-02 provenance + identity fields (Plan 44-16 camelCase lock).
-  // Marked optional + present in the index signature because pre-Phase-39
-  // entities don't carry them.
-  parent?: string
   createdAt?: string
-  createdBy?: string
-  confirmationCount?: number
-  lastConfirmedAt?: string
-  lastConfirmedBy?: string
-  lastSegment?: string
-  /** Index signature lets the EntityDetailPanel Raw section render any
-   *  additional server-side fields without a TS-strict break. */
-  [k: string]: unknown
+  updatedAt?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface Relation {

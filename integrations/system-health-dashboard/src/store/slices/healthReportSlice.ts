@@ -7,6 +7,17 @@ interface HealthCheck {
   severity: string
   message: string
   timestamp: string
+  /**
+   * The producing check's own explanation, carried verbatim from the health
+   * coordinator (server.js maps `state.processes[].detail` onto this).
+   *
+   * Distinct from `details`, the free-form object. This is the one-line human
+   * sentence — "Active consolidation (PID 81604)". Until it existed the only
+   * thing a tile could render was the template `"<name> <status>"`, and one
+   * tile filled that gap with a hardcoded string that contradicted its own
+   * status badge for as long as it was wrong.
+   */
+  detail?: string
   details?: any
   recommendation?: string
   auto_heal?: boolean

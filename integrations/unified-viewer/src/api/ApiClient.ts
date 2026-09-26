@@ -18,14 +18,25 @@ import { canonicalizeRelationType } from '@/graph/relation-types'
 interface ApiSuccess<T> { success: true; data: T }
 interface ApiError { success: false; error: string }
 
-/** km-core canonical entity shape (Phase 44 /api/v1/entities). */
+/**
+ * km-core canonical entity shape (Phase 44 /api/v1/entities).
+ *
+ * Kept byte-aligned with `graph/types.ts` Entity — the two are duplicated so
+ * `graph/` stays dependency-free for fast vitest runs, which means they must be
+ * changed together. Both mirror km-core's `EntityWireSchema`
+ * (lib/km-core/src/api/contracts.ts:157). See the long note on the graph/ copy
+ * for why the index signature and the phantom provenance fields are gone.
+ */
 export interface Entity {
   id: string
   name: string
+  entityType?: string
   ontologyClass: string
+  layer?: 'evidence' | 'pattern'
   description?: string | null
-  level?: number
-  [k: string]: unknown
+  createdAt?: string
+  updatedAt?: string
+  metadata?: Record<string, unknown>
 }
 
 /** km-core canonical relation shape (Phase 44 /api/v1/relations). */

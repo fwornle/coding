@@ -4197,14 +4197,32 @@ async function runAllChecks() {
     if (fs.existsSync(heartbeatPath)) {
       const hb = JSON.parse(fs.readFileSync(heartbeatPath, 'utf8'));
       const pid = hb?.pid;
-      const ts = hb?.timestamp ? Date.parse(hb.timestamp) : 0;
-      const ageMs = ts ? Date.now() - ts : Infinity;
+      // `lastHeartbeat`, not `timestamp`. BOTH writers of this file spell it
+      // that way — scripts/consolidate-observations.js `bumpHeartbeat()` and
+      // observations-api-server.mjs, which also READS it back as
+      // `data.lastHeartbeat`. This check was the only reader looking for a
+      // `timestamp` key, and nothing has ever written one.
+      //
+      // The consequence was not a missing value, it was an inverted verdict:
+      // `ts` fell to 0, `ageMs` to Infinity, `Infinity > 6min` is always true,
+      // so the check reported `warning` for as long as the heartbeat file
+      // existed — including while the heartbeat was seconds old. The dashboard
+      // banner read "Degraded · 1 violation" off it permanently, and the
+      // detail string said so in as many words: "alive but Infinitys old".
+      const ts = hb?.lastHeartbeat ? Date.parse(hb.lastHeartbeat) : NaN;
+      // A heartbeat we cannot date is a DIFFERENT fact from a stale one, and
+      // collapsing the two is what hid this for so long. Keep them apart.
+      const dateable = Number.isFinite(ts);
+      const ageMs = dateable ? Date.now() - ts : null;
       let alive = false;
       if (pid) { try { process.kill(pid, 0); alive = true; } catch { alive = false; } }
       if (pid && !alive) {
         stalePidStatus = 'passed';
         stalePidDetail = `Cleaned stale heartbeat (dead PID ${pid})`;
         try { fs.unlinkSync(heartbeatPath); } catch { /* ignore */ }
+      } else if (pid && alive && !dateable) {
+        stalePidStatus = 'warning';
+        stalePidDetail = `Malformed heartbeat: PID ${pid} alive but no readable lastHeartbeat`;
       } else if (pid && alive && ageMs > 6 * 60 * 1000) {
         stalePidStatus = 'warning';
         stalePidDetail = `Stale heartbeat: PID ${pid} alive but ${Math.round(ageMs / 1000)}s old`;
