@@ -925,14 +925,16 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
 
           <Section title="Identity" testId="entity-section-identity">
             <Kv label="Class" value={className} valueMono />
-            {/* Both fall back to the derived hierarchy: `entity.level` and
-                `entity.parent` are set on 0 of 2801 live rows, so reading them
-                alone made these two lines print `—` for every entity. Same
-                resolver the shared header uses, so the two cannot disagree. */}
-            <Kv label="Level" value={String(entity.level ?? hierarchyIdentity.level ?? '—')} />
+            {/* Both come from the derived hierarchy, and ONLY from it. These
+                used to prefer `entity.level` / `entity.parent`; neither is set
+                on a single live row (0 of 2809), so the stored read could only
+                ever lose to the fallback while suggesting to the next reader
+                that the wire carries these. Same resolver the shared header
+                uses, so the two cannot disagree. */}
+            <Kv label="Level" value={String(hierarchyIdentity.level ?? '—')} />
             <Kv
               label="Parent"
-              value={(entity.parent as string | undefined) ?? hierarchyIdentity.parentName ?? '—'}
+              value={hierarchyIdentity.parentName ?? '—'}
               valueMono
             />
             <Kv label="Created" value={formatLocalTimestamp(entity.createdAt as string | undefined)} tabularNums />

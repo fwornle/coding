@@ -15,12 +15,17 @@ import { EntityIdentityHeader } from './EntityIdentityHeader'
 import { useViewerStore } from '@/store/viewer-store'
 import type { Entity } from '@/graph/types'
 
+// 2026-09-26: this fixture used to carry `level: 2, parent: 'parent-1'`, and
+// Test 3 asserted the header echoed them. The header no longer reads either
+// field — nothing has ever written them (0 of 2809 live rows) — so keeping
+// them here would only re-advertise a wire contract that does not exist. The
+// derived values are pinned in the second describe block, against the store
+// map that actually supplies them. `Observation` is outside the ontology
+// ladder (HIERARCHY_LEVEL), so its depth is legitimately `L—`.
 const baseEntity: Entity = {
   id: 'e1',
   name: 'Selected Entity',
   ontologyClass: 'Observation',
-  level: 2,
-  parent: 'parent-1',
   createdAt: '2026-01-02',
   lastConfirmedAt: '2026-02-03',
 }
@@ -49,8 +54,11 @@ describe('EntityIdentityHeader (Plan 55-09 Task 1)', () => {
     expect(meta.className).toMatch(/\btext-xs\b/)
     expect(meta.className).toMatch(/\btext-muted-foreground\b/)
     expect(meta.className).toMatch(/\btabular-nums\b/)
-    expect(meta.textContent).toContain('L2')
-    expect(meta.textContent).toContain('parent-1')
+    // All four slots present. Level and parent come from the derived hierarchy,
+    // which this bare mount supplies nothing for, so both are placeholders —
+    // the values themselves are asserted in the derived-hierarchy block below.
+    expect(meta.textContent).toContain('L—')
+    expect(meta.textContent).toContain('parent: —')
     expect(meta.textContent).toContain('2026-01-02')
     expect(meta.textContent).toContain('2026-02-03')
   })
@@ -113,7 +121,14 @@ describe('EntityIdentityHeader — a real row has no .level/.parent, and must st
     expect(meta).not.toContain('parent: —')
   })
 
-  test('a stored field still wins over the derived one', () => {
+  test('a stored field is IGNORED — the derived hierarchy is the only source', () => {
+    // Inverted on 2026-09-26. For one day this asserted the opposite: the
+    // stored field was kept as the first operand of a `??` "so a row that one
+    // day does carry it still wins". Nothing writes either field, so that
+    // preference could never fire, and its only effect was to tell the next
+    // reader the wire supplies these. If a writer ever does populate them,
+    // restore the preference deliberately and measure it first — do not let it
+    // back in as an untested `??`.
     render(
       <EntityIdentityHeader
         entity={{ ...realShape, level: 0, parent: 'ExplicitlyStored' }}
@@ -122,8 +137,10 @@ describe('EntityIdentityHeader — a real row has no .level/.parent, and must st
       />,
     )
     const meta = screen.getByTestId('identity-meta').textContent ?? ''
-    expect(meta).toContain('L0')
-    expect(meta).toContain('parent: ExplicitlyStored')
+    expect(meta).toContain('L3')
+    expect(meta).toContain('parent: LiveLoggingSystem')
+    expect(meta).not.toContain('L0')
+    expect(meta).not.toContain('ExplicitlyStored')
   })
 
   test('a row with no parent in the map renders `parent: —`', () => {
