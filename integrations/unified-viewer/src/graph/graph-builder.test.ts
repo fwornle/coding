@@ -10,10 +10,13 @@ const ontology: OntologyClass[] = [
   { name: 'Insight' },
 ]
 
+// No `level` on any fixture: the wire does not carry one (0 of 2809 rows) and
+// `Entity` no longer declares it. buildGraph derives every node's level from
+// its ontologyClass — Observation 2, Digest 3, Insight 3 via deriveLevel.
 const entities: Entity[] = [
-  { id: 'a', name: 'Alpha', ontologyClass: 'Observation', level: 3 },
-  { id: 'b', name: 'Beta', ontologyClass: 'Digest', level: 2 },
-  { id: 'c', name: 'Gamma', ontologyClass: 'Insight', level: 1 },
+  { id: 'a', name: 'Alpha', ontologyClass: 'Observation' },
+  { id: 'b', name: 'Beta', ontologyClass: 'Digest' },
+  { id: 'c', name: 'Gamma', ontologyClass: 'Insight' },
 ]
 
 const relations: Relation[] = [
@@ -127,8 +130,8 @@ describe('buildGraph — Plan 55-05 shape/borderStyle/pulseRule threading', () =
       },
     ]
     const ents: Entity[] = [
-      { id: 'o1', name: 'Obs1', ontologyClass: 'Observation', level: 2 },
-      { id: 'o2', name: 'Obs2', ontologyClass: 'Observation', level: 2 },
+      { id: 'o1', name: 'Obs1', ontologyClass: 'Observation' },
+      { id: 'o2', name: 'Obs2', ontologyClass: 'Observation' },
     ]
     const rels: Relation[] = [{ from: 'o1', to: 'o2', type: 'relates_to' }]
     const g = buildGraph(ents, rels, ont, 'dark')

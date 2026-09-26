@@ -202,3 +202,72 @@ describe('Confidence wire-shape lock (obs-api /api/v1/entities/:id/confidence)',
     expect(classifyConfidence(NaN)).toBe('Low')
   })
 })
+
+// ---------------------------------------------------------------------------
+// 2026-09-26 — the Entity wire shape. The one payload this file did NOT lock.
+//
+// Digest, Insight, Observation and Confidence all had a key list here. Entity
+// did not, and four defects shipped through the gap: the viewer's own `Entity`
+// interface declared seven fields the wire has never sent (`level`, `parent`,
+// `createdBy`, `confirmationCount`, `lastConfirmedAt`, `lastConfirmedBy`,
+// `lastSegment`), omitted three it does, and carried `[k: string]: unknown` so
+// that every phantom read typechecked. Measured against the live store on
+// 2026-09-26: 0 of 2809 rows carried ANY of the seven.
+//
+// The authority is km-core's `EntityWireSchema`
+// (lib/km-core/src/api/contracts.ts:157-172) and `entityToWire()`
+// (lib/km-core/src/adapters/wire-serializers.ts:68), which strips every other
+// top-level field and folds top-level provenance into `metadata.provenance`.
+// If that contract moves, this list and the two `Entity` interfaces move with
+// it — deliberately a hand-written list rather than an import, so a change to
+// km-core cannot silently relax the viewer's expectations.
+// ---------------------------------------------------------------------------
+
+const ENTITY_WIRE_KEYS = [
+  'id',
+  'name',
+  'entityType',
+  'ontologyClass',
+  'layer',
+  'description',
+  'createdAt',
+  'updatedAt',
+  'metadata',
+] as const
+
+describe('Entity wire shape (km-core EntityWireSchema)', () => {
+  test('the nine keys are the whole contract', () => {
+    expect([...ENTITY_WIRE_KEYS].sort()).toEqual(
+      [
+        'createdAt', 'description', 'entityType', 'id', 'layer',
+        'metadata', 'name', 'ontologyClass', 'updatedAt',
+      ],
+    )
+  })
+
+  test.each([
+    'level', 'parent', 'createdBy', 'confirmationCount',
+    'lastConfirmedAt', 'lastConfirmedBy', 'lastSegment',
+  ])('`%s` is NOT a top-level wire field', (field) => {
+    expect(ENTITY_WIRE_KEYS as readonly string[]).not.toContain(field)
+  })
+
+  test('provenance is addressed under metadata, never at the top level', () => {
+    // The shape `readProvenance` reads, and the shape km-core emits.
+    const wire = {
+      id: 'e1', name: 'Alpha', entityType: 'Observation',
+      ontologyClass: 'Observation', layer: 'evidence' as const,
+      description: '', createdAt: '2026-01-02', updatedAt: '2026-02-03',
+      metadata: {
+        provenance: {
+          createdBy: { provider: 'observation-writer', model: 'live-pipeline', runId: 'r1', timestamp: '2026-01-02' },
+          lastConfirmedBy: { provider: 'observation-writer', model: 'live-pipeline', runId: 'r9', timestamp: '2026-02-03' },
+          confirmationCount: 4,
+        },
+      },
+    }
+    expect(Object.keys(wire).sort()).toEqual([...ENTITY_WIRE_KEYS].sort())
+    expect(wire.metadata.provenance.createdBy.provider).toBe('observation-writer')
+    expect(wire).not.toHaveProperty('createdBy')
+  })
+})

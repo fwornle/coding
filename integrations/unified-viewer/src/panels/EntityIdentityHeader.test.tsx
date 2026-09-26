@@ -27,7 +27,17 @@ const baseEntity: Entity = {
   name: 'Selected Entity',
   ontologyClass: 'Observation',
   createdAt: '2026-01-02',
-  lastConfirmedAt: '2026-02-03',
+  // "last confirmed" comes from the provenance stamp, which is where the wire
+  // puts it. It used to be a top-level `lastConfirmedAt` here — a field no
+  // writer sets, so the chip read `—` on every real row while this fixture
+  // made the test pass.
+  metadata: {
+    provenance: {
+      createdBy: { provider: 'observation-writer', model: 'live-pipeline', runId: 'r1', timestamp: '2026-01-02' },
+      lastConfirmedBy: { provider: 'observation-writer', model: 'live-pipeline', runId: 'r9', timestamp: '2026-02-03' },
+      confirmationCount: 3,
+    },
+  },
 }
 
 describe('EntityIdentityHeader (Plan 55-09 Task 1)', () => {
@@ -126,12 +136,15 @@ describe('EntityIdentityHeader — a real row has no .level/.parent, and must st
     // stored field was kept as the first operand of a `??` "so a row that one
     // day does carry it still wins". Nothing writes either field, so that
     // preference could never fire, and its only effect was to tell the next
-    // reader the wire supplies these. If a writer ever does populate them,
-    // restore the preference deliberately and measure it first — do not let it
-    // back in as an untested `??`.
+    // reader the wire supplies these.
+    //
+    // The decoy now sits in `metadata`, because `Entity` no longer has a
+    // top-level `level`/`parent` to put it in — the compiler enforces what this
+    // test asserts. Kept as a test anyway: metadata is an open bag, so a future
+    // reader COULD still reach in and prefer it.
     render(
       <EntityIdentityHeader
-        entity={{ ...realShape, level: 0, parent: 'ExplicitlyStored' }}
+        entity={{ ...realShape, metadata: { level: 0, parent: 'ExplicitlyStored' } }}
         theme="light"
         entities={entities}
       />,

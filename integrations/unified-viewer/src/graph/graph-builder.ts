@@ -188,11 +188,12 @@ export function buildGraph(
     // provenance is shown as a ring in the node reducer, not the fill. The
     // resolver parent-walks so L2 classes inherit an ancestor's color.
     const color = nodeFillColor(e.ontologyClass, registryMap, theme)
-    // Backend payloads omit `level` — derive it from the well-known
-    // ontology hierarchy so FilterRail's L0/L1/L2/L3 toggles actually
-    // exclude nodes. Falls back to `e.level` when the backend ever
-    // populates the field directly.
-    const level = e.level ?? deriveLevel(e.ontologyClass)
+    // The wire carries no `level` — derive it from the ontology hierarchy so
+    // FilterRail's L0/L1/L2/L3 toggles actually exclude nodes. This used to
+    // read `e.level ?? deriveLevel(...)`; the first operand was never once
+    // satisfied (0 of 2809 rows) and only advertised a wire field that does
+    // not exist. `Entity` no longer declares it, so the compiler agrees.
+    const level = deriveLevel(e.ontologyClass)
     // 2026-06-11 (tenth iteration): hierarchical seed lookups.
     //   1. System → origin
     //   2. Project → pre-computed ring position

@@ -443,8 +443,11 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
   // no-op for the D3 render (and useVisibleEntityIds) — the counter changed
   // (UnifiedViewer.visibleCount + graph-builder both already apply deriveLevel)
   // but the rendered graph never filtered. Derive the level from ontologyClass
-  // exactly as graph-builder.ts:188 does so all three predicates agree.
-  const lvl = (e.level ?? deriveLevel(e.ontologyClass)) as 0 | 1 | 2 | 3
+  // exactly as graph-builder does so all three predicates agree.
+  //
+  // 2026-09-26: the vestigial `e.level ??` first operand is gone with it. It
+  // could never fire, and `Entity` no longer declares the field.
+  const lvl = deriveLevel(e.ontologyClass)
   if (!filters.visibleLevels.has(lvl)) return false
 
   // Text filter (substring over name + description, lower-cased).

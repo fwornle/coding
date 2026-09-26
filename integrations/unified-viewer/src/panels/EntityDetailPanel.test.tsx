@@ -38,12 +38,27 @@ const mockEntities = [
     // No `level` / `parent`: the panel reads neither (2026-09-26 — nothing has
     // ever written them), and no test here asserted them. The IDENTITY block's
     // two rows are pinned against the derived hierarchy instead.
-    createdBy: 'agent-coordinator',
-    confirmationCount: 4,
-    lastConfirmedBy: 'agent-verifier',
-    lastSegment: 'seg-42',
+    //
+    // Provenance is in `metadata.provenance`, which is where the wire puts it
+    // (km-core entityToWire). This fixture used to carry top-level
+    // `createdBy` / `confirmationCount` / `lastConfirmedBy` / `lastSegment` /
+    // `lastConfirmedAt` — a shape the store has never produced — and Test 4
+    // passed on the strength of it while all four rows rendered `—` against
+    // real data. A stamp carries all four fields or does not exist.
     createdAt: '2026-01-02',
-    lastConfirmedAt: '2026-02-03',
+    metadata: {
+      provenance: {
+        createdBy: {
+          provider: 'observation-writer', model: 'live-pipeline',
+          runId: 'run-create-1', timestamp: '2026-01-02',
+        },
+        lastConfirmedBy: {
+          provider: 'phase-42-migration', model: 'b-to-km-core',
+          runId: 'run-confirm-9', timestamp: '2026-02-03',
+        },
+        confirmationCount: 4,
+      },
+    },
   },
   { id: 'e2', name: 'Neighbor Two', ontologyClass: 'Insight' },
   { id: 'e3', name: 'Neighbor Three', ontologyClass: 'Insight' },
@@ -52,6 +67,21 @@ const mockEntities = [
     name: 'Pre-Phase39 Entity',
     ontologyClass: 'Observation',
     description: '',
+  },
+  {
+    // Carries a stamp (so Timeline's pill shows) but nothing dated to list and
+    // no createdAt, which is the exact shape that produced a blank tab body.
+    id: 'legacyStamped',
+    name: 'Stamped But Undated',
+    ontologyClass: 'Observation',
+    description: '',
+    metadata: {
+      provenance: {
+        createdBy: { provider: 'observation-writer', model: 'live-pipeline', runId: 'r1', timestamp: '' },
+        lastConfirmedBy: { provider: 'observation-writer', model: 'live-pipeline', runId: 'r1', timestamp: '' },
+        confirmationCount: 1,
+      },
+    },
   },
   {
     id: 'xss',
@@ -171,14 +201,27 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
     expect(container.textContent).toContain('<script>alert(1)</script>')
   })
 
-  test('Test 4: Provenance reads camelCase fields; pre-Phase-39 entities render `—`', () => {
+  test('Test 4: Provenance renders the stamp as provider/model, from metadata.provenance', () => {
     useViewerStore.getState().setSelectedNode('e1')
     renderPanel()
     const prov = screen.getByTestId('entity-section-provenance')
-    expect(prov.textContent).toContain('agent-coordinator')
+    // `<provider>/<model>` — a bare model name does not identify what wrote a
+    // row, because provider names are ACCOUNTS rather than companies.
+    expect(prov.textContent).toContain('observation-writer/live-pipeline')
+    expect(prov.textContent).toContain('phase-42-migration/b-to-km-core')
     expect(prov.textContent).toContain('4')
-    expect(prov.textContent).toContain('agent-verifier')
-    expect(prov.textContent).toContain('seg-42')
+    // "Last run" replaces the old "Last segment": no wire field has ever
+    // carried a segment id, so the row names the run that last confirmed it.
+    expect(prov.textContent).toContain('run-confirm-9')
+  })
+
+  test('Test 4a: the Identity block dates the row from the confirming stamp', () => {
+    useViewerStore.getState().setSelectedNode('e1')
+    renderPanel()
+    // Was `entity.lastConfirmedAt`, which nothing writes — so this row read
+    // `—` for every entity ever selected.
+    const identity = screen.getByTestId('entity-section-identity')
+    expect(identity.textContent).toContain('2026-02-03')
   })
 
   test('Test 4b: Pre-Phase-39 entity → all four provenance rows show `—`', () => {
@@ -224,16 +267,29 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
 
   // ===== Phase 55 sub-tabs =====
 
-  test('Test 7a: pill bar — Default always present; Evolution/Timeline hidden for plain entity (e1)', () => {
-    useViewerStore.getState().setSelectedNode('e1')
+  test('Test 7a: pill bar — Default always present; Evolution/Timeline hidden for a plain entity', () => {
+    // Retargeted from e1 to `legacy` on 2026-09-26. e1 now carries a real
+    // `metadata.provenance` (it must, to pin the Provenance section against
+    // the shape the wire actually sends), and a row with a confirmation count
+    // and a creation stamp is NOT a plain row — Evolution and Timeline are
+    // correctly visible for it. `legacy` has no metadata at all, which is what
+    // this test was always describing.
+    useViewerStore.getState().setSelectedNode('legacy')
     renderPanel()
     expect(screen.getByTestId('subtab-default')).toBeInTheDocument()
-    // e1 has no descriptionSegments / occurrences / confirmationCount metadata,
-    // so Evolution + Timeline are not visible.
     expect(screen.queryByTestId('subtab-evolution')).toBeNull()
     expect(screen.queryByTestId('subtab-timeline')).toBeNull()
     // Confidence is ALWAYS visible per UI-SPEC §8.
     expect(screen.getByTestId('subtab-confidence')).toBeInTheDocument()
+  })
+
+  test('Test 7a2: a row WITH provenance shows Evolution + Timeline', () => {
+    // The other half of the retarget above: provenance alone is enough to make
+    // both tabs meaningful, and e1 is the fixture that carries it.
+    useViewerStore.getState().setSelectedNode('e1')
+    renderPanel()
+    expect(screen.getByTestId('subtab-evolution')).toBeInTheDocument()
+    expect(screen.getByTestId('subtab-timeline')).toBeInTheDocument()
   })
 
   test('Test 7b: pill bar — Evolution + Timeline visible when predicate matches (evo entity)', () => {
@@ -443,12 +499,40 @@ describe('EntityDetailPanel — Phase 45 baseline preserved + Phase 55 sub-tabs'
     expect(screen.getByTestId('subtab-default').getAttribute('aria-selected')).toBe('true')
   })
 
-  test('Test 16b: Keyboard 2/4 are NO-OP when Evolution/Timeline are hidden (plain e1)', () => {
-    useViewerStore.getState().setSelectedNode('e1')
+  test('Test 16b: Keyboard 2/4 are NO-OP when Evolution/Timeline are hidden (plain row)', () => {
+    // Retargeted from e1 for the same reason as Test 7a.
+    useViewerStore.getState().setSelectedNode('legacy')
     renderPanel()
     // Pressing 2 when Evolution is hidden should not change the active sub-tab.
     fireEvent.keyDown(document.body, { key: '2' })
     expect(screen.getByTestId('subtab-default').getAttribute('aria-selected')).toBe('true')
+  })
+
+  // -------------------------------------------------------------------------
+  // 2026-09-26 — a shown tab must say something.
+  // -------------------------------------------------------------------------
+
+  test('Timeline with a stamp but no dated events renders empty-state copy, not a blank tab', () => {
+    // e1 has provenance (so the pill shows) and no segments / occurrences /
+    // sourceRefs. It DOES have a createdAt, so it gets a creation row; the
+    // regression guarded here is the blank <ul> that used to render when the
+    // event list came out empty — pill present, tab body entirely empty.
+    useViewerStore.getState().setSelectedNode('legacyStamped')
+    renderPanel()
+    fireEvent.click(screen.getByTestId('subtab-timeline'))
+    const tl = screen.getByTestId('subtab-content-timeline')
+    expect(tl.textContent?.trim().length ?? 0).toBeGreaterThan(0)
+    expect(screen.getByTestId('timeline-events-empty')).toBeInTheDocument()
+  })
+
+  test('Confidence distinguishes "nothing to score" from a measured 0%', () => {
+    // `legacy` has no segments, no occurrences and no confirmations. The old
+    // renderer painted `Low · 0%` over an empty list, which reads as a verdict.
+    useViewerStore.getState().setSelectedNode('legacy')
+    renderPanel()
+    fireEvent.click(screen.getByTestId('subtab-confidence'))
+    expect(screen.getByTestId('confidence-unmeasurable')).toBeInTheDocument()
+    expect(screen.queryByTestId('confidence-overall')).toBeNull()
   })
 
   test('Test 17: EntityDetailPanel imports EntityIdentityHeader (refactor)', () => {

@@ -22,6 +22,7 @@ import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { classColor } from '@/graph/color-fallback'
 import { resolveHierarchyIdentity, nameLookup } from '@/graph/hierarchy-identity'
+import { readProvenance } from '@/lib-domain/provenance'
 import { useViewerStore } from '@/store/viewer-store'
 import type { Entity } from '@/graph/types'
 
@@ -69,6 +70,13 @@ export function EntityIdentityHeader({ entity, theme, entities = [] }: EntityIde
   // 2026-06-12: render timestamps in the viewer's local timezone. Raw
   // UTC ISO strings (`2026-06-12T05:28:07.593Z`) were confusing on a
   // CEST host where the wall clock showed 07:28.
+  // "last confirmed" comes from the provenance stamp. It used to read
+  // `entity.lastConfirmedAt`, which no writer has ever set, so this chip said
+  // `—` for EVERY entity in both side panels. See lib-domain/provenance.ts.
+  const lastConfirmedIso = readProvenance(
+    entity.metadata as Record<string, unknown> | undefined,
+  ).lastConfirmedBy?.timestamp
+
   const fmtLocal = (iso: string | undefined): string => {
     if (!iso) return '—'
     const t = Date.parse(iso)
@@ -79,7 +87,7 @@ export function EntityIdentityHeader({ entity, theme, entities = [] }: EntityIde
       + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
   }
   const createdAt = fmtLocal(entity.createdAt as string | undefined)
-  const lastConfirmedAt = fmtLocal(entity.lastConfirmedAt as string | undefined)
+  const lastConfirmedAt = fmtLocal(lastConfirmedIso)
 
   return (
     <header className="space-y-2" data-testid="entity-identity-header">

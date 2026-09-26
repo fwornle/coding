@@ -41,6 +41,7 @@ import {
   type EvidenceLinkType,
 } from '@/lib-domain/evidence-types'
 import type { Entity, Relation } from '@/graph/types'
+import { readProvenance } from '@/lib-domain/provenance'
 
 /* ------------------------------------------------------------------ */
 /* RCA-chain edge types — verbatim from VOKB IssueTriage.tsx:64-68    */
@@ -111,7 +112,11 @@ function readDescription(e: Entity): string {
 function readLastSeen(e: Entity): string | undefined {
   const md = (e.metadata ?? {}) as Record<string, unknown>
   if (typeof md.lastSeen === 'string') return md.lastSeen
-  if (typeof e.lastConfirmedAt === 'string') return e.lastConfirmedAt
+  // Was `e.lastConfirmedAt` — a top-level field the wire never carries, so this
+  // rung silently never fired and every row fell through to `createdAt`. The
+  // real answer is the provenance stamp's timestamp.
+  const confirmed = readProvenance(md).lastConfirmedBy?.timestamp
+  if (typeof confirmed === 'string') return confirmed
   if (typeof e.createdAt === 'string') return e.createdAt
   return undefined
 }
