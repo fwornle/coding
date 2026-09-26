@@ -35,8 +35,9 @@ const mockEntities = [
     name: 'Selected Entity',
     ontologyClass: 'Observation',
     description: '**Hello** world',
-    level: 2,
-    parent: 'parent-1',
+    // No `level` / `parent`: the panel reads neither (2026-09-26 — nothing has
+    // ever written them), and no test here asserted them. The IDENTITY block's
+    // two rows are pinned against the derived hierarchy instead.
     createdBy: 'agent-coordinator',
     confirmationCount: 4,
     lastConfirmedBy: 'agent-verifier',

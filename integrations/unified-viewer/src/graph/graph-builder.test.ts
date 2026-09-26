@@ -79,6 +79,69 @@ describe('mergeIntoGraph — idempotency (T-45-02-04 mitigation)', () => {
 })
 
 // -----------------------------------------------------------------------
+// 2026-09-26 — the LIVE entity shape has no `level`.
+//
+// Every fixture above sets one explicitly, which is why the suite passed
+// through a merge path that wrote `level: e.level` straight to the node
+// attribute: the field is populated on 0 of 2809 real rows, so the value
+// written was always `undefined`, and computeNodeState reads `undefined` as
+// `filter-hidden` — anything mergeIntoGraph added was hidden on arrival.
+//
+// The defect never reached an operator, and the reason is worth knowing before
+// anyone "verifies" it in a browser: mergeIntoGraph's only caller fetches
+// `/api/v1/entities/:id/neighbors`, which no backend mounts (404), so the
+// merge is unreachable today. That is exactly why these are unit tests at the
+// function boundary — the rendered canvas cannot currently exercise the path,
+// so the suite is the only place the contract can be pinned.
+//
+// These tests use the wire shape as the server actually sends it — no
+// `level` key at all. Do not "fix" them by adding one.
+// -----------------------------------------------------------------------
+
+describe('level derivation — the two builders must agree (live wire shape)', () => {
+  const liveOntology: OntologyClass[] = [{ name: 'Observation' }, { name: 'Insight' }]
+  // No `level` property. deriveLevel maps Observation -> 2, Insight -> 3.
+  const seed: Entity[] = [{ id: 'a', name: 'Alpha', ontologyClass: 'Observation' }]
+  const neighbour: Entity[] = [{ id: 'n1', name: 'Neighbour', ontologyClass: 'Insight' }]
+
+  const allVisible = {
+    focalNodeId: null,
+    searchQuery: '',
+    visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2, 3]),
+    selectedClasses: new Set<string>(['Observation', 'Insight']),
+  }
+
+  test('buildGraph stamps a derived level when the entity carries none', () => {
+    const g = buildGraph(seed, [], liveOntology, 'dark')
+    expect(g.getNodeAttribute('a', 'level')).toBe(2)
+  })
+
+  test('mergeIntoGraph stamps a derived level too — NOT undefined', () => {
+    const g = buildGraph(seed, [], liveOntology, 'dark')
+    mergeIntoGraph(g, { entities: neighbour, relations: [] }, liveOntology, 'dark')
+    expect(g.getNodeAttribute('n1', 'level')).toBe(3)
+  })
+
+  test('a merged node is visible with all Level boxes checked (regression)', () => {
+    const g = buildGraph(seed, [], liveOntology, 'dark')
+    mergeIntoGraph(g, { entities: neighbour, relations: [] }, liveOntology, 'dark')
+    // The bug: this was 'filter-hidden' while the seeded node was 'default'.
+    const merged = computeNodeState('n1', g.getNodeAttributes('n1') as never, allVisible)
+    const seeded = computeNodeState('a', g.getNodeAttributes('a') as never, allVisible)
+    expect({ merged, seeded }).toEqual({ merged: 'default', seeded: 'default' })
+  })
+
+  test('an unchecked Level still hides a merged node — the filter keeps working', () => {
+    const g = buildGraph(seed, [], liveOntology, 'dark')
+    mergeIntoGraph(g, { entities: neighbour, relations: [] }, liveOntology, 'dark')
+    // Insight derives to L3; uncheck it and the merged node must go.
+    const store = { ...allVisible, visibleLevels: new Set<0 | 1 | 2 | 3>([0, 1, 2]) }
+    expect(computeNodeState('n1', g.getNodeAttributes('n1') as never, store)).toBe('filter-hidden')
+    expect(computeNodeState('a', g.getNodeAttributes('a') as never, store)).toBe('default')
+  })
+})
+
+// -----------------------------------------------------------------------
 // Plan 55-05 — graph-builder threads shape/borderStyle/pulseRule onto
 // per-node attributes from the ApiClient ontology overlay payload. The
 // UI-SPEC §14 fallback chain is applied at build time:

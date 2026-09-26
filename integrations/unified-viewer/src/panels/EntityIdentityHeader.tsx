@@ -42,11 +42,14 @@ export function EntityIdentityHeader({ entity, theme, entities = [] }: EntityIde
   const className = entity.ontologyClass ?? 'Unclassified'
   const borderColor = classColor(className, theme)
 
-  // `entity.level` and `entity.parent` are set on 0 of 2801 live rows — no
+  // `entity.level` and `entity.parent` are set on 0 of 2809 live rows — no
   // writer has ever populated either — so these two slots printed `—` for
-  // every entity in every session until 2026-09-26. Fall back to the hierarchy
-  // the canvas is actually drawing. The stored field stays FIRST so a row that
-  // one day does carry it still wins; today nothing does.
+  // every entity in every session until 2026-09-26. Both now come from the
+  // hierarchy the canvas is actually drawing, and from nothing else: the
+  // stored fields were kept as the first operand of a `??` for a day, which
+  // only advertised a wire contract that does not exist. If a writer ever
+  // does populate them, restore the preference deliberately — and measure it
+  // first, because that is the assumption this whole file exists to correct.
   const hierarchyParents = useViewerStore((s) => s.hierarchyParents)
   const nameOf = useMemo(() => nameLookup(entities), [entities])
   const derived = useMemo(
@@ -60,9 +63,9 @@ export function EntityIdentityHeader({ entity, theme, entities = [] }: EntityIde
     [entity.id, entity.ontologyClass, hierarchyParents, nameOf],
   )
 
-  const levelValue = entity.level ?? derived.level
+  const levelValue = derived.level
   const level = levelValue !== null && levelValue !== undefined ? `L${levelValue}` : 'L—'
-  const parent = (entity.parent as string | undefined) ?? derived.parentName ?? '—'
+  const parent = derived.parentName ?? '—'
   // 2026-06-12: render timestamps in the viewer's local timezone. Raw
   // UTC ISO strings (`2026-06-12T05:28:07.593Z`) were confusing on a
   // CEST host where the wall clock showed 07:28.

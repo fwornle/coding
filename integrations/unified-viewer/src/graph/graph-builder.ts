@@ -365,6 +365,27 @@ export function mergeIntoGraph(
         : borderStyleFallback(e.ontologyClass, hasRelationsInPayload)
     const pulseRule: string | null =
       cls?.display?.pulseRule ?? pulseRuleFallback(e.ontologyClass)
+    // 2026-09-26: DERIVE, exactly as buildGraph does. This used to write
+    // `level: e.level` raw. No writer has ever set that field (0 of 2809 live
+    // rows), so every node added here got `level: undefined` — and
+    // computeNodeState reads undefined as `filter-hidden`, unconditionally. Any
+    // node this function added was therefore hidden the moment it arrived,
+    // whatever the Level checkboxes said. The test fixtures all carried an
+    // explicit `level`, the one shape live data never has, so the suite could
+    // not see it. Keep this in step with buildGraph's line.
+    //
+    // HOW FAR THAT GOT, measured rather than assumed: no operator can currently
+    // reach it. The only caller is handleDoubleClickNode, which on coding/v1
+    // first fetches `/api/v1/entities/:id/neighbors` — a route no backend
+    // mounts. Probed from the live page against obs-api :12436 it returns 404,
+    // and it is absent from km-core's canonical route list (router.ts), so the
+    // fetch rejects before any merge happens; SigmaCanvas calls the handler as
+    // `void handlers.handleDoubleClickNode(node)`, so that rejection is
+    // unhandled and a double-click silently does nothing. The okb branch takes
+    // expandFromLoadedRelations, which never merges — it only re-selects nodes
+    // already present. So this fix removes a trap that was waiting for whoever
+    // makes expand work, NOT a behaviour operators had lost.
+    const level = e.level ?? deriveLevel(e.ontologyClass)
 
     if (graph.hasNode(e.id)) {
       // Idempotent attribute merge — extends existing node without re-creating.
@@ -385,7 +406,7 @@ export function mergeIntoGraph(
         label: e.name,
         color,
         ontologyClass: e.ontologyClass,
-        level: e.level,
+        level,
         description: e.description,
         shape,
         borderStyle: nextBorder,
@@ -401,7 +422,7 @@ export function mergeIntoGraph(
         label: e.name,
         color,
         ontologyClass: e.ontologyClass,
-        level: e.level,
+        level,
         description: e.description,
         shape,
         borderStyle,
@@ -533,8 +554,14 @@ export function computeNodeState(
     if (!store.selectedTeams.has(team)) return 'filter-hidden'
   }
 
-  // Level predicate — entities always have a derived level (deriveLevel
-  // pins unknown classes to L0), so the Set membership is authoritative.
+  // Level predicate — `undefined` is EXCLUSION, not a pass, so this reads as
+  // authoritative Set membership only while every writer of the `level` node
+  // attribute derives it. Both do (buildGraph + mergeIntoGraph call
+  // deriveLevel, which pins unknown classes to L0). That was a claim rather
+  // than a fact until 2026-09-26: mergeIntoGraph wrote the never-populated
+  // wire field straight through, and this line then hid everything it added.
+  // A new writer that stamps `level` from a payload MUST derive, or its nodes
+  // vanish here with no error anywhere.
   const level = attrs.level as 0 | 1 | 2 | 3 | undefined
   const levelOk = level !== undefined && store.visibleLevels.has(level)
   if (!levelOk) return 'filter-hidden'
