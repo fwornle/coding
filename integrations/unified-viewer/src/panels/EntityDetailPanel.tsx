@@ -49,6 +49,7 @@ import CodeItTouches from './CodeItTouches'
 import { INTENT_EDGE } from '@/graph/intent-spine'
 import type { ReachInsight } from '@/graph/intent-code-reach'
 import { EntityIdentityHeader } from './EntityIdentityHeader'
+import { resolveHierarchyIdentity, nameLookup } from '@/graph/hierarchy-identity'
 import { InsightDocumentModal } from './InsightDocumentModal'
 import {
   CONFIDENCE_COLOR,
@@ -636,6 +637,22 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
     setExpandedGroup(null)
   }, [selectedNodeId])
 
+  // Parent / depth for the Identity section, off the SAME map the canvas
+  // collapses by — see graph/hierarchy-identity.ts for why these are derived
+  // rather than read off the entity.
+  const hierarchyParents = useViewerStore((s) => s.hierarchyParents)
+  const nameOf = useMemo(() => nameLookup(entities), [entities])
+  const hierarchyIdentity = useMemo(
+    () =>
+      resolveHierarchyIdentity({
+        entityId: entity?.id ?? '',
+        ontologyClass: entity?.ontologyClass,
+        hierarchyParents,
+        nameOf,
+      }),
+    [entity?.id, entity?.ontologyClass, hierarchyParents, nameOf],
+  )
+
   // Visibility predicate (UI-SPEC §8) — recomputed per entity.
   const visibility = useMemo(() => {
     if (!entity) return { showEvolution: false, showTimeline: false, showConfidence: false }
@@ -808,7 +825,7 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
   return (
     <div data-testid="entity-detail-panel" className="space-y-6 py-2">
       {/* Phase 55 — shared identity header (Task 1) */}
-      <EntityIdentityHeader entity={entity} theme={theme} />
+      <EntityIdentityHeader entity={entity} theme={theme} entities={entities} />
 
       {/* 2026-06-11: VKB-style "View Insight Document" card. Opens an
           in-app modal that fetches the .md from VKB and renders it with
@@ -908,8 +925,16 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
 
           <Section title="Identity" testId="entity-section-identity">
             <Kv label="Class" value={className} valueMono />
-            <Kv label="Level" value={String(entity.level ?? '—')} />
-            <Kv label="Parent" value={(entity.parent as string | undefined) ?? '—'} valueMono />
+            {/* Both fall back to the derived hierarchy: `entity.level` and
+                `entity.parent` are set on 0 of 2801 live rows, so reading them
+                alone made these two lines print `—` for every entity. Same
+                resolver the shared header uses, so the two cannot disagree. */}
+            <Kv label="Level" value={String(entity.level ?? hierarchyIdentity.level ?? '—')} />
+            <Kv
+              label="Parent"
+              value={(entity.parent as string | undefined) ?? hierarchyIdentity.parentName ?? '—'}
+              valueMono
+            />
             <Kv label="Created" value={formatLocalTimestamp(entity.createdAt as string | undefined)} tabularNums />
             <Kv
               label="Last confirmed"

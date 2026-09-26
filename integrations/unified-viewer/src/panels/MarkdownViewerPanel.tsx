@@ -469,7 +469,7 @@ export function MarkdownViewerPanel({ apiClient, system }: MarkdownViewerPanelPr
           Markdown panel's identity block with EntityDetailPanel. Renders ABOVE
           the markdown body so the class chip + L/parent/created/last-confirmed
           row stays visible whether the body is text or a fetched .md file. */}
-      <EntityIdentityHeader entity={entity} theme={theme} />
+      <EntityIdentityHeader entity={entity} theme={theme} entities={entities} />
 
       <div
         ref={contentRef}

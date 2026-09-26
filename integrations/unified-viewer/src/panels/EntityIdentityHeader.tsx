@@ -11,22 +11,58 @@
 //   - Meta row in text-xs text-muted-foreground tabular-nums:
 //     L{level} · parent · created · last confirmed
 // Missing fields render `—` (never blank) per UI-SPEC §16 row "Missing value placeholder".
+//
+// 2026-09-26: `level` and `parent` are no longer read from the entity alone.
+// Both wire fields are set on 0 of 2801 rows, so both slots printed `—` for
+// every entity ever selected. They now fall back to the derived hierarchy —
+// `L{level}` is ontology depth (System 0 … Detail 4) and `parent` is the row
+// the canvas draws the placing edge from. See graph/hierarchy-identity.ts.
 
+import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { classColor } from '@/graph/color-fallback'
+import { resolveHierarchyIdentity, nameLookup } from '@/graph/hierarchy-identity'
+import { useViewerStore } from '@/store/viewer-store'
 import type { Entity } from '@/graph/types'
 
 export interface EntityIdentityHeaderProps {
   entity: Entity
   theme: 'light' | 'dark'
+  /**
+   * The loaded entity list, for resolving a derived parent id to its NAME.
+   * Both consumers hold it already (`useGraphData`). Optional so a test can
+   * mount the header bare; omitting it means a derived parent renders as an
+   * id rather than a name, never as a wrong name.
+   */
+  entities?: readonly Entity[]
 }
 
 /** Shared chip block — see file header for contract. */
-export function EntityIdentityHeader({ entity, theme }: EntityIdentityHeaderProps) {
+export function EntityIdentityHeader({ entity, theme, entities = [] }: EntityIdentityHeaderProps) {
   const className = entity.ontologyClass ?? 'Unclassified'
   const borderColor = classColor(className, theme)
-  const level = entity.level !== undefined ? `L${entity.level}` : 'L—'
-  const parent = (entity.parent as string | undefined) ?? '—'
+
+  // `entity.level` and `entity.parent` are set on 0 of 2801 live rows — no
+  // writer has ever populated either — so these two slots printed `—` for
+  // every entity in every session until 2026-09-26. Fall back to the hierarchy
+  // the canvas is actually drawing. The stored field stays FIRST so a row that
+  // one day does carry it still wins; today nothing does.
+  const hierarchyParents = useViewerStore((s) => s.hierarchyParents)
+  const nameOf = useMemo(() => nameLookup(entities), [entities])
+  const derived = useMemo(
+    () =>
+      resolveHierarchyIdentity({
+        entityId: entity.id,
+        ontologyClass: entity.ontologyClass,
+        hierarchyParents,
+        nameOf,
+      }),
+    [entity.id, entity.ontologyClass, hierarchyParents, nameOf],
+  )
+
+  const levelValue = entity.level ?? derived.level
+  const level = levelValue !== null && levelValue !== undefined ? `L${levelValue}` : 'L—'
+  const parent = (entity.parent as string | undefined) ?? derived.parentName ?? '—'
   // 2026-06-12: render timestamps in the viewer's local timezone. Raw
   // UTC ISO strings (`2026-06-12T05:28:07.593Z`) were confusing on a
   // CEST host where the wall clock showed 07:28.

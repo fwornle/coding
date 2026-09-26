@@ -9,9 +9,10 @@
 //   4. Missing fields render `—` placeholder, never blank
 //   5. Theme prop drives classColor (dark vs light still produces a non-empty borderColor)
 
-import { describe, test, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, test, expect, beforeEach, afterEach } from 'vitest'
+import { render, screen, act } from '@testing-library/react'
 import { EntityIdentityHeader } from './EntityIdentityHeader'
+import { useViewerStore } from '@/store/viewer-store'
 import type { Entity } from '@/graph/types'
 
 const baseEntity: Entity = {
@@ -72,5 +73,81 @@ describe('EntityIdentityHeader (Plan 55-09 Task 1)', () => {
     const badge = screen.getByTestId('identity-class-badge')
     const style = badge.getAttribute('style') ?? ''
     expect(style).toMatch(/border-color/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 2026-09-26 regression: the two slots that could never show a value.
+//
+// Every test above passes an entity carrying `level` and `parent`. No live row
+// does — both fields are set on 0 of 2801 entities — so the suite was green
+// while the header printed `L— · parent: —` for every entity an operator ever
+// selected. These cases use the REAL row shape.
+// ---------------------------------------------------------------------------
+
+describe('EntityIdentityHeader — a real row has no .level/.parent, and must still say where it sits', () => {
+  const realShape: Entity = {
+    id: 'sub',
+    name: 'SpecstoryAdapter',
+    ontologyClass: 'SubComponent',
+    // no `level`, no `parent` — exactly what /api/v1/entities returns
+  }
+  const entities: Entity[] = [
+    { id: 'sub', name: 'SpecstoryAdapter', ontologyClass: 'SubComponent' },
+    { id: 'comp', name: 'LiveLoggingSystem', ontologyClass: 'Component' },
+  ]
+
+  beforeEach(() => {
+    act(() => { useViewerStore.setState({ hierarchyParents: new Map([['sub', 'comp']]) }) })
+  })
+  afterEach(() => {
+    act(() => { useViewerStore.setState({ hierarchyParents: new Map() }) })
+  })
+
+  test('renders the derived depth and the parent NAME, not two dashes', () => {
+    render(<EntityIdentityHeader entity={realShape} theme="light" entities={entities} />)
+    const meta = screen.getByTestId('identity-meta').textContent ?? ''
+    expect(meta).toContain('L3')
+    expect(meta).toContain('parent: LiveLoggingSystem')
+    expect(meta).not.toContain('L—')
+    expect(meta).not.toContain('parent: —')
+  })
+
+  test('a stored field still wins over the derived one', () => {
+    render(
+      <EntityIdentityHeader
+        entity={{ ...realShape, level: 0, parent: 'ExplicitlyStored' }}
+        theme="light"
+        entities={entities}
+      />,
+    )
+    const meta = screen.getByTestId('identity-meta').textContent ?? ''
+    expect(meta).toContain('L0')
+    expect(meta).toContain('parent: ExplicitlyStored')
+  })
+
+  test('a row with no parent in the map renders `parent: —`', () => {
+    act(() => { useViewerStore.setState({ hierarchyParents: new Map() }) })
+    render(<EntityIdentityHeader entity={realShape} theme="light" entities={entities} />)
+    expect(screen.getByTestId('identity-meta').textContent).toContain('parent: —')
+  })
+
+  test('a parent the store does not hold shows its id, so a broken reference does not read as a root', () => {
+    act(() => { useViewerStore.setState({ hierarchyParents: new Map([['sub', 'ghost-id']]) }) })
+    render(<EntityIdentityHeader entity={realShape} theme="light" entities={entities} />)
+    const meta = screen.getByTestId('identity-meta').textContent ?? ''
+    expect(meta).toContain('ghost-id')
+    expect(meta).not.toContain('parent: —')
+  })
+
+  test('a class outside the hierarchy ladder gets no fabricated depth', () => {
+    render(
+      <EntityIdentityHeader
+        entity={{ id: 'o1', name: 'An Observation', ontologyClass: 'Observation' }}
+        theme="light"
+        entities={entities}
+      />,
+    )
+    expect(screen.getByTestId('identity-meta').textContent).toContain('L—')
   })
 })
