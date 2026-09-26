@@ -104,8 +104,30 @@ const READ_PATTERNS = [
   /\b(?:metadata|meta|md)\s*\??\.\s*\[\s*['"]([^'"]+)['"]\s*\]/g,
 ];
 
-/** Property names on the bag itself, not keys in it. */
-const NOT_KEYS = new Set(['length', 'map', 'filter', 'forEach', 'get', 'set', 'has', 'keys', 'values', 'entries', 'slice', 'push', 'find', 'some', 'every', 'sort', 'join', 'includes', 'toString', 'title', 'cause', 'color', 'icon', 'label']);
+/**
+ * Names that are NOT metadata keys.
+ *
+ * Two families, both learned from the first run of this script, which reported
+ * ten dead reads of which four were its own noise:
+ *   - methods called ON the bag or on a string held in a variable named `meta`
+ *     / `md` (`meta.replace(...)`, `md.split(...)`). A lint that cannot tell a
+ *     property from a method call will cry wolf, and a checker nobody believes
+ *     is worse than no checker.
+ *   - `title` / `cause` / `color` / `icon` / `label`, which are local label
+ *     lookups in GraphQualityPanel and IssueTriageView, not entity metadata.
+ */
+const NOT_KEYS = new Set([
+  // Array / Map / Set surface
+  'length', 'map', 'filter', 'forEach', 'get', 'set', 'has', 'keys', 'values',
+  'entries', 'slice', 'push', 'find', 'some', 'every', 'sort', 'join',
+  'includes', 'toString', 'indexOf', 'reduce', 'flat', 'concat', 'at',
+  // String surface
+  'replace', 'replaceAll', 'split', 'match', 'matchAll', 'trim', 'trimStart',
+  'trimEnd', 'toLowerCase', 'toUpperCase', 'startsWith', 'endsWith', 'padEnd',
+  'padStart', 'substring', 'charAt', 'repeat', 'normalize',
+  // Local label lookups that merely share a variable name
+  'title', 'cause', 'color', 'icon', 'label',
+]);
 
 function collectReads() {
   /** @type {Map<string, Set<string>>} key -> files that read it */
@@ -116,10 +138,14 @@ function collectReads() {
     const code = text
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '');
+    // `import.meta.env` is Vite's build-time env, not an entity's metadata bag.
+    // The bare `meta.` pattern below cannot tell them apart, and this file has
+    // a dozen of them, so remove the construct before matching.
+    const scrubbed = code.replace(/\bimport\s*\.\s*meta\b/g, '__IMPORT_META__');
     for (const re of READ_PATTERNS) {
       re.lastIndex = 0;
       let m;
-      while ((m = re.exec(code)) !== null) {
+      while ((m = re.exec(scrubbed)) !== null) {
         const key = m[1];
         if (NOT_KEYS.has(key)) continue;
         if (!reads.has(key)) reads.set(key, new Set());
