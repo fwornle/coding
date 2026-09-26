@@ -147,6 +147,7 @@ nav:
     - Constraint Testing: guides/constraint-testing.md
     - Continuous Integration: ci/README.md
     - Knowledge Workflows: guides/knowledge-workflows.md
+    - Reading the Graph: guides/viewer-detail-levels.md
     - Skills System: guides/skills-system.md
   - Reference:
     - Overview: reference/index.md
