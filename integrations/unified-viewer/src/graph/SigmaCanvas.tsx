@@ -153,13 +153,12 @@ function GraphSetup({ apiClient, system }: { apiClient: ApiClient; system: Syste
 
     // Wire event handlers — closure over the just-built graph.
     const handlers = makeEventHandlers({
-      apiClient,
       graph,
-      getOntology: () => ontology,
-      getTheme: () => theme,
-      // Phase 61-02: the okb (legacy) double-click path computes a 1-hop
-      // neighborhood client-side from the loaded relation set (OKM has no
-      // neighbors endpoint). coding/v1 ignores this and uses getNeighbors.
+      // The double-click expand's only source, for every backend. It used to
+      // be the okb branch's workaround for OKM having no neighbors endpoint,
+      // while coding was believed to fetch one; no backend mounts that route,
+      // so this is now the single path. Cheap and correct here because the
+      // whole relation set is already loaded.
       getLoadedRelations: () => relations,
       setStore: useViewerStore.setState,
       setHoveredNode,

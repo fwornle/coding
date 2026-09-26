@@ -55,11 +55,6 @@ export interface OntologyClass {
   }
 }
 
-export interface NeighborhoodPayload {
-  entities: Entity[]
-  relations: Relation[]
-}
-
 /**
  * Per-node render state — drives the nodeReducer overlay table in
  * UI-SPEC § Color State color overlays (lines 142-152).

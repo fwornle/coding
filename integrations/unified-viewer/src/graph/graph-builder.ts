@@ -322,144 +322,6 @@ export function buildGraph(
 }
 
 /**
- * Merge new entities + relations into an existing graphology Graph
- * idempotently. Returns the count of newly-added nodes (for caller's
- * "did anything actually expand?" decision).
- *
- * T-45-02-04 mitigation: double-clicking the same node twice MUST NOT
- * grow `graph.order` — verified by node-renderer tests.
- */
-export function mergeIntoGraph(
-  graph: Graph,
-  payload: { entities: ReadonlyArray<Entity>; relations: ReadonlyArray<Relation> },
-  ontology: ReadonlyArray<OntologyClass>,
-  theme: 'light' | 'dark',
-): number {
-  const before = graph.order
-  const registryMap = new Map<string, ClassRegistryEntry>()
-  for (const c of ontology) registryMap.set(c.name, c as ClassRegistryEntry)
-  // For incremental merges we cannot trivially recompute the orphan rule
-  // for every PRE-EXISTING node (that would require a full graph scan on
-  // every neighbor expand). Strategy:
-  //   - For the NEW nodes in this payload, compute "has relation in this
-  //     payload's relation set" — same as buildGraph does for the full
-  //     payload.
-  //   - For nodes that GAIN a relation through this merge, flip their
-  //     `borderStyle` to 'solid' if currently 'dashed' AND they didn't
-  //     come in with an explicit overlay 'dashed' (we can't easily tell
-  //     after the fact, so we re-derive from current ontology overlay).
-  //     This keeps the visual contract correct over time.
-  for (const e of payload.entities) {
-    const cls = ontology.find((c) => c.name === e.ontologyClass)
-    const color = nodeFillColor(e.ontologyClass, registryMap, theme)
-    // Plan 55-05 attrs — derive at merge time. For the brand-new node
-    // path, hasRelations is computed from the payload's relations.
-    const shape = nodeShapeFor(e.ontologyClass, registryMap)
-    const hasRelationsInPayload = payload.relations.some(
-      (r) => r.from === e.id || r.to === e.id,
-    )
-    const overlayBorder = cls?.display?.borderStyle
-    const borderStyle: 'solid' | 'dashed' =
-      overlayBorder === 'dashed'
-        ? 'dashed'
-        : borderStyleFallback(e.ontologyClass, hasRelationsInPayload)
-    const pulseRule: string | null =
-      cls?.display?.pulseRule ?? pulseRuleFallback(e.ontologyClass)
-    // 2026-09-26: DERIVE, exactly as buildGraph does. This used to write
-    // `level: e.level` raw. No writer has ever set that field (0 of 2809 live
-    // rows), so every node added here got `level: undefined` — and
-    // computeNodeState reads undefined as `filter-hidden`, unconditionally. Any
-    // node this function added was therefore hidden the moment it arrived,
-    // whatever the Level checkboxes said. The test fixtures all carried an
-    // explicit `level`, the one shape live data never has, so the suite could
-    // not see it. Keep this in step with buildGraph's line.
-    //
-    // HOW FAR THAT GOT, measured rather than assumed: no operator can currently
-    // reach it. The only caller is handleDoubleClickNode, which on coding/v1
-    // first fetches `/api/v1/entities/:id/neighbors` — a route no backend
-    // mounts. Probed from the live page against obs-api :12436 it returns 404,
-    // and it is absent from km-core's canonical route list (router.ts), so the
-    // fetch rejects before any merge happens; SigmaCanvas calls the handler as
-    // `void handlers.handleDoubleClickNode(node)`, so that rejection is
-    // unhandled and a double-click silently does nothing. The okb branch takes
-    // expandFromLoadedRelations, which never merges — it only re-selects nodes
-    // already present. So this fix removes a trap that was waiting for whoever
-    // makes expand work, NOT a behaviour operators had lost.
-    const level = e.level ?? deriveLevel(e.ontologyClass)
-
-    if (graph.hasNode(e.id)) {
-      // Idempotent attribute merge — extends existing node without re-creating.
-      // For existing nodes, only flip `borderStyle` from 'dashed' to 'solid'
-      // if THIS merge introduces a relation that makes it non-orphan
-      // (and the overlay doesn't say 'dashed').
-      const existingBorder = graph.getNodeAttribute(e.id, 'borderStyle') as
-        | 'solid'
-        | 'dashed'
-        | undefined
-      const nextBorder: 'solid' | 'dashed' =
-        overlayBorder === 'dashed'
-          ? 'dashed'
-          : hasRelationsInPayload || existingBorder === 'solid'
-            ? 'solid'
-            : (existingBorder ?? 'dashed')
-      graph.mergeNodeAttributes(e.id, {
-        label: e.name,
-        color,
-        ontologyClass: e.ontologyClass,
-        level,
-        description: e.description,
-        shape,
-        borderStyle: nextBorder,
-        pulseRule,
-        updatedAt: (e as { updatedAt?: string }).updatedAt,
-        metadata: e.metadata,
-      })
-    } else {
-      graph.addNode(e.id, {
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: 2,
-        label: e.name,
-        color,
-        ontologyClass: e.ontologyClass,
-        level,
-        description: e.description,
-        shape,
-        borderStyle,
-        pulseRule,
-        updatedAt: (e as { updatedAt?: string }).updatedAt,
-        metadata: e.metadata,
-      })
-    }
-  }
-  for (const r of payload.relations) {
-    if (!graph.hasNode(r.from) || !graph.hasNode(r.to)) continue
-    // See buildGraph note — fixed hex edges so sigma's WebGL renderer
-    // actually shows them. `type` is Sigma's program selector, so the
-    // actual relation type lives under `relationType`.
-    graph.mergeEdge(r.from, r.to, { size: 1.5, color: '#cbd5e1', relationType: r.type })
-    // Flip endpoints' borderStyle from 'dashed' → 'solid' on edge add
-    // UNLESS their ontology overlay opts into 'dashed' explicitly. We
-    // don't have ontology lookup here, so optimistically clear the
-    // orphan flag — subsequent ontology overlay refreshes can re-apply.
-    for (const endpoint of [r.from, r.to]) {
-      const cur = graph.getNodeAttribute(endpoint, 'borderStyle')
-      if (cur === 'dashed') {
-        const cls = graph.getNodeAttribute(endpoint, 'ontologyClass') as
-          | string
-          | undefined
-        const overlay = ontology.find((c) => c.name === cls)?.display
-          ?.borderStyle
-        if (overlay !== 'dashed') {
-          graph.setNodeAttribute(endpoint, 'borderStyle', 'solid')
-        }
-      }
-    }
-  }
-  return graph.order - before
-}
-
-/**
  * Resolve the rendering state for a single node, given the current
  * Zustand store snapshot. Implements UI-SPEC § Color State table —
  * the precedence ordering matters:
@@ -556,12 +418,15 @@ export function computeNodeState(
 
   // Level predicate — `undefined` is EXCLUSION, not a pass, so this reads as
   // authoritative Set membership only while every writer of the `level` node
-  // attribute derives it. Both do (buildGraph + mergeIntoGraph call
-  // deriveLevel, which pins unknown classes to L0). That was a claim rather
-  // than a fact until 2026-09-26: mergeIntoGraph wrote the never-populated
-  // wire field straight through, and this line then hid everything it added.
-  // A new writer that stamps `level` from a payload MUST derive, or its nodes
-  // vanish here with no error anywhere.
+  // attribute derives it. There is exactly one writer today, buildGraph, and
+  // it calls deriveLevel (which pins unknown classes to L0).
+  //
+  // That was a claim rather than a fact until 2026-09-26. mergeIntoGraph, then
+  // the second writer, stamped the wire's `level` straight through — a field
+  // no writer has ever populated — so this line silently hid every node it
+  // added. It has since been removed with the expand path that called it.
+  // A NEW writer that stamps `level` from a payload MUST derive it, or its
+  // nodes vanish here with no error anywhere.
   const level = attrs.level as 0 | 1 | 2 | 3 | undefined
   const levelOk = level !== undefined && store.visibleLevels.has(level)
   if (!levelOk) return 'filter-hidden'

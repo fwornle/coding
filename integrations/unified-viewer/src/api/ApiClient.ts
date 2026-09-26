@@ -106,13 +106,6 @@ export interface OntologyClass {
   }
 }
 
-/** Entity neighborhood payload (Phase 44 /api/v1/entities/:id/neighbors). */
-export interface NeighborhoodPayload {
-  entity: Entity
-  neighbors: Entity[]
-  relations: Relation[]
-}
-
 /**
  * Phase 55 — confidence payload returned by `/api/v1/entities/:id/confidence`.
  * UI-SPEC §18 row 8. Backend wired in Plan 55-06; the EntityDetailPanel
@@ -173,16 +166,6 @@ export class ApiClient {
     return this.apiVersion === 'legacy'
       ? canonical.replace('/api/v1/', '/api/')
       : canonical
-  }
-
-  /**
-   * Phase 61-02 — OKM Express exposes NO neighbors endpoint (404 on every
-   * variant). Callers branch on this to decide between the server-side
-   * getNeighbors fetch (coding/v1) and a client-side 1-hop computation from
-   * the already-loaded relation set (okb/legacy). True only for v1.
-   */
-  supportsServerNeighbors(): boolean {
-    return this.apiVersion === 'v1'
   }
 
   private async get<T>(path: string): Promise<T> {
@@ -374,12 +357,6 @@ export class ApiClient {
     return this.get<string[]>(this.apiPath('/api/v1/ontology/classes'))
   }
 
-  getNeighbors(id: string, depth = 1): Promise<NeighborhoodPayload> {
-    const safeId = encodeURIComponent(id)
-    return this.get<NeighborhoodPayload>(
-      this.apiPath(`/api/v1/entities/${safeId}/neighbors?depth=${depth}`),
-    )
-  }
 
   /**
    * The predefined team/project registry (config/teams/, served by obs-api at
