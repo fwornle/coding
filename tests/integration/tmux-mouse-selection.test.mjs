@@ -21,7 +21,8 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,13 +49,46 @@ function shippedBindings() {
 const tmux = (...args) =>
   execFileSync('tmux', ['-L', SOCKET, ...args], { encoding: 'utf8' }).trim();
 
+/**
+ * Stop the server and wait for it to actually be gone.
+ *
+ * `kill-server` returns as soon as the request is sent, not when the socket is
+ * released. Starting a new session into that window makes the client attach to
+ * a server on its way out and fail with "server exited unexpectedly" — which is
+ * what CI hit once the run before it left a server behind.
+ */
+function killServer() {
+  try { execFileSync('tmux', ['-L', SOCKET, 'kill-server'], { stdio: 'ignore' }); }
+  catch { return; }   // nothing was running
+  for (let i = 0; i < 50; i++) {
+    const alive = spawnSync('tmux', ['-L', SOCKET, 'has-session'], { stdio: 'ignore' }).status === 0;
+    if (!alive) return;
+    execFileSync('sleep', ['0.1']);
+  }
+}
+
 function startSession({ grab }) {
-  try { execFileSync('tmux', ['-L', SOCKET, 'kill-server'], { stdio: 'ignore' }); } catch { /* none running */ }
+  killServer();
   execFileSync('tmux', ['-L', SOCKET, 'new-session', '-d', '-s', 't',
     '-x', '100', '-y', '24', `${APP} ${grab ? 'grab' : 'nograb'}`]);
   tmux('set-option', '-g', 'mouse', 'on');
-  execFileSync('tmux', ['-L', SOCKET, 'source-file', '/dev/stdin'],
-    { input: shippedBindings() });
+  // Via a real file, NOT `source-file /dev/stdin` with `{ input }`.
+  //
+  // `source-file` is executed by the tmux SERVER, a daemon that long outlives
+  // the client invocation — so `/dev/stdin` is the SERVER's fd 0, never the
+  // pipe `input` writes to. On Linux that path is /proc/self/fd/0 and the
+  // server's stdin is closed, so opening it fails with ENXIO:
+  //   "/dev/stdin: No such device or address"
+  // macOS resolves /dev/stdin differently and happens to succeed, which is why
+  // this passed on every developer machine and failed on every CI run.
+  const dir = mkdtempSync(path.join(tmpdir(), 'tmux-mouse-'));
+  const conf = path.join(dir, 'bindings.conf');
+  try {
+    writeFileSync(conf, shippedBindings());
+    execFileSync('tmux', ['-L', SOCKET, 'source-file', conf]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
   // The app announces its mouse modes after it starts; the flag is not set at
   // the instant new-session returns.
   const want = grab ? '1' : '0';
@@ -71,10 +105,11 @@ function drag(steps) {
   catch { return ''; }   // empty selection copies nothing and creates no buffer
 }
 
+/** Columns 10-29 of the fixture's line 3, the span the drag covers. */
+const SPAN = 'aaaa bbbb cccc dddd ';
+
 describe('tmux drag-to-select', { skip: SKIP }, () => {
-  after(() => {
-    try { execFileSync('tmux', ['-L', SOCKET, 'kill-server'], { stdio: 'ignore' }); } catch { /* gone */ }
-  });
+  after(() => { killServer(); });
 
   test('the agent holding the mouse is what breaks it', () => {
     startSession({ grab: true });
@@ -90,7 +125,16 @@ describe('tmux drag-to-select', { skip: SKIP }, () => {
     startSession({ grab: false });
     assert.equal(tmux('display-message', '-p', '#{mouse_any_flag}'), '0');
     const copied = drag('down:10:3,move:15:3,move:22:3,move:30:3,up:30:3');
-    assert.equal(copied, 'aaaa bbbb cccc dddd ');
+    // Whether the cell UNDER the cursor at MouseDragEnd joins the selection
+    // depends on whether the last motion event was handled separately or
+    // coalesced with the release. Both are correct tmux and which one happens
+    // is machine-speed dependent: idle, this copies 20 chars; under full-suite
+    // load the same gesture copies 21, and the grab case likewise went 5 -> 6.
+    // Pinning the exact boundary cell made the suite fail only when busy, which
+    // is how this reached CI. The behaviour under test is the SPAN — 20 copied
+    // against the collapsed case's 6 — so assert that and not the race.
+    assert.ok(copied === SPAN || copied === `${SPAN}e`,
+      `expected the whole dragged span, got ${JSON.stringify(copied)}`);
   });
 });
 
