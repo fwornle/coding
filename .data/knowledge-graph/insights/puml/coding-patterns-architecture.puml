@@ -1,35 +1,34 @@
 @startuml
 !include _standard-style.puml
 
-package "Root Level (Onboarding)" {
-  component "CLAUDE.md" as claude <<cli>>
-  component "README.md" as readme <<cli>>
-  component "INSTALL_WINDOWS.md" as install <<cli>>
-  component "docker/README.md" as dockerreadme <<cli>>
+package "Documentation Conventions" {
+  component "Style Guide (docs/puml)" as styleGuide <<core>>
+  component "Post-Rewrite Render Triage" as renderTriage <<core>>
 }
 
-package "docs/architecture (Deep Concepts)" {
-  component "architecture/README.md (index)" as archindex <<core>>
-  component "llm-routing.md" as llmrouting <<core>>
-  component "memory-systems.md" as memsys <<core>>
-  component "system-overview.md" as sysoverview <<core>>
+package "Test Integrity Patterns" {
+  component "suiteOwnership() Guard" as suiteGuard <<agent>>
+  component "Test Inventory (node:test)" as testInventory <<agent>>
+  component "Metadata Merge Bug Discipline" as mergeBug <<core>>
 }
 
-package "Diagram Source/Output Pairing" {
-  component "docs/puml/*.puml" as pumlsrc <<storage>>
-  component "docs/images/*.png" as pngout <<storage>>
-  component "docs-content/images/" as mkdocsimg <<storage>>
+package "CI Pipeline Patterns" {
+  component "Build/Test Gate Wiring" as ciGate <<cli>>
+  component ".gitignore / Lockfile Check" as gitignoreCheck <<cli>>
 }
 
-claude --> archindex : "points to deep docs"
-readme --> claude : "references guidelines"
+component "CodingPatterns" as codingPatterns <<component>>
 
-archindex --> llmrouting : "indexes"
-archindex --> memsys : "indexes"
-archindex --> sysoverview : "indexes"
+codingPatterns ..> styleGuide : "aggregates"
+codingPatterns ..> renderTriage : "aggregates"
+codingPatterns ..> suiteGuard : "aggregates"
+codingPatterns ..> testInventory : "aggregates"
+codingPatterns ..> mergeBug : "aggregates"
+codingPatterns ..> ciGate : "aggregates"
+codingPatterns ..> gitignoreCheck : "aggregates"
 
-pumlsrc --> pngout : "rendered into"
-pngout ..> mkdocsimg : "distinct from (not mixed)"
-archindex ..> pumlsrc : "diagrams embedded via"
+suiteGuard --> testInventory : "prevents silent exclusion"
+ciGate --> gitignoreCheck : "diagnoses CI-only failures"
+mergeBug --> renderTriage : "requires re-measurement discipline"
 
 @enduml

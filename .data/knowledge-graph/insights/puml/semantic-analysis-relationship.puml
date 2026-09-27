@@ -11,16 +11,11 @@ title Hierarchy Context: SemanticAnalysis
 [KnowledgeManagement] as knowledge_management #F0F0F0
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
-[Ontology] as ontology #E8F5E8
 [Pipeline] as pipeline #E8F5E8
-[Insights] as insights #E8F5E8
-[OntologyClassificationAgent] as ontology_classification_agent #E8F5E8
-[SemanticAnalysisAgent] as semantic_analysis_agent #E8F5E8
-[BaseAgentFramework] as base_agent_framework #E8F5E8
-[L2RefinementClassifier] as l2_refinement_classifier #E8F5E8
+[Ontology] as ontology #E8F5E8
 [HealthCoordinator] as health_coordinator #E8F5E8
-[AgentLauncherConfigs] as agent_launcher_configs #E8F5E8
-[NoUnboundedFsScanGuard] as no_unbounded_fs_scan_guard #E8F5E8
+[AgentLaunchers] as agent_launchers #E8F5E8
+[PiExtensions] as pi_extensions #E8F5E8
 
 coding --> semantic_analysis
 live_logging_system -[hidden]- semantic_analysis
@@ -29,15 +24,10 @@ dockerized_services -[hidden]- semantic_analysis
 knowledge_management -[hidden]- semantic_analysis
 coding_patterns -[hidden]- semantic_analysis
 constraint_system -[hidden]- semantic_analysis
-semantic_analysis --> ontology
 semantic_analysis --> pipeline
-semantic_analysis --> insights
-semantic_analysis --> ontology_classification_agent
-semantic_analysis --> semantic_analysis_agent
-semantic_analysis --> base_agent_framework
-semantic_analysis --> l2_refinement_classifier
+semantic_analysis --> ontology
 semantic_analysis --> health_coordinator
-semantic_analysis --> agent_launcher_configs
-semantic_analysis --> no_unbounded_fs_scan_guard
+semantic_analysis --> agent_launchers
+semantic_analysis --> pi_extensions
 
 @enduml

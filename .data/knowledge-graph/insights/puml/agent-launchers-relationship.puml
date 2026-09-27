@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: AgentLaunchers
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[AgentLaunchers] as agent_launchers #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[PiExtensions] as pi_extensions #F0F0F0
+[AgentDefinitionScripts] as agent_definition_scripts #E8F5E8
+[OpenCodeProxyRoutingConfig] as open_code_proxy_routing_config #E8F5E8
+[NoUnboundedFsScanExtension] as no_unbounded_fs_scan_extension #E8F5E8
+
+semantic_analysis --> agent_launchers
+pipeline -[hidden]- agent_launchers
+ontology -[hidden]- agent_launchers
+health_coordinator -[hidden]- agent_launchers
+pi_extensions -[hidden]- agent_launchers
+agent_launchers --> agent_definition_scripts
+agent_launchers --> open_code_proxy_routing_config
+agent_launchers --> no_unbounded_fs_scan_extension
+
+@enduml

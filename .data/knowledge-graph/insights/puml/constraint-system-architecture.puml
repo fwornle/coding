@@ -1,37 +1,40 @@
 @startuml
 !include _standard-style.puml
 
-package "HookManagementSystem" {
-  component "hook-config.js\n(HookConfigLoader)" as config <<core>>
-  component "hook-manager.js\n(UnifiedHookManager)" as manager <<core>>
-  component "Statusline Click-Handler" as statusline <<cli>>
+package "Hook Management" {
+  component "UnifiedHookManager" as hookmgr <<core>>
+  component "HookConfigLoader" as cfgloader <<core>>
+  database "hooks.json (user/project)" as cfgfiles
 }
 
-package "ConstraintCapture" {
-  component "violation-capture-service.js" as capture <<core>>
+package "Violation Capture" {
+  component "ViolationCaptureService" as vcs <<core>>
   component "sanitizeParams()" as sanitize <<core>>
-  database "Session JSONL Log" as jsonl
-  database "violation-history.json\n(capped 1000)" as history
+  database "session-violations.jsonl" as jsonl
+  database "violation-history.json" as rollup
 }
 
-package "HealthDashboards" {
-  component "health-prompt-hook.js\n(status aggregator)" as aggregator <<api>>
-  component "constraint-monitor dashboard\n(Next.js)" as dashboard <<api>>
-  component "system-health-dashboard\n(Vite)" as sysdash <<api>>
+package "Dashboards & UX" {
+  component "health-prompt-hook.js" as aggregator <<core>>
+  component "constraint-monitor (Next.js)" as constraintdash <<external>>
+  component "system-health-dashboard (Vite)" as healthdash <<external>>
+  component "tmux Statusline" as statusline <<cli>>
 }
 
-config --> manager : "user + project config merge"
-manager --> capture : "dispatches violation events"
-capture --> sanitize : "redacts sensitive fields"
-sanitize --> jsonl : "append-only raw events"
-sanitize --> history : "rolling aggregate stats"
+cfgfiles --> cfgloader : "loads user+project config"
+cfgloader --> hookmgr : "provides merged handlers"
+hookmgr --> vcs : "dispatches violation events"
 
-history --> aggregator : "feeds statistics"
-jsonl ..> aggregator : "recoverable history"
-aggregator --> dashboard : "constraint violations UI"
-aggregator --> sysdash : "operational metrics"
+vcs --> sanitize : "redacts sensitive params"
+sanitize --> jsonl : "writes append-only log"
+sanitize --> rollup : "updates capped (1000) rollup"
 
-statusline --> dashboard : "click opens/focuses tab"
-manager --> statusline : "violation state surfaced"
+jsonl --> aggregator : "full history read"
+rollup --> aggregator : "aggregated stats"
+
+aggregator --> constraintdash : "feeds violation data"
+aggregator --> healthdash : "feeds violation data"
+
+statusline --> constraintdash : "click opens/focuses tab"
 
 @enduml

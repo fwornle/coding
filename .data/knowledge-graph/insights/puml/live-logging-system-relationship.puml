@@ -11,12 +11,11 @@ title Hierarchy Context: LiveLoggingSystem
 [CodingPatterns] as coding_patterns #F0F0F0
 [ConstraintSystem] as constraint_system #F0F0F0
 [SemanticAnalysis] as semantic_analysis #F0F0F0
-[ObservationWriter] as observation_writer #E8F5E8
-[ObservationConsolidator] as observation_consolidator #E8F5E8
-[MentionsClassifier] as mentions_classifier #E8F5E8
-[EnhancedTranscriptMonitor] as enhanced_transcript_monitor #E8F5E8
-[TokenUsageAdapters] as token_usage_adapters #E8F5E8
-[ClaudeJsonlTreeAdapter] as claude_jsonl_tree_adapter #E8F5E8
+[LSLConfigValidator] as lslconfig_validator #E8F5E8
+[SessionFactIndex] as session_fact_index #E8F5E8
+[ObservationPipeline] as observation_pipeline #E8F5E8
+[TranscriptAdapters] as transcript_adapters #E8F5E8
+[TmuxSessionWrapper] as tmux_session_wrapper #E8F5E8
 
 coding --> live_logging_system
 llmabstraction -[hidden]- live_logging_system
@@ -25,11 +24,10 @@ knowledge_management -[hidden]- live_logging_system
 coding_patterns -[hidden]- live_logging_system
 constraint_system -[hidden]- live_logging_system
 semantic_analysis -[hidden]- live_logging_system
-live_logging_system --> observation_writer
-live_logging_system --> observation_consolidator
-live_logging_system --> mentions_classifier
-live_logging_system --> enhanced_transcript_monitor
-live_logging_system --> token_usage_adapters
-live_logging_system --> claude_jsonl_tree_adapter
+live_logging_system --> lslconfig_validator
+live_logging_system --> session_fact_index
+live_logging_system --> observation_pipeline
+live_logging_system --> transcript_adapters
+live_logging_system --> tmux_session_wrapper
 
 @enduml

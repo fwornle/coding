@@ -1,0 +1,29 @@
+@startuml
+!include _standard-style.puml
+
+package "Manifest / Graph State" {
+  component "Manifest-level\nEntity Descriptions" as manifest <<storage>>
+  component "Graph-level\nEntity Descriptions" as graph <<storage>>
+  component "capturedBy\nEdge Counts" as edges <<storage>>
+}
+
+package "Metadata Merge Bug Fix (Multi-Stage)" {
+  component "Merge Process" as merge <<core>>
+  component "Stage-wise\nVerification" as verify <<core>>
+  component "Published\nDocumentation Page" as docs <<external>>
+}
+
+package "Adjacent Integrity Concern" {
+  component "suiteOwnership() Guard\n(Test Suite Enforcement)" as suiteGuard <<agent>>
+}
+
+manifest --> merge : "merged with"
+graph --> merge : "merged with"
+merge --> edges : "destabilizes/stabilizes"
+merge --> verify : "checked at each stage"
+verify --> docs : "publishes freshly\nmeasured figures"
+edges --> verify : "must be re-measured"
+
+suiteGuard ..> merge : "same drift pattern\n(silent state divergence)"
+
+@enduml

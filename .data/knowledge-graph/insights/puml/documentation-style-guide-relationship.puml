@@ -5,11 +5,17 @@ title Hierarchy Context: DocumentationStyleGuide
 
 [CodingPatterns] as coding_patterns #FFFFDD
 [DocumentationStyleGuide] as documentation_style_guide #LightBlue
-[ErrorTriageDiscipline] as error_triage_discipline #F0F0F0
+[TestingPractices] as testing_practices #F0F0F0
+[DataIntegrityPatterns] as data_integrity_patterns #F0F0F0
 [PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+[ArchitectureGuidelines] as architecture_guidelines #F0F0F0
+[EntityPatternAnalyzer] as entity_pattern_analyzer #F0F0F0
 
 coding_patterns --> documentation_style_guide
-error_triage_discipline -[hidden]- documentation_style_guide
+testing_practices -[hidden]- documentation_style_guide
+data_integrity_patterns -[hidden]- documentation_style_guide
 pattern_verification_tooling -[hidden]- documentation_style_guide
+architecture_guidelines -[hidden]- documentation_style_guide
+entity_pattern_analyzer -[hidden]- documentation_style_guide
 
 @enduml

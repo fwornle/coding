@@ -2,36 +2,35 @@
 !include _standard-style.puml
 
 package "Claude Hook Runtime" {
-  component "main()" as main <<core>>
-  component "checkHealthStatus()" as check <<core>>
-  component "deriveSummary()" as derive <<core>>
-  component "outputEnvelope()/outputHealthContext()" as envelope <<core>>
+  component "health-prompt-hook.js\nmain()" as main <<core>>
+  component "checkHealthStatus()\n(Q3 carve-out)" as check <<core>>
+  component "deriveSummary()\n(allow-listed projection)" as derive <<core>>
+  component "outputEnvelope()\n(SPEC R8)" as envelope <<core>>
+  component "outputHealthContext()\n(emoji mapping)" as context <<core>>
 }
 
-package "Environment Detection" {
-  component "health-verifier.js existence check" as verifierCheck <<cli>>
+package "External Dependencies" {
+  cloud "health-coordinator\n/health/state" as coordinator <<external>>
+  component "health-verifier.js\n(existsSync sentinel)" as verifier <<external>>
 }
 
-package "External Coordinator" {
-  cloud "/health/state endpoint" as coordinator <<external>>
+package "Consumers" {
+  component "Next.js constraint-monitor\ndashboard" as nextjs <<agent>>
+  component "Vite system-health\ndashboard" as vite <<agent>>
+  component "obs-api coverage metric\n(known bug)" as obsapi <<external>>
 }
 
-package "Consumer Dashboards" {
-  component "Constraint-Monitor (Next.js)" as nextDash <<external>>
-  component "System-Health-Dashboard (Vite)" as viteDash <<external>>
-}
+main --> check : "invokes"
+check --> verifier : "existsSync check (in-repo heuristic)"
+check --> coordinator : "HTTP GET /health/state"
+coordinator --> derive : "raw JSON state"
+derive --> envelope : "fixed-format summary strings"
+envelope --> context : "hookSpecificOutput"
+context --> nextjs : "shared string vocabulary"
+context --> vite : "shared string vocabulary"
 
-component "health-prompt-hook-stall.test.mjs" as test <<agent>>
+obsapi ..> coordinator : "upstream data\n(skewed ratio)"
 
-main --> check : "invokes, catches all errors"
-check --> coordinator : "fetch()"
-check --> verifierCheck : "Q3 carve-out heuristic"
-check --> derive : "state.knowledge_pipeline.status"
-derive --> envelope : "summary (issue/no-issue)"
-check --> envelope : "unknown status (SPEC R6)"
-main --> envelope : "fallback on fatal error"
-envelope --> nextDash : "JSON envelope (SPEC R8)"
-envelope --> viteDash : "JSON envelope (SPEC R8)"
-test ..> derive : "asserts stalled vs stale/busy/unreachable/disabled"
+main ..> main : "process.exit(0)\n(fail-open, all paths)"
 
 @enduml

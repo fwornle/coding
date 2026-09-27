@@ -1,0 +1,39 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SigmaGraphRenderer
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[SigmaGraphRenderer] as sigma_graph_renderer #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
+[GraphifyGraphReader] as graphify_graph_reader #F0F0F0
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[KmCoreMigrationTooling] as km_core_migration_tooling #F0F0F0
+[EntityTypeConsolidation] as entity_type_consolidation #F0F0F0
+[DuplicateNameAnchoring] as duplicate_name_anchoring #F0F0F0
+[GraphAttributionAudit] as graph_attribution_audit #F0F0F0
+[GraphVisibilityFiltering] as graph_visibility_filtering #F0F0F0
+[ForceAtlas2LayoutPass] as force_atlas2_layout_pass #E8F5E8
+[ClientSideNeighborExpand] as client_side_neighbor_expand #E8F5E8
+[HierarchyAncestryTrace] as hierarchy_ancestry_trace #E8F5E8
+[SigmaNodeShapeDispatch] as sigma_node_shape_dispatch #E8F5E8
+
+knowledge_management --> sigma_graph_renderer
+manual_learning -[hidden]- sigma_graph_renderer
+online_learning -[hidden]- sigma_graph_renderer
+graph_database_service -[hidden]- sigma_graph_renderer
+graphify_graph_reader -[hidden]- sigma_graph_renderer
+code_graph_agent -[hidden]- sigma_graph_renderer
+km_core_migration_tooling -[hidden]- sigma_graph_renderer
+entity_type_consolidation -[hidden]- sigma_graph_renderer
+duplicate_name_anchoring -[hidden]- sigma_graph_renderer
+graph_attribution_audit -[hidden]- sigma_graph_renderer
+graph_visibility_filtering -[hidden]- sigma_graph_renderer
+sigma_graph_renderer --> force_atlas2_layout_pass
+sigma_graph_renderer --> client_side_neighbor_expand
+sigma_graph_renderer --> hierarchy_ancestry_trace
+sigma_graph_renderer --> sigma_node_shape_dispatch
+
+@enduml

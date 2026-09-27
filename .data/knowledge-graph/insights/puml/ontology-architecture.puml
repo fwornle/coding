@@ -1,43 +1,47 @@
 @startuml
 !include _standard-style.puml
 
-package "Ontology Factory" {
-  component "createOntologySystem" as factory <<core>>
-  component "OntologySystem" as system <<core>>
-  component "validateOntologyConfig" as validator <<core>>
-  component "LegacyOntologyAdapter" as adapter <<agent>>
-  component "OntologyClassifier" as classifier <<agent>>
-  component "createHeuristicClassifier" as heuristic <<agent>>
-  component "UnifiedInferenceEngine" as inference <<external>>
+package "Ontology System (src/ontology/index.ts)" {
+  component "createOntologySystem()" as factory <<core>>
+  component "validateOntologyConfig()" as validator_fn <<core>>
+  component "OntologyClassifier" as classifier <<core>>
+  component "OntologyValidator" as validatorC <<core>>
+  component "LegacyOntologyAdapter" as adapter <<adapter>>
+  component "createHeuristicClassifier\n(heuristics/index.ts)" as heuristic <<core>>
+  component "OntologyConfigManager" as config <<core>>
+  component "ontologyPathResolver\n(+ probe/cache instrumentation)" as resolver <<core>>
 }
 
-package "km-core Storage" {
-  database "OntologyRegistry" as registry <<storage>>
-  database "LevelDB (obs-api)" as leveldb <<storage>>
+package "External Backends" {
+  database "km-core OntologyRegistry" as kmcore <<storage>>
+  component "persistence-agent.ts" as persAgent <<agent>>
+  component "external inferenceEngine" as inference <<external>>
 }
 
-package "Repair & Pipeline Tools" {
-  component "repair-writer-ontology-class.mjs" as repair <<cli>>
-  component "arbitrate()" as arbitrate <<core>>
-  component "OntologyClassificationAgent" as pipeline <<agent>>
-  component "observations-api-server.mjs" as obsapi <<api>>
+package "API / Consumers" {
+  component "ApiClient (OntologyClass,\nlistOntologyClasses)" as apiclient <<api>>
+  component "GraphKMStore.ontology()" as graphstore <<core>>
+  component "observations-api-server.mjs\n(KG_ONTOLOGY_DIR)" as obsserver <<api>>
 }
 
-validator --> factory : "checked before"
-factory --> adapter : "wires"
+factory --> adapter : "requires (fail-fast)"
+factory --> inference : "requires (fail-fast)"
+factory --> validatorC : "wires"
 factory --> classifier : "wires"
-factory --> inference : "requires (hard-fail)"
-classifier --> heuristic : "composes"
-factory --> system : "returns"
-system --> adapter : "field: ontology"
-adapter --> registry : "wraps"
+factory --> heuristic : "wires"
 
-repair --> obsapi : "HTTP only"
-obsapi --> leveldb : "single-owner access"
-repair --> arbitrate : "resolves conflicts"
-arbitrate --> registry : "edge-type derived class"
+classifier --> validatorC : "depends on"
+classifier --> heuristic : "uses"
+classifier --> inference : "delegates inference"
 
-pipeline --> registry : "consumes coding.lower.json"
-pipeline ..> repair : "downstream inconsistencies"
+adapter --> kmcore : "wraps (Adapter pattern)"
+adapter ..> persAgent : "preserves legacy call sites"
+
+validator_fn --> config : "enforces upper/lower rules"
+config --> resolver : "loads paths"
+
+apiclient --> factory : "consumes"
+graphstore --> factory : "consumes"
+obsserver --> config : "reads KG_ONTOLOGY_DIR"
 
 @enduml

@@ -6,18 +6,16 @@ title Hierarchy Context: ProcessStateManager
 [DockerizedServices] as dockerized_services #FFFFDD
 [ProcessStateManager] as process_state_manager #LightBlue
 [ServiceStarter] as service_starter #F0F0F0
-[ServiceProbe] as service_probe #F0F0F0
 [DockerEntrypoint] as docker_entrypoint #F0F0F0
-[DockerComposeStartupScript] as docker_compose_startup_script #F0F0F0
-[ServiceRegistration] as service_registration #E8F5E8
-[PsmConsumersInStartServicesRobust] as psm_consumers_in_start_services_robust #E8F5E8
+[StartServicesScripts] as start_services_scripts #F0F0F0
+[ServiceWrapperScripts] as service_wrapper_scripts #F0F0F0
+[ServiceRegistrationRecord] as service_registration_record #E8F5E8
 
 dockerized_services --> process_state_manager
 service_starter -[hidden]- process_state_manager
-service_probe -[hidden]- process_state_manager
 docker_entrypoint -[hidden]- process_state_manager
-docker_compose_startup_script -[hidden]- process_state_manager
-process_state_manager --> service_registration
-process_state_manager --> psm_consumers_in_start_services_robust
+start_services_scripts -[hidden]- process_state_manager
+service_wrapper_scripts -[hidden]- process_state_manager
+process_state_manager --> service_registration_record
 
 @enduml

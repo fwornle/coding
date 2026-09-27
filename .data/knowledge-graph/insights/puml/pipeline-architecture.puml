@@ -1,40 +1,38 @@
 @startuml
 !include _standard-style.puml
 
-package "SemanticAnalysis Pipeline (unresolved)" {
-  component "SemanticAnalysisAgent" as saa <<agent>>
-  component "OntologyClassificationAgent" as oca <<agent>>
-  component "CodingLowerOntologySource\n(unexpected emission)" as bugsrc <<core>>
-}
-
-package "Ontology Composition Root" {
+package "Ontology Core" {
   component "createOntologySystem()" as factory <<core>>
-  component "OntologyValidator" as validator <<core>>
-  component "OntologyClassifier" as classifier <<core>>
   component "LegacyOntologyAdapter" as adapter <<core>>
-  database "km-core OntologyRegistry" as registry <<storage>>
+  component "OntologyClassificationAgent" as classifier <<agent>>
+  database "coding.lower.json" as codinglower <<storage>>
 }
 
-package "Maintenance & Monitoring (unrelated)" {
-  component "repair-writer-ontology-class.mjs\n(arbitrate)" as repair <<cli>>
-  component "health-coordinator.js\n(pollKnowledgePipeline)" as health <<agent>>
-  cloud "obs-api / LevelDB" as obsapi <<external>>
+package "Data Quality & Repair" {
+  component "repair-writer-ontology-class.mjs" as repair <<cli>>
+  component "arbitrate()" as arbitrate <<core>>
 }
 
-saa --> oca : "classifies intent"
-oca --> bugsrc : "emits (bug: contract violation)"
+package "Monitoring & Health" {
+  component "health-coordinator.js" as health <<agent>>
+  component "knowledge_pipeline slot" as kpslot <<storage>>
+  component "graph_integrity probe" as gintegrity <<core>>
+  component "batch-progress.tsx" as dashboard <<external>>
+}
 
-factory --> validator : "wires"
-factory --> classifier : "wires"
-factory --> adapter : "wires"
-adapter --> registry : "wraps"
+factory --> adapter : "requires (fail-fast)"
+adapter --> classifier : "wires legacy shape"
+classifier --> codinglower : "reads for L2 refinement"
+classifier ..> codinglower : "emits CodingLowerOntologySource (bug)"
 
-repair --> obsapi : "fetch entities/relations"
-repair --> registry : "arbitrate() conflicts"
+repair --> codinglower : "reads/repairs schema"
+repair --> arbitrate : "resolves ontologyClass vs entity Type"
 
-health --> obsapi : "poll freshness"
-health ..> bugsrc : "unrelated (name collision only)"
+health --> kpslot : "tracks pipeline freshness"
+health --> gintegrity : "separates orphans/stranded"
+gintegrity ..> classifier : "detects output quality issues"
+dashboard --> health : "reads state via HTTP"
 
-oca ..> factory : "conceptually adjacent\n(not same file)"
+codinglower ..> repair : "shared-schema coupling"
 
 @enduml

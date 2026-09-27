@@ -6,28 +6,24 @@ title Hierarchy Context: LLMMockService
 [LLMAbstraction] as llmabstraction #FFFFDD
 [LLMMockService] as llmmock_service #LightBlue
 [DMRProvider] as dmrprovider #F0F0F0
-[LLMJsonRepairUtility] as llmjson_repair_utility #F0F0F0
-[ProxyClientWrapper] as proxy_client_wrapper #F0F0F0
+[LLMWithProcessClient] as llmwith_process_client #F0F0F0
+[LlmJsonParser] as llm_json_parser #F0F0F0
 [CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
-[DashboardCostModel] as dashboard_cost_model #F0F0F0
+[CostModel] as cost_model #F0F0F0
 [OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
-[ModelContextLimitsCatalogue] as model_context_limits_catalogue #F0F0F0
-[CopilotModelIdAlignment] as copilot_model_id_alignment #E8F5E8
-[OpencodeModelSplice] as opencode_model_splice #E8F5E8
-[PiModelsJsonMerge] as pi_models_json_merge #E8F5E8
-[ModelContextLimitsResolver] as model_context_limits_resolver #E8F5E8
+[ModelContextLimits] as model_context_limits #F0F0F0
+[CopilotModelIdDriftGuard] as copilot_model_id_drift_guard #E8F5E8
+[ModelContextCatalogueCache] as model_context_catalogue_cache #E8F5E8
 
 llmabstraction --> llmmock_service
 dmrprovider -[hidden]- llmmock_service
-llmjson_repair_utility -[hidden]- llmmock_service
-proxy_client_wrapper -[hidden]- llmmock_service
+llmwith_process_client -[hidden]- llmmock_service
+llm_json_parser -[hidden]- llmmock_service
 copilot_model_id_alignment -[hidden]- llmmock_service
-dashboard_cost_model -[hidden]- llmmock_service
+cost_model -[hidden]- llmmock_service
 offload_routing_dashboard -[hidden]- llmmock_service
-model_context_limits_catalogue -[hidden]- llmmock_service
-llmmock_service --> copilot_model_id_alignment
-llmmock_service --> opencode_model_splice
-llmmock_service --> pi_models_json_merge
-llmmock_service --> model_context_limits_resolver
+model_context_limits -[hidden]- llmmock_service
+llmmock_service --> copilot_model_id_drift_guard
+llmmock_service --> model_context_catalogue_cache
 
 @enduml

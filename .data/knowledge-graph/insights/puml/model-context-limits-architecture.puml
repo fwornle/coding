@@ -1,36 +1,30 @@
 @startuml
 !include _standard-style.puml
 
-package "Sources" {
-  database "models.dev catalogue" as catalogue <<external>>
-  component "opencode.json (user config)" as userconfig <<external>>
+package "Missing Component" {
+  component "ModelContextLimits\n(not found in codebase)" as mcl <<core>>
 }
 
-package "model-limits.cjs" {
-  component "limits()" as limits <<core>>
-  component "deriveLimits()" as derive <<core>>
-  component "byPair / byModel maps" as maps <<storage>>
-  component "FALLBACK_PROVIDERS" as fallback <<core>>
-  component "userConfigContextWindow()" as userwin <<core>>
-  component "catalogueContextWindow()" as catwin <<core>>
-  database "on-disk derived cache" as diskcache <<storage>>
+package "LLM Routing Dashboard Surface" {
+  component "cost-model.ts\npriceForModel()" as cost <<core>>
+  component "offload-decision.tsx\nevaluateOffload()" as offload <<core>>
+  component "use-classifier-judge.ts" as judge <<core>>
+  component "provider.tsx\n(Redux)" as provider <<core>>
 }
 
-package "Consumer" {
-  component "status-line gauge (context-gauge.cjs)" as gauge <<cli>>
+package "Model ID Lifecycle" {
+  component "copilot-model-ids.test.mjs" as idtest <<cli>>
+  component "align-copilot-model-ids.mjs" as aligner <<core>>
 }
 
-catalogue --> limits : "stat mtime+size"
-limits --> diskcache : "read/write atomic temp+rename"
-limits --> derive : "on cache miss"
-derive --> fallback : "resolve custom provider ids"
-derive --> maps : "modal tie-break (favor larger)"
+cloud "@rapid/llm-proxy" as proxy <<external>>
 
-userconfig --> userwin : "override lookup"
-maps --> catwin : "exact/modal fallback"
-userwin --> catwin : "tier 1 precedence"
+cost ..> mcl : "no context-window\nlookup present"
+offload ..> mcl : "routes by complexity band,\nnot token ceiling"
+judge --> offload : "rubric/backend check"
+provider --> offload : "state container"
 
-catwin --> gauge : "context size or null"
-gauge --> gauge : "regex fallback if null"
+idtest --> aligner : "asserts rewrite"
+aligner --> proxy : "rewrites retired\nmodel ids before ship"
 
 @enduml

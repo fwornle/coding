@@ -1,37 +1,34 @@
 @startuml
 !include _standard-style.puml
 
-package "Agent Runtime Hook (Actual Code)" {
-  component "health-prompt-hook.js" as hook <<cli>>
-  component "deriveSummary()" as derive <<core>>
-  component "outputHealthContext()" as envelope <<core>>
+package "Unresolved Component" {
+  component "KnowledgeInjectionHook" as kih <<core>>
 }
 
-package "Health Coordinator" {
-  component "/health/state endpoint" as healthApi <<api>>
-  database "knowledge_pipeline.status" as kpStatus
+package "Hook Infrastructure" {
+  component "UnifiedHookManager" as manager <<core>>
+  component "HookConfigLoader" as loader <<core>>
+  database "hooks.json (user/project)" as config <<storage>>
 }
 
-package "Test Contract" {
-  component "health-prompt-hook-stall.test.mjs" as test <<external>>
+package "Adjacent Analogous Component" {
+  component "health-prompt-hook.js" as healthhook <<agent>>
+  component "SPEC R8 Envelope\n(hookSpecificOutput)" as envelope <<api>>
 }
 
-package "Dashboards (unrelated hooks)" {
-  component "usePolledFetch.ts" as polled <<agent>>
-  component "useWorkflowDefinitions (hooks.ts)" as workflow <<agent>>
+package "Unrelated Dashboard Hooks" {
+  component "usePolledFetch.ts" as polled <<external>>
+  component "hooks.ts (useWorkflowDefinitions,\nuseRecentCalls)" as dashhooks <<external>>
 }
 
-hook --> healthApi : "fetches state"
-healthApi --> kpStatus : "reports"
-hook --> derive : "reduces state"
-derive --> kpStatus : "checks 'stalled'"
-derive --> envelope : "builds summary"
-envelope --> hook : "stdout envelope\n(exit 0 always)"
+kih ..> manager : "presumed registerHandler()\n(unconfirmed)"
+manager --> loader : "loads merged config"
+loader --> config : "project overrides user\n(no append)"
 
-test ..> hook : "execFile black-box\nassert stdout"
-test ..> envelope : "validates contract"
+healthhook --> envelope : "produces"
+envelope ..> kih : "structurally analogous\npattern (not same)"
 
-hook ..> polled : "shared status aggregator\n(no direct code path)"
-hook ..> workflow : "consumed by dashboards"
+polled ..> dashhooks : "shares polling pattern"
+dashhooks ..> kih : "no relationship\n(false match on 'hooks')"
 
 @enduml

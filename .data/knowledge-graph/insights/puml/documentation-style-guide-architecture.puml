@@ -1,33 +1,28 @@
 @startuml
 !include _standard-style.puml
 
-package "Documentation Style Guide (Rules)" {
-  component "Style Guide Policy" as guide <<core>>
-  component ".puml Sources\n(docs/puml/)" as pumlSrc <<storage>>
-  component "Rendered .png Outputs\n(docs/images/)" as pngOut <<storage>>
-  component "MkDocs Published Assets\n(docs-content/images/)" as mkdocsAssets <<storage>>
+package "Documentation Governance" {
+  component "Documentation Style Guide" as guide <<core>>
+  component "docs/puml/ Source Location" as pumlDir <<storage>>
+  component "Rendered Diagram Artifacts" as artifacts <<storage>>
+  component "Render Error Triage Practice" as triage <<agent>>
 }
 
-package "Verification Discipline" {
-  component "Post-Rewrite Render\nError Triage" as triage <<core>>
-  component "Baseline Reproduction\n(git stash / prior commit)" as baseline <<agent>>
-}
-
-package "Unrelated Candidate Tooling\n(no enforcement path)" {
+package "Unrelated Retrieved Code (No Enforcement Link)" {
   component "EntityPatternAnalyzer.ts" as epa <<core>>
-  component "verify-patterns.sh" as vps <<cli>>
-  component "XAML ViewModel Fixtures" as xaml <<external>>
+  component "verify-patterns.sh" as verify <<cli>>
+  component "Team Directories Map" as teamMap <<storage>>
+  database "Shared Memory JSON" as sharedMem
 }
 
-guide --> pumlSrc : "mandates location"
-guide --> pngOut : "mandates location"
-guide ..> mkdocsAssets : "must remain distinct from"
-pumlSrc ..> pngOut : "rendered separately"
+guide --> pumlDir : "mandates .puml source location"
+guide --> artifacts : "defines VCS vs build-output policy"
+guide --> triage : "informs render-error classification"
 
-triage --> baseline : "requires reproduction before filing bug"
+epa --> teamMap : "regex-based ownership lookup"
+verify --> sharedMem : "reads/writes compliance score"
 
-vps ..> guide : "keyword collision only\n(no actual enforcement)"
-epa ..> guide : "no reference / unrelated"
-xaml ..> guide : "no reference / unrelated"
+guide ..> epa : "no coupling (false retrieval match)"
+guide ..> verify : "no coupling (false retrieval match)"
 
 @enduml

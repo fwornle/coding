@@ -5,19 +5,25 @@ title Hierarchy Context: EntityPatternAnalyzer
 
 [CodingPatterns] as coding_patterns #FFFFDD
 [EntityPatternAnalyzer] as entity_pattern_analyzer #LightBlue
+[DocumentationStyleGuide] as documentation_style_guide #F0F0F0
+[TestingPractices] as testing_practices #F0F0F0
+[DataIntegrityPatterns] as data_integrity_patterns #F0F0F0
 [PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
-[StatuslineClickFeedbackPattern] as statusline_click_feedback_pattern #F0F0F0
-[ArtifactPatternTable] as artifact_pattern_table #E8F5E8
+[ArchitectureGuidelines] as architecture_guidelines #F0F0F0
+[ArtifactPatternMap] as artifact_pattern_map #E8F5E8
 [TeamDirectoryRegistry] as team_directory_registry #E8F5E8
-[ArtifactExtractionEngine] as artifact_extraction_engine #E8F5E8
-[TwoStepArtifactMatching] as two_step_artifact_matching #E8F5E8
+[ArtifactExtractor] as artifact_extractor #E8F5E8
+[LayeredConfidenceScoring] as layered_confidence_scoring #E8F5E8
 
 coding_patterns --> entity_pattern_analyzer
+documentation_style_guide -[hidden]- entity_pattern_analyzer
+testing_practices -[hidden]- entity_pattern_analyzer
+data_integrity_patterns -[hidden]- entity_pattern_analyzer
 pattern_verification_tooling -[hidden]- entity_pattern_analyzer
-statusline_click_feedback_pattern -[hidden]- entity_pattern_analyzer
-entity_pattern_analyzer --> artifact_pattern_table
+architecture_guidelines -[hidden]- entity_pattern_analyzer
+entity_pattern_analyzer --> artifact_pattern_map
 entity_pattern_analyzer --> team_directory_registry
-entity_pattern_analyzer --> artifact_extraction_engine
-entity_pattern_analyzer --> two_step_artifact_matching
+entity_pattern_analyzer --> artifact_extractor
+entity_pattern_analyzer --> layered_confidence_scoring
 
 @enduml

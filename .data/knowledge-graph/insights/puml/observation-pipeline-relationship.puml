@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: ObservationPipeline
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[ObservationPipeline] as observation_pipeline #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[SessionFactIndex] as session_fact_index #F0F0F0
+[TranscriptAdapters] as transcript_adapters #F0F0F0
+[TmuxSessionWrapper] as tmux_session_wrapper #F0F0F0
+[RawFallbackReceipt] as raw_fallback_receipt #E8F5E8
+[EvidenceFloorGate] as evidence_floor_gate #E8F5E8
+[ObservationWriteEventBus] as observation_write_event_bus #E8F5E8
+[InsightDedupAndFacetBands] as insight_dedup_and_facet_bands #E8F5E8
+
+live_logging_system --> observation_pipeline
+lslconfig_validator -[hidden]- observation_pipeline
+session_fact_index -[hidden]- observation_pipeline
+transcript_adapters -[hidden]- observation_pipeline
+tmux_session_wrapper -[hidden]- observation_pipeline
+observation_pipeline --> raw_fallback_receipt
+observation_pipeline --> evidence_floor_gate
+observation_pipeline --> observation_write_event_bus
+observation_pipeline --> insight_dedup_and_facet_bands
+
+@enduml

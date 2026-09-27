@@ -1,0 +1,37 @@
+@startuml
+!include _standard-style.puml
+
+package "km-core Anchor Pass (Write Path)" {
+  component "findEntityByName" as findByName <<core>>
+  component "queryIncomingRelations\n(+entity Type)" as queryRel <<core>>
+  component "storeRelationship\n(+entity Type)" as storeRel <<core>>
+  component "projectAnchorName\n= 'Coding' (fallback)" as anchorFallback <<core>>
+}
+
+package "Wave Insight Materialization" {
+  component "Wave Processing Pipeline" as wave <<core>>
+  database "Insight Documents\n(73 stored)" as insightDocs <<storage>>
+  database "Graph Nodes\n(entity Type='Insight': 0)" as graphNodes <<storage>>
+}
+
+package "Unified Viewer (Read Path)" {
+  component "rootOf / rootOfNode" as rootOf <<core>>
+  component "categoriseUnattributed" as categorise <<core>>
+  component "assert-graph-density.ts" as density <<cli>>
+  component "History Sidebar\n(filters entity Type=='Insight')" as historySidebar <<external>>
+}
+
+findByName ..> queryRel : "superseded by\nname+type key"
+queryRel --> storeRel : "disambiguates entity"
+storeRel --> anchorFallback : "attaches orphan\nnodes to sentinel"
+
+wave --> insightDocs : "writes"
+wave --> graphNodes : "fails to create\nInsight nodes"
+graphNodes --> historySidebar : "0 matches\n=> no Batch badge"
+
+storeRel ..> rootOf : "parallel disambiguation\nconcern (write vs read)"
+rootOf --> categorise : "classifies\nunattributed nodes"
+rootOf --> density : "walks hierarchy\nfor budget check"
+categorise ..> anchorFallback : "declines to guess\n(vs type-key fix)"
+
+@enduml

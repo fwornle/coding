@@ -1,32 +1,34 @@
 @startuml
 !include _standard-style.puml
 
-package "Local Inference Tier (unverified)" {
+package "DMR Provider Module" {
   component "DMRProvider" as dmr <<core>>
-  component "dmrClient" as dmrclient <<external>>
+  component "loadDMRConfig()" as cfg <<core>>
+  component "checkDMRAvailability()" as health <<core>>
 }
 
-package "LLM CLI Proxy" {
-  component "proxy-bridge/server.mjs" as proxy <<api>>
-  component "Model Catalogue" as catalogue <<core>>
+package "Config Resolution" {
+  component "cwd/config/dmr-config.yaml" as path1 <<external>>
+  component "cwd/integrations/.../dmr-config.yaml" as path2 <<external>>
+  component "__dirname-relative path" as path3 <<external>>
+  component "DEFAULT_CONFIG (in-code)" as defcfg <<core>>
 }
 
-package "System Health Dashboard (sibling, not DMR)" {
-  component "ReduxProvider (store/provider.tsx)" as redux <<core>>
-  component "OffloadDecision" as offload <<agent>>
-  component "cost-model.ts" as cost <<core>>
-  component "useClassifierJudge" as judge <<agent>>
+package "Routing & Policy Layer" {
+  component "Tiered Provider Fallback\n(max-subscription > Copilot-tier > Groq Llama-70B)" as tiers <<core>>
+  component "rapid-llm-proxy" as proxy <<external>>
+  component "cost-model.ts\n(no DMR pricing entry)" as cost <<storage>>
 }
 
-dmr --> dmrclient : "manages"
-dmr ..> proxy : "would sit behind\n(local-inference tier)"
-proxy --> catalogue : "endpoint-gated\nmodel listing"
+cfg --> path1 : "search order 1"
+cfg --> path2 : "search order 2"
+cfg --> path3 : "search order 3"
+cfg --> defcfg : "fallback if none found"
+dmr --> cfg : "loads config"
+dmr --> health : "time-windowed cache check"
 
-redux --> offload : "mounts /\nerror boundary"
-offload --> proxy : "resolve() calls\n/api/llm/routing/resolve"
-offload --> judge : "uses"
-cost --> offload : "priceForModel\nbudgetProvider"
-
-offload ..> dmr : "NOT verified:\nno route resolves\nto DMR/local target"
+tiers --> dmr : "last resort in fallback chain"
+proxy --> tiers : "routes requests (proxy cleared of timeout issue)"
+tiers --> cost : "usage cost lookup (unpriced for DMR)"
 
 @enduml

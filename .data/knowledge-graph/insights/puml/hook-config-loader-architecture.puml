@@ -1,27 +1,31 @@
 @startuml
 !include _standard-style.puml
 
-package "Hooks Subsystem" {
-  component "HookConfigLoader\n(hook-config.js, not retrieved)" as loader <<core>>
-  component "HooksManager\n(hooks-api.js, abstract)" as manager <<core>>
-  component "UnifiedHookManager\n(hook-manager.js)" as unified <<core>>
+package "Agent API Hooks (lib/agent-api/hooks)" {
+  component "HookConfigLoader" as loader <<core>>
+  database "CONFIG_PATHS.user" as userCfg <<storage>>
+  database "CONFIG_PATHS.project" as projCfg <<storage>>
+  component "mergeConfigs()" as merge <<core>>
 }
 
-package "Bridge Layer" {
-  component "ClaudeBridge\n(claude-bridge.js)" as bridge <<agent>>
+package "Adjacent Hook Tooling (env-driven, not config-loaded)" {
+  component "health-prompt-hook.js" as promptHook <<agent>>
+  component "health-prompt-hook-stall.test.mjs" as testHook <<external>>
 }
 
-package "External / Session Layer" {
-  component "Claude Code Native Hooks" as claude <<external>>
-  component "HookManagementSystem\n(statusline, ETM)" as hms <<agent>>
+package "Unrelated 'hooks' Namespace (React UI)" {
+  component "workflow/hooks.ts" as reactHooks <<external>>
+  component "usePolledFetch.ts" as pollHook <<external>>
 }
 
-claude --> bridge : "PreToolUse/PostToolUse events"
-bridge --> manager : "translates to unified vocabulary"
-manager --> loader : "config-driven registration (inferred)"
-manager --> unified : "shares push-then-sort idiom"
-loader --> unified : "validateConfig() fail-soft pattern"
-bridge --> unified : "fail-open philosophy (bridge layer)"
-hms --> unified : "monitors constraint/session state"
+userCfg --> merge : "loaded"
+projCfg --> merge : "loaded"
+merge --> loader : "produces final config"
+
+loader ..> promptHook : "architecturally adjacent\n(not actually invoked)"
+testHook ..> promptHook : "tests via stdout envelope"
+
+reactHooks ..> loader : "false positive\n(filename collision)"
+pollHook ..> loader : "false positive\n(filename collision)"
 
 @enduml

@@ -1,41 +1,32 @@
 @startuml
 !include _standard-style.puml
 
-package "Backend Agent Layer" {
-  component "CodeGraphAgent" as cga <<agent>>
-  component "checkMemgraphConnection\n(stub shim)" as shim <<core>>
+package "Compatibility Layer" {
+  component "CodeGraphAgent\n(shim)" as cga <<agent>>
+  component "checkMemgraphConnection\n(vestigial)" as chk <<api>>
+}
+
+package "Static Graph Backend" {
   component "GraphifyGraph" as gg <<core>>
-  component "kindOf() / nameOf()" as parse <<core>>
-  component "mapRelation()" as maprel <<core>>
+  component "kindOf/nameOf\n(label parsing)" as parse <<core>>
+  database "graph.json\n(NetworkX node-link)" as graphjson <<storage>>
 }
 
-package "Storage" {
-  database "graph.json" as graphjson <<storage>>
+package "Graph Persistence & Migration" {
+  component "GraphDatabaseService\n(dirty-flag model)" as gds <<core>>
+  component "migrate-graph-db-entity-types.js\n(ENTITY_TYPE_MAPPING)" as migrate <<cli>>
+  component "Anchor Resolution\n(name+type, projectAnchorName)" as anchor <<core>>
 }
 
-package "Dashboard / UI Layer" {
-  component "MultiAgentGraph\n(AGENT_SUBSTEPS)" as mag <<external>>
-  component "UkbWorkflowModal" as ukbmodal <<external>>
-  component "ukbSlice\n(WorkflowExecutionState)" as ukbslice <<external>>
-}
-
-package "Related Migration Patterns" {
-  component "migrate-graph-db-entity-types.js" as migrate <<external>>
-  component "color-fallback.ts\n(node FillColor/node ShapeFor)" as colorfb <<external>>
-}
-
-cga --> shim : "preserves legacy API"
+cga --> chk : "preserves legacy interface"
 cga --> gg : "delegates reads"
-gg --> graphjson : "mtime-based lazy read"
-gg --> parse : "derives type/name from label"
-gg --> maprel : "normalizes relation vocabulary"
-
-mag --> cga : "renders sub-steps\n(stale: 'Cypher on Memgraph')"
-ukbmodal --> mag : "displays workflow graph"
-ukbslice --> mag : "drives step status\n(no staleness field)"
-gg ..> ukbslice : "cached data\nnot reflected as stale"
-
-maprel ..> migrate : "same lossy compression pattern"
-parse ..> colorfb : "same schema-on-read pattern"
+gg --> graphjson : "loads static export"
+gg --> parse : "derives type/name"
+graphjson ..> migrate : "consolidated by"
+migrate ..> parse : "type divergence risk"
+gds --> graphjson : "manual dirty-flag persist"
+anchor --> gds : "queryIncomingRelations/storeRelationship"
+anchor ..> graphjson : "prevents orphan nodes"
+cga ..> gds : "would need write-path audit"
 
 @enduml

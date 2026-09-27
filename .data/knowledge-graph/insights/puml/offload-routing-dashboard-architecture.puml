@@ -1,35 +1,35 @@
 @startuml
 !include _standard-style.puml
 
-package "System Health Dashboard" {
-  component "OffloadDecision" as od <<core>>
-  component "useOffloadPolicyDraft" as policyHook <<agent>>
-  component "useClassifierJudge" as judgeHook <<agent>>
-  component "offload-gates.ts\nevaluateOffload()" as gates <<core>>
+package "LLM Routing UI" {
+  component "OffloadDecision" as decision <<core>>
+  component "useClassifierJudge" as judge <<agent>>
+  component "OffloadGates (GATES ladder)" as gates <<core>>
+  component "offload-replay" as replay <<core>>
+}
+
+package "Proxy / Config Backends" {
+  component "rapid-llm-proxy /resolve" as proxy <<api>>
+  database "llm-routing.yaml" as routingYaml <<storage>>
+  database "prompt-classifier.yaml" as classifierYaml <<storage>>
+}
+
+package "Supporting Data" {
   component "cost-model.ts" as cost <<core>>
+  component "copilot-model-ids drift guard" as drift <<cli>>
 }
 
-package "Local Config Files" {
-  database "prompt-classifier.yaml" as classifierCfg <<storage>>
-}
+decision --> gates : "config mode: evaluateOffload()"
+decision --> replay : "recorded mode: totalsByRoute()"
+decision --> proxy : "queryFor() /api/llm/routing/resolve"
+decision ..> proxy : "verify configRungs vs live resolve"
 
-package "Rapid LLM Proxy" {
-  component "proxy-bridge/server.mjs" as proxy <<external>>
-  database "llm-routing.yaml" as offloadCfg <<storage>>
-  component "/api/llm/routing/resolve" as resolveApi <<api>>
-}
+judge --> proxy : "PATCH /api/llm/classifier"
+judge --> classifierYaml : "save() diffed backends/rubric/strategy"
 
-od --> policyHook : "owns offload policy state"
-od --> judgeHook : "owns classifier/judge state"
-od --> gates : "local rung evaluation"
+proxy --> routingYaml : "reads tier priority order"
 
-policyHook --> offloadCfg : "writes"
-judgeHook --> classifierCfg : "writes"
-
-gates --> resolveApi : "cross-check via pooled() (max 8 concurrent)"
-od --> resolveApi : "configRungs diff"
-resolveApi --> proxy : "resolves route"
-
-od ..> cost : "sibling dashboard tab\n(no direct import)"
+decision --> cost : "route cost context"
+drift ..> decision : "guards vendored model ids"
 
 @enduml

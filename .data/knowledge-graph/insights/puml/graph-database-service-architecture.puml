@@ -1,41 +1,41 @@
 @startuml
 !include _standard-style.puml
 
-package "Config" {
-  component "knowledge-management.json\n(database.type/path/options)" as config <<external>>
+package "GraphDatabaseService (write side)" {
+  database "Graphology/LevelDB Store" as store
+  component "Anchor Pass\n(findEntityByName)" as anchor <<core>>
+  component "queryIncomingRelations /\nstoreRelationship (name+type)" as typedlookup <<core>>
+  component "projectAnchorName = 'Coding'\nfallback" as fallback <<core>>
 }
 
-package "Graph Persistence (Inferred/Absent)" {
-  component "GraphDatabaseService" as gds <<core>>
-  component "km-core-adapter.ts\n(findEntityByName,\nqueryIncomingRelations,\nstoreRelationship)" as adapter <<core>>
-  database "graphology-level\n(.data/knowledge-graph)" as leveldb <<storage>>
-  component "migrate-graph-db-entity-types.js" as migrateTypes <<cli>>
-  component "migrate-leveldb-to-kmcore.mjs" as migrateKmcore <<cli>>
+package "obs-api HTTP Boundary" {
+  component "OBS_API :12436\n/api/v1/entities\n/api/v1/relations" as api <<api>>
 }
 
-package "Graph Consumption (Retrieved Code)" {
-  component "useGraphData(apiClient)" as apiClient <<api>>
-  component "D3GraphCanvas.tsx" as canvas <<agent>>
-  component "hierarchy-parents.test.ts\n(deriveParents)" as hierarchy <<agent>>
+package "Viewer / Dashboard Clients" {
+  component "useGraphData(apiClient, system)" as usegraph <<core>>
+  component "D3GraphCanvas.tsx" as d3 <<external>>
+  component "SigmaCanvas.tsx" as sigma <<external>>
+  component "assert-graph-density.ts" as density <<cli>>
+  component "attribution.ts\n(rootOf / categoriseUnattributed)" as attribution <<core>>
+  component "ukb-workflow-modal.tsx\n/api/ukb/history" as ukb <<external>>
 }
 
-package "Workflow Telemetry (Unrelated)" {
-  component "ukbSlice.ts" as ukbSlice <<agent>>
-  component "ukb-workflow-modal.tsx" as ukbModal <<agent>>
-}
+anchor --> typedlookup : "disambiguates by (name, type)"
+typedlookup --> store : "writes Insight nodes"
+fallback --> store : "attaches orphans to anchor"
 
-config --> gds : "configures backend"
-gds --> leveldb : "opens/persists"
-gds --> adapter : "delegates entity/relation ops"
-adapter --> leveldb : "typed read/write"
+store --> api : "exposes entities/relations"
 
-migrateTypes --> gds : "_persistGraphToLevel()"
-migrateKmcore --> leveldb : "migrates (--dry-run, 5% error budget)"
+api --> density : "fetch entities/relations"
+api --> usegraph : "fetch entities/relations/ontology"
 
-apiClient --> gds : "fetches entities/relations"
-canvas --> apiClient : "renders graph"
-hierarchy --> apiClient : "derives ancestry"
+usegraph --> d3 : "render graph"
+usegraph --> sigma : "render graph"
 
-ukbModal --> ukbSlice : "reads workflow state"
+density --> attribution : "ontologyClass ?? entity Type\nfallback mapping"
+attribution --> usegraph : "shared read-side\nparent resolution"
+
+ukb ..> api : "separate report store\n(not GraphDatabaseService)"
 
 @enduml

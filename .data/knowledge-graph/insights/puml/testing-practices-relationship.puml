@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TestingPractices
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[TestingPractices] as testing_practices #LightBlue
+[DocumentationStyleGuide] as documentation_style_guide #F0F0F0
+[DataIntegrityPatterns] as data_integrity_patterns #F0F0F0
+[PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+[ArchitectureGuidelines] as architecture_guidelines #F0F0F0
+[EntityPatternAnalyzer] as entity_pattern_analyzer #F0F0F0
+
+coding_patterns --> testing_practices
+documentation_style_guide -[hidden]- testing_practices
+data_integrity_patterns -[hidden]- testing_practices
+pattern_verification_tooling -[hidden]- testing_practices
+architecture_guidelines -[hidden]- testing_practices
+entity_pattern_analyzer -[hidden]- testing_practices
+
+@enduml

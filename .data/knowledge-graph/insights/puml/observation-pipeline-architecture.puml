@@ -1,0 +1,32 @@
+@startuml
+!include _standard-style.puml
+
+package "Capture" {
+  component "enhanced-transcript-monitor.js" as monitor <<agent>>
+}
+
+package "Write & Consolidate" {
+  component "ObservationWriter" as writer <<core>>
+  component "ObservationConsolidator" as consolidator <<core>>
+  database "GraphKMStore (km-core LevelDB)" as kmstore <<storage>>
+  component "obs-api" as api <<api>>
+}
+
+package "Export" {
+  component "ObservationExporter" as exporter <<core>>
+  component "raw-fallback.js" as rawfallback <<core>>
+  database ".data/observation-export/*.json" as jsonfiles <<storage>>
+}
+
+monitor --> writer : normalized tool-call/artifact data
+writer --> kmstore : persists observations
+api --> writer : hosts write endpoint (single-threaded)
+consolidator --> kmstore : consolidateDay()/synthesizeInsights()
+consolidator --> writer : writeInsight (single-owner)
+consolidator --> api : runs in-process\n(execFileAsync fix)
+
+exporter --> kmstore : re-derive export data
+exporter --> rawfallback : isRawFallbackSummary()
+exporter --> jsonfiles : _mergeWithExisting()/tombstones
+
+@enduml

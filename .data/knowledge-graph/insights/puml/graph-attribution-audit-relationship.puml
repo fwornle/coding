@@ -1,0 +1,35 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: GraphAttributionAudit
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[GraphAttributionAudit] as graph_attribution_audit #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
+[GraphifyGraphReader] as graphify_graph_reader #F0F0F0
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[KmCoreMigrationTooling] as km_core_migration_tooling #F0F0F0
+[EntityTypeConsolidation] as entity_type_consolidation #F0F0F0
+[DuplicateNameAnchoring] as duplicate_name_anchoring #F0F0F0
+[GraphVisibilityFiltering] as graph_visibility_filtering #F0F0F0
+[SigmaGraphRenderer] as sigma_graph_renderer #F0F0F0
+[AttributionCategorization] as attribution_categorization #E8F5E8
+[RootAncestorWalk] as root_ancestor_walk #E8F5E8
+
+knowledge_management --> graph_attribution_audit
+manual_learning -[hidden]- graph_attribution_audit
+online_learning -[hidden]- graph_attribution_audit
+graph_database_service -[hidden]- graph_attribution_audit
+graphify_graph_reader -[hidden]- graph_attribution_audit
+code_graph_agent -[hidden]- graph_attribution_audit
+km_core_migration_tooling -[hidden]- graph_attribution_audit
+entity_type_consolidation -[hidden]- graph_attribution_audit
+duplicate_name_anchoring -[hidden]- graph_attribution_audit
+graph_visibility_filtering -[hidden]- graph_attribution_audit
+sigma_graph_renderer -[hidden]- graph_attribution_audit
+graph_attribution_audit --> attribution_categorization
+graph_attribution_audit --> root_ancestor_walk
+
+@enduml

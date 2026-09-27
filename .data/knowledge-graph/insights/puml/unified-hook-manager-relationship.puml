@@ -8,16 +8,18 @@ title Hierarchy Context: UnifiedHookManager
 [HookConfigLoader] as hook_config_loader #F0F0F0
 [ViolationCaptureService] as violation_capture_service #F0F0F0
 [HealthPromptHook] as health_prompt_hook #F0F0F0
-[KnowledgeInjectionHooks] as knowledge_injection_hooks #F0F0F0
+[KnowledgeInjectionHook] as knowledge_injection_hook #F0F0F0
+[HookConfigLoader] as hook_config_loader #E8F5E8
+[HandlerPriorityRegistry] as handler_priority_registry #E8F5E8
 [ClaudeBridge] as claude_bridge #E8F5E8
-[UnifiedHookManagerConfigLoading] as unified_hook_manager_config_loading #E8F5E8
 
 constraint_system --> unified_hook_manager
 hook_config_loader -[hidden]- unified_hook_manager
 violation_capture_service -[hidden]- unified_hook_manager
 health_prompt_hook -[hidden]- unified_hook_manager
-knowledge_injection_hooks -[hidden]- unified_hook_manager
+knowledge_injection_hook -[hidden]- unified_hook_manager
+unified_hook_manager --> hook_config_loader
+unified_hook_manager --> handler_priority_registry
 unified_hook_manager --> claude_bridge
-unified_hook_manager --> unified_hook_manager_config_loading
 
 @enduml

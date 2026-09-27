@@ -2,32 +2,33 @@
 !include _standard-style.puml
 
 package "Vendored Dependency" {
-  component "@rapid/llm-proxy" as proxy <<external>>
+  component "@rapid/llm-proxy tarball" as rlp <<external>>
+  component "copilot-provider.js (dist)" as provider <<external>>
+}
+
+package "Alignment Mechanism" {
   component "align-copilot-model-ids.mjs" as script <<core>>
+  component "Dockerfile RUN steps" as dockerfile <<core>>
+  component "package.json postinstall" as postinstall <<core>>
 }
 
-package "Dual Invocation" {
-  component "Dockerfile.coding-services" as docker <<cli>>
-  component "package.json postinstall" as postinstall <<cli>>
+package "Drift-Guard Test Suite" {
+  component "copilot-model-ids.test.mjs" as test <<cli>>
+  component "SA_CHECKED_OUT gate" as gate <<agent>>
+  component "RETIRED id cross-check" as retiredcheck <<agent>>
+  component "Dockerfile order check" as ordercheck <<agent>>
 }
 
-package "Drift Guard" {
-  component "copilot-model-ids.test.mjs" as test <<agent>>
-  component "SA_CHECKED_OUT gate" as gate <<core>>
-}
+rlp --> provider : "ships hardcoded\ncopilot-tier ids"
+dockerfile --> script : "invokes after install"
+postinstall --> script : "invokes on install"
+script --> provider : "patches retired ids\nin dist file"
 
-component "Provider Fallback Chain" as fallback <<core>>
-
-proxy --> script : "hardcoded copilot ids\nrewritten post-install"
-docker --> script : "runs after npm install\n--ignore-scripts"
-postinstall --> script : "runs on host install"
-
-test --> script : "greps source text\nfor RETIRED id pairs"
-test --> docker : "asserts ordering &\nno error swallowing"
-test --> postinstall : "asserts postinstall wiring"
-gate --> test : "gates 4 tests on\nsubmodule presence"
-
-script --> fallback : "prevents retired id\nfrom reaching provider"
-fallback --> proxy : "copilot tier request"
+test --> gate : "skips if submodule absent"
+test --> retiredcheck : "parses replacement table"
+test --> ordercheck : "asserts script runs\nafter npm install"
+ordercheck --> dockerfile : "checks RUN line order"
+retiredcheck --> script : "validates dead->live map"
+test --> provider : "asserts no retired\nids remain"
 
 @enduml

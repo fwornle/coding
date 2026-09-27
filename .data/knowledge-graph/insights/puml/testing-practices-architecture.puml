@@ -1,0 +1,32 @@
+@startuml
+!include _standard-style.puml
+
+package "Test Inventory & Suite Health" {
+  component "Test Inventory Tooling\n(missing)" as inventory <<core>>
+  component "node:test Compatibility Check" as nodetest <<core>>
+  component "suiteOwnership() Guard\n(missing)" as guard <<core>>
+  component "Test Suite Health Workflow" as health <<core>>
+}
+
+package "Adjacent but Unrelated Tooling" {
+  component "EntityPatternAnalyzer.ts" as epa <<core>>
+  component "verify-patterns.sh" as vps <<cli>>
+}
+
+package "Fixture Inputs" {
+  component "DesignViewModel.cs" as fixtureCs <<external>>
+  component "DesignView.xaml" as fixtureXaml <<external>>
+}
+
+nodetest --> inventory : "ensures recognition of\nnode:test imports"
+inventory --> health : "feeds coverage data"
+guard --> health : "requires verified\nexclusion declarations"
+health --> guard : "flags undocumented exclusions"
+
+epa ..> inventory : "unrelated:\nownership routing only"
+vps ..> health : "unrelated:\nstatic pattern audit"
+
+fixtureCs ..> vps : "used by graphify parser tests,\nnot suite tooling"
+fixtureXaml ..> vps : "used by graphify parser tests,\nnot suite tooling"
+
+@enduml

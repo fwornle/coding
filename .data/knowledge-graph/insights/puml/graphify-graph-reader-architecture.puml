@@ -1,0 +1,35 @@
+@startuml
+!include _standard-style.puml
+
+package "Semantic Analysis Agent Layer (inferred)" {
+  component "GraphifyGraphReader" as reader <<core>>
+  component "GraphifyGraph" as graphify <<agent>>
+  component "CodeGraphAgent" as codeagent <<agent>>
+  database "graph.json\n(NetworkX node-link export)" as graphjson <<storage>>
+}
+
+package "Read-time Parsing (fragile coupling)" {
+  component "kindOf() / nameOf()\nlabel-string parsers" as parsers <<core>>
+}
+
+package "Legacy Compatibility Surface" {
+  component "Memgraph/Cypher-era Interface\n(CodeEntity, CodeRelationship,\ncheckMemgraphConnection)" as legacy <<external>>
+}
+
+package "Viewer / Consumer Layer" {
+  component "unified-viewer" as viewer <<external>>
+  component "system-health-dashboard" as dashboard <<external>>
+  component "obs-api (port 12436)" as obsapi <<api>>
+}
+
+reader ..> graphify : "plausible alias / sibling of"
+graphify --> graphjson : "reads as sole source of truth"
+graphify --> parsers : "derives kind/name at read time"
+codeagent --> graphify : "delegates internally"
+codeagent --> legacy : "retains historical interface"
+
+viewer --> obsapi : "HTTP reads"
+dashboard --> obsapi : "HTTP reads"
+obsapi ..> codeagent : "no confirmed import/call edge"
+
+@enduml

@@ -1,31 +1,32 @@
 @startuml
 !include _standard-style.puml
 
-package "LLM Client Layer" {
-  component "LLMWithProcessClient\n(llm-with-process.ts)" as client <<core>>
-  component "llmWithProcessComplete()" as complete <<core>>
+package "CLI / Client Layer" {
+  component "LLMWithProcessClient" as client <<core>>
+  component "resolveProxyCompleteUrl()" as resolver <<core>>
 }
 
-package "Proxy / Provider Fallback" {
-  component "rapid-llm-proxy\n(proxy-bridge/server.mjs)" as proxy <<api>>
-  component "Tiered Provider Fallback Chain" as fallback <<external>>
-  component "LLM Model Catalogue\n(endpoint-gated)" as catalogue <<storage>>
+package "Proxy Layer" {
+  component "@rapid/llm-proxy" as proxy <<external>>
+  component "copilot-model-ids (vendored)" as modelids <<external>>
 }
 
-package "Downstream Consumers (unrelated subsystems)" {
-  component "cost-model.ts" as cost <<external>>
-  component "use-classifier-judge.ts" as judge <<external>>
-  component "offload-decision.tsx" as offload <<external>>
-  component "model-limits.cjs\n(statusline, unrelated)" as statusline <<external>>
+package "Routing & Cost Infrastructure" {
+  component "JudgeBackend (enabled/reachable)" as judge <<agent>>
+  component "cost-model.ts (priceForModel/freshInputTokens)" as cost <<core>>
+  component "LLM Routing Tier Priority" as tierpriority <<core>>
 }
 
-client --> complete : "builds process tag"
-complete --> proxy : "calls /api/complete\n(env-var precedence resolution)"
-proxy --> fallback : "routes via network-mode-aware\nfallback chain"
-fallback --> catalogue : "checks endpoint-gated\nmodel access"
+client --> resolver : "resolve URL fallback (4-tier)"
+client --> proxy : "direct-fetch, tags process telemetry"
+proxy --> modelids : "uses vendored model IDs"
+modelids ..> proxy : "postinstall alignment guards drift"
 
-proxy ..> cost : "flat/object tokens shape\n(circumstantial)"
-proxy ..> judge : "polls routing surface\n(circumstantial)"
-offload ..> proxy : "observes routing decisions"
+client --> judge : "should check reachable, not just enabled"
+client --> cost : "must normalize token/response shape"
+client --> tierpriority : "must respect fallback ordering"
+
+proxy ..> client : "response schema drift risk"
+judge ..> client : "blind spot if only checks enabled"
 
 @enduml

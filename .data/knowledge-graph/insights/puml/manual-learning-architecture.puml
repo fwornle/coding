@@ -1,32 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "KnowledgeManagement Neighborhood" {
-  component "ManualLearning" as ml <<core>>
-  component "ontology.classification\n(Layer0-Layer4)" as classification <<core>>
-  component "embeddings.local/remote" as embeddings <<core>>
+package "Insight Persistence (Wave 4)" {
+  component "Insight Documents\n(73 written)" as docs <<storage>>
+  component "Insight Graph Nodes\n(0 created)" as nodes <<storage>>
+  component "Anchor Pass\nfindEntityByName" as anchor <<core>>
+  component "queryIncomingRelations /\nstoreRelationship" as relations <<core>>
+  component "projectAnchorName='Coding'\n(fallback anchor)" as fallback <<core>>
 }
 
 package "Unified Viewer" {
-  component "D3GraphCanvas" as canvas <<agent>>
-  component "learning-source\n(isOnlineLearned)" as learningSource <<external>>
-  component "hierarchy-parents\n(deriveParents)" as hierarchy <<core>>
+  component "History Sidebar\n(filters entity Type=='Insight')" as history <<api>>
+  component "D3GraphCanvas.tsx\nVisibilityFilters.learningSource" as d3 <<agent>>
+  component "SigmaCanvas.tsx" as sigma <<agent>>
+  component "isOnlineLearned\n(learning-source.ts)" as learningsrc <<core>>
 }
 
-package "System Health Dashboard" {
-  component "ukb-workflow-modal" as ukbModal <<agent>>
-  component "ukbSlice (Redux)" as ukbSlice <<core>>
+package "CI / Quality Gates" {
+  component "assert-graph-density.ts\nDEFAULT_FILTERS" as density <<cli>>
+  component "attribution.test.ts\ncategoriseUnattributed" as attribution <<cli>>
 }
 
-database "Graph Database" as graphdb <<storage>>
+docs --> nodes : "expected but missing"
+nodes --> history : "Batch badge decision"
+docs ..> history : "no trace in UI"
 
-canvas ..> learningSource : "resolves online-vs-manual\nlearning provenance (unconfirmed)"
-canvas --> graphdb : "renders nodes from"
-hierarchy --> graphdb : "derives parent chain"
-ml ..> classification : "no confirmed link"
-ml ..> embeddings : "no confirmed link"
-ml ..> hierarchy : "not present in\nHIERARCHY_CLASSES"
-ukbModal --> ukbSlice : "dispatches batch workflow"
-ukbSlice ..> graphdb : "writes UKB entities\n(entity Type discipline required)"
+anchor --> relations : "disambiguate by (name,type)"
+relations --> fallback : "orphan prevention"
+anchor ..> nodes : "name-only collision risk"
+
+d3 --> learningsrc : "isOnlineLearned()"
+density --> d3 : "mirrors DEFAULT_FILTERS"
+density --> sigma : "shared visibility predicate"
+attribution ..> nodes : "unrooted node checks"
 
 @enduml
