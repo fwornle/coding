@@ -28,9 +28,36 @@
  *
  * Runner: Jest 29 (matches the repo's existing tests/integration/*.test.js
  *   convention — package.json `"test": "... jest"`).
+ *
+ * WHY THIS SUITE WAITS, AND WHY THAT IS NOT A MASKED TIMEOUT
+ * ---------------------------------------------------------
+ * It reads a LIVE obs-api, which is single-owner and single-threaded. obs-api
+ * also runs consolidation on a schedule: chunked insight synthesis across every
+ * project, each chunk an LLM call with a 60s ceiling. While that runs, a request
+ * that answers in 0.25s idle does not answer inside jest's 30s default — so the
+ * suite failed in a full `npm test` and passed in ~6s alone, for no reason
+ * connected to the wire shape it exists to lock.
+ *
+ * Raising the timeout alone would have been the wrong fix: it would make a
+ * genuinely DEAD obs-api take two minutes to report, which is the failure people
+ * actually need told quickly. So the retry distinguishes the two causes, exactly
+ * as the health coordinator already does for its own probe
+ * (scripts/health-coordinator.js "obs_api busy window" — a TIMEOUT means busy,
+ * and only a timeout; a refused connection is still reported immediately, or the
+ * coordinator would restart obs-api mid-consolidation).
+ *
+ *   * connection refused  → obs-api is down. Fail on the first attempt.
+ *   * timeout / 503       → obs-api is busy. Retry, then say which it was.
+ *
+ * The suite also waits once, up front, for a consolidation already in flight to
+ * finish, using the same `/api/consolidation/status .inflight` field the
+ * coordinator reads. Free, when nothing is running: one request.
  */
 
-const A_BASE = 'http://localhost:12436';
+// Same env seam the obs-api scripts use (scripts/backfill-parent-metadata.mjs),
+// so a non-default deployment and the fast-fail branch below are both reachable
+// without editing the file.
+const A_BASE = process.env.OBS_API_URL || 'http://localhost:12436';
 
 const REQUIRED_OBS_KEYS = [
   'id',
@@ -62,20 +89,104 @@ const REQUIRED_INSIGHT_KEYS = [
   'project',
 ];
 
+/** One attempt's patience. Idle responses are ~0.25s; this is for a busy store. */
+const ATTEMPT_TIMEOUT_MS = 20_000;
+/** Attempts per request. Three 20s waits outlast a chunk of insight synthesis. */
+const ATTEMPTS = 3;
+/** How long to let a consolidation already in flight finish before asserting. */
+const QUIET_WAIT_MS = 90_000;
+/**
+ * Covers the retries with slack. Passed per test rather than via
+ * `jest.setTimeout`: under `--experimental-vm-modules` the `jest` global is not
+ * injected (only describe/test/expect are), so that call is a ReferenceError
+ * here — and it raises the budget for the whole FILE, where the third argument
+ * states it on the test it belongs to.
+ */
+const SUITE_TIMEOUT_MS = 120_000;
+
+/** Did this throw because nothing is listening, rather than because it is slow? */
+function isConnectionRefused(err) {
+  const code = err?.cause?.code ?? err?.code ?? '';
+  return code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'EHOSTUNREACH';
+}
+
+/** Whether obs-api currently reports a consolidation in flight. */
+async function consolidationInflight() {
+  try {
+    const res = await fetch(`${A_BASE}/api/consolidation/status`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!res.ok) return false;          // cannot tell — do not claim busy
+    return Boolean((await res.json())?.inflight);
+  } catch {
+    return false;                        // same: absence of an answer is not evidence
+  }
+}
+
+/**
+ * Wait for a consolidation already running to finish. Bounded, and it does NOT
+ * fail on expiry: a long run is a reason to try anyway, not to declare the wire
+ * shape broken. Returns whether obs-api went quiet, for the failure message.
+ */
+async function waitForQuietObsApi(budgetMs = QUIET_WAIT_MS) {
+  const deadline = Date.now() + budgetMs;
+  let sawBusy = false;
+  while (Date.now() < deadline) {
+    if (!(await consolidationInflight())) return { quiet: true, sawBusy };
+    sawBusy = true;
+    await new Promise((r) => setTimeout(r, 2_000));
+  }
+  return { quiet: false, sawBusy };
+}
+
 async function fetchJson(path) {
   const url = `${A_BASE}${path}`;
-  let res;
-  try {
-    res = await fetch(url, { headers: { Accept: 'application/json' } });
-  } catch (err) {
-    throw new Error(`A obs-api at ${url} unreachable: ${err.message}`);
+  let lastErr;
+
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    let res;
+    try {
+      res = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+      });
+    } catch (err) {
+      // Nothing is listening. Retrying cannot change that, and the point of
+      // separating the cases is that THIS one is reported at once.
+      if (isConnectionRefused(err)) {
+        throw new Error(`A obs-api at ${url} unreachable: ${err.message}`);
+      }
+      lastErr = err;
+      continue;                          // timed out — the busy case
+    }
+
+    // 503 is kmRouter's hydration gate: the store is still opening, which is
+    // early rather than broken (observations-api-server.mjs kmRouter.use).
+    if (res.status === 503) {
+      lastErr = new Error('HTTP 503 — knowledge store still hydrating');
+      continue;
+    }
+    if (res.status !== 200) {
+      throw new Error(
+        `Typed view ${path} returned HTTP ${res.status} — /api/coding/* not yet mounted (expected RED until Plan 44-07)`
+      );
+    }
+    return res.json();
   }
-  if (res.status !== 200) {
-    throw new Error(
-      `Typed view ${path} returned HTTP ${res.status} — /api/coding/* not yet mounted (expected RED until Plan 44-07)`
-    );
-  }
-  return res.json();
+
+  // Every attempt timed out. Say which cause it was, so the next reader does not
+  // have to rediscover the consolidation overlap from a bare timeout.
+  const busy = await consolidationInflight();
+  throw new Error(
+    `Typed view ${path} did not answer in ${ATTEMPTS}×${ATTEMPT_TIMEOUT_MS / 1000}s. `
+      + (busy
+        ? 'obs-api reports a consolidation IN FLIGHT — it is busy, not broken; '
+          + 'this run overlapped a scheduled consolidation.'
+        : 'obs-api reports no consolidation in flight, so this is a real stall — '
+          + 'check `sample <pid>` and .logs/, not the schedule.')
+      + ` Last error: ${lastErr?.message ?? 'unknown'}`
+  );
 }
 
 function assertEnvelopeShape(body, path) {
@@ -101,6 +212,17 @@ function assertRowKeys(row, requiredKeys, path) {
 }
 
 describe('A typed views — /api/coding/{observations,digests,insights} (Phase 44 Wave 0 RED)', () => {
+  // Let a consolidation that is already running finish before asserting. One
+  // request when nothing is in flight, which is the usual case.
+  beforeAll(async () => {
+    const { quiet, sawBusy } = await waitForQuietObsApi();
+    if (sawBusy) {
+      process.stderr.write(
+        `[typed-views] obs-api was consolidating; waited and it ${quiet ? 'went quiet' : 'is still busy'}\n`
+      );
+    }
+  }, QUIET_WAIT_MS + 10_000);
+
   test('GET /api/coding/observations returns Pitfall 2 envelope + row shape', async () => {
     const body = await fetchJson('/api/coding/observations?limit=1');
     assertEnvelopeShape(body, '/api/coding/observations');
@@ -113,7 +235,7 @@ describe('A typed views — /api/coding/{observations,digests,insights} (Phase 4
     expect(typeof row.content).toBe('string');
     expect(Array.isArray(row.artifacts)).toBe(true);
     expect(typeof row.timestamp).toBe('string');
-  });
+  }, SUITE_TIMEOUT_MS);
 
   test('GET /api/coding/digests returns legacy digest shape', async () => {
     const body = await fetchJson('/api/coding/digests?limit=1');
@@ -127,7 +249,7 @@ describe('A typed views — /api/coding/{observations,digests,insights} (Phase 4
     expect(Array.isArray(row.observationIds)).toBe(true);
     expect(Array.isArray(row.agents)).toBe(true);
     expect(Array.isArray(row.filesTouched)).toBe(true);
-  });
+  }, SUITE_TIMEOUT_MS);
 
   test('GET /api/coding/insights returns legacy insight shape', async () => {
     const body = await fetchJson('/api/coding/insights?limit=1');
@@ -141,7 +263,7 @@ describe('A typed views — /api/coding/{observations,digests,insights} (Phase 4
     expect(typeof row.confidence).toBe('number');
     expect(Array.isArray(row.digestIds)).toBe(true);
     expect(typeof row.lastUpdated).toBe('string');
-  });
+  }, SUITE_TIMEOUT_MS);
 
   test('GET /api/coding/observations?agent=claude&project=coding filters server-side', async () => {
     const all = await fetchJson('/api/coding/observations?limit=200');
@@ -158,5 +280,5 @@ describe('A typed views — /api/coding/{observations,digests,insights} (Phase 4
       expect(row.agent).toBe('claude');
       expect(row.project).toBe('coding');
     }
-  });
+  }, SUITE_TIMEOUT_MS);
 });
