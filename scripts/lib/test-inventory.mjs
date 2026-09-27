@@ -56,6 +56,35 @@ export const EXCLUDED = new Map([
     'separate package with its own toolchain — run `npm test` inside it',
   ],
   [
+    'src/ontology/OntologyConfigManager.layout.test.ts',
+    // The three src/ontology suites below are node:test suites that NO runner
+    // executes, and until now that was recorded only as a comment on the `.ts`
+    // filter in nodeTestFiles(). Declaring them here is what makes the gap
+    // visible to suiteOwnership() — an undeclared drop now fails the build.
+    //
+    // Why they cannot simply be run: `node --test` strips types, it does not
+    // TRANSFORM them, and ontologyPathResolver.ts uses constructor parameter
+    // properties (`constructor(public readonly kind: …)`) — strip-only mode
+    // rejects that outright with ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX. Running
+    // them needs a real transform (tsx / ts-node) plus a `.js`→`.ts` resolve
+    // hook, because the sources use the TS ESM convention of importing
+    // `./x.js`. jest cannot take them either: its testMatch is `.test.js`
+    // under test/ or tests/, and it cannot see a node:test registration.
+    //
+    // Nor can the neighbouring submodule: `src/ontology` is a real directory
+    // of THIS repo that integrations/semantic-analysis symlinks into, and that
+    // submodule's own `npm test` is `npm run build && node dist/test.js`.
+    'needs a TS transform, not node --test type-stripping (parameter properties); see the note above',
+  ],
+  [
+    'src/ontology/ontologyPathResolver.test.ts',
+    'same: TS transform required; also the source jest would need is imported as ./x.js',
+  ],
+  [
+    'src/ontology/registry-adoption.test.ts',
+    'same TS-transform gap, and it additionally derives the repo root wrong (reads ~/.data/ontologies/upper.json)',
+  ],
+  [
     'tests/integration/cross-system-parity.mjs',
     // Phase 44 Wave 0 RED stub. Its own header says it fails BY DESIGN until
     // Plans 44-07 + 44-08 + 44-09 land /api/v1 on all three systems. Wiring it
@@ -234,6 +263,75 @@ export function nodeTestFilesRelative(opts = {}) {
 export function jestExcludedFilesRelative(opts = {}) {
   const root = opts.root ?? REPO_ROOT;
   return jestExcludedFiles(opts).map((f) => path.relative(root, f));
+}
+
+/**
+ * A suite by NAME, for the ownership audit. Content decides which runner owns a
+ * file (see the module header), but a file named `*.test.*` that imports neither
+ * runner is still a suite somebody meant to run — and is exactly the thing that
+ * disappears silently.
+ */
+const IS_TEST_FILENAME = /\.test\.(?:js|mjs|cjs|ts)$/;
+
+/**
+ * Who owns every suite in the tree — the audit behind the claim this module and
+ * jest.config.js both make, that "a file can never be claimed by both runners or
+ * dropped by both".
+ *
+ * NOTHING ENFORCED THAT CLAIM UNTIL NOW, and it was false. Three node:test
+ * suites under src/ontology ran in neither runner from the day they were
+ * written; the only record was a comment on a `.filter()`. The same shape of
+ * hole swallowed src/live-logging/ObservationConsolidator.test.js for two
+ * months, until 4988235c widened SEARCH_ROOTS to include src/ — and because
+ * nothing checked, the fix was invisible too, and the suite was still being
+ * described as dead five weeks later.
+ *
+ * A dropped suite cannot be noticed by reading output: it produces none. So the
+ * invariant needs a test, and `scripts/lib/test-inventory.test.mjs` is it.
+ *
+ * `unclaimed` is the finding that matters. `contested` covers the other
+ * direction: a suite jest still collects even though the node runner owns it,
+ * which jest reports as the misleading "must contain at least one test".
+ */
+export function suiteOwnership({ root = REPO_ROOT } = {}) {
+  const rel = (f) => path.relative(root, f);
+
+  // The universe is deliberately the UNION of the two ways a suite announces
+  // itself — named like one, or importing a runner. Either alone has a blind
+  // spot: tests/integration/cross-system-parity.mjs is a node:test suite whose
+  // name says nothing, and a `*.test.ts` whose import fails to parse would
+  // vanish from a content-only sweep.
+  const universe = SEARCH_ROOTS
+    .flatMap((r) => walk(path.join(root, r)))
+    .filter((f) => IS_TEST_FILENAME.test(f) || IMPORTS_NODE_TEST.test(read(f)))
+    .map(rel)
+    .sort();
+
+  const node = new Set(nodeTestFilesRelative({ root }));
+  const jestExcluded = new Set(jestExcludedFilesRelative({ root }));
+  const scripts = new Set(executableScriptFiles({ root }).map(rel));
+
+  // Declared drops. CI_SKIPPED counts only where it applies, or the audit would
+  // report those suites as lost on the runner and nowhere else.
+  const declared = (f) =>
+    [...EXCLUDED.keys()].some((k) => f === k || f.startsWith(`${k}/`)) ||
+    (isCI() && CI_SKIPPED.has(f));
+
+  const out = { node: [], jest: [], scripts: [], excluded: [], unclaimed: [], contested: [] };
+  for (const f of universe) {
+    const byNode = node.has(f);
+    // What jest ACTUALLY runs: collected by testMatch and not on its exclusion
+    // list. Testing the pattern alone would call every node:test suite under
+    // tests/ contested, which is the arrangement working as designed.
+    const byJest = JEST_COLLECTS.test(f) && !jestExcluded.has(f);
+    if (byNode && byJest) out.contested.push(f);
+    if (byNode) out.node.push(f);
+    else if (byJest) out.jest.push(f);
+    else if (scripts.has(f)) out.scripts.push(f);
+    else if (declared(f)) out.excluded.push(f);
+    else out.unclaimed.push(f);
+  }
+  return out;
 }
 
 export { REPO_ROOT };
