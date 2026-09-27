@@ -16,6 +16,7 @@ import {
   setWorkflowEdges,
 } from '@/store/slices/workflowConfigSlice'
 import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, STEP_TO_SUBSTEP, MULTI_AGENT_EDGES, AGENT_SUBSTEPS } from './constants'
+import { rowsFromRecentResponse, type RecentCall } from './recent-calls-contract'
 
 // Hook to get workflow definitions from Redux (populated by API with fallback to constants)
 export function useWorkflowDefinitions(workflowName?: string) {
@@ -225,20 +226,6 @@ export function useWorkflowLayout(
 
 // ─── Phase 52 D-04: Live LLM badge hooks ───────────────────────────────────
 
-interface RecentCall {
-  id: number
-  timestamp: string
-  provider: string
-  model: string
-  process: string
-  input_tokens: number
-  output_tokens: number
-  total_tokens: number
-  latency_ms: number
-  subscription: string
-  prompt_preview: string
-}
-
 const PROXY_PORT = '12435'
 const PROXY_BASE = `http://localhost:${PROXY_PORT}`
 const REFRESH_INTERVAL_MS = 30_000
@@ -260,8 +247,9 @@ async function fetchRecentCalls() {
   try {
     const res = await fetch(`${PROXY_BASE}/api/token-usage/recent?limit=${RECENT_LIMIT}`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const json = await res.json()
-    _recentCalls = json.calls ?? json ?? []
+    // The proxy answers `{ data, scope }`. Unwrapping lives in one typed place
+    // so a shape change can only empty the badge, never throw inside render.
+    _recentCalls = rowsFromRecentResponse(await res.json())
     _error = null
   } catch (e: any) {
     _error = `Failed to load LLM telemetry — check rapid-llm-proxy on port ${PROXY_PORT}`
