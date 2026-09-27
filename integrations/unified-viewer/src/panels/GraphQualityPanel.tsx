@@ -16,11 +16,34 @@
 // make the graph look repaired while the cause stayed. So the only write on
 // offer is "use the parent the writer already recorded", and the other three
 // categories say what is wrong instead of pretending to fix it.
+//
+// THE SECOND WRITE: EVIDENCE. The `sourceRefs[]` and `occurrences[]` arrays
+// under an entity's metadata are read by the entity panel in five places and were
+// populated on 0 of 2795 rows, so every entity said "No sources." / "No
+// occurrences.", hid its Evolution and Timeline pills, and scored an
+// unmeasurable confidence. The values are recoverable exactly — an insight
+// document that exists on disk, and incoming `mentions` / `capturedBy` edges
+// that already carry their own dates — so this section offers the same deal as
+// the one above: a finding set enumerated on screen first, then a write scoped
+// to exactly that set. Nothing is inferred and no LLM is involved; the
+// derivation lives in scripts/enrich-entity-sources.mjs and this button drives
+// the same pure planner in-process on obs-api.
+//
+// (Those key names are written WITHOUT a `metadata.` prefix on purpose:
+// scripts/audit-viewer-entity-fields.mjs extracts `metadata.<key>` from viewer
+// source to find reads, so prose in that shape makes this file look like a
+// reader of keys it merely mentions — and a marker named only in a tooltip
+// would enter the audit's key set from nowhere.)
+//
+// WHY THE PREVIEW IS SERVER-SIDE while Attribution above is computed in the
+// browser: the derivation needs the insight-document directory listing and the
+// whole relation set, and it must agree exactly with the CLI. Two
+// implementations of one derivation is how the bug this fixes got made.
 
-import { useMemo, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { ApiClient, EntityUpdateError } from '@/api/ApiClient'
+import { ApiClient, EntityUpdateError, type SourceEnrichmentFinding } from '@/api/ApiClient'
 import {
   categoriseUnattributed,
   CATEGORY_LABEL,
@@ -29,6 +52,7 @@ import {
   type AttributionEntity,
   type AttributionFinding,
 } from '@/graph/attribution'
+import { Progress } from '@/components/ui/progress'
 import { Logger } from '@/lib/logging'
 import { useViewerStore } from '@/store/viewer-store'
 import { useViewerStats } from './useViewerStats'
@@ -144,6 +168,80 @@ export default function GraphQualityPanel({
     },
   })
 
+  // ---- Evidence enrichment -----------------------------------------------
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [enrichError, setEnrichError] = useState<string | null>(null)
+
+  const preview = useQuery({
+    queryKey: ['enrich-sources-preview', apiClient.base],
+    queryFn: () => apiClient.previewSourceEnrichment(),
+    // Only while the section is open: closed, it should cost nothing.
+    enabled: evidenceOpen && apiClient.supportsSourceEnrichment,
+    staleTime: 60_000,
+  })
+
+  // Polls ONLY while a run is in flight. A status poll that keeps running after
+  // the job ends is the reason the workflow panel needed an idle sentinel; here
+  // the condition is simply `applying`, cleared the moment the server reports
+  // no inflight job.
+  const enrichStatus = useQuery({
+    queryKey: ['enrich-sources-status', apiClient.base],
+    queryFn: () => apiClient.sourceEnrichmentStatus(),
+    enabled: applying && apiClient.supportsSourceEnrichment,
+    refetchInterval: applying ? 1000 : false,
+  })
+
+  const inflight = enrichStatus.data?.inflight
+  const lastEnrich = enrichStatus.data?.lastJob
+
+  // Stop polling and refresh the corpus once the server reports the run done.
+  //
+  // Derived from the POLL, not from the POST's own promise: the run is a
+  // server-side singleton, so the poll is the only thing that knows when the
+  // work finished — including a run this client merely attached to, whose POST
+  // resolved immediately with `attached: true`.
+  //
+  // In an effect and not inline in the render body: setState during render
+  // re-enters immediately, and with a 1s refetch behind it that is a loop.
+  const hasStatus = enrichStatus.data !== undefined
+  useEffect(() => {
+    if (!applying || !hasStatus || inflight !== null) return
+    setApplying(false)
+    const failed = lastEnrich?.error?.message ?? null
+    setEnrichError(failed)
+    if (failed) {
+      Logger.warn(Logger.Categories.API, `Source enrichment failed — ${failed}`)
+    } else {
+      Logger.info(
+        Logger.Categories.API,
+        `Source enrichment wrote ${lastEnrich?.result?.written ?? 0} row(s)`,
+      )
+    }
+    // Scoped, per the note on the placement mutation above: a bare
+    // invalidateQueries() would refetch the 17MB entity payload AND every other
+    // query in the app.
+    void queryClient.invalidateQueries({ queryKey: [ENTITIES_KEY] })
+    void queryClient.invalidateQueries({ queryKey: ['enrich-sources-preview'] })
+  }, [applying, hasStatus, inflight, lastEnrich, queryClient])
+
+  const enrich = useMutation({
+    mutationFn: async () => apiClient.runSourceEnrichment({ dryRun: false }),
+    onSuccess: (accepted) => {
+      setEnrichError(null)
+      setApplying(true)
+      Logger.info(
+        Logger.Categories.API,
+        `Source enrichment ${accepted.attached ? 'attached to job' : 'started job'} ${accepted.jobId}`,
+      )
+    },
+    onError: (e: unknown) => {
+      setApplying(false)
+      setEnrichError(e instanceof Error ? e.message : 'Enrichment failed to start.')
+      Logger.warn(Logger.Categories.API, `Source enrichment refused — ${String(e)}`)
+    },
+  })
+
   const s = stats.data
   const coverage = s?.hierarchyCoverage
 
@@ -228,6 +326,148 @@ export default function GraphQualityPanel({
           </p>
         )}
       </section>
+
+      {/* ---- Evidence -------------------------------------------------- */}
+      {apiClient.supportsSourceEnrichment && (
+        <section className="space-y-1.5">
+          <h4 className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Evidence
+          </h4>
+          <div className="rounded border border-border/60 px-2 py-1.5 space-y-1">
+            <button
+              type="button"
+              data-testid="graph-quality-evidence-toggle"
+              aria-expanded={evidenceOpen}
+              onClick={() => setEvidenceOpen((v) => !v)}
+              className="w-full flex items-baseline justify-between gap-2 text-left text-[11px] hover:text-foreground"
+            >
+              <span>Rows missing sources or occurrences</span>
+              <span className={NUM}>
+                {preview.isLoading ? '…' : preview.data ? preview.data.total : '?'}
+              </span>
+            </button>
+
+            {evidenceOpen && (
+              <>
+                {preview.isError && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Preview unavailable — obs-api did not answer.
+                  </p>
+                )}
+                {preview.data && (
+                  <>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Recoverable exactly, from data the graph already holds: an insight
+                      document on disk named after the row, and incoming{' '}
+                      <code>mentions</code> / <code>capturedBy</code> edges carrying
+                      their own dates. Nothing is inferred.
+                    </p>
+                    <Row
+                      label="from an insight document only"
+                      value={String(preview.data.counts.docsOnly)}
+                      title={`${preview.data.docCount} insight documents on disk; matched by exact name.`}
+                    />
+                    <Row
+                      label="from evidence edges only"
+                      value={String(preview.data.counts.edgesOnly)}
+                      title="Incoming mentions / capturedBy edges. Occurrences are capped at the 50 most recent — the panel's own render cap."
+                    />
+                    <Row
+                      label="from both"
+                      value={String(preview.data.counts.both)}
+                    />
+                    {preview.data.counts.skippedMarker > 0 && (
+                      <Row
+                        label="already enriched"
+                        value={String(preview.data.counts.skippedMarker)}
+                        title="Carries the sourceRefsBackfilledAt marker. Re-deriving needs the CLI with --force."
+                      />
+                    )}
+
+                    {/* Enumerated, per this panel's contract: the write below is
+                        scoped to exactly this finding set, so the finding set is
+                        on screen. `truncated` says when the list is shorter than
+                        the count. */}
+                    <ul className="space-y-0.5 pt-0.5">
+                      {preview.data.findings.slice(0, 12).map((f: SourceEnrichmentFinding) => (
+                        <li
+                          key={f.id}
+                          className="text-[10px] text-muted-foreground truncate"
+                          title={`${f.name} — ${f.from.join(' + ')}`}
+                        >
+                          {f.name}
+                          {f.sourceRefs > 0 ? ` · ${f.sourceRefs} ref` : ''}
+                          {f.occurrences > 0 ? ` · ${f.occurrences} occ` : ''}
+                        </li>
+                      ))}
+                      {preview.data.total > 12 && (
+                        <li className="text-[10px] text-muted-foreground italic">
+                          …and {preview.data.total - 12} more
+                          {preview.data.truncated ? ' (list truncated server-side at 200)' : ''}
+                        </li>
+                      )}
+                    </ul>
+
+                    {/* The bar only exists while a job is running — an idle
+                        0% bar reads as "stuck", which is exactly the confusion
+                        the Confidence tab's unmeasurable state was added to
+                        avoid. */}
+                    {applying && inflight?.progress && inflight.progress.total > 0 && (
+                      <Progress
+                        data-testid="graph-quality-enrich-progress"
+                        className="h-1.5"
+                        value={Math.round(
+                          (inflight.progress.done / inflight.progress.total) * 100,
+                        )}
+                      />
+                    )}
+
+                    {preview.data.total > 0 && (
+                      <button
+                        type="button"
+                        data-testid="graph-quality-enrich-apply"
+                        disabled={applying || enrich.isPending}
+                        onClick={() => enrich.mutate()}
+                        className="mt-1 w-full rounded border border-border px-2 py-1 text-[10px] hover:bg-accent disabled:opacity-50"
+                      >
+                        {applying || enrich.isPending
+                          ? `Writing… ${inflight?.progress?.done ?? 0}/${inflight?.progress?.total ?? preview.data.total}`
+                          : `Add sources to ${preview.data.total} row${preview.data.total === 1 ? '' : 's'}`}
+                      </button>
+                    )}
+
+                    {/* The outcome of the last run, whether or not this client
+                        started it. `written` is the server's count, not the
+                        button's optimism. */}
+                    {!applying && lastEnrich?.result && (
+                      <p
+                        data-testid="graph-quality-enrich-result"
+                        className="text-[10px] text-muted-foreground"
+                      >
+                        Last run: wrote {lastEnrich.result.written} of{' '}
+                        {lastEnrich.result.planned}
+                        {lastEnrich.result.dryRun ? ' (rehearsal — nothing written)' : ''}
+                        {lastEnrich.result.failureCount
+                          ? `, ${lastEnrich.result.failureCount} failed`
+                          : ''}
+                        .
+                      </p>
+                    )}
+                  </>
+                )}
+                {enrichError && (
+                  <p
+                    data-testid="graph-quality-enrich-error"
+                    className="text-[10px] text-amber-600 dark:text-amber-500"
+                  >
+                    {enrichError}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ---- Hygiene --------------------------------------------------- */}
       <section className="space-y-1">

@@ -11,6 +11,7 @@ import {
   EVIDENCE_TYPE_ICONS,
   EVIDENCE_TYPE_LABELS,
   evidenceAgeBadge,
+  resolveEvidenceHref,
   type EvidenceLinkType,
 } from './evidence-types'
 
@@ -124,5 +125,28 @@ describe('evidence-types — evidenceAgeBadge (VOKB NodeDetails.tsx:280-296)', (
     const result = evidenceAgeBadge(ISO(95.7))
     expect(result).not.toBeNull()
     expect(result!.label).toBe('95d') // floored, NOT rounded
+  })
+})
+
+describe('resolveEvidenceHref', () => {
+  test('prefixes an origin-relative ref with the API base', () => {
+    expect(resolveEvidenceHref('/api/insights/doc/Foo', 'http://localhost:12436')).toBe(
+      'http://localhost:12436/api/insights/doc/Foo',
+    )
+  })
+
+  test('does not double the slash when the base carries a trailing one', () => {
+    expect(resolveEvidenceHref('/api/insights/doc/Foo', 'http://localhost:12436/')).toBe(
+      'http://localhost:12436/api/insights/doc/Foo',
+    )
+  })
+
+  test('leaves an absolute URL alone', () => {
+    const argo = 'https://argo.example.invalid/workflows/abc'
+    expect(resolveEvidenceHref(argo, 'http://localhost:12436')).toBe(argo)
+  })
+
+  test('passes an empty url through rather than emitting a bare base', () => {
+    expect(resolveEvidenceHref('', 'http://localhost:12436')).toBe('')
   })
 })

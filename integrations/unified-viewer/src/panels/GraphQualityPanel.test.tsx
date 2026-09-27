@@ -8,6 +8,12 @@
 // an action offered on the wrong category papers over a class bug, a wider
 // patch clobbers a writer's metadata, and a 503 rendered as an error teaches
 // people the button is broken.
+//
+// The Evidence section adds a second write, and what matters about it is the
+// same shape of property: the finding set is on screen BEFORE the button is,
+// the POST must say `dryRun: false` explicitly (so a stray call rehearses), the
+// section does not exist at all on a backend that never mounted the route, and
+// a 409 from a concurrent wave reads as "wait", not as "broken".
 
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, waitFor, fireEvent, act } from '@testing-library/react'
@@ -42,6 +48,32 @@ function makeClient(overrides: Partial<ApiClient> = {}): ApiClient {
     updateEntityMetadata: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as ApiClient
+}
+
+const PREVIEW = {
+  total: 3,
+  counts: { docsOnly: 1, edgesOnly: 1, both: 1, skippedMarker: 0, noSource: 40 },
+  docCount: 1334,
+  entityCount: 2796,
+  truncated: false,
+  findings: [
+    { id: 'a', name: 'AckPhraseGate', ontologyClass: 'Detail', sourceRefs: 1, occurrences: 0, from: ['insight-document'] },
+    { id: 'b', name: 'AgentAdapter', ontologyClass: 'SubComponent', sourceRefs: 1, occurrences: 11, from: ['insight-document', 'evidence-edge'] },
+    { id: 'c', name: 'ApiServiceWrapper', ontologyClass: 'Detail', sourceRefs: 0, occurrences: 8, from: ['evidence-edge'] },
+  ],
+}
+
+const IDLE_STATUS = { inflight: null, lastJob: { id: null, finishedAt: null, result: null, error: null } }
+
+/** A client that reaches the enrichment routes, with every seam a spy. */
+function makeEnrichClient(overrides: Partial<ApiClient> = {}): ApiClient {
+  return makeClient({
+    supportsSourceEnrichment: true,
+    previewSourceEnrichment: vi.fn().mockResolvedValue(PREVIEW),
+    runSourceEnrichment: vi.fn().mockResolvedValue({ accepted: true, attached: false, dryRun: false, jobId: 1 }),
+    sourceEnrichmentStatus: vi.fn().mockResolvedValue(IDLE_STATUS),
+    ...overrides,
+  } as Partial<ApiClient>)
 }
 
 function renderPanel(apiClient: ApiClient) {
@@ -203,5 +235,111 @@ describe('GraphQualityPanel — a write that cannot proceed must say so', () => 
     expect(screen.queryByTestId('graph-quality-category-recordedParent')).toBeNull()
     expect(screen.getByTestId('graph-quality-category-unclaimed')).toBeTruthy()
     expect(update).not.toHaveBeenCalled()
+  })
+})
+
+describe('GraphQualityPanel — Evidence enrichment', () => {
+  test('the section does not exist on a backend without the route', () => {
+    // The okb tab talks to OKM Express, which never mounted /api/v1 at all.
+    // Offering a button that 404s is worse than offering nothing.
+    renderPanel(makeClient())
+    expect(screen.queryByTestId('graph-quality-evidence-toggle')).toBeNull()
+  })
+
+  test('no preview is fetched until the section is expanded', async () => {
+    const previewFn = vi.fn().mockResolvedValue(PREVIEW)
+    renderPanel(makeEnrichClient({ previewSourceEnrichment: previewFn } as Partial<ApiClient>))
+
+    expect(screen.getByTestId('graph-quality-evidence-toggle')).toBeTruthy()
+    expect(previewFn).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId('graph-quality-evidence-toggle'))
+    await waitFor(() => expect(previewFn).toHaveBeenCalledTimes(1))
+  })
+
+  test('enumerates the finding set and only then offers the write', async () => {
+    renderPanel(makeEnrichClient())
+    fireEvent.click(screen.getByTestId('graph-quality-evidence-toggle'))
+
+    await waitFor(() => expect(screen.getByTestId('graph-quality-enrich-apply')).toBeTruthy())
+    const panel = screen.getByTestId('graph-quality-panel').textContent ?? ''
+    // Named rows, not just a count — this panel's stated contract is that every
+    // action is scoped to a listed finding set.
+    expect(panel).toContain('AckPhraseGate')
+    expect(panel).toContain('AgentAdapter')
+    expect(panel).toContain('ApiServiceWrapper')
+    expect(screen.getByTestId('graph-quality-enrich-apply').textContent).toContain('3 rows')
+  })
+
+  test('the write says dryRun:false explicitly', async () => {
+    // The server defaults to a rehearsal. If this ever stops passing `false`,
+    // the button silently becomes a no-op that still reports success.
+    const run = vi.fn().mockResolvedValue({ accepted: true, attached: false, dryRun: false, jobId: 7 })
+    renderPanel(makeEnrichClient({ runSourceEnrichment: run } as Partial<ApiClient>))
+    fireEvent.click(screen.getByTestId('graph-quality-evidence-toggle'))
+    await waitFor(() => expect(screen.getByTestId('graph-quality-enrich-apply')).toBeTruthy())
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('graph-quality-enrich-apply'))
+    })
+    expect(run).toHaveBeenCalledWith({ dryRun: false })
+  })
+
+  test('shows the server progress while writing, then the server result', async () => {
+    const status = vi.fn()
+      .mockResolvedValueOnce({
+        inflight: { startedAt: 'now', progress: { done: 2, total: 3, dryRun: false } },
+        lastJob: { id: 1, finishedAt: null, result: null, error: null },
+      })
+      .mockResolvedValue({
+        inflight: null,
+        lastJob: {
+          id: 1,
+          finishedAt: 'later',
+          result: { dryRun: false, written: 3, planned: 3, counts: PREVIEW.counts, failureCount: 0 },
+          error: null,
+        },
+      })
+    renderPanel(makeEnrichClient({ sourceEnrichmentStatus: status } as Partial<ApiClient>))
+    fireEvent.click(screen.getByTestId('graph-quality-evidence-toggle'))
+    await waitFor(() => expect(screen.getByTestId('graph-quality-enrich-apply')).toBeTruthy())
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('graph-quality-enrich-apply'))
+    })
+    // Progress is the SERVER's count, not the button's optimism.
+    //
+    // The explicit timeouts are load-bearing: the status poll runs at 1000ms,
+    // which is exactly waitFor's default, so the assertion races the cadence by
+    // construction. It passed alone and failed in the full suite — the worst
+    // kind of flake to leave in.
+    await waitFor(
+      () => expect(screen.getByTestId('graph-quality-enrich-apply').textContent).toContain('2/3'),
+      { timeout: 5000 },
+    )
+    await waitFor(
+      () => expect(screen.getByTestId('graph-quality-enrich-result').textContent).toContain('wrote 3 of 3'),
+      { timeout: 5000 },
+    )
+  })
+
+  test('a concurrent wave reads as wait, not as broken', async () => {
+    const run = vi.fn().mockRejectedValue(
+      new EntityUpdateError('Consolidation in flight — refusing to enrich concurrently', true),
+    )
+    renderPanel(makeEnrichClient({ runSourceEnrichment: run } as Partial<ApiClient>))
+    fireEvent.click(screen.getByTestId('graph-quality-evidence-toggle'))
+    await waitFor(() => expect(screen.getByTestId('graph-quality-enrich-apply')).toBeTruthy())
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('graph-quality-enrich-apply'))
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('graph-quality-enrich-error').textContent).toContain(
+        'Consolidation in flight',
+      ),
+    )
+    // And the button must come back, not sit disabled forever.
+    expect(screen.getByTestId('graph-quality-enrich-apply')).not.toHaveProperty('disabled', true)
   })
 })

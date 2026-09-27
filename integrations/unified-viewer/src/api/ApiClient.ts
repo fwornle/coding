@@ -151,6 +151,72 @@ export class EntityUpdateError extends Error {
   }
 }
 
+/**
+ * `GET /api/v1/enrich/sources/preview` — the enrichment finding set.
+ *
+ * `findings` is CAPPED server-side (200 rows) while `total` is not, so the
+ * panel must enumerate from `findings` and count from `total`; `truncated`
+ * says when those two disagree.
+ */
+export interface SourceEnrichmentFinding {
+  id: string
+  name: string
+  ontologyClass: string | null
+  /** How many refs this row would gain (0 when only occurrences apply). */
+  sourceRefs: number
+  occurrences: number
+  /** Which derivations fired: `insight-document`, `evidence-edge`, or both. */
+  from: string[]
+}
+
+export interface SourceEnrichmentCounts {
+  docsOnly: number
+  edgesOnly: number
+  both: number
+  skippedMarker: number
+  noSource: number
+}
+
+export interface SourceEnrichmentPreview {
+  total: number
+  counts: SourceEnrichmentCounts
+  /** Insight documents on disk, and active entities considered. */
+  docCount: number
+  entityCount: number
+  truncated: boolean
+  findings: SourceEnrichmentFinding[]
+}
+
+export interface SourceEnrichmentAccepted {
+  accepted: boolean
+  /** True when this call joined a run already in flight. */
+  attached: boolean
+  dryRun: boolean
+  jobId: number | null
+}
+
+export interface SourceEnrichmentResult {
+  dryRun: boolean
+  written: number
+  planned: number
+  counts: SourceEnrichmentCounts
+  failureCount?: number
+  failures?: Array<{ id: string; name: string; error: string }>
+}
+
+export interface SourceEnrichmentStatus {
+  inflight: {
+    startedAt: string | null
+    progress: { done: number; total: number; dryRun: boolean } | null
+  } | null
+  lastJob: {
+    id: number | null
+    finishedAt: string | null
+    result: SourceEnrichmentResult | null
+    error: { message: string } | null
+  }
+}
+
 export class ApiClient {
   // Phase 61-02 — `apiVersion` defaults to 'v1' so coding/VKB and every
   // existing call site stay byte-identical (D-11). Only the okb tab passes
@@ -404,6 +470,74 @@ export class ApiClient {
    * (404 / network), it falls back to the client heuristic per NodeDetails.tsx
    * :165-213 (UI-SPEC §16).
    */
+  /**
+   * Is source enrichment reachable on this backend?
+   *
+   * The three `/api/v1/enrich/*` routes live on obs-api only. The okb tab
+   * talks to OKM Express on :8090, which never mounted `/api/v1/` at all — so
+   * the panel section must not render there rather than offer a button that
+   * 404s.
+   */
+  get supportsSourceEnrichment(): boolean {
+    return this.apiVersion === 'v1'
+  }
+
+  /**
+   * The enrichment finding set: which entities would gain `sourceRefs` /
+   * `occurrences`, and from which derivation. Writes nothing.
+   *
+   * The server computes this from the graph it already holds in memory, so it
+   * is cheap; it is still fetched on expand rather than on mount, because a
+   * closed accordion should cost nothing.
+   */
+  async previewSourceEnrichment(): Promise<SourceEnrichmentPreview> {
+    return this.get<SourceEnrichmentPreview>('/api/v1/enrich/sources/preview')
+  }
+
+  /**
+   * Start an enrichment run. `dryRun` defaults to TRUE on the server, so the
+   * write path requires passing `false` explicitly — a stray POST rehearses
+   * rather than writes.
+   *
+   * Returns as soon as the job is accepted (202). Progress is read from
+   * `sourceEnrichmentStatus()`; the run is a module-level singleton server-side,
+   * so a second call while one is in flight attaches to it instead of starting
+   * a second pass over the same rows.
+   */
+  async runSourceEnrichment(opts: { dryRun: boolean }): Promise<SourceEnrichmentAccepted> {
+    const url = `${this.baseUrl}/api/v1/enrich/sources`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ dryRun: opts.dryRun }),
+    })
+    if (res.status === 503) {
+      throw new EntityUpdateError('The knowledge store is still starting up.', true)
+    }
+    if (res.status === 409) {
+      // A wave / consolidation / roll-up is writing the same rows. Not an
+      // error in the code — a real reason to wait, and it says which one.
+      const body = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new EntityUpdateError(body.error ?? 'Another pass is writing these rows.', true)
+    }
+    if (!res.ok) {
+      throw new EntityUpdateError(`${url} → HTTP ${res.status}`, false)
+    }
+    return (await res.json()) as SourceEnrichmentAccepted
+  }
+
+  /**
+   * Live status of the enrichment job. Unenveloped, like the other job status
+   * routes on obs-api (`/api/insights/parent-synthesis/status`), so it does not
+   * go through `get()`.
+   */
+  async sourceEnrichmentStatus(): Promise<SourceEnrichmentStatus> {
+    const url = `${this.baseUrl}/api/v1/enrich/sources/status`
+    const res = await fetch(url, { headers: { Accept: 'application/json' } })
+    if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`)
+    return (await res.json()) as SourceEnrichmentStatus
+  }
+
   async getEntityConfidence(id: string): Promise<ConfidencePayload> {
     const safeId = encodeURIComponent(id)
     const raw = await this.get<unknown>(`/api/v1/entities/${safeId}/confidence`)

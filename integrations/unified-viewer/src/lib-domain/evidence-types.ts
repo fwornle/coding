@@ -114,3 +114,26 @@ export function evidenceAgeBadge(addedAt: string): { label: string; className: s
   }
   return null // fresh — no badge needed
 }
+
+/**
+ * Resolve a stored `sourceRefs[].url` into something the browser can open.
+ *
+ * WHY A STORED REF IS NOT ALWAYS A FULL URL. Refs written by
+ * `scripts/enrich-entity-sources.mjs` point at documents obs-api serves, and
+ * they are stored ORIGIN-RELATIVE (`/api/insights/doc/Foo`) on purpose: the
+ * graph is exported to `.data/knowledge-graph/exports/general.json`, which is
+ * committed, so a host and port baked into a ref becomes tracked data that is
+ * wrong on every other machine. The one place that knows where obs-api lives
+ * is the client's own `apiClient.base`, so resolution happens here, at render.
+ *
+ * Absolute refs (the VOKB-era Argo / Grafana / GitHub links this type system
+ * was built for) are returned untouched.
+ *
+ * Without this the href would resolve against the VIEWER's origin (:5173) and
+ * 404 — and a link that 404s is worse than text (CodeItTouches.tsx:14-19).
+ */
+export function resolveEvidenceHref(url: string, base: string): string {
+  if (!url) return url
+  if (!url.startsWith('/')) return url        // absolute, or already opaque
+  return `${base.replace(/\/+$/, '')}${url}`
+}
