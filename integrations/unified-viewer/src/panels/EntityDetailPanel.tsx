@@ -60,6 +60,7 @@ import {
   EVIDENCE_TYPE_ICONS,
   EVIDENCE_TYPE_LABELS,
   evidenceAgeBadge,
+  resolveEvidenceHref,
   type EvidenceLinkType,
 } from '@/lib-domain/evidence-types'
 
@@ -1129,12 +1130,17 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
                       <ul className="space-y-0.5 pl-4">
                         {refs.map((ref, i) => {
                           const url = (ref.url as string | undefined) ?? '#'
+                          // Origin-relative refs (the insight documents
+                          // `enrich-entity-sources.mjs` writes) are stored
+                          // without a host so the committed export stays
+                          // portable; obs-api's real base is only known here.
+                          const href = resolveEvidenceHref(url, apiClient.base)
                           const addedAt = (ref.addedAt as string | undefined) ?? ''
                           const badge = addedAt ? evidenceAgeBadge(addedAt) : null
                           return (
                             <li key={i} className="flex items-center gap-2">
                               <a
-                                href={url}
+                                href={href}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-primary underline truncate flex-1"
@@ -1172,11 +1178,24 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
                     <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
                       {relativeTime((occ.timestamp as string | undefined))}
                     </span>
-                    {(occ.sourceEvidenceId as string | undefined) && (
-                      <span className="font-mono text-xs">
-                        {occ.sourceEvidenceId as string}
-                      </span>
-                    )}
+                    {(() => {
+                      // `sourceEvidenceId` is an entity id, and a raw uuid
+                      // tells the operator nothing. When the row it names is
+                      // in the graph, show its NAME and keep the id in the
+                      // title; fall back to the id when it is not (an
+                      // observation pruned since the edge was written).
+                      const id = occ.sourceEvidenceId as string | undefined
+                      if (!id) return null
+                      const name = nameOf(id)
+                      return (
+                        <span
+                          className={name ? 'text-xs truncate' : 'font-mono text-xs'}
+                          title={id}
+                        >
+                          {name ?? id}
+                        </span>
+                      )
+                    })()}
                   </li>
                 ))}
               </ul>

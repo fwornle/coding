@@ -78,6 +78,14 @@ import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
 // graph this process owns, so the two stores stay independent.
 import { ExperimentApi } from '../lib/experiments/experiment-api.mjs';
 import { registerKgbenchRoutes } from '../lib/experiments/kgbench-routes.mjs';
+// One derivation, two drivers — the CLI at scripts/enrich-entity-sources.mjs
+// drives these same pure helpers over HTTP. Importing is side-effect-free: the
+// script's main() is behind an argv guard.
+import {
+  buildEnrichmentPlan,
+  readInsightDocIndex,
+  mergeEnrichment,
+} from './enrich-entity-sources.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -693,6 +701,154 @@ function runParentSynthesis(options = {}) {
   })();
 
   return _parentSynthPromise;
+}
+
+// ── Source-enrichment runner ────────────────────────────────────────────────
+//
+// Fills `metadata.sourceRefs[]` and `metadata.occurrences[]` — two arrays the
+// unified viewer reads in five places and that NO writer has ever populated
+// (0 of 2795 rows on 2026-09-27). See scripts/enrich-entity-sources.mjs for
+// where the values come from and why each derivation is deterministic.
+//
+// IN-PROCESS, not a spawned child: km-core's LevelDB is single-owner and this
+// process holds it. A child would fail to open the store at all. Same reason
+// the consolidator, compaction, roll-up and parent-synthesis runners all live
+// here.
+//
+// The PLAN is pure and shared with the CLI; only the WRITE seam differs —
+// `mergeAttributes` here, an HTTP PUT there.
+const INSIGHTS_DOC_DIR = path.join(REPO_ROOT, 'knowledge-management', 'insights');
+
+/**
+ * Read the graph into the wire-ish shapes the pure planner expects.
+ *
+ * Walks Graphology directly (as composeViewerStats does) rather than paging the
+ * REST surface: this process IS the store, and a self-HTTP round trip of 2.8k
+ * entities + 19k relations to reach data already in memory would be absurd.
+ *
+ * ⚠ SUPERSEDED ROWS ARE EXCLUDED, and must be. The raw graph holds retired
+ * history that `store.iterate()` / `findByOntologyClass()` — and therefore
+ * `GET /api/v1/entities`, and therefore the viewer — filter out by
+ * `validUntil <= now` (GraphKMStore.isActive, Phase 39 D-34). Walking the graph
+ * without that filter made this route see 3011 entities where the CLI saw 2799
+ * and plan 1242 enrichments against the CLI's 1033: the two drivers of the same
+ * derivation would have written different row sets, and 209 of the difference
+ * were retired rows no consumer can render. Predicate duplicated here rather
+ * than imported because it is private to the store.
+ */
+function isActiveForEnrichment(entity, nowMs) {
+  if (entity.validUntil === undefined || entity.validUntil === null) return true;
+  return new Date(entity.validUntil).getTime() > nowMs;
+}
+
+function readGraphForEnrichment(store) {
+  const graph = store.graph;
+  const entities = [];
+  const relations = [];
+  const nowMs = Date.now();
+  graph.forEachNode((id, attrs) => {
+    if (!isActiveForEnrichment(attrs, nowMs)) return;
+    entities.push({ ...attrs, id });
+  });
+  graph.forEachEdge((key, attrs, source, target) => {
+    relations.push({ key, source, target, attributes: attrs });
+  });
+  return { entities, relations };
+}
+
+/** Compute the plan without touching anything. Cheap — pure, in-memory. */
+async function previewSourceEnrichment(options = {}) {
+  const store = await ensureKMStore();
+  const { entities, relations } = readGraphForEnrichment(store);
+  const docIndex = readInsightDocIndex(INSIGHTS_DOC_DIR);
+  const { planned, counts } = buildEnrichmentPlan({
+    entities,
+    relations,
+    docIndex,
+    only: options.only || 'both',
+    force: !!options.force,
+  });
+  return { planned, counts, docCount: docIndex.size, entityCount: entities.length };
+}
+
+let _enrichPromise = null;
+let _enrichStartedAt = null;
+let _enrichJobCounter = 0;
+let _lastEnrichJobId = null;
+let _lastEnrichResult = null;
+let _lastEnrichError = null;
+let _lastEnrichFinishedAt = null;
+let _enrichProgress = null;
+
+function runSourceEnrichment(options = {}) {
+  if (_enrichPromise) return _enrichPromise;
+
+  _enrichStartedAt = new Date().toISOString();
+  _enrichJobCounter += 1;
+  _lastEnrichJobId = _enrichJobCounter;
+  // dryRun UNLESS the caller explicitly says false — the CLI convention every
+  // other write route here follows, and the thing that keeps a stray click out
+  // of the store.
+  const dryRun = options.dryRun !== false;
+
+  _enrichPromise = (async () => {
+    try {
+      const { planned, counts, docCount, entityCount } = await previewSourceEnrichment(options);
+      _enrichProgress = { done: 0, total: planned.length, dryRun };
+
+      if (dryRun) {
+        const result = {
+          dryRun: true, written: 0, planned: planned.length,
+          counts, docCount, entityCount, failures: [],
+        };
+        _lastEnrichResult = result;
+        _lastEnrichError = null;
+        return { ok: true, ...result };
+      }
+
+      const store = await ensureKMStore();
+      let written = 0;
+      const failures = [];
+      for (const item of planned) {
+        const metadata = mergeEnrichment(item.entity.metadata, item);
+        try {
+          await store.mergeAttributes(item.entity.id, {
+            metadata,
+            updatedAt: new Date().toISOString(),
+          });
+          written++;
+        } catch (err) {
+          failures.push({
+            id: item.entity.id,
+            name: item.entity.name,
+            error: err?.message || String(err),
+          });
+        }
+        _enrichProgress = { done: written, total: planned.length, dryRun };
+      }
+
+      const result = {
+        dryRun: false, written, planned: planned.length,
+        counts, docCount, entityCount,
+        failures: failures.slice(0, 20),
+        failureCount: failures.length,
+      };
+      _lastEnrichResult = result;
+      _lastEnrichError = null;
+      return { ok: true, ...result };
+    } catch (err) {
+      _lastEnrichError = { message: err?.message || String(err) };
+      _lastEnrichResult = null;
+      throw err;
+    } finally {
+      _lastEnrichFinishedAt = new Date().toISOString();
+      _enrichStartedAt = null;
+      _enrichPromise = null;
+      _enrichProgress = null;
+    }
+  })();
+
+  return _enrichPromise;
 }
 
 // The SCHEDULED pass is dirty-only and capped.
@@ -3003,6 +3159,97 @@ kmRouter.get('/entities/:id/confidence', async (req, res) => {
     process.stderr.write(`[obs-api] /api/v1/entities/:id/confidence error: ${err.message}\n`);
     res.status(500).json({ success: false, error: 'Failed to compute entity confidence' });
   }
+});
+
+// ── Source enrichment (viewer-triggered) ───────────────────────────────────
+//
+// REGISTERED ON kmRouter, NOT app. An `app.post('/api/v1/…')` added after
+// line ~2519 is shadowed by the JSON-404 catch-all mounted there and returns
+// 404 with no handler ever running — the same trap that hid /api/v1/stream.
+// kmRouter is mounted BEFORE the catch-all, and Express honours routes added
+// to a Router after it was mounted, so these are reachable.
+//
+// Three routes, matching the preview -> diff -> apply safety model the
+// GraphQualityPanel's own header contract demands (every action scoped to a
+// listed finding set):
+//   GET  /enrich/sources/preview  — the finding set, enumerated. Writes nothing.
+//   POST /enrich/sources          — apply. dryRun unless {dryRun:false}.
+//   GET  /enrich/sources/status   — inflight + last job, for progress polling.
+
+/** Rows returned to the panel per preview. Enough to enumerate, bounded. */
+const ENRICH_PREVIEW_ROWS = 200;
+
+kmRouter.get('/enrich/sources/preview', async (req, res) => {
+  try {
+    const { planned, counts, docCount, entityCount } = await previewSourceEnrichment({
+      only: req.query.only,
+      force: req.query.force === 'true',
+    });
+    res.json({
+      success: true,
+      data: {
+        total: planned.length,
+        counts,
+        docCount,
+        entityCount,
+        truncated: planned.length > ENRICH_PREVIEW_ROWS,
+        findings: planned.slice(0, ENRICH_PREVIEW_ROWS).map((p) => ({
+          id: p.entity.id,
+          name: p.entity.name,
+          ontologyClass: p.entity.ontologyClass ?? p.entity.entityType ?? null,
+          sourceRefs: Array.isArray(p.additions.sourceRefs) ? p.additions.sourceRefs.length : 0,
+          occurrences: Array.isArray(p.additions.occurrences) ? p.additions.occurrences.length : 0,
+          from: p.from,
+        })),
+      },
+    });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /api/v1/enrich/sources/preview error: ${err.message}\n`);
+    res.status(500).json({ success: false, error: 'Failed to compute enrichment preview' });
+  }
+});
+
+kmRouter.post('/enrich/sources', (req, res) => {
+  if (_shuttingDown) return res.status(503).json({ error: 'Server is shutting down' });
+  // Everything below writes entity metadata on the same rows a wave does.
+  if (_consolidationPromise) {
+    return res.status(409).json({ error: 'Consolidation in flight — refusing to enrich concurrently' });
+  }
+  if (_compactionPromise) {
+    return res.status(409).json({ error: 'Compaction in flight — refusing to enrich concurrently' });
+  }
+  if (_rollUpPromise) {
+    return res.status(409).json({ error: 'Roll-up in flight — refusing to enrich concurrently' });
+  }
+  if (_parentSynthPromise) {
+    return res.status(409).json({ error: 'Parent synthesis in flight — refusing to enrich concurrently' });
+  }
+  const attached = !!_enrichPromise;
+  runSourceEnrichment(req.body || {}).catch((err) => {
+    process.stderr.write(`[obs-api] /enrich/sources async error: ${err.message}\n`);
+  });
+  res.status(202).json({
+    success: true,
+    accepted: true,
+    attached,
+    dryRun: (req.body || {}).dryRun !== false,
+    jobId: _lastEnrichJobId,
+    startedAt: _enrichStartedAt,
+  });
+});
+
+kmRouter.get('/enrich/sources/status', (_req, res) => {
+  res.json({
+    inflight: _enrichPromise
+      ? { startedAt: _enrichStartedAt, progress: _enrichProgress }
+      : null,
+    lastJob: {
+      id: _lastEnrichJobId,
+      finishedAt: _lastEnrichFinishedAt,
+      result: _lastEnrichResult,
+      error: _lastEnrichError,
+    },
+  });
 });
 
 // ── Phase 44 plan 07 (A-4): /api/coding/* typed views ─────────────────────
