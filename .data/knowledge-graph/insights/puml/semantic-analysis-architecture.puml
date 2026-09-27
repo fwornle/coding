@@ -1,46 +1,38 @@
 @startuml
 !include _standard-style.puml
 
-package "Agent Core" {
-  component "BaseAgent<TInput,TOutput>" as base <<core>>
+package "Agent Framework" {
+  component "BaseAgent" as base <<core>>
   component "SemanticAnalysisAgent" as sem <<agent>>
   component "OntologyClassificationAgent" as onto <<agent>>
 }
 
-package "Classification Pipeline" {
-  component "L1 Classifier\n(heuristic/LLM/hybrid)" as l1 <<core>>
-  component "Hard-Root Guard" as guard <<core>>
-  component "L2 Refinement\n(loadL2Classes/buildPrompt/extract)" as l2 <<core>>
-  component "LegacyOntologyAdapter" as adapter <<core>>
+package "LLM Layer" {
+  component "LLMService (llm-proxy)" as llm <<external>>
+  component "TokenLogger" as tokenlog <<core>>
 }
 
-package "Data & Ontology Sources" {
-  database "upper.json" as upper
-  database "coding-ontology.json" as codingOnt
-  database "coding.lower.json" as codingLower
-  component "OntologyRegistry (km-core)" as registry <<external>>
+package "Classification Data" {
+  component "HIERARCHY_ROOTS (@fwornle/km-core)" as roots <<storage>>
+  component "coding.lower.json (L2 Classes)" as l2json <<storage>>
 }
 
-component "Debug Trace Logs\n(semantic-analysis-trace-*.json)" as trace <<external>>
+component "Debug Trace Logs" as trace <<storage>>
+component "KB Injection A/B Script" as kbscript <<external>>
+component "CodingLowerOntologySource Bug" as bug <<external>>
 
-base --> sem : lifecycle contract
-base --> onto : lifecycle contract
+base --> sem : "template method"
+base --> onto : "template method"
 
-sem --> trace : writes pre-processing payload (non-fatal)
-sem --> onto : delegates classification
+sem --> llm : "ensureLLMInitialized()"
+sem --> tokenlog : "attachTokenLogger()"
+sem --> trace : "writes debug trace JSON"
 
-onto --> guard : checks closed-set roots first
-guard --> l1 : bypass if hard-rooted
-onto --> l1 : classify (if not guarded)
-l1 --> l2 : optional refinement
-l2 --> l2 : regex-match L2 name\nfallback to L1 on mismatch
+onto --> roots : "hard-root-guard check"
+onto --> llm : "classifier.classify()"
+onto --> l2json : "loadL2Classes() / L2 refinement"
+l2json ..> bug : "mismatch: emits despite doc ban"
 
-onto --> adapter : bridges legacy interfaces
-adapter --> registry : resolves ontology chain
-registry --> upper : loads
-registry --> codingOnt : loads
-registry --> codingLower : loads (may be missing)
-
-codingLower ..> l2 : supplies L2 classes\n(BUG: emits CodingLowerOntologySource\nunexpectedly)
+kbscript ..> sem : "planned merge: batch missing-data capture"
 
 @enduml

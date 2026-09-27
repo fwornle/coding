@@ -5,17 +5,23 @@ title Hierarchy Context: LSLConfigValidator
 
 [LiveLoggingSystem] as live_logging_system #FFFFDD
 [LSLConfigValidator] as lslconfig_validator #LightBlue
-[RedactionConfigManager] as redaction_config_manager #F0F0F0
-[MultiUserHashManager] as multi_user_hash_manager #F0F0F0
-[LiveTranscriptWatchers] as live_transcript_watchers #F0F0F0
-[TokenUsageAdapters] as token_usage_adapters #F0F0F0
-[ObservationWriter] as observation_writer #F0F0F0
+[SessionFactIndex] as session_fact_index #F0F0F0
+[ObservationPipeline] as observation_pipeline #F0F0F0
+[TranscriptAdapters] as transcript_adapters #F0F0F0
+[TmuxSessionWrapper] as tmux_session_wrapper #F0F0F0
+[HostPathResolver] as host_path_resolver #E8F5E8
+[RawFallbackContract] as raw_fallback_contract #E8F5E8
+[PostLLMEvidenceFloor] as post_llmevidence_floor #E8F5E8
+[ObservationExportSafetyMerge] as observation_export_safety_merge #E8F5E8
 
 live_logging_system --> lslconfig_validator
-redaction_config_manager -[hidden]- lslconfig_validator
-multi_user_hash_manager -[hidden]- lslconfig_validator
-live_transcript_watchers -[hidden]- lslconfig_validator
-token_usage_adapters -[hidden]- lslconfig_validator
-observation_writer -[hidden]- lslconfig_validator
+session_fact_index -[hidden]- lslconfig_validator
+observation_pipeline -[hidden]- lslconfig_validator
+transcript_adapters -[hidden]- lslconfig_validator
+tmux_session_wrapper -[hidden]- lslconfig_validator
+lslconfig_validator --> host_path_resolver
+lslconfig_validator --> raw_fallback_contract
+lslconfig_validator --> post_llmevidence_floor
+lslconfig_validator --> observation_export_safety_merge
 
 @enduml

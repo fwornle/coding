@@ -1,32 +1,29 @@
 @startuml
 !include _standard-style.puml
 
-package "Pattern Verification Tooling" {
-  component "verify-patterns.sh" as script <<cli>>
-  component "Conditional Checks\n(rg-based)" as checks <<core>>
-  component "Compliance Score\nCalculator" as score <<core>>
-  component "Markdown Report\n(heredoc)" as report <<core>>
-}
-
-package "Knowledge Base" {
-  database "SHARED_MEMORY JSON" as mem <<storage>>
-}
-
-package "Project Under Analysis" {
-  component "package.json / install.sh" as project <<external>>
-}
-
-package "Unrelated Heuristic Layer" {
+package "Pattern Verification Tooling (Gap Analysis)" {
+  component "verify-patterns.sh" as vps <<cli>>
   component "EntityPatternAnalyzer.ts" as epa <<core>>
+  database "pattern-verification-*.md report" as report <<storage>>
+  database "Shared-memory Knowledge File" as knowledge <<storage>>
 }
 
-script --> checks : "invokes"
-checks --> project : "inspects for react/install.sh"
-checks --> score : "PASSED/TOTAL_CHECKS"
-score --> report : "writes summary"
-script --> mem : "reads TransferablePattern (sig>=8)"
-score --> mem : "writes back pattern_compliance_score\n(jq)"
+package "Missing / Unimplemented Logic" {
+  component "Render-Error Triage Logic" as triage <<agent>>
+  component "Diagram Verification Logic" as diagcheck <<agent>>
+}
 
-epa ..> mem : "unrelated: classifies entities\n(no direct link)"
+package "Unrelated Fixtures" {
+  component "DesignViewModel.cs / DesignView.xaml" as xamlfix <<external>>
+}
+
+vps --> report : "generates compliance score"
+vps --> knowledge : "mutates via jq"
+epa --> knowledge : "hardcoded team/pattern mappings"
+
+triage ..> vps : "not implemented here"
+diagcheck ..> vps : "not implemented here"
+
+xamlfix ..> vps : "keyword collision only"
 
 @enduml

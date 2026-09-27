@@ -1,42 +1,38 @@
 @startuml
 !include _standard-style.puml
 
-package "Host Boundary" {
-  component ".env (host)" as envfile <<external>>
-  component "~/.coding/features.yaml" as featuresyaml <<external>>
-  component "llm-cli-proxy :12435" as proxy <<external>>
+package "Entrypoint Stages" {
+  component "wait_for_service()" as wait <<core>>
+  component ".env Loader\n(secret exclusion)" as envload <<core>>
+  component "Feature Gating Block" as featgate <<core>>
+  component "exec \"$@\"" as execcmd <<core>>
 }
 
-package "docker/entrypoint.sh" {
-  component "Env Loader\n(*_API_KEY/*_TOKEN filter)" as envloader <<core>>
-  component "wait_for_service()\nTCP poll, always returns 0" as waitfn <<core>>
-  component "Feature Gating Block\nPROGRAM_FEATURES" as gatefn <<core>>
-  component "exec \"$@\"" as exechandoff <<core>>
+package "External Dependencies" {
+  database "Qdrant" as qdrant
+  database "Redis" as redis
+  cloud "Host .env File" as hostenv
 }
 
-package "Container Runtime" {
-  database "runtime/features.json\n(read-only snapshot)" as snapshot <<storage>>
-  component "/etc/supervisor/features.d/disabled.conf" as disabledconf <<storage>>
-  component "supervisord.conf" as supervisorconf <<core>>
+package "Snapshot & Config" {
+  component "features.json Snapshot" as snapshot <<storage>>
+  component "features.d/disabled.conf" as disabledconf <<storage>>
   component "supervisord" as supervisord <<core>>
-  component "Qdrant / Redis" as qdredis <<external>>
 }
 
-featuresyaml --> snapshot : "flattened by host"
-envfile --> envloader : "imports vars"
-envloader ..> proxy : "forces LLM egress via"
+wait --> qdrant : "TCP poll (fail-open)"
+wait --> redis : "TCP poll (fail-open)"
+wait --> envload : "proceeds regardless"
 
-snapshot --> gatefn : "read (fail-open if missing)"
-gatefn --> disabledconf : "generates autostart=false"
-disabledconf --> supervisorconf : "overrides autostart only"
+hostenv --> envload : "raw key=value lines"
+envload ..> envload : "skip *_API_KEY|*_TOKEN|*_MANAGEMENT_KEY"
+envload --> featgate : "sanitized env"
 
-waitfn --> qdredis : "polls readiness"
-waitfn --> supervisord : "defers failure to restarts"
+snapshot --> featgate : "node -e reads snap.features"
+featgate --> disabledconf : "writes autostart=false stanzas"
+featgate --> execcmd : "on missing snapshot: start everything"
 
-envloader --> waitfn : "setup complete"
-waitfn --> gatefn : "then gating"
-gatefn --> exechandoff : "features.d written"
-exechandoff --> supervisord : "PID 1 handoff"
-supervisorconf --> supervisord : "process config"
+disabledconf --> supervisord : "include dir"
+execcmd --> supervisord : "PID1 exec-replace"
 
 @enduml

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TmuxSessionWrapper
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TmuxSessionWrapper] as tmux_session_wrapper #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[SessionFactIndex] as session_fact_index #F0F0F0
+[ObservationPipeline] as observation_pipeline #F0F0F0
+[TranscriptAdapters] as transcript_adapters #F0F0F0
+
+live_logging_system --> tmux_session_wrapper
+lslconfig_validator -[hidden]- tmux_session_wrapper
+session_fact_index -[hidden]- tmux_session_wrapper
+observation_pipeline -[hidden]- tmux_session_wrapper
+transcript_adapters -[hidden]- tmux_session_wrapper
+
+@enduml

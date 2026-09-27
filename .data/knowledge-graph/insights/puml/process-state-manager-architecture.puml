@@ -1,43 +1,35 @@
 @startuml
 !include _standard-style.puml
 
-package "Startup Orchestration" {
+package "Service Orchestration" {
   component "start-services-robust.js" as ssr <<core>>
-  component "SERVICE_CONFIGS/ORDER" as sc <<core>>
+  component "startOneService (startFn)" as startfn <<core>>
+  component "SERVICE_CONFIGS / SERVICE_ORDER" as configs <<core>>
 }
 
 package "Process State Layer" {
   component "ProcessStateManager" as psm <<core>>
-  component "pgrep OS Scan" as pgrep <<external>>
+  database "Service Registry\n(name/type keyed)" as registry <<storage>>
 }
 
-package "Parallel Gating Authority" {
-  component "entrypoint.sh" as ep <<cli>>
-  database "features.json" as feat
-  component "supervisord" as sup <<external>>
+package "OS-Level Verification" {
+  component "pgrep / isProcessRunningByScript" as pgrep <<external>>
 }
 
-package "Managed Services" {
-  component "api-service.js / dashboard-service.js" as wrap <<agent>>
-  component "transcript-monitor" as tm <<agent>>
-}
+component "service-gating.test.mjs" as tests <<cli>>
 
-ssr --> sc : "reads service configs"
-ssr --> psm : "instantiates singleton"
-ssr --> psm : "isServiceRunning(name, scope, opts)"
-psm ..> pgrep : "falls back to raw scan\n(not sole source of truth)"
-ssr --> pgrep : "isProcessRunningByScript()"
-pgrep --> psm : "registerService() reconciles orphan"
-ssr --> tm : "spawns if not running"
+ssr --> psm : "instantiates\nnew ProcessStateManager()"
+ssr --> configs : "drives service order"
+ssr --> startfn : "invokes per service"
 
-wrap --> psm : "registerService() on spawn"
-wrap --> psm : "unregisterService() on exit"
-sup --> wrap : "tracks wrapper PID only"
+startfn --> psm : "isServiceRunning(name, type)"
+psm --> registry : "reads/writes"
 
-ep --> feat : "reads snapshot"
-feat --> ep : "may drift to logging-only"
-ep --> sup : "autostart=false override"
+startfn --> pgrep : "fallback check\nif PSM reports absent"
+pgrep --> psm : "registerService(...)\n(orphan re-registration)"
 
-psm ..> ep : "no shown integration\n(parallel gating authority)"
+tests ..> startfn : "exercises via configs"
+tests ..> configs : "imports SERVICE_CONFIGS"
+tests ..> psm : "NOT covered\n(gap)"
 
 @enduml

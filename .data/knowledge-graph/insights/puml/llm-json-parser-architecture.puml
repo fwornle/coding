@@ -1,34 +1,30 @@
 @startuml
 !include _standard-style.puml
 
-package "Provider Call Paths" {
-  component "llm-with-process.ts\n(raw-fetch bypass)" as rawfetch <<core>>
-  component "SDK LLMService.complete()" as sdk <<core>>
-  component "dmr-provider.ts\n(OpenAI-compatible client)" as dmr <<core>>
+package "LLM Provider Layer" {
+  component "Anthropic Provider" as anthropic <<external>>
+  component "OpenAI Provider" as openai <<external>>
+  component "Groq Provider" as groq <<external>>
+  component "DMR Provider" as dmr <<external>>
 }
 
-package "LlmJsonParser (parse-llm-json.ts)" {
-  component "escapeControlCharsInStrings()" as escape <<core>>
-  component "truncateToLastCompleteElement()" as truncate <<core>>
+package "Routing & Cost (unrelated surface)" {
+  component "Offload Decision" as offload <<core>>
+  component "Classifier Judge" as classifier <<core>>
+  component "Cost Model" as cost <<core>>
 }
 
-package "Downstream Consumers" {
-  component "JSON-mode Consumers\n(batch extraction, insights/entities)" as consumers <<agent>>
+package "JSON Repair (unverified)" {
+  component "LlmJsonParser" as parser <<core>>
 }
 
-package "Analogous Fail-Soft Patterns" {
-  component "cost-model.ts\npriceForModel()" as cost <<external>>
-  component "model-limits.cjs\ncatalogueContextWindow()" as limits <<external>>
-}
+anthropic ..> parser : "raw output (unconfirmed)"
+openai ..> parser : "raw output (unconfirmed)"
+groq ..> parser : "raw output (unconfirmed)"
+dmr ..> parser : "raw output (unconfirmed)"
 
-rawfetch --> escape : "raw text output"
-sdk --> escape : "raw text output"
-dmr ..> sdk : "used by"
-
-escape --> truncate : "string-safe payload"
-truncate --> consumers : "best-effort typed result"
-
-escape ..> cost : "fail-soft philosophy"
-truncate ..> limits : "explicit-null-over-silent pattern"
+offload --> classifier : "routes tier decisions"
+classifier ..> groq : "fallback after tiers exhausted"
+cost --> offload : "informs budget constraints"
 
 @enduml

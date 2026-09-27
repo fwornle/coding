@@ -1,0 +1,27 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: SessionFactIndex
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[SessionFactIndex] as session_fact_index #LightBlue
+[LSLConfigValidator] as lslconfig_validator #F0F0F0
+[ObservationPipeline] as observation_pipeline #F0F0F0
+[TranscriptAdapters] as transcript_adapters #F0F0F0
+[TmuxSessionWrapper] as tmux_session_wrapper #F0F0F0
+[ConsolidationDedupEngine] as consolidation_dedup_engine #E8F5E8
+[InsightProvenanceAnchors] as insight_provenance_anchors #E8F5E8
+[MentionsClassifier] as mentions_classifier #E8F5E8
+[RawFallbackReceipt] as raw_fallback_receipt #E8F5E8
+
+live_logging_system --> session_fact_index
+lslconfig_validator -[hidden]- session_fact_index
+observation_pipeline -[hidden]- session_fact_index
+transcript_adapters -[hidden]- session_fact_index
+tmux_session_wrapper -[hidden]- session_fact_index
+session_fact_index --> consolidation_dedup_engine
+session_fact_index --> insight_provenance_anchors
+session_fact_index --> mentions_classifier
+session_fact_index --> raw_fallback_receipt
+
+@enduml

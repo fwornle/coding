@@ -1,0 +1,33 @@
+@startuml
+!include _standard-style.puml
+
+package "ETM Transcript Capture" {
+  component "enhanced-transcript-monitor.js" as etm <<core>>
+  component "PiSessionReader/Writer" as pisession <<core>>
+  component "singleton-reclaim (heartbeat/stall)" as reclaim <<core>>
+  component "TmuxSessionWrapper" as tmuxwrap <<agent>>
+}
+
+package "Observation Pipeline" {
+  component "ObservationWriter" as writer <<core>>
+  component "ObservationConsolidator" as consolidator <<core>>
+  component "ObservationExporter" as exporter <<core>>
+  component "raw-fallback.js" as fallback <<core>>
+}
+
+package "External Constraints" {
+  component "obs-api" as obsapi <<api>>
+  component "health-coordinator.js" as health <<core>>
+}
+
+tmuxwrap ..> etm : "unresolved: not found in retrieval"
+etm --> pisession : "reads/writes pi session transcripts"
+etm --> reclaim : "singleton write-lock heartbeat"
+etm --> writer : "captures raw exchanges"
+writer --> consolidator : "produces observation"
+consolidator --> exporter : "digest/insight export"
+writer ..> fallback : "shared RAW_FALLBACK_PREFIX contract"
+writer --> obsapi : "writes via obs-api (single-threaded)"
+tmuxwrap ..> health : "heartbeat + PID liveness (unverified)"
+
+@enduml

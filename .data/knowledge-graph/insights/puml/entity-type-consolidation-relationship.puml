@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EntityTypeConsolidation
+
+[KnowledgeManagement] as knowledge_management #FFFFDD
+[EntityTypeConsolidation] as entity_type_consolidation #LightBlue
+[ManualLearning] as manual_learning #F0F0F0
+[OnlineLearning] as online_learning #F0F0F0
+[GraphDatabaseService] as graph_database_service #F0F0F0
+[GraphifyGraphReader] as graphify_graph_reader #F0F0F0
+[CodeGraphAgent] as code_graph_agent #F0F0F0
+[KmCoreMigrationTooling] as km_core_migration_tooling #F0F0F0
+[DuplicateNameAnchoring] as duplicate_name_anchoring #F0F0F0
+[GraphAttributionAudit] as graph_attribution_audit #F0F0F0
+[GraphVisibilityFiltering] as graph_visibility_filtering #F0F0F0
+[SigmaGraphRenderer] as sigma_graph_renderer #F0F0F0
+
+knowledge_management --> entity_type_consolidation
+manual_learning -[hidden]- entity_type_consolidation
+online_learning -[hidden]- entity_type_consolidation
+graph_database_service -[hidden]- entity_type_consolidation
+graphify_graph_reader -[hidden]- entity_type_consolidation
+code_graph_agent -[hidden]- entity_type_consolidation
+km_core_migration_tooling -[hidden]- entity_type_consolidation
+duplicate_name_anchoring -[hidden]- entity_type_consolidation
+graph_attribution_audit -[hidden]- entity_type_consolidation
+graph_visibility_filtering -[hidden]- entity_type_consolidation
+sigma_graph_renderer -[hidden]- entity_type_consolidation
+
+@enduml

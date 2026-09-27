@@ -5,19 +5,29 @@ title Hierarchy Context: LLMWithProcessClient
 
 [LLMAbstraction] as llmabstraction #FFFFDD
 [LLMWithProcessClient] as llmwith_process_client #LightBlue
+[LLMMockService] as llmmock_service #F0F0F0
 [DMRProvider] as dmrprovider #F0F0F0
-[LlmJsonRepair] as llm_json_repair #F0F0F0
+[LlmJsonParser] as llm_json_parser #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
 [CostModel] as cost_model #F0F0F0
-[OffloadRouting] as offload_routing #F0F0F0
-[ClassifierJudge] as classifier_judge #F0F0F0
+[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
 [ModelContextLimits] as model_context_limits #F0F0F0
+[CopilotModelIdAlignment] as copilot_model_id_alignment #E8F5E8
+[ClassifierJudgeReachability] as classifier_judge_reachability #E8F5E8
+[FastModePricingRule] as fast_mode_pricing_rule #E8F5E8
+[ModelContextLimitsCache] as model_context_limits_cache #E8F5E8
 
 llmabstraction --> llmwith_process_client
+llmmock_service -[hidden]- llmwith_process_client
 dmrprovider -[hidden]- llmwith_process_client
-llm_json_repair -[hidden]- llmwith_process_client
+llm_json_parser -[hidden]- llmwith_process_client
+copilot_model_id_alignment -[hidden]- llmwith_process_client
 cost_model -[hidden]- llmwith_process_client
-offload_routing -[hidden]- llmwith_process_client
-classifier_judge -[hidden]- llmwith_process_client
+offload_routing_dashboard -[hidden]- llmwith_process_client
 model_context_limits -[hidden]- llmwith_process_client
+llmwith_process_client --> copilot_model_id_alignment
+llmwith_process_client --> classifier_judge_reachability
+llmwith_process_client --> fast_mode_pricing_rule
+llmwith_process_client --> model_context_limits_cache
 
 @enduml

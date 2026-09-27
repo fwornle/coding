@@ -1,35 +1,33 @@
 @startuml
 !include _standard-style.puml
 
-package "Claude Code Integration" {
-  component "claude-bridge.js" as bridge <<core>>
-  component "EVENT_MAP\n(transformContext/transformResponse)" as eventmap <<core>>
+package "Agent API Hooks" {
+  component "UnifiedHookManager" as uhm <<core>>
+  component "hook-config.js\nvalidateConfig()" as hookconfig <<core>>
 }
 
-package "Hook Manager Layer" {
-  component "getHookManager()\n(singleton accessor)" as accessor <<api>>
-  component "UnifiedHookManager\n(hook-manager.js)" as uhm <<core>>
-  component "HooksManager\n(hooks-api.js, abstract base)" as hooksapi <<core>>
+package "Health Monitoring" {
+  component "health-prompt-hook.js" as healthhook <<cli>>
+  component "deriveSummary()" as derive <<core>>
+  database "Health Coordinator\n/health/state" as coordinator <<external>>
 }
 
-package "HookManagementSystem (Session)" {
-  component "Statusline Click-Report\n(constraints focus)" as statusline <<core>>
-  component "Tmux Pane Badge\n(ETM entry selection)" as etm <<core>>
+package "Dashboards" {
+  component "Next.js constraint-monitor\ndashboard" as constraintdash <<external>>
+  component "Vite system-health\ndashboard" as healthdash <<external>>
+  component "tmux statusline\n(constraints tab)" as statusline <<cli>>
 }
 
-database "Hook Registry\n(Map<HookEvent, HookHandler[]>)" as registry <<storage>>
+uhm --> hookconfig : "fail-soft config\nvalidation"
+uhm ..> statusline : "dispatches violation\nhandlers (unverified path)"
 
-bridge --> eventmap : "translate native events"
-eventmap --> accessor : "dynamic import ./hook-manager.js"
-accessor --> uhm : "lazy init"
-bridge --> uhm : "initialize(projectPath)"
-bridge --> uhm : "executeHooks(event, context, 'claude')"
-uhm --> registry : "register/sort/dispatch by priority"
-hooksapi ..> uhm : "shared idiom (pre-populate + push-sort)"
+healthhook --> coordinator : "polls HTTP state"
+healthhook --> derive : "computes status"
+derive ..> derive : "refuses silent\n'healthy' (SPEC R6)"
 
-statusline ..> uhm : "adjacent UI dispatch"
-etm ..> uhm : "adjacent session-selection concern"
+healthhook --> constraintdash : "feeds violation data"
+healthhook --> healthdash : "feeds health data"
 
-bridge --> bridge : "fail-open catch\n(decision:allow, exit(0))"
+statusline --> constraintdash : "click opens/focuses tab"
 
 @enduml

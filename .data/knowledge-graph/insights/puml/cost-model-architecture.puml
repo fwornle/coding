@@ -1,39 +1,47 @@
 @startuml
 !include _standard-style.puml
 
-package "cost-model.ts (pure module)" {
-  component "priceForModel()" as price <<core>>
-  component "modelFamily() /\nFAMILY_REPRESENTATIVE" as family <<core>>
-  component "freshInputTokens()" as fresh <<core>>
-  component "budgetForMonth()" as budget <<core>>
-  component "budgetProvider()" as bucket <<core>>
-  component "isSynthetic()" as synth <<core>>
-  component "monthlySeries()" as series <<core>>
+package "Budget Resolution" {
+  component "budgetForMonth()" as budgetForMonth <<core>>
+  component "DEFAULT_COST_CONFIG.budgets" as budgetConfig <<storage>>
+  component "budgetProvider()" as budgetProvider <<core>>
 }
 
-package "External Config / Data" {
-  component "CostRow[]" as rows <<external>>
-  component "CostConfig /\nBudgetConfig.monthlyEurByMonth" as config <<external>>
+package "Pricing Cascade" {
+  component "priceForModel()" as priceForModel <<core>>
+  component "scalePrice() / FAST_MODE_MULTIPLIER" as scalePrice <<core>>
+  component "modelFamily() / FAMILY_REPRESENTATIVE" as modelFamily <<core>>
 }
 
-package "Upstream Systems" {
-  component "rapid-llm-proxy\nopenAIFreshInputTokens()" as proxy <<external>>
-  component "Model Catalogue\n(endpoint gating)" as catalogue <<external>>
+package "Aggregation Layer" {
+  component "cellCostUsd()" as cellCostUsd <<core>>
+  component "monthlySeries()" as monthlySeries <<core>>
+  component "freshInputTokens()" as freshInputTokens <<core>>
+  component "isOpenAIWireProvider()" as wireProvider <<core>>
+  component "isSynthetic()" as isSynthetic <<core>>
 }
 
-price --> family : "fallback when\nexact key misses"
-price ..> family : "fast-mode suffix\nstripping (FAST_MODE_MULTIPLIER)"
+component "Dashboard Components" as dashboard <<external>>
+component "rapid-llm-proxy usage-cache.ts" as proxy <<external>>
+component "LLM Routing Layer" as routing <<external>>
 
-series --> synth : "filter synthetic rows"
-synth --> rows : "reads CostRow[]"
-series --> price : "compute cost per row"
-series --> budget : "aggregate vs cap"
+budgetForMonth --> budgetConfig : "resolves monthly cap override"
+budgetProvider --> budgetForMonth : "maps copilot/claude-max"
+routing ..> budgetProvider : "informs two-bucket split"
 
-budget --> config : "reads monthlyEurByMonth"
-bucket --> budget : "bucket provider →\ncopilot / claude-max"
+priceForModel --> scalePrice : "fast-mode 2x fallback"
+priceForModel --> modelFamily : "family fallback"
 
-fresh ..> proxy : "compensation now\nlives upstream"
+cellCostUsd --> freshInputTokens : "computes fresh input tokens"
+freshInputTokens ..> proxy : "compensation now obsolete"
+wireProvider ..> proxy : "documents cache semantics"
+cellCostUsd --> wireProvider : "reference for wire distinction"
+monthlySeries --> cellCostUsd : "aggregates per-cell cost"
+monthlySeries --> isSynthetic : "filters demo/test rows"
+monthlySeries --> budgetForMonth : "compares spend to cap"
+priceForModel --> cellCostUsd : "supplies per-model price"
 
-price ..> catalogue : "parallel correctness\nconstraint (not enforced here)"
+dashboard --> monthlySeries : "GET /api/token-usage/cost"
+dashboard --> budgetConfig : "GET /api/llm/settings"
 
 @enduml

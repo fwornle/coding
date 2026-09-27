@@ -1,38 +1,35 @@
 @startuml
 !include _standard-style.puml
 
-package "LLMMockService (llm-mock-service.ts)" {
-  component "getLLMMode()" as mode <<core>>
-  component "Per-agent override" as override <<core>>
-  component "Global mode setting" as global <<core>>
-  component "Legacy mockLLM boolean" as legacy <<core>>
-  component "Default 'public'" as default <<core>>
+package "Mock Resolution Layer" {
+  component "LLMMockService" as mock <<core>>
+  component "getLLMMode()" as getmode <<core>>
+  component "workflow-progress.json" as progressjson <<storage>>
 }
 
-database ".data/workflow-progress.json" as state <<storage>>
-
-package "External Dependencies" {
-  component "CODING_ROOT path translation" as root <<core>>
-  cloud "proxy-bridge/server.mjs\n(com.coding.llm-cli-proxy)" as proxy <<external>>
+package "Resolution Sources" {
+  component "perAgentOverrides" as override <<core>>
+  component "globalMode" as global <<core>>
+  component "legacy mockLLM boolean" as legacy <<core>>
+  component "hardcoded 'public' default" as fallback <<core>>
 }
 
-package "LLM Routing Dashboard (unrelated layer)" {
-  component "cost-model.ts" as cost <<core>>
-  component "offload-decision.tsx" as offload <<core>>
-  component "use-classifier-judge.ts" as judge <<core>>
+package "Live Routing Context" {
+  component "LLM Routing Tiers" as tiers <<external>>
+  component "rapid-llm-proxy" as proxy <<external>>
+  component "Provider Failure Handling" as failures <<external>>
 }
 
-override --> mode : "1st precedence"
-global --> mode : "2nd precedence"
-legacy --> mode : "3rd precedence"
-default --> mode : "fallback"
+mock --> getmode : "resolves active mode"
+getmode --> override : "1st priority"
+getmode --> global : "2nd priority"
+getmode --> legacy : "3rd priority (legacy)"
+getmode --> fallback : "4th priority (default)"
+legacy ..> progressjson : "backward compatibility"
 
-mode --> state : "persists/reads mode"
-mode --> root : "Docker/host path resolution"
-mode --> proxy : "live/public mode routes calls"
-
-cost ..> mode : "thematically adjacent\n(no direct call)"
-offload ..> mode : "thematically adjacent\n(no direct call)"
-judge ..> mode : "thematically adjacent\n(no direct call)"
+mock ..> tiers : "should mirror fallback order (unverified)"
+tiers --> proxy : "routes live requests"
+proxy --> failures : "provider failures"
+failures ..> mock : "risk: masks failures behind stale mock state"
 
 @enduml

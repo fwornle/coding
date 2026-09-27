@@ -1,40 +1,51 @@
 @startuml
 !include _standard-style.puml
 
-package "Entry Point" {
-  component "start-services.sh" as shim <<cli>>
-  component "start-services-robust.js" as orchestrator <<core>>
+package "Entry Points" {
+  component "start-services.sh" as legacy <<cli>>
+  component "ROBUST_MODE branch" as robustMode <<cli>>
 }
 
-package "Service Starter Core" {
-  component "lib/service-starter.js" as libStarter <<core>>
+package "Robust Orchestration" {
+  component "start-services-robust.js" as robust <<core>>
   component "SERVICE_CONFIGS / SERVICE_ORDER" as configs <<core>>
-  component "ProcessStateManager (PSM)" as psm <<storage>>
-  component "pgrep Orphan Detector" as pgrep <<agent>>
-  component "Port Shutdown/Startup Race Logic" as portlogic <<core>>
+  component "lib/service-starter.js" as libStarter <<core>>
+  component "startServiceWithRetry" as retry <<core>>
+  component "waitForPortBindable" as portWait <<core>>
+  component "isProcessRunningByScript" as pgrep <<core>>
 }
 
 package "Container-Side Gating" {
-  component "docker/entrypoint.sh" as entrypoint <<cli>>
-  component "features.json snapshot" as features <<storage>>
-  component "supervisord.conf overrides" as supervisord <<external>>
+  component "docker/entrypoint.sh" as entrypoint <<external>>
+  component "PROGRAM_FEATURES" as progFeatures <<core>>
+  component "supervisord include files" as supervisord <<external>>
 }
 
-component "service-gating.test.mjs" as tests <<agent>>
+package "Validation & Policy" {
+  component "service-gating.test.mjs" as gatingTest <<agent>>
+  component "container-gating.test.mjs" as containerTest <<agent>>
+  component "Health Verification Workflow" as healthPolicy <<agent>>
+}
 
-shim --> orchestrator : "execs when ROBUST_MODE=true"
-orchestrator --> configs : "declares service map"
-orchestrator --> libStarter : "startServiceWithRetry / health checks"
-orchestrator --> psm : "isServiceRunning checks"
-orchestrator --> pgrep : "fallback reconciliation"
-pgrep --> psm : "re-registers orphans"
-orchestrator --> portlogic : "SIGTERM->SIGKILL, TCP bind probe"
+legacy --> robustMode : "ROBUST_MODE=true"
+robustMode --> robust : "execs"
+legacy ..> legacy : "legacy fallback (kill_port)"
 
-entrypoint --> features : "reads read-only snapshot"
-entrypoint --> supervisord : "generates disabled.conf"
+robust --> configs : "defines"
+robust --> libStarter : "uses"
+libStarter --> retry : "drives"
+retry --> pgrep : "PSM fallback check"
+retry --> portWait : "poll before spawn"
+portWait ..> retry : "avoids EADDRINUSE"
 
-tests --> configs : "validates structural invariants"
+configs --> gatingTest : "asserted by"
+gatingTest --> configs : "validates SERVICE_ORDER"
 
-orchestrator ..> entrypoint : "parallel container-side gating"
+entrypoint --> progFeatures : "reads features.json"
+progFeatures --> supervisord : "writes autostart=false"
+containerTest --> progFeatures : "validates mapping"
+
+healthPolicy --> robust : "governs post-rebuild checks"
+healthPolicy --> entrypoint : "governs post-rebuild checks"
 
 @enduml

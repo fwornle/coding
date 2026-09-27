@@ -1,34 +1,32 @@
 @startuml
 !include _standard-style.puml
 
-package "LLM Abstraction Layer" {
-  component "getLLMMode()\n(llm-mock-service.ts)" as modeRes <<core>>
-  component "llm-with-process.ts" as wrapper <<core>>
-  component "dmr-provider.ts" as dmr <<core>>
-  component "parse-llm-json.ts" as parser <<core>>
+package "Routing Layer" {
+  component "LLM Mock Service\n(getLLMMode)" as mock <<core>>
+  component "Routing Tier Priority\n(max-sub > work/Copilot > Groq)" as router <<core>>
 }
 
-package "State & Catalogue" {
-  database "workflow-progress.json" as state
-  component "Model Catalogue\n(Endpoint-Gated Rules)" as catalogue <<storage>>
+package "Provider Access" {
+  component "llm-with-process.ts" as withproc <<core>>
+  component "resolveProxyCompleteUrl()" as resolveurl <<core>>
+  component "dmr-provider.ts\n(loadDMRConfig/checkDMRAvailability)" as dmr <<core>>
+  component "parseLlmJson()" as parser <<core>>
 }
 
 package "External Services" {
-  cloud "proxy-bridge/server.mjs\n(llm-cli-proxy)" as proxy <<external>>
-  component "Docker Model Runner" as dmrClient <<external>>
+  cloud "rapid-llm-proxy" as proxy <<external>>
+  cloud "Docker Model Runner" as dmrsvc <<external>>
+  cloud "Groq Llama-70B" as groq <<external>>
 }
 
-component "@rapid/llm-proxy SDK\n(LLMService)" as sdk <<external>>
-
-modeRes --> state : "reads/writes mode"
-wrapper --> proxy : "HTTP /api/complete"
-wrapper ..> sdk : "parallel impl, kept in sync"
-dmr --> dmrClient : "singleton client"
-dmr --> dmr : "healthCheckInterval cache"
-wrapper --> catalogue : "validates endpoint/model"
-proxy --> catalogue : "gates access"
-wrapper --> parser : "repairs malformed JSON"
-modeRes --> wrapper : "selects mode"
-modeRes --> dmr : "selects local tier"
+mock --> router : "resolves active mode"
+router --> withproc : "dispatches by tier"
+withproc --> resolveurl : "resolves proxy URL"
+resolveurl --> proxy : "POST /api/complete"
+withproc --> parser : "normalizes/repairs JSON"
+router --> dmr : "checks DMR availability"
+dmr --> dmrsvc : "health check (cached)"
+router --> groq : "last-resort fallback"
+proxy ..> groq : "cleared as timeout source"
 
 @enduml

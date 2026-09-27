@@ -1,36 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "Layer 1: EntityPatternAnalyzer" {
-  component "EntityPatternAnalyzer" as epa <<core>>
+package "Ontology Types" {
+  component "LayerResult" as lr <<core>>
+  component "ArtifactMatch" as am <<core>>
+}
+
+package "EntityPatternAnalyzer.ts" {
+  component "analyzeEntityPatterns()" as analyze <<core>>
   component "extractArtifacts()" as extract <<core>>
-  component "checkLocalArtifact()\n(confidence 0.9)" as local <<core>>
-  component "matchArtifactPattern()\n(confidence 0.75)" as pattern <<core>>
-  component "inferEntityClass()\n(teamMappings)" as infer <<core>>
+  component "checkLocalArtifact()" as local <<core>>
+  component "matchArtifactPattern()" as regex <<core>>
+  component "inferEntityClass()" as infer <<core>>
 }
 
-package "Static Lookup Tables" {
-  component "teamDirectories\n(4 teams)" as dirs <<storage>>
-  component "artifactPatterns\n(4 teams)" as pats <<storage>>
-  component "'Agentic' mapping\n(unreachable)" as agentic <<storage>>
+package "Hardcoded Rule Tables" {
+  component "teamDirectories Map\n(Coding/RaaS/ReSi/UI)" as dirs <<storage>>
+  component "artifactPatterns Array\n(RegExp + entity ClassMap)" as patterns <<storage>>
 }
 
-package "Types & Downstream" {
-  component "LayerResult" as lr <<external>>
-  component "ArtifactMatch" as am <<external>>
-  component "Downstream Layers\n(Layer 2+)" as downstream <<agent>>
-}
+analyze --> extract : "1. extract candidates"
+extract --> analyze : "Set<string> (ordered)"
+analyze --> local : "2. try exact match"
+local --> dirs : "lookup prefix"
+local --> analyze : "0.9 confidence"
+analyze --> regex : "3. fallback fuzzy match"
+regex --> patterns : "lookup regex"
+regex --> analyze : "0.75 confidence"
+analyze --> infer : "classify team/entity"
+infer --> patterns : "teamMappings"
 
-epa --> extract : "runs 4 regex passes"
-extract --> local : "artifact Set, first-match-wins"
-local --> pattern : "on failure"
-local --> dirs : "prefix match"
-pattern --> pats : "regex match"
-local --> infer : "team value"
-pattern --> infer : "team value"
-infer ..> agentic : "unreachable"
-infer --> am : "produces"
-epa --> lr : "returns\nlayer=1"
-lr --> downstream : "feeds pipeline"
+analyze ..> lr : "returns"
+analyze ..> am : "returns"
 
 @enduml

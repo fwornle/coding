@@ -1,25 +1,28 @@
 @startuml
 !include _standard-style.puml
 
-package "Violation Capture Core" {
+package "Violation Capture Module" {
   component "ViolationCaptureService" as vcs <<core>>
-  component "getViolationCaptureService" as accessor <<core>>
+  component "getViolationCaptureService()" as accessor <<core>>
 }
 
-package "Constraint System" {
-  component "ConstraintSystem" as cs <<core>>
+package "Shared Aggregator" {
+  component "health-prompt-hook.js" as aggregator <<core>>
 }
 
-package "Dashboards" {
-  component "constraint-monitor\n(Next.js)" as cm <<external>>
-  component "system-health-dashboard\n(Vite)" as shd <<external>>
-  component "tmux Statusline" as statusline <<cli>>
+package "Dashboard Consumers" {
+  component "Constraint-Monitor Dashboard (Next.js)" as nextDash <<external>>
+  component "System-Health Dashboard (Vite)" as viteDash <<external>>
+  component "usePolledFetch.ts" as poll <<agent>>
 }
 
-accessor --> vcs : "lazily instantiate/cache"
-cs --> vcs : "produces violation data"
-vcs --> cm : "feeds violation records"
-statusline --> cm : "click-through opens/focuses"
-cm ..> shd : "separate dashboard\n(architecturally distinct)"
+component "tmux Statusline 'constraints' Field" as statusline <<cli>>
+
+accessor --> vcs : "lazily constructs / caches instance"
+vcs --> aggregator : "provides rolled-up JSON + JSONL history"
+aggregator --> nextDash : "feeds"
+aggregator --> viteDash : "feeds"
+poll --> aggregator : "polls"
+statusline --> nextDash : "click opens/focuses tab"
 
 @enduml

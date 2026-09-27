@@ -1,40 +1,33 @@
 @startuml
 !include _standard-style.puml
 
-package "Streaming Ingestion (Online)" {
-  component "Conversational Exchange Buffer" as buffer <<core>>
-  component "Streaming Config\n(bufferSize/debounceMs/minExchangeLength)" as config <<core>>
-  component "learning-source.ts\n(isOnlineLearned)" as learnsrc <<core>>
+package "Rendering Layer" {
+  component "D3GraphCanvas.tsx" as canvas <<core>>
+  component "learning-source.ts" as learnsrc <<external>>
+  component "color-fallback.ts" as colorfb <<external>>
 }
 
-package "Batch Ingestion (UKB/Wave)" {
-  component "UKB Workflow Modal" as modal <<agent>>
-  component "ukbSlice (batchIterations, WaveGroup)" as slice <<core>>
+package "Viewer Store / Filters" {
+  component "viewer-store.ts (missing)" as store <<external>>
+  component "assert-graph-density.ts" as assertscript <<cli>>
 }
 
-package "Shared Graph Store" {
-  database "Entity/Insight Graph" as graph <<storage>>
-  component "km-core-adapter.ts\n(entity Type-aware resolution)" as adapter <<core>>
-  component "hierarchy-parents.ts\n(deriveParents)" as hierarchy <<core>>
+package "Batch Wave Pipeline" {
+  component "ukb-workflow-modal.tsx" as modal <<core>>
+  database "Insight Documents (73)" as insightdocs <<storage>>
+  database "Graph Nodes (Insight type)" as insightnodes <<storage>>
 }
 
-package "Visualization" {
-  component "D3GraphCanvas.tsx" as canvas <<api>>
-  component "vokb-palette\n(ONLINE_RING_COLOR)" as palette <<external>>
-}
+canvas ..> learnsrc : "imports isOnlineLearned"
+canvas ..> colorfb : "imports ONLINE_RING_COLOR"
 
-config --> buffer : "governs debounce/batch"
-buffer --> learnsrc : "flags entities as online-learned"
-learnsrc --> adapter : "writes without wave-analysis stamp"
+assertscript ..> store : "duplicates DEFAULT_FILTERS\n(learningSource='combined')"
 
-modal --> slice : "drives batch state"
-slice --> adapter : "writes with source='wave-analysis'"
+modal --> insightdocs : "writes batch insight docs"
+insightdocs ..> insightnodes : "expected but missing\n(Wave 4 gap)"
+insightnodes ..> modal : "History sidebar Batch badge\n(entity Type='Insight')"
 
-adapter --> graph : "storeRelationship (entity Type-safe)"
-
-graph --> hierarchy : "deriveParents (Insight @ Detail)"
-graph --> canvas : "renders entities"
-learnsrc --> canvas : "isOnlineLearned flag"
-palette --> canvas : "ring color"
+modal --> canvas : "provides batch-derived entities"
+learnsrc ..> insightnodes : "classifies provenance\n(online vs batch)"
 
 @enduml

@@ -1,0 +1,35 @@
+@startuml
+!include _standard-style.puml
+
+package "Data Layer" {
+  component "useGraphData" as hook <<core>>
+  component "graph-builder" as builder <<core>>
+  database "Zustand Store" as store <<storage>>
+}
+
+package "Sigma Renderer" {
+  component "SigmaCanvas.tsx" as sigma <<core>>
+  component "GraphSetup" as setup <<core>>
+  component "forceLayout.assign" as layout <<core>>
+  component "makeNodeReducer/makeEdgeReducer" as reducer <<core>>
+  component "makeEventHandlers" as events <<core>>
+  component "TestHookExposer" as testhook <<cli>>
+}
+
+package "Alternative Renderer" {
+  component "D3GraphCanvas.tsx" as d3 <<core>>
+}
+
+builder --> hook : "seeds hierarchical positions"
+hook --> sigma : "provides entities/relations"
+sigma --> setup : "builds graphology Graph"
+setup --> layout : "polish pass (ForceAtlas2)"
+setup --> events : "wires click/hover"
+sigma --> reducer : "reads store per-frame"
+store --> reducer : "hover/selection state"
+sigma --> testhook : "exposes window.__viewerSigma (dev/test)"
+
+hook --> d3 : "shared data hook"
+d3 ..> sigma : "parallel WebGL/SVG backend"
+
+@enduml

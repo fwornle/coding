@@ -1,0 +1,38 @@
+@startuml
+!include _standard-style.puml
+
+package "Dispatcher Layer" {
+  component "start-services.sh" as dispatcher <<cli>>
+  component "Legacy Docker Fallback\n(port-kill, docker run)" as legacy <<core>>
+}
+
+package "Robust Orchestrator" {
+  component "start-services-robust.js" as robust <<core>>
+  component "ProcessStateManager (PSM)" as psm <<core>>
+  component "isProcessRunningByScript\n(pgrep fallback)" as pgrep <<core>>
+  component "killProcessOnPortAndWait" as killport <<core>>
+  component "waitForPortBindable" as waitport <<core>>
+  component "SERVICE_CONFIGS /\nSERVICE_ORDER" as svcconfig <<core>>
+}
+
+package "Feature Gating & Container" {
+  component "docker/entrypoint.sh\n(PROGRAM_FEATURES)" as entrypoint <<external>>
+  component "supervisord programs" as supervisord <<external>>
+  component "service-gating.test.mjs" as tests <<cli>>
+}
+
+dispatcher --> robust : "ROBUST_MODE=true\nexec"
+dispatcher ..> legacy : "ROBUST_MODE=false"
+
+robust --> psm : "check in-process registry"
+robust --> pgrep : "OS-level orphan check"
+pgrep --> psm : "re-register orphan"
+robust --> killport : "reclaim stale port"
+robust --> waitport : "probe EADDRINUSE"
+robust --> svcconfig : "spawn per config/order"
+
+svcconfig --> tests : "structural coverage\nasserted"
+entrypoint --> supervisord : "autostart=false overrides"
+svcconfig ..> entrypoint : "shared feature ID vocabulary"
+
+@enduml

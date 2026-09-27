@@ -1,42 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "Capture & Persistence" {
-  component "ETM (Enhanced Transcript Monitor)" as etm <<core>>
-  component "ObservationWriter.js" as writer <<core>>
-  database "Observation Database" as db <<storage>>
+package "Session Capture" {
+  component "Meeting Recording Pipeline" as recording <<core>>
+  component "session-facts.ts" as facts <<core>>
+  component "health-coordinator.js" as health <<agent>>
 }
 
-package "Configuration" {
+package "Classification Pipeline" {
+  component "l2-subsystem-classifier.js" as classifier <<core>>
+  component "OntologyClassificationAgent" as agent <<agent>>
+  component "extractL2FromLLMResponse()" as extractor <<core>>
+}
+
+package "Configuration & Storage" {
   component "LSLConfigValidator" as validator <<core>>
-  component "validateUserEnvironment()" as userenv <<core>>
+  database "Knowledge Graph" as kg <<storage>>
+  component "obs-api" as obsapi <<api>>
 }
 
-package "Continuity & Recovery" {
-  component "/sl Command" as sl <<cli>>
-  component "LSL Transcript Files" as transcripts <<storage>>
-}
+recording --> facts : "produces transcripts"
+facts --> obsapi : "writes observations"
+facts --> kg : "anchors via parentId/contains"
 
-package "Ontology Classification" {
-  component "OntologyClassificationAgent" as ontagent <<agent>>
-  component "classifyL2 (l2-subsystem-classifier.js)" as classifier <<agent>>
-  component "session-facts.ts (buildSessionFactIndex)" as sessionfacts <<core>>
-}
+health --> recording : "monitors heartbeat/PID"
 
-etm --> writer : "raw observations"
-writer --> db : "semantic dedup & snapshot promotion"
-writer ..> db : "[Raw] fallback logged as stored\n(silently fails to persist)"
+obsapi --> classifier : "text passed for classification"
+classifier --> agent : "falls back on low confidence"
+agent --> extractor : "validates LLM output"
+extractor --> kg : "stamps LiveLoggingSystem class"
 
-validator --> userenv : "derives 6-char SHA-256\nuser hash"
-validator --> writer : "governs batching/rotation\nthresholds"
-
-sl --> transcripts : "reads"
-transcripts --> sl : "continuity summary"
-writer ..> transcripts : "feeds session logs"
-
-db --> ontagent : "observations tagged\nas generic Component"
-ontagent --> classifier : "invokes classification"
-classifier --> db : "promotes to\nLiveLoggingSystem L2"
-sessionfacts --> db : "anchors Insight nodes\nvia parentId"
+validator --> recording : "validates lsl-config.json"
+validator --> facts : "enforces schema"
 
 @enduml

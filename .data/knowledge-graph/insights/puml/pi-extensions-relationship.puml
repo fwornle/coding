@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: PiExtensions
+
+[SemanticAnalysis] as semantic_analysis #FFFFDD
+[PiExtensions] as pi_extensions #LightBlue
+[Pipeline] as pipeline #F0F0F0
+[Ontology] as ontology #F0F0F0
+[HealthCoordinator] as health_coordinator #F0F0F0
+[AgentLaunchers] as agent_launchers #F0F0F0
+[NoUnboundedFsScanExtension] as no_unbounded_fs_scan_extension #E8F5E8
+
+semantic_analysis --> pi_extensions
+pipeline -[hidden]- pi_extensions
+ontology -[hidden]- pi_extensions
+health_coordinator -[hidden]- pi_extensions
+agent_launchers -[hidden]- pi_extensions
+pi_extensions --> no_unbounded_fs_scan_extension
+
+@enduml

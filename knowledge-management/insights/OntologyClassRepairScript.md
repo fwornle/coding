@@ -4,50 +4,59 @@
 
 ## What It Is
 
-OntologyClassRepairScript is implemented at `scripts/repair-writer-ontology-class.mjs` as a standalone Node CLI tool within the km-core knowledge graph ecosystem. It repairs rows in the graph whose `ontologyClass` field contradicts their `entityType` field — a data-integrity defect traced to a historical bug in `ObservationWriter`. It sits under the Pipeline component hierarchically, and is thematically adjacent to a related but distinct defect documented in the "Pipeline CodingLowerOntologySource Emission Bug" work record, which describes an upstream, still-live tagging-logic mismatch in the SemanticAnalysis pipeline. Where that bug concerns what the pipeline emits going forward, OntologyClassRepairScript concerns cleaning up what has already been persisted.
+OntologyClassRepairScript is implemented at `scripts/repair-writer-ontology-class.mjs`. It is an operator-run CLI auditing tool that fetches entities and relations from obs-api via `/api/v1/entities` and `/api/v1/relations`, builds an ancestor chain per `entityType` using `loadParentMap()` (sourced from `.data/ontologies/obs-api/`), and classifies each row as repairable, migratable, conflicting, foreign, or unknownClass. It exists specifically to clean up rows written during a documented historical bug window where ObservationWriter forcibly overwrote `ontologyClass` to `'Detail'` on every Observation and Digest row.
 
 ## Architecture and Design
 
-The script embodies several deliberate architectural choices. First, it is a thin HTTP client rather than a storage-layer tool: its header comment explicitly states the km-core LevelDB is single-owner (obs-api), so "this process never opens the store." All reads and writes go through `api(pathname, init)`, a fetch wrapper hitting `OBS_API` (default `http://localhost:12436`), pulling entities and relations via `/api/v1/entities` and `/api/v1/relations` before any repair and writing changes back through the same surface.
+The script is a thin HTTP client, explicitly never opening the km-core LevelDB store directly — "this process never opens the store" — reinforcing a single-writer architecture where obs-api is the sole reader/writer of the ontology-backed entity store. This mirrors patterns seen elsewhere (e.g., `scripts/health-coordinator.js`'s currentState pattern) and reflects the broader Architecture Notes principle that ontology-class correctness is validated post-hoc rather than enforced at write time (the putEntity IS-A guard is noted as "not yet landed").
 
-Second, it uses rule-based arbitration keyed off structural graph edges rather than self-reported metadata. `arbitrate(e, parentClasses)` prefers `hierarchyParents` — derived strictly from `contains`/`parent-child` relations, excluding `has_insight` — over `metadata.hierarchyLevel`, because the code's own analysis found hierarchyLevel disagreed with true class in 13 of 36 rows versus 3 for structural edges.
+Its arbitration design is notable: `arbitrate()` resolves conflicting artifact-class claims not by trusting `metadata.hierarchyLevel` (empirically wrong 13/36 times) but by consulting the attaching relation type — 'contains'/'parent-child' edges imply hierarchy membership (resolved via HIERARCHY_SET), while 'has_insight' edges imply learning artifacts, classified as 'Insight' when carrying digest_ids/decayBreakdown/topic fields. This is arbitration via graph edge type rather than field-value trust — a deliberate rejection of a metadata field known to be unreliable.
 
-Third, it classifies violations into four disjoint buckets, each with a narrowly scoped fix: `repairable` (WRITER_OWNED classes Observation/Digest, fixed by `ontologyClass := entityType`), `migratable` (non-artifact tags moved into `metadata.subsystem`), `conflicts` (resolved via `arbitrate()`), and `foreign` (reported only, never auto-fixed). This reflects a scope-discipline pattern: fix only what one identified bug produced, and refuse to guess about anything else.
+The script is dry-run-by-default, gated by an `APPLY` flag, with `tally()`/`arbitrate()` producing reports rather than silent fixes — consistent with the broader system convergence (also seen in Agentic Ontology Cleanup) on reporting ambiguous ontology drift for human decision rather than auto-fixing it.
 
 ## Implementation Details
 
-`loadParentMap()` reads every JSON file under `.data/ontologies/obs-api/` and builds a flat class-to-parent map from each class's `extends`/`parent` field. `chainOf(cls, parent)` walks this map to build a cycle-safe ancestor chain, guarded by a `seen` Set. A row is treated as a legal IS-A relationship — and thus skipped — only when both fields are registered classes AND `chainOf(entityType, parent)` includes `ontologyClass`.
-
-Classification constants `ARTIFACT_CLASSES` (System/Project/Component/SubComponent/Detail/Observation/Digest/Insight and Online* variants), `WRITER_OWNED`, and `HIERARCHY_CLASSES`/`HIERARCHY_SET` drive the bucket split. `tally()` groups violations by `entityType → ontologyClass` pairs and sorts by count for reporting.
-
-Safety is enforced via `process.argv` parsed into a `Set`: `APPLY = args.has('--apply')` gates all writes (default is dry-run/report-only), and `ALL = args.has('--all')` additionally surfaces `foreign` and `unknownClass` violations that are otherwise suppressed.
+Key constructs include `WRITER_OWNED` (`{'Observation','Digest'}`), which encodes the entity types affected by the historical overwrite bug (active 2026-06-11 to 2026-09-20, tied to `visibility-predicate.ts:144` checking both `ontologyClass` and `entityType`). `loadParentMap()` builds the ancestor chain for IS-A validation against the curated obs-api ontology directory — a flattened registry-driven structure. `arbitrate()` implements the edge-type-based conflict resolution described above. The CLI supports three invocation modes: dry run, `--all` (report all violations including "foreign"/other-producer classes), and `--apply` (write).
 
 ## Integration Points
 
-The sole integration point is obs-api's HTTP surface — no direct dependency on km-core's persistence internals. This mirrors the pattern seen in sibling component OntologySystemFactory (`src/ontology/index.ts`'s `createOntologySystem()`), though that factory operates as a composition root wiring `OntologyValidator`/`OntologyClassifier` in-process rather than over HTTP; both share reliance on the same underlying ontology concepts (registry, classes, hierarchy) but at different architectural layers. The script's correctness also depends on the ontology registry under `.data/ontologies/obs-api/` being stable ground truth — a stability claim substantiated separately by the "Taxonomy Stability Validation via Disjoint Sample Re-derivation" work, which validated taxonomy reproducibility via disjoint-sample re-derivation before such tooling could safely trust it.
+As a child of Ontology, it operates against the same ontology directory referenced by the parent context (`KG_ONTOLOGY_DIR`, also used in observations-api-server.mjs). It depends entirely on obs-api's HTTP surface rather than sharing code with sibling components like OntologySystemFactory (`src/ontology/index.ts`'s `createOntologySystem()`, with its hard DI contract) or LegacyOntologyAdapter. Notably, the script currently operates against a flattened ontology view, not yet reflecting the two-tier upper/lower model that `validateOntologyConfig()` enforces structurally and that VKB Ontology's Two-Tier Architecture design describes — a known architectural gap.
 
 ## Usage Guidelines
 
-Run without `--apply` first — the default dry-run mode only prints tallies and exits 0, performing no writes. Use `--all` to surface `foreign` and `unknownClass` violations for manual triage; these are intentionally never auto-repaired since determining which field is wrong requires separate judgment. Only `Observation`/`Digest` rows are auto-repaired by default, reflecting narrow, bug-scoped remediation rather than general-purpose ontology cleanup. If upstream defects like the CodingLowerOntologySource emission bug remain unresolved, expect continued `foreign`/`unknownClass` residue that this script will report but deliberately not fix.
+Always run in dry-run mode first; use `--all` to surface foreign/unknown-class violations for human review rather than assuming automatic repair is safe. Only use `--apply` once arbitration output has been manually verified, since edge-type-based classification is heuristic. Because the script is a thin HTTP client, it must never be modified to open LevelDB directly — that would violate the single-owner invariant. When the two-tier ontology work lands, `loadParentMap()` will need updating to consume upper/lower tiers rather than the flat obs-api directory.
+
+
+## Code Evidence
+
+Key code artifacts grounding this entity's analysis:
+
+**Structural:**
+- The script is explicitly a thin HTTP client — 'the km-core LevelDB is single-owner (obs-api); this process never opens the store' — meaning it never touches ontology (method) in GraphKMStore.ts directly, reinforcing the single-writer architecture also seen in scripts/health-coordinator.js's currentState pattern.
+
+**Other:**
+- scripts/repair-writer-ontology-class.mjs is the actual OntologyClassRepairScript: it fetches entities and relations from obs-api via /api/v1/entities and /api/v1/relations, builds an ancestor chain per entityType using loadParentMap() sourced from .data/ontologies/obs-api/ (the same KG_ONTOLOGY_DIR referenced in observations-api-server.mjs per the parent context), and classifies each row as repairable, migratable, conflicting, foreign, or unknownClass.
+- The script's WRITER_OWNED set ({'Observation','Digest'}) encodes a historical bug: ObservationWriter forcibly overwrote ontologyClass to 'Detail' on every Observation and Digest row starting 2026-06-11 until that rewrite was removed 2026-09-20, once the viewer's predicate began checking both ontologyClass and entityType (visibility-predicate.ts:144, cited in the script's own docstring) — the script exists specifically to clean up rows written during that window.
+- arbitrate() resolves conflicts between two artifact-class claims not by trusting metadata.hierarchyLevel (empirically wrong 13/36 times per the comment) but by consulting the attaching relation type: rows connected via 'contains'/'parent-child' are hierarchy members and take whichever field names a HIERARCHY_SET class, while rows attached only by 'has_insight' are learning artifacts and get 'Insight' if they carry digest_ids/decayBreakdown/topic signature fields.
 
 
 ## Work Record
 
 What working sessions recorded about this entity — decisions taken, problems hit, and why things are the way they are:
 
-- Pipeline CodingLowerOntologySource Emission Bug tracks an unresolved defect where the pipeline emits a CodingLowerOntologySource reference in output despite documentation stating this source type should never be produced, indicating the pipeline's source-tagging logic disagrees with its own contract — the same class of documentation-vs-emission mismatch this repair script targets for ontologyClass/entityType.
-- The work record 'Pipeline CodingLowerOntologySource Emission Bug' documents an unresolved, separate defect: the SemanticAnalysis pipeline emits a `CodingLowerOntologySource` reference near `coding.lower.json` consumption despite documentation stating that source type should never be produced. This is adjacent to, but distinct from, OntologyClassRepairScript's concern — the repair script arbitrates `ontologyClass`/`entityType` conflicts on already-persisted rows, while this record describes a live tagging-logic bug upstream in the pipeline that writes those rows in the first place; the repair script's `foreign`/`unknownClass` buckets are the kind of residue such an upstream bug could still be producing.
-- The work record 'Taxonomy Stability Validation via Disjoint Sample Re-derivation' establishes that intent-derived taxonomies were validated by independently re-deriving them from disjoint data samples and measuring agreement, treating reproducibility as a precondition for freezing the taxonomy as a fixed downstream spine. This bears on OntologyClassRepairScript's correctness assumption: `loadParentMap()`/`chainOf()` treat the curated registry under `.data/ontologies/obs-api/` as a stable ground truth for legality checks, and that stability claim is exactly what the disjoint-sample validation was meant to establish before any repair tooling could safely trust it.
+- Agentic Ontology Cleanup documents verification/removal of stale ontology files no longer referenced in the codebase, which aligns with this repair script's --all flag reporting 'other producers' (foreign) violations from the consolidator and wave path rather than silently guessing at them — both processes converge on the same principle of reporting ambiguous ontology drift for human decision rather than auto-fixing it.
+- VKB Ontology — Two-Tier Architecture's planned split of a flat ontology into upper (generic) and lower (project-scoped) tiers is the same two-tier model that src/ontology/index.ts's validateOntologyConfig() enforces structurally (upperOntologyPath required when enabled, lowerOntologyPath required once a team is set) — the repair script's loadParentMap() only reads the curated obs-api ontology directory, so it currently operates against a flattened view rather than the two-tier model under design.
 
 ## Hierarchy Context
 
 ### Parent
-- [Pipeline](./Pipeline.md) -- [SESSION] Pipeline CodingLowerOntologySource Emission Bug tracks an unresolved defect where the pipeline emits a CodingLowerOntologySource reference in its output despite documentation stating this source type should never be produced, indicating a mismatch between the pipeline's source-tagging logic and its own contract.
+- [Ontology](./Ontology.md) -- [CGR] ontology (variable) in events.test.ts
 
 ### Siblings
-- [OntologySystemFactory](./OntologySystemFactory.md) -- [LLM] src/ontology/index.ts contains createOntologySystem(), an async factory that wires OntologyValidator, OntologyClassifier, createHeuristicClassifier(), and a caller-supplied LegacyOntologyAdapter around a km-core OntologyRegistry. This is the actual 'OntologySystemFactory' implementation in the retrieved code, but it is a composition-root utility, not part of any Pipeline five-stage lifecycle (process/calculateConfidence/detectIssues/generateRouting/applyCorrections) attributed to the parent component.
+- [OntologySystemFactory](./OntologySystemFactory.md) -- [LLM+CGR] src/ontology/index.ts's createOntologySystem() is the actual OntologySystemFactory: it takes an OntologyConfig, a required UnifiedInferenceEngine, and a required LegacyOntologyAdapter, and throws explicit errors ('createOntologySystem requires an inferenceEngine...' / 'createOntologySystem requires a LegacyOntologyAdapter...') if either is missing, rather than silently substituting a mock. This is a hard DI contract enforced at construction time.
+- [LegacyOntologyAdapter](./LegacyOntologyAdapter.md) -- [CGR] LegacyOntologyAdapter (class) in LegacyOntologyAdapter.ts
 
 
 ---
 
-*Generated from 11 observations*
+*Generated from 10 observations*

@@ -1,35 +1,38 @@
 @startuml
 !include _standard-style.puml
 
-package "Validation Layer" {
+package "Config Validation (inferred)" {
   component "LSLConfigValidator" as validator <<core>>
-  component "lsl-config.json" as lslConfig <<storage>>
-  component "redaction-config.yaml" as redactConfig <<storage>>
+  database ".specstory/config/lsl-config.json" as lslconfig <<storage>>
+  component "validateUserEnvironment()" as userhash <<core>>
 }
 
-package "Live Logging Consumers" {
-  component "ObservationWriter" as obsWriter <<core>>
-  component "ConfigurableRedactor" as redactor <<core>>
-  component "getLSLWindow" as window <<core>>
+package "Live-Logging Pipeline (adjacent)" {
+  component "ObservationWriter" as writer <<core>>
+  component "loadConfig()" as loadcfg <<core>>
+  database ".observations/config.json" as obsconfig <<storage>>
+  component "ObservationConsolidator" as consolidator <<core>>
+  component "ObservationExporter" as exporter <<core>>
+  component "enhanced-transcript-monitor" as monitor <<cli>>
 }
 
-package "Token Accounting Subsystem" {
-  component "token-db.mjs" as tokenDb <<storage>>
-  component "copilot-events-tail.mjs" as copilotTail <<agent>>
-  component "opencode-token-rows.mjs" as opencodeRows <<agent>>
+package "Operational Health" {
+  component "health-coordinator.js" as health <<core>>
+  cloud "obs-api" as obsapi <<external>>
 }
 
-validator --> lslConfig : "validates directory/health/perf"
-validator --> redactConfig : "validates redaction schema"
+validator --> lslconfig : "validates schema"
+validator --> userhash : "derives 6-char hash"
+validator ..> health : "config feeds (unconfirmed)"
 
-redactConfig --> redactor : "consumed by (implicit contract)"
-obsWriter --> redactor : "instantiates for PII redaction"
-obsWriter --> window : "session windowing"
+writer --> loadcfg : "loads"
+loadcfg --> obsconfig : "defaults/reads"
+monitor --> writer : "invokes"
+writer --> consolidator : "hands off observations"
+consolidator --> exporter : "consolidated data"
+consolidator --> obsapi : "km-core writes"
+writer --> obsapi : "km-core writes"
 
-validator ..> tokenDb : "userHashLength bound\nprotects user_hash charset"
-tokenDb --> opencodeRows : "shares uid-ownership pattern"
-copilotTail ..> validator : "degraded parity\noutside validation surface"
-
-lslConfig --> window : "directory structure assumed"
+health --> obsapi : "PID/heartbeat staleness checks"
 
 @enduml

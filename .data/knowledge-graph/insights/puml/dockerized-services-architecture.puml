@@ -1,39 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "Wrapper Scripts" {
-  component "api-service.js" as apiWrapper <<core>>
-  component "dashboard-service.js" as dashWrapper <<core>>
-  component "dashboard-server.js" as dashServer <<core>>
-}
-
-package "Process Management" {
+package "Wrapper Layer" {
+  component "api-service.js" as apiSvc <<core>>
+  component "dashboard-service.js" as dashSvc <<core>>
   component "ProcessStateManager" as psm <<core>>
-  component "service-starter.js\n(withDeadline)" as starter <<core>>
-  component "supervisord" as supervisor <<external>>
 }
 
-package "Health & Config" {
-  component "service-probe.js\n(running/stopped/unknown)" as probe <<api>>
-  component "llm-mock-service.ts\n(CODING_ROOT override)" as mockService <<agent>>
+package "Implementation Services" {
+  component "dashboard-server.js\n(port 3031)" as dashServer <<api>>
+  component "Next.js Dashboard" as nextDash <<api>>
+  component "llm-mock-service.ts" as mockSvc <<agent>>
 }
 
-cloud "Docker Compose\nContainer Runtime" as docker <<external>>
+package "Health Verification Stack" {
+  component "service-probe.js" as probe <<core>>
+  component "service-starter.js" as starter <<core>>
+  component "health-coordinator.js" as coordinator <<core>>
+  database "health-verification-rules.json" as rules
+}
 
-apiWrapper --> dashServer : "spawns child process"
-apiWrapper --> psm : "registers PID\n'constraint-api-child'"
-dashWrapper --> dashServer : "wraps 'npm run dev'"
-dashWrapper --> apiWrapper : "hardcoded\nNEXT_PUBLIC_API_BASE_URL:3031"
+apiSvc --> dashServer : spawns child process
+apiSvc --> psm : registers 'constraint-api-child'
+dashSvc --> nextDash : npm run dev
+dashSvc --> psm : registers/unregisters
+nextDash --> dashServer : NEXT_PUBLIC_API_BASE_URL:3031
 
-supervisor --> apiWrapper : "manages lifecycle"
-supervisor --> dashWrapper : "manages lifecycle"
-docker --> supervisor : "docker-compose up -d"
+starter --> probe : uses probeHttpHealth/probeTcpPort
+coordinator --> starter : retry-with-backoff startup
+coordinator --> rules : reads declarative rules
+coordinator --> apiSvc : verifies health endpoint
+coordinator --> dashSvc : verifies health endpoint
 
-starter --> probe : "invokes health checks"
-probe --> supervisor : "reports health state"
-
-mockService ..> docker : "reconciles host vs\ncontainer paths"
-
-docker --> probe : "post-restart\nverification baseline"
+mockSvc ..> dashServer : provides mock LLM responses
 
 @enduml

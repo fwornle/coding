@@ -1,0 +1,36 @@
+@startuml
+!include _standard-style.puml
+
+package "Live Logging Write Path" {
+  component "ObservationWriter" as writer <<core>>
+  component "ObservationConsolidator" as consolidator <<core>>
+  component "raw-fallback" as rawfb <<core>>
+}
+
+package "Export / Cold Store Tier" {
+  component "ObservationExporter" as exporter <<core>>
+  database "observation-export/*.json" as exportjson <<storage>>
+  component "ColdStoreReader" as coldreader <<api>>
+}
+
+package "Knowledge Graph Anchoring" {
+  database "km-core Graph" as kmcore <<storage>>
+  component "ANCHOR_FOR_KIND" as anchor <<core>>
+}
+
+component "SessionFactIndex\n(unverified / not found in code)" as sfi <<component>>
+
+writer --> kmcore : "writes Observation/Digest/Insight"
+consolidator --> writer : "writeInsight (single-owner)"
+writer --> anchor : "capturedBy anchoring"
+rawfb --> writer : "flags [Raw] pending summaries"
+
+kmcore --> exporter : "serialize entities"
+exporter --> exportjson : "_mergeWithExisting / tombstone-safe"
+exportjson --> coldreader : "sole read surface"
+
+exportjson ..> sfi : "hypothetical re-index source"
+kmcore ..> sfi : "hypothetical parentId/contains anchoring"
+rawfb ..> sfi : "must treat [Raw] as incomplete"
+
+@enduml

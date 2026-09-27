@@ -1,37 +1,33 @@
 @startuml
 !include _standard-style.puml
 
-package "Code Graph Layer" {
-  component "GraphifyGraph" as graphify <<core>>
-  component "CodeGraphAgent" as cgagent <<agent>>
-  database "graph.json" as graphjson
+package "Agents" {
+  component "CodeGraphAgent" as cga <<agent>>
+  component "GraphifyGraph" as gg <<agent>>
 }
 
-package "km-core Storage" {
-  component "km-core-adapter" as adapter <<core>>
-  component "GraphDatabaseService" as gdbservice <<core>>
-  database "LevelDB" as leveldb
+package "Migration Scripts" {
+  component "migrate-graph-db-entity-types.js" as migTypes <<cli>>
+  component "migrate-leveldb-to-kmcore.mjs" as migCore <<cli>>
 }
 
-package "Migration Tools" {
-  component "migrate-graph-db-entity-types.js" as migtypes <<cli>>
-  component "migrate-leveldb-to-kmcore.mjs" as migkmcore <<cli>>
+package "Core Storage" {
+  component "GraphDatabaseService" as gds <<core>>
+  database "LevelDB" as ldb <<storage>>
+  component "graph.json (NetworkX export)" as gjson <<external>>
 }
 
-component "History UI" as historyui <<api>>
+component "History Sidebar Viewer" as viewer <<external>>
 
-cgagent --> graphify : delegates calls
-graphify --> graphjson : "lazy mtime-cached read"
+gg --> gjson : "parses label strings\nfor kind/name"
+cga --> gg : "delegates reads\n(compat shim)"
 
-adapter --> leveldb : queryIncomingRelations/\nstoreRelationship (entity Type disambiguation)
-adapter --> historyui : creates Insight nodes\n(source=wave-analysis)
+cga --> gds : "queryIncomingRelations /\nstoreRelationship (by type+name)"
+gds --> ldb : "_persistGraphToLevel()\nwhen isDirty"
 
-migtypes --> gdbservice : consolidates types\n(System/Project/Pattern)
-gdbservice --> leveldb : _persistGraphToLevel()
+migTypes --> gds : "collapses 6 types\ninto 'Pattern'"
+migCore --> ldb : "--dry-run / error-budget\n(5% ok, 10% halts)"
 
-migkmcore --> leveldb : converts to canonical\nkm-core shape (UUIDv7, evidence)
-migkmcore ..> migkmcore : "--dry-run validates\n5% error budget"
-
-historyui ..> leveldb : filters entity Type='Insight'
+gds ..> viewer : "Insight nodes\n(missing in Wave 4)"
 
 @enduml

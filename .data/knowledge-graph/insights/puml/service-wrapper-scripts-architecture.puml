@@ -1,37 +1,39 @@
 @startuml
 !include _standard-style.puml
 
-package "Process Supervisor" {
-  component "Supervisor\n(SIGTERM/SIGINT)" as supervisor <<core>>
-  component "ProcessStateManager" as psm <<core>>
+package "Legacy/Fallback Layer" {
+  component "start-services.sh" as legacy <<cli>>
 }
 
-package "Wrapper Scripts" {
-  component "api-service.js" as apiWrapper <<cli>>
-  component "dashboard-service.js" as dashWrapper <<cli>>
+package "Robust Starter Core" {
+  component "SERVICE_CONFIGS\n(transcriptMonitor, liveLoggingCoordinator...)" as configs <<core>>
+  component "startOneService" as starter <<core>>
+  component "killProcessOnPortAndWait()" as killport <<core>>
+  component "waitForPortBindable()" as waitport <<core>>
+  component "Process State Manager (PSM)" as psm <<core>>
 }
 
-package "Child Services" {
-  component "dashboard-server.js\n(constraint-monitor)" as apiChild <<api>>
-  component "Next.js Dev Server\n(dashboard)" as dashChild <<api>>
+package "Feature Gating" {
+  component "loadFeatures\n(host-side)" as loadfeat <<core>>
+  component "lib/features/catalogue.cjs" as catalogue <<core>>
+  component "docker/entrypoint.sh" as entrypoint <<external>>
+  database "features.json snapshot" as snapshot
 }
 
-supervisor --> apiWrapper : "sends SIGTERM/SIGINT"
-supervisor --> dashWrapper : "sends SIGTERM/SIGINT"
+component "service-gating.test.mjs" as tests <<cli>>
+component "prompt-classifier-service.mjs" as promptclassifier <<agent>>
 
-apiWrapper --> apiChild : "spawn node src/dashboard-server.js\n(PORT, DASHBOARD_PORT env)"
-dashWrapper --> dashChild : "spawn npm run dev\n(NEXT_PUBLIC_API_BASE_URL hardcoded)"
-
-apiWrapper --> apiChild : "forwards signal via child.kill()"
-dashWrapper --> dashChild : "forwards signal via child.kill()"
-
-apiWrapper --> psm : "register 'constraint-api-child'\n(type:'global')"
-dashWrapper --> psm : "register 'constraint-dashboard-child'\n(type:'global')"
-
-apiChild ..> psm : "unregister on 'exit'"
-dashChild ..> psm : "unregister on 'exit'"
-
-psm ..> apiWrapper : "registration failure\n(logged, non-fatal)"
-psm ..> dashWrapper : "registration failure\n(logged, non-fatal)"
+legacy --> starter : "ROBUST_MODE exec"
+starter --> configs : "reads"
+configs --> psm : "orphan check (isServiceRunning)"
+configs --> killport : "reclaim port"
+configs --> waitport : "verify bindable"
+starter --> loadfeat : "gate by feature id"
+loadfeat --> catalogue : "resolve FEATURE_IDS"
+entrypoint --> snapshot : "reads flat JSON"
+entrypoint --> catalogue : "same feature contract"
+tests --> configs : "structural invariants"
+tests --> catalogue : "feature id validation"
+promptclassifier ..> configs : "same env-loading discipline"
 
 @enduml
