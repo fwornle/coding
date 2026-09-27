@@ -55,6 +55,10 @@ export const ROUTING_SRC = path.join(
 export const COST_SRC = path.join(
   ROOT, 'integrations/system-health-dashboard/src/components/cost');
 
+/** The UKB workflow view, incl. the recent-calls response contract. */
+export const WORKFLOW_SRC = path.join(
+  ROOT, 'integrations/system-health-dashboard/src/components/workflow');
+
 /**
  * esbuild, from the root install or the dashboard's.
  *

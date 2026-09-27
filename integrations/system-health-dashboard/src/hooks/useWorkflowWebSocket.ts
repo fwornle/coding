@@ -168,6 +168,18 @@ export function useWorkflowWebSocket(
         setIsTransitionInFlight(false)
         break
 
+      case 'WORKFLOW_STARTED':
+      case 'WORKFLOW_PAUSED':
+      case 'WORKFLOW_COMPLETED':
+      case 'WORKFLOW_FAILED':
+        // Legacy status events. server.js emits these alongside every
+        // STATE_SNAPSHOT ("for backward compatibility with existing React
+        // code"), but that code is gone: status now arrives inside the snapshot
+        // payload, which is dispatched above. Acknowledged explicitly so they
+        // no longer log a warning on every run — four warnings per workflow is
+        // enough noise to bury a real error in the same console.
+        break
+
       default:
         Logger.warn(LogCategories.UKB, 'Unknown WebSocket message type:', type)
     }
