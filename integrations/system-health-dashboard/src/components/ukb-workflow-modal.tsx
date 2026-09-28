@@ -41,6 +41,7 @@ import {
   Activity,
   FlaskConical,
   Cloud,
+  WifiOff,
 } from 'lucide-react'
 import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, TIER_COLORS, useWorkflowDefinitions } from './workflow'
 import type { SubStep } from './workflow'
@@ -428,7 +429,17 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Phase 18: WorkflowState + WebSocket command dispatch
   const workflowState = useSelector(selectWorkflowState)
-  const { sendCommand, isTransitionInFlight } = useWorkflowWebSocket()
+  // `isConnected` and `wsError` were previously destructured away and dropped.
+  // Every control in this header renders from state the socket feeds, so when
+  // it died the controls silently disappeared and a paused run was
+  // indistinguishable from a hung one. The banner below is the whole point.
+  const {
+    sendCommand,
+    isTransitionInFlight,
+    isConnected: wsConnected,
+    error: wsError,
+    connect: wsReconnect,
+  } = useWorkflowWebSocket()
 
   // Single-step debugging mode state (MVI: from Redux store)
   const singleStepMode = useSelector(selectSingleStepMode)
@@ -2139,6 +2150,32 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
             {/* Right side: Buttons */}
             <div className="flex items-center gap-2 shrink-0">
+              {/*
+                Live-link state. Without this the only symptom of a dead socket
+                was controls quietly not rendering, which reads as "the workflow
+                is hung" — it cost an hour of looking for a bug in a workflow
+                that was healthy and paused exactly as asked.
+              */}
+              {!wsConnected && (
+                <div
+                  data-testid="ukb-ws-disconnected"
+                  className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 dark:border-amber-700 dark:bg-amber-950"
+                >
+                  <WifiOff className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span className="text-xs text-amber-800 dark:text-amber-200">
+                    {wsError || 'Live updates disconnected — this view may be stale'}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => wsReconnect()}
+                    data-testid="ukb-ws-reconnect"
+                  >
+                    Reconnect
+                  </Button>
+                </div>
+              )}
               {/* View Trace button - show when there are steps to trace */}
               {((currentProcess?.steps?.length ?? 0) > 0 || activeTab === 'history') && (
                 <Button

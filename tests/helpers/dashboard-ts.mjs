@@ -59,6 +59,10 @@ export const COST_SRC = path.join(
 export const WORKFLOW_SRC = path.join(
   ROOT, 'integrations/system-health-dashboard/src/components/workflow');
 
+/** Dashboard hooks, incl. the WebSocket reconnect policy. */
+export const HOOKS_SRC = path.join(
+  ROOT, 'integrations/system-health-dashboard/src/hooks');
+
 /**
  * esbuild, from the root install or the dashboard's.
  *

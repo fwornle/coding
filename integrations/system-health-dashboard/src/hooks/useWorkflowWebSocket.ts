@@ -17,6 +17,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { Logger, LogCategories } from '@/utils/logging'
+import { decideReconnect } from './ws-reconnect-policy'
 import type { WorkflowState } from '@/shared/workflow-types/state'
 import {
   setWorkflowState,
@@ -130,6 +131,19 @@ export function useWorkflowWebSocket(
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Did WE close the socket, or did it drop?
+  //
+  // This is the whole difference between "the modal was closed" and "the tab has
+  // been lying to you for an hour". A clean server-side close is ALSO code 1000
+  // — a dashboard restart sends exactly that — so keying the reconnect decision
+  // on the code meant any backend restart killed live updates permanently, with
+  // the controls blanked and nothing on screen to say so. A paused workflow and
+  // a dead socket look identical.
+  const intentionalCloseRef = useRef(false)
+  // Attempts live in a ref as well as state: `connect` closes over the state
+  // value, so a socket that drops twice re-read a stale count.
+  const attemptsRef = useRef(0)
+
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
@@ -195,12 +209,14 @@ export function useWorkflowWebSocket(
     Logger.info(LogCategories.UKB, 'WebSocket connecting to:', url)
 
     try {
+      intentionalCloseRef.current = false
       const ws = new WebSocket(url)
 
       ws.onopen = () => {
         Logger.info(LogCategories.UKB, 'WebSocket connected')
         setIsConnected(true)
         setError(null)
+        attemptsRef.current = 0
         setReconnectAttempts(0)
       }
 
@@ -225,14 +241,33 @@ export function useWorkflowWebSocket(
         setIsConnected(false)
         wsRef.current = null
 
-        // Auto-reconnect if enabled and not a clean close
-        if (autoReconnect && event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
-          setReconnectAttempts((prev) => prev + 1)
-          reconnectTimeoutRef.current = setTimeout(() => {
-            Logger.info(LogCategories.UKB, 'Attempting WebSocket reconnect...')
-            connect()
-          }, reconnectDelay)
+        // The rule lives in decideReconnect — keyed on WHO closed the socket,
+        // not on the close code. See ws-reconnect-policy.ts.
+        const decision = decideReconnect({
+          intentional: intentionalCloseRef.current,
+          autoReconnect,
+          attempts: attemptsRef.current,
+          maxAttempts: maxReconnectAttempts,
+          baseDelayMs: reconnectDelay,
+        })
+
+        if (decision.action === 'stop') return
+
+        if (decision.action === 'give-up') {
+          // Say so. Silence here is what made a live workflow look hung: the
+          // controls render from state this socket feeds, so they simply
+          // vanished while the run carried on underneath.
+          setError('Live updates disconnected — this view is stale. Reload the page.')
+          return
         }
+
+        attemptsRef.current = decision.attempt
+        setReconnectAttempts(decision.attempt)
+        setError(`Live updates lost — reconnecting (${decision.attempt}/${maxReconnectAttempts})`)
+        reconnectTimeoutRef.current = setTimeout(() => {
+          Logger.info(LogCategories.UKB, `Attempting WebSocket reconnect ${decision.attempt}...`)
+          connect()
+        }, decision.delayMs)
       }
 
       wsRef.current = ws
@@ -240,10 +275,18 @@ export function useWorkflowWebSocket(
       Logger.error(LogCategories.UKB, 'Failed to create WebSocket:', connectError)
       setError('Failed to create WebSocket connection')
     }
-  }, [serverUrl, autoReconnect, reconnectDelay, maxReconnectAttempts, reconnectAttempts, handleMessage])
+    // `reconnectAttempts` is deliberately NOT a dependency: the count lives in
+    // attemptsRef precisely so reconnecting does not rebuild this callback and
+    // hand the next onclose a stale closure.
+  }, [serverUrl, autoReconnect, reconnectDelay, maxReconnectAttempts, handleMessage])
 
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {
+    // Mark the close as ours BEFORE closing, so onclose does not treat this as
+    // a drop and start reconnecting against an unmounting component.
+    intentionalCloseRef.current = true
+    attemptsRef.current = 0
+
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
       reconnectTimeoutRef.current = null
