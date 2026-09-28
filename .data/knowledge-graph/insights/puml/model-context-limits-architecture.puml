@@ -5,26 +5,25 @@ package "Missing Component" {
   component "ModelContextLimits\n(not found in codebase)" as mcl <<core>>
 }
 
-package "LLM Routing Dashboard Surface" {
-  component "cost-model.ts\npriceForModel()" as cost <<core>>
-  component "offload-decision.tsx\nevaluateOffload()" as offload <<core>>
-  component "use-classifier-judge.ts" as judge <<core>>
-  component "provider.tsx\n(Redux)" as provider <<core>>
+package "LLM Routing (system-health-dashboard)" {
+  component "cost-model.ts\nmodelPrices/priceForModel" as cost <<core>>
+  component "offload-decision.tsx\nGATES/evaluateOffload" as offload <<agent>>
+  component "use-classifier-judge.ts\nJudge/JudgeBackend" as judge <<agent>>
 }
 
-package "Model ID Lifecycle" {
-  component "copilot-model-ids.test.mjs" as idtest <<cli>>
-  component "align-copilot-model-ids.mjs" as aligner <<core>>
+package "Unrelated / Noise" {
+  component "provider.tsx\nReduxProvider" as store <<core>>
+  component "copilot-model-ids.test.mjs\nid drift guard" as idtest <<cli>>
 }
 
-cloud "@rapid/llm-proxy" as proxy <<external>>
+database "BudgetTracker\n(usage/token accounting)" as budget <<storage>>
 
-cost ..> mcl : "no context-window\nlookup present"
-offload ..> mcl : "routes by complexity band,\nnot token ceiling"
-judge --> offload : "rubric/backend check"
-provider --> offload : "state container"
-
-idtest --> aligner : "asserts rewrite"
-aligner --> proxy : "rewrites retired\nmodel ids before ship"
+cost ..> budget : "reports $ pricing,\nnot token limits"
+offload --> judge : "complexity-band\nrouting"
+judge ..> cost : "adjacent domain,\nno context-size logic"
+mcl ..> cost : "closest structural\nanalog (family fallback)"
+mcl ..> offload : "different axis:\ncomplexity vs size"
+store ..> mcl : "retrieval noise\n(no LLM logic)"
+idtest ..> mcl : "id validity only,\nnot limits"
 
 @enduml

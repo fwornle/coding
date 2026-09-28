@@ -1,42 +1,39 @@
 @startuml
 !include _standard-style.puml
 
-package "UKB Pipeline" {
-  component "UKB Wave Pipeline" as wave <<core>>
-  component "Evidence Gate" as gate <<core>>
-  component "writeInsight" as write <<core>>
+package "Ingestion & Generation" {
+  component "UKB Insight Generation Pipeline" as ukb <<core>>
+  component "Evidence Gating" as gating <<core>>
+  component "writeInsight" as writeInsight <<core>>
   component "Embedding Dedup (dry-run)" as dedup <<core>>
 }
 
-package "Insight Processing Scripts" {
-  component "backfill-insight-parents.mjs" as backfillParents <<cli>>
-  component "backfill-insight-mentions.mjs" as backfillMentions <<cli>>
-  component "delete-wave-insight-stubs.mjs" as deleteStubs <<cli>>
-  component "compact-insights.mjs" as compact <<cli>>
-  component "Intent Spine Producer Script" as intentSpine <<core>>
+package "Structuring & Classification" {
+  component "Insight Roll-up (ObservationConsolidator.js)" as rollup <<core>>
+  component "derive-intent-spine.mjs" as intentSpine <<core>>
+  component "repair-writer-ontology-class.mjs" as repair <<core>>
+  component "InsightSchema (schemas.ts)" as schema <<core>>
 }
 
-package "UI / API" {
-  component "handleGetInsights" as apiHandler <<api>>
-  component "InsightsPage" as page <<agent>>
-  component "ConsolidationProgress" as progress <<agent>>
+package "Access & Storage" {
+  database "km-core LevelDB (Insights)" as kb <<storage>>
+  component "observations-api-server.mjs" as apiServer <<api>>
+  component "ApiClient.listInsights" as apiClient <<api>>
 }
 
-database "Knowledge Graph / KB" as kb <<storage>>
+ukb --> gating : "generates candidate insights"
+gating --> writeInsight : "writes evidence-backed insights"
+writeInsight --> dedup : "checks near-duplicates"
+dedup --> kb : "writes (gated)"
 
-wave --> gate : "generates candidate insight"
-gate --> write : "passes evidence check"
-write --> dedup : "checked for near-duplicates"
-dedup --> kb : "writes Insight entity"
+kb --> rollup : "assigns parentId"
+kb --> intentSpine : "loadInsights"
+intentSpine --> kb : "aggregate edges -> Intent"
 
-backfillParents --> kb : "links parent insights"
-backfillMentions --> kb : "derives insight summaries"
-deleteStubs --> kb : "removes empty stubs"
-compact --> kb : "consolidates insights"
-intentSpine --> kb : "clusters insights into Intents"
+kb --> repair : "arbitrate() classification"
+repair --> schema : "validates ARTIFACT_CLASSES"
 
-apiHandler --> kb : "queries insights"
-page --> apiHandler : "fetches insights"
-page --> progress : "shows consolidation status"
+apiServer --> kb : "INSIGHTS_DOC_DIR access"
+apiClient --> apiServer : "handleGetInsights"
 
 @enduml

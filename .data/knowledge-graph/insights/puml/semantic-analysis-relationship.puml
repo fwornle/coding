@@ -13,9 +13,10 @@ title Hierarchy Context: SemanticAnalysis
 [ConstraintSystem] as constraint_system #F0F0F0
 [Pipeline] as pipeline #E8F5E8
 [Ontology] as ontology #E8F5E8
-[HealthCoordinator] as health_coordinator #E8F5E8
-[AgentLaunchers] as agent_launchers #E8F5E8
-[PiExtensions] as pi_extensions #E8F5E8
+[Insights] as insights #E8F5E8
+[OntologyClassificationAgent] as ontology_classification_agent #E8F5E8
+[SemanticAnalysisAgent] as semantic_analysis_agent #E8F5E8
+[L2SubsystemClassifier] as l2_subsystem_classifier #E8F5E8
 
 coding --> semantic_analysis
 live_logging_system -[hidden]- semantic_analysis
@@ -26,8 +27,9 @@ coding_patterns -[hidden]- semantic_analysis
 constraint_system -[hidden]- semantic_analysis
 semantic_analysis --> pipeline
 semantic_analysis --> ontology
-semantic_analysis --> health_coordinator
-semantic_analysis --> agent_launchers
-semantic_analysis --> pi_extensions
+semantic_analysis --> insights
+semantic_analysis --> ontology_classification_agent
+semantic_analysis --> semantic_analysis_agent
+semantic_analysis --> l2_subsystem_classifier
 
 @enduml

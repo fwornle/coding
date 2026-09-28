@@ -1,33 +1,34 @@
 @startuml
 !include _standard-style.puml
 
-package "Agent API Hooks" {
+package "Hook System (Unverified Internals)" {
   component "UnifiedHookManager" as uhm <<core>>
-  component "hook-config.js\nvalidateConfig()" as hookconfig <<core>>
+  component "hook-manager.js" as hmfile <<core>>
 }
 
-package "Health Monitoring" {
-  component "health-prompt-hook.js" as healthhook <<cli>>
-  component "deriveSummary()" as derive <<core>>
-  database "Health Coordinator\n/health/state" as coordinator <<external>>
+package "Sibling Hook (Verified)" {
+  component "health-prompt-hook.js" as hph <<cli>>
+  component "deriveSummary()" as ds <<core>>
 }
 
-package "Dashboards" {
-  component "Next.js constraint-monitor\ndashboard" as constraintdash <<external>>
-  component "Vite system-health\ndashboard" as healthdash <<external>>
-  component "tmux statusline\n(constraints tab)" as statusline <<cli>>
+package "Adjacent Subsystems" {
+  component "Coordinator (HTTP)" as coord <<external>>
+  component "require-feature.sh" as feat <<cli>>
+  component "bin/constraints" as binc <<cli>>
+  component "Constraint-Monitor Dashboard" as cmd <<external>>
+  component "Statusline Click-Report" as sl <<external>>
 }
 
-uhm --> hookconfig : "fail-soft config\nvalidation"
-uhm ..> statusline : "dispatches violation\nhandlers (unverified path)"
+uhm ..> hmfile : "defined in (no bodies known)"
 
-healthhook --> coordinator : "polls HTTP state"
-healthhook --> derive : "computes status"
-derive ..> derive : "refuses silent\n'healthy' (SPEC R6)"
+hph --> coord : "fetches health state"
+hph --> ds : "reduces to summary"
+hph ..> uhm : "sibling, no direct call"
 
-healthhook --> constraintdash : "feeds violation data"
-healthhook --> healthdash : "feeds health data"
+feat --> binc : "gates execution"
 
-statusline --> constraintdash : "click opens/focuses tab"
+uhm ..> cmd : "constraint violations (inferred)"
+sl --> cmd : "click-to-focus"
+hph ..> sl : "status feeds (inferred)"
 
 @enduml

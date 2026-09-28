@@ -1,34 +1,38 @@
 @startuml
 !include _standard-style.puml
 
-package "DMR Provider Module" {
-  component "DMRProvider" as dmr <<core>>
-  component "loadDMRConfig()" as cfg <<core>>
-  component "checkDMRAvailability()" as health <<core>>
+package "CLI / Routing Layer" {
+  component "rapid-llm-proxy" as proxy <<core>>
+  component "Routing Tier Priority Logic" as tierlogic <<core>>
+  component "CLI / UKB Runner" as cli <<cli>>
 }
 
-package "Config Resolution" {
-  component "cwd/config/dmr-config.yaml" as path1 <<external>>
-  component "cwd/integrations/.../dmr-config.yaml" as path2 <<external>>
-  component "__dirname-relative path" as path3 <<external>>
-  component "DEFAULT_CONFIG (in-code)" as defcfg <<core>>
+package "Provider Clients" {
+  component "DMRProvider (dmr-provider.ts)" as dmr <<agent>>
+  component "Anthropic Client" as anthropic <<agent>>
+  component "OpenAI Client" as openai <<agent>>
+  component "Groq Client" as groq <<agent>>
 }
 
-package "Routing & Policy Layer" {
-  component "Tiered Provider Fallback\n(max-subscription > Copilot-tier > Groq Llama-70B)" as tiers <<core>>
-  component "rapid-llm-proxy" as proxy <<external>>
-  component "cost-model.ts\n(no DMR pricing entry)" as cost <<storage>>
+package "Dashboard / Observability (unrelated files)" {
+  component "offload-decision.tsx" as offload <<external>>
+  component "use-classifier-judge.ts" as classifier <<external>>
+  component "cost-model.ts" as cost <<external>>
+  component "copilot-model-ids.test.mjs" as guard <<external>>
 }
 
-cfg --> path1 : "search order 1"
-cfg --> path2 : "search order 2"
-cfg --> path3 : "search order 3"
-cfg --> defcfg : "fallback if none found"
-dmr --> cfg : "loads config"
-dmr --> health : "time-windowed cache check"
+cli --> proxy : "invokes"
+proxy --> tierlogic : "resolves fallback order"
+tierlogic --> dmr : "selects/promotes"
+tierlogic --> anthropic : "max-subscription first"
+tierlogic --> openai : "work/Copilot tier"
+tierlogic --> groq : "last resort"
 
-tiers --> dmr : "last resort in fallback chain"
-proxy --> tiers : "routes requests (proxy cleared of timeout issue)"
-tiers --> cost : "usage cost lookup (unpriced for DMR)"
+cli ..> dmr : "timeout traced to"
+
+offload ..> proxy : "reads resolved routing"
+classifier ..> proxy : "reads classifier health"
+guard ..> openai : "drift-guards Copilot ids"
+cost ..> tierlogic : "pricing input"
 
 @enduml

@@ -7,13 +7,13 @@ title Hierarchy Context: KnowledgeInjectionHook
 [KnowledgeInjectionHook] as knowledge_injection_hook #LightBlue
 [HookConfigLoader] as hook_config_loader #F0F0F0
 [UnifiedHookManager] as unified_hook_manager #F0F0F0
-[ViolationCaptureService] as violation_capture_service #F0F0F0
 [HealthPromptHook] as health_prompt_hook #F0F0F0
+[FeatureGatingSystem] as feature_gating_system #F0F0F0
 
 constraint_system --> knowledge_injection_hook
 hook_config_loader -[hidden]- knowledge_injection_hook
 unified_hook_manager -[hidden]- knowledge_injection_hook
-violation_capture_service -[hidden]- knowledge_injection_hook
 health_prompt_hook -[hidden]- knowledge_injection_hook
+feature_gating_system -[hidden]- knowledge_injection_hook
 
 @enduml

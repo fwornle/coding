@@ -1,40 +1,32 @@
 @startuml
 !include _standard-style.puml
 
-package "Hook Management" {
-  component "UnifiedHookManager" as hookmgr <<core>>
-  component "HookConfigLoader" as cfgloader <<core>>
-  database "hooks.json (user/project)" as cfgfiles
+package "Hook Configuration" {
+  component "HookConfigLoader" as config <<core>>
+  component "UnifiedHookManager" as manager <<core>>
 }
 
 package "Violation Capture" {
-  component "ViolationCaptureService" as vcs <<core>>
+  component "ViolationCaptureService" as capture <<agent>>
+  database "violation-history.json" as history <<storage>>
+  database "JSONL Audit Log" as jsonl <<storage>>
   component "sanitizeParams()" as sanitize <<core>>
-  database "session-violations.jsonl" as jsonl
-  database "violation-history.json" as rollup
 }
 
-package "Dashboards & UX" {
-  component "health-prompt-hook.js" as aggregator <<core>>
-  component "constraint-monitor (Next.js)" as constraintdash <<external>>
-  component "system-health-dashboard (Vite)" as healthdash <<external>>
-  component "tmux Statusline" as statusline <<cli>>
+package "Monitoring UI" {
+  component "Tmux Statusline" as statusline <<cli>>
+  component "Constraint-Monitor Dashboard" as dashboard <<external>>
 }
 
-cfgfiles --> cfgloader : "loads user+project config"
-cfgloader --> hookmgr : "provides merged handlers"
-hookmgr --> vcs : "dispatches violation events"
+component "ContentValidationAgent" as contentagent <<agent>>
 
-vcs --> sanitize : "redacts sensitive params"
-sanitize --> jsonl : "writes append-only log"
-sanitize --> rollup : "updates capped (1000) rollup"
-
-jsonl --> aggregator : "full history read"
-rollup --> aggregator : "aggregated stats"
-
-aggregator --> constraintdash : "feeds violation data"
-aggregator --> healthdash : "feeds violation data"
-
-statusline --> constraintdash : "click opens/focuses tab"
+config --> manager : "supplies merged\nconfig (project > user > default)"
+manager --> capture : "dispatches pre/post-tool\nviolation events"
+capture --> sanitize : "redacts sensitive params"
+sanitize --> jsonl : "append-only write"
+sanitize --> history : "rolling 1000-entry write"
+history --> dashboard : "synchronous read on load"
+statusline --> dashboard : "click 'constraints' field\nopens/focuses tab"
+contentagent ..> capture : "parallel validation strategy\n(unstructured text refs)"
 
 @enduml

@@ -1,32 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "Capture" {
-  component "enhanced-transcript-monitor.js" as monitor <<agent>>
+package "Capture & Upstream" {
+  component "enhanced-transcript-monitor.js" as etm <<agent>>
 }
 
-package "Write & Consolidate" {
+package "Write & Consolidate (obs-api)" {
   component "ObservationWriter" as writer <<core>>
+  component "legacy-ingest adapters" as adapter <<core>>
+  component "raw-fallback.js" as rawfb <<core>>
   component "ObservationConsolidator" as consolidator <<core>>
-  database "GraphKMStore (km-core LevelDB)" as kmstore <<storage>>
-  component "obs-api" as api <<api>>
+  database "GraphKMStore (LevelDB)" as kmstore <<storage>>
 }
 
-package "Export" {
+package "Export & Consumption" {
   component "ObservationExporter" as exporter <<core>>
-  component "raw-fallback.js" as rawfallback <<core>>
-  database ".data/observation-export/*.json" as jsonfiles <<storage>>
+  component "observation-export JSON" as jsonstore <<storage>>
+  component "dashboard /api/coding/observations" as dashboard <<api>>
 }
 
-monitor --> writer : normalized tool-call/artifact data
-writer --> kmstore : persists observations
-api --> writer : hosts write endpoint (single-threaded)
-consolidator --> kmstore : consolidateDay()/synthesizeInsights()
-consolidator --> writer : writeInsight (single-owner)
-consolidator --> api : runs in-process\n(execFileAsync fix)
+etm --> writer : "extracted artifacts"
+writer --> adapter : "legacyObservationToEntity"
+adapter --> kmstore : "putEntity (capturedBy anchored)"
+writer ..> rawfb : "isRawFallbackSummary()"
 
-exporter --> kmstore : re-derive export data
-exporter --> rawfallback : isRawFallbackSummary()
-exporter --> jsonfiles : _mergeWithExisting()/tombstones
+kmstore --> consolidator : "reads observations"
+consolidator --> consolidator : "consolidateDay() / synthesizeInsights()"
+consolidator --> writer : "writeInsight (single-owner)"
+consolidator --> kmstore : "async git via execFileAsync"
+
+kmstore --> exporter : "reads entities"
+exporter ..> rawfb : "keepInExport() filter"
+exporter --> jsonstore : "_mergeWithExisting / tombstones"
+jsonstore --> dashboard : "ColdStoreReader"
 
 @enduml

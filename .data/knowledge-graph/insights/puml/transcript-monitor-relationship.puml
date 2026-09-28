@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TranscriptMonitor
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TranscriptMonitor] as transcript_monitor #LightBlue
+[ObservationPipeline] as observation_pipeline #F0F0F0
+[TokenAttributionAdapters] as token_attribution_adapters #F0F0F0
+[ToolCallArtifactExtraction] as tool_call_artifact_extraction #E8F5E8
+[HostPathResolution] as host_path_resolution #E8F5E8
+[RawFallbackReceipt] as raw_fallback_receipt #E8F5E8
+
+live_logging_system --> transcript_monitor
+observation_pipeline -[hidden]- transcript_monitor
+token_attribution_adapters -[hidden]- transcript_monitor
+transcript_monitor --> tool_call_artifact_extraction
+transcript_monitor --> host_path_resolution
+transcript_monitor --> raw_fallback_receipt
+
+@enduml

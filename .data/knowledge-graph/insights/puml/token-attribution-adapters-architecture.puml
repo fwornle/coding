@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+package "LiveLoggingSystem (Actual Components)" {
+  component "enhanced-transcript-monitor.js" as etm <<core>>
+  component "ObservationConsolidator" as consolidator <<core>>
+  component "ObservationWriter" as writer <<core>>
+  component "ObservationExporter" as exporter <<core>>
+  component "raw-fallback.js" as fallback <<core>>
+}
+
+package "Attribution (Adjacent, Not Token-Level)" {
+  component "repo-router.mjs\n(routeFromArtifacts)" as router <<api>>
+  component "extractFileChanges/\ntoolCallArgs" as artifactAttr <<core>>
+}
+
+package "Unresolved Entity" {
+  component "TokenAttributionAdapters" as taa <<agent>>
+}
+
+etm --> artifactAttr : "attributes tool-call\nside effects"
+etm --> consolidator : "feeds transcript data"
+consolidator --> writer : "consolidated observations"
+writer --> router : "routes by touched artifacts"
+writer --> exporter : "exports JSON"
+fallback --> writer : "marks raw fallback data"
+
+taa ..> writer : "no evidence of\nintegration found"
+taa ..> router : "thematically adjacent,\nnot confirmed"
+
+@enduml

@@ -1,36 +1,31 @@
 @startuml
 !include _standard-style.puml
 
+package "Validation & Classification" {
+  component "validate-lsl-config.js" as validator <<cli>>
+  component "Ontology Classification Agent" as classifier <<agent>>
+}
+
 package "Session Capture" {
-  component "Meeting Recording Pipeline" as recording <<core>>
-  component "session-facts.ts" as facts <<core>>
-  component "health-coordinator.js" as health <<agent>>
+  component "LSL Coding Session Pipeline" as lsl <<core>>
+  component "RapidScribe Meeting Recorder" as rapidscribe <<core>>
+  component "Diarization/Transcription" as transcribe <<agent>>
 }
 
-package "Classification Pipeline" {
-  component "l2-subsystem-classifier.js" as classifier <<core>>
-  component "OntologyClassificationAgent" as agent <<agent>>
-  component "extractL2FromLLMResponse()" as extractor <<core>>
+package "Storage & Continuity" {
+  database "Date-Partitioned LSL Tranches" as tranches <<storage>>
+  database "Cohort Vault (e.g. EF-412)" as vault <<storage>>
+  component "Continuity Summaries" as summaries <<core>>
 }
 
-package "Configuration & Storage" {
-  component "LSLConfigValidator" as validator <<core>>
-  database "Knowledge Graph" as kg <<storage>>
-  component "obs-api" as obsapi <<api>>
-}
+validator --> lsl : "validates config before capture"
+lsl --> classifier : "streams session content"
+classifier --> tranches : "classifies & routes"
 
-recording --> facts : "produces transcripts"
-facts --> obsapi : "writes observations"
-facts --> kg : "anchors via parentId/contains"
+rapidscribe --> transcribe : "records audio"
+transcribe --> vault : "writes timeline.md,\npersonal-development.md"
 
-health --> recording : "monitors heartbeat/PID"
-
-obsapi --> classifier : "text passed for classification"
-classifier --> agent : "falls back on low confidence"
-agent --> extractor : "validates LLM output"
-extractor --> kg : "stamps LiveLoggingSystem class"
-
-validator --> recording : "validates lsl-config.json"
-validator --> facts : "enforces schema"
+tranches --> summaries : "synthesized into"
+vault --> summaries : "synthesized into"
 
 @enduml

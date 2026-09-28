@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: EntityTeamOwnershipHeuristics
+
+[CodingPatterns] as coding_patterns #FFFFDD
+[EntityTeamOwnershipHeuristics] as entity_team_ownership_heuristics #LightBlue
+[DocumentationStyleGuide] as documentation_style_guide #F0F0F0
+[TestingPractices] as testing_practices #F0F0F0
+[DataIntegrityPatterns] as data_integrity_patterns #F0F0F0
+[PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
+[TeamDirectoryMapping] as team_directory_mapping #E8F5E8
+[ArtifactPatternMatching] as artifact_pattern_matching #E8F5E8
+[ArtifactExtraction] as artifact_extraction #E8F5E8
+
+coding_patterns --> entity_team_ownership_heuristics
+documentation_style_guide -[hidden]- entity_team_ownership_heuristics
+testing_practices -[hidden]- entity_team_ownership_heuristics
+data_integrity_patterns -[hidden]- entity_team_ownership_heuristics
+pattern_verification_tooling -[hidden]- entity_team_ownership_heuristics
+entity_team_ownership_heuristics --> team_directory_mapping
+entity_team_ownership_heuristics --> artifact_pattern_matching
+entity_team_ownership_heuristics --> artifact_extraction
+
+@enduml

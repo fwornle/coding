@@ -8,16 +8,14 @@ title Hierarchy Context: PatternVerificationTooling
 [DocumentationStyleGuide] as documentation_style_guide #F0F0F0
 [TestingPractices] as testing_practices #F0F0F0
 [DataIntegrityPatterns] as data_integrity_patterns #F0F0F0
-[ArchitectureGuidelines] as architecture_guidelines #F0F0F0
-[EntityPatternAnalyzer] as entity_pattern_analyzer #F0F0F0
-[PatternComplianceScore] as pattern_compliance_score #E8F5E8
+[EntityTeamOwnershipHeuristics] as entity_team_ownership_heuristics #F0F0F0
+[ComplianceScoreReport] as compliance_score_report #E8F5E8
 
 coding_patterns --> pattern_verification_tooling
 documentation_style_guide -[hidden]- pattern_verification_tooling
 testing_practices -[hidden]- pattern_verification_tooling
 data_integrity_patterns -[hidden]- pattern_verification_tooling
-architecture_guidelines -[hidden]- pattern_verification_tooling
-entity_pattern_analyzer -[hidden]- pattern_verification_tooling
-pattern_verification_tooling --> pattern_compliance_score
+entity_team_ownership_heuristics -[hidden]- pattern_verification_tooling
+pattern_verification_tooling --> compliance_score_report
 
 @enduml

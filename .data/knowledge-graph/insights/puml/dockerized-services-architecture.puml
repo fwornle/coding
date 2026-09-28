@@ -1,37 +1,41 @@
 @startuml
 !include _standard-style.puml
 
-package "Wrapper Layer" {
-  component "api-service.js" as apiSvc <<core>>
-  component "dashboard-service.js" as dashSvc <<core>>
-  component "ProcessStateManager" as psm <<core>>
+package "Orchestration" {
+  component "ServiceStarter" as starter <<core>>
+  component "ServiceProbe" as probe <<core>>
+  component "Coding Copilot Launcher" as launcher <<cli>>
 }
 
-package "Implementation Services" {
-  component "dashboard-server.js\n(port 3031)" as dashServer <<api>>
-  component "Next.js Dashboard" as nextDash <<api>>
-  component "llm-mock-service.ts" as mockSvc <<agent>>
+package "Supervised Services" {
+  component "API Service" as api <<core>>
+  component "Dashboard Service" as dashboard <<core>>
+  component "Semantic Analysis MCP" as semantic <<agent>>
+  component "Constraint Monitor" as constraint <<agent>>
+  component "obs-api" as obsapi <<api>>
+  component "llm-proxy / llm-cli-proxy" as llmproxy <<external>>
 }
 
-package "Health Verification Stack" {
-  component "service-probe.js" as probe <<core>>
-  component "service-starter.js" as starter <<core>>
-  component "health-coordinator.js" as coordinator <<core>>
-  database "health-verification-rules.json" as rules
+package "Observability" {
+  component "System Health Dashboard" as healthdash <<core>>
+  component "Multi-project Statusline" as statusline <<core>>
 }
 
-apiSvc --> dashServer : spawns child process
-apiSvc --> psm : registers 'constraint-api-child'
-dashSvc --> nextDash : npm run dev
-dashSvc --> psm : registers/unregisters
-nextDash --> dashServer : NEXT_PUBLIC_API_BASE_URL:3031
+cloud "LLM Mock Service" as mock <<external>>
 
-starter --> probe : uses probeHttpHealth/probeTcpPort
-coordinator --> starter : retry-with-backoff startup
-coordinator --> rules : reads declarative rules
-coordinator --> apiSvc : verifies health endpoint
-coordinator --> dashSvc : verifies health endpoint
+starter --> api : "spawns"
+starter --> dashboard : "spawns"
 
-mockSvc ..> dashServer : provides mock LLM responses
+probe --> semantic : "health-check poll"
+probe --> constraint : "health-check poll"
+probe --> obsapi : "health-check poll"
+probe --> llmproxy : "health-check poll"
+
+launcher --> probe : "reuses health checks"
+
+llmproxy ..> mock : "swappable via env config"
+
+probe --> healthdash : "surfaces timeouts"
+probe --> statusline : "surfaces timeouts"
 
 @enduml

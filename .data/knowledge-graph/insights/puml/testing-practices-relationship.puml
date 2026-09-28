@@ -8,14 +8,12 @@ title Hierarchy Context: TestingPractices
 [DocumentationStyleGuide] as documentation_style_guide #F0F0F0
 [DataIntegrityPatterns] as data_integrity_patterns #F0F0F0
 [PatternVerificationTooling] as pattern_verification_tooling #F0F0F0
-[ArchitectureGuidelines] as architecture_guidelines #F0F0F0
-[EntityPatternAnalyzer] as entity_pattern_analyzer #F0F0F0
+[EntityTeamOwnershipHeuristics] as entity_team_ownership_heuristics #F0F0F0
 
 coding_patterns --> testing_practices
 documentation_style_guide -[hidden]- testing_practices
 data_integrity_patterns -[hidden]- testing_practices
 pattern_verification_tooling -[hidden]- testing_practices
-architecture_guidelines -[hidden]- testing_practices
-entity_pattern_analyzer -[hidden]- testing_practices
+entity_team_ownership_heuristics -[hidden]- testing_practices
 
 @enduml

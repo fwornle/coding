@@ -13,11 +13,11 @@ title Hierarchy Context: LLMAbstraction
 [SemanticAnalysis] as semantic_analysis #F0F0F0
 [LLMMockService] as llmmock_service #E8F5E8
 [DMRProvider] as dmrprovider #E8F5E8
+[ParseLlmJson] as parse_llm_json #E8F5E8
 [LLMWithProcessClient] as llmwith_process_client #E8F5E8
-[LlmJsonParser] as llm_json_parser #E8F5E8
-[CopilotModelIdAlignment] as copilot_model_id_alignment #E8F5E8
 [CostModel] as cost_model #E8F5E8
-[OffloadRoutingDashboard] as offload_routing_dashboard #E8F5E8
+[OffloadRoutingUI] as offload_routing_ui #E8F5E8
+[AgentModelConfigSplice] as agent_model_config_splice #E8F5E8
 [ModelContextLimits] as model_context_limits #E8F5E8
 
 coding --> llmabstraction
@@ -29,11 +29,11 @@ constraint_system -[hidden]- llmabstraction
 semantic_analysis -[hidden]- llmabstraction
 llmabstraction --> llmmock_service
 llmabstraction --> dmrprovider
+llmabstraction --> parse_llm_json
 llmabstraction --> llmwith_process_client
-llmabstraction --> llm_json_parser
-llmabstraction --> copilot_model_id_alignment
 llmabstraction --> cost_model
-llmabstraction --> offload_routing_dashboard
+llmabstraction --> offload_routing_ui
+llmabstraction --> agent_model_config_splice
 llmabstraction --> model_context_limits
 
 @enduml

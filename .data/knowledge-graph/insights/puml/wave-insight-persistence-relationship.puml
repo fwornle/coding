@@ -5,25 +5,13 @@ title Hierarchy Context: WaveInsightPersistence
 
 [KnowledgeManagement] as knowledge_management #FFFFDD
 [WaveInsightPersistence] as wave_insight_persistence #LightBlue
-[GraphDatabaseService] as graph_database_service #F0F0F0
 [OnlineLearning] as online_learning #F0F0F0
-[ManualLearning] as manual_learning #F0F0F0
-[GraphifyGraph] as graphify_graph #F0F0F0
-[KmCoreMigration] as km_core_migration #F0F0F0
-[UnifiedViewerGraphRendering] as unified_viewer_graph_rendering #F0F0F0
-[UkbWorkflowDashboard] as ukb_workflow_dashboard #F0F0F0
-[InsightHierarchyPlacement] as insight_hierarchy_placement #E8F5E8
-[IntentInsightSpine] as intent_insight_spine #E8F5E8
+[GraphAttributionAudit] as graph_attribution_audit #F0F0F0
+[UnifiedGraphViewerRendering] as unified_graph_viewer_rendering #F0F0F0
 
 knowledge_management --> wave_insight_persistence
-graph_database_service -[hidden]- wave_insight_persistence
 online_learning -[hidden]- wave_insight_persistence
-manual_learning -[hidden]- wave_insight_persistence
-graphify_graph -[hidden]- wave_insight_persistence
-km_core_migration -[hidden]- wave_insight_persistence
-unified_viewer_graph_rendering -[hidden]- wave_insight_persistence
-ukb_workflow_dashboard -[hidden]- wave_insight_persistence
-wave_insight_persistence --> insight_hierarchy_placement
-wave_insight_persistence --> intent_insight_spine
+graph_attribution_audit -[hidden]- wave_insight_persistence
+unified_graph_viewer_rendering -[hidden]- wave_insight_persistence
 
 @enduml

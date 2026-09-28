@@ -6,24 +6,26 @@ title Hierarchy Context: LLMMockService
 [LLMAbstraction] as llmabstraction #FFFFDD
 [LLMMockService] as llmmock_service #LightBlue
 [DMRProvider] as dmrprovider #F0F0F0
+[ParseLlmJson] as parse_llm_json #F0F0F0
 [LLMWithProcessClient] as llmwith_process_client #F0F0F0
-[LlmJsonParser] as llm_json_parser #F0F0F0
-[CopilotModelIdAlignment] as copilot_model_id_alignment #F0F0F0
 [CostModel] as cost_model #F0F0F0
-[OffloadRoutingDashboard] as offload_routing_dashboard #F0F0F0
+[OffloadRoutingUI] as offload_routing_ui #F0F0F0
+[AgentModelConfigSplice] as agent_model_config_splice #F0F0F0
 [ModelContextLimits] as model_context_limits #F0F0F0
 [CopilotModelIdDriftGuard] as copilot_model_id_drift_guard #E8F5E8
-[ModelContextCatalogueCache] as model_context_catalogue_cache #E8F5E8
+[FastModePricingRule] as fast_mode_pricing_rule #E8F5E8
+[CatalogueDerivedModelContextLimits] as catalogue_derived_model_context_limits #E8F5E8
 
 llmabstraction --> llmmock_service
 dmrprovider -[hidden]- llmmock_service
+parse_llm_json -[hidden]- llmmock_service
 llmwith_process_client -[hidden]- llmmock_service
-llm_json_parser -[hidden]- llmmock_service
-copilot_model_id_alignment -[hidden]- llmmock_service
 cost_model -[hidden]- llmmock_service
-offload_routing_dashboard -[hidden]- llmmock_service
+offload_routing_ui -[hidden]- llmmock_service
+agent_model_config_splice -[hidden]- llmmock_service
 model_context_limits -[hidden]- llmmock_service
 llmmock_service --> copilot_model_id_drift_guard
-llmmock_service --> model_context_catalogue_cache
+llmmock_service --> fast_mode_pricing_rule
+llmmock_service --> catalogue_derived_model_context_limits
 
 @enduml

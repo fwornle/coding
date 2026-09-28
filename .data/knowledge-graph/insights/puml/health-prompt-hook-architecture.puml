@@ -1,36 +1,30 @@
 @startuml
 !include _standard-style.puml
 
-package "Claude Hook Runtime" {
-  component "health-prompt-hook.js\nmain()" as main <<core>>
-  component "checkHealthStatus()\n(Q3 carve-out)" as check <<core>>
-  component "deriveSummary()\n(allow-listed projection)" as derive <<core>>
-  component "outputEnvelope()\n(SPEC R8)" as envelope <<core>>
-  component "outputHealthContext()\n(emoji mapping)" as context <<core>>
+package "Claude Code Hook Layer" {
+  component "main()" as main <<core>>
+  component "checkHealthStatus()" as check <<core>>
+  component "deriveSummary()" as derive <<core>>
+  component "outputEnvelope()" as envelope <<core>>
+  component "outputHealthContext()" as context <<core>>
 }
 
-package "External Dependencies" {
-  cloud "health-coordinator\n/health/state" as coordinator <<external>>
-  component "health-verifier.js\n(existsSync sentinel)" as verifier <<external>>
+package "Environment Detection" {
+  component "health-verifier.js\n(existence check)" as verifier <<cli>>
 }
 
-package "Consumers" {
-  component "Next.js constraint-monitor\ndashboard" as nextjs <<agent>>
-  component "Vite system-health\ndashboard" as vite <<agent>>
-  component "obs-api coverage metric\n(known bug)" as obsapi <<external>>
+package "Upstream Source" {
+  cloud "Health Coordinator\n/health/state" as coordinator <<external>>
 }
 
 main --> check : "invokes"
-check --> verifier : "existsSync check (in-repo heuristic)"
-check --> coordinator : "HTTP GET /health/state"
-coordinator --> derive : "raw JSON state"
-derive --> envelope : "fixed-format summary strings"
-envelope --> context : "hookSpecificOutput"
-context --> nextjs : "shared string vocabulary"
-context --> vite : "shared string vocabulary"
-
-obsapi ..> coordinator : "upstream data\n(skewed ratio)"
-
-main ..> main : "process.exit(0)\n(fail-open, all paths)"
+check --> verifier : "checks file existence\n(Q3 carve-out)"
+check --> coordinator : "fetch()"
+coordinator --> check : "JSON status\n(container, databases,\nservices[], knowledge_pipeline)"
+check --> derive : "on success"
+derive --> context : "formats summary"
+check --> envelope : "on error/unknown\n(SPEC R6)"
+context --> envelope : "wraps in JSON"
+main --> envelope : "all exit paths\n(SPEC R8)"
 
 @enduml

@@ -6,18 +6,20 @@ title Hierarchy Context: Pipeline
 [SemanticAnalysis] as semantic_analysis #FFFFDD
 [Pipeline] as pipeline #LightBlue
 [Ontology] as ontology #F0F0F0
-[HealthCoordinator] as health_coordinator #F0F0F0
-[AgentLaunchers] as agent_launchers #F0F0F0
-[PiExtensions] as pi_extensions #F0F0F0
-[OntologyClassRepairScript] as ontology_class_repair_script #E8F5E8
+[Insights] as insights #F0F0F0
+[OntologyClassificationAgent] as ontology_classification_agent #F0F0F0
+[SemanticAnalysisAgent] as semantic_analysis_agent #F0F0F0
+[L2SubsystemClassifier] as l2_subsystem_classifier #F0F0F0
 [OntologySystemFactory] as ontology_system_factory #E8F5E8
+[OntologyClassRepairScript] as ontology_class_repair_script #E8F5E8
 
 semantic_analysis --> pipeline
 ontology -[hidden]- pipeline
-health_coordinator -[hidden]- pipeline
-agent_launchers -[hidden]- pipeline
-pi_extensions -[hidden]- pipeline
-pipeline --> ontology_class_repair_script
+insights -[hidden]- pipeline
+ontology_classification_agent -[hidden]- pipeline
+semantic_analysis_agent -[hidden]- pipeline
+l2_subsystem_classifier -[hidden]- pipeline
 pipeline --> ontology_system_factory
+pipeline --> ontology_class_repair_script
 
 @enduml

@@ -1,40 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "graph/attribution (canonical module)" {
+package "Shared Attribution Module" {
+  component "@/graph/attribution" as attrib <<core>>
   component "rootOf" as rootOf <<core>>
   component "categoriseUnattributed" as categorise <<core>>
   component "CATEGORY_LABEL" as labels <<core>>
 }
 
-package "Category Buckets" {
-  component "recordedParent" as recordedParent <<core>>
-  component "wrongClass" as wrongClass <<core>>
-  component "danglingRef" as danglingRef <<core>>
-  component "unclaimed" as unclaimed <<core>>
+package "CI Gate" {
+  component "assert-graph-density.ts" as gate <<cli>>
+  component "isEntityVisible / deriveParents" as viewerPreds <<core>>
 }
 
-package "Consumers" {
-  component "assert-graph-density.ts" as ci <<cli>>
-  component "attribution.test.ts" as tests <<agent>>
-  component "hierarchy-parents.ts (deriveParents)" as hierarchy <<external>>
+package "Viewer" {
+  component "Graph Quality Panel" as panel <<agent>>
 }
 
-ci --> rootOf : "calls (cycle-safe walk)"
-ci --> categorise : "CI gate check"
-ci --> labels : "reporting"
+component "attribution.test.ts" as tests <<core>>
 
-categorise --> recordedParent : "exclusive bucket"
-categorise --> wrongClass : "exclusive bucket"
-categorise --> danglingRef : "exclusive bucket"
-categorise --> unclaimed : "exclusive bucket"
+attrib --> rootOf
+attrib --> categorise
+attrib --> labels
 
-categorise --> hierarchy : "consults placement rule"
-wrongClass ..> hierarchy : "Project/has_insight/non-Insight refusal"
+gate --> attrib : "imports rootOf, categoriseUnattributed, CATEGORY_LABEL"
+gate --> viewerPreds : "reuses visibility & hierarchy walk"
+gate --> gate : "unrootedByCategory report,\noverBudget on unrooted>0"
 
-recordedParent ..> unclaimed : "ambiguous twin name\nfalls back rather than guesses"
+panel --> attrib : "consumes same categorisation"
 
-tests --> rootOf : "verifies cycle-safety"
-tests --> categorise : "verifies exclusivity & priority"
+tests --> attrib : "exercises 4 categories\n(recordedParent, wrongClass,\ndanglingRef, unclaimed)"
+
+categorise --> categorise : "recordedParent wins on ambiguity"
+rootOf --> rootOf : "cycle-safe walk (a->b->a => null)"
 
 @enduml

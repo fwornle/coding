@@ -1,35 +1,37 @@
 @startuml
 !include _standard-style.puml
 
-package "Mock Resolution Layer" {
+package "LLM Routing Core" {
   component "LLMMockService" as mock <<core>>
-  component "getLLMMode()" as getmode <<core>>
-  component "workflow-progress.json" as progressjson <<storage>>
+  component "getLLMMode()\n(perAgentOverrides>globalMode>legacy)" as mode <<core>>
+  component "rapid-llm-proxy" as proxy <<api>>
+  component "Provider Clients\n(DMR/Anthropic/OpenAI/Groq)" as providers <<external>>
 }
 
-package "Resolution Sources" {
-  component "perAgentOverrides" as override <<core>>
-  component "globalMode" as global <<core>>
-  component "legacy mockLLM boolean" as legacy <<core>>
-  component "hardcoded 'public' default" as fallback <<core>>
+package "Drift & Policy Guards" {
+  component "copilot-model-ids.test.mjs" as idtest <<cli>>
+  component "align-copilot-model-ids.mjs" as aligner <<cli>>
+  component "offload-gates.ts ladder" as ladder <<core>>
 }
 
-package "Live Routing Context" {
-  component "LLM Routing Tiers" as tiers <<external>>
-  component "rapid-llm-proxy" as proxy <<external>>
-  component "Provider Failure Handling" as failures <<external>>
+package "Dashboard Observability" {
+  component "cost-model.ts\npriceForModel()" as cost <<core>>
+  component "offload-decision.tsx" as offload <<agent>>
+  component "use-classifier-judge.ts" as judge <<agent>>
+  component "provider.tsx (Redux)" as reduxprov <<external>>
 }
 
-mock --> getmode : "resolves active mode"
-getmode --> override : "1st priority"
-getmode --> global : "2nd priority"
-getmode --> legacy : "3rd priority (legacy)"
-getmode --> fallback : "4th priority (default)"
-legacy ..> progressjson : "backward compatibility"
+mock --> mode : "resolves mode"
+mode --> proxy : "mock/live toggle"
+proxy --> providers : "tiered fallback\n(max-sub > copilot > groq)"
 
-mock ..> tiers : "should mirror fallback order (unverified)"
-tiers --> proxy : "routes live requests"
-proxy --> failures : "provider failures"
-failures ..> mock : "risk: masks failures behind stale mock state"
+idtest --> aligner : "verifies rewrite"
+aligner ..> providers : "prevents retired-id 400s"
+
+proxy --> cost : "logs calls"
+proxy --> offload : "/api/llm/routing/resolve"
+ladder ..> offload : "local mirror cross-check"
+proxy --> judge : "classifier health"
+judge --> reduxprov : "state updates"
 
 @enduml

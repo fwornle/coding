@@ -1,31 +1,33 @@
 @startuml
 !include _standard-style.puml
 
-package "Agent API Hooks (lib/agent-api/hooks)" {
-  component "HookConfigLoader" as loader <<core>>
-  database "CONFIG_PATHS.user" as userCfg <<storage>>
-  database "CONFIG_PATHS.project" as projCfg <<storage>>
-  component "mergeConfigs()" as merge <<core>>
+package "Health Prompt Hook (unrelated to HookConfigLoader)" {
+  component "health-prompt-hook.js" as hook <<core>>
+  component "deriveSummary()" as summary <<core>>
+  component "outputEnvelope()" as envelope <<core>>
+  cloud "health-coordinator\n:3034 /health/state" as coordinator <<external>>
 }
 
-package "Adjacent Hook Tooling (env-driven, not config-loaded)" {
-  component "health-prompt-hook.js" as promptHook <<agent>>
-  component "health-prompt-hook-stall.test.mjs" as testHook <<external>>
+package "Feature Gating (separate system)" {
+  component "require-feature.sh" as guard <<cli>>
+  component "ruleFeatureActive()" as ruleCheck <<core>>
 }
 
-package "Unrelated 'hooks' Namespace (React UI)" {
-  component "workflow/hooks.ts" as reactHooks <<external>>
-  component "usePolledFetch.ts" as pollHook <<external>>
+package "Dashboards & Client Hooks" {
+  component "constraint-monitor dashboard" as cmDash <<external>>
+  component "system-health-dashboard" as shDash <<external>>
+  component "usePolledFetch.ts" as poll <<agent>>
 }
 
-userCfg --> merge : "loaded"
-projCfg --> merge : "loaded"
-merge --> loader : "produces final config"
+hook --> coordinator : "fetches /health/state"
+hook --> summary : "reduces status"
+summary --> envelope : "wraps in fixed JSON shape (SPEC R8)"
+hook --> envelope : "guarantees on error"
 
-loader ..> promptHook : "architecturally adjacent\n(not actually invoked)"
-testHook ..> promptHook : "tests via stdout envelope"
+guard --> ruleCheck : "must agree on feature state"
 
-reactHooks ..> loader : "false positive\n(filename collision)"
-pollHook ..> loader : "false positive\n(filename collision)"
+hook --> cmDash : "statusline click-report"
+hook --> shDash : "statusline click-report"
+shDash --> poll : "visibility-aware polling"
 
 @enduml

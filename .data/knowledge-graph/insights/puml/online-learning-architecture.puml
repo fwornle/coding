@@ -1,33 +1,31 @@
 @startuml
 !include _standard-style.puml
 
-package "Rendering Layer" {
-  component "D3GraphCanvas.tsx" as canvas <<core>>
-  component "learning-source.ts" as learnsrc <<external>>
-  component "color-fallback.ts" as colorfb <<external>>
+package "Graph Visualization" {
+  component "D3GraphCanvas.tsx" as d3canvas <<core>>
+  component "SigmaCanvas.tsx" as sigmacanvas <<core>>
+  component "learning-source" as learnsrc <<core>>
+  component "isOnlineLearned" as isol <<core>>
 }
 
-package "Viewer Store / Filters" {
-  component "viewer-store.ts (missing)" as store <<external>>
-  component "assert-graph-density.ts" as assertscript <<cli>>
+package "Density Tooling" {
+  component "assert-graph-density.ts" as density <<cli>>
+  component "DEFAULT_FILTERS" as filters <<core>>
 }
 
-package "Batch Wave Pipeline" {
-  component "ukb-workflow-modal.tsx" as modal <<core>>
-  database "Insight Documents (73)" as insightdocs <<storage>>
-  database "Graph Nodes (Insight type)" as insightnodes <<storage>>
+package "Write Path (Unlanded)" {
+  component "writeInsight" as writeinsight <<core>>
+  component "Embedding Dedup (dry-run)" as dedup <<core>>
 }
 
-canvas ..> learnsrc : "imports isOnlineLearned"
-canvas ..> colorfb : "imports ONLINE_RING_COLOR"
+d3canvas --> learnsrc : "imports"
+learnsrc --> isol : "exposes flag"
+isol --> d3canvas : "colors node by learning source"
 
-assertscript ..> store : "duplicates DEFAULT_FILTERS\n(learningSource='combined')"
+density --> filters : "defines"
+filters --> learnsrc : "learningSource='combined'"
 
-modal --> insightdocs : "writes batch insight docs"
-insightdocs ..> insightnodes : "expected but missing\n(Wave 4 gap)"
-insightnodes ..> modal : "History sidebar Batch badge\n(entity Type='Insight')"
-
-modal --> canvas : "provides batch-derived entities"
-learnsrc ..> insightnodes : "classifies provenance\n(online vs batch)"
+writeinsight ..> dedup : "planned integration"
+dedup ..> learnsrc : "conceptually related\n(no code link found)"
 
 @enduml

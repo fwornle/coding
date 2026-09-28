@@ -1,29 +1,34 @@
 @startuml
 !include _standard-style.puml
 
-package "Pattern Verification Tooling (Gap Analysis)" {
+package "Shell-based Verification" {
   component "verify-patterns.sh" as vps <<cli>>
+  component "install.sh (target)" as install <<external>>
+  component "Markdown Compliance Report" as report <<storage>>
+}
+
+package "Ontology Heuristics" {
   component "EntityPatternAnalyzer.ts" as epa <<core>>
-  database "pattern-verification-*.md report" as report <<storage>>
-  database "Shared-memory Knowledge File" as knowledge <<storage>>
+  component "teamDirectories Map" as teamdir <<storage>>
+  component "artifactPatterns Map" as artpat <<storage>>
+  component "checkLocalArtifact()" as localcheck <<agent>>
+  component "matchArtifactPattern()" as patmatch <<agent>>
 }
 
-package "Missing / Unimplemented Logic" {
-  component "Render-Error Triage Logic" as triage <<agent>>
-  component "Diagram Verification Logic" as diagcheck <<agent>>
+package "Unimplemented Verification Discipline" {
+  component "Post-Rewrite Baseline Diff (missing)" as baseline <<external>>
 }
 
-package "Unrelated Fixtures" {
-  component "DesignViewModel.cs / DesignView.xaml" as xamlfix <<external>>
-}
+vps --> install : "greps for patterns"
+vps --> report : "generates score"
 
-vps --> report : "generates compliance score"
-vps --> knowledge : "mutates via jq"
-epa --> knowledge : "hardcoded team/pattern mappings"
+epa --> teamdir : "hardcoded lookup"
+epa --> artpat : "regex fallback"
+epa --> localcheck : "step 1: local match (0.9)"
+epa --> patmatch : "step 2: pattern match (0.75)"
+localcheck ..> patmatch : "fallback if no match"
 
-triage ..> vps : "not implemented here"
-diagcheck ..> vps : "not implemented here"
-
-xamlfix ..> vps : "keyword collision only"
+vps ..> epa : "independent (no coupling)"
+baseline ..> vps : "no baseline-diff logic found"
 
 @enduml

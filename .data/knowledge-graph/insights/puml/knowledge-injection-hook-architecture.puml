@@ -1,34 +1,30 @@
 @startuml
 !include _standard-style.puml
 
-package "Unresolved Component" {
-  component "KnowledgeInjectionHook" as kih <<core>>
+package "Health Prompt Hook (Actual)" {
+  component "health-prompt-hook.js" as hook <<core>>
+  component "outputHealthContext/outputEnvelope" as envelope <<core>>
+  component "Health Coordinator /health/state" as coordinator <<external>>
 }
 
-package "Hook Infrastructure" {
-  component "UnifiedHookManager" as manager <<core>>
-  component "HookConfigLoader" as loader <<core>>
-  database "hooks.json (user/project)" as config <<storage>>
+package "Validation (Adjacent, Not Injection)" {
+  component "ContentValidationAgent" as cva <<agent>>
 }
 
-package "Adjacent Analogous Component" {
-  component "health-prompt-hook.js" as healthhook <<agent>>
-  component "SPEC R8 Envelope\n(hookSpecificOutput)" as envelope <<api>>
+package "Unrelated 'Hook' Sense (React UI)" {
+  component "usePolledFetch.ts" as poll <<core>>
+  component "workflow/hooks.ts" as whooks <<core>>
 }
 
-package "Unrelated Dashboard Hooks" {
-  component "usePolledFetch.ts" as polled <<external>>
-  component "hooks.ts (useWorkflowDefinitions,\nuseRecentCalls)" as dashhooks <<external>>
-}
+hook --> envelope : "builds additionalContext"
+coordinator --> hook : "health state data"
+envelope --> hook : "injects health text (not KB)"
 
-kih ..> manager : "presumed registerHandler()\n(unconfirmed)"
-manager --> loader : "loads merged config"
-loader --> config : "project overrides user\n(no append)"
+cva ..> hook : "no structural link found"
 
-healthhook --> envelope : "produces"
-envelope ..> kih : "structurally analogous\npattern (not same)"
+poll ..> whooks : "React data fetching (different hook type)"
 
-polled ..> dashhooks : "shares polling pattern"
-dashhooks ..> kih : "no relationship\n(false match on 'hooks')"
+hook .. Gap
+cva .. Gap
 
 @enduml
