@@ -1,29 +1,30 @@
 @startuml
 !include _standard-style.puml
 
-package "Manifest / Graph State" {
-  component "Manifest-level\nEntity Descriptions" as manifest <<storage>>
-  component "Graph-level\nEntity Descriptions" as graph <<storage>>
-  component "capturedBy\nEdge Counts" as edges <<storage>>
+package "Metadata Merge Bug (Conceptual Target)" {
+  component "Manifest-Level Descriptions" as manifest <<core>>
+  component "Graph-Level Descriptions" as graph <<core>>
+  component "Merge Reconciliation Logic\n(not present in retrieval)" as merge <<core>>
+  component "Published Documentation Page" as docpage <<external>>
 }
 
-package "Metadata Merge Bug Fix (Multi-Stage)" {
-  component "Merge Process" as merge <<core>>
-  component "Stage-wise\nVerification" as verify <<core>>
-  component "Published\nDocumentation Page" as docs <<external>>
+package "Adjacent Retrieved Evidence" {
+  component "EntityPatternAnalyzer" as epa <<core>>
+  component "checkLocalArtifact()" as local <<core>>
+  component "matchArtifactPattern()" as regexmatch <<core>>
+  component "verify-patterns.sh" as verify <<cli>>
+  database "$SHARED_MEMORY JSON" as sharedmem <<storage>>
 }
 
-package "Adjacent Integrity Concern" {
-  component "suiteOwnership() Guard\n(Test Suite Enforcement)" as suiteGuard <<agent>>
-}
+manifest --> merge : "must sync with"
+graph --> merge : "must sync with"
+merge --> docpage : "publishes freshly measured figures"
 
-manifest --> merge : "merged with"
-graph --> merge : "merged with"
-merge --> edges : "destabilizes/stabilizes"
-merge --> verify : "checked at each stage"
-verify --> docs : "publishes freshly\nmeasured figures"
-edges --> verify : "must be re-measured"
+epa --> local : "step 1: directory match"
+epa --> regexmatch : "step 2: regex fallback"
 
-suiteGuard ..> merge : "same drift pattern\n(silent state divergence)"
+verify --> sharedmem : "jq read-modify-write\n(.tmp && mv)"
+
+sharedmem ..> merge : "structurally similar\nread-modify-write pattern"
 
 @enduml

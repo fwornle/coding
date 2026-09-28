@@ -15,8 +15,7 @@ title Hierarchy Context: CodingPatterns
 [TestingPractices] as testing_practices #E8F5E8
 [DataIntegrityPatterns] as data_integrity_patterns #E8F5E8
 [PatternVerificationTooling] as pattern_verification_tooling #E8F5E8
-[ArchitectureGuidelines] as architecture_guidelines #E8F5E8
-[EntityPatternAnalyzer] as entity_pattern_analyzer #E8F5E8
+[EntityTeamOwnershipHeuristics] as entity_team_ownership_heuristics #E8F5E8
 
 coding --> coding_patterns
 live_logging_system -[hidden]- coding_patterns
@@ -29,7 +28,6 @@ coding_patterns --> documentation_style_guide
 coding_patterns --> testing_practices
 coding_patterns --> data_integrity_patterns
 coding_patterns --> pattern_verification_tooling
-coding_patterns --> architecture_guidelines
-coding_patterns --> entity_pattern_analyzer
+coding_patterns --> entity_team_ownership_heuristics
 
 @enduml

@@ -1,36 +1,38 @@
 @startuml
 !include _standard-style.puml
 
-package "L2 Classification Subsystem (documented, not retrieved)" {
-  component "ontology-classification-agent.ts" as agent <<core>>
-  component "loadL2Classes()" as loadL2 <<core>>
-  component "buildL2RefinementPrompt()" as buildPrompt <<core>>
-  component "extractL2FromLLMResponse()" as extract <<core>>
-  component "classifySingleObservation()" as classify <<core>>
+package "Ontology System" {
+  component "OntologyClassificationAgent" as agent <<agent>>
+  component "L2SubsystemClassifier" as l2 <<core>>
+  component "loadL2Classes" as load <<core>>
+  component "buildL2RefinementPrompt" as prompt <<core>>
+  component "extractL2FromLLMResponse" as extract <<core>>
+  component "createOntologySystem" as factory <<core>>
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  component "OntologyValidator" as validator <<core>>
 }
 
-package "Pipeline Defect Context" {
-  component "CodingLowerOntologySource Emission" as bug <<core>>
-  component "Hard-Root-Guard (unrelated fix)" as guard <<core>>
+database "coding.lower.json" as codingLower <<storage>>
+database "OntologyRegistry" as registry <<storage>>
+
+package "Downstream Consumers" {
+  component "Consolidator" as consolidator <<core>>
+  component "repair-writer-ontology-class.mjs" as repair <<cli>>
 }
 
-package "Retrieved Files (mismatched cluster)" {
-  component "copilot.sh / opencode.sh / pi.sh" as launchers <<cli>>
-  component "no-unbounded-fs-scan.ts" as guardTool <<agent>>
-  component "batch-provenance.mjs" as dashboard <<external>>
-}
+agent --> l2 : "invokes L2 refinement"
+l2 --> load : "loads L2 classes"
+load --> codingLower : "reads source"
+l2 --> prompt : "builds prompt"
+l2 --> extract : "parses LLM response"
+codingLower --> registry : "km-core registry"
+agent --> factory : "constructs"
+factory --> adapter : "requires (throws if absent)"
+factory --> validator
+adapter --> registry : "wraps"
 
-agent --> loadL2 : "loads OntologyRegistry classes"
-agent --> buildPrompt : "builds refinement prompt"
-agent --> extract : "parses LLM response"
-classify --> agent : "invokes L2 refinement"
-extract --> classify : "fail-closed fallback to L1"
-
-classify ..> bug : "leaks CodingLowerOntologySource"
-guard ..> bug : "does not fix (distinct issue)"
-
-launchers ..> agent : "NOT related (retrieval mismatch)"
-guardTool ..> agent : "NOT related (retrieval mismatch)"
-dashboard ..> agent : "NOT related (retrieval mismatch)"
+l2 ..> consolidator : "stamps entity Type"
+consolidator --> repair : "produces violations"
+repair ..> consolidator : "reports (does not repair)"
 
 @enduml

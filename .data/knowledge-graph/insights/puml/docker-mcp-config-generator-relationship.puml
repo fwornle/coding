@@ -1,0 +1,25 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: DockerMcpConfigGenerator
+
+[DockerizedServices] as dockerized_services #FFFFDD
+[DockerMcpConfigGenerator] as docker_mcp_config_generator #LightBlue
+[ContainerEntrypoint] as container_entrypoint #F0F0F0
+[RobustServiceStarter] as robust_service_starter #F0F0F0
+[ConstraintMonitorServices] as constraint_monitor_services #F0F0F0
+[PromptClassifierService] as prompt_classifier_service #F0F0F0
+[FeatureGatingDisabledConfBuilder] as feature_gating_disabled_conf_builder #E8F5E8
+[ServiceStarterRetryPolicy] as service_starter_retry_policy #E8F5E8
+[ServiceFeatureGatingContract] as service_feature_gating_contract #E8F5E8
+
+dockerized_services --> docker_mcp_config_generator
+container_entrypoint -[hidden]- docker_mcp_config_generator
+robust_service_starter -[hidden]- docker_mcp_config_generator
+constraint_monitor_services -[hidden]- docker_mcp_config_generator
+prompt_classifier_service -[hidden]- docker_mcp_config_generator
+docker_mcp_config_generator --> feature_gating_disabled_conf_builder
+docker_mcp_config_generator --> service_starter_retry_policy
+docker_mcp_config_generator --> service_feature_gating_contract
+
+@enduml

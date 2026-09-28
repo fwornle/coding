@@ -1,32 +1,30 @@
 @startuml
 !include _standard-style.puml
 
-package "Test Inventory & Suite Health" {
-  component "Test Inventory Tooling\n(missing)" as inventory <<core>>
-  component "node:test Compatibility Check" as nodetest <<core>>
-  component "suiteOwnership() Guard\n(missing)" as guard <<core>>
-  component "Test Suite Health Workflow" as health <<core>>
+package "Test Inventory & Suite Enforcement" {
+  component "Test Inventory Discovery" as inventory <<core>>
+  component "node:test Compatibility" as nodetest <<core>>
+  component "suiteOwnership() Guard" as guard <<core>>
 }
 
-package "Adjacent but Unrelated Tooling" {
-  component "EntityPatternAnalyzer.ts" as epa <<core>>
-  component "verify-patterns.sh" as vps <<cli>>
+package "CI/Build Gate" {
+  component "Unified Viewer Build/Test Gate" as buildgate <<cli>>
+  component "CI npm ci / .gitignore Handling" as cigate <<cli>>
 }
 
-package "Fixture Inputs" {
-  component "DesignViewModel.cs" as fixtureCs <<external>>
-  component "DesignView.xaml" as fixtureXaml <<external>>
+package "Unrelated / Non-Grounding Evidence" {
+  component "EntityPatternAnalyzer" as epa <<external>>
+  component "verify-patterns.sh" as vps <<external>>
+  component "graphify XAML Fixtures" as fixtures <<external>>
 }
 
-nodetest --> inventory : "ensures recognition of\nnode:test imports"
-inventory --> health : "feeds coverage data"
-guard --> health : "requires verified\nexclusion declarations"
-health --> guard : "flags undocumented exclusions"
+nodetest --> inventory : "must be recognized by"
+inventory --> guard : "feeds visibility into"
+guard --> buildgate : "prevents silent exclusion in"
+buildgate --> cigate : "gates CI pipeline"
 
-epa ..> inventory : "unrelated:\nownership routing only"
-vps ..> health : "unrelated:\nstatic pattern audit"
-
-fixtureCs ..> vps : "used by graphify parser tests,\nnot suite tooling"
-fixtureXaml ..> vps : "used by graphify parser tests,\nnot suite tooling"
+epa ..> guard : "no actual coupling\n(unrelated ownership heuristics)"
+vps ..> guard : "thematically close,\nbut no suite-inventory logic"
+fixtures ..> inventory : "inert fixture data,\nunrelated subsystem"
 
 @enduml

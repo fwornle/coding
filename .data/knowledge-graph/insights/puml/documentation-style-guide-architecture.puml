@@ -1,28 +1,35 @@
 @startuml
 !include _standard-style.puml
 
-package "Documentation Governance" {
-  component "Documentation Style Guide" as guide <<core>>
-  component "docs/puml/ Source Location" as pumlDir <<storage>>
-  component "Rendered Diagram Artifacts" as artifacts <<storage>>
-  component "Render Error Triage Practice" as triage <<agent>>
+package "Documentation Pipeline" {
+  component "Documentation Style Guide" as styleGuide <<core>>
+  component ".puml Source Files" as pumlSrc <<storage>>
+  folder "docs/puml/" as pumlDir <<storage>>
+  component "Docs Rendering Pipeline" as renderPipe <<core>>
 }
 
-package "Unrelated Retrieved Code (No Enforcement Link)" {
-  component "EntityPatternAnalyzer.ts" as epa <<core>>
+package "Governance Rules" {
+  component "Placement Rule\n(File Location = Config Signal)" as placementRule <<core>>
+  component "Formatting & Naming Rules" as formatRules <<core>>
+  component "VCS vs Build-Output Rule" as vcsRule <<core>>
+}
+
+package "Adjacent Tooling (Not Style Guide)" {
+  component "EntityPatternAnalyzer" as epa <<agent>>
   component "verify-patterns.sh" as verify <<cli>>
-  component "Team Directories Map" as teamMap <<storage>>
-  database "Shared Memory JSON" as sharedMem
 }
 
-guide --> pumlDir : "mandates .puml source location"
-guide --> artifacts : "defines VCS vs build-output policy"
-guide --> triage : "informs render-error classification"
+styleGuide --> placementRule : "defines"
+styleGuide --> formatRules : "defines"
+styleGuide --> vcsRule : "defines"
 
-epa --> teamMap : "regex-based ownership lookup"
-verify --> sharedMem : "reads/writes compliance score"
+placementRule --> pumlDir : "mandates location"
+pumlSrc --> pumlDir : "must reside in"
+pumlDir --> renderPipe : "enables correct rendering"
 
-guide ..> epa : "no coupling (false retrieval match)"
-guide ..> verify : "no coupling (false retrieval match)"
+vcsRule ..> renderPipe : "prevents ephemeral artifact commits"
+
+epa ..> styleGuide : "unrelated (team classification)"
+verify ..> styleGuide : "unrelated (pattern audit)"
 
 @enduml

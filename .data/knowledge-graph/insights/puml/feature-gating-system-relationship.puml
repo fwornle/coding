@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: FeatureGatingSystem
+
+[ConstraintSystem] as constraint_system #FFFFDD
+[FeatureGatingSystem] as feature_gating_system #LightBlue
+[HookConfigLoader] as hook_config_loader #F0F0F0
+[UnifiedHookManager] as unified_hook_manager #F0F0F0
+[HealthPromptHook] as health_prompt_hook #F0F0F0
+[KnowledgeInjectionHook] as knowledge_injection_hook #F0F0F0
+
+constraint_system --> feature_gating_system
+hook_config_loader -[hidden]- feature_gating_system
+unified_hook_manager -[hidden]- feature_gating_system
+health_prompt_hook -[hidden]- feature_gating_system
+knowledge_injection_hook -[hidden]- feature_gating_system
+
+@enduml

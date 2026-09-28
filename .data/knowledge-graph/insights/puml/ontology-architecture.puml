@@ -1,47 +1,42 @@
 @startuml
 !include _standard-style.puml
 
-package "Ontology System (src/ontology/index.ts)" {
-  component "createOntologySystem()" as factory <<core>>
-  component "validateOntologyConfig()" as validator_fn <<core>>
+package "Ontology Subsystem (src/ontology/index.ts)" {
+  component "createOntologySystem\n(factory)" as factory <<core>>
+  component "validateOntologyConfig" as validator_fn <<core>>
+  component "OntologySystem\n(interface)" as system <<core>>
+}
+
+package "Core Components" {
+  component "LegacyOntologyAdapter" as adapter <<core>>
+  component "OntologyValidator" as ovalidator <<core>>
   component "OntologyClassifier" as classifier <<core>>
-  component "OntologyValidator" as validatorC <<core>>
-  component "LegacyOntologyAdapter" as adapter <<adapter>>
   component "createHeuristicClassifier\n(heuristics/index.ts)" as heuristic <<core>>
-  component "OntologyConfigManager" as config <<core>>
-  component "ontologyPathResolver\n(+ probe/cache instrumentation)" as resolver <<core>>
+  component "OntologyConfigManager" as configmgr <<core>>
 }
 
-package "External Backends" {
-  database "km-core OntologyRegistry" as kmcore <<storage>>
-  component "persistence-agent.ts" as persAgent <<agent>>
-  component "external inferenceEngine" as inference <<external>>
+package "External / Consumers" {
+  component "km-core OntologyRegistry" as registry <<external>>
+  component "OntologyClassificationAgent" as agent <<agent>>
+  component "coding.lower.json\n(L2 refinement source)" as codinglower <<storage>>
 }
 
-package "API / Consumers" {
-  component "ApiClient (OntologyClass,\nlistOntologyClasses)" as apiclient <<api>>
-  component "GraphKMStore.ontology()" as graphstore <<core>>
-  component "observations-api-server.mjs\n(KG_ONTOLOGY_DIR)" as obsserver <<api>>
-}
+factory --> adapter : "requires (no mock fallback)"
+factory --> ovalidator : "assembles"
+factory --> classifier : "assembles"
+factory --> heuristic : "assembles"
+factory --> system : "produces"
 
-factory --> adapter : "requires (fail-fast)"
-factory --> inference : "requires (fail-fast)"
-factory --> validatorC : "wires"
-factory --> classifier : "wires"
-factory --> heuristic : "wires"
+validator_fn --> configmgr : "checks upper/lower paths"
+validator_fn ..> factory : "pre-flight, decoupled"
 
-classifier --> validatorC : "depends on"
-classifier --> heuristic : "uses"
-classifier --> inference : "delegates inference"
+adapter --> registry : "wraps"
+agent --> adapter : "constructs (shared adapter pattern)"
 
-adapter --> kmcore : "wraps (Adapter pattern)"
-adapter ..> persAgent : "preserves legacy call sites"
+codinglower --> registry : "feeds classification"
+registry --> classifier : "used by"
 
-validator_fn --> config : "enforces upper/lower rules"
-config --> resolver : "loads paths"
-
-apiclient --> factory : "consumes"
-graphstore --> factory : "consumes"
-obsserver --> config : "reads KG_ONTOLOGY_DIR"
+ovalidator --> adapter : "operates via"
+classifier --> adapter : "operates via"
 
 @enduml

@@ -1,32 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "CLI / Client Layer" {
+package "Client Layer" {
   component "LLMWithProcessClient" as client <<core>>
-  component "resolveProxyCompleteUrl()" as resolver <<core>>
+  component "dmr-provider.ts / Anthropic-OpenAI-Groq Clients" as providers <<agent>>
 }
 
-package "Proxy Layer" {
-  component "@rapid/llm-proxy" as proxy <<external>>
-  component "copilot-model-ids (vendored)" as modelids <<external>>
+package "Shared Routing Proxy" {
+  component "rapid-llm-proxy" as proxy <<api>>
+  component "Tier Priority Logic\n(max-subscription > Copilot > Groq)" as tiers <<core>>
+  component "Classifier / Offload Policy" as classifier <<core>>
 }
 
-package "Routing & Cost Infrastructure" {
-  component "JudgeBackend (enabled/reachable)" as judge <<agent>>
-  component "cost-model.ts (priceForModel/freshInputTokens)" as cost <<core>>
-  component "LLM Routing Tier Priority" as tierpriority <<core>>
+package "Dashboard & Observability" {
+  component "cost-model.ts" as cost <<core>>
+  component "offload-decision.tsx" as offload <<agent>>
+  component "use-classifier-judge.ts" as judge <<agent>>
+  component "copilot-model-ids.test.mjs" as drift <<cli>>
 }
 
-client --> resolver : "resolve URL fallback (4-tier)"
-client --> proxy : "direct-fetch, tags process telemetry"
-proxy --> modelids : "uses vendored model IDs"
-modelids ..> proxy : "postinstall alignment guards drift"
+client --> proxy : "/api/complete"
+proxy --> tiers : "resolves fallback order"
+tiers --> providers : "delegates provider calls"
+proxy --> classifier : "routing decisions"
 
-client --> judge : "should check reachable, not just enabled"
-client --> cost : "must normalize token/response shape"
-client --> tierpriority : "must respect fallback ordering"
+client ..> providers : "process-tagged telemetry"
+providers --> cost : "token-usage rows"
 
-proxy ..> client : "response schema drift risk"
-judge ..> client : "blind spot if only checks enabled"
+offload --> proxy : "/api/llm/routing/resolve"
+judge --> proxy : "/api/llm/classifier"
+cost --> proxy : "/api/token-usage/cost"
+
+drift ..> proxy : "drift-guard vendored ids"
 
 @enduml

@@ -1,0 +1,19 @@
+@startuml
+!include _standard-style.puml
+
+title Hierarchy Context: TokenAttributionAdapters
+
+[LiveLoggingSystem] as live_logging_system #FFFFDD
+[TokenAttributionAdapters] as token_attribution_adapters #LightBlue
+[TranscriptMonitor] as transcript_monitor #F0F0F0
+[ObservationPipeline] as observation_pipeline #F0F0F0
+[ClaudeSubagentSweep] as claude_subagent_sweep #E8F5E8
+[RawFallbackMarker] as raw_fallback_marker #E8F5E8
+
+live_logging_system --> token_attribution_adapters
+transcript_monitor -[hidden]- token_attribution_adapters
+observation_pipeline -[hidden]- token_attribution_adapters
+token_attribution_adapters --> claude_subagent_sweep
+token_attribution_adapters --> raw_fallback_marker
+
+@enduml

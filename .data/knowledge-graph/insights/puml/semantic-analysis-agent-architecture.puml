@@ -1,36 +1,35 @@
 @startuml
 !include _standard-style.puml
 
-package "BaseAgent Lifecycle" {
-  component "BaseAgent<TInput,TOutput>" as base <<core>>
+package "Agent Execution Layer" {
+  component "BaseAgent" as base <<core>>
   component "SemanticAnalysisAgent" as sem <<agent>>
-  component "ULTRA DEBUG Trace Writer" as trace <<core>>
+  component "OntologyClassificationAgent" as onto <<agent>>
 }
 
-package "Ontology Subsystem" {
-  component "OntologyClassificationAgent" as ontagent <<agent>>
-  component "createOntologySystem()" as ontfactory <<core>>
+package "Ontology Plumbing" {
+  component "createOntologySystem" as factory <<core>>
   component "LegacyOntologyAdapter" as adapter <<core>>
-  database "coding.lower.json" as lowerjson <<storage>>
+  database "km-core OntologyRegistry" as registry <<storage>>
 }
 
-package "Repair & Validation Tooling" {
-  component "repair-writer-ontology-class.mjs" as repair <<cli>>
-  cloud "obs-api (km-core HTTP)" as obsapi <<external>>
-  component "Taxonomy Stability Validator" as taxval <<core>>
+package "Validation & Data Quality" {
+  component "Taxonomy Stability Validation" as taxval <<external>>
+  component "KB Injection A/B Experiment" as kbab <<external>>
+  component "CodingLowerOntologySource Emission Bug" as bug <<external>>
 }
 
-base --> sem : "fixed execute() stages"
-sem --> trace : "writes non-fatal debug trace"
-sem ..> ontagent : "adjacent processing"
-ontagent --> lowerjson : "consumes (buggy emission)"
-ontfactory --> adapter : "wires"
-ontfactory ..> ontagent : "used by persistence-agent, not sem"
+base --> sem : "execute() envelope\n(process/confidence/issues/routing)"
+base --> onto : "execute() envelope"
 
-sem --> taxval : "produces intent-derived taxonomy"
-taxval --> taxval : "re-derives from disjoint samples"
+sem --> factory : "constructs ontology system"
+onto --> factory : "constructs ontology system"
+factory --> adapter : "requires pre-built adapter"
+adapter --> registry : "wraps"
 
-repair --> obsapi : "HTTP client, single writer"
-repair ..> lowerjson : "reconciles ontologyClass/entity Type"
+sem --> taxval : "output validated by"
+sem ..> kbab : "feeds batch KB quality task"
+registry ..> bug : "emits unexpected source"
+onto --> registry : "classification decisions"
 
 @enduml

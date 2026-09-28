@@ -1,40 +1,39 @@
 @startuml
 !include _standard-style.puml
 
-package "Container Entrypoint" {
-  component "entrypoint.sh\nwait_for_service()" as waitsvc <<core>>
-  component ".env loader\n(excludes *_API_KEY/*_TOKEN)" as envloader <<core>>
-  component "features.json snapshot" as featsnap <<storage>>
-  component "supervisord.d/disabled.conf\ngenerator (node -e)" as gengen <<core>>
-  component "supervisord.conf" as supervisord <<core>>
+package "Container Boundary" {
+  component "entrypoint.sh" as entry <<core>>
+  component "wait_for_service()" as tcpcheck <<core>>
+  component "Feature Gating Block" as featuregate <<core>>
+  component ".env Loader / Filter" as envfilter <<core>>
+  component "supervisord" as supervisord <<core>>
 }
 
-package "Service Orchestration" {
-  component "start-services.sh\n(ROBUST_MODE gate)" as dispatcher <<cli>>
-  component "start-services-robust.js" as robust <<core>>
-  component "lib/service-starter.js\nstartServiceWithRetry" as starter <<core>>
-  component "killProcessOnPortAndWait /\nwaitForPortBindable" as portcheck <<core>>
-  component "PSM registry +\npgrep orphan re-registration" as psm <<core>>
-}
-
-package "External / Verification" {
-  database "Qdrant / Redis" as datastores <<storage>>
+package "External Dependencies" {
+  database "Qdrant" as qdrant
+  database "Redis" as redis
   cloud "llm-cli-proxy :12435" as proxy <<external>>
-  component "container-gating.test.mjs\nservice-gating.test.mjs" as tests <<cli>>
+  component "features.json" as featuresjson <<storage>>
 }
 
-waitsvc --> datastores : "TCP probe /dev/tcp"
-envloader ..> proxy : "forces calls via host proxy\n(no raw keys in container)"
-featsnap --> gengen : "host-written snapshot"
-gengen --> supervisord : "autostart=false overrides"
+package "Host-Side Parallel Gating" {
+  component "start-services-robust.js" as hoststart <<core>>
+  component "service-gating.test.mjs" as gatingtest <<agent>>
+  component "service-probe.js" as probe <<core>>
+}
 
-dispatcher --> robust : "exec (ROBUST_MODE=true)"
-robust --> starter : "delegates orchestration"
-starter --> portcheck : "pre-spawn race checks"
-starter --> psm : "liveness verification"
-psm --> starter : "self-heal orphan drift"
+entry --> tcpcheck : "TCP readiness poll"
+tcpcheck --> qdrant : "checks reachability"
+tcpcheck --> redis : "checks reachability"
+entry --> featuregate : "reads snapshot"
+featuregate --> featuresjson : "loadFeatures()"
+featuregate --> supervisord : "writes disabled.conf"
+entry --> envfilter : "filters *_API_KEY/*_TOKEN"
+envfilter --> proxy : "routes LLM/embedding egress"
+entry --> supervisord : "exec (handoff)"
 
-supervisord ..> tests : "PROGRAM_FEATURES sync\ndrift risk"
-starter ..> tests : "SERVICE_ORDER /\nSERVICE_CONFIGS coverage"
+featuresjson --> hoststart : "shared data contract"
+hoststart --> gatingtest : "validated by"
+supervisord ..> probe : "coarse TCP vs HTTP health tiers"
 
 @enduml

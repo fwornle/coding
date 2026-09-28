@@ -1,34 +1,30 @@
 @startuml
 !include _standard-style.puml
 
-package "Documentation Conventions" {
-  component "Style Guide (docs/puml)" as styleGuide <<core>>
+package "Test Coverage Guards" {
+  component "suiteOwnership() Guard" as suiteGuard <<core>>
+  component "Test Inventory Discovery" as testInv <<core>>
+  component "CI Build/Test Gate Wiring" as ciGate <<core>>
+}
+
+package "Docs Pipeline Rules" {
+  component "Docs Style Guide" as docStyle <<core>>
+  component ".puml Placement Rule" as pumlRule <<core>>
   component "Post-Rewrite Render Triage" as renderTriage <<core>>
 }
 
-package "Test Integrity Patterns" {
-  component "suiteOwnership() Guard" as suiteGuard <<agent>>
-  component "Test Inventory (node:test)" as testInventory <<agent>>
-  component "Metadata Merge Bug Discipline" as mergeBug <<core>>
+package "Data Integrity Rules" {
+  component "Metadata Merge Guard" as mergeGuard <<core>>
 }
 
-package "CI Pipeline Patterns" {
-  component "Build/Test Gate Wiring" as ciGate <<cli>>
-  component ".gitignore / Lockfile Check" as gitignoreCheck <<cli>>
-}
+suiteGuard --> testInv : "requires sync with runners"
+testInv ..> ciGate : "prevents silent skips"
+ciGate --> mergeGuard : "surfaces failures visibly"
 
-component "CodingPatterns" as codingPatterns <<component>>
+docStyle --> pumlRule : "defines placement contract"
+pumlRule ..> renderTriage : "misplacement breaks rendering"
 
-codingPatterns ..> styleGuide : "aggregates"
-codingPatterns ..> renderTriage : "aggregates"
-codingPatterns ..> suiteGuard : "aggregates"
-codingPatterns ..> testInventory : "aggregates"
-codingPatterns ..> mergeBug : "aggregates"
-codingPatterns ..> ciGate : "aggregates"
-codingPatterns ..> gitignoreCheck : "aggregates"
-
-suiteGuard --> testInventory : "prevents silent exclusion"
-ciGate --> gitignoreCheck : "diagnoses CI-only failures"
-mergeBug --> renderTriage : "requires re-measurement discipline"
+mergeGuard ..> renderTriage : "stale data risks regressions"
+renderTriage --> ciGate : "baseline before blame"
 
 @enduml

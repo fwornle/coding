@@ -1,0 +1,42 @@
+@startuml
+!include _standard-style.puml
+
+package "Entrypoint" {
+  component "start-services.sh" as shScript <<cli>>
+  component "RobustServiceStarter\n(start-services-robust.js)" as starter <<core>>
+}
+
+package "Orchestration Policy" {
+  component "SERVICE_CONFIGS /\nSERVICE_ORDER" as configs <<core>>
+  component "startOneService" as startOne <<core>>
+  component "waitForPortBindable /\nkillProcessOnPortAndWait" as portCheck <<core>>
+}
+
+package "Mechanism Layer" {
+  component "lib/service-starter.js" as libStarter <<core>>
+  component "startServiceWithRetry" as retry <<core>>
+  component "createHttpHealthCheck /\ncreatePidHealthCheck" as healthCheck <<core>>
+}
+
+package "Validation & Features" {
+  component "service-gating.test.mjs" as tests <<external>>
+  component "lib/features/catalogue.cjs" as catalogue <<external>>
+}
+
+shScript --> starter : "ROBUST_MODE=true"
+shScript ..> shScript : "legacy bash path\n(ROBUST_MODE=false)"
+
+starter --> configs : "defines services"
+starter --> startOne : "drives startup"
+startOne --> portCheck : "verifies port state"
+startOne --> libStarter : "delegates lifecycle"
+
+libStarter --> retry : "retry-with-backoff"
+libStarter --> healthCheck : "readiness probes"
+
+configs --> catalogue : "validated against FEATURE_IDS"
+tests --> configs : "asserts structural invariants"
+
+healthCheck ..> healthCheck : "reused by\ncopilot launcher"
+
+@enduml

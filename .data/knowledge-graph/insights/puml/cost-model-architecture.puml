@@ -1,47 +1,38 @@
 @startuml
 !include _standard-style.puml
 
-package "Budget Resolution" {
-  component "budgetForMonth()" as budgetForMonth <<core>>
-  component "DEFAULT_COST_CONFIG.budgets" as budgetConfig <<storage>>
-  component "budgetProvider()" as budgetProvider <<core>>
+package "Cost Model (cost-model.ts)" {
+  component "budgetForMonth" as budget <<core>>
+  component "priceForModel" as price <<core>>
+  component "cellCostUsd" as cellcost <<core>>
+  component "freshInputTokens\n(identity, documentary)" as fresh <<core>>
+  component "isOpenAIWireProvider\n(documentary)" as wire <<core>>
+  component "isSynthetic" as synth <<core>>
+  component "budgetProvider\n(bucketing)" as bucket <<core>>
 }
 
-package "Pricing Cascade" {
-  component "priceForModel()" as priceForModel <<core>>
-  component "scalePrice() / FAST_MODE_MULTIPLIER" as scalePrice <<core>>
-  component "modelFamily() / FAMILY_REPRESENTATIVE" as modelFamily <<core>>
+package "Config & Data" {
+  component "CostConfig\n(monthlyEurByMonth)" as config <<storage>>
+  component "CostRow" as rows <<storage>>
 }
 
-package "Aggregation Layer" {
-  component "cellCostUsd()" as cellCostUsd <<core>>
-  component "monthlySeries()" as monthlySeries <<core>>
-  component "freshInputTokens()" as freshInputTokens <<core>>
-  component "isOpenAIWireProvider()" as wireProvider <<core>>
-  component "isSynthetic()" as isSynthetic <<core>>
+package "External Systems" {
+  component "rapid-llm-proxy\nusage-cache.ts" as proxy <<external>>
+  component "Routing / Tier Selector" as router <<external>>
 }
 
-component "Dashboard Components" as dashboard <<external>>
-component "rapid-llm-proxy usage-cache.ts" as proxy <<external>>
-component "LLM Routing Layer" as routing <<external>>
+config --> budget : "per-month override\nvs standing cap"
+rows --> synth : "filter fake/demo rows"
+synth --> cellcost : "clean rows only"
+rows --> price : "model key lookup"
+price --> cellcost : "line-item pricing"
+cellcost --> bucket : "aggregate by provider"
+bucket --> budget : "monthlySeries totals"
 
-budgetForMonth --> budgetConfig : "resolves monthly cap override"
-budgetProvider --> budgetForMonth : "maps copilot/claude-max"
-routing ..> budgetProvider : "informs two-bucket split"
+fresh ..> proxy : "documents moved-upstream\ncache_read subtraction"
+wire ..> proxy : "documents wire protocol\n(Anthropic vs OpenAI)"
+proxy --> rows : "corrected cache split\n(backfill script)"
 
-priceForModel --> scalePrice : "fast-mode 2x fallback"
-priceForModel --> modelFamily : "family fallback"
-
-cellCostUsd --> freshInputTokens : "computes fresh input tokens"
-freshInputTokens ..> proxy : "compensation now obsolete"
-wireProvider ..> proxy : "documents cache semantics"
-cellCostUsd --> wireProvider : "reference for wire distinction"
-monthlySeries --> cellCostUsd : "aggregates per-cell cost"
-monthlySeries --> isSynthetic : "filters demo/test rows"
-monthlySeries --> budgetForMonth : "compares spend to cap"
-priceForModel --> cellCostUsd : "supplies per-model price"
-
-dashboard --> monthlySeries : "GET /api/token-usage/cost"
-dashboard --> budgetConfig : "GET /api/llm/settings"
+price ..> router : "mirrors fallback chain\n(exact->fast->family->none)"
 
 @enduml

@@ -1,33 +1,41 @@
 @startuml
 !include _standard-style.puml
 
-package "Agents" {
-  component "CodeGraphAgent" as cga <<agent>>
-  component "GraphifyGraph" as gg <<agent>>
+package "Graph Backend" {
+  component "GraphifyGraph" as graphify <<agent>>
+  component "CodeGraphAgent" as codeagent <<agent>>
+  component "graph.json (node-link)" as graphjson <<external>>
 }
 
-package "Migration Scripts" {
-  component "migrate-graph-db-entity-types.js" as migTypes <<cli>>
-  component "migrate-leveldb-to-kmcore.mjs" as migCore <<cli>>
+package "Knowledge Store" {
+  component "GraphDatabaseService" as gdbservice <<core>>
+  database "LevelDB" as leveldb <<storage>>
+  component "Graphology In-Memory Graph" as graphology <<core>>
 }
 
-package "Core Storage" {
-  component "GraphDatabaseService" as gds <<core>>
-  database "LevelDB" as ldb <<storage>>
-  component "graph.json (NetworkX export)" as gjson <<external>>
+package "Migration & Repair" {
+  component "migrate-graph-db-entity-types.js" as migtypes <<cli>>
+  component "migrate-leveldb-to-kmcore.mjs" as migkmcore <<cli>>
+  component "Viewer / Evidence Panel" as viewer <<api>>
 }
 
-component "History Sidebar Viewer" as viewer <<external>>
+component "Wave Controller" as wavectrl <<agent>>
 
-gg --> gjson : "parses label strings\nfor kind/name"
-cga --> gg : "delegates reads\n(compat shim)"
+graphjson --> graphify : "mtime-based cache reparse"
+graphify --> codeagent : "node ToCodeEntity() inference"
 
-cga --> gds : "queryIncomingRelations /\nstoreRelationship (by type+name)"
-gds --> ldb : "_persistGraphToLevel()\nwhen isDirty"
+gdbservice --> graphology : "mutates in-memory"
+graphology --> leveldb : "_persistGraphToLevel()"
 
-migTypes --> gds : "collapses 6 types\ninto 'Pattern'"
-migCore --> ldb : "--dry-run / error-budget\n(5% ok, 10% halts)"
+migtypes --> graphology : "rewrite entity Type attrs"
+migtypes --> gdbservice : "triggers persistence"
 
-gds ..> viewer : "Insight nodes\n(missing in Wave 4)"
+leveldb --> migkmcore : "legacy blob records"
+migkmcore --> gdbservice : "km-core canonical entities"
+
+wavectrl --> gdbservice : "storeRelationship(endpointTypes)"
+wavectrl ..> viewer : "insight documents (no graph nodes)"
+
+viewer --> gdbservice : "queryIncomingRelations(name, entity Type)"
 
 @enduml

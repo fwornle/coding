@@ -1,31 +1,34 @@
 @startuml
 !include _standard-style.puml
 
-package "Wave Analysis Pipeline" {
-  component "Wave 4 Batch Analysis" as wave4 <<core>>
-  component "WaveInsightPersistence" as wip <<core>>
-  component "km-core-adapter.ts\n(findEntityByName fix)" as kmadapter <<core>>
+package "Write Path (Persistence - not in retrieval)" {
+  component "Insight Document Writer" as docwriter <<core>>
+  component "findEntityByName" as findentity <<core>>
+  component "queryIncomingRelations(entity Type)" as queryrel <<core>>
+  component "storeRelationship(endpointTypes)" as storerel <<core>>
+  database "Graph Database" as graphdb <<storage>>
 }
 
-package "Persistence Targets" {
-  database "Insight Document Store" as docstore <<storage>>
-  database "Knowledge Graph\n(Insight nodes)" as graph <<storage>>
+package "Read Path (Retrieved Files)" {
+  component "History Sidebar (entity Type filter)" as sidebar <<api>>
+  component "attribution.ts\ncategoriseUnattributed/rootOf" as attribution <<core>>
+  component "assert-graph-density.ts\n(deriveParents)" as density <<cli>>
+  component "D3GraphCanvas / SigmaCanvas" as canvas <<core>>
+  component "ukb-workflow-modal.tsx" as modal <<api>>
 }
 
-package "Consumer Surfaces" {
-  component "History UI\n(entity Type='Insight' filter)" as historyui <<external>>
-  component "UKB Workflow Modal\n(HISTORY_PAGE_SIZE=50)" as ukbmodal <<external>>
-  component "hierarchy-parents.test.ts\n(deriveParents)" as hierarchytest <<external>>
-}
+docwriter --> graphdb : "writes documents\n(no Insight node)"
+findentity --> queryrel : "resolves duplicate names"
+queryrel --> storerel : "threads entity Type/endpointTypes"
+storerel --> graphdb : "writes typed edges"
 
-wave4 --> wip : "produces 73 insights"
-wip --> docstore : "writes insight documents"
-wip --> graph : "explicitly creates Insight nodes\n(source/subsystem='wave-analysis')"
-kmadapter --> graph : "type-qualified queryIncomingRelations\n/storeRelationship"
+graphdb --> sidebar : "queried by entity Type='Insight'"
+graphdb --> canvas : "consumed via useGraphData"
+graphdb --> attribution : "reads entities for hierarchy"
+graphdb --> density : "audits graph density"
+modal --> graphdb : "reads workflow progress"
 
-graph --> historyui : "filtered by entity Type='Insight'"
-docstore ..> historyui : "invisible without graph node"
-graph --> hierarchytest : "975 Insight nodes\nneed parent derivation"
-docstore --> ukbmodal : "workflow reports\n(paginated)"
+sidebar ..> docwriter : "73 docs invisible\n(zero Insight nodes)"
+density ..> attribution : "thematically adjacent\n(Insight placement gap)"
 
 @enduml

@@ -1,0 +1,38 @@
+@startuml
+!include _standard-style.puml
+
+package "Data Layer" {
+  component "useGraphData Hook" as datahook <<core>>
+  database "Zustand Viewer Store" as store <<storage>>
+}
+
+package "Dual Renderers" {
+  component "SigmaCanvas.tsx\n(WebGL/ForceAtlas2)" as sigma <<core>>
+  component "D3GraphCanvas.tsx\n(SVG/d3-force)" as d3canvas <<core>>
+  component "deriveAncestryFromStorePath" as ancestry <<core>>
+  component "GraphSetup / forceLayout.assign()" as graphsetup <<core>>
+}
+
+package "Shared Predicates & CI" {
+  component "isEntityVisible / deriveParents" as sharedpred <<core>>
+  component "attribution.ts\ncategoriseUnattributed" as attribution <<core>>
+  component "assert-graph-density.ts" as cigate <<cli>>
+}
+
+datahook --> sigma : "provides entities/relations"
+datahook --> d3canvas : "provides entities/relations"
+store --> sigma : "selection/hover state"
+store --> d3canvas : "pathToSelected"
+
+d3canvas --> ancestry : "reconciles inline BFS vs store path"
+store --> ancestry : "authoritative ancestry"
+
+sigma --> graphsetup : "polish pass over seed layout"
+
+sigma --> sharedpred : "visibility check"
+d3canvas --> sharedpred : "visibility check"
+cigate --> sharedpred : "imports directly (no reimplementation)"
+
+sharedpred --> attribution : "feeds unattributed classification"
+
+@enduml

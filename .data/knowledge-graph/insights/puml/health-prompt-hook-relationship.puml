@@ -7,19 +7,19 @@ title Hierarchy Context: HealthPromptHook
 [HealthPromptHook] as health_prompt_hook #LightBlue
 [HookConfigLoader] as hook_config_loader #F0F0F0
 [UnifiedHookManager] as unified_hook_manager #F0F0F0
-[ViolationCaptureService] as violation_capture_service #F0F0F0
 [KnowledgeInjectionHook] as knowledge_injection_hook #F0F0F0
-[DeriveSummaryHealthReducer] as derive_summary_health_reducer #E8F5E8
-[CheckHealthStatusCoordinatorFetch] as check_health_status_coordinator_fetch #E8F5E8
-[SpecR8OutputEnvelope] as spec_r8_output_envelope #E8F5E8
+[FeatureGatingSystem] as feature_gating_system #F0F0F0
+[DeriveSummaryStalePipelineDetection] as derive_summary_stale_pipeline_detection #E8F5E8
+[CoordinatorFetchFailOpen] as coordinator_fetch_fail_open #E8F5E8
+[HealthPromptHookEnvelopeContract] as health_prompt_hook_envelope_contract #E8F5E8
 
 constraint_system --> health_prompt_hook
 hook_config_loader -[hidden]- health_prompt_hook
 unified_hook_manager -[hidden]- health_prompt_hook
-violation_capture_service -[hidden]- health_prompt_hook
 knowledge_injection_hook -[hidden]- health_prompt_hook
-health_prompt_hook --> derive_summary_health_reducer
-health_prompt_hook --> check_health_status_coordinator_fetch
-health_prompt_hook --> spec_r8_output_envelope
+feature_gating_system -[hidden]- health_prompt_hook
+health_prompt_hook --> derive_summary_stale_pipeline_detection
+health_prompt_hook --> coordinator_fetch_fail_open
+health_prompt_hook --> health_prompt_hook_envelope_contract
 
 @enduml

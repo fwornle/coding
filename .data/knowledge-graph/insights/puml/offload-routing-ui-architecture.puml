@@ -1,0 +1,38 @@
+@startuml
+!include _standard-style.puml
+
+package "OffloadRoutingUI" {
+  component "OffloadDecision" as decision <<core>>
+  component "useOffloadPolicyDraft" as draft <<core>>
+  component "useClassifierJudge" as judge <<core>>
+  component "offload-gates (ladder)" as gates <<core>>
+  component "offload-replay" as replay <<core>>
+  component "pooled() fetcher" as pooled <<core>>
+}
+
+package "Proxy Authority" {
+  component "rapid-llm-proxy" as proxy <<external>>
+  component "/api/llm/routing/resolve" as resolveApi <<api>>
+  database "llm-routing.yaml" as routingYaml
+}
+
+package "Local Config" {
+  database "config/prompt-classifier.yaml" as classifierYaml
+}
+
+decision --> draft : "reads/writes policy draft"
+decision --> judge : "reads/writes judge config"
+decision --> gates : "computes evaluateOffload() ladder"
+decision --> pooled : "fan-out resolve calls (width 8)"
+decision --> replay : "counterfactual replay (unsaved/non-live)"
+
+pooled --> resolveApi : "39x route+default resolve"
+resolveApi --> proxy : "authoritative routing decision"
+draft --> routingYaml : "PATCH offload policy"
+judge --> classifierYaml : "diff-only PATCH (backends/rubric/strategy)"
+
+decision ..> gates : "compares proxy vs ladder\n(disagreements banner)"
+judge ..> judge : "30s poll: enabled vs reachable"
+decision --> decision : "onDirtyChange suspends parent poll"
+
+@enduml

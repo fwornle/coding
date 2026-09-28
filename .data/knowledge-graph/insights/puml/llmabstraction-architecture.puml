@@ -1,32 +1,36 @@
 @startuml
 !include _standard-style.puml
 
-package "Routing Layer" {
-  component "LLM Mock Service\n(getLLMMode)" as mock <<core>>
-  component "Routing Tier Priority\n(max-sub > work/Copilot > Groq)" as router <<core>>
+package "Routing & Mode Resolution" {
+  component "getLLMMode()\n(llm-mock-service.ts)" as mode <<core>>
+  component "Routing Tier Priority\n(max-sub > work/Copilot > Groq)" as tier <<core>>
 }
 
-package "Provider Access" {
-  component "llm-with-process.ts" as withproc <<core>>
-  component "resolveProxyCompleteUrl()" as resolveurl <<core>>
-  component "dmr-provider.ts\n(loadDMRConfig/checkDMRAvailability)" as dmr <<core>>
-  component "parseLlmJson()" as parser <<core>>
-}
-
-package "External Services" {
-  cloud "rapid-llm-proxy" as proxy <<external>>
+package "Providers" {
+  component "dmr-provider.ts" as dmr <<api>>
+  component "loadDMRConfig()\ndmr-config.yaml" as dmrconf <<core>>
   cloud "Docker Model Runner" as dmrsvc <<external>>
-  cloud "Groq Llama-70B" as groq <<external>>
+  cloud "Anthropic/OpenAI/Groq Clients" as extllm <<external>>
 }
 
-mock --> router : "resolves active mode"
-router --> withproc : "dispatches by tier"
-withproc --> resolveurl : "resolves proxy URL"
-resolveurl --> proxy : "POST /api/complete"
-withproc --> parser : "normalizes/repairs JSON"
-router --> dmr : "checks DMR availability"
-dmr --> dmrsvc : "health check (cached)"
-router --> groq : "last-resort fallback"
-proxy ..> groq : "cleared as timeout source"
+package "Proxy & Utilities" {
+  component "llm-with-process.ts\n(direct-fetch bypass)" as procfetch <<core>>
+  component "@rapid/llm-proxy SDK" as proxy <<api>>
+  component "parse-llm-json.ts\n(JSON repair pipeline)" as jsonparse <<core>>
+}
+
+mode --> tier : "resolves agent run mode"
+tier --> dmr : "last-resort fallback"
+tier --> extllm : "primary/high-tier requests"
+
+dmr --> dmrconf : "loads config"
+dmrconf --> dmrsvc : "resolves baseUrl (env expansion)"
+dmr --> dmrsvc : "cached health check"
+
+procfetch --> proxy : "bypasses missing 'process' field"
+procfetch --> extllm : "attributes tokens per pipeline stage"
+
+extllm --> jsonparse : "raw completion text"
+dmr --> jsonparse : "raw completion text"
 
 @enduml
