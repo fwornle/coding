@@ -12,6 +12,7 @@ import {
   EVIDENCE_TYPE_LABELS,
   evidenceAgeBadge,
   resolveEvidenceHref,
+  insightDocNameFromRef,
   type EvidenceLinkType,
 } from './evidence-types'
 
@@ -148,5 +149,66 @@ describe('resolveEvidenceHref', () => {
 
   test('passes an empty url through rather than emitting a bare base', () => {
     expect(resolveEvidenceHref('', 'http://localhost:12436')).toBe('')
+  })
+})
+
+/**
+ * Which evidence refs the panel may open in-app.
+ *
+ * The Sources & Evidence list used to be a plain `<a target="_blank">` for every
+ * ref, so clicking "Documentation" navigated to obs-api's `text/markdown`
+ * response and the browser showed a wall of plain text — while the very same
+ * document opened as a themed, react-markdown modal from the "View Insight
+ * Document" button two sections higher. obs-api is right to serve markdown from
+ * an API route; the list just needed to recognise its own documents.
+ *
+ * The risk in this predicate is over-matching: intercepting an Argo or Grafana
+ * link would hand it to a renderer that cannot show it, turning a working link
+ * into a broken modal. So the negative cases matter as much as the positive.
+ */
+describe('insightDocNameFromRef', () => {
+  it('matches the origin-relative refs the enrichment writes', () => {
+    expect(insightDocNameFromRef('/api/insights/doc/Coding')).toBe('Coding')
+  })
+
+  it('matches the same ref once resolved against a host', () => {
+    expect(insightDocNameFromRef('http://127.0.0.1:12436/api/insights/doc/Coding')).toBe('Coding')
+  })
+
+  it('decodes a percent-encoded name', () => {
+    // `enrich-entity-sources` encodes names, and entities with spaces exist.
+    expect(insightDocNameFromRef('/api/insights/doc/A%20B')).toBe('A B')
+  })
+
+  it('tolerates a trailing slash', () => {
+    expect(insightDocNameFromRef('/api/insights/doc/Coding/')).toBe('Coding')
+  })
+
+  it('does NOT match the image sub-route', () => {
+    // Same prefix, not a document — rendering a PNG as markdown shows nothing.
+    expect(insightDocNameFromRef('/api/insights/doc/images/coding-architecture.png')).toBeNull()
+  })
+
+  it('does NOT match the document INDEX route', () => {
+    expect(insightDocNameFromRef('/api/insights/docs')).toBeNull()
+  })
+
+  it('leaves external evidence links alone', () => {
+    // These have no in-app renderer; intercepting them breaks a working link.
+    for (const url of [
+      'https://github.com/fwornle/coding/pull/1',
+      'https://grafana.example/d/abc',
+      'https://argo.example/workflows/xyz',
+      '/api/v1/entities/Coding',
+    ]) {
+      expect(insightDocNameFromRef(url)).toBeNull()
+    }
+  })
+
+  it('handles empty and malformed input without throwing', () => {
+    expect(insightDocNameFromRef('')).toBeNull()
+    expect(insightDocNameFromRef('/api/insights/doc/')).toBeNull()
+    // A stray % is invalid percent-encoding; decodeURIComponent throws on it.
+    expect(insightDocNameFromRef('/api/insights/doc/100%')).toBe('100%')
   })
 })
