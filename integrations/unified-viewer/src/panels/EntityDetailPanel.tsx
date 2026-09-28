@@ -61,6 +61,7 @@ import {
   EVIDENCE_TYPE_LABELS,
   evidenceAgeBadge,
   resolveEvidenceHref,
+  insightDocNameFromRef,
   type EvidenceLinkType,
 } from '@/lib-domain/evidence-types'
 
@@ -693,6 +694,11 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null)
   // 2026-06-11: InsightDocument modal open state.
   const [insightModalOpen, setInsightModalOpen] = useState(false)
+  // A document opened from the Sources & Evidence list rather than from the
+  // "View Insight Document" button. Separate state because it names a DIFFERENT
+  // document: an entity's evidence can cite a sibling's write-up, not only its
+  // own. Null when no evidence document is open.
+  const [evidenceDoc, setEvidenceDoc] = useState<{ url: string; name: string } | null>(null)
 
   const entity = useMemo(() => {
     if (!selectedNodeId) return null
@@ -932,6 +938,18 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
         </>
       )}
 
+      {/* A document opened from Sources & Evidence. Rendered outside the block
+          above because that block only exists when THIS entity has a document
+          of its own — an entity can cite a sibling's write-up without having
+          one, and that citation must still open. */}
+      {evidenceDoc && (
+        <InsightDocumentModal
+          url={evidenceDoc.url}
+          title={`${evidenceDoc.name}.md`}
+          onClose={() => setEvidenceDoc(null)}
+        />
+      )}
+
       {/* Pill bar (UI-SPEC §8 + NodeDetails.tsx:893-935 verbatim micro-type) */}
       <div className="flex gap-1" role="tablist" aria-label="Entity detail sub-tabs">
         {tabs
@@ -1137,16 +1155,37 @@ export function EntityDetailPanel({ apiClient, system }: EntityDetailPanelProps)
                           const href = resolveEvidenceHref(url, apiClient.base)
                           const addedAt = (ref.addedAt as string | undefined) ?? ''
                           const badge = addedAt ? evidenceAgeBadge(addedAt) : null
+                          // One of our own insight documents opens in the SAME
+                          // themed modal the "View Insight Document" button
+                          // uses. Following the href instead handed the browser
+                          // `text/markdown`, which renders as a wall of plain
+                          // text — the renderer existed, this list just wasn't
+                          // reaching for it. Anything else (Argo, Grafana,
+                          // GitHub) still opens in a new tab: we cannot render
+                          // those, and intercepting them would break them.
+                          const docName = insightDocNameFromRef(url)
                           return (
                             <li key={i} className="flex items-center gap-2">
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary underline truncate flex-1"
-                              >
-                                {url}
-                              </a>
+                              {docName ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setEvidenceDoc({ url: href, name: docName })}
+                                  data-testid="evidence-doc-link"
+                                  className="text-primary underline truncate flex-1 text-left"
+                                  title={`Open ${docName}.md`}
+                                >
+                                  {url}
+                                </button>
+                              ) : (
+                                <a
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary underline truncate flex-1"
+                                >
+                                  {url}
+                                </a>
+                              )}
                               {badge && (
                                 <span className={`text-[10px] rounded px-1.5 py-0.5 ${badge.className}`}>
                                   {badge.label}

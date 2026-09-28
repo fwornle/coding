@@ -137,3 +137,32 @@ export function resolveEvidenceHref(url: string, base: string): string {
   if (!url.startsWith('/')) return url        // absolute, or already opaque
   return `${base.replace(/\/+$/, '')}${url}`
 }
+
+/**
+ * Is this ref one of OUR insight documents, i.e. something we can render
+ * in-app rather than hand to the browser?
+ *
+ * The panel already had a pretty renderer — InsightDocumentModal, react-markdown,
+ * reached from the "View Insight Document" button. The Sources & Evidence list
+ * was a plain `<a target="_blank">`, so the SAME document opened two different
+ * ways depending on which control you clicked: a themed modal from one, and a
+ * wall of `text/markdown` served as plain text from the other. obs-api is
+ * answering correctly there — it is an API — so the fix belongs on this side.
+ *
+ * Only obs-api's own document route qualifies. Every other ref (Argo, Grafana,
+ * GitHub, the absolute VOKB-era links) must keep opening in a new tab: we have
+ * nothing to render them with, and intercepting them would break them.
+ */
+export function insightDocNameFromRef(url: string): string | null {
+  if (!url) return null
+  // Match origin-relative (`/api/insights/doc/Foo`) and absolute
+  // (`http://host:12436/api/insights/doc/Foo`) spellings alike. The image
+  // sub-route (`/api/insights/doc/images/x.png`) is NOT a document.
+  const m = /(?:^|\/)api\/insights\/doc\/(?!images\/)([^/?#]+)\/?$/.exec(url)
+  if (!m) return null
+  try {
+    return decodeURIComponent(m[1])
+  } catch {
+    return m[1]      // a ref with a stray % is still a name we can show
+  }
+}
