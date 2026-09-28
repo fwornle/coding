@@ -188,6 +188,45 @@ function loadPortConfiguration() {
     }
 }
 
+/**
+ * The debug state of a workflow run, read the way the RUNNER reads it.
+ *
+ * These four fields live in two places in workflow-progress.json and the two
+ * disagree. `--debug` writes them at the TOP LEVEL, where the wave-controller
+ * and llm-mock-service read them. The state machine's nested `config` gets
+ * whatever runWaveAnalysis was started with — and obs-api, which owns the
+ * in-process run, passes no config at all, so `config` is permanently the
+ * production defaults `{singleStepMode:false, mockLLM:false, llmMode:'public'}`.
+ *
+ * Both call sites below used to derive these inline, with different rules, and
+ * neither matched llm-mock-service.resolveLLMMode. The visible result: a debug
+ * run displayed "Cloud" and an unchecked Single-step box while it was in fact
+ * mocked and paused. Believing that chip costs real tokens.
+ *
+ * The ladder mirrors resolveLLMMode exactly — per-agent overrides are not
+ * represented here because this is the GLOBAL chip:
+ *   llmState.globalMode → mockLLM === true ? 'mock' → config.llmMode → undefined
+ *
+ * `config.llmMode` stays as the last rung so a production run still reports the
+ * mode it was started with; the resolver's own last rung is 'public', which is
+ * what that field holds in practice. Leaving it undefined tells the dashboard
+ * not to derive a mode at all, which is the documented signal for "no opinion".
+ */
+function readWorkflowDebugState(raw) {
+    const progress = raw || {};
+    const config = progress.config || {};
+    const mockLLM = config.mockLLM === true || progress.mockLLM === true;
+    return {
+        singleStepMode: config.singleStepMode === true || progress.singleStepMode === true,
+        mockLLM,
+        mockLLMDelay: progress.mockLLMDelay || config.mockLLMDelay || 500,
+        llmMode: progress.llmState?.globalMode
+            || (mockLLM ? 'mock' : undefined)
+            || config.llmMode
+            || undefined,
+    };
+}
+
 class SystemHealthAPIServer {
     constructor(port = 3033, dashboardPort = 3032) {
         this.port = port;
@@ -1447,20 +1486,12 @@ class SystemHealthAPIServer {
                         isInlineMCP: true, // Flag to indicate this is an inline MCP workflow
                         batchProgress: workflowProgress.batchProgress || null, // Batch progress for batch workflows
                         batchIterations: workflowProgress.batchIterations || null, // Per-batch step tracking for tracer
-                        // Single-step debugging mode state
-                        // CRITICAL: Preserve actual values - don't default to false as this causes UI sync issues
-                        // The UI will handle undefined values appropriately
-                        singleStepMode: workflowProgress.config?.singleStepMode === true || workflowProgress.singleStepMode === true,
+                        // Single-step debugging mode state. One reader for all four
+                        // fields — see readWorkflowDebugState for why the nested
+                        // config cannot be trusted on its own.
+                        ...readWorkflowDebugState(workflowProgress),
                         stepPaused: workflowProgress.stepPaused === true,
                         pausedAtStep: workflowProgress.pausedAtStep || null,
-                        // LLM Mock mode for frontend testing
-                        mockLLM: workflowProgress.config?.mockLLM === true || workflowProgress.mockLLM === true,
-                        mockLLMDelay: workflowProgress.mockLLMDelay || 500,
-                        // Three-valued mode. mockLLM above is a boolean and cannot
-                        // express 'local', so carry the real mode alongside it and
-                        // leave it undefined when the server states none — absence is
-                        // what tells the dashboard not to derive a mode at all.
-                        llmMode: workflowProgress.llmState?.globalMode || workflowProgress.config?.llmMode || undefined,
                         // Batch phase step count (derived from workflow YAML)
                         batchPhaseStepCount: workflowProgress.batchPhaseStepCount || null,
                     };
@@ -1777,15 +1808,15 @@ class SystemHealthAPIServer {
             stepsFailed: [],
             elapsedSeconds: progress.elapsedSeconds || 0,
             repositoryPath: null,
-            // Single-step mode fields
-            singleStepMode: config.singleStepMode === true,
+            // Single-step mode fields. These read ONLY the nested config until
+            // now, which is the production defaults for every obs-api run — so a
+            // debug run reported itself as neither mocked nor single-stepped.
+            // `state` IS the raw progress file here, so the shared reader sees
+            // both levels. See readWorkflowDebugState.
+            ...readWorkflowDebugState(state),
             // stepPaused is set by wave-controller directly on the progress file root, not via state machine
             stepPaused: state.stepPaused === true || state.status === 'paused',
             pausedAtStep: state.pausedAtStep || (state.status === 'paused' && state.pausedAt ? state.pausedAt.step : null),
-            mockLLM: config.mockLLM === true,
-            mockLLMDelay: config.mockLLMDelay || 500,
-            // See the note on llmMode in the inline-process builder above.
-            llmMode: state.llmState?.globalMode || config.llmMode || undefined,
             // Wave-specific data for the trace modal
             currentWave: progress.currentWave,
             totalWaves: progress.totalWaves || 4,
