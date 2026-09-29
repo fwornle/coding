@@ -276,24 +276,52 @@ fi
 # Capture the directory where coding was invoked from (before any cd operations)
 INVOKED_FROM_DIR="$(pwd)"
 
+# A cwd inside a private history checkout is still the PROJECT's launch, not a
+# project of its own. `<project>/.specstory/history/` is a nested git repo holding
+# verbatim transcripts; taking it as PROJECT_DIR made every agent_common_init step
+# act on it — offering a `history-history` remote (basename of the directory),
+# writing CLAUDE.md and the agent instruction files into it, and appending a bare
+# `logs/` to its .gitignore, which ignores the very classification tree that repo
+# exists to carry. Resolve up to the directory that owns .specstory instead.
+#
+# `%%` strips the LONGEST matching suffix, so truncation lands on the FIRST
+# `/.specstory/history` segment. That also collapses an already-nested
+# `.../.specstory/history/.specstory/history` in a single pass.
+strip_history_dir() {
+  case "$1" in
+    */.specstory/history|*/.specstory/history/*) printf '%s' "${1%%/.specstory/history*}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 # Validate and set project directory
+PROJECT_DIR_EXPLICIT=false
 if [ -n "$PROJECT_DIR" ]; then
   # Explicit project directory was specified with --project
   if [ ! -d "$PROJECT_DIR" ]; then
     error "Project directory does not exist: $PROJECT_DIR"
   fi
   PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"  # Get absolute path
-  log "Using explicit project directory: $PROJECT_DIR"
+  PROJECT_DIR_EXPLICIT=true
 else
   # No explicit project specified, use the directory where coding was invoked
   PROJECT_DIR="$INVOKED_FROM_DIR"
-  
+fi
+
+PROJECT_DIR_RAW="$PROJECT_DIR"
+PROJECT_DIR="$(strip_history_dir "$PROJECT_DIR")"
+if [ "$PROJECT_DIR" != "$PROJECT_DIR_RAW" ]; then
+  log "$PROJECT_DIR_RAW is a private history checkout, not a project"
+  log "Using the project that owns it: $PROJECT_DIR"
+fi
+
+if [ "$PROJECT_DIR_EXPLICIT" = true ]; then
+  log "Using explicit project directory: $PROJECT_DIR"
+elif [ "$PROJECT_DIR" = "$CODING_REPO_PATH" ]; then
   # Check if we're in the coding repo itself
-  if [ "$PROJECT_DIR" = "$CODING_REPO_PATH" ]; then
-    log "Working in coding repository itself"
-  else
-    log "Working in project: $(basename "$PROJECT_DIR") (from: $PROJECT_DIR)"
-  fi
+  log "Working in coding repository itself"
+else
+  log "Working in project: $(basename "$PROJECT_DIR") (from: $PROJECT_DIR)"
 fi
 
 # Export dry-run and force flags for launch scripts
