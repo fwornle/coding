@@ -34,6 +34,26 @@ function resolveHostCodingPath() {
 }
 const HOST_CODING_PATH = resolveHostCodingPath();
 
+// Tenancy and feature state. Both resolvers are CommonJS (the status line is CJS
+// and renders on every prompt, so they cannot be ESM-only); `require` above is
+// the createRequire bridge this file already uses.
+//
+// The ETM did not read the feature system at all before this. It had to start:
+// the LSL redirect — taking a prompt set written in project X, deciding it is
+// really about the tooling, and filing it under the tools repo — is a
+// tools-DEVELOPER feature. For anyone else it is data loss from their own
+// project's point of view, so `lsl-redirect` gates it and this is the consumer.
+const { isToolsRepo, samePath } = require('../lib/scope/resolve.cjs');
+const { isEnabled: featureEnabled } = require('../lib/features/resolve.cjs');
+
+/**
+ * "Not applicable here", as distinct from "it broke". The classification logger
+ * is built inside a try/catch that reports any failure to stderr; a deliberate
+ * skip must not be reported as one, or switching the feature off would print a
+ * startup error on every ETM generation.
+ */
+class SkipClassificationLogger extends Error {}
+
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -471,12 +491,38 @@ class EnhancedTranscriptMonitor {
     this.lastUserPromptTime = null;
     this.sessionFiles = new Map(); // Track multiple session files
     
-    // Initialize reliable coding classifier for local classification
+    // Is the LSL redirect on for this installation?
+    //
+    // Resolved ONCE, here, rather than per prompt set. `applyTier: 'apply'` for
+    // this feature means exactly that: a flip lands on the next ETM generation.
+    // The health coordinator respawns a dead ETM within 30s, so "next
+    // generation" is seconds away — and resolving per prompt set would put a
+    // config stat() on the hot path and let one long session route half its
+    // turns one way and half the other.
+    //
+    // isEnabled() fails CLOSED (a broken features.yaml resolves to false), which
+    // for this feature is the safe direction: no redirect means every turn stays
+    // in the project that produced it. The failure mode of the other direction
+    // is a colleague's turns silently leaving their repo.
+    this.lslRedirectEnabled = featureEnabled('lsl-redirect');
+
+    // Initialize reliable coding classifier for local classification.
+    // Only built when the redirect is on AND we are not the tools repo — it
+    // exists solely to answer "should this turn be redirected?", and in the
+    // tools repo the answer is already no (determineTargetProject returns early).
+    // Same shape as scripts/batch-lsl-processor.js, which has always skipped it.
     this.reliableCodingClassifier = null;
     this.reliableCodingClassifierReady = false;
-    this.initializeReliableCodingClassifier().catch(err => {
-      console.error('Reliable coding classifier initialization failed:', err.message);
-    });
+    if (this.lslRedirectEnabled && !isToolsRepo(this.config.projectPath)) {
+      this.initializeReliableCodingClassifier().catch(err => {
+        console.error('Reliable coding classifier initialization failed:', err.message);
+      });
+    } else {
+      this.reliableCodingClassifierReady = true; // nothing to wait for
+      if (!this.lslRedirectEnabled) {
+        process.stderr.write('[LSL] lsl-redirect is off — every prompt set stays in its own project\n');
+      }
+    }
 
     // Semantic analyzer removed — all LLM calls route through the LLM proxy (port 12435)
     // SemanticAnalyzer called APIs directly (no proxy support), hanging on VPN
@@ -493,9 +539,16 @@ class EnhancedTranscriptMonitor {
     this._recentArtifactPatches = new Map();
     this._initObservationWriter();
 
-    // Initialize classification logger for tracking 4-layer classification decisions
+    // Initialize classification logger for tracking 4-layer classification
+    // decisions. It exists to trace the redirect decision, so it follows the
+    // same gate as the classifier that produces those decisions: with
+    // lsl-redirect off there is no decision to trace, and building it would
+    // create an empty logs/classification/ tree in every project it monitors.
     this.classificationLogger = null;
     try {
+      if (!this.lslRedirectEnabled || isToolsRepo(this.config.projectPath)) {
+        throw new SkipClassificationLogger();
+      }
       const projectName = path.basename(this.config.projectPath);
       const userHash = UserHashGenerator.generateHash({ debug: false });
       const codingRepo = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
@@ -510,7 +563,9 @@ class EnhancedTranscriptMonitor {
       this.classificationLogger.initializeLogFile();
       this.debug('Classification logger initialized');
     } catch (error) {
-      console.error('Failed to initialize classification logger:', error.message);
+      if (!(error instanceof SkipClassificationLogger)) {
+        console.error('Failed to initialize classification logger:', error.message);
+      }
       this.classificationLogger = null;
     }
 
@@ -3335,6 +3390,18 @@ ORDER BY m.time_created ASC;`;
   async determineTargetProject(exchangeOrPromptSet) {
     const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
 
+    // Redirect disabled: every prompt set stays in the project it was written in.
+    //
+    // 'foreign' mode returns null rather than the local project. That mode exists
+    // ONLY to harvest tools-related turns out of another project — it is a
+    // redirect-only spawn. Returning the local project here would make it start
+    // writing local LSL files it has never written, which is a behaviour change,
+    // not an inert one. Returning null keeps its existing "nothing to file here"
+    // path.
+    if (!this.lslRedirectEnabled) {
+      return this.config.mode === 'foreign' ? null : this.config.projectPath;
+    }
+
     // Handle both single exchange and prompt set array
     const exchanges = Array.isArray(exchangeOrPromptSet) ? exchangeOrPromptSet : [exchangeOrPromptSet];
     const firstExchange = exchanges[0];
@@ -3356,10 +3423,14 @@ ORDER BY m.time_created ASC;`;
       }
     }
 
-    // CRITICAL: Check if we're running from coding directory FIRST (applies to ALL modes)
-    // This prevents _from-coding redirect files when already in the coding project
-    const projectBasename = path.basename(this.config.projectPath);
-    if (projectBasename === 'coding') {
+    // CRITICAL: Check if we ARE the tools repo FIRST (applies to ALL modes).
+    // This prevents _from-coding redirect files when already in the tools project.
+    //
+    // Was `path.basename(projectPath) === 'coding'`, which matched ANY directory
+    // named coding anywhere on the machine and missed a tools checkout under any
+    // other name. isToolsRepo() is a realpath comparison against the resolved
+    // tools checkout — see lib/scope/resolve.cjs for the five tests it replaces.
+    if (isToolsRepo(this.config.projectPath)) {
       if (isSept14Debug) {
         console.log(`   ✅ ROUTING TO CODING PROJECT - running from coding directory (applies to all modes)`);
       }
@@ -3557,12 +3628,11 @@ ORDER BY m.time_created ASC;`;
     const timestamp = tranche.originalTimestamp ||
       new Date(`${tranche.date}T${tranche.timeString.split('-')[0].slice(0,2)}:${tranche.timeString.split('-')[0].slice(2)}:00.000Z`).getTime();
 
-    // CRITICAL: Normalize paths before comparison to avoid false mismatches
-    // (e.g., trailing slashes, symlinks, or different path resolutions)
-    const resolvedTarget = path.resolve(targetProject);
-    const resolvedProject = path.resolve(this.config.projectPath);
-
-    if (resolvedTarget === resolvedProject) {
+    // Normalize paths before comparison to avoid false mismatches (trailing
+    // slashes, symlinks, different path resolutions). samePath() resolves through
+    // symlinks too, which path.resolve() alone does not — and P2 puts a symlink
+    // on exactly this path when .specstory/history moves to the data root.
+    if (samePath(targetProject, this.config.projectPath)) {
       // Local project - use generateLSLFilename with same target/source
       const filename = generateLSLFilename(timestamp, currentProjectName, targetProject, targetProject);
       return lslWritePath(path.join(targetProject, '.specstory', 'history'), filename);
@@ -3609,9 +3679,7 @@ ORDER BY m.time_created ASC;`;
     const baseName = path.basename(baseFile, LSL_EXTENSION);
 
     const currentProjectName = path.basename(this.config.projectPath);
-    const resolvedTarget = path.resolve(targetProject);
-    const resolvedProject = path.resolve(this.config.projectPath);
-    const isRedirected = resolvedTarget !== resolvedProject;
+    const isRedirected = !samePath(targetProject, this.config.projectPath);
     const timestamp = tranche.originalTimestamp ||
       new Date(`${tranche.date}T${tranche.timeString.split('-')[0].slice(0,2)}:${tranche.timeString.split('-')[0].slice(2)}:00.000Z`).getTime();
 
@@ -4188,9 +4256,7 @@ ORDER BY m.time_created ASC;`;
 
     // Git auto-track: stage LSL files in the project's own .specstory directory
     // Fire-and-forget: don't block the monitor on git operations
-    const resolvedTarget = path.resolve(targetProject);
-    const resolvedProject = path.resolve(this.config.projectPath);
-    if (resolvedTarget === resolvedProject) {
+    if (samePath(targetProject, this.config.projectPath)) {
       for (const sessionFile of writtenFiles) {
         if (!sessionFile.includes('.specstory/history/') && !sessionFile.includes('.specstory/logs/')) continue;
         try {

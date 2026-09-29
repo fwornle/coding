@@ -18,7 +18,7 @@ const require = createRequire(import.meta.url);
 const REPO = process.env.CODING_REPO || new URL('../..', import.meta.url).pathname;
 
 const {
-  resolveScope, explain, normaliseScope, isToolsRepo, toolsRepo,
+  resolveScope, explain, normaliseScope, isToolsRepo, toolsRepo, samePath,
   ScopeError, DEFAULT_SCOPE, SCOPE_MAX,
 } = require(join(REPO, 'lib/scope/resolve.cjs'));
 
@@ -217,5 +217,68 @@ describe('isToolsRepo — the one test that replaces five disagreeing ones', () 
       if (saved.r === undefined) delete process.env.CODING_REPO;
       else process.env.CODING_REPO = saved.r;
     }
+  });
+});
+
+describe('samePath', () => {
+  // The primitive isToolsRepo() is built from, exported for the two callers that
+  // compare a pair of paths NEITHER of which is the tools repo: the ETM asking
+  // "was this prompt set redirected?" and the batch processor comparing its
+  // project against its configured checkout. Both were bare
+  // `path.resolve(a) === path.resolve(b)`.
+
+  test('trailing slashes and . segments do not make a path different', () => {
+    const a = join(dir, 'p');
+    mkdirSync(a, { recursive: true });
+    assert.equal(samePath(a, `${a}/`), true);
+    assert.equal(samePath(a, join(a, '.')), true);
+    assert.equal(samePath(a, join(a, 'x', '..')), true);
+  });
+
+  test('a symlink and its target are the same path', () => {
+    // This is the case plain path.resolve() gets wrong, and the reason the two
+    // ETM comparisons had to move off it: P2 makes .specstory/history a symlink
+    // into the data root, so the redirected/not-redirected test would start
+    // reporting every local write as a redirect.
+    const real = join(dir, 'sp-real');
+    const link = join(dir, 'sp-link');
+    mkdirSync(real, { recursive: true });
+    symlinkSync(real, link);
+    assert.equal(samePath(link, real), true);
+  });
+
+  test('a prefix is not a match', () => {
+    // The failure mode of the two substring tests this replaces:
+    // `'<repo>-history'.includes('<repo>')` was true, so a sibling checkout
+    // read as the same project.
+    const base = join(dir, 'repo');
+    mkdirSync(base, { recursive: true });
+    assert.equal(samePath(base, `${base}-history`), false);
+    assert.equal(samePath(`${base}-history`, base), false);
+  });
+
+  test('paths that do not exist compare lexically instead of throwing', () => {
+    const missing = join(dir, 'nope', 'deeper');
+    assert.equal(samePath(missing, missing), true);
+    assert.equal(samePath(missing, join(dir, 'other')), false);
+  });
+
+  test('a falsy operand is never a match', () => {
+    for (const bad of [null, undefined, '']) {
+      assert.equal(samePath(bad, dir), false);
+      assert.equal(samePath(dir, bad), false);
+    }
+  });
+
+  test('isToolsRepo is samePath against the resolved tools checkout', () => {
+    // One implementation, not two: the guarantee that makes exporting the
+    // primitive safe rather than a second copy of the comparison.
+    const tools = join(dir, 'tools-x');
+    mkdirSync(tools, { recursive: true });
+    assert.equal(isToolsRepo(tools, { toolsRepo: tools }), samePath(tools, tools));
+    assert.equal(
+      isToolsRepo(join(dir, 'elsewhere'), { toolsRepo: tools }),
+      samePath(join(dir, 'elsewhere'), tools),
+    );
   });
 });

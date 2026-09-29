@@ -22,6 +22,7 @@ import featureGate from '../lib/statusline/feature-gate.cjs';
 import { visibleCellWidth } from '../lib/statusline/visible-cell-width.cjs';
 import { markClickable, buildProjectTag, decorate as decorateClickable } from '../lib/statusline/clickable.cjs';
 import { loadFeatures } from '../lib/features/index.mjs';
+import { isToolsRepo } from '../lib/scope/index.mjs';
 
 const { statusLeftReserveCells } = paneCacheKey;
 
@@ -333,7 +334,12 @@ class CombinedStatusLine {
       const knowledgeStatus       = await gated('observations', 'knowledge',     () => this.getKnowledgeSystemStatus(), {});
       const proxyStatus           = await gated('llm-proxy',    'proxy',         () => this.getProxySystemStatus());
       const liveLogTarget         = await gated('lsl',          'liveLogTarget', () => this.getCurrentLiveLogTarget());
-      const redirectStatus        = await gated('lsl',          'redirect',      () => this.getRedirectStatus());
+      // The badge follows its OWN feature, not 'lsl'. `lsl-redirect` requires
+      // 'lsl', so the resolver already forces it off when logging is off — but
+      // an install that logs sessions without redirecting them out of their
+      // project is the normal case for everyone but this toolchain's developer,
+      // and that install must not draw a redirect badge.
+      const redirectStatus        = await gated('lsl-redirect', 'redirect',      () => this.getRedirectStatus());
       const globalHealthStatus    = await gated('health',       'globalHealth',  () => this.getGlobalHealthStatus());
       const healthVerifierStatus  = await gated('health',       'healthVerifier',() => this.getHealthVerifierStatus());
       const ukbStatus             = this.features.knowledge ? this.getUKBStatus() : null;
@@ -1624,14 +1630,18 @@ class CombinedStatusLine {
 
   async getRedirectStatus() {
     try {
-      // Only show redirect indicator when working OUTSIDE the coding project
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+      // Only show the redirect indicator when working OUTSIDE the tools repo.
       const targetProject = process.env.TRANSCRIPT_SOURCE_PROJECT;
-      
-      // If target project is the coding project itself, no redirect needed
-      if (!targetProject || targetProject.includes(codingPath)) {
+
+      // If the target IS the tools repo, no redirect is happening.
+      //
+      // Was `targetProject.includes(codingPath)` — a substring test that also
+      // matched any path merely PREFIXED by the tools checkout, so a sibling
+      // like `<repo>-history` or a nested worktree read as "no redirect" and
+      // the badge silently vanished. isToolsRepo() is the realpath comparison.
+      if (!targetProject || isToolsRepo(targetProject)) {
         if (process.env.DEBUG_STATUS) {
-          console.error(`DEBUG: Target is coding project (${targetProject}), no redirect needed`);
+          console.error(`DEBUG: Target is the tools repo (${targetProject}), no redirect needed`);
         }
         return { active: false };
       }
@@ -1840,8 +1850,12 @@ class CombinedStatusLine {
             }
           }
           
-          // Also check if we're currently in the coding directory
-          if (currentWorkingDir && currentWorkingDir.includes('/coding')) {
+          // Also check whether the turn was made from inside the tools repo.
+          //
+          // Was `currentWorkingDir.includes('/coding')` — true for any path with
+          // that word in it (`~/Agentic/coding-history`, `~/src/decoding`), which
+          // lit the badge for turns that had nothing to do with the toolchain.
+          if (isToolsRepo(currentWorkingDir)) {
             if (process.env.DEBUG_STATUS) {
               console.error(`DEBUG: Working in coding directory: ${currentWorkingDir}`);
             }

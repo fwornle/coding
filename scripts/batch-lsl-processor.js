@@ -34,6 +34,8 @@ import ClassificationLogger from './classification-logger.js';
 import UserHashGenerator from './user-hash-generator.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
+import { isToolsRepo } from '../lib/scope/index.mjs';
+import { isEnabled as featureEnabled } from '../lib/features/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,16 +54,31 @@ class BatchLSLProcessor {
     this.retryAttempts = options.retryAttempts || 3;
     this.sessionDuration = options.sessionDuration || 3600000; // 1 hour in ms
 
-    // CRITICAL: Detect if we're processing the coding project itself
-    // When projectPath === codingRepo, no classification is needed - everything is local
-    this.isCodingProject = (this.projectPath === this.codingRepo);
+    // Detect whether we are processing the tools repo itself. In that case no
+    // classification is needed — everything is already local.
+    //
+    // Was raw string equality (`this.projectPath === this.codingRepo`), which a
+    // trailing slash or a symlinked checkout defeats silently: the classifier
+    // gets built, every turn is scored, and the answer is discarded.
+    this.isToolsProject = isToolsRepo(this.projectPath, { toolsRepo: this.codingRepo });
 
-    if (this.isCodingProject) {
-      console.log('📦 Processing coding project itself - classification bypassed (all content is local)');
+    // The redirect is the only reason to classify at all. With `lsl-redirect`
+    // off there is nothing to decide, so the classifier is not built — same
+    // gate the ETM applies, resolved from the same catalogue.
+    this.lslRedirectEnabled = featureEnabled('lsl-redirect');
+
+    // One name for "there is no redirect decision to make here", so the four
+    // downstream guards cannot drift apart from the construction gate.
+    this.classificationBypassed = this.isToolsProject || !this.lslRedirectEnabled;
+
+    if (this.isToolsProject) {
+      console.log('📦 Processing the tools repo itself - classification bypassed (all content is local)');
+    } else if (!this.lslRedirectEnabled) {
+      console.log('📦 lsl-redirect is off - classification bypassed (all content stays local)');
     }
 
-    // Initialize components (only if needed for non-coding projects)
-    if (!this.isCodingProject) {
+    // Initialize components (only when a redirect decision is actually possible)
+    if (!this.classificationBypassed) {
       this.classifier = new ReliableCodingClassifier({
         codingRepo: this.codingRepo,
         projectPath: this.projectPath,
@@ -86,14 +103,21 @@ class BatchLSLProcessor {
     const userHash = UserHashGenerator.generateHash({ debug: false });
     this.projectName = projectName; // Store for use in regenerate method
     this.userHash = userHash; // Store for use in regenerate method
-    this.classificationLogger = new ClassificationLogger({
-      projectPath: this.projectPath, // CRITICAL: Pass absolute project path
-      projectName: projectName,
-      sessionId: `batch-${Date.now()}`,
-      userHash: userHash,
-      codingRepo: this.codingRepo
-    });
-    this.classificationLogger.initializeLogFile();
+    // Built only when a redirect decision is possible. Its whole subject is
+    // that decision, and initializeLogFile() creates a
+    // .specstory/history/logs/classification tree in whatever project it is
+    // pointed at — so an install with the redirect off would grow an empty
+    // one in every project it ever batch-processes. Same gate as the ETM.
+    this.classificationLogger = this.classificationBypassed
+      ? null
+      : new ClassificationLogger({
+        projectPath: this.projectPath, // CRITICAL: Pass absolute project path
+        projectName: projectName,
+        sessionId: `batch-${Date.now()}`,
+        userHash: userHash,
+        codingRepo: this.codingRepo
+      });
+    this.classificationLogger?.initializeLogFile();
     
     // Performance tracking
     this.stats = {
@@ -112,7 +136,7 @@ class BatchLSLProcessor {
     console.log(`🔄 Starting Batch LSL Processor in ${mode} mode...`);
 
     // Initialize classifier if not already done (skip for coding project itself)
-    if (!this.classifierInitialized && !this.isCodingProject) {
+    if (!this.classifierInitialized && !this.classificationBypassed) {
       console.log('🔧 Initializing multi-collection classifier...');
       await this.classifier.initialize();
       this.classifierInitialized = true;
@@ -418,13 +442,18 @@ class BatchLSLProcessor {
       // Read and parse the transcript file
       const content = fs.readFileSync(filePath, 'utf8');
       
-      // CRITICAL FIX: Determine source project from transcript file path
+      // Determine source project from the transcript file path.
+      //
+      // The two hardcoded substring tests that used to come FIRST here
+      // (`includes('nano-degree')`, `includes('coding')`) are gone. They named
+      // two of this developer's own projects, and the 'coding' one was actively
+      // wrong: it matched `~/Agentic/coding-history`, `~/src/decoding`, and any
+      // path with the word anywhere in it — attributing another project's
+      // transcript to the tools repo. The encoded-path match below already
+      // derives the real name for every project including those two, so
+      // deleting the special cases both fixes the bug and removes the hardcodes.
       let sourceProject = 'unknown';
-      if (filePath.includes('nano-degree')) {
-        sourceProject = 'nano-degree';
-      } else if (filePath.includes('coding')) {
-        sourceProject = 'coding';
-      } else {
+      {
         // Extract from path pattern: ~/.claude/projects/-Users-q284340-Agentic-PROJECT-NAME
         // Match everything after the last "Agentic-" until the next slash
         const pathMatch = filePath.match(/Agentic-([^\/]+)/);
@@ -500,13 +529,15 @@ class BatchLSLProcessor {
         let classification;
         let fileType;
 
-        if (this.isCodingProject) {
-          // No classification needed - everything in coding project is local
+        if (this.classificationBypassed) {
+          // No classification needed - nothing can be redirected out of here
           fileType = 'local';
           classification = {
             isCoding: false,
             confidence: 1.0,
-            reason: 'Processing coding project itself - all content is local by definition',
+            reason: this.isToolsProject
+              ? 'Processing the tools repo itself - all content is local by definition'
+              : 'lsl-redirect is off - all content stays in its own project',
             layer: 'bypass'
           };
         } else {
@@ -817,12 +848,14 @@ class BatchLSLProcessor {
    * This is the core of the new architecture - each prompt set gets its own classification
    */
   async classifyPromptSet(promptSet) {
-    // Guard clause: Should never be called for coding project itself
-    if (this.isCodingProject) {
+    // Guard clause: should never be called when no redirect decision exists
+    if (this.classificationBypassed) {
       return {
         isCoding: false,
         confidence: 1.0,
-        reason: 'Processing coding project itself - classification bypassed',
+        reason: this.isToolsProject
+          ? 'Processing the tools repo itself - classification bypassed'
+          : 'lsl-redirect is off - classification bypassed',
         layer: 'bypass'
       };
     }
@@ -1089,13 +1122,20 @@ class BatchLSLProcessor {
         return [];
       }
 
-      // Check both local and coding project directories
+      // Check both the local project's and the tools repo's history dirs.
+      //
+      // Each entry carries the ROOT it came from. The classification-log path
+      // below used to recover that root with `dir.includes('coding')`, which is
+      // wrong twice over: it matched any project whose path contains the word,
+      // and when the local project IS the tools repo both entries are identical
+      // so the substring answer was right only by luck. Pairing the root with
+      // the directory removes the guess.
       const dirsToCheck = [
-        path.join(this.projectPath, '.specstory', 'history'),
-        path.join(this.codingRepo, '.specstory', 'history')
+        { root: this.projectPath, dir: path.join(this.projectPath, '.specstory', 'history') },
+        { root: this.codingRepo, dir: path.join(this.codingRepo, '.specstory', 'history') },
       ];
 
-      for (const dir of dirsToCheck) {
+      for (const { root, dir } of dirsToCheck) {
         if (!fs.existsSync(dir)) continue;
 
         // Recurse YYYY/MM subdirs and flat root. Both LSL extensions: the
@@ -1237,7 +1277,7 @@ class BatchLSLProcessor {
 
             // Also delete corresponding classification log file
             const classificationDir = path.join(
-              dir.includes('coding') ? this.codingRepo : this.projectPath,
+              root,
               '.specstory',
               'history',
               'logs',
