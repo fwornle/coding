@@ -86,6 +86,9 @@ import {
   readInsightDocIndex,
   mergeEnrichment,
 } from './enrich-entity-sources.mjs';
+import {
+  graphDbDir, graphExportsDir, observationExportDir, ensureDataHome,
+} from '../lib/paths/index.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -285,7 +288,7 @@ async function ensureLslResolver() {
 // (the JSON files maintained by ObservationExporter on a 10s debounced cadence).
 function ensureColdStore() {
   if (_coldStore) return _coldStore;
-  _coldStore = new ColdStoreReader({});
+  _coldStore = new ColdStoreReader({ exportDir: observationExportDir() });
   return _coldStore;
 }
 
@@ -309,6 +312,9 @@ function ensureExporter() {
   _exporter = new ObservationExporter({
     kmStore: _kmStore,
     projectRoot: REPO_ROOT,
+    // Explicit: the exporter's own default joins projectRoot with a relative
+    // DEFAULT_EXPORT_DIR, which would put the cold store back in the repo.
+    exportDir: observationExportDir(),
   });
   return _exporter;
 }
@@ -1253,7 +1259,7 @@ app.post('/api/observations/delete', async (req, res) => {
     // actually propagates, then re-export from the now-consistent state.
     let coldPruned = 0;
     try {
-      const coldPath = path.join(REPO_ROOT, '.data', 'observation-export', 'observations.json');
+      const coldPath = path.join(observationExportDir(), 'observations.json');
       if (fs.existsSync(coldPath)) {
         const arr = JSON.parse(fs.readFileSync(coldPath, 'utf-8'));
         if (Array.isArray(arr)) {
@@ -2582,8 +2588,17 @@ app.get('/api/consolidation/status', async (_req, res) => {
 // opens asynchronously; requests that arrive before hydration completes
 // get a 503.
 
-const KG_DB_PATH = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'leveldb');
-const KG_EXPORT_DIR = path.join(REPO_ROOT, '.data', 'knowledge-graph', 'exports');
+// The graph store lives under the DATA root, not the repo. obs-api and the
+// container's sse-server open the same LevelDB (hence the documented LOCK
+// contention), so both must derive it from lib/paths — a disagreement here is
+// two processes silently holding two different graphs.
+//
+// ensureDataHome() runs first because obs-api is usually the earliest writer on
+// a fresh install; ClassicLevel will create its own directory but the sibling
+// exports dir and the var/ .gitignore have to exist before anything writes.
+ensureDataHome();
+const KG_DB_PATH = graphDbDir();
+const KG_EXPORT_DIR = graphExportsDir();
 
 // Gap A (2026-06-19): the bundled defaultOntologyDir() carries ONLY the
 // LearningArtifact axis (LearningArtifact + Observation/Digest/Insight), so the
@@ -2695,7 +2710,11 @@ function mountKMRoutes(store) {
     // overlay file lives at `.data/ontologies/{system}.display.json`,
     // NOT at km-core's default `lib/km-core/ontology` dir — point the
     // handler explicitly at the operator-side data root.
-    ontologyDir: path.join(process.cwd(), '.data', 'ontologies'),
+    // REPO_ROOT, not process.cwd(): ontologies are shipped schema that stays
+    // committed in the tools repo, and deriving them from the cwd made the
+    // answer depend on which launcher started the process (launchd hands this
+    // service no cwd of its own). Deliberately NOT under the data root.
+    ontologyDir: path.join(REPO_ROOT, '.data', 'ontologies'),
     displayOverlaySystem: 'coding',
   });
   process.stderr.write(`[obs-api] km-core /api/v1 routes mounted\n`);

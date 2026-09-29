@@ -24,10 +24,47 @@ profiles:
     description: Everything. The default.
     features:
       lsl: on
+      lsl-redirect: on
       observations: on
       knowledge: on
       codegraph: on
       constraints: on
+      llm-proxy: on
+      performance: on
+      health: on
+      statusline: on
+
+  # The two consumer bundles. Both deliberately omit `lsl-redirect`, `codegraph`
+  # and `constraints`.
+  #
+  # `lsl-redirect` is the one that matters and the omission is the point: it
+  # files turns it judges to be "about the toolchain" into the tools repo instead
+  # of the project you are working in. That is useful only to someone developing
+  # this toolchain. For a team using it, it silently moves their own sessions out
+  # of their own scope. Because a profile turns OFF everything it does not name,
+  # simply not listing it here is the whole gate — there is no separate opt-out
+  # to remember.
+  km:
+    description: >-
+      Knowledge management only — session logging, the observation pipeline and
+      the knowledge base, scoped to YOUR project. No code graph, no guardrails,
+      no LLM proxy. Needs Docker.
+    features:
+      lsl: on
+      observations: on
+      knowledge: on
+      health: on
+      statusline: on
+
+  km-perf:
+    description: >-
+      Knowledge management plus performance measurement — everything in `km`,
+      plus the LLM proxy's provider routing and token accounting, and the
+      per-task measurement and benchmark surfaces. Needs Docker.
+    features:
+      lsl: on
+      observations: on
+      knowledge: on
       llm-proxy: on
       performance: on
       health: on

@@ -26,7 +26,12 @@
 
 # ── Pin a preset ─────────────────────────────────────────────────────────────
 # A profile turns ON what it names and OFF everything else. Available:
-# full, proxy-only, logging-only, minimal (see config/feature-profiles.yaml).
+# full, km, km-perf, proxy-only, logging-only, minimal
+# (see config/feature-profiles.yaml).
+#
+# `km` and `km-perf` are the bundles for a team USING this toolchain rather than
+# developing it: knowledge management, optionally plus performance measurement,
+# scoped to that team's own project. Both leave `lsl-redirect` off — see below.
 #
 # profile: full
 
@@ -36,12 +41,18 @@
 #
 # A feature whose dependency is off is auto-disabled, and the dependency is
 # never switched back on for you:
+#   lsl-redirect requires lsl
 #   observations requires lsl
 #   knowledge    requires observations
 #   performance  requires llm-proxy
 #
 # features:
 #   lsl:          on   # verbatim session transcripts (.specstory markdown)
+#   lsl-redirect: on   # file tools-infrastructure turns into the tools repo
+#                      #   DEVELOPERS OF THIS TOOLCHAIN ONLY. It moves turns out
+#                      #   of the project you are working in; for a team using
+#                      #   the toolchain that is their own data leaving their own
+#                      #   scope. Off in every profile except `full`.
 #   observations: on   # observation → digest → insight pipeline
 #   knowledge:    on   # semantic analysis, UKB workflows, knowledge graph, VKB
 #   codegraph:    on   # graphify code knowledge graph

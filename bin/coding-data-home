@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+/**
+ * Print where this installation's data lives, so shell callers do not have to
+ * reimplement the derivation.
+ *
+ * docker-compose.yml mounts $CODING_DATA_HOME and refuses to start without it
+ * (a wrong data path opens an EMPTY graph, which looks exactly like a knowledge
+ * base that lost its content). Every launcher therefore has to export it, and
+ * they are shell, not node — this is the one-line bridge.
+ *
+ *   export CODING_DATA_HOME="$(bin/coding-data-home)"
+ *
+ * Flags:
+ *   --ensure      create the root and its subtrees first, then print
+ *   --explain     human-readable scope provenance and layout
+ */
+
+// ESM, not CJS: the root package.json declares "type": "module", so an
+// extensionless bin is loaded as ESM and `require` is not defined. That is the
+// same trap that left src/live-logging/ExchangeRouter.js permanently unloadable.
+import { dataHome, ensureDataHome, explain } from '../lib/paths/index.mjs';
+
+const argv = process.argv.slice(2);
+
+if (argv.includes('--help') || argv.includes('-h')) {
+  process.stdout.write(
+    'usage: coding-data-home [--ensure] [--explain]\n' +
+      '  (no flags)  print the resolved data root\n' +
+      '  --ensure    create the root and its history/ kb/ var/ subtrees first\n' +
+      '  --explain   print the scope, where it came from, and the layout\n',
+  );
+  process.exit(0);
+}
+
+if (argv.includes('--ensure')) ensureDataHome();
+
+if (argv.includes('--explain')) {
+  const e = explain();
+  const lines = [
+    `scope        ${e.scope}${e.scopeIsDefault ? '   (PLACEHOLDER — no ~/.coding/scope)' : ''}`,
+    `  from       ${e.scopeSource}${e.scopePath ? ` (${e.scopePath})` : ''}`,
+    `data home    ${e.dataHome}${e.dataHomeOverridden ? '   (CODING_DATA_HOME)' : ''}`,
+    `  exists     ${e.exists}`,
+    `  tracked    ${e.tracked}${e.tracked ? '' : '   (no git repo — data is local only)'}`,
+    `history      ${e.history}        tracked`,
+    `kb           ${e.kb}             tracked`,
+    `var          ${e.var}            NOT tracked`,
+  ];
+  process.stdout.write(`${lines.join('\n')}\n`);
+  process.exit(0);
+}
+
+process.stdout.write(`${dataHome()}\n`);

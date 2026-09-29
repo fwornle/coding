@@ -13,9 +13,12 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 
+const require = createRequire(import.meta.url);
 const exec = promisify(execFile);
 const REPO = (process.env.CODING_REPO || new URL('../..', import.meta.url).pathname).replace(/\/$/, '');
+const { FEATURE_IDS } = require(join(REPO, 'lib/features/catalogue.cjs'));
 const install = readFileSync(join(REPO, 'install.sh'), 'utf8');
 const uninstall = readFileSync(join(REPO, 'uninstall.sh'), 'utf8');
 
@@ -128,10 +131,18 @@ describe('install steps are gated', () => {
     assert.match(block, /generate-docker-mcp-config\.sh/);
   });
 
-  test('feature resolution fails OPEN', () => {
+  test('feature resolution fails OPEN, naming every feature', () => {
     // An installer that silently skipped steps because it could not read a
     // config would be far worse than one that installs too much.
-    assert.match(install, /\[\[ -n "\$ACTIVE_FEATURES" \]\] \|\| ACTIVE_FEATURES="lsl observations knowledge/);
+    //
+    // The list is checked against the catalogue rather than against a literal
+    // prefix. A prefix match went stale the moment a tenth feature was added, and
+    // a stale assertion here is worse than none: the fallback would have silently
+    // stopped installing whatever was missing from it, on exactly the machines
+    // that could not resolve their own config.
+    const m = install.match(/\[\[ -n "\$ACTIVE_FEATURES" \]\] \|\| ACTIVE_FEATURES="([^"]*)"/);
+    assert.ok(m, 'the ACTIVE_FEATURES fail-open default must exist');
+    assert.deepEqual(m[1].split(/\s+/).filter(Boolean).sort(), [...FEATURE_IDS].sort());
     assert.match(install, /\[\[ -n "\$FEATURES_NEED_DOCKER" \]\] \|\| FEATURES_NEED_DOCKER="true"/);
   });
 });

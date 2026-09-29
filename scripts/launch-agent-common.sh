@@ -348,6 +348,27 @@ _resolve_port_conflicts() {
 }
 
 # Start coding services (Docker or Native mode)
+# Export CODING_DATA_HOME for docker-compose.
+#
+# The compose file mounts it and REFUSES to interpolate without it (`:?`). That
+# is deliberate: the data root is where the knowledge graph lives, and a compose
+# run that quietly fell back to some default path would mount an EMPTY graph —
+# indistinguishable, from the dashboard, from a knowledge base that lost its
+# content. So the launcher is required to state it.
+#
+# --ensure creates the root and its history/ kb/ var/ subtrees plus the var/
+# .gitignore, because Docker would otherwise create the mount source itself, as
+# root, with no .gitignore in it.
+_export_data_home() {
+  local resolved
+  if ! resolved="$("$CODING_REPO/bin/coding-data-home" --ensure 2>/dev/null)" || [ -z "$resolved" ]; then
+    _agent_log "Error: could not resolve the data root (bin/coding-data-home failed)"
+    _agent_log "       check ~/.coding/scope, or run: bin/coding-data-home --explain"
+    exit 1
+  fi
+  export CODING_DATA_HOME="$resolved"
+}
+
 _start_services() {
   if ! command -v node &> /dev/null; then
     _agent_log "Error: Node.js is required but not found in PATH"
@@ -368,6 +389,10 @@ _start_services() {
     _agent_log "Error: Docker compose file not found at $docker_dir/docker-compose.yml"
     exit 1
   fi
+
+  # Before ANY compose invocation in this shell — including the ones inside
+  # _recover_stale_container, which inherit the export.
+  _export_data_home
 
   # Fast path: already healthy and ports are bound
   # (skip this shortcut after --force, since we just tore everything down)

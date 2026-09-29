@@ -22,6 +22,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { observationExportDir } from '../../lib/paths/index.mjs';
 
 const MAX_RANGE_DAYS = 366;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -33,11 +34,15 @@ export class ColdStoreReader {
   /**
    * @param {Object} [opts]
    * @param {string} [opts.exportDir] - Directory holding `observations.json` and
-   *   `digests.json`. Defaults to `path.resolve('.data/observation-export')`.
+   *   `digests.json`. Defaults to the resolved cold-store dir under the data root.
    * @param {number} [opts.cacheSize] - Max day-bucket entries in the LRU. Defaults to 16.
    */
   constructor({ exportDir, cacheSize } = {}) {
-    this.exportDir = exportDir || path.resolve('.data/observation-export');
+    // Was `path.resolve('.data/observation-export')` — cwd-relative, so the
+    // answer depended on the working directory of whichever process constructed
+    // it. It only ever worked because obs-api's launchd plist happens to set
+    // WorkingDirectory to the repo.
+    this.exportDir = exportDir || observationExportDir();
     this.cacheSize = Number.isFinite(cacheSize) && cacheSize > 0 ? cacheSize : 16;
     this._cache = new Map();
     this._statsObj = { observationsParsed: 0, digestsParsed: 0, cacheHits: 0, cacheMisses: 0 };
