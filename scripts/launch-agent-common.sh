@@ -367,6 +367,19 @@ _export_data_home() {
     exit 1
   fi
   export CODING_DATA_HOME="$resolved"
+
+  # The scope travels with the data root, for the same reason and by the same
+  # mechanism: `~/.coding/scope` is a per-machine file that does not exist in
+  # the image, so the container is TOLD its tenant rather than deriving one.
+  # Without this a container would resolve the placeholder 'default' and tag a
+  # colleague's entities under a tenant nobody owns.
+  local scope
+  if ! scope="$("$CODING_REPO/bin/coding-data-home" --scope 2>/dev/null)" || [ -z "$scope" ]; then
+    _agent_log "Error: could not resolve the scope (bin/coding-data-home --scope failed)"
+    _agent_log "       check ~/.coding/scope, or run: bin/coding-data-home --explain"
+    exit 1
+  fi
+  export CODING_SCOPE="$scope"
 }
 
 _start_services() {

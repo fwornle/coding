@@ -56,6 +56,14 @@ services:
       # the image. The LAYOUT under this root is not duplicated here — the
       # container resolves it through the same lib/paths helper the host uses.
       - CODING_DATA_HOME=/coding/data
+      # Which tenant owns this installation's knowledge. Passed in for exactly
+      # the reason the data root is: it is resolved from ~/.coding/scope, a
+      # per-machine file that does not exist in the image, so deriving it here
+      # would resolve the placeholder 'default' and tag every entity under a
+      # tenant nobody owns. Fail-closed like CODING_DATA_HOME — a silent wrong
+      # tenant is indistinguishable from a correct one until someone reads the
+      # graph, which is the failure mode lib/scope exists to prevent.
+      - CODING_SCOPE=${CODING_SCOPE:?unset — export it from bin/coding-data-home --scope, or start via coding --claude}
       # T2 egress lockdown (2026-07-26): raw provider API keys are NO LONGER
       # injected into the container. All in-container LLM/embedding callers
       # route through the host llm-cli-proxy (:12435): LLMService falls back to

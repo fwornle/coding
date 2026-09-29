@@ -124,7 +124,11 @@ function storeHolders(want) {
       if (out.split('\n').some((n) => n.trim() === 'coding-services')) {
         holders.push({
           label: 'container coding-services (sse-server opens the same LevelDB)',
-          stop: 'docker compose -f docker/docker-compose.yml stop coding-services',
+          // Both exports are required: compose interpolates the whole file on
+          // every subcommand, `stop` included, and the data-root mount and the
+          // scope are fail-closed.
+          stop: 'CODING_DATA_HOME="$(bin/coding-data-home)" CODING_SCOPE="$(bin/coding-data-home --scope)" '
+            + 'docker compose -f docker/docker-compose.yml stop coding-services',
         });
       }
     } catch { /* no docker, or daemon down — then it is not a holder */ }
@@ -240,6 +244,7 @@ log('');
 log('Done. Restart the services:');
 log('  launchctl kickstart -k gui/$(id -u)/com.coding.obs-api');
 log('  export CODING_DATA_HOME="$(bin/coding-data-home)"');
+log('  export CODING_SCOPE="$(bin/coding-data-home --scope)"');
 log('  docker compose -f docker/docker-compose.yml up -d coding-services');
 log('');
 log('Then untrack what used to be committed (separate, reviewable step):');

@@ -13,22 +13,36 @@
  * Flags:
  *   --ensure      create the root and its subtrees first, then print
  *   --explain     human-readable scope provenance and layout
+ *   --scope       print just the resolved scope
+ *
+ * `--scope` exists for the same reason this file does: docker-compose has to be
+ * TOLD the scope (`~/.coding/scope` is a per-machine fact that does not exist in
+ * the image, exactly as with the data root), the launchers that tell it are
+ * shell, and a second derivation in bash would be a second implementation of
+ * tenancy — the thing lib/scope exists to prevent.
  */
 
 // ESM, not CJS: the root package.json declares "type": "module", so an
 // extensionless bin is loaded as ESM and `require` is not defined. That is the
 // same trap that left src/live-logging/ExchangeRouter.js permanently unloadable.
 import { dataHome, ensureDataHome, explain } from '../lib/paths/index.mjs';
+import { resolveScope } from '../lib/scope/index.mjs';
 
 const argv = process.argv.slice(2);
 
 if (argv.includes('--help') || argv.includes('-h')) {
   process.stdout.write(
-    'usage: coding-data-home [--ensure] [--explain]\n' +
+    'usage: coding-data-home [--ensure] [--explain] [--scope]\n' +
       '  (no flags)  print the resolved data root\n' +
       '  --ensure    create the root and its history/ kb/ var/ subtrees first\n' +
-      '  --explain   print the scope, where it came from, and the layout\n',
+      '  --explain   print the scope, where it came from, and the layout\n' +
+      '  --scope     print just the resolved scope\n',
   );
+  process.exit(0);
+}
+
+if (argv.includes('--scope')) {
+  process.stdout.write(`${resolveScope()}\n`);
   process.exit(0);
 }
 

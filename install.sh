@@ -2456,6 +2456,18 @@ configure_docker_mode() {
     touch "$CODING_REPO/.docker-mode"
 
     if [[ -f "$CODING_REPO/docker/docker-compose.yml" ]]; then
+        # compose interpolates the WHOLE file on every subcommand, `build`
+        # included, and the data-root mount plus the scope are both fail-closed
+        # (`:?`). Without these two exports this step died on interpolation and
+        # reported it as "Docker build had issues" — a fresh install produced a
+        # warning that named the wrong cause and left no image behind.
+        if ! CODING_DATA_HOME="$("$CODING_REPO/bin/coding-data-home" --ensure 2>/dev/null)"            || ! CODING_SCOPE="$("$CODING_REPO/bin/coding-data-home" --scope 2>/dev/null)"; then
+            warning "Could not resolve the data root/scope — skipping image build"
+            INSTALLATION_WARNINGS+=("Docker: data root unresolved, image not built")
+            return 0
+        fi
+        export CODING_DATA_HOME CODING_SCOPE
+
         info "Building Docker images (this may take a few minutes)..."
         if docker compose -f "$CODING_REPO/docker/docker-compose.yml" build; then
             success "Docker images built"
