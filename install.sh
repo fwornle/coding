@@ -2071,67 +2071,35 @@ print(f'Configured {len(copilot_servers)} MCP servers for Copilot')
     success "Copilot MCP configuration created: $copilot_mcp"
 }
 
-# Initialize knowledge management system
-# Imports knowledge from git-tracked JSON exports into GraphDB (LevelDB)
-# This is critical for fresh installs where LevelDB is empty but JSON exports exist
+# Report where knowledge management keeps its data.
+#
+# This used to import git-tracked JSON exports into LevelDB on a fresh
+# install. That step is RETIRED, not broken-and-skipped: the exports stopped
+# being tracked when 119 MB of knowledge base left the repo, so
+# `.data/knowledge-export` does not exist in a clone and the probe could never
+# fire. At the data root the JSON is written FROM the LevelDB by the exporter,
+# which makes importing it back at install time circular rather than a seed.
+#
+# Rebuilding a wiped LevelDB from the last export is a RECOVERY task, not an
+# install step — km-core's own hydrate() does it when the store opens.
 initialize_shared_memory() {
     echo -e "\n${CYAN}📝 Initializing knowledge management...${NC}"
 
-    info "Knowledge management is handled by GraphDB (see .data/knowledge-graph/)"
-    info "Team-specific exports available at .data/knowledge-export/*.json"
-
-    # Check if JSON exports exist but LevelDB is empty (fresh install scenario)
-    local json_exports_exist=false
-    local leveldb_empty=true
-
-    # Check for ANY JSON exports (coding.json, ui.json, resi.json, etc.)
-    local json_count=0
-    if [[ -d "$CODING_REPO/.data/knowledge-export" ]]; then
-        json_count=$(find "$CODING_REPO/.data/knowledge-export" -name "*.json" -type f 2>/dev/null | wc -l | tr -d ' ')
-        if [[ "$json_count" -gt 0 ]]; then
-            json_exports_exist=true
-            info "Found $json_count JSON export file(s) to import"
-        fi
+    local data_home
+    if ! data_home="$("$CODING_REPO/bin/coding-data-home" 2>/dev/null)"; then
+        warning "Could not resolve the data root — knowledge paths unknown"
+        INSTALLATION_WARNINGS+=("Knowledge: data root unresolved")
+        return 0
     fi
 
-    # Check if LevelDB has data (look for .ldb files with content or non-empty .log files)
-    if [[ -d "$CODING_REPO/.data/knowledge-graph" ]]; then
-        local log_size=0
-        for log_file in "$CODING_REPO/.data/knowledge-graph"/*.log; do
-            if [[ -f "$log_file" ]]; then
-                local size=$(stat -f%z "$log_file" 2>/dev/null || stat -c%s "$log_file" 2>/dev/null || echo "0")
-                if [[ "$size" -gt 100 ]]; then
-                    leveldb_empty=false
-                    break
-                fi
-            fi
-        done
-    fi
+    info "Knowledge is stored under the data root, outside this repo:"
+    echo "  • $data_home/var/knowledge-graph/leveldb (live graph, auto-persisted)"
+    echo "  • $data_home/kb/knowledge-graph/exports/ (JSON exports)"
 
-    # Import from JSON if exports exist and LevelDB is empty
-    if [[ "$json_exports_exist" == "true" && "$leveldb_empty" == "true" ]]; then
-        info "Importing knowledge from JSON exports into GraphDB..."
-
-        # Ensure bin directory is in PATH for graph-sync
-        export PATH="$CODING_REPO/bin:$PATH"
-
-        # Run graph-sync import (without file watchers using a simple timeout)
-        if command -v node >/dev/null 2>&1; then
-            cd "$CODING_REPO"
-            # Run import and capture output
-            if run_with_timeout 60 node bin/graph-sync import 2>&1 | grep -E "^✓|entities|relations" | head -10; then
-                success "Knowledge imported from JSON exports to GraphDB"
-            else
-                warning "Knowledge import encountered issues (non-fatal)"
-            fi
-            cd - > /dev/null
-        else
-            warning "Node.js not available - skipping knowledge import"
-        fi
-    elif [[ "$json_exports_exist" == "true" ]]; then
-        info "GraphDB already has data, skipping JSON import"
+    if [[ -d "$data_home/var/knowledge-graph/leveldb" ]]; then
+        info "Existing graph found — it will be opened as-is"
     else
-        info "No JSON exports found - knowledge will be created as you work"
+        info "No graph yet — knowledge will be created as you work"
     fi
 
     success "Knowledge management system ready"
@@ -2395,10 +2363,20 @@ configure_team_setup() {
         success "Team configuration added to $SHELL_RC"
     fi
 
-    info "Your configuration will use these knowledge exports:"
-    echo "  • .data/knowledge-export/coding.json (general coding patterns)"
-    echo "  • .data/knowledge-export/ui.json (UI/frontend specific knowledge)"
-    info "Knowledge is managed by GraphDB at .data/knowledge-graph/ (auto-persisted)"
+    # The export layout is NOT per team. km-core buckets its exports by
+    # DOMAIN — a topic name like 'development-workflow' — and CODING_TEAM is a
+    # node attribute, not a bucket, so every team's entities land in the same
+    # general.json. Naming a per-team file here promised one the exporter
+    # cannot produce: the 142-byte coding.json it implied sat on disk, empty,
+    # from June until it was deleted.
+    local _data_home
+    _data_home="$("$CODING_REPO/bin/coding-data-home" 2>/dev/null)" || _data_home=""
+    if [[ -n "$_data_home" ]]; then
+        info "Your knowledge lives under the data root, not in this repo:"
+        echo "  • $_data_home/var/knowledge-graph/leveldb (live graph, auto-persisted)"
+        echo "  • $_data_home/kb/knowledge-graph/exports/general.json (JSON export)"
+        info "CODING_TEAM tags the entities that get written; it does not split the files"
+    fi
 }
 
 # Build Docker infrastructure — the only supported deployment mode. Native
