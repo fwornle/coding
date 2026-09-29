@@ -42,14 +42,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { tokenUsageDb } from '../lib/paths/index.mjs';
 
 function log(msg) { process.stderr.write(`[auto-measure] ${msg}\n`); }
 
 /** Same token DB the proxy owns and aggregateByTaskId reads (Plan 71-03). */
 function tokenDbPath() {
-  const dir = process.env.LLM_PROXY_DATA_DIR
-    || path.join(process.env.CODING_REPO || path.resolve(import.meta.dirname, '..'), '.data');
-  return path.join(dir, 'llm-proxy', 'token-usage.db');
+  return tokenUsageDb();
 }
 
 function arg(name, fallback) {

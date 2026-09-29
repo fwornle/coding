@@ -35,6 +35,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { redactCorporateIds } from './measurement-stop.mjs';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const err = (s) => process.stderr.write(`${s}\n`);
@@ -50,7 +51,7 @@ const dirIdx = args.indexOf('--dir');
 const REPO = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 const MEAS = dirIdx >= 0 && args[dirIdx + 1]
   ? path.resolve(args[dirIdx + 1])
-  : path.join(REPO, '.data/measurements');
+  : path.join(proxyDataDir(), 'measurements');
 
 if (!fs.existsSync(MEAS)) {
   err(`[backfill] measurements dir not found: ${MEAS}`);

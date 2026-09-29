@@ -8,7 +8,7 @@ set -uo pipefail
 # capture file once they age past the retention window:
 #
 #   1. `context-turns.jsonl(.gz)` + `raw-bodies.jsonl(.gz)` under
-#      `.data/measurements/<task_id>/` — the request-body context capture.
+#      `<LLM_PROXY_DATA_DIR>/measurements/<task_id>/` — the request-body context capture.
 #   2. `<task_id>.jsonl` (+ superseded legacy `<task_id>.json`) in the FLAT
 #      `.data/retrieval-captures/` dir — the per-turn KB injection capture
 #      (what was retrieved, what was dropped, and at which stage).
@@ -31,6 +31,12 @@ set -uo pipefail
 #
 # Env overrides (tests + hand-driving):
 #   CODING_REPO                   repo root (default the script's own checkout)
+#   LLM_PROXY_DATA_DIR            data root the proxy writes to (default
+#                                 `<CODING_REPO>/.data`). The measurements tree
+#                                 followed the data home out of the tools repo;
+#                                 this sweeper MUST resolve it the same way the
+#                                 writer does, or it silently sweeps an empty
+#                                 directory and retention quietly stops holding.
 #   CONTEXT_TURNS_RETENTION_DAYS  retention window in days before a file is
 #                                 eligible for deletion (default 14)
 #
@@ -39,7 +45,8 @@ set -uo pipefail
 REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 RETENTION_DAYS="${CONTEXT_TURNS_RETENTION_DAYS:-14}"
 STALE_SECS=$((RETENTION_DAYS * 86400))
-MEASUREMENTS_DIR="${REPO_ROOT}/.data/measurements"
+DATA_DIR="${LLM_PROXY_DATA_DIR:-${REPO_ROOT}/.data}"
+MEASUREMENTS_DIR="${DATA_DIR}/measurements"
 RETRIEVAL_CAPTURES_DIR="${REPO_ROOT}/.data/retrieval-captures"
 
 # Per-task capture files we reclaim by age. Each is independent.

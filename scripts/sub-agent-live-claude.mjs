@@ -47,6 +47,7 @@ import process from 'node:process';
 import { createRegistry } from '../lib/lsl/registry.mjs';
 import { startClaudeWatcher, stopClaudeWatcher } from '../lib/lsl/live/claude-fs-watch.mjs';
 import { encodeCwd } from '../lib/lsl/adapters/claude-jsonl-tree.mjs';
+import { tokenUsageDb } from '../lib/paths/index.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 const DEFAULT_PROJECTS_DIR = process.env.LSL_CLAUDE_PROJECTS_DIR
@@ -214,9 +215,7 @@ async function main(argv) {
     ({ buildClaudeTokenRows } = await import('../lib/lsl/token/claude-token-rows.mjs'));
     ({ openTokenDb, insertTokenRowDeduped, ADAPTER_USER_HASH_CLAUDE } = await import('../lib/lsl/token/token-db.mjs'));
     ({ resolveLiveTaskIdSafe } = await import('../lib/lsl/token/task-id.mjs'));
-    const dataDir = process.env.LLM_PROXY_DATA_DIR
-      ?? path.join(process.cwd(), '.data');
-    const tokenDbPath = path.join(dataDir, 'llm-proxy', 'token-usage.db');
+    const tokenDbPath = tokenUsageDb();
     tokenDb = openTokenDb(tokenDbPath);
     process.stderr.write(`[live-claude] token emission enabled — db=${tokenDbPath}\n`);
   } catch (err) {

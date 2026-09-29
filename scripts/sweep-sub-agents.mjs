@@ -44,7 +44,6 @@
  *   LSL_COPILOT_SESSIONS_DIR     ~/.copilot/session-state/ override
  */
 
-import path from 'node:path';
 import process from 'node:process';
 import { createRegistry } from '../lib/lsl/registry.mjs';
 import { AGENTS, loadAdapter, getAgentSearchPaths } from '../lib/lsl/adapters/index.mjs';
@@ -54,6 +53,7 @@ import { AGENTS, loadAdapter, getAgentSearchPaths } from '../lib/lsl/adapters/in
 // into Phase 50 internals.
 // eslint-disable-next-line no-unused-vars
 import { convertTranscriptsToObservations } from '../lib/lsl/scan-and-convert.mjs';
+import { tokenUsageDb, measurementsDir as measurementsDir_ } from '../lib/paths/index.mjs';
 
 const DEFAULT_LIMIT = 100;
 
@@ -125,10 +125,10 @@ async function emitClaudeCompletedSessionTokenRows(discovered) {
     const { openTokenDb, insertTokenRow, ADAPTER_USER_HASH_CLAUDE } = await import('../lib/lsl/token/token-db.mjs');
     const { runSweep, loadArchivedSpans } = await import('./backfill-task-id-by-timestamp.mjs');
 
-    const dataDir = process.env.LLM_PROXY_DATA_DIR
-      ?? path.join(process.cwd(), '.data');
-    const tokenDbPath = path.join(dataDir, 'llm-proxy', 'token-usage.db');
-    const measurementsDir = path.join(dataDir, 'measurements');
+    // Was cwd-relative when LLM_PROXY_DATA_DIR was unset — a sweep run from any
+    // other directory silently found no database and swept nothing.
+    const tokenDbPath = tokenUsageDb();
+    const measurementsDir = measurementsDir_();
 
     db = openTokenDb(tokenDbPath);
 
@@ -219,10 +219,10 @@ async function emitCopilotCompletedSessionTokenRows(discovered) {
     const { openTokenDb, insertTokenRow, ADAPTER_USER_HASH_COPILOT } = await import('../lib/lsl/token/token-db.mjs');
     const { runSweep, loadArchivedSpans } = await import('./backfill-task-id-by-timestamp.mjs');
 
-    const dataDir = process.env.LLM_PROXY_DATA_DIR
-      ?? path.join(process.cwd(), '.data');
-    const tokenDbPath = path.join(dataDir, 'llm-proxy', 'token-usage.db');
-    const measurementsDir = path.join(dataDir, 'measurements');
+    // Was cwd-relative when LLM_PROXY_DATA_DIR was unset — a sweep run from any
+    // other directory silently found no database and swept nothing.
+    const tokenDbPath = tokenUsageDb();
+    const measurementsDir = measurementsDir_();
 
     db = openTokenDb(tokenDbPath);
 

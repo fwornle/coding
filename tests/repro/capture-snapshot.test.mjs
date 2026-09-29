@@ -80,7 +80,9 @@ describe('captureSnapshot', () => {
     const res = captureSnapshot('task-123', { repoRoot, dataDir, prompt: 'do the thing' });
     assert.equal(res.snapshot_id, 'task-123');
     assert.equal(typeof res.clock_base, 'number');
-    assert.ok(res.dir.includes(path.join('.data', 'run-snapshots', 'task-123')));
+    // Under dataDir, not repoRoot: run-snapshots followed the data home out of the
+    // tools repo, and the proxy's record tap writes its fixtures under the same root.
+    assert.equal(res.dir, path.join(dataDir, 'run-snapshots', 'task-123'));
   });
 
   test('assembles ALL SC-1 artifacts in the snapshot dir', () => {
@@ -128,7 +130,7 @@ describe('captureSnapshot', () => {
 
   test('T-67-04-01: path-traversal task_id is neutralized (stays under run-snapshots)', () => {
     const { dir, snapshot_id } = captureSnapshot('../evil', { repoRoot, dataDir, prompt: 'p' });
-    const snapRoot = path.join(repoRoot, '.data', 'run-snapshots');
+    const snapRoot = path.join(dataDir, 'run-snapshots');
     const resolved = path.resolve(dir);
     assert.ok(resolved.startsWith(path.resolve(snapRoot) + path.sep), `escaped: ${resolved}`);
     assert.ok(!snapshot_id.includes('..'), 'snapshot_id must not contain ..');

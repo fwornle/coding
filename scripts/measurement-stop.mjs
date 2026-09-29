@@ -79,11 +79,20 @@ import { filterConsequential, isTrivialRun } from '../lib/experiments/consequent
 // close + link snapshot_id onto the Run. recordHarnessFixtures scrapes the
 // WebSearch/WebFetch/MCP tool_use pairs for the span window (LLM fixtures are
 // already written into the snapshot's fixtures/llm/ by the Plan 06 record tap).
-// sanitizeTaskId keeps the snapshot dir under .data/run-snapshots/ (T-67-07-01).
+// sanitizeTaskId keeps the snapshot dir under <DATA_DIR>/run-snapshots/ (T-67-07-01).
 import { recordHarnessFixtures } from '../lib/repro/fixtures/harness-record.mjs';
 import { sanitizeTaskId } from '../lib/repro/capture-snapshot.mjs';
+import { proxyDataDir, observationExportDir } from '../lib/paths/index.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
+
+// The data root the PROXY writes to. Span close reads back three trees the proxy
+// (or a sandboxed cell) produced — the context-turns capture, the raw-bodies
+// sibling and the snapshot fixtures — so it has to resolve them exactly the way
+// the writer did. proxyDataDir() honours LLM_PROXY_DATA_DIR first, which is what
+// an experiment cell sets to isolate itself; deriving these from REPO_ROOT would
+// gzip an empty dir and link a snapshot that is not the one the run recorded.
+const DATA_DIR = proxyDataDir();
 
 const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
   || path.resolve(REPO_ROOT, '..', '_work', 'rapid-llm-proxy', 'dist');
@@ -394,7 +403,7 @@ export async function loadObservationsForWindow({ from, to, agent } = {}) {
     }
   }
   try {
-    const p = path.join(REPO_ROOT, '.data', 'observation-export', 'observations.json');
+    const p = path.join(observationExportDir(), 'observations.json');
     const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
     return Array.isArray(arr) ? arr : [];
   } catch {
@@ -710,7 +719,7 @@ async function main() {
         perRequest,
       };
       const reconcileDirId = sanitizeTaskId(span.task_id);
-      const reconcileDir = path.join(REPO_ROOT, '.data', 'measurements', reconcileDirId);
+      const reconcileDir = path.join(DATA_DIR, 'measurements', reconcileDirId);
       fs.mkdirSync(reconcileDir, { recursive: true });
       fs.writeFileSync(
         path.join(reconcileDir, 'reconciliation.json'),
@@ -725,12 +734,12 @@ async function main() {
 
   // ── (3.0c) D-03/D-07: enrich observation_ref + gzip context-turns at span close ──
   //   Beside the reconciliation write, reusing the SAME sanitizeTaskId(span.task_id)
-  //   + .data/measurements path build. Runs the correlation HERE (not the proxy hot
+  //   + <DATA_DIR>/measurements path build. Runs the correlation HERE (not the proxy hot
   //   path — Pitfall 1). Best-effort never-throw: a failure writes to stderr and
   //   NEVER aborts span close. A crashed span (no close) leaves the readable
   //   plaintext context-turns.jsonl for the age sweeper to reclaim.
   try {
-    const ctDir = path.join(REPO_ROOT, '.data', 'measurements', sanitizeTaskId(span.task_id));
+    const ctDir = path.join(DATA_DIR, 'measurements', sanitizeTaskId(span.task_id));
     const hasCt = fs.existsSync(path.join(ctDir, 'context-turns.jsonl'));
     const hasRb = fs.existsSync(path.join(ctDir, 'raw-bodies.jsonl'));
     if (hasCt || hasRb) {
@@ -815,7 +824,7 @@ async function main() {
 
   // ── (3.3) Phase 67-07: archive fixtures into the RunSnapshot + resolve snapshot_id ──
   //   The LLM record tap (Plan 06) already wrote the recorded /api/complete responses
-  //   directly into .data/run-snapshots/<id>/fixtures/llm/ during the record run. Here,
+  //   directly into <DATA_DIR>/run-snapshots/<id>/fixtures/llm/ during the record run. Here,
   //   best-effort, we (a) scrape the harness channels (WebSearch/WebFetch/MCP) for the
   //   span window into fixtures/harness/, and (b) resolve snapshot_id from the snapshot
   //   dir so writeRun links the Run to its snapshot. ALL best-effort (try/catch + stderr):
@@ -823,7 +832,7 @@ async function main() {
   let snapshotId = null;
   try {
     const snapshotDirId = sanitizeTaskId(span.task_id);
-    const snapDir = path.join(REPO_ROOT, '.data', 'run-snapshots', snapshotDirId);
+    const snapDir = path.join(DATA_DIR, 'run-snapshots', snapshotDirId);
     if (fs.existsSync(snapDir)) {
       snapshotId = snapshotDirId; // link the Run to this snapshot
       const fixturesDir = path.join(snapDir, 'fixtures');

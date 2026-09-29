@@ -29,6 +29,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { runVariantRepeats } from '../lib/experiments/experiment-restore.mjs';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 function parseStrArg(argv, flag) {
   const i = argv.indexOf(flag);
@@ -89,7 +90,7 @@ async function main() {
   }
 
   const repoRoot = process.env.CODING_REPO || process.cwd();
-  const dataDir = process.env.LLM_PROXY_DATA_DIR || path.join(repoRoot, '.data');
+  const dataDir = proxyDataDir();
 
   const opts = { repoRoot, dataDir, variantName };
   const fake = process.env.EXPERIMENT_RESTORE_FAKE;

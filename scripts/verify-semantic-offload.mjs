@@ -55,6 +55,7 @@ import os from 'node:os';
 import process from 'node:process';
 import { createRequire } from 'node:module';
 import { runAgent } from '../lib/kgbench/runner.mjs';
+import { tokenUsageDb } from '../lib/paths/index.mjs';
 
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
@@ -64,8 +65,7 @@ const PORT = process.env.LLM_CLI_PROXY_PORT || '12435';
 const BASE = `http://127.0.0.1:${PORT}`;
 const ROUTING_YAML = process.env.LLM_ROUTING_YAML
   || path.join(REPO, '..', '_work', 'rapid-llm-proxy', 'config', 'llm-routing.yaml');
-const DB_PATH = path.join(process.env.LLM_PROXY_DATA_DIR || path.join(REPO, '.data'),
-  'llm-proxy', 'token-usage.db');
+const DB_PATH = tokenUsageDb();
 const OUT_DIR = path.join(REPO, '.data', 'routing-proof');
 
 const argv = process.argv.slice(2);

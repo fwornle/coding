@@ -38,6 +38,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 import {
   classifierEligibility, lastUserText, vetoesDowngrade, applyDowngrade, SKIP,
@@ -105,7 +106,10 @@ async function verdictFor(text) {
 // ── Mode: structural replay over the captured corpus ─────────────────────────
 
 function corpusFiles() {
-  const root = path.join(REPO, '.data', 'measurements');
+  // The measurements tree resolves off the proxy's data root, not the repo — the
+  // corpus this replays is written by the proxy, so it has to be read where the
+  // proxy put it. An empty dir here is indistinguishable from "no captures yet".
+  const root = path.join(proxyDataDir(), 'measurements');
   if (!fs.existsSync(root)) return [];
   return fs.readdirSync(root)
     .map((d) => path.join(root, d, 'context-turns.jsonl'))
@@ -115,7 +119,7 @@ function corpusFiles() {
 function runCorpus() {
   const files = corpusFiles();
   if (!files.length) {
-    process.stdout.write('No context-turns.jsonl found under .data/measurements — nothing to replay.\n');
+    process.stdout.write(`No context-turns.jsonl found under ${path.join(proxyDataDir(), 'measurements')} — nothing to replay.\n`);
     return 0;
   }
   const stats = { turns: 0, outOfScope: 0, byAgent: {}, eligible: 0, vetoed: 0, reasons: {}, wouldAsk: 0 };
