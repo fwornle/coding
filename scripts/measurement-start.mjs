@@ -48,6 +48,7 @@ import { captureSnapshot, sanitizeTaskId } from '../lib/repro/capture-snapshot.m
 // argv-safety regex the direct-CLI --test-command path reuses (D-08).
 import { resolveExperimentSpec } from '../lib/experiments/experiment-spec.mjs';
 import { SHELL_META_RE } from '../lib/experiments/evidence-harness.mjs';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
@@ -269,9 +270,9 @@ async function main() {
   //   dir (.data/run-snapshots/<sanitizeTaskId>/fixtures — the SAME dir the record
   //   tap wrote to), so record→replay round-trips through one path.
   const replayFrom = parseStrArg(args, '--replay');
-  const dataDir = process.env.LLM_PROXY_DATA_DIR || path.join(REPO_ROOT, '.data');
+  const dataDir = proxyDataDir();
   const replayFixturesDir = replayFrom
-    ? path.join(REPO_ROOT, '.data', 'run-snapshots', sanitizeTaskId(replayFrom), 'fixtures')
+    ? path.join(dataDir, 'run-snapshots', sanitizeTaskId(replayFrom), 'fixtures')
     : null;
   // Merge the variant meta (SPEC-01/SPEC-02) onto the record/replay base — only defined
   // keys land, preserving record:true and the conditional replay_from (Phase 77-02, D-03).

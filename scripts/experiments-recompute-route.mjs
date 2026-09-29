@@ -38,15 +38,15 @@ import { writeRun } from '../lib/experiments/run-write.mjs';
 import { buildNormalizedTrace } from '../lib/lsl/route/build-trace.mjs';
 import { computeHeuristics, ALL_NULL_HEURISTICS } from '../lib/experiments/route-heuristics.mjs';
 import { normalizeAgent, buildTraceSeam } from '../lib/experiments/route-trace-resolve.mjs';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
-const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
 const out = (s) => process.stdout.write(s + '\n');
 const warn = (s) => process.stderr.write(s + '\n');
 
 /** Resolve the default data dir (mirrors the proxy/backfill resolution order). */
 function resolveDataDir() {
-  return process.env.LLM_PROXY_DATA_DIR || path.join(REPO_ROOT, '.data');
+  return proxyDataDir();
 }
 
 /** Read the archived span JSON the proxy wrote at close. Returns null when unreadable. */

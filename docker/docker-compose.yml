@@ -50,6 +50,12 @@ services:
       # CODING_REPO is what config-manager.js uses to find .constraint-monitor.yaml.
       # Inside the container this is /coding (bind-mounted from the host repo).
       - CODING_REPO=/coding
+      # Where this installation's DATA lives, as mounted below. The container is
+      # TOLD its data root rather than deriving it: the scope that decides the
+      # host path is a per-machine fact (~/.coding/scope) that does not exist in
+      # the image. The LAYOUT under this root is not duplicated here — the
+      # container resolves it through the same lib/paths helper the host uses.
+      - CODING_DATA_HOME=/coding/data
       # T2 egress lockdown (2026-07-26): raw provider API keys are NO LONGER
       # injected into the container. All in-container LLM/embedding callers
       # route through the host llm-cli-proxy (:12435): LLMService falls back to
@@ -81,8 +87,22 @@ services:
       - "3032:3032"     # Health Dashboard HTTP
       - "3033:3033"     # Health Dashboard WebSocket
     volumes:
-      # Persistent data
+      # Persistent data.
+      #
+      # `.data` stays mounted for what legitimately lives in the TOOLS repo —
+      # ontologies (shipped schema), knowledge-config.json, graphify metadata.
+      # User knowledge moved OUT of it, to the data root below.
       - ${CODING_REPO:-.}/.data:/coding/.data
+      # The data root: this installation's knowledge, per scope. Fail-closed on
+      # purpose — a compose run with no CODING_DATA_HOME would otherwise mount
+      # some default path and open an EMPTY graph, which is indistinguishable
+      # from a knowledge base that lost its content. `coding --claude` /
+      # start-services.sh export it; a bare `docker compose up` must too.
+      - ${CODING_DATA_HOME:?unset — export it from bin/coding-data-home, or start via coding --claude}:/coding/data
+      # The path + scope resolvers, so the container computes the layout under
+      # the data root with the SAME code as the host instead of a second copy.
+      - ${CODING_REPO:-.}/lib/paths:/coding/lib/paths:ro
+      - ${CODING_REPO:-.}/lib/scope:/coding/lib/scope:ro
       # NOTE: .observations is intentionally NOT bind-mounted. Phase 5 of the
       # observations-api migration: the host obs-api service is the single
       # owner of observations.db, and the container reaches it via HTTP at

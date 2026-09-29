@@ -44,6 +44,7 @@ import process from 'node:process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 import {
   AUTO_MEASURE_AGENTS,
@@ -51,7 +52,9 @@ import {
 } from '../lib/measurement/foreground-sessions.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
-const DATA_DIR = process.env.LLM_PROXY_DATA_DIR || path.join(REPO_ROOT, '.data');
+// proxyDataDir() honours LLM_PROXY_DATA_DIR and otherwise resolves the data
+// root, so this daemon and the proxy cannot disagree about where the span files are.
+const DATA_DIR = proxyDataDir();
 const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
   || path.resolve(REPO_ROOT, '..', '_work', 'rapid-llm-proxy', 'dist');
 const BEHAVIOR_CONFIG = process.env.BEHAVIOR_CONFIG

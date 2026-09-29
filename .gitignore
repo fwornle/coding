@@ -309,19 +309,19 @@ integrations/browser-access/logs/
 *.sqlite
 *.sqlite3
 
-# MCP Memory LevelDB (volatile runtime data)
-# Ignore binary database files, but track insight diagrams
-.data/knowledge-graph/*
-!.data/knowledge-graph/insights/
-.data/knowledge-graph/insights/*
-!.data/knowledge-graph/insights/puml/
-!.data/knowledge-graph/insights/images/
-!.data/knowledge-graph/exports/
-!.data/knowledge-graph/exports/**
-# ...but never the timestamped backups repair/migration scripts drop there
-# (the exports/** re-include above otherwise overrides the global *.bak rule).
-.data/knowledge-graph/exports/*.bak
-.data/knowledge-graph/exports/*.bak-*
+# User knowledge lives OUTSIDE this repo.
+#
+# The graph store, its exports, the insight diagrams and the observation cold
+# store are resolved by lib/paths to ~/.coding/data/<scope>/, because a clone
+# must not arrive carrying someone else's knowledge base and a colleague's first
+# run must not dirty tracked files. Migrated by scripts/migrate-data-home.mjs.
+#
+# The re-includes that used to sit here (`!…/insights/puml/`, `!…/exports/**`)
+# are GONE on purpose: they are what made 507 files of personal KB content
+# tracked. What stays committed under .data/ is shipped schema and config only —
+# ontologies/, ontologies-experiment/, knowledge-config.json,
+# graphify/metadata.json, code-graph-meta/, kb-ab-sampler/{specs,mine-specs}/.
+.data/knowledge-graph/
 .data/knowledge-graph-migrated/
 .data/knowledge.db
 .data/knowledge.db-shm
@@ -329,12 +329,13 @@ integrations/browser-access/logs/
 .data/backups/
 .data/exports/*.pre-*-backup
 
-# Track knowledge exports (git-reviewable JSON)
+# .data/ itself is not ignored — it still holds shipped schema and config.
+# The two export trees below moved to the data root; their re-includes are gone.
 !.data/
-!.data/knowledge-export/
-!.data/observation-export/
 !.data/llm-proxy-export/
 !.data/knowledge-config.json
+.data/knowledge-export/
+.data/observation-export/
 
 # Per-machine local — proxy settings (dashboard's Settings dialog persists
 # routing choices here; should NOT be shared across clones).

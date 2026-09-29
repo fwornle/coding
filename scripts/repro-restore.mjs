@@ -25,10 +25,10 @@
  */
 
 import process from 'node:process';
-import path from 'node:path';
 import readline from 'node:readline';
 
 import { restoreSnapshot } from '../lib/repro/restore-snapshot.mjs';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 const CONFIRM_TOKEN = 'yes-overwrite-live';
 
@@ -69,7 +69,7 @@ async function main() {
   }
 
   const repoRoot = process.env.CODING_REPO || process.cwd();
-  const dataDir = process.env.LLM_PROXY_DATA_DIR || path.join(repoRoot, '.data');
+  const dataDir = proxyDataDir();
 
   if (!inPlace) {
     // ── Default sandbox restore (D-04) ──

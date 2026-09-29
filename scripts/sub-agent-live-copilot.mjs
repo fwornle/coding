@@ -37,6 +37,7 @@ import process from 'node:process';
 
 import { createRegistry } from '../lib/lsl/registry.mjs';
 import { startCopilotWatcher, stopCopilotWatcher } from '../lib/lsl/live/copilot-events-tail.mjs';
+import { tokenUsageDb } from '../lib/paths/index.mjs';
 
 const ERROR_BUDGET_WINDOW_MS = 60_000;
 const ERROR_BUDGET_THRESHOLD = 10;
@@ -215,9 +216,7 @@ async function main() {
     ADAPTER_USER_HASH_COPILOT = tokenDbMod.ADAPTER_USER_HASH_COPILOT;
     ({ resolveLiveTaskIdSafe } = await import('../lib/lsl/token/task-id.mjs'));
 
-    const dataDir = process.env.LLM_PROXY_DATA_DIR
-      ?? path.join(process.cwd(), '.data');
-    const tokenDbPath = path.join(dataDir, 'llm-proxy', 'token-usage.db');
+    const tokenDbPath = tokenUsageDb();
     tokenDb = tokenDbMod.openTokenDb(tokenDbPath);
     process.stderr.write(`[live-copilot] token emission enabled — db=${tokenDbPath}\n`);
 

@@ -14,11 +14,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
-import { fileURLToPath } from 'node:url'
+import { proxyDataDir } from '../../lib/paths/index.mjs'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(__dirname, '..', '..')
-const MEASUREMENTS_DIR = path.join(REPO_ROOT, '.data', 'measurements')
+// Off the proxy's data root, not the repo. The captures this reads are written by
+// the proxy, and they followed the data home out of the tools repo — pointed at
+// `<repo>/.data` this check would skip-with-reason forever and the skip would look
+// exactly like a fresh checkout with no captures yet.
+const MEASUREMENTS_DIR = path.join(proxyDataDir(), 'measurements')
 
 // Fields that, if present on a context-turn line, would mean reasoning sub-steps are
 // emitted as their own lines — which would REQUIRE pre-flattening before signature

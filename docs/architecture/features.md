@@ -11,11 +11,12 @@ the checklist a reviewer uses.
 **Default is all-on.** With no `features.yaml` anywhere, the resolved set is identical to
 the historical single-stack behaviour. Upgrading changes nothing until the user opts in.
 
-## The nine features
+## The ten features
 
 | id | what the user calls it |
 |----|------------------------|
 | `lsl` | verbatim session logging (`.specstory` markdown) |
+| `lsl-redirect` | filing tools-infrastructure turns into the tools repo |
 | `observations` | the observation → digest → insight pipeline |
 | `knowledge` | semantic analysis, UKB workflows, the knowledge graph |
 | `codegraph` | the graphify code knowledge graph |
@@ -35,6 +36,7 @@ dependency is never silently switched back on — that would undo an explicit us
 
 ```mermaid
 graph TD
+    lsl --> lslredirect["lsl-redirect"]
     lsl --> observations
     observations --> knowledge
     llmproxy["llm-proxy"] --> performance
@@ -46,6 +48,7 @@ graph TD
 
 | dependent | requires | why |
 |-----------|----------|-----|
+| `lsl-redirect` | `lsl` | it re-targets where the transcript monitor writes; with no transcript there is nothing to re-target |
 | `observations` | `lsl` | the observation tap lives inside the enhanced transcript monitor; nothing else produces observations |
 | `knowledge` | `observations` | UKB wave-analysis consumes observations and digests |
 | `performance` | `llm-proxy` | token attribution is read off the proxy's usage tap |
@@ -94,6 +97,30 @@ running, and `minimal` / `proxy-only` stop it in the same pass that switches `ls
 which used to leave detached ETMs writing `.specstory/history` indefinitely (measured:
 two of them, up 8-9 hours, under `minimal`). `reconcileEtm` only ever stops; spawning
 stays the coordinator's job, so an apply cannot become a second spawner racing the first.
+
+### `lsl-redirect` owns a decision, not an artifact
+
+`lsl-redirect` has no daemon, no container program, no port and no health rule. What it
+gates is one branch inside the ETM: whether a prompt set written while working in project
+X may be filed under the **tools** repo instead of X, because the classifier judged it to
+be about the toolchain.
+
+That branch is useful to whoever develops this toolchain and actively wrong for everyone
+else — for a team using it, their own sessions leave their own scope. It was
+unconditional until this feature existed: `determineTargetProject()` special-cased
+`basename(projectPath) === 'coding'`, no spawner ever passed a mode to disable it, and the
+ETM did not read the feature system at all.
+
+| path | what it does when `lsl-redirect` is off |
+|------|----------------------------------------|
+| `determineTargetProject()` | returns the local project unconditionally |
+| the 5-layer coding classifier | never constructed |
+| `ClassificationLogger` foreign log | never written into the tools repo |
+| `getRedirectStatus()` + the `[→target]` badge | not computed, not rendered |
+
+Because a profile turns OFF everything it does not name, the `km` and `km-perf` bundles
+gate this simply by not listing it. `full` lists it, so "everything on" still means the
+historical behaviour.
 
 ## Launch-time host services
 
@@ -192,7 +219,8 @@ omitted entirely — no greying, no placeholder.
 | `[N:…]` `[P:…]` | network location, proxydetox state | `health` |
 | `[Cc…]` | per-project session letters | `lsl` |
 | `[LSL●]` | live-session-logging health | `lsl` |
-| `[📋tranche]` `[→target]` | log tranche / redirect target | `lsl` |
+| `[📋tranche]` | log tranche | `lsl` |
+| `[→target]` | redirect target | `lsl-redirect` |
 | `[📚●]` | observation pipeline freshness | `observations` |
 | `[🔒NN%]` | constraint compliance + violations | `constraints` |
 | `[🧠●]` | proxy semantic readiness | `llm-proxy` |
@@ -395,6 +423,8 @@ Presets live in `config/feature-profiles.yaml`:
 | profile | on |
 |---------|-----|
 | `full` | everything (the default) |
+| `km` | `lsl`, `observations`, `knowledge`, `health`, `statusline` |
+| `km-perf` | `km` plus `llm-proxy`, `performance` |
 | `proxy-only` | `llm-proxy`, `statusline` |
 | `logging-only` | `lsl`, `statusline`, `health` |
 | `minimal` | `statusline` |

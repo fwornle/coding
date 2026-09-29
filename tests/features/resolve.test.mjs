@@ -180,7 +180,14 @@ describe('dependency closure', () => {
     writeHome('features:\n  lsl: off\n');
     const r = loadFeatures(opts());
     const auto = r.warnings.filter((w) => w.includes('auto-disabled'));
-    assert.equal(auto.length, 2); // observations, knowledge
+    // observations (direct), knowledge (transitive via observations), and
+    // lsl-redirect (direct). Asserted by name rather than by count: a bare count
+    // passes for the wrong set, and this is the assertion that proves the
+    // fixpoint loop closes over an indirect dependency rather than one level.
+    assert.deepEqual(
+      auto.map((w) => w.split("'")[1]).sort(),
+      ['knowledge', 'lsl-redirect', 'observations'],
+    );
   });
 
   test('disabling health warns that the editor is gone', () => {

@@ -4204,7 +4204,7 @@ resolve_feature_selection() {
         ' "$CODING_REPO/lib/features/resolve.cjs" 2>/dev/null)" || FEATURES_NEED_DOCKER="true"
     fi
 
-    [[ -n "$ACTIVE_FEATURES" ]] || ACTIVE_FEATURES="lsl observations knowledge codegraph constraints llm-proxy performance health statusline"
+    [[ -n "$ACTIVE_FEATURES" ]] || ACTIVE_FEATURES="lsl lsl-redirect observations knowledge codegraph constraints llm-proxy performance health statusline"
     [[ -n "$FEATURES_NEED_DOCKER" ]] || FEATURES_NEED_DOCKER="true"
 }
 

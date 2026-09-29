@@ -25,6 +25,11 @@ function runSweeper(repoRoot, retentionDays) {
     env: {
       ...process.env,
       CODING_REPO: repoRoot,
+      // Pin the data root too. The sweeper resolves the measurements tree from
+      // LLM_PROXY_DATA_DIR (it moved out of the repo with the data home), and this
+      // env spreads process.env — an inherited value would point a DELETING sweep at
+      // the developer's real measurement archive.
+      LLM_PROXY_DATA_DIR: path.join(repoRoot, '.data'),
       CONTEXT_TURNS_RETENTION_DAYS: String(retentionDays),
     },
     encoding: 'utf8',

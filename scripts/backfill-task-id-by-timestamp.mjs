@@ -40,6 +40,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
@@ -55,8 +56,7 @@ function parseStrArg(argv, flag) {
 
 /** Resolve the default data dir (mirrors the proxy's resolveTokenDbPath order). */
 function resolveDataDir() {
-  return process.env.LLM_PROXY_DATA_DIR
-    || path.join(process.env.CODING_REPO || path.resolve(import.meta.dirname, '..'), '.data');
+  return proxyDataDir();
 }
 
 function resolveDbPath(override) {

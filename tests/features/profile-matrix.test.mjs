@@ -32,9 +32,24 @@ const REPO = (process.env.CODING_REPO || new URL('../..', import.meta.url).pathn
 const MATRIX = {
   full: {
     docker: true,
-    features: ['lsl', 'observations', 'knowledge', 'codegraph', 'constraints', 'llm-proxy', 'performance', 'health', 'statusline'],
+    features: ['lsl', 'lsl-redirect', 'observations', 'knowledge', 'codegraph', 'constraints', 'llm-proxy', 'performance', 'health', 'statusline'],
     mcpServers: ['graphify'],
     hooks: ['PreToolUse', 'PostToolUse', 'UserPromptSubmit'],
+  },
+  // The two consumer bundles. The assertion that earns its keep in both is the
+  // ABSENCE of lsl-redirect: that is what stops an install for another team
+  // filing their sessions into the tools repo instead of their own project.
+  km: {
+    docker: true,
+    features: ['lsl', 'observations', 'knowledge', 'health', 'statusline'],
+    mcpServers: [],
+    hooks: ['PostToolUse', 'UserPromptSubmit'],
+  },
+  'km-perf': {
+    docker: true,
+    features: ['lsl', 'observations', 'knowledge', 'llm-proxy', 'performance', 'health', 'statusline'],
+    mcpServers: [],
+    hooks: ['PostToolUse', 'UserPromptSubmit'],
   },
   'proxy-only': {
     docker: false,

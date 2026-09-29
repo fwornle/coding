@@ -47,6 +47,7 @@ import { runMatrix, cellName } from '../lib/experiments/experiment-runner.mjs';
 import { resolveExperimentSpec } from '../lib/experiments/experiment-spec.mjs';
 import { writeProgress } from '../lib/experiments/run-progress.mjs';
 import { loadTaxonomy, isValidClass } from '../lib/experiments/taxonomy.mjs';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 // Required agents whose non-completion makes the whole run fail (copilot may legitimately
 // land a recorded skip-Run when the headless probe fails — that is NOT a failure).
@@ -241,7 +242,7 @@ async function main() {
   }
 
   const repoRoot = process.env.CODING_REPO || process.cwd();
-  const dataDir = process.env.LLM_PROXY_DATA_DIR || path.join(repoRoot, '.data');
+  const dataDir = proxyDataDir();
 
   // Load the raw spec object (so runMatrix can read experiment_id/snapshot_id off it) and
   // resolve+whole-run-validate the matrix via the shipped Phase-77 resolver (fail-fast).

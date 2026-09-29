@@ -50,6 +50,7 @@ import { gatherEvidence, deriveNonGsdRubric } from '../lib/experiments/evidence-
 import { runJudge, nullJudgment } from '../lib/experiments/judge.mjs';
 import { writeScore } from '../lib/experiments/score-write.mjs';
 import { isTrivialRun, filterConsequential } from '../lib/experiments/consequential-events.mjs';
+import { proxyDataDir } from '../lib/paths/index.mjs';
 
 const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
@@ -82,7 +83,7 @@ function overlayNonGsdRubric(judgment, evidence) {
 
 /** Resolve the default data dir (mirrors the proxy/backfill resolution order). */
 function resolveDataDir() {
-  return process.env.LLM_PROXY_DATA_DIR || path.join(REPO_ROOT, '.data');
+  return proxyDataDir();
 }
 
 /** Read the archived span JSON the proxy wrote at close. Returns null when unreadable. */
