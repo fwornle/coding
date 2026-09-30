@@ -313,7 +313,6 @@ Capture, organize, and visualize development insights with git-based team collab
 - **VKB (Visualize Knowledge Base)**: Web-based graph visualization
 - **Graph Database**: Agent-agnostic persistent storage (Graphology + Level)
 - **Git-Tracked JSON**: Team collaboration via pretty JSON exports
-- **graph-sync CLI**: Manual export/import/status operations
 - **Auto-Sync**: Import on startup, export on changes (5s debounce)
 - **Team Isolation**: Multi-team support with conflict resolution
 - **Domain-Specific**: Automatic domain knowledge bases per team
@@ -351,12 +350,6 @@ Capture, organize, and visualize development insights with git-based team collab
 vkb
 
 # View at http://localhost:8080
-
-# Manual sync operations
-graph-sync status      # View sync status
-graph-sync export      # Export all teams to JSON
-graph-sync import      # Import all teams from JSON
-graph-sync sync        # Full bidirectional sync
 ```
 
 ### Constraint Monitoring

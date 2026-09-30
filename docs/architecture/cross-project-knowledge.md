@@ -337,10 +337,11 @@ If patterns seem missing:
 
 If knowledge seems out of sync:
 
-1. Pull latest from git: `cd /Users/you/Agentic/coding && git pull`
-2. Restart coding session: `coding --claude` (auto-imports JSON)
-3. Check auto-export: Verify `.data/knowledge-export/*.json` files updated
-4. Manual sync if needed: Use `graph-sync` CLI tool
+1. Check the graph is where you think it is: `bin/coding-data-home --explain`
+2. Restart the session: `coding --claude` (km-core hydrates the store on open)
+3. Check the export is being written: `<dataHome>/kb/knowledge-graph/exports/general.json`
+   should have a recent mtime — the exporter debounces 5s after a change
+4. If the LevelDB is wiped, the export above is what `hydrate()` rebuilds it from
 
 ### Cross-Project Issues
 
