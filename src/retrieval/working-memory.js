@@ -13,6 +13,7 @@
 
 import { readFileSync } from 'node:fs';
 import { countTokens } from 'gpt-tokenizer';
+import { resolveScope, isPlaceholderScope } from '../../lib/scope/index.mjs';
 
 /** Firm 300-token ceiling for working memory (D-05). */
 const WM_BUDGET = 300;
@@ -29,8 +30,23 @@ const VKB_TIMEOUT = 2000;
 /** VKB API base URL. */
 const VKB_BASE = 'http://localhost:8080';
 
-/** Team identifier used for both VKB queries and canonical project name match. */
-const TEAM = 'coding';
+/**
+ * The tenant this installation's knowledge belongs to, for the VKB query filter
+ * and the canonical project-name match.
+ *
+ * Was the literal `'coding'`, which gave a colleague installing for `raas` this
+ * repo's tenant. LENIENT on purpose: both uses are READS, and this is module
+ * scope — a strict resolve here would throw at import time and take down every
+ * retrieval response rather than refusing one write.
+ *
+ * `null` when no tenant is configured, which means "do not filter". A filter of
+ * `team=default` would return nothing, and an empty working memory is
+ * indistinguishable from a knowledge base that lost its content.
+ */
+const TEAM = (() => {
+  const s = resolveScope();
+  return isPlaceholderScope(s) ? null : s;
+})();
 
 /**
  * Pick the canonical Project entity from a list.
@@ -47,6 +63,12 @@ const TEAM = 'coding';
  */
 function pickCanonicalProject(entities, team) {
   if (!Array.isArray(entities) || entities.length === 0) return null;
+  // No tenant configured means no canonical name to match on. Returning null
+  // matches this module's fail-open contract: working memory is omitted and the
+  // full token budget goes to semantic search. Guessing `entities[0]` instead
+  // would surface a misclassified concept description as the project, which is
+  // the exact pollution this function exists to avoid.
+  if (!team) return null;
   const target = team.toLowerCase();
   return entities.find((e) => (e.entity_name || '').toLowerCase() === target) || null;
 }
@@ -61,7 +83,10 @@ function pickCanonicalProject(entities, team) {
  */
 async function fetchKGStructure() {
   try {
-    const base = `${VKB_BASE}/api/entities?team=${TEAM}`;
+    // No team parameter at all when the tenant is unknown — see TEAM above.
+    const base = TEAM
+      ? `${VKB_BASE}/api/entities?team=${encodeURIComponent(TEAM)}`
+      : `${VKB_BASE}/api/entities?`;
     const [projectRes, componentRes] = await Promise.all([
       fetch(`${base}&type=Project`, { signal: AbortSignal.timeout(VKB_TIMEOUT) }),
       fetch(`${base}&type=Component`, { signal: AbortSignal.timeout(VKB_TIMEOUT) }),

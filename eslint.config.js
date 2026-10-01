@@ -81,23 +81,6 @@ export default [
   },
 
   {
-    // WorkflowOrchestrator is written against an ambient contract: it probes for
-    // `mcp__semantic_analysis__*` with `typeof x === 'function'` and only calls
-    // them when that passes. `typeof` on an undeclared name is safe, so the guard
-    // works and the call sites are unreachable outside that environment — but they
-    // are still references, and no-undef is right to see them. Declaring them says
-    // what the file already assumes instead of silencing the rule.
-    files: ['lib/ukb-unified/core/WorkflowOrchestrator.js'],
-    languageOptions: {
-      globals: {
-        ...globals.node,
-        mcp__semantic_analysis__execute_workflow: 'readonly',
-        mcp__semantic_analysis__test_connection: 'readonly',
-      },
-    },
-  },
-
-  {
     // Test files add the jest globals on top of node's.
     files: ['tests/**', 'test/**', '**/*.test.js', '**/*.test.mjs'],
     languageOptions: {

@@ -466,6 +466,20 @@ if [[ -f "$HOME/.coding/features.yaml" ]]; then
     rmdir "$HOME/.coding" 2>/dev/null || true
 fi
 
+# 1c. The install scope and the data root are KEPT, and said out loud.
+#
+# Both are `reversible|no` in install.sh's mutation manifest. ~/.coding/scope
+# names the tenant that owns the knowledge base, and ~/.coding/data/<scope>/ IS
+# the knowledge base plus the session history. Removing the scope while leaving
+# the data would strand it behind a name nothing can resolve any more, so neither
+# goes. The rmdir above fails harmlessly while they remain, which is correct.
+if [[ -f "$HOME/.coding/scope" ]]; then
+    _kept_root="$("$CODING_REPO/bin/coding-data-home" 2>/dev/null || true)"
+    echo "  KEPT ~/.coding/scope and your knowledge base:"
+    echo "        ${_kept_root:-~/.coding/data/<scope>}"
+    echo "        (delete it by hand if you really mean to lose it)"
+fi
+
 # 2. Global slash commands, but ONLY the files that came from this repo.
 if [[ -d "$HOME/.claude/commands" && -d "$CODING_REPO/.claude/commands" ]]; then
     _removed=0

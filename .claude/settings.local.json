@@ -94,7 +94,7 @@
       "Bash(uv run:*)",
       "Bash(uvx:*)",
       "Bash(CODE_GRAPH_RAG_SSE_URL=http://localhost:3850 .venv/bin/python:*)",
-      "Bash(for f in /Users/Q284340/Agentic/coding/lib/adapters/copilot-http-server.js /Users/Q284340/Agentic/coding/lib/adapters/copilot.js /Users/Q284340/Agentic/coding/lib/fallbacks/memory-fallback.js /Users/Q284340/Agentic/coding/lib/fallbacks/memory-fallback-multiteam.js /Users/Q284340/Agentic/coding/lib/integrations/specstory-adapter.js /Users/Q284340/Agentic/coding/lib/knowledge-api/cli.js /Users/Q284340/Agentic/coding/lib/knowledge-api/utils/config.js /Users/Q284340/Agentic/coding/lib/ukb-database/cli.js /Users/Q284340/Agentic/coding/lib/ukb-unified/cli.js /Users/Q284340/Agentic/coding/lib/vkb-server/debug-graphdb.js /Users/Q284340/Agentic/coding/lib/vkb-server/db-query-cli.js)",
+      "Bash(for f in /Users/Q284340/Agentic/coding/lib/adapters/copilot-http-server.js /Users/Q284340/Agentic/coding/lib/adapters/copilot.js /Users/Q284340/Agentic/coding/lib/fallbacks/memory-fallback.js /Users/Q284340/Agentic/coding/lib/integrations/specstory-adapter.js /Users/Q284340/Agentic/coding/lib/knowledge-api/cli.js /Users/Q284340/Agentic/coding/lib/knowledge-api/utils/config.js /Users/Q284340/Agentic/coding/lib/ukb-database/cli.js /Users/Q284340/Agentic/coding/lib/vkb-server/debug-graphdb.js /Users/Q284340/Agentic/coding/lib/vkb-server/db-query-cli.js)",
       "Bash(do node --check:*)",
       "Bash(pip3 show:*)",
       "Bash(pip3 install:*)",

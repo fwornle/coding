@@ -18,7 +18,8 @@ const require = createRequire(import.meta.url);
 const REPO = process.env.CODING_REPO || new URL('../..', import.meta.url).pathname;
 
 const {
-  resolveScope, explain, normaliseScope, isToolsRepo, toolsRepo, samePath,
+  resolveScope, requireScope, isPlaceholderScope,
+  explain, normaliseScope, isToolsRepo, toolsRepo, samePath,
   ScopeError, DEFAULT_SCOPE, SCOPE_MAX,
 } = require(join(REPO, 'lib/scope/resolve.cjs'));
 
@@ -142,6 +143,73 @@ describe('normalisation and validation', () => {
       assert.match(err.message, /CODING_SCOPE/);
       return true;
     });
+  });
+});
+
+describe('strict resolution — requireScope and isPlaceholderScope', () => {
+  test('with nothing configured requireScope throws and names the fix', () => {
+    assert.throws(() => requireScope(opts()), (err) => {
+      assert.ok(err instanceof ScopeError);
+      // The message has to be actionable: the whole reason this throws rather
+      // than returning the placeholder is so somebody can fix it.
+      assert.match(err.message, /~\/\.coding\/scope/);
+      assert.match(err.message, /CODING_SCOPE/);
+      return true;
+    });
+    // ...while the lenient resolver is unchanged. That pairing is the design.
+    assert.equal(resolveScope(opts()), DEFAULT_SCOPE);
+  });
+
+  test('a real tenant from the home file is returned', () => {
+    writeScope('raas\n');
+    assert.equal(requireScope(opts()), 'raas');
+  });
+
+  test('a real tenant from the env is returned', () => {
+    assert.equal(requireScope(opts({ env: { CODING_SCOPE: 'resi' } })), 'resi');
+  });
+
+  test('CODING_SCOPE=default throws — the placeholder must not arrive via env', () => {
+    // REGRESSION, do not relax this to an `isDefault` check.
+    //
+    // `bin/coding-data-home --scope` prints `default` on a machine with no
+    // ~/.coding/scope, and scripts/launch-agent-common.sh:382 exports whatever
+    // it printed. So the fresh-install case this function exists to catch
+    // arrives as CODING_SCOPE=default, which explain() reports as
+    // `source: 'env', isDefault: false` — an isDefault check waves it through
+    // and the placeholder ends up tagged onto entities permanently.
+    const o = opts({ env: { CODING_SCOPE: 'default' } });
+    assert.equal(explain(o).isDefault, false, 'precondition: env makes isDefault false');
+    assert.equal(explain(o).source, 'env');
+    assert.throws(() => requireScope(o), ScopeError);
+  });
+
+  test('a literal "default" in the scope file throws — the name is reserved', () => {
+    // Every unconfigured install would share ~/.coding/data/default/, so one
+    // person's `default` knowledge would merge with everyone else's.
+    writeScope('default\n');
+    assert.throws(() => requireScope(opts()), ScopeError);
+    writeScope('  DEFAULT  \n');
+    assert.throws(() => requireScope(opts()), ScopeError);
+  });
+
+  test('a malformed value still throws from normalisation, not from the new check', () => {
+    // Ordering matters: a bad value is a bad value, not an unresolved one, and
+    // the message must keep naming its source.
+    assert.throws(() => requireScope(opts({ env: { CODING_SCOPE: 'a/b' } })), (err) => {
+      assert.match(err.message, /CODING_SCOPE/);
+      assert.doesNotMatch(err.message, /has no scope/);
+      return true;
+    });
+  });
+
+  test('isPlaceholderScope recognises the placeholder in every spelling', () => {
+    for (const yes of [null, undefined, '', '   ', 'default', 'DEFAULT', ' Default ']) {
+      assert.equal(isPlaceholderScope(yes), true, `expected ${JSON.stringify(yes)} to be a placeholder`);
+    }
+    for (const no of ['raas', 'coding', 'default-team', 'defaults']) {
+      assert.equal(isPlaceholderScope(no), false, `expected ${JSON.stringify(no)} to be real`);
+    }
   });
 });
 

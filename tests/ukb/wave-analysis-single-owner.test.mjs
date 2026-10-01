@@ -100,28 +100,40 @@ describe('WaveController can borrow the owner\'s store', { skip: SKIP_NO_SUBMODU
     assert.match(waveTypes, /kmStore\?: KmStoreHandle/);
   });
 
-  test('an injected store is used instead of opening a private one', () => {
-    const flat = waveController.replace(/\s+/g, ' ');
-    assert.match(flat, /if \(this\.injectedKmStore\) \{/);
-    assert.match(flat, /createKmCoreAdapter\(\{ store: this\.injectedKmStore as never/);
+  test('an injected store is forwarded rather than a private one being opened', () => {
+    // The branch used to live here as `if (this.injectedKmStore) { ... } else {
+    // new km.GraphKMStore ... }`. It moved to storage/km-store-host.ts so that
+    // tools.ts and coordinator.ts — which had three copies of the WRONG version,
+    // pointed at a directory that exists nowhere — share this one. The invariant
+    // is unchanged: an already-open store is forwarded, never re-opened.
+    const flat = code(waveController).replace(/\s+/g, ' ');
+    assert.match(flat, /acquireKmStore\(\{/);
+    assert.match(flat, /injected: this\.injectedKmStore/);
   });
 
-  test('an injected store is never opened or closed by WaveController', () => {
-    // The owner's lifecycle wins; opening a second handle is the original bug
-    // and closing the owner's would take obs-api's store out from under it.
-    const injectedBranch = waveController.slice(
-      waveController.indexOf('if (this.injectedKmStore)'),
-      waveController.indexOf('} else {', waveController.indexOf('if (this.injectedKmStore)')),
-    );
-    assert.doesNotMatch(injectedBranch, /\.open\(\)/);
-    assert.doesNotMatch(injectedBranch, /\.close\(\)/);
-    assert.doesNotMatch(injectedBranch, /new km\.GraphKMStore/);
+  test('WaveController itself no longer opens or closes any store', () => {
+    // Stronger than the assertion this replaces, which only checked the injected
+    // BRANCH. Opening a second handle is the original bug, and closing the
+    // owner's would take obs-api's store out from under it — km-core's close()
+    // persists the whole graph and drops the LevelDB handle.
+    const src = code(waveController);
+    assert.doesNotMatch(src, /new km\.GraphKMStore/);
+    assert.doesNotMatch(src, /\bstore\.open\(\)/);
+    assert.doesNotMatch(src, /adapter\.close\(\)/);
   });
 
-  test('the private-store path still exists for callers that own nothing', () => {
-    // A fresh checkout or CI has no obs-api holding the lock.
-    assert.match(waveController, /new km\.GraphKMStore\(/);
-    assert.match(waveController, /km-core adapter initialized \(private store\)/);
+  test('the private-store path still exists, in the one place that owns it', () => {
+    // A fresh checkout or CI has no obs-api holding the lock, so the path must
+    // still be reachable — just not duplicated per caller. Ownership is explicit
+    // now (`owned`), and release() is the only route to a close.
+    const host = readOrNull(path.join(SA, 'storage', 'km-store-host.ts'));
+    assert.ok(host, 'storage/km-store-host.ts must exist');
+    assert.match(host, /new km\.GraphKMStore\(/);
+    assert.match(host, /owned: true/);
+    assert.match(host, /owned: false/);
+    // And the three-state provider contract that makes borrowing safe: a host
+    // that is still hydrating must throw rather than open a second handle.
+    assert.match(host, /KmStoreNotReadyError/);
   });
 });
 

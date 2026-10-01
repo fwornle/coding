@@ -26,19 +26,40 @@
 // extensionless bin is loaded as ESM and `require` is not defined. That is the
 // same trap that left src/live-logging/ExchangeRouter.js permanently unloadable.
 import { dataHome, ensureDataHome, explain } from '../lib/paths/index.mjs';
-import { resolveScope } from '../lib/scope/index.mjs';
+import { requireScope, resolveScope, ScopeError } from '../lib/scope/index.mjs';
 
 const argv = process.argv.slice(2);
 
 if (argv.includes('--help') || argv.includes('-h')) {
   process.stdout.write(
-    'usage: coding-data-home [--ensure] [--explain] [--scope]\n' +
-      '  (no flags)  print the resolved data root\n' +
-      '  --ensure    create the root and its history/ kb/ var/ subtrees first\n' +
-      '  --explain   print the scope, where it came from, and the layout\n' +
-      '  --scope     print just the resolved scope\n',
+    'usage: coding-data-home [--ensure] [--explain] [--scope] [--require-scope]\n' +
+      '  (no flags)       print the resolved data root\n' +
+      '  --ensure         create the root and its history/ kb/ var/ subtrees first\n' +
+      '  --explain        print the scope, where it came from, and the layout\n' +
+      '  --scope          print just the resolved scope (may be the placeholder)\n' +
+      '  --require-scope  print the scope, or exit 2 if it is the placeholder\n',
   );
   process.exit(0);
+}
+
+// --require-scope before --scope: a caller that passes both is asking the
+// stricter question, and `argv.includes` has no notion of flag order.
+//
+// This is the shell-callable form of requireScope(), so install.sh can validate
+// an answer by RUNNING the resolver instead of carrying a second copy of
+// SCOPE_RE in bash. Exit 2 rather than 1 matches scripts/migrate-data-home.mjs,
+// the other surface that refuses on the placeholder.
+if (argv.includes('--require-scope')) {
+  try {
+    process.stdout.write(`${requireScope()}\n`);
+    process.exit(0);
+  } catch (err) {
+    if (err instanceof ScopeError) {
+      process.stderr.write(`${err.message}\n`);
+      process.exit(2);
+    }
+    throw err;
+  }
 }
 
 if (argv.includes('--scope')) {

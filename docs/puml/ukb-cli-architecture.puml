@@ -33,7 +33,9 @@ package "UKB Unified CLI" {
     [Help System] as Help
 
     note right of CLI
-      Entry point: lib/ukb-unified/cli.js
+      RETIRED: lib/ukb-unified/cli.js was
+      deleted. Kept as a record of the
+      pre-workflow CLI shape.
       Commands: default, analyze, status,
       checkpoint, config, entity, relation,
       search, validate, help

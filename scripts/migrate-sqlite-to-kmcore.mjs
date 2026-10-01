@@ -325,7 +325,12 @@ async function main() {
       dbPath: targetAbs,
       exportDir,
       ontologyDir: defaultOntologyDir(),
-      domains: ['coding'],
+      // No `domains`. It is a TOPIC slot, not a tenant slot: the only writers of
+      // `metadata.domain` set 'development-workflow', 'pattern-analysis' and
+      // 'cross-analysis', so a tenant name here matched nothing. It also made the
+      // export FILENAME depend on the tenant, which gave every colleague a
+      // permanently-empty bucket. Omitting it resolves the same `['general']`
+      // default every other opener now uses.
     });
     await store.open();
   } else {

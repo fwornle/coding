@@ -13,6 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createLogger } from '../../lib/logging/Logger.js';
+import { requireScope } from '../../lib/scope/index.mjs';
 
 const logger = createLogger('KnowledgeQueryService');
 
@@ -459,11 +460,17 @@ export class KnowledgeQueryService {
         classification = null,
         confidence = 1.0,
         source = 'manual',
-        team = 'coding',
+        team,
         sessionId = null,
         embeddingId = null,
         metadata = {}
       } = entity;
+
+      // Strict: this row is about to be tagged with a tenant, and a tenant is
+      // permanent. Resolved HERE and not as a destructure default, because a
+      // default-parameter resolve would throw for every caller that merely
+      // constructs this service on an unscoped machine.
+      const tenant = team ?? requireScope();
 
       const graphEntity = {
         name: entityName,
@@ -489,7 +496,7 @@ export class KnowledgeQueryService {
       if (entity.role !== undefined) graphEntity.role = entity.role;
       if (entity.enrichedContext !== undefined) graphEntity.enrichedContext = entity.enrichedContext;
 
-      const nodeId = await graphDB.storeEntity(graphEntity, { team });
+      const nodeId = await graphDB.storeEntity(graphEntity, { team: tenant });
 
       if (this.debug) {
         console.log(`[KnowledgeQueryService] Stored entity in graph: ${entityName} (${nodeId})`);
@@ -512,11 +519,17 @@ export class KnowledgeQueryService {
       classification = null,
       confidence = 1.0,
       source = 'manual',
-      team = 'coding',
+      team,
       sessionId = null,
       embeddingId = null,
       metadata = {}
     } = entity;
+
+    // Strict: this row is about to be tagged with a tenant, and a tenant is
+    // permanent. Resolved HERE and not as a destructure default, because a
+    // default-parameter resolve would throw for every caller that merely
+    // constructs this service on an unscoped machine.
+    const tenant = team ?? requireScope();
 
     try {
       const stmt = this.databaseManager.sqlite.prepare(`
@@ -536,7 +549,7 @@ export class KnowledgeQueryService {
         classification,
         confidence,
         source,
-        team,
+        tenant,
         sessionId,
         embeddingId,
         JSON.stringify(metadata)
@@ -572,11 +585,17 @@ export class KnowledgeQueryService {
         toEntityId,
         relationType,
         confidence = 1.0,
-        team = 'coding',
+        team,
         fromTeam,
         toTeam,
         metadata = {}
       } = relation;
+
+      // Strict: this row is about to be tagged with a tenant, and a tenant is
+      // permanent. Resolved HERE and not as a destructure default, because a
+      // default-parameter resolve would throw for every caller that merely
+      // constructs this service on an unscoped machine.
+      const tenant = team ?? requireScope();
 
       // Graph database uses entity names, not IDs
       const fromName = fromEntityName || fromEntityId;
@@ -602,7 +621,7 @@ export class KnowledgeQueryService {
       }
 
       // Return a consistent ID format for graph relations
-      return `${team}:${fromName}:${relationType}:${toName}`;
+      return `${tenant}:${fromName}:${relationType}:${toName}`;
     }
 
     // Fallback to SQLite
@@ -616,9 +635,15 @@ export class KnowledgeQueryService {
       toEntityId,
       relationType,
       confidence = 1.0,
-      team = 'coding',
+      team,
       metadata = {}
     } = relation;
+
+    // Strict: this row is about to be tagged with a tenant, and a tenant is
+    // permanent. Resolved HERE and not as a destructure default, because a
+    // default-parameter resolve would throw for every caller that merely
+    // constructs this service on an unscoped machine.
+    const tenant = team ?? requireScope();
 
     try {
       const stmt = this.databaseManager.sqlite.prepare(`
@@ -634,7 +659,7 @@ export class KnowledgeQueryService {
         toEntityId,
         relationType,
         confidence,
-        team,
+        tenant,
         JSON.stringify(metadata)
       );
 

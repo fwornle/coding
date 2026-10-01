@@ -7,11 +7,14 @@ top to bottom direction
 
 ' Entry point
 package "CLI Entry Point" {
-  [lib/ukb-unified/cli.js] as cli
+  [bin/semantic\nworkflow run wave-analysis] as cli
   note right of cli
-    UKB Unified CLI (v2.0)
-    Smart incremental updates
-    Team checkpoint management
+    The UKB pass is a workflow, not a CLI
+    of its own: bin/semantic POSTs to the
+    :3848 SSE server, which runs it in the
+    process that owns the graph.
+    (lib/ukb-unified/ was the former entry
+    point and is deleted.)
   end note
 }
 
@@ -48,7 +51,7 @@ package "Persistence (km-core)" {
 ' Storage layer
 package "Persistent Storage" {
   database "Graphology\n(via km-core)" as graphology
-  database "LevelDB\n(.data/knowledge-graph/)" as leveldb
+  database "LevelDB\n(<dataHome>/var/)" as leveldb
   database "SQLite\n(.data/knowledge.db)" as sqlite_db
   database "Qdrant\n(Vector DB)" as qdrant_db
 }
@@ -56,7 +59,7 @@ package "Persistent Storage" {
 ' Synchronized JSON export
 package "Git-Tracked Export" {
   [GraphKnowledgeExporter] as exporter
-  file "JSON Files\n(.data/knowledge-export/)" as json_export
+  file "JSON Files\n(<dataHome>/kb/…/exports)" as json_export
 }
 
 ' Visualization
@@ -117,7 +120,7 @@ end note
 note right of km_store
   **km-core Persistence (System B)**
   • GraphKMStore wraps Graphology
-  • LevelDB: .data/knowledge-graph-migrated/
+  • LevelDB: <dataHome>/var/knowledge-graph/leveldb
   • Entity resolution via ontology
   • mergeEntities() deduplication
   • KM_CORE_PERSISTENCE flag retired

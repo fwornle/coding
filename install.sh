@@ -153,6 +153,8 @@ repo|$CODING_REPO/lib/km-core|checkout|yes|git submodule required for session lo
 repo|$CODING_REPO/.coding/|create|yes|per-launch agent config, so nothing global has to change
 repo|$CODING_REPO/.specstory/history/|clone or init|no|private session-history checkout; never pushed without confirmation, and uninstall.sh leaves your transcripts alone [feature:lsl]
 home|~/.coding/features.yaml|create|yes|which parts of coding you chose to install (not written for the default, `full`)
+home|~/.coding/scope|create|no|which tenant owns this machine's knowledge; also names the data root below. Not written if you decline to name one, and never overwritten
+home|~/.coding/data/<scope>/|create|no|your knowledge base and session history. uninstall.sh never deletes it — removing the scope while leaving this would strand the data behind an unresolvable name
 home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
 home|$SHELL_RC|one marker block|yes|exports CODING_REPO and adds bin/ to PATH
 home|~/.gsd-browser/|create|yes|gsd-browser CLI, the mandated browser-automation tool; installer reuses a system Chrome when present and otherwise downloads Chrome for Testing. On macOS also writes config.toml [browser] path + a chromium.app symlink, pinning automation to Chrome for Testing so it cannot intercept AppleScript aimed at your own Chrome
@@ -3993,6 +3995,8 @@ parse_args() {
             # feature list. Absent = ask interactively, default `full`, which is
             # byte-for-byte the historical install.
             --features=*)                CODING_INSTALL_FEATURES="${1#*=}" ;;
+            --scope=*)                   CODING_INSTALL_SCOPE="${1#*=}" ;;
+            --scope)                     shift; CODING_INSTALL_SCOPE="${1:-}" ;;
             --features)                  shift; CODING_INSTALL_FEATURES="${1:-full}" ;;
             -h|--help)                   show_usage; exit 0 ;;
             --skip-hooks)                : ;;  # accepted, no-op at root level
@@ -4008,6 +4012,7 @@ parse_args() {
     # CODING_INSTALL_FEATURES is honoured whether it came from the flag above or
     # from the environment, so a CI matrix can set it once for the whole job.
     CODING_INSTALL_FEATURES="${CODING_INSTALL_FEATURES:-}"
+    CODING_INSTALL_SCOPE="${CODING_INSTALL_SCOPE:-}"
 
     # No controlling TTY on stdin → force non-interactive so `read` under
     # `set -e` can never abort on EOF (the failure mode of piped/CI runs).
@@ -4056,6 +4061,94 @@ read_or_default() {
 #
 # See docs/architecture/features.md.
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# WHICH TENANT OWNS THIS MACHINE'S KNOWLEDGE
+#
+# Writes ~/.coding/scope. Nothing wrote it before, even though the resolver's
+# docstring claimed this installer did — so every install resolved the inert
+# placeholder `default`, and every knowledge-writing path then had to either
+# refuse or invent a tenant. The code now refuses (lib/scope requireScope), which
+# only works if the question actually gets asked.
+#
+# A SEPARATE QUESTION FROM CODING_TEAM, deliberately. CODING_TEAM is a
+# per-observation node attribute; this is a per-machine property that also names
+# the data root (~/.coding/data/<scope>/). Conflating them is the trap lib/scope
+# exists to prevent.
+#
+# THE DEFAULT IS EMPTY, NEVER `coding`. An installer that defaults to this repo's
+# own tenant is the original bug with extra steps — and worse once the consent
+# manifest claims the user chose it.
+# ─────────────────────────────────────────────────────────────────────────────
+ask_install_scope() {
+    local scope_file="$HOME/.coding/scope"
+
+    # Never overwrite. Unlike features.yaml this is not just a preference: the
+    # scope names the data root, so rewriting it MOVES the knowledge base and
+    # session history, orphaning everything under the old name. Changing it is a
+    # migration, not a re-install.
+    if [[ -s "$scope_file" ]]; then
+        local current
+        current="$("$CODING_REPO/bin/coding-data-home" --scope 2>/dev/null || echo '?')"
+        info "Install scope already set: $current ($scope_file)"
+        info "  To change it (this MOVES your knowledge base):"
+        info "    node $CODING_REPO/scripts/migrate-data-home.mjs --help"
+        return 0
+    fi
+
+    local choice="${CODING_INSTALL_SCOPE:-}"
+
+    # An exported CODING_SCOPE is a reasonable suggestion but not an answer:
+    # persisting it means a later launcher resolves the same tenant without the
+    # environment variable being set.
+    local suggestion="${choice:-${CODING_SCOPE:-}}"
+    if [[ "$suggestion" == "default" ]]; then suggestion=""; fi
+
+    if [[ -z "$choice" && "$NON_INTERACTIVE" != "true" ]]; then
+        echo ""
+        echo -e "${PURPLE}────────────────────────────────────────────────────────────────────${NC}"
+        echo -e "${PURPLE}  WHICH TENANT OWNS THIS MACHINE'S KNOWLEDGE?${NC}"
+        echo -e "${PURPLE}────────────────────────────────────────────────────────────────────${NC}"
+        echo ""
+        echo "  This names the knowledge base this machine writes to, and the"
+        echo "  directory it lives in: ~/.coding/data/<scope>/"
+        echo ""
+        echo "  Use your team id — e.g. raas, resi, ui — or 'coding' if you work"
+        echo "  on the coding tools repo itself."
+        echo ""
+        echo "  Leave it blank to decide later. The stack still installs and runs;"
+        echo "  paths that WRITE knowledge will refuse until it is set, rather than"
+        echo "  tagging your work with a tenant nobody owns."
+        echo ""
+        read_or_default choice "$suggestion" "  Scope${suggestion:+ [$suggestion]}: "
+    fi
+    choice="${choice:-$suggestion}"
+    # Trim, so a stray space does not become part of a directory name.
+    choice="$(printf '%s' "$choice" | tr -d '[:space:]')"
+
+    if [[ -z "$choice" ]]; then
+        warning "No install scope set — knowledge-writing paths will refuse until one exists"
+        info "  Set it later with: echo <team-id> > ~/.coding/scope"
+        INSTALLATION_WARNINGS+=("No install scope set (echo <team-id> > ~/.coding/scope)")
+        return 0
+    fi
+
+    # Validate by RUNNING the resolver, not by a second copy of SCOPE_RE in bash.
+    # --require-scope also rejects the literal `default`, which a bash regex here
+    # would have to know about separately.
+    if ! CODING_SCOPE="$choice" "$CODING_REPO/bin/coding-data-home" --require-scope >/dev/null 2>&1; then
+        warning "'$choice' is not usable as a scope"
+        CODING_SCOPE="$choice" "$CODING_REPO/bin/coding-data-home" --require-scope 2>&1 | sed 's/^/    /' || true
+        INSTALLATION_WARNINGS+=("Install scope '$choice' rejected; none was written")
+        return 0
+    fi
+
+    mkdir -p "$HOME/.coding"
+    # The comment line is safe: readScopeFile skips blank and '#' lines.
+    printf '# Written by install.sh on %s\n%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$choice" > "$scope_file"
+    success "Install scope set to '$choice' ($scope_file)"
+    info "  Your knowledge base: $("$CODING_REPO/bin/coding-data-home" 2>/dev/null || echo '~/.coding/data/'"$choice")"
+}
+
 ACTIVE_FEATURES=""          # space-separated ids, set by resolve_feature_selection
 FEATURES_NEED_DOCKER="true" # conservative default until resolved
 
@@ -4466,6 +4559,7 @@ main() {
     # Run installation steps
     check_dependencies
     run_step detect_agents
+    ask_install_scope
     configure_team_setup
     setup_history_repo
     run_step install_node_dependencies

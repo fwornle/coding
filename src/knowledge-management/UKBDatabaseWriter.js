@@ -13,6 +13,7 @@
 
 import crypto from 'crypto';
 import { KnowledgeQueryService } from './KnowledgeQueryService.js';
+import { requireScope, resolveScope, isPlaceholderScope } from '../../lib/scope/index.mjs';
 
 export class UKBDatabaseWriter {
   constructor(databaseManager, options = {}) {
@@ -23,8 +24,34 @@ export class UKBDatabaseWriter {
       options
     );
     this.embeddingGenerator = options.embeddingGenerator || null;
-    this.team = options.team || 'coding';
+    // undefined, not 'coding'. This class writes, so the tenant has to be real —
+    // but resolving it in the constructor would throw for every caller that only
+    // constructs the writer. `tenant()` decides at the write.
+    this.team = options.team;
     this.debug = options.debug || false;
+  }
+
+  /**
+   * The tenant to write with. Throws when the installation has no scope.
+   *
+   * Strict: the tenant stamped on a row is permanent, and `default` is the
+   * directory every unconfigured install shares, so one person's `default`
+   * knowledge would merge with everyone else's.
+   */
+  tenant() {
+    return this.team ?? requireScope();
+  }
+
+  /**
+   * The tenant to FILTER by, or undefined for "every tenant".
+   *
+   * Never the placeholder: a query narrowed to `team: 'default'` returns nothing,
+   * and an empty export is indistinguishable from a knowledge base that lost its
+   * content.
+   */
+  tenantFilter() {
+    const t = this.team ?? resolveScope();
+    return isPlaceholderScope(t) ? undefined : t;
   }
 
   /**
@@ -47,13 +74,13 @@ export class UKBDatabaseWriter {
       entityType: entity.entityType || 'Pattern',
       observations: entity.observations || [],
       extractionType: entity.entityType || 'Pattern',
-      classification: this.team,
+      classification: this.tenant(),
       confidence: (entity.significance || 5) / 10, // Convert 0-10 to 0-1
       // Default to 'manual' for UKB writes; explicit `entity.source`
       // wins so the consolidator's online-learning path can mark its
       // entities as 'online' (rendered red/pink in the viewer).
       source: entity.source || 'manual',
-      team: this.team,
+      team: this.tenant(),
       sessionId: null, // No session for batch knowledge
       embeddingId: null, // Will be set if embeddings are generated
       metadata: {
@@ -136,7 +163,7 @@ export class UKBDatabaseWriter {
     // GraphDatabaseService.storeEntity preserves the original tier.
     const graphDB = this.databaseManager?.graphDB;
     if (graphDB?.graph) {
-      const nodeId = `${this.team}:${entityName}`;
+      const nodeId = `${this.tenant()}:${entityName}`;
       if (graphDB.graph.hasNode(nodeId)) {
         const existing = graphDB.graph.getNodeAttributes(nodeId);
         if (existing.source && updates.source === undefined) {
@@ -179,7 +206,7 @@ export class UKBDatabaseWriter {
       toEntityId: toId,
       relationType: relation.type || 'related_to',
       confidence: relation.confidence || 1.0,
-      team: this.team,
+      team: this.tenant(),
       metadata: relation.metadata || {}
     };
 
@@ -267,7 +294,7 @@ export class UKBDatabaseWriter {
           {
             entity_name: entity.name,
             entity_type: entity.entityType,
-            team: this.team,
+            team: this.tenant(),
             source: 'manual'
           }
         );
@@ -315,13 +342,13 @@ export class UKBDatabaseWriter {
   async exportToJson(limit = 5000) {
     try {
       const entities = await this.queryService.queryEntities({
-        team: this.team,
+        team: this.tenantFilter(),
         source: 'manual',
         limit
       });
 
       const relations = await this.queryService.queryRelations({
-        team: this.team
+        team: this.tenantFilter()
       });
 
       // Transform to UKB JSON format
@@ -356,7 +383,7 @@ export class UKBDatabaseWriter {
    * Get statistics about stored knowledge for this team
    */
   async getStatistics() {
-    return await this.queryService.getStatistics({ team: this.team });
+    return await this.queryService.getStatistics({ team: this.tenantFilter() });
   }
 }
 
