@@ -350,3 +350,27 @@ describe('samePath', () => {
     );
   });
 });
+
+describe('km-core project rule agrees with the scope rule', () => {
+  // km-core is its own package and cannot import lib/scope, so its isProject()
+  // restates the scope's shape rule. If the two drift, a scope lib/scope
+  // accepts is one km-core refuses to stamp — silently, since the writers
+  // skip the project tag on false. This is the tripwire.
+  test('same pattern, same cap, same placeholder', async () => {
+    const km = await import('@fwornle/km-core');
+    const { SCOPE_RE } = require(join(REPO, 'lib/scope/resolve.cjs'));
+    assert.equal(km.PROJECT_RE.source, SCOPE_RE.source);
+    assert.equal(km.PROJECT_RE.flags, SCOPE_RE.flags);
+    assert.equal(km.PROJECT_MAX, SCOPE_MAX);
+    assert.equal(km.PLACEHOLDER_PROJECT, DEFAULT_SCOPE);
+  });
+
+  test('every scope normaliseScope accepts and is not a placeholder is a project', async () => {
+    const { isProject } = await import('@fwornle/km-core');
+    for (const raw of ['coding', 'acme', 'Team-7', ' okm ', 'a.b_c-d', 'x'.repeat(SCOPE_MAX)]) {
+      const scope = normaliseScope(raw, 'test');
+      assert.equal(isProject(scope), !isPlaceholderScope(scope), scope);
+    }
+    assert.equal(isProject(normaliseScope(DEFAULT_SCOPE, 'test')), false);
+  });
+});
