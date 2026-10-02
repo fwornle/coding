@@ -115,11 +115,11 @@ function makeFixtureEntities() {
       name: 'Ambiguous',
       metadata: {},
     },
-    // Case 6: invalid team (not in PROJECTS) → typeguard rejects → step 4 default.
+    // Case 6: malformed team (not a valid project id) → typeguard rejects → step 4 default.
     {
       id: '019e5559-0006-7000-8000-000000000006',
       name: 'InvalidTeam',
-      metadata: { team: 'bmw' },  // 'bmw' not in PROJECTS — falls through.
+      metadata: { team: 'BMW Group' },  // uppercase + space: not a project id — falls through.
     },
   ];
 }
@@ -252,7 +252,7 @@ describe('backfill-project-tag — 4-step precedence', () => {
     );
     assert.ok(
       result.summary.ambiguousDefaultIds.includes('019e5559-0006-7000-8000-000000000006'),
-      'InvalidTeam entity id should be recorded (typeguard rejects bmw)',
+      'InvalidTeam entity id should be recorded (typeguard rejects a malformed team)',
     );
   });
 });

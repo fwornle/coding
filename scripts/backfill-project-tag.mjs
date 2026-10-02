@@ -52,7 +52,7 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import * as process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { GraphKMStore, isProject, PROJECTS } from '@fwornle/km-core';
+import { GraphKMStore, isProject } from '@fwornle/km-core';
 
 // ────────────────────────────────────────────────────────────────────────────
 // CLI flag parsing — pure process.argv walk, no new deps (matches the
@@ -148,16 +148,17 @@ function deriveProject(entity) {
     ? entity.metadata
     : {};
 
-  // Step 2: carry forward existing team — but ONLY if it passes the closed-set
-  // typeguard. A team value like 'bmw' (not in PROJECTS) silently falls through
-  // to step 3/4 and produces a stderr warning so the operator can investigate.
+  // Step 2: carry forward existing team — but ONLY if it passes the tenant-id
+  // typeguard. A malformed team value (uppercase, a path character, the
+  // 'default' placeholder) falls through to step 3/4 and produces a stderr
+  // warning so the operator can investigate.
   if (typeof meta.team === 'string' && meta.team.length > 0) {
     if (isProject(meta.team)) {
       return { project: meta.team, step: 'team' };
     }
     process.stderr.write(
       `[backfill-57] WARN entity ${entity.id?.slice(0, 8) ?? '<no-id>'} `
-      + `metadata.team='${meta.team}' is not in PROJECTS ${JSON.stringify(PROJECTS)} — `
+      + `metadata.team='${meta.team}' is not a valid project id — `
       + `falling through to legacyId / default heuristic\n`,
     );
   }
