@@ -13,6 +13,8 @@ USER dev
 WORKDIR /home/dev
 
 COPY --chown=dev:dev snapshot.tar /tmp/snapshot.tar
+# Optional inputs run.sh may provide (today: a git bundle of the LLM proxy).
+COPY --chown=dev:dev extras/ /tmp/extras/
 
 # A fresh clone, as far as the installer can tell: its own git repo, one commit,
 # nothing ignored present. Submodule contents arrive as plain files (the real

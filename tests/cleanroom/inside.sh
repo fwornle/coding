@@ -72,6 +72,10 @@ home_files > "$OUT/home.before"
 step "2. ./install.sh --ci --scope=$SCOPE --features=km-perf"
 cd "$TOOLS"
 git status --porcelain --ignored > "$OUT/tools.before"
+# The proxy's clone source (see run.sh). Unset when run.sh had no proxy checkout.
+PROXY_BUNDLE=/tmp/extras/rapid-llm-proxy.bundle
+[ -f "$PROXY_BUNDLE" ] && export RAPID_LLM_PROXY_REPO="$PROXY_BUNDLE"
+PROXY_DIR="$HOME/_work/rapid-llm-proxy"
 ./install.sh --ci --scope="$SCOPE" --features=km-perf > "$OUT/install.log" 2>&1
 echo "installer exit=$? (--ci downgrades missing Docker/agents to warnings)"
 tail -25 "$OUT/install.log"
@@ -135,6 +139,25 @@ else
 fi
 kill "$OBS_PID" 2>/dev/null; wait "$OBS_PID" 2>/dev/null
 
+step "3d. the LLM proxy, started the way its login service starts it"
+# The installer does not install the login service here (--ci never opts into
+# CODING_INSTALL_SYSTEM_SERVICES, and there is no systemd), so run the exact
+# script that service runs: scripts/llm-proxy-service.sh.
+PROXY_PORT=12435
+proxy_up=false
+if [ ! -f "$PROXY_BUNDLE" ]; then
+  echo "SKIP  the proxy checks: run.sh found no proxy checkout to bundle"
+elif curl -s -m 2 -o /dev/null "localhost:$PROXY_PORT/health"; then
+  fail "something already answers on localhost:$PROXY_PORT before our proxy starts — refusing to probe it"
+else
+  # COORDINATOR_WAIT_TRIES=1: there is no health coordinator in here, and the
+  # launcher's default patience for one (5 tries x 2s) only slows the test.
+  (cd "$TOOLS" && COORDINATOR_WAIT_TRIES=1 bash scripts/llm-proxy-service.sh > "$OUT/proxy-service.log" 2>&1) &
+  for _ in $(seq 1 60); do curl -sf "localhost:$PROXY_PORT/health" >/dev/null && { proxy_up=true; break; }; sleep 2; done
+  curl -s "localhost:$PROXY_PORT/health" | head -c 300 > "$OUT/proxy-health.json"
+  cp "$DH/var/llm-proxy/logs/stderr.log" "$OUT/proxy-stderr.log" 2>/dev/null || true
+fi
+
 # ── 4. where did it all go ──────────────────────────────────────────────────
 step "4. assertions"
 
@@ -180,10 +203,27 @@ f="$(grep -rlE '"team" *: *"coding"' "$DH" 2>/dev/null | head -3)"
 [ -z "$f" ] && pass "no file in this scope's data home carries team \"coding\"" \
   || fail "team \"coding\" appears in: $f"
 
+# The proxy: cloned as the sibling, built, serving, and writing into THIS scope.
+if [ -f "$PROXY_BUNDLE" ]; then
+  [ -f "$PROXY_DIR/dist/index.js" ] && [ -f "$PROXY_DIR/proxy-bridge/server.mjs" ] \
+    && pass "the proxy was cloned to $PROXY_DIR and built" \
+    || fail "no built proxy at $PROXY_DIR (see install.log)"
+  $proxy_up && pass "the proxy answers /health on :$PROXY_PORT ($(head -c 60 "$OUT/proxy-health.json"))" \
+    || fail "the proxy never answered /health on :$PROXY_PORT (see proxy-service.log, proxy-stderr.log)"
+  [ -f "$DH/var/llm-proxy/token-usage.db" ] \
+    && pass "the proxy's token DB is in this scope's data home ($DH/var/llm-proxy/token-usage.db)" \
+    || fail "no token DB under $DH/var/llm-proxy (proxy data went elsewhere?)"
+  f="$(find "$TOOLS" "$PROXY_DIR" -name token-usage.db -not -path '*/node_modules/*' 2>/dev/null | head -3)"
+  [ -z "$f" ] && pass "no proxy token DB in the tools checkout or the proxy checkout" \
+    || fail "proxy token DB written outside the data home: $f"
+  # Stop it, the way its shutdown is reached: SIGTERM to the bridge.
+  pkill -TERM -f 'proxy-bridge/server.mjs' 2>/dev/null || true
+fi
+
 # HOME: every new file is one the mutation manifest declares.
 home_files > "$OUT/home.after"
 comm -13 "$OUT/home.before" "$OUT/home.after" > "$OUT/home.new"
-grep -vE "^\./(\.coding/scope|\.coding/features\.yaml|\.coding/data/$SCOPE/|bin/coding$|\.bashrc$|\.profile$|\.bash_profile$|\.zshrc$|\.gsd-browser/)" \
+grep -vE "^\./(\.coding/scope|\.coding/features\.yaml|\.coding/data/$SCOPE/|bin/coding$|\.bashrc$|\.profile$|\.bash_profile$|\.zshrc$|\.gsd-browser/|_work/rapid-llm-proxy/)" \
   "$OUT/home.new" > "$OUT/home.undeclared" || true
 [ ! -s "$OUT/home.undeclared" ] \
   && pass "every new file under HOME is declared in the mutation manifest ($(wc -l < "$OUT/home.new") new)" \
