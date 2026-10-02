@@ -20,6 +20,7 @@ import { runIfMain } from '../../lib/utils/esm-cli.js';
 import { readCaptures } from '../../src/retrieval/capture-store.js';
 import { createRequire } from 'node:module';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
+import { resolveScope } from '../../lib/scope/index.mjs';
 // RetrievalService now runs in the host Observations API service. The
 // dashboard's POST /api/retrieve handler is a thin HTTP forwarder (Phase 5).
 // observations.db is owned by the host Observations API service; the dashboard
@@ -1670,7 +1671,7 @@ class SystemHealthAPIServer {
                 return {
                     status: 'completed',
                     workflowName: state.workflowName || 'wave-analysis',
-                    team: 'coding',
+                    team: state.team || resolveScope(),
                     completedSteps: state.completedSteps || 4,
                     totalSteps: 4,
                     stepsDetail: completedStepsDetail,
@@ -1696,7 +1697,7 @@ class SystemHealthAPIServer {
                 return {
                     status: 'failed',
                     workflowName: state.workflowName || 'wave-analysis',
-                    team: 'coding',
+                    team: state.team || resolveScope(),
                     completedSteps: state.progress?.completedSteps?.length || 0,
                     totalSteps: 4,
                     stepsDetail: WAVE_STEPS.map(name => ({
@@ -1724,7 +1725,7 @@ class SystemHealthAPIServer {
                 return {
                     status: 'cancelled',
                     workflowName: state.workflowName || 'wave-analysis',
-                    team: 'coding',
+                    team: state.team || resolveScope(),
                     completedSteps: 0,
                     totalSteps: 4,
                     stepsDetail: WAVE_STEPS.map(name => ({ name, status: 'pending' })),
@@ -1797,7 +1798,7 @@ class SystemHealthAPIServer {
         return {
             status: state.status === 'paused' ? 'running' : state.status,
             workflowName: state.workflowName || 'wave-analysis',
-            team: 'coding',
+            team: state.team || resolveScope(),
             startTime: progress.startTime,
             lastUpdate: progress.lastUpdate,
             currentStep: progress.currentSubstepId || progress.currentStepName,
