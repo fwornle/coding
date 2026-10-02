@@ -1978,6 +1978,24 @@ class SystemHealthAPIServer {
             let killedWorkflowPid = null;
             let usedAbortSignal = false;
 
+            // The UKB workflows run INSIDE obs-api (it owns the km-core store),
+            // so there is no PID to kill, and the run checks the state machine
+            // in that process — not the files written below. Cancel it there
+            // first. Best-effort: obs-api being down must not stop the reset.
+            let inProcessCancel = null;
+            try {
+                const base = process.env.OBS_API_URL || 'http://host.docker.internal:12436';
+                const resp = await fetch(`${base}/api/workflows/cancel`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ reason: 'User cancelled via dashboard' }),
+                    signal: AbortSignal.timeout(5000),
+                });
+                inProcessCancel = await resp.json();
+            } catch (e) {
+                inProcessCancel = { success: false, error: e.message };
+            }
+
             // Read current state before resetting
             if (existsSync(progressPath)) {
                 try {
@@ -2094,6 +2112,7 @@ class SystemHealthAPIServer {
                     killedWorkflowPid,
                     killedStaleProcesses: killedProcesses.length,
                     usedAbortSignal,
+                    inProcessCancel,
                     timestamp: new Date().toISOString()
                 }
             });

@@ -69,10 +69,14 @@ const waveTypes = readOrNull(path.join(SA, 'types', 'wave-types.ts'));
 const runWave = readOrNull(path.join(SA, 'run-wave-analysis.ts'));
 const runner = readOrNull(path.join(SA, 'workflow-runner.ts'));
 const tools = readOrNull(path.join(SA, 'tools.ts'));
+const runCoord = readOrNull(path.join(SA, 'run-coordinator-workflow.ts'));
+const runConfig = readOrNull(path.join(SA, 'run-config.ts'));
+const coordinator = readOrNull(path.join(SA, 'agents', 'coordinator.ts'));
+const semanticAnalyzer = readOrNull(path.join(SA, 'agents', 'semantic-analyzer.ts'));
 // This one is in THIS repo, so it is always present and never gates a skip.
 const obsApi = readFileSync(path.join(REPO_ROOT, 'scripts', 'observations-api-server.mjs'), 'utf8');
 
-const HAVE_SUBMODULE = [waveController, waveTypes, runWave, runner, tools].every(Boolean);
+const HAVE_SUBMODULE = [waveController, waveTypes, runWave, runner, tools, runCoord, runConfig, coordinator, semanticAnalyzer].every(Boolean);
 const SKIP_NO_SUBMODULE = HAVE_SUBMODULE
   ? false
   : 'integrations/semantic-analysis is not checked out (CI uses submodules: false)';
@@ -162,25 +166,83 @@ describe('one shared run implementation', { skip: SKIP_NO_SUBMODULE }, () => {
 
   test('the runner hands its resolved debug config over, so `ukb debug` survives', () => {
     const flat = runner.replace(/\s+/g, ' ');
-    assert.match(flat, /config: \{ singleStepMode: presetConfig\.singleStepMode/);
+    assert.match(flat, /const runConfig = \{ singleStepMode: presetConfig\.singleStepMode/);
+    assert.equal((code(runner).match(/config: runConfig/g) || []).length, 2, 'both branches get it');
     assert.match(runWave, /opts\.config\?\.singleStepMode \?\? false/);
     assert.match(runWave, /opts\.config\?\.mockLLM \?\? false/);
   });
 
-  test('the runner stands its own progress subscriber down first', () => {
+  test('the runner keeps no progress subscriber of its own', () => {
     // Two writers racing on the terminal state is what the single-writer
-    // guarantee (Phase 42 Plan 07 SC#4) exists to prevent.
-    const waveBranch = runner.slice(runner.indexOf("if (workflowName === 'wave-analysis')"));
-    const unsub = waveBranch.indexOf('unsubscribeProgressFile()');
-    const call = waveBranch.indexOf('await runWaveAnalysis(');
-    assert.ok(unsub > -1 && unsub < call, 'unsubscribe must precede the run');
+    // guarantee (Phase 42 Plan 07 SC#4) exists to prevent. Both run functions
+    // own the state machine and the file, so the runner must not subscribe at
+    // all (it used to subscribe and then stand down for the wave branch only).
+    assert.doesNotMatch(code(runner), /subscribe\(/);
+  });
+
+  test('every run writes its debug config itself, explicitly', () => {
+    // The progress subscriber lets the FILE's debug fields win over the start
+    // event, so a stale `mockLLM: true` from an earlier `ukb debug` would turn a
+    // production run into a mock one unless each field is written — false too.
+    for (const [name, src] of [['run-wave-analysis', runWave], ['run-coordinator-workflow', runCoord]]) {
+      const c = code(src);
+      const write = c.indexOf('writeRunConfig(progressFile, opts.config)');
+      const sub = c.indexOf('subscribe(createProgressFileSubscriber');
+      assert.ok(write > -1 && write < sub, `${name}: config written before subscribing`);
+    }
+    assert.match(runConfig, /mockLLM,\n/);
+    assert.match(runConfig, /singleStepMode: !!config\.singleStepMode/);
+  });
+});
+
+describe('the coordinator workflows share one run implementation too', { skip: SKIP_NO_SUBMODULE }, () => {
+  test('CoordinatorAgent forwards an injected store instead of opening its own', () => {
+    // Raw source, not code(): coordinator.ts holds glob strings like `**/*.ts`
+    // that the comment stripper reads as a comment opener and eats code with.
+    const flat = coordinator.replace(/\s+/g, ' ');
+    assert.match(flat, /constructor\(repositoryPath: string = '\.', team\?: string, opts: \{ kmStore\?: object \} = \{\}\)/);
+    assert.match(flat, /injected: this\.injectedKmStore/);
+  });
+
+  test('run-coordinator-workflow passes the store and never exits the process', () => {
+    const c = code(runCoord);
+    assert.match(c, /new CoordinatorAgent\(repositoryPath, opts\.team, \{ kmStore: opts\.kmStore \}\)/);
+    assert.doesNotMatch(c, /process\.exit\(/);
+  });
+
+  test('a thrown run lands a terminal state rather than propagating', () => {
+    const flat = code(runCoord).replace(/\s+/g, ' ');
+    assert.match(flat, /writeTerminalState\(progressFile, 'failed', undefined, \{ error: message/);
+    assert.match(flat, /return \{ success: false, status: 'failed', error: message \}/);
+  });
+
+  test('the run\'s own repository wins over a path the caller sent', () => {
+    // A request relayed from the container carries `/coding`, which on the host
+    // names nothing — and the coordinator prefers parameters.repositoryPath.
+    const flat = code(runCoord).replace(/\s+/g, ' ');
+    assert.match(flat, /\.\.\.callerParameters, repositoryPath, \}/);
+  });
+
+  test('the runner delegates rather than keeping a second copy', () => {
+    const c = code(runner);
+    assert.match(c, /await runCoordinatorWorkflow\(\{/);
+    assert.doesNotMatch(c, /new CoordinatorAgent\(/);
+    assert.doesNotMatch(c, /executeBatchWorkflow\(/);
   });
 });
 
 describe('obs-api exposes the in-process run', () => {
-  test('the run endpoint exists and returns 202 like its consolidation sibling', () => {
-    assert.match(obsApi, /app\.post\('\/api\/workflows\/wave-analysis\/run'/);
+  test('the run endpoints exist and return 202 like their consolidation sibling', () => {
+    assert.match(obsApi, /app\.post\(`\/api\/workflows\/\$\{workflow\}\/run`/);
     assert.match(obsApi, /res\.status\(202\)\.json\(\{/);
+  });
+
+  test('the runnable workflows are an explicit list, not whatever the submodule defines', () => {
+    const flat = obsApi.replace(/\s+/g, ' ');
+    for (const w of ['wave-analysis', 'batch-analysis', 'incremental-analysis', 'complete-analysis']) {
+      assert.match(flat, new RegExp(`'${w}': `), `${w} is registered`);
+    }
+    assert.match(flat, /for \(const workflow of Object\.keys\(WORKFLOW_RUNNERS\)\)/);
   });
 
   test('it passes its OWN store into the run', () => {
@@ -189,38 +251,123 @@ describe('obs-api exposes the in-process run', () => {
     assert.match(flat, /kmStore: store/);
   });
 
-  test('concurrent triggers attach rather than starting a competing run', () => {
+  test('one lock across every workflow: same one attaches, a different one gets 409', () => {
     // The state machine is module-level singleton state and the progress file
-    // has one writer; two runs at once would corrupt both.
-    assert.match(obsApi, /if \(_waveRunPromise\) return _waveRunPromise/);
-  });
-
-  test('a status endpoint reports this process\'s view', () => {
-    assert.match(obsApi, /app\.get\('\/api\/workflows\/wave-analysis\/status'/);
-  });
-
-  test('the import is lazy so an unbuilt dist cannot stop obs-api booting', () => {
+    // has one writer; two runs at once would corrupt both. Attaching a request
+    // to a DIFFERENT workflow would report success for a run nobody started.
     const flat = obsApi.replace(/\s+/g, ' ');
-    assert.match(flat, /await import\( '\.\.\/integrations\/semantic-analysis\/dist\/run-wave-analysis\.js' \)/);
+    assert.match(flat, /outcome: _workflowRun\.workflow === workflow \? 'attached' : 'conflict'/);
+    assert.match(flat, /if \(outcome === 'conflict'\) \{ return res\.status\(409\)/);
+    // The lock is released only when the run settles, never by a timer.
+    assert.match(flat, /\.finally\(\(\) => \{ _workflowRun = null; \}\)/);
+  });
+
+  test('a status endpoint reports this process\'s view, including who holds the lock', () => {
+    assert.match(obsApi, /app\.get\(`\/api\/workflows\/\$\{workflow\}\/status`/);
+    assert.match(obsApi, /activeWorkflow: describeRun\(_workflowRun\)/);
+  });
+
+  test('the imports are lazy so an unbuilt dist cannot stop obs-api booting', () => {
+    const flat = obsApi.replace(/\s+/g, ' ');
+    assert.match(flat, /await import\(`\$\{SA_DIST\}\/run-wave-analysis\.js`\)/);
+    assert.match(flat, /await import\(`\$\{SA_DIST\}\/run-coordinator-workflow\.js`\)/);
+    assert.doesNotMatch(obsApi, /^import .*semantic-analysis\/dist/m);
   });
 });
 
-describe('tools.ts routes wave-analysis to the owner', { skip: SKIP_NO_SUBMODULE }, () => {
+describe('an in-process run can be cancelled', { skip: SKIP_NO_SUBMODULE }, () => {
+  // There is no runner PID to kill once a run lives inside obs-api, and the run
+  // reads the state machine in that process, not the files the dashboard
+  // rewrites. Before these, a cancelled batch run kept going to the end, and a
+  // cancelled single-step wave run ADVANCED (the rewrite cleared stepPaused).
+  test('obs-api cancels by dispatching into its own state machine', () => {
+    const flat = obsApi.replace(/\s+/g, ' ');
+    assert.match(flat, /app\.post\('\/api\/workflows\/cancel'/);
+    assert.match(flat, /await import\(`\$\{SA_DIST\}\/workflow-state-machine\.js`\)/);
+    assert.match(flat, /dispatch\(\{ type: 'cancel'/);
+  });
+
+  test('the dashboard cancel reaches obs-api before rewriting files', () => {
+    const dash = readFileSync(path.join(REPO_ROOT, 'integrations', 'system-health-dashboard', 'server.js'), 'utf8');
+    const handler = dash.slice(dash.indexOf('async handleCancelWorkflow('));
+    const call = handler.indexOf('/api/workflows/cancel');
+    const reset = handler.indexOf('writeFileSync(progressPath');
+    assert.ok(call > -1 && call < reset, 'obs-api is asked first');
+  });
+
+  test('the coordinator checks the state machine, not only its own legacy file', () => {
+    // isWorkflowCancelled() read workflow-progress-legacy.json, which nothing
+    // ever writes 'cancelled' into — its eight checkpoints could not fire.
+    const fn = coordinator.slice(coordinator.indexOf('private isWorkflowCancelled(): boolean {'));
+    assert.match(fn.slice(0, 1200), /getWorkflowState\(\)\.status === 'cancelled'/);
+  });
+
+  test('a paused wave run stops waiting when cancelled', () => {
+    const loop = waveController.slice(waveController.indexOf('// Poll for resume signal'));
+    const cancel = loop.indexOf("getState().status === 'cancelled'");
+    const advance = loop.indexOf('if (!currentProgress.stepPaused)');
+    assert.ok(cancel > -1 && cancel < advance, 'cancel is checked before the Step check');
+  });
+
+  test('both run functions end a cancelled run as cancelled, not failed', () => {
+    assert.match(runWave, /writeTerminalState\(progressFile, 'cancelled'\)/);
+    assert.match(runCoord, /writeTerminalState\(progressFile, 'cancelled'\)/);
+  });
+});
+
+describe('`ukb debug` mock mode makes no real LLM calls', { skip: SKIP_NO_SUBMODULE }, () => {
+  // Measured 2026-10-01: a debug run logged "LLM mode fallback: intended=mock,
+  // actual=public" and spent ~9s per entity on real, metered calls. Two holes.
+  test('the mock service is wired AFTER providers exist', () => {
+    // setMockService() writes into the 'mock' provider, which initialize()
+    // registers — called from the constructor it was a silent no-op.
+    const flat = code(semanticAnalyzer).replace(/\s+/g, ' ');
+    assert.match(flat, /await this\.llmService\.initialize\(\); this\.wireMockService\(\);/);
+    const ctor = flat.slice(flat.indexOf('constructor() {'), flat.indexOf('private wireMockService(): void {'));
+    assert.doesNotMatch(ctor, /setMockService\(/);
+  });
+
+  test('a process-tagged call does not dial the real proxy in mock mode', () => {
+    assert.match(semanticAnalyzer, /if \(llmMode !== 'mock' && typeof processTag === 'string'/);
+  });
+});
+
+describe('tools.ts routes the UKB workflows to the owner', { skip: SKIP_NO_SUBMODULE }, () => {
+  const branchStart = () => tools.indexOf('if (OBS_API_WORKFLOWS.has(workflow_name)) {');
+  const branch = () => tools.slice(branchStart(), tools.indexOf('// CRITICAL: Clean up any existing running workflows'));
+
   test('it dispatches over HTTP instead of spawning a child', () => {
-    assert.match(tools, /if \(resolvedWorkflowName === 'wave-analysis'\) \{/);
-    assert.match(tools, /\/api\/workflows\/wave-analysis\/run/);
+    assert.ok(branchStart() > -1);
+    assert.match(branch(), /\/api\/workflows\/\$\{workflow_name\}\/run/);
+  });
+
+  test('it routes exactly the workflows obs-api runs', () => {
+    // Drift either way is a bug: a name only tools.ts routes gets a 404, a name
+    // only obs-api runs is still spawned into a child that cannot open the store.
+    const routed = tools.match(/const OBS_API_WORKFLOWS = new Set\(\[([^\]]*)\]\)/);
+    assert.ok(routed, 'OBS_API_WORKFLOWS literal');
+    const names = (s) => [...s.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]).sort();
+    const runnersBlock = obsApi.slice(obsApi.indexOf('const WORKFLOW_RUNNERS = {'), obsApi.indexOf('let _workflowRun'));
+    const served = [...runnersBlock.matchAll(/^  '([a-z-]+)': /gm)].map((m) => m[1]).sort();
+    assert.deepEqual(names(routed[1]), served);
+  });
+
+  test('a refused or failed handoff touches nothing local first', () => {
+    // obs-api may answer 409 for a run it is protecting; cancelling that run,
+    // killing runner PIDs or rewriting its debug flags before asking would
+    // wreck exactly what the 409 exists to protect.
+    assert.ok(branchStart() < tools.indexOf('const cleanup = await cleanupExistingWorkflows('));
+    assert.ok(branchStart() < tools.indexOf("dispatch({\n        type: 'start',"));
+    assert.match(branch(), /resp\.status === 409/);
   });
 
   test('an unreachable obs-api fails loudly instead of falling back to the spawn', () => {
     // Falling back would reproduce the original failure with an error naming
     // the database rather than the daemon — the reason this went unnoticed.
-    const branch = tools.slice(
-      tools.indexOf("if (resolvedWorkflowName === 'wave-analysis') {"),
-      tools.indexOf('// Store workflow info locally'),
-    );
-    assert.match(branch, /isError: true/);
-    assert.match(branch, /com\.coding\.obs-api/);
-    assert.doesNotMatch(branch, /spawn\(/);
+    const b = branch();
+    assert.match(b, /isError: true/);
+    assert.match(b, /com\.coding\.obs-api/);
+    assert.doesNotMatch(b, /spawn\(/);
   });
 });
 
