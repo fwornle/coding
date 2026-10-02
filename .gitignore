@@ -179,11 +179,22 @@ integrations/mcp-server-browserbase/
 .data/intent-spine/
 !.data/kb-ab-sampler/specs/
 !.data/kb-ab-sampler/mine-specs/
-!.data/kb-ab-sampler/facts/
-!.data/kb-ab-sampler/ledger.json
-!.data/kb-ab-sampler/ledger-mined.json
-!.data/kb-ab-sampler/mine-window-start
-!.data/kb-ab-sampler/insights-50d4c34bc084c78c.json
+# NOT re-included any more: facts/, the two ledgers, mine-window-start and the
+# frozen insights-*.json. They are mined from ONE developer's knowledge base, and
+# tracking them shipped that knowledge to every clone of these tools. They stay
+# on disk where the sampler wrote them, so local rounds are unaffected; a fresh
+# clone or worktree simply does not carry them. Found by tests/cleanroom.
+
+# Personal knowledge and run output that P0 (the data-home move) missed. Each
+# was still tracked, and the knowledge export was still being re-committed by
+# "refresh export" commits — 928 entities in every clone.
+.data/exports/
+.data/entity-embeddings.json
+.data/kgbench/
+.data/experiments/
+.data/insight-consolidation-plan.md
+.data/knowledge-audit-report.md
+.data/llm-proxy-insight-truthfulness-audit.md
 
 # LLM usage cost tracking (runtime, written by BudgetTracker)
 .data/llm-usage-costs.json
@@ -468,7 +479,9 @@ local_cache/
 # dirty every time a run is in flight and its committed value is whatever instant
 # the commit happened to catch. The end state that matters is in run.json and in
 # results.jsonl's cell count.
-!.data/kgbench/
+# No `!.data/kgbench/` re-include any more: the run summaries are one developer's
+# benchmark history, and tracking them shipped it to every clone. They stay on
+# disk; the finer rules below are kept for anyone who re-includes deliberately.
 # Both pre-image spellings are in use — `results.pre-<what>.jsonl` and
 # `results.jsonl.pre-<what>`. Matching only one lets ~1M snapshots through on the
 # next naming choice, which is how these got missed the first time. A THIRD spelling
