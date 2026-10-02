@@ -2929,11 +2929,15 @@ setup_llm_cli_proxy() {
     # user owns under CODING_AGENT_SCOPE=global.
     info "  pi guard rails (no-unbounded-fs-scan) install per launch via bin/coding"
 
-    # If no CLI tools available, skip proxy setup
+    # No agent CLI is NOT a reason to skip. Selecting the llm-proxy feature is the
+    # consent, and the proxy serves more than the CLIs: API-key providers (Gaia,
+    # OpenAI, Groq, …) and the background LLM calls of observations, knowledge
+    # and performance. This used to return here, so a km-perf install on a
+    # machine without claude/copilot/pi silently got no proxy at all, and the
+    # clean-room test could never reach the code below. Say what it means instead.
     if [[ "$has_cli" != "true" ]]; then
-        info "No CLI tools available - skipping LLM CLI Proxy setup"
-        SKIPPED_SYSTEM_DEPS+=("llm-cli-proxy")
-        return 0
+        info "  No agent CLI found — installing the proxy anyway (it was selected)."
+        info "  Until a CLI is installed or a key is put in the proxy's .env, no provider can answer."
     fi
 
     # Get the proxy checkout. integrations/llm-cli-proxy, which this step used to
