@@ -9,7 +9,13 @@
  * - Transformers.js: ~50ms per embedding (native)
  */
 
-import { pipeline } from '@xenova/transformers';
+// @xenova/transformers is imported lazily, in initialize(). It loads `sharp`
+// (a native image library) at import time, and sharp ships no build for some
+// platforms (linux-arm64 among them). A top-level import made merely
+// CONSTRUCTING the LSL classifier crash there, taking session logging down for
+// every non-tools project — found by tests/cleanroom. Deferred, a missing sharp
+// surfaces as a failed embedding, which the classifier already treats as
+// inconclusive.
 
 class FastEmbeddingGenerator {
   constructor() {
@@ -34,6 +40,7 @@ class FastEmbeddingGenerator {
       console.log('🔄 Loading embedding model (one-time initialization)...');
       const startTime = Date.now();
 
+      const { pipeline } = await import('@xenova/transformers');
       this.extractor = await pipeline('feature-extraction', this.modelName, {
         // Use local cache, download on first use
         progress_callback: null // Suppress download progress

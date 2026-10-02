@@ -894,8 +894,7 @@ check_dependencies() {
 
         # Supported floor is Node 22. That is not a preference: the container
         # this project runs its services in is node:22-bookworm
-        # (docker/Dockerfile.coding-services), install_mastra_opencode requires
-        # >= 22.13.0 outright, and per the Node release schedule both 18 (EOL
+        # (docker/Dockerfile.coding-services), and per the Node release schedule both 18 (EOL
         # 2025-04-30) and 20 (EOL 2026-04-30) are past end-of-life as of this
         # writing. Claiming "18+" — as this installer and the docs did — was
         # claiming support for two unsupported majors.
@@ -909,7 +908,7 @@ check_dependencies() {
         node_major="$(node -v 2>/dev/null | sed 's/^v//' | cut -d. -f1)"
         if [[ -n "$node_major" ]] && [[ "$node_major" -lt 22 ]]; then
             warning "Node.js $node_major is below the supported floor (22 LTS)"
-            info "  → services run on node:22 in Docker; mastra-opencode needs >= 22.13.0"
+            info "  → services run on node:22 in Docker"
             info "  → Node 18 and 20 are both past end-of-life (2025-04-30 / 2026-04-30)"
             info "  → upgrade with: nvm install 22 && nvm use 22   (or your platform's package manager)"
             INSTALLATION_WARNINGS+=("Node.js $node_major is below the supported floor (22 LTS)")
@@ -3301,8 +3300,18 @@ ensure_km_core_link() {
     #    silently. Verify a direct dependency actually resolves instead.
     if [[ ! -d "$km_src/node_modules" ]] || ! (cd "$km_src" && node -e "require.resolve('graphology')" >/dev/null 2>&1); then
         info "Installing km-core dependencies..."
-        (cd "$km_src" && { npm ci --ignore-scripts >/dev/null 2>&1 || npm install --ignore-scripts >/dev/null 2>&1; }) \
-            || warning "km-core dependency install had problems"
+        # Output to the install log, not /dev/null: a registry that answers 502
+        # half-way through (seen through a corporate proxy) left a partial tree,
+        # and with the output discarded the only visible symptom was tsc failing
+        # on graphology's types two steps later — nothing pointed at the network.
+        (cd "$km_src" && { npm ci --ignore-scripts || npm install --ignore-scripts; } >>"$INSTALL_LOG" 2>&1) || true
+        if ! (cd "$km_src" && node -e "require.resolve('graphology')" >/dev/null 2>&1); then
+            warning "km-core dependencies did not install (registry/network?) — see $INSTALL_LOG"
+            info "  → live session logging (LSL) and the knowledge store need them."
+            info "  → fix later with: (cd lib/km-core && npm ci) && ./install.sh"
+            INSTALLATION_WARNINGS+=("km-core dependencies missing — LSL/observations/knowledge disabled (network?)")
+            return 0
+        fi
     fi
 
     # 2b. km-core is TypeScript and nothing imports it without a compiled dist/.
@@ -3318,8 +3327,8 @@ ensure_km_core_link() {
     #     called from install_node_dependencies, several steps earlier in main().
     if [[ ! -f "$km_src/dist/index.js" ]]; then
         info "Building km-core (tsc)..."
-        (cd "$km_src" && npm run build >/dev/null 2>&1) \
-            || warning "km-core build had problems"
+        (cd "$km_src" && npm run build >>"$INSTALL_LOG" 2>&1) \
+            || warning "km-core build had problems — see $INSTALL_LOG"
     fi
 
     # 3. (Re)create the symlink. Relative target so the repo stays movable.
@@ -3385,9 +3394,11 @@ install_fastembed_native() {
 # Re-check host embeddings AFTER every npm install has run, and repair if needed.
 #
 # WHY A SECOND, LATER CHECK. install_fastembed_native() runs inside
-# install_node_dependencies, long before install_mastra_opencode does
-# `npm install @mastra/opencode@latest`. That later install reconciles the tree
-# against package-lock.json and PRUNES anything installed with --no-save —
+# install_node_dependencies, and ANY later `npm install` in the repo root
+# reconciles the tree against package-lock.json and PRUNES anything installed
+# with --no-save. (The one that did it was install_mastra_opencode's
+# `npm install @mastra/opencode@latest`, since removed — it also rewrote the
+# tracked package.json and pruned the @fwornle/km-core link. Kept as a guard.) —
 # which is exactly how the platform tokenizer gets there on linux/arm64.
 # Reproduced directly: a --no-save package is present after its own install and
 # GONE after any subsequent `npm install` in the same directory.
@@ -4636,7 +4647,6 @@ main() {
     create_example_configs
     setup_mcp_config
     install_enhanced_lsl
-    run_step install_mastra_opencode
     run_step install_compaction_guard
     run_step install_knowledge_injection
     run_step install_copilot_file_hooks
@@ -4746,99 +4756,6 @@ install_enhanced_lsl() {
     else
         warning "Enhanced LSL deployment script not found or not executable"
     fi
-}
-
-# Install Mastra OpenCode plugin for observational memory
-install_mastra_opencode() {
-    echo -e "\n${CYAN}🧠 Installing Mastra OpenCode plugin...${NC}"
-
-    cd "$CODING_REPO"
-
-    # Check Node.js >= 22.13.0 (required by @mastra/opencode)
-    if ! command -v node &> /dev/null; then
-        warning "Node.js not found. Mastra OpenCode requires Node.js 22+"
-        INSTALLATION_WARNINGS+=("Mastra OpenCode: Node.js not found")
-        return 1
-    fi
-
-    local node_major
-    node_major=$(node -v | sed 's/^v//' | cut -d. -f1)
-    if [[ "$node_major" -lt 22 ]]; then
-        warning "Node.js $node_major found, but Mastra OpenCode requires Node.js >= 22.13.0"
-        INSTALLATION_WARNINGS+=("Mastra OpenCode: Node.js version too old ($node_major, need 22+)")
-        return 1
-    fi
-    info "Node.js v$(node -v | sed 's/^v//') detected (>= 22 required)"
-
-    # Install @mastra/opencode via npm
-    info "Installing @mastra/opencode..."
-    if npm install @mastra/opencode@latest 2>>"$INSTALL_LOG"; then
-        success "@mastra/opencode installed"
-    else
-        warning "npm install @mastra/opencode failed. If package is unavailable, a monorepo build fallback may be needed."
-        INSTALLATION_WARNINGS+=("Mastra OpenCode: npm install failed -- check npm registry availability")
-        return 1
-    fi
-
-    # Create .observations/ directory for LibSQL storage
-    info "Setting up observation storage directory..."
-    mkdir -p "$CODING_REPO/.observations"
-    success "Created .observations/ directory"
-
-    # Create .observations/config.json with default token budget config
-    if [[ ! -f "$CODING_REPO/.observations/config.json" ]]; then
-        info "Creating default observation config..."
-        cat > "$CODING_REPO/.observations/config.json" << 'OBSCONFIG'
-{
-  "version": 1,
-  "model": "google/gemini-2.5-flash",
-  "observation": {
-    "messageTokens": 20000
-  },
-  "reflection": {
-    "observationTokens": 90000
-  },
-  "budgets": {
-    "opencode": {
-      "dailyTokens": 500000
-    },
-    "mastra": {
-      "dailyTokens": 500000
-    },
-    "claude": {
-      "dailyTokens": 1000000
-    }
-  }
-}
-OBSCONFIG
-        success "Created .observations/config.json with default budgets"
-    else
-        info ".observations/config.json already exists -- skipping"
-    fi
-
-    # Create .opencode/ directory and mastra.json plugin config
-    mkdir -p "$CODING_REPO/.opencode"
-    if [[ ! -f "$CODING_REPO/.opencode/mastra.json" ]]; then
-        info "Creating Mastra plugin config..."
-        cat > "$CODING_REPO/.opencode/mastra.json" << 'MASTRACONFIG'
-{
-  "model": "google/gemini-2.5-flash",
-  "storagePath": ".observations/observations.db",
-  "observation": {
-    "messageTokenThreshold": 500
-  },
-  "reflection": {
-    "observationTokenThreshold": 5000
-  }
-}
-MASTRACONFIG
-        success "Created .opencode/mastra.json with storage path override"
-    else
-        info ".opencode/mastra.json already exists -- skipping"
-    fi
-
-    cd "$CODING_REPO"
-    success "Mastra OpenCode plugin installation complete"
 }
 
 # Install compaction-guard plugin to prevent "Bad Request" during OpenCode compaction.
