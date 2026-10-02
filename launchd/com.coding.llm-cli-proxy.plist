@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The LLM proxy (rapid-llm-proxy, a sibling checkout) as a login service.
+
+  Only the repo path is templated. The proxy checkout, the data directory and the
+  port are resolved at start by scripts/llm-proxy-service.sh, so a scope change or a
+  data-home migration does not need this file re-rendered. The two log paths below
+  receive only what that script prints before it hands over, i.e. why the proxy could
+  not start. The proxy's own logs are under <data home>/var/llm-proxy/logs/.
+
+  KeepAlive is a dict with SuccessfulExit=false, not <true/>: start-llm-proxy.sh exits
+  1 when the port is held by something that is NOT a proxy bridge, and refusing to
+  kill an unknown process is the point. Restart-on-failure plus ThrottleInterval
+  retries that every 10s without spinning. A clean exit (a deliberate stop) stays
+  stopped.
+
+  NODE_BIN is added to EnvironmentVariables by the installer when the node it ran
+  under is not on the PATH below (nvm, fnm, asdf).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.llm-cli-proxy</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__CODING_REPO__/scripts/llm-proxy-service.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__CODING_REPO__</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CODING_REPO</key>
+        <string>__CODING_REPO__</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>__CODING_REPO__/.logs/llm-proxy-service.log</string>
+    <key>StandardErrorPath</key>
+    <string>__CODING_REPO__/.logs/llm-proxy-service.log</string>
+</dict>
+</plist>
