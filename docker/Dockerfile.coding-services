@@ -51,7 +51,8 @@ FROM base AS node-deps
 # Copy root package files
 COPY package.json package-lock.json ./
 
-# Install root dependencies first (includes @rapid/llm-proxy from github:fwornle/rapid-llm-proxy)
+# Install root dependencies first. (The proxy is NOT one of them: it runs on the host from the
+# sibling rapid-llm-proxy checkout. semantic-analysis still pins its own v1 copy, patched below.)
 RUN npm ci --ignore-scripts || npm install --ignore-scripts
 
 # Install platform-specific native binaries for fastembed tokenizers
