@@ -85,8 +85,10 @@ describe('what is committed, and what is not', () => {
     expect(isIgnored('.data/code-graph-meta/codegraph/metadata.json')).toBe(false);
   });
 
-  it('per-run kgbench summaries ARE tracked', () => {
-    expect(isIgnored('.data/kgbench/runs/anyrun/run.json')).toBe(false);
+  it('per-run kgbench summaries are NOT tracked — one developer’s benchmark history', () => {
+    // They used to be, via a `!.data/kgbench/` re-include, which shipped every run
+    // summary to every clone. They stay on disk for the dashboard and kgbench-report.
+    expect(isIgnored('.data/kgbench/runs/anyrun/run.json')).toBe(true);
   });
 
   it('sidecars live outside tool-managed data dirs', () => {

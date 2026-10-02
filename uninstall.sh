@@ -86,48 +86,32 @@ if [[ -d "$CODING_REPO/integrations/semantic-analysis" ]]; then
     echo "    Git submodule source code preserved"
 fi
 
-# Clean up LLM CLI Proxy
-if [[ -d "$CODING_REPO/integrations/llm-cli-proxy" ]]; then
-    echo "  Cleaning LLM CLI Proxy..."
-
-    # Unload LaunchAgent if present (macOS)
-    if [[ -f "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist" ]]; then
-        echo "    Unloading LaunchAgent..."
-        launchctl unload "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist" 2>/dev/null || true
-        rm -f "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
-        echo "    Removed LaunchAgent"
-    fi
-
-    # Stop systemd service if present (Linux)
-    if [[ -f "$HOME/.config/systemd/user/llm-cli-proxy.service" ]]; then
-        echo "    Stopping systemd service..."
-        systemctl --user stop llm-cli-proxy.service 2>/dev/null || true
-        systemctl --user disable llm-cli-proxy.service 2>/dev/null || true
-        rm -f "$HOME/.config/systemd/user/llm-cli-proxy.service"
-        systemctl --user daemon-reload 2>/dev/null || true
-        echo "    Removed systemd service"
-    fi
-
-    # Kill any remaining proxy processes
-    pkill -f "llm-cli-proxy" 2>/dev/null || true
-
-    # Remove build artifacts
-    if [[ -d "$CODING_REPO/integrations/llm-cli-proxy/node_modules" ]]; then
-        rm -rf "$CODING_REPO/integrations/llm-cli-proxy/node_modules"
-        echo "    Removed node_modules"
-    fi
-
-    if [[ -d "$CODING_REPO/integrations/llm-cli-proxy/dist" ]]; then
-        rm -rf "$CODING_REPO/integrations/llm-cli-proxy/dist"
-        echo "    Removed dist"
-    fi
-
-    if [[ -d "$CODING_REPO/integrations/llm-cli-proxy/logs" ]]; then
-        rm -rf "$CODING_REPO/integrations/llm-cli-proxy/logs"
-        echo "    Removed logs"
-    fi
-
-    echo "    Source code preserved"
+# Clean up the LLM proxy's login service.
+#
+# This used to run only when integrations/llm-cli-proxy existed. That directory was
+# removed when the proxy became its own repo, so the service was never removed and
+# kept starting at every login after an "uninstall".
+#
+# The checkout itself (<parent>/_work/rapid-llm-proxy by default) is KEPT: its .env
+# holds the user's provider keys, and it may be a checkout they use for other things.
+if [[ -f "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist" ]]; then
+    echo "  Removing the LLM proxy LaunchAgent..."
+    launchctl bootout "gui/$(id -u)/com.coding.llm-cli-proxy" 2>/dev/null \
+        || launchctl unload "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist" 2>/dev/null || true
+    rm -f "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
+    echo "    Removed LaunchAgent"
+fi
+if [[ -f "$HOME/.config/systemd/user/llm-cli-proxy.service" ]]; then
+    echo "  Removing the LLM proxy systemd service..."
+    systemctl --user stop llm-cli-proxy.service 2>/dev/null || true
+    systemctl --user disable llm-cli-proxy.service 2>/dev/null || true
+    rm -f "$HOME/.config/systemd/user/llm-cli-proxy.service"
+    systemctl --user daemon-reload 2>/dev/null || true
+    echo "    Removed systemd service"
+fi
+_proxy_dir="${RAPID_LLM_PROXY_DIR:-$(cd "$CODING_REPO/.." && pwd)/_work/rapid-llm-proxy}"
+if [[ -d "$_proxy_dir" ]]; then
+    echo "  KEPT the LLM proxy checkout at $_proxy_dir (its .env holds your provider keys)"
 fi
 
 # Remove the Windows scheduled task for the status-line temp-file sweeper.

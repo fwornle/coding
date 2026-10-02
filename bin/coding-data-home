@@ -14,6 +14,8 @@
  *   --ensure      create the root and its subtrees first, then print
  *   --explain     human-readable scope provenance and layout
  *   --scope       print just the resolved scope
+ *   --var         print the untracked runtime subtree (<root>/var) — what the
+ *                 LLM proxy's service script exports as LLM_PROXY_DATA_DIR
  *
  * `--scope` exists for the same reason this file does: docker-compose has to be
  * TOLD the scope (`~/.coding/scope` is a per-machine fact that does not exist in
@@ -25,19 +27,20 @@
 // ESM, not CJS: the root package.json declares "type": "module", so an
 // extensionless bin is loaded as ESM and `require` is not defined. That is the
 // same trap that left src/live-logging/ExchangeRouter.js permanently unloadable.
-import { dataHome, ensureDataHome, explain } from '../lib/paths/index.mjs';
+import { dataHome, ensureDataHome, explain, varDir } from '../lib/paths/index.mjs';
 import { requireScope, resolveScope, ScopeError } from '../lib/scope/index.mjs';
 
 const argv = process.argv.slice(2);
 
 if (argv.includes('--help') || argv.includes('-h')) {
   process.stdout.write(
-    'usage: coding-data-home [--ensure] [--explain] [--scope] [--require-scope]\n' +
+    'usage: coding-data-home [--ensure] [--explain] [--scope] [--require-scope] [--var]\n' +
       '  (no flags)       print the resolved data root\n' +
       '  --ensure         create the root and its history/ kb/ var/ subtrees first\n' +
       '  --explain        print the scope, where it came from, and the layout\n' +
       '  --scope          print just the resolved scope (may be the placeholder)\n' +
-      '  --require-scope  print the scope, or exit 2 if it is the placeholder\n',
+      '  --require-scope  print the scope, or exit 2 if it is the placeholder\n' +
+      '  --var            print the untracked runtime subtree instead of the root\n',
   );
   process.exit(0);
 }
@@ -82,6 +85,12 @@ if (argv.includes('--explain')) {
     `var          ${e.var}            NOT tracked`,
   ];
   process.stdout.write(`${lines.join('\n')}\n`);
+  process.exit(0);
+}
+
+// --var after --ensure, so `--ensure --var` creates the tree it then names.
+if (argv.includes('--var')) {
+  process.stdout.write(`${varDir()}\n`);
   process.exit(0);
 }
 

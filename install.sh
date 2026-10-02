@@ -164,6 +164,7 @@ global|~/.claude/commands/|copy skills|yes|OPT-IN: slash commands available to b
 global|~/.config/opencode/opencode.json|merge plugins|yes|OPT-IN: plugins load in every opencode session
 global|~/.copilot/settings.json|enableFileHooks|yes|OPT-IN (separate): lets repo hooks fire in ANY of your repos
 global|~/.copilot/config.json|add trustedFolders|yes|OPT-IN (separate): trusts this repo; rewrite drops JSONC comments
+home|$CODING_REPO/../_work/rapid-llm-proxy|clone+build|no|the LLM proxy, its own repo, as a sibling of this checkout (an existing checkout is used as-is and never updated). uninstall.sh leaves it: its .env holds your provider keys [feature:llm-proxy]
 system|~/Library/LaunchAgents/com.coding.llm-cli-proxy.plist|create+load|yes|OPT-IN: starts the LLM proxy at login (macOS) [feature:llm-proxy]
 system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux) [feature:llm-proxy]
 system|Scheduled Task \coding\claude-ctx-sweeper|create|yes|Windows only: hourly cleanup of stale status-line temp files, because nothing else ever reclaims %TEMP% (elsewhere this runs at agent launch and changes nothing)
@@ -2822,7 +2823,12 @@ ensure_dmr_model() {
 setup_llm_cli_proxy() {
     skip_unless_feature llm-proxy "the LLM CLI proxy" || return 0
     local proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
-    local proxy_dir="$CODING_REPO/integrations/llm-cli-proxy"
+    # The proxy is its own repo, checked out as a SIBLING of this one. That location
+    # is not a choice made here: lib/lsl/token/task-id.mjs, the measurement scripts and
+    # scripts/llm-proxy-service.sh all resolve <parent>/_work/rapid-llm-proxy, so a
+    # checkout anywhere else needs RAPID_LLM_PROXY_DIR set for every one of them.
+    local proxy_dir="${RAPID_LLM_PROXY_DIR:-$(cd "$CODING_REPO/.." && pwd)/_work/rapid-llm-proxy}"
+    local proxy_repo="${RAPID_LLM_PROXY_REPO:-https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy.git}"
     local has_cli=false
 
     info "Setting up LLM CLI Proxy (optional)..."
@@ -2930,26 +2936,57 @@ setup_llm_cli_proxy() {
         return 0
     fi
 
-    # Build the proxy
-    if [[ -d "$proxy_dir" ]]; then
-        info "Building LLM CLI Proxy..."
-        (cd "$proxy_dir" && npm install && npm run build) 2>&1 | tail -3
-        if [[ -f "$proxy_dir/dist/server.js" ]]; then
-            success "  LLM CLI Proxy built successfully"
-        else
-            warning "  LLM CLI Proxy build failed"
-            INSTALLATION_WARNINGS+=("LLM CLI Proxy: Build failed")
-            return 1
+    # Get the proxy checkout. integrations/llm-cli-proxy, which this step used to
+    # build, was removed when the proxy became its own repo — so for every install
+    # since, this step found nothing, said "nothing to build" and skipped, and no
+    # fresh machine ever had a proxy.
+    if [[ ! -d "$proxy_dir/.git" && ! -f "$proxy_dir/package.json" ]]; then
+        info "Cloning the LLM proxy into $proxy_dir"
+        mkdir -p "$(dirname "$proxy_dir")"
+        if ! run_with_timeout 300 git clone --quiet "$proxy_repo" "$proxy_dir" >>"$INSTALL_LOG" 2>&1; then
+            warning "  Could not clone $proxy_repo"
+            info "  → clone it to $proxy_dir yourself (or set RAPID_LLM_PROXY_REPO), then re-run ./install.sh"
+            INSTALLATION_WARNINGS+=("LLM proxy: clone of $proxy_repo failed — no proxy installed")
+            SKIPPED_SYSTEM_DEPS+=("llm-cli-proxy")
+            return 0
         fi
     else
-        # The directory was removed upstream when the proxy was consolidated into
-        # @rapid/llm-proxy 2.0.0. integrations/llm-cli-proxy no longer exists in
-        # this repo, so this branch is now the NORMAL path, not an error — it was
-        # failing the step on every single install. Skip and carry on.
-        info "  Skipping LLM CLI Proxy setup — not vendored here any more"
-        info "  → superseded by @rapid/llm-proxy; nothing to build at $proxy_dir"
-        SKIPPED_SYSTEM_DEPS+=("llm-cli-proxy")
+        info "Using the LLM proxy checkout at $proxy_dir (not updated — it is your checkout)"
+    fi
+
+    # Build it. dist/ is gitignored and the bridge imports ../dist/*.js, so an unbuilt
+    # checkout fails at the first request with an import error that never mentions
+    # the build. `npm ci` runs `prepare`, which is the build; the explicit build after
+    # it covers a checkout whose node_modules was already current.
+    #
+    # NOT --ignore-scripts, unlike km-core: better-sqlite3 (the token-usage DB) gets
+    # its native binding from its install script, and without it the proxy cannot
+    # record a single token row.
+    info "Building the LLM proxy (output: $INSTALL_LOG)..."
+    if (cd "$proxy_dir" && { npm ci || npm install; } && npm run build) >>"$INSTALL_LOG" 2>&1 \
+        && [[ -f "$proxy_dir/dist/index.js" && -f "$proxy_dir/proxy-bridge/server.mjs" ]]; then
+        success "  LLM proxy built"
+    else
+        warning "  LLM proxy build failed — see $INSTALL_LOG"
+        INSTALLATION_WARNINGS+=("LLM proxy: build failed in $proxy_dir")
         return 0
+    fi
+
+    # Provider keys live in the proxy checkout's own .env, the one file its launcher
+    # sources. Never written here: the installer has no keys to put in it, and a
+    # copied template would read as "configured". Say where it goes instead.
+    if [[ ! -f "$proxy_dir/.env" ]]; then
+        info "  No provider keys yet. Copy $proxy_dir/.env.example to .env and fill in"
+        info "  what you have — a provider without a key just drops out of the routing chain."
+    fi
+
+    # The prompt-complexity judge's hybrid strategy wants a kNN model that is
+    # GENERATED, not shipped (.data/prompt-classifier/knn-model.json). Without it
+    # the judge falls back to its LLM path (fallback_to_llm: true): it degrades,
+    # it does not fail. Saying so here is cheaper than someone finding the gap later.
+    if [[ ! -f "$CODING_REPO/.data/prompt-classifier/knn-model.json" ]]; then
+        info "  Prompt judge: no kNN model, so it uses its LLM fallback. Optional:"
+        info "    node scripts/train-prompt-classifier-knn.mjs"
     fi
 
     # Check if already running
@@ -2988,74 +3025,74 @@ setup_llm_cli_proxy() {
                 create_llm_proxy_systemd "$proxy_dir" "$proxy_port"
             else
                 info "  WSL without a user systemd instance — no autostart service installed."
-                info "  Start manually when needed: cd $proxy_dir && npm start"
+                info "  Start manually when needed: bash $CODING_REPO/scripts/llm-proxy-service.sh"
                 INSTALLATION_WARNINGS+=("LLM proxy: no autostart on this WSL (systemd --user unavailable); start manually")
             fi
             ;;
         *)
-            info "  Start manually: cd $proxy_dir && npm start"
+            info "  Start manually: bash $CODING_REPO/scripts/llm-proxy-service.sh"
             ;;
     esac
 }
 
 # Create macOS LaunchAgent for LLM CLI Proxy
+#
+# Rendered from launchd/com.coding.llm-cli-proxy.plist like every other plist, so it
+# carries no machine path but the repo's. It used to be a heredoc that exec'd
+# <proxy>/dist/server.js directly — skipping start-llm-proxy.sh, and with it the
+# network probe, the .env keys and the port guard — and logged into the proxy
+# checkout. The plist that actually ran on the developer's machine was hand-made and
+# matched neither.
 create_llm_proxy_launchd() {
     local proxy_dir="$1"
     local proxy_port="$2"
     local plist_path="$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
-    local node_path
-    node_path=$(which node)
 
-    if confirm_system_change \
-        "Install LLM CLI Proxy as a LaunchAgent (starts at login)" \
+    if ! confirm_system_change \
+        "Install the LLM proxy as a LaunchAgent (starts at login)" \
         "Creates $plist_path"; then
+        info "  Start manually: bash $CODING_REPO/scripts/llm-proxy-service.sh"
+        return 0
+    fi
 
-        mkdir -p "$HOME/Library/LaunchAgents"
-        cat > "$plist_path" << PLIST_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.coding.llm-cli-proxy</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>${node_path}</string>
-        <string>${proxy_dir}/dist/server.js</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>${proxy_dir}</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>LLM_CLI_PROXY_PORT</key>
-        <string>${proxy_port}</string>
-        <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:${HOME}/.nvm/versions/node/$(node -v)/bin</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>${proxy_dir}/logs/stdout.log</string>
-    <key>StandardErrorPath</key>
-    <string>${proxy_dir}/logs/stderr.log</string>
-</dict>
-</plist>
-PLIST_EOF
+    # shellcheck source=scripts/lib/launchd-plist.sh
+    source "$CODING_REPO/scripts/lib/launchd-plist.sh"
+    local rendered
+    rendered="$(mktemp -t llm-cli-proxy-plist)"
+    if ! render_plist "$CODING_REPO/launchd/com.coding.llm-cli-proxy.plist" "$rendered" "$CODING_REPO"; then
+        rm -f "$rendered"
+        warning "  Could not render the LaunchAgent plist — not installed"
+        INSTALLATION_WARNINGS+=("LLM proxy: LaunchAgent plist failed to render")
+        return 0
+    fi
 
-        mkdir -p "$proxy_dir/logs"
-        launchctl load "$plist_path" 2>/dev/null
-        sleep 2
+    # Pin the node this installer ran under when launchd's PATH would not find it
+    # (nvm/fnm/asdf put node under $HOME, never on a service PATH).
+    local node_path
+    node_path="$(command -v node)"
+    case ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" in
+        *":$(dirname "$node_path"):"*) ;;
+        *) /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:NODE_BIN string $node_path" "$rendered" ;;
+    esac
+    # A non-default port has to reach both the service script and the bridge.
+    if [[ "$proxy_port" != "12435" ]]; then
+        /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:LLM_PROXY_PORT string $proxy_port" "$rendered"
+    fi
+    if [[ "$proxy_dir" != "$(cd "$CODING_REPO/.." && pwd)/_work/rapid-llm-proxy" ]]; then
+        /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:RAPID_LLM_PROXY_DIR string $proxy_dir" "$rendered"
+    fi
 
-        if lsof -i :"$proxy_port" -sTCP:LISTEN >/dev/null 2>&1; then
-            success "  LLM CLI Proxy running as LaunchAgent on port $proxy_port"
-        else
-            warning "  LaunchAgent installed but proxy may not have started yet"
-            info "  Check: launchctl list | grep llm-cli-proxy"
-        fi
+    mkdir -p "$HOME/Library/LaunchAgents" "$CODING_REPO/.logs"
+    launchctl bootout "gui/$(id -u)/com.coding.llm-cli-proxy" 2>/dev/null || true
+    mv "$rendered" "$plist_path"
+    launchctl bootstrap "gui/$(id -u)" "$plist_path" 2>/dev/null || launchctl load "$plist_path" 2>/dev/null
+    sleep 3
+
+    if lsof -i :"$proxy_port" -sTCP:LISTEN >/dev/null 2>&1; then
+        success "  LLM proxy running as a LaunchAgent on port $proxy_port"
     else
-        info "  Start manually: cd $proxy_dir && npm start"
+        warning "  LaunchAgent installed but the proxy is not listening yet"
+        info "  Why it did not start: $CODING_REPO/.logs/llm-proxy-service.log"
     fi
 }
 
@@ -3094,29 +3131,39 @@ setup_claude_ctx_sweeper() {
 }
 
 # Create Linux systemd user service for LLM CLI Proxy
+#
+# Runs the same scripts/llm-proxy-service.sh as the LaunchAgent, so both platforms
+# get the launcher's network probe, the .env keys and the port guard, and both log
+# under the data home. The unit used to exec <proxy>/dist/server.js, which does not
+# exist — server.mjs lives in proxy-bridge/.
 create_llm_proxy_systemd() {
     local proxy_dir="$1"
     local proxy_port="$2"
     local service_path="$HOME/.config/systemd/user/llm-cli-proxy.service"
     local node_path
-    node_path=$(which node)
+    node_path="$(command -v node)"
 
-    if confirm_system_change \
-        "Install LLM CLI Proxy as a systemd user service" \
+    if ! confirm_system_change \
+        "Install the LLM proxy as a systemd user service" \
         "Creates $service_path"; then
+        info "  Start manually: bash $CODING_REPO/scripts/llm-proxy-service.sh"
+        return 0
+    fi
 
-        mkdir -p "$HOME/.config/systemd/user"
-        cat > "$service_path" << SYSTEMD_EOF
+    mkdir -p "$HOME/.config/systemd/user"
+    cat > "$service_path" << SYSTEMD_EOF
 [Unit]
-Description=LLM CLI Proxy - HTTP bridge to host CLI tools
-After=network.target
+Description=coding: LLM proxy (rapid-llm-proxy)
+After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=${proxy_dir}
-ExecStart=${node_path} ${proxy_dir}/dist/server.js
-Environment=LLM_CLI_PROXY_PORT=${proxy_port}
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=${CODING_REPO}
+ExecStart=/bin/bash ${CODING_REPO}/scripts/llm-proxy-service.sh
+Environment=CODING_REPO=${CODING_REPO}
+Environment=RAPID_LLM_PROXY_DIR=${proxy_dir}
+Environment=LLM_PROXY_PORT=${proxy_port}
+Environment=NODE_BIN=${node_path}
 Restart=on-failure
 RestartSec=10
 
@@ -3124,20 +3171,16 @@ RestartSec=10
 WantedBy=default.target
 SYSTEMD_EOF
 
-        mkdir -p "$proxy_dir/logs"
-        systemctl --user daemon-reload
-        systemctl --user enable llm-cli-proxy.service
-        systemctl --user start llm-cli-proxy.service
-        sleep 2
+    systemctl --user daemon-reload
+    systemctl --user enable llm-cli-proxy.service
+    systemctl --user restart llm-cli-proxy.service
+    sleep 3
 
-        if systemctl --user is-active llm-cli-proxy.service >/dev/null 2>&1; then
-            success "  LLM CLI Proxy running as systemd service on port $proxy_port"
-        else
-            warning "  systemd service installed but may not have started"
-            info "  Check: systemctl --user status llm-cli-proxy"
-        fi
+    if systemctl --user is-active llm-cli-proxy.service >/dev/null 2>&1; then
+        success "  LLM proxy running as a systemd user service on port $proxy_port"
     else
-        info "  Start manually: cd $proxy_dir && npm start"
+        warning "  systemd service installed but may not have started"
+        info "  Check: journalctl --user -u llm-cli-proxy"
     fi
 }
 

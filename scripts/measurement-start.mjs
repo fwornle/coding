@@ -7,9 +7,9 @@
  * env the running daemon uses), falling back to <cwd>/.data — mirroring how
  * scripts/backfill-raw-observations.mjs resolves the proxy environment.
  *
- * Import-resolution decision: coding's node_modules holds the pinned v1.0.0
- * .tgz of @rapid/llm-proxy (pre-measurement-span). The operator CLIs therefore
- * import the measurement-span surface from the LOCAL proxy build at
+ * Import-resolution decision: coding has no package dependency on the proxy
+ * (the old v1.0.0 .tgz pin predated measurement-span and is gone). The operator
+ * CLIs import the measurement-span surface from the LOCAL proxy build at
  * <parent-of-repo>/_work/rapid-llm-proxy/dist — the SAME dist the daemon
  * (proxy-bridge/server.mjs) loads and that Plan 68-03's write path will import
  * getActiveMeasurement from. This keeps exactly one reader across the whole
