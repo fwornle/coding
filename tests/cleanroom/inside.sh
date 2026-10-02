@@ -21,6 +21,19 @@
 # Prints one PASS/FAIL line per assertion and exits non-zero on any FAIL.
 set -uo pipefail
 
+# LOOPBACK NEVER GOES THROUGH A PROXY. Docker Desktop injects its proxy settings
+# (HTTP_PROXY=http://host.docker.internal:3128) into every container, with a
+# NO_PROXY that does not name localhost. So `curl localhost:12436` was sent to
+# the HOST's proxy, which forwarded it to the HOST's localhost: the developer's
+# LIVE obs-api. Every health check passed against it, every probe entity was
+# written into the developer's knowledge base (17, deleted), and this container's
+# own obs-api never saw a request, which is why "the entity is not persisted"
+# looked like a km-core export bug. Exempting loopback here covers curl, the
+# installer and the services it starts.
+for _v in NO_PROXY no_proxy; do
+  export "$_v=localhost,127.0.0.1,::1${!_v:+,${!_v}}"
+done
+
 SCOPE=team-a
 TOOLS="$HOME/coding"
 PROJECT="$HOME/work/project-x"
@@ -102,6 +115,12 @@ mk_transcript "$TOOLS"   "cleanroom-tools"   "$OUT/transcripts/tools.jsonl"
 
 step "3c. an entity written through obs-api"
 OBS_PORT=12436
+# Nothing may already answer on the port. If something does, every check below
+# measures THAT server, not ours, and passes or fails for the wrong reason.
+if curl -s -m 2 -o /dev/null "localhost:$OBS_PORT/health"; then
+  fail "something already answers on localhost:$OBS_PORT before our obs-api starts — refusing to probe it"
+  echo "CLEAN ROOM: aborted (foreign server on :$OBS_PORT)"; exit 1
+fi
 (cd "$TOOLS" && node scripts/observations-api-server.mjs > "$OUT/obs-api.log" 2>&1) &
 OBS_PID=$!
 for _ in $(seq 1 90); do curl -sf "localhost:$OBS_PORT/health" >/dev/null && break; sleep 2; done
