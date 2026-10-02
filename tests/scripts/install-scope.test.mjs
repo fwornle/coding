@@ -129,3 +129,57 @@ describe('uninstall.sh keeps the knowledge base', () => {
     assert.match(UNINSTALL, /KEPT ~\/\.coding\/scope/, 'the user must be told what was kept');
   });
 });
+
+describe('the history repo belongs to the person installing, not the tools author', () => {
+  const fnBody = (name) => {
+    const start = INSTALL.indexOf(`${name}() {`);
+    assert.notEqual(start, -1, `${name} must exist`);
+    return INSTALL.slice(start, INSTALL.indexOf('\n}\n', start));
+  };
+
+  test('the suggested repo is named after the scope, never this checkout', () => {
+    // `$(basename "$CODING_REPO")-history` is `coding-history` on every clone:
+    // the author's own private history, offered to every colleague.
+    const fn = fnBody('history_default_url');
+    assert.doesNotMatch(fn, /basename "\$CODING_REPO"/);
+    assert.match(fn, /name="\$\{scope:-YOUR-SCOPE\}-history"/);
+  });
+
+  test('the owner never falls back to the owner of this repo\'s origin', () => {
+    const fn = fnBody('history_default_url');
+    assert.doesNotMatch(fn, /owner="\$\(git_url_slug "\$origin"\)"/);
+  });
+
+  test('every history step resolves its directory through history_home', () => {
+    for (const name of ['history_default_url', 'history_manual_recipe', 'history_repo_seed', 'setup_history_repo']) {
+      assert.match(fnBody(name), /history_home\)/, `${name} must call history_home`);
+    }
+    // ...and nothing else hard-codes the in-repo location as THE checkout.
+    for (const name of ['history_repo_seed', 'setup_history_repo']) {
+      assert.doesNotMatch(fnBody(name), /hist_dir="\$CODING_REPO\/\.specstory\/history"/);
+    }
+  });
+
+  test('a placeholder scope gets no history repo', () => {
+    assert.match(fnBody('history_home'), /--require-scope >\/dev\/null 2>&1 \|\| return 0/);
+  });
+
+  test('the scope is asked before the history step runs', () => {
+    assert.ok(lineOf(INSTALL, '    ask_install_scope') < lineOf(INSTALL, '    setup_history_repo'));
+  });
+
+  test('the per-project bootstrap stands down for the tools repo', () => {
+    const common = readFileSync(join(REPO, 'scripts', 'agent-common-setup.sh'), 'utf8');
+    const fn = common.slice(common.indexOf('ensure_private_history_repo() {'));
+    const skip = fn.indexOf('"$(cd "$CODING_REPO" 2>/dev/null && pwd -P)"');
+    const derive = fn.indexOf('# 4. Derive default remote URL');
+    assert.ok(skip > -1 && skip < derive, 'the tools-repo check must come before any URL is derived');
+  });
+
+  test('the symlink is ignored by the tools repo', () => {
+    // `.specstory/history/` (trailing slash) matches directories only; git sees
+    // a symlink as a file, so `git add -A` would commit the link.
+    const ignore = readFileSync(join(REPO, '.gitignore'), 'utf8');
+    assert.match(ignore, /^\.specstory\/history$/m);
+  });
+});

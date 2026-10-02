@@ -174,6 +174,15 @@ ensure_private_history_repo() {
   local history_dir="$project_dir/.specstory/history"
   local skipped_marker="$project_dir/.specstory/.history-repo-skipped"
 
+  # 0. The tools repo's own history is not this function's. install.sh and
+  #    bin/init-history.sh put it in the per-scope data home (a symlink here),
+  #    and its repo is named after the SCOPE. Bootstrapping here would derive
+  #    `<user>/coding-history` from this checkout's basename and create a
+  #    second, nested repo inside a data home that may already be one.
+  if [ -n "${CODING_REPO:-}" ] && [ "$(cd "$project_dir" 2>/dev/null && pwd -P)" = "$(cd "$CODING_REPO" 2>/dev/null && pwd -P)" ]; then
+    return 0
+  fi
+
   # 1. Already configured — nothing to do
   if [ -d "$history_dir/.git" ] || [ -f "$history_dir/.git" ]; then
     return 0

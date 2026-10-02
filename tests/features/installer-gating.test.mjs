@@ -56,7 +56,7 @@ describe('the mutation manifest tells the truth about the chosen profile', () =>
 
   test('the default lists everything, exactly as before', async () => {
     const out = await dryRun();
-    assert.match(out, /\.specstory\/history\//);
+    assert.match(out, /\.specstory\/history\b/);
     assert.match(out, AUTOSTART_UNIT);
     assert.match(out, /Dry run — nothing was changed/);
   });
@@ -66,13 +66,13 @@ describe('the mutation manifest tells the truth about the chosen profile', () =>
     // the installer will do. A row for a feature the user did not select is a
     // promise the installer will not keep.
     const out = await dryRun(['--features=proxy-only']);
-    assert.doesNotMatch(out, /\.specstory\/history\//, 'lsl is off, so no history checkout');
+    assert.doesNotMatch(out, /\.specstory\/history\b/, 'lsl is off, so no history checkout');
     assert.match(out, AUTOSTART_UNIT, 'llm-proxy is on, so the autostart unit stays');
   });
 
   test('minimal drops the proxy service too', async () => {
     const out = await dryRun(['--features=minimal']);
-    assert.doesNotMatch(out, /\.specstory\/history\//);
+    assert.doesNotMatch(out, /\.specstory\/history\b/);
     assert.doesNotMatch(out, AUTOSTART_UNIT);
   });
 
@@ -104,6 +104,9 @@ describe('install steps are gated', () => {
     ['initialize_knowledge_databases', 'knowledge'],
     ['install_memory_visualizer', 'knowledge'],
     ['install_enhanced_lsl', 'lsl'],
+    // It used to run on every profile, offering a session-history repo to an
+    // install that writes no session history.
+    ['setup_history_repo', 'lsl'],
   ];
 
   for (const [fn, feature] of GATED) {

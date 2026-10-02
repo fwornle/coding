@@ -117,6 +117,11 @@ services:
       # OBS_API_URL (host.docker.internal:12436). Eliminates SQLite WAL/SHM
       # corruption from concurrent openers across the Docker bind-mount boundary.
       - ${CODING_REPO:-.}/.specstory:/coding/.specstory
+      # ...and the data root AGAIN, at its own host path. .specstory/history is
+      # an absolute symlink into the data home (bin/init-history.sh); without
+      # this mount it would dangle in here, and readers of /coding/.specstory/
+      # history would see no history at all — an empty tree, not an error.
+      - ${CODING_DATA_HOME:?unset — export it from bin/coding-data-home, or start via coding --claude}:${CODING_DATA_HOME:?unset — export it from bin/coding-data-home, or start via coding --claude}
       - ${CODING_REPO:-.}/knowledge-management:/coding/knowledge-management
       - ${CODING_REPO:-.}/.git:/coding/.git:rw
       # Workspace access (host repos)

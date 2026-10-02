@@ -67,7 +67,10 @@ __pycache__/
 # .env). The folder is created locally by init-history.sh so LSL services
 # don't crash on a fresh public checkout, but its contents are never
 # committed to this repo.
-.specstory/history/
+# No trailing slash: once bin/init-history.sh makes this a symlink into the
+# data home, a `dir/` pattern no longer matches it (git sees a symlink as a
+# file) and `git add -A` would commit the link.
+.specstory/history
 
 # Knowledge base data (if you want to exclude the actual data)
 # Uncomment the line below if you don't want to track the knowledge base content
