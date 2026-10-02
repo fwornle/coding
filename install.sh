@@ -3289,8 +3289,27 @@ install_node_dependencies() {
     done
     [[ "$native_failed" == "0" ]] || log "One or more native builds failed; logs retained under ${TMPDIR:-/tmp}"
 
-    ensure_km_core_link
+    # The root's own TypeScript (src/**/*.ts → dist/). dist/ is gitignored, and
+    # JS under src/ imports it by relative path — src/retrieval/retrieval-service.js
+    # loads ../../dist/embedding/embedding-service.js — so a fresh clone that never
+    # ran this has an obs-api that starts, accepts a write, then dies on its first
+    # embedding before the store's export debounce persists anything. The clean
+    # room caught exactly that. Nothing here ran `npm run build` for the root.
+    info "Building the root TypeScript (src/ → dist/)..."
+    if npm run build >>"$INSTALL_LOG" 2>&1 && [[ -f "$CODING_REPO/dist/embedding/embedding-service.js" ]]; then
+        success "✓ root TypeScript built"
+    else
+        warning "Root TypeScript build failed — see $INSTALL_LOG"
+        info "  → retrieval and embeddings in obs-api will fail until: npm run build"
+        INSTALLATION_WARNINGS+=("root TypeScript build failed — obs-api retrieval/embeddings unavailable")
+    fi
+
+    # Tokenizer FIRST: install_fastembed_native runs `npm install <pkg> --no-save`
+    # in the root, and npm prunes everything package.json does not declare — which
+    # includes the @fwornle/km-core link. In this order the clean room's obs-api
+    # died with "Cannot find package '@fwornle/km-core'".
     install_fastembed_native
+    ensure_km_core_link
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3316,6 +3335,19 @@ install_node_dependencies() {
 # would make a failed submodule fetch (no network, no SSH key, CN restrictions)
 # abort the ENTIRE install, instead of degrading to "session logging disabled".
 # ─────────────────────────────────────────────────────────────────────────────
+# Print km-core's declared dependencies that are NOT installed in its OWN
+# node_modules (space-separated; empty when complete). Deliberately not
+# require.resolve: that walks up into the root's node_modules and answers for a
+# copy km-core will not get once it is resolved through the link.
+km_core_deps_missing() {
+    (cd "$1" && node -e '
+      const fs = require("fs"), path = require("path");
+      const deps = Object.keys(require("./package.json").dependencies || {});
+      const missing = deps.filter((d) => !fs.existsSync(path.join("node_modules", d, "package.json")));
+      process.stdout.write(missing.join(" "));
+    ' 2>/dev/null) || printf 'package.json-unreadable'
+}
+
 ensure_km_core_link() {
     local km_src="$CODING_REPO/lib/km-core"
     local scope_dir="$CODING_REPO/node_modules/@fwornle"
@@ -3341,15 +3373,24 @@ ensure_km_core_link() {
     #    scoped packages (e.g. @napi-rs, @esbuild) while every direct dependency
     #    (graphology, classic-level, …) is missing, so resolution still fails
     #    silently. Verify a direct dependency actually resolves instead.
-    if [[ ! -d "$km_src/node_modules" ]] || ! (cd "$km_src" && node -e "require.resolve('graphology')" >/dev/null 2>&1); then
+    #
+    #    And it must look INSIDE km-core. `require.resolve('graphology')` run from
+    #    lib/km-core walks up and finds the ROOT's node_modules/graphology (the root
+    #    depends on it too), so it passed on a km-core tree holding 15 stray scoped
+    #    dirs and no uuidv7 — the clean room then failed with "@fwornle/km-core is
+    #    linked but does not import cleanly" and blamed dist/. km_core_deps_missing
+    #    checks every declared dependency in km-core's own node_modules.
+    if [[ -n "$(km_core_deps_missing "$km_src")" ]]; then
         info "Installing km-core dependencies..."
         # Output to the install log, not /dev/null: a registry that answers 502
         # half-way through (seen through a corporate proxy) left a partial tree,
         # and with the output discarded the only visible symptom was tsc failing
         # on graphology's types two steps later — nothing pointed at the network.
         (cd "$km_src" && { npm ci --ignore-scripts || npm install --ignore-scripts; } >>"$INSTALL_LOG" 2>&1) || true
-        if ! (cd "$km_src" && node -e "require.resolve('graphology')" >/dev/null 2>&1); then
-            warning "km-core dependencies did not install (registry/network?) — see $INSTALL_LOG"
+        local km_missing
+        km_missing="$(km_core_deps_missing "$km_src")"
+        if [[ -n "$km_missing" ]]; then
+            warning "km-core dependencies did not install (registry/network?) — missing: $km_missing — see $INSTALL_LOG"
             info "  → live session logging (LSL) and the knowledge store need them."
             info "  → fix later with: (cd lib/km-core && npm ci) && ./install.sh"
             INSTALLATION_WARNINGS+=("km-core dependencies missing — LSL/observations/knowledge disabled (network?)")
@@ -3461,6 +3502,14 @@ install_fastembed_native() {
 verify_host_embeddings() {
     cd "$CODING_REPO"
 
+    # The km-core link is pruned by the same thing that prunes the tokenizer (any
+    # root `npm install`), and nothing else re-checks it after the last one. This
+    # is that last point, so check it here regardless of the tokenizer's state.
+    if ! node -e "import('@fwornle/km-core').then(()=>process.exit(0),()=>process.exit(1))" >/dev/null 2>&1; then
+        info "@fwornle/km-core no longer resolves after later npm installs — relinking..."
+        ensure_km_core_link
+    fi
+
     if node -e "require('@anush008/tokenizers')" >/dev/null 2>&1; then
         success "✓ host embeddings: platform tokenizer loads"
         return 0
@@ -3468,6 +3517,9 @@ verify_host_embeddings() {
 
     info "Platform tokenizer missing after later npm installs — repairing..."
     install_fastembed_native
+    # That repair is itself a pruning `npm install`, so the km-core link it just
+    # removed has to come back. Idempotent; quiet when nothing is wrong.
+    ensure_km_core_link
 
     if node -e "require('@anush008/tokenizers')" >/dev/null 2>&1; then
         success "✓ host embeddings: platform tokenizer restored"
