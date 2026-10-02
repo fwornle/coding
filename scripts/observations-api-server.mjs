@@ -3856,7 +3856,7 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Wave-analysis (UKB) — runs IN-PROCESS on the single-owner km-core store.
+// UKB workflows — run IN-PROCESS on the single-owner km-core store.
 //
 // Same reasoning as the LSL resolver above. km-core's LevelDB is
 // single-owner-rw and this process holds the lock, so the workflow runner
@@ -3865,103 +3865,194 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
 // open" — 2026-07-01, twice on 2026-08-27, 2026-09-07. Rather than stopping
 // obs-api to free the lock (it is the designated owner, has KeepAlive=true and
 // a coordinator auto-heal), the run comes here and borrows the open store.
+// batch-, incremental- and complete-analysis followed once CoordinatorAgent
+// was pointed at the canonical store and hit the same wall.
+//
+// ONE LOCK ACROSS ALL OF THEM. The workflow state machine is module-level
+// singleton state and .data/workflow-progress.json has a single writer, so two
+// runs at once corrupt both the file and the dashboard's view of it. A request
+// for the workflow already running attaches to it; a request for a DIFFERENT
+// workflow gets 409 naming the run in flight — never a 202 for a workflow that
+// is not the one running.
 //
 // Fire-and-forget with a 202, like /api/consolidation/run: a full run is tens
 // of minutes, far past any reverse-proxy timeout. Progress and the terminal
 // state land in .data/workflow-progress.json, which the dashboard already
-// polls; /api/workflows/wave-analysis/status reports this process's view.
+// polls; /api/workflows/<name>/status reports this process's view.
 // ---------------------------------------------------------------------------
 const WORKFLOW_PROGRESS_FILE = path.join(REPO_ROOT, '.data', 'workflow-progress.json');
+const SA_DIST = '../integrations/semantic-analysis/dist';
 
-let _waveRunPromise = null;      // in-flight run, or null
-let _waveRunStartedAt = null;    // ISO timestamp of the in-flight run
-let _waveRunJobId = 0;           // monotonic, surfaced in the 202
-let _waveRunLastResult = null;   // { success, totalEntities, waves, error? }
-let _waveRunLastFinishedAt = null;
+// The tenant every entity a run writes is stamped with. tools.ts always sends
+// one; a caller that does not gets the strict resolver, never a guess.
+async function resolveRunTenant(team) {
+  if (team) return team;
+  const { requireTenant } = await import(`${SA_DIST}/scope.js`);
+  return requireTenant(REPO_ROOT);
+}
 
-async function runWaveAnalysisInProcess(team) {
-  // Serialised deliberately: the shared workflow-state-machine is module-level
-  // singleton state and the progress file has a single writer. A second caller
-  // attaches to the in-flight run rather than starting a competing one.
-  if (_waveRunPromise) return _waveRunPromise;
-
-  _waveRunJobId += 1;
-  _waveRunStartedAt = new Date().toISOString();
-
-  _waveRunPromise = (async () => {
-    const store = await ensureKMStore();
-    if (!store) throw new Error('Knowledge graph store not ready');
-
-    // Imported lazily so a broken or unbuilt semantic-analysis dist cannot stop
-    // obs-api from starting — it only breaks this one endpoint.
-    const { runWaveAnalysis } = await import(
-      '../integrations/semantic-analysis/dist/run-wave-analysis.js'
-    );
-
+// Explicit on purpose: obs-api runs only workflows somebody added here, so an
+// HTTP caller cannot reach whatever else the submodule happens to define. Each
+// runner never throws on a failed run — it writes the terminal state itself.
+// Imported lazily so a broken or unbuilt semantic-analysis dist cannot stop
+// obs-api from starting — it only breaks these endpoints.
+async function runCoordinatorInProcess(workflowName, store, body) {
+  const { runCoordinatorWorkflow } = await import(`${SA_DIST}/run-coordinator-workflow.js`);
+  return runCoordinatorWorkflow({
+    repositoryPath: REPO_ROOT,
+    workflowName,
+    team: await resolveRunTenant(body.team),
+    parameters: body.parameters || {},
+    progressFile: WORKFLOW_PROGRESS_FILE,
+    kmStore: store,
+    config: body.config,
+  });
+}
+const WORKFLOW_RUNNERS = {
+  'wave-analysis': async (store, body) => {
+    const { runWaveAnalysis } = await import(`${SA_DIST}/run-wave-analysis.js`);
     return runWaveAnalysis({
       repositoryPath: REPO_ROOT,
-      team: team || 'coding',
+      team: await resolveRunTenant(body.team),
       progressFile: WORKFLOW_PROGRESS_FILE,
       kmStore: store,
+      config: body.config,
       logLine: (m) => process.stderr.write(`[obs-api] ${m}\n`),
     });
+  },
+  'batch-analysis': (store, body) => runCoordinatorInProcess('batch-analysis', store, body),
+  'incremental-analysis': (store, body) => runCoordinatorInProcess('incremental-analysis', store, body),
+  'complete-analysis': (store, body) => runCoordinatorInProcess('complete-analysis', store, body),
+};
+
+let _workflowRun = null;     // { workflow, jobId, startedAt, promise } while one is in flight
+let _workflowJobId = 0;      // monotonic across all workflows, surfaced in the 202
+const _workflowLast = {};    // workflow -> { jobId, finishedAt, result }
+
+/**
+ * Start `workflow`, attach to it if it is already running, or refuse because a
+ * different one is. Returns { outcome: 'started'|'attached'|'conflict', run }.
+ */
+function startWorkflowRun(workflow, body) {
+  if (_workflowRun) {
+    return { outcome: _workflowRun.workflow === workflow ? 'attached' : 'conflict', run: _workflowRun };
+  }
+
+  const jobId = ++_workflowJobId;
+  const run = { workflow, jobId, startedAt: new Date().toISOString(), promise: null };
+  _workflowRun = run;
+
+  run.promise = (async () => {
+    const store = await ensureKMStore();
+    if (!store) throw new Error('Knowledge graph store not ready');
+    return WORKFLOW_RUNNERS[workflow](store, body || {});
   })()
     .then((result) => {
-      _waveRunLastResult = result;
+      _workflowLast[workflow] = { jobId, finishedAt: new Date().toISOString(), result };
       return result;
     })
     .catch((err) => {
-      _waveRunLastResult = { success: false, totalEntities: 0, waves: 0, error: err.message };
-      throw err;
+      // Only reached when the run could not start (store, import, tenant); a
+      // failed run resolves with success:false. Swallowed here so a failed
+      // start is not an unhandledRejection; the status route reports it.
+      _workflowLast[workflow] = {
+        jobId,
+        finishedAt: new Date().toISOString(),
+        result: { success: false, error: err.message },
+      };
+      process.stderr.write(`[obs-api] ${workflow} async error: ${err.message}\n`);
     })
     .finally(() => {
-      _waveRunLastFinishedAt = new Date().toISOString();
-      _waveRunPromise = null;
-      _waveRunStartedAt = null;
+      _workflowRun = null;
     });
 
-  return _waveRunPromise;
+  return { outcome: 'started', run };
+}
+
+function describeRun(run) {
+  return run ? { workflow: run.workflow, jobId: run.jobId, startedAt: run.startedAt } : null;
+}
+
+for (const workflow of Object.keys(WORKFLOW_RUNNERS)) {
+  /**
+   * POST /api/workflows/<workflow>/run — start a run on the owned store.
+   * Body: { team?: string, parameters?: object, config?: RunConfig }
+   * 202 started or attached (same workflow in flight); 409 when a different
+   * workflow holds the lock.
+   */
+  app.post(`/api/workflows/${workflow}/run`, (req, res) => {
+    if (_shuttingDown) {
+      return res.status(503).json({ success: false, error: 'Server is shutting down' });
+    }
+    const { outcome, run } = startWorkflowRun(workflow, req.body);
+    if (outcome === 'conflict') {
+      return res.status(409).json({
+        success: false,
+        error: `${run.workflow} is running (job ${run.jobId}, started ${run.startedAt}); ` +
+          `${workflow} was not started. Workflows share one progress file and run one at a time.`,
+        running: describeRun(run),
+      });
+    }
+    res.status(202).json({
+      success: true,
+      accepted: true,
+      attached: outcome === 'attached',
+      workflow,
+      jobId: run.jobId,
+      startedAt: run.startedAt,
+      progressFile: WORKFLOW_PROGRESS_FILE,
+    });
+  });
+
+  /**
+   * GET /api/workflows/<workflow>/status — this process's view of the run.
+   * `running` is about THIS workflow; `activeWorkflow` names whichever run
+   * holds the lock, which is what a script about to write the same rows needs.
+   */
+  app.get(`/api/workflows/${workflow}/status`, (_req, res) => {
+    const mine = _workflowRun?.workflow === workflow ? _workflowRun : null;
+    const last = _workflowLast[workflow] || null;
+    res.json({
+      success: true,
+      data: {
+        running: !!mine,
+        jobId: mine ? mine.jobId : (last ? last.jobId : null),
+        startedAt: mine ? mine.startedAt : null,
+        finishedAt: last ? last.finishedAt : null,
+        lastResult: last ? last.result : null,
+        activeWorkflow: describeRun(_workflowRun),
+      },
+    });
+  });
 }
 
 /**
- * POST /api/workflows/wave-analysis/run — start a run on the owned store.
- * Body: { team?: string }
- * Returns 202 immediately; a concurrent caller attaches to the in-flight run.
+ * POST /api/workflows/cancel — cancel whichever workflow holds the lock.
+ *
+ * The cancel has to happen IN this process. The run checks the state machine
+ * module it shares with this file, not the progress file, so the dashboard's
+ * file rewrite cannot reach it — there is no runner PID to kill either. Worse,
+ * the rewrite clears stepPaused, which a paused single-step run reads as
+ * "Step", so a file-only cancel advanced the run it meant to stop.
+ *
+ * 202 while the run winds down: the lock is released when it settles, at the
+ * next step boundary. 200 with cancelled:false when nothing is running.
  */
-app.post('/api/workflows/wave-analysis/run', (req, res) => {
-  if (_shuttingDown) {
-    return res.status(503).json({ success: false, error: 'Server is shutting down' });
+app.post('/api/workflows/cancel', async (req, res) => {
+  const run = _workflowRun;
+  if (!run) {
+    return res.json({ success: true, cancelled: false, reason: 'no workflow is running' });
   }
-  const attached = !!_waveRunPromise;
-
-  // Swallow here: the error is kept in _waveRunLastResult for the status route.
-  // Without this an unhandledRejection is logged on every failed run.
-  runWaveAnalysisInProcess((req.body || {}).team).catch((err) => {
-    process.stderr.write(`[obs-api] wave-analysis async error: ${err.message}\n`);
-  });
-
-  res.status(202).json({
-    success: true,
-    accepted: true,
-    attached,
-    jobId: _waveRunJobId,
-    startedAt: _waveRunStartedAt,
-    progressFile: WORKFLOW_PROGRESS_FILE,
-  });
-});
-
-/** GET /api/workflows/wave-analysis/status — this process's view of the run. */
-app.get('/api/workflows/wave-analysis/status', (_req, res) => {
-  res.json({
-    success: true,
-    data: {
-      running: !!_waveRunPromise,
-      jobId: _waveRunJobId,
-      startedAt: _waveRunStartedAt,
-      finishedAt: _waveRunLastFinishedAt,
-      lastResult: _waveRunLastResult,
-    },
-  });
+  try {
+    const { dispatch } = await import(`${SA_DIST}/workflow-state-machine.js`);
+    dispatch({ type: 'cancel', reason: (req.body || {}).reason || 'Cancelled via obs-api' });
+  } catch (err) {
+    // InvalidTransitionError: the run is already terminal and about to settle.
+    if (err?.name !== 'InvalidTransitionError') {
+      return res.status(500).json({ success: false, error: err.message, running: describeRun(run) });
+    }
+  }
+  res.status(202).json({ success: true, cancelled: true, running: describeRun(run) });
 });
 
 // Phase 44 Plan 14 — guard auto-listen so the integration test

@@ -88,8 +88,10 @@ const cmp = (a, b) => {
 if (APPLY) {
   try {
     const st = await get('/api/workflows/wave-analysis/status');
-    if (st?.running) {
-      out('REFUSING to apply: a wave-analysis run is in flight.');
+    // activeWorkflow, not running: every UKB workflow writes these rows, and
+    // `running` only answers for wave-analysis itself.
+    if (st?.running || st?.activeWorkflow) {
+      out(`REFUSING to apply: a ${st.activeWorkflow?.workflow || 'wave-analysis'} run is in flight.`);
       out('It writes these same rows; wait for it to finish, then re-run.');
       process.exit(2);
     }

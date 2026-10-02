@@ -32,6 +32,22 @@ and leave the UI blind to it.
 Workflow names: `wave-analysis` (the UKB pass), `batch-analysis`, `incremental-analysis`,
 `complete-analysis`.
 
+### All four run inside obs-api (:12436), one at a time
+
+km-core's LevelDB is single-owner and obs-api holds it, so the container hands every one of these
+to obs-api over HTTP (`POST /api/workflows/<name>/run`) instead of spawning a runner — a spawned
+child cannot open the store. Consequences worth knowing:
+
+- **One run at a time, across all four.** Asking for the workflow already running attaches to it;
+  asking for a *different* one is refused with **409** and "Workflow NOT started: <x> is running".
+  That is the lock working, not a failure — wait, or cancel, then retry.
+- **Cancel** with the dashboard's Cancel button or `curl -X POST localhost:12436/api/workflows/cancel`.
+  It is cooperative: the run stops at its next step boundary, which can take as long as the step
+  in flight. `GET /api/workflows/<name>/status` → `activeWorkflow` says who still holds the lock.
+- **obs-api down = "Workflow NOT started … Could not reach obs-api".** There is deliberately no
+  spawn fallback. `launchctl kickstart -k gui/$(id -u)/com.coding.obs-api`.
+- Restarting obs-api kills an in-flight run (the progress file then still says `running`).
+
 ## Commands
 
 ```bash
