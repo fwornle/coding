@@ -4146,31 +4146,64 @@ export const _testHooks = {
   RETRIEVAL_CAPTURES_DIR,
 };
 
+// Bounded km-core flush for shutdown. GraphKMStore.close() drains the debounced
+// JSON export AND writes the graph to LevelDB — the only path that does the
+// latter (persistGraph fires on close, nowhere else). Measured at ~0.3s on the
+// full coding graph (3176 nodes), so the bound is for a wedged disk, not for
+// normal operation.
+const SHUTDOWN_STORE_CLOSE_MS = 6_000;
+async function closeKmStoreForShutdown() {
+  if (!_kmStore) return;
+  const store = _kmStore;
+  // Flip the hydration gate FIRST: a write that arrives during the flush gets a
+  // 503 (which callers retry) instead of landing in a graph that is about to be
+  // discarded without ever being exported.
+  _kmStoreReady = false;
+  const t0 = Date.now();
+  let timer;
+  try {
+    await Promise.race([
+      store.close(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timed out after ${SHUTDOWN_STORE_CLOSE_MS}ms`)), SHUTDOWN_STORE_CLOSE_MS);
+      }),
+    ]);
+    process.stderr.write(`[obs-api] km-core store flushed and closed in ${Date.now() - t0}ms\n`);
+  } catch (err) {
+    process.stderr.write(`[obs-api] km-core store close FAILED (${err.message}) — writes since the last JSON export may be lost\n`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function shutdown(signal) {
   // Include ppid so the next investigator can identify the SIGTERM sender —
   // this codebase has at least three places that can kill obs_api
   // (process-state-manager, health-remediation-actions, ETM-driven cleanups)
   // and the source of any given kill has historically been a guessing game.
   process.stderr.write(`[obs-api] ${signal} — shutting down (pid=${process.pid}, ppid=${process.ppid})\n`);
+  if (_shuttingDown) return; // a second signal must not start a second flush
   _shuttingDown = true;
-  // Wait briefly for in-flight consolidation to drain. Bound the wait so a
-  // wedged LLM call can't outlast the supervisor's SIGKILL grace. We give
-  // the consolidator 10s to finish its current chunk gracefully; if it's
-  // still running after that, we abort the LLM HTTP call so the proxy
-  // tears down its spawned claude CLI subprocess. Then wait up to 10 more
-  // seconds for the consolidator promise itself to settle.
+
+  // THE BUDGET. launchd SIGKILLs a job ExitTimeOut seconds after SIGTERM, and
+  // com.coding.obs-api sets none, so the default 20s applies. Everything below
+  // must finish inside it, with the store flush LAST so it sees every write:
+  //   consolidation drain  ≤ 6s graceful + ≤ 4s after abort
+  //   store flush          ≤ SHUTDOWN_STORE_CLOSE_MS (6s; ~0.3s measured)
+  //   own hard kill        at 18s, still before launchd's
+  // The drain used to be 10s + 10s, which alone could use the whole budget.
   if (_consolidationPromise) {
-    process.stderr.write(`[obs-api] waiting up to 10s for in-flight consolidation to drain naturally\n`);
+    process.stderr.write(`[obs-api] waiting up to 6s for in-flight consolidation to drain naturally\n`);
     const gracefulDrain = await Promise.race([
       _consolidationPromise.catch(() => 'errored').then(() => 'done'),
-      new Promise((r) => setTimeout(() => r('timeout'), 10_000)),
+      new Promise((r) => setTimeout(() => r('timeout'), 6_000)),
     ]);
     if (gracefulDrain === 'timeout' && _consolidationAbort) {
       process.stderr.write(`[obs-api] graceful drain timed out — aborting LLM HTTP calls to reap orphan CLI children\n`);
       _consolidationAbort.abort(new Error('obs-api shutting down'));
       await Promise.race([
         _consolidationPromise.catch(() => { /* surfaced in handler */ }),
-        new Promise((r) => setTimeout(r, 10_000)),
+        new Promise((r) => setTimeout(r, 4_000)),
       ]);
     }
   }
@@ -4181,32 +4214,48 @@ async function shutdown(signal) {
     // No autostart (integration-test path) — nothing to close.
     return;
   }
-  server.close(async () => {
-    if (_writer) {
-      try { await _writer.close?.(); } catch { /* best effort */ }
-    }
-    if (_pipelineStatsConsolidator) {
-      try { _pipelineStatsConsolidator.close(); } catch { /* best effort */ }
-      _pipelineStatsConsolidator = null;
-    }
-    // Plan 44-18 (Task 4) — the prior legacy SQLite shutdown handler is
-    // gone. Pruner + retrieval-service freshness-rerank are km-core-only;
-    // no sqlite handle remains in this process to close.
-    // SIGKILL ourselves to skip Node's native destructor teardown.
-    // process.exit(0) triggers the fastembed C++ cleanup path which hits a
-    // libc++ mutex bug ("mutex lock failed: Invalid argument") and crashes
-    // with a non-zero exit code.  SIGKILL bypasses all destructors cleanly.
+
+  // Stop accepting connections, but do NOT wait for server.close()'s callback.
+  // It fires only once every connection has ended, and an SSE client (the
+  // viewer's /api/v1/stream) never ends one — so the teardown that used to live
+  // in that callback was never reached while a viewer was open, the hard kill
+  // below fired, and the km-core store was never closed. It was never closed on
+  // ANY path, in fact: the writer leaves an injected store to its owner, which
+  // is this process, and nothing here closed it. LevelDB therefore only ever
+  // held what the last clean close wrote — which was none.
+  server.close();
+
+  await closeKmStoreForShutdown();
+  if (_writer) {
+    try { await _writer.close?.(); } catch { /* best effort */ }
+  }
+  if (_pipelineStatsConsolidator) {
+    try { _pipelineStatsConsolidator.close(); } catch { /* best effort */ }
+    _pipelineStatsConsolidator = null;
+  }
+  // Plan 44-18 (Task 4) — the prior legacy SQLite shutdown handler is
+  // gone. Pruner + retrieval-service freshness-rerank are km-core-only;
+  // no sqlite handle remains in this process to close.
+  // SIGKILL ourselves to skip Node's native destructor teardown.
+  // process.exit(0) triggers the fastembed C++ cleanup path which hits a
+  // libc++ mutex bug ("mutex lock failed: Invalid argument") and crashes
+  // with a non-zero exit code.  SIGKILL bypasses all destructors cleanly.
+  process.kill(process.pid, 'SIGKILL');
+}
+// Hard exit if graceful shutdown stalls — armed on the FIRST signal, and before
+// launchd's own 20s SIGKILL, so the log says ours fired rather than nothing.
+function armShutdownHardKill() {
+  setTimeout(() => {
+    process.stderr.write('[obs-api] graceful shutdown exceeded 18s — hard kill\n');
     process.kill(process.pid, 'SIGKILL');
-  });
-  // Hard exit if graceful shutdown stalls
-  setTimeout(() => process.kill(process.pid, 'SIGKILL'), 25_000).unref();
+  }, 18_000).unref();
 }
 if (_autostart) {
   // Skip signal handlers in test mode — Jest reuses the process for many
   // suites; installing a SIGINT/SIGTERM listener would interfere with
   // Jest's own --watch and worker lifecycle.
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => { if (!_shuttingDown) armShutdownHardKill(); shutdown('SIGTERM'); });
+  process.on('SIGINT', () => { if (!_shuttingDown) armShutdownHardKill(); shutdown('SIGINT'); });
 }
 
 // Phase 35 plan 35-04 - re-export merge helpers for any caller that imports the
