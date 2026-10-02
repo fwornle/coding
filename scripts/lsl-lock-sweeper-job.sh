@@ -34,7 +34,16 @@ set -uo pipefail
 
 REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 STALE_SECS="${LSL_LOCK_STALE_SECS:-90}"
-DEFAULT_LOCK="${REPO_ROOT}/.specstory/history/.git/index.lock"
+# Ask git where the history repo's git dir is rather than assuming it: with the
+# history in the data home, .specstory/history is a symlink and the repo may be
+# the whole data home (.git one level ABOVE history/), not history/ itself.
+HISTORY_GIT_DIR="$(git -C "${REPO_ROOT}/.specstory/history" rev-parse --absolute-git-dir 2>/dev/null || true)"
+case "${HISTORY_GIT_DIR}" in
+  # Not the tools repo's own .git — a history with no checkout resolves to it.
+  ""|"$(git -C "${REPO_ROOT}" rev-parse --absolute-git-dir 2>/dev/null)")
+    HISTORY_GIT_DIR="${REPO_ROOT}/.specstory/history/.git" ;;
+esac
+DEFAULT_LOCK="${HISTORY_GIT_DIR}/index.lock"
 LOCK_PATHS="${LSL_LOCK_PATHS:-${DEFAULT_LOCK}}"
 
 log() { printf '[lsl-lock-sweeper][%s] %s\n' "$(date -u +%H:%M:%SZ)" "$*" >&2; }

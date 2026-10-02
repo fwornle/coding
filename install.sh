@@ -151,10 +151,10 @@ repo|$CODING_REPO/.npmrc|create|yes|proxy for npm, only if env vars are not hono
 repo|$CODING_REPO/.git/hooks/pre-commit|replace|yes|knowledge-snapshot guard (original saved as pre-commit.coding-orig)
 repo|$CODING_REPO/lib/km-core|checkout|yes|git submodule required for session logging
 repo|$CODING_REPO/.coding/|create|yes|per-launch agent config, so nothing global has to change
-repo|$CODING_REPO/.specstory/history/|clone or init|no|private session-history checkout; never pushed without confirmation, and uninstall.sh leaves your transcripts alone [feature:lsl]
+repo|$CODING_REPO/.specstory/history|symlink|yes|points at history/ in your data home below, so this checkout holds no transcripts of its own. A pre-existing history directory here is left as it is [feature:lsl]
 home|~/.coding/features.yaml|create|yes|which parts of coding you chose to install (not written for the default, `full`)
 home|~/.coding/scope|create|no|which tenant owns this machine's knowledge; also names the data root below. Not written if you decline to name one, and never overwritten
-home|~/.coding/data/<scope>/|create|no|your knowledge base and session history. uninstall.sh never deletes it — removing the scope while leaving this would strand the data behind an unresolvable name
+home|~/.coding/data/<scope>/|create|no|your knowledge base and session history, optionally a checkout of YOUR private <scope>-history repo (cloned if it exists, never pushed without confirmation). uninstall.sh never deletes it — removing the scope while leaving this would strand the data behind an unresolvable name
 home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
 home|$SHELL_RC|one marker block|yes|exports CODING_REPO and adds bin/ to PATH
 home|~/.gsd-browser/|create|yes|gsd-browser CLI, the mandated browser-automation tool; installer reuses a system Chrome when present and otherwise downloads Chrome for Testing. On macOS also writes config.toml [browser] path + a chromium.app symlink, pinning automation to Chrome for Testing so it cannot intercept AppleScript aimed at your own Chrome
@@ -3565,6 +3565,30 @@ git_url_slug() {
     return 0
 }
 
+# The directory that is — or should become — this installation's history
+# checkout. Prints nothing when there is none to offer.
+#
+#   $CODING_REPO/.specstory/history   a pre-data-home install: a REAL directory
+#                                     with content (the developer's own machine
+#                                     until it migrates). Never moved from here.
+#   <data home>/history               an older transcripts-only repo cloned into
+#                                     the data home by bin/init-history.sh
+#   <data home>                       otherwise: the user-data repo, history/ and
+#                                     kb/ tracked, var/ ignored
+#
+# Nothing when the scope is the placeholder: a history repo named after no one,
+# filed under a data home that moves the moment the user names their scope.
+history_home() {
+    local legacy="$CODING_REPO/.specstory/history" dh
+    if [[ -d "$legacy" && ! -L "$legacy" && -n "$(ls -A "$legacy" 2>/dev/null || true)" ]]; then
+        printf '%s' "$legacy"; return 0
+    fi
+    "$CODING_REPO/bin/coding-data-home" --require-scope >/dev/null 2>&1 || return 0
+    dh="$("$CODING_REPO/bin/coding-data-home" --ensure 2>/dev/null)" || return 0
+    if [[ -e "$dh/history/.git" ]]; then printf '%s' "$dh/history"; else printf '%s' "$dh"; fi
+    return 0
+}
+
 # Derive the default private-history repo URL.
 #
 # WHY DERIVED RATHER THAN HARDCODED: this installer used to carry one
@@ -3574,13 +3598,18 @@ git_url_slug() {
 # installer. The default is instead assembled from what this machine can
 # actually see, strongest signal first. CODING_HISTORY_HOST overrides the host.
 history_default_url() {
-    local host="" owner="" name origin live
-    name="$(basename "$CODING_REPO")-history"
+    local host="" owner="" name origin live home scope
+    # Named after the SCOPE, not this checkout. It used to be this checkout's
+    # basename plus `-history`, which is `coding-history` on every clone — the
+    # tools author's own history repo, offered to every colleague.
+    scope="$("$CODING_REPO/bin/coding-data-home" --require-scope 2>/dev/null || true)"
+    name="${scope:-YOUR-SCOPE}-history"
 
     # 1. An existing checkout outranks everything, including .env: it is where
     #    this machine demonstrably pushes today.
-    if [[ -d "$CODING_REPO/.specstory/history/.git" ]]; then
-        live="$(git -C "$CODING_REPO/.specstory/history" remote get-url origin 2>/dev/null || true)"
+    home="$(history_home)"
+    if [[ -n "$home" && -e "$home/.git" ]]; then
+        live="$(git -C "$home" remote get-url origin 2>/dev/null || true)"
         if [[ -n "$live" ]]; then printf '%s' "$live"; return 0; fi
     fi
 
@@ -3606,9 +3635,10 @@ history_default_url() {
     if command -v gh >/dev/null 2>&1 && gh auth status --hostname "$host" >/dev/null 2>&1; then
         owner="$(GH_HOST="$host" gh api user --jq .login 2>/dev/null || true)"
     fi
-    if [[ -z "$owner" && -n "$origin" ]]; then
-        owner="$(git_url_slug "$origin")"; owner="${owner%%/*}"
-    fi
+    # No fallback to the owner of THIS repo's origin: that is whoever published
+    # the tools, never the person installing them, and it pointed a colleague
+    # without gh at the author's private history. Unknown stays unknown, and
+    # the YOUR-ACCOUNT placeholder makes setup_history_repo print the recipe.
     [[ -n "$owner" ]] || owner="YOUR-ACCOUNT"
 
     printf '%s' "https://${host}/${owner}/${name}.git"
@@ -3645,8 +3675,9 @@ history_repo_state() {
 # Print the manual recipe. Used whenever we cannot (or must not) automate, so
 # that a user on a host gh cannot reach is never left without a path forward.
 history_manual_recipe() {
-    local url="$1" slug
+    local url="$1" slug home
     slug="$(git_url_slug "$url")"
+    home="$(history_home)"
     cat <<EOF
 
   To do this yourself:
@@ -3654,7 +3685,7 @@ history_manual_recipe() {
        (no README, no license, no .gitignore)
     2. Then seed it from the snapshot already on this machine:
 
-         cd $CODING_REPO/.specstory/history
+         cd ${home:-<your data home: bin/coding-data-home>}
          git init -b main && git add . && git commit -m "initial snapshot"
          git remote add origin $url
          git push -u origin main
@@ -3675,9 +3706,17 @@ EOF
 # confirmed explicitly every time and never happens on an unattended run unless
 # CODING_HISTORY_PUSH=1 says so.
 history_repo_seed() {
-    local url="$1" hist_dir="$CODING_REPO/.specstory/history" reply=""
+    local url="$1" hist_dir reply=""
     local n_files
-    n_files="$(find "$hist_dir" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+    hist_dir="$(history_home)"
+    if [[ -z "$hist_dir" ]]; then
+        info "No scope configured — nothing to seed"
+        return 0
+    fi
+    # Every file it would publish: transcripts are .jsonl now as well as .md,
+    # and a data home also carries kb/. var/ is ignored by the .gitignore
+    # ensureDataHome() wrote, so it is not counted.
+    n_files="$(find "$hist_dir" \( -name .git -o -path "$hist_dir/var" \) -prune -o -type f -print 2>/dev/null | wc -l | tr -d ' ')"
 
     if [[ -d "$hist_dir/.git" ]]; then
         info "History dir is already a git checkout — nothing to seed"
@@ -3685,10 +3724,11 @@ history_repo_seed() {
     fi
 
     echo ""
-    echo "  Ready to publish the local session history to:"
+    echo "  Ready to publish $hist_dir to:"
     echo "      $url"
-    echo "  That would push ${n_files} transcript file(s) — verbatim prompts and"
-    echo "  responses — to that remote. Make sure it is PRIVATE."
+    echo "  That would push ${n_files} file(s) — session transcripts (verbatim"
+    echo "  prompts and responses) and your knowledge base — to that remote."
+    echo "  Make sure it is PRIVATE."
     echo ""
 
     if [[ "$NON_INTERACTIVE" == "true" ]]; then
@@ -3743,11 +3783,21 @@ history_repo_seed() {
 # which clones into .specstory/history/ (or just creates the empty dirs
 # if the user skipped or has no access).
 setup_history_repo() {
+    skip_unless_feature lsl "session-history repository" || return 0
     info "Configuring private session-history repository"
 
     local env_file="$CODING_REPO/.env"
-    local hist_dir="$CODING_REPO/.specstory/history"
-    local existing=""
+    local hist_dir existing=""
+    hist_dir="$(history_home)"
+    if [[ -z "$hist_dir" ]]; then
+        # No scope: a repo named after nobody, filed under a data home that
+        # moves when the scope is named. Local-only until then.
+        warning "No install scope set — session history stays local-only."
+        echo "      Name one (re-run ./install.sh, or write ~/.coding/scope), then re-run."
+        INSTALLATION_WARNINGS+=("History: no scope set (local-only)")
+        "$CODING_REPO/bin/init-history.sh" || true
+        return 0
+    fi
 
     if [[ -f "$env_file" ]] && grep -q '^CODING_HISTORY_REPO=' "$env_file"; then
         # grep -m1 rather than `| head -1`: head closing the pipe SIGPIPEs grep
@@ -3767,14 +3817,18 @@ setup_history_repo() {
   ──────────────────────────────────────────────────────────────────
   PRIVATE SESSION-HISTORY REPO
 
-  This repo writes verbatim Claude session transcripts into
-    .specstory/history/YYYY/MM/<file>.md      (LSL transcripts)
-    .specstory/history/logs/                  (classification + operational)
+  Your session transcripts and knowledge base live in your data home,
+  OUTSIDE this checkout:
+    $hist_dir
+      history/YYYY/MM/<file>     verbatim session transcripts
+      history/logs/              classification + operational logs
+      kb/                        knowledge base exports and insights
+  (.specstory/history in this repo is a symlink to history/.)
 
-  This tree is .gitignore'd here — it lives in a SEPARATE PRIVATE
-  repo so conversation content (including occasional unredacted
-  secrets, internal paths, stakeholder names) can't leak via a public
-  clone.
+  This is the ONLY place your data is tracked. Back it with a SEPARATE
+  PRIVATE repo so conversation content (including occasional unredacted
+  secrets, internal paths, stakeholder names) can't leak, and so a clone
+  of these tools never carries anyone else's history.
 
   Any host your team can reach works — GitHub, GitHub Enterprise,
   GitLab, Gitea. The suggested URL below is derived from this machine
