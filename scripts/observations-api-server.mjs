@@ -2037,8 +2037,9 @@ function writeRetrievalCapture(taskId, result) {
  *
  * T6 team filter: `teams` (body, else `context.teams`), else the default for
  * the session's directory (`context.cwd`): the active selection
- * (~/.coding/teams.yaml / CODING_TEAMS), else the teams of the cwd's repo.
- * Only knowledge learned in those teams' projects is injected. [] = no filter.
+ * (~/.coding/teams.yaml / CODING_TEAMS), else the teams of the cwd's repo,
+ * else that repo's own project. Only knowledge learned in those projects is
+ * injected. [] = no filter (a cwd in no repo).
  */
 function retrievalTeams(body) {
   const explicit = body?.teams ?? body?.context?.teams;

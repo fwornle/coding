@@ -466,15 +466,21 @@ function buildPreviousSessionSection(sessionState) {
  * Fail-open: returns { markdown: '', tokens: 0 } on any error (D-03).
  * No caching -- every call queries live data (D-03, D-04).
  *
+ * `opts.projectRoot` is the session's own repo: STATE.md and the previous
+ * session are read from it, never from another repo (a session in a2a-xpr was
+ * told coding's milestone). `null` = the session is in no repo: neither is
+ * read. Absent = `codingRoot` (callers that pass no session directory).
+ *
  * @param {string} codingRoot - Path to the coding repo root
- * @param {{store?: object, projects?: string[]|null}} [opts] - see fetchKGStructure
+ * @param {{store?: object, projects?: string[]|null, projectRoot?: string|null}} [opts] - see fetchKGStructure
  * @returns {Promise<{ markdown: string, tokens: number }>}
  */
 export async function buildWorkingMemory(codingRoot, opts = {}) {
   try {
+    const projectRoot = opts.projectRoot === undefined ? codingRoot : opts.projectRoot;
     const [kgData, stateData] = await Promise.all([
       fetchKGStructure(opts),
-      Promise.resolve(parseStateFrontmatter(codingRoot)),
+      Promise.resolve(projectRoot ? parseStateFrontmatter(projectRoot) : null),
     ]);
 
     let markdown = assembleMarkdown(kgData, stateData);
@@ -491,8 +497,10 @@ export async function buildWorkingMemory(codingRoot, opts = {}) {
     }
 
     // Cross-agent continuity (D-10): inject Previous Session if applicable
-    const projectDir = process.env.CODING_PROJECT_DIR || process.env.TARGET_PROJECT_DIR || codingRoot;
-    const sessionState = readSessionState(projectDir);
+    const projectDir = opts.projectRoot !== undefined
+      ? opts.projectRoot
+      : process.env.CODING_PROJECT_DIR || process.env.TARGET_PROJECT_DIR || codingRoot;
+    const sessionState = projectDir ? readSessionState(projectDir) : null;
     if (sessionState) {
       const relativeTime = formatRelativeTime(sessionState.timestamp);
       process.stderr.write(

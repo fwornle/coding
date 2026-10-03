@@ -68,6 +68,9 @@ test('defaultTeamsFor: active selection, else the teams of the cwd\'s repo', () 
   assert.deepEqual(defaultTeamsFor(join(root, 'raas-api', 'src'), { teamsDoc }), ['raas']);
   assert.deepEqual(defaultTeamsFor(join(root, 'balance'), { teamsDoc }), ['ops'], 'a listed path');
   mkdirSync(join(root, 'loose', '.git'), { recursive: true });
-  assert.deepEqual(defaultTeamsFor(join(root, 'loose'), { teamsDoc }), [], 'in no team: no filter');
+  assert.deepEqual(defaultTeamsFor(join(root, 'loose'), { teamsDoc }), ['loose'], 'in no team: its own project');
+  const own = projectsOfTeams(defaultTeamsFor(join(root, 'loose'), { teamsDoc }), { teamsDoc, repos });
+  assert.deepEqual([...own.projects], ['loose'], 'resolves to that project only');
+  assert.deepEqual(defaultTeamsFor(tmpdir(), { teamsDoc }), [], 'in no repo: no filter');
   assert.deepEqual(defaultTeamsFor(join(root, 'coding'), { teamsDoc: { ...teamsDoc, active: ['ops'] } }), ['ops']);
 });

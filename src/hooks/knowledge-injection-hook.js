@@ -229,6 +229,8 @@ async function main() {
       context,
       task_id,
       timeout: RETRIEVE_TIMEOUT_MS,
+      // Same override as the copilot and opencode hooks (default 3033).
+      ...(process.env.CODING_RETRIEVAL_PORT ? { port: Number(process.env.CODING_RETRIEVAL_PORT) } : {}),
     });
     if (!result || !result.markdown || result.meta?.results_count === 0) return;
 

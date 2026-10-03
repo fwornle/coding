@@ -9,7 +9,7 @@
  * the filter request itself.
  */
 
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -123,6 +123,27 @@ describe('retrieve() with a team selection', () => {
     expect(res.items.length).toBeGreaterThan(0);
     for (const it of res.items) expect(projectOfItem(it)).toBe('coding');
     expect(res.markdown).not.toMatch(/raas|untagged/i);
+  });
+
+  test('Working Memory reads STATE.md from the session\'s repo, not the tools repo', async () => {
+    writeFileSync(path.join(codingRoot, '.planning', 'STATE.md'), '---\nmilestone: tools-milestone\nstatus: executing\n---\n');
+    const other = mkdtempSync(path.join(tmpdir(), 'team-filter-repo-'));
+    try {
+      mkdirSync(path.join(other, '.git'));
+      mkdirSync(path.join(other, '.planning'));
+      writeFileSync(path.join(other, '.planning', 'STATE.md'), '---\nmilestone: own-milestone\nstatus: executing\n---\n');
+      const ask = (cwd) => makeService().retrieve('retry with exponential backoff for flaky upstream calls', {
+        budget: 3000, threshold: 0.1, context: { agent: 'claude', ...(cwd ? { cwd } : {}) },
+      });
+      const own = await ask(path.join(other, '.planning'));
+      expect(own.markdown).toMatch(/own-milestone/);
+      expect(own.markdown).not.toMatch(/tools-milestone/);
+      expect((await ask(tmpdir())).markdown).not.toMatch(/-milestone/);
+      expect((await ask(null)).markdown).toMatch(/tools-milestone/);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+      rmSync(path.join(codingRoot, '.planning', 'STATE.md'), { force: true });
+    }
   });
 
   test('no teams: no filter requested (previous behaviour)', async () => {
