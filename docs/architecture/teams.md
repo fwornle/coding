@@ -79,3 +79,19 @@ active selection and clones missing shared repos. It writes `~/.coding/teams.yam
 only.
 
 Tests: `tests/teams/config.test.mjs`, `tests/teams/discover.test.mjs`.
+
+## Filtering by team
+
+Every team filter resolves through `lib/teams/scope.mjs`: a selection of team ids
+becomes the project ids of their repos (an id that is no team is taken as a project id),
+compared case-insensitively with `metadata.project`, else `metadata.team`.
+
+- **obs-api**: `?teams=a,b` on `/api/v1/entities`, `/api/coding/{observations,digests,insights}`
+  and `/api/coding/lsl/sessions` (which walks every discovered repo's transcripts), applied
+  before pagination. `/api/teams` lists each team's resolved `projects`.
+- **Viewer**: selecting a team admits its repos' entities on both canvases, in the rail
+  counts and in the History sidebar; the LSL strip asks the server.
+- **Injection**: `/api/retrieve` uses `teams` / `context.teams` (hooks forward
+  `CODING_TEAMS`), else the active selection, else the teams of the session's repo
+  (`context.cwd`). Qdrant is queried with a `project` filter and every candidate is
+  re-checked, so nothing from another team is injected. No teams = no filter.

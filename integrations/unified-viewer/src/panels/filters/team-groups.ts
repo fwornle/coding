@@ -100,7 +100,12 @@ export function buildTeamGroups(
   const projectRows: TeamRow[] = []
   const teamRows: TeamRow[] = []
   for (const entry of registry.teams) {
-    const row: TeamRow = { id: entry.id, label: entry.label, count: counts.get(entry.id) ?? 0 }
+    // A team counts what was learned in any of its repos (T6), not just in
+    // the project that happens to share its name.
+    const covered = new Set([entry.id, ...(entry.projects ?? [])])
+    let count = 0
+    for (const p of covered) count += counts.get(p) ?? 0
+    const row: TeamRow = { id: entry.id, label: entry.label, count }
     ;(entry.kind === 'project' ? projectRows : teamRows).push(row)
   }
 

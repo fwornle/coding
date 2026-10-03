@@ -45,6 +45,7 @@ export type VisibilityPredicate = (e: Entity) => boolean
 export function useGraphVisibility(): VisibilityPredicate {
   const selectedTeams = useViewerStore((s) => s.selectedTeams)
   const teamScope = useViewerStore((s) => s.teamScope)
+  const teamProjects = useViewerStore((s) => s.teamProjects)
   const visibleLevels = useViewerStore((s) => s.visibleLevels)
   const selectedClasses = useViewerStore((s) => s.selectedClasses)
   const searchQuery = useViewerStore((s) => s.searchQuery)
@@ -94,6 +95,7 @@ export function useGraphVisibility(): VisibilityPredicate {
       searchQueryLowered: searchQuery.trim().toLowerCase(),
       selectedTeams,
       teamScope,
+      teamProjects,
       learningSource,
       selectedLayers,
       hideDocNodes,
@@ -116,6 +118,7 @@ export function useGraphVisibility(): VisibilityPredicate {
   }, [
     selectedTeams,
     teamScope,
+    teamProjects,
     visibleLevels,
     selectedClasses,
     searchQuery,

@@ -30,6 +30,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import type { ApiClient } from '@/api/ApiClient'
+import { useViewerStore } from '@/store/viewer-store'
 
 export type LslWindow = '24h' | '7d' | '30d' | '1y'
 
@@ -50,21 +51,38 @@ export interface LslSession {
   endAt: string | null
   observationCount: number
   entityIds: string[]
+  /** The repo's project the transcript belongs to (T6: one strip, every repo). */
+  project?: string
   // Provenance discriminator from Plan 01's backend (D-07/D-09):
   // 'batch' = any matched entity tagged manual/wave-analysis; 'online' = auto.
   // Consumed by the strip's fillClass branch (amber=batch, pink=online).
   source?: 'online' | 'batch'
 }
 
+/**
+ * The rail's selection as a `?teams=` value: '' for "all" (no filter). The
+ * server expands team ids to their repos' projects (lib/teams/scope.mjs), and
+ * filters BEFORE its 500-row cap — filtering here after the cap would show a
+ * truncated strip for a small team. `__none__` sends a team that matches
+ * nothing rather than skipping the request.
+ */
+export function teamsParam(selected: ReadonlySet<string>): string {
+  if (selected.size === 0) return ''
+  if (selected.has('__none__')) return '__none__'
+  return [...selected].sort().join(',')
+}
+
 async function fetchSessions(
   apiClient: ApiClient,
   windowMs: number,
+  teams = '',
 ): Promise<{ sessions: LslSession[]; total?: number }> {
   const since = new Date(Date.now() - windowMs).toISOString()
   // Bounded cap = backend LSL_MAX_LIMIT (500). Server slices to this; `total`
   // in the envelope is the full pre-slice M so the strip's N-of-M badge can
   // tell the operator the truth when N < M.
   const url = `${apiClient.base}/api/coding/lsl/sessions?since=${encodeURIComponent(since)}&limit=500`
+    + (teams ? `&teams=${encodeURIComponent(teams)}` : '')
   const res = await fetch(url, { headers: { Accept: 'application/json' } })
   if (!res.ok) {
     throw new Error(`${url} → HTTP ${res.status}`)
@@ -95,9 +113,10 @@ async function fetchSessions(
  * shares the same cache entry as the strip's first render.
  */
 export function useLslSessions(apiClient: ApiClient, windowKey: LslWindow = '7d') {
+  const teams = teamsParam(useViewerStore((s) => s.selectedTeams))
   return useQuery({
-    queryKey: ['lsl-sessions', apiClient.base, windowKey],
-    queryFn: () => fetchSessions(apiClient, WINDOW_MS[windowKey]),
+    queryKey: ['lsl-sessions', apiClient.base, windowKey, teams],
+    queryFn: () => fetchSessions(apiClient, WINDOW_MS[windowKey], teams),
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   })

@@ -220,6 +220,9 @@ export interface ViewerState {
    * Written by TeamsFilter when the registry arrives; null until then.
    */
   teamScope: string | null
+  /** Per registry team, the projects it covers (`/api/teams`); written by
+   *  TeamsFilter. Selecting a team admits its projects' entities. */
+  teamProjects: Readonly<Record<string, readonly string[]>>
 
   // Filters
   searchQuery: string
@@ -699,6 +702,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   learningSource: 'combined',
   selectedTeams: new Set<string>(),
   teamScope: null,
+  teamProjects: {},
   theme: readPersistedThemeForStore(),
   // Default to the D3 renderer — that's the VKB-parity engine. The
   // UnifiedViewer route can override to 'sigma' for systems that

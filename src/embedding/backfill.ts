@@ -26,13 +26,14 @@
  * duplicates for the length of the run rather than going empty.
  */
 
-import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 import { getEmbeddingService } from "./embedding-service.js";
 import { contentHash } from "./content-hash.js";
+import { keyToUuid } from "./point-id.js";
 import { makePreview, previewVersion, SUMMARY_PREVIEW_CHARS } from "./preview.js";
 import { ensureCollections, getQdrantClient } from "./qdrant-collections.js";
 
@@ -97,18 +98,6 @@ function parseArgs(): BackfillOptions {
 // Deterministic UUID from arbitrary key string (for KG entities)
 // ---------------------------------------------------------------------------
 
-function keyToUuid(key: string): string {
-  const hex = crypto.createHash("md5").update(key).digest("hex");
-  // Format as UUID v4 shape: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-  return [
-    hex.substring(0, 8),
-    hex.substring(8, 12),
-    "4" + hex.substring(13, 16),
-    ((parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16) +
-      hex.substring(17, 20),
-    hex.substring(20, 32),
-  ].join("-");
-}
 
 // ---------------------------------------------------------------------------
 // Tier readers
@@ -128,7 +117,10 @@ function keyToUuid(key: string): string {
  * @returns parsed rows, or [] when the export is absent/unreadable
  */
 function readExport(name: string): Array<Record<string, unknown>> {
-  const file = join(projectRoot, ".data/observation-export", `${name}.json`);
+  // The data home's export (lib/paths/data-home.cjs), where obs-api writes
+  // it; `<repo>/.data/observation-export` stopped being written at the
+  // data-home migration.
+  const file = join(dataHome().observationExportDir(), `${name}.json`);
   try {
     const raw = JSON.parse(readFileSync(file, "utf8")) as unknown;
     if (Array.isArray(raw)) return raw as Array<Record<string, unknown>>;
@@ -151,7 +143,7 @@ function readObservations(): BackfillItem[] {
       text: String(r.summary),
       payload: {
         agent: str(r.agent),
-        project: str(r.project) ?? "coding",
+        project: str(r.project),
         date: (str(r.createdAt) ?? "").split("T")[0] || null,
         quality: str(r.quality) ?? "normal",
         summary_preview: makePreview(String(r.summary)),
@@ -172,7 +164,7 @@ function readDigests(): BackfillItem[] {
         // The export carries an array; the retrieval formatter prints it verbatim.
         agents: Array.isArray(r.agents) ? JSON.stringify(r.agents) : str(r.agents),
         quality: str(r.quality) ?? "normal",
-        project: str(r.project) ?? "coding",
+        project: str(r.project),
         summary_preview: makePreview(String(r.summary)),
         preview_version: previewVersion(),
       },
@@ -189,7 +181,7 @@ function readInsights(): BackfillItem[] {
         topic: str(r.topic),
         confidence: typeof r.confidence === "number" ? r.confidence : null,
         digestIds: Array.isArray(r.digestIds) ? JSON.stringify(r.digestIds) : str(r.digestIds),
-        project: str(r.project) ?? "coding",
+        project: str(r.project),
         summary_preview: makePreview(String(r.summary)),
         preview_version: previewVersion(),
       },
@@ -216,6 +208,39 @@ interface SerializedGraph {
   metadata?: unknown;
 }
 
+interface DataHomeModule {
+  observationExportDir(): string;
+}
+
+/** coding's data-home resolver (lib/paths/data-home.cjs). */
+function dataHome(): DataHomeModule {
+  return createRequire(import.meta.url)(join(projectRoot, "lib", "paths", "data-home.cjs")) as DataHomeModule;
+}
+
+/**
+ * Every knowledge-graph export (lib/kb/layout.mjs, 'local' mode = read all:
+ * repo learning checkouts, shared clones, the data home's files) merged by
+ * km-core's rule — the graph obs-api holds.
+ */
+async function readMergedGraph(): Promise<SerializedGraph> {
+  const layoutHref = pathToFileURL(join(projectRoot, "lib", "kb", "layout.mjs")).href;
+  const { kbLayout } = (await import(layoutHref)) as {
+    kbLayout: (o: object) => { sources(): string[] };
+  };
+  const { mergeGraphs } = (await import("@fwornle/km-core")) as unknown as {
+    mergeGraphs: (g: unknown[]) => { graph: SerializedGraph };
+  };
+  const graphs: unknown[] = [];
+  for (const file of kbLayout({ mode: "local", codingRoot: projectRoot }).sources()) {
+    try {
+      graphs.push(JSON.parse(readFileSync(file, "utf8")));
+    } catch {
+      // absent or unreadable — skip
+    }
+  }
+  return mergeGraphs(graphs).graph;
+}
+
 /**
  * Load knowledge-graph entities from the exported Graphology graph.
  *
@@ -229,14 +254,15 @@ interface SerializedGraph {
  *
  * `observations` is still honoured when present so a pre-cutover export still indexes.
  */
-function readKgEntities(): BackfillItem[] {
-  const file = join(projectRoot, ".data/knowledge-graph/exports/general.json");
+async function readKgEntities(): Promise<BackfillItem[]> {
+  // T4: the graph is persisted per project (lib/kb/layout.mjs) — merge every
+  // file the way obs-api hydrates, so each node is read once, newest copy.
   let graph: SerializedGraph;
   try {
-    graph = JSON.parse(readFileSync(file, "utf8")) as SerializedGraph;
+    graph = await readMergedGraph();
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`[Backfill] Could not read ${file}: ${msg}\n`);
+    process.stderr.write(`[Backfill] Could not read the knowledge-graph exports: ${msg}\n`);
     return [];
   }
 
@@ -261,7 +287,10 @@ function readKgEntities(): BackfillItem[] {
         entityType: attrs.entityType ?? attrs.type ?? "Unknown",
         hierarchyLevel: attrs.hierarchyLevel ?? null,
         parentId: attrs.parentEntityName ?? null,
-        project: "coding",
+        // The entity's own project (T6 filters injection on it); was a
+        // hardcoded "coding" for every node.
+        project: str((attrs.metadata as Record<string, unknown> | undefined)?.project)
+          ?? str((attrs.metadata as Record<string, unknown> | undefined)?.team),
         summary_preview: makePreview(text),
         preview_version: previewVersion(),
       },

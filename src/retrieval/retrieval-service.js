@@ -185,6 +185,10 @@ export class RetrievalService {
    */
   async retrieve(query, options = {}) {
     const { budget = this.defaultBudget, threshold = this.scoreThreshold, context = null, taskId = null } = options;
+    // T6 team filter: the project ids the caller's teams cover (resolved by the
+    // route via lib/teams/scope.mjs). null = no filter. Only knowledge learned
+    // in one of these projects may be injected — a hard filter, not a boost.
+    const projects = Array.isArray(options.projects) ? options.projects : null;
 
     // An experiment cell's id is '<exp>--<variant>--rN' (a bare session UUID never contains
     // '--'). For those, suppress the task-agnostic Working Memory scaffold entirely — in a
@@ -199,7 +203,9 @@ export class RetrievalService {
 
     // Step 0: Build working memory (fail-open, per D-03). Skipped for experiment cells — the
     // scaffold is suppressed for them regardless, and this also avoids the VKB round-trip.
-    const wm = isExperiment ? { markdown: '', tokens: 0 } : await buildWorkingMemory(this.codingRoot);
+    const wm = isExperiment
+      ? { markdown: '', tokens: 0 }
+      : await buildWorkingMemory(this.codingRoot, { store: this.kmStoreGetter ? this.kmStoreGetter() : null, projects });
     // The caller's budget governs. This used to read `Math.min(budget - wm.tokens, 700)`,
     // and that 700 was a LITERAL — so a caller asking for 3,000 silently received 700 and
     // the obvious remedy for "give the block more room" was a no-op. Measured before the
@@ -214,9 +220,9 @@ export class RetrievalService {
 
     // Step 2: Parallel semantic + keyword search
     const [semanticResults, keywordHits] = await Promise.all([
-      this._semanticSearch(vector, 20, threshold),
+      this._semanticSearch(vector, 20, threshold, projects),
       this._keywordSearch(query),
-    ]);
+    ]).then(([sem, kw]) => (projects ? [onlyProjects(sem, projects), onlyProjects(kw, projects)] : [sem, kw]));
 
     // Step 3: Build recency list from combined unique results
     const recencyResults = buildRecencyList([...semanticResults, ...keywordHits]);
@@ -376,6 +382,8 @@ export class RetrievalService {
         tokens_used: wmTokens + tokensUsed,
         working_memory_tokens: wmTokens,
         latency_ms: 0,
+        ...(options.teams ? { teams: options.teams } : {}),
+        ...(projects ? { projects } : {}),
       },
     };
   }
@@ -392,7 +400,14 @@ export class RetrievalService {
    * @param {number} threshold - Minimum similarity score (D-04)
    * @returns {Promise<Array<object>>} Flattened results with tier and tierWeight
    */
-  async _semanticSearch(queryVector, limit = 20, threshold = 0.75) {
+  async _semanticSearch(queryVector, limit = 20, threshold = 0.75, projects = null) {
+    // A payload filter, so the per-collection `limit` is spent on the team's
+    // own points rather than filled with other teams' and then emptied.
+    // Exact match in Qdrant, so both spellings are offered; onlyProjects()
+    // re-checks case-insensitively afterwards.
+    const filter = projects
+      ? { must: [{ key: 'project', match: { any: [...new Set(projects.flatMap((p) => [p, String(p).toLowerCase()]))] } }] }
+      : undefined;
     const results = await Promise.all(
       COLLECTIONS.map((collection) =>
         this.qdrantClient
@@ -402,6 +417,7 @@ export class RetrievalService {
             score_threshold: threshold,
             with_payload: true,
             with_vector: false,
+            ...(filter ? { filter } : {}),
           })
           .then((points) =>
             points.map((p) => ({
@@ -734,6 +750,19 @@ export class RetrievalService {
       return [];
     }
   }
+}
+
+/**
+ * Keep candidates learned in one of `projects` (case-insensitive) — the hard
+ * team filter, applied to every source whatever the backend did. A candidate
+ * with no project at all belongs to no team and is dropped.
+ */
+export function onlyProjects(candidates, projects) {
+  const want = new Set(projects.map((p) => String(p).toLowerCase()));
+  return candidates.filter((c) => {
+    const p = c?.payload?.project ?? c?.project ?? c?.payload?.team ?? null;
+    return p !== null && p !== undefined && want.has(String(p).toLowerCase());
+  });
 }
 
 /** Singleton instance for shared use across requests. */
