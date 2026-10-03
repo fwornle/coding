@@ -136,6 +136,32 @@ _resolve_target_project() {
     TARGET_PROJECT_DIR="$CODING_REPO"
     _agent_log "Working in coding repository: $TARGET_PROJECT_DIR"
   fi
+  _resolve_project_id
+}
+
+# The project id the agent's token usage is recorded under (token_usage.project):
+# lib/teams/config.cjs projectIdFor of the enclosing repo — a teams `repos[].id`,
+# else the repo's directory name; empty outside any repo. The SAME function stamps observations, so tokens and knowledge
+# for one repo carry one id. Sent to the proxy as an x-project header (claude,
+# opencode, pi) or a /p/<id> URL segment (copilot); see configure_proxy_routing.
+# A caller-set CODING_PROJECT_ID wins (experiment cells run in a temp worktree
+# whose name is not the project). Empty on any failure: unrecorded, never fatal.
+_resolve_project_id() {
+  if [ -z "${CODING_PROJECT_ID:-}" ]; then
+    # teamForPath = projectIdFor of the enclosing repo root, null outside any
+    # repo — the same answer the token adapters give for a session's cwd.
+    CODING_PROJECT_ID="$(node --input-type=module -e '
+      try {
+        const { teamForPath } = await import(process.argv[1]);
+        process.stdout.write(String(teamForPath(process.argv[2]) || ""));
+      } catch { /* unresolvable -> empty */ }
+    ' "$CODING_REPO/lib/attribution/repo-router.mjs" "$TARGET_PROJECT_DIR" 2>/dev/null || true)"
+  fi
+  # One path-safe segment, or nothing — the proxy applies the same rule.
+  case "$CODING_PROJECT_ID" in
+    *[!A-Za-z0-9._~@+-]*|.|..) CODING_PROJECT_ID="" ;;
+  esac
+  export CODING_PROJECT_ID
 }
 
 # Load environment configuration files
@@ -620,8 +646,10 @@ configure_proxy_routing() {
       # later at reconcile time by the RECONCILE_GAP_FILL_SQL task_id backfill (CR-03), which
       # stamps the span task_id onto a matched task_id='' wire row (span-scoped, not ambient).
       # Header env format verified live in Plan 06's EARLY gate before the full run.
-      export ANTHROPIC_CUSTOM_HEADERS="x-task-id: ${TASK_ID:-}"
-      _agent_log "🔌 claude → proxy ${base}/v1/messages (Max-OAuth forwarded; token_usage agent='claude'; x-task-id=${TASK_ID:-<ambient>})"
+      # x-project: which repo these tokens are for (token_usage.project).
+      export ANTHROPIC_CUSTOM_HEADERS="x-task-id: ${TASK_ID:-}
+x-project: ${CODING_PROJECT_ID:-}"
+      _agent_log "🔌 claude → proxy ${base}/v1/messages (Max-OAuth forwarded; token_usage agent='claude'; x-task-id=${TASK_ID:-<ambient>}; project=${CODING_PROJECT_ID:-<none>})"
       ;;
     opencode)
       # BEST-EFFORT: opencode's AI-SDK anthropic provider should honour
@@ -698,6 +726,10 @@ configure_proxy_routing() {
       # readable message, rather than becoming a URL the proxy declines to match.
       local _copilot_band="${CODING_COPILOT_BAND:-}"
       local _copilot_band_seg=""
+      # The project segment comes first (/p/<id>/b/<band>/t/<task>): copilot can
+      # send no x-project header, so the URL is the only place for it.
+      local _copilot_project_seg=""
+      [ -n "${CODING_PROJECT_ID:-}" ] && _copilot_project_seg="/p/${CODING_PROJECT_ID}"
       if [ -n "$_copilot_band" ]; then
         case "$_copilot_band" in
           small|medium|high) _copilot_band_seg="/b/${_copilot_band}" ;;
@@ -708,7 +740,7 @@ configure_proxy_routing() {
         esac
       fi
       if [ -n "${TASK_ID:-}" ]; then
-        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot${_copilot_band_seg}/t/${TASK_ID}"
+        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot${_copilot_project_seg}${_copilot_band_seg}/t/${TASK_ID}"
         export COPILOT_PROVIDER_TYPE="openai"
         export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
         # The model comes from the `fg-chat/copilot` route in rapid-llm-proxy
@@ -726,7 +758,7 @@ configure_proxy_routing() {
         # Band-only form when there is no measured span. This is the one that
         # actually runs day to day: an interactive `coding --copilot` has no
         # TASK_ID.
-        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot${_copilot_band_seg}"
+        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot${_copilot_project_seg}${_copilot_band_seg}"
         export COPILOT_PROVIDER_TYPE="openai"
         export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
         # Same route as the measured path above — an interactive copilot session and
