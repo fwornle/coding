@@ -11,6 +11,8 @@ set -e
 
 CODING_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="$CODING_REPO/docker/docker-compose.yml"
+# shellcheck source=scripts/lib/port-pids.sh
+source "$CODING_REPO/scripts/lib/port-pids.sh"
 
 if [ ! -f "$COMPOSE_FILE" ]; then
   echo "Error: $COMPOSE_FILE not found" >&2
@@ -35,7 +37,7 @@ checked=0
 
 for port in $host_ports; do
   checked=$((checked + 1))
-  pid=$(lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null | head -1 || true)
+  pid=$(listening_pids "$port" | head -1)
   [ -z "$pid" ] && continue
 
   proc_name=$(ps -p "$pid" -o comm= 2>/dev/null || true)

@@ -45,6 +45,7 @@ import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
 import { loadFeatures, FeatureConfigError, loadProfiles, profileAliases, configPaths } from '../lib/features/index.mjs';
 import { discover as discoverRepos } from '../lib/teams/discover.mjs';
+import { restart as restartDaemon } from '../lib/features/daemons.mjs';
 import { createRequire } from 'node:module';
 import { setFeatures, setProfile } from '../lib/features/write.mjs';
 import { checkSnapshot } from '../lib/features/snapshot.cjs';
@@ -3321,12 +3322,13 @@ async function pollNetworkStatus() {
               const agoS = Math.round((nowMs - netState.last_llm_proxy_restart_at) / 1000);
               log(`network: skipping LLM proxy restart — last one was ${agoS}s ago (min interval ${LLM_PROXY_RESTART_MIN_INTERVAL_MS / 1000}s)`, 'INFO');
             } else {
-              try {
-                await execFileAsync('bash', ['-c', 'launchctl kickstart -k gui/$(id -u)/com.coding.llm-cli-proxy'], { timeout: 5000 });
+              // Through daemons.mjs, so the same restart is a systemctl call on Linux.
+              const r = await restartDaemon('llm-cli-proxy');
+              if (r.ok) {
                 netState.last_llm_proxy_restart_at = nowMs;
-                log('network: LLM proxy kickstarted after proxydetox auto-heal (stale connections)', 'INFO');
-              } catch (e) {
-                log(`network: LLM proxy kickstart failed: ${e.message}`, 'WARN');
+                log('network: LLM proxy restarted after proxydetox auto-heal (stale connections)', 'INFO');
+              } else {
+                log(`network: LLM proxy restart ${r.action}: ${r.detail || r.reason || 'failed'}`, 'WARN');
               }
             }
           } else {

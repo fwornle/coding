@@ -69,11 +69,27 @@ sudo apt install jq plantuml tmux              # optional, but recommended
 # Docker: https://docs.docker.com/engine/install/ubuntu/
 ```
 
-**Windows:**
-- Install Node.js **22 LTS or newer** from [nodejs.org](https://nodejs.org)
-- Install Git Bash from [git-scm.com](https://git-scm.com)
-- Install jq from [stedolan.github.io/jq](https://stedolan.github.io/jq/)
-- Install tmux (available via WSL or MSYS2)
+**Windows — WSL only.** There is no native Windows install (`bin/coding.bat` only
+points here). Install WSL, then follow the Linux steps inside the distribution:
+```powershell
+wsl --install            # once, from an elevated PowerShell; reboot if asked
+wsl                      # open the distribution, then continue with the Linux steps
+```
+The background services (health coordinator, observations API, session capture,
+sweepers) are systemd user units, so the distribution needs systemd. It is on by
+default for distributions installed since late 2022; check with
+`systemctl --user status`. If that says "Failed to connect to bus":
+```bash
+printf '[boot]\nsystemd=true\n' | sudo tee -a /etc/wsl.conf
+wsl.exe --shutdown       # then reopen the distribution and re-run ./install.sh
+```
+Without systemd the installer still completes, installs no background services, and
+says so in its summary.
+
+**Linux background services.** They run under your user manager
+(`systemctl --user list-units 'obs-api*' 'health-coordinator*'`, logs in
+`<coding>/.logs/` and `journalctl --user -u <name>`). Without lingering they stop at
+logout; on a headless or ssh-only account run `sudo loginctl enable-linger $USER`.
 
 ---
 

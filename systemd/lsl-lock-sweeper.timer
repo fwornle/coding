@@ -1,0 +1,12 @@
+# coding: runs lsl-lock-sweeper.service every 60s (launchd StartInterval).
+# OnActiveSec=1s is launchd's RunAtLoad: one run as soon as the timer starts.
+[Unit]
+Description=coding: stale git-lock sweeper for history checkouts (feature: lsl) (every 60s)
+
+[Timer]
+OnActiveSec=1s
+OnUnitActiveSec=60s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

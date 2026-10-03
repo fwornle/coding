@@ -1,14 +1,14 @@
 @echo off
-setlocal
-
-REM Get the directory where this batch file is located
-set "SCRIPT_DIR=%~dp0"
-REM Remove trailing backslash
-set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-REM Get parent directory (coding repo root)
-for %%I in ("%SCRIPT_DIR%\..") do set "CODING_REPO=%%~fI"
-
-REM Export for the bash script
-set "CODING_REPO=%CODING_REPO%"
-
-bash "%CODING_REPO%\bin\coding" %*
+REM coding runs on Windows through WSL only (no native Windows install).
+REM Open your WSL distribution and run `coding` there:
+REM     wsl
+REM     cd ~/Agentic/coding ^&^& ./install.sh
+echo coding does not run natively on Windows. Use WSL:
+echo.
+echo   1. Install WSL (once):        wsl --install
+echo   2. Open your distribution:    wsl
+echo   3. Clone and install there:   git clone ^<coding repo^> ^&^& cd coding ^&^& ./install.sh
+echo   4. Then start agents with:    coding
+echo.
+echo Details: docs/getting-started.md (Windows section)
+exit /b 1

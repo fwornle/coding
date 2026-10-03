@@ -1,0 +1,12 @@
+# coding: runs digest-refs-sweeper.service every 21600s (launchd StartInterval).
+# OnActiveSec=1s is launchd's RunAtLoad: one run as soon as the timer starts.
+[Unit]
+Description=coding: digest reference sweeper (feature: observations) (every 21600s)
+
+[Timer]
+OnActiveSec=1s
+OnUnitActiveSec=21600s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

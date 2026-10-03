@@ -172,6 +172,11 @@ system|~/Library/LaunchAgents/com.coding.prompt-classifier.plist|create+load|yes
 system|~/Library/LaunchAgents/com.coding.{measurement-reconciler,context-turns-sweeper}.plist|create+load|yes|binds live sessions to measurements, and prunes captured context turns (macOS) [feature:performance]
 system|~/Library/LaunchAgents/com.coding.health-coordinator.plist|create+load|yes|the health coordinator: re-spawns dead session loggers, serves the features API (macOS) [feature:health]
 system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux) [feature:llm-proxy]
+system|~/.config/systemd/user/{lsl-lock-sweeper,sub-agent-*}.{service,timer}|create+enable|yes|session-logging daemons: capture sub-agent transcripts, clear stale git locks in the history checkout (Linux/WSL, systemd user units) [feature:lsl]
+system|~/.config/systemd/user/{obs-api,digest-refs-sweeper}.{service,timer}|create+enable|yes|the observations API every agent writes through, and its reference sweeper (Linux/WSL, systemd user units) [feature:observations]
+system|~/.config/systemd/user/prompt-classifier.service|create+enable|yes|the prompt-complexity judge the proxy asks (Linux/WSL, systemd user unit) [feature:llm-proxy]
+system|~/.config/systemd/user/{measurement-reconciler,context-turns-sweeper}.{service,timer}|create+enable|yes|binds live sessions to measurements, and prunes captured context turns (Linux/WSL, systemd user units) [feature:performance]
+system|~/.config/systemd/user/health-coordinator.service|create+enable|yes|the health coordinator: re-spawns dead session loggers, serves the features API (Linux/WSL, systemd user unit) [feature:health]
 system|Scheduled Task \coding\claude-ctx-sweeper|create|yes|Windows only: hourly cleanup of stale status-line temp files, because nothing else ever reclaims %TEMP% (elsewhere this runs at agent launch and changes nothing)
 MANIFEST
 }
@@ -3021,7 +3026,7 @@ setup_llm_cli_proxy() {
     fi
 
     # Check if already running
-    if lsof -i :"$proxy_port" -sTCP:LISTEN >/dev/null 2>&1; then
+    if port_listening "$proxy_port"; then
         success "  LLM CLI Proxy already running on port $proxy_port"
         return 0
     fi
@@ -3047,17 +3052,19 @@ setup_llm_cli_proxy() {
         macos)
             create_llm_proxy_launchd "$proxy_dir" "$proxy_port"
             ;;
-        linux)
-            create_llm_proxy_systemd "$proxy_dir" "$proxy_port"
-            ;;
-        wsl)
-            # Only offer systemd when a user instance actually exists.
-            if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+        linux|wsl)
+            # Only when a user manager answers: WSL without systemd (and a Linux login
+            # nothing started one for) has the binary but no bus, and a unit written
+            # there can never start.
+            # shellcheck source=scripts/lib/systemd-unit.sh
+            source "$CODING_REPO/scripts/lib/systemd-unit.sh"
+            if systemd_user_available; then
                 create_llm_proxy_systemd "$proxy_dir" "$proxy_port"
             else
-                info "  WSL without a user systemd instance — no autostart service installed."
-                info "  Start manually when needed: bash $CODING_REPO/scripts/llm-proxy-service.sh"
-                INSTALLATION_WARNINGS+=("LLM proxy: no autostart on this WSL (systemd --user unavailable); start manually")
+                info "  No systemd user manager — no autostart service installed."
+                systemd_user_unavailable_hint | sed 's/^/  /'
+                info "  Until then, start it manually: bash $CODING_REPO/scripts/llm-proxy-service.sh"
+                INSTALLATION_WARNINGS+=("LLM proxy: no autostart (no systemd user manager); start manually or enable systemd")
             fi
             ;;
         *)
@@ -3182,7 +3189,8 @@ create_llm_proxy_launchd() {
 # LLM proxy uses. That gate guards a login-persistent daemon; this is an hourly cleanup
 # task, and confirm_system_change already declines under --ci/non-interactive and approves
 # under --yes. Declining costs nothing: the launch-time sweep still reclaims the files.
-# The host daemons every enabled feature owns, as launchd agents.
+# The host daemons every enabled feature owns: launchd agents on macOS, systemd user
+# units on Linux and WSL.
 #
 # Until this step existed install.sh installed exactly ONE daemon (the LLM
 # proxy, in setup_llm_cli_proxy). obs-api, the health coordinator, the sub-agent
@@ -3194,27 +3202,40 @@ create_llm_proxy_launchd() {
 # rather than restated, so this step cannot drift from what apply-features and
 # the status line believe. The proxy is excluded: setup_llm_cli_proxy installs
 # it, including the systemd unit on Linux.
+#
+# Templates: launchd/com.coding.<id>.plist, systemd/<id>.service (+ <id>.timer for
+# an interval job). WSL without systemd gets none, and is told how to enable it —
+# decided over a launcher-run supervisor, which would be a third service manager
+# to keep alive, while systemd is the default for every WSL distribution since 2023.
 install_feature_daemons() {
-    if [[ "$PLATFORM" != "macos" ]]; then
-        info "Skipping host daemons — they are launchd agents, installed on macOS only"
-        return 0
-    fi
+    local tpl_dir tpl_fmt installer
+    case "$PLATFORM" in
+        macos)
+            tpl_dir="$CODING_REPO/launchd"; tpl_fmt="com.coding.%s.plist"
+            installer="$CODING_REPO/scripts/install-launchd-daemons.sh" ;;
+        linux|wsl)
+            tpl_dir="$CODING_REPO/systemd"; tpl_fmt="%s.service"
+            installer="$CODING_REPO/scripts/install-systemd-daemons.sh" ;;
+        *)
+            info "Skipping host daemons — there is no service manager for $PLATFORM (use WSL)"
+            return 0 ;;
+    esac
     resolve_feature_selection_once
 
     local ids
     ids="$(node --input-type=module -e '
-        const [, daemonsMod, active, launchdDir] = process.argv;
+        const [, daemonsMod, active, tplDir, tplFmt] = process.argv;
         const { DAEMONS } = await import(daemonsMod);
         const { existsSync } = await import("node:fs");
         const on = new Set(active.split(/\s+/).filter(Boolean));
         const out = [];
         for (const [id, feature] of Object.entries(DAEMONS)) {
           if (!on.has(feature) || id === "llm-cli-proxy") continue;
-          if (existsSync(`${launchdDir}/com.coding.${id}.plist`)) out.push(id);
-          else process.stderr.write(`no launchd template for ${id} (feature ${feature}) — not installed\n`);
+          if (existsSync(`${tplDir}/${tplFmt.replace("%s", id)}`)) out.push(id);
+          else process.stderr.write(`no template for ${id} in ${tplDir} (feature ${feature}) — not installed\n`);
         }
         process.stdout.write(out.join(" "));
-    ' "$CODING_REPO/lib/features/daemons.mjs" "$ACTIVE_FEATURES" "$CODING_REPO/launchd")" || {
+    ' "$CODING_REPO/lib/features/daemons.mjs" "$ACTIVE_FEATURES" "$tpl_dir" "$tpl_fmt")" || {
         warning "Could not read the daemon list from lib/features/daemons.mjs"
         return 1
     }
@@ -3224,8 +3245,15 @@ install_feature_daemons() {
         return 0
     fi
     info "Installing host daemons: $ids"
+    local rc=0
     # shellcheck disable=SC2086  # word-splitting the id list is the point
-    CODING_REPO="$CODING_REPO" bash "$CODING_REPO/scripts/install-launchd-daemons.sh" $ids
+    CODING_REPO="$CODING_REPO" bash "$installer" $ids || rc=$?
+    if [[ $rc -eq 3 ]]; then
+        # No systemd user manager (the installer printed the fix).
+        INSTALLATION_WARNINGS+=("Host daemons NOT installed: no systemd user manager (enable systemd, then re-run ./install.sh)")
+        return 0
+    fi
+    return $rc
 }
 
 setup_claude_ctx_sweeper() {
@@ -3252,16 +3280,16 @@ setup_claude_ctx_sweeper() {
 
 # Create Linux systemd user service for LLM CLI Proxy
 #
-# Runs the same scripts/llm-proxy-service.sh as the LaunchAgent, so both platforms
-# get the launcher's network probe, the .env keys and the port guard, and both log
-# under the data home. The unit used to exec <proxy>/dist/server.js, which does not
-# exist — server.mjs lives in proxy-bridge/.
+# Rendered from systemd/llm-cli-proxy.service like every other unit, so it runs the
+# same scripts/llm-proxy-service.sh as the LaunchAgent: both platforms get the
+# launcher's network probe, the .env keys and the port guard, and both log under the
+# data home. Per-machine values the template cannot know are added as Environment=
+# lines only when they differ from the default, as the PlistBuddy edits do on macOS.
 create_llm_proxy_systemd() {
     local proxy_dir="$1"
     local proxy_port="$2"
-    local service_path="$HOME/.config/systemd/user/llm-cli-proxy.service"
-    local node_path
-    node_path="$(command -v node)"
+    local unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    local service_path="$unit_dir/llm-cli-proxy.service"
 
     if ! confirm_system_change \
         "Install the LLM proxy as a systemd user service" \
@@ -3270,42 +3298,58 @@ create_llm_proxy_systemd() {
         return 0
     fi
 
-    # Restart=always, not on-failure: the bridge traps SIGTERM and exits 0, so
-    # on-failure left the proxy down after any stray SIGTERM. A deliberate stop is
-    # `systemctl --user stop`, which Restart=always does not override. Same reasoning as
-    # the KeepAlive comment in launchd/com.coding.llm-cli-proxy.plist.
-    mkdir -p "$HOME/.config/systemd/user"
-    cat > "$service_path" << SYSTEMD_EOF
-[Unit]
-Description=coding: LLM proxy (rapid-llm-proxy)
-After=network-online.target
+    # shellcheck source=scripts/lib/systemd-unit.sh
+    source "$CODING_REPO/scripts/lib/systemd-unit.sh"
+    local rendered
+    rendered="$(mktemp "${TMPDIR:-/tmp}/llm-cli-proxy-unit.XXXXXX")"
+    if ! render_unit "$CODING_REPO/systemd/llm-cli-proxy.service" "$rendered" \
+            "$CODING_REPO" "$(dirname "$(command -v node)")"; then
+        rm -f "$rendered"
+        warning "  Could not render the systemd unit — not installed"
+        INSTALLATION_WARNINGS+=("LLM proxy: systemd unit failed to render")
+        return 0
+    fi
+    if [[ "$proxy_port" != "12435" ]]; then
+        unit_add_env "$rendered" LLM_PROXY_PORT "$proxy_port"
+    fi
+    if [[ "$proxy_dir" != "$(cd "$CODING_REPO/.." && pwd)/_work/rapid-llm-proxy" ]]; then
+        unit_add_env "$rendered" RAPID_LLM_PROXY_DIR "$proxy_dir"
+    fi
 
-[Service]
-Type=simple
-WorkingDirectory=${CODING_REPO}
-ExecStart=/bin/bash ${CODING_REPO}/scripts/llm-proxy-service.sh
-Environment=CODING_REPO=${CODING_REPO}
-Environment=RAPID_LLM_PROXY_DIR=${proxy_dir}
-Environment=LLM_PROXY_PORT=${proxy_port}
-Environment=NODE_BIN=${node_path}
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=default.target
-SYSTEMD_EOF
-
+    mkdir -p "$unit_dir" "$CODING_REPO/.logs"
+    mv "$rendered" "$service_path"
     systemctl --user daemon-reload
-    systemctl --user enable llm-cli-proxy.service
-    systemctl --user restart llm-cli-proxy.service
-    sleep 3
+    systemctl --user enable llm-cli-proxy.service >/dev/null 2>&1 || true
+    if ! systemctl --user restart llm-cli-proxy.service; then
+        warning "  systemctl --user restart llm-cli-proxy failed"
+        info "  Why: journalctl --user -u llm-cli-proxy -n 50"
+        INSTALLATION_WARNINGS+=("LLM proxy: systemd unit installed but did not start")
+        return 0
+    fi
 
-    if systemctl --user is-active llm-cli-proxy.service >/dev/null 2>&1; then
+    # Same gate as the LaunchAgent path: /health, not "the unit is active" — the
+    # service is active while it is still hydrating the token history (~30s).
+    local _up="" _wait
+    for _wait in $(seq 1 30); do
+        if curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:${proxy_port}/health" 2>/dev/null; then
+            _up=1
+            break
+        fi
+        sleep 2
+    done
+    if [[ -n "$_up" ]]; then
         success "  LLM proxy running as a systemd user service on port $proxy_port"
     else
-        warning "  systemd service installed but may not have started"
-        info "  Check: journalctl --user -u llm-cli-proxy"
+        warning "  systemd unit active but the proxy is not answering /health on port $proxy_port"
+        info "  Why it did not start: $CODING_REPO/.logs/llm-proxy-service.log, journalctl --user -u llm-cli-proxy"
+        INSTALLATION_WARNINGS+=("LLM proxy: unit started but /health on port $proxy_port did not answer within 60s")
     fi
+}
+
+# Is anything listening on a local TCP port? bash's /dev/tcp rather than lsof, which
+# is not installed on a minimal Debian/Ubuntu (or WSL) image; `ss` is Linux-only.
+port_listening() {
+    (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
 }
 
 # Install Node.js dependencies for agent-agnostic functionality

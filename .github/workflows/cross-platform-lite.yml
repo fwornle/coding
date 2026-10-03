@@ -328,6 +328,17 @@ jobs:
         with:
           node-version: '22'
 
+      # A user systemd manager, so the installer's host daemons have somewhere to
+      # go (same recipe as daemon-backends). Without it the installer reports "no
+      # systemd user manager" and installs none — which is the WSL-without-systemd
+      # path, and not what this job is for.
+      - name: Enable a user systemd session
+        run: |
+          sudo loginctl enable-linger "$USER" || true
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus" >> "$GITHUB_ENV"
+          for _ in $(seq 1 20); do [ -S "/run/user/$(id -u)/bus" ] && break; sleep 1; done
+
       - name: Hash shared agent configs before the install
         run: |
           set -e
@@ -405,6 +416,37 @@ jobs:
           if [ $fail -eq 0 ]; then
             echo "all 7 shared agent configs unchanged by a real install"
           fi
+          exit $fail
+
+      # The default tier (harness) owns two host daemons that need nothing
+      # private: the health coordinator and the prompt judge. Both must be
+      # systemd user units, enabled and running — not merely written. The proxy
+      # and the learning tiers need private repos and are proven by
+      # tests/cleanroom/services.sh instead.
+      - name: Host daemons are systemd user units, and running
+        run: |
+          set -e
+          if ! systemctl --user show-environment >/dev/null 2>&1; then
+            echo "::warning::no systemd --user on this runner; daemon assertions skipped"
+            exit 0
+          fi
+          fail=0
+          for id in health-coordinator prompt-classifier; do
+            unit="$HOME/.config/systemd/user/$id.service"
+            [ -f "$unit" ] || { echo "::error::$unit was not installed"; fail=1; continue; }
+            sleep 5
+            state="$(systemctl --user is-active "$id.service" || true)"
+            restarts="$(systemctl --user show "$id.service" -p NRestarts --value)"
+            echo "$id: $state, NRestarts=$restarts"
+            if [ "$state" != active ] || [ "$restarts" != 0 ]; then
+              echo "::error::$id is $state with $restarts restarts"
+              journalctl --user -u "$id.service" -n 30 --no-pager || true
+              fail=1
+            fi
+          done
+          for _ in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:3034/health && break; sleep 2; done
+          curl -sf http://127.0.0.1:3034/health >/dev/null \
+            || { echo "::error::the health coordinator does not answer :3034/health"; fail=1; }
           exit $fail
 
       - name: Installer summary (always shown, for diagnosis)

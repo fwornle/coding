@@ -1,0 +1,13 @@
+# coding: captured context-turn pruning (feature: performance) — one run; scheduled by context-turns-sweeper.timer.
+# Linux twin of launchd/com.coding.context-turns-sweeper.plist. tests/features/systemd-units.test.mjs
+# keeps the two equal.
+[Unit]
+Description=coding: captured context-turn pruning (feature: performance)
+
+[Service]
+Type=oneshot
+WorkingDirectory=__CODING_REPO__
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash "__CODING_REPO__/scripts/context-turns-sweeper-job.sh"
+StandardOutput=append:__CODING_REPO__/.data/context-turns-sweeper.log
+StandardError=append:__CODING_REPO__/.data/context-turns-sweeper.log

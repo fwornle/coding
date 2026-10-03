@@ -74,21 +74,35 @@ Platform service manager: launchd (macOS), systemd `--user` (Linux), Scheduled T
 | `com.coding.llm-cli-proxy` | `scripts/llm-proxy-service.sh` | `llm-proxy` |
 | `com.coding.prompt-classifier` | `scripts/prompt-classifier-service.mjs` | `llm-proxy` |
 | `com.coding.measurement-reconciler` | `scripts/measurement-reconciler.mjs` | `performance` |
-| `com.coding.auto-measure-foreground` | `scripts/auto-measure-foreground.mjs` | `performance` |
 | `com.coding.context-turns-sweeper` | `scripts/context-turns-sweeper-job.sh` | `performance` |
 | `com.coding.health-coordinator` | `scripts/health-coordinator.js` | `health` |
 
-**How they get installed (macOS).** Every label above has a template in `launchd/`
-(the `__CODING_REPO__` token is rendered for the checkout by
-`scripts/lib/launchd-plist.sh`), except `auto-measure-foreground`: nothing runs it yet,
-so there is no tested service definition to ship, and the installer reports it as not
-installable. `install.sh`'s `install_feature_daemons` step reads `DAEMONS` from
-`lib/features/daemons.mjs`, keeps the ids whose feature is on, and hands them to
-`scripts/install-launchd-daemons.sh <id>...` — the one installer, idempotent: an
-up-to-date running job is left alone. The proxy is the exception, installed by
-`setup_llm_cli_proxy` because it also writes the Linux systemd unit. `uninstall.sh`
-removes every installed job that has a template, and leaves hand-made `com.coding.*`
-jobs alone. On Linux and Windows only the proxy is installed today.
+**How they get installed.** Every label above has a template in `launchd/` (macOS) and
+in `systemd/` (Linux, WSL): `<id>.service`, plus `<id>.timer` for an interval job (the
+sweepers — launchd's `StartInterval`). Both use the `__CODING_REPO__` token, rendered for
+the checkout by `scripts/lib/launchd-plist.sh` / `scripts/lib/systemd-unit.sh`; the units
+also take `__NODE_DIR__`, because a user manager inherits no shell PATH and node is as
+often under `$HOME` (nvm, fnm) as in `/usr/bin`. `tests/features/systemd-units.test.mjs`
+keeps each unit equal to its plist (command line, working directory, log, environment,
+restart policy, interval). `install.sh`'s `install_feature_daemons` step reads `DAEMONS`
+from `lib/features/daemons.mjs`, keeps the ids whose feature is on, and hands them to
+`scripts/install-launchd-daemons.sh` or `scripts/install-systemd-daemons.sh <id>...` —
+idempotent: an up-to-date running job is left alone. The proxy is the exception,
+installed by `setup_llm_cli_proxy` (opt-in, `CODING_INSTALL_SYSTEM_SERVICES=1`).
+`uninstall.sh` removes every installed job that has a template, and leaves hand-made
+ones alone.
+
+**WSL needs systemd.** A WSL distribution without `systemd=true` in `/etc/wsl.conf` has
+no user service manager: the installer installs no daemons there, says how to enable it,
+and records a warning. There is deliberately no fallback supervisor — it would be a third
+service manager to keep alive, and systemd is the default for new WSL distributions.
+A Linux account without a running user manager (ssh-only, no lingering) gets the same
+treatment with `sudo loginctl enable-linger $USER` as the fix; with lingering off the
+daemons stop at logout, which the installer points out. Native Windows is not supported
+(`bin/coding.bat` points to WSL).
+
+`auto-measure-foreground` is not a daemon: nothing ever ran it as one, so it has no unit.
+It stays runnable by hand (`node scripts/auto-measure-foreground.mjs --once`).
 
 **Overlapping sessions are not measured.** `measurement-reconciler` binds an agent's
 live session to that agent's one proxy slot. When a second session of the same agent
