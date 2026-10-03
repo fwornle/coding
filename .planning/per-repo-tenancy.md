@@ -111,16 +111,16 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 - [x] `docs/architecture/features.md` + `docs/getting-started.md` tier tables; README + CLAUDE.md updated.
 - Accept: `./install.sh --dry-run --features=<tier>` for each tier prints exactly the tier's manifest rows (asserted per tier in installer-gating); profile-matrix covers the four tiers + `full` + `minimal` + alias `km`.
 
-### T3 — One per-repo learning repo  `status: todo`
+### T3 — One per-repo learning repo  `status: done`
 
-- [ ] Per-user registry **`~/.coding/repos.yaml`**: `repo path → { remote | skip, team? }`. Replaces `.specstory/.history-repo-skipped` (migrate existing markers on first read).
-- [ ] Merge the two mechanisms into one implementation (a node module, e.g. `lib/history/repo-link.mjs`, called by the launcher and by install): `ensure_private_history_repo` becomes a thin caller; `install.sh setup_history_repo` / `init-history.sh` reuse it for the tools repo itself.
-- [ ] Launch flow for repo X (not the tools repo): registry hit → done; else prompt (default `https://bmw.ghe.com/<gh user>/X-history.git`, Enter / URL / `skip`) →
-  `git ls-remote` → **exists**: clone into `<X>/.coding/` (teammate share); **missing**: `gh repo create --private` on the host, then init + push initial layout; **public repo**: refuse. Non-interactive: `LSL_HISTORY_AUTO` semantics kept.
-- [ ] Layout of `<X>/.coding/`: `history/`, `kb/`, `README.md`, `.gitignore`; outer repo ignores `.coding/` (append to `.git/info/exclude`, not the tracked `.gitignore`? — decide; current code edits `.gitignore`).
-- [ ] ETM writes LSL to `<X>/.coding/history/`; `<X>/.specstory/history` → symlink. Migrate existing per-repo `.specstory/history` git checkouts (they ARE X-history repos already) by moving them to `.coding/` and restructuring into `history/`.
-- [ ] Skip = untracked local `<X>/.coding/` (still written, never committed/pushed).
-- Accept: unit tests with a local bare remote for all four paths (new, existing-with-content, skip, public-refused); a launcher smoke in a scratch repo.
+- [x] Per-user registry **`~/.coding/repos.yaml`**: `repo realpath → { remote | skip, team? }`. `.specstory/.history-repo-skipped` is migrated on first read (recorded, marker removed).
+- [x] One implementation: `lib/history/repo-link.mjs` (`ensure`, `linkRemote`, `cloneInto`, `remoteState`, `ensureLayout`, registry). `ensure_private_history_repo` is a thin caller; `bin/init-history.sh` clones the data home through it (`clone --nest`); `install.sh history_repo_state` delegates to `state`.
+- [x] Launch flow: registry hit → done; else prompt (default `https://bmw.ghe.com/<gh user>/X-history.git` or `LSL_HISTORY_REMOTE_TEMPLATE`) → exists: clone into `<X>/.coding/`; missing: `gh repo create --private` (or `git init --bare` for a local path) + init + push skeleton; public: refused. `LSL_HISTORY_AUTO` kept; with no way to ask, layout only, nothing recorded.
+- [x] Layout `<X>/.coding/`: `history/`, `kb/`, `README.md`, `.gitignore` (lock artefacts, `session-state.json`, `var/`). **Decided:** outer repo ignores `.coding/` + `.specstory/history` via `.git/info/exclude` (no tracked change). The legacy `.specstory/history/` line `ensure_coding_runtime_ignored` writes into tracked `.gitignore` is untouched.
+- [x] ETM writes through `<X>/.specstory/history` → `../.coding/history` (relative symlink) — no path change needed. Its `git add -f` now runs only when the nearest repo is not the outer project (a skipped repo used to get transcripts force-staged into the outer repo). Existing nested checkouts become `.coding/` and are restructured into `history/` with a LOCAL commit; plain dirs move into `.coding/history/`.
+- [x] Skip = untracked local `<X>/.coding/` (no `.git`), ignored by the outer repo.
+- Accept: `tests/history/repo-link.test.mjs` (17 cases, local bare remotes: new, existing current/old layout, skip, public-refused, migrations, stand-downs); launcher smoke via `ensure_private_history_repo` in a scratch repo; migration verified on copies of `balance` and `copi`.
+- Follow-up (T4): nothing is pushed beyond the skeleton — restructure commits and migrated transcripts wait for T4's confirmed push. `docs/puml/lsl-repo-split.puml` still shows the nested layout.
 
 ### T5 — Teams and discovery  `status: todo`
 
@@ -177,7 +177,6 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
 ## Open questions (decide inside the phase)
 
-- T3: ignore `.coding/` via `.git/info/exclude` (no tracked change) vs `.gitignore`.
 - T5: where teammate repos that aren't checked out locally are cloned.
 - T2: WSL without systemd.
 
@@ -200,3 +199,12 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   `npm test` green (node:test 1923 pass, jest pass); per-tier `--dry-run` manifests;
   live coordinator `/features` + dashboard Features tab list only the 4 tiers + full +
   minimal. Not verified: a real (non-dry-run) install per tier — that is T8. Next: **T3**.
+- **2026-10-03 (T3)** — One per-repo learning repo, `lib/history/repo-link.mjs`. Decided:
+  `.git/info/exclude` (not tracked `.gitignore`); ETM unchanged (writes through the
+  relative symlink), `git add -f` guarded against the outer repo; clone = `reset --hard`
+  (tracked wins, untracked local kept); only the skeleton is pushed. Verified: `npm test`
+  green (node:test 1940 pass, jest pass); launcher smoke on a scratch repo; migration on
+  copies of `balance` + `copi` (clean `.coding/`, registry = existing remote). NOT done:
+  the developer machine's ~16 nested checkouts migrate on their next `coding` launch (each
+  gets a local restructure commit, unpushed); running ETMs pick up the git-add guard only
+  when restarted. Next: **T5**.

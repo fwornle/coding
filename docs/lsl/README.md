@@ -164,7 +164,8 @@ Routes to: coding/.specstory/history/
 ### Content Routing and Storage
 
 **LOCAL Content** (Project-Specific):
-- Stored in: `project/.specstory/history/`
+- Stored in: `project/.specstory/history/` — a symlink to `project/.coding/history/`
+  (see [Per-repo learning repo](#per-repo-learning-repo))
 - Format: `YYYY-MM-DD_HHMM-HHMM_<userhash>.md`
 - Classification logs: Stay in project
 
@@ -177,6 +178,48 @@ Routes to: coding/.specstory/history/
 - JSONL format: `YYYY-MM-DD_HHMM-HHMM_<userhash>.jsonl`
 - Markdown reports: Separate for LOCAL and CODING decisions
 - Status files: Aggregate statistics with clickable navigation
+
+### Per-repo learning repo
+
+Every project `coding` runs in (other than the tools repo itself, whose history
+lives in the per-scope data home) keeps what was learned there in a nested
+checkout:
+
+```
+<project>/.coding/            private <project>-history repo, or untracked on skip
+├── history/                  LSL transcripts (YYYY/MM/…) + logs/
+├── kb/                       knowledge + measurement exports
+├── README.md
+└── .gitignore                lock artefacts, session-state.json, var/
+<project>/.specstory/history  → ../.coding/history   (symlink, SpecStory-compatible)
+```
+
+The outer repo ignores `.coding/` and the symlink through `.git/info/exclude` —
+no change to its tracked `.gitignore`.
+
+**First launch** in a project asks where to keep it: Enter takes the default
+(`https://bmw.ghe.com/<gh user>/<project>-history.git`, or
+`LSL_HISTORY_REMOTE_TEMPLATE` with `{project}`), a URL picks another, `skip`
+keeps `.coding/` local and untracked. The answer goes to `~/.coding/repos.yaml`
+and is never asked again. Unattended: `LSL_HISTORY_AUTO=yes|no`; with neither,
+nothing is recorded and the question comes back at the next interactive launch.
+
+| remote is… | what happens |
+|---|---|
+| missing | created **private** (`gh repo create --private`), skeleton pushed |
+| empty | skeleton pushed |
+| a teammate's, with content | cloned and shared; an older transcripts-only layout is restructured into `history/` with a local commit |
+| public | refused — transcripts never go to a public repo |
+
+Only the skeleton is ever pushed by this step; existing transcripts are
+committed locally and published deliberately (`git -C <project>/.coding push`).
+Older layouts — a nested `.specstory/history` checkout, a plain
+`.specstory/history` directory, the `.specstory/.history-repo-skipped` marker —
+are migrated on the next launch. The ETM stages new transcripts only when the
+nearest repo is the learning repo, never the outer project.
+
+Implementation: `lib/history/repo-link.mjs` (also clones the tools repo's data
+home for `bin/init-history.sh`); tests: `tests/history/repo-link.test.mjs`.
 
 ### Security Redaction
 

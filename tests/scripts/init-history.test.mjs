@@ -70,7 +70,8 @@ beforeEach(() => {
   mkdirSync(join(tools, 'bin'), { recursive: true });
   mkdirSync(home);
   for (const f of ['init-history.sh', 'coding-data-home']) cpSync(join(REPO, 'bin', f), join(tools, 'bin', f));
-  for (const d of ['lib/paths', 'lib/scope']) cpSync(join(REPO, d), join(tools, d), { recursive: true });
+  // lib/history clones; lib/features/vendor is its YAML parser.
+  for (const d of ['lib/paths', 'lib/scope', 'lib/history', 'lib/features/vendor']) cpSync(join(REPO, d), join(tools, d), { recursive: true });
   // bin/coding-data-home is extensionless ESM; it needs the module type.
   writeFileSync(join(tools, 'package.json'), '{"type":"module"}\n');
 });

@@ -79,25 +79,15 @@ hist_dir="$data_home/history"
 # 3. Clone the configured repo into a data home that has nothing of its own.
 if [ -n "$history_repo" ] && [ ! -e "$data_home/.git" ] && [ ! -e "$hist_dir/.git" ] \
   && is_empty_dir "$hist_dir" && is_empty_dir "$data_home/kb"; then
-  staging="$(mktemp -d "$data_home/.clone.XXXXXX")"
-  if git clone --quiet --no-checkout "$history_repo" "$staging/repo" 2>/dev/null; then
-    if git -C "$staging/repo" cat-file -e HEAD:history 2>/dev/null; then
-      # A data-home repo: its root IS the data home. reset --hard only writes
-      # tracked paths, so var/ and the ignore file ensureDataHome wrote are safe.
-      mv "$staging/repo/.git" "$data_home/.git"
-      git -C "$data_home" reset --quiet --hard
-      echo "[init-history] cloned $history_repo → $data_home"
-    else
-      # A transcripts-only repo (YYYY/ at its root): it is the history/ tree.
-      rmdir "$hist_dir"
-      mv "$staging/repo" "$hist_dir"
-      git -C "$hist_dir" reset --quiet --hard 2>/dev/null || true
-      echo "[init-history] cloned $history_repo → $hist_dir (transcripts-only layout)"
-    fi
-  else
+  # One clone implementation for every learning repo (lib/history/repo-link.mjs).
+  # --nest keeps this data home's historical handling of a transcripts-only repo
+  # (YYYY/ at its root, like the original `coding-history`): it is cloned INTO
+  # history/ and keeps working unchanged. A data-home repo (top-level history/)
+  # becomes the data home itself; local untracked files such as var/ are kept.
+  if ! node "$REPO_ROOT/lib/history/repo-link.mjs" clone "$data_home" "$history_repo" --nest 2>&1 \
+      | sed 's/^\[history\]/[init-history]/'; then
     echo "[init-history] clone of $history_repo failed (auth/network?) — using empty local dir"
   fi
-  rm -rf "$staging"
 fi
 
 mkdir -p "$hist_dir/logs/classification"

@@ -4266,10 +4266,23 @@ ORDER BY m.time_created ASC;`;
           // rejected ("paths are ignored by .gitignore"). Run git from the file's
           // own directory so git resolves to the nearest enclosing repo (the
           // nested history repo), and pass -f to defeat any inner ignore rule.
+          //
+          // ...but ONLY when that nearest repo is not the project itself. With
+          // no nested repo (a skipped learning repo: <project>/.coding/ is
+          // untracked) the nearest repo IS the outer project, and `-f` would
+          // force a verbatim transcript into its index past the ignore rule
+          // that exists to keep it out.
           const fileDir = path.dirname(sessionFile);
-          exec(`git add -f "${path.basename(sessionFile)}"`, { cwd: fileDir, timeout: 5000 }, (err) => {
-            if (err) this.debug(`git add failed for ${path.basename(sessionFile)}: ${err.message}`);
-            else this.debug(`git add OK: ${path.basename(sessionFile)}`);
+          exec('git rev-parse --show-toplevel', { cwd: fileDir, timeout: 5000 }, (topErr, top) => {
+            if (topErr) { this.debug(`git auto-track: no repo for ${fileDir}`); return; }
+            if (samePath(String(top).trim(), targetProject)) {
+              this.debug(`git auto-track: ${path.basename(sessionFile)} has no learning repo — not staged`);
+              return;
+            }
+            exec(`git add -f "${path.basename(sessionFile)}"`, { cwd: fileDir, timeout: 5000 }, (err) => {
+              if (err) this.debug(`git add failed for ${path.basename(sessionFile)}: ${err.message}`);
+              else this.debug(`git add OK: ${path.basename(sessionFile)}`);
+            });
           });
         } catch (e) {
           this.debug(`git auto-track error: ${e.message}`);
