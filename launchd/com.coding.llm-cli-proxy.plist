@@ -9,11 +9,16 @@
   receive only what that script prints before it hands over, i.e. why the proxy could
   not start. The proxy's own logs are under <data home>/var/llm-proxy/logs/.
 
-  KeepAlive is a dict with SuccessfulExit=false, not <true/>: start-llm-proxy.sh exits
-  1 when the port is held by something that is NOT a proxy bridge, and refusing to
-  kill an unknown process is the point. Restart-on-failure plus ThrottleInterval
-  retries that every 10s without spinning. A clean exit (a deliberate stop) stays
-  stopped.
+  KeepAlive is UNCONDITIONAL. It was {SuccessfulExit: false}, on the theory that a
+  clean exit is a deliberate stop. But the bridge traps SIGTERM and exits 0, so ANY
+  SIGTERM launchd did not send itself — a kill, another launch's singleton guard —
+  left the proxy down for good, and every agent routed through it got ECONNREFUSED.
+  The measurement reconciler died exactly that way (2026-09-28, five days), as did
+  the sub-agent daemons (2026-09-01, 14.5h). A deliberate stop is `launchctl
+  bootout`, which unloads the job, so KeepAlive no longer applies to it.
+  start-llm-proxy.sh still exits 1 when the port is held by something that is NOT a
+  proxy bridge (refusing to kill an unknown process is the point); ThrottleInterval
+  retries that every 10s without spinning.
 
   NODE_BIN is added to EnvironmentVariables by the installer when the node it ran
   under is not on the PATH below (nvm, fnm, asdf).
@@ -39,10 +44,7 @@
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-    </dict>
+    <true/>
     <key>ThrottleInterval</key>
     <integer>10</integer>
     <key>StandardOutPath</key>
