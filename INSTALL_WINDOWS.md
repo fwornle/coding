@@ -202,7 +202,6 @@ C:\Users\YourUsername\coding\
 │   └── memory-visualizer\       # Knowledge graph visualizer
 │       └── dist\                # Built web UI
 ├── lib\
-│   ├── knowledge-api\           # Knowledge API library
 │   └── vkb-server\              # VKB server library
 └── shared-memory.json           # Shared knowledge storage
 ```

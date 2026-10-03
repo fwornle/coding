@@ -164,8 +164,8 @@ export VKB_DATA_SOURCE=combined
 # Team-specific knowledge bases
 export KNOWLEDGE_VIEW=coding
 
-# Custom knowledge base path
-export CODING_KB_PATH=/path/to/knowledge
+# The knowledge base lives in the data home, not a configurable path:
+#   bin/coding-data-home --explain
 ```
 
 ---

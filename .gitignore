@@ -370,7 +370,6 @@ package-lock.json
 # needs was silently ignored here. Listing them makes the rule legible instead.
 # Submodules (lib/km-core) are exempt — their lockfile lives in their own repo.
 !/package-lock.json
-!/lib/knowledge-api/package-lock.json
 !/integrations/unified-viewer/package-lock.json
 
 # Build and compiled files

@@ -127,10 +127,9 @@ module graph itself waits on cannot do that. Do not convert one to a hook.
 
 Two lists in `scripts/lib/test-inventory.mjs`, with different meanings:
 
-- **`EXCLUDED`** — never run by `npm test`, anywhere. Currently
-  `lib/knowledge-api` (a self-contained package with its own toolchain and its
-  own `npm test`) and one deliberate RED stub whose header says it fails by
-  design until named plans land.
+- **`EXCLUDED`** — never run by `npm test`, anywhere. Currently the
+  `src/ontology` node:test suites no runner can execute, and one deliberate RED
+  stub whose header says it fails by design until named plans land.
 - **`CI_SKIPPED`** — skipped **only when `process.env.CI` is set**. Locally every
   one of these still runs, because locally every one of them passes.
 

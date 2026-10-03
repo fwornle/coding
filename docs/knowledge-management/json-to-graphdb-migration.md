@@ -462,7 +462,7 @@ await db.close();
 | **Oct 2024** | UKB/VKB migration to GraphDB |
 | **Nov 2024** | Ontology integration (5-layer pipeline) |
 | **Nov 2024** | v2.0.0 Release |
-| **Future (v3.0)** | Remove lib/knowledge-api (deprecated) |
+| **Oct 2026** | `lib/knowledge-api` removed (unused; `CODING_KB_PATH` retired with it) |
 
 ---
 
