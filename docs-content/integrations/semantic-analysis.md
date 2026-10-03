@@ -162,7 +162,7 @@ extract_patterns {
 - Entities: `.data/knowledge-graph-migrated/` — canonical km-core `GraphKMStore` (Graphology + LevelDB). The legacy `.data/knowledge-graph/` directory survives as a transitional readable copy; km-core is the unconditional persistence path.
 - Auto-export: `.data/knowledge-export/{team}.json` — git-tracked, debounced 5s after writes
 - Ontology: imported from `@fwornle/km-core/ontology` (shared upper layer with the observations API and the OKB)
-- Insights: `knowledge-management/insights/`
+- Insights: `knowledge-management/insights/` (in the tools repo a symlink into `.coding/kb/insights/`, its learning checkout)
 
 This service is the **System B** consumer in the [three-system km-core architecture](../core-systems/ukb-vkb.md#the-three-knowledge-systems-on-km-core); System A (observations API) and System C (OKB) consume the same library.
 

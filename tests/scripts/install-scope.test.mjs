@@ -151,29 +151,33 @@ describe('the history repo belongs to the person installing, not the tools autho
   });
 
   test('every history step resolves its directory through history_home', () => {
-    for (const name of ['history_default_url', 'history_manual_recipe', 'history_repo_seed', 'setup_history_repo']) {
+    for (const name of ['history_default_url', 'history_manual_recipe', 'setup_history_repo']) {
       assert.match(fnBody(name), /history_home\)/, `${name} must call history_home`);
     }
-    // ...and nothing else hard-codes the in-repo location as THE checkout.
-    for (const name of ['history_repo_seed', 'setup_history_repo']) {
-      assert.doesNotMatch(fnBody(name), /hist_dir="\$CODING_REPO\/\.specstory\/history"/);
-    }
+    // ...and nothing else hard-codes a location as THE checkout.
+    assert.doesNotMatch(fnBody('setup_history_repo'), /hist_dir="\$CODING_REPO\/\.specstory\/history"/);
   });
 
-  test('a placeholder scope gets no history repo', () => {
-    assert.match(fnBody('history_home'), /--require-scope >\/dev\/null 2>&1 \|\| return 0/);
+  test('the tools repo\'s history is its own learning checkout (T7), not the data home', () => {
+    assert.match(fnBody('history_home'), /printf '%s' "\$CODING_REPO\/\.coding"/);
+    assert.doesNotMatch(fnBody('history_home'), /coding-data-home/);
+  });
+
+  test('the checkout is made by the one implementation, never pushed from the installer', () => {
+    const fn = fnBody('setup_history_repo');
+    assert.match(fn, /bin\/init-history\.sh/);
+    assert.doesNotMatch(fn, /git push|git init|gh repo create/);
   });
 
   test('the scope is asked before the history step runs', () => {
     assert.ok(lineOf(INSTALL, '    ask_install_scope') < lineOf(INSTALL, '    setup_history_repo'));
   });
 
-  test('the per-project bootstrap stands down for the tools repo', () => {
+  test('the per-project bootstrap treats the tools repo like any other (T7)', () => {
     const common = readFileSync(join(REPO, 'scripts', 'agent-common-setup.sh'), 'utf8');
-    const fn = common.slice(common.indexOf('ensure_private_history_repo() {'));
-    const skip = fn.indexOf('"$(cd "$CODING_REPO" 2>/dev/null && pwd -P)"');
-    const delegate = fn.indexOf('lib/history/repo-link.mjs" ensure');
-    assert.ok(skip > -1 && skip < delegate, 'the tools-repo check must come before the learning-repo flow runs');
+    const fn = common.slice(common.indexOf('ensure_private_history_repo() {'), common.indexOf('export -f ensure_private_history_repo'));
+    assert.doesNotMatch(fn, /CODING_REPO" 2>\/dev\/null && pwd -P/, 'no tools-repo exception');
+    assert.match(fn, /lib\/history\/repo-link\.mjs" ensure/);
   });
 
   test('the symlink is ignored by the tools repo', () => {

@@ -13,9 +13,9 @@ km-core's LevelDB); the repo is the unit of persistence and sharing.
 
 | Project has… | File |
 |---|---|
-| a `.coding/` that the outer repo ignores (linked **or** skipped) | `<repo>/.coding/kb/knowledge-graph/<project>.json` |
+| a `.coding/` that the outer repo ignores (linked **or** skipped) — the tools repo included (T7) | `<repo>/.coding/kb/knowledge-graph/<project>.json` |
 | a shared clone of a teammate's repo (T5) | read from `<data home>/var/shared/<X>/kb/…`, **never written** |
-| neither (no checkout here; the tools repo until T7) | `<data home>/kb/knowledge-graph/exports/projects/<project>.json` |
+| neither (no checkout on this machine) | `<data home>/kb/knowledge-graph/exports/projects/<project>.json` |
 
 A repo that has a `.coding/` but was never launched since T3 does not ignore it
 yet, so it gets no file there (it would show up in the user's own `git status`).

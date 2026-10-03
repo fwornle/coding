@@ -125,12 +125,20 @@ services:
       # OBS_API_URL (host.docker.internal:12436). Eliminates SQLite WAL/SHM
       # corruption from concurrent openers across the Docker bind-mount boundary.
       - ${CODING_REPO:-.}/.specstory:/coding/.specstory
-      # ...and the data root AGAIN, at its own host path. .specstory/history is
-      # an absolute symlink into the data home (bin/init-history.sh); without
-      # this mount it would dangle in here, and readers of /coding/.specstory/
-      # history would see no history at all — an empty tree, not an error.
+      # ...and the data root AGAIN, at its own host path. Before per-repo
+      # tenancy T7 .specstory/history was an absolute symlink into the data
+      # home; a checkout not yet migrated still has one, and without this mount
+      # it would dangle in here — an empty history tree, not an error.
       - ${CODING_DATA_HOME:?unset — export it from bin/coding-data-home, or start via coding --claude}:${CODING_DATA_HOME:?unset — export it from bin/coding-data-home, or start via coding --claude}
       - ${CODING_REPO:-.}/knowledge-management:/coding/knowledge-management
+      # The tools repo's own learning checkout (per-repo tenancy T7, the
+      # coding-history repo). knowledge-management/insights and
+      # .specstory/history are RELATIVE symlinks into it (bin/init-history.sh),
+      # so without these two mounts both would dangle in here: semantic-analysis
+      # would fail to write insight documents and the history readers would see
+      # an empty tree. Mounted next to .coding/runtime (read-only, below).
+      - ${CODING_REPO:-.}/.coding/history:/coding/.coding/history
+      - ${CODING_REPO:-.}/.coding/kb:/coding/.coding/kb
       - ${CODING_REPO:-.}/.git:/coding/.git:rw
       # Workspace access (host repos)
       - ${HOME}/Agentic:/workspace:ro

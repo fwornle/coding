@@ -62,15 +62,15 @@ __pycache__/
 .obsolete/workflow-archives/specstory-archive/2025-10-05_0800-0900_g9b30a.md
 
 # Session-history is private — verbatim Claude transcripts that may contain
-# secrets, internal paths, or stakeholder names. Lives in a separate private
-# repo (see install.sh + bin/init-history.sh, and CODING_HISTORY_REPO in
-# .env). The folder is created locally by init-history.sh so LSL services
-# don't crash on a fresh public checkout, but its contents are never
-# committed to this repo.
-# No trailing slash: once bin/init-history.sh makes this a symlink into the
-# data home, a `dir/` pattern no longer matches it (git sees a symlink as a
-# file) and `git add -A` would commit the link.
+# secrets, internal paths, or stakeholder names. Like every repo coding runs
+# in, this one keeps what it learned in its own private learning checkout,
+# .coding/ (the coding-history repo; lib/history/repo-link.mjs, set up by
+# bin/init-history.sh). .specstory/history and knowledge-management/insights
+# are symlinks into it, so the writers that address the old paths keep working.
+# No trailing slash: git sees a symlink as a file, so a `dir/` pattern would
+# not match the link and `git add -A` would commit it.
 .specstory/history
+/knowledge-management/insights
 
 # Knowledge base data (if you want to exclude the actual data)
 # Uncomment the line below if you don't want to track the knowledge base content
@@ -355,8 +355,6 @@ integrations/browser-access/logs/
 # routing choices here; should NOT be shared across clones).
 .data/llm-proxy/llm-settings.json
 
-# PlantUML validation errors (transient, regenerated on diagram validation)
-knowledge-management/insights/plantuml_errors.json
 
 # Package lock files (optional - some prefer to track these)
 package-lock.json

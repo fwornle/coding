@@ -1,15 +1,19 @@
 /**
- * bin/init-history.sh puts the tools repo's session history in the data home.
+ * bin/init-history.sh sets up the tools repo's own learning checkout — the
+ * tools repo is an ordinary linked repo since per-repo tenancy T7:
+ * `<coding>/.coding/` (history/ + kb/), `.specstory/history` and
+ * `knowledge-management/insights` symlinks into it.
  *
- * Behavioural, unlike install-scope.test.mjs: the script runs on every
- * `bin/coding` launch and moves the most private data this system holds, so the
- * properties that matter — that a pre-data-home history is NEVER touched, that a
- * placeholder scope never gets a history, that both repo layouts clone to the
- * right place — are checked by running it, not by reading it.
+ * Behavioural: the script runs on every `bin/coding` launch and moves the most
+ * private data this system holds, so the properties that matter — the
+ * developer's nested history checkout migrates intact, a remote from install
+ * time is cloned, the insight documents leave the tracked tree only once they
+ * are no longer tracked, nothing is pushed — are checked by running it.
  *
- * Each case builds a throwaway "tools repo" holding just the script and the two
- * resolvers it calls, a throwaway HOME (CODING_HOME), and local bare repos as
- * remotes. Nothing here can reach the real ~/.coding or a real history repo.
+ * Each case builds a throwaway "tools repo" (a git repo holding just the script
+ * and the modules it calls), a throwaway HOME (CODING_HOME), and local bare
+ * repos as remotes. Nothing here can reach the real ~/.coding or a real
+ * history repo.
  *
  * Runner: node --test tests/scripts/init-history.test.mjs
  */
@@ -19,24 +23,27 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
   cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
-  readlinkSync, rmSync, writeFileSync,
+  readlinkSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const REPO = new URL('../..', import.meta.url).pathname;
 
-let root, tools, home;
+let root, tools, home, gitconfig;
 
 /** Run the sandboxed script with an environment scrubbed of every scope seam. */
 function run() {
-  const env = { ...process.env, CODING_HOME: home };
-  for (const k of ['CODING_DATA_HOME', 'CODING_SCOPE', 'CODING_TOOLS_PATH', 'CODING_REPO']) delete env[k];
-  return execFileSync('bash', [join(tools, 'bin', 'init-history.sh')], { env, encoding: 'utf8' });
+  const env = { ...process.env, CODING_HOME: home, GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_NOSYSTEM: '1' };
+  for (const k of ['CODING_DATA_HOME', 'CODING_SCOPE', 'CODING_TOOLS_PATH', 'CODING_REPO', 'LSL_HISTORY_AUTO', 'LSL_HISTORY_REMOTE_TEMPLATE']) delete env[k];
+  return execFileSync('bash', [join(tools, 'bin', 'init-history.sh')], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 function git(cwd, ...args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  return execFileSync('git', args, {
+    cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_NOSYSTEM: '1' },
+  }).trim();
 }
 
 /** A bare remote whose tree is `files` ({ relativePath: content }). */
@@ -49,115 +56,134 @@ function remote(name, files) {
     writeFileSync(join(work, rel), body);
   }
   git(work, 'add', '-A');
-  git(work, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'seed');
+  git(work, 'commit', '-q', '-m', 'seed');
   const bare = join(root, `${name}.git`);
   git(root, 'clone', '-q', '--bare', work, bare);
   return bare;
 }
 
-const setScope = (s) => {
-  mkdirSync(join(home, '.coding'), { recursive: true });
-  writeFileSync(join(home, '.coding', 'scope'), `${s}\n`);
-};
 const setRemote = (url) => writeFileSync(join(tools, '.env'), `CODING_HISTORY_REPO=${url}\n`);
 const link = () => join(tools, '.specstory', 'history');
-const dataHome = (s) => join(home, '.coding', 'data', s);
+const insights = () => join(tools, 'knowledge-management', 'insights');
+const checkout = () => join(tools, '.coding');
+const registry = () => readFileSync(join(home, '.coding', 'repos.yaml'), 'utf8');
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'init-history-'));
+  root = realpathSync(mkdtempSync(join(tmpdir(), 'init-history-')));
   tools = join(root, 'tools');
   home = join(root, 'home');
+  gitconfig = join(root, 'gitconfig');
+  writeFileSync(gitconfig, '[user]\n\tname = test\n\temail = test@localhost\n[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n');
   mkdirSync(join(tools, 'bin'), { recursive: true });
   mkdirSync(home);
-  for (const f of ['init-history.sh', 'coding-data-home']) cpSync(join(REPO, 'bin', f), join(tools, 'bin', f));
-  // lib/history clones; lib/features/vendor is its YAML parser.
+  cpSync(join(REPO, 'bin', 'init-history.sh'), join(tools, 'bin', 'init-history.sh'));
+  // lib/history links; lib/scope + lib/paths resolve; lib/features/vendor is its YAML parser.
   for (const d of ['lib/paths', 'lib/scope', 'lib/history', 'lib/features/vendor']) cpSync(join(REPO, d), join(tools, d), { recursive: true });
-  // bin/coding-data-home is extensionless ESM; it needs the module type.
   writeFileSync(join(tools, 'package.json'), '{"type":"module"}\n');
+  // The real repo's ignore rule for the insights link (asserted against the
+  // real .gitignore below), so `git status` here means what it means there.
+  writeFileSync(join(tools, '.gitignore'), '/knowledge-management/insights\n.env\n');
+  git(tools, 'init', '-q');
+  git(tools, 'add', '-A');
+  git(tools, 'commit', '-q', '-m', 'tools');
 });
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+function assertLinks() {
+  assert.ok(lstatSync(link()).isSymbolicLink(), '.specstory/history must be a symlink');
+  assert.equal(readlinkSync(link()), join('..', '.coding', 'history'));
+  assert.ok(lstatSync(insights()).isSymbolicLink(), 'knowledge-management/insights must be a symlink');
+  assert.equal(readlinkSync(insights()), join('..', '.coding', 'kb', 'insights'));
+  assert.ok(existsSync(join(checkout(), 'history', 'logs', 'classification')));
+  assert.equal(git(tools, 'status', '--porcelain'), '', 'the tools repo sees none of it');
+}
+
 describe('bin/init-history.sh', () => {
-  test('a scoped install with no repo gets a symlink into its own data home', () => {
-    setScope('team-a');
-    run();
-    assert.ok(lstatSync(link()).isSymbolicLink(), '.specstory/history must be a symlink');
-    assert.equal(readlinkSync(link()), join(dataHome('team-a'), 'history'));
-    assert.ok(existsSync(join(dataHome('team-a'), 'history', 'logs', 'classification')));
-    assert.ok(!existsSync(join(dataHome('team-a'), '.git')), 'no repo configured, no checkout');
+  test('the real .gitignore ignores the insights link', () => {
+    const r = execFileSync('git', ['check-ignore', '-v', '--no-index', 'knowledge-management/insights'], { cwd: REPO, encoding: 'utf8' });
+    assert.match(r, /\.gitignore:\d+:\/knowledge-management\/insights\s/);
   });
 
-  test('the placeholder scope keeps history in the repo, and creates no data home', () => {
-    // No ~/.coding/scope at all: history under data/default would be stranded
-    // the moment the user names their scope.
+  test('no remote configured: the layout, nothing recorded, nothing asked', () => {
     run();
-    assert.ok(!lstatSync(link()).isSymbolicLink());
-    assert.ok(lstatSync(link()).isDirectory());
-    assert.ok(!existsSync(join(home, '.coding', 'data')), 'nothing filed under the placeholder');
+    assertLinks();
+    assert.ok(!existsSync(join(checkout(), '.git')), 'no repo configured, no checkout');
+    assert.ok(!existsSync(join(home, '.coding', 'repos.yaml')), 'the launcher asks later');
   });
 
-  test('a pre-data-home history directory is never touched', () => {
-    // The developer's own machine, until it migrates deliberately.
-    setScope('coding');
-    setRemote(remote('other', { 'history/x.md': 'x' }));
-    mkdirSync(join(link(), '2026', '10'), { recursive: true });
-    writeFileSync(join(link(), '2026', '10', 'mine.jsonl'), 'precious');
+  test('a remote from install time is cloned and recorded', () => {
+    const url = remote('dh', { 'history/2026/10/s.jsonl': 'session', 'kb/notes.json': '{}', 'README.md': '# c\n' });
+    setRemote(url);
     run();
-    assert.ok(!lstatSync(link()).isSymbolicLink(), 'must not be replaced by a symlink');
-    assert.equal(readFileSync(join(link(), '2026', '10', 'mine.jsonl'), 'utf8'), 'precious');
-    assert.ok(!existsSync(join(dataHome('coding'), '.git')), 'and nothing cloned on its behalf');
-  });
-
-  test('a data-home repo becomes the data home itself, leaving var/ alone', () => {
-    setScope('team-a');
-    setRemote(remote('dh', { 'history/2026/10/s.jsonl': 'session', 'kb/notes.json': '{}', '.gitignore': 'var/\n' }));
-    mkdirSync(join(dataHome('team-a'), 'var'), { recursive: true });
-    writeFileSync(join(dataHome('team-a'), 'var', 'local.db'), 'machine-local');
-    run();
-    assert.ok(existsSync(join(dataHome('team-a'), '.git')), 'the data home is the checkout');
+    assertLinks();
     assert.equal(readFileSync(join(link(), '2026', '10', 's.jsonl'), 'utf8'), 'session');
-    assert.equal(readFileSync(join(dataHome('team-a'), 'kb', 'notes.json'), 'utf8'), '{}');
-    assert.equal(readFileSync(join(dataHome('team-a'), 'var', 'local.db'), 'utf8'), 'machine-local');
-    assert.equal(git(dataHome('team-a'), 'status', '--porcelain'), '', 'a clean checkout');
+    assert.equal(readFileSync(join(checkout(), 'kb', 'notes.json'), 'utf8'), '{}');
+    assert.match(registry(), new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 
-  test('a transcripts-only repo (the original layout) is cloned into history/', () => {
-    setScope('team-a');
-    setRemote(remote('legacy', { '2026/09/old.md': 'old', 'logs/classification/c.json': '{}' }));
+  test('a transcripts-only repo (the original coding-history) is restructured, committed locally, not pushed', () => {
+    const url = remote('legacy', { '2026/09/old.md': 'old', 'logs/classification/c.json': '{}' });
+    setRemote(url);
     run();
-    assert.ok(existsSync(join(dataHome('team-a'), 'history', '.git')));
-    assert.ok(!existsSync(join(dataHome('team-a'), '.git')));
+    assertLinks();
     assert.equal(readFileSync(join(link(), '2026', '09', 'old.md'), 'utf8'), 'old');
+    assert.equal(git(checkout(), 'status', '--porcelain'), '');
+    assert.notEqual(git(checkout(), 'rev-parse', 'HEAD'), git(checkout(), 'rev-parse', 'origin/main'), 'restructure is local');
   });
 
-  test('a data home with knowledge of its own is not cloned over', () => {
-    setScope('team-a');
-    setRemote(remote('dh', { 'history/a.md': 'a' }));
-    mkdirSync(join(dataHome('team-a'), 'kb'), { recursive: true });
-    writeFileSync(join(dataHome('team-a'), 'kb', 'local.json'), 'mine');
+  test("the developer's nested .specstory/history checkout migrates; the runtime stays untracked", () => {
+    const url = remote('coding-history', { '2026/10/mine.md': 'precious', 'chain-map.json': '{}' });
+    git(root, 'clone', '-q', url, link());
+    mkdirSync(join(checkout(), 'runtime'), { recursive: true });
+    writeFileSync(join(checkout(), 'runtime', 'features.json'), '{}');
+    writeFileSync(join(checkout(), 'session-state.json'), '{}');
     run();
-    assert.ok(!existsSync(join(dataHome('team-a'), '.git')));
-    assert.equal(readFileSync(join(dataHome('team-a'), 'kb', 'local.json'), 'utf8'), 'mine');
+    assertLinks();
+    assert.equal(readFileSync(join(link(), '2026', '10', 'mine.md'), 'utf8'), 'precious');
+    assert.ok(existsSync(join(checkout(), 'runtime', 'features.json')));
+    assert.doesNotMatch(git(checkout(), 'ls-files'), /runtime\/|session-state/);
+    assert.equal(git(checkout(), 'status', '--porcelain'), '');
+  });
+
+  test('still-tracked insight documents are left alone', () => {
+    mkdirSync(insights(), { recursive: true });
+    writeFileSync(join(insights(), 'A.md'), 'a');
+    git(tools, 'add', '-f', 'knowledge-management/insights/A.md');
+    git(tools, 'commit', '-q', '-m', 'pre-T7');
+    run();
+    assert.ok(!lstatSync(insights()).isSymbolicLink());
+    assert.equal(readFileSync(join(insights(), 'A.md'), 'utf8'), 'a');
+  });
+
+  test('untracked insight documents fold into .coding/kb/insights/, existing files win', () => {
+    mkdirSync(join(insights(), 'images'), { recursive: true });
+    writeFileSync(join(insights(), 'A.md'), 'a');
+    writeFileSync(join(insights(), 'images', 'a.png'), 'png');
+    writeFileSync(join(insights(), 'plantuml_errors.json'), '[]');
+    mkdirSync(join(checkout(), 'kb', 'insights', 'images'), { recursive: true });
+    writeFileSync(join(checkout(), 'kb', 'insights', 'B.md'), 'b');
+    run();
+    assertLinks();
+    for (const [f, body] of [['A.md', 'a'], ['B.md', 'b'], ['images/a.png', 'png'], ['plantuml_errors.json', '[]']]) {
+      assert.equal(readFileSync(join(insights(), f), 'utf8'), body, f);
+    }
+  });
+
+  test('bin/coding never runs it on --dry-run (it moves data; the profile matrix dry-runs the real checkout)', () => {
+    const launcher = readFileSync(join(REPO, 'bin', 'coding'), 'utf8');
+    const call = launcher.indexOf('"$SCRIPT_DIR/init-history.sh" 2>/dev/null');
+    assert.notEqual(call, -1, 'bin/coding no longer calls init-history.sh');
+    const guard = launcher.lastIndexOf('if [ "$DRY_RUN" != true ]', call);
+    assert.ok(guard > -1 && call - guard < 200, 'the call must sit inside the DRY_RUN guard');
   });
 
   test('re-running changes nothing', () => {
-    setScope('team-a');
     setRemote(remote('dh', { 'history/a.md': 'a' }));
     run();
-    const head = git(dataHome('team-a'), 'rev-parse', 'HEAD');
+    const head = git(checkout(), 'rev-parse', 'HEAD');
     assert.equal(run(), '', 'a second launch is silent');
-    assert.equal(git(dataHome('team-a'), 'rev-parse', 'HEAD'), head);
-    assert.equal(readlinkSync(link()), join(dataHome('team-a'), 'history'));
-  });
-
-  test('a symlink pointing elsewhere is reported, not re-pointed', () => {
-    setScope('team-a');
-    mkdirSync(join(tools, '.specstory'), { recursive: true });
-    const elsewhere = join(root, 'elsewhere');
-    mkdirSync(elsewhere);
-    execFileSync('ln', ['-s', elsewhere, link()]);
-    run();
-    assert.equal(readlinkSync(link()), elsewhere);
+    assert.equal(git(checkout(), 'rev-parse', 'HEAD'), head);
+    assertLinks();
   });
 });

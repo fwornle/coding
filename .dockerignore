@@ -49,9 +49,6 @@ coverage
 docs/
 *.md
 !README.md
-!knowledge-management/insights/*.md
-!knowledge-management/insights/images/
-!knowledge-management/insights/images/*
 
 # Development files
 .env
