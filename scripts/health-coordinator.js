@@ -39,6 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
+import { startNetworkChangeWatcher, networkChangeRecent } from '../lib/network/network-change-watcher.mjs';
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
@@ -361,6 +362,7 @@ const currentState = {
     proxy_functional: false,             // true if proxy can actually reach external hosts
     internet_reachable: false,           // true if we can reach github.com (directly or via proxy)
     consecutive_functional_failures: 0,  // debounce: raw functional-probe failures in a row (hysteresis)
+    last_network_change_at: null,        // epoch ms of the OS's last network-change notification
     last_probe_end: null                 // ISO timestamp
   },
   generated_at: new Date(STARTED_AT).toISOString(),
@@ -3241,6 +3243,10 @@ async function pollNetworkStatus() {
         directExternalOk,
         proxiedInternalOk,
         location: netState.location || null,
+        // An OS network change, or a demotion the hysteresis is still
+        // confirming: either way a failed proxied request is the network's.
+        networkChanging: networkChangeRecent(netState.last_network_change_at)
+          || (netState.location_demotion_pending || 0) > 0,
         consecutiveFailures: netState.consecutive_functional_failures || 0,
         failureThreshold: FUNCTIONAL_FAIL_THRESHOLD,
       });
@@ -3421,6 +3427,7 @@ async function pollNetworkStatus() {
     observed: observedLocation,
     previous: netState.location,
     pending: netState.location_demotion_pending,
+    networkChanged: networkChangeRecent(netState.last_network_change_at),
   });
   netState.location = settled.location;
   netState.location_demotion_pending = settled.pending;
@@ -4271,6 +4278,24 @@ async function tick() {
 }
 
 let tickTimer = null;
+/**
+ * Network changes as events (lib/network/network-change-watcher.mjs): the next
+ * tick re-probes the network at once, as after a wake from sleep, and for a
+ * minute the location is not debounced and proxydetox is not healed.
+ * Recorded in state, so /health/state shows when the last change was seen.
+ */
+let stopNetworkChangeWatcher = () => {};
+function startNetworkWatch() {
+  stopNetworkChangeWatcher = startNetworkChangeWatcher({
+    log,
+    onChange: () => {
+      currentState.network.last_network_change_at = Date.now();
+      currentState.network.last_probe_end = null;
+      log('network: the OS reported a network change — re-probing now', 'INFO');
+    },
+  });
+}
+
 function startTickLoop() {
   tickTimer = setInterval(() => { tick(); }, TICK_MS);
   // Run once immediately so /health/state returns a fresh generated_at right away.
@@ -4885,6 +4910,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   log(`listening on http://0.0.0.0:${PORT}`);
   process.stderr.write(`[HealthCoordinator] listening on http://0.0.0.0:${PORT}\n`);
   startTickLoop();
+  startNetworkWatch();
 });
 
 // RESEARCH §1 + §9 pitfall: EADDRINUSE on launchd respawn. Exit non-zero with
@@ -4911,6 +4937,7 @@ async function shutdown(signal) {
   log(`${signal} — shutting down`, 'INFO');
   process.stderr.write(`[HealthCoordinator] ${signal} — shutting down\n`);
   stopTickLoop();
+  stopNetworkChangeWatcher();
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 5_000).unref();
 }

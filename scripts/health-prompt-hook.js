@@ -28,6 +28,7 @@
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { restartingServices } from '../lib/health/deliberate-restart.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_TOOLS_PATH || join(__dirname, '..');
@@ -142,8 +143,12 @@ function deriveSummary(state) {
         // not an issue, and reporting it as one told the operator
         // "service obs_api stopped" about a service that never stopped.
         const OK_SERVICE_STATUSES = new Set(['running', 'busy']);
+        // Down because the coordinator is restarting it: its own remedy, not
+        // an issue (lib/health/deliberate-restart.mjs).
+        const restarting = restartingServices(state);
         for (const svc of state.services) {
-            if (svc && svc.status && !OK_SERVICE_STATUSES.has(svc.status)) {
+            if (svc && svc.status && !OK_SERVICE_STATUSES.has(svc.status)
+                && !restarting.has(svc.name)) {
                 issues.push(`service ${svc.name} ${svc.status}`);
             }
         }

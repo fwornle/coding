@@ -130,3 +130,23 @@ describe('the counter survives junk without demoting early', () => {
     });
   }
 });
+
+describe('an OS network change is the evidence the debounce waits for', () => {
+  it('publishes `open` at once right after a change', () => {
+    // Leaving VPN, 2026-10-03: the hysteresis held `vpn` for two probes while
+    // configd had already posted the change.
+    const r = settleLocation({ observed: 'open', previous: 'vpn', pending: 0, networkChanged: true });
+    assert.deepEqual(r, { location: 'open', held: false, pending: 0 });
+  });
+
+  it('still debounces a blip with no change behind it', () => {
+    const r = settleLocation({ observed: 'open', previous: 'corporate', networkChanged: false });
+    assert.equal(r.held, true);
+    assert.equal(r.location, 'corporate');
+  });
+
+  it('promotion is immediate either way', () => {
+    const r = settleLocation({ observed: 'vpn', previous: 'open', networkChanged: true });
+    assert.equal(r.location, 'vpn');
+  });
+});
