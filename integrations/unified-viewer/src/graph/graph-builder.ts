@@ -16,7 +16,7 @@ import {
 } from './color-fallback'
 import type { Entity, NodeState, OntologyClass, Relation } from './types'
 import type { Level, ViewerState } from '@/store/viewer-store'
-import { teamOf } from './team-of'
+import { teamOf, teamSelected } from './team-of'
 
 /**
  * Backend entities (Phase 44 /api/v1/entities) ship `entityType` but not
@@ -359,6 +359,7 @@ export function computeNodeState(
     learningSource?: 'batch' | 'online' | 'combined'
     selectedTeams?: ReadonlySet<string>
     teamScope?: string | null
+    teamProjects?: Readonly<Record<string, readonly string[]>>
   },
   hoveredNodeId: string | null = null,
 ): NodeState {
@@ -412,7 +413,7 @@ export function computeNodeState(
     if (store.selectedTeams.has('__none__')) return 'filter-hidden'
     // One rule with the Teams rail and the D3 canvas — see team-of.ts.
     const team = teamOf(attrs as { metadata?: Record<string, unknown> }, store.teamScope ?? null)
-    if (!store.selectedTeams.has(team)) return 'filter-hidden'
+    if (!teamSelected(team, store.selectedTeams, store.teamProjects)) return 'filter-hidden'
   }
 
   // Level predicate — `undefined` is EXCLUSION, not a pass, so this reads as

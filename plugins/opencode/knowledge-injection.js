@@ -50,7 +50,11 @@ function callRetrieval(query) {
     // passed this literal, so raising the default alone changed nothing. Sized so ~3 COMPLETE
     // insights fit: a p90 insight preview is 3,300 chars (~825 tokens) after the 2026-08-23
     // re-index. Was 1000, of which a hidden `Math.min(..., 700)` clamp made only 700 usable.
-    const payload = { query, budget: 3000, threshold: 0.7, context: { agent: "opencode" } };
+    // cwd + teams: obs-api filters injection by the session's teams (T6) —
+    // CODING_TEAMS when set, else the teams of the repo the session runs in.
+    const context = { agent: "opencode", cwd: process.env.CODING_PROJECT_DIR || process.cwd() };
+    if (process.env.CODING_TEAMS) context.teams = process.env.CODING_TEAMS;
+    const payload = { query, budget: 3000, threshold: 0.7, context };
     // Phase B: forward the run id when the launcher set it, so the obs-api persists
     // a structured per-item capture keyed by the same task_id the runs table shows.
     if (process.env.TASK_ID) payload.task_id = process.env.TASK_ID;

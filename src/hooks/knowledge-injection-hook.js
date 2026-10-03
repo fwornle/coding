@@ -181,6 +181,9 @@ async function main() {
         : process.cwd().split('/').pop(),
       cwd: process.env.CODING_PROJECT_DIR || process.cwd(),
       agent: 'claude',
+      // T6 team filter: the session's explicit selection, when it has one.
+      // Otherwise obs-api derives it from `cwd` (active teams, else the repo's).
+      ...(process.env.CODING_TEAMS ? { teams: process.env.CODING_TEAMS } : {}),
     };
 
     // 7. Extract conversation topics from transcript for query enrichment

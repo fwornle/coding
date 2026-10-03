@@ -63,6 +63,9 @@ export interface TeamRegistryEntry {
   label: string
   kind: 'team' | 'project'
   description: string
+  /** The project ids this team covers (its repos', T6). Absent on backends
+   *  that predate it — the team then covers the project named like it. */
+  projects?: string[]
 }
 
 /** One clustering rule for dynamically created views (config/teams/view-groups.json). */

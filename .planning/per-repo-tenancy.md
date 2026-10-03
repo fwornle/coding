@@ -140,13 +140,14 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 - [ ] **T4b** — measurements + token usage tagged by project; per-repo export of summaries. Needs a `project` column in rapid-llm-proxy's `token_usage` (PR there) and every capture path (proxy tap, file adapters, sub-agent capture) to send it. Not started.
 - Accept: `tests/history/sync.test.mjs` — users A/B with separate homes + data homes, one local bare remote, real km-core stores, real sync + merge driver: A's insight reaches B after B's pull; concurrent edits (B deletes + adds, A edits + adds the same file) merge through the driver and both converge. km-core `tests/unit/merge.test.ts` (9). `tests/kb/layout.test.mjs` (4).
 
-### T6 — Team filter everywhere  `status: todo`
+### T6 — Team filter everywhere  `status: done`
 
-- [ ] obs-api: `?teams=a,b` (server-side) on `/api/v1/entities`, observations, digests, insights, history; LSL history iterates the discovered/linked repos, not one dir.
-- [ ] Viewer: send the selection to the server; HistorySidebar honours `selectedTeams`; team list from `/api/teams` (now repo-backed).
-- [ ] Injection: retrieve context carries `teams[]` (active selection, default = teams containing cwd's repo); Qdrant payload **filter** on indexed `team`/`project` payload (index at embed time, `src/embedding/backfill.ts`; backfill existing points); all three hooks (claude, opencode, copilot) send it.
-- [ ] Fix `src/retrieval/working-memory.js` (retired `:8080`) → obs-api with teams.
-- Accept: injection test with fixtures in two teams proves zero cross-team results; viewer filter verified with gsd-browser.
+- [x] One mapping: `lib/teams/scope.mjs` — `projectsOfTeams(teams)` = the project ids of every repo in those teams (discovered repos via `teamsOf`, `repos:` ids/paths, remote-only → repo name minus `-history`, a team with no repos/include → its own id); an id that is no team is a project id (the viewer's "views"); matching case-insensitive on `metadata.project` → `metadata.team`. `defaultTeamsFor(cwd)` = active selection, else the cwd repo's teams.
+- [x] obs-api `?teams=a,b`, filtered before pagination: `/api/v1/entities` (km-core router gained a generic `entityFilter` option), `/api/coding/{observations,digests,insights}`, `/api/coding/lsl/sessions` — which now walks EVERY discovered repo's `.specstory/history` (was the tools repo's only), tags each session with its `project` and matches its entities within that project. `/api/teams` returns each team's resolved `projects`.
+- [x] Viewer: a selected registry team admits its repos' projects (`teamSelected`/`expandTeamSelection` in `graph/team-of.ts`, used by both canvases' predicates, the rail's counts and HistorySidebar, which now honours `selectedTeams`); the LSL strip sends `?teams=` (server-side, before its 500 cap). The graph stays one fetch with client-side filtering — the predicates already hold the whole graph, and refetching per toggle would rebuild the force layout on every click.
+- [x] Injection: `/api/retrieve` resolves teams from `teams` / `context.teams` (hooks send `CODING_TEAMS`) else `defaultTeamsFor(context.cwd)`; `retrieve()` passes a Qdrant `project` `match.any` filter on all four collections AND hard-filters every source afterwards (keyword search too); Working Memory scoped to the same projects. All three hooks send `cwd` (opencode and copilot did not / partly). `project` payload index on all four collections (`ensureCollections` now adds missing indexes to existing collections); `scripts/backfill-qdrant-project.mjs` re-stamped the 1957 `kg_entities` points, which all said `"coding"`; backfill reads every project's export (merged) and writes each entity's own project.
+- [x] `working-memory.js`: reads the live km-core store (or obs-api `/api/v1/entities` over HTTP), not the retired `:8080` — the block had silently been empty.
+- Accept: `tests/integration/retrieval-service.team-filter.test.js` — fixtures in two teams on all four collections + keyword + graph, Qdrant stub IGNORING the filter: zero cross-team items, WM scoped, filter requested on every collection; `tests/integration/obs-api.teams-filter.test.js`; `tests/teams/scope.test.mjs` (6); viewer `team-of.test.ts`. Live + gsd-browser: see session log.
 
 ### T2 — Linux + WSL  `status: todo`
 
@@ -217,3 +218,19 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   mount, discovery maps 22 repos onto /workspace, LSL Sessions now lists 21 projects (incl.
   `_work/*`, which the old scan missed); Teams tab verified in gsd-browser incl. a write
   round-trip (test edits removed — no `~/.coding/teams.yaml` exists). Next: **T4**.
+- **2026-10-03 (T6)** — Team filter everywhere (details in the T6 section). Decided: an
+  id that is no team is a project id (the viewer's "views" keep working through the same
+  `?teams=`); the graph stays one fetch filtered client-side, paginated panels go
+  server-side; injection = Qdrant filter + hard post-filter; no teams and a cwd outside
+  every team = no filter (unchanged behaviour). Verified: `npm test` green (node:test 1975
+  pass, jest 1249 pass), viewer vitest 1095 pass, km-core router test; live: `/api/v1/
+  entities?teams=coding` 2393 + `a2a-xpr` 254 = both 2647; LSL sessions now span 6 repos
+  and narrow per team; `/api/retrieve` from a coding cwd → only coding items, a2a-xpr →
+  only a2a-xpr, `/tmp` → unfiltered; WM back (245 tokens; was empty since :8080 died);
+  Qdrant `project` index on all 4 collections, 1226 live kg_entities points re-stamped
+  (731 stale points left untouched). gsd-browser on 127.0.0.1:5173: rail count Coding 2393
+  (= server), deselecting it → canvas 117→77, HistorySidebar 1534→247 with no coding row,
+  LSL strip refetched with `&teams=` (32 of 68); re-selected → restored. NOT done: the
+  dry-run backfill shows 2186 kg_entities + 861 insights never embedded — a real
+  `node dist/embedding/backfill.js` would add them (with project payloads); not run
+  (minutes of CPU, unrequested). Next: **T4b or T2**.

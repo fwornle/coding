@@ -73,6 +73,12 @@ export function TeamsFilter({ entities, apiClient, registry: registryProp }: Tea
   useEffect(() => {
     set({ teamScope: scope })
   }, [scope, set])
+  // What each registry team covers, so the canvases admit a team's repos.
+  useEffect(() => {
+    const map: Record<string, string[]> = {}
+    for (const t of registry.teams) if (t.projects?.length) map[t.id] = t.projects
+    set({ teamProjects: map })
+  }, [registry, set])
 
   const counts = useMemo(() => {
     const map = new Map<string, number>()

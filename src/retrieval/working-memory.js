@@ -1,11 +1,11 @@
 /**
  * Working memory assembly for retrieval responses.
  *
- * Queries KG entities (Project + Component) via VKB HTTP API and parses
+ * Queries KG entities (Project + Component) from the km-core store and parses
  * STATE.md frontmatter for current milestone/phase/status. Assembles a
  * token-budgeted markdown section (<=300 tokens) prepended to retrieval results.
  *
- * Fail-open design: if VKB is unreachable or STATE.md is missing, returns
+ * Fail-open design: if the graph is unreachable or STATE.md is missing, returns
  * empty working memory and lets semantic search use the full token budget.
  *
  * @module working-memory
@@ -24,14 +24,19 @@ const SESSION_STATE_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 /** Token budget for Previous Session section. */
 const SESSION_STATE_TOKEN_BUDGET = 100;
 
-/** 2-second abort timeout for VKB API calls (pitfall 1). */
-const VKB_TIMEOUT = 2000;
-
-/** VKB API base URL. */
-const VKB_BASE = 'http://localhost:8080';
+/** 2-second abort timeout for the HTTP fallback (pitfall 1). */
+const KG_TIMEOUT = 2000;
 
 /**
- * The tenant this installation's knowledge belongs to, for the VKB query filter
+ * obs-api, which owns the knowledge graph. Used only when no store handle is
+ * passed in (a caller outside obs-api). Was the VKB server on :8080, retired —
+ * so this block had silently been empty.
+ */
+const OBS_API_BASE = `http://127.0.0.1:${process.env.OBSERVATIONS_API_PORT || '12436'}`;
+
+/**
+ * The tenant this installation's knowledge belongs to — the project filter when
+ * the caller passes no teams
  * and the canonical project-name match.
  *
  * Was the literal `'coding'`, which gave a colleague installing for `raas` this
@@ -73,48 +78,69 @@ function pickCanonicalProject(entities, team) {
   return entities.find((e) => (e.entity_name || '').toLowerCase() === target) || null;
 }
 
+/** km-core entity → the shape assembleMarkdown() reads (the old VKB wire shape). */
+function toWmEntity(e) {
+  const desc = typeof e.description === 'string' ? e.description : '';
+  return {
+    entity_name: e.name || '',
+    entity_type: e.ontologyClass || e.entityType || '',
+    observations: desc ? [{ content: desc }] : [],
+  };
+}
+
+function projectOfEntity(e) {
+  const m = e && e.metadata ? e.metadata : {};
+  return m.project || m.team || null;
+}
+
 /**
- * Fetch Project and Component entities from the VKB API.
+ * Fetch Project and Component entities from the knowledge graph.
  *
- * Uses Promise.all for parallel fetches with AbortSignal.timeout
- * to prevent hung requests (T-31-01 mitigation).
+ * `opts.store` — obs-api's live GraphKMStore (retrieval passes it); without it,
+ * obs-api's /api/v1/entities over HTTP (2s timeout, T-31-01).
+ * `opts.projects` — T6: only entities learned in these projects (the caller's
+ * teams). The canonical project is the single project when there is one,
+ * else the installation's tenant.
  *
  * @returns {Promise<{ project: object|null, components: Array<object> }>}
  */
-async function fetchKGStructure() {
+async function fetchKGStructure(opts = {}) {
+  // No team filter: the installation's tenant, as the VKB query always did.
+  const projects = Array.isArray(opts.projects) && opts.projects.length ? opts.projects : (TEAM ? [TEAM] : null);
+  const want = projects ? new Set(projects.map((p) => String(p).toLowerCase())) : null;
+  const inScope = (e) => {
+    if (!want) return true;
+    const p = projectOfEntity(e);
+    return p !== null && want.has(String(p).toLowerCase());
+  };
+  const canonical = projects && projects.length === 1 ? projects[0] : TEAM;
   try {
-    // No team parameter at all when the tenant is unknown — see TEAM above.
-    const base = TEAM
-      ? `${VKB_BASE}/api/entities?team=${encodeURIComponent(TEAM)}`
-      : `${VKB_BASE}/api/entities?`;
-    const [projectRes, componentRes] = await Promise.all([
-      fetch(`${base}&type=Project`, { signal: AbortSignal.timeout(VKB_TIMEOUT) }),
-      fetch(`${base}&type=Component`, { signal: AbortSignal.timeout(VKB_TIMEOUT) }),
-    ]);
-
-    if (!projectRes.ok || !componentRes.ok) {
-      process.stderr.write(
-        `[WorkingMemory] VKB API returned non-OK: project=${projectRes.status}, component=${componentRes.status}\n`
-      );
-      return { project: null, components: [] };
+    let projectEnts;
+    let componentEnts;
+    if (opts.store) {
+      [projectEnts, componentEnts] = await Promise.all([
+        opts.store.findByOntologyClass('Project'),
+        opts.store.findByOntologyClass('Component'),
+      ]);
+    } else {
+      const q = projects ? `&teams=${encodeURIComponent(projects.join(','))}` : '';
+      const get = async (cls) => {
+        const r = await fetch(`${OBS_API_BASE}/api/v1/entities?ontologyClass=${cls}${q}`, { signal: AbortSignal.timeout(KG_TIMEOUT) });
+        if (!r.ok) throw new Error(`/api/v1/entities?ontologyClass=${cls} → HTTP ${r.status}`);
+        const body = await r.json();
+        return Array.isArray(body.data) ? body.data : [];
+      };
+      [projectEnts, componentEnts] = await Promise.all([get('Project'), get('Component')]);
     }
-
-    const projectData = await projectRes.json();
-    const componentData = await componentRes.json();
-
-    // Filter components to true Components — the type filter currently still
-    // pulls in referenced Projects (second-pass) and always-included System
-    // nodes, which we don't want shown in the component list.
-    const components = (componentData.entities || []).filter(
-      (e) => e.entity_type === 'Component'
-    );
-
+    const components = componentEnts
+      .filter((e) => (e.ontologyClass || e.entityType) === 'Component' && inScope(e))
+      .map(toWmEntity);
     return {
-      project: pickCanonicalProject(projectData.entities, TEAM),
+      project: pickCanonicalProject(projectEnts.filter(inScope).map(toWmEntity), canonical),
       components,
     };
   } catch (err) {
-    process.stderr.write(`[WorkingMemory] VKB fetch failed: ${err.message}\n`);
+    process.stderr.write(`[WorkingMemory] knowledge-graph fetch failed: ${err.message}\n`);
     return { project: null, components: [] };
   }
 }
@@ -430,7 +456,7 @@ function buildPreviousSessionSection(sessionState) {
 /**
  * Build working memory section from KG structure and STATE.md.
  *
- * Fetches Project + Component entities from the VKB API and parses
+ * Fetches Project + Component entities from the knowledge graph and parses
  * STATE.md frontmatter for current milestone/phase/status. Assembles
  * a token-budgeted markdown section (<=300 tokens per D-05).
  *
@@ -441,12 +467,13 @@ function buildPreviousSessionSection(sessionState) {
  * No caching -- every call queries live data (D-03, D-04).
  *
  * @param {string} codingRoot - Path to the coding repo root
+ * @param {{store?: object, projects?: string[]|null}} [opts] - see fetchKGStructure
  * @returns {Promise<{ markdown: string, tokens: number }>}
  */
-export async function buildWorkingMemory(codingRoot) {
+export async function buildWorkingMemory(codingRoot, opts = {}) {
   try {
     const [kgData, stateData] = await Promise.all([
-      fetchKGStructure(),
+      fetchKGStructure(opts),
       Promise.resolve(parseStateFrontmatter(codingRoot)),
     ]);
 

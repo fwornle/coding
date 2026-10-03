@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useGraphData } from '@/graph/useGraphData'
+import { teamOf, teamSelected } from '@/graph/team-of'
 import { useViewerStore } from '@/store/viewer-store'
 import { ApiClient } from '@/api/ApiClient'
 import { System } from '@/config/system-endpoints'
@@ -87,11 +88,18 @@ const carriesInsightDocument = (meta: Record<string, unknown>): boolean =>
 
 export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
   const { entities } = useGraphData(apiClient, system)
+  // T6: the history honours the Teams rail, with the canvases' own rule.
+  const selectedTeams = useViewerStore((s) => s.selectedTeams)
+  const teamScope = useViewerStore((s) => s.teamScope)
+  const teamProjects = useViewerStore((s) => s.teamProjects)
 
   const items: HistoryItem[] = useMemo(() => {
     const out: HistoryItem[] = []
+    const filtering = selectedTeams.size > 0
+    if (filtering && selectedTeams.has('__none__')) return out
     for (const e of entities) {
       const meta = (e.metadata as Record<string, unknown> | undefined) ?? {}
+      if (filtering && !teamSelected(teamOf({ metadata: meta }, teamScope), selectedTeams, teamProjects)) continue
       if (!HISTORY_TYPES.has(e.entityType as string) && !carriesInsightDocument(meta)) continue
       // 2026-06-12: hide `[Raw]` placeholder observations the LLM summary
       // pipeline emits on failure — they're not real knowledge.
@@ -115,11 +123,11 @@ export function HistorySidebar({ apiClient, system }: HistorySidebarProps) {
         source,
         headline: headline(e as Parameters<typeof headline>[0]),
         createdAt: created,
-        team: (meta.team as string | undefined) ?? 'general',
+        team: teamOf({ metadata: meta }, teamScope),
       })
     }
     return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  }, [entities])
+  }, [entities, selectedTeams, teamScope, teamProjects])
 
   // 2026-06-13 (Phase 56 / CR-01 fix): route through the canonical
   // `setSelection` store action instead of an inline `setState({...})`.

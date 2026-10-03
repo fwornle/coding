@@ -6,7 +6,7 @@
 // only the developer's own tenant).
 
 import { describe, test, expect } from 'vitest'
-import { teamOf, UNTAGGED_TEAM } from './team-of'
+import { teamOf, teamSelected, UNTAGGED_TEAM } from './team-of'
 
 const node = (metadata: Record<string, unknown> | null | undefined) => ({ metadata })
 
@@ -36,5 +36,27 @@ describe('teamOf', () => {
   test('empty and non-string values count as absent', () => {
     expect(teamOf(node({ project: '', team: 'raas' }), null)).toBe('raas')
     expect(teamOf(node({ project: 42, team: '' }), 'acme')).toBe('acme')
+  })
+})
+
+describe('teamSelected — a selected team admits its repos (T6)', () => {
+  const teamProjects = { raas: ['raas-api', 'raas-ui'] }
+
+  test('a registry team admits each of its projects, case-insensitively', () => {
+    const sel = new Set(['raas'])
+    expect(teamSelected('raas-api', sel, teamProjects)).toBe(true)
+    expect(teamSelected('RAAS-UI', sel, teamProjects)).toBe(true)
+    expect(teamSelected('raas', sel, teamProjects)).toBe(true)
+    expect(teamSelected('coding', sel, teamProjects)).toBe(false)
+  })
+
+  test('a view (no registry entry) admits exactly itself', () => {
+    expect(teamSelected('kgbench-tree-1', new Set(['kgbench-tree-1']), teamProjects)).toBe(true)
+    expect(teamSelected('raas-api', new Set(['kgbench-tree-1']), teamProjects)).toBe(false)
+  })
+
+  test('without the registry map, the old exact-id rule', () => {
+    expect(teamSelected('raas-api', new Set(['raas']), undefined)).toBe(false)
+    expect(teamSelected('raas', new Set(['raas']), undefined)).toBe(true)
   })
 })

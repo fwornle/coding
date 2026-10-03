@@ -51,6 +51,11 @@ import { _computeRetentionBoundary, _mergeObservations, _mergeDigests } from './
 // unified viewer's Teams / Views rail groups by. Served at GET /api/teams.
 import { loadRegistry } from '../lib/teams/registry.mjs';
 import { kbLayout } from '../lib/kb/layout.mjs';
+import { parseTeams, projectsOfTeams, teamPredicate, projectOf, defaultTeamsFor } from '../lib/teams/scope.mjs';
+import { discoveredProjects } from '../lib/teams/discover.mjs';
+import { createRequire as _createRequireT6 } from 'node:module';
+
+const _teamsConfigT6 = _createRequireT6(import.meta.url)('../lib/teams/config.cjs');
 
 // Phase 44 plan 07 — km-core canonical /api/v1 surface (root-barrel imports).
 // The legacy versioned-prefix-removed orphan-draft mount + the orphan-draft
@@ -1550,7 +1555,17 @@ function installationScope() {
 
 app.get('/api/teams', (_req, res) => {
   try {
-    res.json({ ...loadRegistry(REPO_ROOT), scope: installationScope() });
+    const reg = loadRegistry(REPO_ROOT);
+    // T6: each team's resolved project ids (lib/teams/scope.mjs) — the same
+    // mapping every `?teams=` filter on this server uses, so a client that
+    // filters locally cannot disagree with one that asks the server.
+    if (Array.isArray(reg.teams)) {
+      reg.teams = reg.teams.map((t) => ({
+        ...t,
+        projects: [...projectsOfTeams([t.id], { codingRoot: REPO_ROOT }).projects].sort(),
+      }));
+    }
+    res.json({ ...reg, scope: installationScope() });
   } catch (err) {
     // loadRegistry is fail-open by construction, so this is belt-and-braces.
     process.stderr.write(`[obs-api] /teams error: ${err.message}\n`);
@@ -2014,9 +2029,25 @@ function writeRetrievalCapture(taskId, result) {
 
 /**
  * POST /api/retrieve — retrieve relevant knowledge for a query.
- * Body: { query: string, budget?: number, threshold?: number, context?: any, task_id?: string }
- * Returns: { markdown: string, items?: [...], meta: { ... } }
+ * Body: { query: string, budget?: number, threshold?: number, context?: any, task_id?: string,
+ *         teams?: string[] | string }
+ * Returns: { markdown: string, items?: [...], meta: { ..., teams?, projects? } }
+ *
+ * T6 team filter: `teams` (body, else `context.teams`), else the default for
+ * the session's directory (`context.cwd`): the active selection
+ * (~/.coding/teams.yaml / CODING_TEAMS), else the teams of the cwd's repo.
+ * Only knowledge learned in those teams' projects is injected. [] = no filter.
  */
+function retrievalTeams(body) {
+  const explicit = body?.teams ?? body?.context?.teams;
+  if (explicit !== undefined && explicit !== null) return parseTeams(explicit);
+  try {
+    return defaultTeamsFor(body?.context?.cwd || null);
+  } catch {
+    return [];
+  }
+}
+
 app.post('/api/retrieve', async (req, res) => {
   const startMs = Date.now();
   const { query, budget = 1000, threshold = 0.75, context = null, task_id = null } = req.body || {};
@@ -2034,10 +2065,14 @@ app.post('/api/retrieve', async (req, res) => {
 
   try {
     await ensureWriter(); // ensure db is open for keyword search
+    const teams = retrievalTeams(req.body);
+    const projects = teams.length ? [...projectsOfTeams(teams, { codingRoot: REPO_ROOT }).projects] : null;
     const result = await ensureRetrieval().retrieve(query, {
       budget: parsedBudget,
       threshold: Number(threshold) || 0.75,
       context: context || null,
+      teams: teams.length ? teams : null,
+      projects,
       // Thread the run id so retrieve() can detect an experiment cell ('<exp>--<variant>--rN')
       // and suppress the task-agnostic Working Memory scaffold for it (already read for the
       // Phase-B capture below).
@@ -2779,6 +2814,12 @@ function mountKMRoutes(store) {
     // service no cwd of its own). Deliberately NOT under the data root.
     ontologyDir: path.join(REPO_ROOT, '.data', 'ontologies'),
     displayOverlaySystem: 'coding',
+    // T6: GET /api/v1/entities?teams=a,b — strict (no structural exemption):
+    // an API caller asking for a team gets that team's entities only.
+    entityFilter: (query) => {
+      const keep = teamsFilterOf({ query });
+      return keep ? (e) => keep(e.metadata) : null;
+    },
   });
   process.stderr.write(`[obs-api] km-core /api/v1 routes mounted\n`);
 }
@@ -3400,6 +3441,16 @@ async function collectByOntologyClass(cls) {
 // of patterns across the codebase). See user request 2026-06-11:
 //   "you need to separate the vkb viewer content (insights only) from the
 //    tabs in the health monitoring board (observations, digests, insights)".
+/**
+ * T6: `?teams=a,b` on a read route — keeps rows whose project (else legacy
+ * team) belongs to one of the teams (lib/teams/scope.mjs; an id that is no
+ * team is taken as a project id). null = no `teams` param = no filter.
+ * Applied BEFORE pagination, so a page is never clipped by rows it drops.
+ */
+function teamsFilterOf(req) {
+  return teamPredicate(parseTeams(req.query?.teams), { codingRoot: REPO_ROOT });
+}
+
 app.get('/api/coding/observations', async (_req, res) => {
   try {
     const req = _req;
@@ -3449,6 +3500,8 @@ app.get('/api/coding/observations', async (_req, res) => {
     let filtered = reshaped;
     if (agentSet) filtered = filtered.filter((row) => agentSet.has(row.agent));
     if (project) filtered = filtered.filter((row) => row.project === project);
+    const inTeams = teamsFilterOf(req);
+    if (inTeams) filtered = filtered.filter((row) => inTeams({ project: row.project }));
     if (from) filtered = filtered.filter((row) => row.timestamp && row.timestamp >= from);
     if (toExclusive) filtered = filtered.filter((row) => row.timestamp && row.timestamp <= toExclusive);
     if (qualitySet) filtered = filtered.filter((row) => qualitySet.has(row.quality ?? 'normal'));
@@ -3549,6 +3602,8 @@ app.get('/api/coding/digests', async (_req, res) => {
     if (from) filtered = filtered.filter((row) => row.date && row.date >= from);
     if (to) filtered = filtered.filter((row) => row.date && row.date <= to);
     if (project) filtered = filtered.filter((row) => row.project === project);
+    const inTeams = teamsFilterOf(req);
+    if (inTeams) filtered = filtered.filter((row) => inTeams({ project: row.project }));
     if (qLower) {
       filtered = filtered.filter((row) =>
         (typeof row.theme === 'string' && row.theme.toLowerCase().includes(qLower)) ||
@@ -3603,7 +3658,7 @@ app.get('/api/coding/insights', async (_req, res) => {
       // getEntity fallback. legacyId stays intact for cross-ref/migration use.
       legacy.id = entity.id;
       const m = (entity.metadata ?? {});
-      return { legacy, archivedAt: m.archivedAt ?? null };
+      return { legacy, archivedAt: m.archivedAt ?? null, meta: m };
     });
 
     const qLower = q ? String(q).toLowerCase() : null;
@@ -3613,6 +3668,8 @@ app.get('/api/coding/insights', async (_req, res) => {
     }
     if (topic) filtered = filtered.filter((row) => row.legacy.topic === topic);
     if (project) filtered = filtered.filter((row) => row.legacy.project === project);
+    const inTeams = teamsFilterOf(req);
+    if (inTeams) filtered = filtered.filter((row) => inTeams(row.meta));
     if (qLower) {
       filtered = filtered.filter((row) =>
         (typeof row.legacy.topic === 'string' && row.legacy.topic.toLowerCase().includes(qLower)) ||
@@ -3783,8 +3840,31 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
     }
     const sinceISO = new Date(sinceMs).toISOString();
 
-    const historyDir = process.env.OBSERVATIONS_LSL_HISTORY_DIR
-      || path.join(REPO_ROOT, '.specstory', 'history');
+    // T6: every discovered repo's transcripts, not only the tools repo's —
+    // each session tagged with its repo's project, and `?teams=` keeping the
+    // repos of the selected teams. OBSERVATIONS_LSL_HISTORY_DIR (tests) pins
+    // one dir, untagged, as before.
+    const inTeams = teamsFilterOf(req);
+    const historyDirs = [];
+    if (process.env.OBSERVATIONS_LSL_HISTORY_DIR) {
+      historyDirs.push({ dir: process.env.OBSERVATIONS_LSL_HISTORY_DIR, project: null });
+    } else {
+      const seenDirs = new Set();
+      let repos = [];
+      try { repos = discoveredProjects({ codingRoot: REPO_ROOT, marker: 'specstory' }); } catch { /* none */ }
+      if (!repos.some((r) => path.resolve(r.path) === path.resolve(REPO_ROOT))) repos.unshift({ path: REPO_ROOT });
+      for (const r of repos) {
+        const dir = path.join(r.path, '.specstory', 'history');
+        let real;
+        try { real = fs.realpathSync(dir); } catch { continue; }
+        if (seenDirs.has(real)) continue;
+        seenDirs.add(real);
+        let project;
+        try { project = _teamsConfigT6.projectIdFor(r.hostPath || r.path); } catch { project = path.basename(r.path); }
+        if (inTeams && !inTeams({ project })) continue;
+        historyDirs.push({ dir, project });
+      }
+    }
 
     const nowMs = Date.now();
 
@@ -3827,6 +3907,7 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
           if (!Number.isFinite(createdMs)) continue;
           allEnts.push({
             id,
+            project: projectOf(attrs.metadata),
             type: attrs.entityType,
             hidden: HIDDEN_FROM_VIEWER.has(attrs.entityType)
               || (typeof attrs.name === 'string' && attrs.name.startsWith('[Raw]')),
@@ -3851,9 +3932,13 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
     // won't react when the selected entity is hidden (Observation/
     // Digest), but the right panel still shows its content so the user
     // can read what was captured during that session.
-    const aggregateForRange = (startMs, endMs) => {
+    // A session's entities are those created in its window IN ITS PROJECT
+    // (case-insensitive; an untagged dir matches every project, as before).
+    const aggregateForRange = (startMs, endMs, project = null) => {
+      const want = project ? String(project).toLowerCase() : null;
       const matches = allEnts.filter(
-        (e) => e.createdMs >= startMs && e.createdMs < endMs,
+        (e) => e.createdMs >= startMs && e.createdMs < endMs
+          && (!want || (e.project && String(e.project).toLowerCase() === want)),
       );
       matches.sort((a, b) => TYPE_RANK(a.type) - TYPE_RANK(b.type));
       return {
@@ -3876,7 +3961,7 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
     };
 
     const sessions = [];
-    for (const file of _walkLslDir(historyDir)) {
+    for (const { dir: historyDir, project } of historyDirs) for (const file of _walkLslDir(historyDir)) {
       const parsed = _parseLslFilename(path.basename(file));
       if (!parsed) continue;
       if (parsed.startAt < sinceISO) continue;
@@ -3890,12 +3975,13 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
       const endMs = endAt ? Date.parse(endAt) : Date.now() + 1;
       const { entityIds, totalCount, source } =
         (Number.isFinite(startMs) && Number.isFinite(endMs))
-          ? aggregateForRange(startMs, endMs)
+          ? aggregateForRange(startMs, endMs, project)
           : { entityIds: [], totalCount: 0, source: 'online' };
       // Persist for the client side (debug / future per-session API).
       entitiesBySessionStart.set(parsed.startAt, entityIds);
       sessions.push({
         id: parsed.id,
+        ...(project ? { project } : {}),
         startAt: parsed.startAt,
         endAt,
         observationCount: totalCount,

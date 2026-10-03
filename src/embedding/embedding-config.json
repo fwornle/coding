@@ -8,13 +8,13 @@
       "payloadIndexes": ["agent", "quality", "project", "date"]
     },
     "digests": {
-      "payloadIndexes": ["quality", "date"]
+      "payloadIndexes": ["quality", "date", "project"]
     },
     "insights": {
-      "payloadIndexes": ["topic", "confidence"]
+      "payloadIndexes": ["topic", "confidence", "project"]
     },
     "kg_entities": {
-      "payloadIndexes": ["entityType", "hierarchyLevel"]
+      "payloadIndexes": ["entityType", "hierarchyLevel", "project"]
     }
   }
 }

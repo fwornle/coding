@@ -106,7 +106,12 @@ async function retrieve(prompt, sessionId, cwd) {
     query: String(prompt).slice(0, MAX_QUERY_CHARS),
     budget: 1000,
     threshold: 0.70,
-    context: { agent: 'copilot', cwd: cwd || process.cwd() },
+    // T6: obs-api filters by the session's teams — CODING_TEAMS, else the cwd repo's.
+    context: {
+      agent: 'copilot',
+      cwd: cwd || process.cwd(),
+      ...(process.env.CODING_TEAMS ? { teams: process.env.CODING_TEAMS } : {}),
+    },
     task_id: process.env.CODING_EXPERIMENT_TASK_ID || process.env.TASK_ID || sessionId,
     timeout: RETRIEVAL_TIMEOUT_MS,
     // Defaults to 3033 (the retrieval service). Overridable for tests / non-standard ports.

@@ -73,9 +73,18 @@ export async function ensureCollections(qdrant: QdrantClient): Promise<void> {
 
   for (const [name, collectionConfig] of Object.entries(config.collections)) {
     if (existingCollections.includes(name)) {
-      process.stderr.write(
-        `[QdrantCollections] Collection "${name}" already exists — skipping\n`
-      );
+      // An existing collection still gets any payload index the config added
+      // since it was created — T6 added `project` to every tier, and the team
+      // filter on injection searches by it.
+      const info = await qdrant.getCollection(name);
+      const have = new Set(Object.keys(info.payload_schema ?? {}));
+      for (const fieldName of collectionConfig.payloadIndexes) {
+        if (have.has(fieldName)) continue;
+        await qdrant.createPayloadIndex(name, { field_name: fieldName, field_schema: "keyword" });
+        process.stderr.write(
+          `[QdrantCollections] Added payload index "${name}.${fieldName}" (keyword) to the existing collection\n`
+        );
+      }
       continue;
     }
 

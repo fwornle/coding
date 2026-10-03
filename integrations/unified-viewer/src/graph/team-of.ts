@@ -42,3 +42,43 @@ export function teamOf(e: TeamedNode, scope: string | null): string {
   const meta = e.metadata ?? undefined
   return nonEmpty(meta?.project) ?? nonEmpty(meta?.team) ?? scope ?? UNTAGGED_TEAM
 }
+
+/** Per team id, the project ids it covers (`/api/teams .teams[].projects`). */
+export type TeamProjects = Readonly<Record<string, readonly string[]>>
+
+let lastSel: ReadonlySet<string> | null = null
+let lastMap: TeamProjects | null | undefined = null
+let lastOut: ReadonlySet<string> = new Set()
+
+/**
+ * The selection as the set of (lowercased) team values it admits: every
+ * selected id, plus — for a selected registry team — the projects it covers.
+ * A team is a set of repos (T5/T6), so selecting `raas` must admit entities
+ * learned in `raas-api`; the server's `?teams=` filter expands the same way
+ * (lib/teams/scope.mjs). Memoised on identity: the predicates call this per
+ * entity with the same two objects.
+ */
+export function expandTeamSelection(
+  selected: ReadonlySet<string>,
+  teamProjects: TeamProjects | null | undefined,
+): ReadonlySet<string> {
+  if (selected === lastSel && teamProjects === lastMap) return lastOut
+  const out = new Set<string>()
+  for (const id of selected) {
+    out.add(id.toLowerCase())
+    for (const p of teamProjects?.[id] ?? []) out.add(p.toLowerCase())
+  }
+  lastSel = selected
+  lastMap = teamProjects
+  lastOut = out
+  return out
+}
+
+/** Whether an entity's team value passes a (non-empty, non-`__none__`) selection. */
+export function teamSelected(
+  team: string,
+  selected: ReadonlySet<string>,
+  teamProjects: TeamProjects | null | undefined,
+): boolean {
+  return expandTeamSelection(selected, teamProjects).has(team.toLowerCase())
+}
