@@ -337,6 +337,19 @@ describe('`ukb debug` mock mode makes no real LLM calls', { skip: SKIP_NO_SUBMOD
     assert.equal((c.match(/llmWithProcessComplete\(/g) || []).length, 1);
     assert.doesNotMatch(c, /LLMService/);
   });
+
+  test("Wave 1's observation top-up skips its LLM retry in mock mode", () => {
+    // Measured 2026-10-03, after the two holes above were closed: a debug run
+    // still made 4 real calls, all `wave-analysis-wave1-l1emit` observation
+    // retries. ensureMinimumObservations runs for every L1 entity, mock or
+    // not, and the mock analysis rarely yields 3 specific observations.
+    const wave1 = readOrNull(path.join(SA, 'agents', 'wave1-project-agent.ts'));
+    const c = code(wave1);
+    const fn = c.slice(c.indexOf('private async ensureMinimumObservations('));
+    const guard = fn.indexOf('if (!isMockLLMEnabled(this.repositoryPath)) {');
+    const retry = fn.indexOf('this.llmWithProcess.complete(');
+    assert.ok(guard > -1 && retry > -1 && guard < retry, 'mock is checked before the retry call');
+  });
 });
 
 describe('tools.ts routes the UKB workflows to the owner', { skip: SKIP_NO_SUBMODULE }, () => {
