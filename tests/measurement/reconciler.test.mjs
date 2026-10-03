@@ -119,3 +119,39 @@ test('loadBehaviorConfig returns safe defaults for a missing file', () => {
   assert.equal(cfg.pollMs, 5000);
   assert.deepEqual(cfg.agents, {});
 });
+
+// OVERLAP (2026-10-03): two sessions of one agent active at once. The proxy has
+// one slot per agent, so binding the newest flipped the slot between them every
+// poll and booked each session's traffic to the other half the time.
+const withRival = (sessionId, rivalAgoMs) => ({
+  sessionId, lastActivityMs: NOW - 10_000, runnerUpMs: NOW - rivalAgoMs,
+});
+
+test('two fresh sessions: binds neither', () => {
+  const span = makeSpan();
+  const action = reconcileAgent('claude', span, FRESH, withRival('ses_A', 20_000), NOW);
+  assert.equal(action, 'overlap');
+  assert.equal(span.slots.claude, undefined);
+});
+
+test('two fresh sessions: clears the slot it had bound before the overlap began', () => {
+  const span = makeSpan({ claude: own('ses_A') });
+  const action = reconcileAgent('claude', span, FRESH, withRival('ses_B', 5_000), NOW);
+  assert.equal(action, 'cleared(overlap)');
+  assert.equal(span.slots.claude, undefined);
+});
+
+test('the overlap ends when the runner-up goes stale, and measurement resumes', () => {
+  const span = makeSpan();
+  const action = reconcileAgent('claude', span, FRESH, withRival('ses_A', 300_000), NOW);
+  assert.equal(action, 'started ses_A');
+  assert.equal(span.slots.claude.task_id, 'ses_A');
+});
+
+test('an overlap never touches an operator-authored slot', () => {
+  const operator = { task_id: 'manual', agent: 'claude', meta: { source: 'operator' } };
+  const span = makeSpan({ claude: operator });
+  const action = reconcileAgent('claude', span, FRESH, withRival('ses_A', 5_000), NOW);
+  assert.equal(action, 'overlap');
+  assert.equal(span.slots.claude, operator);
+});

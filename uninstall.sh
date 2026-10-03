@@ -109,6 +109,20 @@ if [[ -f "$HOME/.config/systemd/user/llm-cli-proxy.service" ]]; then
     systemctl --user daemon-reload 2>/dev/null || true
     echo "    Removed systemd service"
 fi
+# The host daemons install.sh's install_feature_daemons step created. Exactly the
+# ones with a template in launchd/ — that directory is what the installer can
+# install — so a com.coding.* job someone created by hand is left alone.
+for _tpl in "$CODING_REPO"/launchd/com.coding.*.plist; do
+    [[ -f "$_tpl" ]] || continue
+    _label="$(basename "$_tpl" .plist)"
+    [[ "$_label" == "com.coding.llm-cli-proxy" ]] && continue  # handled above
+    _plist="$HOME/Library/LaunchAgents/$_label.plist"
+    [[ -f "$_plist" ]] || continue
+    echo "  Removing LaunchAgent $_label..."
+    launchctl bootout "gui/$(id -u)/$_label" 2>/dev/null || true
+    rm -f "$_plist"
+done
+
 _proxy_dir="${RAPID_LLM_PROXY_DIR:-$(cd "$CODING_REPO/.." && pwd)/_work/rapid-llm-proxy}"
 if [[ -d "$_proxy_dir" ]]; then
     echo "  KEPT the LLM proxy checkout at $_proxy_dir (its .env holds your provider keys)"

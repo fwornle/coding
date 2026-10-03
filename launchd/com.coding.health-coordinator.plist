@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.coding.health-coordinator — the host health coordinator on :3034 (feature: health).
+
+  Owns every project's ETM (re-spawning a dead one within 30s), serves the
+  /features API the dashboard proxies, and runs the remediation actions.
+  KeepAlive with a 30s throttle so a crash-looping coordinator cannot spin.
+
+  HEALTH_COORDINATOR_PORT is load-bearing: the script's own default is 3033,
+  which is the Health API's port. Everything that talks to the coordinator
+  (status line, dashboard proxy, launcher) expects 3034.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.health-coordinator</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec node "$@"</string>
+        <string>node</string>
+        <string>__CODING_REPO__/scripts/health-coordinator.js</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__CODING_REPO__</string>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>__CODING_REPO__/.logs/health-coordinator.log</string>
+    <key>StandardErrorPath</key>
+    <string>__CODING_REPO__/.logs/health-coordinator.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin</string>
+        <key>HEALTH_COORDINATOR_PORT</key>
+        <string>3034</string>
+    </dict>
+</dict>
+</plist>

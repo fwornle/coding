@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.coding.obs-api — the observations API on :12436 (feature: observations).
+
+  The single owner of the knowledge store: every ETM, the container and the
+  viewer reach the graph through it, so it is KeepAlive — a dead obs-api means
+  observations stop landing and the viewer reads nothing.
+
+  node via `/bin/sh -c 'exec node'` + PATH, not an absolute path: Apple Silicon
+  and Intel Homebrew install node in different places, and a baked-in path is a
+  job that loads and then fails at every run.
+
+  KM_INSIGHT_RESOLVER (fuzzy Insight de-duplication) is deliberately NOT set,
+  which is `off`. `dry-run` logs what it would merge; `on` merges, which cannot
+  be undone. A machine that wants either sets it in its own copy of this file.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.obs-api</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec node "$@"</string>
+        <string>node</string>
+        <string>__CODING_REPO__/scripts/observations-api-server.mjs</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__CODING_REPO__</string>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>__CODING_REPO__/.logs/obs-api.log</string>
+    <key>StandardErrorPath</key>
+    <string>__CODING_REPO__/.logs/obs-api.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin</string>
+    </dict>
+</dict>
+</plist>

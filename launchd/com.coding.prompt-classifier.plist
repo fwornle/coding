@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.coding.prompt-classifier — the prompt-complexity judge on 127.0.0.1:12437
+  (feature: llm-proxy).
+
+  Answers POST /classify {text} -> {band}; rapid-llm-proxy's `classifier.impl:
+  http` asks it. KeepAlive, because a classifier that is down does not break
+  routing — the proxy fails open and keeps the caller's band — but every minute
+  it is down is a minute of cheap work paying for an expensive model, and nobody
+  would notice.
+
+  It loads its backend key from the repo's own .env, so nothing secret belongs
+  here.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.prompt-classifier</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec node "$@"</string>
+        <string>node</string>
+        <string>__CODING_REPO__/scripts/prompt-classifier-service.mjs</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__CODING_REPO__</string>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>__CODING_REPO__/.logs/prompt-classifier.log</string>
+    <key>StandardErrorPath</key>
+    <string>__CODING_REPO__/.logs/prompt-classifier.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin</string>
+    </dict>
+</dict>
+</plist>
