@@ -80,6 +80,29 @@ conflicts aborts the merge, leaves the checkout as it was, and is reported.
 
 Shared clones are pull-only: local changes in them are discarded before a pull.
 
+The reload goes to the obs-api of the same data home: obs-api records its port
+in `<data home>/var/obs-api.json` when it listens, and `coding sync` reads it
+(falling back to `OBSERVATIONS_API_PORT`, then 12436) — so a second
+installation on one machine never reloads the first one's
+(`lib/kb/obs-api-endpoint.mjs`).
+
+The slice in `kb/observation-export/` is merged with what is already in the
+repo, by row id, never replaced: a teammate's rows are in it and in no local
+store.
+
+## Embedding what arrives by git
+
+Embeddings are made on write (`embedding:new` → the listener), and injection
+reads Qdrant only, so what a teammate pushed was invisible to agents. obs-api
+therefore runs the idempotent backfill (`dist/embedding/backfill.js`, skips
+points whose content hash and preview version are unchanged) 60 s after
+startup and after every `/api/kb/reload` that changed the graph — one pass at a
+time, a trigger during a pass queues one more (`lib/kb/embed-index.mjs`). The
+first pass on a machine embeds the whole backlog (≈150 s for 3.9k points);
+after that a pass embeds only the delta (3 s for one pulled insight). Points of
+entities deleted elsewhere are not pruned (retrieve's project filter still
+applies); `backfill.js --prune` removes them.
+
 ## Commands
 
 ```bash
@@ -93,7 +116,5 @@ curl -s -X POST localhost:12436/api/kb/reload # merge pulled files into the live
 
 ## Not yet
 
-- Token usage and measurements are not tagged by project (needs a `project`
-  column in the proxy's `token_usage` and every capture path to send it).
-- Entities that arrive by reload are not embedded into Qdrant until the next
-  backfill (T6 indexes `team`/`project` payloads anyway).
+- Keyword search still reads the archived SQLite file and returns nothing, so
+  a machine without Qdrant gets no injection at all.
