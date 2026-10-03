@@ -28,9 +28,6 @@ export default [
       // them here would report other repositories' code as this one's problems.
       'lib/km-core/**',
       'integrations/**',
-      // A self-contained npm package with its own package.json, dependency set and
-      // `lint` script — the same reason it is excluded from the root jest run.
-      'lib/knowledge-api/**',
       // Build outputs and vendored bundles that happen to live under lib/.
       'lib/**/dist/**',
       'lib/**/vendor/**',

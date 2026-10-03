@@ -29,9 +29,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Logger } from "../lib/knowledge-api/utils/logging.js";
+import { createLogger } from "../lib/logging/Logger.js";
 
-const logger = new Logger({ timestamp: false, colors: false });
+const logger = createLogger("egress-lint", { timestamp: false, colors: false });
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const allowlistPath = path.join(repoRoot, "config", "egress-lint-allowlist.json");
@@ -72,7 +72,7 @@ const baseUrlRe = /base_?url/i;
 
 function loadAllowlist() {
   if (!existsSync(allowlistPath)) {
-    logger.error(`egress-lint: missing allowlist file ${allowlistPath}`);
+    logger.error(`missing allowlist file ${allowlistPath}`);
     process.exit(2);
   }
   const raw = JSON.parse(readFileSync(allowlistPath, "utf8"));
@@ -109,7 +109,7 @@ function discoverRoots() {
       if (existsSync(path.join(dir, ".git"))) {
         roots.push({ prefix: `${sub}/`, dir });
       } else {
-        logger.warn(`egress-lint: submodule not initialized, not scanned: ${sub}`);
+        logger.warn(`submodule not initialized, not scanned: ${sub}`);
       }
     }
   }
@@ -229,21 +229,21 @@ for (const { prefix, dir } of roots) {
 const scannedRootOf = (file) => subPrefixes.find((p) => file.startsWith(p)) ?? "";
 for (const entry of allowlist.providerClients) {
   if (roots.some((r) => r.prefix === scannedRootOf(entry.file)) && !allowUsage.has(entry.file)) {
-    logger.warn(`egress-lint: stale allowlist entry (no matching hit): ${entry.file}`);
+    logger.warn(`stale allowlist entry (no matching hit): ${entry.file}`);
   }
 }
 for (const entry of allowlist.llmService) {
   if (roots.some((r) => r.prefix === scannedRootOf(entry.file)) && !allowUsage.has(`llmservice:${entry.file}`)) {
-    logger.warn(`egress-lint: stale allowlist entry (no matching hit): ${entry.file}`);
+    logger.warn(`stale allowlist entry (no matching hit): ${entry.file}`);
   }
 }
 
 logger.info(
-  `egress-lint: scanned ${filesScanned} files across ${roots.length} root(s): ${roots.map((r) => r.prefix || ".").join(", ")}`
+  `scanned ${filesScanned} files across ${roots.length} root(s): ${roots.map((r) => r.prefix || ".").join(", ")}`
 );
 
 if (violations.length) {
-  logger.error(`egress-lint: ${violations.length} violation(s):`);
+  logger.error(`${violations.length} violation(s):`);
   for (const v of violations) {
     logger.error(`  ${v.file}:${v.line}  [${v.rule}]  ${v.detail}`);
   }
@@ -256,4 +256,4 @@ if (violations.length) {
   process.exit(1);
 }
 
-logger.info("egress-lint: OK — no unguarded provider-cloud egress found.");
+logger.info("OK — no unguarded provider-cloud egress found.");

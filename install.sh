@@ -2142,11 +2142,6 @@ OPENAI_ADMIN_API_KEY=your-openai-admin-api-key
 # CODING_REPO=/path/to/coding/repo (legacy, now uses CODING_TOOLS_PATH)
 # MEMORY_VISUALIZER_DIR=/path/to/memory-visualizer
 
-# Knowledge Base path - where .data/knowledge-graph/ and .data/knowledge-export/ are located
-# Default: same directory as the coding project
-# Can be set to a different path for centralized knowledge management
-CODING_KB_PATH=/path/to/coding/repo
-
 # Default knowledge views to display in VKB viewer
 # Comma-separated list of views (e.g., "coding,ui,resi")
 KNOWLEDGE_VIEW=coding,ui
@@ -2167,10 +2162,6 @@ ANTHROPIC_API_KEY=
 # Project path - automatically set by installer
 CLAUDE_PROJECT_PATH=$CODING_REPO
 
-# Knowledge Base path - where .data/knowledge-graph/ and .data/knowledge-export/ are located
-# Default: same directory as the coding project
-CODING_KB_PATH=$CODING_REPO
-
 # For constraint-monitor system
 GROK_API_KEY=
 OPENAI_API_KEY=
@@ -2187,15 +2178,6 @@ KNOWLEDGE_VIEW=coding,ui
 EOF
         success ".env file created with project paths"
     else
-        # Update existing .env file to add CODING_KB_PATH if missing
-        if ! grep -q "CODING_KB_PATH" "$CODING_REPO/.env"; then
-            info "Adding CODING_KB_PATH to existing .env file..."
-            echo "" >> "$CODING_REPO/.env"
-            echo "# Knowledge Base path - where .data/knowledge-graph/ and .data/knowledge-export/ are located" >> "$CODING_REPO/.env"
-            echo "# Default: same directory as the coding project" >> "$CODING_REPO/.env"
-            echo "CODING_KB_PATH=$CODING_REPO" >> "$CODING_REPO/.env"
-        fi
-        
         # Update existing .env file to add KNOWLEDGE_VIEW if missing
         if ! grep -q "KNOWLEDGE_VIEW" "$CODING_REPO/.env"; then
             info "Adding KNOWLEDGE_VIEW to existing .env file..."
@@ -3062,7 +3044,9 @@ create_llm_proxy_launchd() {
     # shellcheck source=scripts/lib/launchd-plist.sh
     source "$CODING_REPO/scripts/lib/launchd-plist.sh"
     local rendered
-    rendered="$(mktemp -t llm-cli-proxy-plist)"
+    # Explicit XXXXXX template: GNU coreutils mktemp (first on PATH with Homebrew's
+    # gnubin) refuses a bare `-t prefix`, which made this step report "failed to render".
+    rendered="$(mktemp "${TMPDIR:-/tmp}/llm-cli-proxy-plist.XXXXXX")"
     if ! render_plist "$CODING_REPO/launchd/com.coding.llm-cli-proxy.plist" "$rendered" "$CODING_REPO"; then
         rm -f "$rendered"
         warning "  Could not render the LaunchAgent plist — not installed"
@@ -3087,16 +3071,57 @@ create_llm_proxy_launchd() {
     fi
 
     mkdir -p "$HOME/Library/LaunchAgents" "$CODING_REPO/.logs"
-    launchctl bootout "gui/$(id -u)/com.coding.llm-cli-proxy" 2>/dev/null || true
-    mv "$rendered" "$plist_path"
-    launchctl bootstrap "gui/$(id -u)" "$plist_path" 2>/dev/null || launchctl load "$plist_path" 2>/dev/null
-    sleep 3
 
-    if lsof -i :"$proxy_port" -sTCP:LISTEN >/dev/null 2>&1; then
+    # Every agent launched through `coding` talks to this proxy, so the reload must
+    # never leave the job unloaded: that is ECONNREFUSED in every running session,
+    # and the health coordinator's kickstart cannot restart a job launchd no longer
+    # has. bootout returns before the job is gone, so an immediate bootstrap loses
+    # the race ("Bootstrap failed: 5") — and this used to discard that error.
+    local service="gui/$(id -u)/com.coding.llm-cli-proxy" _wait
+    if [[ -f "$plist_path" ]] && cmp -s "$rendered" "$plist_path" \
+        && launchctl print "$service" >/dev/null 2>&1; then
+        # Same definition already loaded: a restart picks up new proxy code.
+        rm -f "$rendered"
+        launchctl kickstart -k "$service" 2>&1 | sed 's/^/  /' || true
+    else
+        launchctl bootout "$service" 2>/dev/null || true
+        for _wait in 1 2 3 4 5 6 7 8 9 10; do
+            launchctl print "$service" >/dev/null 2>&1 || break
+            sleep 1
+        done
+        mv "$rendered" "$plist_path"
+        local _try _err=""
+        for _try in 1 2 3; do
+            if _err="$(launchctl bootstrap "gui/$(id -u)" "$plist_path" 2>&1)"; then
+                _err=""
+                break
+            fi
+            sleep 2
+        done
+        if [[ -n "$_err" ]]; then
+            warning "  launchctl bootstrap failed: $_err"
+            info "  Retry: launchctl bootstrap gui/\$(id -u) $plist_path"
+            INSTALLATION_WARNINGS+=("LLM proxy: LaunchAgent installed but not loaded (launchctl bootstrap: $_err)")
+            return 0
+        fi
+    fi
+
+    # The listening port alone is not proof: health is what agents' launchers gate
+    # on. Startup hydrates the token history first, which can take ~30s.
+    local _up=""
+    for _wait in $(seq 1 30); do
+        if curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:${proxy_port}/health" 2>/dev/null; then
+            _up=1
+            break
+        fi
+        sleep 2
+    done
+    if [[ -n "$_up" ]]; then
         success "  LLM proxy running as a LaunchAgent on port $proxy_port"
     else
-        warning "  LaunchAgent installed but the proxy is not listening yet"
+        warning "  LaunchAgent loaded but the proxy is not answering /health on port $proxy_port"
         info "  Why it did not start: $CODING_REPO/.logs/llm-proxy-service.log"
+        INSTALLATION_WARNINGS+=("LLM proxy: loaded but /health on port $proxy_port did not answer within 60s")
     fi
 }
 

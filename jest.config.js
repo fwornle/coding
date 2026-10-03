@@ -72,9 +72,6 @@ export default {
     // kgbench builds a per-run worktree under .data/kgbench/trees/ for the same
     // reason. .gitignore does not help — jest walks the filesystem, not git.
     ...REPO_COPIES,
-    // Self-contained npm package: own package.json, own deps that root install does
-    // not provide, own `npm test`. The `**/test/**` glob was reaching into it.
-    '/lib/knowledge-api/',
     ...NOT_JEST_SUITES
   ],
   // Keeps the same paths out of the MODULE MAP. Separate setting, separate scan:

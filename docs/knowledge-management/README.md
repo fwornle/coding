@@ -340,7 +340,6 @@ vkb
 ## Key Files
 
 **UKB (Manual/Batch)**:
-- `lib/knowledge-api/` - UKB core implementation
 - `bin/ukb` - Command-line interface
 - `.data/knowledge-graph/` - GraphDB storage (Graphology + LevelDB)
 - `.data/knowledge-export/` - Git-tracked JSON exports

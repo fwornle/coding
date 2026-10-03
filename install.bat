@@ -24,7 +24,7 @@ REM ============================================================================
 REM 1. DEPENDENCY CHECKING
 REM ============================================================================
 
-echo %BLUE%[1/12] Checking dependencies...%NC%
+echo %BLUE%[1/11] Checking dependencies...%NC%
 echo.
 
 REM Check for Node.js
@@ -105,7 +105,7 @@ set CODING_REPO=%CODING_REPO:~0,-1%
 REM Convert to forward slashes for cross-platform compatibility
 set CODING_REPO_UNIX=%CODING_REPO:\=/%
 
-echo %BLUE%[2/12] Installation directory:%NC%
+echo %BLUE%[2/11] Installation directory:%NC%
 echo   %CODING_REPO%
 echo.
 
@@ -113,7 +113,7 @@ REM ============================================================================
 REM 3. INSTALL MAIN PROJECT DEPENDENCIES
 REM ============================================================================
 
-echo %BLUE%[3/12] Installing main project dependencies...%NC%
+echo %BLUE%[3/11] Installing main project dependencies...%NC%
 cd /d "%CODING_REPO%"
 call npm install
 if %errorlevel% neq 0 (
@@ -125,29 +125,10 @@ echo %GREEN%[OK]%NC% Main project dependencies installed
 echo.
 
 REM ============================================================================
-REM 4. INSTALL LIB/KNOWLEDGE-API DEPENDENCIES
+REM 4. INSTALL LIB/VKB-SERVER DEPENDENCIES
 REM ============================================================================
 
-echo %BLUE%[4/12] Installing knowledge-api dependencies...%NC%
-if exist "%CODING_REPO%\lib\knowledge-api" (
-    cd /d "%CODING_REPO%\lib\knowledge-api"
-    call npm install
-    if %errorlevel% neq 0 (
-        echo %RED%ERROR: Failed to install knowledge-api dependencies%NC%
-        pause
-        exit /b 1
-    )
-    echo %GREEN%[OK]%NC% Knowledge-api dependencies installed
-) else (
-    echo %YELLOW%WARNING: lib/knowledge-api directory not found, skipping%NC%
-)
-echo.
-
-REM ============================================================================
-REM 5. INSTALL LIB/VKB-SERVER DEPENDENCIES
-REM ============================================================================
-
-echo %BLUE%[5/12] Installing vkb-server dependencies...%NC%
+echo %BLUE%[4/11] Installing vkb-server dependencies...%NC%
 if exist "%CODING_REPO%\lib\vkb-server" (
     cd /d "%CODING_REPO%\lib\vkb-server"
     call npm install
@@ -163,10 +144,10 @@ if exist "%CODING_REPO%\lib\vkb-server" (
 echo.
 
 REM ============================================================================
-REM 6. CLONE AND BUILD MEMORY-VISUALIZER
+REM 5. CLONE AND BUILD MEMORY-VISUALIZER
 REM ============================================================================
 
-echo %BLUE%[6/12] Setting up memory-visualizer...%NC%
+echo %BLUE%[5/11] Setting up memory-visualizer...%NC%
 cd /d "%CODING_REPO%"
 
 if not exist "%CODING_REPO%\integrations\memory-visualizer" (
@@ -205,10 +186,10 @@ echo %GREEN%[OK]%NC% Memory-visualizer installed and built
 echo.
 
 REM ============================================================================
-REM 7. INSTALL MCP SERVERS
+REM 6. INSTALL MCP SERVERS
 REM ============================================================================
 
-echo %BLUE%[7/12] Installing MCP servers...%NC%
+echo %BLUE%[6/11] Installing MCP servers...%NC%
 cd /d "%CODING_REPO%"
 
 REM Install browser-access MCP server
@@ -275,10 +256,10 @@ echo MCP server installation complete
 echo.
 
 REM ============================================================================
-REM 8. CREATE .ENV FILE
+REM 7. CREATE .ENV FILE
 REM ============================================================================
 
-echo %BLUE%[8/12] Creating .env configuration...%NC%
+echo %BLUE%[7/11] Creating .env configuration...%NC%
 cd /d "%CODING_REPO%"
 
 if not exist "%CODING_REPO%\.env" (
@@ -301,9 +282,6 @@ if not exist "%CODING_REPO%\.env" (
         echo # Primary coding tools path
         echo CODING_TOOLS_PATH=%CODING_REPO_UNIX%
         echo.
-        echo # Knowledge Base path
-        echo CODING_KB_PATH=%CODING_REPO_UNIX%
-        echo.
         echo # Default knowledge views to display
         echo KNOWLEDGE_VIEW=coding,ui
         echo.
@@ -319,10 +297,10 @@ if not exist "%CODING_REPO%\.env" (
 echo.
 
 REM ============================================================================
-REM 9. CREATE COMMAND WRAPPERS
+REM 8. CREATE COMMAND WRAPPERS
 REM ============================================================================
 
-echo %BLUE%[9/12] Creating command wrappers...%NC%
+echo %BLUE%[8/11] Creating command wrappers...%NC%
 cd /d "%CODING_REPO%"
 
 REM Create bin directory
@@ -380,10 +358,10 @@ echo %GREEN%[OK]%NC% Batch wrappers created in bin/
 echo.
 
 REM ============================================================================
-REM 10. CREATE UKB BASH WRAPPER IN KNOWLEDGE-MANAGEMENT
+REM 9. CREATE UKB BASH WRAPPER IN KNOWLEDGE-MANAGEMENT
 REM ============================================================================
 
-echo %BLUE%[10/12] Creating ukb bash wrapper...%NC%
+echo %BLUE%[9/11] Creating ukb bash wrapper...%NC%
 
 if not exist "%CODING_REPO%\knowledge-management\ukb" (
     echo Creating knowledge-management/ukb wrapper...
@@ -431,10 +409,10 @@ if not exist "%CODING_REPO%\knowledge-management\ukb" (
 echo.
 
 REM ============================================================================
-REM 11. CONFIGURE ENVIRONMENT
+REM 10. CONFIGURE ENVIRONMENT
 REM ============================================================================
 
-echo %BLUE%[11/12] Configuring environment...%NC%
+echo %BLUE%[10/11] Configuring environment...%NC%
 echo.
 
 REM ===== 11a. Configure Windows PATH =====
@@ -489,7 +467,7 @@ if exist "%BASH_CONFIG_FILE%" (
 echo.
 
 REM ============================================================================
-REM 12. CREATE CLAUDE CODE SETTINGS
+REM 11. CREATE CLAUDE CODE SETTINGS
 REM ============================================================================
 
 echo %BLUE%[12/13] Creating Claude Code settings...%NC%
@@ -637,7 +615,7 @@ echo %GREEN%[OK]%NC% Claude Code settings created
 echo.
 
 REM ============================================================================
-REM 13. INITIALIZE KNOWLEDGE DATABASES
+REM 12. INITIALIZE KNOWLEDGE DATABASES
 REM ============================================================================
 
 echo %BLUE%[13/13] Initializing knowledge databases and log directories...%NC%

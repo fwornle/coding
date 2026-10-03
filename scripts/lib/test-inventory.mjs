@@ -46,16 +46,6 @@ const SEARCH_ROOTS = ['tests', 'test', 'src', 'scripts', 'lib/lsl'];
  */
 export const EXCLUDED = new Map([
   [
-    'lib/knowledge-api',
-    // Self-contained npm package: its own package.json, its own dependency set
-    // (joi, uuid, commander…) that root `npm install` does not install, and its own
-    // `npm test` (node --test). Root jest was collecting lib/knowledge-api/test/*
-    // through the `**/test/**` glob and failing on `Cannot find module 'uuid'`.
-    // Installing its deps does not help — its tests then fail 33/33 against its own
-    // code with joi "Invalid undefined schema". That is the package's business.
-    'separate package with its own toolchain — run `npm test` inside it',
-  ],
-  [
     'src/ontology/OntologyConfigManager.layout.test.ts',
     // The three src/ontology suites below are node:test suites that NO runner
     // executes, and until now that was recorded only as a comment on the `.ts`
