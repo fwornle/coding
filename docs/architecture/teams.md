@@ -93,5 +93,6 @@ compared case-insensitively with `metadata.project`, else `metadata.team`.
   counts and in the History sidebar; the LSL strip asks the server.
 - **Injection**: `/api/retrieve` uses `teams` / `context.teams` (hooks forward
   `CODING_TEAMS`), else the active selection, else the teams of the session's repo
-  (`context.cwd`). Qdrant is queried with a `project` filter and every candidate is
-  re-checked, so nothing from another team is injected. No teams = no filter.
+  (`context.cwd`), else — a repo in no team — that repo's own project. Qdrant is queried
+  with a `project` filter and every candidate is re-checked, so nothing from another team
+  is injected. Only a session outside every repo, with nothing selected, is unfiltered.

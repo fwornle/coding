@@ -19,6 +19,7 @@ import { KeywordSearch } from './keyword-search.js';
 import { rrfFuse, buildRecencyList, TIER_WEIGHTS, loadAgentProfiles } from './rrf-fusion.js';
 import { assembleBudgetedMarkdown } from './token-budget.js';
 import { buildWorkingMemory } from './working-memory.js';
+import { repoRootOf } from '../../lib/teams/scope.mjs';
 import { judgeRelevance } from './relevance-judge.js';
 
 /** Qdrant collection names matching embedding-config.json. */
@@ -205,7 +206,12 @@ export class RetrievalService {
     // scaffold is suppressed for them regardless, and this also avoids the VKB round-trip.
     const wm = isExperiment
       ? { markdown: '', tokens: 0 }
-      : await buildWorkingMemory(this.codingRoot, { store: this.kmStoreGetter ? this.kmStoreGetter() : null, projects });
+      : await buildWorkingMemory(this.codingRoot, {
+        store: this.kmStoreGetter ? this.kmStoreGetter() : null,
+        projects,
+        // The session's own repo for STATE.md — obs-api serves every repo.
+        ...(context?.cwd ? { projectRoot: repoRootOf(context.cwd) } : {}),
+      });
     // The caller's budget governs. This used to read `Math.min(budget - wm.tokens, 700)`,
     // and that 700 was a LITERAL — so a caller asking for 3,000 silently received 700 and
     // the obvious remedy for "give the block more room" was a no-op. Measured before the
