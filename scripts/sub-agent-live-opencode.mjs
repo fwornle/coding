@@ -188,11 +188,18 @@ async function main() {
   const projectRoot = args.projectRoot || defaultProjectRoot();
   const stateFile = args.stateFile || defaultStateFile();
 
+  // No db = opencode is not installed, or has never run. Wait for it instead of
+  // exiting: under KeepAlive / Restart=always an exit is a restart every
+  // ThrottleInterval for as long as opencode stays absent — a crash loop on
+  // every machine without opencode (found by tests/cleanroom/services.sh).
   if (!fs.existsSync(dbPath)) {
     process.stderr.write(
-      `[live-opencode] db not found: ${dbPath}\n`,
+      `[live-opencode] db not found: ${dbPath} — waiting for opencode to create it\n`,
     );
-    process.exit(1);
+    while (!fs.existsSync(dbPath)) {
+      await new Promise((r) => setTimeout(r, 60_000));
+    }
+    process.stderr.write(`[live-opencode] db appeared: ${dbPath}\n`);
   }
 
   const registry = createRegistry();

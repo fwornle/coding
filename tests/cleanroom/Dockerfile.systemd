@@ -1,0 +1,34 @@
+# A Linux box with systemd as PID 1 and a lingering user — the shape of a
+# colleague's Ubuntu machine or a WSL distribution with systemd=true.
+# See tests/cleanroom/services.sh.
+FROM node:22-bookworm
+
+# Deliberately NO lsof: minimal Debian/Ubuntu and fresh WSL images do not ship it,
+# and the installer must not depend on it. iproute2 (ss) is what systemd distros have.
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends \
+      systemd systemd-sysv dbus dbus-user-session libpam-systemd \
+      git python3 jq curl ca-certificates procps iproute2 >/dev/null \
+ && apt-get purge -y -qq lsof >/dev/null 2>&1 || true \
+ && rm -rf /var/lib/apt/lists/* \
+ # Units a container has no use for, and which only slow boot down.
+ && systemctl mask systemd-udevd.service systemd-udevd-kernel.socket systemd-udevd-control.socket \
+      getty.target console-getty.service >/dev/null 2>&1 || true
+
+# The colleague. Lingering is what `loginctl enable-linger dev` persists: a user
+# manager (user@<uid>.service) that runs without a login session. systemd-logind
+# must stay unmasked — it is what starts a lingering user's manager at boot.
+RUN useradd -m -s /bin/bash dev \
+ && mkdir -p /var/lib/systemd/linger && touch /var/lib/systemd/linger/dev
+
+COPY --chown=dev:dev snapshot.tar /tmp/snapshot.tar
+# NOT under /tmp: systemd-tmpfiles empties /tmp when the container boots.
+COPY --chown=dev:dev extras/ /opt/cleanroom/extras/
+RUN su dev -c 'mkdir /home/dev/coding && tar -xf /tmp/snapshot.tar -C /home/dev/coding \
+ && cd /home/dev/coding && git init -q -b main \
+ && git -c user.email=cleanroom@test -c user.name=cleanroom add -A \
+ && git -c user.email=cleanroom@test -c user.name=cleanroom commit -q -m snapshot' \
+ && rm /tmp/snapshot.tar
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/lib/systemd/systemd"]

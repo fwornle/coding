@@ -1,0 +1,12 @@
+# coding: runs context-turns-sweeper.service every 3600s (launchd StartInterval).
+# OnActiveSec=1s is launchd's RunAtLoad: one run as soon as the timer starts.
+[Unit]
+Description=coding: captured context-turn pruning (feature: performance) (every 3600s)
+
+[Timer]
+OnActiveSec=1s
+OnUnitActiveSec=3600s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

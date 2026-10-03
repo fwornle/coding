@@ -306,20 +306,21 @@ describe('host daemons follow DAEMONS', () => {
     assert.match(fnBody, /llm-cli-proxy/);
   });
 
-  test('every daemon has a template, except the ones known not to', async () => {
+  test('every daemon has a template for both service managers', async () => {
     const { DAEMONS } = await import(DAEMONS_MOD);
-    // auto-measure-foreground: nothing runs it on any machine yet, so there is
-    // no tested service definition to ship. The installer reports it as not
-    // installable rather than skipping it silently.
-    const KNOWN_MISSING = new Set(['auto-measure-foreground']);
     for (const id of Object.keys(DAEMONS)) {
-      const has = existsSync(join(REPO, 'launchd', `com.coding.${id}.plist`));
-      if (KNOWN_MISSING.has(id)) {
-        assert.equal(has, false, `${id} now has a template — drop it from KNOWN_MISSING`);
-      } else {
-        assert.ok(has, `${id} is in DAEMONS but launchd/com.coding.${id}.plist does not exist`);
-      }
+      assert.ok(existsSync(join(REPO, 'launchd', `com.coding.${id}.plist`)),
+        `${id} is in DAEMONS but launchd/com.coding.${id}.plist does not exist`);
+      assert.ok(existsSync(join(REPO, 'systemd', `${id}.service`)),
+        `${id} is in DAEMONS but systemd/${id}.service does not exist`);
     }
+  });
+
+  test('Linux and WSL install the same daemons through systemd', () => {
+    assert.match(fnBody, /linux\|wsl\)/);
+    assert.match(fnBody, /install-systemd-daemons\.sh/);
+    // exit 3 = no user manager: a warning with the fix, not one failure per daemon.
+    assert.match(fnBody, /rc -eq 3/);
   });
 
   test('no daemon restarts only on failure — they all exit 0 on SIGTERM', () => {
@@ -332,13 +333,19 @@ describe('host daemons follow DAEMONS', () => {
       const body = readFileSync(join(REPO, 'launchd', f), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
       assert.doesNotMatch(body, /<key>SuccessfulExit<\/key>/, `${f}: KeepAlive must be <true/>`);
     }
-    // The Linux unit for the proxy, same rule in systemd's spelling.
-    assert.match(install, /^Restart=always$/m);
-    assert.doesNotMatch(install, /^Restart=on-failure$/m);
+    // The Linux units, same rule in systemd's spelling: every long-running one
+    // restarts always; interval jobs are oneshots and restart nothing.
+    for (const f of readdirSync(join(REPO, 'systemd')).filter((n) => n.endsWith('.service'))) {
+      const body = readFileSync(join(REPO, 'systemd', f), 'utf8');
+      assert.doesNotMatch(body, /^Restart=on-failure$/m, f);
+      if (/^Type=simple$/m.test(body)) assert.match(body, /^Restart=always$/m, `${f}: Restart=always`);
+    }
   });
 
   test('uninstall.sh removes every templated daemon, not just the proxy', () => {
     assert.match(uninstall, /launchd\/com\.coding\.\*\.plist/);
     assert.match(uninstall, /launchctl bootout "gui\/\$\(id -u\)\/\$_label"/);
+    assert.match(uninstall, /systemd\/\*\.service/);
+    assert.match(uninstall, /systemctl --user disable --now "\$_u"/);
   });
 });

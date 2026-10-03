@@ -1,0 +1,22 @@
+# coding: observations API on :12436 (feature: observations)
+# Linux twin of launchd/com.coding.obs-api.plist, which carries the reasoning
+# behind each setting. tests/features/systemd-units.test.mjs keeps the two equal.
+#
+# Restart=always for the same reason the plist's KeepAlive is <true/>: the
+# daemon traps SIGTERM and exits 0, so on-failure would leave any stray stop
+# permanent. A deliberate stop is `systemctl --user stop`, which it respects.
+[Unit]
+Description=coding: observations API on :12436 (feature: observations)
+
+[Service]
+Type=simple
+WorkingDirectory=__CODING_REPO__
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/sh -c 'exec node "$$@"' node "__CODING_REPO__/scripts/observations-api-server.mjs"
+Restart=always
+RestartSec=30
+StandardOutput=append:__CODING_REPO__/.logs/obs-api.log
+StandardError=append:__CODING_REPO__/.logs/obs-api.log
+
+[Install]
+WantedBy=default.target

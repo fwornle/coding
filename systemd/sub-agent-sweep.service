@@ -1,0 +1,13 @@
+# coding: sub-agent transcript catch-up sweep (feature: lsl) — one run; scheduled by sub-agent-sweep.timer.
+# Linux twin of launchd/com.coding.sub-agent-sweep.plist. tests/features/systemd-units.test.mjs
+# keeps the two equal.
+[Unit]
+Description=coding: sub-agent transcript catch-up sweep (feature: lsl)
+
+[Service]
+Type=oneshot
+WorkingDirectory=__CODING_REPO__
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash "__CODING_REPO__/scripts/sub-agent-sweep-job.sh"
+StandardOutput=append:__CODING_REPO__/.data/live-sub-agent-sweep.log
+StandardError=append:__CODING_REPO__/.data/live-sub-agent-sweep.log

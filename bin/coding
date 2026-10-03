@@ -72,7 +72,7 @@ force_clean() {
   local killed_any=false
   for port in $CODING_PORTS; do
     local pids
-    pids=$(lsof -ti ":$port" 2>/dev/null || true)
+    pids=$(listening_pids "$port")
     if [ -n "$pids" ]; then
       echo "[Force] Killing process(es) on port $port: $pids"
       echo "$pids" | xargs kill -9 2>/dev/null || true
@@ -96,14 +96,14 @@ force_clean() {
   # 6. Verify ports are free
   local blocked_ports=""
   for port in $CODING_PORTS; do
-    if lsof -ti ":$port" &>/dev/null; then
+    if [ -n "$(listening_pids "$port")" ]; then
       blocked_ports="$blocked_ports $port"
     fi
   done
 
   if [ -n "$blocked_ports" ]; then
     echo "[Force] ⚠️  Ports still in use after cleanup:$blocked_ports"
-    echo "[Force] You may need to manually check: lsof -i :<port>"
+    echo "[Force] You may need to manually check: lsof -i :<port>   (Linux: ss -ltnp)"
   else
     echo "[Force] ✅ All coding ports are free"
   fi
@@ -161,6 +161,8 @@ while [ -L "$SOURCE" ]; do
   [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+# shellcheck source=scripts/lib/port-pids.sh
+source "$SCRIPT_DIR/../scripts/lib/port-pids.sh"
 
 # `coding sync …` — learning-repo sync (lib/history/sync.mjs). A subcommand
 # only as the FIRST word, so an agent argument that happens to be "sync"

@@ -1,0 +1,22 @@
+# coding: prompt-complexity judge (feature: llm-proxy)
+# Linux twin of launchd/com.coding.prompt-classifier.plist, which carries the reasoning
+# behind each setting. tests/features/systemd-units.test.mjs keeps the two equal.
+#
+# Restart=always for the same reason the plist's KeepAlive is <true/>: the
+# daemon traps SIGTERM and exits 0, so on-failure would leave any stray stop
+# permanent. A deliberate stop is `systemctl --user stop`, which it respects.
+[Unit]
+Description=coding: prompt-complexity judge (feature: llm-proxy)
+
+[Service]
+Type=simple
+WorkingDirectory=__CODING_REPO__
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/sh -c 'exec node "$$@"' node "__CODING_REPO__/scripts/prompt-classifier-service.mjs"
+Restart=always
+RestartSec=10
+StandardOutput=append:__CODING_REPO__/.logs/prompt-classifier.log
+StandardError=append:__CODING_REPO__/.logs/prompt-classifier.log
+
+[Install]
+WantedBy=default.target

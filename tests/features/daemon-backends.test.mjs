@@ -20,7 +20,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DAEMONS, platform, listRunning, start, stop, reconcile } from '../../lib/features/daemons.mjs';
+import { DAEMONS, platform, listRunning, start, stop, restart, restartHint, reconcile } from '../../lib/features/daemons.mjs';
 
 /** An executor that records calls and replays canned output. */
 function recorder(responses = {}) {
@@ -80,7 +80,7 @@ describe('linux — systemd --user', () => {
     const r = recorder();
     await listRunning(opts(r));
     assert.deepEqual(r.calls[0], [
-      'systemctl', '--user', 'list-units', '--type=service',
+      'systemctl', '--user', 'list-units', '--type=service,timer',
       '--state=active', '--no-legend', '--plain',
     ]);
     // --no-legend --plain matter: without them systemctl emits a header, a
@@ -126,6 +126,40 @@ describe('linux — systemd --user', () => {
       'systemctl --user enable obs-api.service',
       'systemctl --user start obs-api.service',
     ]);
+  });
+
+  test('an interval job is driven through its timer, not its oneshot service', async () => {
+    // Starting the service of a timer pair runs the job once and schedules
+    // nothing; stopping it stops nothing. The timer is what is on or off.
+    const r = recorder();
+    const withTimer = { ...opts(r), exists: () => true };
+    await start('lsl-lock-sweeper', withTimer);
+    await stop('lsl-lock-sweeper', withTimer);
+    assert.deepEqual(r.joined(), [
+      'systemctl --user enable lsl-lock-sweeper.timer',
+      'systemctl --user start lsl-lock-sweeper.timer',
+      'systemctl --user stop lsl-lock-sweeper.timer',
+      'systemctl --user disable lsl-lock-sweeper.timer',
+    ]);
+  });
+
+  test('listRunning counts an active timer as its daemon running', async () => {
+    // Between runs an interval job's service is inactive; only its timer is.
+    const r = recorder({
+      'list-units': [
+        'lsl-lock-sweeper.timer         loaded active waiting coding: stale git-lock sweeper',
+        'obs-api.service                loaded active running coding: observations API',
+        'apt-daily.timer                loaded active waiting Daily apt download activities',
+      ].join('\n'),
+    });
+    assert.deepEqual([...(await listRunning(opts(r)))].sort(), ['lsl-lock-sweeper', 'obs-api']);
+  });
+
+  test('restart is a try-restart: a stopped daemon stays stopped', async () => {
+    const r = recorder();
+    await restart('llm-cli-proxy', { ...opts(r), ...installed });
+    assert.deepEqual(r.joined(), ['systemctl --user try-restart llm-cli-proxy.service']);
+    assert.equal(restartHint('llm-cli-proxy', { platform: 'linux' }), 'systemctl --user restart llm-cli-proxy.service');
   });
 
   test('unit names carry the .service suffix but no com.coding prefix', async () => {
@@ -298,6 +332,8 @@ describe('reconcile', () => {
 // seam that satisfies that check, so the assertions are about the BACKEND
 // rather than about the guard.
 
-const installed = { exists: () => true };
+// Every unit file exists EXCEPT a .timer, so these assert the plain-service path;
+// the timer path has its own test, which says so explicitly.
+const installed = { exists: (p) => !String(p).endsWith('.timer') };
 const startForced = (name, opts) => start(name, { ...opts, ...installed });
 const stopForced = (name, opts) => stop(name, { ...opts, ...installed });

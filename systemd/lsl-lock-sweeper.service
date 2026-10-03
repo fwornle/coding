@@ -1,0 +1,13 @@
+# coding: stale git-lock sweeper for history checkouts (feature: lsl) — one run; scheduled by lsl-lock-sweeper.timer.
+# Linux twin of launchd/com.coding.lsl-lock-sweeper.plist. tests/features/systemd-units.test.mjs
+# keeps the two equal.
+[Unit]
+Description=coding: stale git-lock sweeper for history checkouts (feature: lsl)
+
+[Service]
+Type=oneshot
+WorkingDirectory=__CODING_REPO__
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash "__CODING_REPO__/scripts/lsl-lock-sweeper-job.sh"
+StandardOutput=append:__CODING_REPO__/.data/lsl-lock-sweeper.log
+StandardError=append:__CODING_REPO__/.data/lsl-lock-sweeper.log

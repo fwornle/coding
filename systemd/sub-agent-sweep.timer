@@ -1,0 +1,12 @@
+# coding: runs sub-agent-sweep.service every 1800s (launchd StartInterval).
+# No run at start (the plist's RunAtLoad is false): the first one is 1800s in.
+[Unit]
+Description=coding: sub-agent transcript catch-up sweep (feature: lsl) (every 1800s)
+
+[Timer]
+OnActiveSec=1800s
+OnUnitActiveSec=1800s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

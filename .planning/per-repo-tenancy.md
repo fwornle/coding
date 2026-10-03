@@ -149,13 +149,17 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 - [x] `working-memory.js`: reads the live km-core store (or obs-api `/api/v1/entities` over HTTP), not the retired `:8080` — the block had silently been empty.
 - Accept: `tests/integration/retrieval-service.team-filter.test.js` — fixtures in two teams on all four collections + keyword + graph, Qdrant stub IGNORING the filter: zero cross-team items, WM scoped, filter requested on every collection; `tests/integration/obs-api.teams-filter.test.js`; `tests/teams/scope.test.mjs` (6); viewer `team-of.test.ts`. Live + gsd-browser: see session log.
 
-### T2 — Linux + WSL  `status: todo`
+### T2 — Linux + WSL  `status: done`
 
-- [ ] systemd **user** units for every `DAEMONS` entry (templates next to `launchd/`, rendered with the same token scheme); `install_feature_daemons` installs them on linux/wsl; uninstall removes them. WSL without systemd: documented fallback (supervisor via `coding` launcher) — decide.
-- [ ] Template (or drop) `auto-measure-foreground`.
-- [ ] Replace `lsof` in the proxy step; Linux-safe launcher hints (no `launchctl` text).
-- [ ] Remove `install.bat`; `bin/coding.bat` → message pointing to WSL.
-- Accept: CI real install of each tier on ubuntu with services up (`health`, obs-api, proxy) and a status-line probe.
+- [x] systemd **user** units for every `DAEMONS` entry: `systemd/<id>.service` (+ `<id>.timer` for the four interval sweepers), tokens `__CODING_REPO__` + `__NODE_DIR__` (a user manager inherits no PATH; node is often under `$HOME`), rendered by `scripts/lib/systemd-unit.sh`, installed by `scripts/install-systemd-daemons.sh` (idempotent, one daemon-reload, enable + restart, poll `is-active`, linger hint). `install_feature_daemons` dispatches macOS→launchd / linux|wsl→systemd. The proxy unit is rendered from `systemd/llm-cli-proxy.service` too (was a heredoc) and gates on `/health` like the LaunchAgent path. `tests/features/systemd-units.test.mjs` keeps each unit field-equal to its plist (mutation-checked). `uninstall.sh` removes every templated unit (timer before service).
+- [x] `lib/features/daemons.mjs`: Linux backend drives the `.timer` of an interval job (start/stop/list); new `restart()` (try-restart / kickstart -k) + `restartHint()`; the coordinator's proxy restart goes through it instead of a hard-coded `launchctl kickstart`.
+- [x] **Decided — WSL without systemd:** no fallback supervisor. The installer installs no daemons, prints the `/etc/wsl.conf` fix and records a warning (exit 3 from the systemd installer). Same path for a Linux login with no user manager (`loginctl enable-linger`). Reason: a launcher-run supervisor is a third service manager; systemd is the default for WSL distros since late 2022.
+- [x] `auto-measure-foreground` **dropped** from `DAEMONS` (nothing ever ran it as a daemon; still runnable by hand).
+- [x] `lsof` out of the proxy step (`port_listening`, bash `/dev/tcp`) and out of the launcher/port checks (`scripts/lib/port-pids.sh`: lsof → ss → fuser); the launcher's "proxy unreachable" fix hint is per-platform.
+- [x] `install.bat` + `INSTALL_WINDOWS.md` removed; `bin/coding.bat` prints the WSL steps and exits 1. `docs/getting-started.md` Windows = WSL section; `docs/architecture/features.md` host-daemon section rewritten.
+- [x] CI `real-install` gets a lingering user manager and asserts the harness tier's coordinator + prompt judge are systemd units, active, 0 restarts, `:3034/health`.
+- [x] Two daemon bugs the developer machine hid, found by the clean room: `sub-agent-live-claude` exited 0 when the repo had no `~/.claude/projects/<repo>` yet (only an unref'd retry timer; now pins the loop like copilot), `sub-agent-live-opencode` exited 1 without opencode's db (a KeepAlive crash loop; now waits for it).
+- [x] Accept: `tests/cleanroom/services.sh` — systemd-as-PID-1 container, real `./install.sh --ci --yes` per tier (harness → learning → learning-perf → everything), each tier's daemons installed + active + 0 restarts, none of another tier's, coordinator/obs-api/proxy `/health`, status line renders; uninstall leaves no unit.
 
 ### T7 — Migrate the developer machine  `status: todo`
 
@@ -178,7 +182,7 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
 ## Open questions (decide inside the phase)
 
-- T2: WSL without systemd.
+- (none open)
 
 ## Session protocol
 
@@ -234,3 +238,15 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   dry-run backfill shows 2186 kg_entities + 861 insights never embedded — a real
   `node dist/embedding/backfill.js` would add them (with project payloads); not run
   (minutes of CPU, unrequested). Next: **T4b or T2**.
+- **2026-10-03 (T2)** — Linux + WSL. systemd user units for every daemon (`systemd/`,
+  timers for the sweepers), `install-systemd-daemons.sh`, timer-aware `daemons.mjs` +
+  `restart()`, uninstall, lsof-free port checks, `install.bat`/`INSTALL_WINDOWS.md`
+  removed, `auto-measure-foreground` dropped from DAEMONS. Decided: WSL without systemd =
+  no daemons + the wsl.conf fix + a warning (no fallback supervisor). Verified:
+  `tests/cleanroom/services.sh` (systemd PID 1, no lsof, proxy from a bundle) — real
+  install harness → learning → learning-perf → everything, 73/73 PASS: each tier's
+  daemons active + enabled + 0 restarts, none of another tier's, timers' first runs
+  succeed, :3034/:12436/:12435 `/health`, status line renders, uninstall leaves no unit.
+  It found and fixed the two sub-agent daemon exits above. NOT verified: the new CI
+  `real-install` systemd step (runs on GitHub only); a real WSL machine (T8). Next: **T4b
+  or T7**.

@@ -1,0 +1,13 @@
+# coding: digest reference sweeper (feature: observations) — one run; scheduled by digest-refs-sweeper.timer.
+# Linux twin of launchd/com.coding.digest-refs-sweeper.plist. tests/features/systemd-units.test.mjs
+# keeps the two equal.
+[Unit]
+Description=coding: digest reference sweeper (feature: observations)
+
+[Service]
+Type=oneshot
+WorkingDirectory=__CODING_REPO__
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash "__CODING_REPO__/scripts/digest-refs-sweeper-job.sh"
+StandardOutput=append:__CODING_REPO__/.data/digest-refs-sweeper.log
+StandardError=append:__CODING_REPO__/.data/digest-refs-sweeper.log

@@ -24,6 +24,9 @@
 
 set -e
 
+# shellcheck source=scripts/lib/port-pids.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/port-pids.sh"
+
 # ============================================
 # Shared Functions
 # ============================================
@@ -320,7 +323,7 @@ _resolve_port_conflicts() {
   for port in $host_ports; do
     # Find PID listening on this port (exclude docker-proxy which is expected)
     local pid
-    pid=$(lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null | head -1 || true)
+    pid=$(listening_pids "$port" | head -1)
 
     if [ -z "$pid" ]; then
       continue
@@ -551,7 +554,7 @@ configure_proxy_routing() {
   local port="${LLM_PROXY_PORT:-12435}"
   local base="http://127.0.0.1:${port}"
 
-  # Retry briefly: the daemon is launchd-managed and may be mid-(re)start.
+  # Retry briefly: the daemon is launchd/systemd-managed and may be mid-(re)start.
   local _px_ok=""
   local _px_try
   for _px_try in 1 2 3 4 5; do
@@ -563,7 +566,11 @@ configure_proxy_routing() {
   done
   if [ -z "$_px_ok" ]; then
     _agent_log "🚫 LLM proxy unreachable at ${base} — ABORTING ${AGENT_NAME:-$AGENT} launch (fail-closed: no unmeasured direct fallback)."
-    _agent_log "    Fix:      launchctl kickstart -k gui/\$(id -u)/com.coding.llm-cli-proxy   then relaunch."
+    case "$(uname -s)" in
+      Darwin) _agent_log "    Fix:      launchctl kickstart -k gui/\$(id -u)/com.coding.llm-cli-proxy   then relaunch." ;;
+      Linux)  _agent_log "    Fix:      systemctl --user restart llm-cli-proxy   (no unit: bash ${CODING_REPO:-<coding>}/scripts/llm-proxy-service.sh &)   then relaunch." ;;
+      *)      _agent_log "    Fix:      bash ${CODING_REPO:-<coding>}/scripts/llm-proxy-service.sh &   then relaunch." ;;
+    esac
     _agent_log "    Override: CODING_PROXY_ROUTE=0 launches direct (unmeasured) — explicit opt-out only."
     exit 1
   fi

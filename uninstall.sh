@@ -101,11 +101,11 @@ if [[ -f "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist" ]]; then
     rm -f "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
     echo "    Removed LaunchAgent"
 fi
-if [[ -f "$HOME/.config/systemd/user/llm-cli-proxy.service" ]]; then
+if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/llm-cli-proxy.service" ]]; then
     echo "  Removing the LLM proxy systemd service..."
     systemctl --user stop llm-cli-proxy.service 2>/dev/null || true
     systemctl --user disable llm-cli-proxy.service 2>/dev/null || true
-    rm -f "$HOME/.config/systemd/user/llm-cli-proxy.service"
+    rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/llm-cli-proxy.service"
     systemctl --user daemon-reload 2>/dev/null || true
     echo "    Removed systemd service"
 fi
@@ -122,6 +122,28 @@ for _tpl in "$CODING_REPO"/launchd/com.coding.*.plist; do
     launchctl bootout "gui/$(id -u)/$_label" 2>/dev/null || true
     rm -f "$_plist"
 done
+
+# Their Linux twins: exactly the units with a template in systemd/, the timer before
+# its service (stopping only the service of an interval job leaves the timer to start
+# it again). The proxy's unit is handled above.
+_unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+_units_removed=false
+for _tpl in "$CODING_REPO"/systemd/*.service; do
+    [[ -f "$_tpl" ]] || continue
+    _id="$(basename "$_tpl" .service)"
+    [[ "$_id" == "llm-cli-proxy" ]] && continue
+    [[ -f "$_unit_dir/$_id.service" || -f "$_unit_dir/$_id.timer" ]] || continue
+    echo "  Removing systemd user unit $_id..."
+    for _u in "$_id.timer" "$_id.service"; do
+        [[ -f "$_unit_dir/$_u" ]] || continue
+        systemctl --user disable --now "$_u" 2>/dev/null || true
+        rm -f "$_unit_dir/$_u"
+    done
+    _units_removed=true
+done
+if [[ "$_units_removed" == true ]]; then
+    systemctl --user daemon-reload 2>/dev/null || true
+fi
 
 _proxy_dir="${RAPID_LLM_PROXY_DIR:-$(cd "$CODING_REPO/.." && pwd)/_work/rapid-llm-proxy}"
 if [[ -d "$_proxy_dir" ]]; then

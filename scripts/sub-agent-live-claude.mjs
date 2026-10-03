@@ -373,9 +373,14 @@ async function main(argv) {
   });
 
   // The daemon stays alive via process.on(SIGTERM/SIGINT). The heartbeat
-  // timer is unref'd, so the only thing keeping the process alive is the
-  // fs.watch handle inside the watcher (which has its own backing event
-  // listener).
+  // timer is unref'd, so the fs.watch handle inside the watcher used to be
+  // the only thing keeping the process alive — and on a machine where this
+  // repo has no Claude transcripts yet there is no watch, only the unref'd
+  // ENOENT retry, so the daemon exited 0 seconds after starting and the
+  // service manager restarted it every ThrottleInterval, forever (found by the
+  // Linux clean room, tests/cleanroom/services.sh). Pin the loop the way the
+  // copilot daemon does.
+  setInterval(() => {}, 1 << 30);
   //
   // Return null to signal "stay running" to the entry-point harness; the
   // process exits via doShutdown's process.exit() call.
