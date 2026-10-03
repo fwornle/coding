@@ -3876,29 +3876,22 @@ history_default_url() {
 }
 
 # What is at the far end of that URL? Echoes exactly one of:
-#   unknown    — no gh, or gh not authenticated to that host: cannot tell
-#   absent     — gh can see the host; no such repo
+#   unknown    — cannot tell (no gh for that host, and git ls-remote failed)
+#   absent     — no such repo (gh can see the host, or a local path is missing)
 #   empty      — repo exists with no commits (freshly created: needs seeding)
 #   populated  — repo exists with content (needs cloning)
 #   public     — repo exists but is PUBLIC, which disqualifies it outright
 history_repo_state() {
-    local url="$1" host slug view
-    host="$(git_url_host "$url")"
-    slug="$(git_url_slug "$url")"
-
-    if [[ -z "$host" || -z "$slug" ]] \
-        || ! command -v gh >/dev/null 2>&1 \
-        || ! gh auth status --hostname "$host" >/dev/null 2>&1; then
-        echo "unknown"; return 0
-    fi
-    if ! view="$(GH_HOST="$host" gh repo view "$slug" --json isEmpty,isPrivate 2>/dev/null)"; then
-        echo "absent"; return 0
-    fi
-    case "$view" in
-        *'"isPrivate":false'*) echo "public"    ; return 0 ;;
-        *'"isEmpty":true'*)    echo "empty"     ; return 0 ;;
+    # One implementation for every learning repo: lib/history/repo-link.mjs
+    # (gh when it is authenticated to the host; otherwise an anonymous
+    # github.com check for public-ness and `git ls-remote` for the rest).
+    # Runs before npm install — the module needs only node and vendored code.
+    local state
+    state="$(node "$CODING_REPO/lib/history/repo-link.mjs" state "$1" 2>/dev/null)" || state=""
+    case "$state" in
+        public|absent|empty|populated|unknown) echo "$state" ;;
+        *) echo "unknown" ;;
     esac
-    echo "populated"
     return 0
 }
 

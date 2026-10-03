@@ -172,8 +172,8 @@ describe('the history repo belongs to the person installing, not the tools autho
     const common = readFileSync(join(REPO, 'scripts', 'agent-common-setup.sh'), 'utf8');
     const fn = common.slice(common.indexOf('ensure_private_history_repo() {'));
     const skip = fn.indexOf('"$(cd "$CODING_REPO" 2>/dev/null && pwd -P)"');
-    const derive = fn.indexOf('# 4. Derive default remote URL');
-    assert.ok(skip > -1 && skip < derive, 'the tools-repo check must come before any URL is derived');
+    const delegate = fn.indexOf('lib/history/repo-link.mjs" ensure');
+    assert.ok(skip > -1 && skip < delegate, 'the tools-repo check must come before the learning-repo flow runs');
   });
 
   test('the symlink is ignored by the tools repo', () => {

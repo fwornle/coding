@@ -111,7 +111,7 @@ Symptom of the stale-cache bug: the dashboard backend exits with `SyntaxError: I
 
 ## Session Logging
 
-- **Location**: `.specstory/history/`
+- **Location**: `.specstory/history/` — in a project (not the tools repo) a symlink into the per-repo learning repo `<repo>/.coding/` (`history/` + `kb/`, a private `<repo>-history` clone or untracked on skip; outer repo ignores it via `.git/info/exclude`). One implementation: `lib/history/repo-link.mjs`; per-user choices in `~/.coding/repos.yaml`.
 - **Format**: `YYYY-MM-DD_HHMM-HHMM-<hash>.md`
 - Use `/sl` command to read session history for continuity
 
