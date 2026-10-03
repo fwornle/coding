@@ -161,22 +161,23 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 - [x] Two daemon bugs the developer machine hid, found by the clean room: `sub-agent-live-claude` exited 0 when the repo had no `~/.claude/projects/<repo>` yet (only an unref'd retry timer; now pins the loop like copilot), `sub-agent-live-opencode` exited 1 without opencode's db (a KeepAlive crash loop; now waits for it).
 - [x] Accept: `tests/cleanroom/services.sh` — systemd-as-PID-1 container, real `./install.sh --ci --yes` per tier (harness → learning → learning-perf → everything), each tier's daemons installed + active + 0 restarts, none of another tier's, coordinator/obs-api/proxy `/health`, status line renders; uninstall leaves no unit.
 
-### T7 — Migrate the developer machine  `status: todo`
+### T7 — Migrate the developer machine  `status: done`
 
-- [ ] `coding` itself becomes a normal linked repo: `coding-history` moves to `<coding>/.coding/` (history/ + kb/); `.specstory/history` symlink.
-- [ ] Move the ~119 MB tracked KB under `.data/` and the 2,353 `knowledge-management/insights/` files out (D5): `git rm --cached`, `.gitignore`, keep the legitimately shipped ~500 KB (ontologies, knowledge-config, graphify metadata, smoke json, kb-ab specs). Update the UKB commit sweep (`feedback_commit_ukb_run_artifacts`) and the OKB pre-commit guard + its test. History not rewritten.
-- [ ] Remove developer paths from tracked files (`.activate`, `.claude/settings.local.json`, `migrate-history-to-private.sh`).
-- [ ] D4: `.gitmodules` → HTTPS; `git submodule sync`.
-- [ ] Services stopped during the move (LevelDB LOCK held by obs-api + container; km-core `close()` persists). Reversible.
-- Accept: UKB production run writes only under data home / `.coding/`; `git status` clean in the tools repo after a UKB run; `/sl` reads history through the symlink.
+- [x] `coding` itself is a normal linked repo: `coding-history` is `<coding>/.coding/` (history/ + kb/), `.specstory/history → ../.coding/history`, registry entry in `~/.coding/repos.yaml`. repo-link has no tools-repo exception; `runtime/` + `claude-plugin/` (the per-launch runtime sharing `.coding/`) are META + ignored, and ignored BEFORE the restructure's `add -A` (fixes `session-state.json` being committed for any repo). `bin/init-history.sh` = thin caller (`ensure --no-ask [--remote $CODING_HISTORY_REPO]`) + the insights link; NOT run on `bin/coding --dry-run` (it moves data; profile-matrix dry-runs the real checkout — that is how the first, unplanned migration happened). install.sh `history_home` = `<coding>/.coding`, `setup_history_repo` delegates to init-history; `history_repo_seed`/`CODING_HISTORY_PUSH`/`clone --nest` removed. kb layout + project usage: no tools-repo skip; coding's export moved to `.coding/kb/knowledge-graph/coding.json`.
+- [x] D5: the `.data/` KB had already left (744 KB shipped files remain). The 2,353 `knowledge-management/insights/` files: `git rm --cached`, `/knowledge-management/insights` ignored, the dir is a symlink → `../.coding/kb/insights` (moved, all 2,353 byte-identical to the committed blobs). semantic-analysis 18929f3: PlantUML sources → `<insights>/puml` (were `<repo>/.data/knowledge-graph/insights/puml`). OKB guard blocks the path (deletions allowed) + test; image no longer bakes insights; compose mounts `.coding/history` + `.coding/kb`. Memory `feedback_commit_ukb_run_artifacts` updated.
+- [x] Developer paths: `.activate`, `.claude/settings.local.json` untracked (install.sh generates both; already ignored); `migrate-history-to-private.sh` → `repo-link default-remote`.
+- [x] D4: `.gitmodules` HTTPS (all 5 verified anonymously reachable); `git submodule sync`; dev keeps SSH pushes via per-submodule `remote.origin.pushurl`.
+- [x] Services stopped during the move (coordinator, obs-api, ETMs, two sweepers); container recreated with the new mounts. Backup of the old `coding.json`: `<data home>/var/backups/t7-*`.
+- Accept: production UKB (`wave-analysis --team coding`, 18:09–18:54) — tools repo `git status` unchanged, 193 docs into `.coding/kb/insights`; its 95 .puml went to `.data/` → fixed (above) and moved. `/sl` discovery + reads through the symlink. Clean room 19/0 incl. new T7 assertions.
 
-### T8 — Whole-system test campaign  `status: todo`
+### T8 — Whole-system test campaign  `status: in progress`
 
-- [ ] Clean-room **real install per tier** (Linux container, extend P4 harness `tests/...clean-room`), asserting the sentinel developer tree untouched and the tier's services/tabs/badges present and others absent.
-- [ ] Real macOS install in a fresh macOS user account; WSL install on a Windows machine.
-- [ ] Two-user sharing scenario (T4 acceptance, end to end with agents).
-- [ ] Functional, per tier: UKB batch (`semantic workflow run wave-analysis` production + `--debug` with zero real calls), online learning (observation → digest → insight), unified viewer with team filters, insight injection with team filters, health dashboard + status line, token accounting, performance tabs, constraints.
-- [ ] UI checks via `gsd-browser` (measure the live DOM).
+- [x] Clean-room **real install per tier** — `tests/cleanroom/services.sh` (T2 harness extended): per tier, as `--scope=team-a`, beside a planted sentinel `coding` tenant: daemons active/absent, `/health`s, status-line badges present for health and ABSENT for every off feature, coordinator `/features` = a literal tier oracle, and (harness, the only Docker-free tier) the host dashboard's own origin serving `/api/features` = the tier (what the nav drops tabs from). Sentinel byte-identical after all four tiers; uninstall leaves no unit. Run: 89/90 → the harness dashboard failure, three causes fixed (2c8357a1) → harness re-run 26/26. Tabs in a real DOM are checked on the live machine (gsd-browser, below) — no browser in the clean room.
+- [ ] Real macOS install in a fresh macOS user account; WSL install on a Windows machine. **Needs the user** (a new macOS account is a machine-wide change; no Windows machine here).
+- [ ] Two-user sharing scenario end to end with agents. Mechanics covered by `tests/history/sync.test.mjs` (T4). End-to-end needs a 2nd account, or a simulated user B (own HOME/data home/obs-api port, clone from a local bare mirror, keyword+graph retrieval only — the machine's one Qdrant would leak A's vectors). **Decision pending.**
+- [x] Functional (live, profile `full` = everything + redirect): UKB production (T7 run, 18:09–18:54, git status clean) + `--debug` (single-step off via `/api/ukb/single-step-mode`, 3 waves/17s, zero UKB rows in token_usage, nothing persisted); online learning observation 17:50 → digest 17:50 → insight 17:51; viewer team filter (rail Coding 2483 = server `?teams=coding` 2483, deselect → canvas 127→77, restored); injection (coding cwd → only coding, explicit a2a-xpr → only a2a-xpr, /tmp unfiltered); health page Healthy / 0 Disabled chips; status line all badges; token accounting — FOUND UKB + consolidator rows carried no project (fixed: semantic-analysis eebe90f AsyncLocalStorage run context + obs-api wrap; consolidator digest/insight pass it; a real call through the client recorded `coding`); Performance + Token Usage pages render data; constraints (violation caught, clean 30/30, status operational).
+- [x] UI via gsd-browser: nav = 8 feature tabs + Teams + Features; `performance` off → Performance tab gone from the DOM, restored. (Note: `coding-features set` APPLIES — it stopped two daemons; re-applied.)
+- Open question for the user: a repo in NO team with nothing selected gets UNFILTERED injection (T6 decision) — e.g. `_work/a2a-xpr` receives coding's Working Memory and a rapid-automations insight. Alternative: default to the cwd repo's own project.
 
 ---
 
@@ -263,3 +264,20 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   file per project from the live DB (probe rows then cleared). NOT done: proxy branch
   not pushed/PR'd (it sits on the local-only `feat/installable`); the first live hourly
   export with real project rows needs sessions launched after this change.
+- **2026-10-03 (T7)** — coding 2cb5a272 + a382c42e, merge 0effacf7 (pushed); semantic-analysis
+  18929f3 (pushed). Incident: the test suite's profile-matrix (`bin/coding --dry-run`, sandboxed
+  CODING_HOME) ran the new init-history against the REAL checkout and migrated it mid-suite — correct
+  result, registry written to the sandbox, ETM + proxy export recreated a plain `.specstory/history`
+  afterwards; reconciled by hand (3 colliding classification logs parked in the T7 backup dir), guarded
+  + tested. Verified: `npm test` green (node:test 1994/0, jest 1263) + touched suites 358/0 after the
+  last change; live: obs-api serves 1395 insight docs + images, 2410 coding entities hydrated from
+  `.coding/kb`, coding ETM writes this session into `.coding/history`, container sees both links
+  (writable). NOT done: coding-history is 6 commits ahead, NOT pushed (D3: `coding sync --push`);
+  495 older .puml in `<data home>/kb/knowledge-graph/insights/puml` left in place (versioned nowhere);
+  docker image not rebuilt (bind mounts make it moot until the next build). Next: **T8**.
+- **2026-10-03 (T8, part 1)** — 2c8357a1 + semantic-analysis eebe90f. Found + fixed: host-mode
+  dashboard broken on a fresh harness install (vite [::1] vs health check 127.0.0.1; no /api proxy in
+  vite; api-server → host.docker.internal), stale Health Verifier service (dead since May), UKB +
+  consolidator tokens without project. Verified: clean room 89/90 → harness 26/26 after the fixes;
+  `npm test` green (node:test 1996/0, jest 1263); live functional + gsd-browser checks above. Open:
+  item 2 (needs the user), item 3 (approach to decide), the no-team injection default (question).
