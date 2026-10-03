@@ -4279,6 +4279,32 @@ async function tick() {
   }
 }
 
+/**
+ * D3's periodic LOCAL commit of every learning checkout (lib/history/sync.mjs):
+ * obs-api keeps rewriting each repo's kb/ export whether or not a session is
+ * open, so a session-end commit alone would leave most of it uncommitted.
+ * Also refreshes <data home>/var/sync-state.json, which the status line reads
+ * for its "unpushed" hint. Never pushes. A child process: a slow `git add`
+ * must not stall the tick loop.
+ */
+const LEARNING_COMMIT_MS = parseInt(process.env.CODING_LEARNING_COMMIT_MS || String(30 * 60_000), 10);
+let learningCommitTimer = null;
+function learningCommit() {
+  execFileAsync('node', [path.join(REPO_ROOT, 'lib', 'history', 'sync.mjs'), 'commit', '--json'], { timeout: 120_000 })
+    .then(({ stdout }) => {
+      const doc = JSON.parse(stdout || '{}');
+      const committed = (doc.repos || []).filter((r) => r.committed).map((r) => r.project);
+      if (committed.length) log(`learning repos: committed locally in ${committed.join(', ')}; ${doc.ahead} checkout(s) await \`coding sync --push\``);
+    })
+    .catch((err) => log(`learning repos: periodic commit failed: ${err.message}`, 'WARN'));
+}
+function startLearningCommitLoop() {
+  if (!(LEARNING_COMMIT_MS > 0)) return;
+  learningCommitTimer = setInterval(learningCommit, LEARNING_COMMIT_MS);
+  learningCommitTimer.unref?.();
+  setTimeout(learningCommit, 60_000).unref?.();
+}
+
 let tickTimer = null;
 /**
  * Network changes as events (lib/network/network-change-watcher.mjs): the next
@@ -5008,6 +5034,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   process.stderr.write(`[HealthCoordinator] listening on http://0.0.0.0:${PORT}\n`);
   startTickLoop();
   startNetworkWatch();
+  startLearningCommitLoop();
 });
 
 // RESEARCH §1 + §9 pitfall: EADDRINUSE on launchd respawn. Exit non-zero with

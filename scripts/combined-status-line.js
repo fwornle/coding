@@ -9,6 +9,7 @@
 import fs, { readFileSync, writeFileSync, existsSync } from 'fs';
 import path, { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import { execSync } from 'child_process';
 import { getTimeWindow, getShortTimeWindow } from './timezone-utils.js';
 import { lslListAll } from './lsl-paths.js';
@@ -874,6 +875,16 @@ class CombinedStatusLine {
    * genuine alarm. Only a session we can positively show is newborn earns the
    * quieter 'starting' state.
    */
+  static _learningReposAhead() {
+    try {
+      const dataHome = createRequire(import.meta.url)('../lib/paths/data-home.cjs');
+      const doc = JSON.parse(readFileSync(join(dataHome.varDir(), 'sync-state.json'), 'utf8'));
+      return Number(doc.ahead) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
   static _sessionAgeMs() {
     const name = process.env.TMUX_SESSION_NAME;
     if (!name || /[/\\]|\.\./.test(name)) return Infinity;
@@ -2644,6 +2655,17 @@ class CombinedStatusLine {
     if (f['llm-proxy']) {
       const ex = await this.getExecutionStatus();
       if (ex && ex.local > 0) parts.push(`[L:${ex.local}]`);
+    }
+
+    // Learning repos with local commits nobody has pushed yet (T4, D3: the
+    // push is always the user's call — `coding sync --push`). n = number of
+    // checkouts ahead of their remote, read from the sync cache the
+    // coordinator refreshes every 30 min; never runs git here. Hidden at zero
+    // like [D:]/[L:], and never colours the line: unpushed is a reminder, not
+    // a fault.
+    if (f.lsl) {
+      const ahead = CombinedStatusLine._learningReposAhead();
+      if (ahead > 0) parts.push(`[P:${ahead}]`);
     }
 
     // Phase 34 (D-12): proxy semantic readiness drives [🧠] badge.

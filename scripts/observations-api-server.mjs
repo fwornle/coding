@@ -50,6 +50,7 @@ import { _computeRetentionBoundary, _mergeObservations, _mergeDigests } from './
 // config/teams/ read at runtime — the predefined team/project registry the
 // unified viewer's Teams / Views rail groups by. Served at GET /api/teams.
 import { loadRegistry } from '../lib/teams/registry.mjs';
+import { kbLayout } from '../lib/kb/layout.mjs';
 
 // Phase 44 plan 07 — km-core canonical /api/v1 surface (root-barrel imports).
 // The legacy versioned-prefix-removed orphan-draft mount + the orphan-draft
@@ -316,6 +317,8 @@ function ensureExporter() {
     // Explicit: the exporter's own default joins projectRoot with a relative
     // DEFAULT_EXPORT_DIR, which would put the cold store back in the repo.
     exportDir: observationExportDir(),
+    // T4: plus a per-project slice in each learning checkout.
+    projectKbDirs: () => KG_LAYOUT.describe(),
   });
   return _exporter;
 }
@@ -1219,6 +1222,37 @@ app.post('/api/observations/resolve-lsl', async (req, res) => {
  * over HTTP. Debounced (30s) like every other trigger, so it is cheap to call
  * once at the end of a batch. Returns 202: the export is scheduled, not done.
  */
+/**
+ * POST /api/kb/reload — merge every project's knowledge export into the live
+ * graph (newest wins, tombstones delete; km-core store/merge.ts).
+ *
+ * Called after `coding sync` pulled learning repos, so what a teammate pushed
+ * is live without restarting obs-api. Re-reads which repos exist first (a
+ * clone or a new link adds files). Returns the merge stats.
+ */
+app.post('/api/kb/reload', async (_req, res) => {
+  try {
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+    KG_LAYOUT.refresh();
+    const stats = await store.reloadSources();
+    if (stats.added || stats.removed || stats.replaced) {
+      scheduleExport();
+      _stalenessCache.invalidate();
+    }
+    process.stderr.write(`[obs-api] kb reload: +${stats.added} -${stats.removed} ~${stats.replaced} (${stats.nodes} nodes)\n`);
+    res.json(stats);
+  } catch (err) {
+    process.stderr.write(`[obs-api] /kb/reload error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'reload failed' });
+  }
+});
+
+/** GET /api/kb/layout — which project's knowledge is written where. */
+app.get('/api/kb/layout', (_req, res) => {
+  res.json({ mode: KG_LAYOUT.mode, projects: KG_LAYOUT.describe() });
+});
+
 app.post('/api/observations/export', async (_req, res) => {
   try {
     const store = await ensureKMStore();
@@ -2617,6 +2651,11 @@ app.get('/api/consolidation/status', async (_req, res) => {
 ensureDataHome();
 const KG_DB_PATH = graphDbDir();
 const KG_EXPORT_DIR = graphExportsDir();
+// T4: one JSON file per project, in the project's own learning checkout when
+// it has one (lib/kb/layout.mjs). obs-api is the 'owner': the only process
+// that writes into repos. Hydrate merges every repo's file, so a teammate's
+// export that arrived by `git pull` is part of the graph.
+const KG_LAYOUT = kbLayout({ mode: 'owner', codingRoot: REPO_ROOT });
 
 // Gap A (2026-06-19): the bundled defaultOntologyDir() carries ONLY the
 // LearningArtifact axis (LearningArtifact + Observation/Digest/Insight), so the
@@ -2659,9 +2698,15 @@ async function ensureKMStore() {
         dbPath: KG_DB_PATH,
         exportDir: KG_EXPORT_DIR,
         ontologyDir: KG_ONTOLOGY_DIR,
+        layout: KG_LAYOUT,
       });
       await _kmStore.open();
       _kmStoreReady = true;
+      // Write the per-project files now rather than at the first mutation, so
+      // a repo's file reflects the merged graph from the moment obs-api is up
+      // (unchanged files are not rewritten).
+      _kmStore.exportJson().catch((err) =>
+        process.stderr.write(`[obs-api] initial per-project export failed: ${err.message}\n`));
       process.stderr.write(`[obs-api] km-core GraphKMStore ready\n`);
       return _kmStore;
     } catch (err) {

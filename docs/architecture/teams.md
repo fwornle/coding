@@ -65,7 +65,8 @@ old sibling scan.
 
 A `repos:` entry that is only a history remote — a teammate's `X-history` for a
 project not checked out here — is cloned under `<data home>/var/shared/<X>/`
-(`lib/teams/shared.mjs`). Clone-only; refreshing and pushing are T4's sync.
+(`lib/teams/shared.mjs`). Clone-only here; `coding sync pull` refreshes them (read-only — see
+[knowledge-sharing.md](knowledge-sharing.md)).
 
 ## API and dashboard
 

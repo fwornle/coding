@@ -188,6 +188,22 @@ ensure_private_history_repo() {
 }
 export -f ensure_private_history_repo
 
+# Pull the project's learning checkout (and the shared clones of teammates'
+# repos) at session start — D3's "automatic pull". In the background: a slow or
+# absent network must not hold up the agent, and nothing the session writes
+# conflicts with it (transcripts are per session; kb JSON merges by entity id
+# through lib/kb/merge-driver.mjs). Changes are merged into the live graph by
+# obs-api's /api/kb/reload, which the sync CLI calls when the pull moved HEAD.
+pull_learning_repo() {
+  local project_dir="$1"
+  local coding_repo="${CODING_REPO:-$(cd "$_AGENT_COMMON_DIR/.." && pwd)}"
+  mkdir -p "$coding_repo/.logs" 2>/dev/null
+  ( node "$coding_repo/lib/history/sync.mjs" pull --repo "$project_dir" \
+      >> "$coding_repo/.logs/learning-sync.log" 2>&1 & ) 2>/dev/null
+  return 0
+}
+export -f pull_learning_repo
+
 # ==============================================================================
 # SESSION REMINDER
 # ==============================================================================
@@ -601,6 +617,7 @@ agent_common_init() {
   # Bootstrap a private <project>-history repo at .specstory/history/ on first launch
   # (skips silently if already configured or user previously declined)
   ensure_private_history_repo "$target_project_dir"
+  pull_learning_repo "$target_project_dir"
 
   # Start robust transcript monitoring for target project
   if [ -d "$target_project_dir/.specstory" ] || mkdir -p "$target_project_dir/.specstory/history" 2>/dev/null; then
