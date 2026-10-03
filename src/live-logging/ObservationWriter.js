@@ -1024,6 +1024,9 @@ export class ObservationWriter {
       const requestBody = {
         process: 'observation-writer',
         ...(attributableTaskId ? { task_id: attributableTaskId } : {}),
+        // The repo this observation is about, so its summarising tokens count
+        // toward that project's usage (token_usage.project).
+        ...(metadata.project ? { project: metadata.project } : {}),
         ...(this.provider ? { provider: this.provider } : {}),
         messages: [
           {

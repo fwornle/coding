@@ -131,13 +131,13 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 - [x] Coordinator `GET/PUT /teams`, `POST /teams/discover`, `POST /teams/sync`; dashboard proxy `/api/teams-config`; **Teams** tab (repo×team matrix, active chips, add/delete own teams, shared-repo clone).
 - Accept: `tests/teams/config.test.mjs` + `discover.test.mjs` (layering, env, mapping, writer, fixture-tree scan, cache, container translation, fallback, shared clone from a bare remote); Teams tab verified with gsd-browser (render, active toggle + assignment written to `~/.coding/teams.yaml`, reverted).
 
-### T4 — Persisting and sharing knowledge  `status: done` (token usage by project → T4b)
+### T4 — Persisting and sharing knowledge  `status: done` (incl. T4b)
 
 - [x] Exports split by **project**: km-core gets an `ExportLayout` seam (`src/store/layout.ts`; default = the old per-domain dir). coding's `lib/kb/layout.mjs`: bucket = `metadata.project` → legacy `metadata.team` → `general`; file = `<repo>/.coding/kb/knowledge-graph/<project>.json` when the repo has a `.coding/` the outer repo IGNORES (linked or skipped — a never-relaunched repo would otherwise get untracked files), else `<data home>/kb/knowledge-graph/exports/projects/<project>.json`. Shared clones are read, never written. Modes: `owner` (obs-api, the only writer into repos) / `local` (container stores: read everything, write `exports/general.json` — `/workspace` is read-only). ObservationExporter also writes a per-project slice to `<repo>/.coding/kb/observation-export/`; the combined cold-store files stay.
 - [x] Hydrate = **union merge** (`src/store/merge.ts`) of LevelDB + every layout source: entities by id, newest `updatedAt` wins (ties → LevelDB/live); relations by `(from,type,to)` (graphology edge keys collide across machines); **tombstones** in `attributes.kmTombstones` (90 days); relations to entities absent on this machine kept aside and written back to their file. Count-based rule removed. Canonical (sorted) files, unchanged files not rewritten. `GraphKMStore.reloadSources()` merges into the live graph; a file changed under the store (git pull) is detected and merged, never overwritten.
 - [x] Sync (D3): `lib/history/sync.mjs`, `coding sync [status|pull|commit|--push] [--repo]`. Pull at launch (`pull_learning_repo`, background, then obs-api `POST /api/kb/reload`), local commit at session end (exit trap) and every 30 min (coordinator), push only via `coding sync --push` (asks; `--yes`). Merge driver `lib/kb/merge-driver.mjs` registered per checkout (`.gitattributes` + local config). Shared clones pull-only. `[P:n]` status-line hint from `<data home>/var/sync-state.json`.
 - [x] `'coding'` defaults removed (`ObservationExporter` ×3 → `project || team || null`, `ObservationWriter` Redis publish → `metadata.project`); `export-graph-to-json.js`, `memory-fallback.js`, copilot adapter → `knowledgeExportDir()`.
-- [ ] **T4b** — measurements + token usage tagged by project; per-repo export of summaries. Needs a `project` column in rapid-llm-proxy's `token_usage` (PR there) and every capture path (proxy tap, file adapters, sub-agent capture) to send it. Not started.
+- [x] **T4b** — token usage + measurements by project. rapid-llm-proxy `token_usage.project` (branch `feat/token-project`, off `feat/installable`): `x-project` header (`/v1/messages`, OpenAI shim), `/p/<id>` path segment (copilot, which cannot send headers), `body.project` (`/api/complete`); `sanitizeProject` = one path-safe id or ''. Launcher `_resolve_project_id` (repo-router `teamForPath` of the target dir, '' outside a repo; `CODING_PROJECT_ID` wins) → claude `ANTHROPIC_CUSTOM_HEADERS`, opencode provider headers, pi models.json `$CODING_PROJECT_ID`, copilot URL. Experiment cells: `buildAgentRoutingEnv` same seams, project = the REAL repo (not the temp worktree). Adapters: `token-db` probes the column; builders read the session's own cwd (claude line `cwd`, copilot `session.start` `gitRoot`, opencode `path.root`) via `lib/lsl/token/project-of.mjs`. ObservationWriter sends `metadata.project`. Runs: `aggregateByTaskId().project` = dominant by tokens → `Run.metadata.project` (measurement-stop, auto-measure). Per-repo export `lib/usage/project-usage.mjs`: obs-api hourly → `<repo>/.coding/kb/usage/<user_hash>.json` (linked/local repos; else `<data home>/kb/usage/<project>/`; shared clones never), this machine's rows only, daily + per-task, unchanged not rewritten. Historic rows stay '' (not backfilled).
 - Accept: `tests/history/sync.test.mjs` — users A/B with separate homes + data homes, one local bare remote, real km-core stores, real sync + merge driver: A's insight reaches B after B's pull; concurrent edits (B deletes + adds, A edits + adds the same file) merge through the driver and both converge. km-core `tests/unit/merge.test.ts` (9). `tests/kb/layout.test.mjs` (4).
 
 ### T6 — Team filter everywhere  `status: done`
@@ -250,3 +250,16 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   It found and fixed the two sub-agent daemon exits above. NOT verified: the new CI
   `real-install` systemd step (runs on GitHub only); a real WSL machine (T8). Next: **T4b
   or T7**.
+- **2026-10-03 (T4b)** — token usage + measurements by project (details in T4). Decided:
+  the proxy stores a project ID, never a path; one usage file per USER per repo
+  (`kb/usage/<user_hash>.json`) so teammates never conflict; Runs derive the project
+  from their own token rows (no span plumbing); historic rows not backfilled.
+  Verified: proxy integration 83/0 + new `token-usage-project.test.mjs`; coding
+  `tests/token-adapters/project-tagging.test.js` 14/14; live after a proxy restart —
+  the column + partial index migrated in the real DB, one real call per wire recorded
+  its project (`/v1/messages` x-project, copilot `/p/`, `/api/complete` body), a real
+  `claude -p` with the launcher's two-line `ANTHROPIC_CUSTOM_HEADERS` sent x-project;
+  launcher resolves coding→`coding`, a subdir→`coding`, /tmp→''; the export wrote one
+  file per project from the live DB (probe rows then cleared). NOT done: proxy branch
+  not pushed/PR'd (it sits on the local-only `feat/installable`); the first live hourly
+  export with real project rows needs sessions launched after this change.

@@ -211,6 +211,7 @@ async function onePass(dbPath) {
           canonical_agent: canonical?.agent ?? 'opencode',
           background_models: bgModels,
           session_summary: summary ?? null,
+          project: agg.project ?? null,
         },
         totals,
       });
@@ -271,7 +272,7 @@ async function reclassifyPass(dbPath) {
           background_models: r.background_models ?? [], session_summary: r.session_summary,
           variant: r.variant, repeat: r.repeat, terminal_state: r.terminal_state,
           skip_reason: r.skip_reason, rerun_of: r.rerun_of, base_variant: r.base_variant,
-          origin_span_id: r.origin_span_id,
+          origin_span_id: r.origin_span_id, project: r.project ?? null,
         },
         // Preserve the Outcome token totals (camelCase on r.outcome → snake_case in).
         totals: {
@@ -422,6 +423,7 @@ async function copilotPass() {
           canonical_agent: canonical?.agent ?? 'copilot',
           background_models: bgModels,
           session_summary: null,
+          project: agg.project ?? null,
         },
         totals,
       });
@@ -659,6 +661,7 @@ async function claudePass(dbPath) {
           canonical_agent: canonical?.agent ?? 'claude',
           background_models: bgModels,
           session_summary: signal.summary || null,
+          project: agg.project ?? null,
         },
         totals,
       });

@@ -161,7 +161,7 @@ export function parseTerminalState(argv) {
  */
 export function buildRunTags({
   span, taskHash, canonicalAgent, canonicalModel, snapshotId,
-  backgroundModels, terminalState, skipReason,
+  backgroundModels, terminalState, skipReason, project,
 }) {
   return {
     task_hash: taskHash,
@@ -190,6 +190,9 @@ export function buildRunTags({
     // ── Parallel experiments: how this cell was executed ('serial' | 'parallel'), folded
     //    from span.meta the same null-preserved way (absent on pre-feature spans → null). ──
     execution_mode: span.meta?.execution_mode ?? null,
+    // The repo: span.meta.project when the starter knew it, else the project that
+    // carried most of the run's tokens (aggregateByTaskId).
+    project: span.meta?.project ?? project ?? null,
   };
 }
 
@@ -759,7 +762,7 @@ async function main() {
   }
 
   // ── (3.1) Token aggregation (read-only) + fg/bg split → canonical (D-05/D-06) ──
-  const { totals, byAgentModel } = aggregateByTaskId(span.task_id);
+  const { totals, byAgentModel, project: tokenProject } = aggregateByTaskId(span.task_id);
   // Split the breakdown into the measured foreground groups vs the concurrent
   // background-daemon groups (isForegroundGroup = adapter user_hash AND a
   // non-denylisted process). Canonical = the FIRST foreground group (or null) —
@@ -867,6 +870,7 @@ async function main() {
     backgroundModels,
     terminalState,
     skipReason,
+    project: tokenProject,
   });
 
   // ── (3.5/3.6) Route heuristics from the normalized cross-agent trace ──

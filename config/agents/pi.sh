@@ -314,7 +314,10 @@ _pi_write_models_json() {
   # A measured run sets TASK_ID before agent_pre_launch, so it still gets the
   # header and keeps the per-request binding that keeps pi out of
   # AMBIENT_BOUND_AGENTS.
-  local headers_json='"x-agent": "pi"'
+  # x-project is interpolated by pi from ITS environment, like x-task-id, so the
+  # shared models.json stays right for every repo pi is launched in.
+  local headers_json='"x-agent": "pi",
+        "x-project": "$CODING_PROJECT_ID"'
   if [ -n "${TASK_ID:-}" ]; then
     headers_json="${headers_json},
         \"x-task-id\": \"\$TASK_ID\""

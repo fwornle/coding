@@ -83,6 +83,8 @@ import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
 // DEDICATED experiment LevelDB via openExperimentStore(), not the knowledge
 // graph this process owns, so the two stores stay independent.
 import { ExperimentApi } from '../lib/experiments/experiment-api.mjs';
+import { writeProjectUsage } from '../lib/usage/project-usage.mjs';
+import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import { registerKgbenchRoutes } from '../lib/experiments/kgbench-routes.mjs';
 // One derivation, two drivers — the CLI at scripts/enrich-entity-sources.mjs
 // drives these same pure helpers over HTTP. Importing is side-effect-free: the
@@ -93,7 +95,7 @@ import {
   mergeEnrichment,
 } from './enrich-entity-sources.mjs';
 import {
-  graphDbDir, graphExportsDir, observationExportDir, ensureDataHome,
+  graphDbDir, graphExportsDir, observationExportDir, ensureDataHome, tokenUsageDb,
 } from '../lib/paths/index.mjs';
 import { resolveScope, isPlaceholderScope } from '../lib/scope/index.mjs';
 
@@ -4231,7 +4233,7 @@ const server = _autostart
       // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
       // doesn't pay a multi-second cold start.
       ensureWriter()
-        .then(() => { ensureRetrieval(); ensurePruner(); ensureLslResolver(); scheduleParentSynthesis(); })
+        .then(() => { ensureRetrieval(); ensurePruner(); ensureLslResolver(); scheduleParentSynthesis(); scheduleProjectUsage(); })
         .catch((err) => {
           process.stderr.write(`[obs-api] startup init failed: ${err.message}\n`);
         });
@@ -4259,6 +4261,32 @@ const server = _autostart
         });
     })
   : null;
+
+/**
+ * Per-repo token-usage summaries (T4b, lib/usage/project-usage.mjs): this
+ * machine's token rows by project, written into each repo's learning checkout
+ * (kb/usage/<user_hash>.json), where the 30-min local commit and `coding sync
+ * --push` share them. obs-api writes them because it is the one process that
+ * writes into repos (lib/kb/layout 'owner'). Hourly, first pass 2 min after
+ * start; an unchanged summary is not rewritten.
+ */
+const PROJECT_USAGE_INTERVAL_MS = 60 * 60 * 1000;
+function runProjectUsage() {
+  try {
+    const userHash = UserHashGenerator.generateHash({ debug: false });
+    const r = writeProjectUsage({ dbPath: tokenUsageDb(), userHash, codingRoot: REPO_ROOT });
+    if (r.written?.length) {
+      process.stderr.write(`[obs-api] project usage: wrote ${r.written.map((w) => w.project).join(', ')}`
+        + ` (${r.unchanged.length} unchanged)\n`);
+    }
+  } catch (err) {
+    process.stderr.write(`[obs-api] project usage export failed: ${err.message}\n`);
+  }
+}
+function scheduleProjectUsage() {
+  setTimeout(runProjectUsage, 2 * 60 * 1000).unref?.();
+  setInterval(runProjectUsage, PROJECT_USAGE_INTERVAL_MS).unref?.();
+}
 
 // Export the Express app + a manual store-injector for tests. The test
 // can construct a tmpdir-backed GraphKMStore, hand it to _testHooks, then

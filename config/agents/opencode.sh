@@ -165,14 +165,16 @@ agent_pre_launch() {
   # Keep OpenCode's native Copilot catalogue (including GPT-5.6 Sol), but move
   # its wire endpoint onto our shim. Authentication remains OpenCode's own; the
   # localhost shim ignores its placeholder bearer and uses the proxy-held OAuth.
-  local _oc_provider_entries="\"rapid-proxy\":{\"models\":{${_oc_models}}},\"github-copilot\":{\"options\":{\"baseURL\":\"${_oc_shim_base}\",\"headers\":{\"x-agent\":\"opencode\"}}}"
+  # x-project on every provider that reaches the proxy: token_usage.project.
+  local _oc_project_hdr="\"x-project\":\"${CODING_PROJECT_ID:-}\""
+  local _oc_provider_entries="\"rapid-proxy\":{\"options\":{\"headers\":{${_oc_project_hdr}}},\"models\":{${_oc_models}}},\"github-copilot\":{\"options\":{\"baseURL\":\"${_oc_shim_base}\",\"headers\":{\"x-agent\":\"opencode\",${_oc_project_hdr}}}}"
 
   # ONE `provider` fragment, built here and spliced once below. Two separate
   # _oc_splice_config calls would each prepend their own "provider" key, and a
   # duplicate key in one object silently drops whichever the parser resolves
   # second — so the opt-in block below adds to this string instead of splicing.
   if [ "${OPENCODE_ANTHROPIC_NATIVE:-0}" = "1" ]; then
-    _oc_provider_entries="${_oc_provider_entries},\"anthropic\":{\"options\":{\"baseURL\":\"http://127.0.0.1:${_oc_proxy_port}/v1\",\"headers\":{\"x-task-id\":\"${TASK_ID:-}\",\"x-agent\":\"opencode\"}}}"
+    _oc_provider_entries="${_oc_provider_entries},\"anthropic\":{\"options\":{\"baseURL\":\"http://127.0.0.1:${_oc_proxy_port}/v1\",\"headers\":{\"x-task-id\":\"${TASK_ID:-}\",\"x-agent\":\"opencode\",${_oc_project_hdr}}}}"
     _agent_log "🧪 opencode ANTHROPIC-NATIVE (opt-in) → proxy http://127.0.0.1:${_oc_proxy_port}/v1/messages (x-agent=opencode; x-task-id=${TASK_ID:-<ambient>})"
   fi
   _oc_splice_config "\"provider\":{${_oc_provider_entries}}"
