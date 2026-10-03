@@ -19,7 +19,7 @@ const REPO = process.env.CODING_REPO || new URL('../..', import.meta.url).pathna
 
 const {
   resolveScope, requireScope, isPlaceholderScope,
-  explain, normaliseScope, isToolsRepo, toolsRepo, samePath,
+  explain, normaliseScope, isToolsRepo, toolsRepo, samePath, isWithinPath,
   ScopeError, DEFAULT_SCOPE, SCOPE_MAX,
 } = require(join(REPO, 'lib/scope/resolve.cjs'));
 
@@ -348,6 +348,54 @@ describe('samePath', () => {
       isToolsRepo(join(dir, 'elsewhere'), { toolsRepo: tools }),
       samePath(join(dir, 'elsewhere'), tools),
     );
+  });
+});
+
+describe('isWithinPath', () => {
+  // The containment twin of samePath, replacing `child.startsWith(root)` and
+  // `child.includes(root)` — both of which call a SIBLING with a shared prefix
+  // (~/Agentic/coding-history next to ~/Agentic/coding) a child.
+  let root;
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'within-'));
+    mkdirSync(join(root, 'coding', 'src'), { recursive: true });
+    mkdirSync(join(root, 'coding-history'), { recursive: true });
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  test('the root itself and anything under it are within', () => {
+    const repo = join(root, 'coding');
+    assert.equal(isWithinPath(repo, repo), true);
+    assert.equal(isWithinPath(`${repo}/`, repo), true);
+    assert.equal(isWithinPath(join(repo, 'src'), repo), true);
+    assert.equal(isWithinPath(join(repo, 'not', 'yet', 'written.md'), repo), true);
+  });
+
+  test('a sibling sharing the prefix is NOT within — the bug the string tests had', () => {
+    const repo = join(root, 'coding');
+    assert.equal(isWithinPath(join(root, 'coding-history'), repo), false);
+    assert.equal(isWithinPath(join(root, 'coding-history', 'x.md'), repo), false);
+    assert.equal(isWithinPath(root, repo), false);
+    assert.equal(isWithinPath(join(repo, '..', 'coding-history'), repo), false);
+  });
+
+  test('a directory whose name merely starts with .. is still within', () => {
+    const repo = join(root, 'coding');
+    assert.equal(isWithinPath(join(repo, '..foo'), repo), true);
+  });
+
+  test('through a symlinked root, existing and not-yet-existing children are within', () => {
+    const repo = join(root, 'coding');
+    const link = join(root, 'link');
+    symlinkSync(repo, link);
+    assert.equal(isWithinPath(join(link, 'src'), repo), true);
+    assert.equal(isWithinPath(join(repo, 'src'), link), true);
+    assert.equal(isWithinPath(join(link, 'new', 'file.md'), link), true);
+  });
+
+  test('missing arguments are never within', () => {
+    assert.equal(isWithinPath('', root), false);
+    assert.equal(isWithinPath(root, undefined), false);
   });
 });
 

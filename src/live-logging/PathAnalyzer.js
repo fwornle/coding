@@ -14,6 +14,7 @@
 
 import path from 'path';
 import fs from 'fs';
+import { isWithinPath } from '../../lib/scope/index.mjs';
 
 class PathAnalyzer {
   constructor(options = {}) {
@@ -437,16 +438,23 @@ class PathAnalyzer {
     try {
       // Handle special cases
       if (filePath === '.' || filePath === './') {
-        return process.cwd().startsWith(this.codingRepo);
+        return isWithinPath(process.cwd(), this.codingRepo);
       }
 
       // Expand and resolve path
       const expandedPath = this.expandPath(filePath);
       const resolvedPath = path.resolve(expandedPath);
 
-      // If path explicitly includes "coding" in it, check if it starts with coding repo
-      if (filePath.includes('coding/') || filePath.includes('coding\\') || resolvedPath.startsWith(this.codingRepo)) {
-        return resolvedPath.startsWith(this.codingRepo);
+      // A path that names the tools checkout as a directory segment, or resolves
+      // into it, is answered by containment alone. Segment match on the checkout's
+      // own name, not `includes('coding/')`: that also fired on `decoding/` and
+      // `coding-history/`, and never on a checkout cloned under another name. And
+      // containment, not `startsWith`: a prefix test put ~/Agentic/coding-history
+      // inside the repo.
+      const repoName = path.basename(this.codingRepo);
+      const namesRepo = filePath.split(/[\\/]/).slice(0, -1).includes(repoName);
+      if (namesRepo || isWithinPath(resolvedPath, this.codingRepo)) {
+        return isWithinPath(resolvedPath, this.codingRepo);
       }
 
       // Step (a): For relative paths without explicit "coding" prefix,
@@ -476,8 +484,8 @@ class PathAnalyzer {
         return false;
       }
 
-      // For absolute paths, check if they start with coding repo
-      return resolvedPath.startsWith(this.codingRepo);
+      // For absolute paths: inside the coding repo, by containment.
+      return isWithinPath(resolvedPath, this.codingRepo);
 
     } catch (error) {
       this.stats.pathResolutionErrors++;
