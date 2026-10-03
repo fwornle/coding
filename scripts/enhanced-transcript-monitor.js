@@ -45,6 +45,7 @@ const HOST_CODING_PATH = resolveHostCodingPath();
 // project's point of view, so `lsl-redirect` gates it and this is the consumer.
 const { isToolsRepo, samePath } = require('../lib/scope/resolve.cjs');
 const { isEnabled: featureEnabled } = require('../lib/features/resolve.cjs');
+const { projectIdFor } = require('../lib/teams/config.cjs');
 
 /**
  * "Not applicable here", as distinct from "it broke". The classification logger
@@ -1617,7 +1618,9 @@ class EnhancedTranscriptMonitor {
       // floor keyed only on files would still have dropped that turn.
       toolCallCount: allToolCalls.length,
       sourceFile: 'live-etm',
-      project: path.basename(this.config.projectPath || ''),
+      // The repo's project id (lib/teams/config.cjs): its directory name unless
+      // a team's `repos:` entry names it. Team membership is derived from this.
+      project: projectIdFor(this.config.projectPath || ''),
       // Mid-turn progress snapshot tag — obs-api exempts kind:'progress' from the
       // 4h semantic dedup so a snapshot never suppresses the turn's final obs.
       kind: kind || undefined,

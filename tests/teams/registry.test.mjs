@@ -169,7 +169,7 @@ describe('loadViewGroups', () => {
 describe('loadRegistry', () => {
   test('returns both halves in the shape GET /api/teams serves', () => {
     const reg = loadRegistry(REPO);
-    assert.deepEqual(Object.keys(reg).sort(), ['teams', 'viewGroups']);
+    assert.deepEqual(Object.keys(reg).sort(), ['active', 'teams', 'viewGroups']);
     assert.equal(reg.teams.length, 5);
     assert.ok(reg.viewGroups.length >= 1);
   });

@@ -10,7 +10,7 @@ import express from 'express';
 import { createServer, get as httpGet } from 'http';
 import { WebSocketServer } from 'ws';
 import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch, statSync, mkdirSync } from 'fs';
-import { join, dirname, basename } from 'path';
+import { join, dirname, basename, resolve as resolvePath } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import { spawn, execSync } from 'child_process';
@@ -21,6 +21,7 @@ import { readCaptures } from '../../src/retrieval/capture-store.js';
 import { createRequire } from 'node:module';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
 import { resolveScope } from '../../lib/scope/index.mjs';
+import { discoveredProjects } from '../../lib/teams/discover.mjs';
 // RetrievalService now runs in the host Observations API service. The
 // dashboard's POST /api/retrieve handler is a thin HTTP forwarder (Phase 5).
 // observations.db is owned by the host Observations API service; the dashboard
@@ -382,6 +383,12 @@ class SystemHealthAPIServer {
         this.app.get('/api/features', this.handleGetFeatures.bind(this));
         this.app.put('/api/features', this.handlePutFeatures.bind(this));
         this.app.post('/api/features/apply', this.handleApplyFeatures.bind(this));
+        // Teams (sets of repos) — served by the host coordinator, like features.
+        // Not /api/teams: obs-api already serves the viewer's registry there.
+        this.app.get('/api/teams-config', (req, res) => this._forwardCoordinatorWithBody(req, res, '/teams'));
+        this.app.put('/api/teams-config', (req, res) => this._forwardCoordinatorWithBody(req, res, '/teams'));
+        this.app.post('/api/teams-config/discover', (req, res) => this._forwardCoordinatorWithBody(req, res, '/teams/discover'));
+        this.app.post('/api/teams-config/sync', (req, res) => this._forwardCoordinatorWithBody(req, res, '/teams/sync'));
 
         // System health verifier endpoints — read-mostly, hit hard by the
         // dashboard's polling loop. A 1 s response cache keeps perceived
@@ -2612,30 +2619,20 @@ class SystemHealthAPIServer {
     }
 
     /**
-     * Get list of known project paths that may contain workflow reports
-     * Scans the Agentic directory for projects with .data/workflow-reports
+     * Known project paths that may contain workflow reports: the tools checkout
+     * plus every discovered repo (lib/teams/discover.mjs — host paths mapped to
+     * this container's mounts) that has .data/workflow-reports.
      */
     getKnownProjectPaths() {
-        const agenticRoot = join(codingRoot, '..');
         const projectPaths = [codingRoot]; // Always include the tools checkout
-
         try {
-            const entries = readdirSync(agenticRoot, { withFileTypes: true });
-            for (const entry of entries) {
-                // Skip the checkout by its own name — it is already listed, and it is
-                // not necessarily called 'coding' on a colleague's machine.
-                if (entry.isDirectory() && entry.name !== basename(codingRoot)) {
-                    const projectPath = join(agenticRoot, entry.name);
-                    const reportsDir = join(projectPath, '.data', 'workflow-reports');
-                    if (existsSync(reportsDir)) {
-                        projectPaths.push(projectPath);
-                    }
-                }
+            for (const repo of discoveredProjects({ codingRoot })) {
+                if (resolvePath(repo.path) === resolvePath(codingRoot)) continue;
+                if (existsSync(join(repo.path, '.data', 'workflow-reports'))) projectPaths.push(repo.path);
             }
         } catch (error) {
-            console.warn('Failed to scan for project paths:', error.message);
+            console.warn('Failed to list discovered projects:', error.message);
         }
-
         return projectPaths;
     }
 

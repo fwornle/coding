@@ -1,0 +1,40 @@
+# Teams — shipped defaults. A team is a SET OF REPOS.
+#
+# Layers (later wins, per team, per field):
+#   config/teams/<id>.json   ontology + validation config (read by semantic-analysis)
+#   config/teams.yaml        this file — labels, kinds, membership defaults
+#   ~/.coding/teams.yaml     yours — membership, your own teams, `active:`
+#                            (written by the dashboard's Teams tab)
+#   CODING_TEAMS=a,b         env override of the active selection
+#
+# A team with neither `repos` nor `include` contains the repo whose directory
+# name is its id — what `metadata.team` has always meant — so nothing needs to
+# be declared here for the existing teams to keep working.
+#
+# Per team:
+#   label, kind (team | project), description
+#   repos:    - ~/src/rapid-automations              a local checkout
+#             - https://bmw.ghe.com/me/x-history.git  a learning repo (cloned under
+#                                                    <data home>/var/shared/ when
+#                                                    not checked out here)
+#             - { path: ~/src/x2, id: x }            name the project id stamped
+#                                                    on what is learned there
+#   include:  - 'rapid-*'                           directory-name globs
+#
+# Example:
+#   teams:
+#     raas:
+#       include: [raas, 'rapid-*']
+#
+# Which teams are active (the viewer's and injection's primary filter):
+#   active: [raas, coding]          # empty or absent = all teams
+#
+# Where discovery looks for repos (defaults shown):
+#   discovery:
+#     roots: ['~']
+#     depth: 4
+#     ignore: [node_modules, Library, Applications, Pictures, Music, Movies,
+#              Downloads, dist, build, vendor, venv, target, __pycache__]
+#     ttlMinutes: 10
+
+teams: {}
