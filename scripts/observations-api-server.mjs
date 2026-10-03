@@ -4096,7 +4096,14 @@ function startWorkflowRun(workflow, body) {
   run.promise = (async () => {
     const store = await ensureKMStore();
     if (!store) throw new Error('Knowledge graph store not ready');
-    return WORKFLOW_RUNNERS[workflow](store, body || {});
+    // Every LLM call the run makes is spent on the repo it analyses: scope that
+    // project to the run's async call tree, so token_usage.project is set
+    // without threading it through every agent — and without leaking onto the
+    // consolidator's calls, which this same process makes concurrently.
+    const { withLlmProject } = await import(`${SA_DIST}/agents/llm-project-context.js`);
+    let project = '';
+    try { project = _teamsConfigT6.projectIdFor(REPO_ROOT); } catch { project = path.basename(REPO_ROOT); }
+    return withLlmProject(project, () => WORKFLOW_RUNNERS[workflow](store, body || {}));
   })()
     .then((result) => {
       _workflowLast[workflow] = { jobId, finishedAt: new Date().toISOString(), result };
