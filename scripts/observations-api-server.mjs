@@ -51,6 +51,8 @@ import { _computeRetentionBoundary, _mergeObservations, _mergeDigests } from './
 // unified viewer's Teams / Views rail groups by. Served at GET /api/teams.
 import { loadRegistry } from '../lib/teams/registry.mjs';
 import { kbLayout } from '../lib/kb/layout.mjs';
+import { createIndexScheduler } from '../lib/kb/embed-index.mjs';
+import { recordEndpoint } from '../lib/kb/obs-api-endpoint.mjs';
 import { parseTeams, projectsOfTeams, teamPredicate, projectOf, defaultTeamsFor } from '../lib/teams/scope.mjs';
 import { discoveredProjects } from '../lib/teams/discover.mjs';
 import { createRequire as _createRequireT6 } from 'node:module';
@@ -1246,6 +1248,8 @@ app.post('/api/kb/reload', async (_req, res) => {
     if (stats.added || stats.removed || stats.replaced) {
       scheduleExport();
       _stalenessCache.invalidate();
+      // What a teammate pushed was never written here, so never embedded.
+      _embedIndex?.schedule('kb reload');
     }
     process.stderr.write(`[obs-api] kb reload: +${stats.added} -${stats.removed} ~${stats.replaced} (${stats.nodes} nodes)\n`);
     res.json(stats);
@@ -4220,6 +4224,13 @@ app.post('/api/workflows/cancel', async (req, res) => {
 // sets OBSERVATIONS_API_NO_AUTOSTART=1, then drives the exported `app`
 // directly via supertest-style in-process fetch.
 const _autostart = process.env.OBSERVATIONS_API_NO_AUTOSTART !== '1';
+
+// Embeds knowledge that reached the graph without a local write (hydrate of a
+// pulled export, /api/kb/reload) — lib/kb/embed-index.mjs. Server only: tests
+// drive the app with autostart off and must not spawn an embedding pass.
+const _embedIndex = _autostart
+  ? createIndexScheduler({ script: path.join(REPO_ROOT, 'dist', 'embedding', 'backfill.js') })
+  : null;
 const server = _autostart
   // '::' not '0.0.0.0'. Node binds an unspecified IPv6 address dual-stack by
   // default (ipv6Only=false), so this accepts BOTH families on the same
@@ -4237,6 +4248,8 @@ const server = _autostart
   // failure look like an obs-api outage rather than an address-family gap.
   ? app.listen(PORT, '::', () => {
       process.stderr.write(`[obs-api] listening on http://[::]:${PORT} (dual-stack; km-core data root: ${path.dirname(KG_DB_PATH)})\n`);
+      // So `coding sync` reloads THIS data home's obs-api, not whatever owns the port.
+      recordEndpoint({ port: PORT });
       // Warm the writer first (opens DB rw + FTS triggers + WAL), then warm
       // retrieval (fastembed model + Qdrant client) so the first POST /retrieve
       // doesn't pay a multi-second cold start.
@@ -4257,6 +4270,8 @@ const server = _autostart
           if (store) {
             subscribeObservationWritten(() => scheduleExport());
             scheduleExport();
+            // Hydrate may have merged exports pulled while obs-api was down.
+            _embedIndex?.schedule('startup');
             // Re-run hourly as a belt-and-suspenders against missed write
             // events (e.g., an observation lands during a coordinator
             // failure and the event bus is briefly orphaned).
