@@ -122,14 +122,14 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 - Accept: `tests/history/repo-link.test.mjs` (17 cases, local bare remotes: new, existing current/old layout, skip, public-refused, migrations, stand-downs); launcher smoke via `ensure_private_history_repo` in a scratch repo; migration verified on copies of `balance` and `copi`.
 - Follow-up (T4): nothing is pushed beyond the skeleton — restructure commits and migrated transcripts wait for T4's confirmed push. `docs/puml/lsl-repo-split.puml` still shows the nested layout.
 
-### T5 — Teams and discovery  `status: todo`
+### T5 — Teams and discovery  `status: done`
 
-- [ ] **`config/teams.yaml`** (shipped defaults, replaces/extends `config/teams/*.json` — keep ontology fields) + **`~/.coding/teams.yaml`** (user layer, wins). Per team: `id`, `label`, `kind`, ontology/validation fields, `repos:` (local paths and/or history remotes), `include` patterns. A team may list a remote that isn't checked out locally → only its `X-history` is cloned (under `~/.coding/data/<scope>/var/shared/<X>/` or similar — decide).
-- [ ] Active selection: `~/.coding/teams.yaml` `active: [raas, coding]`; env `CODING_TEAMS` overrides.
-- [ ] One discovery module `lib/teams/discover.mjs`: configurable roots (default `$HOME`), depth, markers (`.coding/`, `.specstory/history`, nested `*-history` remote), ignore list; cached in `var/projects.json`. Replace the three ad-hoc scanners (coordinator, dashboard lsl-sessions, dashboard workflow-reports).
-- [ ] `lib/teams/registry.mjs` returns `repos[]`; a `teamsOf(repoPath)` helper. `metadata.team`/`project` stamping (`repo-router.mjs`, `ObservationConsolidator.js:895`) derives from the mapping, not the basename.
-- [ ] Coordinator `/teams` API (host, like `/features`, since the files are on the host) + dashboard **Teams** tab: discovered repos, assign to teams, edit teams, set active teams; writes `~/.coding/teams.yaml`. Dashboard `server.js` reverse-proxies.
-- Accept: tests for YAML layering, discovery on a fixture tree, mapping; Teams tab verified with gsd-browser.
+- [x] **`config/teams.yaml`** (shipped, no memberships) + **`~/.coding/teams.yaml`** (user, wins per team/field) EXTEND `config/teams/*.json` (ontology stays there — semantic-analysis reads it directly). Per team: `label`, `kind`, `description`, `repos:` (paths / history remotes / `{path, remote, id}`), `include` globs. No `repos`/`include` = the same-named repo (old basename meaning). **Decided:** remote-only repos clone under `<data home>/var/shared/<X>/` (`lib/teams/shared.mjs`, clone-only).
+- [x] Active selection: `active:` in the user (or shipped) layer; `CODING_TEAMS` overrides. Empty = all.
+- [x] `lib/teams/discover.mjs`: roots (default `$HOME`), depth 4, ignore list, markers `.coding/` + `.specstory/history` on a git repo; cached in `<data home>/var/projects.json` (TTL 10 min). Replaced the coordinator ETM-candidate walk, dashboard `lsl-sessions.mjs` and `server.js getKnownProjectPaths` — the container reads the host cache via the data-home mount, mapping `$HOME/Agentic` → `/workspace` (new `lib/teams` + `lib/features/vendor` bind mounts).
+- [x] `lib/teams/registry.mjs` returns `repos[]`, `include`, `active`; `teamsOf()` / `projectIdFor()` / `isActiveRepo()` in `config.cjs`. ETM observation `project` and `repo-router.teamForPath` stamp via `projectIdFor` (consolidator inherits it).
+- [x] Coordinator `GET/PUT /teams`, `POST /teams/discover`, `POST /teams/sync`; dashboard proxy `/api/teams-config`; **Teams** tab (repo×team matrix, active chips, add/delete own teams, shared-repo clone).
+- Accept: `tests/teams/config.test.mjs` + `discover.test.mjs` (layering, env, mapping, writer, fixture-tree scan, cache, container translation, fallback, shared clone from a bare remote); Teams tab verified with gsd-browser (render, active toggle + assignment written to `~/.coding/teams.yaml`, reverted).
 
 ### T4 — Persisting and sharing knowledge  `status: todo`
 
@@ -177,7 +177,6 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
 ## Open questions (decide inside the phase)
 
-- T5: where teammate repos that aren't checked out locally are cloned.
 - T2: WSL without systemd.
 
 ## Session protocol
@@ -208,3 +207,13 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   the developer machine's ~16 nested checkouts migrate on their next `coding` launch (each
   gets a local restructure commit, unpushed); running ETMs pick up the git-add guard only
   when restarted. Next: **T5**.
+- **2026-10-03 (T5)** — Teams = sets of repos (`lib/teams/config.cjs`), one discovery
+  (`lib/teams/discover.mjs`), shared clones (`lib/teams/shared.mjs`), coordinator `/teams`
+  + dashboard Teams tab. Decided: YAML extends (not replaces) `config/teams/*.json`;
+  shipped `config/teams.yaml` declares no memberships (the JSON says RaaS = "Research as a
+  Service", so guessing `rapid-automations` would have been wrong); shared clones under
+  `<data home>/var/shared/<X>/`. Verified: `npm test` green (node:test 1960 pass, jest
+  pass); coordinator `/teams` live (24 repos); container recreated with the `lib/teams`
+  mount, discovery maps 22 repos onto /workspace, LSL Sessions now lists 21 projects (incl.
+  `_work/*`, which the old scan missed); Teams tab verified in gsd-browser incl. a write
+  round-trip (test edits removed — no `~/.coding/teams.yaml` exists). Next: **T4**.

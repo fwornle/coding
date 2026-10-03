@@ -111,6 +111,11 @@ services:
       # the data root with the SAME code as the host instead of a second copy.
       - ${CODING_REPO:-.}/lib/paths:/coding/lib/paths:ro
       - ${CODING_REPO:-.}/lib/scope:/coding/lib/scope:ro
+      # Repo discovery + teams (lib/teams/discover.mjs reads the host's
+      # <data home>/var/projects.json and maps its paths onto /workspace), and
+      # the vendored YAML parser lib/teams/config.cjs loads.
+      - ${CODING_REPO:-.}/lib/teams:/coding/lib/teams:ro
+      - ${CODING_REPO:-.}/lib/features/vendor:/coding/lib/features/vendor:ro
       # NOTE: .observations is intentionally NOT bind-mounted. Phase 5 of the
       # observations-api migration: the host obs-api service is the single
       # owner of observations.db, and the container reaches it via HTTP at

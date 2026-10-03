@@ -24,6 +24,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { discoveredProjects } from '../../lib/teams/discover.mjs';
 
 import {
   groupChains, concatChain, parseChain, partAt,
@@ -52,23 +53,18 @@ function parseChainId(id) {
 /**
  * Every project that has an LSL history tree.
  *
- * Sibling projects live next to the repo on the host, but inside the
- * coding-services container `codingRoot` is `/coding`, whose parent is `/` —
- * the siblings are bind-mounted at `/workspace` instead. Scanning both keeps
- * one code path working in either place; LSL_WORKSPACE_ROOT overrides.
+ * Read from the one discovery (lib/teams/discover.mjs): its cache lists every
+ * marked repo under the configured roots, not just the tools checkout's
+ * siblings. Inside the coding-services container the cache's host paths are
+ * translated to the workspace mount; with no cache it falls back to the old
+ * sibling scan of `codingRoot/..` and `/workspace` (LSL_WORKSPACE_ROOT).
  */
 export function discoverProjects(codingRoot) {
-  const roots = [path.resolve(codingRoot, '..')];
-  const ws = process.env.LSL_WORKSPACE_ROOT || '/workspace';
-  if (ws && fs.existsSync(ws) && !roots.includes(ws)) roots.push(ws);
-
-  const siblings = roots.flatMap((base) => safeReaddir(base).map((n) => path.join(base, n)));
   const out = [];
-  for (const dir of [codingRoot, ...siblings]) {
-    const hist = path.join(dir, '.specstory', 'history');
+  for (const repo of discoveredProjects({ codingRoot, marker: 'specstory' })) {
+    const hist = path.join(repo.path, '.specstory', 'history');
     if (!fs.existsSync(hist)) continue;
-    const name = path.basename(dir);
-    if (!out.some((p) => p.project === name)) out.push({ project: name, history: hist });
+    if (!out.some((p) => p.project === repo.name)) out.push({ project: repo.name, history: hist });
   }
   return out;
 }

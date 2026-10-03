@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useState } from 'react'
-import { Sun, Moon, Monitor, SlidersHorizontal } from 'lucide-react'
+import { Sun, Moon, Monitor, SlidersHorizontal, Users } from 'lucide-react'
 import { type Theme, getStoredTheme, cycleTheme } from '@/lib/theme'
 import { useAppSelector } from '@/store'
 import type { FeatureId } from '@/store/slices/featuresSlice'
@@ -96,6 +96,21 @@ export function NavBar() {
           )
         })}
         <div className="ml-auto flex items-center gap-1">
+          {features.lsl?.enabled !== false && (
+            <Link
+              to="/teams"
+              data-testid="teams-tab"
+              title="Teams — which repos make up which team"
+              aria-label="Teams"
+              className={`flex items-center justify-center h-8 w-8 rounded-md transition-colors ${
+                location.pathname === '/teams'
+                  ? 'text-foreground bg-accent'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`}
+            >
+              <Users className="h-4 w-4" />
+            </Link>
+          )}
           <Link
             to="/features"
             data-testid="features-tab"

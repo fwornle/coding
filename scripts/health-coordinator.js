@@ -44,6 +44,8 @@ import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/loca
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
 import { loadFeatures, FeatureConfigError, loadProfiles, profileAliases, configPaths } from '../lib/features/index.mjs';
+import { discover as discoverRepos } from '../lib/teams/discover.mjs';
+import { createRequire } from 'node:module';
 import { setFeatures, setProfile } from '../lib/features/write.mjs';
 import { checkSnapshot } from '../lib/features/snapshot.cjs';
 import {
@@ -2477,31 +2479,31 @@ function encodeClaudeProjectDir(projectPath) {
 }
 
 /**
- * Walk Agentic dir up to depth 2 to enumerate real on-disk project paths.
- * This covers both `Agentic/<name>` and `Agentic/_work/<name>` layouts.
+ * On-disk project paths: the repos lib/teams/discover.mjs finds under the
+ * configured roots (default $HOME, cached in <data home>/var/projects.json for
+ * `discovery.ttlMinutes`), i.e. git repos carrying `.coding/` or
+ * `.specstory/history`. This used to be its own two-level walk of ~/Agentic,
+ * one of three scanners that each saw a different set of projects.
+ *
+ * Fails open to that old walk, so a broken teams config can never stop ETMs
+ * from being spawned.
  */
 function discoverProjectCandidates(agenticDir) {
-  const out = [];
-  let entries;
   try {
-    entries = fs.readdirSync(agenticDir, { withFileTypes: true });
-  } catch {
-    return out;
+    return discoverRepos().repos.map((r) => r.path);
+  } catch (err) {
+    etmTrace(() => `discovery failed (${err.message}) — falling back to the ${agenticDir} walk`);
   }
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-    const lvl1 = path.join(agenticDir, entry.name);
-    out.push(lvl1);
-    let subEntries;
+  const out = [];
+  const subdirs = (dir) => {
     try {
-      subEntries = fs.readdirSync(lvl1, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const sub of subEntries) {
-      if (!sub.isDirectory() || sub.name.startsWith('.')) continue;
-      out.push(path.join(lvl1, sub.name));
-    }
+      return fs.readdirSync(dir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+        .map((e) => path.join(dir, e.name));
+    } catch { return []; }
+  };
+  for (const lvl1 of subdirs(agenticDir)) {
+    out.push(lvl1, ...subdirs(lvl1));
   }
   return out;
 }
@@ -4406,6 +4408,98 @@ app.post('/features/apply', async (_req, res) => {
       changed: result.changed,
       containerAvailable: result.container.available,
     });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── /teams ───────────────────────────────────────────────────────────────────
+//
+// Teams = sets of repos (lib/teams/config.cjs). Served here rather than by the
+// dashboard for the same reason as /features: the files (~/.coding/teams.yaml,
+// the repos discovery walks, <data home>/var/shared) are on the host, and the
+// dashboard runs in the container. server.js reverse-proxies /api/teams-config.
+
+async function teamsPayload({ refresh = false, synced } = {}) {
+  const teamsConfig = createRequire(import.meta.url)('../lib/teams/config.cjs');
+  const { sharedPlan } = await import('../lib/teams/shared.mjs');
+  const teamsDoc = teamsConfig.loadTeams({ force: true });
+  const found = discoverRepos({ teamsDoc, refresh });
+  const repos = found.repos.map((r) => ({
+    ...r,
+    teams: teamsConfig.teamsOf(r.path, { teamsDoc, learningRemote: r.learningRemote }),
+    projectId: teamsConfig.projectIdFor(r.path, { teamsDoc, learningRemote: r.learningRemote }),
+  }));
+  const teams = Object.values(teamsDoc.teams)
+    .map((t) => ({
+      id: t.id,
+      label: t.label,
+      kind: t.kind,
+      description: t.description,
+      repos: t.repos,
+      include: t.include,
+      sources: t.sources,
+      active: teamsDoc.active.includes(t.id),
+      members: repos.filter((r) => r.teams.includes(t.id)).map((r) => r.path),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  let shared = [];
+  try { shared = sharedPlan({ teamsDoc, repos: found.repos }); } catch (err) { teamsDoc.warnings.push(`shared repos: ${err.message}`); }
+  return {
+    ok: true,
+    teams,
+    active: teamsDoc.active,
+    activeSource: teamsDoc.activeSource,
+    discovery: { ...teamsDoc.discovery, scannedAt: found.scannedAt },
+    repos,
+    shared,
+    ...(synced ? { synced } : {}),
+    warnings: teamsDoc.warnings,
+    paths: teamsDoc.paths,
+  };
+}
+
+app.get('/teams', async (_req, res) => {
+  try {
+    res.json(await teamsPayload());
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.put('/teams', async (req, res) => {
+  const body = req.body || {};
+  const patch = {};
+  for (const key of ['active', 'teams', 'discovery']) if (key in body) patch[key] = body[key];
+  if (!Object.keys(patch).length) {
+    return res.status(400).json({ ok: false, error: 'expected { active?: string[], teams?: {id: {...}|null}, discovery?: {...} }' });
+  }
+  try {
+    createRequire(import.meta.url)('../lib/teams/config.cjs').writeUserTeams(patch);
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message });
+  }
+  try {
+    res.json(await teamsPayload({ refresh: 'discovery' in patch }));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/teams/discover', async (_req, res) => {
+  try {
+    res.json(await teamsPayload({ refresh: true }));
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/teams/sync', async (_req, res) => {
+  try {
+    const { syncShared } = await import('../lib/teams/shared.mjs');
+    const lines = [];
+    const synced = syncShared({ log: (m) => lines.push(m) });
+    res.json(await teamsPayload({ synced: { items: synced, log: lines } }));
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

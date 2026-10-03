@@ -34,6 +34,8 @@ Paths shown as `~` refer to the user's home directory.
 - **The `/features` API lives on the health COORDINATOR (:3034), not the dashboard server** — the dashboard runs inside the container and the file it edits (`~/.coding/features.yaml`) is on the host, plus applying runs `launchctl`/`systemctl`/`schtasks`. `server.js` reverse-proxies `/api/features`. One writer implementation: `lib/features/write.mjs`.
 - **Adding a service/daemon/container program/tab/badge means declaring its feature.** Four mappings must agree (`lib/features/daemons.mjs`, `scripts/apply-features.mjs`, `docker/entrypoint.sh`, `docs/architecture/features.md`); `tests/features/*.test.mjs` fails the build when they drift. `bin/llm` is deliberately ungated — it queries Docker Model Runner, not rapid-llm-proxy.
 
+- **A team is a SET OF REPOS** (`lib/teams/config.cjs`): `config/teams/<id>.json` (ontology) → `config/teams.yaml` (shipped, no memberships) → `~/.coding/teams.yaml` (user: membership, `active:`) → `CODING_TEAMS`. A team with no `repos`/`include` = the repo named like its id (the old basename meaning). `metadata.project` names the REPO (`projectIdFor`); membership is derived via `teamsOf`, never stamped. ONE scanner, `lib/teams/discover.mjs` (roots default `$HOME`, cache `<data home>/var/projects.json`, container maps `$HOME/Agentic`→`/workspace`). API on the coordinator `/teams`, dashboard proxy `/api/teams-config` (NOT `/api/teams` — obs-api's), **Teams** tab. Ref: `docs/architecture/teams.md`.
+
 ## Startup & Services
 
 - **Command**: `claude-mcp` or `coding --claude` (starts all services). Never use bare `claude`
