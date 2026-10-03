@@ -3,7 +3,7 @@
 #
 # Builds a container that has never seen `coding`, puts a snapshot of THIS
 # working tree in it as a fresh clone, and runs tests/cleanroom/inside.sh: a
-# real ./install.sh --ci --scope=team-a --features=km-perf, then the writers,
+# real ./install.sh --ci --scope=team-a --features=learning-perf, then the writers,
 # then assertions that nothing landed outside team-a's own data home — in
 # particular not on a planted `coding` tenant.
 #

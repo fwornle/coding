@@ -12,7 +12,7 @@
 #   1. plant a SENTINEL tenant (`coding`) in the same HOME and checksum it — the
 #      strongest available stand-in for "the developer's data": every code path
 #      that still addresses the `coding` tenant by literal lands on it
-#   2. ./install.sh --ci --scope=team-a --features=km-perf, from a fresh clone
+#   2. ./install.sh --ci --scope=team-a --features=learning-perf, from a fresh clone
 #   3. drive the writers with no agent and no LLM: the launch-time history
 #      init, session logs for an outside project AND for the tools repo itself,
 #      and an entity written through obs-api
@@ -69,14 +69,14 @@ fingerprint "$SENTINEL" > "$OUT/sentinel.before"
 home_files > "$OUT/home.before"
 
 # ── 2. the install ──────────────────────────────────────────────────────────
-step "2. ./install.sh --ci --scope=$SCOPE --features=km-perf"
+step "2. ./install.sh --ci --scope=$SCOPE --features=learning-perf"
 cd "$TOOLS"
 git status --porcelain --ignored > "$OUT/tools.before"
 # The proxy's clone source (see run.sh). Unset when run.sh had no proxy checkout.
 PROXY_BUNDLE=/tmp/extras/rapid-llm-proxy.bundle
 [ -f "$PROXY_BUNDLE" ] && export RAPID_LLM_PROXY_REPO="$PROXY_BUNDLE"
 PROXY_DIR="$HOME/_work/rapid-llm-proxy"
-./install.sh --ci --scope="$SCOPE" --features=km-perf > "$OUT/install.log" 2>&1
+./install.sh --ci --scope="$SCOPE" --features=learning-perf > "$OUT/install.log" 2>&1
 echo "installer exit=$? (--ci downgrades missing Docker/agents to warnings)"
 tail -25 "$OUT/install.log"
 

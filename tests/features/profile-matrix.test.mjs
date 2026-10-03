@@ -1,5 +1,5 @@
 /**
- * The four profiles, end to end through the real launcher.
+ * The install tiers and the other profiles, end to end through the real launcher.
  *
  * This is the acceptance test for the whole feature system: for each profile it
  * drives `bin/coding --claude --dry-run` — the same code path a launch takes,
@@ -30,44 +30,55 @@ const REPO = (process.env.CODING_REPO || new URL('../..', import.meta.url).pathn
  * proves the YAML parses.
  */
 const MATRIX = {
+  // The four install tiers, each a superset of the last. The assertion that
+  // earns its keep in all four is the ABSENCE of lsl-redirect: that is what
+  // stops an install for another team filing their sessions into the tools
+  // repo instead of their own project.
+  harness: {
+    docker: false,
+    features: ['llm-proxy', 'health', 'statusline'],
+    mcpServers: [],
+    hooks: ['UserPromptSubmit'],
+  },
+  learning: {
+    docker: true,
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge'],
+    mcpServers: [],
+    hooks: ['PostToolUse', 'UserPromptSubmit'],
+  },
+  'learning-perf': {
+    docker: true,
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'performance'],
+    mcpServers: [],
+    hooks: ['PostToolUse', 'UserPromptSubmit'],
+  },
+  everything: {
+    docker: true,
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'performance', 'constraints', 'codegraph'],
+    mcpServers: ['graphify'],
+    hooks: ['PreToolUse', 'PostToolUse', 'UserPromptSubmit'],
+  },
+  // The developer profile: everything + lsl-redirect.
   full: {
     docker: true,
     features: ['lsl', 'lsl-redirect', 'observations', 'knowledge', 'codegraph', 'constraints', 'llm-proxy', 'performance', 'health', 'statusline'],
     mcpServers: ['graphify'],
     hooks: ['PreToolUse', 'PostToolUse', 'UserPromptSubmit'],
   },
-  // The two consumer bundles. The assertion that earns its keep in both is the
-  // ABSENCE of lsl-redirect: that is what stops an install for another team
-  // filing their sessions into the tools repo instead of their own project.
-  km: {
-    docker: true,
-    features: ['lsl', 'observations', 'knowledge', 'health', 'statusline'],
-    mcpServers: [],
-    hooks: ['PostToolUse', 'UserPromptSubmit'],
-  },
-  'km-perf': {
-    docker: true,
-    features: ['lsl', 'observations', 'knowledge', 'llm-proxy', 'performance', 'health', 'statusline'],
-    mcpServers: [],
-    hooks: ['PostToolUse', 'UserPromptSubmit'],
-  },
-  'proxy-only': {
-    docker: false,
-    features: ['llm-proxy', 'statusline'],
-    mcpServers: [],
-    hooks: [],
-  },
-  'logging-only': {
-    docker: false,
-    features: ['lsl', 'health', 'statusline'],
-    mcpServers: [],
-    hooks: ['PostToolUse', 'UserPromptSubmit'],
-  },
+  // The empty baseline `--features=a,b` builds on.
   minimal: {
     docker: false,
     features: ['statusline'],
     mcpServers: [],
     hooks: [],
+  },
+  // A retired name, end to end: an old features.yaml naming it must keep
+  // launching, now as its tier.
+  km: {
+    docker: true,
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge'],
+    mcpServers: [],
+    hooks: ['PostToolUse', 'UserPromptSubmit'],
   },
 };
 
@@ -84,7 +95,7 @@ const homes = {};
  * The snapshot is the one that bites hardest and the one this list originally
  * missed. `bin/coding --dry-run` resolves the SANDBOX home but writes
  * $CODING_REPO/.coding/runtime/features.json, and the last launcher run below
- * is logging-only — so a suite run used to leave the real repo claiming
+ * was then logging-only — so a suite run used to leave the real repo claiming
  * logging-only until the next launch or apply. Nothing notices: the container
  * cannot resolve, so it just disables six programs and the only trace is an
  * ECONNREFUSED loop in a log nobody reads. That happened, and it took about
@@ -167,9 +178,9 @@ describe('the launcher acts on it', () => {
   }
 
   test('a profile needing no container never demands Docker', async () => {
-    // The whole point of proxy-only and minimal: they must work on a machine
+    // The whole point of harness and minimal: they must work on a machine
     // that has no Docker Desktop at all.
-    for (const profile of ['proxy-only', 'minimal', 'logging-only']) {
+    for (const profile of ['harness', 'minimal']) {
       const { out } = await run(join(REPO, 'bin/coding'), ['--claude', '--dry-run', '--verbose'], profile);
       assert.doesNotMatch(out, /Docker is required but not running/, profile);
       assert.match(out, /docker needed: false/, profile);

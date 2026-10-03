@@ -414,20 +414,25 @@ dashboard and do not appear in the status line.
 
 ```bash
 coding-features status                 # what is on, and why
-coding-features profile proxy-only     # just the LLM proxy — no Docker needed
+coding-features profile harness        # launcher, health, LLM proxy — no Docker needed
 coding-features set constraints off    # turn one thing off
 coding-features explain knowledge      # why is this off?
 ```
 
 Or use the dashboard: **http://localhost:3032 → Features**.
 
-Four presets ship: `full` (the default — everything), `proxy-only`,
-`logging-only` and `minimal`. Pick one at install time with
-`./install.sh --features=proxy-only`, or change your mind later — a feature
-enabled after install is set up by `coding-features repair`.
+The installer offers four tiers, each including the one before:
+`harness` (launcher, status line, health, LLM proxy — no Docker; the default),
+`learning` (+ session logging, online + UKB learning, viewer), `learning-perf`
+(+ performance measurement) and `everything` (+ constraints, code graph). Pick
+one at install time with `./install.sh --features=learning`, or change your
+mind later — a feature enabled after install is set up by
+`coding-features repair`. `full` (everything + `lsl-redirect`) is the
+developer profile and is never offered.
 
-**Nothing changes unless you ask.** With no configuration the resolved set is
-everything, exactly as it has always been.
+With no configuration at all the resolved set is everything (`full`); the
+installer always writes the tier you chose, so that only applies to a checkout
+that was never installed.
 
 Configuration is layered, last wins:
 

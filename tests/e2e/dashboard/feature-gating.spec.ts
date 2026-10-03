@@ -52,12 +52,13 @@ function payload(off: string[] = []) {
     disabled: off,
     needsDocker: ALL_FEATURES.some((id) => !off.includes(id) && META[id].needsDocker),
     warnings: [],
-    // Mirrors config/feature-profiles.yaml. `logging-only` KEEPS health, which
-    // is what makes it the control case for the self-destruct confirmation.
+    // Mirrors what the coordinator serves from config/feature-profiles.yaml
+    // (aliases hidden). Every tier KEEPS health — `harness` is the control case
+    // for the self-destruct confirmation; `minimal` is the one that drops it.
     profiles: {
       full: [...ALL_FEATURES],
-      'proxy-only': ['llm-proxy', 'statusline'],
-      'logging-only': ['lsl', 'health', 'statusline'],
+      harness: ['llm-proxy', 'health', 'statusline'],
+      learning: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge'],
       minimal: ['statusline'],
     },
   }
@@ -217,7 +218,7 @@ test.describe('features editor', () => {
   })
 
   test('a profile that turns off health asks before saving', async ({ page }) => {
-    // The dashboard is SERVED by the health feature. Saving proxy-only stops the
+    // The dashboard is SERVED by the health feature. Saving minimal stops the
     // coordinator and this page with it — which the first time round read as
     // "I clicked save and the system broke". It is a valid thing to want; it
     // just must not happen by surprise, and cannot be undone from here.
@@ -228,7 +229,7 @@ test.describe('features editor', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload()) })
     })
     await page.goto('/features')
-    await page.getByTestId('features-profile-proxy-only').click()
+    await page.getByTestId('features-profile-minimal').click()
 
     const panel = page.getByTestId('features-confirm-health')
     await expect(panel).toBeVisible()
@@ -266,9 +267,9 @@ test.describe('features editor', () => {
     })
     await page.route('**/api/features/apply', (route) => route.fulfill({ status: 200, body: '{"ok":true}' }))
     await page.goto('/features')
-    await page.getByTestId('features-profile-logging-only').click()
+    await page.getByTestId('features-profile-harness').click()
     await expect(page.getByTestId('features-confirm-health')).toHaveCount(0)
-    await expect.poll(() => putBody).toEqual({ profile: 'logging-only' })
+    await expect.poll(() => putBody).toEqual({ profile: 'harness' })
   })
 
   test('turning health off by its own toggle asks too', async ({ page }) => {

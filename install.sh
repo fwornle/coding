@@ -148,11 +148,11 @@ mutation_manifest() {
 repo|$CODING_REPO/node_modules|create|yes|Node dependencies
 repo|$CODING_REPO/.env|append|yes|local settings (history repo URL, feature flags)
 repo|$CODING_REPO/.npmrc|create|yes|proxy for npm, only if env vars are not honoured
-repo|$CODING_REPO/.git/hooks/pre-commit|replace|yes|knowledge-snapshot guard (original saved as pre-commit.coding-orig)
+repo|$CODING_REPO/.git/hooks/pre-commit|replace|yes|knowledge-snapshot guard (original saved as pre-commit.coding-orig) [feature:knowledge]
 repo|$CODING_REPO/lib/km-core|checkout|yes|git submodule required for session logging
 repo|$CODING_REPO/.coding/|create|yes|per-launch agent config, so nothing global has to change
 repo|$CODING_REPO/.specstory/history|symlink|yes|points at history/ in your data home below, so this checkout holds no transcripts of its own. A pre-existing history directory here is left as it is [feature:lsl]
-home|~/.coding/features.yaml|create|yes|which parts of coding you chose to install (not written for the default, `full`)
+home|~/.coding/features.yaml|create|yes|which tier (or features) of coding you chose to install
 home|~/.coding/scope|create|no|which tenant owns this machine's knowledge; also names the data root below. Not written if you decline to name one, and never overwritten
 home|~/.coding/data/<scope>/|create|no|your knowledge base and session history, optionally a checkout of YOUR private <scope>-history repo (cloned if it exists, never pushed without confirmation). uninstall.sh never deletes it — removing the scope while leaving this would strand the data behind an unresolvable name
 home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
@@ -1737,22 +1737,35 @@ setup_mcp_config() {
     # this step is a no-op when nothing has been switched; without the splice, changing
     # backends would update the Docker config but leave native mode on the old one.
     # Any non-active backend's serverName is dropped so two never register at once.
+    #
+    # With codegraph off, EVERY backend's entry is dropped: the processed file is
+    # what the launcher and the user-level/opencode/copilot configs below are
+    # built from, so leaving the entry would register an MCP server whose
+    # container is never started.
+    local codegraph_state=off
+    feature_on codegraph && codegraph_state=on
     if command -v node >/dev/null 2>&1 && [[ -f "$CODING_REPO/config/code-graph.json" ]]; then
         if node -e '
             const fs = require("fs");
             const { execFileSync } = require("child_process");
-            const [file, repo] = process.argv.slice(1);
-            const run = (args) => execFileSync("node", [repo + "/scripts/code-graph-config.mjs", ...args], { encoding: "utf8" }).trim();
-            const entry = JSON.parse(run(["mcp-entry", "--agent", "claude", "--flavor", "claude", "--named"]));
+            const [file, repo, codegraph] = process.argv.slice(1);
             const reg = JSON.parse(fs.readFileSync(repo + "/config/code-graph.json", "utf8"));
             const allNames = Object.values(reg.backends).map((b) => b.mcp.serverName);
-            const active = Object.keys(entry)[0];
             const cfg = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (codegraph !== "on") {
+                for (const n of allNames) delete cfg.mcpServers[n];
+                fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+                process.stderr.write("code-graph: feature off, no MCP server registered\n");
+                process.exit(0);
+            }
+            const run = (args) => execFileSync("node", [repo + "/scripts/code-graph-config.mjs", ...args], { encoding: "utf8" }).trim();
+            const entry = JSON.parse(run(["mcp-entry", "--agent", "claude", "--flavor", "claude", "--named"]));
+            const active = Object.keys(entry)[0];
             for (const n of allNames) if (n !== active) delete cfg.mcpServers[n];
             Object.assign(cfg.mcpServers, entry);
             fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
             process.stderr.write("code-graph backend: " + active + "\n");
-        ' "$temp_file" "$CODING_REPO" 2>&1; then
+        ' "$temp_file" "$CODING_REPO" "$codegraph_state" 2>&1; then
             :
         else
             warning "Could not resolve code-graph backend from registry; using the template's literal entry"
@@ -2090,6 +2103,7 @@ print(f'Configured {len(copilot_servers)} MCP servers for Copilot')
 # Rebuilding a wiped LevelDB from the last export is a RECOVERY task, not an
 # install step — km-core's own hydrate() does it when the store opens.
 initialize_shared_memory() {
+    skip_unless_feature knowledge "knowledge management" || return 0
     echo -e "\n${CYAN}📝 Initializing knowledge management...${NC}"
 
     local data_home
@@ -2455,6 +2469,7 @@ configure_docker_mode() {
 
 # Install PlantUML for diagram generation
 install_plantuml() {
+    skip_unless_feature knowledge "PlantUML (UKB diagrams)" || return 0
     info "Installing PlantUML for diagram generation..."
 
     # Check if already installed
@@ -2698,6 +2713,7 @@ detect_gpu_acceleration() {
 # - AMD GPU: Vulkan/ROCm acceleration
 # - CPU: Always available fallback (AVX2/AVX512 optimized)
 setup_local_llm() {
+    skip_unless_feature llm-proxy "local LLM inference (a proxy offload target)" || return 0
     local dmr_port="${DMR_PORT:-12434}"
     local dmr_host="localhost"
 
@@ -2807,6 +2823,29 @@ ensure_dmr_model() {
 
 # Setup LLM CLI Proxy - HTTP bridge to host CLI tools (claude, copilot, pi)
 # for Docker containers. Port 12435, adjacent to DMR's port 12434.
+# The proxy is not optional for a tier that names it: every tier's token
+# measurement, routing and background LLM calls go through it, so an install
+# that "succeeds" without it is a broken install that says it is fine. Abort,
+# naming the access that is missing.
+#
+# --ci is the exception, by the same contract as run_step: there a missing
+# credential is an expected environment gap, recorded as a failure in the
+# summary instead of ending the run.
+llm_proxy_unavailable() {
+    local what="$1"; shift
+    local line
+    if [[ "$CI_LITE" == "true" ]]; then
+        warning "  LLM proxy: $what"
+        for line in "$@"; do info "  $line"; done
+        INSTALLATION_FAILURES+=("LLM proxy: $what")
+        return 0
+    fi
+    echo "" >&2
+    for line in "$@"; do echo -e "${YELLOW}  $line${NC}" >&2; done
+    echo -e "${YELLOW}  Then re-run ./install.sh.${NC}" >&2
+    error_exit "The LLM proxy is part of the selected tier, but $what."
+}
+
 setup_llm_cli_proxy() {
     skip_unless_feature llm-proxy "the LLM CLI proxy" || return 0
     local proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
@@ -2935,10 +2974,10 @@ setup_llm_cli_proxy() {
         info "Cloning the LLM proxy into $proxy_dir"
         mkdir -p "$(dirname "$proxy_dir")"
         if ! run_with_timeout 300 git clone --quiet "$proxy_repo" "$proxy_dir" >>"$INSTALL_LOG" 2>&1; then
-            warning "  Could not clone $proxy_repo"
-            info "  → clone it to $proxy_dir yourself (or set RAPID_LLM_PROXY_REPO), then re-run ./install.sh"
-            INSTALLATION_WARNINGS+=("LLM proxy: clone of $proxy_repo failed — no proxy installed")
-            SKIPPED_SYSTEM_DEPS+=("llm-cli-proxy")
+            llm_proxy_unavailable "could not clone $proxy_repo" \
+                "This needs READ access to $proxy_repo — on bmw.ghe.com that means a" \
+                "GHE account that can see the repo, with git credentials for HTTPS." \
+                "Or clone it to $proxy_dir yourself (or set RAPID_LLM_PROXY_REPO)."
             return 0
         fi
     else
@@ -2958,8 +2997,9 @@ setup_llm_cli_proxy() {
         && [[ -f "$proxy_dir/dist/index.js" && -f "$proxy_dir/proxy-bridge/server.mjs" ]]; then
         success "  LLM proxy built"
     else
-        warning "  LLM proxy build failed — see $INSTALL_LOG"
-        INSTALLATION_WARNINGS+=("LLM proxy: build failed in $proxy_dir")
+        llm_proxy_unavailable "the build failed in $proxy_dir — see $INSTALL_LOG" \
+            "npm needs to reach its registry (and github.com for better-sqlite3's" \
+            "native binding); behind a corporate proxy, check HTTPS_PROXY."
         return 0
     fi
 
@@ -4188,9 +4228,18 @@ OPTIONS:
                             MCP servers and slash commands also apply to bare
                             claude/copilot/opencode sessions in every project.
                             Default is wrapper scope: bare agents are untouched.
+      --features=<tier>     Which tier to install, without asking:
+                              harness        launcher, status line, health,
+                                             LLM proxy + token measurement (no Docker)
+                              learning       + LSL, online + UKB learning, viewer
+                              learning-perf  + performance measurement
+                              everything     + constraints + code graph
+                            Also a profile name (\`coding-features profiles\`) or a
+                            comma-separated feature list. Unattended default: harness.
   -h, --help                Show this help and exit.
 
 ENVIRONMENT:
+  CODING_INSTALL_FEATURES=<tier>   Same as --features.
   CI=true                          Same as --ci (auto-detected on CI runners).
   CODING_INSTALL_YES=1             Same as --yes.
   CODING_INSTALL_CI=1              Same as --ci.
@@ -4234,14 +4283,14 @@ parse_args() {
             --dry-run)                   DRY_RUN=true; NON_INTERACTIVE=true
                                          INSTALL_LOG="${TMPDIR:-/tmp}/coding-install-dryrun.log" ;;
             --global-agents)             CODING_INSTALL_GLOBAL_AGENTS=1 ;;
-            # Which parts of `coding` to install and run. A profile name
-            # (full|proxy-only|logging-only|minimal) or a comma-separated
-            # feature list. Absent = ask interactively, default `full`, which is
-            # byte-for-byte the historical install.
+            # Which parts of `coding` to install and run. A tier
+            # (harness|learning|learning-perf|everything), another profile name
+            # or a comma-separated feature list. Absent = ask interactively
+            # (default harness); unattended default is harness.
             --features=*)                CODING_INSTALL_FEATURES="${1#*=}" ;;
             --scope=*)                   CODING_INSTALL_SCOPE="${1#*=}" ;;
             --scope)                     shift; CODING_INSTALL_SCOPE="${1:-}" ;;
-            --features)                  shift; CODING_INSTALL_FEATURES="${1:-full}" ;;
+            --features)                  shift; CODING_INSTALL_FEATURES="${1:-harness}" ;;
             -h|--help)                   show_usage; exit 0 ;;
             --skip-hooks)                : ;;  # accepted, no-op at root level
             *)                           warning "Unknown option: $1 (ignored)" ;;
@@ -4294,9 +4343,11 @@ read_or_default() {
 # ─────────────────────────────────────────────────────────────────────────────
 # WHICH PARTS TO INSTALL
 #
-# The second question that shapes the install. Default is `full` — byte-for-byte
-# what this installer has always done — so an existing user pressing Enter gets
-# no change at all.
+# The second question that shapes the install: one of four tiers, each a
+# superset of the last (harness → learning → learning-perf → everything). The
+# default is harness, never `full` — that is the developer profile and carries
+# lsl-redirect. A re-run offers the current selection as the default, so an
+# existing user pressing Enter gets no change at all.
 #
 # Writes ~/.coding/features.yaml. Everything downstream (this script's own skip
 # logic, bin/coding, the service starter, the container entrypoint, the hooks,
@@ -4412,46 +4463,70 @@ ask_feature_selection() {
     # An existing selection is also kept in an unattended run with nothing
     # specified, for the same reason: re-running the installer to pick up a
     # fix must not silently reset which parts of the system are installed.
-    if [[ -z "$choice" && -f "$HOME/.coding/features.yaml" ]]; then
-        resolve_feature_selection
-        info "Existing feature selection found — keeping it: ${ACTIVE_FEATURES:-(none)}"
-        info "  Change it with: coding-features profile <name>"
-        return 0
+    # An INTERACTIVE re-run asks again, offering the current selection as the
+    # default, so changing tier is just re-running ./install.sh.
+    local current=""
+    if [[ -f "$HOME/.coding/features.yaml" ]]; then
+        if [[ -z "$choice" && "$NON_INTERACTIVE" == "true" ]]; then
+            resolve_feature_selection
+            info "Existing feature selection found — keeping it: ${ACTIVE_FEATURES:-(none)}"
+            info "  Change it with: coding-features profile <name>"
+            return 0
+        fi
+        current="$(node "$CODING_REPO/bin/coding-features" profile 2>/dev/null || true)"
+        [[ -n "$current" && "$current" != "(none)" ]] || current="keep"
     fi
 
     if [[ -z "$choice" && "$NON_INTERACTIVE" != "true" ]]; then
+        local default="${current:-harness}"
         echo ""
         echo -e "${PURPLE}────────────────────────────────────────────────────────────────────${NC}"
-        echo -e "${PURPLE}  WHICH PARTS DO YOU WANT?${NC}"
+        echo -e "${PURPLE}  WHICH TIER DO YOU WANT?${NC}"
         echo -e "${PURPLE}────────────────────────────────────────────────────────────────────${NC}"
         echo ""
-        echo "  1) full          everything (default — what this installer has always done)"
-        echo "  2) proxy-only    just the LLM proxy: routing, fallback, token accounting."
-        echo "                   No Docker, no logging, no knowledge base."
-        echo "  3) logging-only  verbatim session logging + health monitoring. No Docker."
-        echo "  4) minimal       the agent launcher and a status line. No background services."
+        echo "  1) harness        agent launcher, status line, health monitoring"
+        echo "                    (coordinator + dashboard), LLM proxy + token measurement."
+        echo "                    No Docker."
+        echo "  2) learning       harness + session logging, online learning (observations,"
+        echo "                    digests, insights), UKB batch learning, knowledge viewer."
+        echo "                    Needs Docker."
+        echo "  3) learning-perf  learning + performance measurement. Needs Docker."
+        echo "  4) everything     learning-perf + constraints (guardrails) + code graph."
+        echo "                    Needs Docker."
         echo ""
+        if [[ "$current" == "keep" ]]; then
+            echo "  Enter keeps your current per-feature selection."
+        elif [[ -n "$current" ]]; then
+            echo "  Current selection: $current (Enter keeps it)."
+        fi
         echo "  Any of this can be changed later with \`coding-features\`, or in the"
         echo "  dashboard under Features. Nothing here is permanent."
         echo ""
-        read_or_default choice "full" "Choice [1-4, or a profile name] (default: full): "
+        read_or_default choice "$default" "Choice [1-4, or a profile name] (default: $default): "
         case "$choice" in
-            1|"") choice="full" ;;
-            2) choice="proxy-only" ;;
-            3) choice="logging-only" ;;
-            4) choice="minimal" ;;
+            "") choice="$default" ;;
+            1) choice="harness" ;;
+            2) choice="learning" ;;
+            3) choice="learning-perf" ;;
+            4) choice="everything" ;;
         esac
+        if [[ "$choice" == "keep" ]]; then
+            resolve_feature_selection
+            info "Keeping the existing feature selection: ${ACTIVE_FEATURES:-(none)}"
+            return 0
+        fi
     fi
 
-    [[ -n "$choice" ]] || choice="full"
+    # Unattended with no selection anywhere: the smallest tier. It needs no
+    # Docker, so it cannot fail on a machine without Docker Desktop — and an
+    # absent features.yaml would resolve to all-on, which is the developer's
+    # profile (lsl-redirect included), never right for anyone else.
+    [[ -n "$choice" ]] || choice="harness"
     CODING_INSTALL_FEATURES="$choice"
 
-    # `full` is the default and writes nothing: an absent features.yaml already
-    # resolves to all-on, and not creating a file keeps `coding-features status`
-    # honest about the user never having made a choice.
-    if [[ "$choice" == "full" ]]; then
-        info "Installing everything (default)"
-    elif [[ -x "$CODING_REPO/bin/coding-features" ]] && command -v node >/dev/null 2>&1; then
+    # Always written, `full` included: the file IS the record of the choice, and
+    # skipping it for one value would leave an older selection in force.
+    if [[ -x "$CODING_REPO/bin/coding-features" ]] && command -v node >/dev/null 2>&1; then
         mkdir -p "$HOME/.coding"
         if [[ "$choice" == *","* ]]; then
             # A comma-separated list: start from nothing, switch on what was named.
@@ -4474,14 +4549,17 @@ ask_feature_selection() {
         # name written here would otherwise abort `coding --claude` days later,
         # with nothing pointing back at the install.
         if ! node "$CODING_REPO/bin/coding-features" status >/dev/null 2>&1; then
-            warning "  '$choice' is not a valid feature selection — falling back to full"
-            rm -f "$HOME/.coding/features.yaml"
-            CODING_INSTALL_FEATURES="full"
-            INSTALLATION_WARNINGS+=("Feature selection '$choice' was invalid; installed everything instead")
+            warning "  '$choice' is not a valid feature selection — falling back to harness"
+            printf '# Written by install.sh (fallback from invalid %s)\nprofile: harness\n' "$choice" \
+                > "$HOME/.coding/features.yaml"
+            CODING_INSTALL_FEATURES="harness"
+            INSTALLATION_WARNINGS+=("Feature selection '$choice' was invalid; installed the harness tier instead")
         else
             success "  Feature selection: $choice"
         fi
     else
+        # Fails OPEN like resolve_feature_selection: no resolver means no way to
+        # record a tier, so install everything rather than silently skip steps.
         warning "  Cannot write a feature selection yet (node or bin/coding-features missing) — installing everything"
         CODING_INSTALL_FEATURES="full"
     fi
@@ -4785,7 +4863,7 @@ main() {
     # The single question that decides host impact (default: wrapper-scoped).
     ask_agent_scope
 
-    # The second question: which parts to install (default: everything).
+    # The second question: which tier to install (default: harness).
     # Runs BEFORE any install step, so the skips below act on the answer.
     ask_feature_selection
 
@@ -5296,6 +5374,7 @@ EOF
 # Prevents .data/ files from being accidentally committed with unrelated changes.
 # Only allows .data/ commits when OKB_SNAPSHOT=1 is explicitly set.
 install_okb_snapshot_guard() {
+    skip_unless_feature knowledge "the OKB snapshot guard" || return 0
     echo -e "\n${CYAN}Installing OKB snapshot guard hooks...${NC}"
 
     local hook_template="$CODING_REPO/scripts/hooks/pre-commit-okb-guard.sh"
@@ -5403,178 +5482,37 @@ install_constraint_monitor_hooks() {
     fi
     success "Node.js health check passed"
 
+    # Delegated to build-claude-runtime-config.mjs, which owns "what does coding
+    # need in Claude's settings" for BOTH scopes. It installs only the hooks
+    # whose feature is on (PreToolUse → constraints, PostToolUse → lsl,
+    # UserPromptSubmit → health), strips the ones whose feature is off, merges
+    # by script name so the user's own hooks survive, and writes nothing when
+    # the result already matches disk.
+    #
+    # This used to be a jq merge of its own that added all three hooks
+    # unconditionally, so a --global-agents install with constraints off still
+    # ran the constraint check on every tool call in every project.
+    #
+    # Ordering note: this must run AFTER GSD is installed, since GSD is what
+    # puts gsd-statusline.js in settings.json and the builder wraps it.
+    # Re-running the installer, or launching via `coding`, repairs the order.
     local settings_file="$HOME/.claude/settings.json"
-    local pre_hook_cmd="node $CODING_REPO/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
-    local post_hook_cmd="node $CODING_REPO/scripts/tool-interaction-hook-wrapper.js"
-    local prompt_hook_cmd="node $CODING_REPO/scripts/health-prompt-hook.js"
-
-    # Create .claude directory if it doesn't exist
     mkdir -p "$HOME/.claude"
-
-    # Check if jq is available for JSON manipulation
-    if ! command -v jq >/dev/null 2>&1; then
-        warning "jq not found - attempting manual JSON configuration"
-
-        # Create settings file if it doesn't exist
-        if [[ ! -f "$settings_file" ]]; then
-            cat > "$settings_file" << EOF
-{
-  "\$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$pre_hook_cmd"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$post_hook_cmd"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$prompt_hook_cmd",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
-}
-EOF
-            success "Created new settings file with hooks and status line"
-            return 0
-        else
-            warning "Cannot merge hooks without jq - please install jq and run installer again"
-            INSTALLATION_WARNINGS+=("Hooks: Not installed - jq required for merge")
-            return 1
-        fi
+    # ONE-TIME original, which uninstall.sh knows about.
+    if [[ -f "$settings_file" && ! -f "${settings_file}.coding-orig" ]]; then
+        cp "$settings_file" "${settings_file}.coding-orig"
+        info "Saved a one-time original: ${settings_file}.coding-orig"
     fi
 
-    # Backup existing settings — ONE-TIME original, not one per run.
-    if [[ -f "$settings_file" ]]; then
-        local backup_file="${settings_file}.coding-orig"
-        if [[ ! -f "$backup_file" ]]; then
-            cp "$settings_file" "$backup_file"
-            info "Saved a one-time original: $backup_file"
-        fi
+    if CODING_REPO="$CODING_REPO" node "$CODING_REPO/scripts/build-claude-runtime-config.mjs" --install-global >>"$INSTALL_LOG" 2>&1; then
+        success "Hooks asserted in ~/.claude/settings.json"
+        feature_on constraints && info "  - PreToolUse: Constraint monitoring (blocks violations)"
+        feature_on lsl && info "  - PostToolUse: LSL logging (captures interactions)"
+        feature_on health && info "  - UserPromptSubmit: System health verification"
+        info "  - StatusLine: wrapped (context gauge shown once, in the tmux bar)"
     else
-        # Create new settings file
-        echo '{"$schema": "https://json.schemastore.org/claude-code-settings.json"}' > "$settings_file"
-    fi
-
-    # Use jq to add or update hooks
-    local temp_file=$(mktemp)
-
-    # Check if EXACT hooks already exist with correct paths
-    local pre_exists=$(jq -e --arg cmd "$pre_hook_cmd" '.hooks.PreToolUse[]? | select(.hooks[]?.command == $cmd)' "$settings_file" 2>/dev/null && echo "yes" || echo "no")
-    local post_exists=$(jq -e --arg cmd "$post_hook_cmd" '.hooks.PostToolUse[]? | select(.hooks[]?.command == $cmd)' "$settings_file" 2>/dev/null && echo "yes" || echo "no")
-
-    if [[ "$pre_exists" == "yes" ]] && [[ "$post_exists" == "yes" ]]; then
-        info "Both PreToolUse and PostToolUse hooks already installed with correct paths"
-        return 0
-    fi
-
-    # IMPORTANT: Remove any old hook entries (duplicates or wrong paths) before adding new ones
-    # This ensures clean state and prevents accumulation of stale hooks
-    jq --arg pre_cmd "$pre_hook_cmd" --arg post_cmd "$post_hook_cmd" --arg prompt_cmd "$prompt_hook_cmd" '
-        # Remove ALL existing PreToolUse hooks that match the wrapper script (regardless of path)
-        .hooks.PreToolUse = (
-            if .hooks.PreToolUse then
-                [.hooks.PreToolUse[] | select(.hooks[]?.command | contains("pre-tool-hook-wrapper.js") | not)]
-            else
-                []
-            end
-        ) |
-        # Remove ALL existing PostToolUse hooks that match the wrapper script (regardless of path)
-        .hooks.PostToolUse = (
-            if .hooks.PostToolUse then
-                [.hooks.PostToolUse[] | select(.hooks[]?.command | contains("tool-interaction-hook-wrapper.js") | not)]
-            else
-                []
-            end
-        ) |
-        # Remove ALL existing UserPromptSubmit hooks that match health-prompt-hook (regardless of path)
-        .hooks.UserPromptSubmit = (
-            if .hooks.UserPromptSubmit then
-                [.hooks.UserPromptSubmit[] | select(.hooks[]?.command | contains("health-prompt-hook.js") | not)]
-            else
-                []
-            end
-        ) |
-        # Add the new hooks with correct paths (only ONE instance of each)
-        .hooks.PreToolUse += [{
-            "matcher": "*",
-            "hooks": [{
-                "type": "command",
-                "command": $pre_cmd
-            }]
-        }] |
-        .hooks.PostToolUse += [{
-            "matcher": "*",
-            "hooks": [{
-                "type": "command",
-                "command": $post_cmd
-            }]
-        }] |
-        .hooks.UserPromptSubmit += [{
-            "hooks": [{
-                "type": "command",
-                "command": $prompt_cmd,
-                "timeout": 5
-            }]
-        }]
-    ' "$settings_file" > "$temp_file"
-
-    # Validate JSON
-    if jq empty "$temp_file" 2>/dev/null; then
-        mv "$temp_file" "$settings_file"
-        success "Hooks installed to ~/.claude/settings.json"
-        info "  - PreToolUse: Constraint monitoring (blocks violations)"
-        info "  - PostToolUse: LSL logging (captures interactions)"
-        info "  - UserPromptSubmit: System health verification"
-
-        # Assert the Claude status-line wrapper too. The tmux bar now renders the
-        # context-window gauge for ALL agents, so Claude's own copy of that meter
-        # is a duplicate; scripts/claude-statusline.cjs runs whatever status-line
-        # command the user has configured and strips only that one segment.
-        #
-        # Delegated rather than done with jq here on purpose:
-        # build-claude-runtime-config.mjs already owns "what does coding need in
-        # Claude's settings", so keeping the decision there is what stops the two
-        # scopes drifting. It is idempotent — it re-merges the same hooks this jq
-        # block just wrote and returns without writing when nothing changed — and
-        # it recovers the original upstream command rather than wrapping a
-        # wrapper, so running the installer twice cannot nest it.
-        #
-        # Ordering note: this must run AFTER GSD is installed, since GSD is what
-        # puts gsd-statusline.js in settings.json. Re-running the installer, or
-        # simply launching via `coding`, repairs the order if GSD lands later.
-        if node "$CODING_REPO/scripts/build-claude-runtime-config.mjs" --install-global >/dev/null 2>&1; then
-            info "  - StatusLine: wrapped (context gauge shown once, in the tmux bar)"
-        else
-            warning "Could not assert the Claude status-line wrapper"
-            INSTALLATION_WARNINGS+=("StatusLine: wrapper not asserted; the context gauge may appear twice")
-        fi
-    else
-        rm -f "$temp_file"
-        warning "Failed to update settings file - JSON validation failed"
-        INSTALLATION_WARNINGS+=("Hooks: Installation failed - JSON error")
+        warning "Failed to update ~/.claude/settings.json — see $INSTALL_LOG"
+        INSTALLATION_WARNINGS+=("Hooks: global settings not written")
         return 1
     fi
 }

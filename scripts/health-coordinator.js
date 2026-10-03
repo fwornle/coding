@@ -43,7 +43,7 @@ import { startNetworkChangeWatcher, networkChangeRecent } from '../lib/network/n
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
-import { loadFeatures, FeatureConfigError, loadProfiles, configPaths } from '../lib/features/index.mjs';
+import { loadFeatures, FeatureConfigError, loadProfiles, profileAliases, configPaths } from '../lib/features/index.mjs';
 import { setFeatures, setProfile } from '../lib/features/write.mjs';
 import { checkSnapshot } from '../lib/features/snapshot.cjs';
 import {
@@ -4350,6 +4350,9 @@ app.get('/features', (_req, res) => {
   try {
     const resolved = loadFeatures({ force: true });
     const profiles = loadProfiles(configPaths().profiles);
+    // Retired names (km, proxy-only, …) still resolve but are not offered.
+    const aliases = profileAliases(configPaths().profiles);
+    for (const name of Object.keys(aliases)) delete profiles[name];
     res.json({
       ok: true,
       ...resolved,
