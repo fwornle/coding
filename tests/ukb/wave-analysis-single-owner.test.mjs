@@ -318,17 +318,24 @@ describe('an in-process run can be cancelled', { skip: SKIP_NO_SUBMODULE }, () =
 describe('`ukb debug` mock mode makes no real LLM calls', { skip: SKIP_NO_SUBMODULE }, () => {
   // Measured 2026-10-01: a debug run logged "LLM mode fallback: intended=mock,
   // actual=public" and spent ~9s per entity on real, metered calls. Two holes.
-  test('the mock service is wired AFTER providers exist', () => {
-    // setMockService() writes into the 'mock' provider, which initialize()
-    // registers — called from the constructor it was a silent no-op.
-    const flat = code(semanticAnalyzer).replace(/\s+/g, ' ');
-    assert.match(flat, /await this\.llmService\.initialize\(\); this\.wireMockService\(\);/);
-    const ctor = flat.slice(flat.indexOf('constructor() {'), flat.indexOf('private wireMockService(): void {'));
-    assert.doesNotMatch(ctor, /setMockService\(/);
+  // Both holes were in the vendored SDK's provider wiring. The SDK is gone:
+  // SemanticAnalyzer now has ONE exit point, `complete()`, which answers mock
+  // mode itself before anything can dial out. Behavioural coverage of the same
+  // invariant: src/agents/llm-with-process.test.ts in the submodule.
+  test('the one exit point answers mock mode before it can reach the proxy', () => {
+    const c = code(semanticAnalyzer);
+    const fn = c.slice(c.indexOf('private async complete(request: {'));
+    const mock = fn.indexOf("getLLMModeForAgent() === 'mock'");
+    const dial = fn.indexOf('llmWithProcessComplete(');
+    assert.ok(mock > -1 && dial > -1 && mock < dial, 'mock is checked before the proxy call');
   });
 
-  test('a process-tagged call does not dial the real proxy in mock mode', () => {
-    assert.match(semanticAnalyzer, /if \(llmMode !== 'mock' && typeof processTag === 'string'/);
+  test('nothing else in SemanticAnalyzer dials the proxy', () => {
+    // A second call site would be a path that skips the mock check — which is
+    // exactly what a process-tagged call used to be.
+    const c = code(semanticAnalyzer);
+    assert.equal((c.match(/llmWithProcessComplete\(/g) || []).length, 1);
+    assert.doesNotMatch(c, /LLMService/);
   });
 });
 
