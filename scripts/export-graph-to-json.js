@@ -15,6 +15,10 @@ import { KnowledgeQueryService } from '../src/knowledge-management/KnowledgeQuer
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+// The data home, never the tools checkout: exports are learned data (T4).
+const { knowledgeExportDir } = createRequire(import.meta.url)('../lib/paths/data-home.cjs');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -103,7 +107,7 @@ async function main() {
       console.log(`   Relations: ${relations.length}`);
 
       // Write to JSON file
-      const outputPath = path.join(projectRoot, '.data', 'knowledge-export', `${team}.json`);
+      const outputPath = path.join(knowledgeExportDir(), `${team}.json`);
       const data = {
         team,
         entities,
@@ -112,6 +116,7 @@ async function main() {
         exportedBy: 'export-graph-to-json.js'
       };
 
+      await fs.mkdir(path.dirname(outputPath), { recursive: true });
       await fs.writeFile(outputPath, JSON.stringify(data, null, 2));
       console.log(`   ✅ Exported to: ${outputPath}`);
     }

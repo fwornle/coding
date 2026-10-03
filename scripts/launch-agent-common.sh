@@ -100,6 +100,10 @@ _cleanup_session() {
   node "$SCRIPT_DIR/psm-session-cleanup.js" "$SESSION_ID" 2>/dev/null || {
     _agent_log "Warning: Session cleanup failed"
   }
+
+  # D3: commit what this session learned, locally. Never pushes — that is
+  # `coding sync --push`, on the user's confirmation.
+  node "$SCRIPT_DIR/../lib/history/sync.mjs" commit --repo "$TARGET_PROJECT_DIR" >/dev/null 2>&1 || true
 }
 
 # Mandatory monitoring verification

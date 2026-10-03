@@ -1712,7 +1712,7 @@ export class ObservationWriter {
         type: 'observation',
         id,
         content: redactedSummary,
-        metadata: { agent, quality, date: nowISO.slice(0, 10), project: 'coding' },
+        metadata: { agent, quality, date: nowISO.slice(0, 10), project: metadata.project || metadata.team || null },
         timestamp: nowISO,
       })).catch((err) => {
         process.stderr.write(`[ObservationWriter] Redis publish failed (non-fatal): ${err.message}\n`);

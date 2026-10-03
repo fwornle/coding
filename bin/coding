@@ -162,6 +162,14 @@ while [ -L "$SOURCE" ]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
+# `coding sync …` — learning-repo sync (lib/history/sync.mjs). A subcommand
+# only as the FIRST word, so an agent argument that happens to be "sync"
+# further along still reaches the agent.
+if [[ "${1:-}" == "sync" ]]; then
+  shift
+  exec node "$SCRIPT_DIR/../lib/history/sync.mjs" "$@"
+fi
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in

@@ -78,11 +78,18 @@ export class ObservationExporter {
    *   the historic JSON unchanged.
    * @param {string} [options.projectRoot] - Project root (for resolving export dir)
    * @param {string} [options.exportDir] - Override export directory path
+   * @param {() => Object<string, {kbDir: string}>} [options.projectKbDirs] -
+   *   project id → its learning checkout's `kb/` dir. Each such project also
+   *   gets its own slice of the three files in `<kbDir>/observation-export/`,
+   *   which is what travels to teammates with the repo (T4). The combined
+   *   files in `exportDir` stay as they are — the dashboard's cold store
+   *   reads them.
    */
-  constructor({ kmStore, db, projectRoot, exportDir }) {
+  constructor({ kmStore, db, projectRoot, exportDir, projectKbDirs }) {
     this.kmStore = kmStore || null;
     this.db = db || null;
     this.exportDir = exportDir || path.resolve(projectRoot || '.', DEFAULT_EXPORT_DIR);
+    this.projectKbDirs = projectKbDirs || null;
   }
 
   /**
@@ -127,6 +134,7 @@ export class ObservationExporter {
     this._writeJSON('digests.json', merged.digests);
     this._writeJSON('insights.json', merged.insights);
     this._writeJSON('metadata.json', metadata);
+    this._writeProjectSlices(merged);
 
     process.stderr.write(
       `[ObservationExporter] Exported ${merged.observations.length} obs, ${merged.digests.length} digests, ${merged.insights.length} insights → ${this.exportDir}\n`
@@ -322,7 +330,7 @@ export class ObservationExporter {
             id,
             summary: attrs.description || attrs.name || '',
             agent: m.agent || attrs.agent || 'unknown',
-            project: m.project || 'coding',
+            project: m.project || m.team || null,
             source: m.source || null,
             quality: m.quality || 'normal',
             // kind tags mid-turn progress snapshots ('progress') so the dashboard
@@ -427,7 +435,7 @@ export class ObservationExporter {
           quality: m.quality || 'normal',
           createdAt: m.createdAt || attrs.createdAt || null,
           metadata: m,
-          project: m.project || 'coding',
+          project: m.project || m.team || null,
         };
       });
       mapped.sort((a, b) => {
@@ -490,7 +498,7 @@ export class ObservationExporter {
           lastUpdated: m.last_updated || attrs.updatedAt || attrs.createdAt || null,
           createdAt: m.createdAt || attrs.createdAt || null,
           metadata: m,
-          project: m.project || 'coding',
+          project: m.project || m.team || null,
         };
       });
       mapped.sort((a, b) => {
@@ -575,10 +583,33 @@ export class ObservationExporter {
   }
 
   /**
+   * One slice per project that has a learning checkout: the rows whose
+   * `project` is that project, in `<kbDir>/observation-export/`. No metadata
+   * file — its `exportedAt` would change the repo on every export.
+   */
+  _writeProjectSlices(merged) {
+    if (!this.projectKbDirs) return;
+    let dirs;
+    try { dirs = this.projectKbDirs() || {}; } catch { return; }
+    for (const [project, { kbDir, kind }] of Object.entries(dirs)) {
+      if (!kbDir || kind === 'shared') continue; // someone else's clone: read-only
+      const dir = path.join(kbDir, 'observation-export');
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        for (const kind of ['observations', 'digests', 'insights']) {
+          this._writeJSON(`${kind}.json`, merged[kind].filter((r) => r && r.project === project), dir);
+        }
+      } catch (err) {
+        process.stderr.write(`[ObservationExporter] slice for ${project} failed: ${err.message}\n`);
+      }
+    }
+  }
+
+  /**
    * Write JSON with stable key ordering for clean git diffs.
    */
-  _writeJSON(filename, data) {
-    const filePath = path.join(this.exportDir, filename);
+  _writeJSON(filename, data, dir = this.exportDir) {
+    const filePath = path.join(dir, filename);
     const content = JSON.stringify(data, null, 2) + '\n';
 
     // Skip write if content hasn't changed (avoids unnecessary git churn)
