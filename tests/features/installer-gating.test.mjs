@@ -11,7 +11,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -188,5 +188,50 @@ describe('uninstall symmetry', () => {
     // rmdir, not rm -rf: the directory is ours, but a future version may keep
     // something else there and a blanket delete would take it with us.
     assert.match(uninstall, /rmdir "\$HOME\/\.coding" 2>\/dev\/null/);
+  });
+});
+
+describe('host daemons follow DAEMONS', () => {
+  // install.sh used to install ONE daemon (the proxy). Everything else a km or
+  // km-perf install needs — obs-api, the coordinator, the capture daemons — ran
+  // on the developer's machine only because it had been set up by hand there.
+  const DAEMONS_MOD = join(REPO, 'lib/features/daemons.mjs');
+  const body = install.slice(install.indexOf('install_feature_daemons() {'));
+  const fnBody = body.slice(0, body.indexOf('\n}\n'));
+
+  test('the step is called, after every npm step', () => {
+    const main = install.slice(install.indexOf('main() {'));
+    const step = main.indexOf('run_step install_feature_daemons');
+    assert.ok(step > 0, 'main() should run install_feature_daemons');
+    assert.ok(step > main.indexOf('run_step verify_host_embeddings'),
+      'it must run after the last npm step: the daemons run from node_modules');
+  });
+
+  test('it reads the daemon list from DAEMONS rather than restating it', () => {
+    assert.match(fnBody, /lib\/features\/daemons\.mjs/);
+    assert.match(fnBody, /DAEMONS/);
+    // ...and leaves the proxy to setup_llm_cli_proxy, which also writes the Linux unit.
+    assert.match(fnBody, /llm-cli-proxy/);
+  });
+
+  test('every daemon has a template, except the ones known not to', async () => {
+    const { DAEMONS } = await import(DAEMONS_MOD);
+    // auto-measure-foreground: nothing runs it on any machine yet, so there is
+    // no tested service definition to ship. The installer reports it as not
+    // installable rather than skipping it silently.
+    const KNOWN_MISSING = new Set(['auto-measure-foreground']);
+    for (const id of Object.keys(DAEMONS)) {
+      const has = existsSync(join(REPO, 'launchd', `com.coding.${id}.plist`));
+      if (KNOWN_MISSING.has(id)) {
+        assert.equal(has, false, `${id} now has a template — drop it from KNOWN_MISSING`);
+      } else {
+        assert.ok(has, `${id} is in DAEMONS but launchd/com.coding.${id}.plist does not exist`);
+      }
+    }
+  });
+
+  test('uninstall.sh removes every templated daemon, not just the proxy', () => {
+    assert.match(uninstall, /launchd\/com\.coding\.\*\.plist/);
+    assert.match(uninstall, /launchctl bootout "gui\/\$\(id -u\)\/\$_label"/);
   });
 });

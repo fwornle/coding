@@ -18,10 +18,19 @@
  *     left untouched.
  *
  * State machine, per agent, per tick:
- *   detect → fresh?  ──yes─▶ bound to this session?  ──no─▶ start span
- *                    │                                └─yes▶ no-op
+ *   detect → fresh?  ──yes─▶ another session fresh too?  ──yes─▶ clear own slot
+ *                    │                                    └─no──▶ bound?  ──no─▶ start span
+ *                    │                                                    └─yes▶ no-op
  *                    └no──▶ own a stale reconciler slot?  ──yes─▶ clear it
  *                                                          └─no─▶ no-op
+ *
+ * OVERLAP: the proxy keeps ONE slot per agent, so two sessions of the same
+ * agent active at once cannot both be measured. Binding the newest flipped the
+ * slot between them on every write (observed 2026-10-03: two claude sessions,
+ * a rebind every 5s poll), booking each session's traffic to whichever held the
+ * slot at that instant. While both are fresh the slot stays EMPTY, so their
+ * rows land unattributed — the state before auto-measure existed — instead of
+ * misattributed. Measurement resumes on its own once one goes quiet.
  *
  * Config — config/behavior.json (hot-reloaded each tick, non-fatal if absent):
  *   { "autoMeasure": {
@@ -102,8 +111,9 @@ function isOwnSlot(span) {
  * @param {{ getActiveMeasurement: Function, startMeasurement: Function,
  *           clearAgentSpan: Function }} span
  * @param {ReturnType<typeof loadBehaviorConfig>} cfg
- * @param {{ sessionId: string, lastActivityMs: number } | null} found
- *   the detected foreground session (injected — rule 07: explicit dependency)
+ * @param {{ sessionId: string, lastActivityMs: number, runnerUpMs?: number|null } | null} found
+ *   the detected foreground session (injected — rule 07: explicit dependency);
+ *   runnerUpMs is when the agent's next most recent session was last active
  * @param {number} now epoch ms (injected for testability)
  * @returns {string}
  */
@@ -118,6 +128,11 @@ export function reconcileAgent(agent, span, cfg, found, now = Date.now()) {
 
   if (!fresh) {
     return isOwnSlot(current) && span.clearAgentSpan(agent, DATA_DIR) ? 'cleared(stale)' : 'idle';
+  }
+  const overlap = typeof found.runnerUpMs === 'number' && now - found.runnerUpMs <= cfg.freshnessMs;
+  if (overlap) {
+    // An operator-owned slot is still never touched, overlap or not.
+    return isOwnSlot(current) && span.clearAgentSpan(agent, DATA_DIR) ? 'cleared(overlap)' : 'overlap';
   }
   if (current && current.task_id === found.sessionId) return 'bound';
   if (current && !isOwnSlot(current)) return 'skip(operator-owned)';
@@ -140,7 +155,7 @@ export function tick(span, cfg, log) {
     } catch (err) {
       action = `error: ${err.message}`;
     }
-    if (log && action !== 'idle' && action !== 'bound' && action !== 'skip') {
+    if (log && action !== 'idle' && action !== 'bound' && action !== 'skip' && action !== 'overlap') {
       log(`[reconciler] ${agent}: ${action}`);
     }
   }

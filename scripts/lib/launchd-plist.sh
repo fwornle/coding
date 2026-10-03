@@ -11,7 +11,7 @@
 # is the worst shape of failure: `launchctl list` shows the job, so it looks installed.
 #
 # The plists stay checked in rather than being generated from heredocs (the approach
-# scripts/install-prompt-classifier-launchd.sh takes) because several of them carry the
+# the prompt-classifier's installer used to take) because several of them carry the
 # reasoning for their own settings — com.coding.sub-agent-live-claude.plist has 25 lines
 # explaining why KeepAlive is <true/> and not a dict, written after a daemon stayed dead
 # for 14.5 hours. Moving those into a shell heredoc would bury them.
@@ -32,7 +32,7 @@ LAUNCHD_REPO_TOKEN='__CODING_REPO__'
 #
 # Honours CODING_REPO when set — the wrapper exports it, and tests need to point an
 # installer at a fixture tree — then falls back to the installer's own location. Same idiom
-# as scripts/install-prompt-classifier-launchd.sh, which was already doing this correctly.
+# as the prompt-classifier's old installer, which was already doing this correctly.
 launchd_repo_root() {
     if [[ -n "${CODING_REPO:-}" ]]; then
         printf '%s' "${CODING_REPO}"

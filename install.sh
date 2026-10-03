@@ -166,6 +166,11 @@ global|~/.copilot/settings.json|enableFileHooks|yes|OPT-IN (separate): lets repo
 global|~/.copilot/config.json|add trustedFolders|yes|OPT-IN (separate): trusts this repo; rewrite drops JSONC comments
 home|$CODING_REPO/../_work/rapid-llm-proxy|clone+build|no|the LLM proxy, its own repo, as a sibling of this checkout (an existing checkout is used as-is and never updated). uninstall.sh leaves it: its .env holds your provider keys [feature:llm-proxy]
 system|~/Library/LaunchAgents/com.coding.llm-cli-proxy.plist|create+load|yes|OPT-IN: starts the LLM proxy at login (macOS) [feature:llm-proxy]
+system|~/Library/LaunchAgents/com.coding.{lsl-lock-sweeper,sub-agent-*}.plist|create+load|yes|session-logging daemons: capture sub-agent transcripts, clear stale git locks in the history checkout (macOS) [feature:lsl]
+system|~/Library/LaunchAgents/com.coding.{obs-api,digest-refs-sweeper}.plist|create+load|yes|the observations API every agent writes through, and its reference sweeper (macOS) [feature:observations]
+system|~/Library/LaunchAgents/com.coding.prompt-classifier.plist|create+load|yes|the prompt-complexity judge the proxy asks (macOS) [feature:llm-proxy]
+system|~/Library/LaunchAgents/com.coding.{measurement-reconciler,context-turns-sweeper}.plist|create+load|yes|binds live sessions to measurements, and prunes captured context turns (macOS) [feature:performance]
+system|~/Library/LaunchAgents/com.coding.health-coordinator.plist|create+load|yes|the health coordinator: re-spawns dead session loggers, serves the features API (macOS) [feature:health]
 system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux) [feature:llm-proxy]
 system|Scheduled Task \coding\claude-ctx-sweeper|create|yes|Windows only: hourly cleanup of stale status-line temp files, because nothing else ever reclaims %TEMP% (elsewhere this runs at agent launch and changes nothing)
 MANIFEST
@@ -3137,6 +3142,52 @@ create_llm_proxy_launchd() {
 # LLM proxy uses. That gate guards a login-persistent daemon; this is an hourly cleanup
 # task, and confirm_system_change already declines under --ci/non-interactive and approves
 # under --yes. Declining costs nothing: the launch-time sweep still reclaims the files.
+# The host daemons every enabled feature owns, as launchd agents.
+#
+# Until this step existed install.sh installed exactly ONE daemon (the LLM
+# proxy, in setup_llm_cli_proxy). obs-api, the health coordinator, the sub-agent
+# capture daemons and the sweepers existed on the developer's machine only
+# because they had been installed there by hand — a km or km-perf install got
+# none of them, so observations never landed and nothing re-spawned a dead ETM.
+#
+# Which daemons a feature owns is lib/features/daemons.mjs's DAEMONS, read here
+# rather than restated, so this step cannot drift from what apply-features and
+# the status line believe. The proxy is excluded: setup_llm_cli_proxy installs
+# it, including the systemd unit on Linux.
+install_feature_daemons() {
+    if [[ "$PLATFORM" != "macos" ]]; then
+        info "Skipping host daemons — they are launchd agents, installed on macOS only"
+        return 0
+    fi
+    resolve_feature_selection_once
+
+    local ids
+    ids="$(node --input-type=module -e '
+        const [, daemonsMod, active, launchdDir] = process.argv;
+        const { DAEMONS } = await import(daemonsMod);
+        const { existsSync } = await import("node:fs");
+        const on = new Set(active.split(/\s+/).filter(Boolean));
+        const out = [];
+        for (const [id, feature] of Object.entries(DAEMONS)) {
+          if (!on.has(feature) || id === "llm-cli-proxy") continue;
+          if (existsSync(`${launchdDir}/com.coding.${id}.plist`)) out.push(id);
+          else process.stderr.write(`no launchd template for ${id} (feature ${feature}) — not installed\n`);
+        }
+        process.stdout.write(out.join(" "));
+    ' "$CODING_REPO/lib/features/daemons.mjs" "$ACTIVE_FEATURES" "$CODING_REPO/launchd")" || {
+        warning "Could not read the daemon list from lib/features/daemons.mjs"
+        return 1
+    }
+
+    if [[ -z "$ids" ]]; then
+        info "No host daemons for this feature selection"
+        return 0
+    fi
+    info "Installing host daemons: $ids"
+    # shellcheck disable=SC2086  # word-splitting the id list is the point
+    CODING_REPO="$CODING_REPO" bash "$CODING_REPO/scripts/install-launchd-daemons.sh" $ids
+}
+
 setup_claude_ctx_sweeper() {
     [[ "$PLATFORM" == "windows" ]] || return 0
 
@@ -4779,6 +4830,7 @@ main() {
     # AFTER every npm install: the last one prunes --no-save packages, so the
     # host-embeddings verdict is only true once nothing else will run npm.
     run_step verify_host_embeddings
+    run_step install_feature_daemons  # after every npm step: the daemons run from node_modules
     run_step install_okb_snapshot_guard
     run_step install_constraint_monitor_hooks
     verify_installation

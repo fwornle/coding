@@ -71,12 +71,31 @@ Platform service manager: launchd (macOS), systemd `--user` (Linux), Scheduled T
 | `com.coding.sub-agent-sweep` | `scripts/sub-agent-sweep-job.sh` | `lsl` |
 | `com.coding.obs-api` | `scripts/observations-api-server.mjs` | `observations` |
 | `com.coding.digest-refs-sweeper` | `scripts/digest-refs-sweeper-job.sh` | `observations` |
-| `com.coding.llm-cli-proxy` | `bin/start-llm-proxy.sh` | `llm-proxy` |
+| `com.coding.llm-cli-proxy` | `scripts/llm-proxy-service.sh` | `llm-proxy` |
 | `com.coding.prompt-classifier` | `scripts/prompt-classifier-service.mjs` | `llm-proxy` |
 | `com.coding.measurement-reconciler` | `scripts/measurement-reconciler.mjs` | `performance` |
 | `com.coding.auto-measure-foreground` | `scripts/auto-measure-foreground.mjs` | `performance` |
 | `com.coding.context-turns-sweeper` | `scripts/context-turns-sweeper-job.sh` | `performance` |
 | `com.coding.health-coordinator` | `scripts/health-coordinator.js` | `health` |
+
+**How they get installed (macOS).** Every label above has a template in `launchd/`
+(the `__CODING_REPO__` token is rendered for the checkout by
+`scripts/lib/launchd-plist.sh`), except `auto-measure-foreground`: nothing runs it yet,
+so there is no tested service definition to ship, and the installer reports it as not
+installable. `install.sh`'s `install_feature_daemons` step reads `DAEMONS` from
+`lib/features/daemons.mjs`, keeps the ids whose feature is on, and hands them to
+`scripts/install-launchd-daemons.sh <id>...` — the one installer, idempotent: an
+up-to-date running job is left alone. The proxy is the exception, installed by
+`setup_llm_cli_proxy` because it also writes the Linux systemd unit. `uninstall.sh`
+removes every installed job that has a template, and leaves hand-made `com.coding.*`
+jobs alone. On Linux and Windows only the proxy is installed today.
+
+**Overlapping sessions are not measured.** `measurement-reconciler` binds an agent's
+live session to that agent's one proxy slot. When a second session of the same agent
+is active too, it binds NEITHER: the slot cannot tell their requests apart, and
+binding the newest booked each session's traffic to the other half the time. Those
+rows land unattributed, and measurement resumes once one session has been quiet for
+`freshnessMs` (2 min).
 
 ### The ETM is neither a daemon nor a container program
 

@@ -13,13 +13,17 @@
         <string>__CODING_REPO__/scripts/measurement-reconciler.mjs</string>
         <string>--verbose</string>
     </array>
+    <!--
+      KeepAlive is UNCONDITIONAL. It was {SuccessfulExit: false, NetworkState:
+      true}, and the reconciler traps SIGTERM and exits 0 — so SuccessfulExit
+      made any signalled stop permanent: a bootout or a migration's SIGTERM
+      (2026-09-28) left it dead with nothing restarting it, for five days.
+      NetworkState is not implemented at all (man 5 launchd.plist). Same defect,
+      same fix, as the sub-agent live daemons' 14.5h outage on 2026-09-01. Stop
+      it with `launchctl bootout`, not a kill.
+    -->
     <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-        <key>NetworkState</key>
-        <true/>
-    </dict>
+    <true/>
     <key>RunAtLoad</key>
     <true/>
     <key>ThrottleInterval</key>

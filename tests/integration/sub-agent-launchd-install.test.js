@@ -5,7 +5,7 @@
  *   - launchd/com.coding.sub-agent-live-claude.plist
  *   - launchd/com.coding.sub-agent-live-opencode.plist
  *   - launchd/com.coding.sub-agent-live-copilot.plist
- *   - scripts/install-sub-agent-launchd.sh
+ *   - scripts/install-launchd-daemons.sh (the one installer for every host daemon)
  *   - scripts/sub-agent-sweep-job.sh
  *
  * Mirrors the Plan 50-03 lsl-resolver-launchd test pattern with one extra
@@ -32,7 +32,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const WRAPPER_PATH = path.join(REPO_ROOT, 'scripts/sub-agent-sweep-job.sh');
-const INSTALLER_PATH = path.join(REPO_ROOT, 'scripts/install-sub-agent-launchd.sh');
+const INSTALLER_PATH = path.join(REPO_ROOT, 'scripts/install-launchd-daemons.sh');
 const LAUNCHD_DIR = path.join(REPO_ROOT, 'launchd');
 
 const PLISTS = [
@@ -328,11 +328,13 @@ describe('Phase 51 Plan 11 — launchd plists + installer + sweep wrapper integr
     }
   });
 
-  test('Test 8: install script iterates all 4 plist labels + KeepAlive policy differs by job class', () => {
+  test('Test 8: installer installs by daemon id + KeepAlive policy differs by job class', () => {
     const installerBody = fs.readFileSync(INSTALLER_PATH, 'utf8');
-    // Every label must appear in the installer (the PLISTS=( ... ) array).
+    // The installer no longer names labels: it takes ids and resolves each to
+    // launchd/com.coding.<id>.plist, so every label here must have its template.
+    expect(installerBody).toMatch(/launchd\/\$\{label\}\.plist/);
     for (const label of PLISTS) {
-      expect(installerBody).toMatch(new RegExp(label.replace(/\./g, '\\.')));
+      expect(fs.existsSync(path.join(LAUNCHD_DIR, `${label}.plist`))).toBe(true);
     }
     // Bootstrap idiom present.
     expect(installerBody).toMatch(/launchctl\s+bootstrap/);
