@@ -561,26 +561,50 @@ case 'restart_constraint_monitor':
     // via launchd — which re-runs start-llm-proxy.sh from scratch. Inherits
     // plist EnvironmentVariables (PATH, LLM_PROXY_PORT). Result shape
     // preserved for the dashboard Restart button consumer.
+    //
+    // kickstart only restarts a job launchd still has loaded. An installer run that
+    // boots the job out and then fails to bootstrap it again (bootout is async, so
+    // an immediate bootstrap can lose the race with "Bootstrap failed: 5") leaves
+    // the plist on disk but nothing loaded — and every kickstart then fails until
+    // a human notices, while each agent routed through the proxy gets
+    // ECONNREFUSED. So when the service is not loaded, bootstrap the plist.
     try {
       const { execFile } = await import('node:child_process');
+      const fs = await import('node:fs');
       const uid = process.getuid();
+      const label = 'com.coding.llm-cli-proxy';
+      const domain = `gui/${uid}`;
+      const plistPath = `${process.env.HOME}/Library/LaunchAgents/${label}.plist`;
       const reason = details?.reason ?? 'unspecified';
-      this.log(`[HealthRemediationActions] Restarting LLM CLI Proxy via launchctl kickstart -k (reason: ${reason})...`);
-      return await new Promise((resolve) => {
-        execFile('launchctl',
-          ['kickstart', '-k', `gui/${uid}/com.coding.llm-cli-proxy`],
-          { timeout: 10_000 },
-          (err, stdout, stderr) => {
-            if (err) {
-              this.log(`[HealthRemediationActions] launchctl kickstart failed: ${err.message} (stderr: ${stderr || 'empty'})`, 'ERROR');
-              resolve({ success: false, message: `kickstart failed: ${err.message}`, stderr: stderr || '', reason });
-              return;
-            }
-            this.log(`[HealthRemediationActions] launchctl kickstart -k dispatched (reason: ${reason})`);
-            resolve({ success: true, message: `launchctl kickstart -k gui/${uid}/com.coding.llm-cli-proxy dispatched`, stdout: stdout || '', reason });
-          }
-        );
+      const run = (args) => new Promise((resolve) => {
+        execFile('launchctl', args, { timeout: 10_000 }, (err, stdout, stderr) =>
+          resolve({ err, stdout: stdout || '', stderr: stderr || '' }));
       });
+
+      const loaded = !(await run(['print', `${domain}/${label}`])).err;
+      if (!loaded && fs.existsSync(plistPath)) {
+        this.log(`[HealthRemediationActions] ${label} is not loaded in launchd — bootstrapping ${plistPath} (reason: ${reason})`, 'WARN');
+        let last;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          last = await run(['bootstrap', domain, plistPath]);
+          if (!last.err) {
+            this.log(`[HealthRemediationActions] launchctl bootstrap ${label} succeeded (attempt ${attempt})`);
+            return { success: true, message: `launchctl bootstrap ${domain} ${plistPath} (job was not loaded)`, stdout: last.stdout, reason };
+          }
+          await new Promise(r => setTimeout(r, 2_000));
+        }
+        this.log(`[HealthRemediationActions] launchctl bootstrap failed: ${last.err.message} (stderr: ${last.stderr || 'empty'})`, 'ERROR');
+        return { success: false, message: `bootstrap failed: ${last.err.message}`, stderr: last.stderr, reason };
+      }
+
+      this.log(`[HealthRemediationActions] Restarting LLM CLI Proxy via launchctl kickstart -k (reason: ${reason})...`);
+      const { err, stdout, stderr } = await run(['kickstart', '-k', `${domain}/${label}`]);
+      if (err) {
+        this.log(`[HealthRemediationActions] launchctl kickstart failed: ${err.message} (stderr: ${stderr || 'empty'})`, 'ERROR');
+        return { success: false, message: `kickstart failed: ${err.message}`, stderr, reason };
+      }
+      this.log(`[HealthRemediationActions] launchctl kickstart -k dispatched (reason: ${reason})`);
+      return { success: true, message: `launchctl kickstart -k ${domain}/${label} dispatched`, stdout, reason };
     } catch (error) {
       this.log(`[HealthRemediationActions] restartLLMCLIProxy threw: ${error.message}`, 'ERROR');
       return { success: false, message: error.message };
