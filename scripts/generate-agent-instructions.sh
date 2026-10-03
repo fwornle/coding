@@ -142,9 +142,28 @@ install_claude_global() {
     # GLOBAL ~/.claude/commands, where they apply in every project on every machine.
     # The copilot output has been going through sanitize_paths all along; this is the
     # same treatment for the one output that was missing it.
-    local count=0
+    #
+    # Only skills whose owning feature is on (lib/features/skills.cjs): a
+    # disabled feature's skill would only offer a command that fails. A copy
+    # from an earlier, larger selection is removed for the same reason. No node
+    # means no way to ask, so every skill is installed (fails open).
+    local enabled_skills=""
+    if command -v node >/dev/null 2>&1; then
+        enabled_skills="$(CODING_REPO="$CODING_REPO" node -e '
+            const [repo, ...names] = process.argv.slice(1);
+            const { isEnabled } = require(repo + "/lib/features/resolve.cjs");
+            const { skillEnabled } = require(repo + "/lib/features/skills.cjs");
+            process.stdout.write(names.filter((n) => skillEnabled(n, isEnabled)).join(" "));
+        ' "$CODING_REPO" $(cd "$COMMANDS_DIR" && ls -1 *.md 2>/dev/null | sed 's/\.md$//') 2>/dev/null)" || enabled_skills=""
+    fi
+    local count=0 name
     for cmd_file in "$COMMANDS_DIR"/*.md; do
         [[ -f "$cmd_file" ]] || continue
+        name="$(basename "$cmd_file" .md)"
+        if [[ -n "$enabled_skills" && " $enabled_skills " != *" $name "* ]]; then
+            rm -f "$target/$name.md"
+            continue
+        fi
         sanitize_paths < "$cmd_file" > "$target/$(basename "$cmd_file")"
         count=$((count + 1))
     done

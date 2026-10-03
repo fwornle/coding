@@ -37,6 +37,7 @@ import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 
 import { isEnabled } from '../lib/features/index.mjs';
+import skills from '../lib/features/skills.cjs';
 
 const repo = process.env.CODING_REPO || process.cwd();
 const home = homedir();
@@ -280,6 +281,8 @@ let commandCount = 0;
 if (existsSync(srcCommands)) {
   for (const f of readdirSync(srcCommands)) {
     if (!f.endsWith('.md')) continue;
+    // A disabled feature's skill would only offer a command that fails.
+    if (!skills.skillEnabled(f.slice(0, -3), isEnabled)) continue;
     copyFileSync(join(srcCommands, f), join(pluginCommands, f));
     commandCount += 1;
   }

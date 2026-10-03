@@ -112,7 +112,7 @@ started it. Three places therefore have to agree, and for a while only the first
 | apply | `reconcileEtm()` in `scripts/apply-features.mjs` | SIGTERMs every running ETM |
 
 The last two overlap on purpose. The coordinator can only reap while it is itself
-running, and `minimal` / `proxy-only` stop it in the same pass that switches `lsl` off —
+running, and `minimal` stops it in the same pass that switches `lsl` off —
 which used to leave detached ETMs writing `.specstory/history` indefinitely (measured:
 two of them, up 8-9 hours, under `minimal`). `reconcileEtm` only ever stops; spawning
 stays the coordinator's job, so an apply cannot become a second spawner racing the first.
@@ -137,9 +137,8 @@ ETM did not read the feature system at all.
 | `ClassificationLogger` foreign log | never written into the tools repo |
 | `getRedirectStatus()` + the `[→target]` badge | not computed, not rendered |
 
-Because a profile turns OFF everything it does not name, the `km` and `km-perf` bundles
-gate this simply by not listing it. `full` lists it, so "everything on" still means the
-historical behaviour.
+Because a profile turns OFF everything it does not name, the four install tiers gate
+this simply by not listing it. Only `full` — the developer profile — lists it.
 
 ## Launch-time host services
 
@@ -189,7 +188,7 @@ Sidecar containers:
 **Docker is conditional.** Only `knowledge`, `codegraph` and `constraints` require the
 container; when all three are off, nothing does. `_start_services()` in
 `scripts/launch-agent-common.sh` must skip Docker entirely rather than exiting 1 — this
-is what makes a proxy-only or logging-only install work on a machine without Docker.
+is what makes a `harness` install work on a machine without Docker.
 
 `health` deliberately does **not** require Docker. The coordinator and both dashboard
 servers have host implementations started by `scripts/start-services-robust.js`; the
@@ -280,7 +279,7 @@ upstream is not spawned, so that bridge stops too. Nothing in *this* repo is lef
 half-fed — the tmux gauge is the other reader and it is off by the same switch — but
 GSD's monitor is. Turning the feature back on restores it, live.
 
-No shipped profile switches it off; `proxy-only`, `logging-only` and `minimal` all keep
+No shipped profile switches it off; every tier and `minimal` keep
 it, because a pared-down install is exactly the one where the user most needs a visible
 sign of what is still running.
 
@@ -429,7 +428,7 @@ validated, so a typo in an otherwise-empty file is a loud error rather than sile
 
 ```yaml
 # ~/.coding/features.yaml
-profile: proxy-only
+profile: harness
 features:
   lsl: on
   observations: off
@@ -437,16 +436,52 @@ features:
 
 Env ids upper-case with `-` → `_`: `llm-proxy` becomes `CODING_FEATURE_LLM_PROXY`.
 
-Presets live in `config/feature-profiles.yaml`:
+Presets live in `config/feature-profiles.yaml`. The four **install tiers** are what
+`./install.sh` offers (interactive default and unattended default: `harness`). Each is a
+superset of the one above it, and none carries `lsl-redirect`:
+
+| tier | on | Docker |
+|------|-----|--------|
+| `harness` | `llm-proxy`, `health`, `statusline` — launcher, status line, health monitoring, LLM proxy + token measurement | no |
+| `learning` | harness + `lsl`, `observations`, `knowledge` — session logging, online learning, UKB, viewer | yes |
+| `learning-perf` | learning + `performance` | yes |
+| `everything` | learning-perf + `constraints`, `codegraph` | yes |
+
+Two more profiles are never offered by the installer:
 
 | profile | on |
 |---------|-----|
-| `full` | everything (the default) |
-| `km` | `lsl`, `observations`, `knowledge`, `health`, `statusline` |
-| `km-perf` | `km` plus `llm-proxy`, `performance` |
-| `proxy-only` | `llm-proxy`, `statusline` |
-| `logging-only` | `lsl`, `statusline`, `health` |
-| `minimal` | `statusline` |
+| `full` | everything **plus `lsl-redirect`** — the developer profile, for working on coding itself. Also what an absent configuration resolves to |
+| `minimal` | `statusline` — the empty baseline `--features=a,b` builds on |
+
+Retired names still resolve (an `alias:` entry), so an existing `features.yaml` keeps
+working; they are hidden from `coding-features profiles` and the dashboard, and the
+resolver's reason string says `alias of '<tier>'`:
+
+| retired | resolves to |
+|---------|-------------|
+| `km` | `learning` |
+| `km-perf` | `learning-perf` |
+| `proxy-only` | `harness` (now also keeps `health`) |
+| `logging-only` | `learning` (needs Docker — it kept LSL, and a launcher asking for Docker is loud where losing session logging would be silent) |
+
+### What the installer does per tier
+
+Every install step whose output belongs to a feature is gated on it
+(`tests/features/installer-gating.test.mjs`). Base steps run on every tier: dependency
+check, `gsd-browser`, the launcher, shell setup.
+
+| step | feature |
+|------|---------|
+| LLM proxy clone + build (failure **aborts** the install; `--ci` records it as a failure) | `llm-proxy` |
+| local LLM (Docker Model Runner / Ollama) | `llm-proxy` |
+| PlantUML | `knowledge` |
+| knowledge DBs, OKB snapshot guard, semantic-analysis, viewer | `knowledge` |
+| session-history repo, enhanced LSL | `lsl` |
+| constraint monitor | `constraints` |
+| graphify, and the code-graph MCP entry in every generated MCP config | `codegraph` |
+| global Claude hooks (`--global-agents`) — delegated to `build-claude-runtime-config.mjs --install-global`, one hook per feature | `constraints` / `lsl` / `health` |
+| slash commands, per launch and global copy (`lib/features/skills.cjs`) | per skill |
 
 ## Apply tiers
 

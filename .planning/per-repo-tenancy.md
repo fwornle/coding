@@ -96,20 +96,20 @@ repo→team mapping that T4/T6 build on. Each phase ends green on `npm test` and
 with its own acceptance checks; commit per phase on a topic branch, `merge --no-ff`
 to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
-### T1 — Install tiers  `status: todo`
+### T1 — Install tiers  `status: done`
 
-- [ ] `config/feature-profiles.yaml`: four tier profiles —
+- [x] `config/feature-profiles.yaml`: four tier profiles —
   `harness` = `llm-proxy, health, statusline`;
   `learning` = harness + `lsl, observations, knowledge`;
   `learning-perf` = learning + `performance`;
   `everything` = learning-perf + `constraints, codegraph`.
-  `lsl-redirect` in **no** tier; only via an explicit developer switch (keep `full` as the developer profile = everything + `lsl-redirect`). Decide whether `km`/`km-perf`/`proxy-only`/`logging-only` stay as aliases or go (update profile-matrix tests either way).
-- [ ] Menu shows the four tiers (with one-line descriptions, Docker need: (a) none, (b)–(d) Docker). Default for a fresh interactive install = ask, unattended default = `harness`? (decide in session; never `full`).
-- [ ] Interactive re-run re-asks (showing the current selection as default); `--ci`/`--yes` keep current behaviour.
-- [ ] Gate the ungated steps: skills per feature (`install_skills` filters by owning feature), MCP config, OKB snapshot guard → `knowledge`, constraint hooks → `constraints` (incl. the `--global-agents` path), plantuml/gsd-browser/local LLM → decide owner feature or keep as base. Extend `tests/features/installer-gating.test.mjs`.
-- [ ] Proxy clone/build failure is **fatal** for tiers containing `llm-proxy` (clear message naming the access needed).
-- [ ] `docs/architecture/features.md` + `docs/getting-started.md` tier table.
-- Accept: `./install.sh --dry-run --features=<tier>` for each tier prints exactly the tier's manifest rows; profile-matrix + installer-gating tests cover all four.
+  `lsl-redirect` in **no** tier; `full` stays as the developer profile (= everything + `lsl-redirect`). `km`→learning, `km-perf`→learning-perf, `proxy-only`→harness, `logging-only`→learning are `alias:` entries (resolve, hidden from `coding-features profiles` + coordinator `/features`); `minimal` kept as the `--features=a,b` baseline. Built-ins mirrored in `lib/features/resolve.cjs`.
+- [x] Menu shows the four tiers (one-line descriptions + Docker need). Interactive default `harness` (or the current selection); unattended default `harness`. The choice is always written (`full` included) — an absent file resolves to `full`.
+- [x] Interactive re-run re-asks (current selection as default, `keep` for explicit per-feature configs); `--ci`/`--yes` keep current behaviour.
+- [x] Gating: skills per feature (`lib/features/skills.cjs`, used by the per-launch plugin and the global copy; generated catalogs stay complete), code-graph MCP entry dropped when `codegraph` off, OKB guard + `initialize_shared_memory` + plantuml → `knowledge`, local LLM → `llm-proxy`, gsd-browser = base, constraint/LSL/health hooks under `--global-agents` → delegated to `build-claude-runtime-config.mjs --install-global` (one hook per feature). `tests/features/installer-gating.test.mjs` + new `skill-gating.test.mjs`.
+- [x] Proxy clone/build failure is **fatal** (`llm_proxy_unavailable`, names the access needed); `--ci` records it in INSTALLATION_FAILURES instead.
+- [x] `docs/architecture/features.md` + `docs/getting-started.md` tier tables; README + CLAUDE.md updated.
+- Accept: `./install.sh --dry-run --features=<tier>` for each tier prints exactly the tier's manifest rows (asserted per tier in installer-gating); profile-matrix covers the four tiers + `full` + `minimal` + alias `km`.
 
 ### T3 — One per-repo learning repo  `status: todo`
 
@@ -177,7 +177,6 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
 ## Open questions (decide inside the phase)
 
-- T1: fate of `km`, `km-perf`, `proxy-only`, `logging-only`, `minimal`; unattended default tier; owner feature for plantuml / gsd-browser / local LLM.
 - T3: ignore `.coding/` via `.git/info/exclude` (no tracked change) vs `.gitignore`.
 - T5: where teammate repos that aren't checked out locally are cloned.
 - T2: WSL without systemd.
@@ -194,3 +193,10 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   vendored v1 LLM proxy SDK removed from semantic-analysis + constraint-monitor
   (coding `4e35deb8`); `ukb debug` Wave 1 observation-retry leak fixed (`1a6e5d69`);
   proxy route `bg-constraint-monitor` in PR rapid-llm-proxy#37 (open). Next: **T1**.
+- **2026-10-03 (T1)** — Install tiers done on branch `per-repo-tenancy-t1`. Decided:
+  retired names are aliases (km→learning, km-perf→learning-perf, proxy-only→harness,
+  logging-only→learning), `minimal` kept as the comma-list baseline, unattended default
+  `harness`, plantuml→knowledge / gsd-browser→base / local LLM→llm-proxy. Verified:
+  `npm test` green (node:test 1923 pass, jest pass); per-tier `--dry-run` manifests;
+  live coordinator `/features` + dashboard Features tab list only the 4 tiers + full +
+  minimal. Not verified: a real (non-dry-run) install per tier — that is T8. Next: **T3**.

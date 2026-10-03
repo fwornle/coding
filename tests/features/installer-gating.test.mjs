@@ -61,14 +61,52 @@ describe('the mutation manifest tells the truth about the chosen profile', () =>
     assert.match(out, /Dry run — nothing was changed/);
   });
 
-  test('proxy-only drops the rows that will not happen', async () => {
+  test('harness drops the rows that will not happen', async () => {
     // The manifest's entire value is being a complete and TRUE account of what
     // the installer will do. A row for a feature the user did not select is a
     // promise the installer will not keep.
-    const out = await dryRun(['--features=proxy-only']);
+    const out = await dryRun(['--features=harness']);
     assert.doesNotMatch(out, /\.specstory\/history\b/, 'lsl is off, so no history checkout');
     assert.match(out, AUTOSTART_UNIT, 'llm-proxy is on, so the autostart unit stays');
   });
+
+  /**
+   * T1 acceptance: for each tier, the dry-run manifest prints exactly the
+   * feature-tagged rows of that tier — every row whose feature is on, none
+   * whose feature is off. Rows are taken from install.sh's own manifest and
+   * filtered by platform the same way the installer filters them.
+   */
+  const PLATFORM = process.platform === 'darwin' ? 'macos' : 'linux';
+  const manifest = install.slice(install.indexOf("cat <<'MANIFEST'"), install.indexOf('\nMANIFEST\n'));
+  const tagged = manifest.split('\n')
+    .map((line) => line.split('|'))
+    .filter((f) => f.length >= 5 && /\[feature:[\w-]+\]/.test(f[4]))
+    .filter(([, path]) => {
+      if (path.includes('LaunchAgents')) return PLATFORM === 'macos';
+      if (path.includes('systemd')) return PLATFORM === 'linux';
+      return !path.startsWith('Scheduled Task');
+    })
+    .map((f) => ({
+      feature: /\[feature:([\w-]+)\]/.exec(f[4])[1],
+      // What the installer prints as "└─ <why>", minus the tag.
+      why: f.slice(4).join('|').replace(/ \[feature:[\w-]+\]$/, ''),
+    }));
+
+  for (const tier of ['harness', 'learning', 'learning-perf', 'everything']) {
+    test(`--features=${tier} prints exactly the tier's manifest rows`, async () => {
+      assert.ok(tagged.length > 5, 'manifest rows should parse');
+      const { stdout } = await exec('node', [join(REPO, 'bin/coding-features'), 'list'], {
+        env: { ...process.env, CODING_FEATURE_PROFILE: tier },
+      });
+      const on = new Set(stdout.split(/\s+/).filter(Boolean));
+      const out = await dryRun([`--features=${tier}`]);
+      for (const row of tagged) {
+        const shown = out.includes(`└─ ${row.why}`);
+        assert.equal(shown, on.has(row.feature),
+          `${tier}: row for '${row.feature}' ${shown ? 'shown' : 'missing'}: ${row.why.slice(0, 60)}…`);
+      }
+    });
+  }
 
   test('minimal drops the proxy service too', async () => {
     const out = await dryRun(['--features=minimal']);
@@ -107,6 +145,11 @@ describe('install steps are gated', () => {
     // It used to run on every profile, offering a session-history repo to an
     // install that writes no session history.
     ['setup_history_repo', 'lsl'],
+    // T1: the steps that used to run on every tier.
+    ['install_plantuml', 'knowledge'],
+    ['setup_local_llm', 'llm-proxy'],
+    ['initialize_shared_memory', 'knowledge'],
+    ['install_okb_snapshot_guard', 'knowledge'],
   ];
 
   for (const [fn, feature] of GATED) {
@@ -167,14 +210,63 @@ describe('an existing selection is never silently reset', () => {
     assert.match(cli, /install\.sh/);
   });
 
-  test('an invalid selection falls back to full rather than aborting', () => {
-    assert.match(install, /is not a valid feature selection — falling back to full/);
+  test('an invalid selection falls back to harness rather than aborting', () => {
+    assert.match(install, /is not a valid feature selection — falling back to harness/);
   });
 
-  test('`full` writes no file at all', () => {
-    // An absent features.yaml already resolves to all-on, and not creating one
-    // keeps `coding-features status` honest about the user never having chosen.
-    assert.match(install, /`full` is the default and writes nothing/);
+  test('every choice is written, `full` included', () => {
+    // An absent features.yaml resolves to all-on — the developer profile, with
+    // lsl-redirect — so no choice may be recorded by writing nothing.
+    assert.match(install, /Always written, `full` included/);
+    assert.doesNotMatch(install, /if \[\[ "\$choice" == "full" \]\]; then/);
+  });
+
+  test('an unattended install with no selection gets harness, never full', () => {
+    assert.match(install, /\[\[ -n "\$choice" \]\] \|\| choice="harness"/);
+    assert.match(install, /--features\)\s+shift; CODING_INSTALL_FEATURES="\$\{1:-harness\}"/);
+  });
+
+  test('an interactive re-run asks again, offering the current selection', () => {
+    const fn = install.slice(install.indexOf('ask_feature_selection() {'), install.indexOf('# Resolve a selection for DISPLAY only'));
+    assert.match(fn, /Current selection: \$current \(Enter keeps it\)/);
+    // ...while the unattended keep-path is guarded by NON_INTERACTIVE.
+    assert.match(fn, /if \[\[ -z "\$choice" && "\$NON_INTERACTIVE" == "true" \]\]; then\n\s*resolve_feature_selection\n\s*info "Existing feature selection found/);
+  });
+
+  test('the menu offers the four tiers and never full', () => {
+    const fn = install.slice(install.indexOf('ask_feature_selection() {'), install.indexOf('# Resolve a selection for DISPLAY only'));
+    for (const [n, tier] of [[1, 'harness'], [2, 'learning'], [3, 'learning-perf'], [4, 'everything']]) {
+      assert.match(fn, new RegExp(`${n}\\) choice="${tier}"`));
+    }
+    assert.doesNotMatch(fn, /\d\) choice="full"/);
+  });
+});
+
+describe('T1: no step installs a disabled feature', () => {
+  test('global Claude hooks go through the feature-aware builder', () => {
+    // The old jq merge added the constraint hook unconditionally, so a
+    // --global-agents install with constraints off still ran it everywhere.
+    const fn = install.slice(install.indexOf('install_constraint_monitor_hooks() {'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    assert.match(body, /build-claude-runtime-config\.mjs" --install-global/);
+    assert.doesNotMatch(body, /pre-tool-hook-wrapper\.js/);
+  });
+
+  test('the code-graph MCP entry is dropped when codegraph is off', () => {
+    const fn = install.slice(install.indexOf('setup_mcp_config() {'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    assert.match(body, /feature_on codegraph && codegraph_state=on/);
+    assert.match(body, /if \(codegraph !== "on"\)/);
+  });
+
+  test('a proxy that cannot be cloned or built aborts the install', () => {
+    const helper = install.slice(install.indexOf('llm_proxy_unavailable() {'));
+    assert.match(helper.slice(0, helper.indexOf('\n}\n')), /error_exit "The LLM proxy is part of the selected tier/);
+    const fn = install.slice(install.indexOf('setup_llm_cli_proxy() {'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    assert.match(body, /llm_proxy_unavailable "could not clone/);
+    assert.match(body, /llm_proxy_unavailable "the build failed/);
+    assert.doesNotMatch(body, /clone of \$proxy_repo failed — no proxy installed/);
   });
 });
 

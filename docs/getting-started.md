@@ -93,6 +93,27 @@ cd ~/Agentic/coding
 source ~/.bashrc  # or ~/.zshrc on macOS
 ```
 
+### Choosing a tier
+
+The installer asks which tier to install. Each tier includes the one above it:
+
+| tier | what you get | Docker |
+|------|--------------|--------|
+| **harness** (default) | agent launcher, status line, health monitoring (coordinator + dashboard), LLM proxy with token measurement | not needed |
+| **learning** | harness + session logging (LSL), online learning (observations, digests, insights), UKB batch learning, knowledge viewer | required |
+| **learning-perf** | learning + performance measurement | required |
+| **everything** | learning-perf + constraints (guardrails) + code graph (graphify) | required |
+
+Pick one without the prompt with `./install.sh --features=<tier>`. An unattended run
+(`--yes` / `--ci`) with no selection installs `harness`. Re-running `./install.sh`
+interactively asks again, with your current tier as the default; `coding-features profile
+<tier>` or the dashboard's **Features** tab change it without reinstalling.
+
+Every tier needs the LLM proxy, which is cloned from
+`bmw.ghe.com/adpnext-apps/rapid-llm-proxy`: without read access to that repo the
+install stops and says so (set `RAPID_LLM_PROXY_REPO` to use another location).
+Details: [Feature modularity](./architecture/features.md).
+
 **Note**: The repository uses git submodules for integration components (memory-visualizer, semantic-analysis, constraint-monitor, graphify). The `--recurse-submodules` flag ensures all submodules are initialized during clone.
 
 ### Installation Safety

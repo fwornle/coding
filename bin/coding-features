@@ -23,6 +23,7 @@ import { homedir } from 'node:os';
 import {
   loadFeatures,
   loadProfiles,
+  profileAliases,
   configPaths,
   FeatureConfigError,
   FEATURE_IDS,
@@ -227,7 +228,10 @@ switch (cmd) {
 
   case 'profiles': {
     const profiles = loadProfiles(configPaths().profiles);
+    // Retired names still resolve but are not a choice, so they are not listed.
+    const aliases = profileAliases(configPaths().profiles);
     for (const name of Object.keys(profiles).sort()) {
+      if (aliases[name]) continue;
       const on = FEATURE_IDS.filter((id) => profiles[name][id] === true);
       process.stdout.write(`  ${C.bold}${name.padEnd(14)}${C.reset} ${on.join(', ') || '(nothing)'}\n`);
     }

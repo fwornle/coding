@@ -9,19 +9,87 @@
 # which writes `profile: <name>` into ~/.coding/features.yaml. Individual
 # features can then be refined on top:
 #
-#   profile: proxy-only
+#   profile: harness
 #   features:
 #     lsl: on
 #
+# The four TIERS are what ./install.sh offers, each a superset of the last:
+#   harness → learning → learning-perf → everything
+# `full` is the developer profile (everything + lsl-redirect) and is never
+# offered by the installer. `minimal` is the empty baseline that
+# `--features=a,b` builds on. Entries with `alias:` are retired names that still
+# resolve, to their target's set, so an old features.yaml keeps working; they
+# are never listed as a choice.
+#
 # The built-in defaults (lib/features/catalogue.cjs) are all-on and are what
-# apply when no profile and no features.yaml exist anywhere — so an install that
-# never touches this file behaves exactly as it always has.
+# apply when no profile and no features.yaml exist anywhere.
 #
 # See docs/architecture/features.md for the feature -> artifact matrix.
 
 profiles:
+  # ── the four install tiers ────────────────────────────────────────────────
+  #
+  # None of them names `lsl-redirect`. It files turns it judges to be "about
+  # the toolchain" into the tools repo instead of the project you are working
+  # in — useful only to someone developing this toolchain, and for a team using
+  # it, it silently moves their own sessions out of their own project. A
+  # profile turns OFF everything it does not name, so not listing it is the
+  # whole gate.
+  harness:
+    description: >-
+      The agent launcher, status line, health monitoring (coordinator +
+      dashboard) and the LLM proxy with token measurement. No Docker.
+    features:
+      llm-proxy: on
+      health: on
+      statusline: on
+
+  learning:
+    description: >-
+      harness + session logging (LSL), online learning (observations, digests,
+      insights), UKB batch learning and the knowledge viewer. Needs Docker.
+    features:
+      llm-proxy: on
+      health: on
+      statusline: on
+      lsl: on
+      observations: on
+      knowledge: on
+
+  learning-perf:
+    description: >-
+      learning + performance measurement (per-task measurement, benchmarks).
+      Needs Docker.
+    features:
+      llm-proxy: on
+      health: on
+      statusline: on
+      lsl: on
+      observations: on
+      knowledge: on
+      performance: on
+
+  everything:
+    description: >-
+      learning-perf + constraints (guardrails) + the code graph (graphify).
+      Needs Docker.
+    features:
+      llm-proxy: on
+      health: on
+      statusline: on
+      lsl: on
+      observations: on
+      knowledge: on
+      performance: on
+      constraints: on
+      codegraph: on
+
+  # ── developer ─────────────────────────────────────────────────────────────
   full:
-    description: Everything. The default.
+    description: >-
+      Developer profile — everything, plus lsl-redirect (toolchain turns are
+      filed into this checkout). For developing coding itself; never offered
+      by the installer.
     features:
       lsl: on
       lsl-redirect: on
@@ -34,62 +102,23 @@ profiles:
       health: on
       statusline: on
 
-  # The two consumer bundles. Both deliberately omit `lsl-redirect`, `codegraph`
-  # and `constraints`.
-  #
-  # `lsl-redirect` is the one that matters and the omission is the point: it
-  # files turns it judges to be "about the toolchain" into the tools repo instead
-  # of the project you are working in. That is useful only to someone developing
-  # this toolchain. For a team using it, it silently moves their own sessions out
-  # of their own scope. Because a profile turns OFF everything it does not name,
-  # simply not listing it here is the whole gate — there is no separate opt-out
-  # to remember.
-  km:
-    description: >-
-      Knowledge management only — session logging, the observation pipeline and
-      the knowledge base, scoped to YOUR project. No code graph, no guardrails,
-      no LLM proxy. Needs Docker.
-    features:
-      lsl: on
-      observations: on
-      knowledge: on
-      health: on
-      statusline: on
-
-  km-perf:
-    description: >-
-      Knowledge management plus performance measurement — everything in `km`,
-      plus the LLM proxy's provider routing and token accounting, and the
-      per-task measurement and benchmark surfaces. Needs Docker.
-    features:
-      lsl: on
-      observations: on
-      knowledge: on
-      llm-proxy: on
-      performance: on
-      health: on
-      statusline: on
-
-  proxy-only:
-    description: >-
-      Just the LLM proxy — provider routing, fallback and token accounting.
-      No Docker, no logging, no knowledge base.
-    features:
-      llm-proxy: on
-      statusline: on
-
-  logging-only:
-    description: >-
-      Verbatim session logging and health monitoring, without the observation
-      pipeline, knowledge base or guardrails.
-    features:
-      lsl: on
-      health: on
-      statusline: on
-
+  # ── baseline ──────────────────────────────────────────────────────────────
   minimal:
     description: >-
-      The agent launcher and nothing else. Bare `coding --claude` with a status
-      line; no background services at all.
+      The agent launcher and a status line; no background services. The
+      baseline `--features=a,b` builds on.
     features:
       statusline: on
+
+  # ── retired names ─────────────────────────────────────────────────────────
+  km:
+    alias: learning
+  km-perf:
+    alias: learning-perf
+  proxy-only:
+    alias: harness
+  # Kept LSL, so it maps up to learning (which needs Docker) rather than down to
+  # harness: a launcher that asks for Docker is loud, losing session logging is
+  # silent.
+  logging-only:
+    alias: learning

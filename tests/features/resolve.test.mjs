@@ -101,30 +101,68 @@ describe('layer precedence', () => {
 
 describe('profiles', () => {
   test('a profile turns off everything it does not name', () => {
-    writeHome('profile: proxy-only\n');
+    writeHome('profile: harness\n');
     const r = loadFeatures(opts());
-    assert.deepEqual(r.enabled.sort(), ['llm-proxy', 'statusline']);
-    assert.equal(r.profile, 'proxy-only');
+    assert.deepEqual(r.enabled.sort(), ['health', 'llm-proxy', 'statusline']);
+    assert.equal(r.profile, 'harness');
   });
 
-  test('proxy-only and minimal need no Docker — the point of the exercise', () => {
-    writeHome('profile: proxy-only\n');
+  test('harness and minimal need no Docker — the point of the exercise', () => {
+    writeHome('profile: harness\n');
     assert.equal(loadFeatures(opts()).needsDocker, false);
     writeHome('profile: minimal\n');
     assert.equal(loadFeatures(opts()).needsDocker, false);
   });
 
-  test('logging-only keeps health without pulling in Docker', () => {
-    writeHome('profile: logging-only\n');
-    const r = loadFeatures(opts());
-    assert.equal(r.features.health.enabled, true);
-    assert.equal(r.needsDocker, false);
+  test('each tier is a superset of the one below, and none carries lsl-redirect', () => {
+    // lsl-redirect files toolchain turns into the tools repo — only right for
+    // someone developing coding itself, so it lives in `full` alone.
+    const tiers = ['harness', 'learning', 'learning-perf', 'everything'];
+    let below = [];
+    for (const tier of tiers) {
+      writeHome(`profile: ${tier}\n`);
+      const on = loadFeatures(opts()).enabled;
+      for (const id of below) assert.ok(on.includes(id), `${tier} lost ${id}`);
+      assert.ok(!on.includes('lsl-redirect'), `${tier} must not enable lsl-redirect`);
+      below = on;
+    }
+    writeHome('profile: everything\n');
+    const everything = loadFeatures(opts()).enabled;
+    writeHome('profile: full\n');
+    assert.deepEqual(loadFeatures(opts()).enabled.filter((id) => !everything.includes(id)), ['lsl-redirect']);
+  });
+
+  test('a retired name resolves to its tier and says so', () => {
+    for (const [alias, target] of [['km', 'learning'], ['km-perf', 'learning-perf'], ['proxy-only', 'harness'], ['logging-only', 'learning']]) {
+      writeHome(`profile: ${target}\n`);
+      const want = loadFeatures(opts()).enabled;
+      writeHome(`profile: ${alias}\n`);
+      const r = loadFeatures(opts());
+      assert.deepEqual(r.enabled, want, alias);
+      assert.equal(r.profile, alias, 'the name the user wrote is what is reported');
+      assert.match(r.features.statusline.reason, new RegExp(`alias of '${target}'`));
+    }
+  });
+
+  test('aliases are listed by profileAliases, so choosers can hide them', () => {
+    const { profileAliases, loadProfiles } = require(join(REPO, 'lib/features/resolve.cjs'));
+    const aliases = profileAliases(PROFILES);
+    assert.deepEqual(Object.keys(aliases).sort(), ['km', 'km-perf', 'logging-only', 'proxy-only']);
+    const choices = Object.keys(loadProfiles(PROFILES)).filter((n) => !aliases[n]).sort();
+    assert.deepEqual(choices, ['everything', 'full', 'harness', 'learning', 'learning-perf', 'minimal']);
+  });
+
+  test('an alias to an alias is refused', () => {
+    const bad = join(dir, 'bad-profiles.yaml');
+    writeFileSync(bad, 'profiles:\n  a:\n    alias: km\n');
+    writeHome('profile: harness\n');
+    assert.throws(() => loadFeatures(opts({ profilesPath: bad })), /alias 'a' points at 'km'/);
   });
 
   test('explicit features refine the profile in the same layer', () => {
-    writeHome('profile: proxy-only\nfeatures:\n  codegraph: on\n');
+    writeHome('profile: harness\nfeatures:\n  codegraph: on\n');
     const r = loadFeatures(opts());
-    assert.deepEqual(r.enabled.sort(), ['codegraph', 'llm-proxy', 'statusline']);
+    assert.deepEqual(r.enabled.sort(), ['codegraph', 'health', 'llm-proxy', 'statusline']);
   });
 
   test("a later layer's profile replaces an earlier layer's wholesale", () => {
@@ -330,8 +368,8 @@ describe('caching', () => {
 
   test('built-in profiles answer when feature-profiles.yaml is absent', () => {
     asDefaultPaths(({ home }) => {
-      writeFileSync(home, 'profile: proxy-only\n');
-      assert.deepEqual(loadFeatures().enabled.sort(), ['llm-proxy', 'statusline']);
+      writeFileSync(home, 'profile: harness\n');
+      assert.deepEqual(loadFeatures().enabled.sort(), ['health', 'llm-proxy', 'statusline']);
     });
   });
 });
@@ -344,7 +382,7 @@ describe('helpers', () => {
   });
 
   test('isEnabled agrees with loadFeatures', () => {
-    writeHome('profile: proxy-only\n');
+    writeHome('profile: harness\n');
     const r = loadFeatures(opts());
     for (const id of FEATURE_IDS) {
       assert.equal(isEnabled(id, opts()), r.features[id].enabled, id);
@@ -366,7 +404,7 @@ describe('snapshot', () => {
     const { writeSnapshot, readSnapshot } = require(join(REPO, 'lib/features/snapshot.cjs'));
     const repoDir = join(dir, 'repo');
     mkdirSync(join(repoDir, 'config'), { recursive: true });
-    writeFileSync(join(repoDir, 'config', 'features.yaml'), 'profile: proxy-only\n');
+    writeFileSync(join(repoDir, 'config', 'features.yaml'), 'profile: harness\n');
 
     const { snapshot } = writeSnapshot({
       repoPath: repoDir,

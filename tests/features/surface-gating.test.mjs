@@ -165,19 +165,19 @@ describe('status line', () => {
     }
   });
 
-  test('proxy-only keeps exactly the proxy badges', async () => {
-    const line = await render(homeWith('profile: proxy-only\n'));
-    for (const mark of [...BADGES.health, ...BADGES.constraints, ...BADGES.observations, ...BADGES.lsl]) {
-      assert.ok(!line.includes(mark), `${mark} rendered under 'proxy-only'`);
+  test('harness drops the learning and guardrail badges, keeps the proxy', async () => {
+    const line = await render(homeWith('profile: harness\n'));
+    for (const mark of [...BADGES.constraints, ...BADGES.observations, ...BADGES.lsl]) {
+      assert.ok(!line.includes(mark), `${mark} rendered under 'harness'`);
     }
     assert.ok(
       BADGES['llm-proxy'].some((m) => line.includes(m)),
-      'no proxy badge rendered under proxy-only',
+      'no proxy badge rendered under harness',
     );
   });
 
   test('the clock survives every profile — the line is never empty', async () => {
-    for (const profile of ['full', 'proxy-only', 'logging-only', 'minimal']) {
+    for (const profile of ['full', 'harness', 'learning', 'minimal']) {
       const line = await render(homeWith(`profile: ${profile}\n`));
       assert.match(line, /\d{2}:\d{2}$/, `no clock under '${profile}'`);
     }
@@ -194,7 +194,7 @@ describe('status line', () => {
     // expected width un-assertable.
     const PANE = 120;
     const widths = new Set();
-    for (const profile of ['full', 'proxy-only', 'logging-only', 'minimal']) {
+    for (const profile of ['full', 'harness', 'learning', 'minimal']) {
       const raw = await run('scripts/combined-status-line.js', homeWith(`profile: ${profile}\n`), {
         TRANSCRIPT_SOURCE_PROJECT: REPO,
         CODING_AGENT: 'claude',
@@ -270,7 +270,7 @@ describe('the statusline feature itself', () => {
     // user with no visible sign of what is still running.
     const { statuslineEnabled } = await import(join(REPO, 'lib/statusline/feature-gate.cjs'))
       .then((m) => m.default ?? m);
-    for (const profile of ['full', 'proxy-only', 'logging-only', 'minimal']) {
+    for (const profile of ['full', 'harness', 'learning', 'minimal']) {
       assert.equal(
         statuslineEnabled({ CODING_REPO: REPO, CODING_HOME: homeWith(`profile: ${profile}\n`) }),
         true,
